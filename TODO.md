@@ -10,7 +10,9 @@ Extra items on my TODO list
 
 * Write CLI scripts: scripts/battle.py (simulate a 1v1 matchup and report results across all shield scenarios) and scripts/breakpoints.py (show breakpoints/bulkpoints for a given attacker/move/defender). These are already documented in CLAUDE.md but not yet implemented.
 
-* Add EV-based baiting policy: instead of always baiting with the cheapest move, parameterize the decision by the opponent's estimated shield probability. If the opponent is likely out of shields, skip the bait. This is mentioned in CLAUDE.md as a planned improvement.
+* Implement PvPoke's "Selective" baiting policy: this is the same DP algorithm from ActionLogic.js described above (see the DP TODO item). In PvPoke's UI, "Selective" is the bait toggle setting that uses DP to decide when baiting is worthwhile given the current battle state (turnsToLive, bestChargedMove by actual DPE, minimumCycleThreshold). Resolving the 3 xfailed test scenarios depends on this.
+
+* Add EV-based baiting policy (separate from PvPoke's Selective): parameterize the bait decision by an estimated probability P(opponent shields). If P(shield) ≈ 0, skip the bait and fire best-DPE move; if P(shield) ≈ 1, bait with cheapest. This is our own novel approach, independent of PvPoke's DP.
 
 * Support Shadow Pokemon: shadow multipliers are x1.2 attack and x0.833 defense. This is a major factor in PvP and affects breakpoints/bulkpoints significantly.
 
