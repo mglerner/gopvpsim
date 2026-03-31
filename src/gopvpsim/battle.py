@@ -73,6 +73,29 @@ def bait_with_cheapest(attacker: "BattlePokemon", defender: "BattlePokemon") -> 
         # No shields — throw highest damage
         return max(affordable, key=lambda im: im[1]['power'])[0]
 
+def pvpoke_ai(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
+    """
+    Mimic PvPoke's ActionLogic AI:
+    - When defender has shields: throw the cheapest affordable move (bait).
+    - When defender has no shields: throw the affordable move with the highest
+      actual damage-per-energy (bestChargedMove in PvPoke terms).
+    Fires as soon as any move is affordable; does not wait for a 'better' move.
+    """
+    affordable = [
+        (i, m) for i, m in enumerate(attacker.charged_moves)
+        if attacker.energy >= m['energy']
+    ]
+    if not affordable:
+        return None
+    if defender.shields > 0:
+        return min(affordable, key=lambda im: im[1]['energy'])[0]
+    else:
+        def actual_dpe(im):
+            i, m = im
+            dmg = attacker.charged_move_damage(m, defender)
+            return dmg / m['energy']
+        return max(affordable, key=actual_dpe)[0]
+
 
 # ---------------------------------------------------------------------------
 # BattlePokemon — mutable battle state

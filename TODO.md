@@ -6,4 +6,4 @@ Extra items on my TODO list
 
 * Add code to think about throwing on optimal timing. Note that optimal timing might lead to a loss in some situations, so we should figure out whether to do it or not.
 
-* Throw it in a github repo
+* Allow mons to start a battle with some energy. There are lots of scenarios where, e.g., you win if you are ahead by one or two fast moves ... but lose otherwise.

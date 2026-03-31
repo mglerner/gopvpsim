@@ -156,7 +156,7 @@ class Pokemon:
 
     @classmethod
     def at_best_level(cls, species_name, atk_iv, def_iv, sta_iv,
-                      *, league='great', max_level=40.0):
+                      *, league='great', max_level=51.0):
         """Create a Pokemon at the highest level that fits under the league CP cap."""
         base = get_species(species_name)
         base_atk = base['atk']
