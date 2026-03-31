@@ -121,6 +121,10 @@ def get_species(name):
 # Pokemon dataclass
 # ---------------------------------------------------------------------------
 
+SHADOW_ATK_BONUS = 6 / 5   # ×1.2
+SHADOW_DEF_MULT  = 5 / 6   # ×0.8333…
+
+
 @dataclass
 class Pokemon:
     """A Pokemon ready for battle: species + IVs + level."""
@@ -132,14 +136,17 @@ class Pokemon:
     def_iv:   int
     sta_iv:   int
     level:    float
+    shadow:   bool = False
 
     @property
     def atk(self):
-        return (self.base_atk + self.atk_iv) * CPM[self.level]
+        base = (self.base_atk + self.atk_iv) * CPM[self.level]
+        return base * SHADOW_ATK_BONUS if self.shadow else base
 
     @property
     def def_(self):
-        return (self.base_def + self.def_iv) * CPM[self.level]
+        base = (self.base_def + self.def_iv) * CPM[self.level]
+        return base * SHADOW_DEF_MULT if self.shadow else base
 
     @property
     def hp(self):
@@ -156,7 +163,7 @@ class Pokemon:
 
     @classmethod
     def at_best_level(cls, species_name, atk_iv, def_iv, sta_iv,
-                      *, league='great', max_level=51.0):
+                      *, league='great', max_level=51.0, shadow=False):
         """Create a Pokemon at the highest level that fits under the league CP cap."""
         base = get_species(species_name)
         base_atk = base['atk']
@@ -172,4 +179,55 @@ class Pokemon:
                 f"exceeds {max_cp} CP even at level 1"
             )
         return cls(species_name, base_atk, base_def, base_sta,
-                   atk_iv, def_iv, sta_iv, level)
+                   atk_iv, def_iv, sta_iv, level, shadow=shadow)
+
+
+# ---------------------------------------------------------------------------
+# IV ranking
+# ---------------------------------------------------------------------------
+
+def iv_rank(species_name: str, *, league: str = 'great', max_level: float = 51.0,
+            shadow: bool = False) -> list[dict]:
+    """
+    Return all 4096 IV combinations (0–15 each) for a species, ranked by
+    stat product (descending).  Combinations that exceed the CP cap even at
+    level 1 are omitted (rare, but possible for very low base-stat mons in
+    higher leagues).
+
+    Each entry is a dict:
+        rank, atk_iv, def_iv, sta_iv, level, atk, def_, hp, stat_product, cp
+    Rank 1 is the highest stat product.
+    """
+    base = get_species(species_name)
+    base_atk = base['atk']
+    base_def = base['def']
+    base_sta = base['hp']
+    max_cp   = LEAGUE_CAPS[league]
+
+    shadow_atk_mult = SHADOW_ATK_BONUS if shadow else 1.0
+    shadow_def_mult = SHADOW_DEF_MULT  if shadow else 1.0
+
+    entries = []
+    for a in range(16):
+        for d in range(16):
+            for s in range(16):
+                lv = best_level(base_atk, base_def, base_sta, a, d, s,
+                                max_cp=max_cp, max_level=max_level)
+                if lv is None:
+                    continue
+                cpm = CPM[lv]
+                atk  = (base_atk + a) * cpm * shadow_atk_mult
+                def_ = (base_def + d) * cpm * shadow_def_mult
+                hp   = math.floor((base_sta + s) * cpm)
+                entries.append({
+                    'atk_iv': a, 'def_iv': d, 'sta_iv': s,
+                    'level': lv,
+                    'atk': atk, 'def_': def_, 'hp': hp,
+                    'stat_product': atk * def_ * hp,
+                    'cp': cp(base_atk, base_def, base_sta, a, d, s, lv),
+                })
+
+    entries.sort(key=lambda e: e['stat_product'], reverse=True)
+    for i, e in enumerate(entries):
+        e['rank'] = i + 1
+    return entries

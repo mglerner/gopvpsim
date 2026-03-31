@@ -11,7 +11,8 @@ import pytest
 from gopvpsim.pokemon import (
     CPM, LEAGUE_CAPS, _LEVELS,
     cp, battle_stats, stat_product, best_level,
-    get_species, Pokemon,
+    get_species, Pokemon, iv_rank,
+    SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
 )
 from tests.conftest import FAKE_BASE_ATK, FAKE_BASE_DEF, FAKE_BASE_STA
 
@@ -253,3 +254,100 @@ def test_gamemaster_has_azumarill():
     assert 'atk' in base
     assert 'def' in base
     assert 'hp' in base
+
+
+# ===========================================================================
+# Shadow Pokemon — unit tests
+# ===========================================================================
+
+def test_shadow_atk_multiplier(mock_gm):
+    normal = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great', shadow=False)
+    shadow = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great', shadow=True)
+    assert shadow.atk == pytest.approx(normal.atk * SHADOW_ATK_BONUS)
+
+def test_shadow_def_multiplier(mock_gm):
+    normal = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great', shadow=False)
+    shadow = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great', shadow=True)
+    assert shadow.def_ == pytest.approx(normal.def_ * SHADOW_DEF_MULT)
+
+def test_shadow_hp_unchanged(mock_gm):
+    normal = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great', shadow=False)
+    shadow = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great', shadow=True)
+    assert shadow.hp == normal.hp
+
+def test_shadow_cp_unchanged(mock_gm):
+    """CP is calculated from base stats only — shadow status doesn't affect it."""
+    normal = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great', shadow=False)
+    shadow = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great', shadow=True)
+    assert shadow.cp == normal.cp
+
+def test_non_shadow_unaffected(mock_gm):
+    p = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great')
+    assert p.shadow is False
+    cpm = CPM[p.level]
+    assert p.atk == pytest.approx((FAKE_BASE_ATK + 10) * cpm)
+
+
+# ===========================================================================
+# IV ranking — unit tests
+# ===========================================================================
+
+def test_iv_rank_returns_list(mock_gm):
+    results = iv_rank('Testmon', league='great')
+    assert isinstance(results, list)
+    assert len(results) > 0
+
+def test_iv_rank_has_4096_entries(mock_gm):
+    results = iv_rank('Testmon', league='great')
+    assert len(results) == 4096
+
+def test_iv_rank_sorted_descending(mock_gm):
+    results = iv_rank('Testmon', league='great')
+    sps = [e['stat_product'] for e in results]
+    assert sps == sorted(sps, reverse=True)
+
+def test_iv_rank_rank1_is_1(mock_gm):
+    results = iv_rank('Testmon', league='great')
+    assert results[0]['rank'] == 1
+
+def test_iv_rank_ranks_sequential(mock_gm):
+    results = iv_rank('Testmon', league='great')
+    assert [e['rank'] for e in results] == list(range(1, len(results) + 1))
+
+def test_iv_rank_15_15_15_high(mock_gm):
+    """15/15/15 should be near the top (often rank 1 for many species)."""
+    results = iv_rank('Testmon', league='great')
+    r = next(e for e in results if e['atk_iv'] == 15 and e['def_iv'] == 15 and e['sta_iv'] == 15)
+    assert r['rank'] <= 5
+
+def test_iv_rank_has_required_keys(mock_gm):
+    e = iv_rank('Testmon', league='great')[0]
+    for key in ('rank', 'atk_iv', 'def_iv', 'sta_iv', 'level', 'atk', 'def_', 'hp', 'stat_product', 'cp'):
+        assert key in e
+
+def test_iv_rank_shadow_stat_product_same(mock_gm):
+    """Shadow multipliers (×1.2 atk, ×5/6 def) cancel: atk×def contribution is unchanged."""
+    normal = iv_rank('Testmon', league='great', shadow=False)
+    shadow = iv_rank('Testmon', league='great', shadow=True)
+    assert shadow[0]['stat_product'] == pytest.approx(normal[0]['stat_product'])
+
+
+# ===========================================================================
+# IV ranking — integration tests
+# ===========================================================================
+
+@pytest.mark.integration
+def test_iv_rank_azumarill_rank1():
+    """Azumarill's rank 1 Great League IV combo is well-known: 0/15/14 or similar."""
+    results = iv_rank('Azumarill', league='great')
+    assert len(results) == 4096
+    r1 = results[0]
+    assert r1['rank'] == 1
+    assert r1['stat_product'] >= results[1]['stat_product']
+
+@pytest.mark.integration
+def test_iv_rank_azumarill_0_15_15_rank(mock_gm=None):
+    """0/15/15 is a common 'lucky trade' IV spread; verify its rank is reasonable."""
+    results = iv_rank('Azumarill', league='great')
+    r = next(e for e in results if e['atk_iv'] == 0 and e['def_iv'] == 15 and e['sta_iv'] == 15)
+    assert r['rank'] < 50   # well-known high-rank spread

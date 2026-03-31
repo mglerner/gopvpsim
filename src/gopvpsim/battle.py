@@ -104,14 +104,15 @@ def pvpoke_ai(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
 @dataclass
 class BattlePokemon:
     """Wraps a Pokemon with the mutable state needed during a battle."""
-    species:       str
-    types:         list[str]   # 1 or 2 type strings
-    atk:           float       # effective attack = (base_atk + atk_iv) * cpm
-    def_:          float       # effective defense
-    max_hp:        int
-    fast_move:     dict        # gamemaster move dict
-    charged_moves: list[dict]  # gamemaster move dicts
-    shields:       int = 2
+    species:         str
+    types:           list[str]   # 1 or 2 type strings
+    atk:             float       # effective attack = (base_atk + atk_iv) * cpm
+    def_:            float       # effective defense
+    max_hp:          int
+    fast_move:       dict        # gamemaster move dict
+    charged_moves:   list[dict]  # gamemaster move dicts
+    shields:         int = 2
+    initial_energy:  int = 0     # energy at battle start (0–100)
 
     # Mutable battle state
     hp:            int   = field(init=False)
@@ -122,13 +123,13 @@ class BattlePokemon:
 
     def __post_init__(self):
         self.hp       = self.max_hp
-        self.energy   = 0
+        self.energy   = min(ENERGY_CAP, max(0, self.initial_energy))
         self.cooldown = 0
         self._queued_fast = None
 
     @classmethod
     def from_pokemon(cls, pokemon, fast_move: dict, charged_moves: list[dict],
-                     shields: int = 2) -> "BattlePokemon":
+                     shields: int = 2, initial_energy: int = 0) -> "BattlePokemon":
         """Build a BattlePokemon from a Pokemon dataclass + move dicts."""
         from .data import load_gamemaster
         gm  = load_gamemaster()
@@ -137,14 +138,15 @@ class BattlePokemon:
         if isinstance(types, str):
             types = [types]
         return cls(
-            species       = pokemon.species,
-            types         = types,
-            atk           = pokemon.atk,
-            def_          = pokemon.def_,
-            max_hp        = pokemon.hp,
-            fast_move     = fast_move,
-            charged_moves = charged_moves,
-            shields       = shields,
+            species        = pokemon.species,
+            types          = types,
+            atk            = pokemon.atk,
+            def_           = pokemon.def_,
+            max_hp         = pokemon.hp,
+            fast_move      = fast_move,
+            charged_moves  = charged_moves,
+            shields        = shields,
+            initial_energy = initial_energy,
         )
 
     def fast_move_damage(self, defender: "BattlePokemon") -> int:

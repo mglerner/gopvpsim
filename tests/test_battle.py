@@ -114,6 +114,51 @@ def test_battlepokemon_starts_with_zero_cooldown():
     bp = make_bp()
     assert bp.cooldown == 0
 
+def test_battlepokemon_initial_energy():
+    bp = make_bp()
+    bp2 = BattlePokemon(
+        species='Testmon', types=['normal'], atk=100.0, def_=100.0, max_hp=100,
+        fast_move=make_fast(), charged_moves=[make_charged()],
+        shields=2, initial_energy=50,
+    )
+    assert bp2.energy == 50
+
+def test_battlepokemon_initial_energy_capped():
+    bp = BattlePokemon(
+        species='Testmon', types=['normal'], atk=100.0, def_=100.0, max_hp=100,
+        fast_move=make_fast(), charged_moves=[make_charged()],
+        shields=2, initial_energy=200,
+    )
+    assert bp.energy == ENERGY_CAP
+
+def test_battlepokemon_initial_energy_negative_clamped():
+    bp = BattlePokemon(
+        species='Testmon', types=['normal'], atk=100.0, def_=100.0, max_hp=100,
+        fast_move=make_fast(), charged_moves=[make_charged()],
+        shields=2, initial_energy=-10,
+    )
+    assert bp.energy == 0
+
+def test_simulate_initial_energy_fires_charge_sooner():
+    """A pokemon with enough initial energy to afford a charge move fires it turn 1."""
+    p0 = make_bp(hp=200, atk=100.0, def_=100.0, shields=0,
+                 charged=[make_charged(power=50, energy=40)])
+    p0.initial_energy = 40
+    p0.energy = 40   # set directly since __post_init__ already ran
+
+    p1 = make_bp(hp=200, atk=100.0, def_=100.0, shields=0,
+                 charged=[make_charged(power=50, energy=40)])
+
+    result_early = simulate(p0, p1)
+
+    p0b = make_bp(hp=200, atk=100.0, def_=100.0, shields=0,
+                  charged=[make_charged(power=50, energy=40)])
+    p1b = make_bp(hp=200, atk=100.0, def_=100.0, shields=0,
+                  charged=[make_charged(power=50, energy=40)])
+    result_normal = simulate(p0b, p1b)
+
+    assert result_early.turns <= result_normal.turns
+
 
 # ---------------------------------------------------------------------------
 # simulate() — structural properties
