@@ -9,7 +9,7 @@ import pytest
 from gopvpsim.battle import (
     BattlePokemon, BattleResult,
     always_shield, never_shield, use_first_available, bait_with_cheapest,
-    pvpoke_ai, optimal_timing, simulate, ENERGY_CAP, OPTIMAL_TIMING,
+    no_bait, pvpoke_ai, optimal_timing, simulate, ENERGY_CAP, OPTIMAL_TIMING,
 )
 
 
@@ -75,6 +75,28 @@ def test_use_first_available_returns_index_when_enough_energy():
     p = make_bp(charged=[make_charged(energy=50)])
     p.energy = 50
     assert use_first_available(p, make_bp()) == 0
+
+def test_no_bait_uses_best_dpe_regardless_of_shields():
+    cheap = make_charged(power=40, energy=35)
+    expensive = make_charged(power=100, energy=60)
+    p = make_bp(charged=[cheap, expensive])
+    p.energy = 60
+    defender = make_bp(shields=2)
+    # no_bait ignores shields — picks highest actual DPE (expensive has higher power/energy)
+    assert no_bait(p, defender) == 1
+
+def test_no_bait_ignores_shields_when_none():
+    cheap = make_charged(power=40, energy=35)
+    expensive = make_charged(power=100, energy=60)
+    p = make_bp(charged=[cheap, expensive])
+    p.energy = 60
+    defender = make_bp(shields=0)
+    assert no_bait(p, defender) == 1
+
+def test_no_bait_returns_none_when_cant_afford():
+    p = make_bp(charged=[make_charged(energy=50)])
+    p.energy = 10
+    assert no_bait(p, make_bp()) is None
 
 def test_bait_with_cheapest_uses_cheap_move_when_defender_has_shields():
     cheap = make_charged(power=40, energy=35)
