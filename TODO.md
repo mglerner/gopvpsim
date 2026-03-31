@@ -4,7 +4,7 @@ Extra items on my TODO list
 
 * Implement PvPoke's full dynamic programming charged-move AI (ActionLogic.js). Currently 3 shield scenarios (0v0, Med2vAzu1, Med2vAzu2) are xfailed because our simple heuristics can't match PvPoke's DP-based bestChargedMove sequencing. The DP considers turnsToLive, minimumCycleThreshold, and optimal move sequences rather than greedy per-turn decisions.
 
-* Add code to think about throwing on optimal timing. Note that optimal timing might lead to a loss in some situations, so we should figure out whether to do it or not.
+* DONE: Add code to think about throwing on optimal timing. Implemented as the optimal_timing charged-move policy in battle.py. Uses the OPTIMAL_TIMING lookup table (keyed on your_fast_turns × their_fast_turns) to fire only at the correct fast-move counts within each charge cycle. Falls back to pvpoke_ai for move selection. As noted, this can lead to losses vs always-fire policies due to extra fast-move damage taken while waiting.
 
 * Allow mons to start a battle with some energy. There are lots of scenarios where, e.g., you win if you are ahead by one or two fast moves ... but lose otherwise.
 

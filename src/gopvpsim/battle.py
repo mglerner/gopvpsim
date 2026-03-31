@@ -28,6 +28,26 @@ from .moves import damage as calc_damage, type_effectiveness, stab
 ENERGY_CAP = 100
 MAX_TURNS  = 500   # ~4 minutes; prevents infinite loops
 
+# ---------------------------------------------------------------------------
+# Optimal charge-move timing
+#
+# Source: gobattlekit/src/gobattlekit/data/gamemaster.py
+#
+# Key: (your_fast_turns, their_fast_turns)  — capped at 5 for each
+# Value: (start, step) arithmetic sequence of YOUR fast-move counts at which
+#        to throw the charge move, or None if timing doesn't matter.
+#
+# Example: (2, 3) → (1, 3) means throw after your 1st fast move, then your
+# 4th, 7th, 10th, ... (i.e. fast_move_count ≥ start and (count−start) % step == 0)
+# ---------------------------------------------------------------------------
+OPTIMAL_TIMING: dict[tuple[int, int], tuple[int, int] | None] = {
+    (1, 1): None,   (1, 2): (1, 2), (1, 3): (2, 3), (1, 4): (3, 4), (1, 5): (4, 5),
+    (2, 1): None,   (2, 2): None,   (2, 3): (1, 3), (2, 4): (1, 2), (2, 5): (2, 5),
+    (3, 1): None,   (3, 2): (1, 2), (3, 3): None,   (3, 4): (1, 4), (3, 5): (3, 5),
+    (4, 1): None,   (4, 2): None,   (4, 3): (2, 3), (4, 4): None,   (4, 5): (1, 5),
+    (5, 1): None,   (5, 2): (1, 2), (5, 3): (1, 3), (5, 4): (3, 4), (5, 5): None,
+}
+
 
 # ---------------------------------------------------------------------------
 # Shield / charged-move policies
@@ -96,6 +116,36 @@ def pvpoke_ai(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
             return dmg / m['energy']
         return max(affordable, key=actual_dpe)[0]
 
+def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
+    """
+    Fire a charged move only on the optimal fast-move counts, as determined by
+    the OPTIMAL_TIMING table keyed on (your_fast_turns, their_fast_turns).
+
+    When timing doesn't matter (None entry) or when the current fast-move count
+    is at an optimal point, delegates to pvpoke_ai for move selection.
+    Otherwise returns None (queue another fast move instead).
+
+    Note: may lead to losses in some matchups vs always-fire policies because
+    waiting for optimal timing means taking extra fast-move damage.
+    """
+    your_turns  = min(attacker.fast_move.get('_turns', 1), 5)
+    their_turns = min(defender.fast_move.get('_turns', 1), 5)
+    pattern     = OPTIMAL_TIMING.get((your_turns, their_turns))
+
+    if pattern is None:
+        return pvpoke_ai(attacker, defender)
+
+    start, step = pattern
+    fm = attacker._fm_since_charge
+    on_time = fm >= start and (fm - start) % step == 0
+    if on_time:
+        return pvpoke_ai(attacker, defender)
+    # Not yet at the optimal window — but don't hold energy above the cap;
+    # fire anyway if we can't afford to wait.
+    if attacker.energy >= ENERGY_CAP:
+        return pvpoke_ai(attacker, defender)
+    return None
+
 
 # ---------------------------------------------------------------------------
 # BattlePokemon — mutable battle state
@@ -115,17 +165,19 @@ class BattlePokemon:
     initial_energy:  int = 0     # energy at battle start (0–100)
 
     # Mutable battle state
-    hp:            int   = field(init=False)
-    energy:        int   = field(init=False)
-    cooldown:      int   = field(init=False)   # turns remaining
+    hp:                 int   = field(init=False)
+    energy:             int   = field(init=False)
+    cooldown:           int   = field(init=False)   # turns remaining
+    _fm_since_charge:   int   = field(init=False, repr=False)  # fast moves since last charge (either player)
     # Queued fast move: (queued_on_turn, move_dict) or None
     _queued_fast:  "tuple[int, dict] | None" = field(init=False, repr=False)
 
     def __post_init__(self):
-        self.hp       = self.max_hp
-        self.energy   = min(ENERGY_CAP, max(0, self.initial_energy))
-        self.cooldown = 0
-        self._queued_fast = None
+        self.hp                = self.max_hp
+        self.energy            = min(ENERGY_CAP, max(0, self.initial_energy))
+        self.cooldown          = 0
+        self._fm_since_charge  = 0
+        self._queued_fast      = None
 
     @classmethod
     def from_pokemon(cls, pokemon, fast_move: dict, charged_moves: list[dict],
@@ -278,11 +330,12 @@ def simulate(
 
             defender.hp = max(0, defender.hp - dmg)
 
-        # After any charged move this turn, reset all cooldowns to 0
+        # After any charged move this turn, reset all cooldowns and timing counters
         if charged_actions:
             for p in pokemon:
                 p.cooldown = 0
                 p._queued_fast = None
+                p._fm_since_charge = 0
 
         # --- 4. Resolve fast move landings ---
         for actor_idx, move in fast_landings:
@@ -298,6 +351,7 @@ def simulate(
             attacker.energy = min(ENERGY_CAP, attacker.energy + move['energyGain'])
             defender.hp = max(0, defender.hp - dmg)
             attacker.cooldown = 0   # ready to act next turn
+            attacker._fm_since_charge += 1
 
             log_event(
                 f"{attacker.species} fast → {dmg} dmg, "

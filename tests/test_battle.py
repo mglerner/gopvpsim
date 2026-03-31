@@ -9,7 +9,7 @@ import pytest
 from gopvpsim.battle import (
     BattlePokemon, BattleResult,
     always_shield, never_shield, use_first_available, bait_with_cheapest,
-    pvpoke_ai, simulate, ENERGY_CAP,
+    pvpoke_ai, optimal_timing, simulate, ENERGY_CAP, OPTIMAL_TIMING,
 )
 
 
@@ -214,6 +214,105 @@ def test_simulate_log_produces_events():
     p1 = make_bp()
     result = simulate(p0, p1, log=True)
     assert len(result.timeline) > 0
+
+# ---------------------------------------------------------------------------
+# Optimal timing
+# ---------------------------------------------------------------------------
+
+def test_optimal_timing_table_has_25_entries():
+    assert len(OPTIMAL_TIMING) == 25
+
+def test_optimal_timing_same_turns_is_none():
+    """Same fast move duration on both sides — timing never matters."""
+    for t in range(1, 6):
+        assert OPTIMAL_TIMING[(t, t)] is None
+
+def test_optimal_timing_fires_when_pattern_is_none():
+    """If timing doesn't matter, optimal_timing behaves like pvpoke_ai."""
+    p0 = make_bp(charged=[make_charged(energy=40)])
+    p1 = make_bp()
+    p0.energy = 40
+    # Both use 2-turn fast moves → (2,2) = None → should fire
+    p0.fast_move['_turns'] = 2
+    p1.fast_move['_turns'] = 2
+    assert optimal_timing(p0, p1) == 0
+
+def test_optimal_timing_waits_when_not_on_pattern():
+    """With a (start, step) pattern, returns None when not at the right fast-move count."""
+    # (2, 3) → (1, 3): fire after fast move 1, 4, 7, ...
+    # At fast_move_count=0 (haven't thrown any fast moves yet), should wait.
+    p0 = make_bp(charged=[make_charged(energy=40)])
+    p1 = make_bp()
+    p0.energy = 40
+    p0.fast_move['_turns'] = 2
+    p1.fast_move['_turns'] = 3
+    p0._fm_since_charge = 0  # not at start=1 yet
+    assert optimal_timing(p0, p1) is None
+
+def test_optimal_timing_fires_at_start():
+    """Fires when fast-move count equals start."""
+    # (2, 3) → (1, 3): fire after fast move 1
+    p0 = make_bp(charged=[make_charged(energy=40)])
+    p1 = make_bp()
+    p0.energy = 40
+    p0.fast_move['_turns'] = 2
+    p1.fast_move['_turns'] = 3
+    p0._fm_since_charge = 1  # exactly at start=1
+    assert optimal_timing(p0, p1) == 0
+
+def test_optimal_timing_fires_at_subsequent_steps():
+    """Fires at start + step, start + 2*step, etc."""
+    # (2, 3) → (1, 3): fire at 1, 4, 7, ...
+    p0 = make_bp(charged=[make_charged(energy=40)])
+    p1 = make_bp()
+    p0.energy = 40
+    p0.fast_move['_turns'] = 2
+    p1.fast_move['_turns'] = 3
+    for count in (1, 4, 7, 10):
+        p0._fm_since_charge = count
+        assert optimal_timing(p0, p1) == 0, f"should fire at fm_count={count}"
+
+def test_optimal_timing_waits_between_steps():
+    """Does NOT fire at counts between start and start+step."""
+    p0 = make_bp(charged=[make_charged(energy=40)])
+    p1 = make_bp()
+    p0.energy = 40
+    p0.fast_move['_turns'] = 2
+    p1.fast_move['_turns'] = 3
+    for count in (2, 3, 5, 6):
+        p0._fm_since_charge = count
+        assert optimal_timing(p0, p1) is None, f"should wait at fm_count={count}"
+
+def test_optimal_timing_fires_when_energy_capped():
+    """Never wastes energy above ENERGY_CAP — fires even off-pattern at cap."""
+    p0 = make_bp(charged=[make_charged(energy=40)])
+    p1 = make_bp()
+    p0.energy = ENERGY_CAP
+    p0.fast_move['_turns'] = 2
+    p1.fast_move['_turns'] = 3
+    p0._fm_since_charge = 0  # off-pattern, but energy is capped
+    assert optimal_timing(p0, p1) == 0
+
+def test_optimal_timing_returns_none_when_cant_afford():
+    """No charged move if can't afford any, regardless of timing."""
+    p0 = make_bp(charged=[make_charged(energy=40)])
+    p1 = make_bp()
+    p0.energy = 10   # can't afford
+    p0.fast_move['_turns'] = 2
+    p1.fast_move['_turns'] = 3
+    p0._fm_since_charge = 1
+    assert optimal_timing(p0, p1) is None
+
+def test_simulate_optimal_timing_completes():
+    """Battle with optimal_timing policy terminates normally."""
+    p0 = make_bp(fast=make_fast(cooldown_ms=1000))  # 2-turn
+    p1 = make_bp(fast=make_fast(cooldown_ms=1500))  # 3-turn
+    result = simulate(p0, p1,
+                      charged_policy_0=optimal_timing,
+                      charged_policy_1=optimal_timing)
+    assert isinstance(result, BattleResult)
+    assert result.turns > 0
+
 
 def test_simulate_never_shield_means_no_shields_used():
     p0 = make_bp(shields=2)
