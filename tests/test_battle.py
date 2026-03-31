@@ -1,0 +1,234 @@
+"""
+Tests for gopvpsim.battle — simulation loop, policies, BattlePokemon.
+
+Unit tests use hardcoded move/pokemon dicts (no network).
+Integration tests (marked 'integration') validate against known PvPoke results.
+Run integration tests with: pytest -m integration
+"""
+import pytest
+from gopvpsim.battle import (
+    BattlePokemon, BattleResult,
+    always_shield, never_shield, use_first_available, bait_with_cheapest,
+    simulate, ENERGY_CAP,
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers — minimal fake move/pokemon data for unit tests
+# ---------------------------------------------------------------------------
+
+def make_fast(power=5, energy_gain=5, cooldown_ms=1000, type_='normal'):
+    """Return a minimal fast move dict (2-turn move by default)."""
+    return {'moveId': 'FAKE_FAST', 'name': 'Fake Fast', 'type': type_,
+            'power': power, 'energyGain': energy_gain, 'cooldown': cooldown_ms}
+
+def make_charged(power=50, energy=40, type_='normal'):
+    """Return a minimal charged move dict."""
+    return {'moveId': 'FAKE_CHARGED', 'name': 'Fake Charged', 'type': type_,
+            'power': power, 'energy': energy, 'energyGain': 0}
+
+def make_bp(atk=100.0, def_=100.0, hp=100, types=None,
+            fast=None, charged=None, shields=2):
+    """Return a BattlePokemon with sensible defaults."""
+    return BattlePokemon(
+        species       = 'Testmon',
+        types         = types or ['normal'],
+        atk           = atk,
+        def_          = def_,
+        max_hp        = hp,
+        fast_move     = fast or make_fast(),
+        charged_moves = charged or [make_charged()],
+        shields       = shields,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Shield policies
+# ---------------------------------------------------------------------------
+
+def test_always_shield_when_shields_available():
+    attacker = make_bp()
+    defender = make_bp(shields=2)
+    assert always_shield(attacker, defender, make_charged()) is True
+
+def test_always_shield_when_no_shields():
+    attacker = make_bp()
+    defender = make_bp(shields=0)
+    assert always_shield(attacker, defender, make_charged()) is False
+
+def test_never_shield_regardless():
+    attacker = make_bp()
+    defender = make_bp(shields=2)
+    assert never_shield(attacker, defender, make_charged()) is False
+
+
+# ---------------------------------------------------------------------------
+# Charged-move policies
+# ---------------------------------------------------------------------------
+
+def test_use_first_available_returns_none_when_no_energy():
+    p = make_bp(charged=[make_charged(energy=50)])
+    p.energy = 10
+    assert use_first_available(p, make_bp()) is None
+
+def test_use_first_available_returns_index_when_enough_energy():
+    p = make_bp(charged=[make_charged(energy=50)])
+    p.energy = 50
+    assert use_first_available(p, make_bp()) == 0
+
+def test_bait_with_cheapest_uses_cheap_move_when_defender_has_shields():
+    cheap = make_charged(power=40, energy=35)
+    expensive = make_charged(power=100, energy=60)
+    p = make_bp(charged=[expensive, cheap])
+    p.energy = 60
+    defender = make_bp(shields=1)
+    assert bait_with_cheapest(p, defender) == 1   # cheap move index
+
+def test_bait_with_cheapest_uses_strongest_when_no_shields():
+    cheap = make_charged(power=40, energy=35)
+    expensive = make_charged(power=100, energy=60)
+    p = make_bp(charged=[cheap, expensive])
+    p.energy = 60
+    defender = make_bp(shields=0)
+    assert bait_with_cheapest(p, defender) == 1   # expensive/powerful move index
+
+def test_bait_returns_none_when_cant_afford_any():
+    p = make_bp(charged=[make_charged(energy=50)])
+    p.energy = 10
+    assert bait_with_cheapest(p, make_bp()) is None
+
+
+# ---------------------------------------------------------------------------
+# BattlePokemon state
+# ---------------------------------------------------------------------------
+
+def test_battlepokemon_starts_at_full_hp():
+    bp = make_bp(hp=120)
+    assert bp.hp == 120
+
+def test_battlepokemon_starts_at_zero_energy():
+    bp = make_bp()
+    assert bp.energy == 0
+
+def test_battlepokemon_starts_with_zero_cooldown():
+    bp = make_bp()
+    assert bp.cooldown == 0
+
+
+# ---------------------------------------------------------------------------
+# simulate() — structural properties
+# ---------------------------------------------------------------------------
+
+def test_simulate_returns_battle_result():
+    p0 = make_bp(hp=100, atk=100.0, def_=100.0)
+    p1 = make_bp(hp=100, atk=80.0, def_=80.0)
+    result = simulate(p0, p1)
+    assert isinstance(result, BattleResult)
+
+def test_simulate_winner_has_hp_remaining():
+    p0 = make_bp(hp=200, atk=150.0, def_=150.0)
+    p1 = make_bp(hp=50,  atk=50.0,  def_=50.0)
+    result = simulate(p0, p1)
+    assert result.winner == 0
+    assert result.hp_remaining[0] > 0
+    assert result.hp_remaining[1] <= 0
+
+def test_simulate_loser_has_zero_hp():
+    p0 = make_bp(hp=50,  atk=50.0,  def_=50.0)
+    p1 = make_bp(hp=200, atk=150.0, def_=150.0)
+    result = simulate(p0, p1)
+    assert result.winner == 1
+    assert result.hp_remaining[0] <= 0
+
+def test_simulate_turns_positive():
+    p0 = make_bp()
+    p1 = make_bp()
+    result = simulate(p0, p1)
+    assert result.turns > 0
+
+def test_simulate_0_shields_faster_than_2_shields():
+    """Fewer shields means charged moves land for full damage → battle ends sooner."""
+    def run(shields):
+        p0 = make_bp(hp=100, atk=100.0, def_=100.0, shields=shields)
+        p1 = make_bp(hp=100, atk=100.0, def_=100.0, shields=shields)
+        return simulate(p0, p1).turns
+    assert run(0) <= run(2)
+
+def test_simulate_energy_capped():
+    """Energy never exceeds ENERGY_CAP."""
+    p0 = make_bp(hp=500, atk=50.0, def_=50.0, shields=0,
+                 fast=make_fast(energy_gain=30))
+    p1 = make_bp(hp=500, atk=50.0, def_=50.0, shields=0,
+                 fast=make_fast(energy_gain=30))
+    result = simulate(p0, p1)
+    assert result.energy_remaining[0] <= ENERGY_CAP
+    assert result.energy_remaining[1] <= ENERGY_CAP
+
+def test_simulate_log_produces_events():
+    p0 = make_bp()
+    p1 = make_bp()
+    result = simulate(p0, p1, log=True)
+    assert len(result.timeline) > 0
+
+def test_simulate_never_shield_means_no_shields_used():
+    p0 = make_bp(shields=2)
+    p1 = make_bp(shields=2)
+    result = simulate(p0, p1,
+                      shield_policy_0=never_shield,
+                      shield_policy_1=never_shield)
+    # Both started with 2 shields and never used any
+    assert result.shields_remaining[0] == 2
+    assert result.shields_remaining[1] == 2
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — validate against known PvPoke matchup results
+# Verify at pvpoke.com/battle/ with the specified Pokemon, moves, IVs, league.
+# ---------------------------------------------------------------------------
+
+def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
+                          atk_iv, def_iv, sta_iv, max_level=51.0):
+    """Helper: build a BattlePokemon from the real gamemaster."""
+    from gopvpsim.pokemon import Pokemon
+    from gopvpsim.moves import get_moves
+    from gopvpsim.data import load_gamemaster
+
+    pokemon = Pokemon.at_best_level(species, atk_iv, def_iv, sta_iv,
+                                    league=league, max_level=max_level)
+    fast_moves, charged_moves = get_moves()
+    fm  = dict(fast_moves[fast_id])
+    cms = [dict(charged_moves[cid]) for cid in charged_ids]
+
+    gm  = load_gamemaster()
+    mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
+    types = mon.get('types', [mon.get('type1', 'normal')])
+    if isinstance(types, str):
+        types = [types]
+
+    return BattlePokemon(
+        species=species, types=types,
+        atk=pokemon.atk, def_=pokemon.def_, max_hp=pokemon.hp,
+        fast_move=fm, charged_moves=cms, shields=shields,
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields,expected_winner", [
+    # Medicham (COUNTER/DYNAMIC_PUNCH/PSYCHIC) vs Azumarill (BUBBLE/ICE_BEAM/HYDRO_PUMP)
+    # Verify at pvpoke.com — Great League, these IVs
+    (0, 1),   # 0v0: Azumarill wins
+    (1, 1),   # 1v1: Azumarill wins
+    (2, 0),   # 2v2: Medicham wins
+])
+def test_medicham_vs_azumarill(shields, expected_winner):
+    bp_med = _make_battle_pokemon('Medicham',  'COUNTER',  ['DYNAMIC_PUNCH', 'PSYCHIC'],
+                                   'great', shields, 5, 15, 15)
+    bp_azu = _make_battle_pokemon('Azumarill', 'BUBBLE',   ['ICE_BEAM', 'HYDRO_PUMP'],
+                                   'great', shields, 8, 15, 15)
+    result = simulate(bp_med, bp_azu,
+                      charged_policy_0=bait_with_cheapest,
+                      charged_policy_1=bait_with_cheapest)
+    assert result.winner == expected_winner, (
+        f"{shields}v{shields}: expected winner={expected_winner}, "
+        f"got {result.winner}  HP={result.hp_remaining}"
+    )

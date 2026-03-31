@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gopvpsim"
+version = "0.1.0"
+description = "Pokemon Go PvP battle simulator with breakpoint/bulkpoint analysis"
+requires-python = ">=3.13"
+dependencies = [
+    "certifi",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gopvpsim"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: requires network access or a warm cache (pvpoke gamemaster)",
+]
