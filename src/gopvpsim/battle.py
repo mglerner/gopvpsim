@@ -206,6 +206,7 @@ class BattlePokemon:
         types = mon.get('types', [mon.get('type1', 'normal')])
         if isinstance(types, str):
             types = [types]
+        types = [t for t in types if t and t != 'none']
         return cls(
             species        = pokemon.species,
             types          = types,

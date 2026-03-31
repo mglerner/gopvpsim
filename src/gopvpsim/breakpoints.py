@@ -155,7 +155,8 @@ def _get_types(species_name: str) -> list[str]:
     types = mon.get('types', mon.get('type', None))
     if types is None:
         raise KeyError(f"No type data for {species_name!r}")
-    return [types] if isinstance(types, str) else list(types)
+    types = [types] if isinstance(types, str) else list(types)
+    return [t for t in types if t and t != 'none']
 
 
 def _get_move(move_id: str) -> dict:
