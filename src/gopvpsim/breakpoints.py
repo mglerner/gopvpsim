@@ -147,16 +147,12 @@ def bulkpoints(
 
 def _get_types(species_name: str) -> list[str]:
     """Return the type list for a species from the gamemaster."""
-    from .data import load_gamemaster
+    from .data import load_gamemaster, parse_types
     gm  = load_gamemaster()
     mon = next((m for m in gm['pokemon'] if m['speciesName'] == species_name), None)
     if mon is None:
         raise KeyError(f"Species not found: {species_name!r}")
-    types = mon.get('types', mon.get('type', None))
-    if types is None:
-        raise KeyError(f"No type data for {species_name!r}")
-    types = [types] if isinstance(types, str) else list(types)
-    return [t for t in types if t and t != 'none']
+    return parse_types(mon)
 
 
 def _get_move(move_id: str) -> dict:

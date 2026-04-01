@@ -64,6 +64,17 @@ def load_gamemaster():
     return _fetch_json("gamemaster")
 
 
+def parse_types(mon: dict) -> list[str]:
+    """Extract a Pokemon's type list from a gamemaster entry, filtering placeholder 'none' values.
+
+    Single-type Pokemon are stored as e.g. ['steel', 'none'] in PvPoke's gamemaster.
+    """
+    types = mon.get('types', [mon.get('type1', 'normal')])
+    if isinstance(types, str):
+        types = [types]
+    return [t for t in types if t and t != 'none']
+
+
 def load_rankings(league):
     """Load rankings for a given league: 'great', 'ultra', or 'master'."""
     if league not in ("great", "ultra", "master"):

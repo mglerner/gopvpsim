@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from .moves import damage as calc_damage, type_effectiveness, stab
+from .data import parse_types
 
 ENERGY_CAP = 100
 MAX_TURNS  = 500   # ~4 minutes; prevents infinite loops
@@ -203,10 +204,7 @@ class BattlePokemon:
         from .data import load_gamemaster
         gm  = load_gamemaster()
         mon = next(m for m in gm['pokemon'] if m['speciesName'] == pokemon.species)
-        types = mon.get('types', [mon.get('type1', 'normal')])
-        if isinstance(types, str):
-            types = [types]
-        types = [t for t in types if t and t != 'none']
+        types = parse_types(mon)
         return cls(
             species        = pokemon.species,
             types          = types,

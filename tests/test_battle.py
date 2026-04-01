@@ -367,10 +367,8 @@ def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
 
     gm  = load_gamemaster()
     mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
-    types = mon.get('types', [mon.get('type1', 'normal')])
-    if isinstance(types, str):
-        types = [types]
-    types = [t for t in types if t and t != 'none']
+    from gopvpsim.data import parse_types
+    types = parse_types(mon)
 
     return BattlePokemon(
         species=species, types=types,
