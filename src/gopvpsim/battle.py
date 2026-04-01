@@ -150,6 +150,116 @@ def pvpoke_ai(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
             return dmg / m['energy']
         return max(affordable, key=actual_dpe)[0]
 
+def _calc_turns_to_live(
+    attacker: "BattlePokemon",
+    defender: "BattlePokemon",
+) -> float:
+    """
+    Port of PvPoke's turnsToLive sub-DP (ActionLogic.js lines 38-138).
+
+    Simulates the defender's attack sequence to estimate how many turns until
+    the attacker is KO'd.  Returns math.inf if a KO is not found.
+
+    State: {hp, opEnergy, turn, shields}
+      hp        – attacker's remaining HP
+      opEnergy  – defender's energy
+      turn      – turns into the future for this state
+      shields   – attacker's remaining shields
+
+    When attacker shields > 0 the DP models the defender baiting with their
+    cheapest charged move (shielded → 1 damage).  When shields == 0 it
+    checks whether any charged move would KO.
+    """
+    opp_fast_damage   = defender.fast_move_damage(attacker)
+    opp_fast_energy   = defender.fast_move.get('energyGain', 5)
+    opp_fast_turns    = defender.fast_move.get('_turns', 1)
+    atk_fast_turns    = attacker.fast_move.get('_turns', 1)
+    wins_cmp          = attacker.atk >= defender.atk
+    fastest_cm_energy = min(m['energy'] for m in defender.charged_moves)
+
+    turns_to_live: float = math.inf
+
+    # Build initial state.
+    # In our timing model, fast moves with D ≤ 2 always land before the action-
+    # decision phase, so _queued_fast is None.  For D ≥ 3 moves, compute the
+    # PvPoke-equivalent cooldown: defender.cooldown turns remaining (= D − k,
+    # where k turns have already elapsed).  The fast move lands after
+    # defender.cooldown − 1 more turns, but the DP turn offset uses the full
+    # defender.cooldown to match PvPoke's `opponent.cooldown / 500`.
+    opp_in_fast = defender._queued_fast is not None
+    if opp_in_fast:
+        pvp_turns = defender.cooldown          # matches PvPoke's cooldown / 500
+        initial = {
+            'hp':       attacker.hp - opp_fast_damage,
+            'opEnergy': min(ENERGY_CAP, defender.energy + opp_fast_energy),
+            'turn':     pvp_turns,
+            'shields':  attacker.shields,
+        }
+    else:
+        initial = {
+            'hp':       attacker.hp,
+            'opEnergy': defender.energy,
+            'turn':     0,
+            'shields':  attacker.shields,
+        }
+
+    queue = [initial]
+
+    while queue:
+        curr = queue.pop(0)
+
+        # Prune far-future states when the attacker can still survive another hit
+        if curr['hp'] > opp_fast_damage:
+            if wins_cmp:
+                if curr['turn'] > atk_fast_turns:
+                    continue
+            else:
+                if curr['turn'] > atk_fast_turns + 1:
+                    continue
+
+        # Shields up → model opponent baiting with cheapest charged move
+        if curr['shields'] != 0:
+            if curr['opEnergy'] >= fastest_cm_energy:
+                queue.insert(0, {
+                    'hp':       curr['hp'] - 1,          # shielded: 1 dmg
+                    'opEnergy': curr['opEnergy'] - fastest_cm_energy,
+                    'turn':     curr['turn'] + 1,
+                    'shields':  curr['shields'] - 1,
+                })
+        else:
+            # No shields: check whether any charged move would KO
+            for cm in defender.charged_moves:
+                if curr['opEnergy'] >= cm['energy']:
+                    cm_dmg = defender.charged_move_damage(cm, attacker)
+                    if cm_dmg >= curr['hp']:
+                        turns_to_live = min(curr['turn'], turns_to_live)
+                        opp_cd = defender.fast_move.get('cooldown', 500)
+                        atk_cd = attacker.fast_move.get('cooldown', 500)
+                        if attacker.atk > defender.atk and opp_cd % atk_cd == 0:
+                            turns_to_live += 1
+                        break
+                    queue.insert(0, {
+                        'hp':       curr['hp'] - cm_dmg,
+                        'opEnergy': curr['opEnergy'] - cm['energy'],
+                        'turn':     curr['turn'] + 1,
+                        'shields':  curr['shields'],
+                    })
+
+        # Would a fast move KO?
+        if curr['hp'] - opp_fast_damage <= 0:
+            turns_to_live = min(curr['turn'] + opp_fast_turns, turns_to_live)
+            break
+        else:
+            queue.insert(0, {
+                'hp':       curr['hp'] - opp_fast_damage,
+                'opEnergy': min(ENERGY_CAP, curr['opEnergy'] + opp_fast_energy),
+                'turn':     curr['turn'] + opp_fast_turns,
+                'shields':  curr['shields'],
+            })
+
+    return turns_to_live
+
+
 def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
     """
     Port of PvPoke's ActionLogic.wouldShield.
@@ -228,14 +338,68 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
         Run a forward DP over charge-move sequences to find the fastest KO.
         Fire the first move in the optimal plan; wait if not yet affordable.
     """
-    fast_turns  = attacker.fast_move.get('_turns', 1)
-    fast_energy = attacker.fast_move.get('energyGain', 5)
-    fast_damage = attacker.fast_move_damage(defender)
+    fast_turns       = attacker.fast_move.get('_turns', 1)
+    fast_energy      = attacker.fast_move.get('energyGain', 5)
+    fast_damage      = attacker.fast_move_damage(defender)
+    atk_fast_cd      = attacker.fast_move.get('cooldown', 500)
+    opp_fast_cd      = defender.fast_move.get('cooldown', 500)
+    opp_fast_damage  = defender.fast_move_damage(attacker)
+    wins_cmp         = attacker.atk >= defender.atk
 
     cms = attacker.charged_moves
 
     def actual_dpe(m: dict) -> float:
         return attacker.charged_move_damage(m, defender) / m['energy']
+
+    # ------------------------------------------------------------------ #
+    # turnsToLive: fire highest-damage move now if about to be KO'd
+    # Port of ActionLogic.js lines 38-207
+    # ------------------------------------------------------------------ #
+    turns_to_live = _calc_turns_to_live(attacker, defender)
+
+    # Adjustments (ActionLogic.js lines 142-161) — always applied
+    if attacker.hp <= opp_fast_damage * 2 and opp_fast_cd == 500:
+        turns_to_live -= 1
+
+    if (attacker.hp <= opp_fast_damage
+            and defender._queued_fast is not None
+            and opp_fast_cd > 500):
+        turns_to_live = defender.cooldown      # PvPoke: opponent.cooldown / 500
+        if defender.hp > attacker.fast_move_damage(defender):
+            turns_to_live -= 1
+
+    if (attacker.hp <= opp_fast_damage
+            and defender._queued_fast is None
+            and opp_fast_cd <= atk_fast_cd + 500):
+        if defender.hp > attacker.fast_move_damage(defender):
+            turns_to_live -= 1
+
+    fire_now = (
+        turns_to_live * 500 < atk_fast_cd
+        or (turns_to_live * 500 == atk_fast_cd and not wins_cmp)
+        or (turns_to_live * 500 == atk_fast_cd and attacker.hp <= opp_fast_damage)
+    )
+
+    if fire_now:
+        # Highest-damage affordable move (PvPoke iterates n from len down to 0,
+        # length index is OOB → skipped; effectively reverse order)
+        max_dmg_idx = None
+        prev_dmg    = -1
+        for n in range(len(cms) - 1, -1, -1):
+            if attacker.energy >= cms[n]['energy']:
+                dmg = attacker.charged_move_damage(cms[n], defender)
+                if dmg > prev_dmg:
+                    max_dmg_idx = n
+                    prev_dmg    = dmg
+                # Double-fire: if have energy for two of same move and win CMP
+                if (attacker.energy >= cms[n]['energy'] * 2
+                        and attacker.atk > defender.atk
+                        and dmg * 2 > prev_dmg):
+                    max_dmg_idx = n
+                    prev_dmg    = dmg * 2
+        if max_dmg_idx is None:
+            return None   # no affordable move → fast move
+        return max_dmg_idx
 
     best_idx = max(range(len(cms)), key=lambda i: actual_dpe(cms[i]))
     best_cm  = cms[best_idx]

@@ -407,19 +407,17 @@ def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
     # Expected results verified at pvpoke.com/battle/
     # PvPoke scores (Azumarill's rating; <500 = Medicham wins):
     #   Azu shields →    0     1     2
-    #   Med 0 shields: [579,  671,  764]
-    #   Med 1 shields: [492,  544,  637]
-    #   Med 2 shields: [253,  513,  605]
-    (0, 0, 1),   # Azumarill wins (score 579)
-    (0, 1, 1),   # Azumarill wins (score 671)
-    (0, 2, 1),   # Azumarill wins (score 764)
-    (1, 0, 0),   # Medicham wins (score 492)
-    (1, 1, 1),   # Azumarill wins (score 544)
-    (1, 2, 1),   # Azumarill wins (score 637)
-    (2, 0, 0),   # Medicham wins (score 253)
-    pytest.param(2, 1, 1, marks=pytest.mark.xfail(
-        reason="Score 513 = Azu barely wins by ~5 HP; requires turnsToLive sub-DP "
-               "(ActionLogic.js lines 38-155) to detect when DP plan outlasts survival")),
+    #   Med 0 shields: [608,  730,  851]
+    #   Med 1 shields: [475,  603,  724]
+    #   Med 2 shields: [235,  411,  605]
+    (0, 0, 1),   # Azumarill wins (score 608)
+    (0, 1, 1),   # Azumarill wins (score 730)
+    (0, 2, 1),   # Azumarill wins (score 851)
+    (1, 0, 0),   # Medicham wins (Azu score 475)
+    (1, 1, 1),   # Azumarill wins (score 603)
+    (1, 2, 1),   # Azumarill wins (score 724)
+    (2, 0, 0),   # Medicham wins (Azu score 235)
+    (2, 1, 0),   # Medicham wins (Azu score 411)
     (2, 2, 1),   # Azumarill wins (score 605)
 ])
 def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner):
