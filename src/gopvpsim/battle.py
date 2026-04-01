@@ -240,9 +240,25 @@ class BattleResult:
     winner:       "int | None"  # 0, 1, or None for tie / time-out
     turns:        int
     hp_remaining: list[int]     # [p0_hp, p1_hp] at battle end
+    max_hp:       list[int]     # [p0_max_hp, p1_max_hp]
     energy_remaining: list[int]
     shields_remaining: list[int]
     timeline:     list[str] = field(default_factory=list)  # human-readable log
+
+    def pvpoke_score(self, player: int) -> float:
+        """
+        Compute PvPoke's battle rating for `player` (0 or 1).
+
+        score = 500 * (damage_dealt / opponent_max_hp)
+              + 500 * (hp_remaining / own_max_hp)
+
+        >500 means this player won, <500 means they lost.
+        """
+        opp = 1 - player
+        damage_dealt  = self.max_hp[opp] - max(0, self.hp_remaining[opp])
+        hp_remaining  = max(0, self.hp_remaining[player])
+        return (500 * damage_dealt / self.max_hp[opp]
+                + 500 * hp_remaining / self.max_hp[player])
 
 
 # ---------------------------------------------------------------------------
@@ -387,10 +403,11 @@ def simulate(
         winner = None   # tie or time-out
 
     return BattleResult(
-        winner           = winner,
-        turns            = turn,
-        hp_remaining     = [p0.hp, p1.hp],
-        energy_remaining = [p0.energy, p1.energy],
-        shields_remaining= [p0.shields, p1.shields],
-        timeline         = timeline,
+        winner            = winner,
+        turns             = turn,
+        hp_remaining      = [p0.hp, p1.hp],
+        max_hp            = [p0.max_hp, p1.max_hp],
+        energy_remaining  = [p0.energy, p1.energy],
+        shields_remaining = [p0.shields, p1.shields],
+        timeline          = timeline,
     )

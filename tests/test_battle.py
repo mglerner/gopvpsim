@@ -192,6 +192,29 @@ def test_simulate_returns_battle_result():
     result = simulate(p0, p1)
     assert isinstance(result, BattleResult)
 
+def test_pvpoke_score_winner_above_500():
+    p0 = make_bp(hp=200, atk=150.0, def_=150.0)
+    p1 = make_bp(hp=50,  atk=50.0,  def_=50.0)
+    result = simulate(p0, p1)
+    assert result.winner == 0
+    assert result.pvpoke_score(0) > 500
+    assert result.pvpoke_score(1) < 500
+
+def test_pvpoke_score_sums_to_1000():
+    """The two scores always sum to exactly 1000."""
+    p0 = make_bp(hp=100, atk=100.0, def_=100.0)
+    p1 = make_bp(hp=100, atk=80.0,  def_=80.0)
+    result = simulate(p0, p1)
+    assert result.pvpoke_score(0) + result.pvpoke_score(1) == pytest.approx(1000.0)
+
+def test_pvpoke_score_perfect_win_is_1000():
+    """A pokemon that deals full damage and survives at full HP scores 1000."""
+    p0 = make_bp(hp=100, atk=100.0, def_=100.0)
+    p1 = make_bp(hp=50,  atk=1.0,   def_=1.0, shields=0)
+    result = simulate(p0, p1, shield_policy_0=never_shield)
+    if result.winner == 0 and result.hp_remaining[0] == result.max_hp[0]:
+        assert result.pvpoke_score(0) == pytest.approx(1000.0)
+
 def test_simulate_winner_has_hp_remaining():
     p0 = make_bp(hp=200, atk=150.0, def_=150.0)
     p1 = make_bp(hp=50,  atk=50.0,  def_=50.0)

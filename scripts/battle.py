@@ -155,17 +155,16 @@ def main():
                               charged_policy_0=policy,
                               charged_policy_1=policy)
 
-            if result.winner == 0:
-                winner = args.species1[:4]
-                margin = result.hp_remaining[0]
-            elif result.winner == 1:
-                winner = args.species2[:4]
-                margin = result.hp_remaining[1]
-            else:
-                winner = 'Tie'
-                margin = 0
+            score0 = round(result.pvpoke_score(0))
+            score1 = round(result.pvpoke_score(1))
 
-            cell = f"{winner} +{margin}"
+            if result.winner == 0:
+                cell = f"{args.species1[:4]} {score0}"
+            elif result.winner == 1:
+                cell = f"{args.species2[:4]} {score1}"
+            else:
+                cell = f"Tie {score0}"
+
             row += f"{cell:<{col_w}}"
         print(row)
 
