@@ -239,3 +239,89 @@ def test_iv_bulkpoints_higher_def_iv_lower_or_equal_damage():
                 d_lo = lookup.get((atk_iv, def_iv - 1, sta_iv))
                 if d_hi is not None and d_lo is not None:
                     assert d_hi <= d_lo
+
+
+# ---------------------------------------------------------------------------
+# Annihilape integration tests
+#
+# Annihilape (Fighting/Ghost) is a top Great League meta pick.
+# These cases were verified by running iv_breakpoints/iv_bulkpoints and
+# cross-checking the atk/def thresholds against the damage formula.
+#
+# Breakpoint: Annihilape COUNTER vs Registeel 15/15/15 (GL)
+#   Registeel 15/15/15 sits at L21, def=183.647
+#   Breakpoint threshold: atk >= 128.759 → 8 damage (vs 7 below)
+#   66 of 4096 Annihilape IV combos clear the breakpoint (all at L17)
+#
+# Bulkpoint: Annihilape tanking BUBBLE from Azumarill 8/15/15 (GL)
+#   Azumarill 8/15/15 sits at L40, atk=94.836
+#   Bulkpoint threshold: def >= 98.629 → 6 damage (vs 7 below)
+#   327 of 4096 Annihilape IV combos fall below the bulkpoint (take 7 dmg)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+def test_annihilape_counter_registeel_damage_tiers():
+    """66 IVs reach the 8-damage breakpoint; the rest deal 7."""
+    results = iv_breakpoints('Annihilape', 'COUNTER', 'Registeel', league='great')
+    from collections import Counter
+    tiers = Counter(r['damage'] for r in results)
+    assert tiers[8] == 66
+    assert tiers[7] == 4030
+    assert sum(tiers.values()) == 4096
+
+@pytest.mark.integration
+def test_annihilape_counter_registeel_breakpoint_iv():
+    """The best (highest stat-product) 8-damage IV combo is 14/3/5."""
+    results = iv_breakpoints('Annihilape', 'COUNTER', 'Registeel', league='great')
+    hits8 = [r for r in results if r['damage'] == 8]
+    best = hits8[0]   # sorted by (damage desc, stat_product desc)
+    assert best['atk_iv'] == 14
+    assert best['def_iv'] == 3
+    assert best['sta_iv'] == 5
+
+@pytest.mark.integration
+def test_annihilape_counter_registeel_atk_threshold():
+    """All 8-damage IVs have atk >= the computed breakpoint threshold."""
+    from gopvpsim.breakpoints import atk_for_damage, _get_types, _get_move
+    from gopvpsim.pokemon import Pokemon
+    regi_def = Pokemon.at_best_level('Registeel', 15, 15, 15, league='great').def_
+    move = _get_move('COUNTER')
+    thresh = atk_for_damage(8, regi_def, move,
+                            _get_types('Annihilape'), _get_types('Registeel'))
+    results = iv_breakpoints('Annihilape', 'COUNTER', 'Registeel', league='great')
+    for r in results:
+        if r['damage'] == 8:
+            assert r['atk'] >= thresh, f"{r['atk_iv']}/{r['def_iv']}/{r['sta_iv']} atk={r['atk']:.4f} < thresh={thresh:.4f}"
+        else:
+            assert r['atk'] < thresh, f"{r['atk_iv']}/{r['def_iv']}/{r['sta_iv']} atk={r['atk']:.4f} >= thresh={thresh:.4f}"
+
+@pytest.mark.integration
+def test_annihilape_bubble_bulkpoint_tiers():
+    """3769 Annihilape IVs take 6 dmg from Azu 8/15/15 Bubble; 327 take 7."""
+    results = iv_bulkpoints('Annihilape', 'BUBBLE', 'Azumarill',
+                            attacker_atk_iv=8, attacker_def_iv=15, attacker_sta_iv=15,
+                            league='great')
+    from collections import Counter
+    tiers = Counter(r['damage'] for r in results)
+    assert tiers[6] == 3769
+    assert tiers[7] == 327
+    assert sum(tiers.values()) == 4096
+
+@pytest.mark.integration
+def test_annihilape_bubble_bulkpoint_def_threshold():
+    """All IVs above the bulkpoint threshold take 6 dmg; below take 7."""
+    from gopvpsim.breakpoints import def_for_damage, _get_types, _get_move
+    from gopvpsim.pokemon import Pokemon
+    azu_atk = Pokemon.at_best_level('Azumarill', 8, 15, 15, league='great').atk
+    move = _get_move('BUBBLE')
+    # def_for_damage(6, ...) returns the threshold above which damage drops to 6
+    thresh = def_for_damage(6, azu_atk, move,
+                            _get_types('Azumarill'), _get_types('Annihilape'))
+    results = iv_bulkpoints('Annihilape', 'BUBBLE', 'Azumarill',
+                            attacker_atk_iv=8, attacker_def_iv=15, attacker_sta_iv=15,
+                            league='great')
+    for r in results:
+        if r['damage'] == 6:
+            assert r['def'] > thresh, f"def={r['def']:.4f} should be > thresh={thresh:.4f}"
+        else:
+            assert r['def'] <= thresh, f"def={r['def']:.4f} should be <= thresh={thresh:.4f}"
