@@ -69,6 +69,22 @@ def always_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: di
 def never_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
     return False
 
+def pvpoke_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
+    """
+    Shield policy mirroring PvPoke's ActionLogic.wouldShield.
+
+    Returns True only when the defender has a shield available AND the move is
+    dangerous enough that a smart player would use it.  Mirrors the heuristic in
+    ActionLogic.js: shield if
+      - post-move HP is within one attacker charge-cycle of 0, OR
+      - any of the attacker's charged moves deals ≥ 71 % of remaining HP (and
+        the attacker's fast DPT is high), OR
+      - any of the attacker's charged moves would KO after the cycle damage.
+    """
+    if defender.shields <= 0:
+        return False
+    return would_shield(attacker, defender, move)
+
 def use_first_available(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
     """Throw the first charged move we have enough energy for."""
     for i, move in enumerate(attacker.charged_moves):
@@ -133,6 +149,201 @@ def pvpoke_ai(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
             dmg = attacker.charged_move_damage(m, defender)
             return dmg / m['energy']
         return max(affordable, key=actual_dpe)[0]
+
+def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
+    """
+    Port of PvPoke's ActionLogic.wouldShield.
+
+    Returns True if the defender is expected to use a shield against `move`.
+    Checks whether the post-move HP is survivable given incoming cycle damage,
+    and whether any of the attacker's charged moves are threatening enough.
+    """
+    damage     = attacker.charged_move_damage(move, defender)
+    post_hp    = defender.hp - damage
+
+    fast_turns  = attacker.fast_move.get('_turns', 1)
+    fast_damage = attacker.fast_move_damage(defender)
+    fast_energy = attacker.fast_move.get('energyGain', 5)
+    fast_dpt    = fast_damage / fast_turns
+
+    # Energy remaining after firing `move` (0 if not currently affordable)
+    leftover_energy = max(attacker.energy - move['energy'], 0)
+    # Fast attacks needed before the next charge cycle, plus one margin
+    fast_attacks_needed = math.ceil((move['energy'] - leftover_energy) / fast_energy) + 1
+    cycle_damage = (fast_attacks_needed * fast_damage + 1) * defender.shields
+
+    use_shield = post_hp <= cycle_damage
+
+    for cm in attacker.charged_moves:
+        cm_dmg = attacker.charged_move_damage(cm, defender)
+        if cm_dmg >= defender.hp / 1.4 and fast_dpt > 1.5:
+            use_shield = True
+        if cm_dmg >= defender.hp - cycle_damage:
+            use_shield = True
+
+    return use_shield
+
+
+# DP state: (energy, opp_hp, turn, opp_shields, moves_list)
+# moves_list: list of move indices thrown in this branch
+class _DPState:
+    __slots__ = ('energy', 'hp', 'turn', 'shields', 'moves')
+    def __init__(self, energy, hp, turn, shields, moves):
+        self.energy  = energy
+        self.hp      = hp
+        self.turn    = turn
+        self.shields = shields
+        self.moves   = moves
+
+
+def _dp_insert(queue: list, ns: "_DPState") -> None:
+    """Insert ns into the priority queue (sorted by turn, ascending).
+
+    Applies PvPoke's dominance pruning: if any existing state at the same
+    turn or earlier already has lower hp, more energy, and fewer shields,
+    the new state is dominated and not inserted.
+    """
+    i = 0
+    while i < len(queue) and queue[i].turn <= ns.turn:
+        if (queue[i].hp      <= ns.hp and
+                queue[i].energy  >= ns.energy and
+                queue[i].shields <= ns.shields):
+            return   # dominated
+        i += 1
+    queue.insert(i, ns)
+
+
+def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
+    """
+    PvPoke's DP charged-move AI (ActionLogic.js port, no-buff case).
+
+    Two phases mirroring PvPoke:
+
+    Farm-down  (opponent HP > 2 × best-cycle damage):
+        Select bestChargedMove (highest actual DPE).
+        Bait with cheapest move only if the opponent would shield bestChargedMove.
+        If current energy < selectedMove.energy → wait (return None).
+
+    Near-KO    (opponent HP ≤ 2 × best-cycle damage):
+        Run a forward DP over charge-move sequences to find the fastest KO.
+        Fire the first move in the optimal plan; wait if not yet affordable.
+    """
+    fast_turns  = attacker.fast_move.get('_turns', 1)
+    fast_energy = attacker.fast_move.get('energyGain', 5)
+    fast_damage = attacker.fast_move_damage(defender)
+
+    cms = attacker.charged_moves
+
+    def actual_dpe(m: dict) -> float:
+        return attacker.charged_move_damage(m, defender) / m['energy']
+
+    best_idx = max(range(len(cms)), key=lambda i: actual_dpe(cms[i]))
+    best_cm  = cms[best_idx]
+
+    # bestCycleDamage: fast moves needed to charge from 0 + one charge move
+    fm_to_charge   = math.ceil(best_cm['energy'] / fast_energy)
+    best_cycle_dmg = fast_damage * fm_to_charge + attacker.charged_move_damage(best_cm, defender)
+
+    # ------------------------------------------------------------------ #
+    # Farm-down path
+    # ------------------------------------------------------------------ #
+    if defender.hp > 2 * best_cycle_dmg:
+        selected_idx = best_idx
+
+        # Bait only if opponent has shields AND would shield the best move
+        if (defender.shields > 0 and len(cms) > 1
+                and not cms[0].get('selfDebuffing', False)
+                and would_shield(attacker, defender, best_cm)):
+            selected_idx = min(range(len(cms)), key=lambda i: cms[i]['energy'])
+
+        if attacker.energy < cms[selected_idx]['energy']:
+            return None   # wait for the selected move
+        return selected_idx
+
+    # ------------------------------------------------------------------ #
+    # Near-KO: DP to find the fastest charge-move sequence that KOs
+    # ------------------------------------------------------------------ #
+    queue: list = [_DPState(attacker.energy, float(defender.hp), 0, defender.shields, [])]
+    final_state: "_DPState | None" = None
+    iters = 0
+
+    while queue and iters < 500:
+        iters += 1
+        curr = queue.pop(0)
+
+        # KO achieved — this is the fastest plan (chance == 1 path → break)
+        if curr.hp <= 0:
+            final_state = curr
+            break
+
+        for n, move in enumerate(cms):
+            move_dmg = attacker.charged_move_damage(move, defender)
+
+            if curr.energy >= move['energy']:
+                # Fire immediately (costs 1 extra turn for the charge move)
+                new_e  = curr.energy - move['energy']
+                new_t  = curr.turn + 1
+                new_sh = curr.shields
+                if curr.shields > 0:
+                    new_hp = curr.hp - 1
+                    new_sh -= 1
+                else:
+                    new_hp = curr.hp - move_dmg
+            else:
+                # Fast-forward: ceil((cost − energy) / energyGain) fast moves
+                fm_needed    = math.ceil((move['energy'] - curr.energy) / fast_energy)
+                turns_needed = fm_needed * fast_turns
+                new_e  = fm_needed * fast_energy + curr.energy - move['energy']
+                new_t  = curr.turn + turns_needed + 1
+                new_sh = curr.shields
+                if curr.shields > 0:
+                    new_hp = curr.hp - fast_damage * fm_needed - 1
+                    new_sh -= 1
+                else:
+                    new_hp = curr.hp - fast_damage * fm_needed - move_dmg
+
+            _dp_insert(queue, _DPState(new_e, new_hp, new_t, new_sh, curr.moves + [n]))
+
+    # ------------------------------------------------------------------ #
+    # Select move from plan
+    # ------------------------------------------------------------------ #
+    if final_state is None or not final_state.moves:
+        # No KO found — fallback to best-DPE greedy
+        affordable = [(i, m) for i, m in enumerate(cms) if attacker.energy >= m['energy']]
+        if not affordable:
+            return None
+        return max(affordable, key=lambda im: actual_dpe(im[1]))[0]
+
+    first_idx  = final_state.moves[0]
+    first_move = cms[first_idx]
+
+    # Post-DP bandaid: if shields up and cheapest has better DPE, prefer it
+    # (ActionLogic.js lines 861-864)
+    if (defender.shields > 0 and len(cms) > 1
+            and attacker.energy >= cms[0]['energy']
+            and cms[0]['energy'] <= first_move['energy']
+            and actual_dpe(cms[0]) > actual_dpe(first_move)):
+        first_idx  = 0
+        first_move = cms[first_idx]
+
+    # Bait-wait check (ActionLogic.js lines 820-835):
+    # If shields are up and we can afford the planned move but NOT the most
+    # expensive move (sorted by energy), and the expensive move has better DPE
+    # than our planned first move → wait for the expensive move instead.
+    # This prevents wasting energy on a cheaper move when a better one is coming.
+    if defender.shields > 0 and len(cms) > 1:
+        sorted_by_energy = sorted(range(len(cms)), key=lambda i: cms[i]['energy'])
+        expensive_idx = sorted_by_energy[-1]
+        expensive_cm  = cms[expensive_idx]
+        if (attacker.energy < expensive_cm['energy']
+                and actual_dpe(expensive_cm) > actual_dpe(first_move)
+                and not expensive_cm.get('selfDebuffing', False)):
+            return None   # bait-wait: hold off for the better move
+
+    if attacker.energy < first_move['energy']:
+        return None   # wait until affordable
+    return first_idx
+
 
 def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
     """

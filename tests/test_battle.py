@@ -8,8 +8,8 @@ Run integration tests with: pytest -m integration
 import pytest
 from gopvpsim.battle import (
     BattlePokemon, BattleResult,
-    always_shield, never_shield, use_first_available, bait_with_cheapest,
-    no_bait, pvpoke_ai, optimal_timing, simulate, ENERGY_CAP, OPTIMAL_TIMING,
+    always_shield, never_shield, pvpoke_shield, use_first_available, bait_with_cheapest,
+    no_bait, pvpoke_ai, pvpoke_dp, optimal_timing, simulate, ENERGY_CAP, OPTIMAL_TIMING,
 )
 
 
@@ -410,15 +410,17 @@ def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
     #   Med 0 shields: [579,  671,  764]
     #   Med 1 shields: [492,  544,  637]
     #   Med 2 shields: [253,  513,  605]
-    pytest.param(0, 0, 1, marks=pytest.mark.xfail(reason="simulator gives Medicham win; PvPoke score=579 means Azu wins — charged-move policy mismatch")),
+    (0, 0, 1),   # Azumarill wins (score 579)
     (0, 1, 1),   # Azumarill wins (score 671)
     (0, 2, 1),   # Azumarill wins (score 764)
     (1, 0, 0),   # Medicham wins (score 492)
     (1, 1, 1),   # Azumarill wins (score 544)
     (1, 2, 1),   # Azumarill wins (score 637)
     (2, 0, 0),   # Medicham wins (score 253)
-    pytest.param(2, 1, 1, marks=pytest.mark.xfail(reason="simulator gives Medicham win; PvPoke score=513 means Azu wins — charged-move policy mismatch")),
-    pytest.param(2, 2, 1, marks=pytest.mark.xfail(reason="simulator gives Medicham win; PvPoke score=605 means Azu wins — charged-move policy mismatch")),
+    pytest.param(2, 1, 1, marks=pytest.mark.xfail(
+        reason="Score 513 = Azu barely wins by ~5 HP; requires turnsToLive sub-DP "
+               "(ActionLogic.js lines 38-155) to detect when DP plan outlasts survival")),
+    (2, 2, 1),   # Azumarill wins (score 605)
 ])
 def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner):
     bp_med = _make_battle_pokemon('Medicham',  'PSYCHO_CUT',  ['DYNAMIC_PUNCH', 'PSYCHIC'],
@@ -426,8 +428,10 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner):
     bp_azu = _make_battle_pokemon('Azumarill', 'BUBBLE',   ['ICE_BEAM', 'HYDRO_PUMP'],
                                    'great', shields_azu, 8, 15, 15)
     result = simulate(bp_med, bp_azu,
-                      charged_policy_0=pvpoke_ai,
-                      charged_policy_1=pvpoke_ai)
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp,
+                      shield_policy_0=pvpoke_shield,
+                      shield_policy_1=pvpoke_shield)
     assert result.winner == expected_winner, (
         f"{shields_med}v{shields_azu}: expected winner={expected_winner}, "
         f"got {result.winner}  HP={result.hp_remaining}"

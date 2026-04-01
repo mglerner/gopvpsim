@@ -33,14 +33,15 @@ from gopvpsim.moves import get_moves
 from gopvpsim.data import load_gamemaster
 from gopvpsim.battle import (
     BattlePokemon, simulate,
-    pvpoke_ai, bait_with_cheapest, no_bait, optimal_timing,
+    pvpoke_ai, pvpoke_dp, bait_with_cheapest, no_bait, optimal_timing,
 )
 
 POLICIES = {
-    'pvpoke_ai':         pvpoke_ai,
+    'pvpoke_dp':          pvpoke_dp,
+    'pvpoke_ai':          pvpoke_ai,
     'bait_with_cheapest': bait_with_cheapest,
-    'no_bait':           no_bait,
-    'optimal_timing':    optimal_timing,
+    'no_bait':            no_bait,
+    'optimal_timing':     optimal_timing,
 }
 
 
@@ -110,7 +111,7 @@ def main():
                         metavar='a/d/s', help='IVs for pokemon 1 (default 15/15/15)')
     parser.add_argument('--ivs2',   default='15/15/15', type=parse_ivs,
                         metavar='a/d/s', help='IVs for pokemon 2 (default 15/15/15)')
-    parser.add_argument('--policy', default='pvpoke_ai', choices=list(POLICIES),
+    parser.add_argument('--policy', default='pvpoke_dp', choices=list(POLICIES),
                         help='Charged move policy for both sides (default: pvpoke_ai)')
     parser.add_argument('--shadow1', action='store_true', help='Pokemon 1 is shadow')
     parser.add_argument('--shadow2', action='store_true', help='Pokemon 2 is shadow')
