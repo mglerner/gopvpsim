@@ -910,8 +910,11 @@ def simulate(
             _policy_log.clear()
 
         # --- 3. Resolve fast move landings (fire BEFORE charged moves) ---
-        # PvPoke: naturally-due fast moves get priority +20 and resolve before
-        # charged moves. Only skip if attacker or defender already fainted.
+        # PvPoke: naturally-due fast moves get priority+20 and resolve before
+        # charged moves. When two fast moves land simultaneously, PvPoke sorts
+        # by effective attack descending (higher atk fires first).
+        if len(fast_landings) > 1:
+            fast_landings.sort(key=lambda ia: pokemon[ia[0]].atk, reverse=True)
         for actor_idx, move in fast_landings:
             attacker = pokemon[actor_idx]
             defender = pokemon[1 - actor_idx]
