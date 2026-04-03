@@ -8,7 +8,8 @@ Usage:
                               [--league great|ultra|master] \
                               [--ivs1 a/d/s] [--ivs2 a/d/s] \
                               [--policy pvpoke_ai|bait_with_cheapest|no_bait|optimal_timing] \
-                              [--shadow1] [--shadow2]
+                              [--shadow1] [--shadow2] \
+                              [--pvpoke-scores]
 
     <charged> is a comma-separated list of 1 or 2 move IDs.
 
@@ -115,6 +116,9 @@ def main():
                         help='Charged move policy for both sides (default: pvpoke_ai)')
     parser.add_argument('--shadow1', action='store_true', help='Pokemon 1 is shadow')
     parser.add_argument('--shadow2', action='store_true', help='Pokemon 2 is shadow')
+    parser.add_argument('--pvpoke-scores', action='store_true',
+                        help='Report all scores from species1\'s perspective '
+                             '(like PvPoke\'s table: scores <500 mean species1 loses)')
 
     args = parser.parse_args()
 
@@ -159,7 +163,11 @@ def main():
             score0 = round(result.pvpoke_score(0))
             score1 = round(result.pvpoke_score(1))
 
-            if result.winner == 0:
+            if args.pvpoke_scores:
+                # PvPoke style: always show score from species1's perspective.
+                # >500 = species1 wins, <500 = species1 loses.
+                cell = str(score0)
+            elif result.winner == 0:
                 cell = f"{args.species1[:4]} {score0}"
             elif result.winner == 1:
                 cell = f"{args.species2[:4]} {score1}"
