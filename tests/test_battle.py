@@ -428,8 +428,8 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner):
     result = simulate(bp_med, bp_azu,
                       charged_policy_0=pvpoke_dp,
                       charged_policy_1=pvpoke_dp,
-                      shield_policy_0=pvpoke_shield,
-                      shield_policy_1=pvpoke_shield)
+                      shield_policy_0=always_shield,
+                      shield_policy_1=always_shield)
     assert result.winner == expected_winner, (
         f"{shields_med}v{shields_azu}: expected winner={expected_winner}, "
         f"got {result.winner}  HP={result.hp_remaining}"

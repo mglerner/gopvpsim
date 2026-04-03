@@ -13,3 +13,7 @@ Extra items on my TODO list
 * Team/multi-mon simulation (low priority): currently only 1v1; real PvP is 3v3 with switching. Add support for team composition and switch timing.
 
 * Compare to this [redit post](https://www.reddit.com/r/TheSilphArena/comments/z11xr0/theorycrafting_iv_spectrum_graphs/?utm_source=chatgpt.com). I don't think we can load the airtable.com links (though we can try). We can load the imgur links. When looking through that post, the reddit user /u/RyanOfTheDay is Ryan Swag, the PVP IV OG. His comments are super important. Also, we should note that the reddit post is from several years ago, so the actual move parameters have been changed specifically since then. We're not trying to reproduce specific results; we're trying to reproduce an analysis method.
+
+* See if we can reproduce the information from the iv-tech channel in HSH's Discord.
+
+* PvPoke reports the battle ratings table all in terms of the first mon. That means some of the numbers are below 500. I like the way we're doing it in general for text based output, but we should build in an option to do it PvPoke's way to make it easier to check with PvPoke.

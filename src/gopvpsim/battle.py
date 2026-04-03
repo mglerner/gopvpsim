@@ -30,6 +30,16 @@ ENERGY_CAP = 100
 MAX_TURNS  = 500   # ~4 minutes; prevents infinite loops
 
 # ---------------------------------------------------------------------------
+# Policy debug log
+#
+# When simulate() is called with debug=True, this list is populated with
+# strings describing internal policy decisions (OMT fires, DP choices).
+# It is reset at the start of each simulate() call.
+# ---------------------------------------------------------------------------
+_policy_log: list[str] = []
+_policy_debug: bool = False
+
+# ---------------------------------------------------------------------------
 # Optimal charge-move timing
 #
 # Source: gobattlekit/src/gobattlekit/data/gamemaster.py
@@ -306,19 +316,115 @@ class _DPState:
         self.moves   = moves
 
 
-def _dp_insert(queue: list, ns: "_DPState") -> None:
-    """Insert ns into the priority queue (sorted by turn, ascending).
-
-    Applies PvPoke's dominance pruning: if any existing state at the same
-    turn or earlier already has lower hp, more energy, and fewer shields,
-    the new state is dominated and not inserted.
+def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> bool:
     """
+    Port of ActionLogic.js lines 237-344 (optimizeMoveTiming).
+
+    Returns True if the attacker should throw a fast move instead of a charged
+    move this turn, in order to avoid gifting the opponent extra turns.
+
+    PvPoke fires this when opponent.cooldown == 0 (just became able to act, about
+    to queue a new fast move) or opponent.cooldown > targetCooldown.  In our
+    model the opponent is processed first in the decide-loop, so by the time the
+    attacker decides, the defender's cooldown has already been set to fm['_turns']
+    if it queued a fast move this turn.  That means:
+      - defender just queued  → defender.cooldown == fm_turns  (e.g. 2 for PC)
+      - defender mid-cooldown → defender.cooldown == 1
+    We map PvPoke's "cooldown == 0" to our "cooldown == fm_turns" (just queued),
+    and keep the "> targetCooldown" condition as-is in turn units.
+    """
+    atk_cd = attacker.fast_move.get('cooldown', 500)   # ms
+    def_cd = defender.fast_move.get('cooldown', 500)    # ms
+    atk_turns = attacker.fast_move.get('_turns', 1)
+    def_turns = defender.fast_move.get('_turns', 1)
+
+    # --- Compute targetCooldown (in turns = ms/500) ---
+    target_cd = 1   # default 500 ms
+
+    if atk_cd >= 2000:
+        target_cd = 2
+    if atk_cd >= 1500 and def_cd == 2500:
+        target_cd = 2
+    if atk_cd == 1000 and def_cd == 2000:
+        target_cd = 2
+
+    # No optimisation when moves have the same cooldown
+    if atk_cd == def_cd:
+        return False
+    # No optimisation when attacker's move is a longer even multiple (e.g. 4T vs 2T)
+    if atk_cd % def_cd == 0 and atk_cd > def_cd:
+        return False
+    if target_cd == 0:
+        return False
+
+    opp_cd = defender.cooldown
+    # In our model "just queued" == opp_cd == def_turns; treat it like PvPoke's 0
+    just_queued = (opp_cd == def_turns)
+    if not (just_queued or opp_cd == 0 or opp_cd > target_cd):
+        return False   # timing is already fine — proceed with charged move
+
+    # --- Override conditions (any True → don't optimize, fire charged move) ---
+    opp_fast_dmg = defender.fast_move_damage(attacker)
+
+    # Would faint from the next opponent fast move
+    if attacker.hp <= opp_fast_dmg:
+        return False
+
+    # Throwing a fast move would overflow energy past 100
+    if attacker.energy + attacker.fast_move.get('energyGain', 0) > ENERGY_CAP:
+        return False
+
+    # Turns planned vs turns to live
+    affordable_cms = [m for m in attacker.charged_moves if attacker.energy >= m['energy']]
+    if not affordable_cms:
+        return False
+    cheapest_energy = min(m['energy'] for m in affordable_cms)
+    turns_planned = atk_turns + (attacker.energy // cheapest_energy)
+    if attacker.atk < defender.atk:
+        turns_planned += 1
+    ttl = _calc_turns_to_live(attacker, defender)
+    if turns_planned > ttl:
+        return False
+
+    # Can KO opponent right now with a charged move (shields == 0 only)
+    if defender.shields == 0:
+        for cm in attacker.charged_moves:
+            if attacker.energy >= cm['energy']:
+                if attacker.charged_move_damage(cm, defender) >= defender.hp:
+                    return False
+
+    # Opponent's next charged move can KO within our fast-move window
+    fms_in_atk_fm = atk_turns // def_turns   # opponent FMs that fit inside our FM
+    for cm in defender.charged_moves:
+        fms_needed = math.ceil(
+            max(0, cm['energy'] - defender.energy) / defender.fast_move['energyGain']
+        )
+        turns_from_cm = fms_needed * def_turns + 1
+        if attacker.shields > 0:
+            effective_dmg = 1 + opp_fast_dmg * fms_in_atk_fm
+        else:
+            effective_dmg = (defender.charged_move_damage(cm, attacker)
+                             + opp_fast_dmg * fms_in_atk_fm)
+        if turns_from_cm <= atk_turns and effective_dmg >= attacker.hp:
+            return False
+
+    # Fast moves alone within our fast-move window could KO us
+    fms_in_atk_fm2 = (atk_turns + 1) // def_turns   # Math.floor((atk_cd+500)/def_cd)
+    if attacker.hp <= opp_fast_dmg * fms_in_atk_fm2:
+        return False
+
+    if _policy_debug:
+        _policy_log.append(
+            f"  OMT: {attacker.species} delays (energy={attacker.energy}, "
+            f"def_cd={defender.cooldown}, just_queued={just_queued})"
+        )
+    return True   # optimize: throw fast move instead
+
+
+def _dp_insert(queue: list, ns: "_DPState") -> None:
+    """Insert ns into the priority queue (sorted by turn, ascending)."""
     i = 0
     while i < len(queue) and queue[i].turn <= ns.turn:
-        if (queue[i].hp      <= ns.hp and
-                queue[i].energy  >= ns.energy and
-                queue[i].shields <= ns.shields):
-            return   # dominated
         i += 1
     queue.insert(i, ns)
 
@@ -398,8 +504,23 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
                     max_dmg_idx = n
                     prev_dmg    = dmg * 2
         if max_dmg_idx is None:
+            if _policy_debug:
+                _policy_log.append(
+                    f"  DP[fire_now]: {attacker.species} no affordable move → fast"
+                )
             return None   # no affordable move → fast move
+        if _policy_debug:
+            _policy_log.append(
+                f"  DP[fire_now]: {attacker.species} fires {cms[max_dmg_idx].get('moveId')} "
+                f"(ttl={turns_to_live}, energy={attacker.energy})"
+            )
         return max_dmg_idx
+
+    # ------------------------------------------------------------------ #
+    # optimizeMoveTiming (ActionLogic.js lines 237-344)
+    # ------------------------------------------------------------------ #
+    if _optimize_move_timing(attacker, defender):
+        return None
 
     best_idx = max(range(len(cms)), key=lambda i: actual_dpe(cms[i]))
     best_cm  = cms[best_idx]
@@ -421,7 +542,18 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
             selected_idx = min(range(len(cms)), key=lambda i: cms[i]['energy'])
 
         if attacker.energy < cms[selected_idx]['energy']:
+            if _policy_debug:
+                _policy_log.append(
+                    f"  DP[farm]: {attacker.species} waits for "
+                    f"{cms[selected_idx].get('moveId')} (energy={attacker.energy}/"
+                    f"{cms[selected_idx]['energy']})"
+                )
             return None   # wait for the selected move
+        if _policy_debug:
+            _policy_log.append(
+                f"  DP[farm]: {attacker.species} fires "
+                f"{cms[selected_idx].get('moveId')} (energy={attacker.energy})"
+            )
         return selected_idx
 
     # ------------------------------------------------------------------ #
@@ -468,17 +600,51 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
 
             _dp_insert(queue, _DPState(new_e, new_hp, new_t, new_sh, curr.moves + [n]))
 
+        # Farm-down state: fast-move to KO from here with no more charged moves.
+        # PvPoke ActionLogic.js adds this for every state to represent "stop here,
+        # just fast-move until the opponent faints."
+        if fast_damage > 0 and curr.hp > 0:
+            fm_to_ko  = math.ceil(curr.hp / fast_damage)
+            fd_turn   = curr.turn + fm_to_ko * fast_turns
+            fd_energy = curr.energy + fast_energy * fm_to_ko
+            # Only insert if no strictly-negative-HP KO state already exists
+            # at turn <= fd_turn (mirrors PvPoke's DPQueue[i].hp < 0 check).
+            can_insert = True
+            for s in queue:
+                if s.turn > fd_turn:
+                    break
+                if s.hp < 0:
+                    can_insert = False
+                    break
+            if can_insert:
+                _dp_insert(queue, _DPState(fd_energy, 0.0, fd_turn,
+                                           curr.shields, curr.moves[:]))
+
     # ------------------------------------------------------------------ #
     # Select move from plan
     # ------------------------------------------------------------------ #
-    if final_state is None or not final_state.moves:
+    if final_state is None:
         # No KO found — fallback to best-DPE greedy
         affordable = [(i, m) for i, m in enumerate(cms) if attacker.energy >= m['energy']]
         if not affordable:
             return None
         return max(affordable, key=lambda im: actual_dpe(im[1]))[0]
 
-    first_idx  = final_state.moves[0]
+    if not final_state.moves:
+        # Farm-down plan: no charged moves needed, just fast-move to KO.
+        # PvPoke returns undefined (no action) in this case.
+        return None
+
+    # When shields are down, PvPoke sorts the plan by damage descending
+    # so the highest-damage move fires first (ActionLogic.js lines 851-858).
+    if defender.shields == 0:
+        plan = sorted(final_state.moves,
+                      key=lambda n: attacker.charged_move_damage(cms[n], defender),
+                      reverse=True)
+    else:
+        plan = final_state.moves
+
+    first_idx  = plan[0]
     first_move = cms[first_idx]
 
     # Post-DP bandaid: if shields up and cheapest has better DPE, prefer it
@@ -505,7 +671,19 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
             return None   # bait-wait: hold off for the better move
 
     if attacker.energy < first_move['energy']:
+        if _policy_debug:
+            _policy_log.append(
+                f"  DP[near-ko]: {attacker.species} waits for "
+                f"{first_move.get('moveId')} (energy={attacker.energy}/"
+                f"{first_move['energy']}, plan={[cms[i].get('moveId') for i in plan]})"
+            )
         return None   # wait until affordable
+    if _policy_debug:
+        _policy_log.append(
+            f"  DP[near-ko]: {attacker.species} fires "
+            f"{first_move.get('moveId')} (energy={attacker.energy}, "
+            f"plan={[cms[i].get('moveId') for i in plan]})"
+        )
     return first_idx
 
 
@@ -630,10 +808,11 @@ class BattleResult:
         >500 means this player won, <500 means they lost.
         """
         opp = 1 - player
-        damage_dealt  = self.max_hp[opp] - max(0, self.hp_remaining[opp])
-        hp_remaining  = max(0, self.hp_remaining[player])
-        return (500 * damage_dealt / self.max_hp[opp]
-                + 500 * hp_remaining / self.max_hp[player])
+        # Match PvPoke's Math.floor formula exactly: opp_hp can be negative (overkill counts)
+        return math.floor(
+            500 * (self.max_hp[opp] - self.hp_remaining[opp]) / self.max_hp[opp]
+            + 500 * max(0, self.hp_remaining[player]) / self.max_hp[player]
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -649,12 +828,25 @@ def simulate(
     charged_policy_0: ChargedMovePolicy = bait_with_cheapest,
     charged_policy_1: ChargedMovePolicy = bait_with_cheapest,
     log: bool = False,
+    debug: bool = False,
 ) -> BattleResult:
     """
     Run a 1v1 battle between p0 and p1 and return the result.
 
     p0 and p1 are mutated in place — reset them before reuse.
+
+    debug=True also enables policy decision logging (OMT fires, DP choices).
+    Policy log lines are interleaved into BattleResult.timeline at the turn
+    they occur; they are indented with two leading spaces for easy filtering.
+    Implies log=True.
     """
+    global _policy_debug, _policy_log
+
+    if debug:
+        log = True
+    _policy_debug = debug
+    _policy_log   = []
+
     pokemon   = [p0, p1]
     policies  = [
         (charged_policy_0, shield_policy_0),
@@ -711,7 +903,35 @@ def simulate(
                     p.cooldown = fm['_turns']
                     log_event(f"{p.species} uses {fm.get('name', fm['moveId'])}")
 
-        # --- 3. Resolve charged moves (higher priority first) ---
+        # Flush any policy-debug entries generated during decide step
+        if _policy_debug and _policy_log:
+            for entry in _policy_log:
+                timeline.append(f"T{turn:>3}: {entry.lstrip()}")
+            _policy_log.clear()
+
+        # --- 3. Resolve fast move landings (fire BEFORE charged moves) ---
+        # PvPoke: naturally-due fast moves get priority +20 and resolve before
+        # charged moves. Only skip if attacker or defender already fainted.
+        for actor_idx, move in fast_landings:
+            attacker = pokemon[actor_idx]
+            defender = pokemon[1 - actor_idx]
+
+            if attacker.hp <= 0 or defender.hp <= 0:
+                continue
+
+            dmg = attacker.fast_move_damage(defender)
+            attacker.energy = min(ENERGY_CAP, attacker.energy + move['energyGain'])
+            defender.hp = max(0, defender.hp - dmg)
+            attacker.cooldown = 0
+            attacker._fm_since_charge += 1
+
+            log_event(
+                f"{attacker.species} fast → {dmg} dmg, "
+                f"energy {attacker.energy}"
+            )
+
+        # --- 4. Resolve charged moves (higher priority first) ---
+        # Skip if defender was already killed by the fast move this turn.
         if use_priority and len(charged_actions) == 2:
             charged_actions.sort(key=lambda ia: pokemon[ia[0]].atk, reverse=True)
 
@@ -721,6 +941,9 @@ def simulate(
 
             if attacker.energy < move['energy']:
                 continue   # raced to this — no longer affordable
+
+            if defender.hp <= 0:
+                continue   # defender already fainted from fast move this turn
 
             _, shield_pol = policies[1 - actor_idx]
             use_shield    = shield_pol(attacker, defender, move)
@@ -737,33 +960,32 @@ def simulate(
 
             defender.hp = max(0, defender.hp - dmg)
 
-        # After any charged move this turn, reset all cooldowns and timing counters
+        # After any charged move this turn, fire "floating" fast moves then reset.
+        # PvPoke Battle.js: a fast move queued in the same turn as a charged move
+        # (timeSinceActivated < requiredTimeToPass) fires at -20 priority (after
+        # the charged move) rather than being cancelled.  This is simulate mode
+        # only — queuedActions is never cleared by a charged move in simulate mode.
         if charged_actions:
+            for i, p in enumerate(pokemon):
+                if p._queued_fast is not None:
+                    # Only fire if the pokemon survived (if killed by charged move,
+                    # PvPoke marks faintSource="charged" and the fast is invalid).
+                    if p.hp > 0:
+                        defender = pokemon[1 - i]
+                        if defender.hp > 0:
+                            qmove = p._queued_fast[1]
+                            dmg = p.fast_move_damage(defender)
+                            p.energy = min(ENERGY_CAP, p.energy + qmove['energyGain'])
+                            defender.hp = max(0, defender.hp - dmg)
+                            p._fm_since_charge += 1
+                            log_event(
+                                f"{p.species} floating fast → {dmg} dmg, "
+                                f"energy {p.energy}"
+                            )
             for p in pokemon:
                 p.cooldown = 0
                 p._queued_fast = None
                 p._fm_since_charge = 0
-
-        # --- 4. Resolve fast move landings ---
-        for actor_idx, move in fast_landings:
-            attacker = pokemon[actor_idx]
-            defender = pokemon[1 - actor_idx]
-
-            # A pokemon fainted from a charged move this turn cannot deal fast damage.
-            # A pokemon that has already fainted cannot receive fast damage.
-            if attacker.hp <= 0 or defender.hp <= 0:
-                continue
-
-            dmg = attacker.fast_move_damage(defender)
-            attacker.energy = min(ENERGY_CAP, attacker.energy + move['energyGain'])
-            defender.hp = max(0, defender.hp - dmg)
-            attacker.cooldown = 0   # ready to act next turn
-            attacker._fm_since_charge += 1
-
-            log_event(
-                f"{attacker.species} fast → {dmg} dmg, "
-                f"energy {attacker.energy}"
-            )
 
         # --- 5. Check for faint ---
         if p0.hp <= 0 or p1.hp <= 0:
