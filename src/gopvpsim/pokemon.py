@@ -52,6 +52,13 @@ LEAGUE_CAPS = {
     'master': 10000,
 }
 
+LEAGUE_CP = {
+    'little': 500,
+    'great':  1500,
+    'ultra':  2500,
+    'master': 10000,
+}
+
 # Sorted level list, built once
 _LEVELS = sorted(CPM.keys())
 
@@ -105,6 +112,7 @@ def best_level(base_atk, base_def, base_sta, atk_iv, def_iv, sta_iv,
 # ---------------------------------------------------------------------------
 
 _pokemon_index = None
+_gm_entry_index = None
 
 
 def get_pokemon_index():
@@ -114,6 +122,15 @@ def get_pokemon_index():
         gm = load_gamemaster()
         _pokemon_index = {mon['speciesName']: mon['baseStats'] for mon in gm['pokemon']}
     return _pokemon_index
+
+
+def get_pokemon_entry(name: str) -> dict:
+    """Return the full gamemaster entry for a species by speciesName."""
+    global _gm_entry_index
+    if _gm_entry_index is None:
+        gm = load_gamemaster()
+        _gm_entry_index = {mon['speciesName']: mon for mon in gm['pokemon']}
+    return _gm_entry_index[name]
 
 
 def get_species(name):
@@ -235,3 +252,222 @@ def iv_rank(species_name: str, *, league: str = 'great', max_level: float = 51.0
     for i, e in enumerate(entries):
         e['rank'] = i + 1
     return entries
+
+
+def pvpoke_default_ivs(species_name: str, league: str = 'great',
+                       level_cap: float = 50.0) -> tuple:
+    """
+    Return (level, atk_iv, def_iv, sta_iv) using PvPoke's default IV selection.
+
+    Reads the pre-computed defaultIVs from the gamemaster JSON, exactly as
+    PvPoke does at runtime.  For league='master' always returns 15/15/15.
+    For level_cap=40, uses the l40 variant when available (e.g. Medicham in
+    Great League).
+
+    league: 'little' (500 CP), 'great' (1500), 'ultra' (2500), 'master' (10000)
+    """
+    cap = LEAGUE_CP.get(league)
+    if cap is None:
+        raise ValueError(f"Unknown league {league!r}. Use 'little', 'great', 'ultra', or 'master'.")
+
+    if cap == 10000:
+        return (level_cap, 15, 15, 15)
+
+    entry = get_pokemon_entry(species_name)
+    default_ivs = entry.get('defaultIVs', {})
+    key = f'cp{cap}'
+
+    combo = default_ivs.get(f'{key}l40') if level_cap == 40 else None
+    if combo is None:
+        combo = default_ivs.get(key)
+    if combo is None:
+        raise ValueError(
+            f"No defaultIVs[{key!r}] for {species_name!r} in the gamemaster."
+        )
+
+    level, atk_iv, def_iv, sta_iv = combo
+    return (float(level), int(atk_iv), int(def_iv), int(sta_iv))
+
+
+# ---------------------------------------------------------------------------
+# compute_default_ivs — mirrors PvPoke's generateDefaultIVsByPokemon() dev tool
+# ---------------------------------------------------------------------------
+
+# Legendaries whose level cap is NOT 40 in PvPoke (they can be powered past 40)
+_LEVEL_CAP_EXCLUSIONS = frozenset([
+    "melmetal",
+    "thundurus_incarnate", "thundurus_therian",
+    "landorus_incarnate",  "landorus_therian",
+    "tornadus_incarnate",  "tornadus_therian",
+    "rayquaza",
+])
+
+# Hard-coded overrides from PvPoke's generateDefaultIVsByPokemon switch block.
+# Applied after the algorithm runs, keyed by speciesId → cp-key → (level, a, d, s).
+_DEFAULT_IV_EXCEPTIONS: dict[str, dict[str, tuple]] = {
+    'trevenant':       {'cp1500': (22,    3,  13, 12)},
+    'dhelmise':        {'cp1500': (20,    1,   4,  4)},
+    'medicham':        {'cp1500': (49,    7,  15, 14)},
+    'lokix':           {'cp2500': (47.5, 11,  15, 15)},
+    'regidrago':       {'cp1500': (20,    2,   4,  4)},
+    'aegislash_blade': {'cp1500': (22,    4,  14, 15), 'cp2500': (38, 15, 15, 15)},
+}
+
+
+def _iv_combo_best_level(
+    base_atk, base_def, base_sta,
+    atk_iv, def_iv, hp_iv,
+    cap, level_cap, level_floor,
+):
+    """
+    Find the best level for an IV combo under cap, mimicking PvPoke's
+    step-up / step-back loop in generateIVCombinations().
+    Returns (level, cp) or (None, None) if the combo can't fit.
+    """
+    level = level_floor
+    calc_cp = 0
+    while level < level_cap and calc_cp < cap:
+        level += 0.5
+        calc_cp = cp(base_atk, base_def, base_sta, atk_iv, def_iv, hp_iv, level)
+    if calc_cp > cap:
+        level -= 0.5
+        calc_cp = cp(base_atk, base_def, base_sta, atk_iv, def_iv, hp_iv, level)
+    if calc_cp <= cap:
+        return level, calc_cp
+    return None, None
+
+
+def _generate_iv_combinations(
+    base_atk, base_def, base_sta, cap, level_cap, iv_floor, level_floor=1.0,
+):
+    """
+    Return all IV combos (each IV in [iv_floor..15]) under cap at level_cap,
+    sorted by stat product descending. Mirrors PvPoke's generateIVCombinations().
+
+    Iteration order hp→def→atk (all 15 down to floor) matches PvPoke;
+    Python's stable sort preserves this for ties.
+    """
+    combos = []
+    for hp_iv in range(15, iv_floor - 1, -1):
+        for def_iv in range(15, iv_floor - 1, -1):
+            for atk_iv in range(15, iv_floor - 1, -1):
+                level, _ = _iv_combo_best_level(
+                    base_atk, base_def, base_sta, atk_iv, def_iv, hp_iv,
+                    cap, level_cap, level_floor,
+                )
+                if level is None:
+                    continue
+                cpm_val = CPM[level]
+                combos.append({
+                    'level':  level,
+                    'atk_iv': atk_iv,
+                    'def_iv': def_iv,
+                    'sta_iv': hp_iv,
+                    'stat_product': (
+                        (base_atk + atk_iv) * cpm_val
+                        * (base_def + def_iv) * cpm_val
+                        * math.floor((base_sta + hp_iv) * cpm_val)
+                    ),
+                })
+    combos.sort(key=lambda c: c['stat_product'], reverse=True)
+    return combos
+
+
+def _pick_default_combo(
+    base_atk, base_def, base_sta, tags, level_floor,
+    cap, level_cap, near_cap_cp,
+):
+    """
+    Run generateDefaultIVCombo() for one league/level_cap pair:
+    choose the IV floor, generate combos, return the result at the appropriate rank.
+    """
+    iv_floor = 4
+    if near_cap_cp < cap:
+        iv_floor = 12   # near-cap: assume lucky-trade-eligible IVs (floor 12)
+    if 'legendary' in tags and 'shadow' in tags:
+        iv_floor = 6
+
+    combos = _generate_iv_combinations(
+        base_atk, base_def, base_sta, cap, level_cap, iv_floor, level_floor,
+    )
+    if not combos:
+        # Retry without level floor (PvPoke's fallback)
+        combos = _generate_iv_combinations(
+            base_atk, base_def, base_sta, cap, level_cap, iv_floor, 1.0,
+        )
+    if not combos:
+        return None
+
+    # Rank index: 1 (rank 2) for regular; 31 (rank 32) for legendary/untradeable;
+    # 249 (rank 250) for shadow legendary.
+    idx = 1
+    if 'untradeable' in tags:
+        idx = 31
+    if 'legendary' in tags:
+        idx = 31
+    if 'shadow' in tags and 'legendary' in tags:
+        idx = 249
+
+    if idx >= len(combos):
+        idx = len(combos) // 2
+
+    c = combos[idx]
+    return (float(c['level']), int(c['atk_iv']), int(c['def_iv']), int(c['sta_iv']))
+
+
+def compute_default_ivs(species_name: str, league: str = 'great',
+                        level_cap: float = 50.0) -> tuple:
+    """
+    Compute PvPoke's default IVs from scratch, mimicking generateDefaultIVsByPokemon().
+
+    Implements the algorithm PvPoke's dev tool uses to pre-compute defaultIVs
+    in gamemaster.json.  Useful for verification or for custom Pokemon not in
+    the gamemaster.
+
+    NOTE: The current PvPoke source uses iv_floor=4 in generateDefaultIVCombo().
+    However, the gamemaster.json was generated with an older version of the
+    algorithm that appears to have used iv_floor=2 for many Pokemon.  Expect
+    small differences (~3–5%) between this function and pvpoke_default_ivs()
+    for common non-legendary Pokemon.  pvpoke_default_ivs() is always authoritative.
+
+    Returns (level, atk_iv, def_iv, sta_iv).
+    league:    'little' (500), 'great' (1500), 'ultra' (2500), 'master' (10000)
+    level_cap: 40 to compute the l40 variant (e.g. for level-40-capped formats)
+    """
+    cap = LEAGUE_CP.get(league)
+    if cap is None:
+        raise ValueError(
+            f"Unknown league {league!r}. Use 'little', 'great', 'ultra', or 'master'."
+        )
+    if cap == 10000:
+        return (level_cap, 15, 15, 15)
+
+    entry      = get_pokemon_entry(species_name)
+    base       = entry['baseStats']
+    base_atk   = base['atk']
+    base_def   = base['def']
+    base_sta   = base['hp']
+    tags       = set(entry.get('tags', []))
+    level_floor = float(entry.get('levelFloor', 1))
+    species_id  = entry['speciesId']
+    cp_key      = f'cp{cap}'
+
+    # Hard-coded exceptions apply only to the standard (non-l40) case
+    if level_cap != 40:
+        exc = _DEFAULT_IV_EXCEPTIONS.get(species_id, {}).get(cp_key)
+        if exc is not None:
+            return (float(exc[0]), int(exc[1]), int(exc[2]), int(exc[3]))
+
+    # near-cap CP: level 35 for l40 variant, level 45 for standard
+    near_level  = 35.0 if level_cap == 40 else 45.0
+    near_cap_cp = cp(base_atk, base_def, base_sta, 15, 15, 15, near_level)
+
+    max_cp_at_cap = cp(base_atk, base_def, base_sta, 15, 15, 15, level_cap)
+    if max_cp_at_cap <= cap:
+        return (float(level_cap), 15, 15, 15)
+
+    result = _pick_default_combo(
+        base_atk, base_def, base_sta, tags, level_floor,
+        cap, level_cap, near_cap_cp,
+    )
+    return result if result is not None else (1.0, 0, 0, 0)

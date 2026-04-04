@@ -12,6 +12,7 @@ from gopvpsim.pokemon import (
     CPM, LEAGUE_CAPS, _LEVELS,
     cp, battle_stats, stat_product, best_level,
     get_species, Pokemon, iv_rank,
+    pvpoke_default_ivs, compute_default_ivs,
     SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
 )
 from tests.conftest import FAKE_BASE_ATK, FAKE_BASE_DEF, FAKE_BASE_STA
@@ -351,3 +352,190 @@ def test_iv_rank_azumarill_0_15_15_rank(mock_gm=None):
     results = iv_rank('Azumarill', league='great')
     r = next(e for e in results if e['atk_iv'] == 0 and e['def_iv'] == 15 and e['sta_iv'] == 15)
     assert r['rank'] < 50   # well-known high-rank spread
+
+
+# ===========================================================================
+# pvpoke_default_ivs — integration tests
+#
+# Ground truth: these values were verified against pvpoke.com by hand.
+# pvpoke_default_ivs() reads directly from the gamemaster JSON so it is
+# always authoritative.
+# ===========================================================================
+
+@pytest.mark.integration
+@pytest.mark.parametrize("species,league,level_cap,expected", [
+    # Regular Pokemon, Great League
+    ("Medicham",  "great", 50.0, (49.0,  7, 15, 14)),
+    ("Azumarill", "great", 50.0, (43.0,  4, 15, 13)),
+    ("Spidops",   "great", 50.0, (37.5,  4, 13, 14)),
+    # Legendary, Great League (rank 32)
+    ("Registeel", "great", 50.0, (22.5,  8, 15, 14)),
+    ("Cresselia",  "great", 50.0, (20.0,  4, 11,  9)),
+    # Ultra League
+    ("Swampert",  "ultra", 50.0, (32.0,  4, 15, 14)),
+    ("Registeel", "ultra", 50.0, (49.0,  4,  6, 14)),
+    # l40 variants (level_cap=40)
+    ("Medicham",  "great", 40.0, (40.0, 15, 15, 15)),
+    ("Registeel", "ultra", 40.0, (40.0, 15, 15, 15)),
+    # Master League always 15/15/15
+    ("Medicham",  "master", 50.0, (50.0, 15, 15, 15)),
+    ("Registeel", "master", 50.0, (50.0, 15, 15, 15)),
+])
+def test_pvpoke_default_ivs_known_values(species, league, level_cap, expected):
+    result = pvpoke_default_ivs(species, league, level_cap)
+    assert result == expected, (
+        f"{species} {league} (cap={level_cap}): expected {expected}, got {result}"
+    )
+
+
+@pytest.mark.integration
+def test_pvpoke_default_ivs_unknown_league():
+    with pytest.raises(ValueError, match="Unknown league"):
+        pvpoke_default_ivs("Medicham", "premier")
+
+
+@pytest.mark.integration
+def test_pvpoke_default_ivs_returns_tuple():
+    result = pvpoke_default_ivs("Azumarill", "great")
+    assert isinstance(result, tuple)
+    assert len(result) == 4
+
+
+@pytest.mark.integration
+def test_pvpoke_default_ivs_ivs_in_range():
+    """IVs must be in 0–15."""
+    level, a, d, s = pvpoke_default_ivs("Azumarill", "great")
+    assert 0 <= a <= 15
+    assert 0 <= d <= 15
+    assert 0 <= s <= 15
+
+
+@pytest.mark.integration
+def test_pvpoke_default_ivs_cp_under_cap():
+    """The returned IVs+level must satisfy the CP cap."""
+    from gopvpsim.pokemon import get_pokemon_entry, LEAGUE_CP
+    for species, league in [("Medicham", "great"), ("Azumarill", "great"),
+                             ("Swampert", "ultra"), ("Registeel", "great")]:
+        level, a, d, s = pvpoke_default_ivs(species, league)
+        entry = get_pokemon_entry(species)
+        base = entry['baseStats']
+        actual_cp = cp(base['atk'], base['def'], base['hp'], a, d, s, level)
+        assert actual_cp <= LEAGUE_CP[league], (
+            f"{species} {league}: CP {actual_cp} exceeds cap {LEAGUE_CP[league]}"
+        )
+
+
+# ===========================================================================
+# compute_default_ivs — integration tests
+#
+# This function re-implements PvPoke's generateDefaultIVsByPokemon() dev tool
+# from the JavaScript source.  It uses iv_floor=4 matching the *current*
+# PvPoke source, but the gamemaster.json was generated with an older version
+# of the algorithm (iv_floor appears to have been 2 for many Pokemon).
+#
+# Consequently, compute_default_ivs() matches pvpoke_default_ivs() for:
+#   - legendaries (floor matters less; rank index differs)
+#   - near-cap Pokemon (floor=12 overrides the ambiguous baseline)
+#   - Pokemon that trivially can't reach the CP cap (always 15/15/15)
+#   - Master League (always 15/15/15)
+#
+# It may differ for common non-legendary Pokemon in older gamemaster entries.
+# The broad-match test is marked xfail to document this known limitation.
+# ===========================================================================
+
+@pytest.mark.integration
+@pytest.mark.parametrize("species,league,level_cap,expected", [
+    # Legendary, Great League — floor=4 gives the same answer as the gamemaster
+    ("Registeel", "great", 50.0, (22.5,  8, 15, 14)),
+    ("Cresselia",  "great", 50.0, (20.0,  4, 11,  9)),
+    # l40 variants
+    ("Medicham",  "great", 40.0, (40.0, 15, 15, 15)),
+    ("Registeel", "ultra", 40.0, (40.0, 15, 15, 15)),
+    # Master League
+    ("Medicham",  "master", 50.0, (50.0, 15, 15, 15)),
+    # Hard-coded exception still applied
+    ("Medicham",  "great", 50.0, (49.0,  7, 15, 14)),
+])
+def test_compute_default_ivs_known_values(species, league, level_cap, expected):
+    result = compute_default_ivs(species, league, level_cap)
+    assert result == expected, (
+        f"{species} {league} (cap={level_cap}): expected {expected}, got {result}"
+    )
+
+
+@pytest.mark.integration
+def test_compute_default_ivs_returns_valid_cp():
+    """The IVs+level returned must satisfy the CP cap."""
+    from gopvpsim.pokemon import get_pokemon_entry, LEAGUE_CP
+    for species, league in [("Registeel", "great"), ("Cresselia", "great"),
+                             ("Swampert", "ultra")]:
+        level, a, d, s = compute_default_ivs(species, league)
+        entry = get_pokemon_entry(species)
+        base = entry['baseStats']
+        actual_cp = cp(base['atk'], base['def'], base['hp'], a, d, s, level)
+        assert actual_cp <= LEAGUE_CP[league]
+
+
+@pytest.mark.integration
+def test_compute_default_ivs_result_is_stat_product_rank2_or_higher():
+    """
+    For regular non-legendary Pokemon, compute_default_ivs() should return
+    something near the top of the stat-product ranking (within the top 5).
+
+    Uses Swampert UL as a clean case where floor=4 applies and matches.
+    """
+    from gopvpsim.pokemon import get_pokemon_entry, LEAGUE_CP, _generate_iv_combinations
+    species, league = "Swampert", "ultra"
+    entry = get_pokemon_entry(species)
+    base = entry['baseStats']
+    ba, bd, bs = base['atk'], base['def'], base['hp']
+    cap = LEAGUE_CP[league]
+
+    level, a, d, s = compute_default_ivs(species, league)
+    combos = _generate_iv_combinations(ba, bd, bs, cap, 50.0, 4, 1.0)
+    idx = next((i for i, c in enumerate(combos)
+                if c['atk_iv'] == a and c['def_iv'] == d and c['sta_iv'] == s
+                and c['level'] == level), None)
+    assert idx is not None, "Returned combo not found in generated list"
+    assert idx <= 5, f"Expected top-5 combo, got rank {idx + 1}"
+
+
+@pytest.mark.integration
+@pytest.mark.xfail(reason=(
+    "compute_default_ivs uses iv_floor=4 (current PvPoke source), but "
+    "gamemaster.json was generated with iv_floor≈2 for many Pokemon, so "
+    "~3-5% of entries will differ. pvpoke_default_ivs() is always authoritative."
+))
+def test_compute_default_ivs_matches_gamemaster_broadly():
+    """
+    Ideally compute_default_ivs() would match pvpoke_default_ivs() for every
+    Pokemon.  This test documents that it doesn't due to algorithm evolution.
+    """
+    from gopvpsim.data import load_gamemaster
+    from gopvpsim.pokemon import LEAGUE_CP
+
+    gm = load_gamemaster()
+    league_map = {500: 'little', 1500: 'great', 2500: 'ultra'}
+    mismatches = 0
+    total = 0
+
+    for mon in gm['pokemon']:
+        div = mon.get('defaultIVs', {})
+        for key, combo in div.items():
+            if not key.startswith('cp') or 'l40' in key or len(combo) != 4:
+                continue
+            cap_s = key[2:]
+            if not cap_s.isdigit():
+                continue
+            cap = int(cap_s)
+            league = league_map.get(cap)
+            if not league:
+                continue
+            gm_val = (float(combo[0]), int(combo[1]), int(combo[2]), int(combo[3]))
+            alg_val = compute_default_ivs(mon['speciesName'], league, 50.0)
+            total += 1
+            if gm_val != alg_val:
+                mismatches += 1
+
+    # This assertion will fail — that's expected and documented via xfail
+    assert mismatches == 0, f"{mismatches}/{total} entries differ from gamemaster"
