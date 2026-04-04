@@ -401,7 +401,7 @@ def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_med,shields_azu,expected_winner", [
+@pytest.mark.parametrize("shields_med,shields_azu,expected_winner,expected_azu_score", [
     # Medicham 5/15/15 (PSYCHO_CUT/DYNAMIC_PUNCH/PSYCHIC)
     # vs Azumarill 8/15/15 (BUBBLE/ICE_BEAM/HYDRO_PUMP), Great League
     # Expected results verified at pvpoke.com/battle/
@@ -410,17 +410,17 @@ def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
     #   Med 0 shields: [608,  730,  851]
     #   Med 1 shields: [475,  603,  724]
     #   Med 2 shields: [235,  411,  605]
-    (0, 0, 1),   # Azumarill wins (score 608)
-    (0, 1, 1),   # Azumarill wins (score 730)
-    (0, 2, 1),   # Azumarill wins (score 851)
-    (1, 0, 0),   # Medicham wins (Azu score 475)
-    (1, 1, 1),   # Azumarill wins (score 603)
-    (1, 2, 1),   # Azumarill wins (score 724)
-    (2, 0, 0),   # Medicham wins (Azu score 235)
-    (2, 1, 0),   # Medicham wins (Azu score 411)
-    (2, 2, 1),   # Azumarill wins (score 605)
+    (0, 0, 1, 608),   # Azumarill wins
+    (0, 1, 1, 730),   # Azumarill wins
+    (0, 2, 1, 851),   # Azumarill wins
+    (1, 0, 0, 475),   # Medicham wins
+    (1, 1, 1, 603),   # Azumarill wins
+    (1, 2, 1, 724),   # Azumarill wins
+    (2, 0, 0, 235),   # Medicham wins
+    (2, 1, 0, 411),   # Medicham wins
+    (2, 2, 1, 605),   # Azumarill wins
 ])
-def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner):
+def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expected_azu_score):
     bp_med = _make_battle_pokemon('Medicham',  'PSYCHO_CUT',  ['DYNAMIC_PUNCH', 'PSYCHIC'],
                                    'great', shields_med, 5, 15, 15)
     bp_azu = _make_battle_pokemon('Azumarill', 'BUBBLE',   ['ICE_BEAM', 'HYDRO_PUMP'],
@@ -433,4 +433,9 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner):
     assert result.winner == expected_winner, (
         f"{shields_med}v{shields_azu}: expected winner={expected_winner}, "
         f"got {result.winner}  HP={result.hp_remaining}"
+    )
+    azu_score = round(result.pvpoke_score(1))
+    assert azu_score == expected_azu_score, (
+        f"{shields_med}v{shields_azu}: expected Azu score={expected_azu_score}, "
+        f"got {azu_score}  (delta={azu_score - expected_azu_score:+d})"
     )

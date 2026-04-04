@@ -358,9 +358,13 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
         return False
 
     opp_cd = defender.cooldown
-    # In our model "just queued" == opp_cd == def_turns; treat it like PvPoke's 0
-    just_queued = (opp_cd == def_turns)
-    if not (just_queued or opp_cd == 0 or opp_cd > target_cd):
+    # In our model "just queued" == opp_cd == def_turns; treat it like PvPoke's 0.
+    # opp_cd == 0 only triggers OMT when the defender is genuinely about to
+    # queue a fast move — not when it already queued a charged move this turn
+    # (in which case _queued_charged is set and cooldown stayed at 0).
+    just_queued            = (opp_cd == def_turns)
+    opp_zero_before_action = (opp_cd == 0 and not defender._queued_charged)
+    if not (just_queued or opp_zero_before_action or opp_cd > target_cd):
         return False   # timing is already fine — proceed with charged move
 
     # --- Override conditions (any True → don't optimize, fire charged move) ---
@@ -657,18 +661,25 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
         first_move = cms[first_idx]
 
     # Bait-wait check (ActionLogic.js lines 820-835):
-    # If shields are up and we can afford the planned move but NOT the most
-    # expensive move (sorted by energy), and the expensive move has better DPE
-    # than our planned first move → wait for the expensive move instead.
-    # This prevents wasting energy on a cheaper move when a better one is coming.
+    # PvPoke uses activeChargedMoves[1] (index 1) for both checks below.
+    # If shields are up and we can't yet afford cms[1] but it has better DPE
+    # than our planned first move → wait for cms[1] instead.
     if defender.shields > 0 and len(cms) > 1:
-        sorted_by_energy = sorted(range(len(cms)), key=lambda i: cms[i]['energy'])
-        expensive_idx = sorted_by_energy[-1]
-        expensive_cm  = cms[expensive_idx]
-        if (attacker.energy < expensive_cm['energy']
-                and actual_dpe(expensive_cm) > actual_dpe(first_move)
-                and not expensive_cm.get('selfDebuffing', False)):
+        cm1 = cms[1]
+        if (attacker.energy < cm1['energy']
+                and actual_dpe(cm1) > actual_dpe(first_move)
+                and not cm1.get('selfDebuffing', False)):
             return None   # bait-wait: hold off for the better move
+
+        # Don't-bait-if-won't-shield (ActionLogic.js lines 836-849):
+        # If we CAN afford cms[1], it has much better DPE (ratio > 1.5),
+        # and the opponent wouldn't shield it → switch plan to cms[1].
+        fm0_dpe = actual_dpe(first_move)
+        if fm0_dpe > 0 and attacker.energy >= cm1['energy']:
+            dpe_ratio = actual_dpe(cm1) / fm0_dpe
+            if dpe_ratio > 1.5 and not would_shield(attacker, defender, cm1):
+                first_idx  = 1
+                first_move = cm1
 
     if attacker.energy < first_move['energy']:
         if _policy_debug:
@@ -741,7 +752,11 @@ class BattlePokemon:
     cooldown:           int   = field(init=False)   # turns remaining
     _fm_since_charge:   int   = field(init=False, repr=False)  # fast moves since last charge (either player)
     # Queued fast move: (queued_on_turn, move_dict) or None
-    _queued_fast:  "tuple[int, dict] | None" = field(init=False, repr=False)
+    _queued_fast:    "tuple[int, dict] | None" = field(init=False, repr=False)
+    # Set when this pokemon queued a charged move in the current decide step.
+    # Used by OMT so it doesn't mistake cooldown==0 (charged queued) for
+    # cooldown==0 (about to queue a fast move).
+    _queued_charged: bool = field(init=False, repr=False)
 
     def __post_init__(self):
         self.hp                = self.max_hp
@@ -749,6 +764,7 @@ class BattlePokemon:
         self.cooldown          = 0
         self._fm_since_charge  = 0
         self._queued_fast      = None
+        self._queued_charged   = False
 
     @classmethod
     def from_pokemon(cls, pokemon, fast_move: dict, charged_moves: list[dict],
@@ -878,6 +894,11 @@ def simulate(
         # Fast moves are queued; charged moves are collected for this turn.
         charged_actions = []   # list of (actor_index, move_dict)
         fast_landings   = []   # fast moves that land this turn
+        # Clear charged-queued flag at the start of each decide step so that
+        # OMT can tell the difference between "cooldown==0, about to fast-move"
+        # and "cooldown==0 because I just queued a charged move this turn."
+        for p in pokemon:
+            p._queued_charged = False
 
         for i, p in enumerate(pokemon):
             opponent = pokemon[1 - i]
@@ -896,6 +917,7 @@ def simulate(
                 move_idx = charged_pol(p, opponent)
                 if move_idx is not None:
                     charged_actions.append((i, p.charged_moves[move_idx]))
+                    p._queued_charged = True
                 else:
                     # Queue a fast move
                     fm = p.fast_move
