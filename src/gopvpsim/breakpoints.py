@@ -34,7 +34,13 @@ from .moves import (
 from .pokemon import (
     get_species, best_level, CPM, LEAGUE_CAPS,
     battle_stats,
+    SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
 )
+
+
+def _floor2(x: float) -> float:
+    """Truncate to 2 decimal places (the format used in PvP IV deep dives)."""
+    return math.floor(x * 100) / 100
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +187,8 @@ def iv_breakpoints(
     league: str = 'great',
     attacker_max_level: float = 51.0,
     defender_max_level: float = 51.0,
+    attacker_shadow: bool = False,
+    defender_shadow: bool = False,
 ) -> list[dict]:
     """Damage dealt by every attacker IV combo against a specific defender.
 
@@ -210,7 +218,7 @@ def iv_breakpoints(
     d_stats     = battle_stats(d_base['atk'], d_base['def'], d_base['hp'],
                                defender_atk_iv, defender_def_iv, defender_sta_iv,
                                d_level)
-    defender_def = d_stats['def']
+    defender_def = d_stats['def'] * (SHADOW_DEF_MULT if defender_shadow else 1.0)
 
     results = []
     for atk_iv in range(16):
@@ -227,7 +235,7 @@ def iv_breakpoints(
                     a_base['atk'], a_base['def'], a_base['hp'],
                     atk_iv, def_iv, sta_iv, level,
                 )
-                atk_stat = stats['atk']
+                atk_stat = stats['atk'] * (SHADOW_ATK_BONUS if attacker_shadow else 1.0)
                 dmg      = calc_damage(
                     move['power'], atk_stat, defender_def,
                     move['type'], attacker_types, defender_types,
@@ -258,6 +266,8 @@ def iv_bulkpoints(
     league: str = 'great',
     defender_max_level: float = 51.0,
     attacker_max_level: float = 51.0,
+    attacker_shadow: bool = False,
+    defender_shadow: bool = False,
 ) -> list[dict]:
     """Damage received by every defender IV combo from a specific attacker/move.
 
@@ -287,7 +297,7 @@ def iv_bulkpoints(
     a_stats     = battle_stats(a_base['atk'], a_base['def'], a_base['hp'],
                                attacker_atk_iv, attacker_def_iv, attacker_sta_iv,
                                a_level)
-    attacker_atk = a_stats['atk']
+    attacker_atk = a_stats['atk'] * (SHADOW_ATK_BONUS if attacker_shadow else 1.0)
 
     results = []
     for atk_iv in range(16):
@@ -304,7 +314,7 @@ def iv_bulkpoints(
                     d_base['atk'], d_base['def'], d_base['hp'],
                     atk_iv, def_iv, sta_iv, level,
                 )
-                def_stat = stats['def']
+                def_stat = stats['def'] * (SHADOW_DEF_MULT if defender_shadow else 1.0)
                 dmg = calc_damage(
                     move['power'], attacker_atk, def_stat,
                     move['type'], attacker_types, defender_types,
@@ -323,3 +333,48 @@ def iv_bulkpoints(
 
     results.sort(key=lambda r: (r['damage'], -r['stat_product']))
     return results
+
+
+# ---------------------------------------------------------------------------
+# CMP threshold analysis
+# ---------------------------------------------------------------------------
+
+def cmp_threshold(
+    subject_species: str,
+    opponent_atk: float,
+    *,
+    league: str = 'great',
+    subject_max_level: float = 51.0,
+    subject_shadow: bool = False,
+) -> dict | None:
+    """
+    Minimum discrete effective attack for subject_species that wins CMP vs
+    opponent_atk (i.e. subject.atk > opponent_atk).
+
+    Returns a dict with:
+        atk_threshold  : floor-to-2-dp value (the deep-dive format)
+        atk_exact      : exact floating-point value
+        atk_iv/def_iv/sta_iv : one example IV combo that achieves it
+        rank           : stat-product rank of that IV combo
+    Returns None if no subject IV can beat opponent_atk in this league.
+    """
+    from .pokemon import iv_rank
+    ranks = iv_rank(subject_species, league=league, max_level=subject_max_level,
+                    shadow=subject_shadow)
+    min_atk  = None
+    best_row = None
+    for r in ranks:
+        if r['atk'] > opponent_atk:
+            if min_atk is None or r['atk'] < min_atk:
+                min_atk  = r['atk']
+                best_row = r
+    if best_row is None:
+        return None
+    return {
+        'atk_threshold': _floor2(min_atk),
+        'atk_exact':     min_atk,
+        'atk_iv':        best_row['atk_iv'],
+        'def_iv':        best_row['def_iv'],
+        'sta_iv':        best_row['sta_iv'],
+        'rank':          best_row['rank'],
+    }

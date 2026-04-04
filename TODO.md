@@ -1,19 +1,67 @@
-Extra items on my TODO list
+## What we've built
 
-* See if we can reproduce an article like the old SwagTips PVP IV Deep dives. Some recent ones were https://gamepress.gg/pokemongo/carbink-pvp-iv-deep-dive and https://gamepress.gg/pokemongo/annihilape-pvp-iv-deep-dive ... though those links are dead and we'll have to use the wayback machine to get the articles. We need to remember that the actual results from those deep dives will be wrong, as the movesets and move parameters have been updated several times since those were written.
+The core simulator now matches PvPoke's simulate-mode score table exactly (±0)
+for all 9 shield scenarios. Simulate mode uses `always_shield` + `pvpoke_dp`
+(ActionLogic.js DP for charged-move selection). The scripts `scripts/battle.py`
+and `scripts/breakpoints.py` are implemented. `--pvpoke-scores` outputs scores
+from p0's perspective, matching PvPoke's table format.
 
-* Implement PvPoke's full dynamic programming charged-move AI (ActionLogic.js). Currently 3 shield scenarios (0v0, Med2vAzu1, Med2vAzu2) are xfailed because our simple heuristics can't match PvPoke's DP-based bestChargedMove sequencing. The DP considers turnsToLive, minimumCycleThreshold, and optimal move sequences rather than greedy per-turn decisions.
+---
 
-* Write CLI scripts: scripts/battle.py (simulate a 1v1 matchup and report results across all shield scenarios) and scripts/breakpoints.py (show breakpoints/bulkpoints for a given attacker/move/defender). These are already documented in CLAUDE.md but not yet implemented.
+## Policies to add
 
-* Implement PvPoke's "Selective" baiting policy: this is the same DP algorithm from ActionLogic.js described above (see the DP TODO item). In PvPoke's UI, "Selective" is the bait toggle setting that uses DP to decide when baiting is worthwhile given the current battle state (turnsToLive, bestChargedMove by actual DPE, minimumCycleThreshold). Resolving the 3 xfailed test scenarios depends on this.
+* **PvPoke "Selective" baiting** — PvPoke's UI offers a bait toggle; "Selective"
+  uses the same ActionLogic.js DP to decide *whether* baiting is worthwhile given
+  current state (turnsToLive, bestChargedMove by DPE, minimumCycleThreshold).
+  This is independent of simulate mode (which doesn't bait-toggle at all), but
+  useful for modeling how PvPoke's recommended play differs from always-shield DP.
 
-* Add EV-based baiting policy (separate from PvPoke's Selective): parameterize the bait decision by an estimated probability P(opponent shields). If P(shield) ≈ 0, skip the bait and fire best-DPE move; if P(shield) ≈ 1, bait with cheapest. This is our own novel approach, independent of PvPoke's DP.
+* **EV-based baiting** — our own novel policy: parameterize the bait decision by
+  an estimated P(opponent shields). P≈0 → fire best-DPE move; P≈1 → bait with
+  cheapest. Lets analysts model opponents with known shield tendencies.
 
-* Team/multi-mon simulation (low priority): currently only 1v1; real PvP is 3v3 with switching. Add support for team composition and switch timing.
+* **Team/multi-mon simulation** (low priority) — currently only 1v1; real PvP
+  is 3v3 with switching. Add team composition and switch-timing support.
 
-* Compare to this [redit post](https://www.reddit.com/r/TheSilphArena/comments/z11xr0/theorycrafting_iv_spectrum_graphs/?utm_source=chatgpt.com). I don't think we can load the airtable.com links (though we can try). We can load the imgur links. When looking through that post, the reddit user /u/RyanOfTheDay is Ryan Swag, the PVP IV OG. His comments are super important. Also, we should note that the reddit post is from several years ago, so the actual move parameters have been changed specifically since then. We're not trying to reproduce specific results; we're trying to reproduce an analysis method.
+---
 
-* See if we can reproduce the information from the iv-tech channel in HSH's Discord.
+## Analysis goals
 
-* PvPoke reports the battle ratings table all in terms of the first mon. That means some of the numbers are below 500. I like the way we're doing it in general for text based output, but we should build in an option to do it PvPoke's way to make it easier to check with PvPoke.
+* **Reproduce SwagTips-style IV deep dives** — articles like the old GamePress
+  Carbink and Annihilape PvP IV deep dives (links dead; use Wayback Machine).
+  Note: those articles used old move parameters, so we're reproducing the
+  *method*, not the specific results. In the Pokemon Go Championship
+  Series events, they post graphs of the most commonly used mons and
+  their most common movesets. We can use that for our modern deep
+  dives, to give us a good set of mons to test against. We should sim
+  against those mons. We should also add a flag to our
+  DEFAULT_THRESHOLDS to let us know if there are any there that we
+  should sim against. When we're doing the competitive meta, we should
+  probably sim all 4096 IVs of the competitive mons against the rank
+  1s of the competitive mons. Then, when we find interesting IV
+  targets, we add those to a list and also check against those. We can
+  also do something like look through all 4096 IVs of each of the top
+  100 PvP mons vs the common IVs of the competitive mons to see if
+  there are any hidden corebreakers. When we're thinking about the
+  main competitive mons, it's also worth knowing that people often
+  REALLY want to win CAP ties with super common mons, so some atk
+  weight is very common. It might be nice to suggest atk-weighted IVs
+  for the super common mons.
+
+* **Compare to reddit IV spectrum post** —
+  https://www.reddit.com/r/TheSilphArena/comments/z11xr0/theorycrafting_iv_spectrum_graphs/
+  Airtable links likely dead; imgur links should work. /u/RyanOfTheDay is Ryan
+  Swag, the PvP IV OG — his comments in the thread are especially important.
+  Again, move parameters have changed; reproduce the method, not the numbers.
+
+* **Reproduce iv-tech channel analysis** from HSH's Discord.
+
+---
+
+## Testing / validation
+
+* **More PvPoke battle-log comparison tests** — 1-HP discrepancies in HP threshold
+  analysis (e.g., Medicham 1v2 flips at HP 139→140 in our sim vs 138 in deep dive)
+  suggest subtle simulation differences (energy rounding, CMP resolution, move-timing
+  edge cases). Add tests that compare our full battle timeline against PvPoke's battle
+  log output for the same matchup/shield scenario, to identify and fix the divergence.

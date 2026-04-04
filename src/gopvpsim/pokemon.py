@@ -57,7 +57,11 @@ _LEVELS = sorted(CPM.keys())
 
 
 def cp(base_atk, base_def, base_sta, atk_iv, def_iv, sta_iv, level):
-    """Compute CP at a given level. Minimum CP is 10."""
+    """Compute CP at a given level. Minimum CP is 10.
+
+    Shadow status does NOT affect CP — it only affects battle stats.
+    CP is always calculated from base stats + IVs, same for shadow and non-shadow.
+    """
     cpm = CPM[level]
     raw = (
         (base_atk + atk_iv)

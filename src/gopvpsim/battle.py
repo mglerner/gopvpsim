@@ -910,9 +910,9 @@ def simulate(
             _policy_log.clear()
 
         # --- 3. Resolve fast move landings (fire BEFORE charged moves) ---
-        # PvPoke: naturally-due fast moves get priority+20 and resolve before
-        # charged moves. When two fast moves land simultaneously, PvPoke sorts
-        # by effective attack descending (higher atk fires first).
+        # Naturally-due fast moves resolve before charged moves. When two fast
+        # moves land simultaneously, the game resolves them in descending atk
+        # order (higher effective attack fires first). PvPoke matches this.
         if len(fast_landings) > 1:
             fast_landings.sort(key=lambda ia: pokemon[ia[0]].atk, reverse=True)
         for actor_idx, move in fast_landings:

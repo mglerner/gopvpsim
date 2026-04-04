@@ -276,7 +276,7 @@ def test_shadow_hp_unchanged(mock_gm):
     assert shadow.hp == normal.hp
 
 def test_shadow_cp_unchanged(mock_gm):
-    """CP is calculated from base stats only — shadow status doesn't affect it."""
+    """Shadow status does NOT affect CP — CP is from base stats only, same for shadow and non-shadow."""
     normal = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great', shadow=False)
     shadow = Pokemon.at_best_level('Testmon', 10, 10, 10, league='great', shadow=True)
     assert shadow.cp == normal.cp
