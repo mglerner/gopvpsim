@@ -921,9 +921,15 @@ def simulate(
                 else:
                     # Queue a fast move
                     fm = p.fast_move
-                    p._queued_fast = (turn, fm)
-                    p.cooldown = fm['_turns']
                     log_event(f"{p.species} uses {fm.get('name', fm['moveId'])}")
+                    if fm['_turns'] == 1:
+                        # PvPoke: requiredTimeToPass = cooldown - 500 = 0ms → fires
+                        # the same step it's queued.  Add directly to fast_landings.
+                        fast_landings.append((i, fm))
+                        p.cooldown = 1   # blocks re-acting until next turn
+                    else:
+                        p._queued_fast = (turn, fm)
+                        p.cooldown = fm['_turns']
 
         # Flush any policy-debug entries generated during decide step
         if _policy_debug and _policy_log:
@@ -941,7 +947,11 @@ def simulate(
             attacker = pokemon[actor_idx]
             defender = pokemon[1 - actor_idx]
 
-            if attacker.hp <= 0 or defender.hp <= 0:
+            # PvPoke Battle.js lines 448-450: a dead pokemon's in-flight fast move
+            # is only invalid if faintSource == "charged".  In step 3 (fast landings)
+            # the only possible kill source is a fast move, so attacker.hp <= 0 here
+            # means faintSource="fast" → still valid.  Skip only on dead defender.
+            if defender.hp <= 0:
                 continue
 
             dmg = attacker.fast_move_damage(defender)
