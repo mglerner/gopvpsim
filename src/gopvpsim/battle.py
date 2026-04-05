@@ -473,12 +473,14 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
 
     # Can KO opponent with a non-self-debuffing charged move (shields == 0 only),
     # but only if the fast move alone wouldn't also kill (PvPoke ActionLogic.js
-    # lines 212-233: "opponent.hp > poke.fastMove.damage").
+    # lines 298-309: sets .damage on move objects as a side effect used by
+    # bandaid[866] later).
     if defender.shields == 0:
         _fast_dmg = attacker.fast_move_damage(defender)
         for cm in attacker.charged_moves:
             if attacker.energy >= cm['energy']:
-                if (attacker.charged_move_damage(cm, defender) >= defender.hp
+                cm['_cached_damage'] = attacker.charged_move_damage(cm, defender)
+                if (cm['_cached_damage'] >= defender.hp
                         and not cm.get('selfDebuffing', False)
                         and defender.hp > _fast_dmg):
                     return False
@@ -542,10 +544,23 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
     opp_fast_damage  = defender.fast_move_damage(attacker)
     wins_cmp         = attacker.atk >= defender.atk
 
-    cms = attacker.charged_moves
+    # PvPoke's activeChargedMoves is sorted by energy (cheapest first).
+    # Sort a copy so bandaid indices match PvPoke's convention.
+    cms = sorted(attacker.charged_moves, key=lambda m: m['energy'])
+
+    def _orig_idx(move: dict) -> int:
+        """Map a move back to its index in attacker.charged_moves."""
+        for i, m in enumerate(attacker.charged_moves):
+            if m is move:
+                return i
+        return 0
 
     def actual_dpe(m: dict) -> float:
         return attacker.charged_move_damage(m, defender) / m['energy']
+
+    def raw_dpe(m: dict) -> float:
+        """PvPoke's move.dpe = power/energy (no type effectiveness)."""
+        return m['power'] / m['energy']
 
     # ------------------------------------------------------------------ #
     # turnsToLive: fire highest-damage move now if about to be KO'd
@@ -604,7 +619,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
                 f"  DP[fire_now]: {attacker.species} fires {cms[max_dmg_idx].get('moveId')} "
                 f"(ttl={turns_to_live}, energy={attacker.energy})"
             )
-        return max_dmg_idx
+        return _orig_idx(cms[max_dmg_idx])
 
     # ------------------------------------------------------------------ #
     # ActionLogic.js lines 212-233: fire a lethal charged move immediately,
@@ -631,7 +646,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
                             f"  DP[lethal]: {attacker.species} fires "
                             f"{_cm.get('moveId')} (energy={attacker.energy})"
                         )
-                    return _n
+                    return _orig_idx(cms[_n])
 
     # ------------------------------------------------------------------ #
     # optimizeMoveTiming (ActionLogic.js lines 237-344)
@@ -671,7 +686,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
                 f"  DP[farm]: {attacker.species} fires "
                 f"{cms[selected_idx].get('moveId')} (energy={attacker.energy})"
             )
-        return selected_idx
+        return _orig_idx(cms[selected_idx])
 
     # ------------------------------------------------------------------ #
     # Near-KO: DP to find the fastest charge-move sequence that KOs
@@ -745,7 +760,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
         affordable = [(i, m) for i, m in enumerate(cms) if attacker.energy >= m['energy']]
         if not affordable:
             return None
-        return max(affordable, key=lambda im: actual_dpe(im[1]))[0]
+        best_sorted_idx = max(affordable, key=lambda im: actual_dpe(im[1]))[0]
+        return _orig_idx(cms[best_sorted_idx])
 
     if not final_state.moves:
         # Farm-down plan: no charged moves needed, just fast-move to KO.
@@ -762,10 +778,42 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
             f" turn={final_state.turn} hp={final_state.hp:.0f}"
             f" shields={final_state.shields} iters={iters}")
 
+    # Check if plan contains a debuffing move (used by sort gate)
+    has_debuffing_move = any(cms[n].get('selfDebuffing', False) for n in final_state.moves)
+
+    # Bait-wait check (ActionLogic.js lines 820-835):
+    # If shields are up and we can't yet afford cms[1] but it has better DPE
+    # than our planned first move → wait for cms[1] instead.
+    # PvPoke uses raw dpe (power/energy) here.
+    if defender.shields > 0 and len(cms) > 1:
+        cm1 = cms[1]
+        if (attacker.energy < cm1['energy']
+                and raw_dpe(cm1) > raw_dpe(cms[final_state.moves[0]])
+                and not cm1.get('selfDebuffing', False)):
+            bait = True
+            # Don't bait if an effective self-buffing move exists (line 826)
+            if (raw_dpe(cm1) / raw_dpe(cms[0]) <= 1.5
+                    and cms[0].get('selfBuffing', False)):
+                bait = False
+            if bait:
+                if _dp_trace:
+                    _policy_log.append(
+                        f"  DP-trace[{attacker.species}]: bait-wait for {cm1.get('moveId')}")
+                return None
+
+    # Don't-bait-if-won't-shield (ActionLogic.js lines 838-847):
+    # This one uses actual damage (move.damage / move.energy).
+    if defender.shields > 0 and len(cms) > 1:
+        cm1 = cms[1]
+        fm0_dpe = actual_dpe(cms[final_state.moves[0]])
+        if fm0_dpe > 0 and attacker.energy >= cm1['energy']:
+            dpe_ratio = actual_dpe(cm1) / fm0_dpe
+            if dpe_ratio > 1.5 and not would_shield(attacker, defender, cm1):
+                final_state.moves[0] = cms.index(cm1) if cm1 in cms else 1
+
     # PvPoke sorts plan by damage descending only when baitShields is falsy or
-    # when opponent.shields == 0 and no debuffing move (ActionLogic.js lines 850-858).
-    # Default baitShields=1 (selective), so sort only fires when shields==0.
-    if defender.shields == 0:
+    # when opponent.shields == 0 AND no debuffing move (ActionLogic.js lines 850-858).
+    if defender.shields == 0 and not has_debuffing_move:
         plan = sorted(final_state.moves,
                       key=lambda n: attacker.charged_move_damage(cms[n], defender),
                       reverse=True)
@@ -775,12 +823,14 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
     first_idx  = plan[0]
     first_move = cms[first_idx]
 
-    # Post-DP bandaid: if shields up and cheapest has better DPE, prefer it
-    # (ActionLogic.js lines 861-864)
+    # --- Post-DP bandaids (ActionLogic.js lines 861-935) ---
+
+    # [861] Prefer low energy with better DPE when shields up (raw dpe)
     if (defender.shields > 0 and len(cms) > 1
             and attacker.energy >= cms[0]['energy']
             and cms[0]['energy'] <= first_move['energy']
-            and actual_dpe(cms[0]) > actual_dpe(first_move)):
+            and raw_dpe(cms[0]) > raw_dpe(first_move)
+            and not cms[0].get('selfDebuffing', False)):
         if _dp_trace:
             _policy_log.append(
                 f"  DP-trace[{attacker.species}]: bandaid[861] prefer-low-energy:"
@@ -788,26 +838,139 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
         first_idx  = 0
         first_move = cms[first_idx]
 
-    # Bait-wait check (ActionLogic.js lines 820-835):
-    # PvPoke uses activeChargedMoves[1] (index 1) for both checks below.
-    # If shields are up and we can't yet afford cms[1] but it has better DPE
-    # than our planned first move → wait for cms[1] instead.
+    # [866] Prefer non-debuffing when shields down, both sides have significant HP,
+    #       and the debuffing move won't KO.
+    #       PvPoke uses move.damage which is only set as a side effect of the OMT
+    #       "can KO" check (line 301). If OMT didn't fire, .damage is undefined
+    #       and undefined/hp < 0.8 is NaN < 0.8 = false in JS → bandaid skips.
+    _cached_dmg = first_move.get('_cached_damage')
+    if (defender.shields == 0 and len(cms) > 1
+            and first_move.get('selfDebuffing', False)
+            and first_move['energy'] > 50
+            and attacker.hp / attacker.max_hp > 0.5
+            and _cached_dmg is not None
+            and _cached_dmg / defender.hp < 0.8):
+        if _dp_trace:
+            _policy_log.append(
+                f"  DP-trace[{attacker.species}]: bandaid[866] avoid-self-debuff:"
+                f" {first_move.get('moveId')} → {cms[0].get('moveId')}")
+        first_idx  = 0
+        first_move = cms[first_idx]
+
+    # [871] Force more efficient move of the same energy (raw dpe)
+    if (len(cms) > 1
+            and cms[0]['energy'] == first_move['energy']
+            and raw_dpe(cms[0]) > raw_dpe(first_move)
+            and not cms[0].get('selfDebuffing', False)):
+        if _dp_trace:
+            _policy_log.append(
+                f"  DP-trace[{attacker.species}]: bandaid[871] same-energy-better-dpe:"
+                f" {first_move.get('moveId')} → {cms[0].get('moveId')}")
+        first_idx  = 0
+        first_move = cms[first_idx]
+
+    # [876] Force more efficient similar-energy move if chosen is self-debuffing (raw dpe)
+    if (len(cms) > 1
+            and cms[0]['energy'] - 10 <= first_move['energy']
+            and raw_dpe(cms[0]) > raw_dpe(first_move)
+            and first_move.get('selfDebuffing', False)
+            and not cms[0].get('selfDebuffing', False)):
+        if _dp_trace:
+            _policy_log.append(
+                f"  DP-trace[{attacker.species}]: bandaid[876] avoid-debuff-similar-energy:"
+                f" {first_move.get('moveId')} → {cms[0].get('moveId')}")
+        first_idx  = 0
+        first_move = cms[first_idx]
+
+    # [881] Force more efficient similar-energy move if one is self-buffing (raw dpe)
+    if (len(cms) > 1
+            and cms[0]['energy'] - first_move['energy'] <= 5
+            and raw_dpe(cms[0]) > raw_dpe(first_move)
+            and cms[0].get('selfBuffing', False)):
+        if _dp_trace:
+            _policy_log.append(
+                f"  DP-trace[{attacker.species}]: bandaid[881] prefer-self-buff:"
+                f" {first_move.get('moveId')} → {cms[0].get('moveId')}")
+        first_idx  = 0
+        first_move = cms[first_idx]
+
+    # [886] Don't bait with self-debuffing moves (raw dpe)
     if defender.shields > 0 and len(cms) > 1:
         cm1 = cms[1]
-        if (attacker.energy < cm1['energy']
-                and actual_dpe(cm1) > actual_dpe(first_move)
+        if (attacker.energy >= cm1['energy']
+                and raw_dpe(cm1) > raw_dpe(first_move)
+                and first_move.get('selfDebuffing', False)
                 and not cm1.get('selfDebuffing', False)):
-            return None   # bait-wait: hold off for the better move
+            if _dp_trace:
+                _policy_log.append(
+                    f"  DP-trace[{attacker.species}]: bandaid[886] no-debuff-bait:"
+                    f" {first_move.get('moveId')} → {cm1.get('moveId')}")
+            first_idx  = 1
+            first_move = cm1
 
-        # Don't-bait-if-won't-shield (ActionLogic.js lines 836-849):
-        # If we CAN afford cms[1], it has much better DPE (ratio > 1.5),
-        # and the opponent wouldn't shield it → switch plan to cms[1].
-        fm0_dpe = actual_dpe(first_move)
-        if fm0_dpe > 0 and attacker.energy >= cm1['energy']:
-            dpe_ratio = actual_dpe(cm1) / fm0_dpe
-            if dpe_ratio > 1.5 and not would_shield(attacker, defender, cm1):
-                first_idx  = 1
-                first_move = cm1
+    # [895] While shields up, prefer close non-debuffing when debuffing won't KO
+    if defender.shields > 0 and len(cms) > 1:
+        if (cms[0].get('selfDebuffing', False)
+                and not cms[1].get('selfBuffing', False)):
+            # Is attacker baiting or will debuffing move not come close to KO?
+            if (True  # baitShields is always true in simulate mode
+                    or defender.hp - attacker.charged_move_damage(cms[0], defender) > 10):
+                # Is the second move close in energy and DPE? (raw dpe)
+                if (cms[1]['energy'] - cms[0]['energy'] <= 10
+                        and raw_dpe(cms[1]) / raw_dpe(cms[0]) > 0.7):
+                    if _dp_trace:
+                        _policy_log.append(
+                            f"  DP-trace[{attacker.species}]: bandaid[895] shields-up-prefer-non-debuff:"
+                            f" {first_move.get('moveId')} → {cms[1].get('moveId')}")
+                    first_idx  = 1
+                    first_move = cms[1]
+
+    # [910] Defer self-debuffing until after survivable charged moves
+    if (first_move.get('selfDebuffing', False)
+            and attacker.shields == 0
+            and attacker.energy < 100
+            and defender.charged_moves):
+        opp_best = max(defender.charged_moves,
+                       key=lambda m: defender.charged_move_damage(m, attacker))
+        if (defender.energy >= opp_best['energy']
+                and not would_shield(defender, attacker, opp_best)
+                and not first_move.get('selfBuffing', False)):
+            if _dp_trace:
+                _policy_log.append(
+                    f"  DP-trace[{attacker.species}]: bandaid[910] defer-self-debuff:"
+                    f" waiting for opponent to fire {opp_best.get('moveId')}")
+            return None
+
+    # [918] If self-debuffing move doesn't KO, stack as many as possible
+    if first_move.get('selfDebuffing', False):
+        target_energy = (100 // first_move['energy']) * first_move['energy']
+        if attacker.energy < target_energy:
+            move_dmg = attacker.charged_move_damage(first_move, defender)
+            opp_fast_dmg = defender.fast_move_damage(attacker)
+            opp_fast_cd = defender.fast_move.get('cooldown', 500)
+            atk_fast_cd = attacker.fast_move.get('cooldown', 500)
+            if ((defender.hp > move_dmg or defender.shields != 0)
+                    and (attacker.hp > opp_fast_dmg * 2
+                         or opp_fast_cd - atk_fast_cd > 500)):
+                if _dp_trace:
+                    _policy_log.append(
+                        f"  DP-trace[{attacker.species}]: bandaid[918] stack-self-debuff:"
+                        f" energy={attacker.energy}/{target_energy}, waiting")
+                return None
+        elif defender.shields > 0 and len(cms) > 1:
+            # At target energy and shields up: use cheaper non-debuff if self-buffing
+            # or if opponent would shield (line 929-933)
+            cm0 = cms[0]
+            if (cm0['energy'] - first_move['energy'] <= 10
+                    and not cm0.get('selfDebuffing', False)):
+                if (cm0.get('selfBuffing', False)
+                        or would_shield(attacker, defender, first_move)):
+                    if _dp_trace:
+                        _policy_log.append(
+                            f"  DP-trace[{attacker.species}]: bandaid[929] stack-switch:"
+                            f" {first_move.get('moveId')} → {cm0.get('moveId')}")
+                    first_idx  = 0
+                    first_move = cm0
 
     if attacker.energy < first_move['energy']:
         if _policy_debug:
@@ -823,7 +986,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
             f"{first_move.get('moveId')} (energy={attacker.energy}, "
             f"plan={[cms[i].get('moveId') for i in plan]})"
         )
-    return first_idx
+    return _orig_idx(first_move)
 
 
 def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":

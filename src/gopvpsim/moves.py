@@ -170,6 +170,14 @@ def get_moves():
         gm = load_gamemaster()
         _fast_moves    = {m['moveId']: m for m in gm['moves'] if m['energyGain'] != 0}
         _charged_moves = {m['moveId']: m for m in gm['moves'] if m['energyGain'] == 0}
+        # Add derived properties matching PvPoke's Pokemon.js
+        for m in _charged_moves.values():
+            buffs = m.get('buffs')
+            bt    = m.get('buffTarget')
+            m['selfBuffing']           = bool(buffs and bt == 'self' and (buffs[0] > 0 or buffs[1] > 0))
+            m['selfDebuffing']         = bool(buffs and bt == 'self' and (buffs[0] < 0 or buffs[1] < 0))
+            m['selfAttackDebuffing']   = bool(buffs and bt == 'self' and buffs[0] < 0)
+            m['selfDefenseDebuffing']  = bool(buffs and bt == 'self' and buffs[1] < 0)
     return _fast_moves, _charged_moves
 
 
