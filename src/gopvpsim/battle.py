@@ -46,6 +46,8 @@ def _stat_stage_mult(stage: int) -> float:
 # ---------------------------------------------------------------------------
 _policy_log: list[str] = []
 _policy_debug: bool = False
+_shield_trace: bool = False
+_dp_trace: bool = False
 
 # ---------------------------------------------------------------------------
 # Optimal charge-move timing
@@ -102,6 +104,39 @@ def pvpoke_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: di
     if defender.shields <= 0:
         return False
     return would_shield(attacker, defender, move)
+
+def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
+    """
+    PvPoke's simulate-mode shield policy (Battle.js line 1077).
+
+    For standard charged moves: always shield (useShield = true).
+    For selfBuffing or selfDefensiveDebuffing moves: use wouldShield heuristic.
+    This mirrors Battle.js: useShield = true, then overridden for
+    move.selfBuffing and move.selfDefensiveDebuffing.
+    """
+    if defender.shields <= 0:
+        if _shield_trace:
+            _policy_log.append(
+                f"  shield({defender.species} sh=0 vs {move.get('moveId')}): False (no shields)")
+        return False
+    buffs = move.get('buffs')
+    buff_target = move.get('buffTarget')
+    if buffs and buff_target == 'self':
+        self_buffing       = buffs[0] > 0 or buffs[1] > 0
+        self_def_debuffing = buffs[1] < 0
+        if self_buffing or self_def_debuffing:
+            result = would_shield(attacker, defender, move)
+            if _shield_trace:
+                tag = "selfBuff" if self_buffing else "selfDefDebuff"
+                _policy_log.append(
+                    f"  shield({defender.species} sh={defender.shields} vs"
+                    f" {move.get('moveId')} [{tag}]): → wouldShield={result}")
+            return result
+    if _shield_trace:
+        _policy_log.append(
+            f"  shield({defender.species} sh={defender.shields} vs"
+            f" {move.get('moveId')}): True (always shield)")
+    return True
 
 def use_first_available(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
     """Throw the first charged move we have enough energy for."""
@@ -285,9 +320,24 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
     Returns True if the defender is expected to use a shield against `move`.
     Checks whether the post-move HP is survivable given incoming cycle damage,
     and whether any of the attacker's charged moves are threatening enough.
+
+    Mirrors ActionLogic.js lines 1110-1140: temporarily applies the move's
+    stat change before computing subsequent-cycle damage, then resets.
+    If buffs[0] > 0 (atk buff): apply to attacker.
+    Otherwise: apply to defender (matches PvPoke's else-branch).
     """
-    damage     = attacker.charged_move_damage(move, defender)
-    post_hp    = defender.hp - damage
+    damage  = attacker.charged_move_damage(move, defender)
+    post_hp = defender.hp - damage
+
+    # Temporarily apply move buffs for damage projection (ActionLogic.js 1110-1140)
+    move_buffs   = move.get('buffs', [0, 0]) or [0, 0]
+    saved_stage  = None
+    if move_buffs[0] > 0:
+        saved_stage = attacker.atk_stage
+        attacker.atk_stage = max(-4, min(4, attacker.atk_stage + move_buffs[0]))
+    else:
+        saved_stage = defender.def_stage
+        defender.def_stage = max(-4, min(4, defender.def_stage + move_buffs[1]))
 
     fast_turns  = attacker.fast_move.get('_turns', 1)
     fast_damage = attacker.fast_move_damage(defender)
@@ -302,12 +352,37 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
 
     use_shield = post_hp <= cycle_damage
 
+    cm_reasons = []
     for cm in attacker.charged_moves:
         cm_dmg = attacker.charged_move_damage(cm, defender)
         if cm_dmg >= defender.hp / 1.4 and fast_dpt > 1.5:
             use_shield = True
+            cm_reasons.append(f"{cm.get('moveId')}({cm_dmg})≥hp/1.4({defender.hp/1.4:.0f})&dpt({fast_dpt:.1f})>1.5")
         if cm_dmg >= defender.hp - cycle_damage:
             use_shield = True
+            cm_reasons.append(f"{cm.get('moveId')}({cm_dmg})≥hp-cycle({defender.hp}-{cycle_damage}={defender.hp-cycle_damage})")
+
+    # Reset the temporarily applied buff (ActionLogic.js 1136-1140)
+    if move_buffs[0] > 0:
+        attacker.atk_stage = saved_stage
+    else:
+        defender.def_stage = saved_stage
+
+    if _shield_trace:
+        buff_note = ""
+        if move_buffs != [0, 0]:
+            buff_note = f" buffs={move_buffs}"
+        reasons = []
+        if post_hp <= cycle_damage:
+            reasons.append(f"postHP({post_hp})≤cycle({cycle_damage})")
+        reasons.extend(cm_reasons)
+        reason_str = ', '.join(reasons) if reasons else 'none'
+        _policy_log.append(
+            f"  wouldShield({defender.species} hp={defender.hp} sh={defender.shields},"
+            f" {attacker.species}→{move.get('moveId')} dmg={damage}{buff_note}):"
+            f" fast_dmg={fast_damage} cycle={cycle_damage} → {use_shield}"
+            f" [{reason_str}]"
+        )
 
     return use_shield
 
@@ -366,13 +441,11 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
         return False
 
     opp_cd = defender.cooldown
-    # In our model "just queued" == opp_cd == def_turns; treat it like PvPoke's 0.
-    # opp_cd == 0 only triggers OMT when the defender is genuinely about to
-    # queue a fast move — not when it already queued a charged move this turn
-    # (in which case _queued_charged is set and cooldown stayed at 0).
-    just_queued            = (opp_cd == def_turns)
-    opp_zero_before_action = (opp_cd == 0 and not defender._queued_charged)
-    if not (just_queued or opp_zero_before_action or opp_cd > target_cd):
+    # Match PvPoke ActionLogic.js line 263:
+    # "if( (opponent.cooldown == 0 || opponent.cooldown > targetCooldown) && targetCooldown > 0)"
+    # With the two-pass decision model, both pokemon see each other's pre-queuing
+    # cooldown at decision time (matching PvPoke's cooldownsToSet mechanism).
+    if not (opp_cd == 0 or opp_cd > target_cd):
         return False   # timing is already fine — proceed with charged move
 
     # --- Override conditions (any True → don't optimize, fire charged move) ---
@@ -398,11 +471,16 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     if turns_planned > ttl:
         return False
 
-    # Can KO opponent right now with a charged move (shields == 0 only)
+    # Can KO opponent with a non-self-debuffing charged move (shields == 0 only),
+    # but only if the fast move alone wouldn't also kill (PvPoke ActionLogic.js
+    # lines 212-233: "opponent.hp > poke.fastMove.damage").
     if defender.shields == 0:
+        _fast_dmg = attacker.fast_move_damage(defender)
         for cm in attacker.charged_moves:
             if attacker.energy >= cm['energy']:
-                if attacker.charged_move_damage(cm, defender) >= defender.hp:
+                if (attacker.charged_move_damage(cm, defender) >= defender.hp
+                        and not cm.get('selfDebuffing', False)
+                        and defender.hp > _fast_dmg):
                     return False
 
     # Opponent's next charged move can KO within our fast-move window
@@ -428,7 +506,7 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     if _policy_debug:
         _policy_log.append(
             f"  OMT: {attacker.species} delays (energy={attacker.energy}, "
-            f"def_cd={defender.cooldown}, just_queued={just_queued})"
+            f"opp_cd={defender.cooldown})"
         )
     return True   # optimize: throw fast move instead
 
@@ -527,6 +605,33 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
                 f"(ttl={turns_to_live}, energy={attacker.energy})"
             )
         return max_dmg_idx
+
+    # ------------------------------------------------------------------ #
+    # ActionLogic.js lines 212-233: fire a lethal charged move immediately,
+    # BEFORE OMT consideration.  Conditions (all must hold):
+    #   - shields down
+    #   - move would KO (hp <= damage)
+    #   - move is not self-debuffing
+    #   - fast move alone wouldn't also kill (preserve the energy if it's
+    #     unnecessary to use a charged move)
+    # Only the first two charged moves (n=0 and n=1) are checked (PvPoke
+    # uses n==0 || (n==1 && !baitShields); pvpoke_dp uses selective bait
+    # so baitShields=True → both n=0 and n=1 are eligible).
+    # ------------------------------------------------------------------ #
+    if defender.shields == 0:
+        _fast_dmg = attacker.fast_move_damage(defender)
+        for _n in range(min(2, len(cms))):
+            _cm = cms[_n]
+            if attacker.energy >= _cm['energy']:
+                if (attacker.charged_move_damage(_cm, defender) >= defender.hp
+                        and not _cm.get('selfDebuffing', False)
+                        and defender.hp > _fast_dmg):
+                    if _policy_debug:
+                        _policy_log.append(
+                            f"  DP[lethal]: {attacker.species} fires "
+                            f"{_cm.get('moveId')} (energy={attacker.energy})"
+                        )
+                    return _n
 
     # ------------------------------------------------------------------ #
     # optimizeMoveTiming (ActionLogic.js lines 237-344)
@@ -645,10 +750,21 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
     if not final_state.moves:
         # Farm-down plan: no charged moves needed, just fast-move to KO.
         # PvPoke returns undefined (no action) in this case.
+        if _dp_trace:
+            _policy_log.append(
+                f"  DP-trace[{attacker.species}]: farm-down plan (no charged moves)")
         return None
 
-    # When shields are down, PvPoke sorts the plan by damage descending
-    # so the highest-damage move fires first (ActionLogic.js lines 851-858).
+    if _dp_trace:
+        _policy_log.append(
+            f"  DP-trace[{attacker.species}]: raw plan="
+            f"{[cms[i].get('moveId') for i in final_state.moves]}"
+            f" turn={final_state.turn} hp={final_state.hp:.0f}"
+            f" shields={final_state.shields} iters={iters}")
+
+    # PvPoke sorts plan by damage descending only when baitShields is falsy or
+    # when opponent.shields == 0 and no debuffing move (ActionLogic.js lines 850-858).
+    # Default baitShields=1 (selective), so sort only fires when shields==0.
     if defender.shields == 0:
         plan = sorted(final_state.moves,
                       key=lambda n: attacker.charged_move_damage(cms[n], defender),
@@ -665,6 +781,10 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
             and attacker.energy >= cms[0]['energy']
             and cms[0]['energy'] <= first_move['energy']
             and actual_dpe(cms[0]) > actual_dpe(first_move)):
+        if _dp_trace:
+            _policy_log.append(
+                f"  DP-trace[{attacker.species}]: bandaid[861] prefer-low-energy:"
+                f" {first_move.get('moveId')} → {cms[0].get('moveId')}")
         first_idx  = 0
         first_move = cms[first_idx]
 
@@ -761,10 +881,6 @@ class BattlePokemon:
     _fm_since_charge:   int   = field(init=False, repr=False)  # fast moves since last charge (either player)
     # Queued fast move: (queued_on_turn, move_dict) or None
     _queued_fast:    "tuple[int, dict] | None" = field(init=False, repr=False)
-    # Set when this pokemon queued a charged move in the current decide step.
-    # Used by OMT so it doesn't mistake cooldown==0 (charged queued) for
-    # cooldown==0 (about to queue a fast move).
-    _queued_charged: bool = field(init=False, repr=False)
     # Stat stages: each in [-4, +4]
     atk_stage: int = field(init=False, repr=False)
     def_stage: int = field(init=False, repr=False)
@@ -777,7 +893,6 @@ class BattlePokemon:
         self.cooldown          = 0
         self._fm_since_charge  = 0
         self._queued_fast      = None
-        self._queued_charged   = False
         self.atk_stage         = 0
         self.def_stage         = 0
         self._buff_apply_meters = {}
@@ -878,7 +993,7 @@ def _apply_move_buffs(
 
     move_id   = move.get('moveId', '')
     meter     = attacker._buff_apply_meters.get(move_id, 0) + 1
-    threshold = 1.0 / chance   # 1.0 for guaranteed, 2.0 for 50%, etc.
+    threshold = round(1.0 / chance)   # matches PvPoke's Math.round(1/buffApplyChance)
 
     if meter >= threshold:
         attacker._buff_apply_meters[move_id] = 0
@@ -903,12 +1018,14 @@ def simulate(
     p0: BattlePokemon,
     p1: BattlePokemon,
     *,
-    shield_policy_0: ShieldPolicy   = always_shield,
-    shield_policy_1: ShieldPolicy   = always_shield,
+    shield_policy_0: ShieldPolicy   = pvpoke_simulate_shield,
+    shield_policy_1: ShieldPolicy   = pvpoke_simulate_shield,
     charged_policy_0: ChargedMovePolicy = bait_with_cheapest,
     charged_policy_1: ChargedMovePolicy = bait_with_cheapest,
     log: bool = False,
     debug: bool = False,
+    trace_shields: bool = False,
+    trace_dp: bool = False,
 ) -> BattleResult:
     """
     Run a 1v1 battle between p0 and p1 and return the result.
@@ -919,13 +1036,21 @@ def simulate(
     Policy log lines are interleaved into BattleResult.timeline at the turn
     they occur; they are indented with two leading spaces for easy filtering.
     Implies log=True.
-    """
-    global _policy_debug, _policy_log
 
+    trace_shields=True logs every shield policy call with inputs and results.
+    trace_dp=True logs DP queue plan and bandaid decisions.
+    Both imply log=True and debug=True.
+    """
+    global _policy_debug, _policy_log, _shield_trace, _dp_trace
+
+    if trace_shields or trace_dp:
+        debug = True
     if debug:
         log = True
-    _policy_debug = debug
-    _policy_log   = []
+    _policy_debug  = debug
+    _shield_trace  = trace_shields
+    _dp_trace      = trace_dp
+    _policy_log    = []
 
     pokemon   = [p0, p1]
     policies  = [
@@ -953,53 +1078,75 @@ def simulate(
         for p in pokemon:
             p.cooldown = max(0, p.cooldown - 1)
 
-        # --- 2. Decide actions ---
-        # Each pokemon with cooldown==0 chooses: charged move or fast move.
-        # Fast moves are queued; charged moves are collected for this turn.
+        # --- 2. Decide and queue actions ---
+        # Mirrors PvPoke's cooldownsToSet mechanism: both pokemon see each
+        # other's pre-queuing state at decision time. Implemented in three
+        # phases:
+        #
+        # Phase A — detect fast-move landings (but keep _queued_fast set so
+        #   the turnsToLive DP can see in-flight FMs during decisions).
+        # Phase B — collect decisions (no state mutation; each pokemon sees
+        #   the other's cooldown/energy BEFORE any new queuing this turn).
+        # Phase C — apply decisions and clear landed-FM state.
         charged_actions = []   # list of (actor_index, move_dict)
         fast_landings   = []   # fast moves that land this turn
-        # Clear charged-queued flag at the start of each decide step so that
-        # OMT can tell the difference between "cooldown==0, about to fast-move"
-        # and "cooldown==0 because I just queued a charged move this turn."
-        for p in pokemon:
-            p._queued_charged = False
+        _fired_fast     = []   # indices of pokemon whose queued FM fires now
 
+        # Phase A: mark FMs that land this turn (added to fast_landings).
+        # _queued_fast is intentionally NOT cleared here; it stays set so
+        # that Phase B decision-making can observe the in-flight state.
         for i, p in enumerate(pokemon):
-            opponent = pokemon[1 - i]
-            charged_pol, _ = policies[i]
-
-            # Check if a previously queued fast move lands this turn
             if p._queued_fast is not None:
                 queued_turn, qmove = p._queued_fast
                 duration = qmove['_turns']
                 if (turn - queued_turn) >= duration - 1:
                     fast_landings.append((i, qmove))
-                    p._queued_fast = None
+                    _fired_fast.append(i)
 
-            # Can act (cooldown==0 and no pending fast move)?
+        # Phase B: collect decisions; no state changes yet.
+        # Each pokemon with cooldown==0 AND no pending multi-turn FM decides.
+        # Note: pokemon whose FM fired in Phase A still have _queued_fast set
+        # and cooldown > 0, so they cannot decide this turn (correct: the FM
+        # fires in step 3 and only then is their cooldown reset to 0).
+        _pending: list = []   # (i, 'charged'|'fast_1'|'fast_multi', data)
+        for i, p in enumerate(pokemon):
+            opponent = pokemon[1 - i]
+            charged_pol, _ = policies[i]
+
             if p.cooldown == 0 and p._queued_fast is None:
                 move_idx = charged_pol(p, opponent)
                 if move_idx is not None:
-                    charged_actions.append((i, p.charged_moves[move_idx]))
-                    p._queued_charged = True
+                    _pending.append((i, 'charged', move_idx))
                 else:
-                    # Queue a fast move
                     fm = p.fast_move
                     log_event(f"{p.species} uses {fm.get('name', fm['moveId'])}")
                     if fm['_turns'] == 1:
-                        # PvPoke: requiredTimeToPass = cooldown - 500 = 0ms → fires
-                        # the same step it's queued.  Add directly to fast_landings.
-                        fast_landings.append((i, fm))
-                        p.cooldown = 1   # blocks re-acting until next turn
+                        # PvPoke: requiredTimeToPass = 0 → fires same step.
+                        _pending.append((i, 'fast_1', fm))
                     else:
-                        p._queued_fast = (turn, fm)
-                        p.cooldown = fm['_turns']
+                        _pending.append((i, 'fast_multi', fm))
 
-        # Flush any policy-debug entries generated during decide step
+        # Flush any policy-debug entries generated during Phase B.
         if _policy_debug and _policy_log:
             for entry in _policy_log:
                 timeline.append(f"T{turn:>3}: {entry.lstrip()}")
             _policy_log.clear()
+
+        # Phase C: apply decisions and clear fired-FM state.
+        # Clear _queued_fast only for FMs that fired in Phase A.
+        for i in _fired_fast:
+            pokemon[i]._queued_fast = None
+
+        for i, action_type, data in _pending:
+            p = pokemon[i]
+            if action_type == 'charged':
+                charged_actions.append((i, p.charged_moves[data]))
+            elif action_type == 'fast_1':
+                fast_landings.append((i, data))
+                p.cooldown = 1   # blocks re-acting until next turn
+            else:   # 'fast_multi'
+                p._queued_fast = (turn, data)
+                p.cooldown = data['_turns']
 
         # --- 3. Resolve fast move landings (fire BEFORE charged moves) ---
         # Naturally-due fast moves resolve before charged moves. When two fast
@@ -1037,6 +1184,17 @@ def simulate(
         for actor_idx, move in charged_actions:
             attacker = pokemon[actor_idx]
             defender = pokemon[1 - actor_idx]
+
+            # PvPoke Battle.js lines 471-490: cancel a charged move when the
+            # attacker was killed by the opponent's fast move this turn, UNLESS
+            # the opponent is also throwing a charged move this turn (the
+            # opponentChargedMoveThisTurn exception — simultaneous charged moves
+            # are allowed even if one side was killed by a fast move).
+            if attacker.hp <= 0:
+                opponent_also_charged = any(ai == 1 - actor_idx
+                                            for ai, _ in charged_actions)
+                if not opponent_also_charged:
+                    continue
 
             if attacker.energy < move['energy']:
                 continue   # raced to this — no longer affordable

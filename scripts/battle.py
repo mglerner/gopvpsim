@@ -9,9 +9,18 @@ Usage:
                               [--ivs1 a/d/s] [--ivs2 a/d/s] \
                               [--policy pvpoke_ai|bait_with_cheapest|no_bait|optimal_timing] \
                               [--shadow1] [--shadow2] \
-                              [--pvpoke-scores]
+                              [--pvpoke-scores] \
+                              [--shields1 N] [--shields2 N] \
+                              [--log] [--debug] [--trace-shields] [--trace-dp] [--stats]
 
     <charged> is a comma-separated list of 1 or 2 move IDs.
+    --shields1 / --shields2: restrict to a single shield scenario (0, 1, or 2).
+    --log:   print a turn-by-turn battle timeline after the result table.
+    --debug: print policy decisions interleaved with the timeline (implies --log).
+             Use --shields1/--shields2 to focus on one scenario when debugging.
+    --trace-shields: log every shield-policy call with inputs/results (implies --debug).
+    --trace-dp: log DP queue plans and bandaid decisions (implies --debug).
+    --stats: print computed stats (atk, def, hp, CP, types) for both pokemon.
 
 Examples:
     python scripts/battle.py Medicham PSYCHO_CUT DYNAMIC_PUNCH,PSYCHIC \
@@ -21,6 +30,11 @@ Examples:
     python scripts/battle.py Swampert MUD_SHOT HYDRO_CANNON,EARTHQUAKE \
                               Registeel LOCK_ON FLASH_CANNON,FOCUS_BLAST \
                               --league great
+
+    python scripts/battle.py Azumarill BUBBLE ICE_BEAM,HYDRO_PUMP \
+                              Forretress VOLT_SWITCH ROCK_TOMB \
+                              --ivs1 4/15/13 --ivs2 5/15/13 \
+                              --shields1 2 --shields2 2 --debug
 """
 import argparse
 import sys
@@ -119,6 +133,20 @@ def main():
     parser.add_argument('--pvpoke-scores', action='store_true',
                         help='Report all scores from species1\'s perspective '
                              '(like PvPoke\'s table: scores <500 mean species1 loses)')
+    parser.add_argument('--shields1', type=int, choices=[0, 1, 2], default=None,
+                        metavar='N', help='Simulate only this shield count for species1')
+    parser.add_argument('--shields2', type=int, choices=[0, 1, 2], default=None,
+                        metavar='N', help='Simulate only this shield count for species2')
+    parser.add_argument('--log', action='store_true',
+                        help='Print a turn-by-turn battle timeline after the result table')
+    parser.add_argument('--debug', action='store_true',
+                        help='Print policy decisions interleaved with timeline (implies --log)')
+    parser.add_argument('--trace-shields', action='store_true',
+                        help='Log every shield-policy call with inputs and results (implies --debug)')
+    parser.add_argument('--trace-dp', action='store_true',
+                        help='Log DP queue plans and bandaid decisions (implies --debug)')
+    parser.add_argument('--stats', action='store_true',
+                        help='Print computed stats (atk, def, hp, CP, types) for both pokemon')
 
     args = parser.parse_args()
 
@@ -137,17 +165,55 @@ def main():
     print(f'  policy: {args.policy}')
     print()
 
+    if args.stats:
+        from gopvpsim.data import parse_types
+        for label, species, fast_id, charged_ids_list, ivs, shadow in [
+            ('P1', args.species1, args.fast1, charged_ids1, args.ivs1, args.shadow1),
+            ('P2', args.species2, args.fast2, charged_ids2, args.ivs2, args.shadow2),
+        ]:
+            a, d, s = ivs
+            p = Pokemon.at_best_level(species, a, d, s, league=args.league, shadow=shadow)
+            fast_moves, charged_moves = get_moves()
+            fm = fast_moves[fast_id]
+            gm = load_gamemaster()
+            mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
+            types = parse_types(mon)
+            print(f'  {label} {species}: CP={p.cp} L{p.level} | '
+                  f'atk={p.atk:.2f} def={p.def_:.2f} hp={p.hp} | '
+                  f'types={types}')
+            print(f'      fast: {fast_id} (power={fm["power"]} energy={fm["energyGain"]}'
+                  f' cd={fm["cooldown"]}ms = {fm["cooldown"]//500}T)')
+            for cid in charged_ids_list:
+                cm = charged_moves[cid]
+                buff_str = ''
+                if cm.get('buffs'):
+                    buff_str = (f' buffs={cm["buffs"]} target={cm.get("buffTarget","?")}'
+                                f' chance={cm.get("buffApplyChance","?")}')
+                print(f'      chrg: {cid} (power={cm["power"]} energy={cm["energy"]}{buff_str})')
+        print()
+
+    do_trace_shields = args.trace_shields
+    do_trace_dp     = args.trace_dp
+    do_debug = args.debug or do_trace_shields or do_trace_dp
+    do_log   = args.log or do_debug
+
+    shield_range1 = [args.shields1] if args.shields1 is not None else range(3)
+    shield_range2 = [args.shields2] if args.shields2 is not None else range(3)
+
     col_w = 14
+    s2_list = list(shield_range2)
     header = f"{'':10}" + ''.join(
         f"{'  ' + args.species2[:4] + ' ' + str(sa) + 's':<{col_w}}"
-        for sa in range(3)
+        for sa in s2_list
     )
     print(header)
     print('-' * len(header))
 
-    for s1_shields in range(3):
+    timelines = []  # (label, timeline_lines) collected for printing after table
+
+    for s1_shields in shield_range1:
         row = f"{args.species1[:4] + ' ' + str(s1_shields) + 's':<10}"
-        for s2_shields in range(3):
+        for s2_shields in s2_list:
             bp1 = make_battle_pokemon(
                 args.species1, args.fast1, charged_ids1, args.league,
                 s1_shields, a1, d1, s1, shadow=args.shadow1,
@@ -158,7 +224,11 @@ def main():
             )
             result = simulate(bp1, bp2,
                               charged_policy_0=policy,
-                              charged_policy_1=policy)
+                              charged_policy_1=policy,
+                              log=do_log,
+                              debug=do_debug,
+                              trace_shields=do_trace_shields,
+                              trace_dp=do_trace_dp)
 
             score0 = round(result.pvpoke_score(0))
             score1 = round(result.pvpoke_score(1))
@@ -175,9 +245,22 @@ def main():
                 cell = f"Tie {score0}"
 
             row += f"{cell:<{col_w}}"
+
+            if do_log and result.timeline:
+                label = (f"--- {args.species1} {s1_shields}s  vs  "
+                         f"{args.species2} {s2_shields}s "
+                         f"(score: {score0}) ---")
+                timelines.append((label, result.timeline))
+
         print(row)
 
     print()
+
+    for label, tl in timelines:
+        print(label)
+        for line in tl:
+            print(line)
+        print()
 
 
 if __name__ == '__main__':

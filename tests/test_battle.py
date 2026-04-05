@@ -8,7 +8,8 @@ Run integration tests with: pytest -m integration
 import pytest
 from gopvpsim.battle import (
     BattlePokemon, BattleResult,
-    always_shield, never_shield, pvpoke_shield, use_first_available, bait_with_cheapest,
+    always_shield, never_shield, pvpoke_shield, pvpoke_simulate_shield,
+    use_first_available, bait_with_cheapest,
     no_bait, pvpoke_ai, pvpoke_dp, optimal_timing, simulate, ENERGY_CAP, OPTIMAL_TIMING,
 )
 
@@ -454,12 +455,12 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expect
     # These scores reflect our simulator's internally consistent behavior.
     #
     # Our scores:        Forr 0s  Forr 1s  Forr 2s
-    #   Azu 0 shields:    488      285      214
+    #   Azu 0 shields:    488      300      230
     #   Azu 1 shields:    480      277      218
     #   Azu 2 shields:    612      496      242
     (0, 0, 1, 488),
-    (0, 1, 1, 285),
-    (0, 2, 1, 214),
+    (0, 1, 1, 300),
+    (0, 2, 1, 230),
     (1, 0, 1, 480),
     (1, 1, 1, 277),
     (1, 2, 1, 218),
@@ -484,4 +485,226 @@ def test_azumarill_vs_forretress_sand_rock(shields_azu, shields_forr,
     assert azu_score == expected_azu_score, (
         f"{shields_azu}v{shields_forr}: expected Azu score={expected_azu_score}, "
         f"got {azu_score}  (delta={azu_score - expected_azu_score:+d})"
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_azu,shields_forr,expected_winner,expected_azu_score", [
+    # Azumarill 4/15/13 (BUBBLE/ICE_BEAM/HYDRO_PUMP)
+    # vs Forretress 5/15/13 (VOLT_SWITCH/ROCK_TOMB only), Great League
+    # Policy: pvpoke_dp + always_shield (PvPoke simulate-mode default)
+    #
+    # PvPoke verified scores (pvpoke.com/battle/):
+    #              Forr 0s  Forr 1s  Forr 2s
+    #   Azu 0s:     480      277      218
+    #   Azu 1s:     480      277      218
+    #   Azu 2s:     575      445      265
+    #
+    (0, 0, 1, 480),
+    (0, 1, 1, 277),
+    (0, 2, 1, 218),
+    (1, 0, 1, 480),
+    (1, 1, 1, 277),
+    (1, 2, 1, 218),
+    (2, 0, 0, 575),
+    (2, 1, 1, 445),
+    (2, 2, 1, 265),
+])
+def test_azumarill_vs_forretress_rt_only(shields_azu, shields_forr,
+                                         expected_winner, expected_azu_score):
+    bp_azu  = _make_battle_pokemon('Azumarill',  'BUBBLE',      ['ICE_BEAM', 'HYDRO_PUMP'],
+                                   'great', shields_azu,  4, 15, 13)
+    bp_forr = _make_battle_pokemon('Forretress', 'VOLT_SWITCH', ['ROCK_TOMB'],
+                                   'great', shields_forr, 5, 15, 13)
+    result = simulate(bp_azu, bp_forr,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp)
+    assert result.winner == expected_winner, (
+        f"{shields_azu}v{shields_forr}: expected winner={expected_winner}, "
+        f"got {result.winner}  HP={result.hp_remaining}"
+    )
+    azu_score = round(result.pvpoke_score(0))
+    assert azu_score == expected_azu_score, (
+        f"{shields_azu}v{shields_forr}: expected Azu score={expected_azu_score}, "
+        f"got {azu_score}  (delta={azu_score - expected_azu_score:+d})"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Buff/debuff matchups — verified at pvpoke.com/battle/
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_bee,shields_med,expected_winner,expected_bee_score", [
+    # Beedrill 4/15/15 (POISON_JAB / FELL_STINGER + X_SCISSOR)
+    # vs Medicham 7/15/14 (COUNTER / DYNAMIC_PUNCH + ICE_PUNCH), Great League
+    # Policy: pvpoke_dp + always_shield
+    #
+    # Fell Stinger: guaranteed +1 atk buff on the user every activation.
+    #
+    # PvPoke verified scores (pvpoke.com/battle/):
+    #              Med 0s   Med 1s   Med 2s
+    #   Bee 0s:     707      471      507
+    #   Bee 1s:     857      646      657
+    #   Bee 2s:     857      796      807
+    (0, 0, 0, 707),
+    (0, 1, 1, 471),
+    (0, 2, 0, 507),
+    (1, 0, 0, 857),
+    (1, 1, 0, 646),
+    (1, 2, 0, 657),
+    (2, 0, 0, 857),
+    (2, 1, 0, 796),
+    (2, 2, 0, 807),
+])
+def test_beedrill_vs_medicham_fell_stinger(shields_bee, shields_med,
+                                           expected_winner, expected_bee_score):
+    bp_bee = _make_battle_pokemon('Beedrill', 'POISON_JAB', ['FELL_STINGER', 'X_SCISSOR'],
+                                  'great', shields_bee, 4, 15, 15)
+    bp_med = _make_battle_pokemon('Medicham', 'COUNTER', ['DYNAMIC_PUNCH', 'ICE_PUNCH'],
+                                  'great', shields_med, 7, 15, 14)
+    result = simulate(bp_bee, bp_med,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp)
+    assert result.winner == expected_winner, (
+        f"{shields_bee}v{shields_med}: expected winner={expected_winner}, "
+        f"got {result.winner}  HP={result.hp_remaining}"
+    )
+    bee_score = round(result.pvpoke_score(0))
+    assert bee_score == expected_bee_score, (
+        f"{shields_bee}v{shields_med}: expected Bee score={expected_bee_score}, "
+        f"got {bee_score}  (delta={bee_score - expected_bee_score:+d})"
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_cor,shields_med,expected_winner,expected_cor_score", [
+    # Corviknight 4/12/14 (AIR_SLASH / AIR_CUTTER + PAYBACK)
+    # vs Medicham 7/15/14 (COUNTER / DYNAMIC_PUNCH + ICE_PUNCH), Great League
+    # Policy: pvpoke_dp + always_shield
+    #
+    # Air Cutter: 30% chance (+1 atk buff to user); deterministic meter fires every ~3 uses.
+    #
+    # PvPoke verified scores (pvpoke.com/battle/):
+    #              Med 0s   Med 1s   Med 2s
+    #   Cor 0s:     566      478      326
+    #   Cor 1s:     756      478      326
+    #   Cor 2s:     756      693      633
+    (0, 0, 0, 566),
+    (0, 1, 1, 478),
+    (0, 2, 1, 326),
+    (1, 0, 0, 756),
+    (1, 1, 1, 478),
+    (1, 2, 1, 326),
+    (2, 0, 0, 756),
+    (2, 1, 0, 693),
+    (2, 2, 0, 633),
+])
+def test_corviknight_vs_medicham_air_cutter(shields_cor, shields_med,
+                                            expected_winner, expected_cor_score):
+    bp_cor = _make_battle_pokemon('Corviknight', 'AIR_SLASH', ['AIR_CUTTER', 'PAYBACK'],
+                                  'great', shields_cor, 4, 12, 14)
+    bp_med = _make_battle_pokemon('Medicham', 'COUNTER', ['DYNAMIC_PUNCH', 'ICE_PUNCH'],
+                                  'great', shields_med, 7, 15, 14)
+    result = simulate(bp_cor, bp_med,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp)
+    assert result.winner == expected_winner, (
+        f"{shields_cor}v{shields_med}: expected winner={expected_winner}, "
+        f"got {result.winner}  HP={result.hp_remaining}"
+    )
+    cor_score = round(result.pvpoke_score(0))
+    assert cor_score == expected_cor_score, (
+        f"{shields_cor}v{shields_med}: expected Cor score={expected_cor_score}, "
+        f"got {cor_score}  (delta={cor_score - expected_cor_score:+d})"
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_mie,shields_med,expected_winner,expected_mie_score", [
+    # Mienfoo 13/15/15 (LOW_KICK / HIGH_JUMP_KICK + LOW_SWEEP)
+    # vs Medicham 7/15/14 (COUNTER / DYNAMIC_PUNCH + ICE_PUNCH), Great League
+    # Policy: pvpoke_dp + always_shield
+    #
+    # High Jump Kick: 10% self-debuff (-2 def stages); deterministic meter fires every 10 uses.
+    # In a typical GL battle HJK fires <10 times so the debuff does not trigger here.
+    # These tests cover normal HJK behavior; the self-debuff code path is exercised
+    # only in longer battles.
+    #
+    # PvPoke verified scores (pvpoke.com/battle/):
+    #              Med 0s   Med 1s   Med 2s
+    #   Mie 0s:     269       78       78
+    #   Mie 1s:     521      347      145
+    #   Mie 2s:     414      212      145
+    (0, 0, 1, 269),
+    (0, 1, 1,  78),
+    (0, 2, 1,  78),
+    (1, 0, 0, 521),
+    (1, 1, 1, 347),
+    (1, 2, 1, 145),
+    (2, 0, 1, 414),
+    (2, 1, 1, 212),
+    (2, 2, 1, 145),
+])
+def test_mienfoo_vs_medicham_high_jump_kick(shields_mie, shields_med,
+                                            expected_winner, expected_mie_score):
+    bp_mie = _make_battle_pokemon('Mienfoo', 'LOW_KICK', ['HIGH_JUMP_KICK', 'LOW_SWEEP'],
+                                  'great', shields_mie, 13, 15, 15)
+    bp_med = _make_battle_pokemon('Medicham', 'COUNTER', ['DYNAMIC_PUNCH', 'ICE_PUNCH'],
+                                  'great', shields_med, 7, 15, 14)
+    result = simulate(bp_mie, bp_med,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp)
+    assert result.winner == expected_winner, (
+        f"{shields_mie}v{shields_med}: expected winner={expected_winner}, "
+        f"got {result.winner}  HP={result.hp_remaining}"
+    )
+    mie_score = round(result.pvpoke_score(0))
+    assert mie_score == expected_mie_score, (
+        f"{shields_mie}v{shields_med}: expected Mie score={expected_mie_score}, "
+        f"got {mie_score}  (delta={mie_score - expected_mie_score:+d})"
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_cor,shields_azu,expected_winner,expected_cor_score", [
+    # Corviknight 4/12/14 (AIR_SLASH / AIR_CUTTER + PAYBACK)
+    # vs Azumarill 4/15/13 (BUBBLE / ICE_BEAM + PLAY_ROUGH), Great League
+    # Policy: pvpoke_dp + always_shield
+    #
+    # Corviknight throws 3 Air Cutters; deterministic buff meter fires on the 3rd.
+    # Tests chance-buff firing mid-battle affecting subsequent damage.
+    #
+    # PvPoke verified scores (pvpoke.com/battle/):
+    #              Azu 0s   Azu 1s   Azu 2s
+    #   Cor 0s:     426      356      285
+    #   Cor 1s:     445      374      303
+    #   Cor 2s:     586      586      536
+    (0, 0, 1, 426),
+    (0, 1, 1, 356),
+    (0, 2, 1, 285),
+    (1, 0, 1, 445),
+    (1, 1, 1, 374),
+    (1, 2, 1, 303),
+    (2, 0, 0, 586),
+    (2, 1, 0, 586),
+    (2, 2, 0, 536),
+])
+def test_corviknight_vs_azumarill_air_cutter_buff(shields_cor, shields_azu,
+                                                   expected_winner, expected_cor_score):
+    bp_cor = _make_battle_pokemon('Corviknight', 'AIR_SLASH', ['AIR_CUTTER', 'PAYBACK'],
+                                  'great', shields_cor, 4, 12, 14)
+    bp_azu = _make_battle_pokemon('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+                                  'great', shields_azu, 4, 15, 13)
+    result = simulate(bp_cor, bp_azu,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp)
+    assert result.winner == expected_winner, (
+        f"{shields_cor}v{shields_azu}: expected winner={expected_winner}, "
+        f"got {result.winner}  HP={result.hp_remaining}"
+    )
+    cor_score = round(result.pvpoke_score(0))
+    assert cor_score == expected_cor_score, (
+        f"{shields_cor}v{shields_azu}: expected Cor score={expected_cor_score}, "
+        f"got {cor_score}  (delta={cor_score - expected_cor_score:+d})"
     )
