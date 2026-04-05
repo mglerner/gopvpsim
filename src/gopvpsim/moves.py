@@ -170,14 +170,27 @@ def get_moves():
         gm = load_gamemaster()
         _fast_moves    = {m['moveId']: m for m in gm['moves'] if m['energyGain'] != 0}
         _charged_moves = {m['moveId']: m for m in gm['moves'] if m['energyGain'] == 0}
-        # Add derived properties matching PvPoke's Pokemon.js
+        # Add derived properties matching PvPoke's GameMaster.js lines 859-875.
+        # Key: selfBuffing requires buffApplyChance == 1 (guaranteed),
+        #      selfDebuffing requires buffApplyChance >= 0.5.
         for m in _charged_moves.values():
-            buffs = m.get('buffs')
-            bt    = m.get('buffTarget')
-            m['selfBuffing']           = bool(buffs and bt == 'self' and (buffs[0] > 0 or buffs[1] > 0))
-            m['selfDebuffing']         = bool(buffs and bt == 'self' and (buffs[0] < 0 or buffs[1] < 0))
-            m['selfAttackDebuffing']   = bool(buffs and bt == 'self' and buffs[0] < 0)
-            m['selfDefenseDebuffing']  = bool(buffs and bt == 'self' and buffs[1] < 0)
+            buffs  = m.get('buffs')
+            bt     = m.get('buffTarget')
+            chance = float(m.get('buffApplyChance', 0) or 0)
+            mid    = m.get('moveId', '')
+            # selfDebuffing: chance >= 0.5, self-targeting, negative buff,
+            # with DRAGON_ASCENT excluded (PvPoke line 859)
+            m['selfDebuffing'] = bool(
+                buffs and bt == 'self' and chance >= 0.5
+                and mid != 'DRAGON_ASCENT'
+                and (buffs[0] < 0 or buffs[1] < 0))
+            # selfAttackDebuffing / selfDefenseDebuffing: subsets of selfDebuffing
+            m['selfAttackDebuffing']  = bool(m['selfDebuffing'] and buffs[0] < 0)
+            m['selfDefenseDebuffing'] = bool(m['selfDebuffing'] and buffs[1] < 0)
+            # selfBuffing: guaranteed (chance == 1) positive self-buff (PvPoke line 873)
+            m['selfBuffing'] = bool(
+                buffs and chance == 1
+                and bt == 'self' and (buffs[0] > 0 or buffs[1] > 0))
     return _fast_moves, _charged_moves
 
 

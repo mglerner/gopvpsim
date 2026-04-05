@@ -120,19 +120,22 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
             _policy_log.append(
                 f"  shield({defender.species} sh=0 vs {move.get('moveId')}): False (no shields)")
         return False
-    buffs = move.get('buffs')
-    buff_target = move.get('buffTarget')
-    if buffs and buff_target == 'self':
-        self_buffing       = buffs[0] > 0 or buffs[1] > 0
-        self_def_debuffing = buffs[1] < 0
-        if self_buffing or self_def_debuffing:
-            result = would_shield(attacker, defender, move)
-            if _shield_trace:
-                tag = "selfBuff" if self_buffing else "selfDefDebuff"
-                _policy_log.append(
-                    f"  shield({defender.species} sh={defender.shields} vs"
-                    f" {move.get('moveId')} [{tag}]): → wouldShield={result}")
-            return result
+
+    # PvPoke Battle.js lines 1083-1094: only use wouldShield heuristic for
+    # moves with precomputed selfBuffing flag (requires buffApplyChance==1)
+    # or selfDefenseDebuffing flag (requires buffApplyChance>=0.5).
+    # Chance-buff moves like Air Cutter (30%) are NOT selfBuffing in PvPoke,
+    # so they are always shielded.
+    self_buffing        = move.get('selfBuffing', False)
+    self_def_debuffing  = move.get('selfDefenseDebuffing', False)
+    if self_buffing or self_def_debuffing:
+        result = would_shield(attacker, defender, move)
+        if _shield_trace:
+            tag = "selfBuff" if self_buffing else "selfDefDebuff"
+            _policy_log.append(
+                f"  shield({defender.species} sh={defender.shields} vs"
+                f" {move.get('moveId')} [{tag}]): → wouldShield={result}")
+        return result
     if _shield_trace:
         _policy_log.append(
             f"  shield({defender.species} sh={defender.shields} vs"
