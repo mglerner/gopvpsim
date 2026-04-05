@@ -8,7 +8,7 @@ a BeeWare mobile app.
 ## Architecture
 - `data.py` — load and cache PvPoke's gamemaster.json
 - `pokemon.py` — stat calculation (CP, level, IV, stat product)
-- `moves.py` — move data and damage formula
+- `moves.py` — move data, damage formula, type effectiveness
 - `battle.py` — battle simulation loop with pluggable shield/bait policies
 - `breakpoints.py` — breakpoint and bulkpoint analysis
 
@@ -33,8 +33,13 @@ parameterized by opponent shield probability.
 Pluggable policy. Simulate all three shield scenarios (0-0, 1-1, 2-2).
 
 ## CLI scripts
-- `scripts/battle.py` — simulate a 1v1 matchup across all three shield scenarios
+- `scripts/battle.py` — simulate a 1v1 matchup across all 9 shield scenarios
+  Flags: `--stats`, `--show-damage`, `--trace-dp`, `--trace-shields`, `--debug`, `--pvpoke-scores`
 - `scripts/breakpoints.py` — show breakpoints/bulkpoints for a given attacker/move/defender
+
+## Testing
+- `python -m pytest tests/test_battle.py -q` — run all battle tests (99/102 passing)
+- Tests verify scores against PvPoke ground truth from pvpoke.com/battle/
 
 ## Out of scope for now
 Adaptive/game-tree search (minimax). Web app UI.
