@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Callable
 
 from .moves import damage as calc_damage, type_effectiveness, stab
@@ -513,15 +514,147 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     return True   # optimize: throw fast move instead
 
 
-def _dp_insert(queue: list, ns: "_DPState") -> None:
-    """Insert ns into the priority queue (sorted by turn, ascending)."""
+def _dp_count_debuffs(moves: list, cms: list) -> int:
+    """Count net debuffs in a move plan (for dedup tie-breaking)."""
+    count = 0
+    for m_idx in moves:
+        m = cms[m_idx]
+        if m.get('selfDebuffing', False):
+            count += 1
+        if (m.get('buffApplyChance') == 1
+                and m.get('buffTarget') == 'self'
+                and sum(m.get('buffs', [0, 0])) > 0):
+            count -= 1
+    return count
+
+
+# ---------------------------------------------------------------------------
+# DP queue insertion strategies (PvPoke ActionLogic.js lines 469-762)
+#
+# PvPoke uses three different insertion strategies with built-in pruning.
+# However, the dominance checks (lines 600, 697) and the farm-down blocking
+# check (line 479) reference ``.hp`` and ``.shields`` on BattleState objects.
+# BattleState stores those values as ``.oppHealth`` and ``.oppShields``
+# (lines 1190-1192), so ``.hp``/``.shields`` are ``undefined`` in JS.
+# Since ``undefined < 0`` and ``undefined <= number`` are always ``false``
+# in JavaScript, these pruning checks are dead code — they never fire.
+#
+# The ``intended_pruning`` flag controls whether we replicate PvPoke's
+# *actual* JS behavior (pruning disabled) or the apparently *intended*
+# behavior (pruning enabled, as if ``.hp``→``.oppHealth`` and
+# ``.shields``→``.oppShields`` were used).
+# ---------------------------------------------------------------------------
+
+
+def _dp_insert_farm_down(queue: list, ns: "_DPState", *,
+                         intended_pruning: bool = False) -> None:
+    """Farm-down insertion (PvPoke lines 469-491).
+
+    Insert AFTER same-turn states (``<=``).
+
+    PvPoke line 479 checks ``DPQueue[i].hp < 0`` to block insertion, but
+    ``.hp`` is undefined on BattleState (stored as ``.oppHealth``), so
+    ``undefined < 0`` is always ``false`` and farm-down always inserts.
+    With ``intended_pruning=True``, the blocking check uses our real
+    ``.hp`` field and actually fires.
+    """
     i = 0
     while i < len(queue) and queue[i].turn <= ns.turn:
+        if intended_pruning and queue[i].hp < 0:
+            return  # blocked by existing KO state
         i += 1
     queue.insert(i, ns)
 
 
-def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
+def _dp_insert_ready(queue: list, ns: "_DPState", cms: list, *,
+                     intended_pruning: bool = False) -> None:
+    """Ready-move insertion (PvPoke lines 541-616).
+
+    Phase 1 — dedup (lines 544-586): scan states at exactly
+    ``turn == ns.turn``.  If an existing state has the same hp (and
+    buffs, always 0), don't insert (different energy) or compare debuff
+    counts (same energy).  This check uses ``.oppHealth`` (real field)
+    and is always active.
+
+    Phase 2 — dominance (lines 598-608): scan states at
+    ``turn <= ns.turn``.  Block if existing state has hp <= newHp AND
+    energy >= newEnergy AND shields <= newShields.  This check uses
+    ``.hp``/``.shields`` (undefined), so it is dead code in PvPoke.
+    Only active when ``intended_pruning=True``.
+
+    Insert AFTER same-turn states (``<=``).
+    """
+    # Phase 1: dedup (always active — uses .oppHealth, a real field)
+    i = 0
+    insert_element = True
+    while i < len(queue) and queue[i].turn == ns.turn:
+        # buffs always 0 → buffs check always matches
+        if queue[i].hp == ns.hp:
+            if queue[i].energy == ns.energy:
+                # Same energy — compare debuff counts
+                existing_debuffs = _dp_count_debuffs(queue[i].moves, cms)
+                new_debuffs = _dp_count_debuffs(ns.moves, cms)
+                if existing_debuffs > new_debuffs:
+                    queue.pop(i)  # remove worse existing state
+                else:
+                    insert_element = False
+                    i += 1
+            else:
+                # Different energy, same hp → don't insert
+                insert_element = False
+                i += 1
+        else:
+            i += 1
+
+    if not insert_element:
+        return
+
+    # Phase 2: dominance check (dead code in PvPoke; active if intended)
+    i = 0
+    if intended_pruning:
+        while i < len(queue) and queue[i].turn <= ns.turn:
+            if (queue[i].hp <= ns.hp
+                    and queue[i].energy >= ns.energy
+                    and queue[i].shields <= ns.shields):
+                return  # dominated by existing state
+            i += 1
+    else:
+        while i < len(queue) and queue[i].turn <= ns.turn:
+            i += 1
+    queue.insert(i, ns)
+
+
+def _dp_insert_not_ready(queue: list, ns: "_DPState", *,
+                         intended_pruning: bool = False) -> None:
+    """Not-ready-move insertion (PvPoke lines 686-708).
+
+    Insert BEFORE same-turn states (strict ``<``).  This gives
+    charged-move KO paths priority over farm-down KOs at the same turn.
+
+    Dominance check (lines 696-704) uses ``.hp``/``.shields`` (undefined
+    on BattleState), so it is dead code in PvPoke.  Only active when
+    ``intended_pruning=True``.
+
+    Verified: the ``<`` insertion order produces 2 exact PvPoke matches
+    and 3 closer scores for Azu vs Forretress (Sand+Rock) compared to
+    the old ``<=`` order.
+    """
+    i = 0
+    if intended_pruning:
+        while i < len(queue) and queue[i].turn < ns.turn:
+            if (queue[i].hp <= ns.hp
+                    and queue[i].energy >= ns.energy
+                    and queue[i].shields <= ns.shields):
+                return  # dominated by existing state
+            i += 1
+    else:
+        while i < len(queue) and queue[i].turn < ns.turn:
+            i += 1
+    queue.insert(i, ns)
+
+
+def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
+              *, intended_pruning: bool = False) -> "int | None":
     """
     PvPoke's DP charged-move AI (ActionLogic.js port, no-buff case).
 
@@ -535,6 +668,19 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
     Near-KO    (opponent HP ≤ 2 × best-cycle damage):
         Run a forward DP over charge-move sequences to find the fastest KO.
         Fire the first move in the optimal plan; wait if not yet affordable.
+
+    intended_pruning:
+        False (default) — replicate PvPoke's actual JS behavior.  The DP
+        queue dominance checks (lines 600, 697) and farm-down blocking
+        (line 479) reference ``.hp``/``.shields`` which are undefined on
+        BattleState (stored as ``.oppHealth``/``.oppShields``), making
+        them dead code.  Not-ready states insert with ``<`` (before
+        same-turn), ready states use dedup + ``<=`` (after same-turn).
+
+        True — what PvPoke apparently intended.  Dominance checks and
+        farm-down blocking are functional (using our real ``.hp`` and
+        ``.shields`` fields).  This prevents dominated states from
+        accumulating in the queue.
     """
     fast_turns       = attacker.fast_move.get('_turns', 1)
     fast_energy      = attacker.fast_move.get('energyGain', 5)
@@ -708,7 +854,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
             move_dmg = attacker.charged_move_damage(move, defender)
 
             if curr.energy >= move['energy']:
-                # Fire immediately (costs 1 extra turn for the charge move)
+                # Move ready (PvPoke lines 524-616): dedup + dominance
+                # pruning, insert AFTER same-turn (<=)
                 new_e  = curr.energy - move['energy']
                 new_t  = curr.turn + 1
                 new_sh = curr.shields
@@ -717,8 +864,15 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
                     new_sh -= 1
                 else:
                     new_hp = curr.hp - move_dmg
+
+                _dp_insert_ready(
+                    queue,
+                    _DPState(new_e, new_hp, new_t, new_sh, curr.moves + [n]),
+                    cms, intended_pruning=intended_pruning)
             else:
-                # Fast-forward: ceil((cost − energy) / energyGain) fast moves
+                # Move not ready (PvPoke lines 686-708): dominance
+                # pruning, insert BEFORE same-turn (<).  This gives
+                # charged-move KO paths priority over farm-down KOs.
                 fm_needed    = math.ceil((move['energy'] - curr.energy) / fast_energy)
                 turns_needed = fm_needed * fast_turns
                 new_e  = fm_needed * fast_energy + curr.energy - move['energy']
@@ -730,27 +884,21 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
                 else:
                     new_hp = curr.hp - fast_damage * fm_needed - move_dmg
 
-            _dp_insert(queue, _DPState(new_e, new_hp, new_t, new_sh, curr.moves + [n]))
+                _dp_insert_not_ready(
+                    queue,
+                    _DPState(new_e, new_hp, new_t, new_sh, curr.moves + [n]),
+                    intended_pruning=intended_pruning)
 
-        # Farm-down state: fast-move to KO from here with no more charged moves.
-        # PvPoke ActionLogic.js adds this for every state to represent "stop here,
-        # just fast-move until the opponent faints."
+        # Farm-down state: fast-move to KO from here with no more charged
+        # moves.
         if fast_damage > 0 and curr.hp > 0:
             fm_to_ko  = math.ceil(curr.hp / fast_damage)
             fd_turn   = curr.turn + fm_to_ko * fast_turns
             fd_energy = curr.energy + fast_energy * fm_to_ko
-            # Only insert if no strictly-negative-HP KO state already exists
-            # at turn <= fd_turn (mirrors PvPoke's DPQueue[i].hp < 0 check).
-            can_insert = True
-            for s in queue:
-                if s.turn > fd_turn:
-                    break
-                if s.hp < 0:
-                    can_insert = False
-                    break
-            if can_insert:
-                _dp_insert(queue, _DPState(fd_energy, 0.0, fd_turn,
-                                           curr.shields, curr.moves[:]))
+            _dp_insert_farm_down(
+                queue,
+                _DPState(fd_energy, 0.0, fd_turn, curr.shields, curr.moves[:]),
+                intended_pruning=intended_pruning)
 
     # ------------------------------------------------------------------ #
     # Select move from plan
@@ -987,6 +1135,10 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
             f"plan={[cms[i].get('moveId') for i in plan]})"
         )
     return _orig_idx(first_move)
+
+
+# Policy callback for intended-pruning mode (usable as charged_policy_N).
+pvpoke_dp_intended = partial(pvpoke_dp, intended_pruning=True)
 
 
 def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":

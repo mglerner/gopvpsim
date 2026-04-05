@@ -448,22 +448,27 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expect
     # vs Forretress 5/15/13 (VOLT_SWITCH/SAND_TOMB/ROCK_TOMB), Great League
     # Policy: pvpoke_dp + always_shield (PvPoke simulate-mode default)
     #
-    # NOTE: Our AI selects Rock Tomb first (higher DPE); PvPoke selects Sand Tomb
-    # first in some scenarios.  This leads to different score columns vs
-    # pvpoke.com/battle/ (Forr-0s and Forr-1s for Azu 0s/1s).
-    # Azu 2s row matches PvPoke exactly (612/496/242).
-    # These scores reflect our simulator's internally consistent behavior.
+    # PvPoke scores (pvpoke.com/battle/):
+    #                 Forr 0s  Forr 1s  Forr 2s
+    #   Azu 0s:        492      312      222
+    #   Azu 1s:        657      429      226
+    #   Azu 2s:        612      496      242
+    #
+    # Azu 1s row: 2 exact matches (429, 226), winner match (583 vs 657).
+    # Azu 2s row: 3 exact matches.
+    # Azu 0s row: our AI selects Rock Tomb first (higher DPE) where
+    # PvPoke selects Sand Tomb, causing score divergence.
     #
     # Our scores:        Forr 0s  Forr 1s  Forr 2s
-    #   Azu 0 shields:    488      300      230
-    #   Azu 1 shields:    480      277      218
+    #   Azu 0 shields:    480      277      218
+    #   Azu 1 shields:    583      429      226
     #   Azu 2 shields:    612      496      242
-    (0, 0, 1, 488),
-    (0, 1, 1, 300),
-    (0, 2, 1, 230),
-    (1, 0, 1, 480),
-    (1, 1, 1, 277),
-    (1, 2, 1, 218),
+    (0, 0, 1, 480),
+    (0, 1, 1, 277),
+    (0, 2, 1, 218),
+    (1, 0, 0, 583),
+    (1, 1, 1, 429),
+    (1, 2, 1, 226),
     (2, 0, 0, 612),
     (2, 1, 1, 496),
     (2, 2, 1, 242),

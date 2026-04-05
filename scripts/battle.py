@@ -147,6 +147,8 @@ def main():
                         help='Log DP queue plans and bandaid decisions (implies --debug)')
     parser.add_argument('--stats', action='store_true',
                         help='Print computed stats (atk, def, hp, CP, types) for both pokemon')
+    parser.add_argument('--show-damage', action='store_true',
+                        help='Print damage each move deals to the opponent (for verification)')
 
     args = parser.parse_args()
 
@@ -190,6 +192,32 @@ def main():
                     buff_str = (f' buffs={cm["buffs"]} target={cm.get("buffTarget","?")}'
                                 f' chance={cm.get("buffApplyChance","?")}')
                 print(f'      chrg: {cid} (power={cm["power"]} energy={cm["energy"]}{buff_str})')
+        print()
+
+    if args.show_damage:
+        # Build one pair of BattlePokemon to compute damage values
+        bp1 = make_battle_pokemon(
+            args.species1, args.fast1, charged_ids1, args.league,
+            2, a1, d1, s1, shadow=args.shadow1)
+        bp2 = make_battle_pokemon(
+            args.species2, args.fast2, charged_ids2, args.league,
+            2, a2, d2, s2, shadow=args.shadow2)
+        print(f'  Damage: {args.species1} → {args.species2}')
+        print(f'    {args.fast1}: {bp1.fast_move_damage(bp2)} dmg'
+              f'  (power={bp1.fast_move["power"]}'
+              f' energy={bp1.fast_move["energyGain"]}'
+              f' turns={bp1.fast_move.get("_turns", bp1.fast_move["cooldown"]//500)})')
+        for cm in bp1.charged_moves:
+            print(f'    {cm["moveId"]}: {bp1.charged_move_damage(cm, bp2)} dmg'
+                  f'  (power={cm["power"]} energy={cm["energy"]})')
+        print(f'  Damage: {args.species2} → {args.species1}')
+        print(f'    {args.fast2}: {bp2.fast_move_damage(bp1)} dmg'
+              f'  (power={bp2.fast_move["power"]}'
+              f' energy={bp2.fast_move["energyGain"]}'
+              f' turns={bp2.fast_move.get("_turns", bp2.fast_move["cooldown"]//500)})')
+        for cm in bp2.charged_moves:
+            print(f'    {cm["moveId"]}: {bp2.charged_move_damage(cm, bp1)} dmg'
+                  f'  (power={cm["power"]} energy={cm["energy"]})')
         print()
 
     do_trace_shields = args.trace_shields
