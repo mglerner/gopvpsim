@@ -29,6 +29,14 @@ from .data import parse_types
 ENERGY_CAP = 100
 MAX_TURNS  = 500   # ~4 minutes; prevents infinite loops
 
+
+def _stat_stage_mult(stage: int) -> float:
+    """PvPoke stat stage multiplier for a stage in [-4, +4]."""
+    if stage >= 0:
+        return (4 + stage) / 4.0
+    else:
+        return 4.0 / (4 - stage)
+
 # ---------------------------------------------------------------------------
 # Policy debug log
 #
@@ -757,6 +765,11 @@ class BattlePokemon:
     # Used by OMT so it doesn't mistake cooldown==0 (charged queued) for
     # cooldown==0 (about to queue a fast move).
     _queued_charged: bool = field(init=False, repr=False)
+    # Stat stages: each in [-4, +4]
+    atk_stage: int = field(init=False, repr=False)
+    def_stage: int = field(init=False, repr=False)
+    # Buff apply meters for deterministic probabilistic buffs: {moveId: count}
+    _buff_apply_meters: dict = field(init=False, repr=False)
 
     def __post_init__(self):
         self.hp                = self.max_hp
@@ -765,6 +778,9 @@ class BattlePokemon:
         self._fm_since_charge  = 0
         self._queued_fast      = None
         self._queued_charged   = False
+        self.atk_stage         = 0
+        self.def_stage         = 0
+        self._buff_apply_meters = {}
 
     @classmethod
     def from_pokemon(cls, pokemon, fast_move: dict, charged_moves: list[dict],
@@ -787,15 +803,19 @@ class BattlePokemon:
         )
 
     def fast_move_damage(self, defender: "BattlePokemon") -> int:
-        m = self.fast_move
+        m    = self.fast_move
+        atk  = self.atk  * _stat_stage_mult(self.atk_stage)
+        def_ = defender.def_ * _stat_stage_mult(defender.def_stage)
         return calc_damage(
-            m['power'], self.atk, defender.def_,
+            m['power'], atk, def_,
             m['type'], self.types, defender.types,
         )
 
     def charged_move_damage(self, move: dict, defender: "BattlePokemon") -> int:
+        atk  = self.atk  * _stat_stage_mult(self.atk_stage)
+        def_ = defender.def_ * _stat_stage_mult(defender.def_stage)
         return calc_damage(
-            move['power'], self.atk, defender.def_,
+            move['power'], atk, def_,
             move['type'], self.types, defender.types,
         )
 
@@ -829,6 +849,50 @@ class BattleResult:
             500 * (self.max_hp[opp] - self.hp_remaining[opp]) / self.max_hp[opp]
             + 500 * max(0, self.hp_remaining[player]) / self.max_hp[player]
         )
+
+
+# ---------------------------------------------------------------------------
+# Buff/debuff application
+# ---------------------------------------------------------------------------
+
+def _apply_move_buffs(
+    attacker: "BattlePokemon",
+    defender: "BattlePokemon",
+    move: dict,
+) -> None:
+    """
+    Apply stat stage changes from a charged move.
+
+    Fires even when the move is shielded (shieldBuffModifier defaults to 0 in
+    PvPoke, meaning no suppression).  Uses a deterministic meter for moves with
+    buffApplyChance < 1: the buff fires every floor(1/chance) uses (simulate
+    mode equivalent of PvPoke's buffApplyMeter logic).
+    """
+    buffs = move.get('buffs')
+    if not buffs:
+        return
+    chance_str = move.get('buffApplyChance', '0')
+    chance     = float(chance_str) if chance_str else 0.0
+    if chance <= 0:
+        return
+
+    move_id   = move.get('moveId', '')
+    meter     = attacker._buff_apply_meters.get(move_id, 0) + 1
+    threshold = 1.0 / chance   # 1.0 for guaranteed, 2.0 for 50%, etc.
+
+    if meter >= threshold:
+        attacker._buff_apply_meters[move_id] = 0
+        atk_chg = buffs[0]
+        def_chg = buffs[1]
+        target  = move.get('buffTarget', 'opponent')
+        if target in ('self', 'both'):
+            attacker.atk_stage = max(-4, min(4, attacker.atk_stage + atk_chg))
+            attacker.def_stage = max(-4, min(4, attacker.def_stage + def_chg))
+        if target in ('opponent', 'both'):
+            defender.atk_stage = max(-4, min(4, defender.atk_stage + atk_chg))
+            defender.def_stage = max(-4, min(4, defender.def_stage + def_chg))
+    else:
+        attacker._buff_apply_meters[move_id] = meter
 
 
 # ---------------------------------------------------------------------------
@@ -980,10 +1044,10 @@ def simulate(
             if defender.hp <= 0:
                 continue   # defender already fainted from fast move this turn
 
+            attacker.energy -= move['energy']
+
             _, shield_pol = policies[1 - actor_idx]
             use_shield    = shield_pol(attacker, defender, move)
-
-            attacker.energy -= move['energy']
 
             if use_shield and defender.shields > 0:
                 dmg = 1
@@ -994,6 +1058,9 @@ def simulate(
                 log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → {dmg} dmg")
 
             defender.hp = max(0, defender.hp - dmg)
+
+            # Apply stat stage buffs/debuffs (fires even when shielded)
+            _apply_move_buffs(attacker, defender, move)
 
         # After any charged move this turn, fire "floating" fast moves then reset.
         # PvPoke Battle.js: a fast move queued in the same turn as a charged move

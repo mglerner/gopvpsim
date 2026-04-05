@@ -14,7 +14,39 @@ from p0's perspective, matching PvPoke's table format.
   uses the same ActionLogic.js DP to decide *whether* baiting is worthwhile given
   current state (turnsToLive, bestChargedMove by DPE, minimumCycleThreshold).
   This is independent of simulate mode (which doesn't bait-toggle at all), but
-  useful for modeling how PvPoke's recommended play differs from always-shield DP.
+  useful for modeling how PvPoke's recommended play differs from
+  always-shield DP.
+
+* **Random buff/debuff** - For chance-based buffs (< 1), PvPoke uses a
+  deterministic buffApplyMeter that fires every 1/chance
+  activations. That makes sense if you're just running a simulation
+  once. But it might be really nice to run a simulation a bunch of
+  times, to look for win conditions (e.g. if your first air cutter
+  boosts, you win, otherwise you lose). When we're reproducing deep
+  dives, maybe we run a bunch of sims and average the results. Random
+  vs deterministic should definitely be an option. If it's not too
+  cluttered, maybe even a deterministic mode where the buff/debuff
+  hits first every time, or just never hits, or you double-boost, etc.
+
+* **More tests for buff/debuff** - When we're testing buffs and debuffs, we should have the following
+test cases
+    * guaranteed buff - we can use Beedrill with Fell Stinger for this
+  
+    * guaranteed debuff - covered by the Azu/Forretress test we started with
+
+    * buff with chance < 100% - let's do Corviknight with aircutter vs Medicham
+
+    * debuff with chance < 100% - let's do Mienfoo with High Jumpkick to
+       test self-debuffing
+
+    * both buffs and debuffs from the same mon within the same match - we
+       could resule the azu/forretress matachup for this.
+
+    * matchups where both mons have buff/debuff moves - let's do a
+      corviknight mirror with air cutter and payback on both
+
+* **Other things to test** Form Change for Morpeko. Low priority.
+
 
 * **EV-based baiting** — our own novel policy: parameterize the bait decision by
   an estimated P(opponent shields). P≈0 → fire best-DPE move; P≈1 → bait with
