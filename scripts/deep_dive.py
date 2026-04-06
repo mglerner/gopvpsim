@@ -437,8 +437,10 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
 
                 total_score = 0.0
                 count = 0
-                for opp in opp_cache:
-                    for s_focal, s_opp in shield_scenarios:
+                # Per-opponent scores keyed by (scenario_idx, opp_idx)
+                per_opp = {}
+                for oi, opp in enumerate(opp_cache):
+                    for si, (s_focal, s_opp) in enumerate(shield_scenarios):
                         bp0 = BattlePokemon(
                             species=species, types=focal_types,
                             atk=atk_stat, def_=def_stat, max_hp=hp_stat,
@@ -456,7 +458,9 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                         result = simulate(bp0, bp1,
                                           charged_policy_0=pvpoke_dp,
                                           charged_policy_1=pvpoke_dp)
-                        total_score += result.pvpoke_score(0)
+                        score = result.pvpoke_score(0)
+                        per_opp[(si, oi)] = score
+                        total_score += score
                         count += 1
                         n_sims += 1
 
@@ -468,6 +472,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                     'atk': atk_stat, 'def_': def_stat, 'hp': hp_stat,
                     'stat_product': sp,
                     'avg_score': avg_score,
+                    'per_opp': per_opp,
                 })
 
     results.sort(key=lambda r: r['avg_score'], reverse=True)
@@ -521,27 +526,34 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
     for fast_id, charged_ids, results in moveset_results:
         label = moveset_label(fast_id, charged_ids)
 
+        # Rank-1 reference for matchup diffs (results are sorted by avg_score desc)
+        r1 = results[0] if results else None
+        ref_per_opp = r1.get('per_opp') if r1 else None
+        ref_label = (f"Rank 1 ({r1['atk_iv']}/{r1['def_iv']}/{r1['sta_iv']})"
+                     if r1 else None)
+
+        def hover(r, tier=None):
+            return _hover_text(r, tier_name=tier, ref_per_opp=ref_per_opp,
+                               ref_label=ref_label, opponent_names=opponent_names,
+                               shield_scenarios=shield_scenarios)
+
         if thresholds:
-            # Classify each IV spread
             for r in results:
                 r['_tier'] = classify_iv(r, thresholds)
 
-            # Build separate traces per tier (for legend interactivity)
             traces = []
 
-            # "Other" trace — points that don't meet any threshold
             other = [r for r in results if r['_tier'] is None]
             if other:
                 traces.append({
                     'name': 'Other',
                     'x': [r['sp_rank'] for r in other],
                     'y': [r['avg_score'] for r in other],
-                    'text': [_hover_text(r) for r in other],
+                    'text': [hover(r) for r in other],
                     'marker_color': [r['avg_score'] for r in other],
                     'use_colorscale': True,
                 })
 
-            # One trace per threshold tier (most restrictive first)
             for tier_name in tier_names:
                 tier_results = [r for r in results if r['_tier'] == tier_name]
                 if tier_results:
@@ -551,19 +563,18 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
                         'name': f'{tier_name} ({thresh_desc})',
                         'x': [r['sp_rank'] for r in tier_results],
                         'y': [r['avg_score'] for r in tier_results],
-                        'text': [_hover_text(r, tier_name) for r in tier_results],
+                        'text': [hover(r, tier_name) for r in tier_results],
                         'marker_color': tier_colors[tier_name],
                         'use_colorscale': False,
                     })
 
             plots_data.append({'label': label, 'traces': traces, 'results': results})
         else:
-            # No thresholds — single trace with colorscale
             traces = [{
                 'name': 'All IVs',
                 'x': [r['sp_rank'] for r in results],
                 'y': [r['avg_score'] for r in results],
-                'text': [_hover_text(r) for r in results],
+                'text': [hover(r) for r in results],
                 'marker_color': [r['avg_score'] for r in results],
                 'use_colorscale': True,
             }]
@@ -624,7 +635,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
             html += (f'<span class="tier-badge" style="background:{color};color:#000">'
                      f'{tier_name}</span> {desc}<br>\n')
         html += '<br><em>Hover over legend entries to isolate that tier. '
-        html += 'Click to show/hide.</em>\n'
+        html += 'Click to lock the isolation; click again to unlock.</em>\n'
         html += '</div>\n'
 
     for i, pd in enumerate(plots_data):
@@ -740,6 +751,7 @@ Plotly.newPlot("plot{i}", {json.dumps(traces_js)}, {json.dumps(layout)},
   {{responsive: true}}).then(function(gd) {{
   var origOpacities = {json.dumps(original_opacities)};
   var nTraces = origOpacities.length;
+  var lockedIdx = -1;  // -1 = not locked; >= 0 = locked to that trace
 
   gd.on("plotly_legendclick", function() {{ return false; }});
   gd.on("plotly_legenddoubleclick", function() {{ return false; }});
@@ -757,7 +769,6 @@ Plotly.newPlot("plot{i}", {json.dumps(traces_js)}, {json.dumps(layout)},
     }}
   }}
 
-  // Retry until legend DOM elements appear (Plotly renders them async)
   var attempts = 0;
   function attachLegendHover() {{
     var items = gd.querySelectorAll(".legend .traces");
@@ -768,8 +779,21 @@ Plotly.newPlot("plot{i}", {json.dumps(traces_js)}, {json.dumps(layout)},
     }}
     items.forEach(function(el, idx) {{
       el.style.cursor = "pointer";
-      el.addEventListener("mouseenter", function() {{ highlightTrace(idx); }});
-      el.addEventListener("mouseleave", function() {{ restoreAll(); }});
+      el.addEventListener("mouseenter", function() {{
+        if (lockedIdx < 0) highlightTrace(idx);
+      }});
+      el.addEventListener("mouseleave", function() {{
+        if (lockedIdx < 0) restoreAll();
+      }});
+      el.addEventListener("click", function() {{
+        if (lockedIdx === idx) {{
+          lockedIdx = -1;
+          restoreAll();
+        }} else {{
+          lockedIdx = idx;
+          highlightTrace(idx);
+        }}
+      }});
     }});
   }}
   attachLegendHover();
@@ -815,18 +839,55 @@ Atk &times; Def &times; HP.
     print(f"  HTML written to {html_path}")
 
 
-def _hover_text(r, tier_name=None):
-    """Build hover text for a single IV result."""
+def _hover_text(r, tier_name=None, ref_per_opp=None, ref_label=None,
+                opponent_names=None, shield_scenarios=None):
+    """Build hover text for a single IV result.
+
+    If ref_per_opp is provided (the rank-1 IV's per-opponent scores),
+    show which matchups were gained/lost compared to rank 1.
+    """
     lines = [
         f"IVs: {r['atk_iv']}/{r['def_iv']}/{r['sta_iv']}",
         f"L{r['level']} CP{r['cp']}",
         f"Atk:{r['atk']:.2f} Def:{r['def_']:.2f} HP:{r['hp']}",
-        f"StatProd Rank: #{r['sp_rank']}",
-        f"Battle Rank: #{r['battle_rank']}",
+        f"SP Rank: #{r['sp_rank']} | Battle Rank: #{r['battle_rank']}",
         f"Avg Score: {r['avg_score']:.1f}",
     ]
     if tier_name:
         lines.append(f"Tier: {tier_name}")
+
+    # Matchup diffs vs rank 1
+    if ref_per_opp and opponent_names and shield_scenarios and 'per_opp' in r:
+        my_opp = r['per_opp']
+        if my_opp is not ref_per_opp:  # skip for rank 1 itself
+            lines.append(f'')
+            lines.append(f'vs {ref_label}:')
+            for si, (s_focal, s_opp) in enumerate(shield_scenarios):
+                gained = []
+                lost = []
+                for oi, opp_name in enumerate(opponent_names):
+                    key = (si, oi)
+                    my_score = my_opp.get(key, 0)
+                    ref_score = ref_per_opp.get(key, 0)
+                    my_win = my_score >= 500
+                    ref_win = ref_score >= 500
+                    # Short name for display
+                    short = opp_name.split('(')[0].strip()[:12]
+                    if my_win and not ref_win:
+                        gained.append(short)
+                    elif not my_win and ref_win:
+                        lost.append(short)
+                scenario_label = f'{s_focal}v{s_opp}'
+                parts = []
+                if gained:
+                    parts.append(f'+{",".join(gained)}')
+                if lost:
+                    parts.append(f'-{",".join(lost)}')
+                if parts:
+                    lines.append(f'  {scenario_label}: {" | ".join(parts)}')
+                else:
+                    lines.append(f'  {scenario_label}: (same matchups)')
+
     return '<br>'.join(lines)
 
 
