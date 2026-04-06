@@ -504,9 +504,26 @@ THRESHOLD_COLORS = [
 ]
 
 
+PLOTLY_CDN = "https://cdn.plot.ly/plotly-2.35.2.min.js"
+
+
+def _plotly_script_tag(standalone):
+    """Return the <script> tag for Plotly.js — CDN link or inlined source."""
+    if not standalone:
+        return f'<script src="{PLOTLY_CDN}"></script>'
+    import urllib.request
+    import ssl
+    import certifi
+    print("  Downloading Plotly.js for standalone HTML...")
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    with urllib.request.urlopen(PLOTLY_CDN, context=ctx) as r:
+        plotly_src = r.read().decode()
+    return f'<script>{plotly_src}</script>'
+
+
 def generate_html(species, league, moveset_results, html_path, thresholds=None,
                   opponent_label=None, shield_scenarios=None, opponent_names=None,
-                  opp_iv_mode='pvpoke'):
+                  opp_iv_mode='pvpoke', standalone=False):
     """
     Generate an interactive HTML file with Plotly.js scatter plots.
 
@@ -586,7 +603,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
 <head>
 <meta charset="utf-8">
 <title>{species} {league.title()} League IV Deep Dive</title>
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{_plotly_script_tag(standalone)}
 <style>
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
          margin: 20px; background: #1a1a2e; color: #e0e0e0; }}
@@ -946,6 +963,9 @@ def main():
                              'Order from most restrictive to least restrictive.')
     parser.add_argument('--html', default=None, metavar='FILE',
                         help='Write interactive HTML plot to FILE')
+    parser.add_argument('--standalone', action='store_true',
+                        help='Inline Plotly.js into the HTML so the file works '
+                             'offline with no CDN dependency (~4MB larger)')
     parser.add_argument('--screen-opponents', type=int, default=None, metavar='N',
                         help='Use only top N opponents for phase 1 screen '
                              '(default: same as --opponents)')
@@ -1098,7 +1118,8 @@ def main():
         generate_html(args.species, args.league, all_moveset_results, args.html,
                       thresholds=thresholds, opponent_label=opponent_label,
                       shield_scenarios=shield_scenarios,
-                      opponent_names=opponents, opp_iv_mode=opp_iv_mode)
+                      opponent_names=opponents, opp_iv_mode=opp_iv_mode,
+                      standalone=args.standalone)
 
     print("Done.\n")
 
