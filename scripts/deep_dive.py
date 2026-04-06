@@ -708,54 +708,50 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
                 'borderwidth': 1,
             },
         }
-        html += f'Plotly.newPlot("plot{i}", {json.dumps(traces_js)}, {json.dumps(layout)}, '
-        html += '  {responsive: true});\n'
-
-        # Add legend hover-to-isolate behavior via DOM events on legend items.
-        # We attach mouseenter/mouseleave to each legend <g class="traces">
-        # element after Plotly finishes rendering (requestAnimationFrame).
-        # plotly_legendclick and plotly_legenddoubleclick are suppressed so
-        # clicking doesn't toggle visibility or rescale axes.
+        # Use .then() to attach legend hover behavior after Plotly finishes rendering.
+        # Plotly.restyle is the correct API for per-trace marker updates.
+        # We suppress default legend click/doubleclick, and instead use
+        # mouseenter/mouseleave on the legend SVG <g class="traces"> elements
+        # to isolate one tier at a time without rescaling axes.
         html += f"""
-(function() {{
-  var gd = document.getElementById("plot{i}");
+Plotly.newPlot("plot{i}", {json.dumps(traces_js)}, {json.dumps(layout)},
+  {{responsive: true}}).then(function(gd) {{
   var origOpacities = {json.dumps(original_opacities)};
   var nTraces = origOpacities.length;
 
-  // Suppress default legend click/double-click (toggle/isolate)
   gd.on("plotly_legendclick", function() {{ return false; }});
   gd.on("plotly_legenddoubleclick", function() {{ return false; }});
 
   function highlightTrace(idx) {{
-    var updates = [];
     for (var j = 0; j < nTraces; j++) {{
-      updates.push({{ "marker.opacity": (j === idx) ? Math.min(1.0, origOpacities[j] + 0.15) : 0.03 }});
+      var op = (j === idx) ? Math.min(1.0, origOpacities[j] + 0.15) : 0.03;
+      Plotly.restyle(gd, {{"marker.opacity": op}}, [j]);
     }}
-    Plotly.update(gd, updates);
   }}
 
   function restoreAll() {{
-    var updates = [];
     for (var j = 0; j < nTraces; j++) {{
-      updates.push({{ "marker.opacity": origOpacities[j] }});
+      Plotly.restyle(gd, {{"marker.opacity": origOpacities[j]}}, [j]);
     }}
-    Plotly.update(gd, updates);
   }}
 
+  // Retry until legend DOM elements appear (Plotly renders them async)
+  var attempts = 0;
   function attachLegendHover() {{
-    var legendGroups = gd.querySelectorAll(".legend .traces");
-    if (legendGroups.length === 0) {{
-      requestAnimationFrame(attachLegendHover);
+    var items = gd.querySelectorAll(".legend .traces");
+    if (items.length === 0 && attempts < 50) {{
+      attempts++;
+      setTimeout(attachLegendHover, 100);
       return;
     }}
-    legendGroups.forEach(function(group, idx) {{
-      group.style.cursor = "pointer";
-      group.addEventListener("mouseenter", function() {{ highlightTrace(idx); }});
-      group.addEventListener("mouseleave", function() {{ restoreAll(); }});
+    items.forEach(function(el, idx) {{
+      el.style.cursor = "pointer";
+      el.addEventListener("mouseenter", function() {{ highlightTrace(idx); }});
+      el.addEventListener("mouseleave", function() {{ restoreAll(); }});
     }});
   }}
-  requestAnimationFrame(attachLegendHover);
-}})();
+  attachLegendHover();
+}});
 """
 
     # Methodology footer
