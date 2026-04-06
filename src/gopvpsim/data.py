@@ -20,6 +20,10 @@ URLS = {
     "master":     f"{BASE_URL}/rankings/all/overall/rankings-10000.json",
 }
 
+# PvPoke custom groups (matrix battle quick-fill).
+# Key pattern: "group_<name>" in the cache.
+GROUP_URL_TEMPLATE = f"{BASE_URL}/groups/{{}}.json"
+
 
 class NoDataError(Exception):
     """Raised when data cannot be fetched and no cache is available."""
@@ -95,6 +99,38 @@ def _get_rankings_index(league):
         rankings = load_rankings(league)
         _rankings_index[league] = {r['speciesId']: r for r in rankings}
     return _rankings_index[league]
+
+
+def load_group(group_name):
+    """Load a PvPoke custom group (e.g. 'championshipseries').
+
+    Fetches from GitHub and caches locally, same as gamemaster/rankings.
+    Returns the raw JSON list of group entries.
+    """
+    cache_key = f"group_{group_name}"
+    CACHE_DIR.mkdir(exist_ok=True, parents=True)
+    cache_file = CACHE_DIR / f"{cache_key}.json"
+
+    if cache_file.exists():
+        age = time.time() - cache_file.stat().st_mtime
+        if age < CACHE_TTL:
+            return json.loads(cache_file.read_text())
+
+    url = GROUP_URL_TEMPLATE.format(group_name)
+    try:
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        with urllib.request.urlopen(url, context=ssl_context) as r:
+            data = json.loads(r.read().decode())
+        cache_file.write_text(json.dumps(data))
+        return data
+    except Exception as e:
+        if cache_file.exists():
+            print(f"Fetch error for group {group_name}: {e}; using cache")
+            return json.loads(cache_file.read_text())
+        raise NoDataError(
+            f"Could not fetch group '{group_name}' and no cached data is available. "
+            f"Check the group name and try again."
+        )
 
 
 def get_default_moveset(species_name, league='great', shadow=False):
