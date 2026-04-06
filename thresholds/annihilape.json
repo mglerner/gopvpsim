@@ -1,0 +1,5 @@
+{
+    "High Atk (mirror)": {"attack": 125.0, "defense": 103.0, "stamina": 0},
+    "Balanced":          {"attack": 122.0, "defense": 106.0, "stamina": 136},
+    "High Bulk":         {"attack": 0,     "defense": 107.0, "stamina": 138}
+}
