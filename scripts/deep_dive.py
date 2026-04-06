@@ -231,6 +231,8 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None):
         all_charged = list(set(legal_charged) | {fixed})
         charged_pairs = []
         for other in sorted(all_charged):
+            if other == fixed:
+                continue  # skip duplicate (e.g. GH paired with itself)
             pair = tuple(sorted([fixed, other]))
             if pair not in charged_pairs:
                 charged_pairs.append(pair)
