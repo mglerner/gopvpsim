@@ -335,8 +335,8 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
     Quick screen: sim rank-1 IVs for each moveset against opponents.
     Return the top N movesets by average score.
     """
-    if len(movesets) <= top_n:
-        print(f"  Only {len(movesets)} moveset(s) — skipping screen phase.\n")
+    if top_n == 0 or len(movesets) <= top_n:
+        print(f"  {len(movesets)} moveset(s) — skipping screen phase.\n")
         return movesets
 
     print(f"  Phase 1: Screening {len(movesets)} movesets (rank-1 IVs, "
@@ -1557,7 +1557,12 @@ def main():
                              'cached locally. Known groups: '
                              f'{", ".join(KNOWN_GROUPS[:8])}...')
     parser.add_argument('--top-movesets', type=int, default=5, metavar='N',
-                        help='Keep top N movesets after screening (default: 5)')
+                        help='Keep top N movesets after Phase 1 screening (default: 5). '
+                             'Screening sims the stat-product rank 1 IV against '
+                             'opponents for each candidate moveset, then keeps the '
+                             'top N by average score. Only the survivors go through '
+                             'the full 4096-IV sweep. Set to 0 to skip screening '
+                             'and sweep all candidate movesets.')
     parser.add_argument('--shield-scenario', default='1,1', metavar='S1,S2',
                         help='Shield scenario as focal,opponent (default: 1,1). '
                              'Use "all" for 0v0+1v1+2v2.')
