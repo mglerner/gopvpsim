@@ -27,7 +27,7 @@
 
 ## Tests to add
 
-* **Shadow pokemon** — verify shadow mons correctly do more damage and take more.
+* ~~**Shadow pokemon**~~ — DONE. Shadow Swampert vs Registeel: 9/9 match PvPoke.
 
 * **Both mons with buff/debuff** — e.g. Corviknight mirror with Air Cutter +
   Payback on both sides.

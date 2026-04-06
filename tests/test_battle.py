@@ -377,14 +377,15 @@ def test_simulate_never_shield_means_no_shields_used():
 # ---------------------------------------------------------------------------
 
 def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
-                          atk_iv, def_iv, sta_iv, max_level=51.0):
+                          atk_iv, def_iv, sta_iv, max_level=51.0, shadow=False):
     """Helper: build a BattlePokemon from the real gamemaster."""
     from gopvpsim.pokemon import Pokemon
     from gopvpsim.moves import get_moves
     from gopvpsim.data import load_gamemaster
 
     pokemon = Pokemon.at_best_level(species, atk_iv, def_iv, sta_iv,
-                                    league=league, max_level=max_level)
+                                    league=league, max_level=max_level,
+                                    shadow=shadow)
     fast_moves, charged_moves = get_moves()
     fm  = dict(fast_moves[fast_id])
     cms = [dict(charged_moves[cid]) for cid in charged_ids]
@@ -401,8 +402,29 @@ def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
     )
 
 
+def _extract_battle_log(result):
+    """Extract compact charged-move sequence from a BattleResult timeline.
+
+    Returns a list like:
+        ['Mienfoo: High Jump Kick (shielded)', 'Medicham: Ice Punch']
+    """
+    log = []
+    for line in result.timeline:
+        if ('uses' not in line or '→' not in line
+                or 'fast' in line.lower() or 'floating' in line.lower()):
+            continue
+        body = line.strip().split(': ', 1)[1]  # strip "T xx: "
+        who, rest = body.split(' uses ', 1)
+        move_name = rest.split(' →')[0]
+        if 'SHIELDED' in line:
+            log.append(f'{who}: {move_name} (shielded)')
+        else:
+            log.append(f'{who}: {move_name}')
+    return log
+
+
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_med,shields_azu,expected_winner,expected_azu_score", [
+@pytest.mark.parametrize("shields_med,shields_azu,expected_winner,expected_azu_score,expected_log", [
     # Medicham 5/15/15 (PSYCHO_CUT/DYNAMIC_PUNCH/PSYCHIC)
     # vs Azumarill 8/15/15 (BUBBLE/ICE_BEAM/HYDRO_PUMP), Great League
     # Expected results verified at pvpoke.com/battle/
@@ -411,17 +433,18 @@ def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
     #   Med 0 shields: [608,  730,  851]
     #   Med 1 shields: [475,  603,  724]
     #   Med 2 shields: [235,  411,  605]
-    (0, 0, 1, 608),   # Azumarill wins
-    (0, 1, 1, 730),   # Azumarill wins
-    (0, 2, 1, 851),   # Azumarill wins
-    (1, 0, 0, 475),   # Medicham wins
-    (1, 1, 1, 603),   # Azumarill wins
-    (1, 2, 1, 724),   # Azumarill wins
-    (2, 0, 0, 235),   # Medicham wins
-    (2, 1, 0, 411),   # Medicham wins
-    (2, 2, 1, 605),   # Azumarill wins
+    (0, 0, 1, 608, ['Medicham: Psychic', 'Azumarill: Hydro Pump', 'Medicham: Psychic', 'Azumarill: Ice Beam']),
+    (0, 1, 1, 730, ['Medicham: Psychic (shielded)', 'Azumarill: Hydro Pump', 'Medicham: Psychic', 'Azumarill: Ice Beam']),
+    (0, 2, 1, 851, ['Medicham: Psychic (shielded)', 'Azumarill: Hydro Pump', 'Medicham: Psychic (shielded)', 'Azumarill: Ice Beam']),
+    (1, 0, 0, 475, ['Medicham: Psychic', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic', 'Azumarill: Hydro Pump', 'Medicham: Psychic']),
+    (1, 1, 1, 603, ['Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic', 'Azumarill: Hydro Pump', 'Medicham: Dynamic Punch']),
+    (1, 2, 1, 724, ['Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic (shielded)', 'Azumarill: Hydro Pump', 'Medicham: Dynamic Punch']),
+    (2, 0, 0, 235, ['Medicham: Psychic', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic', 'Azumarill: Hydro Pump (shielded)', 'Medicham: Psychic']),
+    (2, 1, 0, 411, ['Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic', 'Azumarill: Ice Beam (shielded)', 'Medicham: Dynamic Punch', 'Azumarill: Ice Beam', 'Medicham: Dynamic Punch']),
+    (2, 2, 1, 605, ['Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Psychic (shielded)', 'Azumarill: Ice Beam (shielded)', 'Medicham: Dynamic Punch', 'Medicham: Dynamic Punch', 'Azumarill: Hydro Pump']),
 ])
-def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expected_azu_score):
+def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expected_azu_score,
+                               expected_log):
     bp_med = _make_battle_pokemon('Medicham',  'PSYCHO_CUT',  ['DYNAMIC_PUNCH', 'PSYCHIC'],
                                    'great', shields_med, 5, 15, 15)
     bp_azu = _make_battle_pokemon('Azumarill', 'BUBBLE',   ['ICE_BEAM', 'HYDRO_PUMP'],
@@ -430,7 +453,8 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expect
                       charged_policy_0=pvpoke_dp,
                       charged_policy_1=pvpoke_dp,
                       shield_policy_0=always_shield,
-                      shield_policy_1=always_shield)
+                      shield_policy_1=always_shield,
+                      log=True)
     assert result.winner == expected_winner, (
         f"{shields_med}v{shields_azu}: expected winner={expected_winner}, "
         f"got {result.winner}  HP={result.hp_remaining}"
@@ -440,10 +464,13 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expect
         f"{shields_med}v{shields_azu}: expected Azu score={expected_azu_score}, "
         f"got {azu_score}  (delta={azu_score - expected_azu_score:+d})"
     )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_med}v{shields_azu}: battle log mismatch"
+    )
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_azu,shields_forr,expected_winner,expected_azu_score", [
+@pytest.mark.parametrize("shields_azu,shields_forr,expected_winner,expected_azu_score,expected_log", [
     # Azumarill 4/15/13 (BUBBLE/ICE_BEAM/HYDRO_PUMP)
     # vs Forretress 5/15/13 (VOLT_SWITCH/SAND_TOMB/ROCK_TOMB), Great League
     # Policy: pvpoke_dp + always_shield (PvPoke simulate-mode default)
@@ -463,25 +490,27 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expect
     #   Azu 0 shields:    480      277      218
     #   Azu 1 shields:    583      429      226
     #   Azu 2 shields:    612      496      242
-    (0, 0, 1, 480),
-    (0, 1, 1, 277),
-    (0, 2, 1, 218),
-    (1, 0, 0, 583),
-    (1, 1, 1, 429),
-    (1, 2, 1, 226),
-    (2, 0, 0, 612),
-    (2, 1, 1, 496),
-    (2, 2, 1, 242),
+    (0, 0, 1, 480, ['Forretress: Rock Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
+    (0, 1, 1, 277, ['Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
+    (0, 2, 1, 218, ['Forretress: Rock Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)']),
+    (1, 0, 0, 583, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
+    (1, 1, 1, 429, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb']),
+    (1, 2, 1, 226, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Sand Tomb']),
+    (2, 0, 0, 612, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb (shielded)', 'Forretress: Sand Tomb']),
+    (2, 1, 1, 496, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
+    (2, 2, 1, 242, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
 ])
 def test_azumarill_vs_forretress_sand_rock(shields_azu, shields_forr,
-                                           expected_winner, expected_azu_score):
+                                           expected_winner, expected_azu_score,
+                                           expected_log):
     bp_azu  = _make_battle_pokemon('Azumarill',  'BUBBLE',       ['ICE_BEAM', 'HYDRO_PUMP'],
                                    'great', shields_azu,  4, 15, 13)
     bp_forr = _make_battle_pokemon('Forretress', 'VOLT_SWITCH',  ['SAND_TOMB', 'ROCK_TOMB'],
                                    'great', shields_forr, 5, 15, 13)
     result = simulate(bp_azu, bp_forr,
                       charged_policy_0=pvpoke_dp,
-                      charged_policy_1=pvpoke_dp)
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
     assert result.winner == expected_winner, (
         f"{shields_azu}v{shields_forr}: expected winner={expected_winner}, "
         f"got {result.winner}  HP={result.hp_remaining}"
@@ -491,10 +520,13 @@ def test_azumarill_vs_forretress_sand_rock(shields_azu, shields_forr,
         f"{shields_azu}v{shields_forr}: expected Azu score={expected_azu_score}, "
         f"got {azu_score}  (delta={azu_score - expected_azu_score:+d})"
     )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_azu}v{shields_forr}: battle log mismatch"
+    )
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_azu,shields_forr,expected_winner,expected_azu_score", [
+@pytest.mark.parametrize("shields_azu,shields_forr,expected_winner,expected_azu_score,expected_log", [
     # Azumarill 4/15/13 (BUBBLE/ICE_BEAM/HYDRO_PUMP)
     # vs Forretress 5/15/13 (VOLT_SWITCH/ROCK_TOMB only), Great League
     # Policy: pvpoke_dp + always_shield (PvPoke simulate-mode default)
@@ -505,25 +537,27 @@ def test_azumarill_vs_forretress_sand_rock(shields_azu, shields_forr,
     #   Azu 1s:     480      277      218
     #   Azu 2s:     575      445      265
     #
-    (0, 0, 1, 480),
-    (0, 1, 1, 277),
-    (0, 2, 1, 218),
-    (1, 0, 1, 480),
-    (1, 1, 1, 277),
-    (1, 2, 1, 218),
-    (2, 0, 0, 575),
-    (2, 1, 1, 445),
-    (2, 2, 1, 265),
+    (0, 0, 1, 480, ['Forretress: Rock Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
+    (0, 1, 1, 277, ['Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
+    (0, 2, 1, 218, ['Forretress: Rock Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)']),
+    (1, 0, 1, 480, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam', 'Forretress: Rock Tomb']),
+    (1, 1, 1, 277, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam', 'Forretress: Rock Tomb']),
+    (1, 2, 1, 218, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
+    (2, 0, 0, 575, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump']),
+    (2, 1, 1, 445, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
+    (2, 2, 1, 265, ['Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
 ])
 def test_azumarill_vs_forretress_rt_only(shields_azu, shields_forr,
-                                         expected_winner, expected_azu_score):
+                                         expected_winner, expected_azu_score,
+                                         expected_log):
     bp_azu  = _make_battle_pokemon('Azumarill',  'BUBBLE',      ['ICE_BEAM', 'HYDRO_PUMP'],
                                    'great', shields_azu,  4, 15, 13)
     bp_forr = _make_battle_pokemon('Forretress', 'VOLT_SWITCH', ['ROCK_TOMB'],
                                    'great', shields_forr, 5, 15, 13)
     result = simulate(bp_azu, bp_forr,
                       charged_policy_0=pvpoke_dp,
-                      charged_policy_1=pvpoke_dp)
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
     assert result.winner == expected_winner, (
         f"{shields_azu}v{shields_forr}: expected winner={expected_winner}, "
         f"got {result.winner}  HP={result.hp_remaining}"
@@ -533,6 +567,9 @@ def test_azumarill_vs_forretress_rt_only(shields_azu, shields_forr,
         f"{shields_azu}v{shields_forr}: expected Azu score={expected_azu_score}, "
         f"got {azu_score}  (delta={azu_score - expected_azu_score:+d})"
     )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_azu}v{shields_forr}: battle log mismatch"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -540,7 +577,7 @@ def test_azumarill_vs_forretress_rt_only(shields_azu, shields_forr,
 # ---------------------------------------------------------------------------
 
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_bee,shields_med,expected_winner,expected_bee_score", [
+@pytest.mark.parametrize("shields_bee,shields_med,expected_winner,expected_bee_score,expected_log", [
     # Beedrill 4/15/15 (POISON_JAB / FELL_STINGER + X_SCISSOR)
     # vs Medicham 7/15/14 (COUNTER / DYNAMIC_PUNCH + ICE_PUNCH), Great League
     # Policy: pvpoke_dp + always_shield
@@ -552,25 +589,27 @@ def test_azumarill_vs_forretress_rt_only(shields_azu, shields_forr,
     #   Bee 0s:     707      471      507
     #   Bee 1s:     857      646      657
     #   Bee 2s:     857      796      807
-    (0, 0, 0, 707),
-    (0, 1, 1, 471),
-    (0, 2, 0, 507),
-    (1, 0, 0, 857),
-    (1, 1, 0, 646),
-    (1, 2, 0, 657),
-    (2, 0, 0, 857),
-    (2, 1, 0, 796),
-    (2, 2, 0, 807),
+    (0, 0, 0, 707, ['Beedrill: X-Scissor', 'Medicham: Ice Punch', 'Beedrill: X-Scissor']),
+    (0, 1, 1, 471, ['Beedrill: X-Scissor (shielded)', 'Medicham: Ice Punch', 'Beedrill: X-Scissor', 'Medicham: Ice Punch']),
+    (0, 2, 0, 507, ['Beedrill: Fell Stinger (shielded)', 'Medicham: Ice Punch', 'Beedrill: Fell Stinger (shielded)', 'Medicham: Ice Punch', 'Beedrill: X-Scissor']),
+    (1, 0, 0, 857, ['Beedrill: X-Scissor', 'Medicham: Ice Punch (shielded)', 'Beedrill: X-Scissor']),
+    (1, 1, 0, 646, ['Beedrill: X-Scissor (shielded)', 'Medicham: Ice Punch (shielded)', 'Beedrill: X-Scissor', 'Medicham: Ice Punch', 'Beedrill: Fell Stinger']),
+    (1, 2, 0, 657, ['Beedrill: Fell Stinger (shielded)', 'Medicham: Ice Punch (shielded)', 'Beedrill: Fell Stinger (shielded)', 'Medicham: Ice Punch', 'Beedrill: X-Scissor']),
+    (2, 0, 0, 857, ['Beedrill: X-Scissor', 'Medicham: Ice Punch (shielded)', 'Beedrill: X-Scissor']),
+    (2, 1, 0, 796, ['Beedrill: X-Scissor (shielded)', 'Medicham: Ice Punch (shielded)', 'Beedrill: X-Scissor', 'Medicham: Ice Punch (shielded)', 'Beedrill: Fell Stinger']),
+    (2, 2, 0, 807, ['Beedrill: Fell Stinger (shielded)', 'Medicham: Ice Punch (shielded)', 'Beedrill: Fell Stinger (shielded)', 'Medicham: Ice Punch (shielded)', 'Beedrill: X-Scissor']),
 ])
 def test_beedrill_vs_medicham_fell_stinger(shields_bee, shields_med,
-                                           expected_winner, expected_bee_score):
+                                           expected_winner, expected_bee_score,
+                                           expected_log):
     bp_bee = _make_battle_pokemon('Beedrill', 'POISON_JAB', ['FELL_STINGER', 'X_SCISSOR'],
                                   'great', shields_bee, 4, 15, 15)
     bp_med = _make_battle_pokemon('Medicham', 'COUNTER', ['DYNAMIC_PUNCH', 'ICE_PUNCH'],
                                   'great', shields_med, 7, 15, 14)
     result = simulate(bp_bee, bp_med,
                       charged_policy_0=pvpoke_dp,
-                      charged_policy_1=pvpoke_dp)
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
     assert result.winner == expected_winner, (
         f"{shields_bee}v{shields_med}: expected winner={expected_winner}, "
         f"got {result.winner}  HP={result.hp_remaining}"
@@ -580,10 +619,13 @@ def test_beedrill_vs_medicham_fell_stinger(shields_bee, shields_med,
         f"{shields_bee}v{shields_med}: expected Bee score={expected_bee_score}, "
         f"got {bee_score}  (delta={bee_score - expected_bee_score:+d})"
     )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_bee}v{shields_med}: battle log mismatch"
+    )
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_cor,shields_med,expected_winner,expected_cor_score", [
+@pytest.mark.parametrize("shields_cor,shields_med,expected_winner,expected_cor_score,expected_log", [
     # Corviknight 4/12/14 (AIR_SLASH / AIR_CUTTER + PAYBACK)
     # vs Medicham 7/15/14 (COUNTER / DYNAMIC_PUNCH + ICE_PUNCH), Great League
     # Policy: pvpoke_dp + always_shield
@@ -595,25 +637,27 @@ def test_beedrill_vs_medicham_fell_stinger(shields_bee, shields_med,
     #   Cor 0s:     566      478      326
     #   Cor 1s:     756      478      326
     #   Cor 2s:     756      693      633
-    (0, 0, 0, 566),
-    (0, 1, 1, 478),
-    (0, 2, 1, 326),
-    (1, 0, 0, 756),
-    (1, 1, 1, 478),
-    (1, 2, 1, 326),
-    (2, 0, 0, 756),
-    (2, 1, 0, 693),
-    (2, 2, 0, 633),
+    (0, 0, 0, 566, ['Corviknight: Air Cutter', 'Medicham: Dynamic Punch', 'Corviknight: Air Cutter']),
+    (0, 1, 1, 478, ['Medicham: Dynamic Punch', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Medicham: Ice Punch']),
+    (0, 2, 1, 326, ['Medicham: Dynamic Punch', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)']),
+    (1, 0, 0, 756, ['Corviknight: Air Cutter', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter']),
+    (1, 1, 1, 478, ['Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Medicham: Dynamic Punch']),
+    (1, 2, 1, 326, ['Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Medicham: Dynamic Punch']),
+    (2, 0, 0, 756, ['Corviknight: Air Cutter', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter']),
+    (2, 1, 0, 693, ['Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter']),
+    (2, 2, 0, 633, ['Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter (shielded)', 'Medicham: Ice Punch (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter']),
 ])
 def test_corviknight_vs_medicham_air_cutter(shields_cor, shields_med,
-                                            expected_winner, expected_cor_score):
+                                            expected_winner, expected_cor_score,
+                                            expected_log):
     bp_cor = _make_battle_pokemon('Corviknight', 'AIR_SLASH', ['AIR_CUTTER', 'PAYBACK'],
                                   'great', shields_cor, 4, 12, 14)
     bp_med = _make_battle_pokemon('Medicham', 'COUNTER', ['DYNAMIC_PUNCH', 'ICE_PUNCH'],
                                   'great', shields_med, 7, 15, 14)
     result = simulate(bp_cor, bp_med,
                       charged_policy_0=pvpoke_dp,
-                      charged_policy_1=pvpoke_dp)
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
     assert result.winner == expected_winner, (
         f"{shields_cor}v{shields_med}: expected winner={expected_winner}, "
         f"got {result.winner}  HP={result.hp_remaining}"
@@ -623,10 +667,13 @@ def test_corviknight_vs_medicham_air_cutter(shields_cor, shields_med,
         f"{shields_cor}v{shields_med}: expected Cor score={expected_cor_score}, "
         f"got {cor_score}  (delta={cor_score - expected_cor_score:+d})"
     )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_cor}v{shields_med}: battle log mismatch"
+    )
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_mie,shields_med,expected_winner,expected_mie_score", [
+@pytest.mark.parametrize("shields_mie,shields_med,expected_winner,expected_mie_score,expected_log", [
     # Mienfoo 13/15/15 (LOW_KICK / HIGH_JUMP_KICK + LOW_SWEEP)
     # vs Medicham 7/15/14 (COUNTER / DYNAMIC_PUNCH + ICE_PUNCH), Great League
     # Policy: pvpoke_dp + always_shield
@@ -641,25 +688,27 @@ def test_corviknight_vs_medicham_air_cutter(shields_cor, shields_med,
     #   Mie 0s:     269       78       78
     #   Mie 1s:     521      347      145
     #   Mie 2s:     414      212      145
-    (0, 0, 1, 269),
-    (0, 1, 1,  78),
-    (0, 2, 1,  78),
-    (1, 0, 0, 521),
-    (1, 1, 1, 347),
-    (1, 2, 1, 145),
-    (2, 0, 1, 414),
-    (2, 1, 1, 212),
-    (2, 2, 1, 145),
+    (0, 0, 1, 269, ['Mienfoo: High Jump Kick', 'Medicham: Dynamic Punch']),
+    (0, 1, 1,  78, ['Mienfoo: High Jump Kick (shielded)', 'Medicham: Dynamic Punch']),
+    (0, 2, 1,  78, ['Mienfoo: Low Sweep (shielded)', 'Medicham: Dynamic Punch']),
+    (1, 0, 0, 521, ['Mienfoo: High Jump Kick', 'Medicham: Ice Punch (shielded)', 'Mienfoo: High Jump Kick']),
+    (1, 1, 1, 347, ['Mienfoo: High Jump Kick (shielded)', 'Medicham: Ice Punch (shielded)', 'Mienfoo: High Jump Kick', 'Medicham: Ice Punch']),
+    (1, 2, 1, 145, ['Mienfoo: Low Sweep (shielded)', 'Medicham: Ice Punch (shielded)', 'Mienfoo: High Jump Kick (shielded)', 'Medicham: Ice Punch']),
+    (2, 0, 1, 414, ['Mienfoo: High Jump Kick', 'Mienfoo: Low Sweep', 'Medicham: Dynamic Punch (shielded)']),
+    (2, 1, 1, 212, ['Mienfoo: High Jump Kick (shielded)', 'Mienfoo: Low Sweep']),
+    (2, 2, 1, 145, ['Mienfoo: Low Sweep (shielded)', 'Mienfoo: High Jump Kick (shielded)']),
 ])
 def test_mienfoo_vs_medicham_high_jump_kick(shields_mie, shields_med,
-                                            expected_winner, expected_mie_score):
+                                            expected_winner, expected_mie_score,
+                                            expected_log):
     bp_mie = _make_battle_pokemon('Mienfoo', 'LOW_KICK', ['HIGH_JUMP_KICK', 'LOW_SWEEP'],
                                   'great', shields_mie, 13, 15, 15)
     bp_med = _make_battle_pokemon('Medicham', 'COUNTER', ['DYNAMIC_PUNCH', 'ICE_PUNCH'],
                                   'great', shields_med, 7, 15, 14)
     result = simulate(bp_mie, bp_med,
                       charged_policy_0=pvpoke_dp,
-                      charged_policy_1=pvpoke_dp)
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
     assert result.winner == expected_winner, (
         f"{shields_mie}v{shields_med}: expected winner={expected_winner}, "
         f"got {result.winner}  HP={result.hp_remaining}"
@@ -669,10 +718,13 @@ def test_mienfoo_vs_medicham_high_jump_kick(shields_mie, shields_med,
         f"{shields_mie}v{shields_med}: expected Mie score={expected_mie_score}, "
         f"got {mie_score}  (delta={mie_score - expected_mie_score:+d})"
     )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_mie}v{shields_med}: battle log mismatch"
+    )
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_cor,shields_azu,expected_winner,expected_cor_score", [
+@pytest.mark.parametrize("shields_cor,shields_azu,expected_winner,expected_cor_score,expected_log", [
     # Corviknight 4/12/14 (AIR_SLASH / AIR_CUTTER + PAYBACK)
     # vs Azumarill 4/15/13 (BUBBLE / ICE_BEAM + PLAY_ROUGH), Great League
     # Policy: pvpoke_dp + always_shield
@@ -685,25 +737,27 @@ def test_mienfoo_vs_medicham_high_jump_kick(shields_mie, shields_med,
     #   Cor 0s:     426      356      285
     #   Cor 1s:     445      374      303
     #   Cor 2s:     586      586      536
-    (0, 0, 1, 426),
-    (0, 1, 1, 356),
-    (0, 2, 1, 285),
-    (1, 0, 1, 445),
-    (1, 1, 1, 374),
-    (1, 2, 1, 303),
-    (2, 0, 0, 586),
-    (2, 1, 0, 586),
-    (2, 2, 0, 536),
+    (0, 0, 1, 426, ['Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
+    (0, 1, 1, 356, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
+    (0, 2, 1, 285, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
+    (1, 0, 1, 445, ['Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam']),
+    (1, 1, 1, 374, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam']),
+    (1, 2, 1, 303, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam']),
+    (2, 0, 0, 586, ['Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
+    (2, 1, 0, 586, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Air Cutter']),
+    (2, 2, 0, 536, ['Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter (shielded)', 'Azumarill: Ice Beam (shielded)', 'Corviknight: Air Cutter', 'Azumarill: Ice Beam', 'Corviknight: Payback']),
 ])
 def test_corviknight_vs_azumarill_air_cutter_buff(shields_cor, shields_azu,
-                                                   expected_winner, expected_cor_score):
+                                                   expected_winner, expected_cor_score,
+                                                   expected_log):
     bp_cor = _make_battle_pokemon('Corviknight', 'AIR_SLASH', ['AIR_CUTTER', 'PAYBACK'],
                                   'great', shields_cor, 4, 12, 14)
     bp_azu = _make_battle_pokemon('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
                                   'great', shields_azu, 4, 15, 13)
     result = simulate(bp_cor, bp_azu,
                       charged_policy_0=pvpoke_dp,
-                      charged_policy_1=pvpoke_dp)
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
     assert result.winner == expected_winner, (
         f"{shields_cor}v{shields_azu}: expected winner={expected_winner}, "
         f"got {result.winner}  HP={result.hp_remaining}"
@@ -712,4 +766,54 @@ def test_corviknight_vs_azumarill_air_cutter_buff(shields_cor, shields_azu,
     assert cor_score == expected_cor_score, (
         f"{shields_cor}v{shields_azu}: expected Cor score={expected_cor_score}, "
         f"got {cor_score}  (delta={cor_score - expected_cor_score:+d})"
+    )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_cor}v{shields_azu}: battle log mismatch"
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_swam,shields_regi,expected_winner,expected_swam_score,expected_log", [
+    # Shadow Swampert 15/15/15 (MUD_SHOT / HYDRO_CANNON + EARTHQUAKE)
+    # vs Registeel 15/15/15 (LOCK_ON / FLASH_CANNON + FOCUS_BLAST), Great League
+    # Policy: pvpoke_dp + always_shield
+    #
+    # Tests shadow multipliers: Shadow Swampert deals ×1.2 damage, takes ×1.2 damage.
+    #
+    # PvPoke verified scores (pvpoke.com/battle/, Swampert's perspective):
+    #              Regi 0s  Regi 1s  Regi 2s
+    #   Swam 0s:    541      507      216
+    #   Swam 1s:    936      902      436
+    #   Swam 2s:    936      902      861
+    (0, 0, 0, 541, ['Registeel: Focus Blast', 'Swampert: Earthquake']),
+    (0, 1, 0, 507, ['Swampert: Hydro Cannon (shielded)', 'Registeel: Focus Blast', 'Swampert: Earthquake']),
+    (0, 2, 1, 216, ['Swampert: Hydro Cannon (shielded)', 'Registeel: Focus Blast', 'Swampert: Hydro Cannon (shielded)']),
+    (1, 0, 0, 936, ['Registeel: Focus Blast (shielded)', 'Swampert: Earthquake']),
+    (1, 1, 0, 902, ['Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon (shielded)', 'Swampert: Earthquake']),
+    (1, 2, 1, 436, ['Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon', 'Registeel: Focus Blast']),
+    (2, 0, 0, 936, ['Registeel: Focus Blast (shielded)', 'Swampert: Earthquake']),
+    (2, 1, 0, 902, ['Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon (shielded)', 'Swampert: Earthquake']),
+    (2, 2, 0, 861, ['Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon (shielded)', 'Swampert: Earthquake']),
+])
+def test_shadow_swampert_vs_registeel(shields_swam, shields_regi, expected_winner,
+                                      expected_swam_score, expected_log):
+    bp_swam = _make_battle_pokemon('Swampert', 'MUD_SHOT', ['HYDRO_CANNON', 'EARTHQUAKE'],
+                                    'great', shields_swam, 15, 15, 15, shadow=True)
+    bp_regi = _make_battle_pokemon('Registeel', 'LOCK_ON', ['FLASH_CANNON', 'FOCUS_BLAST'],
+                                    'great', shields_regi, 15, 15, 15)
+    result = simulate(bp_swam, bp_regi,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
+    assert result.winner == expected_winner, (
+        f"{shields_swam}v{shields_regi}: expected winner={expected_winner}, "
+        f"got {result.winner}  HP={result.hp_remaining}"
+    )
+    swam_score = round(result.pvpoke_score(0))
+    assert swam_score == expected_swam_score, (
+        f"{shields_swam}v{shields_regi}: expected Swam score={expected_swam_score}, "
+        f"got {swam_score}  (delta={swam_score - expected_swam_score:+d})"
+    )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_swam}v{shields_regi}: battle log mismatch"
     )

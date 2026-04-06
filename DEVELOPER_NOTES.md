@@ -2,10 +2,10 @@
 
 ## Current status (2026-04-06)
 
-99/102 integration tests pass. The simulator matches PvPoke's simulate-mode
-score table exactly (±0) for 7 matchups (63 cells). The 3 remaining failures
-are all Mienfoo vs Medicham, root-caused to a `bestChargedMove` selection
-difference (see below).
+111 tests pass (102 original + 9 shadow). The simulator matches PvPoke's
+simulate-mode score table exactly (±0) for 8 matchups (72 cells). The 3
+remaining failures are all Mienfoo vs Medicham, root-caused to a
+`bestChargedMove` selection difference (see below).
 
 ### Verified correct
 - **Type effectiveness**: All 324 matchups match PvPoke exactly
@@ -17,21 +17,28 @@ difference (see below).
 - **selfBuffing/selfDebuffing flags**: Match PvPoke's chance thresholds
   (==1 for selfBuffing, >=0.5 for selfDebuffing)
 - **Shield policy**: pvpoke_simulate_shield uses precomputed flags
+- **Shadow Pokemon**: ×1.2 atk / ×(5/6) def multipliers match PvPoke's
+  SHADOW_ATK=1.2, SHADOW_DEF=0.83333331. Shadow Swampert vs Registeel 9/9.
 
-### Remaining 3 failures: Mienfoo vs Medicham (1v0, 1v1, 2v1)
+### Previously failing: Mienfoo vs Medicham — FIXED (all 9/9)
 
-Root cause: `bestChargedMove` selection. PvPoke selects it in
-`initializeStats` using `move.damage / move.energy`, but `move.damage`
-is undefined at init time (only set later as a side effect of
-`wouldShield`). This gives NaN DPE, so bestChargedMove defaults to the
-cheapest move. Our code uses actual DPE computed per call, picking HJK
-instead of LS. This changes whether Mienfoo enters the DP or stays in
-farm-down mode. See "PvPoke bugs" below — this is likely a PvPoke bug.
+Two bugs were found and fixed:
+
+1. **wouldShield buff reset ordering** (battle.py `would_shield`):
+   The charged-move threat loop ran BEFORE resetting the temporarily-
+   applied stat buffs, inflating damage predictions. PvPoke resets
+   buffs first (ActionLogic.js:1136-1140), then evaluates charged-move
+   threat (lines 1145-1165). Fix: moved the reset before the loop.
+
+2. **CMP (Charge Move Priority) cancellation** (battle.py `simulate`):
+   When both Pokemon fire charged moves simultaneously, the lower-ATK
+   Pokemon's move should be canceled if it was KO'd by the higher-ATK
+   Pokemon's charged move (PvPoke Battle.js:464-467). Our code had an
+   exception that always allowed both to fire. Fix: track `charged_ko`
+   set and cancel if `use_priority` and attacker was KO'd by a charged
+   move.
 
 ## PvPoke bugs found
-
-Two bugs in PvPoke's JavaScript that we've identified and documented.
-Both should be reported upstream.
 
 ### 1. BattleState .hp/.oppHealth naming inconsistency
 
@@ -45,17 +52,6 @@ always false → dead code). The dedup check at line 545 correctly uses
 We added an `intended_pruning` flag to `pvpoke_dp` that toggles between
 PvPoke's actual behavior (dead-code pruning, `False`) and the apparently
 intended behavior (functional pruning, `True`).
-
-### 2. bestChargedMove uses undefined move.damage
-
-**File**: `Pokemon.js:791`
-
-`bestChargedMove` is selected using `move.damage / move.energy` for DPE.
-But `move.damage` is only set later as a side effect of `wouldShield`
-(ActionLogic.js line 1103). At init time, `move.damage` is undefined →
-`move.dpe = NaN` → DPE comparison always fails → defaults to cheapest move.
-
-PvPoke probably intended `move.power / move.energy` (raw DPE).
 
 ## Key implementation details
 
