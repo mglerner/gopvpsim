@@ -12,6 +12,7 @@ from gopvpsim.battle import (
     use_first_available, bait_with_cheapest,
     no_bait, pvpoke_ai, pvpoke_dp, optimal_timing, simulate, ENERGY_CAP, OPTIMAL_TIMING,
 )
+from gopvpsim.data import get_default_moveset
 
 
 # ---------------------------------------------------------------------------
@@ -873,3 +874,62 @@ def test_corviknight_mirror_both_buff(shields_0, shields_1,
     assert _extract_battle_log(result) == expected_log, (
         f"{shields_0}v{shields_1}: battle log mismatch"
     )
+
+
+# ---------------------------------------------------------------------------
+# Default moveset integration tests
+# ---------------------------------------------------------------------------
+
+def _make_battle_pokemon_default(species, league, shields, shadow=False):
+    """Build a BattlePokemon using PvPoke's default moveset and default IVs (15/15/15)."""
+    from gopvpsim.pokemon import Pokemon
+    from gopvpsim.moves import get_moves
+    from gopvpsim.data import load_gamemaster, parse_types, get_default_moveset
+
+    fast_id, charged_ids = get_default_moveset(species, league=league, shadow=shadow)
+    pokemon = Pokemon.at_best_level(species, 15, 15, 15,
+                                    league=league, shadow=shadow)
+    fast_moves, charged_moves = get_moves()
+    fm  = dict(fast_moves[fast_id])
+    cms = [dict(charged_moves[cid]) for cid in charged_ids]
+
+    gm  = load_gamemaster()
+    mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
+    types = parse_types(mon)
+
+    return BattlePokemon(
+        species=species, types=types,
+        atk=pokemon.atk, def_=pokemon.def_, max_hp=pokemon.hp,
+        fast_move=fm, charged_moves=cms, shields=shields,
+    )
+
+
+@pytest.mark.integration
+def test_default_moveset_medicham_vs_azumarill_runs():
+    """Smoke test: default movesets produce a valid battle result."""
+    bp_med = _make_battle_pokemon_default('Medicham', 'great', shields=1)
+    bp_azu = _make_battle_pokemon_default('Azumarill', 'great', shields=1)
+    result = simulate(bp_med, bp_azu,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp)
+    assert result.winner in (0, 1, -1)
+    assert 0 < result.pvpoke_score(0) < 1000
+    assert 0 < result.pvpoke_score(1) < 1000
+
+
+@pytest.mark.integration
+def test_default_moveset_medicham_uses_psycho_cut():
+    """Medicham's default fast move should be PSYCHO_CUT in Great League."""
+    bp = _make_battle_pokemon_default('Medicham', 'great', shields=2)
+    assert bp.fast_move['moveId'] == 'PSYCHO_CUT'
+
+
+@pytest.mark.integration
+def test_default_moveset_shadow_runs():
+    """Shadow Pokemon default movesets should work too."""
+    bp_shadow = _make_battle_pokemon_default('Quagsire', 'great', shields=1, shadow=True)
+    bp_normal = _make_battle_pokemon_default('Medicham', 'great', shields=1)
+    result = simulate(bp_shadow, bp_normal,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp)
+    assert result.winner in (0, 1, -1)

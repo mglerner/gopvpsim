@@ -29,8 +29,8 @@
 
 * **Form Change** — Morpeko. Low priority.
 
-* **Default movesets** — figure out why we don't default to PvPoke's default
-  movesets and fix it. Important for deep dive defaults.
+* ~~**Default movesets**~~ — DONE. `get_default_moveset()` reads PvPoke's
+  rankings `moveset` field. `scripts/battle.py` moves are now optional.
 
 ## Analysis goals
 

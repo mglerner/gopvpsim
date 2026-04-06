@@ -3,8 +3,8 @@
 Simulate a 1v1 PvP matchup across all 9 shield scenarios.
 
 Usage:
-    python scripts/battle.py <species1> <fast1> <charged1> \
-                              <species2> <fast2> <charged2> \
+    python scripts/battle.py <species1> [fast1] [charged1] \
+                              <species2> [fast2] [charged2] \
                               [--league great|ultra|master] \
                               [--ivs1 a/d/s] [--ivs2 a/d/s] \
                               [--policy pvpoke_ai|bait_with_cheapest|no_bait|optimal_timing] \
@@ -13,6 +13,8 @@ Usage:
                               [--shields1 N] [--shields2 N] \
                               [--log] [--debug] [--trace-shields] [--trace-dp] [--stats]
 
+    fast/charged moves are optional — if omitted, PvPoke's recommended moveset
+    for that species/league is used (from rankings data).
     <charged> is a comma-separated list of 1 or 2 move IDs.
     --shields1 / --shields2: restrict to a single shield scenario (0, 1, or 2).
     --log:   print a turn-by-turn battle timeline after the result table.
@@ -23,6 +25,8 @@ Usage:
     --stats: print computed stats (atk, def, hp, CP, types) for both pokemon.
 
 Examples:
+    python scripts/battle.py Medicham Azumarill
+
     python scripts/battle.py Medicham PSYCHO_CUT DYNAMIC_PUNCH,PSYCHIC \
                               Azumarill BUBBLE ICE_BEAM,HYDRO_PUMP \
                               --ivs1 5/15/15 --ivs2 8/15/15
@@ -45,7 +49,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from gopvpsim.pokemon import Pokemon
 from gopvpsim.moves import get_moves
-from gopvpsim.data import load_gamemaster
+from gopvpsim.data import load_gamemaster, get_default_moveset
 from gopvpsim.battle import (
     BattlePokemon, simulate,
     pvpoke_ai, pvpoke_dp, bait_with_cheapest, no_bait, optimal_timing,
@@ -113,13 +117,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument('species1')
-    parser.add_argument('fast1',    metavar='fast_move1')
-    parser.add_argument('charged1', metavar='charged_moves1',
-                        help='Comma-separated, e.g. DYNAMIC_PUNCH,PSYCHIC')
-    parser.add_argument('species2')
-    parser.add_argument('fast2',    metavar='fast_move2')
-    parser.add_argument('charged2', metavar='charged_moves2')
+    parser.add_argument('pokemon', nargs='+', metavar='ARG',
+                        help='species1 [fast1 charged1] species2 [fast2 charged2]. '
+                             'Moves default to PvPoke recommended if omitted.')
     parser.add_argument('--league',  default='great',
                         choices=['great', 'ultra', 'master'])
     parser.add_argument('--ivs1',   default='15/15/15', type=parse_ivs,
@@ -155,17 +155,56 @@ def main():
 
     args = parser.parse_args()
 
-    charged_ids1 = [c.strip() for c in args.charged1.split(',')]
-    charged_ids2 = [c.strip() for c in args.charged2.split(',')]
+    # Parse positional args: accept 2, 4, 5, or 6 positional args.
+    #   2: species1 species2                    (both use default moves)
+    #   5: species1 fast1 charged1 species2     (species2 uses defaults; rare)
+    #   6: species1 fast1 charged1 species2 fast2 charged2
+    # We detect the pattern by checking if arg looks like a species name
+    # (starts with uppercase) vs a move ID (all uppercase with underscores).
+    positional = args.pokemon
+    if len(positional) == 2:
+        species1, species2 = positional
+        fast1 = charged1_str = fast2 = charged2_str = None
+    elif len(positional) == 6:
+        species1, fast1, charged1_str, species2, fast2, charged2_str = positional
+    elif len(positional) == 4:
+        # species1 fast1 charged1 species2 (species2 uses defaults)
+        species1, fast1, charged1_str, species2 = positional
+        fast2 = charged2_str = None
+    else:
+        sys.exit(f"Expected 2, 4, or 6 positional args "
+                 f"(species1 [fast charged] species2 [fast charged]), got {len(positional)}.\n"
+                 f"  2 args: species1 species2  (both use PvPoke default moves)\n"
+                 f"  6 args: species1 fast1 charged1 species2 fast2 charged2")
+
+    # Resolve default movesets from PvPoke rankings when not specified
+    if fast1 is None or charged1_str is None:
+        default_fast, default_charged = get_default_moveset(
+            species1, league=args.league, shadow=args.shadow1)
+        if fast1 is None:
+            fast1 = default_fast
+        if charged1_str is None:
+            charged1_str = ','.join(default_charged)
+
+    if fast2 is None or charged2_str is None:
+        default_fast, default_charged = get_default_moveset(
+            species2, league=args.league, shadow=args.shadow2)
+        if fast2 is None:
+            fast2 = default_fast
+        if charged2_str is None:
+            charged2_str = ','.join(default_charged)
+
+    charged_ids1 = [c.strip() for c in charged1_str.split(',')]
+    charged_ids2 = [c.strip() for c in charged2_str.split(',')]
     policy = POLICIES[args.policy]
     a1, d1, s1 = args.ivs1
     a2, d2, s2 = args.ivs2
 
     print()
-    print(mon_label(args.species1, args.fast1, charged_ids1, a1, d1, s1,
+    print(mon_label(species1, fast1, charged_ids1, a1, d1, s1,
                     args.league, args.shadow1))
     print('  vs')
-    print(mon_label(args.species2, args.fast2, charged_ids2, a2, d2, s2,
+    print(mon_label(species2, fast2, charged_ids2, a2, d2, s2,
                     args.league, args.shadow2))
     print(f'  policy: {args.policy}')
     print()
@@ -173,8 +212,8 @@ def main():
     if args.stats:
         from gopvpsim.data import parse_types
         for label, species, fast_id, charged_ids_list, ivs, shadow in [
-            ('P1', args.species1, args.fast1, charged_ids1, args.ivs1, args.shadow1),
-            ('P2', args.species2, args.fast2, charged_ids2, args.ivs2, args.shadow2),
+            ('P1', species1, fast1, charged_ids1, args.ivs1, args.shadow1),
+            ('P2', species2, fast2, charged_ids2, args.ivs2, args.shadow2),
         ]:
             a, d, s = ivs
             p = Pokemon.at_best_level(species, a, d, s, league=args.league, shadow=shadow)
@@ -200,21 +239,21 @@ def main():
     if args.show_damage:
         # Build one pair of BattlePokemon to compute damage values
         bp1 = make_battle_pokemon(
-            args.species1, args.fast1, charged_ids1, args.league,
+            species1, fast1, charged_ids1, args.league,
             2, a1, d1, s1, shadow=args.shadow1)
         bp2 = make_battle_pokemon(
-            args.species2, args.fast2, charged_ids2, args.league,
+            species2, fast2, charged_ids2, args.league,
             2, a2, d2, s2, shadow=args.shadow2)
-        print(f'  Damage: {args.species1} → {args.species2}')
-        print(f'    {args.fast1}: {bp1.fast_move_damage(bp2)} dmg'
+        print(f'  Damage: {species1} → {species2}')
+        print(f'    {fast1}: {bp1.fast_move_damage(bp2)} dmg'
               f'  (power={bp1.fast_move["power"]}'
               f' energy={bp1.fast_move["energyGain"]}'
               f' turns={bp1.fast_move.get("_turns", bp1.fast_move["cooldown"]//500)})')
         for cm in bp1.charged_moves:
             print(f'    {cm["moveId"]}: {bp1.charged_move_damage(cm, bp2)} dmg'
                   f'  (power={cm["power"]} energy={cm["energy"]})')
-        print(f'  Damage: {args.species2} → {args.species1}')
-        print(f'    {args.fast2}: {bp2.fast_move_damage(bp1)} dmg'
+        print(f'  Damage: {species2} → {species1}')
+        print(f'    {fast2}: {bp2.fast_move_damage(bp1)} dmg'
               f'  (power={bp2.fast_move["power"]}'
               f' energy={bp2.fast_move["energyGain"]}'
               f' turns={bp2.fast_move.get("_turns", bp2.fast_move["cooldown"]//500)})')
@@ -234,7 +273,7 @@ def main():
     col_w = 14
     s2_list = list(shield_range2)
     header = f"{'':10}" + ''.join(
-        f"{'  ' + args.species2[:4] + ' ' + str(sa) + 's':<{col_w}}"
+        f"{'  ' + species2[:4] + ' ' + str(sa) + 's':<{col_w}}"
         for sa in s2_list
     )
     print(header)
@@ -243,14 +282,14 @@ def main():
     timelines = []  # (label, timeline_lines) collected for printing after table
 
     for s1_shields in shield_range1:
-        row = f"{args.species1[:4] + ' ' + str(s1_shields) + 's':<10}"
+        row = f"{species1[:4] + ' ' + str(s1_shields) + 's':<10}"
         for s2_shields in s2_list:
             bp1 = make_battle_pokemon(
-                args.species1, args.fast1, charged_ids1, args.league,
+                species1, fast1, charged_ids1, args.league,
                 s1_shields, a1, d1, s1, shadow=args.shadow1,
             )
             bp2 = make_battle_pokemon(
-                args.species2, args.fast2, charged_ids2, args.league,
+                species2, fast2, charged_ids2, args.league,
                 s2_shields, a2, d2, s2, shadow=args.shadow2,
             )
             result = simulate(bp1, bp2,
@@ -269,17 +308,17 @@ def main():
                 # >500 = species1 wins, <500 = species1 loses.
                 cell = str(score0)
             elif result.winner == 0:
-                cell = f"{args.species1[:4]} {score0}"
+                cell = f"{species1[:4]} {score0}"
             elif result.winner == 1:
-                cell = f"{args.species2[:4]} {score1}"
+                cell = f"{species2[:4]} {score1}"
             else:
                 cell = f"Tie {score0}"
 
             row += f"{cell:<{col_w}}"
 
             if do_log and result.timeline:
-                label = (f"--- {args.species1} {s1_shields}s  vs  "
-                         f"{args.species2} {s2_shields}s "
+                label = (f"--- {species1} {s1_shields}s  vs  "
+                         f"{species2} {s2_shields}s "
                          f"(score: {score0}) ---")
                 timelines.append((label, result.timeline))
 

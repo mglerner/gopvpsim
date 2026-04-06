@@ -80,3 +80,54 @@ def load_rankings(league):
     if league not in ("great", "ultra", "master"):
         raise ValueError(f"Unknown league: {league!r}")
     return _fetch_json(league)
+
+
+# ---------------------------------------------------------------------------
+# Rankings index (cached)
+# ---------------------------------------------------------------------------
+
+_rankings_index = {}  # league -> {speciesId -> ranking entry}
+
+
+def _get_rankings_index(league):
+    """Return a dict of speciesId -> ranking entry for a league. Cached."""
+    if league not in _rankings_index:
+        rankings = load_rankings(league)
+        _rankings_index[league] = {r['speciesId']: r for r in rankings}
+    return _rankings_index[league]
+
+
+def get_default_moveset(species_name, league='great', shadow=False):
+    """Return (fast_move_id, [charged_move_ids]) from PvPoke's rankings.
+
+    PvPoke's rankings files contain a 'moveset' field for each species:
+    [FAST_MOVE, CHARGED1, CHARGED2].  This is the default moveset shown
+    on pvpoke.com/battle/ when no moves are specified.
+
+    Args:
+        species_name: e.g. 'Medicham', 'Azumarill'
+        league: 'great', 'ultra', or 'master'
+        shadow: if True, look up the shadow variant (e.g. 'medicham_shadow')
+
+    Returns:
+        (fast_move_id, [charged_move_id, ...])
+
+    Raises:
+        KeyError: if species not found in rankings for this league
+    """
+    index = _get_rankings_index(league)
+
+    # Build the speciesId key PvPoke uses: lowercase, underscored
+    species_id = species_name.lower().replace(' ', '_').replace('(', '').replace(')', '')
+    if shadow:
+        species_id = species_id + '_shadow'
+
+    if species_id not in index:
+        raise KeyError(
+            f"{species_name!r} {'(Shadow) ' if shadow else ''}"
+            f"not found in {league} league rankings. "
+            f"Available species can be listed with load_rankings({league!r})."
+        )
+
+    moveset = index[species_id]['moveset']
+    return moveset[0], moveset[1:]
