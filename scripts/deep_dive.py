@@ -53,7 +53,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from gopvpsim.pokemon import (
     Pokemon, get_pokemon_entry, get_species, iv_rank, CPM, best_level,
-    LEAGUE_CAPS, cp as calc_cp,
+    LEAGUE_CAPS, cp as calc_cp, pvpoke_default_ivs,
 )
 from gopvpsim.moves import get_moves
 from gopvpsim.data import (
@@ -283,17 +283,36 @@ def get_top_opponents(league, n, exclude_species=None):
     return opponents
 
 
+def resolve_opp_ivs(species_name, league, shadow, opp_iv_mode):
+    """Return (atk_iv, def_iv, sta_iv) for an opponent based on the IV mode.
+
+    opp_iv_mode:
+      'pvpoke'  — PvPoke's default IVs from the gamemaster (what pvpoke.com uses)
+      'rank1'   — stat-product rank 1 IVs
+    """
+    if opp_iv_mode == 'rank1':
+        ranked = iv_rank(species_name, league=league, shadow=shadow)
+        r1 = ranked[0]
+        return r1['atk_iv'], r1['def_iv'], r1['sta_iv']
+    else:
+        # pvpoke default
+        _lv, a, d, s = pvpoke_default_ivs(species_name, league=league)
+        return a, d, s
+
+
 def sim_score(focal_species, fast_id, charged_ids, league, shields_focal,
               shields_opp, atk_iv, def_iv, sta_iv, shadow,
-              opp_species, opp_fast, opp_charged, opp_shadow=False):
+              opp_species, opp_fast, opp_charged, opp_shadow=False,
+              opp_iv_mode='pvpoke'):
     """Run one sim and return the focal mon's PvPoke score (0-1000)."""
     bp0 = make_battle_pokemon(focal_species, fast_id, charged_ids, league,
                               shields_focal, atk_iv, def_iv, sta_iv, shadow)
 
     opp_is_shadow = opp_shadow or opp_species.endswith(' (Shadow)')
     opp_name = opp_species.replace(' (Shadow)', '') if opp_is_shadow else opp_species
+    oa, od, os_ = resolve_opp_ivs(opp_name, league, opp_is_shadow, opp_iv_mode)
     bp1 = make_battle_pokemon(opp_name, opp_fast, opp_charged, league,
-                              shields_opp, 15, 15, 15, shadow=opp_is_shadow)
+                              shields_opp, oa, od, os_, shadow=opp_is_shadow)
 
     result = simulate(bp0, bp1,
                       charged_policy_0=pvpoke_dp,
@@ -311,7 +330,7 @@ def moveset_label(fast_id, charged_ids):
 # ---------------------------------------------------------------------------
 
 def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
-                    shield_scenarios, top_n):
+                    shield_scenarios, top_n, opp_iv_mode='pvpoke'):
     """
     Quick screen: sim rank-1 IVs for each moveset against opponents.
     Return the top N movesets by average score.
@@ -337,7 +356,8 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
             for s_focal, s_opp in shield_scenarios:
                 score = sim_score(species, fast_id, charged_ids, league,
                                   s_focal, s_opp, a_iv, d_iv, s_iv, shadow,
-                                  opp_name, opp_fast, opp_charged)
+                                  opp_name, opp_fast, opp_charged,
+                                  opp_iv_mode=opp_iv_mode)
                 total += score
                 count += 1
         avg = total / count if count else 0
@@ -360,7 +380,7 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
 # ---------------------------------------------------------------------------
 
 def iv_sweep(species, fast_id, charged_ids, league, shadow,
-             opponents, opp_movesets, shield_scenarios):
+             opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke'):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Returns list of dicts with IV info + composite score, sorted by score desc.
@@ -381,7 +401,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     for opp_name, (opp_fast, opp_charged) in zip(opponents, opp_movesets):
         opp_is_shadow = '_shadow' in opp_name.lower().replace(' ', '_')
         opp_clean = opp_name
-        opp_pokemon = Pokemon.at_best_level(opp_clean, 15, 15, 15,
+        oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode)
+        opp_pokemon = Pokemon.at_best_level(opp_clean, oa, od, os_,
                                             league=league, shadow=opp_is_shadow)
         opp_mon = next(m for m in gm['pokemon'] if m['speciesName'] == opp_clean)
         opp_types = parse_types(opp_mon)
@@ -479,7 +500,8 @@ THRESHOLD_COLORS = [
 
 
 def generate_html(species, league, moveset_results, html_path, thresholds=None,
-                  opponent_label=None, shield_scenarios=None, opponent_names=None):
+                  opponent_label=None, shield_scenarios=None, opponent_names=None,
+                  opp_iv_mode='pvpoke'):
     """
     Generate an interactive HTML file with Plotly.js scatter plots.
 
@@ -757,6 +779,11 @@ Plotly.newPlot("plot{i}", {json.dumps(traces_js)}, {json.dumps(layout)},
     # Methodology footer
     shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in (shield_scenarios or [(1, 1)]))
     n_opponents = len(opponent_names) if opponent_names else '?'
+    if opp_iv_mode == 'rank1':
+        opp_iv_desc = 'stat-product rank 1 IVs'
+    else:
+        opp_iv_desc = ("PvPoke's default IVs (the IVs pvpoke.com uses when you "
+                       "load a matchup)")
     html += '</script>\n'
     html += f"""
 <hr style="border-color:#0f3460; margin-top:40px">
@@ -765,9 +792,9 @@ Plotly.newPlot("plot{i}", {json.dumps(traces_js)}, {json.dumps(layout)},
 Each of the 4096 possible IV spreads (0&ndash;15 for Atk/Def/Sta) is leveled to the
 highest level that stays under the {league.title()} League CP cap ({LEAGUE_CAPS[league]}).
 For each IV spread, a battle is simulated against each of the {n_opponents} opponents
-in the {shield_desc} shield scenario(s) using the <code>pvpoke_dp</code> policy
-(PvPoke's simulate-mode dynamic programming policy). Opponents use 15/15/15 IVs at
-their best level for this league.
+in the {opp_desc} pool in the {shield_desc} shield scenario(s), using the
+<code>pvpoke_dp</code> policy (PvPoke's simulate-mode dynamic programming policy).
+Opponents use {opp_iv_desc} at their best level for this league.
 <br><br>
 <strong>Avg Battle Score</strong> is the mean of the PvPoke battle scores across all
 opponents and shield scenarios. The PvPoke score for a single battle is:
@@ -848,6 +875,10 @@ def main():
                              'Use "all" for 0v0+1v1+2v2.')
     parser.add_argument('--shadow', action='store_true',
                         help='Focal species is shadow')
+    parser.add_argument('--opp-ivs', default='pvpoke', choices=['pvpoke', 'rank1'],
+                        help='Opponent IV selection: pvpoke (PvPoke default IVs, '
+                             'what pvpoke.com uses) or rank1 (stat product rank 1). '
+                             'Default: pvpoke.')
     parser.add_argument('--thresholds', default=None, metavar='FILE',
                         help='JSON file with IV thresholds to highlight on plots. '
                              'Format: {"Name": {"attack": N, "defense": N, "stamina": N}}. '
@@ -923,7 +954,9 @@ def main():
             idx = opponents.index(opp)
             opponents.pop(idx)
 
+    opp_iv_label = 'PvPoke defaults' if args.opp_ivs == 'pvpoke' else 'rank 1 (stat product)'
     print(f"  Shield scenario(s): {shield_scenarios}")
+    print(f"  Opponent IVs: {opp_iv_label}")
     if thresholds:
         for name, thresh in thresholds.items():
             print(f"  Threshold: {name} — {_threshold_desc(thresh)}")
@@ -939,10 +972,11 @@ def main():
         screen_opp_movesets = opp_movesets_full[:screen_n]
 
     # Phase 1: Screen movesets
+    opp_iv_mode = args.opp_ivs
     surviving = screen_movesets(
         args.species, movesets, args.league, args.shadow,
         screen_opponents, screen_opp_movesets, shield_scenarios,
-        args.top_movesets,
+        args.top_movesets, opp_iv_mode=opp_iv_mode,
     )
 
     # Phase 2: Full IV sweep for each surviving moveset
@@ -957,6 +991,7 @@ def main():
         results, n_sims = iv_sweep(
             args.species, fast_id, charged_ids, args.league, args.shadow,
             opponents, opp_movesets_full, shield_scenarios,
+            opp_iv_mode=opp_iv_mode,
         )
 
         elapsed = time.time() - t0
@@ -1002,7 +1037,7 @@ def main():
         generate_html(args.species, args.league, all_moveset_results, args.html,
                       thresholds=thresholds, opponent_label=opponent_label,
                       shield_scenarios=shield_scenarios,
-                      opponent_names=opponents)
+                      opponent_names=opponents, opp_iv_mode=opp_iv_mode)
 
     print("Done.\n")
 
