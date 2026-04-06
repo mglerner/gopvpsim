@@ -475,6 +475,24 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                     'per_opp': per_opp,
                 })
 
+    # Build canonical-order score array BEFORE sorting results.
+    # Canonical order = iteration order (a=0..15, d=0..15, s=0..15), skipping invalid.
+    # Layout: scores[iv_idx * n_scenarios * n_opponents + scenario_idx * n_opponents + opp_idx]
+    n_scenarios = len(shield_scenarios)
+    n_opponents = len(opp_cache)
+    canonical_scores = []
+    canonical_meta = []  # [(a,d,s, lv, cp, atk, def_, hp), ...]
+    for r in results:
+        canonical_meta.append((
+            r['atk_iv'], r['def_iv'], r['sta_iv'],
+            r['level'], r['cp'],
+            r['atk'], r['def_'], r['hp'],
+        ))
+        for si in range(n_scenarios):
+            for oi in range(n_opponents):
+                canonical_scores.append(round(r['per_opp'][(si, oi)]))
+
+    # Now sort and rank
     results.sort(key=lambda r: r['avg_score'], reverse=True)
     for i, r in enumerate(results):
         r['battle_rank'] = i + 1
@@ -483,7 +501,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     for i, r in enumerate(by_sp):
         r['sp_rank'] = i + 1
 
-    return results, n_sims
+    return results, n_sims, canonical_scores, canonical_meta
 
 
 # ---------------------------------------------------------------------------
@@ -540,7 +558,8 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
     opp_desc = opponent_label or "PvPoke rankings"
 
     plots_data = []
-    for fast_id, charged_ids, results in moveset_results:
+    for entry in moveset_results:
+        fast_id, charged_ids, results = entry[0], entry[1], entry[2]
         label = moveset_label(fast_id, charged_ids)
 
         # Rank-1 reference for matchup diffs (results are sorted by avg_score desc)
@@ -921,8 +940,565 @@ def _threshold_desc(thresh):
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Reference moveset resolution
 # ---------------------------------------------------------------------------
+
+def resolve_reference_moveset(species, league, shadow, ref_arg):
+    """Return (fast_id, [charged_ids]) for the reference moveset, or None.
+
+    ref_arg: 'auto' (PvPoke default), 'none' (skip), or 'FAST,CHARGED1,CHARGED2'
+    """
+    if ref_arg == 'none':
+        return None
+    if ref_arg == 'auto':
+        try:
+            fast, charged = get_default_moveset(species, league=league, shadow=shadow)
+            return fast, charged
+        except KeyError:
+            print(f"  Warning: no default moveset for {species} in {league} rankings; "
+                  f"skipping reference")
+            return None
+    # Explicit: FAST,CHARGED1,CHARGED2
+    parts = [p.strip() for p in ref_arg.split(',')]
+    if len(parts) == 3:
+        return parts[0], parts[1:]
+    sys.exit(f"--reference must be 'auto', 'none', or FAST,CHARGED1,CHARGED2, got {ref_arg!r}")
+
+
+# ---------------------------------------------------------------------------
+# Interactive HTML output
+# ---------------------------------------------------------------------------
+
+def generate_interactive_html(species, league, moveset_data, html_path,
+                              thresholds=None, opponent_label=None,
+                              shield_scenarios=None, opponent_names=None,
+                              opp_iv_modes=None, reference_idx=-1,
+                              standalone=False):
+    """Generate a single-page interactive HTML with JS-driven dropdowns.
+
+    moveset_data: list of dicts, each with:
+        'label': str (e.g. "COUNTER / DYNAMIC_PUNCH, ICE_PUNCH")
+        'scores': dict of opp_iv_mode -> flat score list (canonical order)
+        'meta': canonical_meta list (shared across modes for same moveset)
+    """
+    opp_iv_modes = opp_iv_modes or ['pvpoke']
+    shield_scenarios = shield_scenarios or [(1, 1)]
+    opponent_names = opponent_names or []
+    n_ivs = len(moveset_data[0]['meta']) if moveset_data else 0
+    n_scenarios = len(shield_scenarios)
+    n_opponents = len(opponent_names)
+
+    # Build threshold tier info
+    tier_names = list(thresholds.keys()) if thresholds else []
+    tier_info = []
+    for i, name in enumerate(tier_names):
+        color = THRESHOLD_COLORS[i % len(THRESHOLD_COLORS)]
+        thresh = thresholds[name]
+        tier_info.append({
+            'name': name,
+            'color': color,
+            'attack': thresh['attack'],
+            'defense': thresh['defense'],
+            'stamina': thresh['stamina'],
+            'desc': _threshold_desc(thresh),
+        })
+
+    # Build the DATA object for JS
+    # IV metadata: shared across all movesets (same species = same valid IVs)
+    meta = moveset_data[0]['meta']
+    iv_a = [m[0] for m in meta]
+    iv_d = [m[1] for m in meta]
+    iv_s = [m[2] for m in meta]
+    iv_lv = [m[3] for m in meta]
+    iv_cp = [m[4] for m in meta]
+    iv_atk = [round(m[5], 2) for m in meta]
+    iv_def = [round(m[6], 2) for m in meta]
+    iv_hp = [m[7] for m in meta]
+    iv_sp = [round(m[5] * m[6] * m[7], 1) for m in meta]
+
+    # Compute stat product ranks (same for all movesets)
+    sp_sorted = sorted(range(n_ivs), key=lambda i: iv_sp[i], reverse=True)
+    sp_ranks = [0] * n_ivs
+    for rank, idx in enumerate(sp_sorted):
+        sp_ranks[idx] = rank + 1
+
+    # Classify IVs by threshold tier (-1 = no tier)
+    iv_tiers = [-1] * n_ivs
+    if thresholds:
+        for i in range(n_ivs):
+            for ti, (tname, thresh) in enumerate(thresholds.items()):
+                meets = True
+                if thresh['attack'] > 0 and iv_atk[i] < thresh['attack']:
+                    meets = False
+                if thresh['defense'] > 0 and iv_def[i] < thresh['defense']:
+                    meets = False
+                if thresh['stamina'] > 0 and iv_hp[i] < thresh['stamina']:
+                    meets = False
+                if meets:
+                    iv_tiers[i] = ti
+                    break
+
+    data_obj = {
+        'species': species,
+        'league': league,
+        'cpCap': LEAGUE_CAPS[league],
+        'nIvs': n_ivs,
+        'nScenarios': n_scenarios,
+        'nOpponents': n_opponents,
+        'scenarios': [[s0, s1] for s0, s1 in shield_scenarios],
+        'opponents': opponent_names,
+        'oppIvModes': opp_iv_modes,
+        'opponentLabel': opponent_label or 'PvPoke rankings',
+        'referenceIdx': reference_idx,
+        'tiers': tier_info,
+        'movesets': [{'label': md['label']} for md in moveset_data],
+        # IV metadata
+        'ivA': iv_a, 'ivD': iv_d, 'ivS': iv_s,
+        'ivLv': iv_lv, 'ivCp': iv_cp,
+        'ivAtk': iv_atk, 'ivDef': iv_def, 'ivHp': iv_hp,
+        'ivSp': iv_sp, 'spRanks': sp_ranks, 'ivTiers': iv_tiers,
+    }
+
+    # Score arrays: one per (moveset_idx, opp_iv_mode)
+    score_arrays = {}
+    for mi, md in enumerate(moveset_data):
+        for mode in opp_iv_modes:
+            key = f'{mi}_{mode}'
+            score_arrays[key] = md['scores'][mode]
+
+    opp_desc = opponent_label or 'PvPoke rankings'
+    shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in shield_scenarios)
+
+    # --- Build HTML ---
+    plotly_tag = _plotly_script_tag(standalone)
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{species} {league.title()} League IV Deep Dive</title>
+{plotly_tag}
+<style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         margin: 20px; background: #1a1a2e; color: #e0e0e0; }}
+  h1 {{ color: #e94560; }}
+  .meta {{ color: #888; font-size: 13px; margin-bottom: 15px; }}
+  details.meta {{ cursor: pointer; }}
+  details.meta summary {{ color: #888; font-size: 13px; }}
+  .controls {{ background: #16213e; padding: 10px 14px; border-radius: 6px;
+               margin-bottom: 15px; display: flex; gap: 18px; align-items: center;
+               flex-wrap: wrap; }}
+  .controls label {{ font-size: 13px; color: #aaa; }}
+  .controls select {{ background: #0f3460; color: #e0e0e0; border: 1px solid #1a3a6e;
+                      padding: 4px 8px; border-radius: 4px; font-size: 13px; }}
+  .plot-container {{ margin-bottom: 20px; }}
+  .summary {{ background: #16213e; padding: 12px; border-radius: 6px;
+              margin-bottom: 20px; font-size: 13px; overflow-x: auto; }}
+  .summary table {{ border-collapse: collapse; width: 100%; }}
+  .summary th, .summary td {{ text-align: left; padding: 3px 8px;
+                               border-bottom: 1px solid #0f3460; white-space: nowrap; }}
+  .summary th {{ color: #e94560; }}
+  .tier-badge {{ display: inline-block; padding: 2px 8px; border-radius: 3px;
+                 font-size: 11px; font-weight: bold; }}
+  .threshold-info {{ background: #16213e; padding: 10px; border-radius: 6px;
+                     margin-bottom: 15px; font-size: 13px; }}
+  .threshold-info span {{ font-weight: bold; }}
+  .methodology {{ color: #888; font-size: 12px; max-width: 800px;
+                  margin: 10px 0 30px 0; line-height: 1.6; }}
+</style>
+</head>
+<body>
+<h1>{species} — {league.title()} League IV Deep Dive</h1>
+<p class="meta">Opponents: {opp_desc}
+| Shield scenario(s): {shield_desc} | Policy: pvpoke_dp</p>
+"""
+
+    # Opponent list
+    if opponent_names:
+        html += '<details class="meta"><summary>Opponent list '
+        html += f'({len(opponent_names)} mons)</summary><p style="margin:4px 0 8px 12px">'
+        html += ', '.join(opponent_names)
+        html += '</p></details>\n'
+
+    # Threshold legend
+    if thresholds:
+        html += '<div class="threshold-info">\n'
+        html += '<strong>IV Thresholds:</strong><br>\n'
+        for ti in tier_info:
+            html += (f'<span class="tier-badge" style="background:{ti["color"]};color:#000">'
+                     f'{ti["name"]}</span> {ti["desc"]}<br>\n')
+        html += '<br><em>Hover over legend entries to isolate that tier. '
+        html += 'Click to lock the isolation; click again to unlock.</em>\n'
+        html += '</div>\n'
+
+    # Controls
+    html += '<div class="controls">\n'
+    if len(moveset_data) > 1:
+        html += '  <label>Moveset: <select id="moveset-sel" onchange="updateView()">\n'
+        for mi, md in enumerate(moveset_data):
+            ref_tag = ' (reference)' if mi == reference_idx else ''
+            html += f'    <option value="{mi}">{md["label"]}{ref_tag}</option>\n'
+        html += '  </select></label>\n'
+
+    if n_scenarios > 1:
+        html += '  <label>Shields: <select id="scenario-sel" onchange="updateView()">\n'
+        html += '    <option value="avg">All (avg)</option>\n'
+        for si, (s0, s1) in enumerate(shield_scenarios):
+            sel = ' selected' if n_scenarios == 1 else ''
+            html += f'    <option value="{si}"{sel}>{s0}v{s1}</option>\n'
+        html += '  </select></label>\n'
+
+    if len(opp_iv_modes) > 1:
+        html += '  <label>Opponent IVs: <select id="oppiv-sel" onchange="updateView()">\n'
+        for mode in opp_iv_modes:
+            label = 'PvPoke Defaults' if mode == 'pvpoke' else 'Rank 1'
+            html += f'    <option value="{mode}">{label}</option>\n'
+        html += '  </select></label>\n'
+    html += '</div>\n'
+
+    # Summary table and plot placeholders
+    html += '<div id="summary" class="summary"></div>\n'
+    html += '<div id="plot" class="plot-container" style="height:550px;"></div>\n'
+
+    # Methodology footer
+    html += '<div id="methodology" class="methodology"></div>\n'
+
+    # Embed data
+    html += f'<script>var DATA = {json.dumps(data_obj)};\n'
+    html += f'var SCORES = {json.dumps(score_arrays)};\n'
+    html += '</script>\n'
+
+    # JS engine
+    html += '<script>\n'
+    html += _interactive_js_engine(n_scenarios, n_opponents, opp_iv_modes,
+                                   reference_idx, tier_info, opp_desc, league,
+                                   shield_scenarios)
+    html += '</script>\n'
+    html += '</body>\n</html>\n'
+
+    with open(html_path, 'w') as f:
+        f.write(html)
+    print(f"  Interactive HTML written to {html_path}")
+
+
+def _interactive_js_engine(n_scenarios, n_opponents, opp_iv_modes, reference_idx,
+                           tier_info, opp_desc, league, shield_scenarios):
+    """Return the JS code for the interactive deep dive page."""
+    tier_colors_js = json.dumps([t['color'] for t in tier_info])
+    tier_names_js = json.dumps([t['name'] for t in tier_info])
+
+    return f"""
+// ---- State ----
+var state = {{
+  movesetIdx: 0,
+  scenarioMode: {'"avg"' if n_scenarios > 1 else '"0"'},
+  oppIvMode: '{opp_iv_modes[0]}',
+}};
+var avgScores, battleRanks, refAvgScores, refBattleRanks;
+var lockedIdx = -1;
+var tierColors = {tier_colors_js};
+var tierNames = {tier_names_js};
+var nIvs = DATA.nIvs, nS = DATA.nScenarios, nO = DATA.nOpponents;
+
+// ---- Helpers ----
+function getScoreKey(mi, mode) {{ return mi + '_' + mode; }}
+function getScores(mi, mode) {{ return SCORES[getScoreKey(mi, mode)]; }}
+
+function getActiveScenarioIndices() {{
+  if (state.scenarioMode === 'avg') {{
+    var arr = []; for (var i=0; i<nS; i++) arr.push(i); return arr;
+  }}
+  return [parseInt(state.scenarioMode)];
+}}
+
+// ---- Compute view ----
+function computeAvgScores(mi) {{
+  var scores = getScores(mi, state.oppIvMode);
+  if (!scores) return null;
+  var sis = getActiveScenarioIndices();
+  var nSel = sis.length;
+  var avgs = new Float64Array(nIvs);
+  for (var iv = 0; iv < nIvs; iv++) {{
+    var sum = 0;
+    for (var k = 0; k < nSel; k++) {{
+      var si = sis[k];
+      var base = iv * nS * nO + si * nO;
+      for (var oi = 0; oi < nO; oi++) sum += scores[base + oi];
+    }}
+    avgs[iv] = sum / (nSel * nO);
+  }}
+  return avgs;
+}}
+
+function computeRanks(avgs) {{
+  var indices = new Array(nIvs);
+  for (var i=0; i<nIvs; i++) indices[i] = i;
+  indices.sort(function(a,b) {{ return avgs[b] - avgs[a]; }});
+  var ranks = new Uint16Array(nIvs);
+  for (var r=0; r<nIvs; r++) ranks[indices[r]] = r + 1;
+  return ranks;
+}}
+
+function computeView() {{
+  avgScores = computeAvgScores(state.movesetIdx);
+  battleRanks = computeRanks(avgScores);
+  if (DATA.referenceIdx >= 0 && DATA.referenceIdx !== state.movesetIdx) {{
+    refAvgScores = computeAvgScores(DATA.referenceIdx);
+    refBattleRanks = computeRanks(refAvgScores);
+  }} else {{
+    refAvgScores = null;
+    refBattleRanks = null;
+  }}
+}}
+
+// ---- Hover text ----
+function shortName(name) {{ return name.split('(')[0].trim().substring(0, 12); }}
+
+function buildHoverText(iv) {{
+  var a = DATA.ivA[iv], d = DATA.ivD[iv], s = DATA.ivS[iv];
+  var lines = [
+    'IVs: '+a+'/'+d+'/'+s,
+    'L'+DATA.ivLv[iv]+' CP'+DATA.ivCp[iv],
+    'Atk:'+DATA.ivAtk[iv].toFixed(2)+' Def:'+DATA.ivDef[iv].toFixed(2)+' HP:'+DATA.ivHp[iv],
+    'SP Rank: #'+DATA.spRanks[iv]+' | Battle Rank: #'+battleRanks[iv],
+    'Avg Score: '+avgScores[iv].toFixed(1),
+  ];
+  var tier = DATA.ivTiers[iv];
+  if (tier >= 0) lines.push('Tier: '+tierNames[tier]);
+
+  // Diff vs battle rank 1
+  var r1 = -1;
+  for (var i=0; i<nIvs; i++) {{ if (battleRanks[i]===1) {{ r1=i; break; }} }}
+  if (r1 >= 0 && iv !== r1) {{
+    lines.push('');
+    lines.push('vs Rank 1 ('+DATA.ivA[r1]+'/'+DATA.ivD[r1]+'/'+DATA.ivS[r1]+'):');
+    appendMatchupDiff(lines, state.movesetIdx, iv, state.movesetIdx, r1);
+  }}
+
+  // Diff vs reference moveset (same IV)
+  if (refAvgScores && DATA.referenceIdx >= 0 && DATA.referenceIdx !== state.movesetIdx) {{
+    lines.push('');
+    lines.push('vs Ref ('+DATA.movesets[DATA.referenceIdx].label+'):');
+    appendMatchupDiff(lines, state.movesetIdx, iv, DATA.referenceIdx, iv);
+  }}
+
+  return lines.join('<br>');
+}}
+
+function appendMatchupDiff(lines, mi1, iv1, mi2, iv2) {{
+  var s1 = getScores(mi1, state.oppIvMode);
+  var s2 = getScores(mi2, state.oppIvMode);
+  var sis = getActiveScenarioIndices();
+  for (var k=0; k<sis.length; k++) {{
+    var si = sis[k];
+    var gained = [], lost = [];
+    for (var oi=0; oi<nO; oi++) {{
+      var sc1 = s1[iv1*nS*nO + si*nO + oi];
+      var sc2 = s2[iv2*nS*nO + si*nO + oi];
+      var w1 = sc1 >= 500, w2 = sc2 >= 500;
+      if (w1 && !w2) gained.push(shortName(DATA.opponents[oi]));
+      else if (!w1 && w2) lost.push(shortName(DATA.opponents[oi]));
+    }}
+    var sc = DATA.scenarios[si];
+    var lab = sc[0]+'v'+sc[1];
+    var parts = [];
+    if (gained.length) parts.push('+'+gained.join(','));
+    if (lost.length) parts.push('-'+lost.join(','));
+    lines.push('  '+lab+': '+(parts.length ? parts.join(' | ') : '(same)'));
+  }}
+}}
+
+// ---- Build Plotly traces ----
+function buildTraces() {{
+  computeView();
+  var hasTiers = tierNames.length > 0;
+  var traces = [];
+
+  if (hasTiers) {{
+    // "Other" trace (no tier)
+    var otherX=[], otherY=[], otherText=[], otherColor=[];
+    for (var iv=0; iv<nIvs; iv++) {{
+      if (DATA.ivTiers[iv] < 0) {{
+        otherX.push(DATA.spRanks[iv]);
+        otherY.push(avgScores[iv]);
+        otherText.push(buildHoverText(iv));
+        otherColor.push(avgScores[iv]);
+      }}
+    }}
+    if (otherX.length) {{
+      traces.push({{
+        name:'Other', x:otherX, y:otherY, text:otherText,
+        mode:'markers', type:'scattergl', hoverinfo:'text',
+        marker:{{size:3, color:otherColor, colorscale:'Viridis', opacity:0.4}}
+      }});
+    }}
+    // Tier traces
+    for (var ti=0; ti<tierNames.length; ti++) {{
+      var tx=[], ty=[], tt=[];
+      for (var iv=0; iv<nIvs; iv++) {{
+        if (DATA.ivTiers[iv] === ti) {{
+          tx.push(DATA.spRanks[iv]);
+          ty.push(avgScores[iv]);
+          tt.push(buildHoverText(iv));
+        }}
+      }}
+      if (tx.length) {{
+        traces.push({{
+          name:tierNames[ti]+' ('+DATA.tiers[ti].desc+')',
+          x:tx, y:ty, text:tt,
+          mode:'markers', type:'scattergl', hoverinfo:'text',
+          marker:{{size:5, color:tierColors[ti], opacity:0.85,
+                   line:{{width:0.5, color:'#000'}}}}
+        }});
+      }}
+    }}
+  }} else {{
+    // Single trace, colorscale
+    var ax=[], ay=[], at=[], ac=[];
+    for (var iv=0; iv<nIvs; iv++) {{
+      ax.push(DATA.spRanks[iv]);
+      ay.push(avgScores[iv]);
+      at.push(buildHoverText(iv));
+      ac.push(avgScores[iv]);
+    }}
+    traces.push({{
+      name:'All IVs', x:ax, y:ay, text:at,
+      mode:'markers', type:'scattergl', hoverinfo:'text',
+      marker:{{size:3, color:ac, colorscale:'Viridis', opacity:0.4,
+               colorbar:{{title:'Avg Score'}}}}
+    }});
+  }}
+  return traces;
+}}
+
+// ---- Summary table ----
+function updateSummaryTable() {{
+  // Get top 10 by battle rank
+  var indices = [];
+  for (var i=0; i<nIvs; i++) indices.push(i);
+  indices.sort(function(a,b) {{ return battleRanks[a] - battleRanks[b]; }});
+  var top = indices.slice(0, 10);
+
+  var hasTiers = tierNames.length > 0;
+  var h = '<table><tr><th>Battle Rank</th><th>IVs</th><th>Level</th><th>CP</th>';
+  h += '<th>Atk</th><th>Def</th><th>HP</th><th>SP Rank</th><th>Avg Score</th>';
+  if (hasTiers) h += '<th>Tier</th>';
+  h += '</tr>';
+  for (var k=0; k<top.length; k++) {{
+    var iv = top[k];
+    var tier = DATA.ivTiers[iv];
+    h += '<tr><td>#'+battleRanks[iv]+'</td>';
+    h += '<td>'+DATA.ivA[iv]+'/'+DATA.ivD[iv]+'/'+DATA.ivS[iv]+'</td>';
+    h += '<td>'+DATA.ivLv[iv]+'</td><td>'+DATA.ivCp[iv]+'</td>';
+    h += '<td>'+DATA.ivAtk[iv].toFixed(2)+'</td><td>'+DATA.ivDef[iv].toFixed(2)+'</td>';
+    h += '<td>'+DATA.ivHp[iv]+'</td><td>#'+DATA.spRanks[iv]+'</td>';
+    h += '<td>'+avgScores[iv].toFixed(1)+'</td>';
+    if (hasTiers) {{
+      if (tier >= 0) {{
+        h += '<td><span class="tier-badge" style="background:'+tierColors[tier]+';color:#000">'+tierNames[tier]+'</span></td>';
+      }} else h += '<td>\\u2014</td>';
+    }}
+    h += '</tr>';
+  }}
+  h += '</table>';
+  document.getElementById('summary').innerHTML = h;
+}}
+
+// ---- Methodology ----
+function updateMethodology() {{
+  var scenSel = document.getElementById('scenario-sel');
+  var scenDesc = scenSel ? scenSel.options[scenSel.selectedIndex].text : '{shield_scenarios[0][0]}v{shield_scenarios[0][1]}';
+  var modeDesc = state.oppIvMode === 'rank1' ? 'stat-product rank 1 IVs' :
+    "PvPoke\\'s default IVs (the IVs pvpoke.com uses when you load a matchup)";
+  var h = '<hr style="border-color:#0f3460; margin-top:30px">';
+  h += '<strong>Methodology</strong><br>';
+  h += 'Each of the '+nIvs+' valid IV spreads is leveled to the highest level under the ';
+  h += '{league.title()} League CP cap ({LEAGUE_CAPS[league]}). For each IV, a battle is simulated ';
+  h += 'against each of the '+nO+' opponents in the {opp_desc.replace("'", "\\'")} pool ';
+  h += 'in the '+scenDesc+' shield scenario(s), using the pvpoke_dp policy. ';
+  h += 'Opponents use '+modeDesc+' at their best level.<br><br>';
+  h += '<strong>Avg Battle Score</strong> = mean PvPoke score across opponents/scenarios. ';
+  h += '500 = tie, &gt;500 = win, &lt;500 = loss.<br>';
+  h += '<strong>Battle Rank</strong> = position when sorted by Avg Battle Score (desc). ';
+  h += '<strong>Stat Product Rank</strong> (x-axis) = traditional PvP IV rank (Atk\\u00d7Def\\u00d7HP).';
+  document.getElementById('methodology').innerHTML = h;
+}}
+
+// ---- Plot ----
+var origOpacities = [];
+function updateView() {{
+  // Read state from dropdowns
+  var msel = document.getElementById('moveset-sel');
+  if (msel) state.movesetIdx = parseInt(msel.value);
+  var ssel = document.getElementById('scenario-sel');
+  if (ssel) state.scenarioMode = ssel.value;
+  var osel = document.getElementById('oppiv-sel');
+  if (osel) state.oppIvMode = osel.value;
+  lockedIdx = -1;
+
+  var traces = buildTraces();
+  origOpacities = traces.map(function(t) {{ return t.marker.opacity; }});
+
+  // Compute fixed axis ranges from all data
+  var allX = [], allY = [];
+  traces.forEach(function(t) {{ allX = allX.concat(t.x); allY = allY.concat(t.y); }});
+  var xMin = Math.min.apply(null, allX), xMax = Math.max.apply(null, allX);
+  var yMin = Math.min.apply(null, allY), yMax = Math.max.apply(null, allY);
+  var xPad = Math.max(1, (xMax-xMin)*0.02), yPad = Math.max(0.5, (yMax-yMin)*0.03);
+
+  var layout = {{
+    title: DATA.movesets[state.movesetIdx].label,
+    xaxis: {{title:'Stat Product Rank (1=best)', range:[xMax+xPad, xMin-xPad], fixedrange:true}},
+    yaxis: {{title:'Avg Battle Score', range:[yMin-yPad, yMax+yPad], fixedrange:true}},
+    paper_bgcolor:'#1a1a2e', plot_bgcolor:'#16213e',
+    font:{{color:'#e0e0e0'}}, hovermode:'closest',
+    legend:{{bgcolor:'rgba(22,33,62,0.8)', bordercolor:'#0f3460', borderwidth:1}}
+  }};
+
+  Plotly.react('plot', traces, layout, {{responsive:true}});
+  reattachLegendHandlers();
+  updateSummaryTable();
+  updateMethodology();
+}}
+
+// ---- Legend hover/click ----
+function highlightTrace(idx) {{
+  var gd = document.getElementById('plot');
+  for (var j=0; j<origOpacities.length; j++) {{
+    var op = (j===idx) ? Math.min(1.0, origOpacities[j]+0.15) : 0.03;
+    Plotly.restyle(gd, {{'marker.opacity':op}}, [j]);
+  }}
+}}
+function restoreAll() {{
+  var gd = document.getElementById('plot');
+  for (var j=0; j<origOpacities.length; j++) {{
+    Plotly.restyle(gd, {{'marker.opacity':origOpacities[j]}}, [j]);
+  }}
+}}
+function reattachLegendHandlers() {{
+  var gd = document.getElementById('plot');
+  gd.on('plotly_legendclick', function() {{ return false; }});
+  gd.on('plotly_legenddoubleclick', function() {{ return false; }});
+  var attempts = 0;
+  function tryAttach() {{
+    var items = gd.querySelectorAll('.legend .traces');
+    if (items.length === 0 && attempts < 50) {{ attempts++; setTimeout(tryAttach, 100); return; }}
+    items.forEach(function(el, idx) {{
+      el.style.cursor = 'pointer';
+      el.addEventListener('mouseenter', function() {{ if (lockedIdx<0) highlightTrace(idx); }});
+      el.addEventListener('mouseleave', function() {{ if (lockedIdx<0) restoreAll(); }});
+      el.addEventListener('click', function() {{
+        if (lockedIdx===idx) {{ lockedIdx=-1; restoreAll(); }}
+        else {{ lockedIdx=idx; highlightTrace(idx); }}
+      }});
+    }});
+  }}
+  tryAttach();
+}}
+
+// ---- Init ----
+updateView();
+"""
 
 def main():
     parser = argparse.ArgumentParser(
@@ -953,9 +1529,10 @@ def main():
                              'Use "all" for 0v0+1v1+2v2.')
     parser.add_argument('--shadow', action='store_true',
                         help='Focal species is shadow')
-    parser.add_argument('--opp-ivs', default='pvpoke', choices=['pvpoke', 'rank1'],
+    parser.add_argument('--opp-ivs', default='pvpoke', choices=['pvpoke', 'rank1', 'both'],
                         help='Opponent IV selection: pvpoke (PvPoke default IVs, '
-                             'what pvpoke.com uses) or rank1 (stat product rank 1). '
+                             'what pvpoke.com uses), rank1 (stat product rank 1), '
+                             'or both (run both, selectable in interactive HTML). '
                              'Default: pvpoke.')
     parser.add_argument('--thresholds', default=None, metavar='FILE',
                         help='JSON file with IV thresholds to highlight on plots. '
@@ -963,6 +1540,14 @@ def main():
                              'Order from most restrictive to least restrictive.')
     parser.add_argument('--html', default=None, metavar='FILE',
                         help='Write interactive HTML plot to FILE')
+    parser.add_argument('--interactive', action='store_true',
+                        help='Generate interactive HTML with dropdowns for moveset, '
+                             'shield scenario, and opp IV mode switching. '
+                             'Runs all shield scenarios and reference moveset.')
+    parser.add_argument('--reference', default='auto', metavar='SPEC',
+                        help='Reference moveset for comparison: auto (PvPoke default, '
+                             'shown in interactive mode), none (skip), or '
+                             'FAST,CHARGED1,CHARGED2. Default: auto.')
     parser.add_argument('--standalone', action='store_true',
                         help='Inline Plotly.js into the HTML so the file works '
                              'offline with no CDN dependency (~4MB larger)')
@@ -1035,7 +1620,8 @@ def main():
             idx = opponents.index(opp)
             opponents.pop(idx)
 
-    opp_iv_label = 'PvPoke defaults' if args.opp_ivs == 'pvpoke' else 'rank 1 (stat product)'
+    opp_iv_labels = {'pvpoke': 'PvPoke defaults', 'rank1': 'rank 1 (stat product)', 'both': 'both (PvPoke + rank 1)'}
+    opp_iv_label = opp_iv_labels.get(args.opp_ivs, args.opp_ivs)
     print(f"  Shield scenario(s): {shield_scenarios}")
     print(f"  Opponent IVs: {opp_iv_label}")
     if thresholds:
@@ -1053,7 +1639,8 @@ def main():
         screen_opp_movesets = opp_movesets_full[:screen_n]
 
     # Phase 1: Screen movesets
-    opp_iv_mode = args.opp_ivs
+    # For screening and the initial sweep, use 'pvpoke' when 'both' is requested
+    opp_iv_mode = 'pvpoke' if args.opp_ivs == 'both' else args.opp_ivs
     surviving = screen_movesets(
         args.species, movesets, args.league, args.shadow,
         screen_opponents, screen_opp_movesets, shield_scenarios,
@@ -1069,7 +1656,7 @@ def main():
               f"× {len(shield_scenarios)} scenario(s)...")
         t0 = time.time()
 
-        results, n_sims = iv_sweep(
+        results, n_sims, canonical_scores, canonical_meta = iv_sweep(
             args.species, fast_id, charged_ids, args.league, args.shadow,
             opponents, opp_movesets_full, shield_scenarios,
             opp_iv_mode=opp_iv_mode,
@@ -1111,15 +1698,133 @@ def main():
             print(line)
         print()
 
-        all_moveset_results.append((fast_id, charged_ids, results))
+        all_moveset_results.append((fast_id, charged_ids, results,
+                                     canonical_scores, canonical_meta))
 
     # HTML output
     if args.html:
-        generate_html(args.species, args.league, all_moveset_results, args.html,
-                      thresholds=thresholds, opponent_label=opponent_label,
-                      shield_scenarios=shield_scenarios,
-                      opponent_names=opponents, opp_iv_mode=opp_iv_mode,
-                      standalone=args.standalone)
+        if args.interactive:
+            # Interactive mode: embed all data, JS-driven dropdowns
+            # Determine opp IV modes to run
+            if args.opp_ivs == 'both':
+                opp_iv_modes_to_run = ['pvpoke', 'rank1']
+            else:
+                opp_iv_modes_to_run = [opp_iv_mode]
+
+            # Force all shield scenarios for interactive mode
+            if shield_scenarios == [(1, 1)]:
+                print("  Interactive mode: auto-expanding to all shield scenarios (0v0, 1v1, 2v2)")
+                shield_scenarios = [(0, 0), (1, 1), (2, 2)]
+                # Re-run sweeps with all scenarios
+                all_moveset_results = []
+                for mi, (fast_id, charged_ids) in enumerate(surviving):
+                    label = moveset_label(fast_id, charged_ids)
+                    scores_by_mode = {}
+                    meta = None
+                    for mode in opp_iv_modes_to_run:
+                        mode_label = 'PvPoke defaults' if mode == 'pvpoke' else 'rank 1'
+                        print(f"  Interactive sweep [{mi+1}/{len(surviving)}] "
+                              f"{label} (opp IVs: {mode_label}, all shields)...")
+                        t0 = time.time()
+                        results, n_sims, cs, cm = iv_sweep(
+                            args.species, fast_id, charged_ids, args.league, args.shadow,
+                            opponents, opp_movesets_full, shield_scenarios,
+                            opp_iv_mode=mode,
+                        )
+                        elapsed = time.time() - t0
+                        rate = n_sims / elapsed if elapsed > 0 else 0
+                        print(f"    {n_sims:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
+                        scores_by_mode[mode] = cs
+                        if meta is None:
+                            meta = cm
+                    all_moveset_results.append((fast_id, charged_ids, results,
+                                                scores_by_mode, meta))
+            else:
+                # Already ran with the right scenarios, repack data
+                new_results = []
+                for fast_id, charged_ids, results, cs, cm in all_moveset_results:
+                    scores_by_mode = {opp_iv_mode: cs}
+                    # Run additional mode if needed
+                    if args.opp_ivs == 'both':
+                        other_mode = 'rank1' if opp_iv_mode == 'pvpoke' else 'pvpoke'
+                        print(f"  Running {moveset_label(fast_id, charged_ids)} "
+                              f"with opp IVs: {other_mode}...")
+                        t0 = time.time()
+                        _, n2, cs2, _ = iv_sweep(
+                            args.species, fast_id, charged_ids, args.league, args.shadow,
+                            opponents, opp_movesets_full, shield_scenarios,
+                            opp_iv_mode=other_mode,
+                        )
+                        elapsed = time.time() - t0
+                        print(f"    {n2:,} sims in {elapsed:.1f}s")
+                        scores_by_mode[other_mode] = cs2
+                    new_results.append((fast_id, charged_ids, results,
+                                        scores_by_mode, cm))
+                all_moveset_results = new_results
+
+            # Resolve and run reference moveset
+            reference_idx = -1
+            ref_moveset = resolve_reference_moveset(
+                args.species, args.league, args.shadow, args.reference)
+            if ref_moveset:
+                ref_fast, ref_charged = ref_moveset
+                ref_label = moveset_label(ref_fast, ref_charged)
+                # Check if reference is already a surviving moveset
+                for mi, entry in enumerate(all_moveset_results):
+                    existing_label = moveset_label(entry[0], entry[1])
+                    if existing_label == ref_label:
+                        reference_idx = mi
+                        break
+                if reference_idx < 0:
+                    # Run reference sweep
+                    print(f"  Reference sweep: {ref_label}")
+                    ref_scores_by_mode = {}
+                    ref_meta = None
+                    for mode in opp_iv_modes_to_run:
+                        t0 = time.time()
+                        ref_results, ref_n, ref_cs, ref_cm = iv_sweep(
+                            args.species, ref_fast, ref_charged, args.league, args.shadow,
+                            opponents, opp_movesets_full, shield_scenarios,
+                            opp_iv_mode=mode,
+                        )
+                        elapsed = time.time() - t0
+                        rate = ref_n / elapsed if elapsed > 0 else 0
+                        print(f"    {ref_n:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
+                        ref_scores_by_mode[mode] = ref_cs
+                        if ref_meta is None:
+                            ref_meta = ref_cm
+                    reference_idx = len(all_moveset_results)
+                    all_moveset_results.append((ref_fast, ref_charged, ref_results,
+                                                ref_scores_by_mode, ref_meta))
+
+            # Build moveset_data for interactive HTML
+            moveset_data = []
+            for entry in all_moveset_results:
+                fast_id, charged_ids = entry[0], entry[1]
+                scores_by_mode = entry[3]
+                meta = entry[4]
+                moveset_data.append({
+                    'label': moveset_label(fast_id, charged_ids),
+                    'scores': scores_by_mode,
+                    'meta': meta,
+                })
+
+            generate_interactive_html(
+                args.species, args.league, moveset_data, args.html,
+                thresholds=thresholds, opponent_label=opponent_label,
+                shield_scenarios=shield_scenarios,
+                opponent_names=opponents,
+                opp_iv_modes=opp_iv_modes_to_run,
+                reference_idx=reference_idx,
+                standalone=args.standalone,
+            )
+        else:
+            # Static mode (original behavior)
+            generate_html(args.species, args.league, all_moveset_results, args.html,
+                          thresholds=thresholds, opponent_label=opponent_label,
+                          shield_scenarios=shield_scenarios,
+                          opponent_names=opponents, opp_iv_mode=opp_iv_mode,
+                          standalone=args.standalone)
 
     print("Done.\n")
 
