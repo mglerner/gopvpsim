@@ -1,10 +1,5 @@
 ## Battle simulator
 
-* **Fix bestChargedMove selection** — Root cause of remaining 3 test failures.
-  Replicate PvPoke's `move.damage` caching lifecycle so bestChargedMove
-  defaults to cheapest move at init (matching PvPoke's undefined→NaN behavior).
-  Needs focused session. See DEVELOPER_NOTES.md for details.
-
 * **File PvPoke bug reports** — Two bugs found in PvPoke's JS:
   1. BattleState `.hp`/`.oppHealth` naming inconsistency (dead-code dominance checks)
   2. bestChargedMove using `move.damage` (undefined at init) instead of `move.power`
@@ -29,8 +24,8 @@
 
 * ~~**Shadow pokemon**~~ — DONE. Shadow Swampert vs Registeel: 9/9 match PvPoke.
 
-* **Both mons with buff/debuff** — e.g. Corviknight mirror with Air Cutter +
-  Payback on both sides.
+* ~~**Both mons with buff/debuff**~~ — DONE. Corviknight mirror (Air Cutter only):
+  9/9 match PvPoke. Both mons buff independently; damage goes 18→23 after 4th hit.
 
 * **Form Change** — Morpeko. Low priority.
 

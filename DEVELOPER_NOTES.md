@@ -2,7 +2,7 @@
 
 ## Current status (2026-04-06)
 
-111 tests pass (102 original + 9 shadow). The simulator matches PvPoke's
+120 tests pass (102 original + 9 shadow + 9 Corviknight mirror). The simulator matches PvPoke's
 simulate-mode score table exactly (±0) for 8 matchups (72 cells). The 3
 remaining failures are all Mienfoo vs Medicham, root-caused to a
 `bestChargedMove` selection difference (see below).
@@ -19,6 +19,8 @@ remaining failures are all Mienfoo vs Medicham, root-caused to a
 - **Shield policy**: pvpoke_simulate_shield uses precomputed flags
 - **Shadow Pokemon**: ×1.2 atk / ×(5/6) def multipliers match PvPoke's
   SHADOW_ATK=1.2, SHADOW_DEF=0.83333331. Shadow Swampert vs Registeel 9/9.
+- **Both-side buffs**: Corviknight mirror (Air Cutter only) 9/9. Both mons'
+  buffApplyMeter fires independently; unbuffed Air Cutter does 18, buffed does 23.
 
 ### Previously failing: Mienfoo vs Medicham — FIXED (all 9/9)
 

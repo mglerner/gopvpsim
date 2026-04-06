@@ -817,3 +817,59 @@ def test_shadow_swampert_vs_registeel(shields_swam, shields_regi, expected_winne
     assert _extract_battle_log(result) == expected_log, (
         f"{shields_swam}v{shields_regi}: battle log mismatch"
     )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_0,shields_1,expected_winner,expected_score_0,expected_log", [
+    # Corviknight mirror: 4/12/14 vs 4/12/14 (AIR_SLASH / AIR_CUTTER only), Great League
+    # Policy: pvpoke_dp + always_shield
+    #
+    # Tests both mons with chance-based buff (Air Cutter: 30% +1 ATK).
+    # Deterministic buffApplyMeter fires on the 4th Air Cutter for each mon.
+    # Non-shielded damage: 18 (unbuffed) → 23 (buffed, after 4th lands).
+    # The 3rd non-shielded Air Cutter triggers the buff; the 4th hits for 23.
+    #
+    # PvPoke verified scores (pvpoke.com/battle/, Corv0's perspective):
+    #              Corv1 0s  Corv1 1s  Corv1 2s
+    #   Corv0 0s:    500       443       386
+    #   Corv0 1s:    556       500       500
+    #   Corv0 2s:    613       500       500
+    (0, 0, None, 500, ['Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (0, 1, 1, 443, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (0, 2, 1, 386, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (1, 0, 0, 556, ['Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (1, 1, None, 500, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (1, 2, None, 500, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (2, 0, 0, 613, ['Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (2, 1, None, 500, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+    (2, 2, None, 500, ['Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter (shielded)', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter', 'Corviknight: Air Cutter']),
+])
+def test_corviknight_mirror_both_buff(shields_0, shields_1,
+                                      expected_winner, expected_score_0,
+                                      expected_log):
+    bp0 = _make_battle_pokemon('Corviknight', 'AIR_SLASH', ['AIR_CUTTER'],
+                                'great', shields_0, 4, 12, 14)
+    bp1 = _make_battle_pokemon('Corviknight', 'AIR_SLASH', ['AIR_CUTTER'],
+                                'great', shields_1, 4, 12, 14)
+    result = simulate(bp0, bp1,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
+    if expected_winner is None:
+        assert result.winner is None, (
+            f"{shields_0}v{shields_1}: expected tie, "
+            f"got winner={result.winner}  HP={result.hp_remaining}"
+        )
+    else:
+        assert result.winner == expected_winner, (
+            f"{shields_0}v{shields_1}: expected winner={expected_winner}, "
+            f"got {result.winner}  HP={result.hp_remaining}"
+        )
+    score_0 = round(result.pvpoke_score(0))
+    assert score_0 == expected_score_0, (
+        f"{shields_0}v{shields_1}: expected Corv0 score={expected_score_0}, "
+        f"got {score_0}  (delta={score_0 - expected_score_0:+d})"
+    )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_0}v{shields_1}: battle log mismatch"
+    )
