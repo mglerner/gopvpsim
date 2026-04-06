@@ -983,6 +983,602 @@ def resolve_reference_moveset(species, league, shadow, ref_arg):
 
 
 # ---------------------------------------------------------------------------
+# Deep dive analysis (banding, clusters, flips, volatility)
+# ---------------------------------------------------------------------------
+
+def _pearson_r(xs, ys):
+    """Pearson correlation coefficient."""
+    n = len(xs)
+    if n < 3:
+        return 0.0
+    mx, my = sum(xs) / n, sum(ys) / n
+    num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    dx = math.sqrt(sum((x - mx)**2 for x in xs))
+    dy = math.sqrt(sum((y - my)**2 for y in ys))
+    return num / (dx * dy) if dx and dy else 0.0
+
+
+def _detect_banding(stat_values, scores, stat_name):
+    """Detect banding: group IVs by discrete stat value, compute F-ratio and eta^2."""
+    groups = {}
+    for sv, sc in zip(stat_values, scores):
+        key = int(sv) if stat_name == 'hp' else round(sv, 2)
+        groups.setdefault(key, []).append(sc)
+    if len(groups) < 3:
+        return None
+    grand_mean = sum(scores) / len(scores)
+    n_total = len(scores)
+    gmeans = {k: sum(v)/len(v) for k, v in groups.items()}
+    ssb = sum(len(v) * (gmeans[k] - grand_mean)**2 for k, v in groups.items())
+    ssw = sum(sum((x - gmeans[k])**2 for x in v) for k, v in groups.items())
+    df_b, df_w = len(groups) - 1, n_total - len(groups)
+    f_ratio = (ssb / df_b) / (ssw / df_w) if df_w and ssw else float('inf')
+    eta_sq = ssb / (ssb + ssw) if (ssb + ssw) else 0
+    sorted_keys = sorted(gmeans)
+    jumps = []
+    for i in range(len(sorted_keys) - 1):
+        k1, k2 = sorted_keys[i], sorted_keys[i + 1]
+        jumps.append((k1, k2, gmeans[k2] - gmeans[k1], len(groups[k1]), len(groups[k2])))
+    jumps.sort(key=lambda x: abs(x[2]), reverse=True)
+    return {'stat_name': stat_name, 'n_groups': len(groups), 'f_ratio': f_ratio,
+            'eta_squared': eta_sq, 'correlation': _pearson_r(stat_values, scores),
+            'top_jumps': jumps[:5], 'group_means': gmeans}
+
+
+def _detect_clusters(scores, data):
+    """Gap analysis: find natural breakpoints in sorted score distribution."""
+    si = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+    ss = [scores[i] for i in si]
+    gaps = [(i, ss[i-1] - ss[i]) for i in range(1, len(ss))]
+    gap_vals = sorted(g[1] for g in gaps)
+    med = gap_vals[len(gap_vals) // 2]
+    sig = [(i, g) for i, g in gaps if g > 3 * med and i <= len(scores) // 4]
+    sig.sort(key=lambda x: x[1], reverse=True)
+    boundaries = sorted(set([0] + [g[0] for g in sig[:5]] + [len(scores)]))
+    clusters = []
+    for j in range(len(boundaries) - 1):
+        s, e = boundaries[j], boundaries[j + 1]
+        idx = si[s:e]
+        scs = ss[s:e]
+        if not scs:
+            continue
+        clusters.append({
+            'rank_range': (s + 1, e), 'size': e - s,
+            'score_range': (min(scs), max(scs)),
+            'atk': (min(data['ivAtk'][i] for i in idx), sum(data['ivAtk'][i] for i in idx)/len(idx), max(data['ivAtk'][i] for i in idx)),
+            'def': (min(data['ivDef'][i] for i in idx), sum(data['ivDef'][i] for i in idx)/len(idx), max(data['ivDef'][i] for i in idx)),
+            'hp': (min(data['ivHp'][i] for i in idx), sum(data['ivHp'][i] for i in idx)/len(idx), max(data['ivHp'][i] for i in idx)),
+            'indices': idx,
+        })
+    return clusters, sig[:5]
+
+
+def _opp_importance(scores_flat, nIvs, nS, nO, si, top_set, opponents):
+    """Rank opponents by how much they differentiate top_set from population."""
+    results = []
+    for oi in range(nO):
+        top_avg = sum(scores_flat[iv * nS * nO + si * nO + oi] for iv in top_set) / len(top_set)
+        all_avg = sum(scores_flat[iv * nS * nO + si * nO + oi] for iv in range(nIvs)) / nIvs
+        results.append({'opponent': opponents[oi], 'top_avg': top_avg, 'all_avg': all_avg, 'gap': top_avg - all_avg})
+    results.sort(key=lambda x: abs(x['gap']), reverse=True)
+    return results
+
+
+def _find_flips(scores_flat, nIvs, nS, nO, ref_iv, test_ivs, scenarios, opponents):
+    """Find matchup flips (crossing 500-point boundary) for test IVs vs reference."""
+    flips = {}
+    for iv in test_ivs:
+        if iv == ref_iv:
+            continue
+        gains, losses = [], []
+        for si in range(nS):
+            for oi in range(nO):
+                rs = scores_flat[ref_iv * nS * nO + si * nO + oi]
+                ts = scores_flat[iv * nS * nO + si * nO + oi]
+                if (rs >= 500) != (ts >= 500):
+                    entry = {'scenario': f'{scenarios[si][0]}v{scenarios[si][1]}',
+                             'opponent': opponents[oi], 'ref_score': rs, 'iv_score': ts}
+                    (gains if ts >= 500 else losses).append(entry)
+        if gains or losses:
+            flips[iv] = {'gains': gains, 'losses': losses}
+    return flips
+
+
+def _scenario_ranks(scores_flat, nIvs, nS, nO):
+    """Compute per-scenario ranks and overall average ranks/scores."""
+    scene_ranks = []
+    for si in range(nS):
+        ss = [sum(scores_flat[iv * nS * nO + si * nO + oi] for oi in range(nO)) for iv in range(nIvs)]
+        order = sorted(range(nIvs), key=lambda i: ss[i], reverse=True)
+        ranks = [0] * nIvs
+        for r, idx in enumerate(order):
+            ranks[idx] = r + 1
+        scene_ranks.append(ranks)
+    avg_scores = [sum(scores_flat[iv * nS * nO + si * nO + oi] for si in range(nS) for oi in range(nO)) / (nS * nO) for iv in range(nIvs)]
+    avg_order = sorted(range(nIvs), key=lambda i: avg_scores[i], reverse=True)
+    avg_ranks = [0] * nIvs
+    for r, idx in enumerate(avg_order):
+        avg_ranks[idx] = r + 1
+    return scene_ranks, avg_ranks, avg_scores, avg_order
+
+
+def _iv_label(data, iv):
+    return f"{data['ivA'][iv]}/{data['ivD'][iv]}/{data['ivS'][iv]}"
+
+
+def _tier_badge_html(data, iv):
+    ti = data['ivTiers'][iv]
+    if ti < 0:
+        return ''
+    t = data['tiers'][ti]
+    return f' <span class="dd-badge" style="background:{t["color"]};color:#000">{t["name"]}</span>'
+
+
+def _pretty_name(raw_id):
+    """Convert GIGATON_HAMMER to Gigaton Hammer, FAIRY_WIND to Fairy Wind, etc."""
+    return raw_id.replace('_', ' ').title()
+
+
+def _pretty_moveset(label):
+    """Convert 'FAIRY_WIND / BULLDOZE, GIGATON_HAMMER' to pretty names."""
+    parts = label.split(' / ')
+    if len(parts) == 2:
+        fast = _pretty_name(parts[0].strip())
+        charged = ', '.join(_pretty_name(c.strip()) for c in parts[1].split(','))
+        return f'{fast} / {charged}'
+    return label
+
+
+def _prose_flip_summary(flip_data, max_gains=3, max_losses=2):
+    """Generate a natural-language summary of matchup gains/losses.
+
+    Returns a string like "gains Togekiss 1v2, G. Stunfisk 2v0; loses Steelix 0v2, 1v2"
+    """
+    parts = []
+    gains = flip_data.get('gains', [])
+    losses = flip_data.get('losses', [])
+    if gains:
+        # Sort by delta descending
+        top = sorted(gains, key=lambda e: e['iv_score'] - e['ref_score'], reverse=True)[:max_gains]
+        gain_strs = [f'{e["opponent"]} {e["scenario"]}' for e in top]
+        extra = len(gains) - len(top)
+        s = 'gains ' + ', '.join(gain_strs)
+        if extra > 0:
+            s += f' (+{extra} more)'
+        parts.append(s)
+    if losses:
+        top = sorted(losses, key=lambda e: e['ref_score'] - e['iv_score'], reverse=True)[:max_losses]
+        loss_strs = [f'{e["opponent"]} {e["scenario"]}' for e in top]
+        extra = len(losses) - len(top)
+        s = 'loses ' + ', '.join(loss_strs)
+        if extra > 0:
+            s += f' (+{extra} more)'
+        parts.append(s)
+    return '; '.join(parts) if parts else 'no matchup flips'
+
+
+def _generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode):
+    """Generate HSH/RyanSwag-style threshold descriptions from flip data.
+
+    Returns list of HTML paragraphs describing key stat thresholds with
+    matchup justification.
+    """
+    # Collect all unique (opponent, scenario) flips across IVs and find
+    # which stat change drives the flip
+    opp_label = 'PvPoke default' if opp_iv_mode == 'pvpoke' else 'rank 1'
+
+    # Group flips by opponent+scenario to find common themes
+    opp_scene_gains = {}  # (opp, scene) -> list of (iv, delta)
+    opp_scene_losses = {}
+    for iv, fd in flips.items():
+        for e in fd['gains']:
+            key = (e['opponent'], e['scenario'])
+            opp_scene_gains.setdefault(key, []).append((iv, e['iv_score'] - e['ref_score']))
+        for e in fd['losses']:
+            key = (e['opponent'], e['scenario'])
+            opp_scene_losses.setdefault(key, []).append((iv, e['ref_score'] - e['iv_score']))
+
+    lines = []
+
+    # Attack thresholds: flips where higher-atk IVs gain matchups
+    # Defense/HP thresholds: flips where higher-bulk IVs gain matchups
+    # We identify these by checking the stat profile of IVs that gain vs lose
+
+    # Most common gain matchups (by how many IVs gain them)
+    gain_counts = sorted(opp_scene_gains.items(), key=lambda x: len(x[1]), reverse=True)
+    for (opp, scene), iv_deltas in gain_counts[:6]:
+        n = len(iv_deltas)
+        avg_delta = sum(d for _, d in iv_deltas) / n
+        # What stat distinguishes IVs that get this gain?
+        gain_ivs = [iv for iv, _ in iv_deltas]
+        gain_atk = sum(data['ivAtk'][iv] for iv in gain_ivs) / len(gain_ivs)
+        gain_def = sum(data['ivDef'][iv] for iv in gain_ivs) / len(gain_ivs)
+        gain_hp = sum(data['ivHp'][iv] for iv in gain_ivs) / len(gain_ivs)
+        pop_atk = sum(data['ivAtk'][iv] for iv in ranked[:50]) / 50
+        pop_def = sum(data['ivDef'][iv] for iv in ranked[:50]) / 50
+        pop_hp = sum(data['ivHp'][iv] for iv in ranked[:50]) / 50
+
+        # Which stat differs most?
+        diffs = [('Atk', gain_atk - pop_atk, gain_atk),
+                 ('Def', gain_def - pop_def, gain_def),
+                 ('HP', gain_hp - pop_hp, gain_hp)]
+        dominant = max(diffs, key=lambda x: abs(x[1]))
+
+        if abs(dominant[1]) < 0.5 and dominant[0] != 'HP':
+            stat_note = ''
+        elif dominant[1] > 0:
+            stat_note = f' (favors higher {dominant[0]}, avg {dominant[2]:.1f})'
+        else:
+            stat_note = f' (favors lower {dominant[0]}, avg {dominant[2]:.1f})'
+
+        lines.append(
+            f'<li><b>{opp} {scene}</b> &mdash; '
+            f'{n} of top IVs gain this matchup vs {opp_label} opponent '
+            f'(avg +{avg_delta:.0f} score){stat_note}</li>'
+        )
+
+    # Most common loss matchups
+    loss_counts = sorted(opp_scene_losses.items(), key=lambda x: len(x[1]), reverse=True)
+    if loss_counts:
+        lines.append('<li class="dd-loss-item"><b>Common losses:</b> ')
+        loss_parts = []
+        for (opp, scene), iv_deltas in loss_counts[:4]:
+            n = len(iv_deltas)
+            loss_parts.append(f'{opp} {scene} ({n} IVs)')
+        lines.append(', '.join(loss_parts) + '</li>')
+
+    return lines
+
+
+def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
+                               shield_scenarios, opponent_names):
+    """Generate the full analysis HTML for injection into the interactive page.
+
+    Returns (css_str, html_str) to be injected into <style> and before the plot div.
+    """
+    nIvs = data_obj['nIvs']
+    nS = data_obj['nScenarios']
+    nO = data_obj['nOpponents']
+    scenarios = [tuple(s) for s in data_obj['scenarios']]
+    opponents = opponent_names or data_obj.get('opponents', [])
+    score_key = f'{moveset_idx}_{opp_iv_mode}'
+    scores_flat = score_arrays.get(score_key, [])
+    if not scores_flat:
+        return '', '<!-- analysis: no scores available -->'
+    moveset_label = data_obj['movesets'][moveset_idx]['label']
+    ref_iv = data_obj['pvpokeRefIvIdx']
+    if ref_iv < 0:
+        ref_iv = 0
+
+    print("  Generating analysis sections...")
+
+    scene_ranks, avg_ranks, avg_scores, ranked = _scenario_ranks(scores_flat, nIvs, nS, nO)
+
+    # ---- CSS ----
+    css = """
+.dd-section { background: #16213e; padding: 16px 20px; border-radius: 8px; margin: 20px 0; }
+.dd-h2 { color: #e94560; font-size: 1.3rem; margin: 0 0 12px 0; border-bottom: 1px solid #0f3460; padding-bottom: 6px; }
+.dd-h3 { color: #58a6ff; font-size: 1rem; margin: 14px 0 8px 0; }
+.dd-table { border-collapse: collapse; margin: 8px 0 12px; font-size: 0.82rem; width: 100%; }
+.dd-table.dd-narrow { width: auto; }
+.dd-table th, .dd-table td { padding: 4px 8px; border: 1px solid #0f3460; text-align: left; }
+.dd-table th { background: #0f3460; color: #58a6ff; font-weight: 600; }
+.dd-table td { background: #1a1a2e; }
+.dd-table tr:hover td { background: #16213e; }
+.dd-gain { color: #3fb950; }
+.dd-loss { color: #f85149; }
+.dd-strong { font-weight: 700; color: #FFD700; }
+.dd-rank-good { color: #3fb950; font-weight: 600; }
+.dd-rank-bad { color: #f85149; }
+.dd-small { font-size: 0.82rem; color: #8b949e; margin: 4px 0; }
+.dd-callout { background: #0f3460; border-left: 3px solid #58a6ff; padding: 8px 12px; margin: 10px 0; border-radius: 0 4px 4px 0; font-size: 0.85rem; }
+.dd-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; }
+.dd-methods-dl { margin: 8px 0; }
+.dd-methods-dl dt { color: #58a6ff; font-weight: 600; margin-top: 8px; }
+.dd-methods-dl dd { margin-left: 16px; font-size: 0.88rem; color: #aaa; }
+.dd-flip-detail { margin: 6px 0; }
+.dd-flip-detail summary { cursor: pointer; padding: 4px 0; font-size: 0.9rem; }
+.dd-flip-detail summary:hover { color: #58a6ff; }
+.dd-rec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin: 12px 0; }
+.dd-rec-card { background: #0f3460; border: 1px solid #1a3a6e; border-radius: 6px; padding: 12px; }
+.dd-rec-card h4 { color: #e94560; margin: 0 0 6px; font-size: 1rem; }
+.dd-rec-card p { margin: 3px 0; font-size: 0.88rem; }
+.dd-prose { font-size: 0.88rem; color: #b0b8c4; margin: 4px 0 8px 0; font-style: italic; }
+.dd-threshold-list { list-style: none; padding: 0; margin: 8px 0; }
+.dd-threshold-list li { padding: 4px 0 4px 12px; border-left: 2px solid #0f3460; margin: 4px 0; font-size: 0.88rem; }
+.dd-threshold-list .dd-loss-item { border-left-color: #f85149; }
+.dd-opp-label { color: #8b949e; font-size: 0.75rem; }
+"""
+
+    html_parts = []
+
+    # -- Toggle button --
+    html_parts.append("""
+<div style="margin: 10px 0;">
+  <button onclick="var s=document.getElementById('dd-analysis');s.style.display=s.style.display==='none'?'block':'none';this.textContent=s.style.display==='none'?'Show Deep Dive Analysis':'Hide Deep Dive Analysis'"
+          style="background:#e94560;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:14px">
+    Show Deep Dive Analysis
+  </button>
+</div>
+<div id="dd-analysis" style="display:none">
+""")
+
+    # -- Methods --
+    html_parts.append(f"""
+<div class="dd-section" id="dd-methods">
+<h2 class="dd-h2">Methods</h2>
+<p>Automated analysis of {nIvs} IV spreads across {nS} shield scenarios against
+{nO} opponents ({data_obj.get('opponentLabel', '')}).</p>
+<p><strong>Moveset:</strong> {_pretty_moveset(moveset_label)} | <strong>Opp IVs:</strong> {opp_iv_mode}
+| <strong>Reference IV:</strong> {_iv_label(data_obj, ref_iv)} (PvPoke default)</p>
+<dl class="dd-methods-dl">
+  <dt>Banding detection</dt>
+  <dd>IVs grouped by discrete stat value. F-ratio and &eta;&sup2; (variance explained)
+  measure how much each stat creates visible bands. Pearson <em>r</em> shows correlation direction.</dd>
+  <dt>Cluster detection (gap analysis)</dt>
+  <dd>Sorted scores scanned for gaps &gt; 3&times; median, indicating natural performance tiers.</dd>
+  <dt>Opponent importance</dt>
+  <dd>Top-50 cluster average vs population average per opponent. Large gaps show what drives the cluster.</dd>
+  <dt>Rank volatility</dt>
+  <dd>Each IV ranked per-scenario. Range = max rank &minus; min rank. High range = scenario specialist.</dd>
+  <dt>Matchup flip analysis</dt>
+  <dd>Matchups crossing the 500-point win/loss boundary vs reference IV. Net flips = gains &minus; losses.</dd>
+</dl>
+</div>
+""")
+
+    # -- Banding --
+    html_parts.append("""<div class="dd-section" id="dd-banding">
+<h2 class="dd-h2">Banding &amp; Stat Correlations</h2>
+<p>Which stats create visible structure? High &eta;&sup2; = strong banding.</p>
+<table class="dd-table"><tr><th>Scenario</th><th>Atk <em>r</em></th><th>Atk &eta;&sup2;</th><th>Def <em>r</em></th><th>Def &eta;&sup2;</th><th>HP <em>r</em></th><th>HP &eta;&sup2;</th><th>Dominant</th></tr>
+""")
+
+    hp_list = [data_obj['ivHp'][i] for i in range(nIvs)]
+    all_scenarios_plus_avg = list(range(nS)) + ['avg']
+    for si_or_avg in all_scenarios_plus_avg:
+        if si_or_avg == 'avg':
+            sc = avg_scores
+            label = '<strong>Average</strong>'
+            row_style = ' style="border-top:2px solid #e94560"'
+        else:
+            si = si_or_avg
+            sc = [sum(scores_flat[iv * nS * nO + si * nO + oi] for oi in range(nO)) / nO for iv in range(nIvs)]
+            s0, s1 = scenarios[si]
+            label = f'{s0}v{s1}'
+            row_style = ''
+        bands = [('Atk', _detect_banding(data_obj['ivAtk'], sc, 'atk')),
+                 ('Def', _detect_banding(data_obj['ivDef'], sc, 'def')),
+                 ('HP', _detect_banding(hp_list, sc, 'hp'))]
+        dominant = max(bands, key=lambda x: x[1]['eta_squared'] if x[1] else 0)
+        row = f'<tr{row_style}><td>{label}</td>'
+        for name, b in bands:
+            if b:
+                rc = ' class="dd-strong"' if abs(b['correlation']) > 0.3 else ''
+                ec = ' class="dd-strong"' if b['eta_squared'] > 0.3 else ''
+                row += f'<td{rc}>{b["correlation"]:+.3f}</td><td{ec}>{b["eta_squared"]:.3f}</td>'
+            else:
+                row += '<td>-</td><td>-</td>'
+        row += f'<td><strong>{dominant[0]}</strong> ({dominant[1]["eta_squared"]:.3f})</td></tr>\n'
+        html_parts.append(row)
+
+    # HP banding detail
+    avg_hp_band = _detect_banding(hp_list, avg_scores, 'hp')
+    html_parts.append('</table>\n')
+    if avg_hp_band and avg_hp_band['top_jumps']:
+        html_parts.append('<h3 class="dd-h3">Largest HP band jumps (average score)</h3>\n')
+        html_parts.append('<table class="dd-table dd-narrow"><tr><th>HP below</th><th>HP above</th><th>Score jump</th></tr>\n')
+        for k1, k2, diff, n1, n2 in avg_hp_band['top_jumps'][:5]:
+            cls = 'dd-gain' if diff > 0 else 'dd-loss'
+            html_parts.append(f'<tr><td>{int(k1)}</td><td>{int(k2)}</td><td class="{cls}">{diff:+.1f}</td></tr>\n')
+        html_parts.append('</table>\n')
+    html_parts.append('</div>\n')
+
+    # -- Clusters per scenario --
+    html_parts.append('<div class="dd-section" id="dd-clusters">\n<h2 class="dd-h2">Cluster Analysis (Per-Scenario)</h2>\n')
+    html_parts.append('<p>Natural performance tiers detected via gap analysis (&gt;3&times; median gap).</p>\n')
+    for si in range(nS):
+        s0, s1 = scenarios[si]
+        sc = [sum(scores_flat[iv * nS * nO + si * nO + oi] for oi in range(nO)) / nO for iv in range(nIvs)]
+        clusters, sig_gaps = _detect_clusters(sc, data_obj)
+        top50 = set(sorted(range(nIvs), key=lambda i: sc[i], reverse=True)[:50])
+        opp_imp = _opp_importance(scores_flat, nIvs, nS, nO, si, top50, opponents)
+        scene_label = f'{s0}v{s1}'
+        if s0 == s1:
+            scene_label += {0: ' (no shields)', 1: ' (even)', 2: ' (double shield)'}.get(s0, '')
+        elif s0 > s1:
+            scene_label += ' (shield adv.)'
+        else:
+            scene_label += ' (shield disadv.)'
+        html_parts.append(f'<h3 class="dd-h3">{scene_label}</h3>\n')
+        if sig_gaps:
+            html_parts.append(f'<p>{len(sig_gaps)} gap(s). Largest at rank {sig_gaps[0][0]}: gap={sig_gaps[0][1]:.1f}</p>\n')
+        else:
+            html_parts.append('<p>Smooth gradient (no large gaps).</p>\n')
+        scene_ranked = sorted(range(nIvs), key=lambda i: sc[i], reverse=True)
+        html_parts.append('<table class="dd-table dd-narrow"><tr><th>#</th><th>IVs</th><th>Atk</th><th>Def</th><th>HP</th><th>Score</th><th>Tier</th></tr>\n')
+        for rank in range(5):
+            iv = scene_ranked[rank]
+            html_parts.append(f'<tr><td>{rank+1}</td><td>{_iv_label(data_obj, iv)}</td><td>{data_obj["ivAtk"][iv]:.2f}</td><td>{data_obj["ivDef"][iv]:.2f}</td><td>{data_obj["ivHp"][iv]}</td><td>{sc[iv]:.1f}</td><td>{_tier_badge_html(data_obj, iv)}</td></tr>\n')
+        html_parts.append('</table>\n')
+        pos = [d for d in opp_imp if d['gap'] > 0][:3]
+        neg = [d for d in opp_imp if d['gap'] < 0][:2]
+        pos_str = ', '.join(f'{d["opponent"]} ({d["gap"]:+.0f})' for d in pos)
+        neg_str = ', '.join(f'{d["opponent"]} ({d["gap"]:+.0f})' for d in neg)
+        line = f'<p class="dd-small"><b>Top differentiators:</b> {pos_str}'
+        if neg:
+            line += f' | <b>Sacrifices:</b> {neg_str}'
+        html_parts.append(line + '</p>\n')
+    html_parts.append('</div>\n')
+
+    # -- Rank volatility --
+    html_parts.append('<div class="dd-section" id="dd-volatility">\n<h2 class="dd-h2">Rank Volatility</h2>\n')
+    html_parts.append('<p>Per-scenario ranks for top IVs. High range = specialist; low range = generalist.</p>\n')
+    html_parts.append('<table class="dd-table"><tr><th>IVs</th>')
+    for s0, s1 in scenarios:
+        html_parts.append(f'<th>{s0}v{s1}</th>')
+    html_parts.append('<th>Avg</th><th>Range</th><th>Tier</th></tr>\n')
+    for iv in ranked[:15]:
+        row = f'<tr><td>{_iv_label(data_obj, iv)}</td>'
+        ranks_for_iv = [scene_ranks[si][iv] for si in range(nS)]
+        for r in ranks_for_iv:
+            cls = ''
+            if r <= 10:
+                cls = ' class="dd-rank-good"'
+            elif r > 1000:
+                cls = ' class="dd-rank-bad"'
+            row += f'<td{cls}>{r}</td>'
+        rng = max(ranks_for_iv) - min(ranks_for_iv)
+        row += f'<td><b>{avg_ranks[iv]}</b></td><td>{rng}</td><td>{_tier_badge_html(data_obj, iv)}</td></tr>\n'
+        html_parts.append(row)
+    html_parts.append('</table>\n')
+
+    # Most stable top-50
+    top50_vols = [(iv, max(scene_ranks[si][iv] for si in range(nS)) - min(scene_ranks[si][iv] for si in range(nS))) for iv in ranked[:50]]
+    top50_vols.sort(key=lambda x: x[1])
+    html_parts.append('<h3 class="dd-h3">Most stable top-50 IVs</h3>\n')
+    html_parts.append('<table class="dd-table dd-narrow"><tr><th>IVs</th><th>Avg</th><th>Best</th><th>Worst</th><th>Range</th><th>Tier</th></tr>\n')
+    for iv, rng in top50_vols[:8]:
+        best = min(scene_ranks[si][iv] for si in range(nS))
+        worst = max(scene_ranks[si][iv] for si in range(nS))
+        html_parts.append(f'<tr><td>{_iv_label(data_obj, iv)}</td><td>{avg_ranks[iv]}</td><td class="dd-rank-good">{best}</td><td>{worst}</td><td>{rng}</td><td>{_tier_badge_html(data_obj, iv)}</td></tr>\n')
+    html_parts.append('</table></div>\n')
+
+    # -- Key Thresholds (RyanSwag/HSH style) --
+    test_set = set(ranked[:10])
+    for iv in range(nIvs):
+        if data_obj['ivTiers'][iv] >= 0:
+            test_set.add(iv)
+    test_set.discard(ref_iv)
+    flips = _find_flips(scores_flat, nIvs, nS, nO, ref_iv, sorted(test_set), scenarios, opponents)
+
+    flip_summary = [(iv, len(f['gains']), len(f['losses']), len(f['gains']) - len(f['losses'])) for iv, f in flips.items()]
+    flip_summary.sort(key=lambda x: (-x[3], -x[1]))
+    flip_map = {iv: (g, l, net) for iv, g, l, net in flip_summary}
+
+    opp_label = 'PvPoke default' if opp_iv_mode == 'pvpoke' else 'rank 1'
+    threshold_descs = _generate_threshold_descriptions(flips, data_obj, avg_scores, ranked, opp_iv_mode)
+    if threshold_descs:
+        html_parts.append('<div class="dd-section" id="dd-thresholds">\n')
+        html_parts.append(f'<h2 class="dd-h2">Key Matchup Thresholds</h2>\n')
+        html_parts.append(f'<p>Matchups that flip vs {opp_label} opponents, ordered by how many top IVs benefit. '
+                          f'These are the stat checks that matter most for IV selection.</p>\n')
+        html_parts.append('<ul class="dd-threshold-list">\n')
+        html_parts.append('\n'.join(threshold_descs))
+        html_parts.append('\n</ul></div>\n')
+
+    # -- Matchup flips --
+    html_parts.append(f'<div class="dd-section" id="dd-flips">\n<h2 class="dd-h2">Matchup Flip Table</h2>\n')
+    html_parts.append(f'<p>Matchups crossing 500-point boundary vs reference '
+                      f'({_iv_label(data_obj, ref_iv)}, {opp_label}).</p>\n')
+
+    html_parts.append('<table class="dd-table"><tr><th>IVs</th><th>Atk</th><th>Def</th><th>HP</th><th>Avg</th><th>Gains</th><th>Loses</th><th>Net</th><th>Tier</th></tr>\n')
+    for iv, g, l, net in flip_summary[:25]:
+        nc = 'dd-gain' if net > 0 else ('dd-loss' if net < 0 else '')
+        html_parts.append(f'<tr><td>{_iv_label(data_obj, iv)}</td><td>{data_obj["ivAtk"][iv]:.2f}</td><td>{data_obj["ivDef"][iv]:.2f}</td><td>{data_obj["ivHp"][iv]}</td><td>{avg_scores[iv]:.1f}</td><td class="dd-gain">{g}</td><td class="dd-loss">{l}</td><td class="{nc}"><b>{net:+d}</b></td><td>{_tier_badge_html(data_obj, iv)}</td></tr>\n')
+    html_parts.append('</table>\n')
+
+    # Detail flips for notable IVs — with prose summary
+    notable = [x for x in flip_summary if abs(x[3]) >= 3 or x[0] in set(ranked[:5])]
+    for iv, g, l, net in notable[:8]:
+        fd = flips[iv]
+        prose = _prose_flip_summary(fd)
+        html_parts.append(f'<details class="dd-flip-detail"><summary>{_iv_label(data_obj, iv)} &mdash; <span class="dd-gain">+{g}</span>/<span class="dd-loss">-{l}</span> (net {net:+d}){_tier_badge_html(data_obj, iv)}</summary>\n')
+        html_parts.append(f'<p class="dd-prose">{prose}</p>\n')
+        for label, entries, cls in [('Gains', fd['gains'], 'dd-gain'), ('Losses', fd['losses'], 'dd-loss')]:
+            if entries:
+                entries_sorted = sorted(entries, key=lambda e: abs(e['iv_score'] - e['ref_score']), reverse=True)
+                html_parts.append(f'<table class="dd-table dd-narrow"><tr><th>Scen.</th><th>Opponent</th><th>Ref</th><th>IV</th><th>&Delta;</th></tr>\n')
+                for e in entries_sorted:
+                    d = e['iv_score'] - e['ref_score']
+                    html_parts.append(f'<tr><td>{e["scenario"]}</td><td>{e["opponent"]}</td><td>{e["ref_score"]}</td><td class="{cls}">{e["iv_score"]}</td><td class="{cls}">{d:+d}</td></tr>\n')
+                html_parts.append('</table>\n')
+        html_parts.append('</details>\n')
+    html_parts.append('</div>\n')
+
+    # -- Recommendations with named tiers and tradeoff prose --
+    html_parts.append('<div class="dd-section" id="dd-recommendations">\n')
+    html_parts.append(f'<h2 class="dd-h2">IV Recommendations</h2>\n')
+    html_parts.append(f'<p>Combined average score, matchup flips, and rank stability '
+                      f'vs {opp_label} opponents.</p>\n')
+
+    rec_candidates = []
+    for iv in ranked[:50]:
+        g, l, net = flip_map.get(iv, (0, 0, 0))
+        rng = max(scene_ranks[si][iv] for si in range(nS)) - min(scene_ranks[si][iv] for si in range(nS))
+        score = -avg_ranks[iv] + net * 3 - rng * 0.001
+        rec_candidates.append({'iv': iv, 'avg_rank': avg_ranks[iv], 'avg_score': avg_scores[iv],
+                                'gains': g, 'losses': l, 'net': net, 'range': rng, 'score': score})
+    rec_candidates.sort(key=lambda x: x['score'], reverse=True)
+
+    # Assign descriptive tier names based on stat profile
+    species = data_obj.get('species', '')
+    for rc in rec_candidates:
+        iv = rc['iv']
+        atk, def_, hp = data_obj['ivAtk'][iv], data_obj['ivDef'][iv], data_obj['ivHp'][iv]
+        pop_atk = sum(data_obj['ivAtk'][i] for i in ranked[:20]) / 20
+        pop_def = sum(data_obj['ivDef'][i] for i in ranked[:20]) / 20
+        pop_hp = sum(data_obj['ivHp'][i] for i in ranked[:20]) / 20
+        # Classify by which stat is most above/below population average
+        if atk > pop_atk + 0.5:
+            rc['style'] = 'Attack Weight'
+        elif def_ > pop_def + 2:
+            rc['style'] = 'High Defense'
+        elif hp > pop_hp + 2:
+            rc['style'] = 'High HP'
+        elif rc['net'] > 5:
+            rc['style'] = 'Matchup Hunter'
+        elif rc['range'] < 500:
+            rc['style'] = 'Generalist'
+        else:
+            rc['style'] = 'Balanced'
+
+    html_parts.append('<div class="dd-rec-grid">\n')
+    for i, rc in enumerate(rec_candidates[:3]):
+        iv = rc['iv']
+        nc = 'dd-gain' if rc['net'] > 0 else ('dd-loss' if rc['net'] < 0 else '')
+        fd = flips.get(iv, {'gains': [], 'losses': []})
+        prose = _prose_flip_summary(fd, max_gains=2, max_losses=1)
+        html_parts.append(f'<div class="dd-rec-card">\n')
+        html_parts.append(f'<h4>{rc["style"]}: {_iv_label(data_obj, iv)}{_tier_badge_html(data_obj, iv)}</h4>\n')
+        html_parts.append(f'<p>Atk={data_obj["ivAtk"][iv]:.2f}, Def={data_obj["ivDef"][iv]:.2f}, HP={data_obj["ivHp"][iv]}, SP #{data_obj["spRanks"][iv]}</p>\n')
+        html_parts.append(f'<p>Avg: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f}) &mdash; rank range {rc["range"]} across scenarios</p>\n')
+        html_parts.append(f'<p>Flips: <span class="dd-gain">+{rc["gains"]}</span>/<span class="dd-loss">-{rc["losses"]}</span> = <span class="{nc}"><b>{rc["net"]:+d}</b></span></p>\n')
+        html_parts.append(f'<p class="dd-prose">{prose}</p>\n')
+        html_parts.append('</div>\n')
+    html_parts.append('</div>\n')
+
+    # Threshold tier summary (if thresholds defined)
+    if data_obj.get('tiers'):
+        html_parts.append('<h3 class="dd-h3">Threshold Tier Summary</h3>\n')
+        html_parts.append('<p>IV spreads meeting the predefined threshold tiers:</p>\n')
+        for ti, t in enumerate(data_obj['tiers']):
+            tier_ivs = [iv for iv in range(nIvs) if data_obj['ivTiers'][iv] == ti]
+            if not tier_ivs:
+                continue
+            # Find the best IV in this tier by net flips
+            best_in_tier = max(tier_ivs, key=lambda iv: flip_map.get(iv, (0, 0, 0))[2])
+            g, l, net = flip_map.get(best_in_tier, (0, 0, 0))
+            fd = flips.get(best_in_tier, {'gains': [], 'losses': []})
+            prose = _prose_flip_summary(fd, max_gains=2, max_losses=1)
+            html_parts.append(f'<div class="dd-callout">\n')
+            html_parts.append(f'<b><span class="dd-badge" style="background:{t["color"]};color:#000">{t["name"]}</span></b> '
+                              f'({t["desc"]}) &mdash; {len(tier_ivs)} IV spreads qualify<br>\n')
+            html_parts.append(f'Best in tier: <b>{_iv_label(data_obj, best_in_tier)}</b> '
+                              f'(avg #{avg_ranks[best_in_tier]}, '
+                              f'net flips {net:+d})<br>\n')
+            html_parts.append(f'<span class="dd-prose">{prose}</span>\n')
+            html_parts.append('</div>\n')
+
+    html_parts.append('</div>\n')
+
+    # Close the toggle div
+    html_parts.append('</div>\n')
+
+    return css, ''.join(html_parts)
+
+
+# ---------------------------------------------------------------------------
 # Interactive HTML output
 # ---------------------------------------------------------------------------
 
@@ -1192,12 +1788,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         html += '  </select></label>\n'
     html += '</div>\n'
 
-    # Summary table and plot placeholders
-    html += '<div id="summary" class="summary"></div>\n'
+    # Plot first, then summary table below
     html += '<div id="plot" class="plot-container" style="height:550px;"></div>\n'
+    html += '<div id="summary" class="summary"></div>\n'
 
     # Methodology footer
     html += '<div id="methodology" class="methodology"></div>\n'
+
+    # Deep dive analysis sections (banding, clusters, flips, etc.)
+    analysis_css, analysis_html = generate_analysis_sections(
+        data_obj, score_arrays, 0, opp_iv_modes[0],
+        shield_scenarios, opponent_names)
+    # Inject analysis CSS into the style block (replace closing tag we already emitted)
+    html = html.replace('</style>\n</head>', analysis_css + '\n</style>\n</head>', 1)
+    html += analysis_html
 
     # Embed data
     html += f'<script>var DATA = {json.dumps(data_obj)};\n'
@@ -1567,7 +2171,8 @@ def main():
                              'and sweep all candidate movesets.')
     parser.add_argument('--shield-scenario', default='1,1', metavar='S1,S2',
                         help='Shield scenario as focal,opponent (default: 1,1). '
-                             'Use "all" for 0v0+1v1+2v2.')
+                             'Use "all" for all 9 scenarios (0v0 through 2v2), '
+                             'or "even" for 0v0+1v1+2v2.')
     parser.add_argument('--shadow', action='store_true',
                         help='Focal species is shadow')
     parser.add_argument('--opp-ivs', default='pvpoke', choices=['pvpoke', 'rank1', 'both'],
@@ -1599,12 +2204,16 @@ def main():
     args = parser.parse_args()
 
     # Parse shield scenarios
+    ALL_NINE = [(s0, s1) for s0 in range(3) for s1 in range(3)]
+    EVEN_THREE = [(0, 0), (1, 1), (2, 2)]
     if args.shield_scenario == 'all':
-        shield_scenarios = [(0, 0), (1, 1), (2, 2)]
+        shield_scenarios = ALL_NINE
+    elif args.shield_scenario == 'even':
+        shield_scenarios = EVEN_THREE
     else:
         parts = args.shield_scenario.split(',')
         if len(parts) != 2:
-            sys.exit("--shield-scenario must be S1,S2 (e.g. 1,1) or 'all'")
+            sys.exit("--shield-scenario must be S1,S2 (e.g. 1,1), 'all', or 'even'")
         shield_scenarios = [(int(parts[0]), int(parts[1]))]
 
     # Parse charged moves
@@ -1754,8 +2363,8 @@ def main():
 
             # Force all shield scenarios for interactive mode
             if shield_scenarios == [(1, 1)]:
-                print("  Interactive mode: auto-expanding to all shield scenarios (0v0, 1v1, 2v2)")
-                shield_scenarios = [(0, 0), (1, 1), (2, 2)]
+                print("  Interactive mode: auto-expanding to all 9 shield scenarios")
+                shield_scenarios = ALL_NINE
                 # Re-run sweeps with all scenarios
                 all_moveset_results = []
                 for mi, (fast_id, charged_ids) in enumerate(surviving):

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tinkaton GH Cluster &amp; Flip Analysis — 2026-04-07</title>
+<style>
+  :root {
+    --bg: #0d1117; --fg: #c9d1d9; --muted: #8b949e;
+    --accent: #58a6ff; --green: #3fb950; --yellow: #d29922; --red: #f85149;
+    --surface: #161b22; --border: #30363d; --purple: #a371f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.6; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+  h1 { color: var(--accent); margin-bottom: 0.3rem; font-size: 1.8rem; }
+  h2 { color: var(--accent); margin: 2rem 0 0.8rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+  h3 { color: var(--fg); margin: 1.2rem 0 0.5rem; }
+  p, li { margin-bottom: 0.5rem; }
+  ul, ol { padding-left: 1.5rem; }
+  .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .meta span { display: inline-block; margin-right: 1.5rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; }
+  th, td { padding: 0.4rem 0.6rem; text-align: left; border: 1px solid var(--border); }
+  th { background: var(--surface); color: var(--accent); font-weight: 600; }
+  td { background: var(--bg); }
+  tr:hover td { background: var(--surface); }
+  .yes { color: var(--green); font-weight: 600; }
+  .no { color: var(--red); font-weight: 600; }
+  .highlight { background: #1a2332; border-left: 3px solid var(--accent); padding: 0.8rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+  .highlight.warn { border-left-color: var(--yellow); }
+  .highlight.good { border-left-color: var(--green); }
+  .highlight.key { border-left-color: var(--purple); }
+  code { background: var(--surface); padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.85em; }
+  pre { background: var(--surface); padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; line-height: 1.5; margin: 1rem 0; }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.8rem; font-weight: 600; }
+  .badge-great { background: #1a4d2e; color: var(--green); }
+  .badge-good { background: #3d2e00; color: var(--yellow); }
+  .gain { color: var(--green); }
+  .lose { color: var(--red); }
+  .net-pos { color: var(--green); font-weight: 600; }
+  .net-neg { color: var(--red); font-weight: 600; }
+  .net-zero { color: var(--muted); }
+  .rank-bad { color: var(--red); }
+  .rank-good { color: var(--green); }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+  .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; }
+  .summary-card h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.95rem; }
+  .summary-card .big { font-size: 1.3rem; font-weight: 700; color: var(--green); }
+  @media (max-width: 800px) { .summary-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+</style>
+</head>
+<body>
+
+<h1>Tinkaton GH: Cluster Analysis &amp; Matchup Flip Tables</h1>
+<div class="meta">
+  <span>Date: 2026-04-07</span>
+  <span>Moveset: Fairy Wind / Bulldoze + Gigaton Hammer</span>
+  <span>39 Championship Series opponents, all 9 shield scenarios</span>
+</div>
+
+<h2>1. Per-Scenario Rank Instability</h2>
+
+<div class="highlight key">
+  <strong>Key finding:</strong> Our overall #1 (2/13/13) is rank <span class="rank-bad">#2670</span> in the 2v0 scenario.
+  No single IV is "best" &mdash; optimal IVs depend entirely on shield scenario.
+</div>
+
+<table>
+  <tr><th>IVs</th><th>0v0</th><th>0v1</th><th>0v2</th><th>1v0</th><th>1v1</th><th>1v2</th><th>2v0</th><th>2v1</th><th>2v2</th><th>Avg</th></tr>
+  <tr><td>2/13/13</td><td class="rank-good">1</td><td class="rank-good">1</td><td class="rank-good">4</td><td>131</td><td>185</td><td class="rank-good">2</td><td class="rank-bad">2670</td><td class="rank-good">7</td><td class="rank-good">9</td><td><strong>1</strong></td></tr>
+  <tr><td>0/11/12</td><td class="rank-good">2</td><td class="rank-good">2</td><td class="rank-good">5</td><td>217</td><td>246</td><td class="rank-good">4</td><td class="rank-bad">2680</td><td class="rank-good">3</td><td class="rank-good">4</td><td><strong>2</strong></td></tr>
+  <tr><td>0/8/15</td><td class="rank-good">3</td><td class="rank-good">9</td><td>78</td><td>206</td><td>199</td><td class="rank-good">1</td><td class="rank-bad">2654</td><td class="rank-good">1</td><td class="rank-good">1</td><td><strong>3</strong></td></tr>
+  <tr><td>0/9/14</td><td>56</td><td class="rank-good">8</td><td class="rank-good">6</td><td>279</td><td>194</td><td class="rank-good">5</td><td class="rank-bad">2676</td><td class="rank-good">2</td><td class="rank-good">5</td><td><strong>4</strong></td></tr>
+  <tr><td>2/12/14</td><td class="rank-good">15</td><td class="rank-good">5</td><td class="rank-good">1</td><td>146</td><td>91</td><td>35</td><td class="rank-bad">2644</td><td class="rank-good">4</td><td class="rank-good">6</td><td><strong>5</strong></td></tr>
+  <tr><td>0/12/11 <span class="badge badge-good">GH Good</span></td><td class="rank-good">5</td><td class="rank-good">3</td><td>17</td><td>425</td><td>457</td><td class="rank-good">9</td><td class="rank-bad">2723</td><td>13</td><td>13</td><td><strong>6</strong></td></tr>
+  <tr><td>0/14/9 <span class="badge badge-great">GH Great</span></td><td>103</td><td class="rank-good">12</td><td class="rank-good">11</td><td>599</td><td>470</td><td>31</td><td class="rank-bad">2733</td><td>24</td><td>22</td><td><strong>14</strong></td></tr>
+</table>
+
+<p><strong>Pattern:</strong> Low-attack IVs dominate 0v0, 0v1, 0v2, 1v2, 2v1, 2v2. In 2v0 (shield advantage), high-attack IVs take over because attack matters most when you're shielding and the opponent isn't.</p>
+
+<h2>2. What Drives the Clusters?</h2>
+
+<table>
+  <tr><th>Scenario</th><th>Top cluster favors</th><th>#1 differentiator (gap)</th><th>Top cluster loses to</th></tr>
+  <tr><td>0v0 (no shields)</td><td>Bulk (atk ~106.7, HP ~143)</td><td>G. Stunfisk (+83.5)</td><td>Jellicent (-29.0)</td></tr>
+  <tr><td>1v1 (even)</td><td>Balanced (atk ~105.7, def ~140)</td><td>Steelix (+180.8)</td><td>Lapras (-55.0)</td></tr>
+  <tr><td>2v2 (double shield)</td><td>HP-heavy (HP ~143)</td><td>Steelix (+196.6), G. Stunfisk (+181.1)</td><td>Lapras (-93.1)</td></tr>
+  <tr><td>1v2 (shield disadvantage)</td><td>Max bulk (def ~140.9, HP ~143)</td><td>Steelix (+194.6)</td><td>Super Gourgeist (-79.2)</td></tr>
+  <tr><td>2v0 (shield advantage)</td><td><strong>Max attack</strong> (atk ~110.1!)</td><td>Steelix (+195.5)</td><td>Super Gourgeist (-76.1)</td></tr>
+</table>
+
+<div class="highlight">
+  <strong>Steelix is the single most important matchup differentiator</strong> across nearly every scenario.
+  It's extremely sensitive to Tinkaton's stat distribution and swings by 200+ points per scenario.
+  This is why average-score rankings favor HP: Steelix matchups span 5+ scenarios.
+</div>
+
+<h2>3. Matchup Flip Table</h2>
+
+<p>Flips vs PvPoke default IVs (4/15/14). A "flip" = crossing the 500-point win/loss boundary.</p>
+
+<h3>Our #1: 2/13/13 &mdash; <span class="gain">Gains 8</span>, <span class="lose">Loses 0</span></h3>
+<table>
+  <tr><th>Scenario</th><th>Opponent</th><th>Ref</th><th>2/13/13</th><th>Delta</th></tr>
+  <tr><td>2v0</td><td>Stunfisk (Galarian)</td><td>418</td><td class="gain">746</td><td class="gain">+328</td></tr>
+  <tr><td>0v0</td><td>Quagsire (Shadow)</td><td>403</td><td class="gain">623</td><td class="gain">+220</td></tr>
+  <tr><td>1v2</td><td>Togekiss</td><td>291</td><td class="gain">503</td><td class="gain">+212</td></tr>
+  <tr><td>1v2</td><td>Clefable</td><td>302</td><td class="gain">503</td><td class="gain">+201</td></tr>
+  <tr><td>0v1</td><td>Charjabug</td><td>392</td><td class="gain">535</td><td class="gain">+143</td></tr>
+  <tr><td>2v1</td><td>Stunfisk</td><td>491</td><td class="gain">584</td><td class="gain">+93</td></tr>
+  <tr><td>0v0</td><td>Corsola (Galarian)</td><td>453</td><td class="gain">503</td><td class="gain">+50</td></tr>
+  <tr><td>2v1</td><td>Corviknight</td><td>496</td><td class="gain">500</td><td class="gain">+4</td></tr>
+</table>
+
+<h3>Reference top pick: 0/14/9 <span class="badge badge-great">GH Great</span> &mdash; <span class="gain">Gains 5</span>, <span class="lose">Loses 2</span></h3>
+<table>
+  <tr><th>Scenario</th><th>Opponent</th><th>Ref</th><th>0/14/9</th><th>Delta</th></tr>
+  <tr><td>2v0</td><td>Stunfisk (Galarian)</td><td>418</td><td class="gain">744</td><td class="gain">+326</td></tr>
+  <tr><td>1v2</td><td>Clefable</td><td>302</td><td class="gain">507</td><td class="gain">+205</td></tr>
+  <tr><td>0v1</td><td>Charjabug</td><td>392</td><td class="gain">542</td><td class="gain">+150</td></tr>
+  <tr><td>2v1</td><td>Stunfisk</td><td>491</td><td class="gain">585</td><td class="gain">+94</td></tr>
+  <tr><td>0v0</td><td>Corsola (Galarian)</td><td>453</td><td class="gain">507</td><td class="gain">+54</td></tr>
+  <tr><td>0v2</td><td><strong>Steelix</strong></td><td><strong>503</strong></td><td class="lose">329</td><td class="lose">-174</td></tr>
+  <tr><td>1v2</td><td><strong>Steelix</strong></td><td><strong>570</strong></td><td class="lose">452</td><td class="lose">-118</td></tr>
+</table>
+
+<h3>Reference pick: 0/15/8 <span class="badge badge-great">GH Great</span> &mdash; <span class="gain">Gains 6</span>, <span class="lose">Loses 5</span></h3>
+<p>Net +1. Gains G. Stunfisk, Togekiss, Clefable, Charjabug, Stunfisk, G. Corsola but <strong>loses 5 Steelix matchups</strong>. Too much defense at the cost of HP.</p>
+
+<h3>Reference "solid" pick: 2/13/5 &mdash; <span class="lose">Gains 0, Loses 2</span></h3>
+<p>Net -2. High attack (106.94) for CMP ties, but low HP (138) costs 2 Steelix matchups and gains nothing.</p>
+
+<h2>4. The Steelix Problem</h2>
+
+<div class="highlight warn">
+  <strong>Nearly every IV spread's flip profile is dominated by Steelix.</strong>
+  Low-HP spreads (HP &le; 140) lose 5&ndash;7 Steelix matchups. HP &ge; 141 reduces to 1&ndash;2. HP &ge; 142
+  with adequate defense eliminates Steelix losses entirely.
+</div>
+
+<h3>GH Great threshold problem</h3>
+<p>The "GH Great" threshold (def &ge; 143.03, HP &ge; 138) includes low-HP spreads that have
+<em>net negative</em> flip profiles:</p>
+
+<table>
+  <tr><th>IV</th><th>Def</th><th>HP</th><th>Gains</th><th>Loses</th><th>Net</th></tr>
+  <tr><td>0/12/3</td><td>143.04</td><td>138</td><td>0</td><td>2</td><td class="net-neg">-2</td></tr>
+  <tr><td>0/14/5</td><td>143.04</td><td>138</td><td>2</td><td>5</td><td class="net-neg">-3</td></tr>
+  <tr><td>0/15/5</td><td>143.73</td><td>138</td><td>2</td><td>5</td><td class="net-neg">-3</td></tr>
+  <tr><td colspan="6" style="border:none; padding-top:0.5rem"><em>Only GH Great with positive net:</em></td></tr>
+  <tr><td><strong>0/14/9</strong></td><td>143.04</td><td><strong>141</strong></td><td>5</td><td>2</td><td class="net-pos">+3</td></tr>
+  <tr><td>0/15/8</td><td>143.73</td><td>140</td><td>6</td><td>5</td><td class="net-pos">+1</td></tr>
+  <tr><td>0/14/8</td><td>143.04</td><td>140</td><td>5</td><td>5</td><td class="net-zero">0</td></tr>
+</table>
+
+<p><strong>HP &ge; 141 would be a better GH Great threshold</strong> than HP &ge; 138.</p>
+
+<h2>5. Revised Recommendations</h2>
+
+<div class="summary-grid">
+  <div class="summary-card">
+    <h4>Best Overall: 2/13/13</h4>
+    <p>Atk=105.91, Def=140.99, HP=142, SP #14</p>
+    <p>Avg: <strong>#1</strong> (564.5)</p>
+    <p>Flips: <span class="big">+8</span> (gains 8, loses 0)</p>
+    <p>Cleanest flip profile of any IV tested</p>
+  </div>
+  <div class="summary-card">
+    <h4>Best Threshold: 0/14/9 <span class="badge badge-great">GH Great</span></h4>
+    <p>Atk=105.58, Def=143.04, HP=141, SP #2</p>
+    <p>Avg: <strong>#14</strong> (560.5)</p>
+    <p>Flips: <span class="net-pos">+3</span> (gains 5, loses 2)</p>
+    <p>Reference recommendation validated</p>
+  </div>
+  <div class="summary-card">
+    <h4>Best Balanced: 0/11/12</h4>
+    <p>Atk=105.58, Def=141.00, HP=143, SP #3</p>
+    <p>Avg: <strong>#2</strong> (563.9)</p>
+    <p>Flips: <span class="net-pos">+7</span> (gains 8, loses 1)</p>
+    <p>Loses only Steelix 0v2</p>
+  </div>
+</div>
+
+<h2>Appendix: Full Net Flip Summary (Top 15)</h2>
+<pre>
+       IVs      Atk      Def   HP      Avg  Gains  Loses   Net        Tier
+  ------------------------------------------------------------------------
+   2/13/13   105.91   140.99  142    564.5      8      0    +8
+   0/11/11   105.58   141.00  142    562.6      8      1    +7
+   0/11/12   105.58   141.00  143    563.9      8      1    +7
+   0/12/11   105.58   141.68  142    562.7      8      1    +7     GH Good
+   0/ 8/15   105.58   138.96  145    563.3      7      1    +6
+   0/ 9/14   105.58   139.64  144    562.9      7      1    +6
+   0/ 7/15   105.58   138.28  145    561.5      6      1    +5
+   2/11/14   105.91   139.64  143    562.3      5      0    +5
+   2/11/15   105.91   139.64  143    562.3      5      0    +5
+   2/12/14   105.91   140.31  143    562.9      5      0    +5
+   1/14/13   105.23   141.66  142    556.8      6      2    +4     GH Good
+   1/14/14   105.23   141.66  143    557.8      6      2    +4     GH Good
+   1/15/13   105.23   142.34  142    557.3      6      2    +4     GH Good
+   0/14/ 9   105.58   143.04  141    560.5      5      2    +3    GH Great
+   0/14/14   104.56   141.66  143    556.2      5      3    +2     GH Good
+</pre>
+
+</body>
+</html>

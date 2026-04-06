@@ -22,15 +22,7 @@
 
 ## Tests to add
 
-* ~~**Shadow pokemon**~~ — DONE. Shadow Swampert vs Registeel: 9/9 match PvPoke.
-
-* ~~**Both mons with buff/debuff**~~ — DONE. Corviknight mirror (Air Cutter only):
-  9/9 match PvPoke. Both mons buff independently; damage goes 18→23 after 4th hit.
-
-* **Form Change** — Morpeko. Low priority.
-
-* ~~**Default movesets**~~ — DONE. `get_default_moveset()` reads PvPoke's
-  rankings `moveset` field. `scripts/battle.py` moves are now optional.
+* **Form Change** — Morpeko. Aegislash. Eventually Mimikyu. Low priority.
 
 ## Analysis goals
 
@@ -45,6 +37,50 @@
   Reproduce the method (move parameters have changed since then).
 
 * **Reproduce iv-tech channel analysis** from HSH's Discord.
+
+* When I look at our interactive plots of Fairy Wind/Bulldoze,Gigaton
+  Hammer Tinkaton, against the PvPoke default IVs, the 1v1 sheilds has
+  a clear cluster at the top right, and I'd liek to know what's
+  distinguishing about it. Especially since none of our pre-programmed
+  thresholds show up in it. The 2v2 shows a similar cluster, though
+  some of our pre-programmed thresholds do show up there. And the 2v2
+  has some clear mostly horizontal banding structure. That would be
+  interesting to dig into. The 0v0 has a big chunk in the bottom right
+  that does include several of our GH Good mons ... but those have far
+  worse battle scores here than lots of other mons. What are they
+  missing? It's weird that a lot of that structure (almost all of it,
+  actually) washes out when we look at the average battle score across
+  all scenarios. Well. Across all even shield scenarios. We should
+  check against all scenarios when we fix that bug.
+
+## UI / Display
+
+* **Additional scatter plot color modes** — The current color scheme has some dark
+  points that are hard to see against the background. Add a dropdown with alternate
+  color modes (e.g. color by stat product rank, color by HP, color by attack,
+  single bright color for non-threshold IVs). Should be a JS dropdown next to the
+  existing moveset/scenario selectors.
+
+* **Pretty-print move and species names in reports** — HTML output, analysis
+  sections, and console summaries should use natural casing (e.g. "Gigaton Hammer"
+  not "GIGATON_HAMMER", "Galarian Stunfisk" not "STUNFISK_GALARIAN"). The CLI
+  argument parsing can stay uppercase/underscore for ease of typing.
+
+* **List all valid options in CLI help** — Flags like `--group` and `--charged`
+  should enumerate all valid choices in `--help` output (e.g. list all known
+  PvPoke groups, list all legal moves for the species). Currently only a few
+  example group names are shown. Get user input before fully
+  implementing this, though, because listing all legal moves might
+  make the help text too long.
+
+## Performance
+
+* **Speed up deep dive simulations** — A full deep dive (4096 IVs × 39 opponents
+  × 9 scenarios × 3 movesets) takes ~90 min single-threaded at ~1300 sims/s.
+  With `--opp-ivs both` that doubles. Options: multiprocessing (parallelize across
+  IVs or opponents), caching (opponent BattlePokemon setup is repeated), or
+  optimizing the hot path in `simulate()`. Must stay pure Python (BeeWare/iOS
+  compatibility) but `multiprocessing` is fine.
 
 ## Low priority
 
