@@ -562,11 +562,26 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
         fast_id, charged_ids, results = entry[0], entry[1], entry[2]
         label = moveset_label(fast_id, charged_ids)
 
-        # Rank-1 reference for matchup diffs (results are sorted by avg_score desc)
-        r1 = results[0] if results else None
-        ref_per_opp = r1.get('per_opp') if r1 else None
-        ref_label = (f"Rank 1 ({r1['atk_iv']}/{r1['def_iv']}/{r1['sta_iv']})"
-                     if r1 else None)
+        # Reference IV for matchup diffs: use the IV that matches the opp_iv_mode.
+        # If opp_iv_mode=pvpoke, compare against PvPoke default IVs for this species.
+        # If opp_iv_mode=rank1, compare against stat-product rank 1.
+        ref_result = None
+        if opp_iv_mode == 'rank1':
+            # Rank 1 by stat product
+            ref_result = min(results, key=lambda r: r['sp_rank'])
+            ref_label = (f"SP Rank 1 ({ref_result['atk_iv']}/"
+                         f"{ref_result['def_iv']}/{ref_result['sta_iv']})")
+        else:
+            # PvPoke default IVs
+            _lv, da, dd, ds = pvpoke_default_ivs(species, league=league)
+            for r in results:
+                if (r['atk_iv'] == da and r['def_iv'] == dd
+                        and r['sta_iv'] == ds):
+                    ref_result = r
+                    break
+            ref_label = (f"Default ({da}/{dd}/{ds})"
+                         if ref_result else None)
+        ref_per_opp = ref_result.get('per_opp') if ref_result else None
 
         def hover(r, tier=None):
             return _hover_text(r, tier_name=tier, ref_per_opp=ref_per_opp,
@@ -1038,6 +1053,22 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                     iv_tiers[i] = ti
                     break
 
+    # Find canonical IV indices for the reference IV spreads
+    # PvPoke default IVs for this species
+    pvpoke_ref_iv_idx = -1
+    rank1_ref_iv_idx = -1
+    try:
+        _lv, da, dd, ds = pvpoke_default_ivs(species, league=league)
+        for i in range(n_ivs):
+            if iv_a[i] == da and iv_d[i] == dd and iv_s[i] == ds:
+                pvpoke_ref_iv_idx = i
+                break
+    except (ValueError, KeyError):
+        pass
+    # Rank 1 by stat product
+    if n_ivs > 0:
+        rank1_ref_iv_idx = min(range(n_ivs), key=lambda i: sp_ranks[i])
+
     data_obj = {
         'species': species,
         'league': league,
@@ -1052,6 +1083,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'referenceIdx': reference_idx,
         'tiers': tier_info,
         'movesets': [{'label': md['label']} for md in moveset_data],
+        # Reference IV indices (for matchup diff in hover text)
+        'pvpokeRefIvIdx': pvpoke_ref_iv_idx,
+        'rank1RefIvIdx': rank1_ref_iv_idx,
         # IV metadata
         'ivA': iv_a, 'ivD': iv_d, 'ivS': iv_s,
         'ivLv': iv_lv, 'ivCp': iv_cp,
@@ -1266,13 +1300,13 @@ function buildHoverText(iv) {{
   var tier = DATA.ivTiers[iv];
   if (tier >= 0) lines.push('Tier: '+tierNames[tier]);
 
-  // Diff vs battle rank 1
-  var r1 = -1;
-  for (var i=0; i<nIvs; i++) {{ if (battleRanks[i]===1) {{ r1=i; break; }} }}
-  if (r1 >= 0 && iv !== r1) {{
+  // Diff vs reference IV (PvPoke default or rank 1, depending on opp IV mode)
+  var refIv = (state.oppIvMode === 'rank1') ? DATA.rank1RefIvIdx : DATA.pvpokeRefIvIdx;
+  var refDesc = (state.oppIvMode === 'rank1') ? 'SP Rank 1' : 'Default IVs';
+  if (refIv >= 0 && iv !== refIv) {{
     lines.push('');
-    lines.push('vs Rank 1 ('+DATA.ivA[r1]+'/'+DATA.ivD[r1]+'/'+DATA.ivS[r1]+'):');
-    appendMatchupDiff(lines, state.movesetIdx, iv, state.movesetIdx, r1);
+    lines.push('vs '+refDesc+' ('+DATA.ivA[refIv]+'/'+DATA.ivD[refIv]+'/'+DATA.ivS[refIv]+'):');
+    appendMatchupDiff(lines, state.movesetIdx, iv, state.movesetIdx, refIv);
   }}
 
   // Diff vs reference moveset (same IV)
