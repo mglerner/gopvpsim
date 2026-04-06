@@ -149,6 +149,9 @@ def main():
                         help='Print computed stats (atk, def, hp, CP, types) for both pokemon')
     parser.add_argument('--show-damage', action='store_true',
                         help='Print damage each move deals to the opponent (for verification)')
+    parser.add_argument('--battle-log', action='store_true',
+                        help='Print compact charged-move sequence for each scenario '
+                             '(useful for adding to tests)')
 
     args = parser.parse_args()
 
@@ -223,7 +226,7 @@ def main():
     do_trace_shields = args.trace_shields
     do_trace_dp     = args.trace_dp
     do_debug = args.debug or do_trace_shields or do_trace_dp
-    do_log   = args.log or do_debug
+    do_log   = args.log or do_debug or args.battle_log
 
     shield_range1 = [args.shields1] if args.shields1 is not None else range(3)
     shield_range2 = [args.shields2] if args.shields2 is not None else range(3)
@@ -289,6 +292,26 @@ def main():
         for line in tl:
             print(line)
         print()
+
+    if args.battle_log:
+        print('Battle logs (charged moves only):')
+        print()
+        for label, tl in timelines:
+            print(label)
+            for line in tl:
+                if ('uses' not in line or '→' not in line
+                        or 'fast' in line.lower()
+                        or 'floating' in line.lower()):
+                    continue
+                raw = line.strip()
+                body = raw.split(': ', 1)[1]  # strip "T xx: "
+                who, rest = body.split(' uses ', 1)
+                move_name = rest.split(' →')[0]
+                if 'SHIELDED' in raw:
+                    print(f'  {who}: {move_name} (shielded)')
+                else:
+                    print(f'  {who}: {move_name}')
+            print()
 
 
 if __name__ == '__main__':

@@ -356,6 +356,15 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
 
     use_shield = post_hp <= cycle_damage
 
+    # Reset the temporarily applied buff (ActionLogic.js 1136-1140)
+    # Must happen BEFORE the charged-move loop below — PvPoke evaluates
+    # charged-move threat with normal stats, not the temporarily-applied
+    # buff from the move being evaluated.
+    if move_buffs[0] > 0:
+        attacker.atk_stage = saved_stage
+    else:
+        defender.def_stage = saved_stage
+
     cm_reasons = []
     for cm in attacker.charged_moves:
         cm_dmg = attacker.charged_move_damage(cm, defender)
@@ -365,12 +374,6 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
         if cm_dmg >= defender.hp - cycle_damage:
             use_shield = True
             cm_reasons.append(f"{cm.get('moveId')}({cm_dmg})≥hp-cycle({defender.hp}-{cycle_damage}={defender.hp-cycle_damage})")
-
-    # Reset the temporarily applied buff (ActionLogic.js 1136-1140)
-    if move_buffs[0] > 0:
-        attacker.atk_stage = saved_stage
-    else:
-        defender.def_stage = saved_stage
 
     if _shield_trace:
         buff_note = ""
@@ -1499,9 +1502,16 @@ def simulate(
         if use_priority and len(charged_actions) == 2:
             charged_actions.sort(key=lambda ia: pokemon[ia[0]].atk, reverse=True)
 
+        charged_ko = set()  # track Pokemon KO'd by charged moves this turn
+
         for actor_idx, move in charged_actions:
             attacker = pokemon[actor_idx]
             defender = pokemon[1 - actor_idx]
+
+            # PvPoke Battle.js line 464-467: cancel if KO'd by a
+            # higher-priority charged move (CMP).
+            if use_priority and attacker.hp <= 0 and actor_idx in charged_ko:
+                continue
 
             # PvPoke Battle.js lines 471-490: cancel a charged move when the
             # attacker was killed by the opponent's fast move this turn, UNLESS
@@ -1534,6 +1544,8 @@ def simulate(
                 log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → {dmg} dmg")
 
             defender.hp = max(0, defender.hp - dmg)
+            if defender.hp <= 0:
+                charged_ko.add(1 - actor_idx)
 
             # Apply stat stage buffs/debuffs (fires even when shielded)
             _apply_move_buffs(attacker, defender, move)
