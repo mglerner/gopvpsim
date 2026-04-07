@@ -1196,23 +1196,28 @@ def _pvp_damage(power, atk, def_, effectiveness, stab_mult):
     return math.floor(0.5 * 1.3 * power * atk / def_ * effectiveness * stab_mult) + 1
 
 
-def _narrate_flip(focal_atk, focal_def, ref_atk, ref_def,
+def _narrate_flip(focal_atk, focal_def, focal_hp, ref_atk, ref_def, ref_hp,
                   opp_atk, opp_def, opp_name,
                   focal_moves, opp_moves,
-                  focal_types, opp_types):
+                  focal_types, opp_types,
+                  is_gain):
     """
     Identify which move's per-hit damage changed between ref and focal IV stats,
-    and return a narrative string. Checks both directions (opp attacking focal,
-    focal attacking opp).
+    and return a narrative string explaining *why* the flip happened.
 
-    focal_moves / opp_moves: list of (move_id, power, move_type) tuples
-    focal_types / opp_types: list of type strings
+    Only reports damage changes that explain the flip direction:
+    - For gains: bulkpoints (taking less damage) or breakpoints (dealing more)
+    - For losses: lost bulkpoints (taking more damage) or lost breakpoints (dealing less)
 
-    Returns narrative string or '' if no breakpoint found.
+    If no per-hit damage change explains the flip, notes the HP difference
+    as the likely cause.
+
+    is_gain: True if this IV gains the matchup vs reference, False if it loses it.
     """
-    changes = []
+    favorable = []
+    unfavorable = []
 
-    # Opponent's moves hitting focal at focal_def vs ref_def
+    # Opponent's moves hitting focal at focal_def vs ref_def (bulkpoints)
     if focal_def != ref_def:
         for move_id, power, mtype in opp_moves:
             eff = type_effectiveness(mtype, focal_types)
@@ -1220,14 +1225,15 @@ def _narrate_flip(focal_atk, focal_def, ref_atk, ref_def,
             dmg_ref = _pvp_damage(power, opp_atk, ref_def, eff, stab_mult)
             dmg_focal = _pvp_damage(power, opp_atk, focal_def, eff, stab_mult)
             if dmg_ref != dmg_focal:
-                direction = 'less' if dmg_focal < dmg_ref else 'more'
-                changes.append(
-                    f'{_pretty_name(move_id)} from {opp_name} does '
-                    f'{dmg_focal} instead of {dmg_ref} damage '
-                    f'(Def {focal_def:.2f} vs {ref_def:.2f})'
-                )
+                takes_less = dmg_focal < dmg_ref
+                entry = (move_id, opp_name, dmg_focal, dmg_ref, 'Def',
+                         focal_def, ref_def, takes_less)
+                if takes_less:  # bulkpoint gain — favorable for gaining matchups
+                    favorable.append(entry)
+                else:
+                    unfavorable.append(entry)
 
-    # Focal's moves hitting opp at focal_atk vs ref_atk
+    # Focal's moves hitting opp at focal_atk vs ref_atk (breakpoints)
     if focal_atk != ref_atk:
         for move_id, power, mtype in focal_moves:
             eff = type_effectiveness(mtype, opp_types)
@@ -1235,13 +1241,47 @@ def _narrate_flip(focal_atk, focal_def, ref_atk, ref_def,
             dmg_ref = _pvp_damage(power, ref_atk, opp_def, eff, stab_mult)
             dmg_focal = _pvp_damage(power, focal_atk, opp_def, eff, stab_mult)
             if dmg_ref != dmg_focal:
-                changes.append(
-                    f'{_pretty_name(move_id)} does '
-                    f'{dmg_focal} instead of {dmg_ref} damage '
-                    f'(Atk {focal_atk:.2f} vs {ref_atk:.2f})'
-                )
+                deals_more = dmg_focal > dmg_ref
+                entry = (move_id, None, dmg_focal, dmg_ref, 'Atk',
+                         focal_atk, ref_atk, deals_more)
+                if deals_more:  # breakpoint gain — favorable
+                    favorable.append(entry)
+                else:
+                    unfavorable.append(entry)
 
-    return '; '.join(changes)
+    # Pick the changes that explain the flip direction
+    if is_gain:
+        explaining = favorable
+    else:
+        explaining = unfavorable
+
+    parts = []
+    for move_id, src_name, dmg_new, dmg_old, stat, val_new, val_old, _ in explaining:
+        move_pretty = _pretty_name(move_id)
+        if src_name:
+            # Bulkpoint: opponent's move
+            if dmg_new < dmg_old:
+                parts.append(f'bulkpoint: {move_pretty} from {src_name} does '
+                             f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
+            else:
+                parts.append(f'lost bulkpoint: {move_pretty} from {src_name} does '
+                             f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
+        else:
+            # Breakpoint: focal's move
+            if dmg_new > dmg_old:
+                parts.append(f'breakpoint: {move_pretty} does '
+                             f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
+            else:
+                parts.append(f'lost breakpoint: {move_pretty} does '
+                             f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
+
+    if not parts:
+        # No per-hit damage change explains the flip — likely HP-driven
+        hp_diff = focal_hp - ref_hp
+        if hp_diff != 0:
+            parts.append(f'HP {focal_hp} vs {ref_hp} ({hp_diff:+d})')
+
+    return '; '.join(parts)
 
 
 def _build_move_tuples(moveset_label, fast_db, charged_db):
@@ -1556,17 +1596,21 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         # Breakpoint narrations for top gains/losses
         focal_atk_rc = data_obj['ivAtk'][iv]
         focal_def_rc = data_obj['ivDef'][iv]
+        focal_hp_rc = data_obj['ivHp'][iv]
+        ref_hp_val = data_obj['ivHp'][ref_iv]
         bp_lines = []
-        for entries in [fd.get('gains', [])[:2], fd.get('losses', [])[:1]]:
+        for is_gain, entries in [(True, fd.get('gains', [])[:2]), (False, fd.get('losses', [])[:1])]:
             for e in entries:
                 opp_name = e['opponent']
                 if opp_name in opp_info_cache and focal_moves:
                     oi = opp_info_cache[opp_name]
                     narr = _narrate_flip(
-                        focal_atk_rc, focal_def_rc, ref_atk, ref_def,
+                        focal_atk_rc, focal_def_rc, focal_hp_rc,
+                        ref_atk, ref_def, ref_hp_val,
                         oi['atk'], oi['def_'], opp_name,
                         focal_moves, oi['moves'],
                         focal_types, oi['types'],
+                        is_gain=is_gain,
                     )
                     if narr:
                         bp_lines.append(narr)
@@ -1831,22 +1875,26 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         analysis_parts.append(f'<p class="dd-prose">{prose}</p>\n')
         focal_atk_iv = data_obj['ivAtk'][iv]
         focal_def_iv = data_obj['ivDef'][iv]
-        for label, entries, cls in [('Gains', fd['gains'], 'dd-gain'), ('Losses', fd['losses'], 'dd-loss')]:
+        focal_hp_iv = data_obj['ivHp'][iv]
+        ref_hp_val2 = data_obj['ivHp'][ref_iv]
+        for label, entries, cls, is_gain in [('Gains', fd['gains'], 'dd-gain', True),
+                                              ('Losses', fd['losses'], 'dd-loss', False)]:
             if entries:
                 entries_sorted = sorted(entries, key=lambda e: abs(e['iv_score'] - e['ref_score']), reverse=True)
-                analysis_parts.append(f'<table class="dd-table dd-narrow"><tr><th>Scen.</th><th>Opponent</th><th>Ref</th><th>IV</th><th>&Delta;</th><th>Breakpoint</th></tr>\n')
+                analysis_parts.append(f'<table class="dd-table dd-narrow"><tr><th>Scen.</th><th>Opponent</th><th>Ref</th><th>IV</th><th>&Delta;</th><th>Why</th></tr>\n')
                 for e in entries_sorted:
                     d = e['iv_score'] - e['ref_score']
-                    # Breakpoint narration
                     narr = ''
                     opp_name = e['opponent']
                     if opp_name in opp_info_cache and focal_moves:
                         oi = opp_info_cache[opp_name]
                         narr = _narrate_flip(
-                            focal_atk_iv, focal_def_iv, ref_atk, ref_def,
+                            focal_atk_iv, focal_def_iv, focal_hp_iv,
+                            ref_atk, ref_def, ref_hp_val2,
                             oi['atk'], oi['def_'], opp_name,
                             focal_moves, oi['moves'],
                             focal_types, oi['types'],
+                            is_gain=is_gain,
                         )
                     analysis_parts.append(f'<tr><td>{e["scenario"]}</td><td>{e["opponent"]}</td><td>{e["ref_score"]}</td><td class="{cls}">{e["iv_score"]}</td><td class="{cls}">{d:+d}</td><td class="dd-small">{narr}</td></tr>\n')
                 analysis_parts.append('</table>\n')
