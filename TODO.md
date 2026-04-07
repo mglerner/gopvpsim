@@ -20,9 +20,21 @@
   an estimated P(opponent shields). P~0 → fire best-DPE move; P~1 → bait with
   cheapest.
 
+## Features to add
+
+* **Form Change** — Morpeko. Aegislash. Mimikyu. These are all
+  implemented in pvpoke, so we can check against their results. As
+  soon as we get Mimikyu's form change added, we should do a Mimikyu
+  deep dive. The form change deep dives should include some text about
+  how their individual form changes work.
+
 ## Tests to add
 
-* **Form Change** — Morpeko. Aegislash. Eventually Mimikyu. Low priority.
+* **Form Change** — Morpeko. Aegislash. Eventually Mimikyu. Low
+  priority. Do this when we add the form change features. Do the form
+  changes affect the shielding strategy and/or baiting strategy of the
+  opponent? Probably. Make sure we test enough explicit battle
+  timelines from pvpoke to confirm.
 
 ## Analysis goals
 
@@ -81,6 +93,9 @@
   IVs or opponents), caching (opponent BattlePokemon setup is repeated), or
   optimizing the hot path in `simulate()`. Must stay pure Python (BeeWare/iOS
   compatibility) but `multiprocessing` is fine.
+
+* **HTML file size** -- Are our deep dive/interactive HTML files
+  getting too big?
 
 ## Low priority
 

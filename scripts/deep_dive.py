@@ -148,6 +148,67 @@ def load_thresholds(path):
     return data
 
 
+def auto_discover_thresholds(results, n_tiers=2):
+    """
+    Discover threshold tiers automatically from simulation results.
+
+    Analyzes the top-performing IVs to find stat values that distinguish
+    them from the rest. For each stat, if the top group's 25th percentile
+    is notably above the population median, that stat becomes a floor
+    threshold. We use the 25th percentile (not minimum) to be robust to
+    outliers.
+
+    results: list of dicts from iv_sweep (sorted by avg_score desc)
+    n_tiers: number of tiers to generate (default 2)
+    """
+    if not results or len(results) < 50:
+        return {}
+
+    n = len(results)
+
+    # Tier 1: "Premium" — top 5% by score
+    # Tier 2: "Good" — top 20% by score
+    tier_cuts = [max(5, n // 20), max(20, n // 5)][:n_tiers]
+    tier_names = ['Premium', 'Good'][:n_tiers]
+
+    # Population stats (medians)
+    pop_atk = sorted(r['atk'] for r in results)
+    pop_def = sorted(r['def_'] for r in results)
+    pop_hp = sorted(r['hp'] for r in results)
+    pop_atk_med = pop_atk[n // 2]
+    pop_def_med = pop_def[n // 2]
+    pop_hp_med = pop_hp[n // 2]
+
+    thresholds = {}
+    for cut, name in zip(tier_cuts, tier_names):
+        top = results[:cut]
+
+        # 25th percentile of top group (robust floor)
+        top_atk = sorted(r['atk'] for r in top)
+        top_def = sorted(r['def_'] for r in top)
+        top_hp = sorted(r['hp'] for r in top)
+        p25 = max(0, len(top) // 4)
+        top_atk_p25 = top_atk[p25]
+        top_def_p25 = top_def[p25]
+        top_hp_p25 = top_hp[p25]
+
+        thresh = {'attack': 0, 'defense': 0, 'stamina': 0}
+
+        # A stat is a meaningful threshold if the top group's p25 is above
+        # the population median by more than 1%
+        if top_atk_p25 > pop_atk_med * 1.01:
+            thresh['attack'] = round(top_atk_p25, 2)
+        if top_def_p25 > pop_def_med * 1.01:
+            thresh['defense'] = round(top_def_p25, 2)
+        if top_hp_p25 > pop_hp_med + 1:
+            thresh['stamina'] = int(top_hp_p25)
+
+        if any(v > 0 for v in thresh.values()):
+            thresholds[name] = thresh
+
+    return thresholds
+
+
 def classify_iv(result, thresholds):
     """
     Return the name of the most restrictive threshold this IV spread meets,
@@ -1534,13 +1595,23 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         else:
             scene_label += ' (shield disadv.)'
         analysis_parts.append(f'<h3 class="dd-h3">{scene_label}</h3>\n')
+        scene_ranked = sorted(range(nIvs), key=lambda i: sc[i], reverse=True)
         if sig_gaps:
-            analysis_parts.append(f'<p>{len(sig_gaps)} significant gap(s) detected. '
-                                  f'Largest at rank {sig_gaps[0][0]}: '
-                                  f'score drops by {sig_gaps[0][1]:.1f} points.</p>\n')
+            # Top cluster = IVs above the first gap
+            top_cluster_size = sig_gaps[0][0]
+            top_cluster_ivs = scene_ranked[:top_cluster_size]
+            tc_sp_min = min(data_obj['spRanks'][iv] for iv in top_cluster_ivs)
+            tc_sp_max = max(data_obj['spRanks'][iv] for iv in top_cluster_ivs)
+            tc_score_min = sc[scene_ranked[top_cluster_size - 1]]
+            tc_score_max = sc[scene_ranked[0]]
+            analysis_parts.append(f'<p>{len(sig_gaps)} significant gap(s). '
+                                  f'Top cluster: {top_cluster_size} IVs, '
+                                  f'scores {tc_score_min:.0f}&ndash;{tc_score_max:.0f} '
+                                  f'(SP ranks {tc_sp_min}&ndash;{tc_sp_max}). '
+                                  f'<b>On graph:</b> look for Y &ge; {tc_score_min:.0f} '
+                                  f'with SP rank {tc_sp_min}&ndash;{tc_sp_max} on X axis.</p>\n')
         else:
             analysis_parts.append('<p>Smooth gradient (no gaps &gt; 3&times; median).</p>\n')
-        scene_ranked = sorted(range(nIvs), key=lambda i: sc[i], reverse=True)
         analysis_parts.append('<table class="dd-table dd-narrow"><tr><th>#</th><th>IVs</th><th>Atk</th><th>Def</th><th>HP</th><th>SP</th><th>Score</th><th>Tier</th></tr>\n')
         for rank in range(5):
             iv = scene_ranked[rank]
@@ -1844,16 +1915,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         html += ', '.join(opponent_names)
         html += '</p></details>\n'
 
-    # Threshold legend
-    if thresholds:
-        html += '<div class="threshold-info">\n'
-        html += '<strong>IV Thresholds:</strong><br>\n'
-        for ti in tier_info:
-            html += (f'<span class="tier-badge" style="background:{ti["color"]};color:#000">'
-                     f'{ti["name"]}</span> {ti["desc"]}<br>\n')
-        html += '<br><em>Hover over legend entries to isolate that tier. '
-        html += 'Click to lock the isolation; click again to unlock.</em>\n'
-        html += '</div>\n'
+    # Threshold info folded into controls (legend shows tier name + desc)
+    # No separate threshold-info box needed — graph legend has full detail
 
     # Controls
     html += '<div class="controls">\n'
@@ -1878,6 +1941,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             label = 'PvPoke Defaults' if mode == 'pvpoke' else 'Rank 1'
             html += f'    <option value="{mode}">{label}</option>\n'
         html += '  </select></label>\n'
+    if thresholds:
+        html += '  <span style="font-size:11px;color:#888;margin-left:8px">Threshold tiers shown in graph legend. Hover to isolate; click to lock.</span>\n'
     html += '</div>\n'
 
     # Plot first, then summary table below
@@ -2409,6 +2474,15 @@ def main():
         elapsed = time.time() - t0
         rate = n_sims / elapsed if elapsed > 0 else 0
         print(f"    {n_sims:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
+
+        # Auto-discover thresholds from the first moveset if none provided
+        if thresholds is None and mi == 0:
+            auto = auto_discover_thresholds(results)
+            if auto:
+                thresholds = auto
+                print(f"    Auto-discovered {len(thresholds)} threshold tier(s):")
+                for name, thresh in thresholds.items():
+                    print(f"      {name}: {_threshold_desc(thresh)}")
 
         # Classify by thresholds if provided
         if thresholds:
