@@ -248,7 +248,13 @@ def iv_rank(species_name: str, *, league: str = 'great', max_level: float = 51.0
                     'cp': cp(base_atk, base_def, base_sta, a, d, s, lv),
                 })
 
-    entries.sort(key=lambda e: e['stat_product'], reverse=True)
+    # Sort by stat product descending; break ties by total IV sum descending
+    # (when stats are identical due to floor/CPM rounding, the higher-IV
+    # spread is preferred — this matches PvPoke's tie-breaking behavior).
+    entries.sort(
+        key=lambda e: (e['stat_product'], e['atk_iv'] + e['def_iv'] + e['sta_iv']),
+        reverse=True,
+    )
     for i, e in enumerate(entries):
         e['rank'] = i + 1
     return entries

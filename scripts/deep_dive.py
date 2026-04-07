@@ -152,56 +152,77 @@ def discover_slayer_thresholds(results, opponent_idx, n_scenarios, opponent_name
     """
     Discover IV thresholds optimized to beat a specific opponent.
 
-    Ranks all IVs by their average score against ONE opponent (across all
-    shield scenarios), then finds the stat profile of the top 5%. This
-    surfaces "slayer" tiers — IVs that sacrifice average meta performance
-    to dominate a specific matchup.
+    Ranks each IV by the number of shield scenarios it WINS (score >= 500)
+    against the target opponent, breaking ties by average score. This
+    surfaces "slayer" tiers — IVs that flip the most matchups in their
+    favor against a specific opponent.
 
     Returns (thresholds_dict, slayer_results) where slayer_results is the
-    full list of results re-sorted by score against this opponent.
+    list of (wins, avg_score, result) tuples sorted by win count desc.
+    Threshold = minimum stat values among IVs that achieve the top win count.
+    Only stats meaningfully separate the winners from losers are reported.
     """
     if not results or len(results) < 50:
         return {}, []
 
-    # Re-score each IV by its average score against this opponent only
+    # Score each IV by win count + avg score vs the target opponent
     scored = []
     for r in results:
         po = r.get('per_opp', {})
-        opp_total = sum(po.get((si, opponent_idx), 0) for si in range(n_scenarios))
-        opp_avg = opp_total / n_scenarios if n_scenarios else 0
-        scored.append((opp_avg, r))
-    scored.sort(key=lambda x: -x[0])
+        scen_scores = [po.get((si, opponent_idx), 0) for si in range(n_scenarios)]
+        wins = sum(1 for s in scen_scores if s >= 500)
+        avg = sum(scen_scores) / n_scenarios if n_scenarios else 0
+        scored.append((wins, avg, r))
+    scored.sort(key=lambda x: (-x[0], -x[1]))
 
-    n = len(scored)
-    cut = max(5, n // 20)  # top 5%
-    top = [r for _, r in scored[:cut]]
+    if not scored:
+        return {}, []
 
-    # Population stats (medians)
+    max_wins = scored[0][0]
+    if max_wins == 0:
+        # Can't beat this opponent at all
+        return {}, scored
+
+    # All IVs that achieve the maximum win count
+    winners = [r for w, _, r in scored if w == max_wins]
+    losers = [r for w, _, r in scored if w < max_wins]
+
+    if not winners or not losers:
+        # Either everyone or no one wins — no meaningful threshold
+        return {}, scored
+
+    # For each stat, find the range that separates winners from losers
+    win_atk = sorted(r['atk'] for r in winners)
+    win_def = sorted(r['def_'] for r in winners)
+    win_hp = sorted(r['hp'] for r in winners)
+    lose_atk_max = max(r['atk'] for r in losers)
+    lose_def_max = max(r['def_'] for r in losers)
+    lose_hp_max = max(r['hp'] for r in losers)
+
+    # The most useful threshold is the MINIMUM stat among winners — that's the
+    # "you need at least this much" requirement. But we only want to report
+    # a stat if losers also exist with HIGHER values (meaning the stat alone
+    # doesn't determine the win — but it's still a necessary floor).
+    # A stat is "discriminating" if winners have a higher minimum than the
+    # population median.
     n_results = len(results)
-    pop_atk = sorted(r['atk'] for r in results)
-    pop_def = sorted(r['def_'] for r in results)
-    pop_hp = sorted(r['hp'] for r in results)
-    pop_atk_med = pop_atk[n_results // 2]
-    pop_def_med = pop_def[n_results // 2]
-    pop_hp_med = pop_hp[n_results // 2]
+    pop_atk_med = sorted(r['atk'] for r in results)[n_results // 2]
+    pop_def_med = sorted(r['def_'] for r in results)[n_results // 2]
+    pop_hp_med = sorted(r['hp'] for r in results)[n_results // 2]
 
-    # 25th percentile of top group
-    top_atk = sorted(r['atk'] for r in top)
-    top_def = sorted(r['def_'] for r in top)
-    top_hp = sorted(r['hp'] for r in top)
-    p25 = max(0, len(top) // 4)
-    top_atk_p25 = top_atk[p25]
-    top_def_p25 = top_def[p25]
-    top_hp_p25 = top_hp[p25]
+    win_atk_min = win_atk[0]
+    win_def_min = win_def[0]
+    win_hp_min = win_hp[0]
 
-    # Threshold = top group's p25 if above population median by >1%
     thresh = {'attack': 0, 'defense': 0, 'stamina': 0}
-    if top_atk_p25 > pop_atk_med * 1.01:
-        thresh['attack'] = round(top_atk_p25, 2)
-    if top_def_p25 > pop_def_med * 1.01:
-        thresh['defense'] = round(top_def_p25, 2)
-    if top_hp_p25 > pop_hp_med + 0.5:
-        thresh['stamina'] = int(top_hp_p25)
+    # Report stat thresholds where the winner minimum is meaningfully above
+    # the population median (so it's actually a constraint).
+    if win_atk_min > pop_atk_med * 1.005:
+        thresh['attack'] = round(win_atk_min, 2)
+    if win_def_min > pop_def_med * 1.005:
+        thresh['defense'] = round(win_def_min, 2)
+    if win_hp_min > pop_hp_med:
+        thresh['stamina'] = int(win_hp_min)
 
     return thresh, scored
 
@@ -2940,7 +2961,7 @@ def main():
                 slayer_thresh, slayer_scored = discover_slayer_thresholds(
                     results, mirror_idx, len(shield_scenarios), args.species
                 )
-                if slayer_thresh and any(v > 0 for v in slayer_thresh.values()):
+                if slayer_scored:
                     # Community nicknames for slayer builds. Default = full species name.
                     SLAYER_NICKNAMES = {
                         'Annihilape': 'Ape',
@@ -2949,25 +2970,35 @@ def main():
                     }
                     short = SLAYER_NICKNAMES.get(args.species, args.species)
                     slayer_name = f'{short} Slayer'
-                    print(f"    {slayer_name} thresholds: {_threshold_desc(slayer_thresh)}")
-                    # Cost analysis: top slayer IV vs top average IV
-                    top_slayer = slayer_scored[0][1]
-                    top_avg = results[0]
-                    avg_diff = top_slayer['avg_score'] - top_avg['avg_score']
-                    print(f"      Top slayer IV: {top_slayer['atk_iv']}/{top_slayer['def_iv']}/{top_slayer['sta_iv']} "
-                          f"(avg score {top_slayer['avg_score']:.1f}, "
-                          f"vs best {top_avg['avg_score']:.1f}, cost {avg_diff:+.1f})")
-                    # Add as a tier if thresholds were provided
-                    if thresholds is None:
-                        thresholds = {}
-                    if slayer_name not in thresholds:
-                        # Insert slayer tier (most restrictive — front of dict)
-                        new_thresholds = {slayer_name: slayer_thresh}
-                        new_thresholds.update(thresholds)
-                        thresholds = new_thresholds
-                else:
-                    print(f"    No clear {args.species} Slayer thresholds found "
-                          f"(mirror IVs don't form a distinct cluster)")
+
+                    max_wins = slayer_scored[0][0]
+                    n_winners = sum(1 for w, _, _ in slayer_scored if w == max_wins)
+                    n_total = len(slayer_scored)
+                    n_scen = len(shield_scenarios)
+
+                    if slayer_thresh and any(v > 0 for v in slayer_thresh.values()):
+                        print(f"    {slayer_name}: {n_winners}/{n_total} IVs win {max_wins}/{n_scen} mirror scenarios")
+                        print(f"      Required floor: {_threshold_desc(slayer_thresh)}")
+                        # Cost analysis: best slayer IV's avg score vs best avg score IV
+                        top_slayer = slayer_scored[0][2]
+                        top_avg_iv = results[0]
+                        avg_diff = top_slayer['avg_score'] - top_avg_iv['avg_score']
+                        print(f"      Best slayer IV: {top_slayer['atk_iv']}/{top_slayer['def_iv']}/{top_slayer['sta_iv']} "
+                              f"(avg score {top_slayer['avg_score']:.1f}, "
+                              f"vs avg-best {top_avg_iv['avg_score']:.1f}, cost {avg_diff:+.1f})")
+                        if thresholds is None:
+                            thresholds = {}
+                        if slayer_name not in thresholds:
+                            new_thresholds = {slayer_name: slayer_thresh}
+                            new_thresholds.update(thresholds)
+                            thresholds = new_thresholds
+                    elif max_wins == n_scen:
+                        print(f"    {slayer_name}: all IVs win the mirror — no slayer threshold needed")
+                    elif max_wins == 0:
+                        print(f"    {slayer_name}: no IV beats the mirror")
+                    else:
+                        print(f"    {slayer_name}: {n_winners}/{n_total} IVs win {max_wins}/{n_scen} mirror scenarios "
+                              f"but no clear stat floor distinguishes them")
 
         # Classify by thresholds if provided
         if thresholds:
