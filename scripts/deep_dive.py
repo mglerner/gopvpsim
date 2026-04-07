@@ -1249,37 +1249,31 @@ def _narrate_flip(focal_atk, focal_def, focal_hp, ref_atk, ref_def, ref_hp,
                 else:
                     unfavorable.append(entry)
 
-    # Pick the changes that explain the flip direction
-    if is_gain:
-        explaining = favorable
-    else:
-        explaining = unfavorable
-
+    # Show ALL damage changes, labeled by direction, plus HP diff.
+    # This lets the user see combinations (e.g. gained a bulkpoint but lost HP).
     parts = []
-    for move_id, src_name, dmg_new, dmg_old, stat, val_new, val_old, _ in explaining:
+
+    for move_id, src_name, dmg_new, dmg_old, stat, val_new, val_old, is_favorable in favorable:
         move_pretty = _pretty_name(move_id)
         if src_name:
-            # Bulkpoint: opponent's move
-            if dmg_new < dmg_old:
-                parts.append(f'bulkpoint: {move_pretty} from {src_name} does '
-                             f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
-            else:
-                parts.append(f'lost bulkpoint: {move_pretty} from {src_name} does '
-                             f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
+            parts.append(f'bulkpoint: {move_pretty} from {src_name} does '
+                         f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
         else:
-            # Breakpoint: focal's move
-            if dmg_new > dmg_old:
-                parts.append(f'breakpoint: {move_pretty} does '
-                             f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
-            else:
-                parts.append(f'lost breakpoint: {move_pretty} does '
-                             f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
+            parts.append(f'breakpoint: {move_pretty} does '
+                         f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
 
-    if not parts:
-        # No per-hit damage change explains the flip — likely HP-driven
-        hp_diff = focal_hp - ref_hp
-        if hp_diff != 0:
-            parts.append(f'HP {focal_hp} vs {ref_hp} ({hp_diff:+d})')
+    for move_id, src_name, dmg_new, dmg_old, stat, val_new, val_old, is_favorable in unfavorable:
+        move_pretty = _pretty_name(move_id)
+        if src_name:
+            parts.append(f'lost bulkpoint: {move_pretty} from {src_name} does '
+                         f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
+        else:
+            parts.append(f'lost breakpoint: {move_pretty} does '
+                         f'{dmg_new} instead of {dmg_old} ({stat} {val_new:.2f})')
+
+    hp_diff = focal_hp - ref_hp
+    if hp_diff != 0:
+        parts.append(f'HP {focal_hp} vs {ref_hp} ({hp_diff:+d})')
 
     return '; '.join(parts)
 
