@@ -32,11 +32,14 @@ def _move_hash(move_dict):
     return ','.join(parts)
 
 
-def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_stats):
+def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_stats,
+                      shield_scenarios=None):
     """
     Build a stable cache key string identifying a slayer-iteration scenario.
 
     Two runs with the same key are guaranteed to produce identical sims.
+    Cache key includes the shield scenario list — different scenario sets
+    produce different cached score-tuple shapes, so they must not collide.
     """
     h = hashlib.md5()
     h.update(f'v{CACHE_VERSION}'.encode())
@@ -47,6 +50,9 @@ def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_st
     for cm in charged_moves:
         h.update(_move_hash(cm).encode())
     h.update(json.dumps(base_stats, sort_keys=True).encode())
+    if shield_scenarios:
+        scen_str = ','.join(f'{s0}v{s1}' for s0, s1 in shield_scenarios)
+        h.update(scen_str.encode())
     return f'{species}_{league}_{h.hexdigest()[:12]}'
 
 

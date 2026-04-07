@@ -3396,6 +3396,7 @@ def main():
                 fast_moves_db.get(fast_id, {}),
                 [charged_moves_db.get(cid, {}) for cid in charged_ids],
                 base_stats_dict,
+                shield_scenarios=shield_scenarios,
             )
             slayer_cache = SlayerCache(cache_key=cache_key, disk=not args.no_cache)
 
