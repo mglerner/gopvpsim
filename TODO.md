@@ -65,6 +65,13 @@
   all scenarios. Well. Across all even shield scenarios. We should
   check against all scenarios when we fix that bug.
 
+* **Reinvestigate clustering methodology** — Current gap analysis (>3× median
+  gap in sorted scores) is a rough heuristic. Consider better approaches:
+  density-based methods, stat-space clustering instead of score-space, or
+  matchup-aware clustering (group IVs that win/lose the same matchups).
+  The Color By dropdown (HP/Def/Atk) already reveals banding structure
+  visually; the automated analysis should match what users see.
+
 ## UI / Display
 
 * **Additional scatter plot color modes** — The current color scheme has some dark
