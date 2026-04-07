@@ -55,7 +55,7 @@ from gopvpsim.pokemon import (
     Pokemon, get_pokemon_entry, get_species, iv_rank, CPM, best_level,
     LEAGUE_CAPS, cp as calc_cp, pvpoke_default_ivs,
 )
-from gopvpsim.moves import get_moves
+from gopvpsim.moves import get_moves, type_effectiveness, stab
 from gopvpsim.data import (
     load_gamemaster, load_rankings, get_default_moveset, parse_types,
     load_group as fetch_group,
@@ -1184,6 +1184,78 @@ def _tier_badge_html(data, iv):
     return f' <span class="dd-badge" style="background:{t["color"]};color:#000">{t["name"]}</span>'
 
 
+def _pvp_damage(power, atk, def_, effectiveness, stab_mult):
+    """PvP damage formula: floor(0.5 * 1.3 * power * atk/def * eff * stab) + 1"""
+    return math.floor(0.5 * 1.3 * power * atk / def_ * effectiveness * stab_mult) + 1
+
+
+def _narrate_flip(focal_atk, focal_def, ref_atk, ref_def,
+                  opp_atk, opp_def, opp_name,
+                  focal_moves, opp_moves,
+                  focal_types, opp_types):
+    """
+    Identify which move's per-hit damage changed between ref and focal IV stats,
+    and return a narrative string. Checks both directions (opp attacking focal,
+    focal attacking opp).
+
+    focal_moves / opp_moves: list of (move_id, power, move_type) tuples
+    focal_types / opp_types: list of type strings
+
+    Returns narrative string or '' if no breakpoint found.
+    """
+    changes = []
+
+    # Opponent's moves hitting focal at focal_def vs ref_def
+    if focal_def != ref_def:
+        for move_id, power, mtype in opp_moves:
+            eff = type_effectiveness(mtype, focal_types)
+            stab_mult = 1.2 if mtype in opp_types else 1.0
+            dmg_ref = _pvp_damage(power, opp_atk, ref_def, eff, stab_mult)
+            dmg_focal = _pvp_damage(power, opp_atk, focal_def, eff, stab_mult)
+            if dmg_ref != dmg_focal:
+                direction = 'less' if dmg_focal < dmg_ref else 'more'
+                changes.append(
+                    f'{_pretty_name(move_id)} from {opp_name} does '
+                    f'{dmg_focal} instead of {dmg_ref} damage '
+                    f'(Def {focal_def:.2f} vs {ref_def:.2f})'
+                )
+
+    # Focal's moves hitting opp at focal_atk vs ref_atk
+    if focal_atk != ref_atk:
+        for move_id, power, mtype in focal_moves:
+            eff = type_effectiveness(mtype, opp_types)
+            stab_mult = 1.2 if mtype in focal_types else 1.0
+            dmg_ref = _pvp_damage(power, ref_atk, opp_def, eff, stab_mult)
+            dmg_focal = _pvp_damage(power, focal_atk, opp_def, eff, stab_mult)
+            if dmg_ref != dmg_focal:
+                changes.append(
+                    f'{_pretty_name(move_id)} does '
+                    f'{dmg_focal} instead of {dmg_ref} damage '
+                    f'(Atk {focal_atk:.2f} vs {ref_atk:.2f})'
+                )
+
+    return '; '.join(changes)
+
+
+def _build_move_tuples(moveset_label, fast_db, charged_db):
+    """Parse moveset label into list of (move_id, power, type) tuples."""
+    # Label format: "FAIRY_WIND / BULLDOZE, GIGATON_HAMMER"
+    parts = moveset_label.split(' / ')
+    if len(parts) != 2:
+        return []
+    fast_id = parts[0].strip()
+    charged_ids = [c.strip() for c in parts[1].split(',')]
+    moves = []
+    if fast_id in fast_db:
+        m = fast_db[fast_id]
+        moves.append((fast_id, m['power'], m['type']))
+    for cid in charged_ids:
+        if cid in charged_db:
+            m = charged_db[cid]
+            moves.append((cid, m['power'], m['type']))
+    return moves
+
+
 def _pretty_name(raw_id):
     """Convert GIGATON_HAMMER to Gigaton Hammer, FAIRY_WIND to Fairy Wind, etc."""
     return raw_id.replace('_', ' ').title()
@@ -1324,6 +1396,51 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 
     print("  Generating analysis sections...")
 
+    # Set up breakpoint narration: load move data, species types, opponent info
+    fast_db, charged_db = get_moves()
+    gm = load_gamemaster()
+    focal_entry = next((m for m in gm['pokemon']
+                        if m['speciesName'] == data_obj.get('species', '')), None)
+    focal_types = parse_types(focal_entry) if focal_entry else []
+    focal_moves = _build_move_tuples(moveset_label, fast_db, charged_db)
+
+    # Cache opponent info for narration: {name: (atk, def, types, moves)}
+    opp_info_cache = {}
+    league = data_obj.get('league', 'great')
+    for opp_name in opponents:
+        try:
+            opp_clean = opp_name
+            opp_is_shadow = '_shadow' in opp_name.lower().replace(' ', '_')
+            oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode)
+            opp_pokemon = Pokemon.at_best_level(opp_clean, oa, od, os_,
+                                                league=league, shadow=opp_is_shadow)
+            opp_entry = next((m for m in gm['pokemon']
+                              if m['speciesName'] == opp_clean), None)
+            opp_types = parse_types(opp_entry) if opp_entry else []
+            # Get opponent's default moveset moves
+            try:
+                opp_fast, opp_charged = get_default_moveset(opp_clean, league=league,
+                                                            shadow=opp_is_shadow)
+                opp_moves_list = []
+                if opp_fast in fast_db:
+                    fm = fast_db[opp_fast]
+                    opp_moves_list.append((opp_fast, fm['power'], fm['type']))
+                for cid in opp_charged:
+                    if cid in charged_db:
+                        cm = charged_db[cid]
+                        opp_moves_list.append((cid, cm['power'], cm['type']))
+            except (KeyError, ValueError):
+                opp_moves_list = []
+            opp_info_cache[opp_name] = {
+                'atk': opp_pokemon.atk, 'def_': opp_pokemon.def_,
+                'types': opp_types, 'moves': opp_moves_list,
+            }
+        except Exception:
+            pass  # skip opponents we can't resolve
+
+    ref_atk = data_obj['ivAtk'][ref_iv]
+    ref_def = data_obj['ivDef'][ref_iv]
+
     scene_ranks, avg_ranks, avg_scores, ranked = _scenario_ranks(scores_flat, nIvs, nS, nO)
 
     # ---- CSS ----
@@ -1429,6 +1546,25 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         results_parts.append(f'<p>Avg score rank: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f})</p>\n')
         results_parts.append(f'<p>Flips vs {opp_label} ref: <span class="dd-gain">+{rc["gains"]}</span>/<span class="dd-loss">-{rc["losses"]}</span> = <span class="{nc}"><b>{rc["net"]:+d}</b></span></p>\n')
         results_parts.append(f'<p class="dd-prose">{prose}</p>\n')
+        # Breakpoint narrations for top gains/losses
+        focal_atk_rc = data_obj['ivAtk'][iv]
+        focal_def_rc = data_obj['ivDef'][iv]
+        bp_lines = []
+        for entries in [fd.get('gains', [])[:2], fd.get('losses', [])[:1]]:
+            for e in entries:
+                opp_name = e['opponent']
+                if opp_name in opp_info_cache and focal_moves:
+                    oi = opp_info_cache[opp_name]
+                    narr = _narrate_flip(
+                        focal_atk_rc, focal_def_rc, ref_atk, ref_def,
+                        oi['atk'], oi['def_'], opp_name,
+                        focal_moves, oi['moves'],
+                        focal_types, oi['types'],
+                    )
+                    if narr:
+                        bp_lines.append(narr)
+        if bp_lines:
+            results_parts.append(f'<p class="dd-small">Key breakpoints: {"; ".join(bp_lines)}</p>\n')
         results_parts.append('</div>\n')
     results_parts.append('</div>\n')
 
@@ -1679,20 +1815,33 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         analysis_parts.append(f'<tr><td>{_iv_label(data_obj, iv)}</td><td>{data_obj["ivAtk"][iv]:.2f}</td><td>{data_obj["ivDef"][iv]:.2f}</td><td>{data_obj["ivHp"][iv]}</td><td>{avg_scores[iv]:.1f}</td><td class="dd-gain">{g}</td><td class="dd-loss">{l}</td><td class="{nc}"><b>{net:+d}</b></td><td>{_tier_badge_html(data_obj, iv)}</td></tr>\n')
     analysis_parts.append('</table>\n')
 
-    # Detail flips for notable IVs
+    # Detail flips for notable IVs — with breakpoint narration
     notable = [x for x in flip_summary if abs(x[3]) >= 3 or x[0] in set(ranked[:5])]
     for iv, g, l, net in notable[:8]:
         fd = flips[iv]
         prose = _prose_flip_summary(fd)
         analysis_parts.append(f'<details class="dd-flip-detail"><summary>{_iv_label(data_obj, iv)} &mdash; <span class="dd-gain">+{g}</span>/<span class="dd-loss">-{l}</span> (net {net:+d}){_tier_badge_html(data_obj, iv)}</summary>\n')
         analysis_parts.append(f'<p class="dd-prose">{prose}</p>\n')
+        focal_atk_iv = data_obj['ivAtk'][iv]
+        focal_def_iv = data_obj['ivDef'][iv]
         for label, entries, cls in [('Gains', fd['gains'], 'dd-gain'), ('Losses', fd['losses'], 'dd-loss')]:
             if entries:
                 entries_sorted = sorted(entries, key=lambda e: abs(e['iv_score'] - e['ref_score']), reverse=True)
-                analysis_parts.append(f'<table class="dd-table dd-narrow"><tr><th>Scen.</th><th>Opponent</th><th>Ref</th><th>IV</th><th>&Delta;</th></tr>\n')
+                analysis_parts.append(f'<table class="dd-table dd-narrow"><tr><th>Scen.</th><th>Opponent</th><th>Ref</th><th>IV</th><th>&Delta;</th><th>Breakpoint</th></tr>\n')
                 for e in entries_sorted:
                     d = e['iv_score'] - e['ref_score']
-                    analysis_parts.append(f'<tr><td>{e["scenario"]}</td><td>{e["opponent"]}</td><td>{e["ref_score"]}</td><td class="{cls}">{e["iv_score"]}</td><td class="{cls}">{d:+d}</td></tr>\n')
+                    # Breakpoint narration
+                    narr = ''
+                    opp_name = e['opponent']
+                    if opp_name in opp_info_cache and focal_moves:
+                        oi = opp_info_cache[opp_name]
+                        narr = _narrate_flip(
+                            focal_atk_iv, focal_def_iv, ref_atk, ref_def,
+                            oi['atk'], oi['def_'], opp_name,
+                            focal_moves, oi['moves'],
+                            focal_types, oi['types'],
+                        )
+                    analysis_parts.append(f'<tr><td>{e["scenario"]}</td><td>{e["opponent"]}</td><td>{e["ref_score"]}</td><td class="{cls}">{e["iv_score"]}</td><td class="{cls}">{d:+d}</td><td class="dd-small">{narr}</td></tr>\n')
                 analysis_parts.append('</table>\n')
         analysis_parts.append('</details>\n')
     analysis_parts.append('</div>\n')
