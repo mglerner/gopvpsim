@@ -167,6 +167,16 @@ experimentation actually pleasant.
 * **HTML file size** -- Are our deep dive/interactive HTML files
   getting too big?
 
+* **Better slayer iteration progress reporting** — The current progress
+  prints fire only when a `pool.imap_unordered` chunk completes. With
+  10 chunks each taking ~85 minutes, the first progress line doesn't
+  appear for 85 minutes. We need to either (a) chunk much more finely
+  (e.g. 100-1000 chunks of 4-50 minutes each so prints fire every few
+  minutes), or (b) have workers report progress via a shared counter
+  (e.g. multiprocessing.Value) that the parent polls. Option (a) is
+  simpler — just lower the chunk_size in iterative_slayer_discovery.
+  Watch for diminishing returns due to pickle overhead per chunk.
+
 * **Incremental slayer cache flush** — The slayer iteration cache
   (`SlayerCache` in `scripts/slayer_cache.py`) currently does one read
   at startup and one save at the end. If a long run crashes mid-iteration
