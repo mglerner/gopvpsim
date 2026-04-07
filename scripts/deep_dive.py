@@ -252,69 +252,46 @@ def _slayer_worker_init(species, focal_types, base_atk, base_def, base_sta,
 
 def _slayer_iter_worker(args):
     """
-    Process one atk_iv chunk against a list of opponent IVs.
-    Returns dict of (a, d, s, opp_iv_idx) -> tuple of scores.
+    Process a chunk of focal stat profiles against a list of opponent IVs.
+    Returns dict of (profile_key, opp_iv_idx) -> tuple of scores.
+    profile_key is a (atk, def_, hp) tuple. The parent expands these to
+    all matching focal_idx values.
     """
-    from gopvpsim.pokemon import SHADOW_ATK_BONUS, SHADOW_DEF_MULT
-
-    a, opponents, focal_iv_to_idx = args
+    focal_profile_chunk, opponents = args
+    # focal_profile_chunk: list of (profile_key, atk, def_, hp)
+    # opponents: list of (opp_iv_idx, (opp_atk, opp_def, opp_hp))
     ws = _slayer_state
     species = ws['species']
     focal_types = ws['focal_types']
-    base_atk, base_def, base_sta = ws['base_atk'], ws['base_def'], ws['base_sta']
-    max_cp = ws['max_cp']
-    shadow = ws['shadow']
     fm_template = ws['fm_template']
     cms_template = ws['cms_template']
     shield_scenarios = ws['shield_scenarios']
 
     results = {}
-    for d in range(16):
-        for s in range(16):
-            lv = best_level(base_atk, base_def, base_sta, a, d, s,
-                            max_cp=max_cp, max_level=51.0)
-            if lv is None:
-                continue
-            cpm = CPM[lv]
-            atk_stat = (base_atk + a) * cpm
-            def_stat = (base_def + d) * cpm
-            if shadow:
-                atk_stat *= SHADOW_ATK_BONUS
-                def_stat *= SHADOW_DEF_MULT
-            hp_stat = math.floor((base_sta + s) * cpm)
-
-            # focal_iv_idx: lookup using (a, d, s) → idx in canonical IV list
-            focal_idx = focal_iv_to_idx.get((a, d, s))
-            if focal_idx is None:
-                continue
-
-            # Sim against each opponent
-            for opp_iv_idx, opp_data in opponents:
-                # opp_data: (atk, def_, hp) computed by parent
-                opp_atk = opp_data[0]
-                opp_def = opp_data[1]
-                opp_hp = opp_data[2]
-                scores = []
-                for s_focal, s_opp in shield_scenarios:
-                    bp0 = BattlePokemon(
-                        species=species, types=focal_types,
-                        atk=atk_stat, def_=def_stat, max_hp=hp_stat,
-                        fast_move=dict(fm_template),
-                        charged_moves=[dict(cm) for cm in cms_template],
-                        shields=s_focal,
-                    )
-                    bp1 = BattlePokemon(
-                        species=species, types=focal_types,
-                        atk=opp_atk, def_=opp_def, max_hp=opp_hp,
-                        fast_move=dict(fm_template),
-                        charged_moves=[dict(cm) for cm in cms_template],
-                        shields=s_opp,
-                    )
-                    res = simulate(bp0, bp1,
-                                   charged_policy_0=pvpoke_dp,
-                                   charged_policy_1=pvpoke_dp)
-                    scores.append(round(res.pvpoke_score(0)))
-                results[(focal_idx, opp_iv_idx)] = tuple(scores)
+    for profile_key, atk_stat, def_stat, hp_stat in focal_profile_chunk:
+        for opp_iv_idx, opp_data in opponents:
+            opp_atk, opp_def, opp_hp = opp_data
+            scores = []
+            for s_focal, s_opp in shield_scenarios:
+                bp0 = BattlePokemon(
+                    species=species, types=focal_types,
+                    atk=atk_stat, def_=def_stat, max_hp=hp_stat,
+                    fast_move=dict(fm_template),
+                    charged_moves=[dict(cm) for cm in cms_template],
+                    shields=s_focal,
+                )
+                bp1 = BattlePokemon(
+                    species=species, types=focal_types,
+                    atk=opp_atk, def_=opp_def, max_hp=opp_hp,
+                    fast_move=dict(fm_template),
+                    charged_moves=[dict(cm) for cm in cms_template],
+                    shields=s_opp,
+                )
+                res = simulate(bp0, bp1,
+                               charged_policy_0=pvpoke_dp,
+                               charged_policy_1=pvpoke_dp)
+                scores.append(round(res.pvpoke_score(0)))
+            results[(profile_key, opp_iv_idx)] = tuple(scores)
     return results
 
 
@@ -392,6 +369,23 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     if cache is None:
         cache = SlayerCache(disk=False)
 
+    # Pre-compute focal profile groups: profile_key -> list of focal_idx values
+    # IVs with identical (atk, def, hp) produce identical battles, so we only
+    # need to sim one representative per profile and copy the result to the rest.
+    def _profile_key(focal_idx):
+        a_, d_, s_, at, df, hp = iv_meta[focal_idx]
+        return (round(at, 4), round(df, 4), int(hp))
+
+    focal_profile_to_ivs = {}  # profile_key -> [focal_idx, ...]
+    focal_profile_data = {}    # profile_key -> (atk, def, hp) for sim
+    for focal_idx in range(n_focal):
+        a_, d_, s_, at, df, hp = iv_meta[focal_idx]
+        pk = (round(at, 4), round(df, 4), int(hp))
+        focal_profile_to_ivs.setdefault(pk, []).append(focal_idx)
+        if pk not in focal_profile_data:
+            focal_profile_data[pk] = (at, df, hp)
+    n_unique_profiles = len(focal_profile_data)
+
     # Round 0: initial opponent IV
     initial_iv = initial_opp_iv  # (a, d, s)
     if initial_iv not in iv_to_idx:
@@ -411,19 +405,34 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
             a, d, s, atk_, def_, hp_ = iv_meta[opp_idx]
             opp_data_list.append((opp_idx, (atk_, def_, hp_)))
 
-        # Determine which (focal, opp) pairs need sim (cache miss)
-        # For simplicity, we sim all pairs for opponents not yet fully cached.
-        # The worker computes for an entire (atk_chunk × all opponents) in one shot,
-        # so we can't cache-skip individual entries within a chunk easily.
-        # Instead: identify opponents fully cached vs needing sim.
+        # Determine which (focal, opp) pairs need sim (cache miss).
+        # We dedup BOTH sides:
+        # - Focals are deduped via focal_profile_to_ivs (same stats = same battle)
+        # - Opponents are already deduped because the caller does dedup before
+        #   passing current_opponent_indices.
+        # For each opp, check if any of its focal-profile representatives are missing.
         opps_needing_sim = []
         for opp_idx, opp_data in opp_data_list:
-            # Check if this opp is fully cached for all focal IVs
-            if not all((focal_idx, opp_idx) in cache.data for focal_idx in range(n_focal)):
+            # Check if any representative is missing for this opponent
+            any_missing = False
+            for pk, ivs in focal_profile_to_ivs.items():
+                rep = ivs[0]
+                if (rep, opp_idx) not in cache.data:
+                    any_missing = True
+                    break
+            if any_missing:
                 opps_needing_sim.append((opp_idx, opp_data))
 
         if opps_needing_sim:
-            # Run sims for cache-missing opponents in parallel across atk chunks
+            # Build the focal profile chunks. We sim each unique (atk, def, hp)
+            # exactly once per opponent. After workers return, we expand the
+            # results to all focal IVs that share that profile.
+            profile_list = [(pk, dat[0], dat[1], dat[2])
+                            for pk, dat in focal_profile_data.items()]
+            # Split into n_workers chunks
+            chunk_size = max(1, (len(profile_list) + n_workers - 1) // n_workers)
+            chunks = [profile_list[i:i+chunk_size] for i in range(0, len(profile_list), chunk_size)]
+
             init_args = (species, focal_types, base_atk, base_def, base_sta,
                          max_cp, shadow, fm_template, cms_template, shield_scenarios)
             with multiprocessing.Pool(
@@ -431,13 +440,14 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                 initializer=_slayer_worker_init,
                 initargs=init_args,
             ) as pool:
-                worker_args = [(a, opps_needing_sim, iv_to_idx) for a in range(16)]
+                worker_args = [(chunk, opps_needing_sim) for chunk in chunks]
                 chunk_results = pool.map(_slayer_iter_worker, worker_args)
 
-            # Merge into cache
+            # Merge into cache, expanding profile results to all matching focal IVs
             for chunk in chunk_results:
-                for (focal_idx, opp_idx), scores in chunk.items():
-                    cache.put(focal_idx, opp_idx, scores)
+                for (profile_key, opp_idx), scores in chunk.items():
+                    for focal_idx in focal_profile_to_ivs[profile_key]:
+                        cache.put(focal_idx, opp_idx, scores)
 
         # Identify even-scenario indices for the metric
         even_indices = [i for i, (s0, s1) in enumerate(shield_scenarios) if s0 == s1]
@@ -508,8 +518,17 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                 converged = True
                 break
 
-        # Set up next round's opponents = current top
-        current_opponent_indices = [r['focal_idx'] for r in top]
+        # Set up next round's opponents from the survivor pool.
+        # Dedup by effective stats: IVs with identical (atk, def, hp) produce
+        # literally identical battles, so we only need ONE per unique profile
+        # as an opponent. The full survivor list is preserved in history[]
+        # so users still see all the equivalent IVs in the final categories.
+        seen_profiles = {}
+        for r in top:
+            profile = (round(r['atk'], 4), round(r['def_'], 4), int(r['hp']))
+            if profile not in seen_profiles:
+                seen_profiles[profile] = r['focal_idx']
+        current_opponent_indices = list(seen_profiles.values())
 
     return {
         'history': history,
@@ -2174,23 +2193,61 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 
         # Categorized survivors
         categories = slayer_iter_result.get('categories', {})
+        CATEGORY_DESCRIPTIONS = {
+            'Atk Slayer': 'Above-median attack within the survivor pool. '
+                          'Optimized to chase fast-move and charged-move breakpoints '
+                          '(do one extra damage per hit). Sacrifices bulk for atk.',
+            'Bulk Slayer': 'Above-median HP and defense within the survivor pool. '
+                           'Optimized to outlast opponents through accumulation '
+                           '(survive one extra fast move tick or charged move). '
+                           'Sacrifices attack for bulk.',
+            'CMP Slayer': 'Top-quartile attack within the survivor pool. '
+                          'Optimized to win Charge Move Priority — when both '
+                          'players fire a charged move on the same turn, the '
+                          'higher-attack Pokemon resolves first.',
+        }
         if categories:
+            # Build a map of IV -> set of categories it appears in (for cross-badges)
+            iv_categories = {}
+            for cat_name, cat_ivs in categories.items():
+                for r in cat_ivs:
+                    iv_categories.setdefault(r['iv'], set()).add(cat_name)
+
+            results_parts.append('<p class="dd-small">RyanSwag identified three '
+                                 'mirror slayer patterns. Each category shows survivors '
+                                 'that fit that pattern. IVs that fit <em>multiple</em> '
+                                 'patterns are marked with extra badges &mdash; these '
+                                 'are particularly versatile slayers.</p>\n')
             results_parts.append('<div class="dd-rec-grid">\n')
+            CAT_ABBREV = {'Atk Slayer': 'A', 'Bulk Slayer': 'B', 'CMP Slayer': 'C'}
+            CAT_COLORS = {'Atk Slayer': '#f85149', 'Bulk Slayer': '#3fb950', 'CMP Slayer': '#d29922'}
             for cat_name, cat_ivs in categories.items():
                 if not cat_ivs:
                     continue
+                desc = CATEGORY_DESCRIPTIONS.get(cat_name, '')
                 results_parts.append(f'<div class="dd-rec-card">\n')
                 results_parts.append(f'<h4>{cat_name}</h4>\n')
+                if desc:
+                    results_parts.append(f'<p class="dd-small dd-prose">{desc}</p>\n')
                 results_parts.append('<table class="dd-table dd-narrow">\n')
-                results_parts.append('<tr><th>IVs</th><th>Atk</th><th>Def</th><th>HP</th><th>Wins</th><th>Avg</th></tr>\n')
+                results_parts.append('<tr><th>IVs</th><th>Atk</th><th>Def</th><th>HP</th><th>Wins</th><th>Avg</th><th>Also</th></tr>\n')
                 for r in cat_ivs:
                     a, d, s = r['iv']
+                    # Cross-category badges (excluding the current category)
+                    others = sorted(iv_categories.get(r['iv'], set()) - {cat_name})
+                    badges = ''
+                    for o in others:
+                        ab = CAT_ABBREV.get(o, '?')
+                        col = CAT_COLORS.get(o, '#888')
+                        badges += (f'<span class="dd-badge" style="background:{col};color:#000" '
+                                   f'title="{o}">{ab}</span> ')
                     results_parts.append(f'<tr><td>{a}/{d}/{s}</td>'
                                          f'<td>{r["atk"]:.2f}</td>'
                                          f'<td>{r["def_"]:.2f}</td>'
                                          f'<td>{r["hp"]}</td>'
                                          f'<td class="dd-gain">{r["total_wins"]}</td>'
-                                         f'<td>{r["avg_score"]:.1f}</td></tr>\n')
+                                         f'<td>{r["avg_score"]:.1f}</td>'
+                                         f'<td>{badges}</td></tr>\n')
                 results_parts.append('</table>\n')
                 results_parts.append('</div>\n')
             results_parts.append('</div>\n')
@@ -3477,13 +3534,22 @@ def main():
                         continue
                     max_w = top[0]['total_wins']
                     n_at_max = sum(1 for r in top if r['total_wins'] == max_w)
+                    # How many unique stat profiles (deduped opponents for next round)
+                    n_unique = len({(round(r['atk'], 4), round(r['def_'], 4), int(r['hp'])) for r in top})
                     print(f"    Round {ri}: {len(top)} IVs in pool "
-                          f"({n_at_max} at max wins {max_w}, "
+                          f"({n_unique} unique stat profiles, "
+                          f"{n_at_max} at max wins {max_w}, "
                           f"top avg score: {top[0]['avg_score']:.1f})")
 
                 # Categorize survivors
                 survivors = slayer_iter_result['final']
                 categories = categorize_slayers(survivors, top_n=args.mirror_slayer_show)
+                # Build cross-category map
+                iv_categories = {}
+                for cn, civs in categories.items():
+                    for r in civs:
+                        iv_categories.setdefault(r['iv'], set()).add(cn)
+                CAT_AB = {'Atk Slayer': 'A', 'Bulk Slayer': 'B', 'CMP Slayer': 'C'}
                 print(f"    Final survivors classified into {sum(1 for v in categories.values() if v)} categories:")
                 for cat_name, cat_ivs in categories.items():
                     if not cat_ivs:
@@ -3491,8 +3557,10 @@ def main():
                     print(f"      {cat_name} (top {len(cat_ivs)}):")
                     for r in cat_ivs:
                         a, d, s = r['iv']
+                        others = sorted(iv_categories.get(r['iv'], set()) - {cat_name})
+                        also = ' [+' + ''.join(CAT_AB.get(o, '?') for o in others) + ']' if others else ''
                         print(f"        {a:2d}/{d:2d}/{s:2d}  atk={r['atk']:.2f} def={r['def_']:.2f} hp={r['hp']}  "
-                              f"wins {r['total_wins']}/{r['n_pairs']*len(shield_scenarios)} avg {r['avg_score']:.1f}")
+                              f"wins {r['total_wins']}/{r['n_pairs']*len(shield_scenarios)} avg {r['avg_score']:.1f}{also}")
                 # Stash for HTML rendering
                 slayer_iter_result['categories'] = categories
                 main_slayer_iter_result = slayer_iter_result
