@@ -94,12 +94,11 @@
 
 ## Performance
 
-* **Speed up deep dive simulations** — A full deep dive (4096 IVs × 39 opponents
-  × 9 scenarios × 3 movesets) takes ~90 min single-threaded at ~1300 sims/s.
-  With `--opp-ivs both` that doubles. Options: multiprocessing (parallelize across
-  IVs or opponents), caching (opponent BattlePokemon setup is repeated), or
-  optimizing the hot path in `simulate()`. Must stay pure Python (BeeWare/iOS
-  compatibility) but `multiprocessing` is fine.
+* **Further sim optimization** — Multiprocessing across atk_iv chunks gives
+  ~6-7x speedup (1300 → ~10000 sims/s on a 10-core Mac). Further wins:
+  caching opponent BattlePokemon templates (avoid dict copies per sim),
+  optimizing the hot path in `simulate()`, or process pool reuse across
+  multiple iv_sweep calls. Must stay pure Python (BeeWare/iOS compatibility).
 
 * **HTML file size** -- Are our deep dive/interactive HTML files
   getting too big?

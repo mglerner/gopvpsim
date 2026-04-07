@@ -446,15 +446,112 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
 
 
 # ---------------------------------------------------------------------------
-# Phase 2: Full IV sweep
+# Phase 2: Full IV sweep (parallelized)
 # ---------------------------------------------------------------------------
+
+# Worker state for multiprocessing (set via initializer, avoids pickling per call)
+_worker_state = {}
+
+
+def _sweep_worker_init(species, focal_types, base_atk, base_def, base_sta,
+                       max_cp, shadow, fm_template, cms_template,
+                       opp_cache, shield_scenarios):
+    """Initialize shared state in each worker process."""
+    _worker_state['species'] = species
+    _worker_state['focal_types'] = focal_types
+    _worker_state['base_atk'] = base_atk
+    _worker_state['base_def'] = base_def
+    _worker_state['base_sta'] = base_sta
+    _worker_state['max_cp'] = max_cp
+    _worker_state['shadow'] = shadow
+    _worker_state['fm_template'] = fm_template
+    _worker_state['cms_template'] = cms_template
+    _worker_state['opp_cache'] = opp_cache
+    _worker_state['shield_scenarios'] = shield_scenarios
+
+
+def _sweep_worker(a):
+    """Process all IVs with atk_iv=a. Returns (results_list, n_sims)."""
+    from gopvpsim.pokemon import SHADOW_ATK_BONUS, SHADOW_DEF_MULT
+
+    ws = _worker_state
+    species = ws['species']
+    focal_types = ws['focal_types']
+    base_atk, base_def, base_sta = ws['base_atk'], ws['base_def'], ws['base_sta']
+    max_cp = ws['max_cp']
+    shadow = ws['shadow']
+    fm_template = ws['fm_template']
+    cms_template = ws['cms_template']
+    opp_cache = ws['opp_cache']
+    shield_scenarios = ws['shield_scenarios']
+
+    results = []
+    n_sims = 0
+    for d in range(16):
+        for s in range(16):
+            lv = best_level(base_atk, base_def, base_sta, a, d, s,
+                            max_cp=max_cp, max_level=51.0)
+            if lv is None:
+                continue
+            cpm = CPM[lv]
+            atk_stat = (base_atk + a) * cpm
+            def_stat = (base_def + d) * cpm
+            if shadow:
+                atk_stat *= SHADOW_ATK_BONUS
+                def_stat *= SHADOW_DEF_MULT
+            hp_stat = math.floor((base_sta + s) * cpm)
+            mon_cp = calc_cp(base_atk, base_def, base_sta, a, d, s, lv)
+
+            total_score = 0.0
+            count = 0
+            per_opp = {}
+            for oi, opp in enumerate(opp_cache):
+                for si, (s_focal, s_opp) in enumerate(shield_scenarios):
+                    bp0 = BattlePokemon(
+                        species=species, types=focal_types,
+                        atk=atk_stat, def_=def_stat, max_hp=hp_stat,
+                        fast_move=dict(fm_template),
+                        charged_moves=[dict(cm) for cm in cms_template],
+                        shields=s_focal,
+                    )
+                    bp1 = BattlePokemon(
+                        species=opp['species'], types=opp['types'],
+                        atk=opp['atk'], def_=opp['def_'], max_hp=opp['hp'],
+                        fast_move=dict(opp['fm']),
+                        charged_moves=[dict(cm) for cm in opp['cms']],
+                        shields=s_opp,
+                    )
+                    result = simulate(bp0, bp1,
+                                      charged_policy_0=pvpoke_dp,
+                                      charged_policy_1=pvpoke_dp)
+                    score = result.pvpoke_score(0)
+                    per_opp[(si, oi)] = score
+                    total_score += score
+                    count += 1
+                    n_sims += 1
+
+            avg_score = total_score / count if count else 0
+            sp = atk_stat * def_stat * hp_stat
+            results.append({
+                'atk_iv': a, 'def_iv': d, 'sta_iv': s,
+                'level': lv, 'cp': mon_cp,
+                'atk': atk_stat, 'def_': def_stat, 'hp': hp_stat,
+                'stat_product': sp,
+                'avg_score': avg_score,
+                'per_opp': per_opp,
+            })
+    return results, n_sims
+
 
 def iv_sweep(species, fast_id, charged_ids, league, shadow,
              opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke'):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
+    Parallelized across atk_iv values (16 chunks) using multiprocessing.
     Returns list of dicts with IV info + composite score, sorted by score desc.
     """
+    import multiprocessing
+
     base = get_species(species)
     base_atk, base_def, base_sta = base['atk'], base['def'], base['hp']
     max_cp = LEAGUE_CAPS[league]
@@ -485,65 +582,23 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
             'shadow': opp_is_shadow,
         })
 
-    from gopvpsim.pokemon import SHADOW_ATK_BONUS, SHADOW_DEF_MULT
+    # Parallel sweep: one worker per atk_iv value (16 chunks)
+    n_workers = min(multiprocessing.cpu_count(), 16)
+    with multiprocessing.Pool(
+        processes=n_workers,
+        initializer=_sweep_worker_init,
+        initargs=(species, focal_types, base_atk, base_def, base_sta,
+                  max_cp, shadow, fm_template, cms_template,
+                  opp_cache, shield_scenarios),
+    ) as pool:
+        chunk_results = pool.map(_sweep_worker, range(16))
 
+    # Merge results in canonical order (a=0..15)
     results = []
     n_sims = 0
-    for a in range(16):
-        for d in range(16):
-            for s in range(16):
-                lv = best_level(base_atk, base_def, base_sta, a, d, s,
-                                max_cp=max_cp, max_level=51.0)
-                if lv is None:
-                    continue
-                cpm = CPM[lv]
-                atk_stat = (base_atk + a) * cpm
-                def_stat = (base_def + d) * cpm
-                if shadow:
-                    atk_stat *= SHADOW_ATK_BONUS
-                    def_stat *= SHADOW_DEF_MULT
-                hp_stat = math.floor((base_sta + s) * cpm)
-                mon_cp = calc_cp(base_atk, base_def, base_sta, a, d, s, lv)
-
-                total_score = 0.0
-                count = 0
-                # Per-opponent scores keyed by (scenario_idx, opp_idx)
-                per_opp = {}
-                for oi, opp in enumerate(opp_cache):
-                    for si, (s_focal, s_opp) in enumerate(shield_scenarios):
-                        bp0 = BattlePokemon(
-                            species=species, types=focal_types,
-                            atk=atk_stat, def_=def_stat, max_hp=hp_stat,
-                            fast_move=dict(fm_template),
-                            charged_moves=[dict(cm) for cm in cms_template],
-                            shields=s_focal,
-                        )
-                        bp1 = BattlePokemon(
-                            species=opp['species'], types=opp['types'],
-                            atk=opp['atk'], def_=opp['def_'], max_hp=opp['hp'],
-                            fast_move=dict(opp['fm']),
-                            charged_moves=[dict(cm) for cm in opp['cms']],
-                            shields=s_opp,
-                        )
-                        result = simulate(bp0, bp1,
-                                          charged_policy_0=pvpoke_dp,
-                                          charged_policy_1=pvpoke_dp)
-                        score = result.pvpoke_score(0)
-                        per_opp[(si, oi)] = score
-                        total_score += score
-                        count += 1
-                        n_sims += 1
-
-                avg_score = total_score / count if count else 0
-                sp = atk_stat * def_stat * hp_stat
-                results.append({
-                    'atk_iv': a, 'def_iv': d, 'sta_iv': s,
-                    'level': lv, 'cp': mon_cp,
-                    'atk': atk_stat, 'def_': def_stat, 'hp': hp_stat,
-                    'stat_product': sp,
-                    'avg_score': avg_score,
-                    'per_opp': per_opp,
-                })
+    for chunk_res, chunk_sims in chunk_results:
+        results.extend(chunk_res)
+        n_sims += chunk_sims
 
     # Build canonical-order score array BEFORE sorting results.
     # Canonical order = iteration order (a=0..15, d=0..15, s=0..15), skipping invalid.
