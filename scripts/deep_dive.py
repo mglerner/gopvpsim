@@ -148,6 +148,64 @@ def load_thresholds(path):
     return data
 
 
+def discover_slayer_thresholds(results, opponent_idx, n_scenarios, opponent_name=None):
+    """
+    Discover IV thresholds optimized to beat a specific opponent.
+
+    Ranks all IVs by their average score against ONE opponent (across all
+    shield scenarios), then finds the stat profile of the top 5%. This
+    surfaces "slayer" tiers — IVs that sacrifice average meta performance
+    to dominate a specific matchup.
+
+    Returns (thresholds_dict, slayer_results) where slayer_results is the
+    full list of results re-sorted by score against this opponent.
+    """
+    if not results or len(results) < 50:
+        return {}, []
+
+    # Re-score each IV by its average score against this opponent only
+    scored = []
+    for r in results:
+        po = r.get('per_opp', {})
+        opp_total = sum(po.get((si, opponent_idx), 0) for si in range(n_scenarios))
+        opp_avg = opp_total / n_scenarios if n_scenarios else 0
+        scored.append((opp_avg, r))
+    scored.sort(key=lambda x: -x[0])
+
+    n = len(scored)
+    cut = max(5, n // 20)  # top 5%
+    top = [r for _, r in scored[:cut]]
+
+    # Population stats (medians)
+    n_results = len(results)
+    pop_atk = sorted(r['atk'] for r in results)
+    pop_def = sorted(r['def_'] for r in results)
+    pop_hp = sorted(r['hp'] for r in results)
+    pop_atk_med = pop_atk[n_results // 2]
+    pop_def_med = pop_def[n_results // 2]
+    pop_hp_med = pop_hp[n_results // 2]
+
+    # 25th percentile of top group
+    top_atk = sorted(r['atk'] for r in top)
+    top_def = sorted(r['def_'] for r in top)
+    top_hp = sorted(r['hp'] for r in top)
+    p25 = max(0, len(top) // 4)
+    top_atk_p25 = top_atk[p25]
+    top_def_p25 = top_def[p25]
+    top_hp_p25 = top_hp[p25]
+
+    # Threshold = top group's p25 if above population median by >1%
+    thresh = {'attack': 0, 'defense': 0, 'stamina': 0}
+    if top_atk_p25 > pop_atk_med * 1.01:
+        thresh['attack'] = round(top_atk_p25, 2)
+    if top_def_p25 > pop_def_med * 1.01:
+        thresh['defense'] = round(top_def_p25, 2)
+    if top_hp_p25 > pop_hp_med + 0.5:
+        thresh['stamina'] = int(top_hp_p25)
+
+    return thresh, scored
+
+
 def auto_discover_thresholds(results, n_tiers=2):
     """
     Discover threshold tiers automatically from simulation results.
@@ -2766,22 +2824,39 @@ def main():
     print(f"  {len(movesets)} moveset combination(s) to evaluate")
 
     # Get opponents — from group or rankings
+    # Always include the focal species so we can do mirror slayer analysis.
     opponent_label = None
+    focal_in_opponents = False
     if args.group:
         group_entries = load_group(args.group)
         opponents = []
         opp_movesets_full = []
         for species_name, fast_move, charged_moves, is_shadow in group_entries:
-            if species_name == args.species:
-                continue
             opponents.append(species_name)
             opp_movesets_full.append((fast_move, charged_moves))
+            if species_name == args.species:
+                focal_in_opponents = True
+        # Append focal species if not already in group
+        if not focal_in_opponents:
+            try:
+                focal_fast, focal_charged = get_default_moveset(
+                    args.species, league=args.league, shadow=args.shadow)
+                opponents.append(args.species)
+                opp_movesets_full.append((focal_fast, focal_charged))
+                focal_in_opponents = True
+                print(f"  (added {args.species} to opponents for mirror analysis)")
+            except (KeyError, ValueError):
+                pass
         opponent_label = f"PvPoke group: {args.group} ({len(opponents)} mons)"
         print(f"  Opponents: {opponent_label}")
     else:
         screen_n = args.screen_opponents or args.opponents
-        opponents = get_top_opponents(args.league, args.opponents,
-                                      exclude_species=args.species)
+        opponents = get_top_opponents(args.league, args.opponents)
+        # Always include focal species for mirror analysis (append if not in top N)
+        if args.species not in opponents:
+            opponents.append(args.species)
+            print(f"  (added {args.species} to opponents for mirror analysis)")
+        focal_in_opponents = True
         opponent_label = f"Top {len(opponents)} from {args.league} rankings"
         print(f"  {len(opponents)} meta opponents (top from {args.league} rankings)")
 
@@ -2853,6 +2928,46 @@ def main():
                 print(f"    Auto-discovered {len(thresholds)} threshold tier(s):")
                 for name, thresh in thresholds.items():
                     print(f"      {name}: {_threshold_desc(thresh)}")
+
+        # Slayer discovery: always check for mirror slayer thresholds on first moveset
+        if mi == 0:
+            mirror_idx = None
+            for oi, opp_name in enumerate(opponents):
+                if opp_name == args.species or opp_name.replace(' (Shadow)', '') == args.species:
+                    mirror_idx = oi
+                    break
+            if mirror_idx is not None:
+                slayer_thresh, slayer_scored = discover_slayer_thresholds(
+                    results, mirror_idx, len(shield_scenarios), args.species
+                )
+                if slayer_thresh and any(v > 0 for v in slayer_thresh.values()):
+                    # Community nicknames for slayer builds. Default = full species name.
+                    SLAYER_NICKNAMES = {
+                        'Annihilape': 'Ape',
+                        'Galarian Stunfisk': 'GFisk',
+                        'Stunfisk (Galarian)': 'GFisk',
+                    }
+                    short = SLAYER_NICKNAMES.get(args.species, args.species)
+                    slayer_name = f'{short} Slayer'
+                    print(f"    {slayer_name} thresholds: {_threshold_desc(slayer_thresh)}")
+                    # Cost analysis: top slayer IV vs top average IV
+                    top_slayer = slayer_scored[0][1]
+                    top_avg = results[0]
+                    avg_diff = top_slayer['avg_score'] - top_avg['avg_score']
+                    print(f"      Top slayer IV: {top_slayer['atk_iv']}/{top_slayer['def_iv']}/{top_slayer['sta_iv']} "
+                          f"(avg score {top_slayer['avg_score']:.1f}, "
+                          f"vs best {top_avg['avg_score']:.1f}, cost {avg_diff:+.1f})")
+                    # Add as a tier if thresholds were provided
+                    if thresholds is None:
+                        thresholds = {}
+                    if slayer_name not in thresholds:
+                        # Insert slayer tier (most restrictive — front of dict)
+                        new_thresholds = {slayer_name: slayer_thresh}
+                        new_thresholds.update(thresholds)
+                        thresholds = new_thresholds
+                else:
+                    print(f"    No clear {args.species} Slayer thresholds found "
+                          f"(mirror IVs don't form a distinct cluster)")
 
         # Classify by thresholds if provided
         if thresholds:
