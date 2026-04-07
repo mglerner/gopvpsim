@@ -1861,6 +1861,39 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             key = f'{mi}_{mode}'
             score_arrays[key] = md['scores'][mode]
 
+    # Compute cluster gap Y-values per (moveset, opp_iv_mode, scenario)
+    # These are the score thresholds where significant gaps appear in the
+    # sorted score distribution. Used by JS to draw horizontal lines on the plot.
+    cluster_gaps = {}  # key: "mi_mode" -> list of lists (one per scenario)
+    for mi, md in enumerate(moveset_data):
+        for mode in opp_iv_modes:
+            key = f'{mi}_{mode}'
+            sf = score_arrays[key]
+            per_scenario = []
+            for si in range(n_scenarios):
+                # Compute per-IV average score for this scenario
+                scene_scores = []
+                for iv in range(n_ivs):
+                    base = iv * n_scenarios * n_opponents + si * n_opponents
+                    total = sum(sf[base + oi] for oi in range(n_opponents))
+                    scene_scores.append(total / n_opponents)
+                # Sort descending, find gaps
+                sorted_sc = sorted(scene_scores, reverse=True)
+                gaps = [sorted_sc[i-1] - sorted_sc[i] for i in range(1, len(sorted_sc))]
+                if gaps:
+                    gap_sorted = sorted(gaps)
+                    median_gap = gap_sorted[len(gap_sorted) // 2]
+                    # Gap Y-values: the score BELOW the gap (i.e. the top of the lower cluster)
+                    sig = []
+                    for i, g in enumerate(gaps):
+                        if g > 3 * median_gap and i < n_ivs // 4:
+                            sig.append(round(sorted_sc[i+1], 1))  # score just below the gap
+                    per_scenario.append(sig[:5])  # max 5 gaps per scenario
+                else:
+                    per_scenario.append([])
+            cluster_gaps[key] = per_scenario
+    data_obj['clusterGaps'] = cluster_gaps
+
     opp_desc = opponent_label or 'PvPoke rankings'
     shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in shield_scenarios)
 
@@ -1941,6 +1974,14 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             label = 'PvPoke Defaults' if mode == 'pvpoke' else 'Rank 1'
             html += f'    <option value="{mode}">{label}</option>\n'
         html += '  </select></label>\n'
+    html += '  <label>Color: <select id="color-sel" onchange="updateView()">\n'
+    html += '    <option value="threshold">Threshold tiers</option>\n'
+    html += '    <option value="hp">HP</option>\n'
+    html += '    <option value="def">Defense</option>\n'
+    html += '    <option value="atk">Attack</option>\n'
+    html += '    <option value="score">Score</option>\n'
+    html += '  </select></label>\n'
+    html += '  <label style="font-size:12px;color:#aaa"><input type="checkbox" id="cluster-chk" onchange="updateView()" style="margin-left:12px"> Show clusters</label>\n'
     if thresholds:
         html += '  <span style="font-size:11px;color:#888;margin-left:8px">Threshold tiers shown in graph legend. Hover to isolate; click to lock.</span>\n'
     html += '</div>\n'
@@ -1992,6 +2033,7 @@ var state = {{
   movesetIdx: 0,
   scenarioMode: {'"avg"' if n_scenarios > 1 else '"0"'},
   oppIvMode: '{opp_iv_modes[0]}',
+  colorMode: 'threshold',
 }};
 var avgScores, battleRanks, refAvgScores, refBattleRanks;
 var lockedIdx = -1;
@@ -2110,11 +2152,12 @@ function appendMatchupDiff(lines, mi1, iv1, mi2, iv2) {{
 // ---- Build Plotly traces ----
 function buildTraces() {{
   computeView();
+  var cm = state.colorMode || 'threshold';
   var hasTiers = tierNames.length > 0;
   var traces = [];
 
-  if (hasTiers) {{
-    // "Other" trace (no tier at all)
+  if (cm === 'threshold' && hasTiers) {{
+    // --- Threshold tier coloring ---
     var otherX=[], otherY=[], otherText=[], otherColor=[];
     for (var iv=0; iv<nIvs; iv++) {{
       if (!DATA.ivAllTiers[iv] || DATA.ivAllTiers[iv].length === 0) {{
@@ -2131,7 +2174,6 @@ function buildTraces() {{
         marker:{{size:3, color:otherColor, colorscale:'Viridis', opacity:0.4}}
       }});
     }}
-    // Tier traces — each tier shows ALL IVs that meet it (not just primary)
     for (var ti=0; ti<tierNames.length; ti++) {{
       var tx=[], ty=[], tt=[];
       for (var iv=0; iv<nIvs; iv++) {{
@@ -2152,19 +2194,26 @@ function buildTraces() {{
       }}
     }}
   }} else {{
-    // Single trace, colorscale
+    // --- Stat or score coloring (single trace) ---
     var ax=[], ay=[], at=[], ac=[];
+    var cLabel = 'Avg Score';
     for (var iv=0; iv<nIvs; iv++) {{
       ax.push(DATA.spRanks[iv]);
       ay.push(avgScores[iv]);
       at.push(buildHoverText(iv));
-      ac.push(avgScores[iv]);
+      if (cm === 'hp') {{ ac.push(DATA.ivHp[iv]); cLabel = 'HP'; }}
+      else if (cm === 'def') {{ ac.push(DATA.ivDef[iv]); cLabel = 'Defense'; }}
+      else if (cm === 'atk') {{ ac.push(DATA.ivAtk[iv]); cLabel = 'Attack'; }}
+      else {{ ac.push(avgScores[iv]); }}
     }}
+    // Use a colorscale that's bright against dark background
+    var cscale = (cm === 'hp') ? 'YlOrRd' : (cm === 'def') ? 'Blues' : (cm === 'atk') ? 'RdYlGn' : 'Viridis';
     traces.push({{
-      name:'All IVs', x:ax, y:ay, text:at,
+      name:'All IVs (colored by '+cLabel+')', x:ax, y:ay, text:at,
       mode:'markers', type:'scattergl', hoverinfo:'text',
-      marker:{{size:3, color:ac, colorscale:'Viridis', opacity:0.4,
-               colorbar:{{title:'Avg Score'}}}}
+      marker:{{size:3.5, color:ac, colorscale:cscale, opacity:0.6,
+               colorbar:{{title:cLabel, len:0.6}},
+               reversescale: (cm === 'atk')}}
     }});
   }}
   return traces;
@@ -2233,6 +2282,8 @@ function updateView() {{
   if (ssel) state.scenarioMode = ssel.value;
   var osel = document.getElementById('oppiv-sel');
   if (osel) state.oppIvMode = osel.value;
+  var csel = document.getElementById('color-sel');
+  if (csel) state.colorMode = csel.value;
   lockedIdx = -1;
 
   var traces = buildTraces();
@@ -2245,13 +2296,56 @@ function updateView() {{
   var yMin = Math.min.apply(null, allY), yMax = Math.max.apply(null, allY);
   var xPad = Math.max(1, (xMax-xMin)*0.02), yPad = Math.max(0.5, (yMax-yMin)*0.03);
 
+  // Cluster overlay shapes
+  var shapes = [];
+  var annotations = [];
+  var clusterChk = document.getElementById('cluster-chk');
+  if (clusterChk && clusterChk.checked) {{
+    var gapKey = state.movesetIdx + '_' + state.oppIvMode;
+    var gapData = DATA.clusterGaps[gapKey];
+    if (gapData) {{
+      var sis = getActiveScenarioIndices();
+      // For "avg" mode, take the union of gaps across all scenarios (deduplicated)
+      var gapYs = [];
+      if (sis.length === nS) {{
+        // Average mode: use the gaps from each scenario, pick the most common
+        var allGaps = [];
+        for (var k=0; k<nS; k++) {{ allGaps = allGaps.concat(gapData[k] || []); }}
+        // Deduplicate within ±2 points
+        allGaps.sort(function(a,b){{ return b-a; }});
+        for (var g=0; g<allGaps.length; g++) {{
+          var dup = false;
+          for (var h=0; h<gapYs.length; h++) {{ if (Math.abs(allGaps[g]-gapYs[h]) < 2) dup = true; }}
+          if (!dup) gapYs.push(allGaps[g]);
+        }}
+      }} else {{
+        gapYs = gapData[sis[0]] || [];
+      }}
+      var clusterColors = ['rgba(233,69,96,0.5)', 'rgba(88,166,255,0.4)', 'rgba(63,185,80,0.3)'];
+      for (var gi=0; gi<gapYs.length && gi<3; gi++) {{
+        shapes.push({{
+          type:'line', xref:'paper', x0:0, x1:1,
+          y0:gapYs[gi], y1:gapYs[gi],
+          line:{{ color:clusterColors[gi], width:2, dash:'dash' }}
+        }});
+        annotations.push({{
+          xref:'paper', x:1.0, y:gapYs[gi], xanchor:'left',
+          text:' Cluster ' + (gi+1) + ' boundary',
+          showarrow:false, font:{{size:10, color:clusterColors[gi]}}
+        }});
+      }}
+    }}
+  }}
+
   var layout = {{
     title: DATA.movesets[state.movesetIdx].label,
     xaxis: {{title:'Stat Product Rank (1=best)', range:[xMax+xPad, xMin-xPad], fixedrange:true}},
     yaxis: {{title:'Avg Battle Score', range:[yMin-yPad, yMax+yPad], fixedrange:true}},
     paper_bgcolor:'#1a1a2e', plot_bgcolor:'#16213e',
     font:{{color:'#e0e0e0'}}, hovermode:'closest',
-    legend:{{bgcolor:'rgba(22,33,62,0.8)', bordercolor:'#0f3460', borderwidth:1}}
+    legend:{{bgcolor:'rgba(22,33,62,0.8)', bordercolor:'#0f3460', borderwidth:1}},
+    shapes: shapes,
+    annotations: annotations
   }};
 
   Plotly.react('plot', traces, layout, {{responsive:true}});
