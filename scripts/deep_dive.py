@@ -1664,7 +1664,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                     if narr:
                         bp_lines.append(narr)
         if bp_lines:
-            results_parts.append(f'<p class="dd-small">Key breakpoints:<br>{"<br>".join(bp_lines)}</p>\n')
+            results_parts.append(f'<p class="dd-small"><b style="color:#58a6ff">Key changes</b><br>{"<br>".join(bp_lines)}</p>\n')
         results_parts.append('</div>\n')
     results_parts.append('</div>\n')
 
