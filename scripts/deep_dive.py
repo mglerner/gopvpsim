@@ -1330,7 +1330,7 @@ def _narrate_flip(focal_atk, focal_def, focal_hp, ref_atk, ref_def, ref_hp,
     if hp_diff != 0:
         parts.append(f'HP {focal_hp} vs {ref_hp} ({hp_diff:+d})')
 
-    return '; '.join(parts)
+    return '<br>'.join(parts)
 
 
 def _build_move_tuples(moveset_label, fast_db, charged_db):
@@ -1664,7 +1664,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                     if narr:
                         bp_lines.append(narr)
         if bp_lines:
-            results_parts.append(f'<p class="dd-small">Key breakpoints: {"; ".join(bp_lines)}</p>\n')
+            results_parts.append(f'<p class="dd-small">Key breakpoints:<br>{"<br>".join(bp_lines)}</p>\n')
         results_parts.append('</div>\n')
     results_parts.append('</div>\n')
 
