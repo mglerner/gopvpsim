@@ -77,7 +77,37 @@
   represent them as IV thresholds. They really may just be a
   collection of specific IVs. But we should at least categorize the IV
   spreads that they're using. And if it *is* possible to describe them
-  as IV thresholds, we should give that description in addition to the table.
+  as IV thresholds, we should give that description in addition to the
+  table.
+
+* **More Slayer ideas** -- from our session with the first converged
+  slayer IVs: "  We're going higher attack and lower defense than the
+  community. The community spreads are at exactly the Lickitung BP
+  cutoff (127.23) and above the mirror Def BP (103.54). Our
+  convergence pushes attack to the maximum and accepts lower defense."
+  which makes sense. But if this is right, that it was basically a
+  search for "find slayers, but make sure to meet the lickitung" maybe
+  we should add the ability to find slayers with other specified
+  constraints like that.
+
+* **Fix Atk Slayer vs CMP Slayer categorization** — The current
+  categorize_slayers() in scripts/deep_dive.py uses two attack-based
+  filters: Atk Slayer = "above survivor median atk", CMP Slayer = "top
+  quartile by atk". Since top quartile is strictly above median, CMP
+  Slayer is a strict subset of Atk Slayer — they're measuring the same
+  thing twice with different cutoffs, not two distinct concepts. The
+  RyanSwag patterns we identified are actually different:
+  - **Atk Slayer** should mean "hits a specific damage breakpoint
+    against a notable opponent" (e.g. atk >= 127.23 for the Lickitung
+    BP). This requires either pre-known BP thresholds or detecting them
+    from per-opponent damage data (we already compute this in the
+    breakpoint narration code).
+  - **CMP Slayer** should mean "atk is high enough to win CMP ties
+    against the typical opponent IV." Binary check: focal_atk >
+    opponent_atk for the reference opponent.
+  - Bulk Slayer can stay as-is (HP+Def above median).
+  Implementation: integrate with breakpoint narration to find BPs, and
+  add a CMP comparison against the reference opponent atk.
 
 ## UI / Display
 
