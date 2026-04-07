@@ -217,11 +217,18 @@ def _calc_turns_to_live(
     Simulates the defender's attack sequence to estimate how many turns until
     the attacker is KO'd.  Returns math.inf if a KO is not found.
 
-    State: {hp, opEnergy, turn, shields}
+    State tuple: (hp, opEnergy, turn, shields)
       hp        – attacker's remaining HP
       opEnergy  – defender's energy
       turn      – turns into the future for this state
       shields   – attacker's remaining shields
+
+    The original PvPoke code does ``queue.unshift()`` and ``queue.shift()``
+    (push/pop at the front).  Both ends behave like a stack here — we read
+    the most-recently-pushed state next — so a list with ``append()``/
+    ``pop()`` (LIFO) gives identical exploration order in O(1) per op,
+    instead of the O(n) ``insert(0, ...)`` / ``pop(0)`` the dict version
+    used.
 
     When attacker shields > 0 the DP models the defender baiting with their
     cheapest charged move (shielded → 1 damage).  When shields == 0 it
@@ -232,7 +239,14 @@ def _calc_turns_to_live(
     opp_fast_turns    = defender.fast_move.get('_turns', 1)
     atk_fast_turns    = attacker.fast_move.get('_turns', 1)
     wins_cmp          = attacker.atk >= defender.atk
-    fastest_cm_energy = min(m['energy'] for m in defender.charged_moves)
+
+    # Hoist defender's charged-move energy + damage into parallel arrays so
+    # the inner loop avoids method/dict lookups. The damage cache was
+    # populated by defender.fast_move_damage(attacker) above.
+    d_cm_dmgs   = defender._cached_charged_dmgs
+    d_cm_energy = [cm['energy'] for cm in defender.charged_moves]
+    n_d_cms     = len(d_cm_energy)
+    fastest_cm_energy = min(d_cm_energy) if d_cm_energy else 0
 
     turns_to_live: float = math.inf
 
@@ -243,76 +257,74 @@ def _calc_turns_to_live(
     # where k turns have already elapsed).  The fast move lands after
     # defender.cooldown − 1 more turns, but the DP turn offset uses the full
     # defender.cooldown to match PvPoke's `opponent.cooldown / 500`.
-    opp_in_fast = defender._queued_fast is not None
-    if opp_in_fast:
-        pvp_turns = defender.cooldown          # matches PvPoke's cooldown / 500
-        initial = {
-            'hp':       attacker.hp - opp_fast_damage,
-            'opEnergy': min(ENERGY_CAP, defender.energy + opp_fast_energy),
-            'turn':     pvp_turns,
-            'shields':  attacker.shields,
-        }
+    if defender._queued_fast is not None:
+        initial = (attacker.hp - opp_fast_damage,
+                   min(ENERGY_CAP, defender.energy + opp_fast_energy),
+                   defender.cooldown,
+                   attacker.shields)
     else:
-        initial = {
-            'hp':       attacker.hp,
-            'opEnergy': defender.energy,
-            'turn':     0,
-            'shields':  attacker.shields,
-        }
+        initial = (attacker.hp,
+                   defender.energy,
+                   0,
+                   attacker.shields)
 
-    queue = [initial]
+    stack = [initial]
 
-    while queue:
-        curr = queue.pop(0)
+    while stack:
+        c_hp, c_op_e, c_turn, c_shields = stack.pop()
 
         # Prune far-future states when the attacker can still survive another hit
-        if curr['hp'] > opp_fast_damage:
+        if c_hp > opp_fast_damage:
             if wins_cmp:
-                if curr['turn'] > atk_fast_turns:
+                if c_turn > atk_fast_turns:
                     continue
             else:
-                if curr['turn'] > atk_fast_turns + 1:
+                if c_turn > atk_fast_turns + 1:
                     continue
 
         # Shields up → model opponent baiting with cheapest charged move
-        if curr['shields'] != 0:
-            if curr['opEnergy'] >= fastest_cm_energy:
-                queue.insert(0, {
-                    'hp':       curr['hp'] - 1,          # shielded: 1 dmg
-                    'opEnergy': curr['opEnergy'] - fastest_cm_energy,
-                    'turn':     curr['turn'] + 1,
-                    'shields':  curr['shields'] - 1,
-                })
+        if c_shields != 0:
+            if c_op_e >= fastest_cm_energy:
+                stack.append((
+                    c_hp - 1,                          # shielded: 1 dmg
+                    c_op_e - fastest_cm_energy,
+                    c_turn + 1,
+                    c_shields - 1,
+                ))
         else:
             # No shields: check whether any charged move would KO
-            for cm in defender.charged_moves:
-                if curr['opEnergy'] >= cm['energy']:
-                    cm_dmg = defender.charged_move_damage(cm, attacker)
-                    if cm_dmg >= curr['hp']:
-                        turns_to_live = min(curr['turn'], turns_to_live)
+            for n in range(n_d_cms):
+                e = d_cm_energy[n]
+                if c_op_e >= e:
+                    cm_dmg = d_cm_dmgs[n]
+                    if cm_dmg >= c_hp:
+                        if c_turn < turns_to_live:
+                            turns_to_live = c_turn
                         opp_cd = defender.fast_move.get('cooldown', 500)
                         atk_cd = attacker.fast_move.get('cooldown', 500)
                         if attacker.atk > defender.atk and opp_cd % atk_cd == 0:
                             turns_to_live += 1
                         break
-                    queue.insert(0, {
-                        'hp':       curr['hp'] - cm_dmg,
-                        'opEnergy': curr['opEnergy'] - cm['energy'],
-                        'turn':     curr['turn'] + 1,
-                        'shields':  curr['shields'],
-                    })
+                    stack.append((
+                        c_hp - cm_dmg,
+                        c_op_e - e,
+                        c_turn + 1,
+                        c_shields,
+                    ))
 
         # Would a fast move KO?
-        if curr['hp'] - opp_fast_damage <= 0:
-            turns_to_live = min(curr['turn'] + opp_fast_turns, turns_to_live)
+        if c_hp - opp_fast_damage <= 0:
+            tt = c_turn + opp_fast_turns
+            if tt < turns_to_live:
+                turns_to_live = tt
             break
         else:
-            queue.insert(0, {
-                'hp':       curr['hp'] - opp_fast_damage,
-                'opEnergy': min(ENERGY_CAP, curr['opEnergy'] + opp_fast_energy),
-                'turn':     curr['turn'] + opp_fast_turns,
-                'shields':  curr['shields'],
-            })
+            stack.append((
+                c_hp - opp_fast_damage,
+                min(ENERGY_CAP, c_op_e + opp_fast_energy),
+                c_turn + opp_fast_turns,
+                c_shields,
+            ))
 
     return turns_to_live
 
@@ -564,11 +576,17 @@ def _dp_insert_farm_down(queue: list, ns: "_DPState", *,
     With ``intended_pruning=True``, the blocking check uses our real
     ``.hp`` field and actually fires.
     """
+    n = len(queue)
+    ns_turn = ns.turn
     i = 0
-    while i < len(queue) and queue[i].turn <= ns.turn:
-        if intended_pruning and queue[i].hp < 0:
-            return  # blocked by existing KO state
-        i += 1
+    if intended_pruning:
+        while i < n and queue[i].turn <= ns_turn:
+            if queue[i].hp < 0:
+                return  # blocked by existing KO state
+            i += 1
+    else:
+        while i < n and queue[i].turn <= ns_turn:
+            i += 1
     queue.insert(i, ns)
 
 
@@ -645,16 +663,22 @@ def _dp_insert_not_ready(queue: list, ns: "_DPState", *,
     and 3 closer scores for Azu vs Forretress (Sand+Rock) compared to
     the old ``<=`` order.
     """
+    n = len(queue)
+    ns_turn = ns.turn
     i = 0
     if intended_pruning:
-        while i < len(queue) and queue[i].turn < ns.turn:
-            if (queue[i].hp <= ns.hp
-                    and queue[i].energy >= ns.energy
-                    and queue[i].shields <= ns.shields):
+        ns_hp = ns.hp
+        ns_energy = ns.energy
+        ns_shields = ns.shields
+        while i < n and queue[i].turn < ns_turn:
+            q = queue[i]
+            if (q.hp <= ns_hp
+                    and q.energy >= ns_energy
+                    and q.shields <= ns_shields):
                 return  # dominated by existing state
             i += 1
     else:
-        while i < len(queue) and queue[i].turn < ns.turn:
+        while i < n and queue[i].turn < ns_turn:
             i += 1
     queue.insert(i, ns)
 
@@ -699,16 +723,27 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # PvPoke's activeChargedMoves is sorted by energy (cheapest first).
     # Sort a copy so bandaid indices match PvPoke's convention.
     cms = sorted(attacker.charged_moves, key=lambda m: m['energy'])
+    n_cms = len(cms)
+
+    # Hoist per-cm constants into parallel arrays so the hot DP loop can
+    # do array lookups instead of dict accesses + method calls. The damage
+    # cache (BattlePokemon._cached_charged_dmgs) was populated by the
+    # fast_move_damage() call above. Map sorted cms back through that.
+    a_charged = attacker.charged_moves
+    a_cm_dmgs = attacker._cached_charged_dmgs
+    a_idx_map = attacker._cm_id_to_idx
+    cm_dmgs    = [a_cm_dmgs[a_idx_map[id(m)]] for m in cms]
+    cm_energy  = [m['energy'] for m in cms]
+    # original-charged-moves index for each sorted entry — used by callers
+    # that need to return an index into attacker.charged_moves
+    cm_orig_idx = [a_idx_map[id(m)] for m in cms]
 
     def _orig_idx(move: dict) -> int:
         """Map a move back to its index in attacker.charged_moves."""
-        for i, m in enumerate(attacker.charged_moves):
-            if m is move:
-                return i
-        return 0
+        return a_idx_map[id(move)]
 
-    def actual_dpe(m: dict) -> float:
-        return attacker.charged_move_damage(m, defender) / m['energy']
+    def actual_dpe(i: int) -> float:
+        return cm_dmgs[i] / cm_energy[i]
 
     def raw_dpe(m: dict) -> float:
         """PvPoke's move.dpe = power/energy (no type effectiveness)."""
@@ -748,15 +783,19 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         # length index is OOB → skipped; effectively reverse order)
         max_dmg_idx = None
         prev_dmg    = -1
-        for n in range(len(cms) - 1, -1, -1):
-            if attacker.energy >= cms[n]['energy']:
-                dmg = attacker.charged_move_damage(cms[n], defender)
+        a_energy    = attacker.energy
+        a_atk       = attacker.atk
+        d_atk       = defender.atk
+        for n in range(n_cms - 1, -1, -1):
+            cm_e = cm_energy[n]
+            if a_energy >= cm_e:
+                dmg = cm_dmgs[n]
                 if dmg > prev_dmg:
                     max_dmg_idx = n
                     prev_dmg    = dmg
                 # Double-fire: if have energy for two of same move and win CMP
-                if (attacker.energy >= cms[n]['energy'] * 2
-                        and attacker.atk > defender.atk
+                if (a_energy >= cm_e * 2
+                        and a_atk > d_atk
                         and dmg * 2 > prev_dmg):
                     max_dmg_idx = n
                     prev_dmg    = dmg * 2
@@ -771,7 +810,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 f"  DP[fire_now]: {attacker.species} fires {cms[max_dmg_idx].get('moveId')} "
                 f"(ttl={turns_to_live}, energy={attacker.energy})"
             )
-        return _orig_idx(cms[max_dmg_idx])
+        return cm_orig_idx[max_dmg_idx]
 
     # ------------------------------------------------------------------ #
     # ActionLogic.js lines 212-233: fire a lethal charged move immediately,
@@ -786,19 +825,20 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # so baitShields=True → both n=0 and n=1 are eligible).
     # ------------------------------------------------------------------ #
     if defender.shields == 0:
-        _fast_dmg = attacker.fast_move_damage(defender)
-        for _n in range(min(2, len(cms))):
-            _cm = cms[_n]
-            if attacker.energy >= _cm['energy']:
-                if (attacker.charged_move_damage(_cm, defender) >= defender.hp
+        _fast_dmg = fast_damage
+        d_hp      = defender.hp
+        for _n in range(min(2, n_cms)):
+            if attacker.energy >= cm_energy[_n]:
+                _cm = cms[_n]
+                if (cm_dmgs[_n] >= d_hp
                         and not _cm.get('selfDebuffing', False)
-                        and defender.hp > _fast_dmg):
+                        and d_hp > _fast_dmg):
                     if _policy_debug:
                         _policy_log.append(
                             f"  DP[lethal]: {attacker.species} fires "
                             f"{_cm.get('moveId')} (energy={attacker.energy})"
                         )
-                    return _orig_idx(cms[_n])
+                    return cm_orig_idx[_n]
 
     # ------------------------------------------------------------------ #
     # optimizeMoveTiming (ActionLogic.js lines 237-344)
@@ -806,12 +846,12 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     if _optimize_move_timing(attacker, defender):
         return None
 
-    best_idx = max(range(len(cms)), key=lambda i: actual_dpe(cms[i]))
+    best_idx = max(range(n_cms), key=actual_dpe)
     best_cm  = cms[best_idx]
 
     # bestCycleDamage: fast moves needed to charge from 0 + one charge move
-    fm_to_charge   = math.ceil(best_cm['energy'] / fast_energy)
-    best_cycle_dmg = fast_damage * fm_to_charge + attacker.charged_move_damage(best_cm, defender)
+    fm_to_charge   = math.ceil(cm_energy[best_idx] / fast_energy)
+    best_cycle_dmg = fast_damage * fm_to_charge + cm_dmgs[best_idx]
 
     # ------------------------------------------------------------------ #
     # Farm-down path
@@ -819,18 +859,19 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     if defender.hp > 2 * best_cycle_dmg:
         selected_idx = best_idx
 
-        # Bait only if opponent has shields AND would shield the best move
-        if (defender.shields > 0 and len(cms) > 1
+        # Bait only if opponent has shields AND would shield the best move.
+        # cms is sorted by energy, so the cheapest is index 0.
+        if (defender.shields > 0 and n_cms > 1
                 and not cms[0].get('selfDebuffing', False)
                 and would_shield(attacker, defender, best_cm)):
-            selected_idx = min(range(len(cms)), key=lambda i: cms[i]['energy'])
+            selected_idx = 0
 
-        if attacker.energy < cms[selected_idx]['energy']:
+        if attacker.energy < cm_energy[selected_idx]:
             if _policy_debug:
                 _policy_log.append(
                     f"  DP[farm]: {attacker.species} waits for "
                     f"{cms[selected_idx].get('moveId')} (energy={attacker.energy}/"
-                    f"{cms[selected_idx]['energy']})"
+                    f"{cm_energy[selected_idx]})"
                 )
             return None   # wait for the selected move
         if _policy_debug:
@@ -838,7 +879,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 f"  DP[farm]: {attacker.species} fires "
                 f"{cms[selected_idx].get('moveId')} (energy={attacker.energy})"
             )
-        return _orig_idx(cms[selected_idx])
+        return cm_orig_idx[selected_idx]
 
     # ------------------------------------------------------------------ #
     # Near-KO: DP to find the fastest charge-move sequence that KOs
@@ -856,43 +897,49 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             final_state = curr
             break
 
-        for n, move in enumerate(cms):
-            move_dmg = attacker.charged_move_damage(move, defender)
+        curr_e  = curr.energy
+        curr_hp = curr.hp
+        curr_t  = curr.turn
+        curr_sh = curr.shields
+        curr_moves = curr.moves
+        for n in range(n_cms):
+            move_dmg = cm_dmgs[n]
+            move_e   = cm_energy[n]
 
-            if curr.energy >= move['energy']:
+            if curr_e >= move_e:
                 # Move ready (PvPoke lines 524-616): dedup + dominance
                 # pruning, insert AFTER same-turn (<=)
-                new_e  = curr.energy - move['energy']
-                new_t  = curr.turn + 1
-                new_sh = curr.shields
-                if curr.shields > 0:
-                    new_hp = curr.hp - 1
+                new_e  = curr_e - move_e
+                new_t  = curr_t + 1
+                new_sh = curr_sh
+                if curr_sh > 0:
+                    new_hp = curr_hp - 1
                     new_sh -= 1
                 else:
-                    new_hp = curr.hp - move_dmg
+                    new_hp = curr_hp - move_dmg
 
                 _dp_insert_ready(
                     queue,
-                    _DPState(new_e, new_hp, new_t, new_sh, curr.moves + [n]),
+                    _DPState(new_e, new_hp, new_t, new_sh, curr_moves + [n]),
                     cms, intended_pruning=intended_pruning)
             else:
                 # Move not ready (PvPoke lines 686-708): dominance
                 # pruning, insert BEFORE same-turn (<).  This gives
                 # charged-move KO paths priority over farm-down KOs.
-                fm_needed    = math.ceil((move['energy'] - curr.energy) / fast_energy)
+                fm_needed    = math.ceil((move_e - curr_e) / fast_energy)
                 turns_needed = fm_needed * fast_turns
-                new_e  = fm_needed * fast_energy + curr.energy - move['energy']
-                new_t  = curr.turn + turns_needed + 1
-                new_sh = curr.shields
-                if curr.shields > 0:
-                    new_hp = curr.hp - fast_damage * fm_needed - 1
+                new_e  = fm_needed * fast_energy + curr_e - move_e
+                new_t  = curr_t + turns_needed + 1
+                new_sh = curr_sh
+                if curr_sh > 0:
+                    new_hp = curr_hp - fast_damage * fm_needed - 1
                     new_sh -= 1
                 else:
-                    new_hp = curr.hp - fast_damage * fm_needed - move_dmg
+                    new_hp = curr_hp - fast_damage * fm_needed - move_dmg
 
                 _dp_insert_not_ready(
                     queue,
-                    _DPState(new_e, new_hp, new_t, new_sh, curr.moves + [n]),
+                    _DPState(new_e, new_hp, new_t, new_sh, curr_moves + [n]),
                     intended_pruning=intended_pruning)
 
         # Farm-down state: fast-move to KO from here with no more charged
@@ -911,11 +958,11 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # ------------------------------------------------------------------ #
     if final_state is None:
         # No KO found — fallback to best-DPE greedy
-        affordable = [(i, m) for i, m in enumerate(cms) if attacker.energy >= m['energy']]
+        affordable = [i for i in range(n_cms) if attacker.energy >= cm_energy[i]]
         if not affordable:
             return None
-        best_sorted_idx = max(affordable, key=lambda im: actual_dpe(im[1]))[0]
-        return _orig_idx(cms[best_sorted_idx])
+        best_sorted_idx = max(affordable, key=actual_dpe)
+        return cm_orig_idx[best_sorted_idx]
 
     if not final_state.moves:
         # Farm-down plan: no charged moves needed, just fast-move to KO.
@@ -939,9 +986,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # If shields are up and we can't yet afford cms[1] but it has better DPE
     # than our planned first move → wait for cms[1] instead.
     # PvPoke uses raw dpe (power/energy) here.
-    if defender.shields > 0 and len(cms) > 1:
+    if defender.shields > 0 and n_cms > 1:
         cm1 = cms[1]
-        if (attacker.energy < cm1['energy']
+        if (attacker.energy < cm_energy[1]
                 and raw_dpe(cm1) > raw_dpe(cms[final_state.moves[0]])
                 and not cm1.get('selfDebuffing', False)):
             bait = True
@@ -957,20 +1004,19 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
 
     # Don't-bait-if-won't-shield (ActionLogic.js lines 838-847):
     # This one uses actual damage (move.damage / move.energy).
-    if defender.shields > 0 and len(cms) > 1:
+    if defender.shields > 0 and n_cms > 1:
         cm1 = cms[1]
-        fm0_dpe = actual_dpe(cms[final_state.moves[0]])
-        if fm0_dpe > 0 and attacker.energy >= cm1['energy']:
-            dpe_ratio = actual_dpe(cm1) / fm0_dpe
+        fm0_dpe = actual_dpe(final_state.moves[0])
+        if fm0_dpe > 0 and attacker.energy >= cm_energy[1]:
+            dpe_ratio = actual_dpe(1) / fm0_dpe
             if dpe_ratio > 1.5 and not would_shield(attacker, defender, cm1):
-                final_state.moves[0] = cms.index(cm1) if cm1 in cms else 1
+                # cm1 is cms[1] (which exists since n_cms > 1)
+                final_state.moves[0] = 1
 
     # PvPoke sorts plan by damage descending only when baitShields is falsy or
     # when opponent.shields == 0 AND no debuffing move (ActionLogic.js lines 850-858).
     if defender.shields == 0 and not has_debuffing_move:
-        plan = sorted(final_state.moves,
-                      key=lambda n: attacker.charged_move_damage(cms[n], defender),
-                      reverse=True)
+        plan = sorted(final_state.moves, key=cm_dmgs.__getitem__, reverse=True)
     else:
         plan = final_state.moves
 
@@ -998,7 +1044,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     #       "can KO" check (line 301). If OMT didn't fire, .damage is undefined
     #       and undefined/hp < 0.8 is NaN < 0.8 = false in JS → bandaid skips.
     _cached_dmg = first_move.get('_cached_damage')
-    if (defender.shields == 0 and len(cms) > 1
+    if (defender.shields == 0 and n_cms > 1
             and first_move.get('selfDebuffing', False)
             and first_move['energy'] > 50
             and attacker.hp / attacker.max_hp > 0.5
@@ -1182,7 +1228,7 @@ def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int
 # BattlePokemon — mutable battle state
 # ---------------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class BattlePokemon:
     """Wraps a Pokemon with the mutable state needed during a battle."""
     species:         str
@@ -1208,6 +1254,19 @@ class BattlePokemon:
     # Buff apply meters for deterministic probabilistic buffs: {moveId: count}
     _buff_apply_meters: dict = field(init=False, repr=False)
 
+    # Damage cache (vs current opponent at current stat stages).
+    # Within one simulate() call, charged_move_damage(move, defender) is fully
+    # determined by (self.atk * stage_mult, defender.def_ * stage_mult, move,
+    # types). The pvpoke_dp policy can call this hundreds of times per
+    # simulate() with the same inputs — we memoize the full per-move table
+    # and invalidate via key comparison.
+    _dmg_cache_opp_id:    int       = field(init=False, repr=False)
+    _dmg_cache_atk_stage: int       = field(init=False, repr=False)
+    _dmg_cache_def_stage: int       = field(init=False, repr=False)
+    _cached_fast_dmg:     int       = field(init=False, repr=False)
+    _cached_charged_dmgs: list      = field(init=False, repr=False)
+    _cm_id_to_idx:        dict      = field(init=False, repr=False)
+
     def __post_init__(self):
         self.hp                = self.max_hp
         self.energy            = min(ENERGY_CAP, max(0, self.initial_energy))
@@ -1217,6 +1276,16 @@ class BattlePokemon:
         self.atk_stage         = 0
         self.def_stage         = 0
         self._buff_apply_meters = {}
+        # Damage cache starts invalid (opp id -1 never matches any real id).
+        self._dmg_cache_opp_id    = -1
+        self._dmg_cache_atk_stage = 0
+        self._dmg_cache_def_stage = 0
+        self._cached_fast_dmg     = 0
+        self._cached_charged_dmgs = []
+        # Identity-keyed lookup so charged_move_damage(move, ...) can find
+        # its precomputed entry even when the policy passes a sorted copy
+        # of self.charged_moves (same dict objects, different order).
+        self._cm_id_to_idx = {id(cm): i for i, cm in enumerate(self.charged_moves)}
 
     @classmethod
     def from_pokemon(cls, pokemon, fast_move: dict, charged_moves: list[dict],
@@ -1238,22 +1307,44 @@ class BattlePokemon:
             initial_energy = initial_energy,
         )
 
-    def fast_move_damage(self, defender: "BattlePokemon") -> int:
-        m    = self.fast_move
-        atk  = self.atk  * _stat_stage_mult(self.atk_stage)
-        def_ = defender.def_ * _stat_stage_mult(defender.def_stage)
-        return calc_damage(
-            m['power'], atk, def_,
-            m['type'], self.types, defender.types,
+    def _ensure_dmg_cache(self, defender: "BattlePokemon") -> None:
+        """Populate _cached_fast_dmg and _cached_charged_dmgs vs `defender`
+        at the current stat stages, if not already valid."""
+        if (self._dmg_cache_opp_id == id(defender)
+                and self._dmg_cache_atk_stage == self.atk_stage
+                and self._dmg_cache_def_stage == defender.def_stage):
+            return
+        atk_eff = self.atk * _stat_stage_mult(self.atk_stage)
+        def_eff = defender.def_ * _stat_stage_mult(defender.def_stage)
+        my_types  = self.types
+        opp_types = defender.types
+        fm = self.fast_move
+        self._cached_fast_dmg = calc_damage(
+            fm['power'], atk_eff, def_eff,
+            fm['type'], my_types, opp_types,
         )
+        self._cached_charged_dmgs = [
+            calc_damage(cm['power'], atk_eff, def_eff,
+                        cm['type'], my_types, opp_types)
+            for cm in self.charged_moves
+        ]
+        self._dmg_cache_opp_id    = id(defender)
+        self._dmg_cache_atk_stage = self.atk_stage
+        self._dmg_cache_def_stage = defender.def_stage
+
+    def fast_move_damage(self, defender: "BattlePokemon") -> int:
+        if (self._dmg_cache_opp_id != id(defender)
+                or self._dmg_cache_atk_stage != self.atk_stage
+                or self._dmg_cache_def_stage != defender.def_stage):
+            self._ensure_dmg_cache(defender)
+        return self._cached_fast_dmg
 
     def charged_move_damage(self, move: dict, defender: "BattlePokemon") -> int:
-        atk  = self.atk  * _stat_stage_mult(self.atk_stage)
-        def_ = defender.def_ * _stat_stage_mult(defender.def_stage)
-        return calc_damage(
-            move['power'], atk, def_,
-            move['type'], self.types, defender.types,
-        )
+        if (self._dmg_cache_opp_id != id(defender)
+                or self._dmg_cache_atk_stage != self.atk_stage
+                or self._dmg_cache_def_stage != defender.def_stage):
+            self._ensure_dmg_cache(defender)
+        return self._cached_charged_dmgs[self._cm_id_to_idx[id(move)]]
 
 
 # ---------------------------------------------------------------------------
