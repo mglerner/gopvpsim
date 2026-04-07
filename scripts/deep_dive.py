@@ -1736,7 +1736,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     analysis_parts.append("""
 <div style="margin: 8px 0;">
   <label style="font-size:12px;color:#888"><input type="checkbox" id="alpha-chk"
-    onchange="document.getElementById('dd-alpha').style.display=this.checked?'block':'none'"
+    onchange="var d=this.checked?'block':'none';document.getElementById('dd-alpha').style.display=d;var m=document.getElementById('dd-alpha-methods');if(m)m.style.display=d;"
   > Show experimental analysis (banding, clusters)</label>
 </div>
 <div id="dd-alpha" style="display:none">
@@ -1964,6 +1964,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     analysis_parts.append('</div>\n')
 
     # -- Methods (moved to bottom per #2) --
+    # Alpha methods only show when the experimental checkbox is on (linked via JS)
     analysis_parts.append(f"""
 <div class="dd-section" id="dd-methods">
 <h2 class="dd-h2">Methods</h2>
@@ -1971,6 +1972,21 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 {nO} opponents ({data_obj.get('opponentLabel', '')}).</p>
 <p><strong>Moveset:</strong> {_pretty_moveset(moveset_label)} | <strong>Opp IVs:</strong> {opp_iv_mode}
 | <strong>Reference IV:</strong> {_iv_label(data_obj, ref_iv)} (PvPoke default)</p>
+<dl class="dd-methods-dl">
+  <dt>Rank volatility</dt>
+  <dd>Each IV is ranked 1&ndash;{nIvs} for each scenario independently. The range (best rank minus
+  worst rank) shows how scenario-dependent performance is. Low range = generalist; high range = specialist.</dd>
+  <dt>Matchup flip analysis</dt>
+  <dd>For each IV, we check every (opponent, scenario) pair and compare to the reference IV
+  ({_iv_label(data_obj, ref_iv)}, {opp_label}). A &ldquo;flip&rdquo; occurs when one IV wins
+  (score &ge; 500) and the other loses (&lt; 500). Net flips = gains &minus; losses.</dd>
+  <dt>Breakpoint/bulkpoint narration</dt>
+  <dd>For each flip, we compute per-hit damage from each move at the focal IV and reference IV
+  stats. Damage changes are reported as breakpoints (your moves do more damage), bulkpoints
+  (opponent moves do less damage), or their losses. HP differences are also shown.</dd>
+</dl>
+<div id="dd-alpha-methods" style="display:none">
+<h3 class="dd-h3">Experimental methods</h3>
 <dl class="dd-methods-dl">
   <dt>Banding detection</dt>
   <dd>IVs grouped by discrete stat value. F-ratio and &eta;&sup2; (fraction of total score
@@ -1986,14 +2002,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
   <dd>For each scenario, the average score of the top 50 IVs against each opponent is compared
   to the population average. Large positive gaps show which opponents the top cluster dominates;
   negative gaps show where it sacrifices performance.</dd>
-  <dt>Rank volatility</dt>
-  <dd>Each IV is ranked 1&ndash;{nIvs} for each scenario independently. The range (best rank minus
-  worst rank) shows how scenario-dependent performance is. Low range = generalist; high range = specialist.</dd>
-  <dt>Matchup flip analysis</dt>
-  <dd>For each IV, we check every (opponent, scenario) pair and compare to the reference IV
-  ({_iv_label(data_obj, ref_iv)}, {opp_label}). A &ldquo;flip&rdquo; occurs when one IV wins
-  (score &ge; 500) and the other loses (&lt; 500). Net flips = gains &minus; losses.</dd>
 </dl>
+</div>
 </div>
 """)
 
