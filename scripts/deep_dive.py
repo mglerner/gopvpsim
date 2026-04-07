@@ -1683,6 +1683,16 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 <div id="dd-analysis" style="display:none">
 """)
 
+    # -- Alpha features (banding + clusters) — hidden by default --
+    analysis_parts.append("""
+<div style="margin: 8px 0;">
+  <label style="font-size:12px;color:#888"><input type="checkbox" id="alpha-chk"
+    onchange="document.getElementById('dd-alpha').style.display=this.checked?'block':'none'"
+  > Show experimental analysis (banding, clusters)</label>
+</div>
+<div id="dd-alpha" style="display:none">
+""")
+
     # -- Banding (#3: sort by η², label opp IV mode) --
     analysis_parts.append(f'<div class="dd-section" id="dd-banding">\n')
     analysis_parts.append(f'<h2 class="dd-h2">Banding &amp; Stat Correlations</h2>\n')
@@ -1813,6 +1823,9 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         if neg:
             line += f' | <b>Sacrifices:</b> {neg_str}'
         analysis_parts.append(line + '</p>\n')
+    analysis_parts.append('</div>\n')
+
+    # -- Close alpha features div --
     analysis_parts.append('</div>\n')
 
     # -- Rank volatility (#8: label opp IV mode, #9: hover text) --
