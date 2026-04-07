@@ -383,9 +383,12 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     history = []
     converged = False
 
+    import time as _time
     n_workers = min(multiprocessing.cpu_count(), 16)
+    total_round_sims = 0  # accumulated across rounds for an estimate
 
     for round_idx in range(max_rounds):
+        round_start = _time.time()
         # Build opponent meta (atk, def, hp) for current round's opponents
         opp_data_list = []
         for opp_idx in current_opponent_indices:
@@ -410,7 +413,17 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
             if any_missing:
                 opps_needing_sim.append((opp_idx, opp_data))
 
+        n_profiles = len(focal_profile_data)
+        n_scen = len(shield_scenarios)
+        # Estimate sim count: profiles * cache-missing opponents * scenarios
+        n_round_sims = n_profiles * len(opps_needing_sim) * n_scen
+
         if opps_needing_sim:
+            print(f"    Round {round_idx}: {len(opp_data_list)} opponents "
+                  f"({len(opps_needing_sim)} need sim), "
+                  f"{n_profiles} unique focal profiles, "
+                  f"~{n_round_sims:,} sims to run", flush=True)
+
             # Build the focal profile chunks. We sim each unique (atk, def, hp)
             # exactly once per opponent. After workers return, we expand the
             # results to all focal IVs that share that profile.
@@ -422,19 +435,47 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
 
             init_args = (species, focal_types, base_atk, base_def, base_sta,
                          max_cp, shadow, fm_template, cms_template, shield_scenarios)
+            sim_start = _time.time()
             with multiprocessing.Pool(
                 processes=n_workers,
                 initializer=_slayer_worker_init,
                 initargs=init_args,
             ) as pool:
                 worker_args = [(chunk, opps_needing_sim) for chunk in chunks]
-                chunk_results = pool.map(_slayer_iter_worker, worker_args)
+                # Use imap_unordered so we can report progress as workers finish
+                chunk_results = []
+                completed = 0
+                last_print = sim_start
+                for result in pool.imap_unordered(_slayer_iter_worker, worker_args):
+                    chunk_results.append(result)
+                    completed += 1
+                    now = _time.time()
+                    # Print every 10s or every chunk, whichever is less frequent
+                    if now - last_print >= 10 or completed == len(chunks):
+                        elapsed = now - sim_start
+                        frac = completed / len(chunks)
+                        eta = (elapsed / frac) * (1 - frac) if frac > 0 else 0
+                        print(f"      sim progress: {completed}/{len(chunks)} chunks "
+                              f"({frac*100:.0f}%), elapsed {elapsed:.0f}s, "
+                              f"eta {eta:.0f}s", flush=True)
+                        last_print = now
+
+            sim_elapsed = _time.time() - sim_start
+            print(f"      sim done in {sim_elapsed:.1f}s "
+                  f"({n_round_sims / max(sim_elapsed, 0.01):,.0f} sims/s)", flush=True)
 
             # Merge into cache, expanding profile results to all matching focal IVs
+            merge_start = _time.time()
             for chunk in chunk_results:
                 for (profile_key, opp_idx), scores in chunk.items():
                     for focal_idx in focal_profile_to_ivs[profile_key]:
                         cache.put(focal_idx, opp_idx, scores)
+            merge_elapsed = _time.time() - merge_start
+            if merge_elapsed > 1.0:
+                print(f"      cache merge: {merge_elapsed:.1f}s", flush=True)
+        else:
+            print(f"    Round {round_idx}: {len(opp_data_list)} opponents, all cache hits",
+                  flush=True)
 
         # Identify even-scenario indices for the metric
         even_indices = [i for i, (s0, s1) in enumerate(shield_scenarios) if s0 == s1]
@@ -1043,13 +1084,28 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     chunk_size = max(1, (len(profile_list) + n_workers - 1) // n_workers)
     chunks = [profile_list[i:i+chunk_size] for i in range(0, len(profile_list), chunk_size)]
 
+    import time as _time
+    sim_start = _time.time()
+    chunk_results = []
     with multiprocessing.Pool(
         processes=n_workers,
         initializer=_sweep_worker_init,
         initargs=(species, focal_types, fm_template, cms_template,
                   opp_cache, shield_scenarios),
     ) as pool:
-        chunk_results = pool.map(_sweep_worker, chunks)
+        last_print = sim_start
+        completed = 0
+        for result in pool.imap_unordered(_sweep_worker, chunks):
+            chunk_results.append(result)
+            completed += 1
+            now = _time.time()
+            if now - last_print >= 10 and completed < len(chunks):
+                elapsed = now - sim_start
+                frac = completed / len(chunks)
+                eta = (elapsed / frac) * (1 - frac)
+                print(f"      progress: {completed}/{len(chunks)} chunks "
+                      f"({frac*100:.0f}%), eta {eta:.0f}s", flush=True)
+                last_print = now
 
     # Merge profile results
     profile_per_opp = {}
