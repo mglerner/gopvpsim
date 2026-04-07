@@ -1870,7 +1870,8 @@ def _generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mod
 
 
 def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
-                               shield_scenarios, opponent_names):
+                               shield_scenarios, opponent_names,
+                               slayer_iter_result=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
@@ -2116,6 +2117,55 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         results_parts.append('<ul class="dd-threshold-list">\n')
         results_parts.append('\n'.join(threshold_descs))
         results_parts.append('\n</ul>\n')
+
+    # -- Mirror Slayer Iteration --
+    if slayer_iter_result and slayer_iter_result.get('final'):
+        results_parts.append(f'<h3 class="dd-h3">Mirror Slayer Iteration</h3>\n')
+        results_parts.append(f'<p>Nash-style iterative discovery of IVs that beat the '
+                             f'{data_obj.get("species", "mirror")} mirror match. '
+                             f'Each round tests focal IVs against the previous round\'s top winners. '
+                             f'Survivors are classified into RyanSwag\'s three patterns.</p>\n')
+        rounds_run = slayer_iter_result.get('rounds_run', 0)
+        converged = slayer_iter_result.get('converged', False)
+        results_parts.append(f'<p class="dd-small">{rounds_run} rounds run '
+                             f'({"converged" if converged else "max rounds reached"}). '
+                             f'{slayer_iter_result.get("cache_stats", "")}</p>\n')
+
+        # Per-round summary table
+        history = slayer_iter_result.get('history', [])
+        if history:
+            results_parts.append('<table class="dd-table dd-narrow">\n')
+            results_parts.append('<tr><th>Round</th><th>Survivors</th><th>Max Wins</th><th>Top Avg Score</th></tr>\n')
+            for ri, top in enumerate(history):
+                if not top:
+                    continue
+                results_parts.append(f'<tr><td>{ri}</td><td>{len(top)}</td>'
+                                     f'<td>{top[0]["total_wins"]}</td>'
+                                     f'<td>{top[0]["avg_score"]:.1f}</td></tr>\n')
+            results_parts.append('</table>\n')
+
+        # Categorized survivors
+        categories = slayer_iter_result.get('categories', {})
+        if categories:
+            results_parts.append('<div class="dd-rec-grid">\n')
+            for cat_name, cat_ivs in categories.items():
+                if not cat_ivs:
+                    continue
+                results_parts.append(f'<div class="dd-rec-card">\n')
+                results_parts.append(f'<h4>{cat_name}</h4>\n')
+                results_parts.append('<table class="dd-table dd-narrow">\n')
+                results_parts.append('<tr><th>IVs</th><th>Atk</th><th>Def</th><th>HP</th><th>Wins</th><th>Avg</th></tr>\n')
+                for r in cat_ivs:
+                    a, d, s = r['iv']
+                    results_parts.append(f'<tr><td>{a}/{d}/{s}</td>'
+                                         f'<td>{r["atk"]:.2f}</td>'
+                                         f'<td>{r["def_"]:.2f}</td>'
+                                         f'<td>{r["hp"]}</td>'
+                                         f'<td class="dd-gain">{r["total_wins"]}</td>'
+                                         f'<td>{r["avg_score"]:.1f}</td></tr>\n')
+                results_parts.append('</table>\n')
+                results_parts.append('</div>\n')
+            results_parts.append('</div>\n')
 
     results_parts.append('</div>\n')
 
@@ -2422,7 +2472,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               thresholds=None, opponent_label=None,
                               shield_scenarios=None, opponent_names=None,
                               opp_iv_modes=None, reference_idx=-1,
-                              standalone=False):
+                              standalone=False, slayer_iter_result=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -2673,7 +2723,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # Deep dive analysis sections (banding, clusters, flips, etc.)
     analysis_css, results_html, analysis_html = generate_analysis_sections(
         data_obj, score_arrays, 0, opp_iv_modes[0],
-        shield_scenarios, opponent_names)
+        shield_scenarios, opponent_names,
+        slayer_iter_result=slayer_iter_result)
     # Inject analysis CSS into the style block (replace closing tag we already emitted)
     html = html.replace('</style>\n</head>', analysis_css + '\n</style>\n</head>', 1)
     # Results section is always visible; analysis is behind a toggle
@@ -3254,6 +3305,7 @@ def main():
 
     # Phase 2: Full IV sweep for each surviving moveset
     all_moveset_results = []
+    main_slayer_iter_result = None  # populated by first moveset's --mirror-slayer pass
     for mi, (fast_id, charged_ids) in enumerate(surviving):
         label = moveset_label(fast_id, charged_ids)
         print(f"  Phase 2 [{mi+1}/{len(surviving)}]: {label}")
@@ -3386,6 +3438,9 @@ def main():
                         a, d, s = r['iv']
                         print(f"        {a:2d}/{d:2d}/{s:2d}  atk={r['atk']:.2f} def={r['def_']:.2f} hp={r['hp']}  "
                               f"wins {r['total_wins']}/{r['n_pairs']*len(shield_scenarios)} avg {r['avg_score']:.1f}")
+                # Stash for HTML rendering
+                slayer_iter_result['categories'] = categories
+                main_slayer_iter_result = slayer_iter_result
 
         # Classify by thresholds if provided
         if thresholds:
@@ -3538,6 +3593,7 @@ def main():
                 opp_iv_modes=opp_iv_modes_to_run,
                 reference_idx=reference_idx,
                 standalone=args.standalone,
+                slayer_iter_result=main_slayer_iter_result,
             )
         else:
             # Static mode (original behavior)
