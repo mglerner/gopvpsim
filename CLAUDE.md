@@ -13,7 +13,8 @@ a BeeWare mobile app.
 - `breakpoints.py` — breakpoint and bulkpoint analysis
 
 ## Key design decisions
-- Pure Python, no C extensions (BeeWare/iOS compatibility)
+- Core `gopvpsim/` library is pure Python (keeps mobile option open).
+  Deep dive scripts (`scripts/`) may use numba/Cython/C extensions for speed.
 - Data sourced from PvPoke's open-source JSON (github.com/pvpoke/pvpoke)
 - Battle policies are pluggable — shield decisions, bait decisions, and
   charge move timing are separate from the core simulation loop

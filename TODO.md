@@ -109,11 +109,60 @@
 
 ## Performance
 
-* **Further sim optimization** — Multiprocessing across atk_iv chunks gives
-  ~6-7x speedup (1300 → ~10000 sims/s on a 10-core Mac). Further wins:
-  caching opponent BattlePokemon templates (avoid dict copies per sim),
-  optimizing the hot path in `simulate()`, or process pool reuse across
-  multiple iv_sweep calls. Must stay pure Python (BeeWare/iOS compatibility).
+**Architecture note (2026-04-07)**: The BeeWare/iOS-pure-Python constraint
+has been DROPPED. Mobile is no longer a meaningful use case for the deep
+dive scripts. We can now use numba, Cython, C extensions, etc. — though
+the core `gopvpsim/` library should still avoid making mobile impossible
+in case we want to revisit it. The optimization work below targets the
+desktop deep-dive workflow.
+
+**Optimization priority order** (next session, highest impact first):
+
+1. **Eliminate per-sim dict copies in BattlePokemon construction**
+   — Each `simulate()` call currently does `dict(fm_template)` and
+   `[dict(cm) for cm in cms_template]` for both focal and opponent.
+   That's ~4 dict allocations per sim × ~40M sims per slayer round
+   = 170M+ allocations. Many of these are likely redundant: if move
+   templates are treated as immutable inside `simulate()` (verify by
+   reading the simulate path), we can share them across sims.
+   Estimated speedup: 2-3x. Smallest invasive change.
+
+2. **Cache opponent BattlePokemon objects, reset mutable state between sims**
+   — In a slayer round chunk, the same opponent IV is simulated against
+   2430 focal profiles × 9 scenarios = 21,870 times. Currently we build
+   a fresh BattlePokemon each time. Better: build once per (opp, scenario),
+   then reset HP/energy/buffs between sims via a `reset()` method.
+   Estimated speedup: 1.5-2x on top of #1.
+
+3. **Add `__slots__` to `BattlePokemon` and `Move` classes**
+   — Reduces attribute lookup cost and memory footprint. Easy change,
+   small but real wins (5-15%).
+
+4. **Numba JIT for the damage formula and inner sim loop**
+   — Preferred over Cython because numba is quick to implement and
+   leaves the code looking like Python in the easy cases. Annotate
+   `_pvp_damage` and the tightest loops in `battle.py` with `@njit`.
+   Type effectiveness lookups would need restructuring (numba doesn't
+   like Python dicts well — use numpy arrays indexed by type enum).
+   Estimated speedup: 5-10x for arithmetic-heavy paths. Try this AFTER
+   #1 and #2 since profiling will show whether it's worth the cost.
+
+5. **Profile-guided optimization** (do this BEFORE #4)
+   — Run `py-spy` or `cProfile` on a real deep dive to find the actual
+   hot spots. We're guessing about which functions matter most. Profile
+   first, optimize second.
+
+6. **Process pool reuse** — Currently we create a new `multiprocessing.Pool`
+   for each iv_sweep call. Pool startup is ~1-2 seconds. Across a deep
+   dive with 5 sweeps + 1 slayer iteration, that's ~10s of overhead.
+   Minor but free.
+
+**Why the speedup matters now**: A full Annihilape deep dive with
+`--mirror-slayer --mirror-slayer-rounds 4 --mirror-slayer-metric even-strict`
+currently takes ~90 minutes wall clock (the slayer round 1 is the
+dominant cost at ~85 min). With the optimizations above stacked, we
+should be able to bring that to under 10 minutes, making iterative
+experimentation actually pleasant.
 
 * **HTML file size** -- Are our deep dive/interactive HTML files
   getting too big?
