@@ -27,6 +27,16 @@ from typing import Callable
 from .moves import damage as calc_damage, type_effectiveness, stab
 from .data import parse_types
 
+# Optional numba JIT for the near-KO DP loop. If unavailable (numba not
+# installed, LLVM mismatch, etc.), pvpoke_dp falls back to the pure-Python
+# loop further down.
+try:
+    import numpy as _np
+    from ._dp_jit import _near_ko_dp_jit as _NEAR_KO_DP_JIT
+except Exception:                       # pragma: no cover - jit optional
+    _np = None
+    _NEAR_KO_DP_JIT = None
+
 ENERGY_CAP = 100
 MAX_TURNS  = 500   # ~4 minutes; prevents infinite loops
 
@@ -406,16 +416,32 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
     return use_shield
 
 
-# DP state: (energy, opp_hp, turn, opp_shields, moves_list)
-# moves_list: list of move indices thrown in this branch
+# DP state: scalar-only fields (no Python list of moves).
+#
+# Originally each state carried a `moves: list[int]` of charge-move indices
+# thrown in this branch. The post-DP code only needs four pieces of
+# information about the plan:
+#   - the first move thrown      (first_idx)
+#   - the highest-damage move    (max_dmg_idx)  — for the shields-down sort
+#   - whether any move debuffs   (has_debuf)    — gates that sort branch
+#   - net debuff count           (debuf_count)  — for _dp_insert_ready dedup
+#
+# Tracking these as scalars avoids a per-state `list + [n]` allocation in the
+# inner loop and makes the state numba-friendly. With no moves: first_idx is
+# -1 and the other scalars are 0.
 class _DPState:
-    __slots__ = ('energy', 'hp', 'turn', 'shields', 'moves')
-    def __init__(self, energy, hp, turn, shields, moves):
-        self.energy  = energy
-        self.hp      = hp
-        self.turn    = turn
-        self.shields = shields
-        self.moves   = moves
+    __slots__ = ('energy', 'hp', 'turn', 'shields',
+                 'first_idx', 'max_dmg_idx', 'has_debuf', 'debuf_count')
+    def __init__(self, energy, hp, turn, shields,
+                 first_idx, max_dmg_idx, has_debuf, debuf_count):
+        self.energy      = energy
+        self.hp          = hp
+        self.turn        = turn
+        self.shields     = shields
+        self.first_idx   = first_idx
+        self.max_dmg_idx = max_dmg_idx
+        self.has_debuf   = has_debuf
+        self.debuf_count = debuf_count
 
 
 def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> bool:
@@ -532,18 +558,21 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     return True   # optimize: throw fast move instead
 
 
-def _dp_count_debuffs(moves: list, cms: list) -> int:
-    """Count net debuffs in a move plan (for dedup tie-breaking)."""
-    count = 0
-    for m_idx in moves:
-        m = cms[m_idx]
-        if m.get('selfDebuffing', False):
-            count += 1
-        if (m.get('buffApplyChance') == 1
-                and m.get('buffTarget') == 'self'
-                and sum(m.get('buffs', [0, 0])) > 0):
-            count -= 1
-    return count
+def _cm_debuf_delta(m: dict) -> int:
+    """Per-move delta for the dedup tie-break debuff count.
+
+    +1 for self-debuffing, −1 for guaranteed self-buffing. Precomputed once
+    per cms-list at the top of pvpoke_dp so the inner loop only carries an
+    integer running sum.
+    """
+    delta = 0
+    if m.get('selfDebuffing', False):
+        delta += 1
+    if (m.get('buffApplyChance') == 1
+            and m.get('buffTarget') == 'self'
+            and sum(m.get('buffs', [0, 0])) > 0):
+        delta -= 1
+    return delta
 
 
 # ---------------------------------------------------------------------------
@@ -590,7 +619,7 @@ def _dp_insert_farm_down(queue: list, ns: "_DPState", *,
     queue.insert(i, ns)
 
 
-def _dp_insert_ready(queue: list, ns: "_DPState", cms: list, *,
+def _dp_insert_ready(queue: list, ns: "_DPState", *,
                      intended_pruning: bool = False) -> None:
     """Ready-move insertion (PvPoke lines 541-616).
 
@@ -611,15 +640,21 @@ def _dp_insert_ready(queue: list, ns: "_DPState", cms: list, *,
     # Phase 1: dedup (always active — uses .oppHealth, a real field)
     i = 0
     insert_element = True
-    while i < len(queue) and queue[i].turn == ns.turn:
+    n = len(queue)
+    ns_turn = ns.turn
+    ns_hp = ns.hp
+    ns_energy = ns.energy
+    ns_debuf = ns.debuf_count
+    while i < n and queue[i].turn == ns_turn:
+        q = queue[i]
         # buffs always 0 → buffs check always matches
-        if queue[i].hp == ns.hp:
-            if queue[i].energy == ns.energy:
-                # Same energy — compare debuff counts
-                existing_debuffs = _dp_count_debuffs(queue[i].moves, cms)
-                new_debuffs = _dp_count_debuffs(ns.moves, cms)
-                if existing_debuffs > new_debuffs:
+        if q.hp == ns_hp:
+            if q.energy == ns_energy:
+                # Same energy — compare net debuff counts (precomputed
+                # scalar on each state, no per-comparison list scan)
+                if q.debuf_count > ns_debuf:
                     queue.pop(i)  # remove worse existing state
+                    n -= 1
                 else:
                     insert_element = False
                     i += 1
@@ -636,14 +671,16 @@ def _dp_insert_ready(queue: list, ns: "_DPState", cms: list, *,
     # Phase 2: dominance check (dead code in PvPoke; active if intended)
     i = 0
     if intended_pruning:
-        while i < len(queue) and queue[i].turn <= ns.turn:
-            if (queue[i].hp <= ns.hp
-                    and queue[i].energy >= ns.energy
-                    and queue[i].shields <= ns.shields):
+        ns_shields = ns.shields
+        while i < n and queue[i].turn <= ns_turn:
+            q = queue[i]
+            if (q.hp <= ns_hp
+                    and q.energy >= ns_energy
+                    and q.shields <= ns_shields):
                 return  # dominated by existing state
             i += 1
     else:
-        while i < len(queue) and queue[i].turn <= ns.turn:
+        while i < n and queue[i].turn <= ns_turn:
             i += 1
     queue.insert(i, ns)
 
@@ -737,6 +774,11 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # original-charged-moves index for each sorted entry — used by callers
     # that need to return an index into attacker.charged_moves
     cm_orig_idx = [a_idx_map[id(m)] for m in cms]
+    # Per-cm self-debuff flag and net debuff delta — precomputed once so the
+    # near-KO DP body can update its scalar plan summary in O(1) without dict
+    # lookups on each move dispatch.
+    cm_self_debuf = [1 if m.get('selfDebuffing', False) else 0 for m in cms]
+    cm_debuf_delta = [_cm_debuf_delta(m) for m in cms]
 
     def _orig_idx(move: dict) -> int:
         """Map a move back to its index in attacker.charged_moves."""
@@ -884,74 +926,111 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # ------------------------------------------------------------------ #
     # Near-KO: DP to find the fastest charge-move sequence that KOs
     # ------------------------------------------------------------------ #
-    queue: list = [_DPState(attacker.energy, float(defender.hp), 0, defender.shields, [])]
     final_state: "_DPState | None" = None
     iters = 0
 
-    while queue and iters < 500:
-        iters += 1
-        curr = queue.pop(0)
+    if _NEAR_KO_DP_JIT is not None:
+        # Numba-JIT'd inner DP. Same algorithm as the Python loop below;
+        # operates on numpy scalar arrays for ~5-10x inner-loop speedup.
+        cm_dmgs_np    = _np.asarray(cm_dmgs, dtype=_np.float64)
+        cm_energy_np  = _np.asarray(cm_energy, dtype=_np.int64)
+        cm_self_db_np = _np.asarray(cm_self_debuf, dtype=_np.int8)
+        cm_db_dlt_np  = _np.asarray(cm_debuf_delta, dtype=_np.int8)
+        (found, _first, _max_idx, _has_deb, _deb_cnt,
+         _f_turn, _f_hp, _f_sh, iters) = _NEAR_KO_DP_JIT(
+            cm_dmgs_np, cm_energy_np, cm_self_db_np, cm_db_dlt_np,
+            n_cms,
+            int(attacker.energy),
+            float(defender.hp),
+            int(defender.shields),
+            int(fast_damage),
+            int(fast_energy),
+            int(fast_turns),
+            bool(intended_pruning),
+        )
+        if found:
+            final_state = _DPState(0, _f_hp, _f_turn, _f_sh,
+                                   _first, _max_idx, _has_deb, _deb_cnt)
+        # else: final_state stays None → fall through to greedy fallback
+    else:
+        # Pure-Python fallback (numba unavailable). Same algorithm as the
+        # JIT in _dp_jit.py — kept here so the project still runs without
+        # numba installed.
+        queue: list = [_DPState(attacker.energy, float(defender.hp), 0,
+                                 defender.shields, -1, -1, 0, 0)]
+        while queue and iters < 500:
+            iters += 1
+            curr = queue.pop(0)
 
-        # KO achieved — this is the fastest plan (chance == 1 path → break)
-        if curr.hp <= 0:
-            final_state = curr
-            break
+            # KO achieved — this is the fastest plan (chance == 1 path → break)
+            if curr.hp <= 0:
+                final_state = curr
+                break
 
-        curr_e  = curr.energy
-        curr_hp = curr.hp
-        curr_t  = curr.turn
-        curr_sh = curr.shields
-        curr_moves = curr.moves
-        for n in range(n_cms):
-            move_dmg = cm_dmgs[n]
-            move_e   = cm_energy[n]
+            curr_e        = curr.energy
+            curr_hp       = curr.hp
+            curr_t        = curr.turn
+            curr_sh       = curr.shields
+            curr_first    = curr.first_idx
+            curr_max_idx  = curr.max_dmg_idx
+            curr_max_dmg  = cm_dmgs[curr_max_idx] if curr_max_idx >= 0 else -1.0
+            curr_has_deb  = curr.has_debuf
+            curr_deb_cnt  = curr.debuf_count
+            for n in range(n_cms):
+                move_dmg = cm_dmgs[n]
+                move_e   = cm_energy[n]
 
-            if curr_e >= move_e:
-                # Move ready (PvPoke lines 524-616): dedup + dominance
-                # pruning, insert AFTER same-turn (<=)
-                new_e  = curr_e - move_e
-                new_t  = curr_t + 1
-                new_sh = curr_sh
-                if curr_sh > 0:
-                    new_hp = curr_hp - 1
-                    new_sh -= 1
+                # Update scalar plan summary for the new state.
+                new_first = curr_first if curr_first >= 0 else n
+                if move_dmg > curr_max_dmg:
+                    new_max_idx = n
                 else:
-                    new_hp = curr_hp - move_dmg
+                    new_max_idx = curr_max_idx
+                new_has_deb = curr_has_deb | cm_self_debuf[n]
+                new_deb_cnt = curr_deb_cnt + cm_debuf_delta[n]
 
-                _dp_insert_ready(
-                    queue,
-                    _DPState(new_e, new_hp, new_t, new_sh, curr_moves + [n]),
-                    cms, intended_pruning=intended_pruning)
-            else:
-                # Move not ready (PvPoke lines 686-708): dominance
-                # pruning, insert BEFORE same-turn (<).  This gives
-                # charged-move KO paths priority over farm-down KOs.
-                fm_needed    = math.ceil((move_e - curr_e) / fast_energy)
-                turns_needed = fm_needed * fast_turns
-                new_e  = fm_needed * fast_energy + curr_e - move_e
-                new_t  = curr_t + turns_needed + 1
-                new_sh = curr_sh
-                if curr_sh > 0:
-                    new_hp = curr_hp - fast_damage * fm_needed - 1
-                    new_sh -= 1
+                if curr_e >= move_e:
+                    new_e  = curr_e - move_e
+                    new_t  = curr_t + 1
+                    new_sh = curr_sh
+                    if curr_sh > 0:
+                        new_hp = curr_hp - 1
+                        new_sh -= 1
+                    else:
+                        new_hp = curr_hp - move_dmg
+
+                    _dp_insert_ready(
+                        queue,
+                        _DPState(new_e, new_hp, new_t, new_sh,
+                                 new_first, new_max_idx, new_has_deb, new_deb_cnt),
+                        intended_pruning=intended_pruning)
                 else:
-                    new_hp = curr_hp - fast_damage * fm_needed - move_dmg
+                    fm_needed    = math.ceil((move_e - curr_e) / fast_energy)
+                    turns_needed = fm_needed * fast_turns
+                    new_e  = fm_needed * fast_energy + curr_e - move_e
+                    new_t  = curr_t + turns_needed + 1
+                    new_sh = curr_sh
+                    if curr_sh > 0:
+                        new_hp = curr_hp - fast_damage * fm_needed - 1
+                        new_sh -= 1
+                    else:
+                        new_hp = curr_hp - fast_damage * fm_needed - move_dmg
 
-                _dp_insert_not_ready(
+                    _dp_insert_not_ready(
+                        queue,
+                        _DPState(new_e, new_hp, new_t, new_sh,
+                                 new_first, new_max_idx, new_has_deb, new_deb_cnt),
+                        intended_pruning=intended_pruning)
+
+            if fast_damage > 0 and curr_hp > 0:
+                fm_to_ko  = math.ceil(curr_hp / fast_damage)
+                fd_turn   = curr_t + fm_to_ko * fast_turns
+                fd_energy = curr_e + fast_energy * fm_to_ko
+                _dp_insert_farm_down(
                     queue,
-                    _DPState(new_e, new_hp, new_t, new_sh, curr_moves + [n]),
+                    _DPState(fd_energy, 0.0, fd_turn, curr_sh,
+                             curr_first, curr_max_idx, curr_has_deb, curr_deb_cnt),
                     intended_pruning=intended_pruning)
-
-        # Farm-down state: fast-move to KO from here with no more charged
-        # moves.
-        if fast_damage > 0 and curr.hp > 0:
-            fm_to_ko  = math.ceil(curr.hp / fast_damage)
-            fd_turn   = curr.turn + fm_to_ko * fast_turns
-            fd_energy = curr.energy + fast_energy * fm_to_ko
-            _dp_insert_farm_down(
-                queue,
-                _DPState(fd_energy, 0.0, fd_turn, curr.shields, curr.moves[:]),
-                intended_pruning=intended_pruning)
 
     # ------------------------------------------------------------------ #
     # Select move from plan
@@ -964,7 +1043,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         best_sorted_idx = max(affordable, key=actual_dpe)
         return cm_orig_idx[best_sorted_idx]
 
-    if not final_state.moves:
+    if final_state.first_idx < 0:
         # Farm-down plan: no charged moves needed, just fast-move to KO.
         # PvPoke returns undefined (no action) in this case.
         if _dp_trace:
@@ -974,13 +1053,16 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
 
     if _dp_trace:
         _policy_log.append(
-            f"  DP-trace[{attacker.species}]: raw plan="
-            f"{[cms[i].get('moveId') for i in final_state.moves]}"
+            f"  DP-trace[{attacker.species}]: raw plan first="
+            f"{cms[final_state.first_idx].get('moveId')}"
+            f" max_dmg={cms[final_state.max_dmg_idx].get('moveId')}"
+            f" has_deb={bool(final_state.has_debuf)}"
             f" turn={final_state.turn} hp={final_state.hp:.0f}"
             f" shields={final_state.shields} iters={iters}")
 
-    # Check if plan contains a debuffing move (used by sort gate)
-    has_debuffing_move = any(cms[n].get('selfDebuffing', False) for n in final_state.moves)
+    has_debuffing_move = bool(final_state.has_debuf)
+    final_first_thrown = final_state.first_idx
+    final_max_dmg_idx  = final_state.max_dmg_idx
 
     # Bait-wait check (ActionLogic.js lines 820-835):
     # If shields are up and we can't yet afford cms[1] but it has better DPE
@@ -989,7 +1071,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     if defender.shields > 0 and n_cms > 1:
         cm1 = cms[1]
         if (attacker.energy < cm_energy[1]
-                and raw_dpe(cm1) > raw_dpe(cms[final_state.moves[0]])
+                and raw_dpe(cm1) > raw_dpe(cms[final_first_thrown])
                 and not cm1.get('selfDebuffing', False)):
             bait = True
             # Don't bait if an effective self-buffing move exists (line 826)
@@ -1002,25 +1084,27 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                         f"  DP-trace[{attacker.species}]: bait-wait for {cm1.get('moveId')}")
                 return None
 
+    # PvPoke sorts plan by damage descending only when baitShields is falsy or
+    # when opponent.shields == 0 AND no debuffing move (ActionLogic.js lines 850-858).
+    # In scalar form: first_idx = max_dmg_idx (sort branch) or first_thrown.
+    if defender.shields == 0 and not has_debuffing_move:
+        first_idx = final_max_dmg_idx
+    else:
+        first_idx = final_first_thrown
+
     # Don't-bait-if-won't-shield (ActionLogic.js lines 838-847):
-    # This one uses actual damage (move.damage / move.energy).
+    # This one uses actual damage (move.damage / move.energy).  PvPoke reads
+    # final_state.moves[0] (= first thrown) for fm0_dpe, then mutates
+    # moves[0] = 1 — only takes effect when shields > 0 (so the sort branch
+    # above does NOT fire), so we override `first_idx` directly here.
     if defender.shields > 0 and n_cms > 1:
         cm1 = cms[1]
-        fm0_dpe = actual_dpe(final_state.moves[0])
+        fm0_dpe = actual_dpe(final_first_thrown)
         if fm0_dpe > 0 and attacker.energy >= cm_energy[1]:
             dpe_ratio = actual_dpe(1) / fm0_dpe
             if dpe_ratio > 1.5 and not would_shield(attacker, defender, cm1):
-                # cm1 is cms[1] (which exists since n_cms > 1)
-                final_state.moves[0] = 1
+                first_idx = 1
 
-    # PvPoke sorts plan by damage descending only when baitShields is falsy or
-    # when opponent.shields == 0 AND no debuffing move (ActionLogic.js lines 850-858).
-    if defender.shields == 0 and not has_debuffing_move:
-        plan = sorted(final_state.moves, key=cm_dmgs.__getitem__, reverse=True)
-    else:
-        plan = final_state.moves
-
-    first_idx  = plan[0]
     first_move = cms[first_idx]
 
     # --- Post-DP bandaids (ActionLogic.js lines 861-935) ---
