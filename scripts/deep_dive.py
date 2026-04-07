@@ -350,7 +350,8 @@ def _build_focal_meta(species, league, shadow):
 
 def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                                 shield_scenarios, initial_opp_iv,
-                                max_rounds=4, top_per_round=10, cache=None):
+                                max_rounds=4, top_per_round=10, cache=None,
+                                metric='all'):
     """
     Iterative slayer discovery: find IVs that beat the mirror match through
     Nash-style iteration.
@@ -438,17 +439,34 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                 for (focal_idx, opp_idx), scores in chunk.items():
                     cache.put(focal_idx, opp_idx, scores)
 
+        # Identify even-scenario indices for the metric
+        even_indices = [i for i, (s0, s1) in enumerate(shield_scenarios) if s0 == s1]
+        n_even = len(even_indices)
+
         # Score each focal IV vs current opponents
         focal_scores = []
         for focal_idx in range(n_focal):
             total_wins = 0
+            even_wins_per_opp = []  # for "even-strict" mode
             total_score = 0
             n_pairs = 0
             for opp_idx, _ in opp_data_list:
                 cached = cache.get(focal_idx, opp_idx)
                 if cached is None:
                     continue
-                wins = sum(1 for s in cached if s >= 500)
+
+                if metric == 'all':
+                    wins = sum(1 for s in cached if s >= 500)
+                elif metric == 'even':
+                    wins = sum(1 for i in even_indices if cached[i] >= 500)
+                elif metric == 'even-strict':
+                    # Counts only IVs that win ALL even scenarios vs this opponent
+                    won_all_even = all(cached[i] >= 500 for i in even_indices)
+                    wins = n_even if won_all_even else 0
+                    even_wins_per_opp.append(won_all_even)
+                else:
+                    wins = sum(1 for s in cached if s >= 500)
+
                 avg = sum(cached) / len(cached)
                 total_wins += wins
                 total_score += avg
@@ -501,14 +519,14 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     }
 
 
-def categorize_slayers(survivors, iv_meta_list=None):
+def categorize_slayers(survivors, iv_meta_list=None, top_n=20):
     """
     Classify slayer survivors into RyanSwag's three patterns:
     - Atk Slayer: atk noticeably above survivor median (chases breakpoints)
     - Bulk Slayer: HP+Def above median (outlasts opponents)
     - CMP Slayer: top quartile by atk among survivors (priority ties)
 
-    Returns dict of category -> top N IVs in that category, sorted by quality.
+    Returns dict of category -> top top_n IVs in that category, sorted by quality.
     """
     if not survivors:
         return {}
@@ -543,9 +561,9 @@ def categorize_slayers(survivors, iv_meta_list=None):
     cmp_slayers.sort(key=lambda r: (-r['total_wins'], -r['atk']))
 
     return {
-        'Atk Slayer': atk_slayers[:5],
-        'Bulk Slayer': bulk_slayers[:5],
-        'CMP Slayer': cmp_slayers[:5],
+        'Atk Slayer': atk_slayers[:top_n],
+        'Bulk Slayer': bulk_slayers[:top_n],
+        'CMP Slayer': cmp_slayers[:top_n],
     }
 
 
@@ -2121,10 +2139,19 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # -- Mirror Slayer Iteration --
     if slayer_iter_result and slayer_iter_result.get('final'):
         results_parts.append(f'<h3 class="dd-h3">Mirror Slayer Iteration</h3>\n')
+        metric_label = slayer_iter_result.get('metric', 'all')
+        max_rounds_arg = slayer_iter_result.get('max_rounds_arg', 4)
+        metric_explain = {
+            'all': 'all 9 shield scenarios count toward win totals',
+            'even': 'only even shields (0v0/1v1/2v2) count toward win totals',
+            'even-strict': 'only IVs that win ALL three even shields against an opponent get credit',
+        }.get(metric_label, '')
         results_parts.append(f'<p>Nash-style iterative discovery of IVs that beat the '
                              f'{data_obj.get("species", "mirror")} mirror match. '
                              f'Each round tests focal IVs against the previous round\'s top winners. '
                              f'Survivors are classified into RyanSwag\'s three patterns.</p>\n')
+        results_parts.append(f'<p class="dd-small"><b>Metric:</b> <code>{metric_label}</code> '
+                             f'({metric_explain}) | <b>Max rounds:</b> {max_rounds_arg}</p>\n')
         rounds_run = slayer_iter_result.get('rounds_run', 0)
         converged = slayer_iter_result.get('converged', False)
         results_parts.append(f'<p class="dd-small">{rounds_run} rounds run '
@@ -3187,6 +3214,22 @@ def main():
                              'the deep dive but classifies survivors into Atk Slayer, '
                              'Bulk Slayer, and CMP Slayer categories. Results are '
                              'cached on disk for fast re-runs.')
+    parser.add_argument('--mirror-slayer-metric', default='all',
+                        choices=['all', 'even', 'even-strict'],
+                        help='Slayer iteration metric: "all" counts wins across all '
+                             '9 scenarios (default), "even" counts only 0v0/1v1/2v2, '
+                             '"even-strict" requires winning ALL 3 even scenarios.')
+    parser.add_argument('--mirror-slayer-rounds', type=int, default=4,
+                        help='Max rounds for mirror slayer iteration (default 4). '
+                             'Set to 1 for "beat the typical opponent" mode (no '
+                             'Nash iteration).')
+    parser.add_argument('--mirror-slayer-pool', type=int, default=30,
+                        help='Number of survivors to keep per iteration round '
+                             '(default 30). Larger = more inclusive surviving '
+                             'cohort, more IVs reported in final categories.')
+    parser.add_argument('--mirror-slayer-show', type=int, default=20,
+                        help='Number of IVs to show per category in final output '
+                             '(default 20).')
     parser.add_argument('--no-cache', action='store_true',
                         help='Disable disk cache for slayer iteration')
 
@@ -3385,7 +3428,8 @@ def main():
         # Iterative slayer discovery (Nash-style) on the first moveset
         slayer_iter_result = None
         if mi == 0 and args.mirror_slayer and mirror_idx is not None:
-            print(f"  Mirror slayer iteration (--mirror-slayer):")
+            print(f"  Mirror slayer iteration (metric={args.mirror_slayer_metric}, "
+                  f"max_rounds={args.mirror_slayer_rounds}):")
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
             from slayer_cache import SlayerCache, compute_cache_key
             base = get_species(args.species)
@@ -3413,9 +3457,14 @@ def main():
                     args.species, args.league, args.shadow,
                     fast_id, charged_ids, shield_scenarios,
                     initial_opp_iv,
-                    max_rounds=4, top_per_round=10,
+                    max_rounds=args.mirror_slayer_rounds,
+                    top_per_round=args.mirror_slayer_pool,
                     cache=slayer_cache,
+                    metric=args.mirror_slayer_metric,
                 )
+                # Stash the metric/rounds for HTML rendering
+                slayer_iter_result['metric'] = args.mirror_slayer_metric
+                slayer_iter_result['max_rounds_arg'] = args.mirror_slayer_rounds
                 slayer_cache.save()
                 elapsed_iter = time.time() - t_iter
                 print(f"    {slayer_iter_result['rounds_run']} rounds in {elapsed_iter:.1f}s "
@@ -3429,7 +3478,7 @@ def main():
 
                 # Categorize survivors
                 survivors = slayer_iter_result['final']
-                categories = categorize_slayers(survivors)
+                categories = categorize_slayers(survivors, top_n=args.mirror_slayer_show)
                 print(f"    Final survivors classified into {sum(1 for v in categories.values() if v)} categories:")
                 for cat_name, cat_ivs in categories.items():
                     if not cat_ivs:
