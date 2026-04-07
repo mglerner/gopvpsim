@@ -227,6 +227,328 @@ def discover_slayer_thresholds(results, opponent_idx, n_scenarios, opponent_name
     return thresh, scored
 
 
+# ---------------------------------------------------------------------------
+# Iterative slayer discovery (mirror match Nash-style iteration)
+# ---------------------------------------------------------------------------
+
+# Worker state for slayer iteration multiprocessing
+_slayer_state = {}
+
+
+def _slayer_worker_init(species, focal_types, base_atk, base_def, base_sta,
+                         max_cp, shadow, fm_template, cms_template,
+                         shield_scenarios):
+    _slayer_state['species'] = species
+    _slayer_state['focal_types'] = focal_types
+    _slayer_state['base_atk'] = base_atk
+    _slayer_state['base_def'] = base_def
+    _slayer_state['base_sta'] = base_sta
+    _slayer_state['max_cp'] = max_cp
+    _slayer_state['shadow'] = shadow
+    _slayer_state['fm_template'] = fm_template
+    _slayer_state['cms_template'] = cms_template
+    _slayer_state['shield_scenarios'] = shield_scenarios
+
+
+def _slayer_iter_worker(args):
+    """
+    Process one atk_iv chunk against a list of opponent IVs.
+    Returns dict of (a, d, s, opp_iv_idx) -> tuple of scores.
+    """
+    from gopvpsim.pokemon import SHADOW_ATK_BONUS, SHADOW_DEF_MULT
+
+    a, opponents, focal_iv_to_idx = args
+    ws = _slayer_state
+    species = ws['species']
+    focal_types = ws['focal_types']
+    base_atk, base_def, base_sta = ws['base_atk'], ws['base_def'], ws['base_sta']
+    max_cp = ws['max_cp']
+    shadow = ws['shadow']
+    fm_template = ws['fm_template']
+    cms_template = ws['cms_template']
+    shield_scenarios = ws['shield_scenarios']
+
+    results = {}
+    for d in range(16):
+        for s in range(16):
+            lv = best_level(base_atk, base_def, base_sta, a, d, s,
+                            max_cp=max_cp, max_level=51.0)
+            if lv is None:
+                continue
+            cpm = CPM[lv]
+            atk_stat = (base_atk + a) * cpm
+            def_stat = (base_def + d) * cpm
+            if shadow:
+                atk_stat *= SHADOW_ATK_BONUS
+                def_stat *= SHADOW_DEF_MULT
+            hp_stat = math.floor((base_sta + s) * cpm)
+
+            # focal_iv_idx: lookup using (a, d, s) → idx in canonical IV list
+            focal_idx = focal_iv_to_idx.get((a, d, s))
+            if focal_idx is None:
+                continue
+
+            # Sim against each opponent
+            for opp_iv_idx, opp_data in opponents:
+                # opp_data: (atk, def_, hp) computed by parent
+                opp_atk = opp_data[0]
+                opp_def = opp_data[1]
+                opp_hp = opp_data[2]
+                scores = []
+                for s_focal, s_opp in shield_scenarios:
+                    bp0 = BattlePokemon(
+                        species=species, types=focal_types,
+                        atk=atk_stat, def_=def_stat, max_hp=hp_stat,
+                        fast_move=dict(fm_template),
+                        charged_moves=[dict(cm) for cm in cms_template],
+                        shields=s_focal,
+                    )
+                    bp1 = BattlePokemon(
+                        species=species, types=focal_types,
+                        atk=opp_atk, def_=opp_def, max_hp=opp_hp,
+                        fast_move=dict(fm_template),
+                        charged_moves=[dict(cm) for cm in cms_template],
+                        shields=s_opp,
+                    )
+                    res = simulate(bp0, bp1,
+                                   charged_policy_0=pvpoke_dp,
+                                   charged_policy_1=pvpoke_dp)
+                    scores.append(round(res.pvpoke_score(0)))
+                results[(focal_idx, opp_iv_idx)] = tuple(scores)
+    return results
+
+
+def _build_focal_meta(species, league, shadow):
+    """Compute (atk, def, hp, iv_idx) for all valid focal IVs."""
+    base = get_species(species)
+    base_atk, base_def, base_sta = base['atk'], base['def'], base['hp']
+    max_cp = LEAGUE_CAPS[league]
+    from gopvpsim.pokemon import SHADOW_ATK_BONUS, SHADOW_DEF_MULT
+
+    iv_to_idx = {}  # (a, d, s) -> idx
+    iv_meta = []  # list of (a, d, s, atk, def, hp)
+    idx = 0
+    for a in range(16):
+        for d in range(16):
+            for s in range(16):
+                lv = best_level(base_atk, base_def, base_sta, a, d, s,
+                                max_cp=max_cp, max_level=51.0)
+                if lv is None:
+                    continue
+                cpm = CPM[lv]
+                atk_stat = (base_atk + a) * cpm
+                def_stat = (base_def + d) * cpm
+                if shadow:
+                    atk_stat *= SHADOW_ATK_BONUS
+                    def_stat *= SHADOW_DEF_MULT
+                hp_stat = math.floor((base_sta + s) * cpm)
+                iv_to_idx[(a, d, s)] = idx
+                iv_meta.append((a, d, s, atk_stat, def_stat, hp_stat))
+                idx += 1
+    return iv_to_idx, iv_meta
+
+
+def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
+                                shield_scenarios, initial_opp_iv,
+                                max_rounds=4, top_per_round=10, cache=None):
+    """
+    Iterative slayer discovery: find IVs that beat the mirror match through
+    Nash-style iteration.
+
+    Round 0: test all 4096 focal IVs vs the initial opponent (e.g. PvPoke
+             default). Find the top N by win count.
+    Round k: test all 4096 focal IVs vs the previous round's top N opponents.
+             Find the new top N by total wins across all current opponents.
+    Stop when: top set converges, or max_rounds reached.
+
+    Returns dict with:
+        'history': list of per-round top sets (each is list of (focal_idx, total_wins, avg_score, atk, def, hp))
+        'final': the final top set (list of dicts)
+        'rounds_run': how many rounds executed
+        'converged': bool
+        'cache_stats': string from cache
+    """
+    import multiprocessing
+    # slayer_cache is in the same scripts/ directory
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from slayer_cache import SlayerCache
+
+    iv_to_idx, iv_meta = _build_focal_meta(species, league, shadow)
+    n_focal = len(iv_meta)
+
+    fast_moves_db, charged_moves_db = get_moves()
+    fm_template = dict(fast_moves_db[fast_id])
+    cms_template = [dict(charged_moves_db[cid]) for cid in charged_ids]
+
+    gm = load_gamemaster()
+    focal_mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
+    focal_types = parse_types(focal_mon)
+
+    base = get_species(species)
+    base_atk, base_def, base_sta = base['atk'], base['def'], base['hp']
+    max_cp = LEAGUE_CAPS[league]
+
+    if cache is None:
+        cache = SlayerCache(disk=False)
+
+    # Round 0: initial opponent IV
+    initial_iv = initial_opp_iv  # (a, d, s)
+    if initial_iv not in iv_to_idx:
+        # Initial opponent not in our IV list (shouldn't happen)
+        return {'error': f'Initial opponent IV {initial_iv} not in valid IVs'}
+
+    current_opponent_indices = [iv_to_idx[initial_iv]]
+    history = []
+    converged = False
+
+    n_workers = min(multiprocessing.cpu_count(), 16)
+
+    for round_idx in range(max_rounds):
+        # Build opponent meta (atk, def, hp) for current round's opponents
+        opp_data_list = []
+        for opp_idx in current_opponent_indices:
+            a, d, s, atk_, def_, hp_ = iv_meta[opp_idx]
+            opp_data_list.append((opp_idx, (atk_, def_, hp_)))
+
+        # Determine which (focal, opp) pairs need sim (cache miss)
+        # For simplicity, we sim all pairs for opponents not yet fully cached.
+        # The worker computes for an entire (atk_chunk × all opponents) in one shot,
+        # so we can't cache-skip individual entries within a chunk easily.
+        # Instead: identify opponents fully cached vs needing sim.
+        opps_needing_sim = []
+        for opp_idx, opp_data in opp_data_list:
+            # Check if this opp is fully cached for all focal IVs
+            if not all((focal_idx, opp_idx) in cache.data for focal_idx in range(n_focal)):
+                opps_needing_sim.append((opp_idx, opp_data))
+
+        if opps_needing_sim:
+            # Run sims for cache-missing opponents in parallel across atk chunks
+            init_args = (species, focal_types, base_atk, base_def, base_sta,
+                         max_cp, shadow, fm_template, cms_template, shield_scenarios)
+            with multiprocessing.Pool(
+                processes=n_workers,
+                initializer=_slayer_worker_init,
+                initargs=init_args,
+            ) as pool:
+                worker_args = [(a, opps_needing_sim, iv_to_idx) for a in range(16)]
+                chunk_results = pool.map(_slayer_iter_worker, worker_args)
+
+            # Merge into cache
+            for chunk in chunk_results:
+                for (focal_idx, opp_idx), scores in chunk.items():
+                    cache.put(focal_idx, opp_idx, scores)
+
+        # Score each focal IV vs current opponents
+        focal_scores = []
+        for focal_idx in range(n_focal):
+            total_wins = 0
+            total_score = 0
+            n_pairs = 0
+            for opp_idx, _ in opp_data_list:
+                cached = cache.get(focal_idx, opp_idx)
+                if cached is None:
+                    continue
+                wins = sum(1 for s in cached if s >= 500)
+                avg = sum(cached) / len(cached)
+                total_wins += wins
+                total_score += avg
+                n_pairs += 1
+            if n_pairs == 0:
+                continue
+            avg_score = total_score / n_pairs
+            a, d, s, atk_, def_, hp_ = iv_meta[focal_idx]
+            focal_scores.append({
+                'focal_idx': focal_idx,
+                'iv': (a, d, s),
+                'atk': atk_, 'def_': def_, 'hp': hp_,
+                'total_wins': total_wins,
+                'avg_score': avg_score,
+                'n_pairs': n_pairs,
+            })
+
+        # Sort by total wins desc, then avg score desc
+        focal_scores.sort(key=lambda x: (-x['total_wins'], -x['avg_score']))
+
+        # Top N (handle ties — include all IVs tied with the Nth)
+        if len(focal_scores) > top_per_round:
+            cutoff_wins = focal_scores[top_per_round - 1]['total_wins']
+            cutoff_score = focal_scores[top_per_round - 1]['avg_score']
+            top = [r for r in focal_scores
+                   if r['total_wins'] > cutoff_wins
+                   or (r['total_wins'] == cutoff_wins and r['avg_score'] >= cutoff_score)]
+        else:
+            top = focal_scores
+
+        history.append(top)
+
+        # Convergence check: same focal_idx set as previous round
+        new_set = frozenset(r['focal_idx'] for r in top)
+        if round_idx > 0:
+            prev_set = frozenset(r['focal_idx'] for r in history[round_idx - 1])
+            if new_set == prev_set:
+                converged = True
+                break
+
+        # Set up next round's opponents = current top
+        current_opponent_indices = [r['focal_idx'] for r in top]
+
+    return {
+        'history': history,
+        'final': history[-1] if history else [],
+        'rounds_run': len(history),
+        'converged': converged,
+        'cache_stats': cache.stats(),
+    }
+
+
+def categorize_slayers(survivors, iv_meta_list=None):
+    """
+    Classify slayer survivors into RyanSwag's three patterns:
+    - Atk Slayer: atk noticeably above survivor median (chases breakpoints)
+    - Bulk Slayer: HP+Def above median (outlasts opponents)
+    - CMP Slayer: top quartile by atk among survivors (priority ties)
+
+    Returns dict of category -> top N IVs in that category, sorted by quality.
+    """
+    if not survivors:
+        return {}
+
+    n = len(survivors)
+    atks = sorted(r['atk'] for r in survivors)
+    defs = sorted(r['def_'] for r in survivors)
+    hps = sorted(r['hp'] for r in survivors)
+    atk_med = atks[n // 2]
+    def_med = defs[n // 2]
+    hp_med = hps[n // 2]
+    atk_q3 = atks[3 * n // 4] if n >= 4 else atks[-1]
+
+    atk_slayers = []
+    bulk_slayers = []
+    cmp_slayers = []
+
+    for r in survivors:
+        # CMP slayer: top quartile by attack
+        if r['atk'] >= atk_q3:
+            cmp_slayers.append(r)
+        # Atk slayer: atk above median
+        if r['atk'] > atk_med:
+            atk_slayers.append(r)
+        # Bulk slayer: hp + def both above median
+        if r['hp'] >= hp_med and r['def_'] >= def_med:
+            bulk_slayers.append(r)
+
+    # Sort each by total_wins desc, then by the relevant stat
+    atk_slayers.sort(key=lambda r: (-r['total_wins'], -r['atk']))
+    bulk_slayers.sort(key=lambda r: (-r['total_wins'], -(r['hp'] + r['def_'])))
+    cmp_slayers.sort(key=lambda r: (-r['total_wins'], -r['atk']))
+
+    return {
+        'Atk Slayer': atk_slayers[:5],
+        'Bulk Slayer': bulk_slayers[:5],
+        'CMP Slayer': cmp_slayers[:5],
+    }
+
+
 def auto_discover_thresholds(results, n_tiers=2):
     """
     Discover threshold tiers automatically from simulation results.
@@ -2808,6 +3130,14 @@ def main():
     parser.add_argument('--screen-opponents', type=int, default=None, metavar='N',
                         help='Use only top N opponents for phase 1 screen '
                              '(default: same as --opponents)')
+    parser.add_argument('--mirror-slayer', action='store_true',
+                        help='Run iterative slayer discovery for the focal species '
+                             '(Nash-style mirror match iteration). Adds ~2-5 min to '
+                             'the deep dive but classifies survivors into Atk Slayer, '
+                             'Bulk Slayer, and CMP Slayer categories. Results are '
+                             'cached on disk for fast re-runs.')
+    parser.add_argument('--no-cache', action='store_true',
+                        help='Disable disk cache for slayer iteration')
 
     args = parser.parse_args()
 
@@ -2999,6 +3329,63 @@ def main():
                     else:
                         print(f"    {slayer_name}: {n_winners}/{n_total} IVs win {max_wins}/{n_scen} mirror scenarios "
                               f"but no clear stat floor distinguishes them")
+
+        # Iterative slayer discovery (Nash-style) on the first moveset
+        slayer_iter_result = None
+        if mi == 0 and args.mirror_slayer and mirror_idx is not None:
+            print(f"  Mirror slayer iteration (--mirror-slayer):")
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from slayer_cache import SlayerCache, compute_cache_key
+            base = get_species(args.species)
+            base_stats_dict = {'atk': base['atk'], 'def': base['def'], 'hp': base['hp']}
+            fast_moves_db, charged_moves_db = get_moves()
+            cache_key = compute_cache_key(
+                args.species, args.league, args.shadow,
+                fast_moves_db.get(fast_id, {}),
+                [charged_moves_db.get(cid, {}) for cid in charged_ids],
+                base_stats_dict,
+            )
+            slayer_cache = SlayerCache(cache_key=cache_key, disk=not args.no_cache)
+
+            # Round 0 opponent: PvPoke default
+            try:
+                _lv, da, dd, ds = pvpoke_default_ivs(args.species, league=args.league)
+                initial_opp_iv = (da, dd, ds)
+            except (KeyError, ValueError):
+                initial_opp_iv = None
+
+            if initial_opp_iv:
+                t_iter = time.time()
+                slayer_iter_result = iterative_slayer_discovery(
+                    args.species, args.league, args.shadow,
+                    fast_id, charged_ids, shield_scenarios,
+                    initial_opp_iv,
+                    max_rounds=4, top_per_round=10,
+                    cache=slayer_cache,
+                )
+                slayer_cache.save()
+                elapsed_iter = time.time() - t_iter
+                print(f"    {slayer_iter_result['rounds_run']} rounds in {elapsed_iter:.1f}s "
+                      f"({'converged' if slayer_iter_result['converged'] else 'max rounds'})")
+                print(f"    {slayer_iter_result['cache_stats']}")
+                # Show per-round top counts
+                for ri, top in enumerate(slayer_iter_result['history']):
+                    print(f"    Round {ri}: {len(top)} IVs survived "
+                          f"(max wins: {top[0]['total_wins']}, "
+                          f"avg score: {top[0]['avg_score']:.1f})")
+
+                # Categorize survivors
+                survivors = slayer_iter_result['final']
+                categories = categorize_slayers(survivors)
+                print(f"    Final survivors classified into {sum(1 for v in categories.values() if v)} categories:")
+                for cat_name, cat_ivs in categories.items():
+                    if not cat_ivs:
+                        continue
+                    print(f"      {cat_name} (top {len(cat_ivs)}):")
+                    for r in cat_ivs:
+                        a, d, s = r['iv']
+                        print(f"        {a:2d}/{d:2d}/{s:2d}  atk={r['atk']:.2f} def={r['def_']:.2f} hp={r['hp']}  "
+                              f"wins {r['total_wins']}/{r['n_pairs']*len(shield_scenarios)} avg {r['avg_score']:.1f}")
 
         # Classify by thresholds if provided
         if thresholds:
