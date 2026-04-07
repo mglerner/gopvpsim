@@ -72,6 +72,13 @@
   The Color By dropdown (HP/Def/Atk) already reveals banding structure
   visually; the automated analysis should match what users see.
 
+
+* **Slayer ideas** -- for the slayer IVs, it may not be possible to
+  represent them as IV thresholds. They really may just be a
+  collection of specific IVs. But we should at least categorize the IV
+  spreads that they're using. And if it *is* possible to describe them
+  as IV thresholds, we should give that description in addition to the table.
+
 ## UI / Display
 
 * **Additional scatter plot color modes** — The current color scheme has some dark
@@ -92,6 +99,14 @@
   implementing this, though, because listing all legal moves might
   make the help text too long.
 
+* **Table sorting** We have a lot of tables that would be a bit more
+  useful if we made it so that clicking on the headers sorted the
+  table by that column (the standard thing where you click it once to
+  sort descending, and a little arrow appears to show how you've
+  sorted, then you click it again to reverse the sort order, the arrow
+  changes direction, you click on another column to sort by that
+  column and the arrow from the first column goes away, etc).
+
 ## Performance
 
 * **Further sim optimization** — Multiprocessing across atk_iv chunks gives
@@ -102,6 +117,14 @@
 
 * **HTML file size** -- Are our deep dive/interactive HTML files
   getting too big?
+
+* **Incremental slayer cache flush** — The slayer iteration cache
+  (`SlayerCache` in `scripts/slayer_cache.py`) currently does one read
+  at startup and one save at the end. If a long run crashes mid-iteration
+  (e.g. 28 minutes into a 30-minute run), all the work done in that run
+  is lost. Add periodic flush to disk after each slayer round so a crash
+  loses at most one round's worth of sims. Tiny code change, big peace
+  of mind.
 
 ## Low priority
 
