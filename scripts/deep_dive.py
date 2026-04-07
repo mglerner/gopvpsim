@@ -487,13 +487,14 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
         # Sort by total wins desc, then avg score desc
         focal_scores.sort(key=lambda x: (-x['total_wins'], -x['avg_score']))
 
-        # Top N (handle ties — include all IVs tied with the Nth)
+        # Keep ALL IVs tied with the top_per_round threshold's win count.
+        # When many IVs share the same max win count (common in mirror analysis
+        # where ~80% of IVs win the same scenarios), we keep the full tied pool
+        # rather than tie-breaking by avg score (which biases toward HP-heavy
+        # IVs that win their losses by smaller margins).
         if len(focal_scores) > top_per_round:
             cutoff_wins = focal_scores[top_per_round - 1]['total_wins']
-            cutoff_score = focal_scores[top_per_round - 1]['avg_score']
-            top = [r for r in focal_scores
-                   if r['total_wins'] > cutoff_wins
-                   or (r['total_wins'] == cutoff_wins and r['avg_score'] >= cutoff_score)]
+            top = [r for r in focal_scores if r['total_wins'] >= cutoff_wins]
         else:
             top = focal_scores
 
@@ -3472,9 +3473,13 @@ def main():
                 print(f"    {slayer_iter_result['cache_stats']}")
                 # Show per-round top counts
                 for ri, top in enumerate(slayer_iter_result['history']):
-                    print(f"    Round {ri}: {len(top)} IVs survived "
-                          f"(max wins: {top[0]['total_wins']}, "
-                          f"avg score: {top[0]['avg_score']:.1f})")
+                    if not top:
+                        continue
+                    max_w = top[0]['total_wins']
+                    n_at_max = sum(1 for r in top if r['total_wins'] == max_w)
+                    print(f"    Round {ri}: {len(top)} IVs in pool "
+                          f"({n_at_max} at max wins {max_w}, "
+                          f"top avg score: {top[0]['avg_score']:.1f})")
 
                 # Categorize survivors
                 survivors = slayer_iter_result['final']
