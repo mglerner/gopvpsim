@@ -384,7 +384,14 @@ def sim_score(focal_species, fast_id, charged_ids, league, shields_focal,
 
 
 def moveset_label(fast_id, charged_ids):
-    """Short human-readable moveset label."""
+    """Short human-readable moveset label with pretty names."""
+    fast = _pretty_name(fast_id)
+    charged = ', '.join(_pretty_name(c) for c in charged_ids)
+    return f"{fast} / {charged}"
+
+
+def moveset_label_raw(fast_id, charged_ids):
+    """Raw moveset label for internal parsing (e.g. _build_move_tuples)."""
     return f"{fast_id} / {', '.join(charged_ids)}"
 
 
@@ -1992,7 +1999,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'opponentLabel': opponent_label or 'PvPoke rankings',
         'referenceIdx': reference_idx,
         'tiers': tier_info,
-        'movesets': [{'label': md['label']} for md in moveset_data],
+        'movesets': [{'label': md['label'], 'prettyLabel': _pretty_moveset(md['label'])} for md in moveset_data],
         # Reference IV indices (for matchup diff in hover text)
         'pvpokeRefIvIdx': pvpoke_ref_iv_idx,
         'rank1RefIvIdx': rank1_ref_iv_idx,
@@ -2106,7 +2113,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         html += '  <label>Moveset: <select id="moveset-sel" onchange="updateView()">\n'
         for mi, md in enumerate(moveset_data):
             ref_tag = ' (reference)' if mi == reference_idx else ''
-            html += f'    <option value="{mi}">{md["label"]}{ref_tag}</option>\n'
+            html += f'    <option value="{mi}">{_pretty_moveset(md["label"])}{ref_tag}</option>\n'
         html += '  </select></label>\n'
 
     if n_scenarios > 1:
@@ -2268,7 +2275,7 @@ function buildHoverText(iv) {{
   // Diff vs reference moveset (same IV)
   if (refAvgScores && DATA.referenceIdx >= 0 && DATA.referenceIdx !== state.movesetIdx) {{
     lines.push('');
-    lines.push('vs Ref ('+DATA.movesets[DATA.referenceIdx].label+'):');
+    lines.push('vs Ref ('+DATA.movesets[DATA.referenceIdx].prettyLabel+'):');
     appendMatchupDiff(lines, state.movesetIdx, iv, DATA.referenceIdx, iv);
   }}
 
@@ -2487,7 +2494,7 @@ function updateView() {{
   }}
 
   var layout = {{
-    title: DATA.movesets[state.movesetIdx].label,
+    title: DATA.movesets[state.movesetIdx].prettyLabel,
     xaxis: {{title:'Stat Product Rank (1=best)', range:[xMax+xPad, xMin-xPad], fixedrange:true}},
     yaxis: {{title:'Avg Battle Score', range:[yMin-yPad, yMax+yPad], fixedrange:true}},
     paper_bgcolor:'#1a1a2e', plot_bgcolor:'#16213e',
@@ -2865,7 +2872,7 @@ def main():
                 scores_by_mode = entry[3]
                 meta = entry[4]
                 moveset_data.append({
-                    'label': moveset_label(fast_id, charged_ids),
+                    'label': moveset_label_raw(fast_id, charged_ids),
                     'scores': scores_by_mode,
                     'meta': meta,
                 })
