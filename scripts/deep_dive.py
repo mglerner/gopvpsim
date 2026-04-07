@@ -429,8 +429,12 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
             # results to all focal IVs that share that profile.
             profile_list = [(pk, dat[0], dat[1], dat[2])
                             for pk, dat in focal_profile_data.items()]
-            # Split into n_workers chunks
-            chunk_size = max(1, (len(profile_list) + n_workers - 1) // n_workers)
+            # Split into ~100 chunks (capped by len(profile_list)). With
+            # imap_unordered the pool grabs the next chunk as workers free
+            # up — finer granularity → more frequent progress reports and
+            # better load balancing on uneven workloads.
+            n_chunks_target = 100
+            chunk_size = max(1, (len(profile_list) + n_chunks_target - 1) // n_chunks_target)
             chunks = [profile_list[i:i+chunk_size] for i in range(0, len(profile_list), chunk_size)]
 
             init_args = (species, focal_types, base_atk, base_def, base_sta,
@@ -1079,9 +1083,12 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     profile_to_indices, profile_data = group_ivs_by_stat_profile(iv_meta)
     profile_list = [(pk, dat[0], dat[1], dat[2]) for pk, dat in profile_data.items()]
 
-    # Parallel sim: one worker per chunk of profiles
+    # Parallel sim: ~100 chunks across the worker pool. imap_unordered
+    # hands chunks out as workers free up — finer granularity gives more
+    # frequent progress reports and better load balancing.
     n_workers = min(multiprocessing.cpu_count(), 16)
-    chunk_size = max(1, (len(profile_list) + n_workers - 1) // n_workers)
+    n_chunks_target = 100
+    chunk_size = max(1, (len(profile_list) + n_chunks_target - 1) // n_chunks_target)
     chunks = [profile_list[i:i+chunk_size] for i in range(0, len(profile_list), chunk_size)]
 
     import time as _time
