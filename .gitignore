@@ -29,3 +29,8 @@ htmlcov/
 
 # Claude Code local memory
 .claude/
+
+# User-specific scratch / output (deep dive HTMLs, logs, ad-hoc data)
+# See DEVELOPER_NOTES.md "Deep dive output file layout" for the convention
+# on userdata/dives/ vs /tmp/ for HTML output files.
+userdata/
