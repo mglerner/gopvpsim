@@ -36,27 +36,31 @@
   opponent? Probably. Make sure we test enough explicit battle
   timelines from pvpoke to confirm.
 
+* **Auto-anchor fallback gating tests** — `build_auto_anchors()` and
+  the per-kind gating logic are currently only verified by smoke runs
+  against real Annihilape data. Add explicit unit tests for the
+  gating cases (no kinds existing → all three fire; one kind existing
+  → other two fire; all three existing → empty registry).
+  *Note: bulkpoint gating tests landed in 2026-04-08; this entry now
+  covers the broader BP/CMP gating coverage gap.*
+
 ## Analysis goals
 
 * **Meta-wide slayer reference (ambitious)** — With the slayer anchor
-  system shipped, we can systematically run `--mirror-slayer` (with
-  anchors) on the top 30 GL meta picks and build a meta-wide reference
-  of "the converged slayer cohort + named anchors" for every relevant
-  species. Each species gets its own `thresholds/<species>.toml` with
-  hand-picked anchors against its key opponents (and the auto-fallback
-  layer fills the gaps). The output: a per-species HTML deep dive plus
-  a top-level summary table of which IVs are slayer-quality across the
-  meta. This is the natural extension of the Annihilape work to the
-  rest of the format. Could be paced as 2-5 species per session to keep
-  momentum without burning out on TOML authoring. Goodra, Clodsire,
-  Carbink, Galarian Stunfisk, Tinkaton, Medicham, Annihilape (already
-  done) are obvious starting points — they're in the existing dive
-  history. Anything in the championship-series group is a candidate.
-  Bulkpoint anchor kind (see "Bulkpoint anchor kind" above) should
-  probably ship before this lands so each species can use the def-side
-  anchors too.
-
-
+  system AND bulkpoint anchor system shipped, we can systematically run
+  `--mirror-slayer` (with anchors) on the top 30 GL meta picks and build
+  a meta-wide reference of "the converged slayer cohort + named anchors"
+  for every relevant species. Each species gets its own
+  `thresholds/<species>.toml` with hand-picked anchors against its key
+  opponents (and the auto-fallback layer fills the gaps). The output:
+  a per-species HTML deep dive plus a top-level summary table of which
+  IVs are slayer-quality across the meta. This is the natural extension
+  of the Annihilape work to the rest of the format. Could be paced as
+  2-5 species per session to keep momentum without burning out on TOML
+  authoring. Goodra, Clodsire, Carbink, Galarian Stunfisk, Tinkaton,
+  Medicham, Annihilape (already done) are obvious starting points —
+  they're in the existing dive history. Anything in the championship-
+  series group is a candidate.
 
 * **Reproduce SwagTips-style IV deep dives** — articles like the old GamePress
   Carbink and Annihilape PvP IV deep dives. Use Pokemon Go Championship Series
@@ -92,8 +96,53 @@
   The Color By dropdown (HP/Def/Atk) already reveals banding structure
   visually; the automated analysis should match what users see.
 
+* **Send mercuryish a Discord message about the Lurgan 102.9 def floor**
+  — Our 2026-04-08 bulkpoint Level 3 enumeration against the Annihilape
+  mirror found that the historical Lurgan Ape `def ≥ 102.9` floor is
+  *unrecoverable* from current sims: the next bulkpoint above 102.9
+  (`shadow_ball ≤149` at def 103.34) is unreachable for today's
+  converged cohort (max def ~101.30). The 102.9 floor predates Rage Fist,
+  so the threat-move set has shifted. Ask mercuryish whether the
+  historical calibration was against a Counter or Close Combat tier
+  transition, or against something more niche (Shadow Ball / Night Slash).
+  This is the missing context that would let us promote a specific
+  bulkpoint to a Level 1 anchor with full provenance.
 
-## HTML interactive output bugs
+## Slayer card UX (post-bulkpoint shipped 2026-04-08)
+
+* **Slayer-card signal-loss audit + design discussion** *(needs design
+  before implementing; broader than originally scoped)* — With Level 3
+  auto-bulkpoint enumeration shipped, every survivor in the converged
+  cohort passes nearly every parent's *lowest* sub-anchor (which is
+  trivially cleared). Result: Bulk Slayer membership = 100% of the
+  survivor pool, no signal. Same effective problem for Atk Slayer with
+  auto-BP enumeration. **We will almost certainly find similar
+  signal-loss in other places once we go looking** — e.g. the CMP
+  Slayer top-quartile fallback may saturate too on some species, the
+  banding-by-color analysis in the interactive HTML may have similar
+  issues, and the threshold-tier dropdown may produce vacuous tiers
+  on some cohorts. Treat this as a **systemic audit** rather than a
+  local Bulk Slayer fix. Possible fixes for the immediate Bulk Slayer
+  case, none ideal:
+  1. **Minimum interesting threshold gate**: in the resolver, suppress
+     sub-anchors whose lowest tier is cleared by 100% of the cohort.
+     Pros: simple, applies uniformly. Cons: cohort-dependent (two
+     dives with different cohorts get different anchor sets).
+  2. **Show only differentiating parents in row badges**: render
+     a parent's badge only when this row passes *more* sub-anchors
+     than the cohort median for that parent. Pros: highlights what's
+     unique. Cons: hides structure that's "everyone passes 6/6", which
+     is sometimes information.
+  3. **Tier badges by significance**: color-code badges by how rare
+     the row's sub-anchor count is in the cohort. Pros: keeps all info,
+     adds signal. Cons: more visual complexity.
+  4. **Hide parents with 100% pass rate from the filter panel and
+     row badges, surface them once in a "everyone passes" callout**.
+     Pros: cleanest. Cons: extra renderer state to track.
+  Pick one (or a hybrid) before implementing. This is *not* the same
+  bug as the cell-level tooltip dump (fixed 2026-04-09 separately).
+  When this is worked, sweep the rest of the slayer/threshold/banding
+  output for similar "everyone passes the lowest tier" patterns.
 
 * **"Show clusters" section is always visible** — it sits above the
   interactive scatter plot but should be gated behind the "Show
@@ -102,6 +151,44 @@
   `#dd-alpha-methods`; the cluster-display block needs to either move
   inside `#dd-alpha` or be hidden by the same JS handler. Discovered
   2026-04-08.
+
+## Slayer iteration cleanup
+
+* **Investigate inconsistent slayer Max Wins column** *(cosmetic, not
+  blocking — ranking is correct)* — Yesterday's
+  `annihilape_*_old.html` files report Max Wins values in the round
+  table that aren't multiples of `n_even` (3) — e.g. round 2 max=41.
+  Today's runs with the same code (and same metric=even-strict) produce
+  values that ARE multiples of 3 (round 2 max=123 = 41×3). The
+  converged pool sizes match exactly (round 1 = 66 in both), so the
+  iteration logic is consistent and IV ranking is preserved; only
+  the displayed Max Wins column number differs. Either the metric
+  semantics changed between runs, or the HTML rendering uses a
+  different code path that I haven't found. Check git history of
+  `iterative_slayer_discovery` for any silent shifts. Discovered
+  2026-04-08, deferred as task #13.
+
+* **Re-run Annihilape mirror slayer with Lurgan as an explicit
+  opponent variant** — Hypothesis 2 from the validation doc was that
+  the community optimizes against a broader opponent set (PvPoke
+  defaults + atk-weighted + Lurgan-style hand-builds). With the new
+  TOML format, we can put the Lurgan spread in as a named opponent IV
+  cohort and re-run mirror iteration to see whether our convergence
+  shifts. If atk 129.44 still wins, hypothesis 1 (outdated community
+  spread) is confirmed; if it shifts toward 127, hypothesis 2 is
+  confirmed.
+
+* **Update `docs/validations/2026-04-07_annihilape_mirror_slayer_iteration.md`**
+  to reflect mercuryish testimony (Discord, 2026-04-08) and the
+  bulkpoint Level 3 enumeration finding (2026-04-09): the community
+  Lurgan Ape spread is a *historical anchor* calibrated to a Lickitung
+  BP near atk 127.23, predating Counter nerf, Rage Fist addition, and
+  Low Kick buff. Current expert advice is to push higher attack than
+  the Lurgan baseline, which matches our converged result. Reframe
+  the validation doc from "we disagree with community" to "we converge
+  to current expert practice; the published Lurgan spread is a frozen
+  historical reference." Also note the 102.9 def floor knowledge-
+  recovery investigation conclusion (unrecoverable from today's data).
 
 ## HTML output paths
 
@@ -116,175 +203,6 @@
   Discovered 2026-04-08 during anchor-system smoke testing — it's easy
   to mistakenly run a smoke test without `--interactive` and conclude
   nothing rendered.
-
-### Bulkpoint anchor kind — design + implementation
-
-Schema gap surfaced 2026-04-08 by mercuryish testimony on the Lurgan Ape:
-the Lurgan spread is defined by `atk >= 127.2` AND `def >= 102.9`. The
-atk side maps cleanly to our existing `damage_breakpoint` anchor (Level 2:
-`above_atk = 127.2`). The def side is a *bulkpoint* — focal def crossing
-a threshold to take less damage from some incoming move — and we have no
-parallel anchor kind for it. mercuryish does not remember which specific
-bulkpoint 102.9 keeps; recovering that knowledge requires the bulkpoint
-infrastructure.
-
-The library already has the math (`gopvpsim.breakpoints.bulkpoints`,
-`def_for_damage`, `Bulkpoint` namedtuple) — only the anchor schema and
-resolver wrapping is missing. The work is mostly mechanical, parallel to
-the existing `damage_breakpoint` code path.
-
-Required pieces:
-
-* **Schema**: new `BulkpointAnchor` dataclass in
-  `gopvpsim/thresholds.py` with the same three precision levels:
-  - Level 1: `move` + `takes_at_most = N` (focal def must be high enough
-    that the named opponent's named move deals ≤ N damage)
-  - Level 2: `above_def = X` (smallest focal def above X at which any
-    incoming move's damage steps down)
-  - Level 3: bare anchor enumerates every bulkpoint against the opponent
-    in the focal def range
-
-* **Parser**: extend `_parse_anchor` for the new `kind = "bulkpoint"`
-  discriminator. Mutual-exclusion rules mirror the BP side: can't combine
-  `takes_at_most` and `above_def`, etc.
-
-* **Resolver**: new branch in `gopvpsim/anchors.py` using
-  `scan_bulkpoints()` from the breakpoints library. ResolvedAnchor needs
-  a "what stat does this check" indicator (currently it's hardcoded to
-  `threshold_atk` + `passes(focal_atk)`); generalize to a stat target
-  (`threshold_value` + `target_stat: 'atk' | 'def'`). The bulkpoint
-  resolver populates `target_stat = 'def'` and the categorize_slayers
-  tag-iv logic checks `passes(focal_def)` for those.
-
-* **categorize_slayers**: bulkpoint anchors route into **Bulk Slayer**
-  (parallel to how breakpoint anchors route into Atk Slayer). Bulk Slayer
-  membership becomes "structural HP+def above median **OR** clears at
-  least one named bulkpoint." Hide-when-empty rule applies to the
-  named-bulkpoint subset only; the structural pool is always shown.
-
-* **HTML rendering**: filter panel + tag badges for bulkpoint anchors in
-  the Bulk Slayer card. display_name derivation for the new anchor name
-  pattern (likely `<opponent>_blkp_any` etc.).
-
-* **Auto-fallback**: `build_auto_anchors` gains an auto-bulkpoint layer
-  parallel to auto-Atk. One Level 3 bulkpoint anchor per opponent in the
-  dive's opponent set; gated by `"bulkpoint" not in existing_kinds`.
-
-* **Tests**: parsing variants, mutual exclusion errors, three precision
-  levels, resolution against fixtures, fallback gating.
-
-* **Docs**: update `docs/concepts.md` to introduce bulkpoint anchors as
-  the def-side analog of damage_breakpoint anchors. Update
-  `docs/threshold_schema.md` with the new TOML keys and a worked example.
-  Likely also update the Annihilape TOML to add a Level 2 anchor for the
-  102.9 def floor and a Level 3 mirror-bulkpoint discovery anchor.
-
-Once shipped, run the discover-mode sweep against the Annihilape mirror
-to identify which specific (move, tier) bulkpoint the 102.9 floor
-preserves. That recovers the lost-to-history calibration knowledge from
-the original Lurgan spread and lets us promote the discovered bulkpoint
-to a Level 1 anchor with full provenance.
-
-### Auto-anchor fallback — shipped 2026-04-08
-
-When `--mirror-slayer` runs and the user provides no explicit anchors of a
-given kind via `--thresholds`, `gopvpsim.anchors.build_auto_anchors`
-synthesizes a fallback overlay so the Atk Slayer and CMP Slayer category
-boxes still populate. Gating is per-kind: if you have explicit
-`damage_breakpoint` anchors only, you get auto CMP filled in; if you have
-explicit `cmp` only, you get auto BPs; if neither, both fire; if both,
-neither auto fires.
-
-Auto BP anchors create one Level 3 `damage_breakpoint` per opponent species
-(named `auto_<species>_bp_any`), enumerating every breakpoint over **all**
-focal moves (fast + charged). Earlier draft restricted to the focal fast
-move only on the theory that fast-move BPs compound across many ticks while
-charged-move +1s are one-off; that turned out to silently disable auto-Atk
-for low-power-fast-move species like Annihilape (Low Kick power 5 produces
-0–1 BPs against typical opponents). All-moves enumeration produces noisier
-sub-anchor families but the filter panel + per-row tag abbreviation handle
-the volume tolerably.
-
-Auto CMP anchor uses **top quartile by atk in the survivor cohort**, not
-"strictly beat the max." This is non-obvious and deserves a callout:
-
-* **The focal IV is a member of its own cohort.** When the auto-CMP
-  cohort = the converged survivor pool, "strictly beat max" is unreachable
-  by definition — the highest-atk IV in the cohort can at best tie itself.
-  My first cut used `strict=True` against an `IvListSpread` of the
-  survivors and the CMP Slayer category came up empty for every fresh
-  dive. Fix: compute the 75th-percentile effective atk over the cohort,
-  wrap in a `StatCutoffSpread`, use a non-strict (`>=`) `CmpAnchor`. This
-  always populates and matches the spirit of the old top-quartile-by-atk
-  heuristic, now grounded in the actual converged survivors instead of
-  the unfiltered 4096-IV space. Anchor name: `auto_cmp_vs_cohort`,
-  display name: `cmp:cohort`.
-
-* **The strict-max semantic is still correct for explicit external CMP
-  anchors** like `cmp_vs_lurgan` in `thresholds/annihilape.toml`. There the
-  cohort (Lurgan IVs) is external to the focal pool, so "strictly beat max"
-  is a real, achievable threshold. Don't generalize the auto-CMP fix to
-  the explicit case.
-
-Auto markers: every auto-generated parent renders with a small italic
-"(auto)" suffix in the filter panel UI so the user can see which anchors
-came from runtime fallback vs the TOML. Display-name derivation strips the
-`auto_` prefix first so badge text in the table cells stays clean
-(`corviknight`, `cmp:cohort`, etc.).
-
-Outstanding follow-ups for the auto-anchor system:
-
-* **Add tests** for `build_auto_anchors()` and the gating logic. Currently
-  only verified by smoke runs against the real Annihilape data.
-* **Consider exposing a CLI flag** to opt out of auto fallback entirely
-  (e.g. `--no-auto-anchors`) for users who only want their explicit set.
-  Not built yet — wait until someone wants it.
-* **Bulk Slayer anchor display**: when auto anchors fire, the Bulk Slayer
-  card shows the anchor tags too (since `want_kinds = {bp, cmp}` for Bulk).
-  This is fine but means a fresh dive's Bulk Slayer rows will be tagged
-  with the auto anchors of any kind. Worth eyeballing whether that adds
-  signal or noise.
-
-### Slayer anchor system — shipped 2026-04-08
-
-The TOML threshold schema (`docs/threshold_schema.md`), anchor resolver
-(`gopvpsim/anchors.py`), and anchor-tagged `categorize_slayers` are all in
-place. Atk Slayer and CMP Slayer now use named anchors instead of vacuous
-median heuristics. Three follow-up observations from the smoke run:
-
-* **Level 3 anchors are noisy on charged moves** — Close Combat and Rage
-  Fist produce 10–15 BPs each across the survivor atk range because
-  charged-move damage ladders are very fine-grained (every ~1 atk gives a
-  +1 damage step). The tactically meaningful BPs are almost always on fast
-  moves, since fast-move +1 damage compounds across many ticks per battle
-  while a charged-move +1 is one-off. Two possible fixes:
-  1. Add `moves = ["LOW_KICK"]` filters to L3 anchors in
-     `thresholds/annihilape.toml` to scope discovery to fast moves only.
-  2. Teach the resolver to filter out "micro-BPs" on high-power moves by
-     default (e.g., suppress sub-anchors whose damage delta is < some
-     fraction of the move's base damage).
-  Decide which after looking at the rendered HTML.
-
-* **`docs/validations/2026-04-07_annihilape_mirror_slayer_iteration.md`
-  is now stale** — should be updated to reflect the mercuryish testimony
-  (Discord, 2026-04-08): the community Lurgan Ape spread is a *historical
-  anchor* calibrated to a Lickitung BP near atk 127.23, predating the
-  Counter nerf, Rage Fist addition, and Low Kick buff. Current expert
-  advice is to push higher attack than the Lurgan baseline for CMP wins
-  and BP security against the mirror and Lickitung — which matches our
-  converged result, not contradicts it. Reframe the validation doc from
-  "we disagree with community" to "we converge to current expert
-  practice; the published Lurgan spread is a frozen historical
-  reference."
-
-* **Re-run Annihilape mirror slayer with Lurgan as an explicit opponent
-  variant** — Hypothesis 2 from the validation doc was that the community
-  optimizes against a broader opponent set (PvPoke defaults + atk-weighted
-  + Lurgan-style hand-builds). With the new TOML format, we can put the
-  Lurgan spread in as a named opponent IV cohort and re-run mirror
-  iteration to see whether our convergence shifts. If atk 129.44 still
-  wins, hypothesis 1 (outdated community spread) is confirmed; if it
-  shifts toward 127, hypothesis 2 is confirmed.
 
 ## UI / Display
 
@@ -323,66 +241,22 @@ the core `gopvpsim/` library should still avoid making mobile impossible
 in case we want to revisit it. The optimization work below targets the
 desktop deep-dive workflow.
 
-**Optimization priority order** (next session, highest impact first):
-
-1. **Eliminate per-sim dict copies in BattlePokemon construction**
-   — Each `simulate()` call currently does `dict(fm_template)` and
-   `[dict(cm) for cm in cms_template]` for both focal and opponent.
-   That's ~4 dict allocations per sim × ~40M sims per slayer round
-   = 170M+ allocations. Many of these are likely redundant: if move
-   templates are treated as immutable inside `simulate()` (verify by
-   reading the simulate path), we can share them across sims.
-   Estimated speedup: 2-3x. Smallest invasive change.
-
-2. **Cache opponent BattlePokemon objects, reset mutable state between sims**
-   — In a slayer round chunk, the same opponent IV is simulated against
-   2430 focal profiles × 9 scenarios = 21,870 times. Currently we build
-   a fresh BattlePokemon each time. Better: build once per (opp, scenario),
-   then reset HP/energy/buffs between sims via a `reset()` method.
-   Estimated speedup: 1.5-2x on top of #1.
-
-3. **Add `__slots__` to `BattlePokemon` and `Move` classes**
-   — Reduces attribute lookup cost and memory footprint. Easy change,
-   small but real wins (5-15%).
-
-4. **Numba JIT for the damage formula and inner sim loop**
-   — Preferred over Cython because numba is quick to implement and
-   leaves the code looking like Python in the easy cases. Annotate
-   `_pvp_damage` and the tightest loops in `battle.py` with `@njit`.
-   Type effectiveness lookups would need restructuring (numba doesn't
-   like Python dicts well — use numpy arrays indexed by type enum).
-   Estimated speedup: 5-10x for arithmetic-heavy paths. Try this AFTER
-   #1 and #2 since profiling will show whether it's worth the cost.
-
-5. **Profile-guided optimization** (do this BEFORE #4)
-   — Run `py-spy` or `cProfile` on a real deep dive to find the actual
-   hot spots. We're guessing about which functions matter most. Profile
-   first, optimize second.
-
-6. **Process pool reuse** — Currently we create a new `multiprocessing.Pool`
-   for each iv_sweep call. Pool startup is ~1-2 seconds. Across a deep
-   dive with 5 sweeps + 1 slayer iteration, that's ~10s of overhead.
-   Minor but free.
-
-**Why the speedup matters now**: A full Annihilape deep dive with
-`--mirror-slayer --mirror-slayer-rounds 4 --mirror-slayer-metric even-strict`
-currently takes ~90 minutes wall clock (the slayer round 1 is the
-dominant cost at ~85 min). With the optimizations above stacked, we
-should be able to bring that to under 10 minutes, making iterative
-experimentation actually pleasant.
+**Round 1 + Round 2 + chunking optimizations are SHIPPED** (see Shipped
+section). Real-world impact: 9hr → 6 min on the actual deep-dive workload.
+Round 3 (numba JIT for the inner sim loop) was deprioritized because
+fastmath was confirmed a dead-end and the workload is no longer the
+bottleneck.
 
 * **HTML file size** -- Are our deep dive/interactive HTML files
-  getting too big?
+  getting too big? Latest fresh Annihilape HTML is ~25 MB; explicit is
+  ~23 MB. Mostly the embedded data + the wall of badge spans.
 
 * **Better slayer iteration progress reporting** — The current progress
   prints fire only when a `pool.imap_unordered` chunk completes. With
   10 chunks each taking ~85 minutes, the first progress line doesn't
-  appear for 85 minutes. We need to either (a) chunk much more finely
-  (e.g. 100-1000 chunks of 4-50 minutes each so prints fire every few
-  minutes), or (b) have workers report progress via a shared counter
-  (e.g. multiprocessing.Value) that the parent polls. Option (a) is
-  simpler — just lower the chunk_size in iterative_slayer_discovery.
-  Watch for diminishing returns due to pickle overhead per chunk.
+  appear for 85 minutes. *Partly addressed in 2026-04-07 by chunking
+  to ~100 chunks (commit 8498ec4), but consider further refinement
+  if individual chunks become slow again.*
 
 * **Incremental slayer cache flush** — The slayer iteration cache
   (`SlayerCache` in `scripts/slayer_cache.py`) currently does one read
@@ -396,3 +270,158 @@ experimentation actually pleasant.
 
 * **Team/multi-mon simulation** — currently only 1v1; real PvP is 3v3 with
   switching. Add team composition and switch-timing support.
+
+---
+
+# Shipped
+
+Items here have been completed and are kept for context. Move them
+out (delete) when they're no longer useful as historical reference —
+generally a few weeks after they've stabilized in production.
+
+## 2026-04-08 / 2026-04-09 — Bulkpoint anchor system
+
+Def-side mirror of `damage_breakpoint` anchors. Three precision levels
+(L1 explicit, L2 reference-anchored via `above_def`, L3 discover-and-tag),
+parser, resolver, auto-fallback, tests, docs, Annihilape TOML entries.
+Bulk Slayer category gained dual membership (structural HP+def OR
+clears at least one named bulkpoint). `ResolvedAnchor` generalized to
+`target_stat` with `threshold_value` so the same passes() machinery
+handles both atk and def side. Commits: `13665dc` (main feature +
+brkp/blkp rename + tag UX + CLI args embed — should have been split,
+see commit message), `8f9369d` (clarify ×N count in hover tooltip),
+`7ed5765` + `967bb09` (Compact/Expand toggle for tag cells).
+
+**Headline finding** from running the new system on Annihilape
+explicit: the historical Lurgan Ape `def ≥ 102.9` floor is *not*
+recoverable as a single (move, tier) bulkpoint. The next bulkpoint
+above 102.9 is `shadow_ball ≤149` at def 103.34, but 0/66 of today's
+converged cohort can reach it (max cohort def ~101.30). The 102.9
+floor predates Rage Fist, so the threat-move set has shifted; today's
+optimization trades def for atk and lands well below the historical
+baseline. Don't promote anything to Level 1 from this enumeration —
+follow up via Discord with mercuryish to recover historical context
+(see "Send mercuryish a Discord message" in Analysis goals).
+
+## 2026-04-08 — bp → brkp short-name rename
+
+Renamed all anchor name slugs from `_bp_` to `_brkp_` so the
+breakpoint short form is unambiguous against the new bulkpoint
+`_blkp_` short form. The Python kind discriminator stays
+`damage_breakpoint` (full word); only the slug-style short forms
+changed. Touched anchors.py, build_auto_anchors, annihilape.toml
+anchor table keys, tests, and docs. Part of commit `13665dc`.
+
+## 2026-04-08 — Ultra-short anchor abbreviations + Compact tags toggle
+
+Tag cells in slayer cards previously truncated badges horizontally
+with `text-overflow: ellipsis` at 280px max-width, hiding most of
+the badges past the first 2-3. Replaced with: (a) `derive_short_name`
+function producing 3-6 char badge labels (cre, lic, mirb, lic↑lur,
+c:lur, quasb...) with the long form preserved in the badge hover
+tooltip, (b) cell wrapping enabled, max-width bumped to 480px,
+(c) Compact/Expand toggle button at the top of the slayer card grid
+that caps cells at ~2 lines via an inner `<div>` wrapper (the wrapper
+is needed because `<td>` ignores `max-height` in CSS — fixed in
+`967bb09` after the first attempt at the toggle didn't actually work).
+Part of commit `13665dc` + the three follow-ups.
+
+## 2026-04-08 — CLI args embedded in HTML output for forensics
+
+`format_cli_args(args, parser)` builds the *fully-resolved* equivalent
+invocation: every flag emitted with its actual value, including flags
+whose value happens to equal the current parser default. Embedded in
+HTML two places: a grep-able `<!-- CLI: ... -->` comment near the top
+and a collapsed `<details>` footer at the bottom of `<body>`. Also
+printed to console at startup as `CLI: ...`. Why fully-resolved
+instead of literal user input: defaults can change between runs, so
+a string that omits "default" flags becomes ambiguous when read later.
+This is the forensic gold standard. Part of commit `13665dc`.
+
+## 2026-04-08 — Slayer anchor system
+
+The TOML threshold schema (`docs/threshold_schema.md`), anchor
+resolver (`gopvpsim/anchors.py`), and anchor-tagged
+`categorize_slayers` are all in place. Atk Slayer and CMP Slayer use
+named anchors instead of vacuous median heuristics. Three precision
+levels for damage_breakpoint anchors (L1 explicit, L2
+reference-anchored, L3 discover-and-tag). Auto-fallback layer
+synthesizes anchors at runtime when the user doesn't provide them
+via TOML, gated per kind so explicit user input always wins. Commits
+`beace47` (main) and `10a693c` (mercuryish testimony incorporated
+into thresholds/annihilape.toml + anchors tests).
+
+## 2026-04-07 — Battle simulator perf optimization (round 1 + round 2 + chunking)
+
+Real-world impact: ~9hr → ~6 min on a full Annihilape mirror slayer
+deep dive workload. Stack of optimizations:
+* Damage cache + DP hoisting — +51% throughput (commit `3596fb4`)
+* Numba JIT on the near-KO DP loop — +40% throughput (commit `a57c39f`)
+* Stat profile dedup in `iv_sweep` — ~1.7x faster Phase 2 (commit `6ccb124`)
+* Slayer iteration: dedup focal & opponent IVs by effective stats
+  (commit `579aef7`)
+* Slayer iteration: keep all IVs tied at top win count (commit `eb145a2`)
+* Chunk count bumped from `n_workers` to ~100 for finer progress
+  reporting (commit `8498ec4`)
+
+Round 3 (numba JIT for the entire inner sim loop) was deprioritized
+after round 1+2 made the workload tolerable; fastmath was confirmed
+a dead-end during the round 1 work.
+
+## 2026-04-07 — Iterative slayer discovery (Nash-style mirror match)
+
+`scripts/deep_dive.py --mirror-slayer` runs Round 0 (focal IVs vs
+PvPoke default opponent) then iterates Round k (focal IVs vs round
+k-1's top survivors), stopping on convergence or `--mirror-slayer-rounds`.
+Survivors are classified into RyanSwag-style Atk Slayer / Bulk Slayer
+/ CMP Slayer categories. Disk cache at
+`~/.cache/gopvpsim/slayer/<key>.pkl` keyed on species/league/shadow/
+moves/scenarios so re-runs are near-instant. Commits `43b8784` (main),
+`75fa8ce` (HTML rendering), `9cabba7` (cache key fix), `3b9d5fb`
+(metric/rounds/pool/show CLI flags), `0dfcc98` (validation doc).
+
+## 2026-04-06 — IV deep dive script + interactive HTML
+
+`scripts/deep_dive.py` simulates all 4096 IV spreads of a focal
+species against meta opponents across moveset combinations, with
+threshold-tier coloring, custom group support, and an interactive
+HTML mode (`--interactive`) with moveset/scenario/opp-IV switching
+dropdowns. Commits `f0253d5` (script), `a4d18e5` (interactive mode),
+`30452c6` (PvPoke default IVs for opponents), `4c7bcf9` (legend
+isolation, matchup hover), `6924b1a` (`--standalone` inline Plotly).
+Doc reorganization in `0ce1229` (CLAUDE.md, TODO.md, DEVELOPER_NOTES.md).
+
+## 2026-04-04 to 2026-04-06 — Battle simulator correctness
+
+Several rounds of bug fixing brought the battle simulator into
+agreement with PvPoke's reference output:
+* Three turn-model bugs: 1-turn FM timing, faintSource, FM fire order
+  (commit `e036670`)
+* Buff/debuff implementation (commit `6145aaa`)
+* Buff meter, pvpoke_simulate_shield, trace flags (commit `ead46c1`)
+* ActionLogic.js post-DP bandaids, sort cms by energy, raw_dpe
+  (commit `f4d0eb3`)
+* DP queue insertion strategies, intended_pruning flag (commit `44f3215`)
+* Shadow Pokemon support (commit `8c5fb65`)
+* `wouldShield` buff reset ordering, CMP cancellation (commit `5b07790`)
+* All 9 Medicham vs Azumarill scenarios match PvPoke (commit `008d8e7`)
+
+## 2026-04-01 — pvpoke_dp charged-move policy
+
+Implemented PvPoke's `ActionLogic.js` DP-based charged-move decision
+policy in Python (`gopvpsim.battle.pvpoke_dp`). Commit `62b9cfb`.
+
+---
+
+# Resolved (deeper history)
+
+* **Slayer Ape / Lurgan Ape IV analysis** — Resolved 2026-04-08 by
+  mercuryish Discord testimony. The community Lurgan Ape spread is a
+  *historical floor* (`atk ≥ 127.2`, `def ≥ 102.9`) calibrated to a
+  Lickitung breakpoint near atk 127.23, predating the Counter nerf,
+  Rage Fist addition, and Low Kick buff. Our slayer iteration's
+  convergence to atk 129.44 matches *current* expert advice (push
+  higher than the Lurgan baseline for CMP wins and BP security against
+  the mirror and Lickitung). The "we disagree with the community"
+  framing in earlier analysis was wrong — we converge to current
+  expert practice; Lurgan is a frozen historical reference.
