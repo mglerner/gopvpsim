@@ -49,28 +49,91 @@ The Nash iteration is working: starting from "everyone who beats the typical opp
 
 All survivors have **atk_iv = 15** (max attack). This is the iteration's strong message: in the converged Annihilape mirror, attack matters more than defense or HP.
 
-## Comparison to community Slayer Ape spreads
+## Comparison to the community Lurgan Ape spread
 
-| Attribute | Community spreads | Our convergence | Difference |
-|-----------|------------------|-----------------|------------|
-| Atk | 127.23 – 127.78 | **129.44** | **+1.7 to +2.2** |
-| Def | 103.10 – 104.73 | 98.04 – 100.80 | **−3 to −5** |
-| HP | 131 – 134 | 133 – 137 | similar |
-| Pool size | 27 hand-picked | 30 converged | similar |
+The single named community spread for Annihilape is the "Lurgan Ape," popularized
+by lurganrocket on Twitter. Per IV expert mercuryish (Discord, 2026-04-08), the
+spread is canonically defined by two cutoffs:
 
-**The community goes lower attack and higher defense.** Our model goes higher attack and lower defense.
+| Cutoff | Value | Source |
+|--------|-------|--------|
+| Atk    | **>= 127.2** | "127.2 attack was the minimum needed for a lurgan ape" — mercuryish |
+| Def    | **>= 102.9** | "102.9 defense was the goal" — mercuryish ("i do not remember what for") |
 
-### Why the disagreement?
+The 27-IV list popularly screenshotted is the *enumeration* of those two cutoffs at
+GL CP cap. Both forms are now in `thresholds/annihilape.toml` as
+`spreads.lurgan_ape` (IV list) and `spreads.lurgan_ape_stat` (stat-cutoff).
 
-Three plausible explanations, in order of likelihood:
+Comparison vs our converged cohort:
 
-1. **Move parameters changed since the community spreads were made.** The community originally calibrated to specific named breakpoints (Lickitung BP at 127.23, mirror Def BP at 103.54 against 127.23 atk Counter). After the Counter nerf and Rage Fist addition, those exact BPs may no longer be the right cutoff — but the community spreads were never updated.
+| Attribute | Lurgan Ape (community) | Our convergence | Difference |
+|-----------|------------------------|-----------------|------------|
+| Atk minimum | **127.2** | **129.44** | **+2.24** |
+| Def minimum | **102.9** | **98.04** | **−4.86** |
+| Pool size | 27 IVs | 30 converged | similar |
 
-2. **The community optimizes against a broader opponent set.** Real GBL/tournament play has a mix of PvPoke defaults, atk-weighted variants, best-buddy variants, and hand-built opponents. Our iteration only tests against the converged cohort. Higher def is more robust to opponent variation.
+Our cohort sits **above the Lurgan atk minimum and below the Lurgan def minimum**.
+At first glance this looks like a disagreement. It is not.
 
-3. **Our model has a bug we haven't found yet.** Possible but the cache fix and dedup were both validated against scripts/battle.py for the 15/15/0 vs 4/13/13 case. The math checks out.
+### Resolution: Lurgan is a historical floor, not a current target
 
-The most likely explanation is **(1) — our convergence is correct for current move stats, the community spreads are outdated**. Worth re-running against rank-1 + atk-weighted + default opponent variants to see if (2) shifts the result.
+Per mercuryish:
+
+> "the lurgan ape only gets some lickitung. lickitung could keep the bulkpoint with
+> enough defense, so people went for even higher attack iv annihilape to beat lurgan
+> ape in cmp ties & secure the lickitung breakpoint"
+
+> "that is the list of slayer annihilape, but higher attack is preferred for more
+> consistency against the mirror and lickitung"
+
+The Lurgan spread is the **floor** — the minimum atk to clear a specific Lickitung
+damage breakpoint AND the minimum def to keep some bulkpoint mercuryish does not
+remember the source of. Current community advice is to push *higher* atk than the
+Lurgan baseline for two reasons:
+
+1. **CMP wins against the mirror**: a non-Lurgan Annihilape with atk > 127.78 (the
+   maximum effective atk in the Lurgan IV list) wins charge-move-priority ties
+   against any Lurgan Ape opponent.
+2. **BP security against Lickitung**: pushing past the strict 127.2 minimum gives
+   margin for breakpoints in any move beyond the originally-targeted one.
+
+Our converged cohort (atk 129.44, the maximum possible) is precisely what mercuryish
+describes as the "preferred for consistency" target. The convergence is not in
+disagreement with the community — it is in agreement with the *current* community
+view, which has moved past the Lurgan baseline.
+
+The original three hypotheses for the apparent disagreement were:
+
+1. **Move parameters changed since Lurgan was published.** Confirmed by
+   mercuryish: "i am pretty sure this predates the counter nerf, addition of rage
+   fist, low kick buff, and annihilape almost never even considered running close
+   combat." The Lurgan spread was calibrated to a Counter-era Annihilape that no
+   longer exists.
+
+2. **The community optimizes against a broader opponent set.** Partially correct
+   but not the main story — mercuryish's framing is that Lurgan was always a floor,
+   and the broader opponent set just shifted the *recommendation* above that floor
+   without retiring the floor itself.
+
+3. **Our model has a bug.** Ruled out — convergence matches current expert
+   guidance.
+
+### Followup work surfaced by this resolution
+
+- **The 102.9 def cutoff is not yet representable as a named anchor.** It is a
+  *bulkpoint* threshold — focal def crossing some value to take less damage from
+  some incoming move. Our anchor schema currently has `damage_breakpoint` (atk
+  side) but no `bulkpoint` (def side) kind. Adding the parallel kind, with the
+  same Level 1 / Level 2 / Level 3 precision structure, would let us represent
+  the 102.9 floor as a Level 2 anchor and use Level 3 discovery to identify
+  *which* specific bulkpoint mercuryish was targeting (which they don't remember).
+  Tracked in TODO.md.
+
+- **Re-run with Lurgan as an explicit opponent variant.** Even though the
+  resolution above explains the disagreement, it would still be worth running
+  the mirror slayer iteration with Lurgan IVs in the opponent pool (alongside
+  PvPoke defaults) to see whether our atk 129.44 convergence holds when forced
+  to also beat the Lurgan-style opponents. Tracked in TODO.md.
 
 ## Algorithm notes
 

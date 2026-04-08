@@ -97,6 +97,74 @@
   to mistakenly run a smoke test without `--interactive` and conclude
   nothing rendered.
 
+### Bulkpoint anchor kind — design + implementation
+
+Schema gap surfaced 2026-04-08 by mercuryish testimony on the Lurgan Ape:
+the Lurgan spread is defined by `atk >= 127.2` AND `def >= 102.9`. The
+atk side maps cleanly to our existing `damage_breakpoint` anchor (Level 2:
+`above_atk = 127.2`). The def side is a *bulkpoint* — focal def crossing
+a threshold to take less damage from some incoming move — and we have no
+parallel anchor kind for it. mercuryish does not remember which specific
+bulkpoint 102.9 keeps; recovering that knowledge requires the bulkpoint
+infrastructure.
+
+The library already has the math (`gopvpsim.breakpoints.bulkpoints`,
+`def_for_damage`, `Bulkpoint` namedtuple) — only the anchor schema and
+resolver wrapping is missing. The work is mostly mechanical, parallel to
+the existing `damage_breakpoint` code path.
+
+Required pieces:
+
+* **Schema**: new `BulkpointAnchor` dataclass in
+  `gopvpsim/thresholds.py` with the same three precision levels:
+  - Level 1: `move` + `takes_at_most = N` (focal def must be high enough
+    that the named opponent's named move deals ≤ N damage)
+  - Level 2: `above_def = X` (smallest focal def above X at which any
+    incoming move's damage steps down)
+  - Level 3: bare anchor enumerates every bulkpoint against the opponent
+    in the focal def range
+
+* **Parser**: extend `_parse_anchor` for the new `kind = "bulkpoint"`
+  discriminator. Mutual-exclusion rules mirror the BP side: can't combine
+  `takes_at_most` and `above_def`, etc.
+
+* **Resolver**: new branch in `gopvpsim/anchors.py` using
+  `scan_bulkpoints()` from the breakpoints library. ResolvedAnchor needs
+  a "what stat does this check" indicator (currently it's hardcoded to
+  `threshold_atk` + `passes(focal_atk)`); generalize to a stat target
+  (`threshold_value` + `target_stat: 'atk' | 'def'`). The bulkpoint
+  resolver populates `target_stat = 'def'` and the categorize_slayers
+  tag-iv logic checks `passes(focal_def)` for those.
+
+* **categorize_slayers**: bulkpoint anchors route into **Bulk Slayer**
+  (parallel to how breakpoint anchors route into Atk Slayer). Bulk Slayer
+  membership becomes "structural HP+def above median **OR** clears at
+  least one named bulkpoint." Hide-when-empty rule applies to the
+  named-bulkpoint subset only; the structural pool is always shown.
+
+* **HTML rendering**: filter panel + tag badges for bulkpoint anchors in
+  the Bulk Slayer card. display_name derivation for the new anchor name
+  pattern (likely `<opponent>_blkp_any` etc.).
+
+* **Auto-fallback**: `build_auto_anchors` gains an auto-bulkpoint layer
+  parallel to auto-Atk. One Level 3 bulkpoint anchor per opponent in the
+  dive's opponent set; gated by `"bulkpoint" not in existing_kinds`.
+
+* **Tests**: parsing variants, mutual exclusion errors, three precision
+  levels, resolution against fixtures, fallback gating.
+
+* **Docs**: update `docs/concepts.md` to introduce bulkpoint anchors as
+  the def-side analog of damage_breakpoint anchors. Update
+  `docs/threshold_schema.md` with the new TOML keys and a worked example.
+  Likely also update the Annihilape TOML to add a Level 2 anchor for the
+  102.9 def floor and a Level 3 mirror-bulkpoint discovery anchor.
+
+Once shipped, run the discover-mode sweep against the Annihilape mirror
+to identify which specific (move, tier) bulkpoint the 102.9 floor
+preserves. That recovers the lost-to-history calibration knowledge from
+the original Lurgan spread and lets us promote the discovered bulkpoint
+to a Level 1 anchor with full provenance.
+
 ### Auto-anchor fallback — shipped 2026-04-08
 
 When `--mirror-slayer` runs and the user provides no explicit anchors of a

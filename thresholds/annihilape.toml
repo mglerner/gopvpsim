@@ -40,8 +40,21 @@ description = "High-bulk cutoff (legacy)."
 # ─────────────────────────────────────────────────────────────────────
 
 [Annihilape.Great.spreads.lurgan_ape]
-description = "Community 'Lurgan Ape' spread popularized by lurganrocket. Calibrated to a Lickitung damage breakpoint near atk 127.23. Predates the Counter nerf, Rage Fist addition, and Low Kick buff — treated as a historical anchor, not a current target. Per mercuryish, current expert advice is to go higher attack than this baseline for CMP wins and BP security against the mirror and Lickitung."
-source = "Community spread (lurganrocket); mercuryish testimony 2026-04-08"
+description = """
+Community 'Lurgan Ape' spread popularized by lurganrocket. Per mercuryish
+(Discord, 2026-04-08), the spread is defined by two cutoffs:
+  attack >= 127.2  (minimum atk for the Lickitung damage breakpoint)
+  defense >= 102.9 (def floor; mercuryish does not remember which specific
+                    bulkpoint this preserves — likely a mirror or Lickitung
+                    bulkpoint, recoverable via Level 3 bulkpoint discovery
+                    once we add the bulkpoint anchor kind)
+The 27 IVs below are the enumeration of those cutoffs at GL CP cap. The
+spread predates the Counter nerf, Rage Fist addition, and Low Kick buff —
+treat as a historical anchor, not a current target. Current expert advice
+is to go higher attack than this baseline for CMP wins and BP security
+against the mirror and Lickitung.
+"""
+source = "Community spread (lurganrocket); mercuryish testimony 2026-04-08 (atk 127.2, def 102.9)"
 ivs = [
     [11, 10, 2],
     [15, 12, 5],
@@ -72,6 +85,19 @@ ivs = [
     [15, 12, 0],
 ]
 
+# Stat-cutoff form of the same Lurgan Ape spread. Per mercuryish
+# (Discord, 2026-04-08) the spread is canonically defined by the two
+# cutoffs below; the lurgan_ape IV-list above is the enumeration of
+# those cutoffs at GL CP cap. Either form can be referenced from anchors;
+# use this form when you want a "is this IV a Lurgan Ape?" membership
+# check that's robust to game changes (e.g. level cap shifts).
+[Annihilape.Great.spreads.lurgan_ape_stat]
+description = "Stat-cutoff form of the Lurgan Ape spread (atk >= 127.2, def >= 102.9). Equivalent to the lurgan_ape IV list at GL CP cap, generative form."
+source = "mercuryish testimony 2026-04-08"
+attack = 127.2
+defense = 102.9
+stamina = 0
+
 # ─────────────────────────────────────────────────────────────────────
 # Anchors — CMP
 # ─────────────────────────────────────────────────────────────────────
@@ -85,13 +111,15 @@ description = "Win CMP ties against the community Lurgan Ape spread. Pushing foc
 # Anchors — damage breakpoints
 # ─────────────────────────────────────────────────────────────────────
 
-# Level 2: reproduce the Lurgan-era community Lickitung BP without needing
-# to know exactly which (move, tier) was originally calibrated to 127.23.
+# Level 2: reproduce the Lurgan-era community Lickitung BP using the actual
+# 127.2 minimum atk that mercuryish (Discord, 2026-04-08) confirmed as the
+# Lurgan calibration point. Earlier draft used 127.23 — that was a precision
+# error from a screenshot.
 [Annihilape.Great.anchors.lickitung_bp_above_lurgan]
 kind = "damage_breakpoint"
 opponent = "Lickitung"
-above_atk = 127.23
-description = "Smallest atk > 127.23 at which any focal move's damage to default Lickitung steps up. Reproduces the historical Lurgan-era 'Lickitung BP' calibration."
+above_atk = 127.2
+description = "Smallest atk > 127.2 at which any focal move's damage to default Lickitung steps up. Reproduces the historical Lurgan-era 'Lickitung BP' calibration; 127.2 is mercuryish-confirmed as the original Lurgan atk minimum."
 
 # Level 3: discover and tag every Lickitung BP in the survivor range.
 [Annihilape.Great.anchors.lickitung_bp_any]
