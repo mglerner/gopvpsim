@@ -1,5 +1,5 @@
 
-the individual matchups are definitely on the longer side, but the "specific iv suggestions" part is basically a tldr 
+the individual matchups are definitely on the longer side, but the "specific iv suggestions" part is basically a tldr
 
 ## Corviknight
 
@@ -20,8 +20,6 @@ the individual matchups are definitely on the longer side, but the "specific iv 
 * 113.39 attack (max attack) gives a sand attack breakpoint on most forretress before the first rock tomb. 111.25 attack gets a breakpoint against the rank #1, but the rank #1 is a little skewed because the iv spread is 0/9/15. the rank 2 forretress (1/15/15) requires max attack corviknight to get the breakpoint and feels more reasonable. you need as much as 112.03 attack just for default iv forretress (5/15/13) because that has more defense than the rank #1. there is also a bug bite bulkpoint: you need 134.04 defense to cover the default iv spread before the first sand tomb, or 132.61 defense to cover the rank 1 before the first sand tomb
 
 * 113.39 attack gives a sand attack breakpoint on rank #1 empoleon, which flips the 0s
-
-
 
 ### defense & hp:
 
@@ -59,8 +57,6 @@ the individual matchups are definitely on the longer side, but the "specific iv 
 
 * 135.46 defense (max defense) picks up a bulkpoint vs default iv shadow sableye (default used here since shadow sableye tend to be attack weighted) which flips the 2s if you bait twice, flips the 1 without baiting (but the rank #1 corviknight can reach a payback to win the 1s despite not having the bulkpoint). 132.75 defense gets the bulkpoint vs rank #1 shadow sableye
 
-
-
 ### non-matchup changing benchmarks
 
 * 106.85 attack gives a sand attack breakpoint vs dedenne until the first parabolic charge (107.14 attack covers defense weighted dedenne until the first parabolic charge)
@@ -72,8 +68,6 @@ the individual matchups are definitely on the longer side, but the "specific iv 
 * 129.07 defense gets a bulkpoint vs slight attack weight shadow scizor
 
 * 133.40 defense gives a bulkpoint vs shadow annihilape (arbitrarily chose the 6/11/11 to account for the fact that most people use attack weighted shadow annihilape. after a rage fist, counter does the same damage to most corviknight iv spreads regardless of the bulkpoint
-
-
 
 ### the mirror match
 

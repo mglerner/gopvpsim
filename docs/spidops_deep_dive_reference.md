@@ -34,8 +34,6 @@ anything here can work with more defense/less hp or vice versa. if you have some
 
 * 140.67 defense with 132+ hp flips the 1s vs the rank #1 altaria without baits by reducing sky attack damage. 140.85 defense with 133+ hp covers the default IV altaria (4/12/13)
 
-
-
 ### summary
 
 * a slight attack-weighted spidops seems really strong, but a bulk-focus spidops also looks solid
@@ -44,8 +42,6 @@ anything here can work with more defense/less hp or vice versa. if you have some
 
 * slight attack weight stats i recommend: 113.03 attack, 138.88 defense, and as much hp as possible. 1/7/1 is pretty cool
 
-
 ### Note
 
 spidops is less meta relevant now that it was when this deep dive was done.
- 

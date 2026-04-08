@@ -2,8 +2,15 @@
 """
 Format markdown files for raw-text readability.
 
-Currently runs one pass:
+Current passes (run in order):
 
+* **strip_trailing_whitespace** — removes trailing whitespace from prose
+  lines while preserving markdown's two-space soft line break and leaving
+  fenced code blocks untouched (where trailing whitespace may be
+  meaningful column padding).
+* **collapse_blank_lines** — collapses runs of 2+ consecutive blank lines
+  outside code fences down to a single blank line, and strips trailing
+  blank lines at end-of-file.
 * **pad_tables** — pads pipe-table cells with spaces so columns line up
   in a plain text editor while remaining valid GitHub-flavored markdown.
 
@@ -37,6 +44,114 @@ import json
 import sys
 from pathlib import Path
 from typing import Callable
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+
+def _fence_mask(lines: list[str]) -> list[bool]:
+    """For each line, return True iff it lies inside a fenced code block.
+
+    Fence markers (the ``` or ~~~ lines themselves) count as outside the
+    fence — passes that operate on prose can leave them alone since the
+    marker text is itself markdown punctuation. Supports both ``` and ~~~
+    fences and only treats a closing fence as one that uses the same
+    marker as the opener (so ``` doesn't accidentally close ~~~).
+    """
+    mask = [False] * len(lines)
+    in_fence = False
+    fence_marker = ""
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        if not in_fence and (stripped.startswith("```") or stripped.startswith("~~~")):
+            in_fence = True
+            fence_marker = stripped[:3]
+            mask[i] = False  # the opening fence line itself
+            continue
+        if in_fence and stripped.startswith(fence_marker):
+            in_fence = False
+            fence_marker = ""
+            mask[i] = False  # the closing fence line itself
+            continue
+        mask[i] = in_fence
+    return mask
+
+
+# ---------------------------------------------------------------------------
+# Pass: strip_trailing_whitespace
+# ---------------------------------------------------------------------------
+
+
+def strip_trailing_whitespace(lines: list[str]) -> list[str]:
+    """Strip trailing whitespace from prose lines.
+
+    Lines inside fenced code blocks are left untouched (the trailing
+    whitespace may be meaningful column padding in tabular data dumps).
+
+    Markdown's ``two-trailing-spaces`` soft line break is preserved: a
+    line that ends in two-or-more spaces is normalized to exactly two
+    trailing spaces (so the line break is preserved while any extra
+    padding is cleaned up). Tabs at end-of-line are stripped — they have
+    no markdown semantics.
+    """
+    in_fence = _fence_mask(lines)
+    out: list[str] = []
+    for i, line in enumerate(lines):
+        if in_fence[i]:
+            out.append(line)
+            continue
+        # Count trailing spaces (only spaces, not tabs).
+        stripped = line.rstrip()
+        n_trailing_spaces = len(line) - len(line.rstrip(" "))
+        if n_trailing_spaces >= 2 and stripped:
+            # Preserve the markdown soft break — but normalize to exactly
+            # two spaces. (Empty-after-rstrip lines are just blank lines
+            # with whitespace; collapse them to truly blank instead.)
+            out.append(stripped + "  ")
+        else:
+            out.append(stripped)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Pass: collapse_blank_lines
+# ---------------------------------------------------------------------------
+
+
+def collapse_blank_lines(lines: list[str]) -> list[str]:
+    """Collapse runs of 2+ consecutive blank lines down to 1, outside fences.
+
+    Multiple blank lines have no semantic effect in markdown. A single
+    blank line is the canonical separator between block elements; runs of
+    two or more are leftover noise. Inside fenced code blocks blank-line
+    runs are preserved verbatim — they may be meaningful in code samples.
+
+    Trailing blank lines at end-of-file are also collapsed away (the file
+    will end with exactly one newline, handled by ``format_text``).
+    """
+    in_fence = _fence_mask(lines)
+    out: list[str] = []
+    prev_blank_outside_fence = False
+    for i, line in enumerate(lines):
+        if in_fence[i]:
+            out.append(line)
+            prev_blank_outside_fence = False
+            continue
+        if line == "":
+            if prev_blank_outside_fence:
+                continue  # drop the duplicate blank
+            prev_blank_outside_fence = True
+            out.append(line)
+        else:
+            prev_blank_outside_fence = False
+            out.append(line)
+    # Strip trailing blank lines outright. (format_text adds back exactly
+    # one newline at end-of-file.)
+    while out and out[-1] == "":
+        out.pop()
+    return out
+
 
 # ---------------------------------------------------------------------------
 # Pass: pad_tables
@@ -204,6 +319,8 @@ def pad_tables(lines: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 PASSES: list[Callable[[list[str]], list[str]]] = [
+    strip_trailing_whitespace,
+    collapse_blank_lines,
     pad_tables,
 ]
 

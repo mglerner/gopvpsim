@@ -30,7 +30,6 @@ gigaton hammer was datamined to be 130/60. i made a write-up for stat checks tha
 
 -* 143.04 defense with 141 hp (or 143.72 defense with 140 hp) lets you win the 0-1s against the rank #1 shadow altaria without baiting. this seems inconsistent, as shadow ivs vary & you no longer win against shadow altaria with a little bit of attack
 
-
 ### recommendation / summary
 
 * the 0/14/9 and 0/15/8 tinkaton meet all of the bulk requirements above while having higher attack than default iv lickilicky
