@@ -38,6 +38,26 @@
 
 ## Analysis goals
 
+* **Meta-wide slayer reference (ambitious)** — With the slayer anchor
+  system shipped, we can systematically run `--mirror-slayer` (with
+  anchors) on the top 30 GL meta picks and build a meta-wide reference
+  of "the converged slayer cohort + named anchors" for every relevant
+  species. Each species gets its own `thresholds/<species>.toml` with
+  hand-picked anchors against its key opponents (and the auto-fallback
+  layer fills the gaps). The output: a per-species HTML deep dive plus
+  a top-level summary table of which IVs are slayer-quality across the
+  meta. This is the natural extension of the Annihilape work to the
+  rest of the format. Could be paced as 2-5 species per session to keep
+  momentum without burning out on TOML authoring. Goodra, Clodsire,
+  Carbink, Galarian Stunfisk, Tinkaton, Medicham, Annihilape (already
+  done) are obvious starting points — they're in the existing dive
+  history. Anything in the championship-series group is a candidate.
+  Bulkpoint anchor kind (see "Bulkpoint anchor kind" above) should
+  probably ship before this lands so each species can use the def-side
+  anchors too.
+
+
+
 * **Reproduce SwagTips-style IV deep dives** — articles like the old GamePress
   Carbink and Annihilape PvP IV deep dives. Use Pokemon Go Championship Series
   event data (most common mons/movesets) as the modern test pool. Sim all 4096
