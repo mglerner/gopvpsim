@@ -1,0 +1,121 @@
+# Annihilape — Great League thresholds, spreads, and slayer anchors.
+#
+# Sources:
+#   - Iteration findings (mirror slayer Nash convergence, 2026-04-07). See
+#     docs/validations/2026-04-07_annihilape_mirror_slayer_iteration.md
+#   - Community "Lurgan Ape" spread popularized by lurganrocket on Twitter.
+#   - Expert testimony from mercuryish (Discord, 2026-04-08) confirming the
+#     Lurgan spread predates the Counter nerf, Rage Fist addition, and Low
+#     Kick buff, and that current expert advice is to go higher attack than
+#     the Lurgan baseline for CMP wins and BP security.
+
+[Annihilape]
+sources = "Mirror slayer iteration (2026-04-07) + community Lurgan Ape + mercuryish testimony (2026-04-08)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — stat-cutoff form (preserved from the legacy JSON file so
+# tier-coloring scatter plots keep working)
+# ─────────────────────────────────────────────────────────────────────
+
+[Annihilape.Great.spreads."High Atk (mirror)"]
+attack = 125.0
+defense = 103.0
+stamina = 0
+description = "High-attack mirror cutoff (legacy)."
+
+[Annihilape.Great.spreads.Balanced]
+attack = 122.0
+defense = 106.0
+stamina = 136
+description = "Balanced atk/bulk cutoff (legacy)."
+
+[Annihilape.Great.spreads."High Bulk"]
+attack = 0
+defense = 107.0
+stamina = 138
+description = "High-bulk cutoff (legacy)."
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — IV-list form
+# ─────────────────────────────────────────────────────────────────────
+
+[Annihilape.Great.spreads.lurgan_ape]
+description = "Community 'Lurgan Ape' spread popularized by lurganrocket. Calibrated to a Lickitung damage breakpoint near atk 127.23. Predates the Counter nerf, Rage Fist addition, and Low Kick buff — treated as a historical anchor, not a current target. Per mercuryish, current expert advice is to go higher attack than this baseline for CMP wins and BP security against the mirror and Lickitung."
+source = "Community spread (lurganrocket); mercuryish testimony 2026-04-08"
+ivs = [
+    [11, 10, 2],
+    [15, 12, 5],
+    [11, 11, 0],
+    [15, 13, 4],
+    [11,  9, 3],
+    [11,  9, 2],
+    [15, 14, 3],
+    [15, 14, 2],
+    [11, 10, 1],
+    [11, 10, 0],
+    [12,  9, 1],
+    [12,  9, 0],
+    [15, 15, 1],
+    [15, 15, 0],
+    [15, 12, 4],
+    [15, 13, 3],
+    [15, 13, 2],
+    [11,  9, 1],
+    [11,  9, 0],
+    [15, 14, 1],
+    [15, 14, 0],
+    [15, 12, 3],
+    [15, 12, 2],
+    [15, 13, 1],
+    [15, 13, 0],
+    [15, 12, 1],
+    [15, 12, 0],
+]
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — CMP
+# ─────────────────────────────────────────────────────────────────────
+
+[Annihilape.Great.anchors.cmp_vs_lurgan]
+kind = "cmp"
+spread = "lurgan_ape"
+description = "Win CMP ties against the community Lurgan Ape spread. Pushing focal atk above max(lurgan) wins the mirror against anyone using a Lurgan IV combo."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 2: reproduce the Lurgan-era community Lickitung BP without needing
+# to know exactly which (move, tier) was originally calibrated to 127.23.
+[Annihilape.Great.anchors.lickitung_bp_above_lurgan]
+kind = "damage_breakpoint"
+opponent = "Lickitung"
+above_atk = 127.23
+description = "Smallest atk > 127.23 at which any focal move's damage to default Lickitung steps up. Reproduces the historical Lurgan-era 'Lickitung BP' calibration."
+
+# Level 3: discover and tag every Lickitung BP in the survivor range.
+[Annihilape.Great.anchors.lickitung_bp_any]
+kind = "damage_breakpoint"
+opponent = "Lickitung"
+description = "Enumerate every Lickitung damage breakpoint in the survivor atk range and tag each survivor with the sub-anchors it clears."
+
+# Level 3: Cresselia — per mercuryish, rumored to have been one of the
+# original Lurgan-era calibration points. Discover all BPs so we can see
+# which one matters.
+[Annihilape.Great.anchors.cresselia_bp_any]
+kind = "damage_breakpoint"
+opponent = "Cresselia"
+description = "Discover all Cresselia damage breakpoints. Mercuryish recalled Cresselia as a possible original Lurgan calibration point — Level 3 lets us find which BP that was."
+
+# Level 3: Umbreon — ditto.
+[Annihilape.Great.anchors.umbreon_bp_any]
+kind = "damage_breakpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon damage breakpoints in the survivor atk range."
+
+# Level 3: the mirror itself. Useful to see which BPs matter in the
+# Annihilape mirror before the converged cohort is computed.
+[Annihilape.Great.anchors.mirror_bp_any]
+kind = "damage_breakpoint"
+opponent = "Annihilape"
+description = "Discover all damage breakpoints against a default Annihilape. Anchors mirror-match damage analysis."

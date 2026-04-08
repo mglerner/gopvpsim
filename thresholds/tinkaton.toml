@@ -1,0 +1,19 @@
+# Tinkaton — Great League thresholds.
+#
+# Current data is Gigaton Hammer stat-cutoff spreads, preserved from the
+# legacy JSON file. Source: HomeSliceHenry Discord server.
+
+[Tinkaton]
+sources = "HomeSliceHenry Discord server; Gigaton Hammer matchups"
+
+[Tinkaton.Great.spreads."GH Great"]
+attack = 0
+defense = 143.03
+stamina = 138
+description = "Gigaton Hammer 'great' bulk cutoff."
+
+[Tinkaton.Great.spreads."GH Good"]
+attack = 0
+defense = 141.66
+stamina = 138
+description = "Gigaton Hammer 'good' bulk cutoff (slightly relaxed)."

@@ -42,5 +42,13 @@ Pluggable policy. Simulate all three shield scenarios (0-0, 1-1, 2-2).
 - `python -m pytest tests/test_battle.py -q` — run all battle tests (99/102 passing)
 - Tests verify scores against PvPoke ground truth from pvpoke.com/battle/
 
+## Documentation
+- `docs/concepts.md` — vocabulary used in deep-dive HTML outputs and threshold files
+  (spread, anchor, slayer category, breakpoint, bulkpoint, CMP). Read this first.
+- `docs/threshold_schema.md` — TOML schema for `thresholds/*.toml` files. Assumes
+  familiarity with `concepts.md`.
+- `DEVELOPER_NOTES.md` — verification status, PvPoke comparison, bugs found.
+- `docs/validations/` — point-in-time experiment writeups.
+
 ## Out of scope for now
 Adaptive/game-tree search (minimax). Web app UI.

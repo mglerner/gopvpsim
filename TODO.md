@@ -73,41 +73,130 @@
   visually; the automated analysis should match what users see.
 
 
-* **Slayer ideas** -- for the slayer IVs, it may not be possible to
-  represent them as IV thresholds. They really may just be a
-  collection of specific IVs. But we should at least categorize the IV
-  spreads that they're using. And if it *is* possible to describe them
-  as IV thresholds, we should give that description in addition to the
-  table.
+## HTML interactive output bugs
 
-* **More Slayer ideas** -- from our session with the first converged
-  slayer IVs: "  We're going higher attack and lower defense than the
-  community. The community spreads are at exactly the Lickitung BP
-  cutoff (127.23) and above the mirror Def BP (103.54). Our
-  convergence pushes attack to the maximum and accepts lower defense."
-  which makes sense. But if this is right, that it was basically a
-  search for "find slayers, but make sure to meet the lickitung" maybe
-  we should add the ability to find slayers with other specified
-  constraints like that.
+* **"Show clusters" section is always visible** — it sits above the
+  interactive scatter plot but should be gated behind the "Show
+  experimental analysis (banding, clusters)" checkbox in the Deep Dive
+  Analysis section. The checkbox already toggles `#dd-alpha` and
+  `#dd-alpha-methods`; the cluster-display block needs to either move
+  inside `#dd-alpha` or be hidden by the same JS handler. Discovered
+  2026-04-08.
 
-* **Fix Atk Slayer vs CMP Slayer categorization** — The current
-  categorize_slayers() in scripts/deep_dive.py uses two attack-based
-  filters: Atk Slayer = "above survivor median atk", CMP Slayer = "top
-  quartile by atk". Since top quartile is strictly above median, CMP
-  Slayer is a strict subset of Atk Slayer — they're measuring the same
-  thing twice with different cutoffs, not two distinct concepts. The
-  RyanSwag patterns we identified are actually different:
-  - **Atk Slayer** should mean "hits a specific damage breakpoint
-    against a notable opponent" (e.g. atk >= 127.23 for the Lickitung
-    BP). This requires either pre-known BP thresholds or detecting them
-    from per-opponent damage data (we already compute this in the
-    breakpoint narration code).
-  - **CMP Slayer** should mean "atk is high enough to win CMP ties
-    against the typical opponent IV." Binary check: focal_atk >
-    opponent_atk for the reference opponent.
-  - Bulk Slayer can stay as-is (HP+Def above median).
-  Implementation: integrate with breakpoint narration to find BPs, and
-  add a CMP comparison against the reference opponent atk.
+## HTML output paths
+
+* **Non-interactive `generate_html` is now strictly worse than interactive**
+  — `generate_analysis_sections` (line 2046, which produces the slayer
+  iteration display, breakpoint narration, banding analysis, clusters,
+  etc.) is *only* called from `generate_interactive_html` (line 2866),
+  not from `generate_html` (line 1242). Without `--interactive`, the HTML
+  shows just the top-N table, the plot, and a brief methodology footer —
+  none of the slayer analysis. Fix: either deprecate the non-interactive
+  path entirely, or refactor so both paths render the analysis sections.
+  Discovered 2026-04-08 during anchor-system smoke testing — it's easy
+  to mistakenly run a smoke test without `--interactive` and conclude
+  nothing rendered.
+
+### Auto-anchor fallback — shipped 2026-04-08
+
+When `--mirror-slayer` runs and the user provides no explicit anchors of a
+given kind via `--thresholds`, `gopvpsim.anchors.build_auto_anchors`
+synthesizes a fallback overlay so the Atk Slayer and CMP Slayer category
+boxes still populate. Gating is per-kind: if you have explicit
+`damage_breakpoint` anchors only, you get auto CMP filled in; if you have
+explicit `cmp` only, you get auto BPs; if neither, both fire; if both,
+neither auto fires.
+
+Auto BP anchors create one Level 3 `damage_breakpoint` per opponent species
+(named `auto_<species>_bp_any`), enumerating every breakpoint over **all**
+focal moves (fast + charged). Earlier draft restricted to the focal fast
+move only on the theory that fast-move BPs compound across many ticks while
+charged-move +1s are one-off; that turned out to silently disable auto-Atk
+for low-power-fast-move species like Annihilape (Low Kick power 5 produces
+0–1 BPs against typical opponents). All-moves enumeration produces noisier
+sub-anchor families but the filter panel + per-row tag abbreviation handle
+the volume tolerably.
+
+Auto CMP anchor uses **top quartile by atk in the survivor cohort**, not
+"strictly beat the max." This is non-obvious and deserves a callout:
+
+* **The focal IV is a member of its own cohort.** When the auto-CMP
+  cohort = the converged survivor pool, "strictly beat max" is unreachable
+  by definition — the highest-atk IV in the cohort can at best tie itself.
+  My first cut used `strict=True` against an `IvListSpread` of the
+  survivors and the CMP Slayer category came up empty for every fresh
+  dive. Fix: compute the 75th-percentile effective atk over the cohort,
+  wrap in a `StatCutoffSpread`, use a non-strict (`>=`) `CmpAnchor`. This
+  always populates and matches the spirit of the old top-quartile-by-atk
+  heuristic, now grounded in the actual converged survivors instead of
+  the unfiltered 4096-IV space. Anchor name: `auto_cmp_vs_cohort`,
+  display name: `cmp:cohort`.
+
+* **The strict-max semantic is still correct for explicit external CMP
+  anchors** like `cmp_vs_lurgan` in `thresholds/annihilape.toml`. There the
+  cohort (Lurgan IVs) is external to the focal pool, so "strictly beat max"
+  is a real, achievable threshold. Don't generalize the auto-CMP fix to
+  the explicit case.
+
+Auto markers: every auto-generated parent renders with a small italic
+"(auto)" suffix in the filter panel UI so the user can see which anchors
+came from runtime fallback vs the TOML. Display-name derivation strips the
+`auto_` prefix first so badge text in the table cells stays clean
+(`corviknight`, `cmp:cohort`, etc.).
+
+Outstanding follow-ups for the auto-anchor system:
+
+* **Add tests** for `build_auto_anchors()` and the gating logic. Currently
+  only verified by smoke runs against the real Annihilape data.
+* **Consider exposing a CLI flag** to opt out of auto fallback entirely
+  (e.g. `--no-auto-anchors`) for users who only want their explicit set.
+  Not built yet — wait until someone wants it.
+* **Bulk Slayer anchor display**: when auto anchors fire, the Bulk Slayer
+  card shows the anchor tags too (since `want_kinds = {bp, cmp}` for Bulk).
+  This is fine but means a fresh dive's Bulk Slayer rows will be tagged
+  with the auto anchors of any kind. Worth eyeballing whether that adds
+  signal or noise.
+
+### Slayer anchor system — shipped 2026-04-08
+
+The TOML threshold schema (`docs/threshold_schema.md`), anchor resolver
+(`gopvpsim/anchors.py`), and anchor-tagged `categorize_slayers` are all in
+place. Atk Slayer and CMP Slayer now use named anchors instead of vacuous
+median heuristics. Three follow-up observations from the smoke run:
+
+* **Level 3 anchors are noisy on charged moves** — Close Combat and Rage
+  Fist produce 10–15 BPs each across the survivor atk range because
+  charged-move damage ladders are very fine-grained (every ~1 atk gives a
+  +1 damage step). The tactically meaningful BPs are almost always on fast
+  moves, since fast-move +1 damage compounds across many ticks per battle
+  while a charged-move +1 is one-off. Two possible fixes:
+  1. Add `moves = ["LOW_KICK"]` filters to L3 anchors in
+     `thresholds/annihilape.toml` to scope discovery to fast moves only.
+  2. Teach the resolver to filter out "micro-BPs" on high-power moves by
+     default (e.g., suppress sub-anchors whose damage delta is < some
+     fraction of the move's base damage).
+  Decide which after looking at the rendered HTML.
+
+* **`docs/validations/2026-04-07_annihilape_mirror_slayer_iteration.md`
+  is now stale** — should be updated to reflect the mercuryish testimony
+  (Discord, 2026-04-08): the community Lurgan Ape spread is a *historical
+  anchor* calibrated to a Lickitung BP near atk 127.23, predating the
+  Counter nerf, Rage Fist addition, and Low Kick buff. Current expert
+  advice is to push higher attack than the Lurgan baseline for CMP wins
+  and BP security against the mirror and Lickitung — which matches our
+  converged result, not contradicts it. Reframe the validation doc from
+  "we disagree with community" to "we converge to current expert
+  practice; the published Lurgan spread is a frozen historical
+  reference."
+
+* **Re-run Annihilape mirror slayer with Lurgan as an explicit opponent
+  variant** — Hypothesis 2 from the validation doc was that the community
+  optimizes against a broader opponent set (PvPoke defaults + atk-weighted
+  + Lurgan-style hand-builds). With the new TOML format, we can put the
+  Lurgan spread in as a named opponent IV cohort and re-run mirror
+  iteration to see whether our convergence shifts. If atk 129.44 still
+  wins, hypothesis 1 (outdated community spread) is confirmed; if it
+  shifts toward 127, hypothesis 2 is confirmed.
 
 ## UI / Display
 
