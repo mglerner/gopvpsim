@@ -2195,6 +2195,18 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 .dd-anchor-tags-cell { max-width: 480px; white-space: normal; line-height: 1.5;
   cursor: help; }
 .dd-anchor-tags-cell .dd-anchor-tag { vertical-align: baseline; }
+/* Compact mode: cap tag cells at ~2 lines so survivor rows stay readable.
+   The "Expand all tags" toggle in the slayer section header removes this
+   class from every cell to reveal the full badge wall. */
+.dd-anchor-tags-cell.dd-tags-compact { max-height: 3em; overflow: hidden;
+  position: relative; }
+.dd-anchor-tags-cell.dd-tags-compact::after { content: ""; position: absolute;
+  bottom: 0; left: 0; right: 0; height: 1.5em; pointer-events: none;
+  background: linear-gradient(transparent, #16213e); }
+.dd-tags-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
+  padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
+  margin:6px 0; }
+.dd-tags-toggle:hover { background:#1a3a6e; color:#fff; }
 .dd-filter-hidden { display: none !important; }
 .dd-filter-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
   padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
@@ -2537,9 +2549,24 @@ function ddSlayerToggleFilterPanel(cardId) {
   var hidden = (p.style.display === 'none' || p.style.display === '');
   p.style.display = hidden ? 'block' : 'none';
 }
+function ddToggleTagsCompact(btn) {
+  // Toggle the dd-tags-compact class on every anchor tag cell across all
+  // slayer cards. Default state is "compact" (cells capped at ~2 lines
+  // with a fade gradient at the bottom). Click expands to full height
+  // so the badge wall is fully visible.
+  var cells = document.querySelectorAll('.dd-anchor-tags-cell');
+  if (!cells.length) return;
+  var nowExpanded = cells[0].classList.contains('dd-tags-compact');
+  cells.forEach(function(c) { c.classList.toggle('dd-tags-compact', !nowExpanded); });
+  btn.textContent = nowExpanded ? 'Compact tags' : 'Expand all tags';
+}
 </script>
 """)
 
+            results_parts.append(
+                '<button class="dd-tags-toggle" '
+                'onclick="ddToggleTagsCompact(this)">Expand all tags</button>\n'
+            )
             results_parts.append('<div class="dd-rec-grid">\n')
             CAT_ABBREV = {'Atk Slayer': 'A', 'Bulk Slayer': 'B', 'CMP Slayer': 'C'}
             CAT_COLORS = {'Atk Slayer': '#f85149', 'Bulk Slayer': '#3fb950',
@@ -2786,7 +2813,8 @@ function ddSlayerToggleFilterPanel(cardId) {
                         f'<td class="dd-gain">{r["total_wins"]}</td>'
                         f'<td>{r["avg_score"]:.1f}</td>'
                         f'<td>{badges}</td>'
-                        f'<td class="dd-anchor-tags-cell" title="{cell_title_attr}">'
+                        f'<td class="dd-anchor-tags-cell dd-tags-compact" '
+                        f'title="{cell_title_attr}">'
                         f'{tags_cell}</td></tr>\n'
                     )
                 results_parts.append('</table>\n')
