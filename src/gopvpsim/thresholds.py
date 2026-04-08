@@ -132,7 +132,52 @@ class DamageBreakpointAnchor:
         return 3
 
 
-Anchor = Union[CmpAnchor, DamageBreakpointAnchor]
+@dataclass
+class BulkpointAnchor:
+    """Bulkpoint anchor: focal *defense* clears a damage tier against a named opponent.
+
+    Symmetric to ``DamageBreakpointAnchor`` but on the def side. Three precision
+    levels, determined by which fields are set:
+      Level 1 (fully explicit): ``move`` AND ``takes_at_most``
+      Level 2 (reference-anchored): ``above_def`` (optionally with ``move``)
+      Level 3 (discover-and-tag): none of the above; optionally ``moves`` filter
+
+    Opponent attack is computed from ``opponent_ivs`` or ``opponent_spread`` if
+    provided; otherwise from the league's default IVs for the opponent species.
+    When ``opponent_spread`` is an IV-list spread, the *highest-attack* member is
+    used (worst case for the focal — symmetric to how DamageBreakpointAnchor
+    picks the bulkiest member of a defender spread). Pin a specific
+    representative with ``opponent_ivs`` if max-atk is not what you want.
+    """
+    name: str
+    opponent: str
+    # Level 1 fields:
+    move: Optional[str] = None
+    takes_at_most: Optional[int] = None
+    # Level 2 field:
+    above_def: Optional[float] = None
+    # Level 3 field (optional):
+    moves: Optional[tuple[str, ...]] = None
+    # Opponent reference attack:
+    opponent_ivs: Optional[tuple[int, int, int]] = None
+    opponent_spread: Optional[str] = None
+    description: str = ""
+    display_name: Optional[str] = None  # short label for HTML badges; auto-derived if None
+
+    @property
+    def kind(self) -> str:
+        return "bulkpoint"
+
+    @property
+    def level(self) -> int:
+        if self.move is not None and self.takes_at_most is not None:
+            return 1
+        if self.above_def is not None:
+            return 2
+        return 3
+
+
+Anchor = Union[CmpAnchor, DamageBreakpointAnchor, BulkpointAnchor]
 
 
 # ---------------------------------------------------------------------------
@@ -335,12 +380,101 @@ def _parse_spread(name: str, raw: dict, *, path: str) -> Spread:
     )
 
 
+def _parse_bulkpoint_anchor(
+    name: str, raw: dict, *, path: str, description: str,
+) -> "BulkpointAnchor":
+    """Parse a bulkpoint anchor — symmetric to the damage_breakpoint branch."""
+    opponent = raw.get("opponent")
+    _require(
+        isinstance(opponent, str) and opponent,
+        f"bulkpoint anchor {name!r} must have an 'opponent' field",
+        path=path,
+    )
+
+    move = raw.get("move")
+    takes_at_most = raw.get("takes_at_most")
+    above_def = raw.get("above_def")
+    moves = raw.get("moves")
+    opponent_ivs_raw = raw.get("opponent_ivs")
+    opponent_spread = raw.get("opponent_spread")
+
+    if move is not None:
+        _require(isinstance(move, str), f"{name}.move must be a string", path=path)
+    if takes_at_most is not None:
+        _require(isinstance(takes_at_most, int),
+                 f"{name}.takes_at_most must be an int", path=path)
+    if above_def is not None:
+        _require(isinstance(above_def, (int, float)),
+                 f"{name}.above_def must be a number", path=path)
+        above_def = float(above_def)
+    if moves is not None:
+        _require(
+            isinstance(moves, (list, tuple)) and all(isinstance(m, str) for m in moves),
+            f"{name}.moves must be a list of strings",
+            path=path,
+        )
+        moves = tuple(moves)
+
+    # Mutual exclusion: takes_at_most ⇔ Level 1, above_def ⇔ Level 2.
+    _require(
+        not (takes_at_most is not None and above_def is not None),
+        f"bulkpoint anchor {name!r} cannot specify both "
+        f"'takes_at_most' (Level 1) and 'above_def' (Level 2)",
+        path=path,
+    )
+    if takes_at_most is not None:
+        _require(
+            move is not None,
+            f"bulkpoint anchor {name!r} specifies 'takes_at_most' "
+            f"(Level 1) but no 'move' — both are required",
+            path=path,
+        )
+    if moves is not None:
+        _require(
+            move is None and takes_at_most is None and above_def is None,
+            f"bulkpoint anchor {name!r} 'moves' filter is only "
+            f"valid in Level 3 (no 'move'/'takes_at_most'/'above_def')",
+            path=path,
+        )
+
+    _require(
+        not (opponent_ivs_raw is not None and opponent_spread is not None),
+        f"bulkpoint anchor {name!r} cannot specify both "
+        f"'opponent_ivs' and 'opponent_spread'",
+        path=path,
+    )
+    opponent_ivs = None
+    if opponent_ivs_raw is not None:
+        opponent_ivs = _iv_tuple(opponent_ivs_raw, path=f"{path}:{name}.opponent_ivs")
+    if opponent_spread is not None:
+        _require(isinstance(opponent_spread, str),
+                 f"{name}.opponent_spread must be a string", path=path)
+
+    display_name = raw.get("display_name")
+    if display_name is not None:
+        _require(isinstance(display_name, str),
+                 f"{name}.display_name must be a string", path=path)
+
+    return BulkpointAnchor(
+        name=name,
+        opponent=opponent,
+        move=move,
+        takes_at_most=takes_at_most,
+        above_def=above_def,
+        moves=moves,
+        opponent_ivs=opponent_ivs,
+        opponent_spread=opponent_spread,
+        description=description,
+        display_name=display_name,
+    )
+
+
 def _parse_anchor(name: str, raw: dict, *, path: str) -> Anchor:
     kind = raw.get("kind")
     _require(
-        kind in ("cmp", "damage_breakpoint"),
+        kind in ("cmp", "damage_breakpoint", "bulkpoint"),
         f"anchor {name!r} has unknown or missing kind {kind!r} "
-        f"(expected 'cmp' or 'damage_breakpoint')",
+        f"(expected 'cmp', 'damage_breakpoint', or 'bulkpoint')",
         path=path,
     )
     description = raw.get("description", "")
@@ -364,6 +498,9 @@ def _parse_anchor(name: str, raw: dict, *, path: str) -> Anchor:
                      f"{name}.display_name must be a string", path=path)
         return CmpAnchor(name=name, spread=spread, strict=strict,
                          description=description, display_name=display_name)
+
+    if kind == "bulkpoint":
+        return _parse_bulkpoint_anchor(name, raw, path=path, description=description)
 
     # damage_breakpoint
     opponent = raw.get("opponent")
@@ -688,14 +825,14 @@ def parse_inline_anchor(spec: str) -> tuple[str, Anchor]:
                 raise ThresholdError(
                     f"--anchor {name!r}: non-int opponent_ivs {val!r}"
                 )
-        elif key in ("deals_at_least",):
+        elif key in ("deals_at_least", "takes_at_most"):
             try:
                 fields[key] = int(val)
             except ValueError:
                 raise ThresholdError(
                     f"--anchor {name!r}: {key} must be int, got {val!r}"
                 )
-        elif key in ("above_atk",):
+        elif key in ("above_atk", "above_def"):
             try:
                 fields[key] = float(val)
             except ValueError:
@@ -767,6 +904,10 @@ def _main(argv: list[str]) -> int:
                 if isinstance(anchor, CmpAnchor):
                     print(f"    anchor {aname}: cmp vs spread {anchor.spread}"
                           f" ({'strict' if anchor.strict else 'non-strict'})")
+                elif isinstance(anchor, BulkpointAnchor):
+                    lvl = anchor.level
+                    print(f"    anchor {aname}: bulkpoint L{lvl} "
+                          f"vs {anchor.opponent}")
                 else:
                     lvl = anchor.level
                     print(f"    anchor {aname}: damage_breakpoint L{lvl} "

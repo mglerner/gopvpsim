@@ -69,6 +69,7 @@ from gopvpsim.thresholds import (
 )
 from gopvpsim.anchors import (
     resolve_anchors, tag_iv, ResolvedAnchor, build_auto_anchors,
+    derive_short_name,
 )
 
 # ---------------------------------------------------------------------------
@@ -592,8 +593,10 @@ def categorize_slayers(survivors, resolved_anchors=None, iv_meta_list=None, top_
                    survivor clears any BP anchor, this category is empty and
                    the HTML renderer hides it.
       CMP Slayer — at least one cmp anchor passed. Same empty-hide rule.
-      Bulk Slayer — HP and def both at or above survivor median. Structural,
-                    always shown.
+      Bulk Slayer — HP and def both at or above survivor median (structural)
+                    OR clears at least one named bulkpoint anchor. Always
+                    shown; the structural pool is the default fallback when
+                    no bulkpoint anchors are configured.
 
     Survivors in multiple categories appear in each (cross-category badges in
     the HTML make the overlap visible).
@@ -615,7 +618,7 @@ def categorize_slayers(survivors, resolved_anchors=None, iv_meta_list=None, top_
 
     # Tag each survivor with the anchors it passes (mutates the dict)
     for r in survivors:
-        tags = tag_iv(r['atk'], resolved_anchors)
+        tags = tag_iv(r['atk'], r['def_'], resolved_anchors)
         r['_anchor_tags'] = tags
 
     # Structural medians for Bulk slayer classification
@@ -640,11 +643,17 @@ def categorize_slayers(survivors, resolved_anchors=None, iv_meta_list=None, top_
             any(a.kind == 'cmp' for a in subs)
             for subs in tags.values()
         )
+        has_bulkpoint = any(
+            any(a.kind == 'bulkpoint' for a in subs)
+            for subs in tags.values()
+        )
         if has_bp:
             atk_slayers.append(r)
         if has_cmp:
             cmp_slayers.append(r)
-        if r['hp'] >= hp_med and r['def_'] >= def_med:
+        # Bulk Slayer membership: structural HP+def above median OR clears
+        # at least one named bulkpoint anchor.
+        if (r['hp'] >= hp_med and r['def_'] >= def_med) or has_bulkpoint:
             bulk_slayers.append(r)
 
     # Sort each by total_wins desc, then by the relevant tiebreaker.
@@ -1243,7 +1252,7 @@ def _plotly_script_tag(standalone):
 
 def generate_html(species, league, moveset_results, html_path, thresholds=None,
                   opponent_label=None, shield_scenarios=None, opponent_names=None,
-                  opp_iv_mode='pvpoke', standalone=False):
+                  opp_iv_mode='pvpoke', standalone=False, cli_args_str=None):
     """
     Generate an interactive HTML file with Plotly.js scatter plots.
 
@@ -1334,8 +1343,15 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
             plots_data.append({'label': label, 'traces': traces, 'results': results})
 
     # --- Build HTML ---
+    # Embed CLI invocation as an HTML comment near the top so
+    # `grep '<!-- CLI:' file.html` works for forensic comparison.
+    cli_comment = ''
+    if cli_args_str:
+        from html import escape as _esc_cmt
+        cli_comment = f'<!-- CLI: {_esc_cmt(cli_args_str)} -->\n'
+
     html = f"""<!DOCTYPE html>
-<html>
+{cli_comment}<html>
 <head>
 <meta charset="utf-8">
 <title>{species} {league.title()} League IV Deep Dive</title>
@@ -1585,6 +1601,18 @@ best on average against this opponent pool.
 Atk &times; Def &times; HP.
 </div>
 """
+    # Footer: equivalent CLI invocation, kept at the bottom so it's
+    # discoverable but doesn't compete with the actual analysis content.
+    if cli_args_str:
+        from html import escape as _esc
+        html += '<details class="meta" style="margin-top:30px;border-top:1px solid #0f3460;padding-top:10px">'
+        html += '<summary>Run parameters (CLI invocation)</summary>'
+        html += '<pre style="margin:8px 0;background:#16213e;'
+        html += 'padding:10px;border-radius:4px;color:#e0e0e0;font-size:12px;'
+        html += 'white-space:pre-wrap;word-break:break-all">'
+        html += _esc(cli_args_str)
+        html += '</pre></details>\n'
+
     html += '</body>\n</html>\n'
 
     with open(html_path, 'w') as f:
@@ -2164,8 +2192,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
   font-family:monospace; cursor:help; }
 .dd-anchor-tag:hover { background:#1a3a6e; color:#fff; }
 .dd-anchor-tag-count { color:#d29922; font-weight:600; }
-.dd-anchor-tags-cell { max-width: 280px; white-space: nowrap; overflow: hidden;
-  text-overflow: ellipsis; line-height: 1.4; cursor: help; }
+.dd-anchor-tags-cell { max-width: 480px; white-space: normal; line-height: 1.5;
+  cursor: help; }
 .dd-anchor-tags-cell .dd-anchor-tag { vertical-align: baseline; }
 .dd-filter-hidden { display: none !important; }
 .dd-filter-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
@@ -2393,9 +2421,21 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                           'clears any named breakpoint</strong> &mdash; an '
                           'empty Atk Slayer box means no anchors fired '
                           'against the current opponent set.',
-            'Bulk Slayer': 'Structural: HP and defense both at or above the '
-                           'survivor-pool median. Optimized to outlast '
-                           'opponents through accumulation.',
+            'Bulk Slayer': 'IVs that either (a) have HP and defense both at '
+                           'or above the survivor-pool median (structural '
+                           'high-bulk pool, always shown) <strong>or</strong> '
+                           '(b) clear at least one named <em>bulkpoint</em> '
+                           'anchor against a notable opponent &mdash; '
+                           'reaching a defense tier at which one of the '
+                           'opponent&rsquo;s threat moves deals strictly '
+                           'less damage to the focal. Each row&rsquo;s Tags '
+                           'column shows which bulkpoint(s) the IV clears '
+                           '(badges with the &ldquo;b&rdquo; suffix or '
+                           '&ldquo;&uarr;&rdquo; reference markers); hover '
+                           'for the move&nbsp;+&nbsp;damage&nbsp;tier '
+                           'detail. The structural pool is the default '
+                           'fallback when no bulkpoint anchors are '
+                           'configured for the species.',
             'CMP Slayer': 'IVs whose raw attack beats at least one named '
                           'CMP anchor (e.g., the max attack of a reference '
                           'cohort). Wins Charge Move Priority against the '
@@ -2519,12 +2559,14 @@ function ddSlayerToggleFilterPanel(cardId) {
                 _table_uid += 1
                 card_id = f"{_ms_prefix}-slayer-{_table_uid}"
 
-                # Determine which anchor kinds apply to this category card
+                # Determine which anchor kinds apply to this category card.
+                # Bulk Slayer surfaces all kinds (bulkpoint anchors are its
+                # native kind; bp/cmp tags also show as cross-info).
                 want_kinds = {
                     'Atk Slayer': {'damage_breakpoint'},
                     'CMP Slayer': {'cmp'},
-                    'Bulk Slayer': {'damage_breakpoint', 'cmp'},
-                }.get(cat_name, {'damage_breakpoint', 'cmp'})
+                    'Bulk Slayer': {'damage_breakpoint', 'cmp', 'bulkpoint'},
+                }.get(cat_name, {'damage_breakpoint', 'cmp', 'bulkpoint'})
 
                 # Build the per-card sub-anchor index. anchor_parents was computed
                 # earlier (line ~2348) from resolved_anchors. We filter to only
@@ -2538,7 +2580,7 @@ function ddSlayerToggleFilterPanel(cardId) {
                                      if s_.kind in want_kinds]
                     if not relevant_subs:
                         continue
-                    relevant_subs.sort(key=lambda x: x.threshold_atk)
+                    relevant_subs.sort(key=lambda x: x.threshold_value)
                     for sub in relevant_subs:
                         key = (parent, sub.label or sub.name)
                         if key in card_anchor_index:
@@ -2655,14 +2697,14 @@ function ddSlayerToggleFilterPanel(cardId) {
                             f'title="{o}">{ab}</span> '
                         )
 
-                    # Abbreviated tag rendering: one badge per parent.
-                    # Badge text uses the parent's display_name (set in TOML
-                    # or auto-derived). For multi-sub-anchor parents (L3),
-                    # append " ×N". The actual sub-anchor labels (e.g.
-                    # "close_combat→125") only appear in hover tooltips.
-                    # The whole cell is single-line with overflow ellipsis;
-                    # the cell's title= holds the unabbreviated full list so
-                    # hovering anywhere on the cell shows the truncated tail.
+                    # Ultra-short tag rendering: one badge per parent.
+                    # Badge VISIBLE TEXT uses derive_short_name() — typically
+                    # 3-6 characters (e.g. "lic", "mirb", "lic↑lur", "c:lur").
+                    # The badge HOVER tooltip carries the long form
+                    # (parent_display_name) plus the per-sub-anchor labels
+                    # (e.g. "close_combat→125, rage_fist→78"), so the
+                    # abbreviation stays decipherable. The cell-level title=
+                    # also includes the full parent name for fallback hover.
                     tag_bits = []
                     cell_hover_parts = []
                     row_anchor_indices = []
@@ -2676,26 +2718,37 @@ function ddSlayerToggleFilterPanel(cardId) {
                             key = (parent, s_.label or s_.name)
                             if key in card_anchor_index:
                                 row_anchor_indices.append(card_anchor_index[key])
-                        # Pull display_name from any of the relevant ResolvedAnchors
-                        # (they all share it for a given parent).
-                        display = (relevant[0].parent_display_name or parent)
+                        # Long form (filter panel + tooltip) and short form
+                        # (visible badge text). Both derive from the parent
+                        # name; long form is also stored on the resolved
+                        # anchor as parent_display_name in case the TOML
+                        # set it explicitly.
+                        long_name = (relevant[0].parent_display_name or parent)
+                        short = derive_short_name(parent)
                         if len(labels) == 1:
-                            badge_text = display
-                            hover_text = labels[0]
+                            badge_text = short
+                            count_suffix = ''
+                            sub_labels_text = labels[0]
                         else:
-                            badge_text = (f'{display} '
+                            count_suffix = f'×{len(labels)}'
+                            badge_text = (f'{short}'
                                           f'<span class="dd-anchor-tag-count">'
-                                          f'×{len(labels)}</span>')
-                            hover_text = ", ".join(labels)
+                                          f'{count_suffix}</span>')
+                            sub_labels_text = ", ".join(labels)
+                        # Hover tooltip on the badge: long display name +
+                        # full anchor name + sub-anchor labels.
+                        hover_text = (
+                            f'{long_name}{count_suffix}  ({parent})\n'
+                            f'{sub_labels_text}'
+                        )
                         hover_attr = hover_text.replace('"', '&quot;')
                         tag_bits.append(
                             f'<span class="dd-anchor-tag" title="{hover_attr}">'
                             f'{badge_text}</span>'
                         )
                         # For the cell-level title: include the parent name
-                        # (the long form) so hovering the cell shows what
-                        # each badge maps back to.
-                        cell_hover_parts.append(f"{parent}: {hover_text}")
+                        # so hovering the cell shows what each badge maps to.
+                        cell_hover_parts.append(f"{parent}: {sub_labels_text}")
                     tags_cell = ' '.join(tag_bits) if tag_bits else '&mdash;'
                     cell_title_attr = ' | '.join(cell_hover_parts).replace('"', '&quot;')
                     data_anchors = ' '.join(str(i) for i in sorted(set(row_anchor_indices)))
@@ -2742,23 +2795,33 @@ function ddSlayerToggleFilterPanel(cardId) {
 
             # Level 3 sub-anchor distribution: for each Level 3 parent, show
             # how many survivors clear each sub-anchor. This is the
-            # "discover-mode" output — what BPs actually matter here.
+            # "discover-mode" output — what BPs and bulkpoints actually
+            # matter here. Includes both damage_breakpoint (atk-side) and
+            # bulkpoint (def-side) Level 3 parents; the per-row "Threshold"
+            # cell is annotated with " atk" or " def" so the two kinds are
+            # visually distinct in a single combined table.
             level3_parents = []
             for parent, subs in anchor_parents.items():
-                if len(subs) > 1 and all(s_.kind == 'damage_breakpoint' for s_ in subs):
+                if len(subs) > 1 and all(
+                    s_.kind in ('damage_breakpoint', 'bulkpoint') for s_ in subs
+                ):
                     level3_parents.append((parent, subs))
             if level3_parents and slayer_iter_result.get('final'):
                 all_survivors = slayer_iter_result['final']
                 results_parts.append(
                     '<h4 class="dd-h3" style="margin-top:16px">'
-                    'Level&nbsp;3 breakpoint distribution</h4>\n'
+                    'Level&nbsp;3 sub-anchor distribution '
+                    '(breakpoints + bulkpoints)</h4>\n'
                 )
                 results_parts.append(
                     '<p class="dd-small">For each discover-mode anchor, how '
                     'many survivors in the full cohort clear each '
-                    '(move,&nbsp;tier) sub-anchor. Use this to identify '
-                    'which breakpoints actually matter for this species — '
-                    'high-count sub-anchors are the ones worth promoting '
+                    '(move,&nbsp;tier) sub-anchor. Atk-side rows are '
+                    'breakpoints (focal&nbsp;atk needed to deal more damage); '
+                    'def-side rows are bulkpoints (focal&nbsp;def needed to '
+                    'take less damage). Use this to identify which '
+                    'sub-anchors actually matter for this species — '
+                    'high-count rows are the ones worth promoting '
                     'to Level&nbsp;1 in the TOML.</p>\n'
                 )
                 for parent, subs in sorted(level3_parents):
@@ -2770,17 +2833,23 @@ function ddSlayerToggleFilterPanel(cardId) {
                     )
                     results_parts.append('<table class="dd-table dd-narrow">\n')
                     results_parts.append(
-                        '<tr><th>Sub-anchor</th><th>Atk threshold</th>'
+                        '<tr><th>Sub-anchor</th><th>Threshold</th>'
                         '<th>Clears</th><th>%</th></tr>\n'
                     )
-                    # Sort sub-anchors by threshold ascending (easier BPs first)
-                    subs_sorted = sorted(subs, key=lambda x: x.threshold_atk)
+                    # Sort sub-anchors by threshold ascending (easier tiers first)
+                    subs_sorted = sorted(subs, key=lambda x: x.threshold_value)
                     for sub in subs_sorted:
-                        n_clear = sum(1 for sv in all_survivors if sub.passes(sv['atk']))
+                        n_clear = sum(
+                            1 for sv in all_survivors
+                            if sub.passes(sv['atk'], sv['def_'])
+                        )
                         pct = 100.0 * n_clear / len(all_survivors) if all_survivors else 0
+                        # Annotate threshold with which stat it targets so
+                        # bp/blkp aren't visually conflated.
+                        stat_label = 'atk' if sub.target_stat == 'atk' else 'def'
                         results_parts.append(
                             f'<tr><td>{sub.label}</td>'
-                            f'<td>{sub.threshold_atk:.2f}</td>'
+                            f'<td>{sub.threshold_value:.2f} {stat_label}</td>'
                             f'<td>{n_clear}/{len(all_survivors)}</td>'
                             f'<td>{pct:.0f}%</td></tr>\n'
                         )
@@ -3092,7 +3161,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               thresholds=None, opponent_label=None,
                               shield_scenarios=None, opponent_names=None,
                               opp_iv_modes=None, reference_idx=-1,
-                              standalone=False, slayer_iter_result=None):
+                              standalone=False, slayer_iter_result=None,
+                              cli_args_str=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -3246,9 +3316,16 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 
     # --- Build HTML ---
     plotly_tag = _plotly_script_tag(standalone)
+    # Embed the equivalent CLI invocation as an HTML comment near the top so
+    # `grep '<!-- CLI:' file.html` works for forensic comparison without
+    # adding visible page chrome.
+    cli_comment = ''
+    if cli_args_str:
+        from html import escape as _esc_cmt
+        cli_comment = f'<!-- CLI: {_esc_cmt(cli_args_str)} -->\n'
 
     html = f"""<!DOCTYPE html>
-<html>
+{cli_comment}<html>
 <head>
 <meta charset="utf-8">
 <title>{species} {league.title()} League IV Deep Dive</title>
@@ -3362,6 +3439,19 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                                    reference_idx, tier_info, opp_desc, league,
                                    shield_scenarios)
     html += '</script>\n'
+
+    # Footer: equivalent CLI invocation, kept at the bottom of the page so
+    # it's discoverable but doesn't compete with the actual analysis content.
+    if cli_args_str:
+        from html import escape as _esc
+        html += '<details class="meta" style="margin-top:30px;border-top:1px solid #0f3460;padding-top:10px">'
+        html += '<summary>Run parameters (CLI invocation)</summary>'
+        html += '<pre style="margin:8px 0;background:#16213e;'
+        html += 'padding:10px;border-radius:4px;color:#e0e0e0;font-size:12px;'
+        html += 'white-space:pre-wrap;word-break:break-all">'
+        html += _esc(cli_args_str)
+        html += '</pre></details>\n'
+
     html += '</body>\n</html>\n'
 
     with open(html_path, 'w') as f:
@@ -3741,6 +3831,83 @@ function reattachLegendHandlers() {{
 updateView();
 """
 
+def format_cli_args(args, parser) -> str:
+    """Build the *fully-resolved* equivalent command from a parsed Namespace.
+
+    Walks the parser's actions in declaration order and emits **every** flag
+    with its actual value, including flags whose value happens to equal the
+    current parser default. This is intentional: defaults can change between
+    runs, so a string that omits "default" flags becomes ambiguous when read
+    later — you can't tell whether `--mirror-slayer-pool` was unset (and got
+    today's default) or set to today's default explicitly.
+
+    The fully-resolved form is verbose but unambiguous: re-reading the HTML
+    next month after a default has changed still tells you exactly what value
+    was used. This output is the forensic record, not necessarily a
+    convenient copy-paste — though it IS pasteable and will reproduce the
+    same run.
+
+    Boolean flags are emitted only when True (False is the implicit absence),
+    since there's no `--no-X` form for store_true / store_false flags here.
+    Flags whose value is None are skipped because there's no syntax for
+    "explicitly set to None" on the command line.
+    """
+    parts = ["python scripts/deep_dive.py"]
+    positional: list[str] = []
+    flags: list[str] = []
+    for action in parser._actions:
+        # Skip the implicit help action
+        if action.dest == 'help':
+            continue
+        val = getattr(args, action.dest, None)
+        # Positional args (no option strings)
+        if not action.option_strings:
+            if val is not None:
+                positional.append(_shell_quote(str(val)))
+            continue
+        flag = action.option_strings[0]
+        if isinstance(action, argparse._StoreTrueAction):
+            # store_true: only emit when True (False = absent on the cmdline)
+            if val:
+                flags.append(flag)
+            continue
+        if isinstance(action, argparse._StoreFalseAction):
+            # store_false: emit only when explicitly False
+            if not val:
+                flags.append(flag)
+            continue
+        # None means "not set and no default to record"
+        if val is None:
+            continue
+        if action.nargs in (None, '?', 0) or action.nargs == argparse.OPTIONAL:
+            if isinstance(val, list):
+                # action='append' — emit one occurrence per value
+                for item in val:
+                    flags.append(f'{flag} {_shell_quote(str(item))}')
+            else:
+                flags.append(f'{flag} {_shell_quote(str(val))}')
+        else:
+            # nargs='+', '*', or numeric — join with spaces
+            if isinstance(val, (list, tuple)):
+                joined = ' '.join(_shell_quote(str(v)) for v in val)
+            else:
+                joined = _shell_quote(str(val))
+            flags.append(f'{flag} {joined}')
+    return ' '.join(parts + positional + flags)
+
+
+def _shell_quote(s: str) -> str:
+    """Quote a string for shell display only when needed."""
+    # Conservative: quote anything containing shell-meaningful characters.
+    if not s:
+        return "''"
+    safe = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-./,=:")
+    if all(c in safe for c in s):
+        return s
+    # Use single quotes; escape any embedded single quotes the POSIX way.
+    return "'" + s.replace("'", "'\"'\"'") + "'"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='IV deep dive: sim all 4096 IV spreads against meta opponents.',
@@ -3843,6 +4010,13 @@ def main():
                         help='Disable disk cache for slayer iteration')
 
     args = parser.parse_args()
+
+    # Capture the equivalent command line for forensic reproducibility.
+    # Printed to console and embedded in HTML output so any future reader can
+    # see exactly what flags produced a given dive (including defaults that
+    # have since changed).
+    cli_args_str = format_cli_args(args, parser)
+    print(f"CLI: {cli_args_str}")
 
     # Parse shield scenarios
     ALL_NINE = [(s0, s1) for s0 in range(3) for s1 in range(3)]
@@ -4212,6 +4386,9 @@ def main():
                         all_atks = [iv['atk'] for iv in all_ivs]
                         atk_min = min(all_atks)
                         atk_max = max(all_atks)
+                        all_defs = [iv['def_'] for iv in all_ivs]
+                        def_min = min(all_defs)
+                        def_max = max(all_defs)
 
                         # Determine which anchor kinds the user already
                         # provided so the auto-fallback only fills gaps.
@@ -4257,7 +4434,9 @@ def main():
                         resolved = resolve_anchors(
                             effective_registry, args.species, args.league,
                             moves_for_anchors, focal_types_for_anchors,
-                            atk_min, atk_max, focal_shadow=args.shadow,
+                            atk_min, atk_max,
+                            def_min=def_min, def_max=def_max,
+                            focal_shadow=args.shadow,
                         )
                         if resolved:
                             n_parents = len({r.parent for r in resolved})
@@ -4463,6 +4642,7 @@ def main():
                 reference_idx=reference_idx,
                 standalone=args.standalone,
                 slayer_iter_result=main_slayer_iter_result,
+                cli_args_str=cli_args_str,
             )
         else:
             # Static mode (original behavior)
@@ -4470,7 +4650,8 @@ def main():
                           thresholds=thresholds, opponent_label=opponent_label,
                           shield_scenarios=shield_scenarios,
                           opponent_names=opponents, opp_iv_mode=opp_iv_mode,
-                          standalone=args.standalone)
+                          standalone=args.standalone,
+                          cli_args_str=cli_args_str)
 
     print("Done.\n")
 
