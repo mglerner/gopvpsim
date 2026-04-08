@@ -90,12 +90,12 @@ tagged with all three.
 These two words sound similar but mean different things, and the deep-dive output
 uses both. Be precise:
 
-| | **Spread** | **Anchor** |
-|---|---|---|
-| What it is | *Data*: a description of a set of IVs | *A rule*: a yes/no test applied to one IV |
-| Answers | "Is this IV a member of THAT cohort?" | "Does this IV satisfy THIS condition?" |
-| Form | Stat-cutoff region OR explicit IV list | A derived numeric threshold + a comparison |
-| Example | `lurgan_ape` = a list of 27 IVs | `cmp_vs_lurgan` = focal_atk > max(lurgan_ape.atk) |
+|            | **Spread**                             | **Anchor**                                        |
+| ---------- | -------------------------------------- | ------------------------------------------------- |
+| What it is | *Data*: a description of a set of IVs  | *A rule*: a yes/no test applied to one IV         |
+| Answers    | "Is this IV a member of THAT cohort?"  | "Does this IV satisfy THIS condition?"            |
+| Form       | Stat-cutoff region OR explicit IV list | A derived numeric threshold + a comparison        |
+| Example    | `lurgan_ape` = a list of 27 IVs        | `cmp_vs_lurgan` = focal_atk > max(lurgan_ape.atk) |
 
 Anchors can be *built from* spreads. The CMP anchor `cmp_vs_lurgan` takes the
 `lurgan_ape` spread, computes the maximum effective atk over its members, and uses
@@ -187,15 +187,15 @@ a fallback layer so the category is never empty.
 The two "ladder" anchor kinds are mirror images. Same shape, same three precision
 levels, different stat targets:
 
-| | **damage_breakpoint** | **bulkpoint** |
-|---|---|---|
-| Tests focal | attack | defense |
-| Damage direction | outgoing (focal hits opponent) | incoming (opponent hits focal) |
-| Threshold semantic | "smallest atk that deals ≥ N damage" | "smallest def above which damage ≤ N" |
-| Threat moves | focal's movepool | opponent's movepool |
-| Opponent reference | effective *defense* (bulkiest IV in spread) | effective *attack* (punchiest IV in spread) |
-| Routes into category | Atk Slayer | Bulk Slayer |
-| TOML keys | `move`, `deals_at_least`, `above_atk` | `move`, `takes_at_most`, `above_def` |
+|                      | **damage_breakpoint**                       | **bulkpoint**                               |
+| -------------------- | ------------------------------------------- | ------------------------------------------- |
+| Tests focal          | attack                                      | defense                                     |
+| Damage direction     | outgoing (focal hits opponent)              | incoming (opponent hits focal)              |
+| Threshold semantic   | "smallest atk that deals ≥ N damage"        | "smallest def above which damage ≤ N"       |
+| Threat moves         | focal's movepool                            | opponent's movepool                         |
+| Opponent reference   | effective *defense* (bulkiest IV in spread) | effective *attack* (punchiest IV in spread) |
+| Routes into category | Atk Slayer                                  | Bulk Slayer                                 |
+| TOML keys            | `move`, `deals_at_least`, `above_atk`       | `move`, `takes_at_most`, `above_def`        |
 
 A focal IV can clear both kinds in the same anchor pass — the slayer categorizer
 looks at every tag the IV passes and routes it into all the categories it qualifies

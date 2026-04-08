@@ -275,14 +275,14 @@ anchors route into Atk Slayer.
 
 The TOML field map is mechanical:
 
-| damage_breakpoint | bulkpoint |
-|---|---|
-| `move`             | `move`             |
-| `deals_at_least`   | `takes_at_most`    |
-| `above_atk`        | `above_def`        |
-| `moves` (filter)   | `moves` (filter)   |
-| `opponent_ivs`     | `opponent_ivs`     |
-| `opponent_spread`  | `opponent_spread`  |
+| damage_breakpoint | bulkpoint         |
+| ----------------- | ----------------- |
+| `move`            | `move`            |
+| `deals_at_least`  | `takes_at_most`   |
+| `above_atk`       | `above_def`       |
+| `moves` (filter)  | `moves` (filter)  |
+| `opponent_ivs`    | `opponent_ivs`    |
+| `opponent_spread` | `opponent_spread` |
 
 `opponent_spread` differs in one resolver detail: damage_breakpoint picks the
 *bulkiest* (max-def) member of the spread as worst case for the focal attacker;

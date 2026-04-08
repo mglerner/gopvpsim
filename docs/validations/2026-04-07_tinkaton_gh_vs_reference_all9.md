@@ -14,13 +14,13 @@
 
 ## 1. Moveset Ranking — Full Agreement
 
-| Rank | Moveset | Avg Score (9 scen.) | Avg Score (3 even) | Delta |
-|------|---------|--------------------|--------------------|-------|
-| **1** | **Fairy Wind / Bulldoze + Gigaton Hammer** | **556** | 559 | -3 |
-| 2 | Fairy Wind / Gigaton Hammer + Heavy Slam | 543 | 544 | -1 |
-| 3 | Fairy Wind / Gigaton Hammer + Play Rough | 529 | 534 | -5 |
-| 4 | Fairy Wind / Flash Cannon + Gigaton Hammer | 527 | 531 | -4 |
-| 5 | Rock Smash / Bulldoze + Gigaton Hammer | 379 | 353 | +26 |
+| Rank  | Moveset                                    | Avg Score (9 scen.) | Avg Score (3 even) | Delta |
+| ----- | ------------------------------------------ | ------------------- | ------------------ | ----- |
+| **1** | **Fairy Wind / Bulldoze + Gigaton Hammer** | **556**             | 559                | -3    |
+| 2     | Fairy Wind / Gigaton Hammer + Heavy Slam   | 543                 | 544                | -1    |
+| 3     | Fairy Wind / Gigaton Hammer + Play Rough   | 529                 | 534                | -5    |
+| 4     | Fairy Wind / Flash Cannon + Gigaton Hammer | 527                 | 531                | -4    |
+| 5     | Rock Smash / Bulldoze + Gigaton Hammer     | 379                 | 353                | +26   |
 
 Ranking order unchanged. Fairy Wind / GH + Bulldoze leads by 13 points. Rock Smash benefits
 disproportionately from asymmetric scenarios (+26) but remains far behind.
@@ -29,15 +29,15 @@ disproportionately from asymmetric scenarios (+26) but remains far behind.
 
 The biggest change: **the top IV moved from 0/8/15 (HP-heavy) to 2/13/13 (balanced)**.
 
-| IV Spread | Atk | Def | HP | SP Rank | Even-only Rank | All-9 Rank | Shift |
-|-----------|-----|-----|----|----|------|------|-------|
-| 2/13/13 | 105.91 | 140.99 | 142 | #14 | #3 | **#1** (564.5) | +2 |
-| 0/11/12 | 105.58 | 141.00 | 143 | #3 | #2 | **#2** (563.9) | 0 |
-| 0/8/15 | 105.58 | 138.96 | 145 | #6 | **#1** | **#3** (563.3) | -2 |
-| 0/9/14 | 105.58 | 139.64 | 144 | #11 | #9 | **#4** (562.9) | +5 |
-| 0/12/11 | 105.58 | 141.68 | 142 | #10 | #5 | **#6** (562.7) | -1 |
-| 0/14/9 | 105.58 | 143.04 | 141 | #2 | #17 | **#14** (560.5) | +3 |
-| 0/0/15 | 106.59 | 134.79 | 146 | #114 | #7 | **#19** (560.1) | -12 |
+| IV Spread | Atk    | Def    | HP  | SP Rank | Even-only Rank | All-9 Rank      | Shift |
+| --------- | ------ | ------ | --- | ------- | -------------- | --------------- | ----- |
+| 2/13/13   | 105.91 | 140.99 | 142 | #14     | #3             | **#1** (564.5)  | +2    |
+| 0/11/12   | 105.58 | 141.00 | 143 | #3      | #2             | **#2** (563.9)  | 0     |
+| 0/8/15    | 105.58 | 138.96 | 145 | #6      | **#1**         | **#3** (563.3)  | -2    |
+| 0/9/14    | 105.58 | 139.64 | 144 | #11     | #9             | **#4** (562.9)  | +5    |
+| 0/12/11   | 105.58 | 141.68 | 142 | #10     | #5             | **#6** (562.7)  | -1    |
+| 0/14/9    | 105.58 | 143.04 | 141 | #2      | #17            | **#14** (560.5) | +3    |
+| 0/0/15    | 106.59 | 134.79 | 146 | #114    | #7             | **#19** (560.1) | -12   |
 
 **Key observations**:
 - **Defense matters more in asymmetric scenarios.** The biggest winner is 2/13/13
@@ -52,22 +52,22 @@ The biggest change: **the top IV moved from 0/8/15 (HP-heavy) to 2/13/13 (balanc
 
 Unchanged from previous analysis (pure math, not affected by shield scenarios):
 
-| Opponent | Ref Threshold | Our Calc | Match? |
-|----------|--------------|----------|--------|
-| Rank #1 Corviknight (0/13/14 L23.5) | 105.58 | 105.56 | **Yes** |
-| Default Lickilicky (4/15/8 L23.0) | 105.79 | 105.71 | **Close** (CPM rounding) |
-| Rank #1 non-BB Medicham (7/15/14) | 105.90 | 106.92 at L49 | **Note**: level cap diff |
-| Rank #1 Jellicent (1/14/14 L24.5) | 105.90 | 105.80 | **Close** |
+| Opponent                            | Ref Threshold | Our Calc      | Match?                   |
+| ----------------------------------- | ------------- | ------------- | ------------------------ |
+| Rank #1 Corviknight (0/13/14 L23.5) | 105.58        | 105.56        | **Yes**                  |
+| Default Lickilicky (4/15/8 L23.0)   | 105.79        | 105.71        | **Close** (CPM rounding) |
+| Rank #1 non-BB Medicham (7/15/14)   | 105.90        | 106.92 at L49 | **Note**: level cap diff |
+| Rank #1 Jellicent (1/14/14 L24.5)   | 105.90        | 105.80        | **Close**                |
 
 ## 4. Recommended IVs vs. Reference — The Gap Narrows
 
-| IV Spread | Atk | Def | HP | Reference Says | Our All-9 Rank | Our Even Rank |
-|-----------|-----|-----|----|----|------|------|
-| 0/14/9 | 105.58 | 143.04 | 141 | **Top pick** ("meets all bulk") | #14 (560.5) | #17 |
-| 0/15/8 | 105.58 | 143.73 | 140 | **Top pick** ("meets all bulk") | Not top 20 | Not top 20 |
-| 2/13/5 | 106.94 | 142.36 | 138 | **"Really solid"** (CMP atk) | Not top 20 | Not top 20 |
-| 2/13/13 | 105.91 | 140.99 | 142 | Not mentioned | **#1** (564.5) | #3 |
-| 0/11/12 | 105.58 | 141.00 | 143 | Not mentioned | **#2** (563.9) | #2 |
+| IV Spread | Atk    | Def    | HP  | Reference Says                  | Our All-9 Rank | Our Even Rank |
+| --------- | ------ | ------ | --- | ------------------------------- | -------------- | ------------- |
+| 0/14/9    | 105.58 | 143.04 | 141 | **Top pick** ("meets all bulk") | #14 (560.5)    | #17           |
+| 0/15/8    | 105.58 | 143.73 | 140 | **Top pick** ("meets all bulk") | Not top 20     | Not top 20    |
+| 2/13/5    | 106.94 | 142.36 | 138 | **"Really solid"** (CMP atk)    | Not top 20     | Not top 20    |
+| 2/13/13   | 105.91 | 140.99 | 142 | Not mentioned                   | **#1** (564.5) | #3            |
+| 0/11/12   | 105.58 | 141.00 | 143 | Not mentioned                   | **#2** (563.9) | #2            |
 
 The reference's 0/14/9 improved by 3 ranks when we added asymmetric scenarios. The
 optimization gap between our approach and theirs is real but smaller than it looked
@@ -78,14 +78,14 @@ average performance. The two approaches converge as we add more scenarios.
 
 ## 5. Bulkpoint Thresholds — 5/6 Verified (Unchanged)
 
-| Threshold | Reference Claim | Our Verification | Match? |
-|-----------|----------------|------------------|--------|
-| vs Shadow Drapion (atk-weighted): def > 140.21 | Flips 0-1s | Pure math verified | **Yes** |
-| vs Shadow Politoed r1 (0/15/11): def > 140.91 | Flips 0s | Pure math verified | **Yes** |
-| vs Shadow Politoed default (4/15/10): def > 142.33 | For 2-1s | Pure math verified | **Yes** |
-| vs Medicham default (7/15/14): def > 141.66, HP >= 138 | Win 1s no bait | Verified (HP ±1-2) | **Close** |
-| vs G. Corsola (4/15/14): def > 143.03, HP >= 140 | Win 0s | Pure math verified | **Yes** |
-| vs Azu r1: def > 143.03 | Flips 1-2s | No clean bulkpoint found | **Diverge** |
+| Threshold                                              | Reference Claim | Our Verification         | Match?      |
+| ------------------------------------------------------ | --------------- | ------------------------ | ----------- |
+| vs Shadow Drapion (atk-weighted): def > 140.21         | Flips 0-1s      | Pure math verified       | **Yes**     |
+| vs Shadow Politoed r1 (0/15/11): def > 140.91          | Flips 0s        | Pure math verified       | **Yes**     |
+| vs Shadow Politoed default (4/15/10): def > 142.33     | For 2-1s        | Pure math verified       | **Yes**     |
+| vs Medicham default (7/15/14): def > 141.66, HP >= 138 | Win 1s no bait  | Verified (HP ±1-2)       | **Close**   |
+| vs G. Corsola (4/15/14): def > 143.03, HP >= 140       | Win 0s          | Pure math verified       | **Yes**     |
+| vs Azu r1: def > 143.03                                | Flips 1-2s      | No clean bulkpoint found | **Diverge** |
 
 With all 9 scenarios, we can now check the Drapion 0-1s and Politoed 2-1s claims directly
 in the interactive HTML (per-opponent breakdown).

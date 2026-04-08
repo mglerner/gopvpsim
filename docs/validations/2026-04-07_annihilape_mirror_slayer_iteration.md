@@ -24,28 +24,28 @@ Wall clock: ~80 minutes (slayer round 1: ~81 min, everything else ~1 min)
 
 ## Round-by-round
 
-| Round | Pool | Profiles | Max wins | Description |
-|-------|------|----------|----------|-------------|
-| 0 | 3354 | 1982 | 3/3 | All IVs that win all 3 even shield scenarios vs PvPoke default |
-| 1 | **30** | 22 | 5907 | **Massive collapse** when tested against round 0's full survivor cohort |
-| 2 | 41 | 30 | 60 | Slight re-expansion as the metric narrows |
-| 3 | 31 | 22 | 90 | Stable |
+| Round | Pool   | Profiles | Max wins | Description                                                             |
+| ----- | ------ | -------- | -------- | ----------------------------------------------------------------------- |
+| 0     | 3354   | 1982     | 3/3      | All IVs that win all 3 even shield scenarios vs PvPoke default          |
+| 1     | **30** | 22       | 5907     | **Massive collapse** when tested against round 0's full survivor cohort |
+| 2     | 41     | 30       | 60       | Slight re-expansion as the metric narrows                               |
+| 3     | 31     | 22       | 90       | Stable                                                                  |
 
 The Nash iteration is working: starting from "everyone who beats the typical opponent," we collapse to "everyone who beats the slayer cohort itself." That collapse from 3354 → 30 is the meaningful signal.
 
 ## Top survivors (Atk Slayer category)
 
-| IVs | Atk | Def | HP | Wins | Multi-cat |
-|-----|-----|-----|----|----|------|
-| 15/2/4  | 129.44 | 99.14  | 135 | 90/270 | +CMP |
-| 15/5/0  | 129.44 | 100.80 | 133 | 87/270 | +CMP |
-| 15/3/2  | 129.44 | 99.69  | 134 | 87/270 | **+Bulk +CMP** (most versatile) |
-| 15/1/5  | 129.44 | 98.59  | 136 | 75/270 | +CMP |
-| 15/1/4  | 129.44 | 98.59  | 135 | 69/270 | +CMP |
-| 15/4/0  | 129.44 | 100.24 | 133 | 63/270 | +CMP |
-| 15/4/1  | 129.44 | 100.24 | 133 | 63/270 | +CMP |
-| 15/2/2  | 129.44 | 99.14  | 134 | 63/270 | +CMP |
-| 15/2/3  | 129.44 | 99.14  | 134 | 63/270 | +CMP |
+| IVs    | Atk    | Def    | HP  | Wins   | Multi-cat                       |
+| ------ | ------ | ------ | --- | ------ | ------------------------------- |
+| 15/2/4 | 129.44 | 99.14  | 135 | 90/270 | +CMP                            |
+| 15/5/0 | 129.44 | 100.80 | 133 | 87/270 | +CMP                            |
+| 15/3/2 | 129.44 | 99.69  | 134 | 87/270 | **+Bulk +CMP** (most versatile) |
+| 15/1/5 | 129.44 | 98.59  | 136 | 75/270 | +CMP                            |
+| 15/1/4 | 129.44 | 98.59  | 135 | 69/270 | +CMP                            |
+| 15/4/0 | 129.44 | 100.24 | 133 | 63/270 | +CMP                            |
+| 15/4/1 | 129.44 | 100.24 | 133 | 63/270 | +CMP                            |
+| 15/2/2 | 129.44 | 99.14  | 134 | 63/270 | +CMP                            |
+| 15/2/3 | 129.44 | 99.14  | 134 | 63/270 | +CMP                            |
 
 All survivors have **atk_iv = 15** (max attack). This is the iteration's strong message: in the converged Annihilape mirror, attack matters more than defense or HP.
 
@@ -55,9 +55,9 @@ The single named community spread for Annihilape is the "Lurgan Ape," popularize
 by lurganrocket on Twitter. Per IV expert mercuryish (Discord, 2026-04-08), the
 spread is canonically defined by two cutoffs:
 
-| Cutoff | Value | Source |
-|--------|-------|--------|
-| Atk    | **>= 127.2** | "127.2 attack was the minimum needed for a lurgan ape" — mercuryish |
+| Cutoff | Value        | Source                                                                   |
+| ------ | ------------ | ------------------------------------------------------------------------ |
+| Atk    | **>= 127.2** | "127.2 attack was the minimum needed for a lurgan ape" — mercuryish      |
 | Def    | **>= 102.9** | "102.9 defense was the goal" — mercuryish ("i do not remember what for") |
 
 The 27-IV list popularly screenshotted is the *enumeration* of those two cutoffs at
@@ -66,11 +66,11 @@ GL CP cap. Both forms are now in `thresholds/annihilape.toml` as
 
 Comparison vs our converged cohort:
 
-| Attribute | Lurgan Ape (community) | Our convergence | Difference |
-|-----------|------------------------|-----------------|------------|
-| Atk minimum | **127.2** | **129.44** | **+2.24** |
-| Def minimum | **102.9** | **98.04** | **−4.86** |
-| Pool size | 27 IVs | 30 converged | similar |
+| Attribute   | Lurgan Ape (community) | Our convergence | Difference |
+| ----------- | ---------------------- | --------------- | ---------- |
+| Atk minimum | **127.2**              | **129.44**      | **+2.24**  |
+| Def minimum | **102.9**              | **98.04**       | **−4.86**  |
+| Pool size   | 27 IVs                 | 30 converged    | similar    |
 
 Our cohort sits **above the Lurgan atk minimum and below the Lurgan def minimum**.
 At first glance this looks like a disagreement. It is not.

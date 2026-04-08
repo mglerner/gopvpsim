@@ -14,13 +14,13 @@
 
 Our Phase 1 screening confirms the reference's moveset choice:
 
-| Rank | Moveset | Avg Score |
-|------|---------|-----------|
-| **1** | **Fairy Wind / Bulldoze + Gigaton Hammer** | **559** |
-| 2 | Fairy Wind / Gigaton Hammer + Heavy Slam | 544 |
-| 3 | Fairy Wind / Gigaton Hammer + Play Rough | 534 |
-| 4 | Fairy Wind / Flash Cannon + Gigaton Hammer | 531 |
-| 5 | Rock Smash / Bulldoze + Gigaton Hammer | 353 |
+| Rank  | Moveset                                    | Avg Score |
+| ----- | ------------------------------------------ | --------- |
+| **1** | **Fairy Wind / Bulldoze + Gigaton Hammer** | **559**   |
+| 2     | Fairy Wind / Gigaton Hammer + Heavy Slam   | 544       |
+| 3     | Fairy Wind / Gigaton Hammer + Play Rough   | 534       |
+| 4     | Fairy Wind / Flash Cannon + Gigaton Hammer | 531       |
+| 5     | Rock Smash / Bulldoze + Gigaton Hammer     | 353       |
 
 Fairy Wind / GH + Bulldoze leads by 15 points. Rock Smash is dramatically worse.
 
@@ -28,25 +28,25 @@ Fairy Wind / GH + Bulldoze leads by 15 points. Rock Smash is dramatically worse.
 
 The reference lists these CMP tie thresholds (minimum Tinkaton attack to win priority):
 
-| Opponent | Ref Threshold | Opponent Atk (our calc) | Match? |
-|----------|--------------|------------------------|--------|
-| Rank #1 Corviknight (0/13/14 L23.5) | 105.58 | 105.56 | **Yes** |
-| Default Lickilicky (4/15/8 L23.0) | 105.79 | 105.71 | **Close** (0.08 diff, likely CPM rounding) |
-| Rank #1 non-BB Medicham (7/15/14) | 105.90 | 106.92 at L49 | **Note**: ref assumes L40 non-BB; our defaults use L50 cap |
-| Rank #1 Jellicent (1/14/14 L24.5) | 105.90 | 105.80 | **Close** (same direction) |
+| Opponent                            | Ref Threshold | Opponent Atk (our calc) | Match?                                                     |
+| ----------------------------------- | ------------- | ----------------------- | ---------------------------------------------------------- |
+| Rank #1 Corviknight (0/13/14 L23.5) | 105.58        | 105.56                  | **Yes**                                                    |
+| Default Lickilicky (4/15/8 L23.0)   | 105.79        | 105.71                  | **Close** (0.08 diff, likely CPM rounding)                 |
+| Rank #1 non-BB Medicham (7/15/14)   | 105.90        | 106.92 at L49           | **Note**: ref assumes L40 non-BB; our defaults use L50 cap |
+| Rank #1 Jellicent (1/14/14 L24.5)   | 105.90        | 105.80                  | **Close** (same direction)                                 |
 
 All four CMP thresholds point to the same Tinkaton stat neighborhood: atk ~105.6–106.0. The small numerical differences are due to level cap assumptions and CPM table precision.
 
 ## 3. Recommended IVs — Different Optimization Goals
 
-| IV Spread | Atk | Def | HP | SP Rank | Reference | Our Sim Rank (GH+Bulldoze) |
-|-----------|-----|-----|----|----|-----------|------------|
-| 0/14/9 | 105.58 | 143.04 | 141 | #2 | **Top pick** ("meets all bulk requirements") | #17 (Play Rough moveset) — GH Great tier |
-| 0/15/8 | 105.58 | 143.73 | 140 | #9 | **Top pick** ("meets all bulk requirements") | Not in top 20 (too bulky, loses HP for avg performance) |
-| 2/13/5 | 106.94 | 142.36 | 138 | #84 | **"Really solid"** (more atk for CMP ties) | Not in top 20 (low HP hurts average) |
-| 0/8/15 | 105.58 | 138.96 | 145 | #6 | Not mentioned | **Our #1** (avg score 572.3) |
-| 0/11/12 | 105.58 | 141.00 | 143 | #3 | Not mentioned | **Our #2** (avg score 571.9) |
-| 0/12/11 | 105.58 | 141.68 | 142 | #10 | Not mentioned | **Our #5** (avg score 570.5) — GH Good tier |
+| IV Spread | Atk    | Def    | HP  | SP Rank | Reference                                    | Our Sim Rank (GH+Bulldoze)                              |
+| --------- | ------ | ------ | --- | ------- | -------------------------------------------- | ------------------------------------------------------- |
+| 0/14/9    | 105.58 | 143.04 | 141 | #2      | **Top pick** ("meets all bulk requirements") | #17 (Play Rough moveset) — GH Great tier                |
+| 0/15/8    | 105.58 | 143.73 | 140 | #9      | **Top pick** ("meets all bulk requirements") | Not in top 20 (too bulky, loses HP for avg performance) |
+| 2/13/5    | 106.94 | 142.36 | 138 | #84     | **"Really solid"** (more atk for CMP ties)   | Not in top 20 (low HP hurts average)                    |
+| 0/8/15    | 105.58 | 138.96 | 145 | #6      | Not mentioned                                | **Our #1** (avg score 572.3)                            |
+| 0/11/12   | 105.58 | 141.00 | 143 | #3      | Not mentioned                                | **Our #2** (avg score 571.9)                            |
+| 0/12/11   | 105.58 | 141.68 | 142 | #10     | Not mentioned                                | **Our #5** (avg score 570.5) — GH Good tier             |
 
 ### Why the rankings differ
 
@@ -62,14 +62,14 @@ Example: Our #1 (0/8/15) has def=138.96, HP=145. It fails the "GH Great" thresho
 
 ## 4. Bulkpoint Thresholds — 5/6 Verified
 
-| Threshold | Reference Claim | Our Verification | Match? |
-|-----------|----------------|------------------|--------|
-| vs Shadow Drapion (atk-weighted): def > 140.21 | Flips 0-1s | Pure math verified | **Yes** |
-| vs Shadow Politoed rank #1 (0/15/11): def > 140.91 | Flips 0s | Pure math verified | **Yes** |
-| vs Shadow Politoed default (4/15/10): def > 142.33 | Needed for 2-1s | Pure math verified | **Yes** |
-| vs Medicham default (7/15/14): def > 141.66, HP >= 138 | Win 1s without baiting | Verified (HP threshold ±1–2 due to def/HP entanglement) | **Close** |
-| vs G. Corsola (4/15/14): def > 143.03, HP >= 140 | Win 0s (consistent) | Pure math verified | **Yes** |
-| vs Azumarill rank #1: def > 143.03 | Flips 1-2s | No clean single-move bulkpoint found at 143.03 | **Diverge** |
+| Threshold                                              | Reference Claim        | Our Verification                                        | Match?      |
+| ------------------------------------------------------ | ---------------------- | ------------------------------------------------------- | ----------- |
+| vs Shadow Drapion (atk-weighted): def > 140.21         | Flips 0-1s             | Pure math verified                                      | **Yes**     |
+| vs Shadow Politoed rank #1 (0/15/11): def > 140.91     | Flips 0s               | Pure math verified                                      | **Yes**     |
+| vs Shadow Politoed default (4/15/10): def > 142.33     | Needed for 2-1s        | Pure math verified                                      | **Yes**     |
+| vs Medicham default (7/15/14): def > 141.66, HP >= 138 | Win 1s without baiting | Verified (HP threshold ±1–2 due to def/HP entanglement) | **Close**   |
+| vs G. Corsola (4/15/14): def > 143.03, HP >= 140       | Win 0s (consistent)    | Pure math verified                                      | **Yes**     |
+| vs Azumarill rank #1: def > 143.03                     | Flips 1-2s             | No clean single-move bulkpoint found at 143.03          | **Diverge** |
 
 ### Azumarill divergence
 
@@ -84,10 +84,10 @@ No per-hit damage change at def = 143.03. The 1-2s matchup flip may be a battle-
 
 ## 5. Breakpoints — Agreement
 
-| Threshold | Reference Claim | Our Verification | Match? |
-|-----------|----------------|------------------|--------|
-| vs Annihilape: Fairy Wind breakpoint at atk >= 106.58 | No matchup flip | Pure math verified | **Yes** |
-| vs Jellicent: atk >= 106.20 beats Jellicent in 1-0s | Regardless of bait | Not yet battle-sim verified | Pending (need asymmetric shields) |
+| Threshold                                             | Reference Claim    | Our Verification            | Match?                            |
+| ----------------------------------------------------- | ------------------ | --------------------------- | --------------------------------- |
+| vs Annihilape: Fairy Wind breakpoint at atk >= 106.58 | No matchup flip    | Pure math verified          | **Yes**                           |
+| vs Jellicent: atk >= 106.20 beats Jellicent in 1-0s   | Regardless of bait | Not yet battle-sim verified | Pending (need asymmetric shields) |
 
 ## 6. Threshold Tier Classification
 
