@@ -27,8 +27,10 @@ htmlcov/
 # Cached gamemaster data (stored in ~/Documents, not here)
 *.json.cache
 
-# Claude Code local memory
-.claude/
+# Claude Code local memory and per-user settings.
+# .claude/settings.json is shared (committed); settings.local.json is personal.
+.claude/*
+!.claude/settings.json
 
 # User-specific scratch / output (deep dive HTMLs, logs, ad-hoc data)
 # See DEVELOPER_NOTES.md "Deep dive output file layout" for the convention

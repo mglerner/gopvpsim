@@ -64,5 +64,13 @@ Pluggable policy. Simulate all three shield scenarios (0-0, 1-1, 2-2).
 - `DEVELOPER_NOTES.md` — verification status, PvPoke comparison, bugs found.
 - `docs/validations/` — point-in-time experiment writeups.
 
+## Markdown formatting
+All `*.md` files in this project should be formatted by `scripts/format_md.py`,
+which keeps them readable in a raw text editor (currently: pads pipe-table cells
+so columns line up). A PostToolUse hook in `.claude/settings.json` runs it
+automatically after Edit/Write/MultiEdit. To format manually: `python
+scripts/format_md.py [FILE ...]` (no args = walk the whole repo). The script is
+idempotent.
+
 ## Out of scope for now
 Adaptive/game-tree search (minimax). Web app UI.

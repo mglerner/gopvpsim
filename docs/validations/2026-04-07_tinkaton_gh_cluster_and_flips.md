@@ -83,16 +83,16 @@ matchup that the reference loses (crossing the 500-point boundary).
 
 The cleanest flip profile of any IV spread tested:
 
-| Scenario | Opponent | Ref | 2/13/13 | Delta |
-|----------|----------|-----|---------|-------|
-| 2v0 | Stunfisk (Galarian) | 418 | **746** | +328 |
-| 0v0 | Quagsire (Shadow) | 403 | **623** | +220 |
-| 1v2 | Togekiss | 291 | **503** | +212 |
-| 1v2 | Clefable | 302 | **503** | +201 |
-| 0v1 | Charjabug | 392 | **535** | +143 |
-| 2v1 | Stunfisk | 491 | **584** | +93 |
-| 0v0 | Corsola (Galarian) | 453 | **503** | +50 |
-| 2v1 | Corviknight | 496 | **500** | +4 |
+| Scenario | Opponent            | Ref | 2/13/13 | Delta |
+| -------- | ------------------- | --- | ------- | ----- |
+| 2v0      | Stunfisk (Galarian) | 418 | **746** | +328  |
+| 0v0      | Quagsire (Shadow)   | 403 | **623** | +220  |
+| 1v2      | Togekiss            | 291 | **503** | +212  |
+| 1v2      | Clefable            | 302 | **503** | +201  |
+| 0v1      | Charjabug           | 392 | **535** | +143  |
+| 2v1      | Stunfisk            | 491 | **584** | +93   |
+| 0v0      | Corsola (Galarian)  | 453 | **503** | +50   |
+| 2v1      | Corviknight         | 496 | **500** | +4    |
 
 No lost matchups. It picks up wins against G. Stunfisk, Shadow Quagsire, Togekiss,
 Clefable, Charjabug, Stunfisk, G. Corsola, and Corviknight. Many of these are
@@ -100,15 +100,15 @@ asymmetric-scenario flips that wouldn't show up in even-only analysis.
 
 ### Reference top pick: 0/14/9 — Gains 5, Loses 2
 
-| Scenario | Opponent | Ref | 0/14/9 | Delta |
-|----------|----------|-----|--------|-------|
-| 2v0 | Stunfisk (Galarian) | 418 | **744** | +326 |
-| 1v2 | Clefable | 302 | **507** | +205 |
-| 0v1 | Charjabug | 392 | **542** | +150 |
-| 2v1 | Stunfisk | 491 | **585** | +94 |
-| 0v0 | Corsola (Galarian) | 453 | **507** | +54 |
-| 0v2 | **Steelix** | **503** | 329 | -174 |
-| 1v2 | **Steelix** | **570** | 452 | -118 |
+| Scenario | Opponent            | Ref     | 0/14/9  | Delta |
+| -------- | ------------------- | ------- | ------- | ----- |
+| 2v0      | Stunfisk (Galarian) | 418     | **744** | +326  |
+| 1v2      | Clefable            | 302     | **507** | +205  |
+| 0v1      | Charjabug           | 392     | **542** | +150  |
+| 2v1      | Stunfisk            | 491     | **585** | +94   |
+| 0v0      | Corsola (Galarian)  | 453     | **507** | +54   |
+| 0v2      | **Steelix**         | **503** | 329     | -174  |
+| 1v2      | **Steelix**         | **570** | 452     | -118  |
 
 Gains 5 flips but **loses Steelix in 0v2 and 1v2**. The Steelix losses are because
 0/14/9 has lower HP (141 vs 142 for the reference) — the HP tradeoff for defense
@@ -143,22 +143,22 @@ The "GH Great" threshold (def >= 143.03, HP >= 138) was designed from the commun
 reference. But our flip analysis reveals a problem: **the low-HP GH Great spreads
 (HP=138) all have net negative flip profiles**:
 
-| IV | Def | HP | Gains | Loses | Net |
-|----|-----|----|-------|-------|-----|
-| 0/12/3 | 143.04 | 138 | 0 | 2 | -2 |
-| 0/14/5 | 143.04 | 138 | 2 | 5 | -3 |
-| 0/14/6 | 143.04 | 138 | 2 | 5 | -3 |
-| 0/15/5 | 143.73 | 138 | 2 | 5 | -3 |
-| 0/15/6 | 143.73 | 138 | 2 | 5 | -3 |
+| IV     | Def    | HP  | Gains | Loses | Net |
+| ------ | ------ | --- | ----- | ----- | --- |
+| 0/12/3 | 143.04 | 138 | 0     | 2     | -2  |
+| 0/14/5 | 143.04 | 138 | 2     | 5     | -3  |
+| 0/14/6 | 143.04 | 138 | 2     | 5     | -3  |
+| 0/15/5 | 143.73 | 138 | 2     | 5     | -3  |
+| 0/15/6 | 143.73 | 138 | 2     | 5     | -3  |
 
 These spreads meet the defense threshold but their low HP costs them 2-5 Steelix
 matchups. The only GH Great spreads with positive net flips are:
 
-| IV | Def | HP | Gains | Loses | Net |
-|----|-----|----|-------|-------|-----|
-| **0/14/9** | 143.04 | **141** | 5 | 2 | **+3** |
-| 0/15/8 | 143.73 | 140 | 6 | 5 | +1 |
-| 0/14/8 | 143.04 | 140 | 5 | 5 | 0 |
+| IV         | Def    | HP      | Gains | Loses | Net    |
+| ---------- | ------ | ------- | ----- | ----- | ------ |
+| **0/14/9** | 143.04 | **141** | 5     | 2     | **+3** |
+| 0/15/8     | 143.73 | 140     | 6     | 5     | +1     |
+| 0/14/8     | 143.04 | 140     | 5     | 5     | 0      |
 
 The reference's recommendation of 0/14/9 specifically is validated — it's the best
 GH Great spread by net flips. But the threshold definition itself (HP >= 138) is
