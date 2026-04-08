@@ -1,5 +1,19 @@
 # PoGo PvP Battle Simulator
 
+## Session startup
+At the start of every new session, before doing other work, read these
+files so you have current context on what's planned, what's broken, and
+what's been verified:
+
+- `TODO.md` — pending features, known bugs, design notes for upcoming work
+- `DEVELOPER_NOTES.md` — verification status, PvPoke comparison results,
+  known bugs we've found in PvPoke
+
+You don't need to re-read them every turn — once per session is enough.
+Mention briefly in your first substantive reply that you've read them
+(e.g., "Caught up on TODO.md and DEVELOPER_NOTES.md.") so the user
+knows the startup happened.
+
 ## Project goal
 A pure Python library for Pokemon Go PvP battle simulation, focused on
 breakpoint/bulkpoint analysis. Will be used by CLI scripts and eventually
