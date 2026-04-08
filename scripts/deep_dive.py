@@ -2725,20 +2725,35 @@ function ddSlayerToggleFilterPanel(cardId) {
                         # set it explicitly.
                         long_name = (relevant[0].parent_display_name or parent)
                         short = derive_short_name(parent)
-                        if len(labels) == 1:
+                        n_subs = len(labels)
+                        if n_subs == 1:
                             badge_text = short
-                            count_suffix = ''
                             sub_labels_text = labels[0]
+                            # For single-sub-anchor parents (Level 1, Level 2,
+                            # CMP) the badge has no count suffix and the
+                            # tooltip leads with "clears <single sub-anchor>".
+                            hover_first_line = (
+                                f'{long_name} \u00b7 clears {sub_labels_text}'
+                            )
                         else:
-                            count_suffix = f'×{len(labels)}'
                             badge_text = (f'{short}'
                                           f'<span class="dd-anchor-tag-count">'
-                                          f'{count_suffix}</span>')
+                                          f'\u00d7{n_subs}</span>')
                             sub_labels_text = ", ".join(labels)
+                            # For Level 3 discover-mode parents the badge
+                            # shows "<short>×N"; the tooltip explains that
+                            # ×N means "this IV passes N of the parent's
+                            # sub-anchors" so the abbreviation isn't cryptic.
+                            hover_first_line = (
+                                f'{long_name} \u00b7 '
+                                f'clears {n_subs} sub-anchors'
+                            )
                         # Hover tooltip on the badge: long display name +
-                        # full anchor name + sub-anchor labels.
+                        # explicit count meaning + full anchor name +
+                        # the sub-anchor labels.
                         hover_text = (
-                            f'{long_name}{count_suffix}  ({parent})\n'
+                            f'{hover_first_line}\n'
+                            f'{parent}\n'
                             f'{sub_labels_text}'
                         )
                         hover_attr = hover_text.replace('"', '&quot;')
