@@ -2738,8 +2738,16 @@ function ddToggleTagsCompact(btn) {
                     # abbreviation stays decipherable. The cell-level title=
                     # also includes the full parent name for fallback hover.
                     tag_bits = []
-                    cell_hover_parts = []
                     row_anchor_indices = []
+                    # Per-row counters for the cell-level summary tooltip.
+                    # Each parent contributes once to its kind bucket and
+                    # n_subs to the total sub-anchor count.
+                    n_parents_by_kind = {
+                        'damage_breakpoint': 0,
+                        'bulkpoint': 0,
+                        'cmp': 0,
+                    }
+                    n_total_subs = 0
                     for parent in sorted(r.get('_anchor_tags', {}).keys()):
                         subs = r['_anchor_tags'][parent]
                         relevant = [s_ for s_ in subs if s_.kind in want_kinds]
@@ -2793,11 +2801,44 @@ function ddToggleTagsCompact(btn) {
                             f'<span class="dd-anchor-tag" title="{hover_attr}">'
                             f'{badge_text}</span>'
                         )
-                        # For the cell-level title: include the parent name
-                        # so hovering the cell shows what each badge maps to.
-                        cell_hover_parts.append(f"{parent}: {sub_labels_text}")
+                        # Tally for the cell-level summary tooltip. Use the
+                        # kind from the first relevant ResolvedAnchor (all
+                        # share kind for a given parent).
+                        kind = relevant[0].kind
+                        if kind in n_parents_by_kind:
+                            n_parents_by_kind[kind] += 1
+                        n_total_subs += n_subs
                     tags_cell = ' '.join(tag_bits) if tag_bits else '&mdash;'
-                    cell_title_attr = ' | '.join(cell_hover_parts).replace('"', '&quot;')
+                    # Cell-level title is now a one-line summary instead of
+                    # the previous per-parent dump (which was 2000+ chars
+                    # and literally taller than a screen for rows with 40+
+                    # parents). Per-badge tooltips still hold the per-anchor
+                    # detail, so this summary just gives an at-a-glance
+                    # signal of how many parents the row clears and the
+                    # kind breakdown.
+                    n_total_parents = sum(n_parents_by_kind.values())
+                    if n_total_parents == 0:
+                        cell_title_attr = 'No anchors cleared'
+                    else:
+                        kind_parts = []
+                        if n_parents_by_kind['damage_breakpoint']:
+                            kind_parts.append(
+                                f"{n_parents_by_kind['damage_breakpoint']} brkp"
+                            )
+                        if n_parents_by_kind['bulkpoint']:
+                            kind_parts.append(
+                                f"{n_parents_by_kind['bulkpoint']} blkp"
+                            )
+                        if n_parents_by_kind['cmp']:
+                            kind_parts.append(
+                                f"{n_parents_by_kind['cmp']} cmp"
+                            )
+                        cell_title_attr = (
+                            f'Clears {n_total_parents} parents '
+                            f'({" \u00b7 ".join(kind_parts)}) '
+                            f'\u00b7 {n_total_subs} sub-anchors total. '
+                            f'Hover any badge for per-anchor detail.'
+                        )
                     data_anchors = ' '.join(str(i) for i in sorted(set(row_anchor_indices)))
 
                     # Row classes: collapse-hidden beyond top N until expanded;
