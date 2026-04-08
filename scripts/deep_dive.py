@@ -2834,7 +2834,7 @@ function ddToggleTagsCompact(btn) {
                                 f"{n_parents_by_kind['cmp']} cmp"
                             )
                         cell_title_attr = (
-                            f'Clears {n_total_parents} parents '
+                            f'Clears {n_total_parents} anchors '
                             f'({" \u00b7 ".join(kind_parts)}) '
                             f'\u00b7 {n_total_subs} sub-anchors total. '
                             f'Hover any badge for per-anchor detail.'
