@@ -56,7 +56,7 @@ several deep dives — define them at the top of a shared file `thresholds/_shar
 [shared.Great.spreads.lickitung_default]
 # ...
 
-[shared.Great.anchors.lickitung_bp_any]
+[shared.Great.anchors.lickitung_brkp_any]
 # ...
 ```
 
@@ -121,9 +121,12 @@ never both. The loader rejects mixed entries with a clear error.
 ## Anchors
 
 An anchor is a named yes/no rule applied to focal IVs. Every anchor has a `kind`
-field that determines how the rule is computed. Two kinds today: `cmp` and
-`damage_breakpoint`. The schema is designed so additional kinds can be added later
-without disturbing existing files.
+field that determines how the rule is computed. Three kinds today: `cmp`,
+`damage_breakpoint`, and `bulkpoint`. `damage_breakpoint` and `bulkpoint` are
+mirror-image atk-side / def-side ladder anchors with the same three precision
+levels — see the table in [`concepts.md`](concepts.md) for the side-by-side. The
+schema is designed so additional kinds can be added later without disturbing
+existing files.
 
 ### CMP anchors
 
@@ -188,7 +191,7 @@ this to reproduce community spreads when you know the calibration atk but not th
 exact (move, tier).
 
 ```toml
-[Annihilape.Great.anchors.lickitung_bp_above_lurgan]
+[Annihilape.Great.anchors.lickitung_brkp_above_lurgan]
 kind = "damage_breakpoint"
 opponent = "Lickitung"
 above_atk = 127.23
@@ -207,7 +210,7 @@ How it's resolved:
 4. The anchor's check is `A >= T`.
 
 The deep-dive output will report which move + tier `T` corresponds to (e.g., "Level
-2 anchor `lickitung_bp_above_lurgan` resolved to: Counter 4 → 5 at atk 127.78"), so
+2 anchor `lickitung_brkp_above_lurgan` resolved to: Counter 4 → 5 at atk 127.78"), so
 you can promote it to a Level 1 anchor if you want it locked in.
 
 #### Level 3 — discover and tag
@@ -217,7 +220,7 @@ against the named opponent within the survivor atk range and the anchor expands 
 a *family* of sub-anchors at categorization time.
 
 ```toml
-[Annihilape.Great.anchors.lickitung_bp_any]
+[Annihilape.Great.anchors.lickitung_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Lickitung"
 description = "Discover and tag every Lickitung damage breakpoint in the survivor range."
@@ -231,9 +234,9 @@ How it's resolved:
 2. For each focal move (or each move in the optional `moves` list), find every atk
    value in the survivor range where the integer damage steps up. Each (move,
    dmg_before, dmg_after, min_atk) tuple becomes a sub-anchor.
-3. The parent anchor `lickitung_bp_any` doesn't have a single threshold; instead,
+3. The parent anchor `lickitung_brkp_any` doesn't have a single threshold; instead,
    each focal IV is tagged with the *list* of sub-anchors it clears, e.g.
-   `lickitung_bp_any:[counter→5, low_kick→6]`.
+   `lickitung_brkp_any:[counter→5, low_kick→6]`.
 
 The deep-dive output reports the per-sub-anchor distribution across the survivor
 cohort ("28 of 30 clear `counter→5`, 12 of 30 clear `low_kick→6`, ..."), which is
@@ -260,6 +263,83 @@ opponent_spread = "lickitung_default"   # references shared.Great.spreads.lickit
 ```
 
 Most of the time the default is fine and you don't think about this.
+
+### Bulkpoint anchors
+
+Bulkpoint anchors are the def-side mirror of damage-breakpoint anchors. Same three
+precision levels, same opponent-specification mechanism, same expansion behavior at
+Level 3. Different fields and different stat target. Use them to express "this
+focal IV reaches a defense tier where the named opponent's damage to it drops by
+1." Bulkpoint anchors route into **Bulk Slayer**, parallel to how damage_breakpoint
+anchors route into Atk Slayer.
+
+The TOML field map is mechanical:
+
+| damage_breakpoint | bulkpoint |
+|---|---|
+| `move`             | `move`             |
+| `deals_at_least`   | `takes_at_most`    |
+| `above_atk`        | `above_def`        |
+| `moves` (filter)   | `moves` (filter)   |
+| `opponent_ivs`     | `opponent_ivs`     |
+| `opponent_spread`  | `opponent_spread`  |
+
+`opponent_spread` differs in one resolver detail: damage_breakpoint picks the
+*bulkiest* (max-def) member of the spread as worst case for the focal attacker;
+bulkpoint picks the *punchiest* (max-atk) member as worst case for the focal
+defender. Both choices are intentionally pessimistic; pin a specific representative
+with `opponent_ivs` if max isn't what you want.
+
+#### Level 1 — fully explicit (bulkpoint)
+
+```toml
+[Annihilape.Great.anchors.lickitung_body_slam_at_most_5]
+kind = "bulkpoint"
+opponent = "Lickitung"
+move = "BODY_SLAM"
+takes_at_most = 5
+description = "Lickitung's Body Slam must deal ≤ 5 damage to the focal."
+```
+
+How it's resolved: compute the opponent's effective attack at its reference IVs,
+then find the smallest focal effective def `T` strictly above which Body Slam's
+integer damage to the focal is ≤ 5. The check on a focal IV with effective def `D`
+is `D > T` (strict — `D == T` still takes 6 damage).
+
+#### Level 2 — reference-anchored (bulkpoint)
+
+```toml
+[Annihilape.Great.anchors.mirror_blkp_above_lurgan]
+kind = "bulkpoint"
+opponent = "Annihilape"
+above_def = 102.9
+description = "Smallest def > 102.9 at which any of the mirror's threat moves' damage to the focal steps down. Reproduces the historical Lurgan-era 102.9 def floor."
+```
+
+How it's resolved: compute opponent reference atk, scan every threat move (the
+opponent's fast + charged moves) for def thresholds above 102.9, pick the earliest.
+The check is `D > T`.
+
+#### Level 3 — discover and tag (bulkpoint)
+
+```toml
+[Annihilape.Great.anchors.lickitung_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickitung"
+description = "Discover and tag every Lickitung bulkpoint in the survivor def range."
+# Optional:
+moves = ["BODY_SLAM", "POWER_WHIP"]   # restrict to a subset of opponent threat moves
+```
+
+The parent anchor expands into one sub-anchor per `(threat move, damage tier)`
+bulkpoint in the survivor def range, just like Level 3 damage breakpoints expand
+into one sub-anchor per (focal move, damage tier). Each focal IV gets tagged with
+the list of sub-anchors it clears, e.g.
+`lickitung_blkp_any:[body_slam≤5, power_whip≤8]`.
+
+The badge text in the HTML appends a trailing " bulk" to the parent display name
+(`lickitung bulk`, `mirror bulk↑lurgan`) so bulkpoint tags are visually distinct
+from breakpoint tags in the Bulk Slayer card, where both kinds can appear together.
 
 ---
 
@@ -305,10 +385,10 @@ Examples:
 --anchor "ltung_counter_5:kind=damage_breakpoint,opponent=Lickitung,move=COUNTER,deals_at_least=5"
 
 # Damage-breakpoint anchor (Level 2):
---anchor "ltung_bp_above_127:kind=damage_breakpoint,opponent=Lickitung,above_atk=127.23"
+--anchor "ltung_brkp_above_127:kind=damage_breakpoint,opponent=Lickitung,above_atk=127.23"
 
 # Damage-breakpoint anchor (Level 3):
---anchor "ltung_bp_any:kind=damage_breakpoint,opponent=Lickitung"
+--anchor "ltung_brkp_any:kind=damage_breakpoint,opponent=Lickitung"
 ```
 
 Inline anchors with the same name as a TOML-declared anchor *replace* the TOML one
@@ -390,7 +470,7 @@ description = "Win CMP ties against our converged mirror cohort (i.e., be the bu
 
 # Level 2: reproduce the Lurgan-era community Lickitung BP without
 # needing to know exactly which (move, tier) it was originally calibrated to.
-[Annihilape.Great.anchors.lickitung_bp_above_lurgan]
+[Annihilape.Great.anchors.lickitung_brkp_above_lurgan]
 kind = "damage_breakpoint"
 opponent = "Lickitung"
 above_atk = 127.23
@@ -399,13 +479,13 @@ description = "Smallest atk > 127.23 at which any focal move's damage to default
 # Level 3: discover and tag every Cresselia BP in the survivor range.
 # Per mercuryish, Cresselia was rumored to be one of the original
 # calibration points but the exact (move, tier) was never confirmed.
-[Annihilape.Great.anchors.cresselia_bp_any]
+[Annihilape.Great.anchors.cresselia_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Cresselia"
 description = "Discover and tag every Cresselia damage breakpoint in the survivor atk range. Mercuryish recalled Cresselia as a possible original calibration point — Level 3 lets us find which BP that was."
 
 # Level 3: same idea for Umbreon.
-[Annihilape.Great.anchors.umbreon_bp_any]
+[Annihilape.Great.anchors.umbreon_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Umbreon"
 description = "Discover and tag every Umbreon damage breakpoint in the survivor atk range."

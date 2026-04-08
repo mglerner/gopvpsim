@@ -115,14 +115,14 @@ description = "Win CMP ties against the community Lurgan Ape spread. Pushing foc
 # 127.2 minimum atk that mercuryish (Discord, 2026-04-08) confirmed as the
 # Lurgan calibration point. Earlier draft used 127.23 — that was a precision
 # error from a screenshot.
-[Annihilape.Great.anchors.lickitung_bp_above_lurgan]
+[Annihilape.Great.anchors.lickitung_brkp_above_lurgan]
 kind = "damage_breakpoint"
 opponent = "Lickitung"
 above_atk = 127.2
 description = "Smallest atk > 127.2 at which any focal move's damage to default Lickitung steps up. Reproduces the historical Lurgan-era 'Lickitung BP' calibration; 127.2 is mercuryish-confirmed as the original Lurgan atk minimum."
 
 # Level 3: discover and tag every Lickitung BP in the survivor range.
-[Annihilape.Great.anchors.lickitung_bp_any]
+[Annihilape.Great.anchors.lickitung_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Lickitung"
 description = "Enumerate every Lickitung damage breakpoint in the survivor atk range and tag each survivor with the sub-anchors it clears."
@@ -130,20 +130,50 @@ description = "Enumerate every Lickitung damage breakpoint in the survivor atk r
 # Level 3: Cresselia — per mercuryish, rumored to have been one of the
 # original Lurgan-era calibration points. Discover all BPs so we can see
 # which one matters.
-[Annihilape.Great.anchors.cresselia_bp_any]
+[Annihilape.Great.anchors.cresselia_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Cresselia"
 description = "Discover all Cresselia damage breakpoints. Mercuryish recalled Cresselia as a possible original Lurgan calibration point — Level 3 lets us find which BP that was."
 
 # Level 3: Umbreon — ditto.
-[Annihilape.Great.anchors.umbreon_bp_any]
+[Annihilape.Great.anchors.umbreon_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Umbreon"
 description = "Discover all Umbreon damage breakpoints in the survivor atk range."
 
 # Level 3: the mirror itself. Useful to see which BPs matter in the
 # Annihilape mirror before the converged cohort is computed.
-[Annihilape.Great.anchors.mirror_bp_any]
+[Annihilape.Great.anchors.mirror_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Annihilape"
 description = "Discover all damage breakpoints against a default Annihilape. Anchors mirror-match damage analysis."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side mirror of damage breakpoints)
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 2: reproduce the Lurgan-era 102.9 def floor that mercuryish (Discord,
+# 2026-04-08) confirmed as the second half of the historical Lurgan calibration.
+# The exact (move, tier) bulkpoint that 102.9 preserves was lost — use the
+# Level 3 mirror_blkp_any anchor below to discover candidates, then promote
+# the matching one to a Level 1 anchor with full provenance.
+[Annihilape.Great.anchors.mirror_blkp_above_lurgan]
+kind = "bulkpoint"
+opponent = "Annihilape"
+above_def = 102.9
+description = "Smallest def > 102.9 at which any of the mirror's threat moves' damage to the focal steps down. Reproduces the historical Lurgan-era 102.9 def floor; the exact (move, tier) calibration is currently unknown."
+
+# Level 3: enumerate every mirror bulkpoint in the survivor def range. Used to
+# identify which (move, tier) the 102.9 floor preserves.
+[Annihilape.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover and tag every mirror-Annihilape bulkpoint in the survivor def range. Goal: identify which (move, tier) the historical 102.9 def floor was originally calibrated to."
+
+# Level 3: same idea against Lickitung. Mercuryish noted Lickitung as one of
+# the historical calibration targets; the def floor may also map onto a
+# Lickitung threat move bulkpoint.
+[Annihilape.Great.anchors.lickitung_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickitung"
+description = "Discover and tag every Lickitung bulkpoint in the survivor def range."

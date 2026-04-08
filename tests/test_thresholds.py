@@ -233,6 +233,105 @@ class TestAnchors:
         assert b.opponent_spread == "some_spread"
         assert b.opponent_ivs is None
 
+    # ---- bulkpoint anchors ----
+
+    def test_blkp_level_1(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+            [Annihilape.Great.anchors.ltung_body_slam_at_most_5]
+            kind = "bulkpoint"
+            opponent = "Lickitung"
+            move = "BODY_SLAM"
+            takes_at_most = 5
+        """)
+        reg = th.load_toml(p)
+        a = reg.get_anchor("Annihilape", "Great", "ltung_body_slam_at_most_5")
+        assert isinstance(a, th.BulkpointAnchor)
+        assert a.kind == "bulkpoint"
+        assert a.level == 1
+        assert a.move == "BODY_SLAM"
+        assert a.takes_at_most == 5
+
+    def test_blkp_level_2(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+            [Annihilape.Great.anchors.ltung_above_lurgan_def]
+            kind = "bulkpoint"
+            opponent = "Lickitung"
+            above_def = 102.9
+        """)
+        reg = th.load_toml(p)
+        a = reg.get_anchor("Annihilape", "Great", "ltung_above_lurgan_def")
+        assert isinstance(a, th.BulkpointAnchor)
+        assert a.level == 2
+        assert a.above_def == 102.9
+
+    def test_blkp_level_3_bare(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+            [Annihilape.Great.anchors.ltung_blkp_any]
+            kind = "bulkpoint"
+            opponent = "Lickitung"
+        """)
+        reg = th.load_toml(p)
+        a = reg.get_anchor("Annihilape", "Great", "ltung_blkp_any")
+        assert a.level == 3
+        assert a.moves is None
+
+    def test_blkp_level_3_with_moves_filter(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+            [Annihilape.Great.anchors.ltung_blkp_charged]
+            kind = "bulkpoint"
+            opponent = "Lickitung"
+            moves = ["BODY_SLAM", "POWER_WHIP"]
+        """)
+        reg = th.load_toml(p)
+        a = reg.get_anchor("Annihilape", "Great", "ltung_blkp_charged")
+        assert a.level == 3
+        assert a.moves == ("BODY_SLAM", "POWER_WHIP")
+
+    def test_blkp_level_1_missing_move_errors(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+            [Annihilape.Great.anchors.bad]
+            kind = "bulkpoint"
+            opponent = "Lickitung"
+            takes_at_most = 5
+        """)
+        with pytest.raises(th.ThresholdError, match="'takes_at_most' .* no 'move'"):
+            th.load_toml(p)
+
+    def test_blkp_level_conflict_errors(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+            [Annihilape.Great.anchors.bad]
+            kind = "bulkpoint"
+            opponent = "Lickitung"
+            move = "BODY_SLAM"
+            takes_at_most = 5
+            above_def = 100.0
+        """)
+        with pytest.raises(th.ThresholdError, match="cannot specify both"):
+            th.load_toml(p)
+
+    def test_blkp_moves_filter_invalid_on_level_1(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+            [Annihilape.Great.anchors.bad]
+            kind = "bulkpoint"
+            opponent = "Lickitung"
+            move = "BODY_SLAM"
+            takes_at_most = 5
+            moves = ["POWER_WHIP"]
+        """)
+        with pytest.raises(th.ThresholdError, match="'moves' filter"):
+            th.load_toml(p)
+
+    def test_blkp_opponent_ref_mutual_exclusion(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+            [Annihilape.Great.anchors.bad]
+            kind = "bulkpoint"
+            opponent = "Lickitung"
+            opponent_ivs = [15, 15, 15]
+            opponent_spread = "foo"
+        """)
+        with pytest.raises(th.ThresholdError, match="cannot specify both"):
+            th.load_toml(p)
+
     def test_opponent_ref_def_mutual_exclusion(self, tmp_path):
         p = _write(tmp_path, "a.toml", """
             [Annihilape.Great.anchors.bad]
@@ -451,9 +550,9 @@ class TestRepoFiles:
         assert len(sp.ivs) == 27
         a = reg.get_anchor("Annihilape", "Great", "cmp_vs_lurgan")
         assert isinstance(a, th.CmpAnchor)
-        a2 = reg.get_anchor("Annihilape", "Great", "lickitung_bp_above_lurgan")
+        a2 = reg.get_anchor("Annihilape", "Great", "lickitung_brkp_above_lurgan")
         assert a2.level == 2
-        a3 = reg.get_anchor("Annihilape", "Great", "cresselia_bp_any")
+        a3 = reg.get_anchor("Annihilape", "Great", "cresselia_brkp_any")
         assert a3.level == 3
 
     def test_tinkaton_toml_loads(self):

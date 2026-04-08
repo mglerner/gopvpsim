@@ -2,7 +2,7 @@
 
 This document defines the terms used throughout the deep-dive HTML outputs and the
 threshold configuration files. If you've opened a deep-dive report and seen labels
-like "Atk Slayer [lickitung_bp, cmp_vs_lurgan]" or "survivor cohort" and want to know
+like "Atk Slayer [lickitung_brkp, cmp_vs_lurgan]" or "survivor cohort" and want to know
 what they mean, this is the place.
 
 For the TOML file format that *configures* these things, see
@@ -71,8 +71,11 @@ correspond to *distinct strategies*, not three different cuts of the same metric
 - **Atk Slayer** — IVs that clear a *named damage breakpoint or set of breakpoints*
   against a notable opponent. The point is not "above-median attack" (which is
   vacuous); the point is "this IV reaches a damage tier the median doesn't."
-- **Bulk Slayer** — IVs that have notably high HP+def, trading off some attack for
-  the ability to absorb more incoming damage.
+- **Bulk Slayer** — IVs that either (a) have notably high HP+def (above the survivor
+  median, structural) or (b) clear a *named bulkpoint* against a notable opponent —
+  i.e., reach a defense tier at which one of the opponent's moves deals strictly less
+  damage. Both routes route into the same category; the structural pool is the
+  default fallback when no bulkpoint anchors are configured.
 - **CMP Slayer** — IVs whose raw attack stat is high enough to win CMP ties against a
   reference opponent (e.g., the converged mirror cohort, or a community-defined
   baseline).
@@ -115,7 +118,7 @@ each focal IV in the survivor pool, "which anchors does this IV pass?" and label
 IV with the set of anchor names.
 
 That set is what makes the Atk Slayer category informative. Instead of "atk above
-median" (vacuous), you get "passes lickitung_bp + cmp_vs_lurgan" (actionable: it
+median" (vacuous), you get "passes lickitung_brkp + cmp_vs_lurgan" (actionable: it
 tells you what this IV does that others don't).
 
 ### Walkthrough: a CMP anchor
@@ -134,7 +137,7 @@ Lurgan Ape cohort."
 
 ### Walkthrough: a damage-breakpoint anchor
 
-Suppose we have a damage-breakpoint anchor named `lickitung_bp`, defined as "clear a
+Suppose we have a damage-breakpoint anchor named `lickitung_brkp`, defined as "clear a
 damage breakpoint against Lickitung."
 
 1. At setup time, the loader knows the opponent is Lickitung. It computes Lickitung's
@@ -149,6 +152,55 @@ damage breakpoint against Lickitung."
    breakpoint from this ladder?"
 
 Step 4 hides an important question: *which* breakpoint? See the next section.
+
+### Walkthrough: a bulkpoint anchor
+
+A bulkpoint anchor is the def-side mirror of a damage-breakpoint anchor. Same shape,
+same three precision levels, but it tests *focal defense* against incoming damage
+instead of *focal attack* against outgoing damage. Suppose we have a bulkpoint anchor
+named `mirror_blkp_above_lurgan`, defined as "starting from the Lurgan-era 102.9 def
+floor, find the next def threshold at which the Annihilape mirror's damage to us
+steps down."
+
+1. At setup time, the loader identifies the opponent (Annihilape mirror). It computes
+   the opponent's effective *attack* — symmetric to how the BP anchor computes
+   opponent defense. By default this uses PvPoke's reference IVs; if a hand-built
+   `opponent_spread` is given, the resolver picks the *highest-attack* member as the
+   worst case for the focal defender.
+2. The loader looks up the *opponent's* fast and charged moves from the gamemaster.
+   These are the threat moves we're measuring incoming damage from. (BP anchors use
+   the focal's own moves; bulkpoint anchors use the opponent's, because the question
+   is "what hits us" rather than "what we hit.")
+3. For each threat move, scan the survivor def range for def thresholds at which the
+   incoming integer damage steps *down* by 1. That gives a list of candidate
+   bulkpoints — tuples of `(move, dmg_before, dmg_after, min_def_to_reach)`.
+4. The Level 2 anchor's check becomes: "the smallest def above 102.9 at which any
+   threat move's damage drops" — pick the earliest threshold across all moves.
+
+The output gets tagged into the **Bulk Slayer** category (parallel to how BP anchors
+route into Atk Slayer). Each focal IV that meets the def threshold for at least one
+named bulkpoint is highlighted; the structural HP+def-above-median pool remains as
+a fallback layer so the category is never empty.
+
+### Atk-side vs def-side anchors
+
+The two "ladder" anchor kinds are mirror images. Same shape, same three precision
+levels, different stat targets:
+
+| | **damage_breakpoint** | **bulkpoint** |
+|---|---|---|
+| Tests focal | attack | defense |
+| Damage direction | outgoing (focal hits opponent) | incoming (opponent hits focal) |
+| Threshold semantic | "smallest atk that deals ≥ N damage" | "smallest def above which damage ≤ N" |
+| Threat moves | focal's movepool | opponent's movepool |
+| Opponent reference | effective *defense* (bulkiest IV in spread) | effective *attack* (punchiest IV in spread) |
+| Routes into category | Atk Slayer | Bulk Slayer |
+| TOML keys | `move`, `deals_at_least`, `above_atk` | `move`, `takes_at_most`, `above_def` |
+
+A focal IV can clear both kinds in the same anchor pass — the slayer categorizer
+looks at every tag the IV passes and routes it into all the categories it qualifies
+for, so a high-atk + above-bulkpoint IV ends up in both Atk Slayer and Bulk Slayer
+with cross-category badges.
 
 ---
 
@@ -190,7 +242,7 @@ recover the lost tweet.
 You don't know the move *or* the tier and want to find out. The loader enumerates
 *every* (move, tier) breakpoint against the named opponent within the survivor atk
 range and treats each as its own sub-anchor. Each focal IV gets tagged with the list
-of sub-anchors it clears: `lickitung_bp:[counter→5, low_kick→6]`.
+of sub-anchors it clears: `lickitung_brkp:[counter→5, low_kick→6]`.
 
 This is exploration mode. The deep-dive output will show, for example, "of the 30
 survivors, 28 clear `counter→5`, 12 clear `low_kick→6`, 3 clear `rage_fist→8`." That
@@ -221,8 +273,8 @@ this (sketch — actual rendering may differ):
 Atk Slayer (3 of 30 survivors clear at least one named breakpoint)
 ─────────────────────────────────────────────────────────────────
 IVs        Atk      Def     HP    Tags                       Wins
-15/3/2     129.44   99.69   134   lickitung_bp, cmp_vs_lurgan, cmp_vs_mirror, bulk    87/270
-15/2/4     129.44   99.14   135   lickitung_bp, cmp_vs_lurgan                          90/270
+15/3/2     129.44   99.69   134   lickitung_brkp, cmp_vs_lurgan, cmp_vs_mirror, bulk    87/270
+15/2/4     129.44   99.14   135   lickitung_brkp, cmp_vs_lurgan                          90/270
 15/15/0    129.44   101.91  131   cmp_vs_lurgan                                        45/270
 ...
 ```
