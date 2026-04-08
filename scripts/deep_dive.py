@@ -2192,13 +2192,17 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
   font-family:monospace; cursor:help; }
 .dd-anchor-tag:hover { background:#1a3a6e; color:#fff; }
 .dd-anchor-tag-count { color:#d29922; font-weight:600; }
-.dd-anchor-tags-cell { max-width: 480px; cursor: help; }
+.dd-anchor-tags-cell { max-width: 480px; }
 .dd-anchor-tags-cell .dd-anchor-tag { vertical-align: baseline; }
 /* The badges live inside an inner <div> rather than directly in the <td>
    because <td> uses display: table-cell, which silently ignores max-height
    in every major browser. Capping the cell to ~2 lines requires a real
-   block-level wrapper. */
-.dd-anchor-tags-inner { white-space: normal; line-height: 1.5; }
+   block-level wrapper. The wrapper itself is click-toggleable: clicking
+   anywhere on the cell whitespace flips that one cell between compact
+   and expanded; clicking a specific badge triggers its hover tooltip
+   instead (badges keep cursor:help to signal hover-only). */
+.dd-anchor-tags-inner { white-space: normal; line-height: 1.5;
+  cursor: pointer; }
 /* Compact mode: cap tag cells at ~2 lines so survivor rows stay readable.
    The "Expand all tags" toggle in the slayer section header removes this
    class from every inner div to reveal the full badge wall. */
@@ -2559,11 +2563,23 @@ function ddToggleTagsCompact(btn) {
   // <td> uses display:table-cell which ignores max-height. Default state
   // is "compact" (capped at ~2 lines with a fade gradient at the bottom).
   // Click expands to full height so the badge wall is fully visible.
+  // Mixed prior state (some cells individually toggled) is collapsed onto
+  // a single state based on the first cell's current class.
   var inners = document.querySelectorAll('.dd-anchor-tags-inner');
   if (!inners.length) return;
   var nowExpanded = inners[0].classList.contains('dd-tags-compact');
   inners.forEach(function(c) { c.classList.toggle('dd-tags-compact', !nowExpanded); });
   btn.textContent = nowExpanded ? 'Compact tags' : 'Expand all tags';
+}
+function ddToggleTagsCompactCell(event) {
+  // Per-cell click toggle. Flips the dd-tags-compact class on just the
+  // clicked inner wrapper. Ignores clicks that originated inside an
+  // anchor badge so badge hover tooltips keep working without
+  // accidentally collapsing or expanding the cell. The bulk button
+  // still works on top of any per-cell state — it forces every cell to
+  // a single state based on the first cell.
+  if (event.target.closest('.dd-anchor-tag')) return;
+  event.currentTarget.classList.toggle('dd-tags-compact');
 }
 </script>
 """)
@@ -2861,7 +2877,8 @@ function ddToggleTagsCompact(btn) {
                         f'<td>{badges}</td>'
                         f'<td class="dd-anchor-tags-cell" '
                         f'title="{cell_title_attr}">'
-                        f'<div class="dd-anchor-tags-inner dd-tags-compact">'
+                        f'<div class="dd-anchor-tags-inner dd-tags-compact" '
+                        f'onclick="ddToggleTagsCompactCell(event)">'
                         f'{tags_cell}</div></td></tr>\n'
                     )
                 results_parts.append('</table>\n')
