@@ -11,6 +11,19 @@ dependencies = [
     "certifi",
 ]
 
+[project.optional-dependencies]
+# Test/dev tooling. Install with `pip install -e .[dev]`.
+dev = [
+    "pytest",
+]
+# Optional numba acceleration for the pvpoke_dp inner loop.
+# `src/gopvpsim/_dp_jit.py` is written to fall back to a pure-Python loop
+# if numba is not importable, so this is genuinely optional.
+# Install with `pip install -e .[perf]`.
+perf = [
+    "numba",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/gopvpsim"]
 
