@@ -2680,6 +2680,7 @@ def _aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
                 'opponent': anchor.opponent,
                 'scenarios': flipped_scenarios,
                 'direction': 'gain',
+                'hp_threshold': None,
                 # Canonical IV indices that pass this anchor. Used by
                 # the interactive scatter plot's anchor-clear overlay
                 # to highlight which spreads actually clear an emitted
@@ -2687,6 +2688,67 @@ def _aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
                 'passing_ivs': list(passing),
             })
         else:
+            # -- HP co-condition search for def-side anchors --
+            # When a def partition alone isn't clean, try adding an HP
+            # floor to tighten the passing set. For each candidate HP
+            # value (unique HPs in the passing set, descending), re-check
+            # all scenarios. Emit the LOWEST HP that produces at least one
+            # clean scenario — that's the minimum HP needed alongside the
+            # def threshold.
+            if anchor.target_stat == 'def' and len(passing) > 1:
+                hp_vals = data_obj.get('ivHp', [])
+                if hp_vals:
+                    # Unique HP values in the passing set, ascending
+                    pass_hps = sorted({hp_vals[iv] for iv in passing})
+                    best_hp = None
+                    best_scenarios = []
+                    # Search from highest HP down — first hit with a clean
+                    # scenario is the tightest useful HP floor. Then relax
+                    # downward to find the minimum HP that still flips.
+                    for hp_floor in reversed(pass_hps):
+                        sub_pass = [iv for iv in passing
+                                    if hp_vals[iv] >= hp_floor]
+                        sub_fail_extra = [iv for iv in passing
+                                          if hp_vals[iv] < hp_floor]
+                        sub_fail = failing + sub_fail_extra
+                        if not sub_pass or not sub_fail:
+                            continue
+                        hp_flipped = []
+                        for si in range(nS):
+                            pw = sum(
+                                1 for iv in sub_pass
+                                if scores_flat[iv * nS * nO + si * nO + oi]
+                                >= win_threshold
+                            ) / len(sub_pass)
+                            fw = sum(
+                                1 for iv in sub_fail
+                                if scores_flat[iv * nS * nO + si * nO + oi]
+                                >= win_threshold
+                            ) / len(sub_fail)
+                            if (pw >= pass_winrate_min
+                                    and fw <= fail_winrate_max):
+                                hp_flipped.append(scenarios[si])
+                        if hp_flipped:
+                            best_hp = hp_floor
+                            best_scenarios = hp_flipped
+                            # Keep going lower to find the minimum HP
+                        else:
+                            if best_hp is not None:
+                                break  # went too low, previous was min
+                    if best_hp is not None and best_scenarios:
+                        stats['emitted'] += 1
+                        stats['no_clean_scenario'] -= 1
+                        records.append({
+                            'anchor': anchor,
+                            'opponent': anchor.opponent,
+                            'scenarios': best_scenarios,
+                            'direction': 'gain',
+                            'hp_threshold': best_hp,
+                            'passing_ivs': [
+                                iv for iv in passing
+                                if hp_vals[iv] >= best_hp],
+                        })
+                        continue
             stats['no_clean_scenario'] += 1
 
     if debug_stats is not None:
@@ -2773,8 +2835,18 @@ def _render_anchor_flip_bullets(records):
                     scen_set.add(tuple(s))
             scen_strs = ', '.join(f'{s[0]}v{s[1]}' for s in sorted(scen_set))
 
+            # HP co-condition: if any record in the group carries an
+            # hp_threshold, show it alongside the def threshold.
+            hp_thresholds = [r.get('hp_threshold') for r in recs
+                             if r.get('hp_threshold') is not None]
+            hp_str = ''
+            if hp_thresholds:
+                hp_str = (f' + <span class="dd-strong">{min(hp_thresholds)}'
+                          f' HP</span>')
+
             lines.append(
-                f'<li><span class="dd-strong">{min_thresh:.2f} {stat_label}</span> '
+                f'<li><span class="dd-strong">{min_thresh:.2f} {stat_label}</span>'
+                f'{hp_str} '
                 f'for <b>{anchor_label}</b>{move_str} vs {recs[0]["opponent"]} '
                 f'(<span class="dd-gain">{scen_strs}</span>)</li>'
             )
