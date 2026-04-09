@@ -3355,7 +3355,8 @@ def _generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mod
 
 def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                shield_scenarios, opponent_names,
-                               slayer_iter_result=None):
+                               slayer_iter_result=None,
+                               has_toml_tiers=False):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
@@ -3631,11 +3632,13 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # when they have atk/def cutoffs; otherwise auto-derive from the
     # anchor-flip records so a clean dive still gets real tiers.
     effective_tiers = data_obj.get('tiers') or []
-    _has_anchor_relevant_cutoffs = any(
-        (t.get('attack', 0) or 0) > 0 or (t.get('defense', 0) or 0) > 0
-        for t in effective_tiers
-    )
-    if not _has_anchor_relevant_cutoffs and anchor_flip_records:
+    if has_toml_tiers:
+        # TOML tiers take precedence — use them as-is.
+        pass
+    elif anchor_flip_records:
+        # No TOML: auto-derive per-opponent tiers from anchor-flip records.
+        # This replaces the statistical auto-discover tiers (Top 5% etc.)
+        # which usually lack the atk/def cutoffs needed for anchor matching.
         effective_tiers = _auto_derive_tiers(anchor_flip_records, data_obj)
         if effective_tiers:
             print(f"  Auto-derived {len(effective_tiers)} threshold tier(s) "
@@ -4650,7 +4653,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               shield_scenarios=None, opponent_names=None,
                               opp_iv_modes=None, reference_idx=-1,
                               standalone=False, slayer_iter_result=None,
-                              cli_args_str=None):
+                              cli_args_str=None, has_toml_tiers=False):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -5065,7 +5068,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     analysis_css, results_html, analysis_html = generate_analysis_sections(
         data_obj, score_arrays, 0, opp_iv_modes[0],
         shield_scenarios, opponent_names,
-        slayer_iter_result=slayer_iter_result)
+        slayer_iter_result=slayer_iter_result,
+        has_toml_tiers=has_toml_tiers)
     # Inject analysis CSS into the style block (replace closing tag we already emitted)
     html = html.replace('</style>\n</head>', analysis_css + '\n</style>\n</head>', 1)
     # Results section is always visible; analysis is behind a toggle
@@ -5468,10 +5472,13 @@ def main():
             threshold_registry = threshold_registry.merge(overlay_reg)
 
     # Derive the legacy flat dict for tier-coloring paths that still expect it.
+    _toml_tiers_loaded = False
     if threshold_registry is not None:
         thresholds = as_legacy_dict(
             threshold_registry, args.species, args.league.capitalize(),
         ) or None
+        if thresholds:
+            _toml_tiers_loaded = True
         n_spreads = len(thresholds) if thresholds else 0
         n_anchors = 0
         sp = threshold_registry.species(args.species)
@@ -6028,6 +6035,7 @@ def main():
                 standalone=args.standalone,
                 slayer_iter_result=main_slayer_iter_result,
                 cli_args_str=cli_args_str,
+                has_toml_tiers=_toml_tiers_loaded,
             )
         else:
             # Static mode (original behavior)
