@@ -255,6 +255,22 @@
 
 ## Deep-dive narrative
 
+* **Export Notable IVs cards to external scanner tool** — The user has a
+  separate tool that scans their existing pokemon collection against
+  IV target specs. Each Notable IVs card represents a target the user
+  might want to feed to that scanner: composite cards have stat
+  cutoffs (`atk≥X, def≥Y, hp≥Z`) and matchup cards have an exhaustive
+  IV list. Add per-card "Copy to clipboard" buttons (matchup cards →
+  IV triples; composite cards → stat cutoffs). Possible "Copy all
+  visible" button at the section header for the typical "filter to
+  notable, copy everything" flow. **Format unknown until user
+  specifies what their scanner accepts** — could be plain comma-
+  separated triples (`0/8/15, 0/11/11, ...`), Pokegenie/CalcyIV search
+  strings, JSON, or something specific to the scanner. Ask before
+  implementing. Discovered 2026-04-09 while reviewing the first
+  Annihilape Notable IVs render — a 16-IV matchup card with no way
+  to extract its members surfaced the gap.
+
 * **Hand-named composite categories via TOML** *(round 2 of structured
   IV categories)* — Round 1 shipped 2026-04-09 (commits f3aa4ad, 8ff4469,
   79e2e87, b344356) as the unified `IVCategory` framework with
