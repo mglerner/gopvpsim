@@ -171,3 +171,69 @@ def test_no_composite_when_no_intersection():
 
 def test_empty_data_obj_returns_empty():
     assert build_iv_categories({'nIvs': 0}) == []
+
+
+def test_matchup_categories_emit_non_trivial_partitions():
+    """Round-one matchup branch: each (opponent, scenario) pair where
+    some-but-not-all IVs win the matchup becomes a 'matchup' category.
+    Carries declarative matchup_conditions for the future bait-axis
+    sweep to extend without disturbing the data model.
+    """
+    data_obj = _make_data_obj()
+    n_ivs = data_obj['nIvs']
+    # 2 scenarios × 2 opponents. Score grid hand-built so:
+    #   (opp 0, scen 0): IVs 0, 1 win → non-trivial → emit
+    #   (opp 0, scen 1): everyone wins → degenerate → skip
+    #   (opp 1, scen 0): no one wins → degenerate → skip
+    #   (opp 1, scen 1): IV 3 alone wins → non-trivial → emit
+    nS, nO = 2, 2
+    scores_flat = [0.0] * (n_ivs * nS * nO)
+
+    def _set(iv, si, oi, val):
+        scores_flat[iv * nS * nO + si * nO + oi] = val
+
+    # opp 0, scen 0
+    _set(0, 0, 0, 600); _set(1, 0, 0, 700)
+    _set(2, 0, 0, 100); _set(3, 0, 0, 200)
+    # opp 0, scen 1: all win
+    for iv in range(n_ivs):
+        _set(iv, 1, 0, 800)
+    # opp 1, scen 0: none win (all 0.0 already)
+    # opp 1, scen 1: only IV 3 wins
+    _set(3, 1, 1, 999)
+
+    matchup_data = {
+        'scores_flat': scores_flat,
+        'nS': nS, 'nO': nO,
+        'scenarios': [(0, 0), (2, 2)],
+        'opponents': ['Lickitung', 'Cresselia'],
+        'opp_iv_mode': 'rank1',
+        'win_threshold': 500,
+    }
+    cats = build_iv_categories(data_obj, matchup_data=matchup_data)
+    matchup_cats = [c for c in cats if c.kind == 'matchup']
+    assert len(matchup_cats) == 2
+
+    by_name = {c.name: c for c in matchup_cats}
+    assert 'Beats rank 1 Lickitung in the 0v0' in by_name
+    assert 'Beats rank 1 Cresselia in the 2v2' in by_name
+
+    lic = by_name['Beats rank 1 Lickitung in the 0v0']
+    assert lic.members == [0, 1]
+    assert lic.matchup_conditions == [{
+        'opponent': 'Lickitung',
+        'opponent_ivs': 'rank1',
+        'scenario': (0, 0),
+        'bait': None,
+        'outcome': 'win',
+    }]
+    assert lic.member_meta[0]['score'] == 600
+
+    cress = by_name['Beats rank 1 Cresselia in the 2v2']
+    assert cress.members == [3]
+
+
+def test_matchup_branch_skipped_without_matchup_data():
+    data_obj = _make_data_obj()
+    cats = build_iv_categories(data_obj)
+    assert all(c.kind != 'matchup' for c in cats)
