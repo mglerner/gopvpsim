@@ -3268,7 +3268,9 @@ def _auto_derive_tiers(anchor_flip_records, data_obj,
                    and (hc <= 0 or data_obj['ivHp'][iv] >= hc))
     atk_tiers.sort(key=_selectivity)
     def_tiers.sort(key=_selectivity)
-    tiers = general + atk_tiers[:3] + def_tiers[:3]
+    # Most selective first — they get priority in ivTiers assignment so
+    # IVs are colored by their most selective tier, not General.
+    tiers = atk_tiers[:3] + def_tiers[:3] + general
 
     return tiers
 

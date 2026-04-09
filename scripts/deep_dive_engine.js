@@ -314,7 +314,7 @@ function buildTraces() {
       }
       if (tx.length) {
         _tierTraces.push({
-          name:tierNames[ti]+' ('+DATA.tiers[ti].desc+')',
+          name:tierNames[ti],
           x:tx, y:ty, text:tt,
           mode:'markers', type:'scattergl', hoverinfo:'text',
           marker:{size:7, color:tierColors[ti], opacity:0.9,
