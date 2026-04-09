@@ -2925,6 +2925,7 @@ def _auto_derive_tiers(anchor_flip_records, data_obj):
 def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                                   avg_ranks, flip_map,
                                   max_members_shown=10,
+                                  max_members_rendered=50,
                                   override_tiers=None):
     """RyanSwag-style threshold tier cards.
 
@@ -3102,7 +3103,9 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                 'PvPoke default reference IV. Hover each cell for '
                 'the gain/loss breakdown.">Net flips</th></tr>\n'
             )
-            for row_i, iv in enumerate(tier_ivs):
+            n_to_render = min(len(tier_ivs), max_members_rendered)
+            n_truncated = len(tier_ivs) - n_to_render
+            for row_i, iv in enumerate(tier_ivs[:n_to_render]):
                 triple = (data_obj['ivA'][iv], data_obj['ivD'][iv],
                           data_obj['ivS'][iv])
                 _g, _l, net = flip_map.get(iv, (0, 0, 0))
@@ -3121,9 +3124,15 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                     f'<td class="{nc}" title="{flip_hover}">'
                     f'{net:+d}</td></tr>\n'
                 )
+            if n_truncated > 0:
+                parts.append(
+                    f'<tr class="dd-slayer-hidden"><td colspan="6" '
+                    f'class="dd-small">… {n_truncated} more not rendered '
+                    f'(top {n_to_render} by avg rank shown)</td></tr>\n'
+                )
             parts.append('</table>\n')
-            if n_members > max_members_shown:
-                _iv_card_id = f'dd-tier-iv-{ti}'
+            n_expandable = min(n_to_render, n_members)
+            if n_expandable > max_members_shown:
                 parts.append(
                     f'<button class="dd-slayer-toggle" '
                     f'onclick="(function(btn){{'
@@ -3132,9 +3141,9 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                     f'var shown=rows.length>0&&rows[0].classList.contains(\'dd-slayer-shown\');'
                     f'rows.forEach(function(r){{r.classList.toggle(\'dd-slayer-shown\',!shown);}});'
                     f'btn.textContent=shown'
-                    f'?\'Show all {n_members} IVs\''
+                    f'?\'Show top {n_expandable} IVs\''
                     f':\'Collapse to top {max_members_shown}\';'
-                    f'}})(this)">Show all {n_members} IVs</button>\n'
+                    f'}})(this)">Show top {n_expandable} IVs</button>\n'
                 )
             parts.append('</details>\n')
         else:
