@@ -3243,7 +3243,8 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                                   override_tiers=None,
                                   score_arrays=None,
                                   moveset_idx=0,
-                                  flips_detail=None):
+                                  flips_detail=None,
+                                  matchup_boundaries=None):
     """RyanSwag-style threshold tier cards.
 
     Each tier becomes a card whose headline is the tier's stat-target spec
@@ -3406,6 +3407,37 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                 '<p class="dd-small">No named anchors fall within '
                 "this tier's spec.</p>\n"
             )
+
+        # --- Matchup-flipping boundaries covered by this tier ---
+        if matchup_boundaries:
+            tier_mbs = []
+            for mb in matchup_boundaries:
+                mb_def = mb['def_threshold']
+                mb_hp = mb.get('hp_threshold')
+                # Does this tier's spec cover this boundary?
+                if def_cut > 0 and def_cut < mb_def:
+                    continue  # tier's def isn't high enough
+                if mb_hp is not None and hp_cut > 0 and hp_cut < mb_hp:
+                    continue  # tier's hp isn't high enough
+                if def_cut <= 0 and mb_def > 0:
+                    continue  # tier has no def cutoff
+                tier_mbs.append(mb)
+            # Filter out opponents already shown by anchor bullets
+            anchor_opps = {r['opponent'] for r in tier_records}
+            new_mbs = [mb for mb in tier_mbs
+                       if mb['opponent'] not in anchor_opps]
+            if new_mbs:
+                mb_bullets = _render_matchup_boundary_bullets(new_mbs)
+                if mb_bullets:
+                    parts.append(
+                        '<p class="dd-small" style="margin-top:6px">'
+                        '<b style="color:#3fb950">Matchup-flipping '
+                        'boundaries</b> (full-battle stat targets, not '
+                        'just damage tiers):</p>\n'
+                    )
+                    parts.append('<ul class="dd-threshold-list">\n')
+                    parts.append('\n'.join(mb_bullets))
+                    parts.append('\n</ul>\n')
 
         # --- Tier-cutoff probe: matchup flips at the tier's own spec ---
         # Catches flips that fall between Level 3 sub-anchor thresholds
@@ -3900,18 +3932,35 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                     anchor_flip_records.append(rec)
             print(f"  Anchor-flip aggregator ({_mode}): {_debug}")
 
+    # -- Compute matchup-flipping boundaries (def/HP sweep) --
+    # Run before tier cards so they can include boundary bullets.
+    all_matchup_boundaries = []
+    _mb_seen: set = set()
+    all_modes = data_obj.get('oppIvModes', [opp_iv_mode])
+    for _mode in all_modes:
+        _key = f'{moveset_idx}_{_mode}'
+        _scores = score_arrays.get(_key, [])
+        if not _scores:
+            continue
+        _mbs = _find_matchup_boundaries(
+            _scores, nIvs, nS, nO,
+            data_obj, scenarios, opponents,
+        )
+        for mb in _mbs:
+            dedup_key = (mb['opponent'], mb['def_threshold'],
+                         mb.get('hp_threshold'),
+                         frozenset(tuple(s) for s in mb['scenarios']))
+            if dedup_key not in _mb_seen:
+                _mb_seen.add(dedup_key)
+                all_matchup_boundaries.append(mb)
+    if all_matchup_boundaries:
+        print(f"  Matchup boundaries: {len(all_matchup_boundaries)} found")
+
     # -- Threshold Tiers (RyanSwag-style, stat-target-forward) --
-    # The headline section — closest to the scatter plot. Use TOML tiers
-    # when they have atk/def cutoffs; otherwise auto-derive from the
-    # anchor-flip records so a clean dive still gets real tiers.
     effective_tiers = data_obj.get('tiers') or []
     if has_toml_tiers:
-        # TOML tiers take precedence — use them as-is.
         pass
     elif anchor_flip_records:
-        # No TOML: auto-derive per-opponent tiers from anchor-flip records.
-        # This replaces the statistical auto-discover tiers (Top 5% etc.)
-        # which usually lack the atk/def cutoffs needed for anchor matching.
         effective_tiers = _auto_derive_tiers(anchor_flip_records, data_obj)
         if effective_tiers:
             print(f"  Auto-derived {len(effective_tiers)} threshold tier(s) "
@@ -3922,6 +3971,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             override_tiers=effective_tiers,
             score_arrays=score_arrays, moveset_idx=moveset_idx,
             flips_detail=flips,
+            matchup_boundaries=all_matchup_boundaries,
         )
         if tier_cards_html:
             results_parts.append(tier_cards_html)
@@ -4595,32 +4645,8 @@ function ddToggleTagsCompactCell(event) {
         results_parts.append('\n'.join(threshold_descs))
         results_parts.append('\n</ul>\n')
 
-    # -- Matchup-Flipping Boundaries (def/HP sweep) --
-    # Finds the actual stat targets where matchup outcomes change,
-    # which are usually higher than the damage-tier boundaries from
-    # anchors. Run against all opp_iv_modes and dedup.
-    all_matchup_boundaries = []
-    _mb_seen: set = set()
-    all_modes = data_obj.get('oppIvModes', [opp_iv_mode])
-    for _mode in all_modes:
-        _key = f'{moveset_idx}_{_mode}'
-        _scores = score_arrays.get(_key, [])
-        if not _scores:
-            continue
-        _mbs = _find_matchup_boundaries(
-            _scores, nIvs, nS, nO,
-            data_obj, scenarios, opponents,
-        )
-        for mb in _mbs:
-            dedup_key = (mb['opponent'], mb['def_threshold'],
-                         mb.get('hp_threshold'),
-                         frozenset(tuple(s) for s in mb['scenarios']))
-            if dedup_key not in _mb_seen:
-                _mb_seen.add(dedup_key)
-                all_matchup_boundaries.append(mb)
-    if all_matchup_boundaries:
-        print(f"  Matchup boundaries: {len(all_matchup_boundaries)} found")
-
+    # -- Matchup-Flipping Boundaries (flat list) --
+    # all_matchup_boundaries was computed earlier (before tier cards).
     if all_matchup_boundaries:
         mb_bullets = _render_matchup_boundary_bullets(all_matchup_boundaries)
         if mb_bullets:
