@@ -5,8 +5,15 @@ var state = {
   scenarioMode: __SCENARIO_MODE_DEFAULT__,
   oppIvMode: '__OPP_IV_MODE_DEFAULT__',
   colorMode: 'threshold',
+  yAxisMode: 'avgScore',
 };
 var yValues, yRanks, refYValues, refYRanks;
+// Updated by computeView() based on the active y-axis mode. Read by
+// hover text, layout title, and the summary table column header so a
+// single source of truth controls how the y-axis labels itself.
+var currentYLabel = 'Avg Battle Score';
+var currentYMax = null;  // for "X / N" formatting on wins-based modes
+var currentYIsSparse = false;  // true for winsMirror; false otherwise
 var lockedIdx = -1;
 var tierColors = __TIER_COLORS_JS__;
 var tierNames = __TIER_NAMES_JS__;
@@ -54,34 +61,119 @@ function getActiveScenarioIndices() {
 }
 
 // ---- Compute view ----
+//
+// computeYValues dispatches on state.yAxisMode to produce the y-axis
+// values for every IV. Modes:
+//
+//   'avgScore'   mean PvPoke score across selected scenarios + opponents
+//                (the original behavior)
+//   'winsPvpoke' count of (opp, scenario) pairs the IV wins (score >= 500)
+//                against the PvPoke-default opponent IV cohort
+//   'winsRank1'  same against rank-1-stat-product opponent IVs
+//   'winsMirror' total mirror-match wins from the slayer iteration's
+//                final round. SPARSE: only the slayer survivors have a
+//                value here. Returns NaN for missing IVs so the trace
+//                builders can filter them out cleanly.
+//
+// Wins modes ignore state.oppIvMode and state.scenarioMode for source
+// selection (winsPvpoke always reads pvpoke scores, etc.) but do
+// honor scenarioMode for which scenarios contribute to the count.
 function computeYValues(mi) {
-  var scores = getScores(mi, state.oppIvMode);
-  if (!scores) return null;
+  var mode = state.yAxisMode || 'avgScore';
   var sis = getActiveScenarioIndices();
   var nSel = sis.length;
-  var avgs = new Float64Array(nIvs);
-  for (var iv = 0; iv < nIvs; iv++) {
-    var sum = 0;
-    for (var k = 0; k < nSel; k++) {
-      var si = sis[k];
-      var base = iv * nS * nO + si * nO;
-      for (var oi = 0; oi < nO; oi++) sum += scores[base + oi];
+
+  if (mode === 'winsMirror') {
+    // Sparse mode: pull from DATA.mirrorWinsByIv. Missing IVs become
+    // NaN so downstream trace builders can detect and skip them.
+    var mw = DATA.mirrorWinsByIv || {};
+    var out = new Float64Array(nIvs);
+    for (var iv = 0; iv < nIvs; iv++) {
+      out[iv] = (mw[iv] !== undefined) ? mw[iv] : NaN;
     }
-    avgs[iv] = sum / (nSel * nO);
+    return out;
+  }
+
+  // Pick the underlying score array for the active mode.
+  var scoreMode;
+  if (mode === 'winsPvpoke') scoreMode = 'pvpoke';
+  else if (mode === 'winsRank1') scoreMode = 'rank1';
+  else scoreMode = state.oppIvMode;  // 'avgScore' uses the active oppIvMode
+  var scores = getScores(mi, scoreMode);
+  if (!scores) return null;
+
+  if (mode === 'winsPvpoke' || mode === 'winsRank1') {
+    var winCounts = new Float64Array(nIvs);
+    for (var ivW = 0; ivW < nIvs; ivW++) {
+      var c = 0;
+      for (var kW = 0; kW < nSel; kW++) {
+        var siW = sis[kW];
+        var baseW = ivW * nS * nO + siW * nO;
+        for (var oiW = 0; oiW < nO; oiW++) {
+          if (scores[baseW + oiW] >= 500) c++;
+        }
+      }
+      winCounts[ivW] = c;
+    }
+    return winCounts;
+  }
+
+  // 'avgScore' (default)
+  var avgs = new Float64Array(nIvs);
+  for (var iv2 = 0; iv2 < nIvs; iv2++) {
+    var sum = 0;
+    for (var k2 = 0; k2 < nSel; k2++) {
+      var si2 = sis[k2];
+      var base2 = iv2 * nS * nO + si2 * nO;
+      for (var oi2 = 0; oi2 < nO; oi2++) sum += scores[base2 + oi2];
+    }
+    avgs[iv2] = sum / (nSel * nO);
   }
   return avgs;
+}
+
+// Helper: is this y-mode "sparse" (missing values represented as NaN)?
+// Used by all trace builders to skip points instead of plotting NaN.
+function isSparseMode(mode) {
+  return mode === 'winsMirror';
 }
 
 function computeRanks(avgs) {
   var indices = new Array(nIvs);
   for (var i=0; i<nIvs; i++) indices[i] = i;
-  indices.sort(function(a,b) { return avgs[b] - avgs[a]; });
+  // NaN entries (from sparse y-modes) get pushed to the end so they
+  // don't accidentally get rank #1 — JS's default sort treats NaN
+  // comparisons as "equal," producing undefined ordering otherwise.
+  indices.sort(function(a,b) {
+    var va = avgs[a], vb = avgs[b];
+    var na = isNaN(va), nb = isNaN(vb);
+    if (na && nb) return 0;
+    if (na) return 1;
+    if (nb) return -1;
+    return vb - va;
+  });
   var ranks = new Uint16Array(nIvs);
   for (var r=0; r<nIvs; r++) ranks[indices[r]] = r + 1;
   return ranks;
 }
 
 function computeView() {
+  // Look up the active mode's label/maxValue from DATA.yAxisModes so
+  // hover, layout, and table all read from one source of truth.
+  var mode = state.yAxisMode || 'avgScore';
+  currentYLabel = 'Avg Battle Score';
+  currentYMax = null;
+  if (DATA.yAxisModes) {
+    for (var ym = 0; ym < DATA.yAxisModes.length; ym++) {
+      if (DATA.yAxisModes[ym].id === mode) {
+        currentYLabel = DATA.yAxisModes[ym].label;
+        currentYMax = DATA.yAxisModes[ym].maxValue;
+        break;
+      }
+    }
+  }
+  currentYIsSparse = isSparseMode(mode);
+
   yValues = computeYValues(state.movesetIdx);
   yRanks = computeRanks(yValues);
   if (DATA.referenceIdx >= 0 && DATA.referenceIdx !== state.movesetIdx) {
@@ -98,12 +190,24 @@ function shortName(name) { return name.split('(')[0].trim().substring(0, 12); }
 
 function buildHoverText(iv) {
   var a = DATA.ivA[iv], d = DATA.ivD[iv], s = DATA.ivS[iv];
+  // Format the y-value line based on the active mode. Wins-based modes
+  // show "X / N" using the precomputed currentYMax; avg-score shows
+  // a one-decimal float.
+  var yv = yValues[iv];
+  var yLine;
+  if (currentYMax != null && isFinite(yv)) {
+    yLine = currentYLabel + ': ' + Math.round(yv) + ' / ' + currentYMax;
+  } else if (isFinite(yv)) {
+    yLine = currentYLabel + ': ' + yv.toFixed(1);
+  } else {
+    yLine = currentYLabel + ': (no data)';
+  }
   var lines = [
     'IVs: '+a+'/'+d+'/'+s,
     'L'+DATA.ivLv[iv]+' CP'+DATA.ivCp[iv],
     'Atk:'+DATA.ivAtk[iv].toFixed(2)+' Def:'+DATA.ivDef[iv].toFixed(2)+' HP:'+DATA.ivHp[iv],
-    'SP Rank: #'+DATA.spRanks[iv]+' | Battle Rank: #'+yRanks[iv],
-    'Avg Score: '+yValues[iv].toFixed(1),
+    'SP Rank: #'+DATA.spRanks[iv]+' | Y Rank: #'+yRanks[iv],
+    yLine,
   ];
   var tier = DATA.ivTiers[iv];
   if (tier >= 0) lines.push('Tier: '+tierNames[tier]);
@@ -177,6 +281,7 @@ function buildTraces() {
     // --- Threshold tier coloring ---
     var otherX=[], otherY=[], otherText=[], otherColor=[];
     for (var iv=0; iv<nIvs; iv++) {
+      if (currentYIsSparse && !isFinite(yValues[iv])) continue;
       if (!DATA.ivAllTiers[iv] || DATA.ivAllTiers[iv].length === 0) {
         otherX.push(DATA.spRanks[iv]);
         otherY.push(yValues[iv]);
@@ -196,6 +301,7 @@ function buildTraces() {
     for (var ti=0; ti<tierNames.length; ti++) {
       var tx=[], ty=[], tt=[];
       for (var iv=0; iv<nIvs; iv++) {
+        if (currentYIsSparse && !isFinite(yValues[iv])) continue;
         if (DATA.ivAllTiers[iv] && DATA.ivAllTiers[iv].indexOf(ti) >= 0) {
           tx.push(DATA.spRanks[iv]);
           ty.push(yValues[iv]);
@@ -217,6 +323,7 @@ function buildTraces() {
     var ax=[], ay=[], at=[], ac=[];
     var cLabel = 'Avg Score';
     for (var iv=0; iv<nIvs; iv++) {
+      if (currentYIsSparse && !isFinite(yValues[iv])) continue;
       ax.push(DATA.spRanks[iv]);
       ay.push(yValues[iv]);
       at.push(buildHoverText(iv));
@@ -321,6 +428,8 @@ function buildTraces() {
       var sp = DATA.spRanks[iv];
       var av = yValues[iv];
       if (typeof sp !== 'number' || typeof av !== 'number') continue;
+      // In sparse y-modes (winsMirror), drop IVs with no value.
+      if (currentYIsSparse && !isFinite(av)) continue;
       ox.push(sp);
       oy.push(av);
       ot.push(buildHoverText(iv));
@@ -333,7 +442,7 @@ function buildTraces() {
       x: ox, y: oy, text: ot,
       mode: 'markers', type: 'scatter', hoverinfo: 'text',
       marker: {
-        size: 10,
+        size: 7,
         color: ocol,
         symbol: osym,
         opacity: 0.95,
@@ -359,19 +468,22 @@ function updateSummaryTable() {
   var top = indices.slice(0, 10);
 
   var hasTiers = tierNames.length > 0;
-  var h = '<table><tr><th>Battle Rank</th><th>IVs</th><th>Level</th><th>CP</th>';
-  h += '<th>Atk</th><th>Def</th><th>HP</th><th>SP Rank</th><th>Avg Score</th>';
+  var h = '<table><tr><th>Y Rank</th><th>IVs</th><th>Level</th><th>CP</th>';
+  h += '<th>Atk</th><th>Def</th><th>HP</th><th>SP Rank</th><th>'+currentYLabel+'</th>';
   if (hasTiers) h += '<th>Tier</th>';
   h += '</tr>';
   for (var k=0; k<top.length; k++) {
     var iv = top[k];
+    // In sparse y-modes, the top-by-yRanks list still includes IVs
+    // with NaN y-values; skip those so the table only lists ranked IVs.
+    if (currentYIsSparse && !isFinite(yValues[iv])) continue;
     var tier = DATA.ivTiers[iv];
     h += '<tr><td>#'+yRanks[iv]+'</td>';
     h += '<td>'+DATA.ivA[iv]+'/'+DATA.ivD[iv]+'/'+DATA.ivS[iv]+'</td>';
     h += '<td>'+DATA.ivLv[iv]+'</td><td>'+DATA.ivCp[iv]+'</td>';
     h += '<td>'+DATA.ivAtk[iv].toFixed(2)+'</td><td>'+DATA.ivDef[iv].toFixed(2)+'</td>';
     h += '<td>'+DATA.ivHp[iv]+'</td><td>#'+DATA.spRanks[iv]+'</td>';
-    h += '<td>'+yValues[iv].toFixed(1)+'</td>';
+    h += '<td>'+(isFinite(yValues[iv]) ? yValues[iv].toFixed(1) : '\u2014')+'</td>';
     if (hasTiers) {
       if (tier >= 0) {
         h += '<td><span class="tier-badge" style="background:'+tierColors[tier]+';color:#000">'+tierNames[tier]+'</span></td>';
@@ -415,6 +527,8 @@ function updateView() {
   if (osel) state.oppIvMode = osel.value;
   var csel = document.getElementById('color-sel');
   if (csel) state.colorMode = csel.value;
+  var ysel = document.getElementById('yaxis-sel');
+  if (ysel) state.yAxisMode = ysel.value;
   lockedIdx = -1;
 
   var traces = buildTraces();
@@ -427,11 +541,13 @@ function updateView() {
   var yMin = Math.min.apply(null, allY), yMax = Math.max.apply(null, allY);
   var xPad = Math.max(1, (xMax-xMin)*0.02), yPad = Math.max(0.5, (yMax-yMin)*0.03);
 
-  // Cluster overlay shapes
+  // Cluster overlay shapes. Hidden in non-avgScore y-modes because the
+  // cluster gaps are derived from the avg-score distribution and would
+  // be plotted at the wrong y-coordinates against any other metric.
   var shapes = [];
   var annotations = [];
   var clusterChk = document.getElementById('cluster-chk');
-  if (clusterChk && clusterChk.checked) {
+  if (clusterChk && clusterChk.checked && state.yAxisMode === 'avgScore') {
     var gapKey = state.movesetIdx + '_' + state.oppIvMode;
     var gapData = DATA.clusterGaps[gapKey];
     if (gapData) {
@@ -471,7 +587,7 @@ function updateView() {
   var layout = {
     title: DATA.movesets[state.movesetIdx].prettyLabel,
     xaxis: {title:'Stat Product Rank (1=best)', range:[xMax+xPad, xMin-xPad], fixedrange:true},
-    yaxis: {title:'Avg Battle Score', range:[yMin-yPad, yMax+yPad], fixedrange:true},
+    yaxis: {title:currentYLabel, range:[yMin-yPad, yMax+yPad], fixedrange:true},
     paper_bgcolor:'#1a1a2e', plot_bgcolor:'#16213e',
     font:{color:'#e0e0e0'}, hovermode:'closest',
     legend:{bgcolor:'rgba(22,33,62,0.8)', bordercolor:'#0f3460', borderwidth:1},

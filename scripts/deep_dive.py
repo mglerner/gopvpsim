@@ -3730,6 +3730,68 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         str(idx): sorted(labels) for idx, labels in anchor_cleared_by_idx.items()
     }
 
+    # ---- Wins-based y-axis data ----
+    # The interactive scatter's y-axis defaults to avg battle score, but
+    # users want alternative metrics that count *how many matchups
+    # this IV wins* under different opponent assumptions. Slayer IVs in
+    # particular don't appear at the top of the avg-score-ranked plot
+    # (they optimize a different target — mirror-match wins under
+    # even-strict), so a wins-based axis makes that cohort visible.
+    #
+    # Three wins modes are exposed in addition to avg score:
+    #   * winsPvpoke: count of (opp, scenario) pairs the IV wins vs the
+    #     PvPoke-default opponent IV cohort. Always available.
+    #   * winsRank1: same but vs rank-1-stat-product opponents. Only
+    #     available if --opp-ivs is rank1 or both.
+    #   * winsMirror: total mirror-match wins from the slayer iteration's
+    #     final round. SPARSE — only the ~tens of slayer survivors have
+    #     a value here; all other IVs are dropped from the plot when
+    #     this mode is active.
+    mirror_wins_by_idx: dict = {}
+    mirror_wins_max = 0
+    if slayer_iter_result and slayer_iter_result.get('final'):
+        for r in slayer_iter_result['final']:
+            iv_triple = r.get('iv')
+            wins = r.get('total_wins', 0)
+            if iv_triple is None:
+                continue
+            idx = iv_idx_by_triple.get(tuple(iv_triple))
+            if idx is None:
+                continue
+            mirror_wins_by_idx[idx] = wins
+            if wins > mirror_wins_max:
+                mirror_wins_max = wins
+    data_obj['mirrorWinsByIv'] = {
+        str(idx): wins for idx, wins in mirror_wins_by_idx.items()
+    }
+    data_obj['mirrorWinsMax'] = mirror_wins_max
+
+    # Build the y-axis mode list. Each entry: (id, label, max_value).
+    # max_value is the theoretical max wins so hover text can show
+    # "X / N" for the wins modes. avgScore has no max in that sense.
+    y_axis_modes = [
+        {'id': 'avgScore', 'label': 'Avg Battle Score', 'maxValue': None},
+    ]
+    if 'pvpoke' in opp_iv_modes:
+        y_axis_modes.append({
+            'id': 'winsPvpoke',
+            'label': 'Wins vs PvPoke default',
+            'maxValue': n_scenarios * n_opponents,
+        })
+    if 'rank1' in opp_iv_modes:
+        y_axis_modes.append({
+            'id': 'winsRank1',
+            'label': 'Wins vs rank 1',
+            'maxValue': n_scenarios * n_opponents,
+        })
+    if mirror_wins_by_idx:
+        y_axis_modes.append({
+            'id': 'winsMirror',
+            'label': 'Wins vs mirror cohort',
+            'maxValue': mirror_wins_max,
+        })
+    data_obj['yAxisModes'] = y_axis_modes
+
     opp_desc = opponent_label or 'PvPoke rankings'
     shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in shield_scenarios)
 
@@ -3816,6 +3878,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         for mode in opp_iv_modes:
             label = 'PvPoke Defaults' if mode == 'pvpoke' else 'Rank 1'
             html += f'    <option value="{mode}">{label}</option>\n'
+        html += '  </select></label>\n'
+    if len(y_axis_modes) > 1:
+        html += '  <label>Y-axis: <select id="yaxis-sel" onchange="updateView()">\n'
+        for ym in y_axis_modes:
+            html += f'    <option value="{ym["id"]}">{ym["label"]}</option>\n'
         html += '  </select></label>\n'
     html += '  <label>Color: <select id="color-sel" onchange="updateView()">\n'
     html += '    <option value="threshold">Threshold tiers</option>\n'
