@@ -3020,20 +3020,74 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
             f'</span>'
             f'</h4>\n'
         )
-        if t.get('desc'):
+        # --- Auto-generated prose summary for the card ---
+        if tier_records:
+            # Collect unique opponents whose anchors this tier clears
+            tier_opps = sorted({r['opponent'] for r in tier_records})
+            n_bullets = len(_render_anchor_flip_bullets(tier_records))
+            scen_set = set()
+            for r in tier_records:
+                for s in r['scenarios']:
+                    scen_set.add(tuple(s))
+            prose_parts = []
+            if tier_opps:
+                opp_str = ', '.join(tier_opps[:4])
+                if len(tier_opps) > 4:
+                    opp_str += f', +{len(tier_opps) - 4} more'
+                prose_parts.append(
+                    f'Clears {n_bullets} anchor'
+                    f'{"s" if n_bullets != 1 else ""} across '
+                    f'{len(scen_set)} shield scenario'
+                    f'{"s" if len(scen_set) != 1 else ""}, '
+                    f'covering {opp_str}.'
+                )
+            if t.get('desc'):
+                prose_parts.append(t['desc'])
+            if prose_parts:
+                parts.append(
+                    f'<p class="dd-prose">{" ".join(prose_parts)}</p>\n'
+                )
+        elif t.get('desc'):
             parts.append(f'<p class="dd-prose">{t["desc"]}</p>\n')
 
+        # --- Anchor-flip bullets (collapsed past 5) ---
+        max_bullets_visible = 5
         if tier_records:
             bullets = _render_anchor_flip_bullets(tier_records)
-            parts.append('<ul class="dd-threshold-list">\n')
-            parts.append('\n'.join(bullets))
-            parts.append('\n</ul>\n')
+            if bullets:
+                tier_card_uid = f'dd-tier-{ti}'
+                n_vis = min(len(bullets), max_bullets_visible)
+                parts.append('<ul class="dd-threshold-list">\n')
+                parts.append('\n'.join(bullets[:n_vis]))
+                if len(bullets) > max_bullets_visible:
+                    for b in bullets[max_bullets_visible:]:
+                        parts.append(
+                            f'\n<li class="dd-iv-hidden" '
+                            f'data-tier-card="{tier_card_uid}">{b[4:]}'
+                        )  # strip leading <li> since we're adding class
+                    parts.append('\n</ul>\n')
+                    n_hidden = len(bullets) - max_bullets_visible
+                    parts.append(
+                        f'<button class="dd-slayer-toggle" '
+                        f'onclick="(function(btn){{'
+                        f'var items=document.querySelectorAll('
+                        f'\'[data-tier-card=\\&quot;{tier_card_uid}\\&quot;]\');'
+                        f'var shown=items.length>0&&items[0].classList.contains(\'dd-iv-shown\');'
+                        f'items.forEach(function(r){{r.classList.toggle(\'dd-iv-shown\',!shown);}});'
+                        f'btn.textContent=shown'
+                        f'?\'Show all {len(bullets)} anchors\''
+                        f':\'Collapse to top {n_vis}\';'
+                        f'}})(this)">Show all {len(bullets)} anchors</button>\n'
+                    )
+                else:
+                    parts.append('\n</ul>\n')
         elif cutoff_bits:
             parts.append(
                 '<p class="dd-small">No named anchors fall within '
                 "this tier's spec.</p>\n"
             )
 
+        # --- Member IVs (collapsed, with expand toggle) ---
         if tier_ivs:
             tier_ivs.sort(key=lambda iv: avg_ranks[iv])
             parts.append(
@@ -3043,29 +3097,45 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
             parts.append('<table class="dd-table dd-narrow">\n')
             parts.append(
                 '<tr><th>IV</th><th>Atk</th><th>Def</th><th>HP</th>'
-                '<th>Avg rank</th><th>Net flips</th></tr>\n'
+                '<th>Avg rank</th>'
+                '<th title="Matchup wins gained minus lost vs the '
+                'PvPoke default reference IV. Hover each cell for '
+                'the gain/loss breakdown.">Net flips</th></tr>\n'
             )
-            for iv in tier_ivs[:max_members_shown]:
+            for row_i, iv in enumerate(tier_ivs):
                 triple = (data_obj['ivA'][iv], data_obj['ivD'][iv],
                           data_obj['ivS'][iv])
                 _g, _l, net = flip_map.get(iv, (0, 0, 0))
                 nc = 'dd-gain' if net > 0 else ('dd-loss' if net < 0 else '')
+                flip_hover = (f'+{_g} gained, -{_l} lost vs reference IV '
+                              f'(net {net:+d})')
+                row_cls = (' class="dd-slayer-hidden"'
+                           if row_i >= max_members_shown else '')
                 parts.append(
-                    f'<tr><td>{triple[0]}/{triple[1]}/{triple[2]}</td>'
+                    f'<tr{row_cls}>'
+                    f'<td>{triple[0]}/{triple[1]}/{triple[2]}</td>'
                     f'<td>{data_obj["ivAtk"][iv]:.2f}</td>'
                     f'<td>{data_obj["ivDef"][iv]:.2f}</td>'
                     f'<td>{data_obj["ivHp"][iv]}</td>'
                     f'<td>#{avg_ranks[iv]}</td>'
-                    f'<td class="{nc}">{net:+d}</td></tr>\n'
-                )
-            if n_members > max_members_shown:
-                parts.append(
-                    f'<tr><td colspan="6" class="dd-small">'
-                    f'… {n_members - max_members_shown} more — see Mirror '
-                    f'Slayer Iteration tables below for the full listing'
-                    f'</td></tr>\n'
+                    f'<td class="{nc}" title="{flip_hover}">'
+                    f'{net:+d}</td></tr>\n'
                 )
             parts.append('</table>\n')
+            if n_members > max_members_shown:
+                _iv_card_id = f'dd-tier-iv-{ti}'
+                parts.append(
+                    f'<button class="dd-slayer-toggle" '
+                    f'onclick="(function(btn){{'
+                    f'var t=btn.previousElementSibling;'
+                    f'var rows=t.querySelectorAll(\'tr.dd-slayer-hidden\');'
+                    f'var shown=rows.length>0&&rows[0].classList.contains(\'dd-slayer-shown\');'
+                    f'rows.forEach(function(r){{r.classList.toggle(\'dd-slayer-shown\',!shown);}});'
+                    f'btn.textContent=shown'
+                    f'?\'Show all {n_members} IVs\''
+                    f':\'Collapse to top {max_members_shown}\';'
+                    f'}})(this)">Show all {n_members} IVs</button>\n'
+                )
             parts.append('</details>\n')
         else:
             # Mirror the existing tier-summary "0 spreads" callout: tell the
