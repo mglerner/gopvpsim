@@ -2555,7 +2555,11 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
             return (-wins, idx)
         members_sorted = sorted(cat.members, key=_sort_key)
 
-        for row_i, m_idx in enumerate(members_sorted):
+        # Cap total rendered members to avoid multi-MB HTML for large
+        # matchup cards (e.g. 2200 IVs beating Lapras). Top members by
+        # wins are the most informative; the rest add bytes but no signal.
+        max_members_rendered = 30
+        for row_i, m_idx in enumerate(members_sorted[:max_members_rendered]):
             triple = (data_obj['ivA'][m_idx],
                       data_obj['ivD'][m_idx],
                       data_obj['ivS'][m_idx])
@@ -2579,6 +2583,12 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
                     parts.append(
                         f'<p class="dd-prose{prose_cls}">{prose}</p>\n'
                     )
+        if n_members > max_members_rendered:
+            parts.append(
+                f'<p class="dd-iv-hidden dd-small">'
+                f'… {n_members - max_members_rendered} more not rendered '
+                f'(top {max_members_rendered} shown)</p>\n'
+            )
 
         if n_members > max_members_shown:
             n_hidden = n_members - max_members_shown
@@ -5534,9 +5544,31 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += results_html
     html += analysis_html
 
-    # Embed data
+    # Embed data. Scores are packed as base64 uint16 arrays to reduce
+    # file size (~44% smaller than JSON integer arrays). The JS decoder
+    # at the top of the engine unpacks them back to regular arrays.
+    import base64
+    import struct
+    packed_scores = {}
+    for key, arr in score_arrays.items():
+        # Clamp to uint16 range (scores are 0-1000 integers)
+        clamped = [max(0, min(65535, int(v))) for v in arr]
+        raw = struct.pack(f'<{len(clamped)}H', *clamped)
+        packed_scores[key] = base64.b64encode(raw).decode('ascii')
     html += f'<script>var DATA = {json.dumps(data_obj)};\n'
-    html += f'var SCORES = {json.dumps(score_arrays)};\n'
+    html += f'var SCORES_B64 = {json.dumps(packed_scores)};\n'
+    html += """var SCORES = {};
+(function() {
+  for (var key in SCORES_B64) {
+    var bin = atob(SCORES_B64[key]);
+    var arr = new Uint16Array(bin.length / 2);
+    for (var i = 0; i < arr.length; i++) {
+      arr[i] = bin.charCodeAt(i*2) | (bin.charCodeAt(i*2+1) << 8);
+    }
+    SCORES[key] = Array.from(arr);
+  }
+})();
+"""
     html += '</script>\n'
 
     # JS engine
