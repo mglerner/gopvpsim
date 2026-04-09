@@ -2756,6 +2756,184 @@ def _aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
     return records
 
 
+def _find_matchup_boundaries(scores_flat, nIvs, nS, nO,
+                              data_obj, scenarios, opponents,
+                              win_threshold=500,
+                              pass_winrate_min=0.75, fail_winrate_max=0.25,
+                              min_passing=3):
+    """Find the matchup-flipping def (+ optional HP) boundary per opponent.
+
+    For each (opponent, scenario), sweep def thresholds to find the minimum
+    def at which "IVs with def >= threshold" cleanly win and "IVs with
+    def < threshold" cleanly lose. This finds the *actual stat target* a
+    player needs, which is usually higher than the damage-tier boundary
+    because multiple damage reductions must accumulate to flip a battle.
+
+    When no single-def partition is clean, tries adding HP co-conditions
+    at each candidate def threshold (same approach as the anchor HP search).
+
+    Returns a list of dicts:
+        {
+          'opponent': str,
+          'scenarios': [(s0, s1), ...],
+          'def_threshold': float,
+          'hp_threshold': int | None,
+          'n_passing': int,  # how many IVs meet the spec
+        }
+
+    Only emits for (opponent, scenario_group) combinations where the
+    partition is clean. Scenarios that flip at the same def+HP threshold
+    are grouped.
+    """
+    if nIvs == 0 or nO == 0:
+        return []
+
+    # Pre-sort IVs by def ascending for the sweep
+    def_vals = data_obj['ivDef']
+    hp_vals = data_obj.get('ivHp', [])
+    iv_by_def = sorted(range(nIvs), key=lambda iv: def_vals[iv])
+    unique_defs = sorted({def_vals[iv] for iv in range(nIvs)})
+
+    results = []
+
+    for oi in range(nO):
+        opp = opponents[oi]
+
+        for si in range(nS):
+            # Precompute win/loss for each IV in this (opp, scenario)
+            wins = [scores_flat[iv * nS * nO + si * nO + oi] >= win_threshold
+                    for iv in range(nIvs)]
+
+            # Sweep def thresholds ascending. For each threshold, count
+            # pass/fail wins efficiently using running totals.
+            # total_wins = sum of wins across all IVs
+            total_wins = sum(1 for w in wins if w)
+            if total_wins == 0 or total_wins == nIvs:
+                continue  # everyone wins or everyone loses — no flip
+
+            best_def = None
+            best_hp = None
+
+            # Walk unique_defs ascending. At each threshold, passing =
+            # IVs with def >= threshold. We want the LOWEST def where
+            # the partition is clean.
+            # Build cumulative: n_below[d] = count of IVs with def < d
+            # and wins_below[d] = count of winning IVs with def < d.
+            for def_thresh in unique_defs:
+                passing = [iv for iv in range(nIvs)
+                           if def_vals[iv] >= def_thresh]
+                failing = [iv for iv in range(nIvs)
+                           if def_vals[iv] < def_thresh]
+                if len(passing) < min_passing or not failing:
+                    continue
+
+                pw = sum(1 for iv in passing if wins[iv]) / len(passing)
+                fw = sum(1 for iv in failing if wins[iv]) / len(failing)
+
+                if pw >= pass_winrate_min and fw <= fail_winrate_max:
+                    best_def = def_thresh
+                    best_hp = None
+                    break  # found minimum def — done
+
+            # If no single-def threshold works, try def + HP
+            if best_def is None and hp_vals:
+                for def_thresh in unique_defs:
+                    def_passing = [iv for iv in range(nIvs)
+                                   if def_vals[iv] >= def_thresh]
+                    def_failing = [iv for iv in range(nIvs)
+                                   if def_vals[iv] < def_thresh]
+                    if len(def_passing) < min_passing or not def_failing:
+                        continue
+                    # Check if there's ANY signal — do the passing IVs
+                    # win more often than failing ones?
+                    pw_raw = sum(1 for iv in def_passing if wins[iv])
+                    fw_raw = sum(1 for iv in def_failing if wins[iv])
+                    if pw_raw == 0:
+                        continue  # no wins in passing set at all
+                    if pw_raw / len(def_passing) < 0.3:
+                        continue  # too low to be tightenable
+
+                    # Try HP thresholds within the def-passing set
+                    pass_hps = sorted({hp_vals[iv] for iv in def_passing})
+                    found_hp = None
+                    for hp_floor in reversed(pass_hps):
+                        sub_pass = [iv for iv in def_passing
+                                    if hp_vals[iv] >= hp_floor]
+                        sub_fail = def_failing + [
+                            iv for iv in def_passing
+                            if hp_vals[iv] < hp_floor]
+                        if len(sub_pass) < min_passing or not sub_fail:
+                            continue
+                        spw = sum(1 for iv in sub_pass
+                                  if wins[iv]) / len(sub_pass)
+                        sfw = sum(1 for iv in sub_fail
+                                  if wins[iv]) / len(sub_fail)
+                        if (spw >= pass_winrate_min
+                                and sfw <= fail_winrate_max):
+                            found_hp = hp_floor
+                        else:
+                            if found_hp is not None:
+                                break
+                    if found_hp is not None:
+                        best_def = def_thresh
+                        best_hp = found_hp
+                        break  # found minimum def+HP — done
+
+            if best_def is not None:
+                n_pass = sum(
+                    1 for iv in range(nIvs)
+                    if def_vals[iv] >= best_def
+                    and (best_hp is None or hp_vals[iv] >= best_hp)
+                )
+                results.append({
+                    'opponent': opp,
+                    'scenario': scenarios[si],
+                    'def_threshold': best_def,
+                    'hp_threshold': best_hp,
+                    'n_passing': n_pass,
+                })
+
+    # Group scenarios that flip at the same (opponent, def, hp) threshold
+    grouped: dict = {}
+    for r in results:
+        key = (r['opponent'], r['def_threshold'], r['hp_threshold'])
+        if key not in grouped:
+            grouped[key] = {
+                'opponent': r['opponent'],
+                'def_threshold': r['def_threshold'],
+                'hp_threshold': r['hp_threshold'],
+                'n_passing': r['n_passing'],
+                'scenarios': [],
+            }
+        grouped[key]['scenarios'].append(r['scenario'])
+
+    return sorted(grouped.values(),
+                  key=lambda r: (r['def_threshold'], r['opponent']))
+
+
+def _render_matchup_boundary_bullets(boundaries):
+    """Render matchup-flipping boundaries as HTML <li> bullets.
+
+    Format: "141.66 Def + 138 HP flips Medicham (1v1, 1v2) [85 IVs]"
+    """
+    lines = []
+    for b in boundaries:
+        scen_str = ', '.join(
+            f'{s[0]}v{s[1]}' for s in sorted(b['scenarios']))
+        hp_str = ''
+        if b.get('hp_threshold') is not None:
+            hp_str = (f' + <span class="dd-strong">'
+                      f'{b["hp_threshold"]} HP</span>')
+        lines.append(
+            f'<li><span class="dd-strong">'
+            f'{b["def_threshold"]:.2f} Def</span>{hp_str} '
+            f'flips <b>{b["opponent"]}</b> '
+            f'(<span class="dd-gain">{scen_str}</span>) '
+            f'<span class="dd-small">[{b["n_passing"]} IVs]</span></li>'
+        )
+    return lines
+
+
 def _render_anchor_flip_bullets(records):
     """Render anchor-flip records as RyanSwag-style HTML <li> bullets.
 
@@ -4417,23 +4595,59 @@ function ddToggleTagsCompactCell(event) {
         results_parts.append('\n'.join(threshold_descs))
         results_parts.append('\n</ul>\n')
 
+    # -- Matchup-Flipping Boundaries (def/HP sweep) --
+    # Finds the actual stat targets where matchup outcomes change,
+    # which are usually higher than the damage-tier boundaries from
+    # anchors. Run against all opp_iv_modes and dedup.
+    all_matchup_boundaries = []
+    _mb_seen: set = set()
+    all_modes = data_obj.get('oppIvModes', [opp_iv_mode])
+    for _mode in all_modes:
+        _key = f'{moveset_idx}_{_mode}'
+        _scores = score_arrays.get(_key, [])
+        if not _scores:
+            continue
+        _mbs = _find_matchup_boundaries(
+            _scores, nIvs, nS, nO,
+            data_obj, scenarios, opponents,
+        )
+        for mb in _mbs:
+            dedup_key = (mb['opponent'], mb['def_threshold'],
+                         mb.get('hp_threshold'),
+                         frozenset(tuple(s) for s in mb['scenarios']))
+            if dedup_key not in _mb_seen:
+                _mb_seen.add(dedup_key)
+                all_matchup_boundaries.append(mb)
+    if all_matchup_boundaries:
+        print(f"  Matchup boundaries: {len(all_matchup_boundaries)} found")
+
+    if all_matchup_boundaries:
+        mb_bullets = _render_matchup_boundary_bullets(all_matchup_boundaries)
+        if mb_bullets:
+            results_parts.append(
+                '<h3 class="dd-h3">Matchup-Flipping Boundaries</h3>\n')
+            results_parts.append(
+                '<p>The minimum def (+ HP) at which a matchup outcome '
+                'actually changes from loss to win. These are higher than '
+                'damage-tier boundaries because multiple damage reductions '
+                'must accumulate across a full battle to flip the result. '
+                f'Vs {opp_label} opponents.</p>\n'
+            )
+            results_parts.append('<ul class="dd-threshold-list">\n')
+            results_parts.append('\n'.join(mb_bullets))
+            results_parts.append('\n</ul>\n')
+
     # -- Anchor-Driven Matchup Flips (flat list of every anchor) --
     if anchor_flip_records:
         anchor_bullets = _render_anchor_flip_bullets(anchor_flip_records)
         if anchor_bullets:
             results_parts.append('<h3 class="dd-h3">Anchor-Driven Matchup Flips</h3>\n')
             results_parts.append(
-                '<p>Named anchors (from <code>thresholds/*.toml</code> or the '
-                'auto-fallback layer) that cleanly partition matchup wins/losses '
-                f'against their opponent. Each bullet lists the shield scenarios '
-                f'in which IVs clearing the anchor reliably win and IVs failing '
-                f'it reliably lose. Vs {opp_label} opponents.</p>\n'
-            )
-            results_parts.append(
-                '<p class="dd-small">Format: <em>threshold</em> for <em>anchor name</em> '
-                'vs <em>opponent</em> (<em>shield scenarios where the partition holds</em>). '
-                'Bait/farm and move-restriction dimensions are not yet swept — '
-                'see TODO &ldquo;Baiting policy as a deep-dive sim axis&rdquo;.</p>\n'
+                '<p>Damage-tier boundaries from named anchors — the def/atk '
+                'at which a specific move\'s damage steps up or down by 1. '
+                'These are necessary but not always sufficient to flip a '
+                'matchup (see Matchup-Flipping Boundaries above for the '
+                f'actual stat targets). Vs {opp_label} opponents.</p>\n'
             )
             results_parts.append('<ul class="dd-threshold-list">\n')
             results_parts.append('\n'.join(anchor_bullets))
