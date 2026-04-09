@@ -3564,19 +3564,28 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             'even': 'only even shields (0v0/1v1/2v2) count toward win totals',
             'even-strict': 'only IVs that win ALL three even shields against an opponent get credit',
         }.get(metric_label, '')
+        rounds_run = slayer_iter_result.get('rounds_run', 0)
+        converged = slayer_iter_result.get('converged', False)
+        final_pool = len(slayer_iter_result.get('final', []))
+        results_parts.append(
+            f'<p class="dd-small">{final_pool} survivors after '
+            f'{rounds_run} round{"s" if rounds_run != 1 else ""} '
+            f'({"converged" if converged else "max rounds reached"}).</p>\n'
+        )
+
+        # Iteration details — collapsed by default
+        results_parts.append(
+            '<details class="dd-flip-detail">'
+            '<summary>Iteration details</summary>\n'
+        )
         results_parts.append(f'<p>Nash-style iterative discovery of IVs that beat the '
                              f'{data_obj.get("species", "mirror")} mirror match. '
                              f'Each round tests focal IVs against the previous round\'s top winners. '
                              f'Survivors are classified into RyanSwag\'s three patterns.</p>\n')
         results_parts.append(f'<p class="dd-small"><b>Metric:</b> <code>{metric_label}</code> '
                              f'({metric_explain}) | <b>Max rounds:</b> {max_rounds_arg}</p>\n')
-        rounds_run = slayer_iter_result.get('rounds_run', 0)
-        converged = slayer_iter_result.get('converged', False)
-        results_parts.append(f'<p class="dd-small">{rounds_run} rounds run '
-                             f'({"converged" if converged else "max rounds reached"}). '
+        results_parts.append(f'<p class="dd-small">'
                              f'{slayer_iter_result.get("cache_stats", "")}</p>\n')
-
-        # Per-round summary table
         history = slayer_iter_result.get('history', [])
         if history:
             results_parts.append('<table class="dd-table dd-narrow">\n')
@@ -3588,6 +3597,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                      f'<td>{top[0]["total_wins"]}</td>'
                                      f'<td>{top[0]["avg_score"]:.1f}</td></tr>\n')
             results_parts.append('</table>\n')
+        results_parts.append('</details>\n')
 
         # Categorized survivors
         categories = slayer_iter_result.get('categories', {})
