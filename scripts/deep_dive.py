@@ -2468,8 +2468,8 @@ def _render_notable_ivs_section(categories, data_obj, opp_iv_mode,
         'Matchup cards surface non-trivial '
         '(opponent,&nbsp;scenario)&nbsp;partitions for selective '
         'matchups. Pure slayer cards live in the Mirror Slayer '
-        'Iteration block below; pure tier cards in the Threshold Tier '
-        'Summary above. The bait-axis dimension is not yet swept '
+        'Iteration block below; pure tier cards in the Threshold Tiers '
+        'section above. The bait-axis dimension is not yet swept '
         '— see TODO &ldquo;Baiting policy as a deep-dive sim '
         'axis.&rdquo;</p>\n'
     )
@@ -2774,6 +2774,170 @@ def _render_anchor_flip_bullets(records):
                 f'(<span class="dd-gain">{scen_strs}</span>)</li>'
             )
     return lines
+
+
+def _render_threshold_tier_cards(data_obj, anchor_flip_records,
+                                  avg_ranks, flip_map,
+                                  max_members_shown=10):
+    """RyanSwag-style threshold tier cards.
+
+    Each tier in ``data_obj['tiers']`` becomes a card whose headline is the
+    tier's stat-target spec (``atk≥X, def≥Y, hp≥Z``) and whose body is the
+    set of anchor-flip bullets that the tier's spec actually clears, plus a
+    collapsed table of the tier's member IVs. This is the *stat-target-
+    forward* presentation of the same data the slayer cards expose IV-
+    forward — the round-one piece of the SwagTips reframing.
+
+    Filter rule: an anchor with ``target_stat='atk'`` belongs to a tier iff
+    the tier specifies an atk cutoff and that cutoff is ``>=`` the anchor's
+    threshold value (i.e. the tier clears the anchor). Symmetric for def-
+    side anchors. Tiers with no cutoff for an anchor's stat never include
+    that anchor; HP-only anchors don't exist today (no anchor has
+    ``target_stat='hp'``). Overlap across tiers is intentional and matches
+    RyanSwag's format — each card shows what its spec buys you, even when
+    a stricter tier above also buys it.
+
+    Auto-only: bullet text is whatever ``_render_anchor_flip_bullets``
+    produces from the resolved anchors. No new TOML schema work — see TODO
+    "Hand-named composite categories via TOML" for the round-two follow-up.
+    """
+    tiers = data_obj.get('tiers', [])
+    if not tiers:
+        return ''
+    n_ivs = data_obj.get('nIvs', 0)
+
+    parts = []
+    parts.append('<h3 class="dd-h3" id="dd-threshold-tiers">Threshold Tiers</h3>\n')
+    parts.append(
+        '<p class="dd-small">Stat-target headlines from <code>thresholds/'
+        '*.toml</code>, each grouped with the named anchors its spec '
+        'clears and the IV spreads that meet it. Tiers may share bullets '
+        '— a stricter tier above also clears everything a looser tier '
+        'below clears, and the overlap is intentional. The flat list of '
+        'every anchor (regardless of tier) lives in <em>Anchor-Driven '
+        'Matchup Flips</em> below.</p>\n'
+    )
+    parts.append('<div class="dd-rec-grid">\n')
+
+    for ti, t in enumerate(tiers):
+        atk_cut = t.get('attack', 0) or 0
+        def_cut = t.get('defense', 0) or 0
+        hp_cut = t.get('stamina', 0) or 0
+        cutoff_bits = []
+        if atk_cut > 0:
+            cutoff_bits.append(f'atk≥{atk_cut:g}')
+        if def_cut > 0:
+            cutoff_bits.append(f'def≥{def_cut:g}')
+        if hp_cut > 0:
+            cutoff_bits.append(f'hp≥{hp_cut:g}')
+        cutoffs_str = ', '.join(cutoff_bits) if cutoff_bits else 'no cutoff'
+
+        # Filter: which anchor records does this tier clear?
+        tier_records = []
+        for rec in anchor_flip_records:
+            a = rec['anchor']
+            tv = getattr(a, 'threshold_value', None)
+            if tv is None:
+                continue
+            stat = a.target_stat
+            if stat == 'atk' and atk_cut > 0 and atk_cut >= tv:
+                tier_records.append(rec)
+            elif stat == 'def' and def_cut > 0 and def_cut >= tv:
+                tier_records.append(rec)
+
+        tier_ivs = [iv for iv in range(n_ivs) if data_obj['ivTiers'][iv] == ti]
+        n_members = len(tier_ivs)
+
+        color = t.get('color', '#888')
+        parts.append('<div class="dd-rec-card">\n')
+        parts.append(
+            f'<h4>'
+            f'<span class="dd-badge" style="background:{color};color:#000">'
+            f'{t["name"]}</span> '
+            f'<span class="dd-small" style="font-weight:400;color:#b0b8c4">'
+            f'· {cutoffs_str}</span> '
+            f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+            f'({n_members} IV{"s" if n_members != 1 else ""})'
+            f'</span>'
+            f'</h4>\n'
+        )
+        if t.get('desc'):
+            parts.append(f'<p class="dd-prose">{t["desc"]}</p>\n')
+
+        if tier_records:
+            bullets = _render_anchor_flip_bullets(tier_records)
+            parts.append('<ul class="dd-threshold-list">\n')
+            parts.append('\n'.join(bullets))
+            parts.append('\n</ul>\n')
+        elif cutoff_bits:
+            parts.append(
+                '<p class="dd-small">No named anchors fall within '
+                "this tier's spec.</p>\n"
+            )
+
+        if tier_ivs:
+            tier_ivs.sort(key=lambda iv: avg_ranks[iv])
+            parts.append(
+                f'<details class="dd-flip-detail">'
+                f'<summary>Member IVs ({n_members})</summary>\n'
+            )
+            parts.append('<table class="dd-table dd-narrow">\n')
+            parts.append(
+                '<tr><th>IV</th><th>Atk</th><th>Def</th><th>HP</th>'
+                '<th>Avg rank</th><th>Net flips</th></tr>\n'
+            )
+            for iv in tier_ivs[:max_members_shown]:
+                triple = (data_obj['ivA'][iv], data_obj['ivD'][iv],
+                          data_obj['ivS'][iv])
+                _g, _l, net = flip_map.get(iv, (0, 0, 0))
+                nc = 'dd-gain' if net > 0 else ('dd-loss' if net < 0 else '')
+                parts.append(
+                    f'<tr><td>{triple[0]}/{triple[1]}/{triple[2]}</td>'
+                    f'<td>{data_obj["ivAtk"][iv]:.2f}</td>'
+                    f'<td>{data_obj["ivDef"][iv]:.2f}</td>'
+                    f'<td>{data_obj["ivHp"][iv]}</td>'
+                    f'<td>#{avg_ranks[iv]}</td>'
+                    f'<td class="{nc}">{net:+d}</td></tr>\n'
+                )
+            if n_members > max_members_shown:
+                parts.append(
+                    f'<tr><td colspan="6" class="dd-small">'
+                    f'… {n_members - max_members_shown} more — see Mirror '
+                    f'Slayer Iteration tables below for the full listing'
+                    f'</td></tr>\n'
+                )
+            parts.append('</table>\n')
+            parts.append('</details>\n')
+        else:
+            # Mirror the existing tier-summary "0 spreads" callout: tell the
+            # reader whether nothing reaches the spec or whether everything
+            # also clears a stricter tier above (the tier-priority artifact).
+            all_meeting = 0
+            for iv in range(n_ivs):
+                meets = True
+                if atk_cut > 0 and data_obj['ivAtk'][iv] < atk_cut:
+                    meets = False
+                if def_cut > 0 and data_obj['ivDef'][iv] < def_cut:
+                    meets = False
+                if hp_cut > 0 and data_obj['ivHp'][iv] < hp_cut:
+                    meets = False
+                if meets:
+                    all_meeting += 1
+            if all_meeting > 0:
+                parts.append(
+                    f'<p class="dd-small">{all_meeting} IV spread'
+                    f'{"s" if all_meeting != 1 else ""} meet this spec, '
+                    f'but all also qualify for a stricter tier above.</p>\n'
+                )
+            else:
+                parts.append(
+                    '<p class="dd-small">0 IV spreads can reach this spec '
+                    'at this CP cap.</p>\n'
+                )
+
+        parts.append('</div>\n')  # rec-card
+    parts.append('</div>\n')  # rec-grid
+    return ''.join(parts)
 
 
 def _generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode):
@@ -3131,43 +3295,25 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         results_parts.append('</div>\n')
     results_parts.append('</div>\n')
 
-    # -- Threshold tier summary (all tiers, including empty ones) --
+    # -- Compute anchor-flip records (used by both Threshold Tiers and
+    #    the flat Anchor-Driven Matchup Flips section below) --
+    anchor_flip_records = []
+    if resolved_anchors_top:
+        anchor_flip_debug = {}
+        anchor_flip_records = _aggregate_flips_by_anchor(
+            scores_flat, nIvs, nS, nO,
+            resolved_anchors_top, data_obj, scenarios, opponents,
+            debug_stats=anchor_flip_debug,
+        )
+        print(f"  Anchor-flip aggregator: {anchor_flip_debug}")
+
+    # -- Threshold Tiers (RyanSwag-style, stat-target-forward) --
     if data_obj.get('tiers'):
-        results_parts.append('<h3 class="dd-h3">Threshold Tier Summary</h3>\n')
-        for ti, t in enumerate(data_obj['tiers']):
-            tier_ivs = [iv for iv in range(nIvs) if data_obj['ivTiers'][iv] == ti]
-            results_parts.append(f'<div class="dd-callout">\n')
-            results_parts.append(f'<b><span class="dd-badge" style="background:{t["color"]};color:#000">{t["name"]}</span></b> '
-                                 f'({t["desc"]})')
-            if not tier_ivs:
-                # (#1/#11) Show tiers even when empty, explain why
-                # Count IVs that meet this threshold ignoring tier priority
-                all_meeting = 0
-                for iv in range(nIvs):
-                    meets = True
-                    if t.get('attack', 0) > 0 and data_obj['ivAtk'][iv] < t['attack']:
-                        meets = False
-                    if t.get('defense', 0) > 0 and data_obj['ivDef'][iv] < t['defense']:
-                        meets = False
-                    if t.get('stamina', 0) > 0 and data_obj['ivHp'][iv] < t['stamina']:
-                        meets = False
-                    if meets:
-                        all_meeting += 1
-                if all_meeting > 0:
-                    results_parts.append(f' &mdash; {all_meeting} IV spreads meet these stats, '
-                                         f'but all also qualify for a more restrictive tier above')
-                else:
-                    results_parts.append(f' &mdash; 0 IV spreads can reach these stats at this CP cap')
-            else:
-                results_parts.append(f' &mdash; {len(tier_ivs)} IV spreads qualify')
-                best_in_tier = max(tier_ivs, key=lambda iv: flip_map.get(iv, (0, 0, 0))[2])
-                g, l, net = flip_map.get(best_in_tier, (0, 0, 0))
-                fd = flips.get(best_in_tier, {'gains': [], 'losses': []})
-                prose = _prose_flip_summary(fd, max_gains=2, max_losses=1)
-                results_parts.append(f'<br>Best in tier: <b>{_iv_label(data_obj, best_in_tier)}</b> '
-                                     f'(avg #{avg_ranks[best_in_tier]}, net flips {net:+d})')
-                results_parts.append(f'<br><span class="dd-prose">{prose}</span>')
-            results_parts.append('\n</div>\n')
+        tier_cards_html = _render_threshold_tier_cards(
+            data_obj, anchor_flip_records, avg_ranks, flip_map,
+        )
+        if tier_cards_html:
+            results_parts.append(tier_cards_html)
 
     # -- Key Matchup Thresholds --
     threshold_descs = _generate_threshold_descriptions(flips, data_obj, avg_scores, ranked, opp_iv_mode)
@@ -3179,22 +3325,10 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         results_parts.append('\n'.join(threshold_descs))
         results_parts.append('\n</ul>\n')
 
-    # -- Anchor-Driven Matchup Flips (RyanSwag-style, phase 1) --
-    # New aggregator: groups shield scenarios under each named anchor +
-    # opponent so the bullets read like the GamePress IV deep dives.
-    # Lives alongside the heuristic Key Matchup Thresholds section above
-    # for at least one session — different lens on the same flip data,
-    # decide later whether to merge or replace.
-    if resolved_anchors_top:
-        anchor_flip_debug = {}
-        anchor_flip_records = _aggregate_flips_by_anchor(
-            scores_flat, nIvs, nS, nO,
-            resolved_anchors_top, data_obj, scenarios, opponents,
-            debug_stats=anchor_flip_debug,
-        )
-        print(f"  Anchor-flip aggregator: {anchor_flip_debug}")
-        if anchor_flip_records:
-            anchor_bullets = _render_anchor_flip_bullets(anchor_flip_records)
+    # -- Anchor-Driven Matchup Flips (flat list of every anchor) --
+    if anchor_flip_records:
+        anchor_bullets = _render_anchor_flip_bullets(anchor_flip_records)
+        if anchor_bullets:
             results_parts.append('<h3 class="dd-h3">Anchor-Driven Matchup Flips</h3>\n')
             results_parts.append(
                 '<p>Named anchors (from <code>thresholds/*.toml</code> or the '
