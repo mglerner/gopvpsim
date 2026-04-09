@@ -3641,6 +3641,37 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             cluster_gaps[key] = per_scenario
     data_obj['clusterGaps'] = cluster_gaps
 
+    # Slayer IV overlay: extract canonical IV indices that landed in any
+    # slayer category from the iterative-slayer-discovery result. Rendered
+    # as a separate legend entry on the scatter plot with a distinct
+    # marker shape (star-diamond) so users can see what avg-score trade
+    # a "slayer-quality" spread costs vs the avg-score-optimal cluster.
+    # Slayer membership is fundamentally a different optimization target
+    # than avg score (mirror-match wins under even-strict), so the two
+    # often don't coincide — visualizing the gap is the whole point.
+    # The slayer iteration stores ``iv`` as a (a_iv, d_iv, s_iv) triple
+    # (see line ~529 in iterative_slayer_discovery), but the JS plot
+    # indexes IVs by their canonical position in iv_a/iv_d/iv_s. Build a
+    # reverse lookup so we can translate triples → canonical indices.
+    iv_idx_by_triple = {(iv_a[i], iv_d[i], iv_s[i]): i for i in range(n_ivs)}
+    slayer_cats_by_idx: dict = {}
+    if slayer_iter_result and slayer_iter_result.get('categories'):
+        for cat_name, cat_rows in slayer_iter_result['categories'].items():
+            for r in (cat_rows or []):
+                iv_triple = r.get('iv')
+                if iv_triple is None:
+                    continue
+                idx = iv_idx_by_triple.get(tuple(iv_triple))
+                if idx is None:
+                    continue
+                slayer_cats_by_idx.setdefault(idx, []).append(cat_name)
+    data_obj['slayerIvs'] = sorted(slayer_cats_by_idx.keys())
+    # Stringify keys so json.dumps emits a clean JS object (JS treats
+    # both numeric and string keys identically for object access).
+    data_obj['slayerCatsByIv'] = {
+        str(idx): sorted(set(cats)) for idx, cats in slayer_cats_by_idx.items()
+    }
+
     opp_desc = opponent_label or 'PvPoke rankings'
     shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in shield_scenarios)
 
@@ -3813,6 +3844,36 @@ var nIvs = DATA.nIvs, nS = DATA.nScenarios, nO = DATA.nOpponents;
 function getScoreKey(mi, mode) {{ return mi + '_' + mode; }}
 function getScores(mi, mode) {{ return SCORES[getScoreKey(mi, mode)]; }}
 
+// Viridis interpolator: lets the slayer overlay color untiered points
+// the same way the base "Other" trace would (matching Plotly's built-in
+// 'Viridis' colorscale). Plotly doesn't let one trace mix string colors
+// with a colorscale, so we'd otherwise have to split the slayer overlay
+// into tiered/untiered sub-traces; computing per-point colors in JS
+// keeps it as a single legend entry.
+var VIRIDIS_STOPS = [
+  [0.0, [68, 1, 84]], [0.1, [72, 35, 116]], [0.2, [64, 67, 135]],
+  [0.3, [52, 94, 141]], [0.4, [41, 120, 142]], [0.5, [32, 144, 140]],
+  [0.6, [34, 167, 132]], [0.7, [68, 190, 112]], [0.8, [121, 209, 81]],
+  [0.9, [189, 222, 38]], [1.0, [253, 231, 36]]
+];
+function viridisColor(t) {{
+  if (!isFinite(t)) return 'rgb(68,1,84)';
+  if (t <= 0) return 'rgb(68,1,84)';
+  if (t >= 1) return 'rgb(253,231,36)';
+  for (var i = 1; i < VIRIDIS_STOPS.length; i++) {{
+    if (t <= VIRIDIS_STOPS[i][0]) {{
+      var t0 = VIRIDIS_STOPS[i-1][0], t1 = VIRIDIS_STOPS[i][0];
+      var c0 = VIRIDIS_STOPS[i-1][1], c1 = VIRIDIS_STOPS[i][1];
+      var f = (t - t0) / (t1 - t0);
+      var r = Math.round(c0[0] + f * (c1[0] - c0[0]));
+      var g = Math.round(c0[1] + f * (c1[1] - c0[1]));
+      var b = Math.round(c0[2] + f * (c1[2] - c0[2]));
+      return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }}
+  }}
+  return 'rgb(253,231,36)';
+}}
+
 function getActiveScenarioIndices() {{
   if (state.scenarioMode === 'avg') {{
     var arr = []; for (var i=0; i<nS; i++) arr.push(i); return arr;
@@ -3874,6 +3935,11 @@ function buildHoverText(iv) {{
   ];
   var tier = DATA.ivTiers[iv];
   if (tier >= 0) lines.push('Tier: '+tierNames[tier]);
+  // Slayer membership: shown for any IV that landed in an Atk/Bulk/CMP
+  // Slayer category during iterative slayer discovery.
+  if (DATA.slayerCatsByIv && DATA.slayerCatsByIv[iv]) {{
+    lines.push('Slayer: '+DATA.slayerCatsByIv[iv].join(', '));
+  }}
 
   // Diff vs reference IV (PvPoke default or rank 1, depending on opp IV mode)
   var refIv = (state.oppIvMode === 'rank1') ? DATA.rank1RefIvIdx : DATA.pvpokeRefIvIdx;
@@ -3924,6 +3990,12 @@ function buildTraces() {{
   var hasTiers = tierNames.length > 0;
   var traces = [];
 
+  // otherMin/Max are computed during the threshold-mode "Other" trace
+  // build below and reused by the slayer overlay so untiered slayer
+  // points are colored on the same Viridis range Plotly uses for the
+  // base Other trace. Initialized here so they're in scope outside the
+  // if branch as well.
+  var otherMin = Infinity, otherMax = -Infinity;
   if (cm === 'threshold' && hasTiers) {{
     // --- Threshold tier coloring ---
     var otherX=[], otherY=[], otherText=[], otherColor=[];
@@ -3933,6 +4005,8 @@ function buildTraces() {{
         otherY.push(avgScores[iv]);
         otherText.push(buildHoverText(iv));
         otherColor.push(avgScores[iv]);
+        if (avgScores[iv] < otherMin) otherMin = avgScores[iv];
+        if (avgScores[iv] > otherMax) otherMax = avgScores[iv];
       }}
     }}
     if (otherX.length) {{
@@ -3984,6 +4058,83 @@ function buildTraces() {{
                reversescale: (cm === 'atk')}}
     }});
   }}
+
+  // ---- Slayer IV overlay ----
+  // Always rendered (regardless of color mode) so users can see slayer
+  // spreads in context. Coloring depends on the active color mode:
+  //
+  // * Threshold mode: fill = the IV's tier color (or white if untiered),
+  //   border = gold to distinguish slayer points from non-slayer points
+  //   in the same tier. The fill matches "what color this point would
+  //   be if it weren't a slayer" so users can visually map a slayer
+  //   star-diamond back to its tier identity.
+  //
+  // * Stat/score modes (HP/Def/Atk/Score): fill = gold so the slayer
+  //   points are clearly distinct from the colorscale gradient of the
+  //   base trace. (Per-point colorscale matching is awkward in Plotly
+  //   when mixed with fixed tier colors, and gold reads cleanly against
+  //   any of the stat colorscales we use.)
+  //
+  // SVG `scatter` is used (not scattergl) because scattergl has limited
+  // symbol support and can't render `star-diamond`; the slayer set is
+  // small enough (~tens of points) that SVG performance is fine.
+  //
+  // Defensive: validate each entry is a non-negative integer index into
+  // the IV arrays. A bad entry (e.g. an IV triple that wasn't translated
+  // to a canonical index) would otherwise produce undefined x/y values
+  // and cause Plotly to silently fail to render the *entire* plot.
+  if (DATA.slayerIvs && DATA.slayerIvs.length > 0) {{
+    var slayerInTierMode = (cm === 'threshold' && hasTiers);
+    var sx = [], sy = [], st = [], scol = [];
+    for (var k = 0; k < DATA.slayerIvs.length; k++) {{
+      var iv = DATA.slayerIvs[k];
+      if (typeof iv !== 'number' || iv < 0 || iv >= nIvs) continue;
+      var sp = DATA.spRanks[iv];
+      var av = avgScores[iv];
+      if (typeof sp !== 'number' || typeof av !== 'number') continue;
+      sx.push(sp);
+      sy.push(av);
+      st.push(buildHoverText(iv));
+      if (slayerInTierMode) {{
+        var t = DATA.ivTiers[iv];
+        if (t >= 0) {{
+          // Tier color: matches what the IV would look like in its tier trace.
+          scol.push(tierColors[t]);
+        }} else {{
+          // Untiered: replicate the Viridis color the "Other" trace would
+          // give this point. Normalize against the same min/max Plotly
+          // is using for the Other trace's colorscale so the slayer
+          // marker fill matches the underlying base point exactly.
+          var range = otherMax - otherMin;
+          var t01 = (range > 0) ? (avgScores[iv] - otherMin) / range : 0.5;
+          scol.push(viridisColor(t01));
+        }}
+      }} else {{
+        // Stat/score modes: fixed gold fill against the stat colorscale.
+        scol.push('#FFD700');
+      }}
+    }}
+    if (sx.length > 0) {{
+      // Border is gold in threshold mode (marks slayer-ness) and a
+      // subtle dark outline elsewhere (so the gold fill stays clean).
+      var slayerLine = slayerInTierMode
+        ? {{ width: 1, color: '#FFD700' }}
+        : {{ width: 1, color: '#000' }};
+      traces.push({{
+        name: 'Slayer IVs',
+        x: sx, y: sy, text: st,
+        mode: 'markers', type: 'scatter', hoverinfo: 'text',
+        marker: {{
+          size: 10,
+          color: scol,
+          symbol: 'star-diamond',
+          opacity: 0.95,
+          line: slayerLine
+        }}
+      }});
+    }}
+  }}
+
   return traces;
 }}
 
