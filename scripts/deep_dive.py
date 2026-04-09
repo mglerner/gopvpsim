@@ -48,6 +48,7 @@ import math
 import os
 import sys
 import time
+from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
@@ -669,6 +670,238 @@ def categorize_slayers(survivors, resolved_anchors=None, iv_meta_list=None, top_
         'Bulk Slayer': bulk_slayers,
         'CMP Slayer': cmp_slayers,
     }
+
+
+# ---------------------------------------------------------------------------
+# Structured IV categories — unified registry over slayer categories,
+# threshold tiers, and their intersections (composites). Future kinds:
+# 'matchup' for "beats opp X in scenario Y" categories once the
+# baiting-axis sweep TODO lands.
+# ---------------------------------------------------------------------------
+
+@dataclass
+class IVCategory:
+    """A named IV grouping with explicit provenance.
+
+    Abstracts over the several sources of named IV groupings the deep dive
+    already produces (anchor-driven slayer categories, stat-cutoff threshold
+    tiers, future matchup-conditional categories) so a single renderer can
+    surface them all uniformly. Composite categories (intersections of
+    multiple parents) are the framework's payoff: ``13/0/11 is the rare
+    bulk-floor slayer`` falls out as ``Atk Slayer ∩ Top 5%`` with one IV.
+
+    Fields are intentionally permissive: a slayer kind populates
+    ``source_anchors``, a tier kind populates ``source_tier`` and
+    ``stat_cutoffs``, a composite populates ``source_categories``, a
+    future matchup kind populates ``matchup_conditions``. The renderer
+    inspects whichever fields are set.
+
+    ``member_meta`` carries per-IV info the renderer needs (e.g. mirror
+    wins, the original IV triple) without forcing the renderer to plumb
+    extra data structures alongside the category list.
+    """
+    name: str
+    kind: str  # 'slayer' | 'tier' | 'structural' | 'composite' | 'matchup'
+    members: list  # canonical IV indices, sorted ascending
+    description: str = ''
+    # Provenance — exactly which upstream sources built this category.
+    source_categories: list = field(default_factory=list)  # composites
+    source_anchors: list = field(default_factory=list)     # slayer kinds
+    source_tier: object = None                             # tier kinds (str or None)
+    # Membership predicates — declarative; multiple shapes coexist.
+    stat_cutoffs: object = None  # dict {'atk', 'def', 'hp'} or None
+    matchup_conditions: object = None
+        # Reserved for kind='matchup'. Each condition is a dict like:
+        # {'opponent': str, 'opponent_ivs': str, 'scenario': (int, int),
+        #  'bait': str | None, 'outcome': 'win' | 'loss'}
+        # The 'bait' key is reserved for the future bait-axis sweep
+        # (TODO "Baiting policy as a deep-dive sim axis"); round-one
+        # matchup categories leave it None.
+    # Per-member info: maps canonical IV index -> dict with whatever
+    # the renderer needs (total_wins, avg_score, original triple, etc.).
+    member_meta: dict = field(default_factory=dict)
+
+
+def _stat_cutoffs_from_anchors(anchor_objs):
+    """Best-effort stat_cutoffs derived from a bag of ResolvedAnchor.
+
+    Picks the *minimum* threshold per target_stat (the easiest tier to
+    clear) so the cutoff reflects the floor that membership in this
+    category implies. Returns ``{'atk': float|None, 'def': float|None,
+    'hp': None}`` (HP isn't a target_stat for any anchor today).
+    Returns None if no anchor has a numeric threshold (pure CMP without
+    a numeric threshold_value, etc.).
+    """
+    atk_vals = [a.threshold_value for a in anchor_objs
+                if getattr(a, 'target_stat', None) == 'atk'
+                and getattr(a, 'threshold_value', None) is not None]
+    def_vals = [a.threshold_value for a in anchor_objs
+                if getattr(a, 'target_stat', None) == 'def'
+                and getattr(a, 'threshold_value', None) is not None]
+    if not atk_vals and not def_vals:
+        return None
+    return {
+        'atk': min(atk_vals) if atk_vals else None,
+        'def': min(def_vals) if def_vals else None,
+        'hp': None,
+    }
+
+
+def build_iv_categories(data_obj, slayer_categories=None,
+                        iv_idx_by_triple=None):
+    """Build the unified ``list[IVCategory]`` for a deep-dive run.
+
+    Inputs:
+        data_obj: the JS-bound data object (already populated with tiers,
+            ivAllTiers, ivAtk/ivDef/ivHp, nIvs, ivA/ivD/ivS).
+        slayer_categories: dict from ``categorize_slayers``. May be None
+            if the run didn't include slayer iteration; in that case the
+            slayer-kind branch is skipped.
+        iv_idx_by_triple: optional precomputed (atk_iv, def_iv, sta_iv)
+            -> canonical-index map. Built from data_obj if not given.
+
+    Output: list of IVCategory in stable order: slayer categories first,
+    then tier categories, then composites. Empty categories are dropped.
+
+    The function is intentionally pure — no I/O, no HTML, no globals.
+    Easy to unit-test with synthetic data_obj dicts.
+    """
+    n_ivs = data_obj.get('nIvs', 0)
+    if n_ivs == 0:
+        return []
+
+    if iv_idx_by_triple is None:
+        iv_a = data_obj.get('ivA', [])
+        iv_d = data_obj.get('ivD', [])
+        iv_s = data_obj.get('ivS', [])
+        iv_idx_by_triple = {(iv_a[i], iv_d[i], iv_s[i]): i
+                            for i in range(n_ivs)}
+
+    categories: list = []
+
+    # ---- Slayer categories ----
+    # Iterate categorize_slayers output and lift each non-empty bucket
+    # into an IVCategory. The slayer survivors carry the rich
+    # _anchor_tags dict that we want to preserve as member_meta so the
+    # renderer can show which specific anchors fired per IV.
+    if slayer_categories:
+        SLAYER_KIND_DESC = {
+            'Atk Slayer': 'IVs that clear at least one named damage '
+                          'breakpoint anchor against a notable opponent.',
+            'Bulk Slayer': 'IVs at or above the survivor-pool HP+def median, '
+                           'or that clear at least one named bulkpoint anchor.',
+            'CMP Slayer': 'IVs whose raw attack beats at least one named '
+                          'CMP cohort, winning Charge Move Priority ties.',
+        }
+        for cat_name, survivors in slayer_categories.items():
+            if not survivors:
+                continue
+            members = []
+            member_meta: dict = {}
+            anchor_set: set = set()
+            anchor_objs: list = []
+            for r in survivors:
+                triple = tuple(r.get('iv', ()))
+                idx = iv_idx_by_triple.get(triple)
+                if idx is None:
+                    continue
+                members.append(idx)
+                tags = r.get('_anchor_tags', {}) or {}
+                for parent_name, sublist in tags.items():
+                    anchor_set.add(parent_name)
+                    anchor_objs.extend(sublist)
+                member_meta[idx] = {
+                    'iv': triple,
+                    'total_wins': r.get('total_wins', 0),
+                    'avg_score': r.get('avg_score', 0.0),
+                    'anchor_tags': tags,
+                }
+            if not members:
+                continue
+            members.sort()
+            categories.append(IVCategory(
+                name=cat_name,
+                kind='slayer',
+                members=members,
+                description=SLAYER_KIND_DESC.get(cat_name, ''),
+                source_anchors=sorted(anchor_set),
+                stat_cutoffs=_stat_cutoffs_from_anchors(anchor_objs),
+                member_meta=member_meta,
+            ))
+
+    # ---- Threshold tier categories ----
+    # data_obj['tiers'] is the ordered list of tier dicts; ivAllTiers[i]
+    # is the list of tier indices that IV i meets (inclusive — an IV
+    # that's "Top 5%" also lives in "Good"). We use ivAllTiers, not the
+    # primary ivTiers, because we want category membership to be
+    # inclusive across the tier ladder.
+    tiers = data_obj.get('tiers') or []
+    iv_all_tiers = data_obj.get('ivAllTiers') or []
+    iv_a = data_obj.get('ivA', [])
+    iv_d = data_obj.get('ivD', [])
+    iv_s = data_obj.get('ivS', [])
+    for ti, tier in enumerate(tiers):
+        members = [i for i in range(n_ivs)
+                   if i < len(iv_all_tiers) and ti in iv_all_tiers[i]]
+        if not members:
+            continue
+        atk_cut = tier.get('attack', 0) or None
+        def_cut = tier.get('defense', 0) or None
+        hp_cut = tier.get('stamina', 0) or None
+        member_meta = {
+            i: {'iv': (iv_a[i], iv_d[i], iv_s[i]) if i < len(iv_a) else None}
+            for i in members
+        }
+        categories.append(IVCategory(
+            name=tier['name'],
+            kind='tier',
+            members=members,
+            description=tier.get('desc', ''),
+            source_tier=tier['name'],
+            stat_cutoffs={'atk': atk_cut, 'def': def_cut, 'hp': hp_cut},
+            member_meta=member_meta,
+        ))
+
+    # ---- Composite categories: slayer ∩ tier ----
+    # Round one uses literal-intersection naming. The composite_meta
+    # entries inherit from both parents so the renderer can show, e.g.,
+    # "Atk Slayer member with mirror wins 45/132, also clears Top 5%
+    # (HP≥139)".
+    slayer_cats = [c for c in categories if c.kind == 'slayer']
+    tier_cats = [c for c in categories if c.kind == 'tier']
+    for slayer in slayer_cats:
+        slayer_set = set(slayer.members)
+        for tier in tier_cats:
+            inter = sorted(slayer_set & set(tier.members))
+            if not inter:
+                continue
+            comp_meta: dict = {}
+            for idx in inter:
+                merged = {}
+                if idx in slayer.member_meta:
+                    merged.update(slayer.member_meta[idx])
+                if idx in tier.member_meta:
+                    # Don't clobber the slayer 'iv' with the tier one;
+                    # they should match anyway.
+                    for k, v in tier.member_meta[idx].items():
+                        merged.setdefault(k, v)
+                comp_meta[idx] = merged
+            categories.append(IVCategory(
+                name=f'{slayer.name} ∩ {tier.name}',
+                kind='composite',
+                members=inter,
+                description=(
+                    f'IVs that qualify as {slayer.name} '
+                    f'and also clear the {tier.name} threshold.'
+                ),
+                source_categories=[slayer.name, tier.name],
+                source_anchors=list(slayer.source_anchors),
+                source_tier=tier.source_tier,
+                stat_cutoffs=tier.stat_cutoffs,
+                member_meta=comp_meta,
+            ))
+
+    return categories
 
 
 def auto_discover_thresholds(results, n_tiers=2):
