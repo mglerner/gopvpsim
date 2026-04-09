@@ -237,3 +237,67 @@ def test_matchup_branch_skipped_without_matchup_data():
     data_obj = _make_data_obj()
     cats = build_iv_categories(data_obj)
     assert all(c.kind != 'matchup' for c in cats)
+
+
+# ---------------------------------------------------------------------------
+# Renderer tests — verify _render_notable_ivs_section produces the
+# expected HTML structure for the Annihilape 13/0/11-style case.
+# ---------------------------------------------------------------------------
+
+def _make_render_data_obj():
+    """Same shape as _make_data_obj but with the extra fields the
+    renderer reads (spRanks, etc.)."""
+    d = _make_data_obj()
+    d['spRanks'] = [10, 1767, 100, 200]
+    return d
+
+
+def test_render_notable_ivs_emits_composite_card():
+    data_obj = _make_render_data_obj()
+    slayer = _make_slayer_categories(data_obj)
+    cats = deep_dive.build_iv_categories(data_obj, slayer)
+    html = deep_dive._render_notable_ivs_section(cats, data_obj, 'pvpoke')
+
+    assert html  # non-empty
+    # Composite card title is present
+    assert 'Atk Slayer ∩ Top 5%' in html
+    # Notability filter checkbox is present
+    assert 'dd-notable-only-cb' in html
+    assert 'Show only notable categories' in html
+    # The composite member (IV 1) is listed with its IV triple
+    assert '15/5/10' in html
+    # Tradeoff prose mentions the wins ratio (132 is max, this IV has 132 too)
+    # Actually IV 1 has 132 wins which IS the max, so prose should say "no tradeoff"
+    assert 'no tradeoff' in html
+
+
+def test_render_notable_ivs_returns_empty_when_no_targets():
+    """No composites and no matchups → empty section."""
+    data_obj = _make_render_data_obj()
+    cats = deep_dive.build_iv_categories(data_obj)  # tier-only
+    html = deep_dive._render_notable_ivs_section(cats, data_obj, 'pvpoke')
+    assert html == ''
+
+
+def test_render_notable_ivs_includes_matchup_card():
+    data_obj = _make_render_data_obj()
+    n_ivs = data_obj['nIvs']
+    nS, nO = 1, 1
+    scores_flat = [0.0] * (n_ivs * nS * nO)
+    scores_flat[1 * nS * nO + 0 * nO + 0] = 800  # only IV 1 wins
+
+    matchup_data = {
+        'scores_flat': scores_flat,
+        'nS': nS, 'nO': nO,
+        'scenarios': [(2, 2)],
+        'opponents': ['Lickitung'],
+        'opp_iv_mode': 'rank1',
+        'win_threshold': 500,
+    }
+    cats = deep_dive.build_iv_categories(
+        data_obj, matchup_data=matchup_data
+    )
+    html = deep_dive._render_notable_ivs_section(cats, data_obj, 'rank1')
+    assert 'Beats rank 1 Lickitung in the 2v2' in html
+    assert 'bait dim. not yet swept' in html
+    assert '15/5/10' in html  # IV 1's triple
