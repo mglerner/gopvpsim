@@ -748,7 +748,7 @@ def _stat_cutoffs_from_anchors(anchor_objs):
 
 
 def build_iv_categories(data_obj, slayer_categories=None,
-                        iv_idx_by_triple=None):
+                        iv_idx_by_triple=None, matchup_data=None):
     """Build the unified ``list[IVCategory]`` for a deep-dive run.
 
     Inputs:
@@ -759,9 +759,23 @@ def build_iv_categories(data_obj, slayer_categories=None,
             slayer-kind branch is skipped.
         iv_idx_by_triple: optional precomputed (atk_iv, def_iv, sta_iv)
             -> canonical-index map. Built from data_obj if not given.
+        matchup_data: optional dict enabling kind='matchup' categories.
+            Shape:
+                {
+                  'scores_flat': flat list, len = nIvs * nS * nO,
+                  'nS': int, 'nO': int,
+                  'scenarios': [(focal_shields, opp_shields), ...],
+                  'opponents': [opp_name, ...],
+                  'opp_iv_mode': 'pvpoke' or 'rank1',
+                  'win_threshold': float (default 500),
+                }
+            Each (opponent, scenario) pair becomes a candidate category;
+            non-trivial partitions (1 <= winners < nIvs) are emitted.
+            If None, the matchup branch is skipped.
 
     Output: list of IVCategory in stable order: slayer categories first,
-    then tier categories, then composites. Empty categories are dropped.
+    then tier categories, then composites, then matchups. Empty
+    categories are dropped.
 
     The function is intentionally pure — no I/O, no HTML, no globals.
     Easy to unit-test with synthetic data_obj dicts.
@@ -900,6 +914,71 @@ def build_iv_categories(data_obj, slayer_categories=None,
                 stat_cutoffs=tier.stat_cutoffs,
                 member_meta=comp_meta,
             ))
+
+    # ---- Matchup categories ----
+    # Synthesize one IVCategory per (opponent, scenario) pair where the
+    # win/loss partition is non-trivial. The 'matchup_conditions' field
+    # carries the (opponent, scenario, opp_iv_mode) tuple in declarative
+    # form so the renderer (and future bait-axis sweep) can interrogate
+    # it without parsing the display name.
+    #
+    # Selectivity: skip pairs where every IV wins or no IV wins. Both
+    # are degenerate from a "named category" perspective — they'd just
+    # be "everyone" or "no one". The renderer applies a separate
+    # "notable" filter (small categories only) on top of this baseline.
+    if matchup_data:
+        scores_flat = matchup_data.get('scores_flat') or []
+        nS = matchup_data.get('nS', 0)
+        nO = matchup_data.get('nO', 0)
+        m_scenarios = matchup_data.get('scenarios') or []
+        m_opponents = matchup_data.get('opponents') or []
+        opp_iv_mode = matchup_data.get('opp_iv_mode', 'pvpoke')
+        win_threshold = matchup_data.get('win_threshold', 500)
+        opp_iv_label = ('PvPoke default'
+                        if opp_iv_mode == 'pvpoke' else 'rank 1')
+        if (scores_flat and nS and nO
+                and len(scores_flat) >= n_ivs * nS * nO):
+            for oi, opp_name in enumerate(m_opponents):
+                if oi >= nO:
+                    break
+                for si, scen in enumerate(m_scenarios):
+                    if si >= nS:
+                        break
+                    members = []
+                    member_meta: dict = {}
+                    for iv in range(n_ivs):
+                        score = scores_flat[iv * nS * nO + si * nO + oi]
+                        if score >= win_threshold:
+                            members.append(iv)
+                            member_meta[iv] = {
+                                'iv': (iv_a[iv], iv_d[iv], iv_s[iv])
+                                if iv < len(iv_a) else None,
+                                'score': score,
+                            }
+                    n_win = len(members)
+                    if n_win == 0 or n_win == n_ivs:
+                        continue  # degenerate partition — skip
+                    scen_label = f'{scen[0]}v{scen[1]}'
+                    name = f'Beats {opp_iv_label} {opp_name} in the {scen_label}'
+                    categories.append(IVCategory(
+                        name=name,
+                        kind='matchup',
+                        members=members,
+                        description=(
+                            f'IVs whose battle score against the '
+                            f'{opp_iv_label} {opp_name} in the {scen_label} '
+                            f'shield scenario meets the win threshold '
+                            f'({win_threshold:g}).'
+                        ),
+                        matchup_conditions=[{
+                            'opponent': opp_name,
+                            'opponent_ivs': opp_iv_mode,
+                            'scenario': (scen[0], scen[1]),
+                            'bait': None,  # reserved for bait-axis TODO
+                            'outcome': 'win',
+                        }],
+                        member_meta=member_meta,
+                    ))
 
     return categories
 
