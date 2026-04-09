@@ -246,6 +246,32 @@
   to mistakenly run a smoke test without `--interactive` and conclude
   nothing rendered.
 
+## Deep-dive narrative
+
+* **Cross-category IV callouts** — When a slayer IV *also* clears a
+  non-slayer threshold tier (Top 5%, Good, etc.) or vice versa, the
+  intersection is rare and notable: it's an IV that sacrifices some
+  slayer optimum to stay competitive on the broader-meta avg-score
+  axis (or vice versa). The deep-dive narrative should automatically
+  detect these intersection IVs and call them out with their specific
+  trade-off framed in plain English. This is a building block of the
+  SwagTips-style structured-IV-categories goal — instead of a generic
+  "here's the top-N table," surface specific named IVs with a clear
+  identity ("the compromise slayer," "the bulk-floor slayer," etc.).
+  Concrete example surfaced 2026-04-09 during wins-axis feature work:
+  Annihilape `13/0/11` (atk 128.33, def 98.04, hp 139, SP rank #1767)
+  was the *sole* slayer IV in a 66-IV survivor cohort that also
+  cleared the auto-discovered Top 5% (HP≥139) bulk floor. It sits in
+  Atk Slayer + Bulk Slayer with 45/132 mirror wins — middle-of-pack
+  within the slayer cohort, but the only one that clears the
+  broader-meta bulk floor. Call-out wording could be along the lines
+  of: "13/0/11 is the rare bulk-floor slayer — it gives up mirror
+  dominance (45/132 wins, vs 132/132 for the top survivors) to clear
+  HP≥139, making it the only slayer-grade IV that doesn't sacrifice
+  the broader-meta bulk floor." Detection logic: any IV in
+  `slayerCatsByIv` whose `ivTiers` value is non-negative qualifies.
+  Cross-ref: SwagTips-style structured-IV-categories TODO.
+
 ## Reproducibility
 
 * **Deep dives have non-reproducible opponent data** — `scripts/deep_dive.py`
