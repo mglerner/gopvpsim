@@ -3926,8 +3926,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                                    shield_scenarios)
     html += '</script>\n'
 
-    # Footer: equivalent CLI invocation, kept at the bottom of the page so
-    # it's discoverable but doesn't compete with the actual analysis content.
+    # Footer: equivalent CLI invocation + rankings data fingerprint, kept
+    # at the bottom of the page so they're discoverable but don't compete
+    # with the actual analysis content. The fingerprint addresses the
+    # reproducibility gap noted in TODO.md "Reproducibility": two dives
+    # with identical CLI args can produce different results when the
+    # underlying PvPoke rankings cache drifts. Fingerprint = the cache
+    # mtime + first-5 species so a reader can spot drift between dives.
     if cli_args_str:
         from html import escape as _esc
         html += '<details class="meta" style="margin-top:30px;border-top:1px solid #0f3460;padding-top:10px">'
@@ -3937,6 +3942,32 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         html += 'white-space:pre-wrap;word-break:break-all">'
         html += _esc(cli_args_str)
         html += '</pre></details>\n'
+
+    # Rankings fingerprint
+    try:
+        import datetime
+        from gopvpsim import data as _gpdata
+        cache_path = _gpdata.CACHE_DIR / f"{league}.json"
+        if cache_path.exists():
+            mtime = datetime.datetime.fromtimestamp(cache_path.stat().st_mtime)
+            mtime_str = mtime.strftime('%Y-%m-%d %H:%M:%S')
+            rk = _gpdata.load_rankings(league)
+            top5 = ', '.join(r.get('speciesName', r.get('speciesId', '?'))
+                             for r in rk[:5])
+            html += '<details class="meta" style="margin-top:8px">'
+            html += '<summary>Rankings data fingerprint</summary>'
+            html += '<pre style="margin:8px 0;background:#16213e;'
+            html += 'padding:10px;border-radius:4px;color:#e0e0e0;font-size:12px;'
+            html += 'white-space:pre-wrap;word-break:break-all">'
+            html += f'cache file: {cache_path}\n'
+            html += f'cache mtime: {mtime_str}\n'
+            html += f'rankings count: {len(rk)}\n'
+            html += f'top 5 species: {top5}'
+            html += '</pre></details>\n'
+    except Exception as _e:
+        # Fingerprint is best-effort — don't break HTML generation
+        # if the cache file is missing or unreadable.
+        pass
 
     html += '</body>\n</html>\n'
 
