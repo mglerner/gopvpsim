@@ -298,6 +298,10 @@ function buildTraces() {
         marker:{size:2, color:otherColor, colorscale:'Viridis', opacity:0.15}
       });
     }
+    // Tier traces are collected separately and appended AFTER the
+    // slayer/anchor overlays so they render on top (Plotly z-order =
+    // trace insertion order).
+    var _tierTraces = [];
     for (var ti=0; ti<tierNames.length; ti++) {
       var tx=[], ty=[], tt=[];
       for (var iv=0; iv<nIvs; iv++) {
@@ -309,7 +313,7 @@ function buildTraces() {
         }
       }
       if (tx.length) {
-        traces.push({
+        _tierTraces.push({
           name:tierNames[ti]+' ('+DATA.tiers[ti].desc+')',
           x:tx, y:ty, text:tt,
           mode:'markers', type:'scattergl', hoverinfo:'text',
@@ -455,6 +459,13 @@ function buildTraces() {
   if (slayerTrace) traces.push(slayerTrace);
   var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff');
   if (anchorTrace) traces.push(anchorTrace);
+
+  // Tier traces go LAST so they render on top of overlays.
+  if (typeof _tierTraces !== 'undefined') {
+    for (var _ti = 0; _ti < _tierTraces.length; _ti++) {
+      traces.push(_tierTraces[_ti]);
+    }
+  }
 
   return traces;
 }
