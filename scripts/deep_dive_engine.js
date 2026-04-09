@@ -6,7 +6,7 @@ var state = {
   oppIvMode: '__OPP_IV_MODE_DEFAULT__',
   colorMode: 'threshold',
 };
-var avgScores, battleRanks, refAvgScores, refBattleRanks;
+var yValues, yRanks, refYValues, refYRanks;
 var lockedIdx = -1;
 var tierColors = __TIER_COLORS_JS__;
 var tierNames = __TIER_NAMES_JS__;
@@ -54,7 +54,7 @@ function getActiveScenarioIndices() {
 }
 
 // ---- Compute view ----
-function computeAvgScores(mi) {
+function computeYValues(mi) {
   var scores = getScores(mi, state.oppIvMode);
   if (!scores) return null;
   var sis = getActiveScenarioIndices();
@@ -82,14 +82,14 @@ function computeRanks(avgs) {
 }
 
 function computeView() {
-  avgScores = computeAvgScores(state.movesetIdx);
-  battleRanks = computeRanks(avgScores);
+  yValues = computeYValues(state.movesetIdx);
+  yRanks = computeRanks(yValues);
   if (DATA.referenceIdx >= 0 && DATA.referenceIdx !== state.movesetIdx) {
-    refAvgScores = computeAvgScores(DATA.referenceIdx);
-    refBattleRanks = computeRanks(refAvgScores);
+    refYValues = computeYValues(DATA.referenceIdx);
+    refYRanks = computeRanks(refYValues);
   } else {
-    refAvgScores = null;
-    refBattleRanks = null;
+    refYValues = null;
+    refYRanks = null;
   }
 }
 
@@ -102,8 +102,8 @@ function buildHoverText(iv) {
     'IVs: '+a+'/'+d+'/'+s,
     'L'+DATA.ivLv[iv]+' CP'+DATA.ivCp[iv],
     'Atk:'+DATA.ivAtk[iv].toFixed(2)+' Def:'+DATA.ivDef[iv].toFixed(2)+' HP:'+DATA.ivHp[iv],
-    'SP Rank: #'+DATA.spRanks[iv]+' | Battle Rank: #'+battleRanks[iv],
-    'Avg Score: '+avgScores[iv].toFixed(1),
+    'SP Rank: #'+DATA.spRanks[iv]+' | Battle Rank: #'+yRanks[iv],
+    'Avg Score: '+yValues[iv].toFixed(1),
   ];
   var tier = DATA.ivTiers[iv];
   if (tier >= 0) lines.push('Tier: '+tierNames[tier]);
@@ -128,7 +128,7 @@ function buildHoverText(iv) {
   }
 
   // Diff vs reference moveset (same IV)
-  if (refAvgScores && DATA.referenceIdx >= 0 && DATA.referenceIdx !== state.movesetIdx) {
+  if (refYValues && DATA.referenceIdx >= 0 && DATA.referenceIdx !== state.movesetIdx) {
     lines.push('');
     lines.push('vs Ref ('+DATA.movesets[DATA.referenceIdx].prettyLabel+'):');
     appendMatchupDiff(lines, state.movesetIdx, iv, DATA.referenceIdx, iv);
@@ -179,11 +179,11 @@ function buildTraces() {
     for (var iv=0; iv<nIvs; iv++) {
       if (!DATA.ivAllTiers[iv] || DATA.ivAllTiers[iv].length === 0) {
         otherX.push(DATA.spRanks[iv]);
-        otherY.push(avgScores[iv]);
+        otherY.push(yValues[iv]);
         otherText.push(buildHoverText(iv));
-        otherColor.push(avgScores[iv]);
-        if (avgScores[iv] < otherMin) otherMin = avgScores[iv];
-        if (avgScores[iv] > otherMax) otherMax = avgScores[iv];
+        otherColor.push(yValues[iv]);
+        if (yValues[iv] < otherMin) otherMin = yValues[iv];
+        if (yValues[iv] > otherMax) otherMax = yValues[iv];
       }
     }
     if (otherX.length) {
@@ -198,7 +198,7 @@ function buildTraces() {
       for (var iv=0; iv<nIvs; iv++) {
         if (DATA.ivAllTiers[iv] && DATA.ivAllTiers[iv].indexOf(ti) >= 0) {
           tx.push(DATA.spRanks[iv]);
-          ty.push(avgScores[iv]);
+          ty.push(yValues[iv]);
           tt.push(buildHoverText(iv));
         }
       }
@@ -218,12 +218,12 @@ function buildTraces() {
     var cLabel = 'Avg Score';
     for (var iv=0; iv<nIvs; iv++) {
       ax.push(DATA.spRanks[iv]);
-      ay.push(avgScores[iv]);
+      ay.push(yValues[iv]);
       at.push(buildHoverText(iv));
       if (cm === 'hp') { ac.push(DATA.ivHp[iv]); cLabel = 'HP'; }
       else if (cm === 'def') { ac.push(DATA.ivDef[iv]); cLabel = 'Defense'; }
       else if (cm === 'atk') { ac.push(DATA.ivAtk[iv]); cLabel = 'Attack'; }
-      else { ac.push(avgScores[iv]); }
+      else { ac.push(yValues[iv]); }
     }
     // Use a colorscale that's bright against dark background
     var cscale = (cm === 'hp') ? 'YlOrRd' : (cm === 'def') ? 'Blues' : (cm === 'atk') ? 'RdYlGn' : 'Viridis';
@@ -293,7 +293,7 @@ function buildTraces() {
       var t = DATA.ivTiers[iv];
       if (t >= 0) return tierColors[t];
       var range = otherMax - otherMin;
-      var t01 = (range > 0) ? (avgScores[iv] - otherMin) / range : 0.5;
+      var t01 = (range > 0) ? (yValues[iv] - otherMin) / range : 0.5;
       return viridisColor(t01);
     }
     return '#FFD700';
@@ -319,7 +319,7 @@ function buildTraces() {
       var iv = ivList[k];
       if (typeof iv !== 'number' || iv < 0 || iv >= nIvs) continue;
       var sp = DATA.spRanks[iv];
-      var av = avgScores[iv];
+      var av = yValues[iv];
       if (typeof sp !== 'number' || typeof av !== 'number') continue;
       ox.push(sp);
       oy.push(av);
@@ -355,7 +355,7 @@ function updateSummaryTable() {
   // Get top 10 by battle rank
   var indices = [];
   for (var i=0; i<nIvs; i++) indices.push(i);
-  indices.sort(function(a,b) { return battleRanks[a] - battleRanks[b]; });
+  indices.sort(function(a,b) { return yRanks[a] - yRanks[b]; });
   var top = indices.slice(0, 10);
 
   var hasTiers = tierNames.length > 0;
@@ -366,12 +366,12 @@ function updateSummaryTable() {
   for (var k=0; k<top.length; k++) {
     var iv = top[k];
     var tier = DATA.ivTiers[iv];
-    h += '<tr><td>#'+battleRanks[iv]+'</td>';
+    h += '<tr><td>#'+yRanks[iv]+'</td>';
     h += '<td>'+DATA.ivA[iv]+'/'+DATA.ivD[iv]+'/'+DATA.ivS[iv]+'</td>';
     h += '<td>'+DATA.ivLv[iv]+'</td><td>'+DATA.ivCp[iv]+'</td>';
     h += '<td>'+DATA.ivAtk[iv].toFixed(2)+'</td><td>'+DATA.ivDef[iv].toFixed(2)+'</td>';
     h += '<td>'+DATA.ivHp[iv]+'</td><td>#'+DATA.spRanks[iv]+'</td>';
-    h += '<td>'+avgScores[iv].toFixed(1)+'</td>';
+    h += '<td>'+yValues[iv].toFixed(1)+'</td>';
     if (hasTiers) {
       if (tier >= 0) {
         h += '<td><span class="tier-badge" style="background:'+tierColors[tier]+';color:#000">'+tierNames[tier]+'</span></td>';
