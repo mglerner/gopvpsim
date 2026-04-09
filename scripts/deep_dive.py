@@ -689,10 +689,12 @@ def auto_discover_thresholds(results, n_tiers=2):
 
     n = len(results)
 
-    # Tier 1: "Premium" — top 5% by score
+    # Tier 1: "Top 5%" — top 5% by avg score (renamed from "Premium" to
+    # avoid clashing with the community use of "premium" in IV deep dives,
+    # which means something more specific than a top-percentile bucket).
     # Tier 2: "Good" — top 20% by score
     tier_cuts = [max(5, n // 20), max(20, n // 5)][:n_tiers]
-    tier_names = ['Premium', 'Good'][:n_tiers]
+    tier_names = ['Top 5%', 'Good'][:n_tiers]
 
     # Population stats (medians)
     pop_atk = sorted(r['atk'] for r in results)
@@ -2000,6 +2002,186 @@ def _prose_flip_summary(flip_data, max_gains=3, max_losses=2):
     return '; '.join(parts) if parts else 'no matchup flips'
 
 
+def _aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
+                                resolved_anchors, data_obj, scenarios, opponents,
+                                win_threshold=500,
+                                pass_winrate_min=0.75, fail_winrate_max=0.25,
+                                debug_stats=None):
+    """Find shield scenarios in which a named anchor cleanly partitions
+    matchup wins/losses against the anchor's named opponent.
+
+    For each ResolvedAnchor with an opponent set, partition all IVs into
+    pass/fail by ``anchor.passes(focal_atk, focal_def)``. For each shield
+    scenario, check whether passing IVs ~always win the matchup vs that
+    opponent and failing IVs ~always lose it (or the symmetric case for
+    a "lost matchup" anchor — currently we only emit the gain direction).
+
+    Returns a list of records:
+        {
+          'anchor': ResolvedAnchor,
+          'opponent': str,
+          'scenarios': [(shields_focal, shields_opp), ...],
+          'direction': 'gain',  # passing IVs win, failing IVs lose
+        }
+
+    Anchors with no opponent, anchors where everyone or no one passes, and
+    anchors where no scenario meets the cleanliness thresholds are skipped.
+    """
+    # Build case-insensitive opponent index lookup so TOML and opponent-list
+    # naming differences (Annihilape vs annihilape) don't silently drop hits.
+    opp_idx_by_name = {}
+    for oi, name in enumerate(opponents):
+        opp_idx_by_name[name] = oi
+        opp_idx_by_name[name.lower()] = oi
+
+    # Counters so callers can diagnose why an anchor list produced few bullets.
+    stats = {
+        'considered': 0, 'no_opponent': 0, 'unknown_opponent': 0,
+        'trivial_partition': 0, 'no_clean_scenario': 0, 'emitted': 0,
+    }
+
+    records = []
+    for anchor in resolved_anchors:
+        stats['considered'] += 1
+        if not anchor.opponent:
+            stats['no_opponent'] += 1
+            continue
+        oi = opp_idx_by_name.get(anchor.opponent)
+        if oi is None:
+            oi = opp_idx_by_name.get(anchor.opponent.lower())
+        if oi is None:
+            stats['unknown_opponent'] += 1
+            continue
+
+        passing = []
+        failing = []
+        for iv in range(nIvs):
+            atk = data_obj['ivAtk'][iv]
+            def_ = data_obj['ivDef'][iv]
+            if anchor.passes(atk, def_):
+                passing.append(iv)
+            else:
+                failing.append(iv)
+        if not passing or not failing:
+            stats['trivial_partition'] += 1
+            continue  # anchor isn't a real partition for this cohort
+
+        flipped_scenarios = []
+        for si in range(nS):
+            pass_wins = sum(
+                1 for iv in passing
+                if scores_flat[iv * nS * nO + si * nO + oi] >= win_threshold
+            ) / len(passing)
+            fail_wins = sum(
+                1 for iv in failing
+                if scores_flat[iv * nS * nO + si * nO + oi] >= win_threshold
+            ) / len(failing)
+            if pass_wins >= pass_winrate_min and fail_wins <= fail_winrate_max:
+                flipped_scenarios.append(scenarios[si])
+
+        if flipped_scenarios:
+            stats['emitted'] += 1
+            records.append({
+                'anchor': anchor,
+                'opponent': anchor.opponent,
+                'scenarios': flipped_scenarios,
+                'direction': 'gain',
+            })
+        else:
+            stats['no_clean_scenario'] += 1
+
+    if debug_stats is not None:
+        debug_stats.update(stats)
+    return records
+
+
+def _render_anchor_flip_bullets(records):
+    """Render anchor-flip records as RyanSwag-style HTML <li> bullets.
+
+    Grouping grain is ``(parent, opponent, target_stat, move_id)``.
+    Within each group we take the *minimum* threshold value: Level 3
+    parents expand into one sub-anchor per (move, damage tier), and a
+    higher-tier sub-anchor is automatically subsumed by its lower-tier
+    sibling for matchup-flipping purposes (anything that crosses the
+    high tier necessarily crosses the low one). The min threshold is
+    "the smallest stat at which this move starts driving any flip
+    against this opponent" — the actionable number.
+
+    Result: one bullet per (parent, opponent, move) triple, e.g.
+        "96.62 Def for lickilicky bulk (Hyper Beam) vs Lickilicky (0v1, 1v2)"
+    Sub-anchors with no ``move_id`` (Level 1/2 anchors) keep their
+    own bullet and omit the move parenthetical entirely.
+
+    Bullets are sorted within each (parent, opponent) family by
+    threshold ascending so increasing-stat bulkpoints read top-to-bottom
+    in the order a player would clear them.
+    """
+    # Group: (parent, opponent, target_stat, move_id) -> list of records.
+    groups: dict = {}
+    order: list = []  # preserve first-seen order for stable output
+    for rec in records:
+        a = rec['anchor']
+        key = (a.parent, rec['opponent'], a.target_stat, a.move_id)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(rec)
+
+    # Sort groups within each (parent, opponent) family by min threshold
+    # so a parent with multiple moves reads in ascending stat order.
+    def _group_sort_key(key):
+        recs = groups[key]
+        min_thresh = min(r['anchor'].threshold_value for r in recs)
+        # Primary: parent+opponent groups stay together (preserve original
+        # first-seen order via index). Secondary: ascending threshold.
+        return (order.index(key) // 1000, key[0], key[1], min_thresh)
+    # Stable group ordering: keep parents+opponents in original first-seen
+    # order, then sort within by min threshold. Use a two-pass approach
+    # so different parents/opponents don't interleave.
+    family_order: list = []
+    families: dict = {}
+    for key in order:
+        family = (key[0], key[1], key[2])  # parent, opponent, target_stat
+        if family not in families:
+            families[family] = []
+            family_order.append(family)
+        families[family].append(key)
+    for family in family_order:
+        families[family].sort(
+            key=lambda k: min(r['anchor'].threshold_value for r in groups[k])
+        )
+
+    lines = []
+    for family in family_order:
+        for key in families[family]:
+            recs = groups[key]
+            first = recs[0]['anchor']
+            stat_label = 'Atk' if first.target_stat == 'atk' else 'Def'
+            anchor_label = first.parent_display_name or first.label or first.parent
+
+            min_thresh = min(r['anchor'].threshold_value for r in recs)
+
+            move_str = ''
+            if first.move_id:
+                move_str = f' ({_pretty_name(first.move_id)})'
+
+            # Scenarios: union across sub-anchors of the same group
+            # (different damage tiers of the same move usually flip
+            # the same scenarios, but if they diverge we show all).
+            scen_set = set()
+            for r in recs:
+                for s in r['scenarios']:
+                    scen_set.add(tuple(s))
+            scen_strs = ', '.join(f'{s[0]}v{s[1]}' for s in sorted(scen_set))
+
+            lines.append(
+                f'<li><span class="dd-strong">{min_thresh:.2f} {stat_label}</span> '
+                f'for <b>{anchor_label}</b>{move_str} vs {recs[0]["opponent"]} '
+                f'(<span class="dd-gain">{scen_strs}</span>)</li>'
+            )
+    return lines
+
+
 def _generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode):
     """Generate HSH/RyanSwag-style threshold descriptions from flip data.
 
@@ -2097,6 +2279,13 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         ref_iv = 0
 
     print("  Generating analysis sections...")
+
+    # Resolved anchors are needed by both the slayer-iteration block (much
+    # further down) and the new anchor-driven matchup-flip section (rendered
+    # right after Key Matchup Thresholds). Extract once here.
+    resolved_anchors_top = []
+    if slayer_iter_result:
+        resolved_anchors_top = slayer_iter_result.get('resolved_anchors', []) or []
 
     # Set up breakpoint narration: load move data, species types, opponent info
     fast_db, charged_db = get_moves()
@@ -2381,6 +2570,40 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         results_parts.append('<ul class="dd-threshold-list">\n')
         results_parts.append('\n'.join(threshold_descs))
         results_parts.append('\n</ul>\n')
+
+    # -- Anchor-Driven Matchup Flips (RyanSwag-style, phase 1) --
+    # New aggregator: groups shield scenarios under each named anchor +
+    # opponent so the bullets read like the GamePress IV deep dives.
+    # Lives alongside the heuristic Key Matchup Thresholds section above
+    # for at least one session — different lens on the same flip data,
+    # decide later whether to merge or replace.
+    if resolved_anchors_top:
+        anchor_flip_debug = {}
+        anchor_flip_records = _aggregate_flips_by_anchor(
+            scores_flat, nIvs, nS, nO,
+            resolved_anchors_top, data_obj, scenarios, opponents,
+            debug_stats=anchor_flip_debug,
+        )
+        print(f"  Anchor-flip aggregator: {anchor_flip_debug}")
+        if anchor_flip_records:
+            anchor_bullets = _render_anchor_flip_bullets(anchor_flip_records)
+            results_parts.append('<h3 class="dd-h3">Anchor-Driven Matchup Flips</h3>\n')
+            results_parts.append(
+                '<p>Named anchors (from <code>thresholds/*.toml</code> or the '
+                'auto-fallback layer) that cleanly partition matchup wins/losses '
+                f'against their opponent. Each bullet lists the shield scenarios '
+                f'in which IVs clearing the anchor reliably win and IVs failing '
+                f'it reliably lose. Vs {opp_label} opponents.</p>\n'
+            )
+            results_parts.append(
+                '<p class="dd-small">Format: <em>threshold</em> for <em>anchor name</em> '
+                'vs <em>opponent</em> (<em>shield scenarios where the partition holds</em>). '
+                'Bait/farm and move-restriction dimensions are not yet swept — '
+                'see TODO &ldquo;Baiting policy as a deep-dive sim axis&rdquo;.</p>\n'
+            )
+            results_parts.append('<ul class="dd-threshold-list">\n')
+            results_parts.append('\n'.join(anchor_bullets))
+            results_parts.append('\n</ul>\n')
 
     # -- Mirror Slayer Iteration --
     if slayer_iter_result and slayer_iter_result.get('final'):

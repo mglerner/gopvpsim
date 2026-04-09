@@ -20,6 +20,23 @@
   an estimated P(opponent shields). P~0 → fire best-DPE move; P~1 → bait with
   cheapest.
 
+* **Baiting policy as a deep-dive sim axis** — Currently, baiting is a
+  property baked into a single simulation run, not an output dimension
+  swept across the IV grid. RyanSwag-style threshold callouts mix
+  shield count with bait mode ("2-2 *no bait*, 2-1 *farm*") and even
+  move-restriction ("0-0 *Ice Punch only*"). To reproduce that
+  editorial nuance faithfully, the deep dive sims need a baiting-policy
+  axis (and ideally a move-restriction axis) alongside the existing
+  shield-scenario axis. Open design questions: which bait modes to
+  enumerate (no-bait / always-bait / Selective / EV-based?), does the
+  existing PvPoke "Selective" implementation suffice, where in the UI
+  do we expose the new dropdown, how badly does the multiplied sim
+  count hurt runtime. Cross-ref: the "RyanSwag-style matchup-flip
+  annotations" Phase 1 work intentionally ships *without* this axis;
+  this TODO is the natural follow-up that lets the bullet format
+  upgrade from "(2-2, 2-1, 0-0)" to "(2-2 no bait, 2-1 farm, 0-0 Ice
+  Punch only)". Discovered 2026-04-09 while scoping Phase 1.
+
 ## Features to add
 
 * **Form Change** — Morpeko. Aegislash. Mimikyu. These are all
@@ -45,6 +62,31 @@
   covers the broader BP/CMP gating coverage gap.*
 
 ## Analysis goals
+
+* **RyanSwag-style matchup-flip annotations + wins-based y-axis**
+  *(in progress 2026-04-09)* — Extend deep dives to call out *which
+  specific matchups flip at which IV thresholds, in which shield
+  scenarios* (e.g. "103.54 Def for the mirror BP vs Annihilape: 2-2
+  no bait, 2-1 farm, 0-0 Ice Punch only"). The flip infrastructure
+  already exists (`_find_flips`, `_narrate_flip`,
+  `_generate_threshold_descriptions` in `scripts/deep_dive.py`); the
+  gaps are: (a) the aggregator collapses scenarios instead of naming
+  them, (b) threshold descriptions are stat-shape heuristics, not
+  tied to named anchors (mirror BP, etc.), (c) flips are computed
+  against a single reference IV, not multiple baselines.
+  **Phase 1 (text)**: Extend the aggregator to emit per-anchor
+  bullets that name the scenarios where each anchor's flip occurs;
+  tie threshold descriptions to anchor names from the resolver.
+  **Phase 2 (graph)**: Add a wins-based y-axis to the interactive
+  scatter plot, with three baseline traces — vs rank-1, vs PvPoke
+  default, vs mirror-converged cohort. Single shared flip table
+  feeds both phases. **Caveat**: move parameters have changed since
+  the original RyanSwag dives; we are reproducing the *format and
+  reasoning style*, not the exact stats. **Cross-ref**: this work
+  may resolve (or substantially shift) the "Slayer-card signal-loss
+  audit" item below — both are about surfacing differentiating
+  signal where current heuristics produce vacuous output. Re-read
+  the audit item before starting Phase 2 renderer changes.
 
 * **Meta-wide slayer reference (ambitious)** — With the slayer anchor
   system AND bulkpoint anchor system shipped, we can systematically run
