@@ -367,6 +367,43 @@ bottleneck.
   loses at most one round's worth of sims. Tiny code change, big peace
   of mind.
 
+## Schema simplification
+
+* **TOML simplification triggers** *(collect friction, don't act yet)* —
+  Worry surfaced 2026-04-09: the legacy JSON threshold files were three
+  keys; the current TOML schema is ~530 lines of docs and Annihilape's
+  hand-authored file is ~180 lines. Sample size of one species (plus a
+  one-line tinkaton stub) is too small to design a simplification
+  against — Annihilape is also the *worst* canary because its
+  Lurgan/mercuryish historical provenance pressure makes it
+  documentation-heavy in ways most species won't be.
+  **Action**: when authoring the *next* species TOML (Tinkaton CD prep,
+  Goodra, etc.), aim for the smallest file possible — lean on the
+  auto-fallback hard, skip provenance you don't need. If you reach for
+  a schema feature and it feels heavy, write a one-liner here noting
+  *which* feature and *why*. Three friction observations in a row is
+  the action threshold; until then, collect.
+  **Two candidates already named** without acting:
+  1. The Level 1/2/3 anchor distinction is a doc artifact, not a
+     schema artifact — the resolver just looks at which optional
+     fields are populated. Could be re-presented as "fill in whichever
+     fields you know" instead of three named precision tiers. Doc
+     rewrite, not code rewrite — cheap whenever it stops feeling
+     helpful to teach the levels separately.
+  2. The mandatory spread/anchor split is overhead for one-off CMP
+     anchors. Most species would benefit from inlining `ivs = [...]`
+     or `above_atk = X` directly on the anchor instead of needing a
+     separate `[spreads.x]` table. Don't *remove* the split — it earns
+     its keep when multiple anchors share a spread (cf. Annihilape's
+     `lurgan_ape` referenced by both `cmp_vs_lurgan` and
+     `lickitung_brkp_above_lurgan`) — just make it optional.
+  **Meta-rule**: distinguish complexity that *enables provenance*
+  (description fields, source fields, the multiple breakpoint
+  precision levels) from complexity that's *structural overhead*
+  (deep nesting, mandatory spread/anchor split for one-offs).
+  Simplifications target the second category; don't accidentally cut
+  the first.
+
 ## Refactoring
 
 * **Split `scripts/deep_dive.py`** *(deferred from 2026-04-09; not
