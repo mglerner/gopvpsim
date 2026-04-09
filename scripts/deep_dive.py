@@ -2446,6 +2446,11 @@ def _render_notable_ivs_section(categories, data_obj, opp_iv_mode,
     if not target:
         return ''
 
+    # Per-card unique counter so the JS expand toggle can address each
+    # card individually. Resets per call to _render_notable_ivs_section,
+    # which is fine because the section is rendered once per page.
+    card_uid = 0
+
     # Sort: composites first (the headline), then matchups, with smaller
     # categories first within each kind so the most distinctive cards
     # land at the top of the grid.
@@ -2478,6 +2483,21 @@ function ddNotableToggle(cb) {
   if (!sec) return;
   sec.classList.toggle('dd-notable-only', cb.checked);
 }
+function ddNotableExpand(cardId, btn, nHidden, nVisible) {
+  // Per-card "Show all N" / "Collapse" toggle. Flips dd-iv-shown
+  // on every dd-iv-hidden row inside this card so the overflow
+  // members appear or disappear in place. Same pattern as the
+  // slayer-card expand toggle.
+  var card = document.getElementById(cardId);
+  if (!card) return;
+  var rows = card.querySelectorAll('.dd-iv-hidden');
+  if (!rows.length) return;
+  var nowShown = rows[0].classList.contains('dd-iv-shown');
+  rows.forEach(function(r) { r.classList.toggle('dd-iv-shown', !nowShown); });
+  btn.textContent = nowShown
+    ? ('Show all ' + (nHidden + nVisible))
+    : ('Collapse to top ' + nVisible);
+}
 </script>
 """)
     parts.append(
@@ -2501,7 +2521,9 @@ function ddNotableToggle(cb) {
                       or n_members <= notable_max_pct * n_ivs)
         notable_cls = 'dd-notable' if is_notable else 'dd-not-notable'
 
-        parts.append(f'<div class="dd-rec-card {notable_cls}">\n')
+        card_uid += 1
+        card_id = f'dd-notable-card-{card_uid}'
+        parts.append(f'<div class="dd-rec-card {notable_cls}" id="{card_id}">\n')
         parts.append(
             f'<h4>{cat.name} '
             f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
@@ -2520,14 +2542,15 @@ function ddNotableToggle(cb) {
                 parts.append(f'<p class="dd-small dd-prose">{sub}</p>\n')
 
         # Member list — sort by total_wins desc when available, else
-        # by IV index. Cap at max_members_shown unless expanded.
+        # by IV index. Render every member; rows past max_members_shown
+        # get the dd-iv-hidden class and the expand button toggles
+        # dd-iv-shown on them (matching the slayer-card pattern).
         def _sort_key(idx):
             wins = cat.member_meta.get(idx, {}).get('total_wins', 0)
             return (-wins, idx)
         members_sorted = sorted(cat.members, key=_sort_key)
-        shown = members_sorted[:max_members_shown]
 
-        for m_idx in shown:
+        for row_i, m_idx in enumerate(members_sorted):
             triple = (data_obj['ivA'][m_idx],
                       data_obj['ivD'][m_idx],
                       data_obj['ivS'][m_idx])
@@ -2536,8 +2559,9 @@ function ddNotableToggle(cb) {
             hp = data_obj['ivHp'][m_idx]
             sp_rank = data_obj['spRanks'][m_idx]
             label = f'{triple[0]}/{triple[1]}/{triple[2]}'
+            row_cls = ' class="dd-iv-hidden"' if row_i >= max_members_shown else ''
             parts.append(
-                f'<p><b>{label}</b> &mdash; '
+                f'<p{row_cls}><b>{label}</b> &mdash; '
                 f'atk {atk:.2f}, def {def_:.2f}, hp {hp}, '
                 f'SP&nbsp;#{sp_rank}</p>\n'
             )
@@ -2546,12 +2570,19 @@ function ddNotableToggle(cb) {
                     m_idx, cat, parent_categories, data_obj
                 )
                 if prose:
-                    parts.append(f'<p class="dd-prose">{prose}</p>\n')
+                    prose_cls = ' dd-iv-hidden' if row_i >= max_members_shown else ''
+                    parts.append(
+                        f'<p class="dd-prose{prose_cls}">{prose}</p>\n'
+                    )
 
         if n_members > max_members_shown:
+            n_hidden = n_members - max_members_shown
             parts.append(
-                f'<p class="dd-small">… and {n_members - max_members_shown} '
-                f'more (not shown).</p>\n'
+                f'<button class="dd-iv-toggle" '
+                f'onclick="ddNotableExpand(\'{card_id}\', this, '
+                f'{n_hidden}, {max_members_shown})">'
+                f'Show all {n_members}'
+                f'</button>\n'
             )
         parts.append('</div>\n')  # rec-card
 
@@ -2996,6 +3027,15 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
    class via ddNotableToggle(); default state is "only notable". */
 .dd-notable-only .dd-not-notable { display: none; }
 .dd-rec-card.dd-notable { border-color: #d29922; }
+/* Per-card "Show all N" expand: overflow members render with
+   dd-iv-hidden and become visible when ddNotableExpand() adds
+   dd-iv-shown. Same pattern as the slayer-card row expand. */
+.dd-rec-card .dd-iv-hidden { display: none; }
+.dd-rec-card .dd-iv-hidden.dd-iv-shown { display: block; }
+.dd-iv-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
+  padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
+  margin-top:6px; }
+.dd-iv-toggle:hover { background:#1a3a6e; color:#fff; }
 """
 
     opp_label = 'PvPoke default' if opp_iv_mode == 'pvpoke' else 'rank 1'

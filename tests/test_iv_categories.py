@@ -301,3 +301,51 @@ def test_render_notable_ivs_includes_matchup_card():
     assert 'Beats rank 1 Lickitung in the 2v2' in html
     assert 'bait dim. not yet swept' in html
     assert '15/5/10' in html  # IV 1's triple
+
+
+def test_render_notable_ivs_card_expand_button():
+    """When a category has more members than max_members_shown, every
+    member must still be present in the HTML (overflow rows hidden via
+    a CSS class so the per-card expand button can reveal them). The
+    'Show all N' button must be present for the user to find the
+    hidden IVs."""
+    # Build a matchup category with 8 winners; default max_members_shown=5.
+    n_ivs = 8
+    iv_a_iv = list(range(n_ivs))
+    data_obj = {
+        'nIvs': n_ivs,
+        'ivA': iv_a_iv, 'ivD': [0] * n_ivs, 'ivS': [0] * n_ivs,
+        'ivAtk': [120.0] * n_ivs, 'ivDef': [100.0] * n_ivs,
+        'ivHp': [130] * n_ivs, 'spRanks': list(range(1, n_ivs + 1)),
+        'tiers': [], 'ivAllTiers': [[] for _ in range(n_ivs)],
+    }
+    nS, nO = 1, 1
+    scores_flat = [800.0] * (n_ivs * nS * nO)  # everyone wins
+    # Make IV 0 lose so it's not a degenerate partition
+    scores_flat[0] = 0.0
+    matchup_data = {
+        'scores_flat': scores_flat,
+        'nS': nS, 'nO': nO,
+        'scenarios': [(0, 0)],
+        'opponents': ['Whiscash'],
+        'opp_iv_mode': 'pvpoke',
+        'win_threshold': 500,
+    }
+    cats = deep_dive.build_iv_categories(
+        data_obj, matchup_data=matchup_data
+    )
+    # 7 winners (IVs 1-7), max_members_shown defaults to 5 → 2 hidden
+    html = deep_dive._render_notable_ivs_section(cats, data_obj, 'pvpoke')
+
+    # Every winning IV's triple is in the HTML, even ones beyond
+    # max_members_shown.
+    for iv_a in range(1, 8):
+        assert f'{iv_a}/0/0' in html, f'missing IV {iv_a}/0/0'
+    # IV 0 is the loser, should not appear
+    assert '0/0/0' not in html
+    # Hidden-row marker class is on the overflow rows
+    assert 'dd-iv-hidden' in html
+    # Expand button is present with the right total count
+    assert 'Show all 7' in html
+    # JS helper is loaded
+    assert 'ddNotableExpand' in html
