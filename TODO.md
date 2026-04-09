@@ -246,6 +246,33 @@
   to mistakenly run a smoke test without `--interactive` and conclude
   nothing rendered.
 
+## Reproducibility
+
+* **Deep dives have non-reproducible opponent data** — `scripts/deep_dive.py`
+  fetches PvPoke rankings (`great`, `ultra`, `master`) from GitHub via a
+  24-hour-TTL on-disk cache at `~/Documents/gopvpsim_cache/`. Two dives
+  with the same CLI args can produce *substantially* different opponent
+  sets if the cache was refreshed between them — not "Annihilape moved
+  one spot," but "the entire top 20 changed." Discovered 2026-04-09 while
+  trying to byte-equality-verify a JS rename refactor: the post-rename HTML
+  vs the pre-rename backup HTML disagreed on the opponent list because
+  the cache had been refreshed (likely by a `pytest` invocation that
+  triggered `load_rankings`) between the runs that generated each file.
+  CLI-args embedding (already shipped, see `format_cli_args`) lets a reader
+  reproduce the *command*; this gap means it doesn't fully reproduce the
+  *data*. Possible fixes:
+    1. Embed a small "data fingerprint" in the HTML at run time: hash +
+       mtime + first-N species of the rankings list. Lets a reader spot
+       drift without enabling reproduction.
+    2. Add a `--rankings-snapshot DATE_OR_HASH` flag that pins to a
+       specific cache state for full reproduction. Requires durably
+       archiving rankings snapshots, e.g. under
+       `userdata/rankings_snapshots/`.
+    3. At minimum, log the `great.json` mtime + first-5 species at run
+       start so users notice when their dive's opponent set is unusual.
+  Option 1 + option 3 together is probably the right starting point —
+  cheap, doesn't require any new infra.
+
 ## UI / Display
 
 * **Additional scatter plot color modes** — The current color scheme has some dark
