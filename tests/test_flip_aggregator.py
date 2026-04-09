@@ -401,3 +401,140 @@ class TestRenderAnchorFlipBullets:
         # No "()" left over from an empty move list
         assert '()' not in out[0]
         assert '127.23 Atk' in out[0]
+
+
+# ---------------------------------------------------------------------------
+# _render_threshold_tier_cards
+# ---------------------------------------------------------------------------
+
+def _make_tier_data_obj(n_ivs, tiers, tier_assignments, atk_vals, def_vals, hp_vals,
+                        iv_triples=None):
+    """Build a data_obj with the fields _render_threshold_tier_cards reads."""
+    if iv_triples is None:
+        iv_triples = [(0, 15, i) for i in range(n_ivs)]
+    return {
+        'nIvs': n_ivs,
+        'tiers': tiers,
+        'ivTiers': tier_assignments,
+        'ivAtk': atk_vals,
+        'ivDef': def_vals,
+        'ivHp': hp_vals,
+        'ivA': [t[0] for t in iv_triples],
+        'ivD': [t[1] for t in iv_triples],
+        'ivS': [t[2] for t in iv_triples],
+    }
+
+
+class TestRenderThresholdTierCards:
+    """The new stat-target-forward tier cards should organise anchor-flip
+    bullets under the tiers whose stat specs clear them, and list member
+    IVs in a collapsed details block."""
+
+    def test_basic_tier_card_with_matching_anchor(self):
+        # One tier requiring atk >= 125, one anchor at atk 122.
+        # The tier clears the anchor, so the bullet should appear.
+        tiers = [{'name': 'Atk Weight', 'desc': 'High atk', 'color': '#f00',
+                  'attack': 125, 'defense': 0, 'stamina': 0}]
+        data_obj = _make_tier_data_obj(
+            n_ivs=3, tiers=tiers,
+            tier_assignments=[0, 0, -1],
+            atk_vals=[126, 127, 120],
+            def_vals=[100, 99, 105],
+            hp_vals=[140, 139, 142],
+        )
+        anchor = ResolvedAnchor(
+            name='bp', parent_display_name='lick BP', parent='bp',
+            kind='damage_breakpoint', threshold_value=122.0,
+            target_stat='atk', opponent='Lickitung',
+        )
+        records = [{'anchor': anchor, 'opponent': 'Lickitung',
+                    'scenarios': [(1, 1)], 'direction': 'gain'}]
+
+        html = deep_dive._render_threshold_tier_cards(
+            data_obj, records,
+            avg_ranks={0: 1, 1: 2, 2: 3},
+            flip_map={0: (2, 0, 2), 1: (1, 0, 1), 2: (0, 0, 0)},
+        )
+        assert 'Threshold Tiers' in html
+        assert 'Atk Weight' in html
+        assert 'atk≥125' in html
+        assert '122.00 Atk' in html      # anchor bullet
+        assert 'lick BP' in html
+        assert 'Member IVs (2)' in html   # two IVs in tier 0
+        assert '126' in html or '127' in html  # member atk values
+
+    def test_anchor_above_tier_cutoff_excluded(self):
+        # Tier requires atk >= 120. Anchor threshold is 125.
+        # The tier does NOT clear the 125 anchor — bullet should be absent.
+        tiers = [{'name': 'Low Atk', 'desc': '', 'color': '#0f0',
+                  'attack': 120, 'defense': 0, 'stamina': 0}]
+        data_obj = _make_tier_data_obj(
+            n_ivs=2, tiers=tiers,
+            tier_assignments=[0, 0],
+            atk_vals=[121, 122],
+            def_vals=[100, 100],
+            hp_vals=[140, 140],
+        )
+        anchor = ResolvedAnchor(
+            name='bp', parent_display_name='high bp', parent='bp',
+            kind='damage_breakpoint', threshold_value=125.0,
+            target_stat='atk', opponent='Foo',
+        )
+        records = [{'anchor': anchor, 'opponent': 'Foo',
+                    'scenarios': [(2, 2)], 'direction': 'gain'}]
+        html = deep_dive._render_threshold_tier_cards(
+            data_obj, records,
+            avg_ranks={0: 1, 1: 2},
+            flip_map={},
+        )
+        assert '125.00 Atk' not in html
+        assert 'No named anchors' in html
+
+    def test_def_anchor_included_when_tier_has_def_cutoff(self):
+        tiers = [{'name': 'Bulk', 'desc': '', 'color': '#0f0',
+                  'attack': 0, 'defense': 105, 'stamina': 0}]
+        data_obj = _make_tier_data_obj(
+            n_ivs=2, tiers=tiers,
+            tier_assignments=[0, 0],
+            atk_vals=[120, 120],
+            def_vals=[106, 107],
+            hp_vals=[140, 140],
+        )
+        anchor = ResolvedAnchor(
+            name='blkp', parent_display_name='lick blkp', parent='blkp',
+            kind='bulkpoint', threshold_value=103.0,
+            target_stat='def', opponent='Lickitung',
+        )
+        records = [{'anchor': anchor, 'opponent': 'Lickitung',
+                    'scenarios': [(2, 2)], 'direction': 'gain'}]
+        html = deep_dive._render_threshold_tier_cards(
+            data_obj, records,
+            avg_ranks={0: 1, 1: 2},
+            flip_map={},
+        )
+        assert '103.00 Def' in html
+        assert 'lick blkp' in html
+
+    def test_empty_tiers_returns_empty(self):
+        data_obj = {'tiers': [], 'nIvs': 0}
+        html = deep_dive._render_threshold_tier_cards(data_obj, [], {}, {})
+        assert html == ''
+
+    def test_no_records_still_renders_tier_headline(self):
+        tiers = [{'name': 'Solo', 'desc': 'test', 'color': '#fff',
+                  'attack': 130, 'defense': 0, 'stamina': 0}]
+        data_obj = _make_tier_data_obj(
+            n_ivs=1, tiers=tiers,
+            tier_assignments=[0],
+            atk_vals=[131],
+            def_vals=[100],
+            hp_vals=[140],
+        )
+        html = deep_dive._render_threshold_tier_cards(
+            data_obj, [],
+            avg_ranks={0: 1},
+            flip_map={},
+        )
+        assert 'Solo' in html
+        assert 'atk≥130' in html
+        assert 'No named anchors' in html
