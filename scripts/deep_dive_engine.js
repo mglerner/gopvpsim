@@ -442,7 +442,7 @@ function buildTraces() {
       x: ox, y: oy, text: ot,
       mode: 'markers', type: 'scatter', hoverinfo: 'text',
       marker: {
-        size: 7,
+        size: 6,
         color: ocol,
         symbol: osym,
         opacity: 0.95,
