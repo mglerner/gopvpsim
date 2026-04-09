@@ -3208,10 +3208,14 @@ function ddToggleTagsCompactCell(event) {
 """)
 
     # -- Alpha features (banding + clusters) — hidden by default --
+    # The onchange handler also toggles the "Show clusters" checkbox
+    # wrapper in the controls bar above the plot, and force-unchecks
+    # the cluster checkbox + re-renders when experimental is turned off
+    # so the cluster overlay disappears with the rest of the alpha UI.
     analysis_parts.append("""
 <div style="margin: 8px 0;">
   <label style="font-size:12px;color:#888"><input type="checkbox" id="alpha-chk"
-    onchange="var d=this.checked?'block':'none';document.getElementById('dd-alpha').style.display=d;var m=document.getElementById('dd-alpha-methods');if(m)m.style.display=d;"
+    onchange="var on=this.checked;var d=on?'block':'none';document.getElementById('dd-alpha').style.display=d;var m=document.getElementById('dd-alpha-methods');if(m)m.style.display=d;var cw=document.getElementById('cluster-toggle-wrapper');if(cw)cw.style.display=on?'inline':'none';if(!on){var cc=document.getElementById('cluster-chk');if(cc&&cc.checked){cc.checked=false;if(typeof updateView==='function')updateView();}}"
   > Show experimental analysis (banding, clusters)</label>
 </div>
 <div id="dd-alpha" style="display:none">
@@ -3891,7 +3895,12 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += '    <option value="atk">Attack</option>\n'
     html += '    <option value="score">Score</option>\n'
     html += '  </select></label>\n'
-    html += '  <label style="font-size:12px;color:#aaa"><input type="checkbox" id="cluster-chk" onchange="updateView()" style="margin-left:12px"> Show clusters</label>\n'
+    # "Show clusters" is gated behind the experimental-analysis toggle
+    # in the Deep Dive Analysis section — hidden by default, revealed
+    # when the user opts into experimental output. The wrapper span is
+    # toggled by the alpha-chk onchange handler below (in the analysis
+    # sections block).
+    html += '  <span id="cluster-toggle-wrapper" style="display:none"><label style="font-size:12px;color:#aaa"><input type="checkbox" id="cluster-chk" onchange="updateView()" style="margin-left:12px"> Show clusters</label></span>\n'
     if thresholds:
         html += '  <span style="font-size:11px;color:#888;margin-left:8px">Threshold tiers shown in graph legend. Hover to isolate; click to lock.</span>\n'
     html += '</div>\n'
