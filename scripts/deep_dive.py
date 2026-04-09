@@ -3246,19 +3246,14 @@ def _auto_derive_tiers(anchor_flip_records, data_obj,
                             f'{pick["n_pass"]} IVs).',
                 })
 
-    # Cap: keep General, up to 3 atk-side, up to 3 def-side. Prioritize
-    # tiers with fewer qualifying IVs (more selective = more interesting).
+    # Rank all non-General tiers by selectivity (fewest qualifying IVs
+    # first). The most selective tiers are the ones experts hand-identify
+    # — def-side matchup boundaries (26-1218 IVs) naturally outrank
+    # broad atk tiers (900-4000 IVs). Keep top 5 + General as fallback.
     general = [t for t in tiers if t['name'] == 'General']
-    atk_tiers = [t for t in tiers
-                 if t['name'] != 'General' and (t.get('attack', 0) or 0) > 0]
-    def_tiers = [t for t in tiers
-                 if t['name'] != 'General' and (t.get('defense', 0) or 0) > 0]
-    # Sort by selectivity: fewer IVs = listed later = shown first in the
-    # render (smallest-on-top pattern for visual prominence).
-    # For capping we keep the most selective (fewest IVs) first.
+    rest = [t for t in tiers if t['name'] != 'General']
     n_ivs = data_obj.get('nIvs', 1) or 1
     def _selectivity(t):
-        """Estimate how many IVs meet a tier's spec (lower = more selective)."""
         ac = t.get('attack', 0) or 0
         dc = t.get('defense', 0) or 0
         hc = t.get('stamina', 0) or 0
@@ -3266,11 +3261,9 @@ def _auto_derive_tiers(anchor_flip_records, data_obj,
                    if (ac <= 0 or data_obj['ivAtk'][iv] >= ac)
                    and (dc <= 0 or data_obj['ivDef'][iv] >= dc)
                    and (hc <= 0 or data_obj['ivHp'][iv] >= hc))
-    atk_tiers.sort(key=_selectivity)
-    def_tiers.sort(key=_selectivity)
-    # Most selective first — they get priority in ivTiers assignment so
-    # IVs are colored by their most selective tier, not General.
-    tiers = atk_tiers[:3] + def_tiers[:3] + general
+    rest.sort(key=_selectivity)
+    # Most selective first — they get priority in ivTiers assignment.
+    tiers = rest[:5] + general
 
     return tiers
 
@@ -4066,14 +4059,17 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         if effective_tiers:
             print(f"  Auto-derived {len(effective_tiers)} threshold tier(s) "
                   f"from anchor-flip records")
-            # Inject auto-derived tiers into data_obj so the scatter plot
-            # JS can color IVs by tier membership.
-            data_obj['tiers'] = effective_tiers
-            # Compute ivTiers + ivAllTiers for the scatter plot
+            # Inject auto-derived tiers into data_obj for scatter plot
+            # coloring. Exclude the "General" tier — it's too broad (catches
+            # ~all IVs) and kills the contrast that makes selective tiers
+            # visible. General stays in effective_tiers for the tier cards.
+            plot_tiers = [t for t in effective_tiers
+                          if t['name'] != 'General']
+            data_obj['tiers'] = plot_tiers
             _n = data_obj['nIvs']
             _iv_tiers = [-1] * _n
             _iv_all_tiers = [[] for _ in range(_n)]
-            for _ti, _t in enumerate(effective_tiers):
+            for _ti, _t in enumerate(plot_tiers):
                 _ac = _t.get('attack', 0) or 0
                 _dc = _t.get('defense', 0) or 0
                 _hc = _t.get('stamina', 0) or 0
