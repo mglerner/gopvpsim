@@ -2777,35 +2777,177 @@ def _render_anchor_flip_bullets(records):
     return lines
 
 
+TIER_COLORS_AUTO = [
+    '#58a6ff',  # blue  — general
+    '#f85149',  # red   — atk specialist
+    '#3fb950',  # green — def specialist
+    '#d29922',  # gold  — premium
+    '#bc8cff',  # purple
+    '#f0883e',  # orange
+]
+
+
+def _auto_derive_tiers(anchor_flip_records, data_obj):
+    """Synthesize threshold tiers from emitted anchor-flip records.
+
+    Groups the records by ``(opponent, target_stat)`` and composes them into
+    2–6 RyanSwag-style tiers. Each unique opponent whose anchors flip
+    matchups produces a candidate "slayer" tier; the overall floor across
+    all records becomes a "General" tier. This is the fully automatic path
+    — no TOML needed, works on a clean dive.
+
+    Returns a list of tier dicts matching the shape ``data_obj['tiers']``
+    expects: ``{name, color, attack, defense, stamina, desc}``.
+    """
+    if not anchor_flip_records:
+        return []
+
+    # Collect per-opponent, per-stat minimum thresholds
+    # Key: (opponent, target_stat) -> min threshold across all records
+    opp_stat_min: dict = {}
+    opp_stat_records: dict = {}
+    for rec in anchor_flip_records:
+        a = rec['anchor']
+        tv = getattr(a, 'threshold_value', None)
+        if tv is None:
+            continue
+        key = (rec['opponent'], a.target_stat)
+        if key not in opp_stat_min or tv < opp_stat_min[key]:
+            opp_stat_min[key] = tv
+        opp_stat_records.setdefault(key, []).append(rec)
+
+    if not opp_stat_min:
+        return []
+
+    # Separate into atk-side and def-side opponent groups
+    atk_opps = {}  # opponent -> min atk threshold
+    def_opps = {}  # opponent -> min def threshold
+    for (opp, stat), thresh in opp_stat_min.items():
+        if stat == 'atk':
+            atk_opps[opp] = thresh
+        elif stat == 'def':
+            def_opps[opp] = thresh
+
+    # Global floors: minimum threshold across all opponents per stat
+    atk_floor = min(atk_opps.values()) if atk_opps else 0
+    def_floor = min(def_opps.values()) if def_opps else 0
+
+    # Count how many total matchup-flipping scenarios each opponent group
+    # contributes — used to prioritize which opponents get their own tier.
+    def _scenario_count(opp, stat):
+        key = (opp, stat)
+        return sum(len(r['scenarios']) for r in opp_stat_records.get(key, []))
+
+    tiers = []
+    color_idx = 0
+
+    def _next_color():
+        nonlocal color_idx
+        c = TIER_COLORS_AUTO[color_idx % len(TIER_COLORS_AUTO)]
+        color_idx += 1
+        return c
+
+    # --- General tier: floor atk + floor def ---
+    # Only emit if we have thresholds on both sides, or at least one side
+    # has multiple opponents (otherwise the general tier IS the only
+    # opponent-specific tier and we'd just duplicate it).
+    if (atk_floor > 0 or def_floor > 0) and (len(atk_opps) + len(def_opps) > 1):
+        n_atk_opps = len(atk_opps)
+        n_def_opps = len(def_opps)
+        desc_parts = []
+        if n_atk_opps:
+            desc_parts.append(f'{n_atk_opps} atk breakpoint opponent'
+                              f'{"s" if n_atk_opps != 1 else ""}')
+        if n_def_opps:
+            desc_parts.append(f'{n_def_opps} bulkpoint opponent'
+                              f'{"s" if n_def_opps != 1 else ""}')
+        tiers.append({
+            'name': 'General',
+            'color': _next_color(),
+            'attack': atk_floor if atk_floor > 0 else 0,
+            'defense': def_floor if def_floor > 0 else 0,
+            'stamina': 0,
+            'desc': f'Floor across {" + ".join(desc_parts)}. '
+                    f'Clears the easiest anchor for every opponent.',
+        })
+
+    # --- Per-opponent specialist tiers ---
+    # Sort opponents by scenario count (most impactful first), then
+    # alphabetically for stability.
+    atk_ranked = sorted(atk_opps.keys(),
+                        key=lambda o: (-_scenario_count(o, 'atk'), o))
+    def_ranked = sorted(def_opps.keys(),
+                        key=lambda o: (-_scenario_count(o, 'def'), o))
+
+    # Atk-side specialist tiers: only emit if the opponent's threshold is
+    # above the general floor (otherwise it's already covered by General).
+    for opp in atk_ranked:
+        thresh = atk_opps[opp]
+        if len(atk_opps) > 1 and abs(thresh - atk_floor) < 0.01:
+            continue  # already in General
+        n_scen = _scenario_count(opp, 'atk')
+        tiers.append({
+            'name': f'{opp} Atk',
+            'color': _next_color(),
+            'attack': thresh,
+            'defense': 0,
+            'stamina': 0,
+            'desc': f'Atk breakpoint(s) vs {opp} '
+                    f'({n_scen} scenario flip{"s" if n_scen != 1 else ""}).',
+        })
+
+    # Def-side specialist tiers
+    for opp in def_ranked:
+        thresh = def_opps[opp]
+        if len(def_opps) > 1 and abs(thresh - def_floor) < 0.01:
+            continue  # already in General
+        n_scen = _scenario_count(opp, 'def')
+        tiers.append({
+            'name': f'{opp} Bulk',
+            'color': _next_color(),
+            'attack': 0,
+            'defense': thresh,
+            'stamina': 0,
+            'desc': f'Bulkpoint(s) vs {opp} '
+                    f'({n_scen} scenario flip{"s" if n_scen != 1 else ""}).',
+        })
+
+    # Cap at 6 tiers to avoid overwhelming the UI. Keep General + top 5
+    # by scenario count.
+    if len(tiers) > 6:
+        general = [t for t in tiers if t['name'] == 'General']
+        rest = [t for t in tiers if t['name'] != 'General']
+        tiers = general + rest[:5]
+
+    return tiers
+
+
 def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                                   avg_ranks, flip_map,
-                                  max_members_shown=10):
+                                  max_members_shown=10,
+                                  override_tiers=None):
     """RyanSwag-style threshold tier cards.
 
-    Each tier in ``data_obj['tiers']`` becomes a card whose headline is the
-    tier's stat-target spec (``atk≥X, def≥Y, hp≥Z``) and whose body is the
-    set of anchor-flip bullets that the tier's spec actually clears, plus a
-    collapsed table of the tier's member IVs. This is the *stat-target-
-    forward* presentation of the same data the slayer cards expose IV-
-    forward — the round-one piece of the SwagTips reframing.
+    Each tier becomes a card whose headline is the tier's stat-target spec
+    (``atk≥X, def≥Y, hp≥Z``) and whose body is the set of anchor-flip
+    bullets that the tier's spec actually clears, plus a collapsed table
+    of the tier's member IVs.
 
     Filter rule: an anchor with ``target_stat='atk'`` belongs to a tier iff
     the tier specifies an atk cutoff and that cutoff is ``>=`` the anchor's
-    threshold value (i.e. the tier clears the anchor). Symmetric for def-
-    side anchors. Tiers with no cutoff for an anchor's stat never include
-    that anchor; HP-only anchors don't exist today (no anchor has
-    ``target_stat='hp'``). Overlap across tiers is intentional and matches
-    RyanSwag's format — each card shows what its spec buys you, even when
-    a stricter tier above also buys it.
+    threshold value (i.e. the tier clears the anchor). Symmetric for def.
+    Overlap across tiers is intentional.
 
-    Auto-only: bullet text is whatever ``_render_anchor_flip_bullets``
-    produces from the resolved anchors. No new TOML schema work — see TODO
-    "Hand-named composite categories via TOML" for the round-two follow-up.
+    Args:
+        override_tiers: optional list of tier dicts to use instead of
+            ``data_obj['tiers']``. Used by the auto-derive path when the
+            TOML doesn't supply tiers.
     """
-    tiers = data_obj.get('tiers', [])
+    tiers = override_tiers if override_tiers is not None else data_obj.get('tiers', [])
     if not tiers:
         return ''
     n_ivs = data_obj.get('nIvs', 0)
+    iv_tiers_precomputed = data_obj.get('ivTiers') if override_tiers is None else None
 
     parts = []
     parts.append('<h3 class="dd-h3" id="dd-threshold-tiers">Threshold Tiers</h3>\n')
@@ -2826,9 +2968,9 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
         hp_cut = t.get('stamina', 0) or 0
         cutoff_bits = []
         if atk_cut > 0:
-            cutoff_bits.append(f'atk≥{atk_cut:g}')
+            cutoff_bits.append(f'atk≥{atk_cut:.2f}')
         if def_cut > 0:
-            cutoff_bits.append(f'def≥{def_cut:g}')
+            cutoff_bits.append(f'def≥{def_cut:.2f}')
         if hp_cut > 0:
             cutoff_bits.append(f'hp≥{hp_cut:g}')
         cutoffs_str = ', '.join(cutoff_bits) if cutoff_bits else 'no cutoff'
@@ -2846,7 +2988,23 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
             elif stat == 'def' and def_cut > 0 and def_cut >= tv:
                 tier_records.append(rec)
 
-        tier_ivs = [iv for iv in range(n_ivs) if data_obj['ivTiers'][iv] == ti]
+        # Tier membership: use precomputed ivTiers when available (TOML path),
+        # else compute on the fly from stat cutoffs (auto-derive path).
+        if iv_tiers_precomputed is not None:
+            tier_ivs = [iv for iv in range(n_ivs)
+                        if iv_tiers_precomputed[iv] == ti]
+        else:
+            tier_ivs = []
+            for iv in range(n_ivs):
+                meets = True
+                if atk_cut > 0 and data_obj['ivAtk'][iv] < atk_cut:
+                    meets = False
+                if def_cut > 0 and data_obj['ivDef'][iv] < def_cut:
+                    meets = False
+                if hp_cut > 0 and data_obj['ivHp'][iv] < hp_cut:
+                    meets = False
+                if meets:
+                    tier_ivs.append(iv)
         n_members = len(tier_ivs)
 
         color = t.get('color', '#888')
@@ -3309,9 +3467,25 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         print(f"  Anchor-flip aggregator: {anchor_flip_debug}")
 
     # -- Threshold Tiers (RyanSwag-style, stat-target-forward) --
-    if data_obj.get('tiers'):
+    # Use TOML tiers when they have meaningful atk/def cutoffs; otherwise
+    # auto-derive from anchor-flip records so a fully clean dive still
+    # produces named stat-target tiers. The statistical auto-discover
+    # (Top 5% etc.) often only finds HP cutoffs, which don't connect to
+    # anchors — those tiers get replaced by anchor-derived ones.
+    effective_tiers = data_obj.get('tiers') or []
+    _has_anchor_relevant_cutoffs = any(
+        (t.get('attack', 0) or 0) > 0 or (t.get('defense', 0) or 0) > 0
+        for t in effective_tiers
+    )
+    if not _has_anchor_relevant_cutoffs and anchor_flip_records:
+        effective_tiers = _auto_derive_tiers(anchor_flip_records, data_obj)
+        if effective_tiers:
+            print(f"  Auto-derived {len(effective_tiers)} threshold tier(s) "
+                  f"from anchor-flip records")
+    if effective_tiers:
         tier_cards_html = _render_threshold_tier_cards(
             data_obj, anchor_flip_records, avg_ranks, flip_map,
+            override_tiers=effective_tiers,
         )
         if tier_cards_html:
             results_parts.append(tier_cards_html)

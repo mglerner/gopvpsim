@@ -520,6 +520,50 @@ class TestRenderThresholdTierCards:
         html = deep_dive._render_threshold_tier_cards(data_obj, [], {}, {})
         assert html == ''
 
+    def test_auto_derived_tiers_render_with_bullets(self):
+        """Tiers synthesized by _auto_derive_tiers should produce cards with
+        matching anchor bullets when passed via override_tiers."""
+        # Two opponents: one atk anchor, one def anchor
+        a_atk = ResolvedAnchor(
+            name='bp', parent_display_name='mirror', parent='bp',
+            kind='damage_breakpoint', threshold_value=121.39,
+            target_stat='atk', opponent='Mirror',
+        )
+        a_def = ResolvedAnchor(
+            name='blkp', parent_display_name='sealeo blkp', parent='blkp',
+            kind='bulkpoint', threshold_value=101.5,
+            target_stat='def', opponent='Sealeo',
+        )
+        records = [
+            {'anchor': a_atk, 'opponent': 'Mirror',
+             'scenarios': [(0, 0), (1, 1)], 'direction': 'gain'},
+            {'anchor': a_def, 'opponent': 'Sealeo',
+             'scenarios': [(1, 2)], 'direction': 'gain'},
+        ]
+        data_obj = _make_tier_data_obj(
+            n_ivs=4, tiers=[],  # no TOML tiers
+            tier_assignments=[-1, -1, -1, -1],
+            atk_vals=[120, 122, 125, 128],
+            def_vals=[100, 102, 104, 106],
+            hp_vals=[140, 140, 140, 140],
+        )
+        auto_tiers = deep_dive._auto_derive_tiers(records, data_obj)
+        assert len(auto_tiers) >= 2
+        # Should have a General tier and at least one specialist
+        names = [t['name'] for t in auto_tiers]
+        assert 'General' in names
+
+        # Render with override_tiers — should produce bullets
+        html = deep_dive._render_threshold_tier_cards(
+            data_obj, records,
+            avg_ranks={0: 1, 1: 2, 2: 3, 3: 4},
+            flip_map={},
+            override_tiers=auto_tiers,
+        )
+        assert '121.39 Atk' in html
+        assert '101.50 Def' in html
+        assert 'General' in html
+
     def test_no_records_still_renders_tier_headline(self):
         tiers = [{'name': 'Solo', 'desc': 'test', 'color': '#fff',
                   'attack': 130, 'defense': 0, 'stamina': 0}]
