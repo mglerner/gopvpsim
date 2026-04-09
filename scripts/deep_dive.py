@@ -2314,6 +2314,252 @@ def _prose_flip_summary(flip_data, max_gains=3, max_losses=2):
     return '; '.join(parts) if parts else 'no matchup flips'
 
 
+def _format_stat_cutoffs(cutoffs):
+    """Render an IVCategory.stat_cutoffs dict as a human-readable string,
+    e.g. ``atk≥128, hp≥139``. Returns '' if no constraints are set."""
+    if not cutoffs:
+        return ''
+    parts = []
+    if cutoffs.get('atk'):
+        parts.append(f"atk≥{cutoffs['atk']:g}")
+    if cutoffs.get('def'):
+        parts.append(f"def≥{cutoffs['def']:g}")
+    if cutoffs.get('hp'):
+        parts.append(f"hp≥{cutoffs['hp']:g}")
+    return ', '.join(parts)
+
+
+def _composite_tradeoff_prose(member_idx, comp_cat, parent_categories, data_obj):
+    """Auto-generate the per-member tradeoff prose for a composite category.
+
+    The Annihilape 13/0/11 wording is the literal target:
+        "Sole Atk Slayer that also clears the Top 5% bulk floor (HP≥139).
+         Trades mirror dominance (45/132 wins, vs 132/132 for the top
+         survivors) for the broader-meta bulk floor."
+
+    Inputs:
+        member_idx: canonical IV index of the member to describe.
+        comp_cat: the composite IVCategory.
+        parent_categories: dict of name → IVCategory for the parent
+            slayer/tier categories the composite was built from. Used
+            to compute the "max wins in cohort" baseline.
+        data_obj: for stat lookups (used by callers; this helper itself
+            only reads parent_categories).
+
+    Returns a single string sentence (HTML-safe; no tags).
+    """
+    if not comp_cat.source_categories or len(comp_cat.source_categories) < 2:
+        return ''
+    slayer_name, tier_name = comp_cat.source_categories[0], comp_cat.source_categories[1]
+    slayer_parent = parent_categories.get(slayer_name)
+    n_in_comp = len(comp_cat.members)
+
+    # Identity sentence
+    if n_in_comp == 1:
+        identity = (f"The sole {slayer_name} that also clears "
+                    f"the {tier_name} threshold")
+    else:
+        identity = (f"One of {n_in_comp} {slayer_name} members "
+                    f"that also clear the {tier_name} threshold")
+    cutoffs = _format_stat_cutoffs(comp_cat.stat_cutoffs)
+    if cutoffs:
+        identity += f" ({cutoffs})"
+    identity += '.'
+
+    # Tradeoff sentence — compute against the slayer cohort's max wins.
+    tradeoff = ''
+    if slayer_parent and slayer_parent.member_meta:
+        all_wins = [
+            meta.get('total_wins', 0)
+            for meta in slayer_parent.member_meta.values()
+        ]
+        max_wins = max(all_wins) if all_wins else 0
+        this_wins = (slayer_parent.member_meta.get(member_idx, {})
+                     .get('total_wins', 0))
+        if max_wins > 0 and this_wins < max_wins:
+            tradeoff = (f" Trades mirror dominance ({this_wins}/{max_wins} wins, "
+                        f"vs {max_wins}/{max_wins} for the top {slayer_name} "
+                        f"survivors) for the {tier_name} cutoff.")
+        elif max_wins > 0 and this_wins == max_wins:
+            tradeoff = (f" Carries top {slayer_name} mirror wins "
+                        f"({this_wins}/{max_wins}) AND clears the {tier_name} "
+                        f"cutoff — no tradeoff.")
+    return identity + tradeoff
+
+
+def _matchup_subtitle(cat):
+    """Render an IVCategory.matchup_conditions list as a one-line summary
+    (e.g. ``rank 1 Lickitung · 0v0 · no-bait dim. not yet swept``).
+    Returns '' for non-matchup categories."""
+    if not cat.matchup_conditions:
+        return ''
+    bits = []
+    for c in cat.matchup_conditions:
+        opp = c.get('opponent', '?')
+        opp_iv = c.get('opponent_ivs', '?')
+        opp_iv_label = ('PvPoke default' if opp_iv == 'pvpoke'
+                        else 'rank 1' if opp_iv == 'rank1' else opp_iv)
+        scen = c.get('scenario', (0, 0))
+        bait = c.get('bait')
+        outcome = c.get('outcome', 'win')
+        b = f'{opp_iv_label} {opp} · {scen[0]}v{scen[1]} · {outcome}'
+        if bait is None:
+            b += ' (bait dim. not yet swept)'
+        else:
+            b += f' · {bait}'
+        bits.append(b)
+    return ' | '.join(bits)
+
+
+def _render_notable_ivs_section(categories, data_obj, opp_iv_mode,
+                                  notable_max_pct=0.05,
+                                  notable_max_count=5,
+                                  max_members_shown=5):
+    """Render the "Notable IVs" HTML section from a list of IVCategory.
+
+    Surfaces composite (slayer ∩ tier) and matchup categories — the
+    intersections that the SwagTips-style structured-IV-categories goal
+    is about. Pure slayer and pure tier categories already have
+    dedicated UI elsewhere on the page; this section is *additive*,
+    not a replacement, for round one.
+
+    Args:
+        categories: full list from build_iv_categories(). Pure
+            slayer/tier kinds are filtered out at render time so the
+            section stays focused on intersections.
+        data_obj: the JS-bound data object (for IV labels, sp ranks).
+        opp_iv_mode: 'pvpoke' or 'rank1' (used for the prose).
+        notable_max_pct: float — categories with member count <= this
+            fraction of nIvs are tagged dd-notable. The UI checkbox
+            defaults to "show only notable" using this class.
+        notable_max_count: hard cap on the notable bucket regardless
+            of pct (e.g. ≤ 5 members is always notable).
+        max_members_shown: per-card cap on listed members before the
+            "expand" toggle.
+
+    Returns: HTML string. Empty string if no notable categories exist.
+    """
+    n_ivs = data_obj.get('nIvs', 0) or 1
+    parent_categories = {c.name: c for c in categories
+                         if c.kind in ('slayer', 'tier', 'structural')}
+    target = [c for c in categories if c.kind in ('composite', 'matchup')]
+    if not target:
+        return ''
+
+    # Sort: composites first (the headline), then matchups, with smaller
+    # categories first within each kind so the most distinctive cards
+    # land at the top of the grid.
+    kind_order = {'composite': 0, 'matchup': 1}
+    target.sort(key=lambda c: (kind_order.get(c.kind, 99), len(c.members), c.name))
+
+    parts = []
+    parts.append('<h3 class="dd-h3" id="dd-notable-ivs">Notable IVs</h3>\n')
+    parts.append(
+        '<p class="dd-small">Cross-category IVs and notable matchup '
+        'wins. Composite cards (slayer&nbsp;∩&nbsp;tier) surface IVs '
+        'that satisfy a slayer anchor <em>and</em> a stat-cutoff '
+        'threshold tier — the rare intersections that trade some '
+        'slayer optimum for a broader-meta floor (or vice versa). '
+        'Matchup cards surface non-trivial '
+        '(opponent,&nbsp;scenario)&nbsp;partitions for selective '
+        'matchups. Pure slayer cards live in the Mirror Slayer '
+        'Iteration block below; pure tier cards in the Threshold Tier '
+        'Summary above. The bait-axis dimension is not yet swept '
+        '— see TODO &ldquo;Baiting policy as a deep-dive sim '
+        'axis.&rdquo;</p>\n'
+    )
+
+    # Notability filter checkbox. Default ON: show only small,
+    # distinctive categories. JS toggles a class on the section
+    # container; each card carries dd-notable / dd-not-notable.
+    parts.append("""<script>
+function ddNotableToggle(cb) {
+  var sec = document.getElementById('dd-notable-ivs-section');
+  if (!sec) return;
+  sec.classList.toggle('dd-notable-only', cb.checked);
+}
+</script>
+""")
+    parts.append(
+        '<div class="dd-callout"><label>'
+        '<input type="checkbox" id="dd-notable-only-cb" checked '
+        'onchange="ddNotableToggle(this)"> '
+        'Show only notable categories '
+        f'(≤ {int(notable_max_pct * 100)}% of cohort or '
+        f'≤ {notable_max_count} members). Uncheck to see every '
+        'non-trivial intersection.</label></div>\n'
+    )
+
+    parts.append(
+        '<div id="dd-notable-ivs-section" class="dd-notable-only">\n'
+    )
+    parts.append('<div class="dd-rec-grid">\n')
+
+    for cat in target:
+        n_members = len(cat.members)
+        is_notable = (n_members <= notable_max_count
+                      or n_members <= notable_max_pct * n_ivs)
+        notable_cls = 'dd-notable' if is_notable else 'dd-not-notable'
+
+        parts.append(f'<div class="dd-rec-card {notable_cls}">\n')
+        parts.append(
+            f'<h4>{cat.name} '
+            f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+            f'({n_members} IV{"s" if n_members != 1 else ""})'
+            f'</span></h4>\n'
+        )
+        # Description and provenance subtitle
+        if cat.kind == 'composite':
+            cutoffs = _format_stat_cutoffs(cat.stat_cutoffs)
+            sub = (f'{" + ".join(cat.source_categories)}'
+                   + (f' · {cutoffs}' if cutoffs else ''))
+            parts.append(f'<p class="dd-small dd-prose">{sub}</p>\n')
+        elif cat.kind == 'matchup':
+            sub = _matchup_subtitle(cat)
+            if sub:
+                parts.append(f'<p class="dd-small dd-prose">{sub}</p>\n')
+
+        # Member list — sort by total_wins desc when available, else
+        # by IV index. Cap at max_members_shown unless expanded.
+        def _sort_key(idx):
+            wins = cat.member_meta.get(idx, {}).get('total_wins', 0)
+            return (-wins, idx)
+        members_sorted = sorted(cat.members, key=_sort_key)
+        shown = members_sorted[:max_members_shown]
+
+        for m_idx in shown:
+            triple = (data_obj['ivA'][m_idx],
+                      data_obj['ivD'][m_idx],
+                      data_obj['ivS'][m_idx])
+            atk = data_obj['ivAtk'][m_idx]
+            def_ = data_obj['ivDef'][m_idx]
+            hp = data_obj['ivHp'][m_idx]
+            sp_rank = data_obj['spRanks'][m_idx]
+            label = f'{triple[0]}/{triple[1]}/{triple[2]}'
+            parts.append(
+                f'<p><b>{label}</b> &mdash; '
+                f'atk {atk:.2f}, def {def_:.2f}, hp {hp}, '
+                f'SP&nbsp;#{sp_rank}</p>\n'
+            )
+            if cat.kind == 'composite':
+                prose = _composite_tradeoff_prose(
+                    m_idx, cat, parent_categories, data_obj
+                )
+                if prose:
+                    parts.append(f'<p class="dd-prose">{prose}</p>\n')
+
+        if n_members > max_members_shown:
+            parts.append(
+                f'<p class="dd-small">… and {n_members - max_members_shown} '
+                f'more (not shown).</p>\n'
+            )
+        parts.append('</div>\n')  # rec-card
+
+    parts.append('</div>\n')  # rec-grid
+    parts.append('</div>\n')  # dd-notable-ivs-section
+    return ''.join(parts)
+
+
 def _aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
                                 resolved_anchors, data_obj, scenarios, opponents,
                                 win_threshold=500,
