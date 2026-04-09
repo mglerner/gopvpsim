@@ -461,7 +461,9 @@ function buildTraces() {
   if (anchorTrace) traces.push(anchorTrace);
 
   // Tier traces go LAST so they render on top of overlays.
+  // Sort largest first so smallest tiers (most selective) draw on top.
   if (typeof _tierTraces !== 'undefined') {
+    _tierTraces.sort(function(a, b) { return b.x.length - a.x.length; });
     for (var _ti = 0; _ti < _tierTraces.length; _ti++) {
       traces.push(_tierTraces[_ti]);
     }
