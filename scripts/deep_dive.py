@@ -2991,6 +2991,11 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 .dd-filter-status { color:#8b949e; font-size:0.72rem; margin-left:auto; }
 .dd-auto-marker { color:#d29922; font-size:0.7rem; font-weight:400;
   font-style:italic; }
+/* Notable IVs section: dd-notable-only is a section-level class that
+   hides every dd-not-notable card. The header checkbox toggles the
+   class via ddNotableToggle(); default state is "only notable". */
+.dd-notable-only .dd-not-notable { display: none; }
+.dd-rec-card.dd-notable { border-color: #d29922; }
 """
 
     opp_label = 'PvPoke default' if opp_iv_mode == 'pvpoke' else 'rank 1'
@@ -3167,6 +3172,32 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             results_parts.append('<ul class="dd-threshold-list">\n')
             results_parts.append('\n'.join(anchor_bullets))
             results_parts.append('\n</ul>\n')
+
+    # -- Notable IVs (cross-category callouts + matchup categories) --
+    # Unified IVCategory framework: surfaces composite (slayer ∩ tier)
+    # IVs and notable matchup partitions in one place. The Annihilape
+    # 13/0/11 case is the canonical composite example.
+    slayer_categories_for_ivcat = None
+    if slayer_iter_result:
+        slayer_categories_for_ivcat = slayer_iter_result.get('categories')
+    matchup_data_for_ivcat = {
+        'scores_flat': scores_flat,
+        'nS': nS, 'nO': nO,
+        'scenarios': scenarios,
+        'opponents': opponents,
+        'opp_iv_mode': opp_iv_mode,
+        'win_threshold': 500,
+    }
+    iv_categories_all = build_iv_categories(
+        data_obj,
+        slayer_categories=slayer_categories_for_ivcat,
+        matchup_data=matchup_data_for_ivcat,
+    )
+    notable_html = _render_notable_ivs_section(
+        iv_categories_all, data_obj, opp_iv_mode
+    )
+    if notable_html:
+        results_parts.append(notable_html)
 
     # -- Mirror Slayer Iteration --
     if slayer_iter_result and slayer_iter_result.get('final'):
