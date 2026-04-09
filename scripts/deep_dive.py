@@ -3489,52 +3489,13 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 
     # ======== RESULTS section (always visible) ========
 
-    # -- IV Recommendations --
     results_parts.append(f'<div class="dd-section" id="dd-recommendations">\n')
     results_parts.append(f'<h2 class="dd-h2">Deep Dive Results</h2>\n')
-    results_parts.append(f'<p>Recommendations based on average score, matchup flips, and rank stability '
-                         f'vs {opp_label} opponents. Moveset: {_pretty_moveset(moveset_label)}.</p>\n')
+    results_parts.append(f'<p>Moveset: {_pretty_moveset(moveset_label)}. '
+                         f'Vs {opp_label} opponents.</p>\n')
 
-    results_parts.append('<div class="dd-rec-grid">\n')
-    for i, rc in enumerate(rec_candidates[:3]):
-        iv = rc['iv']
-        nc = 'dd-gain' if rc['net'] > 0 else ('dd-loss' if rc['net'] < 0 else '')
-        fd = flips.get(iv, {'gains': [], 'losses': []})
-        prose = _prose_flip_summary(fd, max_gains=2, max_losses=1)
-        results_parts.append(f'<div class="dd-rec-card">\n')
-        results_parts.append(f'<h4>{rc["style"]}: {_iv_label(data_obj, iv)}{_tier_badge_html(data_obj, iv)}</h4>\n')
-        results_parts.append(f'<p>Atk={data_obj["ivAtk"][iv]:.2f}, Def={data_obj["ivDef"][iv]:.2f}, HP={data_obj["ivHp"][iv]}, SP #{data_obj["spRanks"][iv]}</p>\n')
-        results_parts.append(f'<p>Avg score rank: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f})</p>\n')
-        results_parts.append(f'<p>Flips vs {opp_label} ref: <span class="dd-gain">+{rc["gains"]}</span>/<span class="dd-loss">-{rc["losses"]}</span> = <span class="{nc}"><b>{rc["net"]:+d}</b></span></p>\n')
-        results_parts.append(f'<p class="dd-prose">{prose}</p>\n')
-        # Breakpoint narrations for top gains/losses
-        focal_atk_rc = data_obj['ivAtk'][iv]
-        focal_def_rc = data_obj['ivDef'][iv]
-        focal_hp_rc = data_obj['ivHp'][iv]
-        ref_hp_val = data_obj['ivHp'][ref_iv]
-        bp_lines = []
-        for is_gain, entries in [(True, fd.get('gains', [])[:2]), (False, fd.get('losses', [])[:1])]:
-            for e in entries:
-                opp_name = e['opponent']
-                if opp_name in opp_info_cache and focal_moves:
-                    oi = opp_info_cache[opp_name]
-                    narr = _narrate_flip(
-                        focal_atk_rc, focal_def_rc, focal_hp_rc,
-                        ref_atk, ref_def, ref_hp_val,
-                        oi['atk'], oi['def_'], opp_name,
-                        focal_moves, oi['moves'],
-                        focal_types, oi['types'],
-                        is_gain=is_gain,
-                    )
-                    if narr:
-                        bp_lines.append(narr)
-        if bp_lines:
-            results_parts.append(f'<p class="dd-small"><b style="color:#58a6ff">Key changes</b><br>{"<br>".join(bp_lines)}</p>\n')
-        results_parts.append('</div>\n')
-    results_parts.append('</div>\n')
-
-    # -- Compute anchor-flip records (used by both Threshold Tiers and
-    #    the flat Anchor-Driven Matchup Flips section below) --
+    # -- Compute anchor-flip records (used by Threshold Tiers, the flat
+    #    Anchor-Driven Matchup Flips section, and Notable IVs below) --
     anchor_flip_records = []
     if resolved_anchors_top:
         anchor_flip_debug = {}
@@ -3546,11 +3507,9 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         print(f"  Anchor-flip aggregator: {anchor_flip_debug}")
 
     # -- Threshold Tiers (RyanSwag-style, stat-target-forward) --
-    # Use TOML tiers when they have meaningful atk/def cutoffs; otherwise
-    # auto-derive from anchor-flip records so a fully clean dive still
-    # produces named stat-target tiers. The statistical auto-discover
-    # (Top 5% etc.) often only finds HP cutoffs, which don't connect to
-    # anchors — those tiers get replaced by anchor-derived ones.
+    # The headline section — closest to the scatter plot. Use TOML tiers
+    # when they have atk/def cutoffs; otherwise auto-derive from the
+    # anchor-flip records so a clean dive still gets real tiers.
     effective_tiers = data_obj.get('tiers') or []
     _has_anchor_relevant_cutoffs = any(
         (t.get('attack', 0) or 0) > 0 or (t.get('defense', 0) or 0) > 0
@@ -3568,38 +3527,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         )
         if tier_cards_html:
             results_parts.append(tier_cards_html)
-
-    # -- Key Matchup Thresholds --
-    threshold_descs = _generate_threshold_descriptions(flips, data_obj, avg_scores, ranked, opp_iv_mode)
-    if threshold_descs:
-        results_parts.append(f'<h3 class="dd-h3">Key Matchup Thresholds</h3>\n')
-        results_parts.append(f'<p>Matchups that flip vs {opp_label} opponents, '
-                             f'ordered by how many top IVs benefit:</p>\n')
-        results_parts.append('<ul class="dd-threshold-list">\n')
-        results_parts.append('\n'.join(threshold_descs))
-        results_parts.append('\n</ul>\n')
-
-    # -- Anchor-Driven Matchup Flips (flat list of every anchor) --
-    if anchor_flip_records:
-        anchor_bullets = _render_anchor_flip_bullets(anchor_flip_records)
-        if anchor_bullets:
-            results_parts.append('<h3 class="dd-h3">Anchor-Driven Matchup Flips</h3>\n')
-            results_parts.append(
-                '<p>Named anchors (from <code>thresholds/*.toml</code> or the '
-                'auto-fallback layer) that cleanly partition matchup wins/losses '
-                f'against their opponent. Each bullet lists the shield scenarios '
-                f'in which IVs clearing the anchor reliably win and IVs failing '
-                f'it reliably lose. Vs {opp_label} opponents.</p>\n'
-            )
-            results_parts.append(
-                '<p class="dd-small">Format: <em>threshold</em> for <em>anchor name</em> '
-                'vs <em>opponent</em> (<em>shield scenarios where the partition holds</em>). '
-                'Bait/farm and move-restriction dimensions are not yet swept — '
-                'see TODO &ldquo;Baiting policy as a deep-dive sim axis&rdquo;.</p>\n'
-            )
-            results_parts.append('<ul class="dd-threshold-list">\n')
-            results_parts.append('\n'.join(anchor_bullets))
-            results_parts.append('\n</ul>\n')
 
     # -- Notable IVs (cross-category callouts + matchup categories) --
     # Unified IVCategory framework: surfaces composite (slayer ∩ tier)
@@ -4207,6 +4134,80 @@ function ddToggleTagsCompactCell(event) {
                         )
                     results_parts.append('</table>\n')
                     results_parts.append('</details>\n')
+
+    # -- IV Recommendations (top-3 by composite score) --
+    results_parts.append('<h3 class="dd-h3">IV Recommendations</h3>\n')
+    results_parts.append(
+        f'<p class="dd-small">Top candidates by average score, matchup flips, '
+        f'and rank stability vs {opp_label} opponents.</p>\n')
+    results_parts.append('<div class="dd-rec-grid">\n')
+    for i, rc in enumerate(rec_candidates[:3]):
+        iv = rc['iv']
+        nc = 'dd-gain' if rc['net'] > 0 else ('dd-loss' if rc['net'] < 0 else '')
+        fd = flips.get(iv, {'gains': [], 'losses': []})
+        prose = _prose_flip_summary(fd, max_gains=2, max_losses=1)
+        results_parts.append(f'<div class="dd-rec-card">\n')
+        results_parts.append(f'<h4>{rc["style"]}: {_iv_label(data_obj, iv)}{_tier_badge_html(data_obj, iv)}</h4>\n')
+        results_parts.append(f'<p>Atk={data_obj["ivAtk"][iv]:.2f}, Def={data_obj["ivDef"][iv]:.2f}, HP={data_obj["ivHp"][iv]}, SP #{data_obj["spRanks"][iv]}</p>\n')
+        results_parts.append(f'<p>Avg score rank: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f})</p>\n')
+        results_parts.append(f'<p>Flips vs {opp_label} ref: <span class="dd-gain">+{rc["gains"]}</span>/<span class="dd-loss">-{rc["losses"]}</span> = <span class="{nc}"><b>{rc["net"]:+d}</b></span></p>\n')
+        results_parts.append(f'<p class="dd-prose">{prose}</p>\n')
+        focal_atk_rc = data_obj['ivAtk'][iv]
+        focal_def_rc = data_obj['ivDef'][iv]
+        focal_hp_rc = data_obj['ivHp'][iv]
+        ref_hp_val = data_obj['ivHp'][ref_iv]
+        bp_lines = []
+        for is_gain, entries in [(True, fd.get('gains', [])[:2]), (False, fd.get('losses', [])[:1])]:
+            for e in entries:
+                opp_name = e['opponent']
+                if opp_name in opp_info_cache and focal_moves:
+                    oi = opp_info_cache[opp_name]
+                    narr = _narrate_flip(
+                        focal_atk_rc, focal_def_rc, focal_hp_rc,
+                        ref_atk, ref_def, ref_hp_val,
+                        oi['atk'], oi['def_'], opp_name,
+                        focal_moves, oi['moves'],
+                        focal_types, oi['types'],
+                        is_gain=is_gain,
+                    )
+                    if narr:
+                        bp_lines.append(narr)
+        if bp_lines:
+            results_parts.append(f'<p class="dd-small"><b style="color:#58a6ff">Key changes</b><br>{"<br>".join(bp_lines)}</p>\n')
+        results_parts.append('</div>\n')
+    results_parts.append('</div>\n')
+
+    # -- Key Matchup Thresholds --
+    threshold_descs = _generate_threshold_descriptions(flips, data_obj, avg_scores, ranked, opp_iv_mode)
+    if threshold_descs:
+        results_parts.append(f'<h3 class="dd-h3">Key Matchup Thresholds</h3>\n')
+        results_parts.append(f'<p>Matchups that flip vs {opp_label} opponents, '
+                             f'ordered by how many top IVs benefit:</p>\n')
+        results_parts.append('<ul class="dd-threshold-list">\n')
+        results_parts.append('\n'.join(threshold_descs))
+        results_parts.append('\n</ul>\n')
+
+    # -- Anchor-Driven Matchup Flips (flat list of every anchor) --
+    if anchor_flip_records:
+        anchor_bullets = _render_anchor_flip_bullets(anchor_flip_records)
+        if anchor_bullets:
+            results_parts.append('<h3 class="dd-h3">Anchor-Driven Matchup Flips</h3>\n')
+            results_parts.append(
+                '<p>Named anchors (from <code>thresholds/*.toml</code> or the '
+                'auto-fallback layer) that cleanly partition matchup wins/losses '
+                f'against their opponent. Each bullet lists the shield scenarios '
+                f'in which IVs clearing the anchor reliably win and IVs failing '
+                f'it reliably lose. Vs {opp_label} opponents.</p>\n'
+            )
+            results_parts.append(
+                '<p class="dd-small">Format: <em>threshold</em> for <em>anchor name</em> '
+                'vs <em>opponent</em> (<em>shield scenarios where the partition holds</em>). '
+                'Bait/farm and move-restriction dimensions are not yet swept — '
+                'see TODO &ldquo;Baiting policy as a deep-dive sim axis&rdquo;.</p>\n'
+            )
+            results_parts.append('<ul class="dd-threshold-list">\n')
+            results_parts.append('\n'.join(anchor_bullets))
+            results_parts.append('\n</ul>\n')
 
     results_parts.append('</div>\n')
 
