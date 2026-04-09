@@ -1,19 +1,130 @@
-# Tinkaton — Great League thresholds.
+# Tinkaton — Great League thresholds, spreads, and slayer anchors.
 #
-# Current data is Gigaton Hammer stat-cutoff spreads, preserved from the
-# legacy JSON file. Source: HomeSliceHenry Discord server.
+# Sources:
+#   - acidArisen #iv-tech writeup on HomeSliceHenry Discord server
+#     (datamined Gigaton Hammer 130/60, stat checks for GL Tinkaton)
+#   - Legacy JSON thresholds (GH Great / GH Good bulk cutoffs)
 
 [Tinkaton]
-sources = "HomeSliceHenry Discord server; Gigaton Hammer matchups"
+sources = "acidArisen (HSH Discord #iv-tech); legacy JSON thresholds"
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — stat-cutoff tiers from the acidArisen summary
+# ─────────────────────────────────────────────────────────────────────
 
 [Tinkaton.Great.spreads."GH Great"]
 attack = 0
 defense = 143.03
 stamina = 138
-description = "Gigaton Hammer 'great' bulk cutoff."
+description = "Premium bulk: Azu bulkpoint + Medicham survival + all lower def checks."
 
 [Tinkaton.Great.spreads."GH Good"]
 attack = 0
 defense = 141.66
 stamina = 138
-description = "Gigaton Hammer 'good' bulk cutoff (slightly relaxed)."
+description = "Medicham Dynamic Punch survival (1s no bait) + all lower def checks."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — CMP ties (atk-side)
+#
+# acidArisen notes CMP thresholds at 105.58 (Corviknight), 105.79
+# (Lickilicky, flips 2s no-bait), 105.90 (Medicham, Jellicent). These
+# require IV-list spreads to encode as CMP anchors in our schema;
+# deferred until CMP anchors support single-opponent shorthand (see
+# TODO "Schema simplification"). The BP/blkp anchors below cover the
+# matchup-flipping thresholds.
+# ─────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side)
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 3: discover all Jellicent BPs. acidArisen notes 106.20 atk
+# beats Jellicent in 1-0 regardless of bait.
+[Tinkaton.Great.anchors.jellicent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent damage breakpoints. acidArisen: 106.20 atk flips the 1-0."
+
+# Level 3: discover all Annihilape BPs. acidArisen notes 106.58 atk
+# gives a bulkpoint vs rank 1 Annihilape (but doesn't flip matchups).
+[Tinkaton.Great.anchors.annihilape_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape damage breakpoints. acidArisen: 106.58 atk gives a BP."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side)
+#
+# These are the core of the acidArisen writeup: def thresholds that
+# flip specific matchups by reducing incoming damage.
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 3: discover all Azumarill bulkpoints. acidArisen: 143.03 def
+# flips 1-2 vs rank 1 Azu.
+[Tinkaton.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. acidArisen: 143.03 def flips 1-2."
+
+# Level 3: discover all Medicham bulkpoints. acidArisen: 141.66 def +
+# 138 hp survives Dynamic Punch to win 1s no bait.
+[Tinkaton.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. acidArisen: 141.66 def + 138 hp flips 1s."
+
+# Level 3: discover all Corsola (Galarian) bulkpoints. acidArisen:
+# 143.04 def + 140 hp reaches two Gigaton Hammers in the 0s.
+[Tinkaton.Great.anchors.corsola_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover all G-Corsola bulkpoints. acidArisen: 143.04 def + 140 hp flips 0s."
+
+# Level 3: discover all Shadow Altaria bulkpoints. acidArisen:
+# 143.04 def + 141 hp flips 0-1 no bait. Shadow IV variance noted.
+[Tinkaton.Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints. acidArisen: 143.04 def + 141 hp flips 0-1. High shadow IV variance."
+
+# Level 3: discover all Corviknight bulkpoints (the mirror).
+[Tinkaton.Great.anchors.corviknight_blkp_any]
+kind = "bulkpoint"
+opponent = "Corviknight"
+description = "Discover all Corviknight bulkpoints."
+
+# Level 3: discover all Quagsire bulkpoints (GL #1).
+[Tinkaton.Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire bulkpoints."
+
+# Level 3: the mirror.
+[Tinkaton.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Tinkaton"
+description = "Discover all mirror Tinkaton bulkpoints."
+
+# ─────────────────────────────────────────────────────────────────────
+# Opponents not in top-20 that acidArisen calls out
+# (auto-included via TOML anchor opponent injection)
+# ─────────────────────────────────────────────────────────────────────
+
+# Shadow Drapion: 140.21 def bulkpoint flips 0-1.
+[Tinkaton.Great.anchors.shadow_drapion_blkp_any]
+kind = "bulkpoint"
+opponent = "Drapion (Shadow)"
+description = "Discover all Shadow Drapion bulkpoints. acidArisen: 140.21 def flips 0-1."
+
+# Shadow Politoed: 140.91 def bulkpoint flips 0s.
+[Tinkaton.Great.anchors.shadow_politoed_blkp_any]
+kind = "bulkpoint"
+opponent = "Politoed (Shadow)"
+description = "Discover all Shadow Politoed bulkpoints. acidArisen: 140.91 def flips 0s."
+
+# Annihilape: already covered by the atk-side BP above.
+[Tinkaton.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints."

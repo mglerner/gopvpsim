@@ -2922,11 +2922,73 @@ def _auto_derive_tiers(anchor_flip_records, data_obj):
     return tiers
 
 
+def _probe_tier_cutoff_flips(data_obj, score_arrays_all, moveset_idx,
+                             atk_cut, def_cut, hp_cut,
+                             scenarios, opponents,
+                             pass_winrate_min=0.75, fail_winrate_max=0.25):
+    """Probe a tier's stat cutoffs directly as a partition point.
+
+    For each (opponent, scenario, opp_iv_mode), partition IVs by whether
+    they meet ALL of the tier's cutoffs and check win-rate cleanliness.
+    Returns a list of dicts: {opponent, scenario, opp_iv_mode, pass_wr,
+    fail_wr}. This catches matchup flips at the tier boundary that fall
+    between Level 3 sub-anchor thresholds (e.g. acidArisen's 143.03 def
+    vs Azu, which lies between the damage tiers at 142.34 and 144.41).
+    """
+    nIvs = data_obj.get('nIvs', 0)
+    nS = len(scenarios)
+    nO = len(opponents)
+    if nIvs == 0 or nO == 0:
+        return []
+
+    passing = []
+    failing = []
+    for iv in range(nIvs):
+        meets = True
+        if atk_cut > 0 and data_obj['ivAtk'][iv] < atk_cut:
+            meets = False
+        if def_cut > 0 and data_obj['ivDef'][iv] < def_cut:
+            meets = False
+        if hp_cut > 0 and data_obj['ivHp'][iv] < hp_cut:
+            meets = False
+        (passing if meets else failing).append(iv)
+
+    if not passing or not failing:
+        return []
+
+    results = []
+    all_modes = data_obj.get('oppIvModes', ['pvpoke'])
+    for mode in all_modes:
+        key = f'{moveset_idx}_{mode}'
+        scores_flat = score_arrays_all.get(key, [])
+        if not scores_flat:
+            continue
+        for si, scen in enumerate(scenarios):
+            for oi, opp in enumerate(opponents):
+                pw = sum(1 for iv in passing
+                         if scores_flat[iv * nS * nO + si * nO + oi] >= 500
+                         ) / len(passing)
+                fw = sum(1 for iv in failing
+                         if scores_flat[iv * nS * nO + si * nO + oi] >= 500
+                         ) / len(failing)
+                if pw >= pass_winrate_min and fw <= fail_winrate_max:
+                    results.append({
+                        'opponent': opp,
+                        'scenario': scen,
+                        'opp_iv_mode': mode,
+                        'pass_wr': pw,
+                        'fail_wr': fw,
+                    })
+    return results
+
+
 def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                                   avg_ranks, flip_map,
                                   max_members_shown=10,
                                   max_members_rendered=50,
-                                  override_tiers=None):
+                                  override_tiers=None,
+                                  score_arrays=None,
+                                  moveset_idx=0):
     """RyanSwag-style threshold tier cards.
 
     Each tier becomes a card whose headline is the tier's stat-target spec
@@ -2949,6 +3011,8 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
         return ''
     n_ivs = data_obj.get('nIvs', 0)
     iv_tiers_precomputed = data_obj.get('ivTiers') if override_tiers is None else None
+    scenarios = [tuple(s) for s in data_obj.get('scenarios', [])]
+    opponents = data_obj.get('opponents', [])
 
     parts = []
     parts.append('<h3 class="dd-h3" id="dd-threshold-tiers">Threshold Tiers</h3>\n')
@@ -3087,6 +3151,44 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                 '<p class="dd-small">No named anchors fall within '
                 "this tier's spec.</p>\n"
             )
+
+        # --- Tier-cutoff probe: matchup flips at the tier's own spec ---
+        # Catches flips that fall between Level 3 sub-anchor thresholds
+        # (e.g. acidArisen's 143.03 def vs Azu lives between damage
+        # tiers at 142.34 and 144.41).
+        if score_arrays and (atk_cut > 0 or def_cut > 0):
+            probe_results = _probe_tier_cutoff_flips(
+                data_obj, score_arrays, moveset_idx,
+                atk_cut, def_cut, hp_cut,
+                scenarios, opponents,
+            )
+            if probe_results:
+                # Group by opponent, union scenarios
+                _probe_opps: dict = {}
+                for pr in probe_results:
+                    _probe_opps.setdefault(pr['opponent'], set()).add(
+                        tuple(pr['scenario']))
+                # Filter out opponents already covered by anchor bullets
+                _anchor_opps = {r['opponent'] for r in tier_records}
+                _new_opps = {o for o in _probe_opps if o not in _anchor_opps}
+                if _new_opps:
+                    parts.append(
+                        '<p class="dd-small" style="margin-top:6px">'
+                        '<b style="color:#d29922">Additional matchup flips '
+                        'at this tier\'s spec</b> (not explained by a single '
+                        'anchor — may involve HP or multi-stat interactions):'
+                        '</p>\n'
+                    )
+                    parts.append('<ul class="dd-threshold-list">\n')
+                    for opp in sorted(_new_opps):
+                        scens = sorted(_probe_opps[opp])
+                        scen_str = ', '.join(f'{s[0]}v{s[1]}' for s in scens)
+                        parts.append(
+                            f'<li>vs <b>{opp}</b> '
+                            f'(<span class="dd-gain">{scen_str}</span>)'
+                            f'</li>\n'
+                        )
+                    parts.append('</ul>\n')
 
         # --- Member IVs (collapsed, with expand toggle) ---
         if tier_ivs:
@@ -3496,15 +3598,33 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 
     # -- Compute anchor-flip records (used by Threshold Tiers, the flat
     #    Anchor-Driven Matchup Flips section, and Notable IVs below) --
+    # Run the aggregator against every opp_iv_mode (pvpoke, rank1, or both)
+    # and union the results. acidArisen-style thresholds are often against
+    # rank-1 opponent IVs; running only against pvpoke defaults would miss
+    # them. Dedup by (anchor.name, opponent, frozenset(scenarios)) so a
+    # record that fires in both modes doesn't appear twice.
     anchor_flip_records = []
     if resolved_anchors_top:
-        anchor_flip_debug = {}
-        anchor_flip_records = _aggregate_flips_by_anchor(
-            scores_flat, nIvs, nS, nO,
-            resolved_anchors_top, data_obj, scenarios, opponents,
-            debug_stats=anchor_flip_debug,
-        )
-        print(f"  Anchor-flip aggregator: {anchor_flip_debug}")
+        _seen_keys: set = set()
+        all_modes = data_obj.get('oppIvModes', [opp_iv_mode])
+        for _mode in all_modes:
+            _key = f'{moveset_idx}_{_mode}'
+            _scores = score_arrays.get(_key, [])
+            if not _scores:
+                continue
+            _debug: dict = {}
+            _recs = _aggregate_flips_by_anchor(
+                _scores, nIvs, nS, nO,
+                resolved_anchors_top, data_obj, scenarios, opponents,
+                debug_stats=_debug,
+            )
+            for rec in _recs:
+                dedup_key = (rec['anchor'].name, rec['opponent'],
+                             frozenset(tuple(s) for s in rec['scenarios']))
+                if dedup_key not in _seen_keys:
+                    _seen_keys.add(dedup_key)
+                    anchor_flip_records.append(rec)
+            print(f"  Anchor-flip aggregator ({_mode}): {_debug}")
 
     # -- Threshold Tiers (RyanSwag-style, stat-target-forward) --
     # The headline section — closest to the scatter plot. Use TOML tiers
@@ -3524,6 +3644,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         tier_cards_html = _render_threshold_tier_cards(
             data_obj, anchor_flip_records, avg_ranks, flip_map,
             override_tiers=effective_tiers,
+            score_arrays=score_arrays, moveset_idx=moveset_idx,
         )
         if tier_cards_html:
             results_parts.append(tier_cards_html)
