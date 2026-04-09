@@ -150,6 +150,13 @@
   This is the missing context that would let us promote a specific
   bulkpoint to a Level 1 anchor with full provenance.
 
+* **Rename `mercuryish` → `acidicArisen` throughout the codebase** —
+  acidicArisen is their preferred username on HSH's Discord; we've been
+  using the older `mercuryish` handle in code, comments, docs, validation
+  writeups, and TOML provenance fields. Sweep the repo (code, docs/,
+  thresholds/, DEVELOPER_NOTES.md, TODO.md, validation writeups) and
+  update references. Discovered 2026-04-09.
+
 ## Slayer card UX (post-bulkpoint shipped 2026-04-08)
 
 * **Slayer-card signal-loss audit + design discussion** *(needs design
@@ -248,29 +255,28 @@
 
 ## Deep-dive narrative
 
-* **Cross-category IV callouts** — When a slayer IV *also* clears a
-  non-slayer threshold tier (Top 5%, Good, etc.) or vice versa, the
-  intersection is rare and notable: it's an IV that sacrifices some
-  slayer optimum to stay competitive on the broader-meta avg-score
-  axis (or vice versa). The deep-dive narrative should automatically
-  detect these intersection IVs and call them out with their specific
-  trade-off framed in plain English. This is a building block of the
-  SwagTips-style structured-IV-categories goal — instead of a generic
-  "here's the top-N table," surface specific named IVs with a clear
-  identity ("the compromise slayer," "the bulk-floor slayer," etc.).
-  Concrete example surfaced 2026-04-09 during wins-axis feature work:
-  Annihilape `13/0/11` (atk 128.33, def 98.04, hp 139, SP rank #1767)
-  was the *sole* slayer IV in a 66-IV survivor cohort that also
-  cleared the auto-discovered Top 5% (HP≥139) bulk floor. It sits in
-  Atk Slayer + Bulk Slayer with 45/132 mirror wins — middle-of-pack
-  within the slayer cohort, but the only one that clears the
-  broader-meta bulk floor. Call-out wording could be along the lines
-  of: "13/0/11 is the rare bulk-floor slayer — it gives up mirror
-  dominance (45/132 wins, vs 132/132 for the top survivors) to clear
-  HP≥139, making it the only slayer-grade IV that doesn't sacrifice
-  the broader-meta bulk floor." Detection logic: any IV in
-  `slayerCatsByIv` whose `ivTiers` value is non-negative qualifies.
-  Cross-ref: SwagTips-style structured-IV-categories TODO.
+* **Hand-named composite categories via TOML** *(round 2 of structured
+  IV categories)* — Round 1 shipped 2026-04-09 (commits f3aa4ad, 8ff4469,
+  79e2e87, b344356) as the unified `IVCategory` framework with
+  literal-intersection naming (`Atk Slayer ∩ Top 5%`). The natural next
+  step is a `[Species.Great.categories.<name>]` TOML table that lets
+  the user assign a memorable display name + custom description to a
+  specific intersection (`bulk_floor_slayer`, `compromise_slayer`,
+  etc.) and override the literal name with the playstyle name. Schema
+  sketch: `includes_anchors = [...]` + `includes_tier = "..."` +
+  `display_priority = N`. Defer until the auto-derived path proves
+  useful on Tinkaton + 1-2 more species — single point of data
+  doesn't yet justify the schema work.
+
+* **Bait-axis matchup categories** — Round 1 of structured IV
+  categories shipped `kind='matchup'` cards keyed by
+  `(opponent, scenario)` with the `bait` field on `matchup_conditions`
+  reserved as `None`. Once the "Baiting policy as a deep-dive sim
+  axis" TODO above lands, the matchup-category builder needs to also
+  iterate the bait dimension so we get cards like "Beats rank-1
+  Lickitung in the 2v2 no-bait." The data model already handles this
+  cleanly — only the builder loop and the `_matchup_subtitle()`
+  renderer need updating.
 
 ## Reproducibility
 
@@ -361,6 +367,49 @@ bottleneck.
   loses at most one round's worth of sims. Tiny code change, big peace
   of mind.
 
+## Refactoring
+
+* **Split `scripts/deep_dive.py`** *(deferred from 2026-04-09; not
+  blocking, but file is now ~5100 lines)* — After the structured IV
+  categories shipped, the file is approaching the size where edits
+  start fighting the line-cap. Concrete extraction targets, in rough
+  order of independence:
+  1. **`scripts/deep_dive_lib/categories.py`** — `IVCategory` dataclass,
+     `build_iv_categories()`, `_stat_cutoffs_from_anchors()`,
+     `_format_stat_cutoffs()`, `_composite_tradeoff_prose()`,
+     `_matchup_subtitle()`. Pure-Python, already isolated, already has
+     unit tests in `tests/test_iv_categories.py`. Easiest move.
+  2. **`scripts/deep_dive_lib/anchor_flips.py`** — `_aggregate_flips_by_anchor()`,
+     `_render_anchor_flip_bullets()`. Pure-Python, already isolated,
+     already has tests in `tests/test_flip_aggregator.py`.
+  3. **`scripts/deep_dive_lib/slayer.py`** — `iterative_slayer_discovery()`,
+     `categorize_slayers()`, `_slayer_iter_worker()`, related helpers.
+     The multiprocessing entry points complicate this — workers are
+     resolved by qualified name, so the move requires careful import
+     plumbing.
+  4. **`scripts/deep_dive_lib/render.py`** — `generate_analysis_sections()`,
+     the per-section helpers (`_render_notable_ivs_section`,
+     `_iv_label`, `_tier_badge_html`, `_threshold_desc`,
+     `_hover_text`, etc.), the CSS string. This is the actual monster
+     (~1500 lines and growing). Needs a small "renderer context"
+     dataclass first to avoid passing a 15-arg tuple around.
+  5. **`scripts/deep_dive_lib/sweep.py`** — `iv_sweep()`, the worker
+     init/run pair, `screen_movesets()`, `compute_iv_metadata()`,
+     `group_ivs_by_stat_profile()`. Numba-touching code; same
+     multiprocessing import-plumbing concern as slayer.
+  Remaining in `scripts/deep_dive.py` after all five steps: argument
+  parsing, the top-level orchestration in `main()`, and the legacy
+  non-interactive `generate_html()` (already on the chopping block —
+  see "Non-interactive `generate_html` is now strictly worse" above).
+  Test split: each module gets its own `tests/test_<module>.py`; the
+  existing tests already prove the importlib pattern works for
+  modules that can't import from `gopvpsim` directly.
+  **Recommendation**: do this in a dedicated session, not interleaved
+  with feature work — refactor diffs and feature diffs shouldn't ride
+  the same commit. Mechanical (file moves + import fixes) so it
+  shouldn't take long once started; the risk is multiprocessing
+  worker resolution and CSS-string fragment positioning.
+
 ## Low priority
 
 * **Team/multi-mon simulation** — currently only 1v1; real PvP is 3v3 with
@@ -373,6 +422,25 @@ bottleneck.
 Items here have been completed and are kept for context. Move them
 out (delete) when they're no longer useful as historical reference —
 generally a few weeks after they've stabilized in production.
+
+## 2026-04-09 — Structured IV categories (round 1)
+
+Unified `IVCategory` framework abstracting over slayer categories,
+threshold tiers, and their intersections. New "Notable IVs" HTML
+section surfaces composite (slayer ∩ tier) cards and matchup
+(opponent, scenario) cards with auto-generated tradeoff prose.
+Annihilape `13/0/11` lands as the canonical example: "The sole Atk
+Slayer that also clears the Top 5% threshold (hp≥139). Trades mirror
+dominance (45/132 wins, vs 132/132 for the top Atk Slayer survivors)
+for the Top 5% cutoff." Section is gated behind a "show only notable"
+header checkbox (≤ 5% of cohort or ≤ 5 members, default on). Round 1
+ships zero TOML changes — composite + matchup categories are
+auto-derived from existing infrastructure. Bait dimension on
+`matchup_conditions` is reserved (`None`) until the bait-axis sweep
+TODO lands. Commits: `f3aa4ad` (dataclass + builder), `8ff4469`
+(matchup branch), `79e2e87` (renderer), `b344356` (wire-in). Cross-ref:
+"Hand-named composite categories via TOML" and "Bait-axis matchup
+categories" in Deep-dive narrative for round 2 followups.
 
 ## 2026-04-08 / 2026-04-09 — Bulkpoint anchor system
 
