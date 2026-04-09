@@ -1787,7 +1787,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
                 # exist so the tier-colored points are clearly visible.
                 has_tier_traces = any(
                     not tr['use_colorscale'] for tr in pd['traces'])
-                opacity = 0.3 if has_tier_traces else 0.4
+                opacity = 0.4
                 t['marker'] = {
                     'size': 2,
                     'color': trace['marker_color'],

@@ -295,7 +295,7 @@ function buildTraces() {
       traces.push({
         name:'Other', x:otherX, y:otherY, text:otherText,
         mode:'markers', type:'scattergl', hoverinfo:'text',
-        marker:{size:2, color:otherColor, colorscale:'Viridis', opacity:0.3}
+        marker:{size:2, color:otherColor, colorscale:'Viridis', opacity:0.4}
       });
     }
     // Tier traces are collected separately and appended AFTER the
