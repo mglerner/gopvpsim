@@ -1785,7 +1785,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
             if trace['use_colorscale']:
                 opacity = 0.4
                 t['marker'] = {
-                    'size': 3,
+                    'size': 2,
                     'color': trace['marker_color'],
                     'colorscale': 'Viridis',
                     'opacity': opacity,
@@ -1795,7 +1795,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
             else:
                 opacity = 0.85
                 t['marker'] = {
-                    'size': 5,
+                    'size': 4,
                     'color': trace['marker_color'],
                     'opacity': opacity,
                     'line': {'width': 0.5, 'color': '#000'},
@@ -2988,7 +2988,8 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                                   max_members_rendered=50,
                                   override_tiers=None,
                                   score_arrays=None,
-                                  moveset_idx=0):
+                                  moveset_idx=0,
+                                  flips_detail=None):
     """RyanSwag-style threshold tier cards.
 
     Each tier becomes a card whose headline is the tier's stat-target spec
@@ -3212,8 +3213,26 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                           data_obj['ivS'][iv])
                 _g, _l, net = flip_map.get(iv, (0, 0, 0))
                 nc = 'dd-gain' if net > 0 else ('dd-loss' if net < 0 else '')
-                flip_hover = (f'+{_g} gained, -{_l} lost vs reference IV '
-                              f'(net {net:+d})')
+                # Build hover text with matchup names when available
+                fd = (flips_detail or {}).get(iv)
+                if fd:
+                    hover_lines = []
+                    if fd.get('gains'):
+                        gain_names = [f"{e['opponent']} {e['scenario']}"
+                                      for e in fd['gains'][:6]]
+                        hover_lines.append(f"Gained: {', '.join(gain_names)}")
+                        if len(fd['gains']) > 6:
+                            hover_lines[-1] += f' +{len(fd["gains"])-6} more'
+                    if fd.get('losses'):
+                        loss_names = [f"{e['opponent']} {e['scenario']}"
+                                      for e in fd['losses'][:6]]
+                        hover_lines.append(f"Lost: {', '.join(loss_names)}")
+                        if len(fd['losses']) > 6:
+                            hover_lines[-1] += f' +{len(fd["losses"])-6} more'
+                    flip_hover = '\n'.join(hover_lines) if hover_lines else f'net {net:+d}'
+                else:
+                    flip_hover = (f'+{_g} gained, -{_l} lost vs reference IV '
+                                  f'(net {net:+d})')
                 row_cls = (' class="dd-slayer-hidden"'
                            if row_i >= max_members_shown else '')
                 parts.append(
@@ -3648,6 +3667,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             data_obj, anchor_flip_records, avg_ranks, flip_map,
             override_tiers=effective_tiers,
             score_arrays=score_arrays, moveset_idx=moveset_idx,
+            flips_detail=flips,
         )
         if tier_cards_html:
             results_parts.append(tier_cards_html)
