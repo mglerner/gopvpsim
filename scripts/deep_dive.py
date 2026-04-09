@@ -1783,7 +1783,11 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
                 'hoverinfo': 'text',
             }
             if trace['use_colorscale']:
-                opacity = 0.4
+                # Dim the background "Other" points when tier traces
+                # exist so the tier-colored points are clearly visible.
+                has_tier_traces = any(
+                    not tr['use_colorscale'] for tr in pd['traces'])
+                opacity = 0.15 if has_tier_traces else 0.4
                 t['marker'] = {
                     'size': 2,
                     'color': trace['marker_color'],
@@ -1793,12 +1797,12 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
                 if not thresholds:
                     t['marker']['colorbar'] = {'title': 'Avg Score'}
             else:
-                opacity = 0.85
+                opacity = 0.9
                 t['marker'] = {
-                    'size': 4,
+                    'size': 6,
                     'color': trace['marker_color'],
                     'opacity': opacity,
-                    'line': {'width': 0.5, 'color': '#000'},
+                    'line': {'width': 1, 'color': '#000'},
                 }
             traces_js.append(t)
             original_opacities.append(opacity)

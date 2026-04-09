@@ -295,7 +295,7 @@ function buildTraces() {
       traces.push({
         name:'Other', x:otherX, y:otherY, text:otherText,
         mode:'markers', type:'scattergl', hoverinfo:'text',
-        marker:{size:3, color:otherColor, colorscale:'Viridis', opacity:0.4}
+        marker:{size:2, color:otherColor, colorscale:'Viridis', opacity:0.15}
       });
     }
     for (var ti=0; ti<tierNames.length; ti++) {
@@ -313,8 +313,8 @@ function buildTraces() {
           name:tierNames[ti]+' ('+DATA.tiers[ti].desc+')',
           x:tx, y:ty, text:tt,
           mode:'markers', type:'scattergl', hoverinfo:'text',
-          marker:{size:5, color:tierColors[ti], opacity:0.85,
-                   line:{width:0.5, color:'#000'}}
+          marker:{size:7, color:tierColors[ti], opacity:0.9,
+                   line:{width:1, color:'#000'}}
         });
       }
     }
@@ -442,10 +442,10 @@ function buildTraces() {
       x: ox, y: oy, text: ot,
       mode: 'markers', type: 'scatter', hoverinfo: 'text',
       marker: {
-        size: 6,
+        size: 5,
         color: ocol,
         symbol: osym,
-        opacity: 0.95,
+        opacity: 0.85,
         line: { width: 1, color: borderColor }
       }
     };
