@@ -46,6 +46,7 @@ import itertools
 import json
 import math
 import os
+from pathlib import Path
 import sys
 import time
 from dataclasses import dataclass, field
@@ -5013,6 +5014,21 @@ def main():
         except Exception as e:
             print(f"  Warning: failed to load {args.thresholds}: {e}")
             threshold_registry = None
+    else:
+        # Auto-discover: look for thresholds/<species>.toml (case-insensitive)
+        # so the user doesn't have to remember --thresholds every run.
+        _species_lower = args.species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+        _auto_toml = Path(__file__).resolve().parent.parent / 'thresholds' / f'{_species_lower}.toml'
+        if _auto_toml.exists():
+            try:
+                threshold_registry = load_threshold_file(
+                    str(_auto_toml), species=args.species,
+                    league=args.league.capitalize(),
+                )
+                print(f"  Auto-loaded thresholds: {_auto_toml.name}")
+            except Exception as e:
+                print(f"  Warning: auto-load {_auto_toml.name} failed: {e}")
+                threshold_registry = None
 
     # Overlay --anchor-file files on top (repeatable; later wins on collision)
     if threshold_registry is not None and args.anchor_files:
@@ -5141,6 +5157,34 @@ def main():
         for opp in to_remove:
             idx = opponents.index(opp)
             opponents.pop(idx)
+
+    # Auto-include opponents named by TOML anchors so anchor-flip matching
+    # works even when those opponents aren't in the top-N rankings. Only
+    # fires when a threshold_registry is loaded (explicit or auto-discovered).
+    if threshold_registry is not None:
+        _sp_for_opps = threshold_registry.species(args.species)
+        if _sp_for_opps is not None:
+            _lt_for_opps = _sp_for_opps.leagues.get(args.league.capitalize())
+            if _lt_for_opps is not None:
+                _toml_opps = set()
+                for _a in _lt_for_opps.anchors.values():
+                    _opp = getattr(_a, 'opponent', None) or getattr(_a, 'opponent_species', None)
+                    if _opp and _opp not in opponents:
+                        _toml_opps.add(_opp)
+                for _opp in sorted(_toml_opps):
+                    try:
+                        _opp_fast, _opp_charged = get_default_moveset(
+                            _opp, league=args.league)
+                        opponents.append(_opp)
+                        opp_movesets_full.append((_opp_fast, _opp_charged))
+                    except (KeyError, ValueError):
+                        print(f"  Warning: TOML anchor opponent {_opp} "
+                              f"has no default moveset, skipping")
+                if _toml_opps:
+                    _added = sorted(_toml_opps & set(opponents))
+                    if _added:
+                        print(f"  (added {len(_added)} TOML anchor opponent(s): "
+                              f"{', '.join(_added)})")
 
     opp_iv_labels = {'pvpoke': 'PvPoke defaults', 'rank1': 'rank 1 (stat product)', 'both': 'both (PvPoke + rank 1)'}
     opp_iv_label = opp_iv_labels.get(args.opp_ivs, args.opp_ivs)
