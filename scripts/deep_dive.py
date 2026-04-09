@@ -5545,9 +5545,12 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 
     # JS engine
     html += '<script>\n'
+    # Use data_obj['tiers'] (may have been updated by generate_analysis_sections
+    # with auto-derived tiers) rather than the original tier_info.
+    final_tier_info = data_obj.get('tiers', tier_info) or tier_info
     html += _interactive_js_engine(n_scenarios, n_opponents, opp_iv_modes,
-                                   reference_idx, tier_info, opp_desc, league,
-                                   shield_scenarios)
+                                   reference_idx, final_tier_info, opp_desc,
+                                   league, shield_scenarios)
     html += '</script>\n'
 
     # Footer: equivalent CLI invocation + rankings data fingerprint, kept
