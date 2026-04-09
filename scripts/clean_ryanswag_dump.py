@@ -122,9 +122,33 @@ def strip_whitespace_only_lines(lines: list[str]) -> list[str]:
     return ["" if _is_blankish(line) else line for line in lines]
 
 
+def strip_leading_single_space(lines: list[str]) -> list[str]:
+    """Strip a single leading space from lines that start with exactly one.
+
+    The HTML scrape left a single leading space on most prose lines —
+    leftover from the source HTML's indentation pattern. Markdown
+    preserves this leading space in rendered paragraphs, which looks
+    odd in the output.
+
+    Only acts on lines starting with **exactly one** space followed by a
+    non-space character. Lines with zero leading spaces are untouched.
+    Lines with 2+ leading spaces are untouched (defensive — preserves
+    list-item continuation indents and any 4-space code blocks, even
+    though the current source files contain none).
+    """
+    out: list[str] = []
+    for line in lines:
+        if len(line) >= 2 and line[0] == " " and line[1] != " ":
+            out.append(line[1:])
+        else:
+            out.append(line)
+    return out
+
+
 def clean(text: str) -> str:
     lines = text.splitlines()
     lines = strip_whitespace_only_lines(lines)
+    lines = strip_leading_single_space(lines)
     lines = fix_orphan_bullets(lines)
     lines = fix_source_header(lines)
     return "\n".join(lines) + "\n"
