@@ -112,6 +112,11 @@ function buildHoverText(iv) {
   if (DATA.slayerCatsByIv && DATA.slayerCatsByIv[iv]) {
     lines.push('Slayer: '+DATA.slayerCatsByIv[iv].join(', '));
   }
+  // Anchor-clear membership: which named anchors (mirror BP, etc.) the
+  // IV passes among those for which we emitted a matchup-flip bullet.
+  if (DATA.anchorClearByIv && DATA.anchorClearByIv[iv]) {
+    lines.push('Clears: '+DATA.anchorClearByIv[iv].join(', '));
+  }
 
   // Diff vs reference IV (PvPoke default or rank 1, depending on opp IV mode)
   var refIv = (state.oppIvMode === 'rank1') ? DATA.rank1RefIvIdx : DATA.pvpokeRefIvIdx;
@@ -255,57 +260,92 @@ function buildTraces() {
   // the IV arrays. A bad entry (e.g. an IV triple that wasn't translated
   // to a canonical index) would otherwise produce undefined x/y values
   // and cause Plotly to silently fail to render the *entire* plot.
-  if (DATA.slayerIvs && DATA.slayerIvs.length > 0) {
-    var slayerInTierMode = (cm === 'threshold' && hasTiers);
-    var sx = [], sy = [], st = [], scol = [];
-    for (var k = 0; k < DATA.slayerIvs.length; k++) {
-      var iv = DATA.slayerIvs[k];
+  // Build O(1) lookup sets for slayer and anchor-clear membership.
+  // A point may belong to one set, the other, or both. Marker symbol
+  // depends on which sets it's in:
+  //   * slayer only       → triangle-down
+  //   * anchor-clear only → triangle-up
+  //   * both              → hexagram
+  // Each set gets its own legend entry ("Slayer IVs", "Anchor IVs")
+  // so they can be isolated independently. "Both" points are drawn
+  // twice (once per trace) on top of each other with the same hexagram
+  // symbol — visually identical, hover works on either.
+  var slayerSet = {};
+  if (DATA.slayerIvs) {
+    for (var ssi = 0; ssi < DATA.slayerIvs.length; ssi++) {
+      slayerSet[DATA.slayerIvs[ssi]] = true;
+    }
+  }
+  var anchorSet = {};
+  if (DATA.anchorClearIvs) {
+    for (var asi = 0; asi < DATA.anchorClearIvs.length; asi++) {
+      anchorSet[DATA.anchorClearIvs[asi]] = true;
+    }
+  }
+
+  // Per-IV color: matches "what the point would look like in its base
+  // trace." In threshold mode, tier color if tiered or per-point Viridis
+  // matched against the Other trace's range if untiered. In stat/score
+  // modes, a fixed gold fill so the overlay stays distinct from the
+  // colorscale gradient.
+  function overlayFill(iv) {
+    if (cm === 'threshold' && hasTiers) {
+      var t = DATA.ivTiers[iv];
+      if (t >= 0) return tierColors[t];
+      var range = otherMax - otherMin;
+      var t01 = (range > 0) ? (avgScores[iv] - otherMin) / range : 0.5;
+      return viridisColor(t01);
+    }
+    return '#FFD700';
+  }
+
+  function overlaySymbol(iv) {
+    var inSlayer = !!slayerSet[iv];
+    var inAnchor = !!anchorSet[iv];
+    if (inSlayer && inAnchor) return 'hexagram';
+    if (inSlayer) return 'triangle-down';
+    return 'triangle-up';  // anchor only
+  }
+
+  // Build one trace per overlay set. Defensive: validate each entry
+  // is a non-negative integer index into the IV arrays. A bad entry
+  // (e.g. an IV triple that wasn't translated to a canonical index)
+  // would otherwise produce undefined x/y values and cause Plotly to
+  // silently fail to render the *entire* plot.
+  function buildOverlayTrace(name, ivList, borderColor) {
+    if (!ivList || ivList.length === 0) return null;
+    var ox = [], oy = [], ot = [], ocol = [], osym = [];
+    for (var k = 0; k < ivList.length; k++) {
+      var iv = ivList[k];
       if (typeof iv !== 'number' || iv < 0 || iv >= nIvs) continue;
       var sp = DATA.spRanks[iv];
       var av = avgScores[iv];
       if (typeof sp !== 'number' || typeof av !== 'number') continue;
-      sx.push(sp);
-      sy.push(av);
-      st.push(buildHoverText(iv));
-      if (slayerInTierMode) {
-        var t = DATA.ivTiers[iv];
-        if (t >= 0) {
-          // Tier color: matches what the IV would look like in its tier trace.
-          scol.push(tierColors[t]);
-        } else {
-          // Untiered: replicate the Viridis color the "Other" trace would
-          // give this point. Normalize against the same min/max Plotly
-          // is using for the Other trace's colorscale so the slayer
-          // marker fill matches the underlying base point exactly.
-          var range = otherMax - otherMin;
-          var t01 = (range > 0) ? (avgScores[iv] - otherMin) / range : 0.5;
-          scol.push(viridisColor(t01));
-        }
-      } else {
-        // Stat/score modes: fixed gold fill against the stat colorscale.
-        scol.push('#FFD700');
+      ox.push(sp);
+      oy.push(av);
+      ot.push(buildHoverText(iv));
+      ocol.push(overlayFill(iv));
+      osym.push(overlaySymbol(iv));
+    }
+    if (ox.length === 0) return null;
+    return {
+      name: name,
+      x: ox, y: oy, text: ot,
+      mode: 'markers', type: 'scatter', hoverinfo: 'text',
+      marker: {
+        size: 10,
+        color: ocol,
+        symbol: osym,
+        opacity: 0.95,
+        line: { width: 1, color: borderColor }
       }
-    }
-    if (sx.length > 0) {
-      // Border is gold in threshold mode (marks slayer-ness) and a
-      // subtle dark outline elsewhere (so the gold fill stays clean).
-      var slayerLine = slayerInTierMode
-        ? { width: 1, color: '#FFD700' }
-        : { width: 1, color: '#000' };
-      traces.push({
-        name: 'Slayer IVs',
-        x: sx, y: sy, text: st,
-        mode: 'markers', type: 'scatter', hoverinfo: 'text',
-        marker: {
-          size: 10,
-          color: scol,
-          symbol: 'star-diamond',
-          opacity: 0.95,
-          line: slayerLine
-        }
-      });
-    }
+    };
   }
+
+  var slayerTrace = buildOverlayTrace('Slayer IVs', DATA.slayerIvs, '#FFD700');
+  if (slayerTrace) traces.push(slayerTrace);
+  var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff');
+  if (anchorTrace) traces.push(anchorTrace);
 
   return traces;
 }

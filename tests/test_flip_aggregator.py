@@ -206,6 +206,31 @@ class TestAggregateFlipsByAnchor:
         )
         assert records == []
 
+    def test_passing_ivs_populated_on_record(self):
+        # When a record is emitted, it should carry the canonical IV
+        # indices that pass the anchor — used downstream by the
+        # interactive plot's anchor-clear overlay.
+        ivs = [(125, 100), (128, 100), (131, 100), (134, 100)]
+        data_obj = _make_data_obj(ivs)
+        opponents = ['Annihilape']
+        scenarios = [(2, 2)]
+
+        def fill(iv, si, oi):
+            return 700 if data_obj['ivAtk'][iv] >= 130 else 300
+
+        scores = _make_scores(4, 1, 1, fill)
+        anchor = ResolvedAnchor(
+            name='x', parent_display_name='x', parent='x',
+            kind='damage_breakpoint', threshold_value=130.0,
+            target_stat='atk', opponent='Annihilape',
+        )
+        records = deep_dive._aggregate_flips_by_anchor(
+            scores, 4, 1, 1, [anchor], data_obj, scenarios, opponents,
+        )
+        assert len(records) == 1
+        # Strict > 130 → IVs at 131 (idx 2) and 134 (idx 3) pass.
+        assert sorted(records[0]['passing_ivs']) == [2, 3]
+
     def test_case_insensitive_opponent_match(self):
         ivs = [(125, 100), (135, 100)]
         data_obj = _make_data_obj(ivs)

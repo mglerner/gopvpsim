@@ -2086,6 +2086,11 @@ def _aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
                 'opponent': anchor.opponent,
                 'scenarios': flipped_scenarios,
                 'direction': 'gain',
+                # Canonical IV indices that pass this anchor. Used by
+                # the interactive scatter plot's anchor-clear overlay
+                # to highlight which spreads actually clear an emitted
+                # anchor (separate from the bullet text rendering).
+                'passing_ivs': list(passing),
             })
         else:
             stats['no_clean_scenario'] += 1
@@ -3672,6 +3677,59 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         str(idx): sorted(set(cats)) for idx, cats in slayer_cats_by_idx.items()
     }
 
+    # Anchor-clear IV overlay: union the canonical IV indices that pass
+    # any anchor for which _aggregate_flips_by_anchor emitted a record.
+    # The aggregator runs again inside generate_analysis_sections for
+    # the bullet rendering — running it here too is cheap and avoids
+    # plumbing its output through a side channel. Per-IV "which anchors
+    # cleared" data populates the hover tooltip.
+    #
+    # Only fires when slayer iteration is on (resolved_anchors come from
+    # slayer_iter_result); without --mirror-slayer the anchor-clear
+    # overlay is silently empty. See TODO entry "RyanSwag-style matchup
+    # flip annotations" for the longer-term plan to surface anchors
+    # without requiring a slayer iteration.
+    # Selectivity gate: an anchor counts toward overlay membership only
+    # if it's "actually selective" — i.e., passed by less than half the
+    # IV pool. The bullets layer keeps all emitted anchors (an
+    # easy-to-clear breakpoint is still informational about where the
+    # damage tier lands), but for the overlay, "every IV clears
+    # something" is degenerate noise. Without this filter, e.g. a
+    # Lickilicky Hyper Beam bulkpoint at def 96.62 — which essentially
+    # every spread satisfies — would mark every point on the scatter
+    # as anchor-cleared and defeat the highlighting purpose.
+    SELECTIVITY_MAX_PASS_RATE = 0.5
+    anchor_cleared_by_idx: dict = {}
+    if slayer_iter_result:
+        ra = slayer_iter_result.get('resolved_anchors', []) or []
+        if ra:
+            mset_key = f'0_{opp_iv_modes[0]}'
+            sf = score_arrays.get(mset_key, [])
+            if sf:
+                # Build a stub data_obj-shaped dict the aggregator can read.
+                # It only needs ivAtk/ivDef.
+                stub = {'ivAtk': iv_atk, 'ivDef': iv_def}
+                records = _aggregate_flips_by_anchor(
+                    sf, n_ivs, n_scenarios, n_opponents,
+                    ra, stub, shield_scenarios, opponent_names,
+                )
+                for rec in records:
+                    passing = rec.get('passing_ivs', [])
+                    if not passing:
+                        continue
+                    pass_rate = len(passing) / n_ivs if n_ivs else 0.0
+                    if pass_rate > SELECTIVITY_MAX_PASS_RATE:
+                        continue  # too easy — skip for overlay purposes
+                    label = (rec['anchor'].parent_display_name
+                             or rec['anchor'].label
+                             or rec['anchor'].parent)
+                    for iv in passing:
+                        anchor_cleared_by_idx.setdefault(iv, set()).add(label)
+    data_obj['anchorClearIvs'] = sorted(anchor_cleared_by_idx.keys())
+    data_obj['anchorClearByIv'] = {
+        str(idx): sorted(labels) for idx, labels in anchor_cleared_by_idx.items()
+    }
+
     opp_desc = opponent_label or 'PvPoke rankings'
     shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in shield_scenarios)
 
@@ -4010,12 +4068,14 @@ def main():
     parser.add_argument('--screen-opponents', type=int, default=None, metavar='N',
                         help='Use only top N opponents for phase 1 screen '
                              '(default: same as --opponents)')
-    parser.add_argument('--mirror-slayer', action='store_true',
+    parser.add_argument('--mirror-slayer', action=argparse.BooleanOptionalAction,
+                        default=True,
                         help='Run iterative slayer discovery for the focal species '
                              '(Nash-style mirror match iteration). Adds ~2-5 min to '
                              'the deep dive but classifies survivors into Atk Slayer, '
                              'Bulk Slayer, and CMP Slayer categories. Results are '
-                             'cached on disk for fast re-runs.')
+                             'cached on disk for fast re-runs. ENABLED by default; '
+                             'pass --no-mirror-slayer to skip.')
     parser.add_argument('--mirror-slayer-metric', default='all',
                         choices=['all', 'even', 'even-strict'],
                         help='Slayer iteration metric: "all" counts wins across all '
