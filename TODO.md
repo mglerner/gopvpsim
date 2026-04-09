@@ -423,7 +423,7 @@ bottleneck.
 ## Refactoring
 
 * **Split `scripts/deep_dive.py`** *(deferred from 2026-04-09; not
-  blocking, but file is now ~5100 lines)* — After the structured IV
+  blocking, but file is now ~6100 lines as of 2026-04-10)* — After the structured IV
   categories shipped, the file is approaching the size where edits
   start fighting the line-cap. Concrete extraction targets, in rough
   order of independence:
@@ -475,6 +475,64 @@ bottleneck.
 Items here have been completed and are kept for context. Move them
 out (delete) when they're no longer useful as historical reference —
 generally a few weeks after they've stabilized in production.
+
+## 2026-04-09/10 — Stat-target reframing (SwagTips round 1)
+
+Threshold Tier cards, matchup-flipping boundaries, HP co-conditions,
+auto-derive from clean dives, scatter plot visual overhaul, HTML size
+reduction. 26 commits. Key design decisions:
+
+### Two kinds of threshold
+- **Damage-tier boundaries** (from `_aggregate_flips_by_anchor`): the
+  def/atk at which `floor(damage_formula)` steps by 1. Invariant to
+  battle conditions (energy leads, bait policies). Come from Level 3
+  anchor discovery.
+- **Matchup-flipping boundaries** (from `_find_matchup_boundaries`):
+  the def (+HP) at which the overall battle outcome flips win→loss.
+  Usually higher than the damage tier because multiple damage reductions
+  must accumulate. Depend on battle conditions — will shift when we add
+  energy-lead sims. Both are shown: damage tiers in anchor-flip bullets,
+  matchup boundaries in their own section + tier cards.
+
+### Auto-derive path (no TOML needed)
+`_auto_derive_tiers` consumes both anchor-flip records (atk-side) and
+matchup boundaries (def-side). Tiers ranked by selectivity (fewest
+qualifying IVs first); General excluded from scatter plot coloring.
+Tinkaton clean dive produces tiers at ~143 def (≈acidArisen GH Great),
+~140 def (≈GH Good), ~138 def (intermediate). Validated against 4/6
+acidArisen findings.
+
+### Open threads for next sessions
+- **Atk-side matchup-flipping boundaries**: `_find_matchup_boundaries`
+  currently only sweeps def. Should also sweep atk for species where
+  atk breakpoints flip matchups (e.g. Annihilape Lickitung BP at 127).
+  Same algorithm, different partition stat.
+- **Energy-lead matchup boundaries**: damage tiers don't change with
+  energy leads, but matchup boundaries do. Once we add energy-lead sim
+  options (`--energy-lead 1` etc.), re-sweep matchup boundaries under
+  those conditions. The two-layer display (damage tier + matchup flip)
+  is designed for this.
+- **Shadow / atk-weighted opponent IVs**: acidArisen's Shadow Drapion
+  (140.21 def) uses "attack-weighted" opponent IVs, not rank-1 or
+  PvPoke default. Our system doesn't simulate arbitrary opponent IV
+  spreads. Possible fix: `--opp-ivs custom:119.80` in the TOML or CLI.
+- **HP co-condition on atk-side**: currently only def anchors try HP
+  co-conditions. Atk-side anchors theoretically could too (HP affects
+  whether a fast-move damage increase translates to a KO), but no
+  known case warrants it yet.
+- **CMP anchor schema shorthand**: acidArisen's CMP thresholds
+  (105.58 Corviknight, 105.79 Lickilicky, etc.) can't be expressed as
+  CMP anchors without an IV-list spread. Need a `opponent_species`
+  shorthand that resolves the opponent's rank-1 atk automatically.
+  Listed in "Schema simplification" TODO.
+- **HTML size**: down from 25 MB to 10 MB (base64 uint16 scores +
+  Notable IVs member cap). Remaining 9 MB is packed scores. Further:
+  delta-encode, drop non-displayed moveset scores, or serve gzipped.
+- **deep_dive.py refactor**: now ~6000 lines. The extraction targets
+  in the Refactoring TODO are still valid; this session added
+  `_find_matchup_boundaries`, `_auto_derive_tiers` (matchup boundary
+  path), `_probe_tier_cutoff_flips`, `_render_matchup_boundary_bullets`
+  as new extraction candidates for `deep_dive_lib/boundaries.py`.
 
 ## 2026-04-09 — Structured IV categories (round 1)
 

@@ -55,6 +55,27 @@ We added an `intended_pruning` flag to `pvpoke_dp` that toggles between
 PvPoke's actual behavior (dead-code pruning, `False`) and the apparently
 intended behavior (functional pruning, `True`).
 
+## Threshold model: damage tiers vs matchup boundaries
+
+The deep dive reports two kinds of stat threshold (2026-04-09/10):
+
+**Damage-tier boundaries** (`_aggregate_flips_by_anchor`): the exact
+def (or atk) at which `floor(0.5 * 1.3 * Power * Atk/Def * Eff * STAB) + 1`
+steps by 1. These are pure-formula boundaries, invariant to battle
+conditions (energy leads, bait policy, turn count). Discovered by
+Level 3 anchor enumeration.
+
+**Matchup-flipping boundaries** (`_find_matchup_boundaries`): the
+minimum def (+HP) at which the overall battle outcome changes from loss
+to win. Usually higher than the damage tier because multiple per-hit
+reductions must accumulate across a full fight to change the turn count.
+Found by sweeping def thresholds against sim results.
+
+Both are shown in the HTML output: damage tiers in the "Anchor-Driven
+Matchup Flips" section, matchup boundaries in "Matchup-Flipping
+Boundaries" and in tier cards. The distinction matters for future
+energy-lead work: damage tiers won't change, matchup boundaries will.
+
 ## Key implementation details
 
 ### DP queue insertion (pvpoke_dp)
