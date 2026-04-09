@@ -3041,14 +3041,19 @@ TIER_COLORS_AUTO = [
 ]
 
 
-def _auto_derive_tiers(anchor_flip_records, data_obj):
-    """Synthesize threshold tiers from emitted anchor-flip records.
+def _auto_derive_tiers(anchor_flip_records, data_obj,
+                       matchup_boundaries=None):
+    """Synthesize threshold tiers from anchor-flip records + matchup boundaries.
 
-    Groups the records by ``(opponent, target_stat)`` and composes them into
-    2–6 RyanSwag-style tiers. Each unique opponent whose anchors flip
-    matchups produces a candidate "slayer" tier; the overall floor across
-    all records becomes a "General" tier. This is the fully automatic path
-    — no TOML needed, works on a clean dive.
+    Two sources feed tier derivation:
+    1. Anchor-flip records → atk-side tiers (per-opponent breakpoints)
+    2. Matchup boundaries → def-side tiers (clustered by def threshold)
+
+    For def-side, the matchup boundaries' def_thresholds are clustered by
+    gap detection: sorted ascending, a gap > 2.0 starts a new cluster.
+    Each cluster becomes a tier named after the opponents it covers. The
+    highest cluster corresponds to acidArisen's "GH Great", the next to
+    "GH Good", etc.
 
     Returns a list of tier dicts matching the shape ``data_obj['tiers']``
     expects: ``{name, color, attack, defense, stamina, desc}``.
@@ -3166,12 +3171,104 @@ def _auto_derive_tiers(anchor_flip_records, data_obj):
                     f'({n_scen} scenario flip{"s" if n_scen != 1 else ""}).',
         })
 
-    # Cap at 6 tiers to avoid overwhelming the UI. Keep General + top 5
-    # by scenario count.
-    if len(tiers) > 6:
-        general = [t for t in tiers if t['name'] == 'General']
-        rest = [t for t in tiers if t['name'] != 'General']
-        tiers = general + rest[:5]
+    # --- Def-side tiers from matchup boundaries ---
+    # Sort boundaries by def threshold ascending and pick tier breaks
+    # where the number of qualifying IVs drops significantly — these
+    # correspond to acidArisen-style tiers like "GH Good" (many IVs)
+    # vs "GH Great" (few IVs, stricter spec).
+    if matchup_boundaries:
+        # Dedup by def_threshold (take max n_passing at each def level)
+        mb_by_def: dict = {}
+        for mb in matchup_boundaries:
+            dt = mb['def_threshold']
+            mb_by_def.setdefault(dt, []).append(mb)
+
+        # Build candidate tier entries: one per unique def threshold,
+        # with the opponents/scenarios at that threshold.
+        candidates = []
+        for dt in sorted(mb_by_def.keys()):
+            mbs = mb_by_def[dt]
+            opps = sorted({mb['opponent'] for mb in mbs})
+            total_scens = sum(len(mb['scenarios']) for mb in mbs)
+            hp_vals_in = [mb['hp_threshold'] for mb in mbs
+                          if mb.get('hp_threshold') is not None]
+            hp_cut = max(hp_vals_in) if hp_vals_in else 0
+            n_pass = max(mb['n_passing'] for mb in mbs)
+            candidates.append({
+                'def': dt, 'hp': hp_cut, 'opps': opps,
+                'n_scens': total_scens, 'n_pass': n_pass,
+            })
+
+        if len(candidates) >= 2:
+            # Pick tier breaks by two signals:
+            # 1. Significant IV-count drop: n_passing < 40% of high-water mark
+            # 2. Def gap: > 2 def points from the previous pick AND n < 50%
+            # These catch both the "same def neighborhood, sharply fewer IVs"
+            # pattern (e.g. 502→79) and the "jump to a new def region"
+            # pattern (e.g. 140→143).
+            tier_picks = [candidates[0]]  # floor
+            hwm = candidates[0]['n_pass']
+            for i in range(1, len(candidates)):
+                curr_n = candidates[i]['n_pass']
+                hwm = max(hwm, curr_n)
+                iv_drop = hwm > 0 and curr_n < hwm * 0.4
+                def_gap = (candidates[i]['def'] - tier_picks[-1]['def'] > 2.0
+                           and hwm > 0 and curr_n < hwm * 0.5)
+                if iv_drop or def_gap:
+                    tier_picks.append(candidates[i])
+                    hwm = curr_n
+
+            # Skip the floor (too many IVs, not selective) unless it's
+            # the only one.
+            if len(tier_picks) > 1:
+                tier_picks = tier_picks[1:]
+
+            for pick in tier_picks:
+                opp_str = ', '.join(pick['opps'][:3])
+                if len(pick['opps']) > 3:
+                    opp_str += f' +{len(pick["opps"]) - 3}'
+                # Avoid duplicates with existing anchor-derived tiers
+                already_exists = any(
+                    abs((t.get('defense', 0) or 0) - pick['def']) < 1.0
+                    for t in tiers
+                )
+                if already_exists:
+                    continue
+                tiers.append({
+                    'name': f'Bulk {pick["def"]:.0f}+',
+                    'color': _next_color(),
+                    'attack': 0,
+                    'defense': pick['def'],
+                    'stamina': pick['hp'],
+                    'desc': f'Matchup flips vs {opp_str} '
+                            f'({pick["n_scens"]} scenario'
+                            f'{"s" if pick["n_scens"] != 1 else ""}, '
+                            f'{pick["n_pass"]} IVs).',
+                })
+
+    # Cap: keep General, up to 3 atk-side, up to 3 def-side. Prioritize
+    # tiers with fewer qualifying IVs (more selective = more interesting).
+    general = [t for t in tiers if t['name'] == 'General']
+    atk_tiers = [t for t in tiers
+                 if t['name'] != 'General' and (t.get('attack', 0) or 0) > 0]
+    def_tiers = [t for t in tiers
+                 if t['name'] != 'General' and (t.get('defense', 0) or 0) > 0]
+    # Sort by selectivity: fewer IVs = listed later = shown first in the
+    # render (smallest-on-top pattern for visual prominence).
+    # For capping we keep the most selective (fewest IVs) first.
+    n_ivs = data_obj.get('nIvs', 1) or 1
+    def _selectivity(t):
+        """Estimate how many IVs meet a tier's spec (lower = more selective)."""
+        ac = t.get('attack', 0) or 0
+        dc = t.get('defense', 0) or 0
+        hc = t.get('stamina', 0) or 0
+        return sum(1 for iv in range(n_ivs)
+                   if (ac <= 0 or data_obj['ivAtk'][iv] >= ac)
+                   and (dc <= 0 or data_obj['ivDef'][iv] >= dc)
+                   and (hc <= 0 or data_obj['ivHp'][iv] >= hc))
+    atk_tiers.sort(key=_selectivity)
+    def_tiers.sort(key=_selectivity)
+    tiers = general + atk_tiers[:3] + def_tiers[:3]
 
     return tiers
 
@@ -3961,10 +4058,37 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     if has_toml_tiers:
         pass
     elif anchor_flip_records:
-        effective_tiers = _auto_derive_tiers(anchor_flip_records, data_obj)
+        effective_tiers = _auto_derive_tiers(
+            anchor_flip_records, data_obj,
+            matchup_boundaries=all_matchup_boundaries)
         if effective_tiers:
             print(f"  Auto-derived {len(effective_tiers)} threshold tier(s) "
                   f"from anchor-flip records")
+            # Inject auto-derived tiers into data_obj so the scatter plot
+            # JS can color IVs by tier membership.
+            data_obj['tiers'] = effective_tiers
+            # Compute ivTiers + ivAllTiers for the scatter plot
+            _n = data_obj['nIvs']
+            _iv_tiers = [-1] * _n
+            _iv_all_tiers = [[] for _ in range(_n)]
+            for _ti, _t in enumerate(effective_tiers):
+                _ac = _t.get('attack', 0) or 0
+                _dc = _t.get('defense', 0) or 0
+                _hc = _t.get('stamina', 0) or 0
+                for _iv in range(_n):
+                    meets = True
+                    if _ac > 0 and data_obj['ivAtk'][_iv] < _ac:
+                        meets = False
+                    if _dc > 0 and data_obj['ivDef'][_iv] < _dc:
+                        meets = False
+                    if _hc > 0 and data_obj['ivHp'][_iv] < _hc:
+                        meets = False
+                    if meets:
+                        _iv_all_tiers[_iv].append(_ti)
+                        if _iv_tiers[_iv] < 0:
+                            _iv_tiers[_iv] = _ti
+            data_obj['ivTiers'] = _iv_tiers
+            data_obj['ivAllTiers'] = _iv_all_tiers
     if effective_tiers:
         tier_cards_html = _render_threshold_tier_cards(
             data_obj, anchor_flip_records, avg_ranks, flip_map,
