@@ -5701,6 +5701,18 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                                 padding: 4px 10px; font-size: 12px;
                                 cursor: pointer; }}
   .collection-buttons button:hover {{ background: #1a3a6e; }}
+  .collection-matches {{ margin-top: 12px; }}
+  .collection-matches h5 {{ margin: 8px 0 4px 0; font-size: 12px;
+                             color: #e0e0e0; font-weight: 600; }}
+  .collection-matches table {{ border-collapse: collapse; font-size: 11px;
+                                color: #e0e0e0; width: auto; }}
+  .collection-matches th, .collection-matches td {{ padding: 2px 10px 2px 0;
+                                                     text-align: left;
+                                                     white-space: nowrap; }}
+  .collection-matches th {{ color: #888; font-weight: 500;
+                             border-bottom: 1px solid #0f3460; }}
+  .collection-matches tr.lucky td {{ color: #ffd966; }}
+  .collection-matches tr.shadow td {{ color: #b084e0; }}
 </style>
 </head>
 <body>
@@ -5803,6 +5815,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             '      <span id="collection-status" '
             'style="font-size:12px;color:#aaa;margin-left:6px"></span>\n'
             '    </div>\n'
+            '    <div id="collection-matches" class="collection-matches"></div>\n'
             '  </div>\n'
             '</details>\n'
         )
