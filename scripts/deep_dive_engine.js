@@ -240,12 +240,13 @@ function buildHoverText(iv) {
   // AND user overlay) instead of only on the user overlay. Previously
   // only the user overlay trace constructed this text, so hovering a
   // base/tier point would silently omit user info even if owned.
+  //
+  // Uses the ownedByIv lookup cache (populated in loadCollection)
+  // instead of linearly scanning state.userRecords. For collections
+  // in the hundreds-to-thousands of mons, the old O(n) scan per IV
+  // was rebuilding 4096 × N every time buildTraces ran.
   if (state.userRecords && state.userRecords.length > 0) {
-    var owned = [];
-    for (var urH = 0; urH < state.userRecords.length; urH++) {
-      var urHR = state.userRecords[urH];
-      if (urHR.canonicalIvIdx === iv) owned.push(urHR);
-    }
+    var owned = (state.ownedByIv && state.ownedByIv[iv]) || [];
     if (owned.length > 0) {
       // Sort by current CP descending so the best in-game search
       // target leads.
@@ -313,9 +314,20 @@ function appendMatchupDiff(lines, mi1, iv1, mi2, iv2) {
     }
     var sc = DATA.scenarios[si];
     var lab = sc[0]+'v'+sc[1];
+    // Cap per direction so the tooltip stays a reasonable size on
+    // dives with large opponent pools (61 for GL top50+CS dives ×
+    // 9 scenarios × 2 moveset comparisons = massive tooltip
+    // without this). Overflow rendered as "+N more".
+    var DIFF_CAP = 4;
+    function fmt(arr, sign) {
+      if (arr.length === 0) return null;
+      var head = arr.slice(0, DIFF_CAP).join(',');
+      var more = arr.length > DIFF_CAP ? ('+' + (arr.length - DIFF_CAP)) : '';
+      return sign + head + more;
+    }
     var parts = [];
-    if (gained.length) parts.push('+'+gained.join(','));
-    if (lost.length) parts.push('-'+lost.join(','));
+    var g = fmt(gained, '+'); if (g) parts.push(g);
+    var l = fmt(lost, '-'); if (l) parts.push(l);
     lines.push('  '+lab+': '+(parts.length ? parts.join(' | ') : '(same)'));
   }
 }
@@ -460,6 +472,19 @@ function loadCollection(csvText) {
   }
 
   state.userRecords = records;
+
+  // Build canonical-iv → [records] lookup once so buildHoverText's
+  // "Yours:" section is O(1) per IV instead of O(n) linear scan.
+  // For large collections (~600 mons) this is the difference between
+  // a snappy hover and a multi-second freeze when building traces.
+  var ownedByIv = {};
+  for (var oir = 0; oir < records.length; oir++) {
+    var oirRec = records[oir];
+    if (oirRec.canonicalIvIdx < 0) continue;
+    if (!ownedByIv[oirRec.canonicalIvIdx]) ownedByIv[oirRec.canonicalIvIdx] = [];
+    ownedByIv[oirRec.canonicalIvIdx].push(oirRec);
+  }
+  state.ownedByIv = ownedByIv;
 
   // Status line + tier-card counts.
   var parts = [mons.length + ' rows parsed'];
@@ -650,6 +675,7 @@ function escapeHtml(s) {
 
 function clearCollection() {
   state.userRecords = null;
+  state.ownedByIv = null;
   state.showOnlyMine = false;
   var chk = document.getElementById('collection-only-chk');
   if (chk) chk.checked = false;
@@ -986,30 +1012,22 @@ function buildTraces() {
   if (state.userRecords && state.userRecords.length > 0) {
     var qualX=[], qualY=[], qualText=[];
     var ownX=[],  ownY=[],  ownText=[];
-    // Dedup by canonicalIvIdx so one ring per unique IV (two mons at
-    // the same spread share a single scatter point). The "Yours:"
-    // block inside buildHoverText already lists every owned mon at
-    // that IV, so the hover shows all of them regardless.
-    var seenIvs = {};
-    for (var ur = 0; ur < state.userRecords.length; ur++) {
-      var rec = state.userRecords[ur];
-      var iv = rec.canonicalIvIdx;
-      if (iv < 0) continue;
-      if (seenIvs[iv]) continue;
-      seenIvs[iv] = true;
+    // Iterate unique owned IV indices (not userRecords) so we hit each
+    // scatter point once. The ownedByIv cache groups records by IV,
+    // so anyMatched is just "does any record in this IV's group have
+    // a non-empty matched list" — no nested O(n) scan needed.
+    var ownedByIv = state.ownedByIv || {};
+    for (var ivKey in ownedByIv) {
+      if (!ownedByIv.hasOwnProperty(ivKey)) continue;
+      var iv = parseInt(ivKey, 10);
+      if (iv < 0 || iv >= nIvs) continue;
       var sp = DATA.spRanks[iv], yv = yValues[iv];
       if (currentYIsSparse && !isFinite(yv)) continue;
-      // Hover text comes from the shared buildHoverText — it already
-      // includes the "Yours:" block now (see hover builder above),
-      // so no overlay-specific text construction needed.
       var fullText = buildHoverText(iv);
-      // Qualifying = any record at this IV hit a tier. We find the
-      // "best" record (highest current CP among matched) to decide
-      // which ring bucket this dedup'd point lands in.
+      var recsAtIv = ownedByIv[ivKey];
       var anyMatched = false;
-      for (var urD = 0; urD < state.userRecords.length; urD++) {
-        var rcD = state.userRecords[urD];
-        if (rcD.canonicalIvIdx === iv && rcD.matched && rcD.matched.length > 0) {
+      for (var urD = 0; urD < recsAtIv.length; urD++) {
+        if (recsAtIv[urD].matched && recsAtIv[urD].matched.length > 0) {
           anyMatched = true; break;
         }
       }
