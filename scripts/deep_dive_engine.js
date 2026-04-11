@@ -895,7 +895,11 @@ function buildTraces() {
   function overlaySymbol(iv) {
     var inSlayer = !!slayerSet[iv];
     var inAnchor = !!anchorSet[iv];
-    if (inSlayer && inAnchor) return 'hexagram';
+    // 'star' replaces 'hexagram' because hexagram isn't supported in
+    // scattergl and we need this trace to be gl to match tier +
+    // Other + user-overlay traces — mixing svg and gl trace types
+    // breaks hover hit detection on overlapping points.
+    if (inSlayer && inAnchor) return 'star';
     if (inSlayer) return 'triangle-down';
     return 'triangle-up';  // anchor only
   }
@@ -926,9 +930,14 @@ function buildTraces() {
     return {
       name: name,
       x: ox, y: oy, text: ot,
-      mode: 'markers', type: 'scatter', hoverinfo: 'text',
+      // scattergl (not svg scatter) so hover hit detection stays
+      // consistent when slayer/anchor points overlap tier + user
+      // overlay traces. Mixing svg + gl breaks hover on multi-trace
+      // overlaps — see commit 0305924 for the user overlay version
+      // of this same fix.
+      mode: 'markers', type: 'scattergl', hoverinfo: 'text',
       marker: {
-        size: 5,
+        size: 6,
         color: ocol,
         symbol: osym,
         opacity: 0.85,
