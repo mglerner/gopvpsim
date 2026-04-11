@@ -3011,7 +3011,18 @@ def _render_matchup_boundary_bullets(boundaries):
     return lines
 
 
-def _render_anchor_flip_bullets(records):
+def _anchor_group_id(parent, opponent, target_stat, move_id):
+    """Deterministic short id for an anchor bullet's (parent, opponent,
+    target_stat, move_id) group. Used as a DOM attribute so JS can
+    look up which of the user's canonical IVs pass this specific
+    bullet and fill in a "— yours: 0/15/15, 1/14/15" annotation.
+    """
+    import hashlib as _hl
+    key = '|'.join(str(x) for x in (parent, opponent, target_stat, move_id or ''))
+    return 'af-' + _hl.md5(key.encode('utf-8')).hexdigest()[:10]
+
+
+def _render_anchor_flip_bullets(records, anchor_passing_sink=None):
     """Render anchor-flip records as RyanSwag-style HTML <li> bullets.
 
     Grouping grain is ``(parent, opponent, target_stat, move_id)``.
@@ -3031,6 +3042,14 @@ def _render_anchor_flip_bullets(records):
     Bullets are sorted within each (parent, opponent) family by
     threshold ascending so increasing-stat bulkpoints read top-to-bottom
     in the order a player would clear them.
+
+    When ``anchor_passing_sink`` is a dict, each emitted bullet
+    populates it with ``{anchor_id: sorted(passing_iv_idx_list)}``
+    where the passing set is the union across all sub-anchors in the
+    group. The sink-provided path also injects a
+    ``<span class="user-anchor-hits" data-anchor-id="…"></span>``
+    placeholder into every bullet so the JS can fill it in with
+    "— yours: a/d/s, a/d/s" after a Poke Genie CSV is loaded.
     """
     # Group: (parent, opponent, target_stat, move_id) -> list of records.
     groups: dict = {}
@@ -3099,11 +3118,37 @@ def _render_anchor_flip_bullets(records):
                 hp_str = (f' + <span class="dd-strong">{min(hp_thresholds)}'
                           f' HP</span>')
 
+            # Anchor id + passing-IV union for the user-collection
+            # annotation layer. Only populated when a sink was passed.
+            anchor_span = ''
+            if anchor_passing_sink is not None:
+                anchor_id = _anchor_group_id(
+                    first.parent, recs[0]['opponent'],
+                    first.target_stat, first.move_id,
+                )
+                # Union passing_ivs across every sub-anchor in the group.
+                # Any IV in the union meets at least one sub-anchor's
+                # flip condition for this (parent, opponent, move) bullet.
+                union = set()
+                for r in recs:
+                    for iv in r.get('passing_ivs', []) or []:
+                        union.add(iv)
+                # Store once per anchor_id. If the same id appears in
+                # multiple grouping passes (e.g. tier-filtered + flat
+                # list), the underlying record set is identical, so
+                # overwriting is a no-op.
+                anchor_passing_sink[anchor_id] = sorted(union)
+                anchor_span = (
+                    f' <span class="user-anchor-hits" '
+                    f'data-anchor-id="{anchor_id}"></span>'
+                )
+
             lines.append(
                 f'<li><span class="dd-strong">{min_thresh:.2f} {stat_label}</span>'
                 f'{hp_str} '
                 f'for <b>{anchor_label}</b>{move_str} vs {recs[0]["opponent"]} '
-                f'(<span class="dd-gain">{scen_strs}</span>)</li>'
+                f'(<span class="dd-gain">{scen_strs}</span>)'
+                f'{anchor_span}</li>'
             )
     return lines
 
@@ -3436,7 +3481,8 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
                                   score_arrays=None,
                                   moveset_idx=0,
                                   flips_detail=None,
-                                  matchup_boundaries=None):
+                                  matchup_boundaries=None,
+                                  anchor_passing_sink=None):
     """RyanSwag-style threshold tier cards.
 
     Each tier becomes a card whose headline is the tier's stat-target spec
@@ -3545,6 +3591,8 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
         if tier_records:
             # Collect unique opponents whose anchors this tier clears
             tier_opps = sorted({r['opponent'] for r in tier_records})
+            # Count only — no sink here; the actual rendered bullets
+            # below populate the sink.
             n_bullets = len(_render_anchor_flip_bullets(tier_records))
             scen_set = set()
             for r in tier_records:
@@ -3574,7 +3622,8 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
         # --- Anchor-flip bullets (collapsed past 5) ---
         max_bullets_visible = 5
         if tier_records:
-            bullets = _render_anchor_flip_bullets(tier_records)
+            bullets = _render_anchor_flip_bullets(
+                tier_records, anchor_passing_sink=anchor_passing_sink)
             if bullets:
                 tier_card_uid = f'dd-tier-{ti}'
                 n_vis = min(len(bullets), max_bullets_visible)
@@ -3864,12 +3913,20 @@ def _generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mod
 def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                shield_scenarios, opponent_names,
                                slayer_iter_result=None,
-                               has_toml_tiers=False):
+                               has_toml_tiers=False,
+                               anchor_passing_sink=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
     results_html is always visible ("Deep Dive Results").
     analysis_html goes behind the toggle ("Deep Dive Analysis").
+
+    When ``anchor_passing_sink`` is a dict, it gets populated with
+    ``{anchor_id: [passing_iv_idx, ...]}`` for every anchor-flip bullet
+    rendered, so the interactive HTML can embed the map as DATA and
+    light up "which of your IVs hit this breakpoint" annotations after
+    the user loads their CSV. Populated as a side effect — callers who
+    just want HTML can leave it at None.
     """
     nIvs = data_obj['nIvs']
     nS = data_obj['nScenarios']
@@ -4212,6 +4269,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             score_arrays=score_arrays, moveset_idx=moveset_idx,
             flips_detail=flips,
             matchup_boundaries=all_matchup_boundaries,
+            anchor_passing_sink=anchor_passing_sink,
         )
         if tier_cards_html:
             results_parts.append(tier_cards_html)
@@ -4911,7 +4969,8 @@ function ddToggleTagsCompactCell(event) {
 
     # -- Anchor-Driven Matchup Flips (flat list of every anchor) --
     if anchor_flip_records:
-        anchor_bullets = _render_anchor_flip_bullets(anchor_flip_records)
+        anchor_bullets = _render_anchor_flip_bullets(
+            anchor_flip_records, anchor_passing_sink=anchor_passing_sink)
         if anchor_bullets:
             results_parts.append('<h3 class="dd-h3">Anchor-Driven Matchup Flips</h3>\n')
             results_parts.append(
@@ -5713,6 +5772,12 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                              border-bottom: 1px solid #0f3460; }}
   .collection-matches tr.lucky td {{ color: #ffd966; }}
   .collection-matches tr.shadow td {{ color: #b084e0; }}
+  .collection-matches td.rank {{ color: #9be89b; font-weight: 600; }}
+  .collection-matches td.powerup-big {{ color: #e94560; }}
+  .collection-matches td.powerup-med {{ color: #d29922; }}
+  .collection-matches td.powerup-ready {{ color: #9be89b; font-weight: 600; }}
+  span.user-anchor-hits {{ font-size: 11px; font-style: italic;
+                           margin-left: 6px; }}
 </style>
 </head>
 <body>
@@ -5828,11 +5893,18 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += '<div id="methodology" class="methodology"></div>\n'
 
     # Deep dive analysis sections (banding, clusters, flips, etc.)
+    # The anchor_passing_sink accumulates {anchor_id: [passing_iv_idx]}
+    # for every anchor-flip bullet rendered inside the analysis layer.
+    # We embed it into DATA below so JS can light up "which of your
+    # IVs hit this breakpoint" annotations when a CSV is loaded.
+    anchor_passing_sink: dict = {}
     analysis_css, results_html, analysis_html = generate_analysis_sections(
         data_obj, score_arrays, 0, opp_iv_modes[0],
         shield_scenarios, opponent_names,
         slayer_iter_result=slayer_iter_result,
-        has_toml_tiers=has_toml_tiers)
+        has_toml_tiers=has_toml_tiers,
+        anchor_passing_sink=anchor_passing_sink)
+    data_obj['anchorFlipSets'] = anchor_passing_sink
     # Inject analysis CSS into the style block (replace closing tag we already emitted)
     html = html.replace('</style>\n</head>', analysis_css + '\n</style>\n</head>', 1)
     # Results section is always visible; analysis is behind a toggle
