@@ -198,7 +198,14 @@ function computeView() {
 }
 
 // ---- Hover text ----
-function shortName(name) { return name.split('(')[0].trim().substring(0, 12); }
+// Short name for matchup diff opponents. 4 chars is the sweet spot:
+// compact enough that a scenario row with 4 gained + 4 lost fits on
+// one readable line even on 61-opponent dives, still long enough to
+// disambiguate (Med=Medicham, Ann=Annihilape, Tink=Tinkaton, etc).
+// Occasional collision (e.g. Stunfisk vs Stunfisk Galarian both →
+// Stun) is acceptable — context usually makes it clear and the full
+// opponent list is in the dive metadata anyway.
+function shortName(name) { return name.split('(')[0].trim().substring(0, 4); }
 
 function buildHoverText(iv) {
   var a = DATA.ivA[iv], d = DATA.ivD[iv], s = DATA.ivS[iv];
@@ -1055,13 +1062,16 @@ function buildTraces() {
     // circle-open (hollow stroke) is fine here because we no longer
     // care about hit-box shape — nothing about hover depends on
     // this trace.
+    // Sizes: user-overlay traces are hoverinfo:'skip' (pure visual),
+    // so ring size has no effect on hit detection — tuned purely
+    // for visual readability without being loud.
     if (ownX.length > 0) {
       traces.push({
         name: 'Your IVs (owned)', x: ownX, y: ownY, text: ownText,
         mode: 'markers', type: 'scattergl', hoverinfo: 'skip',
         marker: {
-          size: 12, color: '#cccccc', symbol: 'circle-open',
-          opacity: 0.9, line: { width: 2, color: '#cccccc' }
+          size: 9, color: '#cccccc', symbol: 'circle-open',
+          opacity: 0.9, line: { width: 1.5, color: '#cccccc' }
         }
       });
     }
@@ -1070,8 +1080,8 @@ function buildTraces() {
         name: 'Your IVs (qualifying)', x: qualX, y: qualY, text: qualText,
         mode: 'markers', type: 'scattergl', hoverinfo: 'skip',
         marker: {
-          size: 18, color: '#ffffff', symbol: 'circle-open',
-          opacity: 1.0, line: { width: 3, color: '#ffffff' }
+          size: 13, color: '#ffffff', symbol: 'circle-open',
+          opacity: 1.0, line: { width: 2, color: '#ffffff' }
         }
       });
     }
