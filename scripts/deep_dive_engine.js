@@ -1177,45 +1177,41 @@ function buildTraces() {
         ownX.push(sp); ownY.push(yv); ownText.push(fullText);
       }
     }
-    // Hover strategy: the user-overlay traces are VISUAL-ONLY. Hover
-    // hit detection is explicitly disabled via hoverinfo:'skip' so
-    // they never catch a tooltip themselves — instead, the underlying
-    // base trace (Other / tier / slayer / anchor) always wins hover
-    // at that (x, y) position. The base trace's hover text already
-    // includes the "★ Yours:" block (see buildHoverText), so the
-    // user still gets their mon info without the user trace ever
-    // competing for the hit.
+    // Hover strategy: user-overlay traces carry their own
+    // hoverinfo:'text' with the exact same text buildHoverText
+    // produces for the underlying base trace at each IV. Whichever
+    // of (user overlay, tier, slayer, Other) Plotly's "closest"
+    // picks, the tooltip is correct — the "★ Yours:" block is in
+    // every trace's text via buildHoverText.
     //
-    // Why this works when the previous attempts didn't: Plotly's
-    // scattergl hit detection with multiple stacked traces at the
-    // exact same (x, y) is unpredictable — it picks "the closest"
-    // but tiebreaker behavior varies. By making user traces
-    // non-interactive, we eliminate the tie entirely.
-    //
-    // circle-open (hollow stroke) is fine here because we no longer
-    // care about hit-box shape — nothing about hover depends on
-    // this trace.
-    // Sizes: user-overlay traces are hoverinfo:'skip' (pure visual),
-    // so ring size has no effect on hit detection — tuned purely
-    // for visual readability without being loud.
+    // Earlier attempt used hoverinfo:'skip' to make user overlays
+    // "invisible to hover," thinking Plotly would fall through to
+    // the next-closest trace. It doesn't — when closest lands on a
+    // skip trace, Plotly just shows NO tooltip instead of cascading.
+    // That silently broke hover on any user point where the ring
+    // was marginally closer to the cursor than the underlying
+    // marker. The legend-overlap bug (commit 43d9341) that was the
+    // original motivation for 'skip' is fixed, so 'text' is safe.
     if (ownX.length > 0) {
       traces.push({
         name: 'Your IVs (owned)', x: ownX, y: ownY, text: ownText,
-        mode: 'markers', type: 'scattergl', hoverinfo: 'skip',
+        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
           size: 9, color: '#cccccc', symbol: 'circle-open',
           opacity: 0.9, line: { width: 1.5, color: '#cccccc' }
-        }
+        },
+        hoverlabel: { bordercolor: '#cccccc' }
       });
     }
     if (qualX.length > 0) {
       traces.push({
         name: 'Your IVs (qualifying)', x: qualX, y: qualY, text: qualText,
-        mode: 'markers', type: 'scattergl', hoverinfo: 'skip',
+        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
           size: 13, color: '#ffffff', symbol: 'circle-open',
           opacity: 1.0, line: { width: 2, color: '#ffffff' }
-        }
+        },
+        hoverlabel: { bordercolor: '#ffffff' }
       });
     }
     // Dev log: one line per render so if the overlay stays invisible
