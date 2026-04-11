@@ -1197,7 +1197,24 @@ function updateView() {
     yaxis: {title:currentYLabel, range:[yMin-yPad, yMax+yPad], fixedrange:true},
     paper_bgcolor:'#1a1a2e', plot_bgcolor:'#16213e',
     font:{color:'#e0e0e0'}, hovermode:'closest',
-    legend:{bgcolor:'rgba(22,33,62,0.8)', bordercolor:'#0f3460', borderwidth:1},
+    // Legend pinned explicitly OUTSIDE the plot area so it never
+    // covers top-right hover tooltips (the rank-1 points on the
+    // inverted x-axis are in the corner that Plotly's default
+    // top-right legend position sits on, and tooltips there were
+    // rendering under the legend box).
+    legend: {
+      bgcolor:'rgba(22,33,62,0.8)', bordercolor:'#0f3460', borderwidth:1,
+      x: 1.02, xanchor: 'left', y: 1, yanchor: 'top',
+    },
+    // Explicit hoverlabel so tooltip sizing and font are deterministic
+    // — namelength:-1 disables trace-name truncation so we see the
+    // full "★ Yours:" block.
+    hoverlabel: {
+      bgcolor: '#2a2a4a', bordercolor: '#e94560',
+      font: { size: 11, color: '#e0e0e0', family: 'monospace' },
+      namelength: -1, align: 'left',
+    },
+    margin: { r: 180 },  // reserve room for the outside legend
     shapes: shapes,
     annotations: annotations
   };
