@@ -47,6 +47,54 @@
 
 ## Tests to add
 
+* **No-bait oracle tests from iv-tech deep dives** — `pvpoke_dp` now
+  accepts `bait_shields=False`. Sanity tests for the farm-down gate
+  landed in `test_battle.py` (see `test_pvpoke_dp_no_bait_*`), but we
+  should add real-world oracle cases from the HSH #iv-tech deep dives
+  in `docs/*.md`. Candidates (each asserts that `bait_shields=False`
+  still wins the cited matchup):
+
+  1. **Tinkaton vs rank #1 Medicham 1-1** —
+     `docs/tinkaton_deep_dive_reference.md:25`. "141.66 defense with
+     138 hp lets you shield a dynamic punch & survive two more … win
+     the 1s *without baiting*." Candidate IVs: Tinkaton 0/12/11
+     (def=141.68, hp=142); Medicham rank #1 (likely 0/15/15 or
+     0/14/13 non best-buddy, max_level=50). Needs verified moveset
+     (likely Fairy Wind + Gigaton Hammer + Bulldoze vs Counter + Ice
+     Punch + Psychic). Confirm against pvpoke.com/battle before
+     committing the exact scores.
+
+  2. **Tinkaton vs rank #1 Azumarill 1-2** —
+     `docs/tinkaton_deep_dive_reference.md:27`. "143.03 defense
+     gives a bulkpoint vs rank #1 azu which flips the 1-2s (*no
+     baiting required*)."
+
+  3. **Tinkaton vs rank #1 shadow Altaria 0-1** —
+     `docs/tinkaton_deep_dive_reference.md:31`. "143.04 defense with
+     141 hp … win the 0-1s *without baiting*." Note: reference also
+     flags inconsistency due to shadow IV variance.
+
+  4. **Spidops vs rank #1 Altaria 1s** —
+     `docs/spidops_deep_dive_reference.md:35`. "140.67 defense with
+     132+ hp flips the 1s vs the rank #1 altaria *without baits* by
+     reducing sky attack damage."
+
+  5. **Corviknight vs rank #1 shadow Sableye 1-shield** —
+     `docs/corviknight_deep_dive_reference.md:58`. "135.46 defense
+     … flips the 2s if you bait twice, *flips the 1 without
+     baiting*." Nice A/B case — same IVs should assert
+     `bait_shields=True` loses the 1 but `bait_shields=False` wins.
+
+  Each test should parametrize over `bait_shields=[True, False]`
+  when the reference makes a directional claim (cases 1, 5
+  especially). For cases where the reference only asserts the
+  no-bait result, test only `bait_shields=False`.
+
+  Priority: low-to-medium. These are integration oracles, not
+  correctness-blocking — the simple unit tests in `test_battle.py`
+  already prove the gate works. Pick these up in a session where you
+  can verify exact movesets/IVs at pvpoke.com/battle.
+
 * **Form Change** — Morpeko. Aegislash. Eventually Mimikyu. Low
   priority. Do this when we add the form change features. Do the form
   changes affect the shielding strategy and/or baiting strategy of the

@@ -936,7 +936,7 @@ def build_iv_categories(data_obj, slayer_categories=None,
         opp_iv_mode = matchup_data.get('opp_iv_mode', 'pvpoke')
         win_threshold = matchup_data.get('win_threshold', 500)
         opp_iv_label = ('PvPoke default'
-                        if opp_iv_mode == 'pvpoke' else 'rank 1')
+                        if parse_mode(opp_iv_mode)[0] == 'pvpoke' else 'rank 1')
         if (scores_flat and nS and nO
                 and len(scores_flat) >= n_ivs * nS * nO):
             for oi, opp_name in enumerate(m_opponents):
@@ -1184,13 +1184,54 @@ def get_top_opponents(league, n, exclude_species=None):
     return opponents
 
 
+def parse_mode(composite_mode):
+    """Decompose a composite mode string into (opp_iv_mode, bait_mode).
+
+    Accepted forms:
+      'pvpoke'         -> ('pvpoke', 'bait')     # bait-on default
+      'rank1'          -> ('rank1',  'bait')
+      'pvpoke:bait'    -> ('pvpoke', 'bait')
+      'pvpoke:nobait'  -> ('pvpoke', 'nobait')
+      'rank1:nobait'   -> ('rank1',  'nobait')
+
+    Legacy callers that only know the opp-iv axis can pass
+    ``'pvpoke'``/``'rank1'`` and get the bait-on default.
+    """
+    if ':' in composite_mode:
+        opp_iv, bait = composite_mode.split(':', 1)
+        return opp_iv, bait
+    return composite_mode, 'bait'
+
+
+def compose_mode(opp_iv_mode, bait_mode='bait'):
+    """Inverse of ``parse_mode``. Bait-on collapses to the bare opp-iv form
+    so existing keys (e.g. ``f'{mi}_pvpoke'``) stay unchanged when bait mode
+    isn't part of the sweep."""
+    if bait_mode == 'nobait':
+        return f'{opp_iv_mode}:nobait'
+    return opp_iv_mode
+
+
+def mode_pretty_label(composite_mode):
+    """Human-readable label for a composite mode, e.g. for dropdowns."""
+    opp_iv, bait = parse_mode(composite_mode)
+    opp_label = 'PvPoke Defaults' if opp_iv == 'pvpoke' else 'Rank 1'
+    if bait == 'nobait':
+        return f'{opp_label}, no bait'
+    return opp_label
+
+
 def resolve_opp_ivs(species_name, league, shadow, opp_iv_mode):
     """Return (atk_iv, def_iv, sta_iv) for an opponent based on the IV mode.
 
     opp_iv_mode:
       'pvpoke'  — PvPoke's default IVs from the gamemaster (what pvpoke.com uses)
       'rank1'   — stat-product rank 1 IVs
+
+    Tolerates composite mode strings like ``'pvpoke:nobait'`` — the bait axis
+    is focal-side and has no effect on opponent IV selection, so we strip it.
     """
+    opp_iv_mode, _ = parse_mode(opp_iv_mode)
     if opp_iv_mode == 'rank1':
         ranked = iv_rank(species_name, league=league, shadow=shadow)
         r1 = ranked[0]
@@ -1350,7 +1391,7 @@ def group_ivs_by_stat_profile(iv_meta_list):
 
 
 def _sweep_worker_init(species, focal_types, fm_template, cms_template,
-                       opp_cache, shield_scenarios):
+                       opp_cache, shield_scenarios, focal_bait=True):
     """Initialize shared state in each sweep worker process."""
     _worker_state['species'] = species
     _worker_state['focal_types'] = focal_types
@@ -1358,6 +1399,13 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
     _worker_state['cms_template'] = cms_template
     _worker_state['opp_cache'] = opp_cache
     _worker_state['shield_scenarios'] = shield_scenarios
+    _worker_state['focal_bait'] = focal_bait
+    if focal_bait:
+        _worker_state['focal_policy'] = pvpoke_dp
+    else:
+        import functools
+        _worker_state['focal_policy'] = functools.partial(
+            pvpoke_dp, bait_shields=False)
 
 
 def _sweep_worker(profile_chunk):
@@ -1374,6 +1422,7 @@ def _sweep_worker(profile_chunk):
     cms_template = ws['cms_template']
     opp_cache = ws['opp_cache']
     shield_scenarios = ws['shield_scenarios']
+    focal_policy = ws.get('focal_policy', pvpoke_dp)
 
     results = {}
     n_sims = 0
@@ -1396,7 +1445,7 @@ def _sweep_worker(profile_chunk):
                     shields=s_opp,
                 )
                 result = simulate(bp0, bp1,
-                                  charged_policy_0=pvpoke_dp,
+                                  charged_policy_0=focal_policy,
                                   charged_policy_1=pvpoke_dp)
                 per_opp[(si, oi)] = result.pvpoke_score(0)
                 n_sims += 1
@@ -1413,9 +1462,19 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     battles, so we sim each profile once and copy the result to all
     matching IVs (~1.7x speedup).
 
+    opp_iv_mode may be a composite mode string encoding a bait-shields axis:
+      'pvpoke', 'rank1'        — bait-on (default pvpoke_dp behavior)
+      'pvpoke:nobait', 'rank1:nobait'
+                                — bait-off (pvpoke_dp bait_shields=False)
+    When the ``:nobait`` suffix is present, the focal uses a no-bait policy;
+    the opponent still baits normally.
+
     Returns (results, n_sims, canonical_scores, canonical_meta) where results
     is one dict per IV, sorted by avg_score desc.
     """
+    # Split composite mode into opponent-IV and bait axes.
+    opp_iv_mode_simple, bait_mode = parse_mode(opp_iv_mode)
+    focal_bait = (bait_mode == 'bait')
     import multiprocessing
 
     fast_moves_db, charged_moves_db = get_moves()
@@ -1431,7 +1490,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     for opp_name, (opp_fast, opp_charged) in zip(opponents, opp_movesets):
         opp_is_shadow = '_shadow' in opp_name.lower().replace(' ', '_')
         opp_clean = opp_name
-        oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode)
+        oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode_simple)
         opp_pokemon = Pokemon.at_best_level(opp_clean, oa, od, os_,
                                             league=league, shadow=opp_is_shadow)
         opp_mon = next(m for m in gm['pokemon'] if m['speciesName'] == opp_clean)
@@ -1465,7 +1524,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         processes=n_workers,
         initializer=_sweep_worker_init,
         initargs=(species, focal_types, fm_template, cms_template,
-                  opp_cache, shield_scenarios),
+                  opp_cache, shield_scenarios, focal_bait),
     ) as pool:
         last_print = sim_start
         completed = 0
@@ -1592,7 +1651,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
         # If opp_iv_mode=pvpoke, compare against PvPoke default IVs for this species.
         # If opp_iv_mode=rank1, compare against stat-product rank 1.
         ref_result = None
-        if opp_iv_mode == 'rank1':
+        if parse_mode(opp_iv_mode)[0] == 'rank1':
             # Rank 1 by stat product
             ref_result = min(results, key=lambda r: r['sp_rank'])
             ref_label = (f"SP Rank 1 ({ref_result['atk_iv']}/"
@@ -1891,7 +1950,7 @@ Plotly.newPlot("plot{i}", {json.dumps(traces_js)}, {json.dumps(layout)},
     # Methodology footer
     shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in (shield_scenarios or [(1, 1)]))
     n_opponents = len(opponent_names) if opponent_names else '?'
-    if opp_iv_mode == 'rank1':
+    if parse_mode(opp_iv_mode)[0] == 'rank1':
         opp_iv_desc = 'stat-product rank 1 IVs'
     else:
         opp_iv_desc = ("PvPoke's default IVs (the IVs pvpoke.com uses when you "
@@ -3729,7 +3788,7 @@ def _generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mod
     """
     # Collect all unique (opponent, scenario) flips across IVs and find
     # which stat change drives the flip
-    opp_label = 'PvPoke default' if opp_iv_mode == 'pvpoke' else 'rank 1'
+    opp_label = 'PvPoke default' if parse_mode(opp_iv_mode)[0] == 'pvpoke' else 'rank 1'
 
     # Group flips by opponent+scenario to find common themes
     opp_scene_gains = {}  # (opp, scene) -> list of (iv, delta)
@@ -3984,7 +4043,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 .dd-iv-toggle:hover { background:#1a3a6e; color:#fff; }
 """
 
-    opp_label = 'PvPoke default' if opp_iv_mode == 'pvpoke' else 'rank 1'
+    opp_label = 'PvPoke default' if parse_mode(opp_iv_mode)[0] == 'pvpoke' else 'rank 1'
 
     # ======== RESULTS (always visible — "Deep Dive Results") ========
     results_parts = []
@@ -5466,6 +5525,18 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     opp_desc = opponent_label or 'PvPoke rankings'
     shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in shield_scenarios)
 
+    # Bait-mode meta annotation for the page header. Three cases:
+    #  - all bait-on        → empty string, header unchanged
+    #  - all bait-off       → " | Bait: off" (whole-dive mode)
+    #  - mixed (axis active) → " | Bait: on/off selector" (driven by dropdown)
+    _bait_axis_values = {parse_mode(m)[1] for m in (opp_iv_modes or ['pvpoke'])}
+    if _bait_axis_values == {'nobait'}:
+        _bait_meta = ' | <b style="color:#e94560">Bait: OFF</b>'
+    elif 'nobait' in _bait_axis_values and 'bait' in _bait_axis_values:
+        _bait_meta = ' | <b style="color:#e94560">Bait: on/off selector</b>'
+    else:
+        _bait_meta = ''
+
     # --- Build HTML ---
     plotly_tag = _plotly_script_tag(standalone)
     # Embed the equivalent CLI invocation as an HTML comment near the top so
@@ -5514,7 +5585,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 <body>
 <h1>{species} — {league.title()} League IV Deep Dive</h1>
 <p class="meta">Opponents: {opp_desc}
-| Shield scenario(s): {shield_desc} | Policy: pvpoke_dp</p>
+| Shield scenario(s): {shield_desc} | Policy: pvpoke_dp{_bait_meta}</p>
 """
 
     # Opponent list
@@ -5545,9 +5616,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         html += '  </select></label>\n'
 
     if len(opp_iv_modes) > 1:
-        html += '  <label>Opponent IVs: <select id="oppiv-sel" onchange="updateView()">\n'
+        # Detect whether bait axis is in play (any composite mode has :nobait).
+        _any_nobait = any(':nobait' in m for m in opp_iv_modes)
+        _label_text = 'Scenario' if _any_nobait else 'Opponent IVs'
+        html += (f'  <label>{_label_text}: '
+                 '<select id="oppiv-sel" onchange="updateView()">\n')
         for mode in opp_iv_modes:
-            label = 'PvPoke Defaults' if mode == 'pvpoke' else 'Rank 1'
+            label = mode_pretty_label(mode)
             html += f'    <option value="{mode}">{label}</option>\n'
         html += '  </select></label>\n'
     if len(y_axis_modes) > 1:
@@ -5894,6 +5969,17 @@ def main():
                              '(default 20).')
     parser.add_argument('--no-cache', action='store_true',
                         help='Disable disk cache for slayer iteration')
+    parser.add_argument('--bait', default='on', choices=['on', 'off', 'both'],
+                        help="Focal-side bait-shields policy: "
+                             "'on' (default) uses PvPoke simulate-mode DP "
+                             "with baiting enabled. "
+                             "'off' runs with pvpoke_dp bait_shields=False "
+                             "(focal never baits; opponent still baits). "
+                             "'both' runs both modes in a single dive and "
+                             "adds a bait selector to the interactive HTML "
+                             "(answers 'can I win this without needing my "
+                             "bait to be called?'). Doubles compute time. "
+                             "Interactive mode only.")
 
     args = parser.parse_args()
 
@@ -6460,12 +6546,27 @@ def main():
     # HTML output
     if args.html:
         if args.interactive:
-            # Interactive mode: embed all data, JS-driven dropdowns
-            # Determine opp IV modes to run
+            # Interactive mode: embed all data, JS-driven dropdowns.
+            # Determine composite (opp_iv, bait) modes to run. The axis is
+            # 2D: opp-IVs × bait-shields. Composite modes are encoded as
+            # a string ('pvpoke', 'pvpoke:nobait', 'rank1', 'rank1:nobait')
+            # so score_arrays key format ``f'{mi}_{mode}'`` doesn't need
+            # schema changes.
             if args.opp_ivs == 'both':
-                opp_iv_modes_to_run = ['pvpoke', 'rank1']
+                _base_opp_modes = ['pvpoke', 'rank1']
             else:
-                opp_iv_modes_to_run = [opp_iv_mode]
+                _base_opp_modes = [opp_iv_mode]
+            if args.bait == 'both':
+                _bait_modes = ['bait', 'nobait']
+            elif args.bait == 'off':
+                _bait_modes = ['nobait']
+            else:
+                _bait_modes = ['bait']
+            opp_iv_modes_to_run = [
+                compose_mode(om, bm)
+                for om in _base_opp_modes
+                for bm in _bait_modes
+            ]
 
             # Force all shield scenarios for interactive mode
             if shield_scenarios == [(1, 1)]:
@@ -6478,9 +6579,9 @@ def main():
                     scores_by_mode = {}
                     meta = None
                     for mode in opp_iv_modes_to_run:
-                        mode_label = 'PvPoke defaults' if mode == 'pvpoke' else 'rank 1'
+                        mode_label = mode_pretty_label(mode)
                         print(f"  Interactive sweep [{mi+1}/{len(surviving)}] "
-                              f"{label} (opp IVs: {mode_label}, all shields)...")
+                              f"{label} ({mode_label}, all shields)...")
                         t0 = time.time()
                         results, n_sims, cs, cm = iv_sweep(
                             args.species, fast_id, charged_ids, args.league, args.shadow,
@@ -6496,24 +6597,30 @@ def main():
                     all_moveset_results.append((fast_id, charged_ids, results,
                                                 scores_by_mode, meta))
             else:
-                # Already ran with the right scenarios, repack data
+                # Already ran with the right scenarios — repack Phase 2
+                # results and fill in any additional composite modes
+                # (extra opp-IV mode and/or bait mode) that weren't run
+                # originally. The cached Phase 2 result corresponds to
+                # ``opp_iv_mode`` at bait-on (the Phase 2 default).
+                cached_mode = opp_iv_mode  # bait-on, no :nobait suffix
                 new_results = []
                 for fast_id, charged_ids, results, cs, cm in all_moveset_results:
-                    scores_by_mode = {opp_iv_mode: cs}
-                    # Run additional mode if needed
-                    if args.opp_ivs == 'both':
-                        other_mode = 'rank1' if opp_iv_mode == 'pvpoke' else 'pvpoke'
+                    scores_by_mode = {cached_mode: cs}
+                    for mode in opp_iv_modes_to_run:
+                        if mode in scores_by_mode:
+                            continue
+                        mode_label = mode_pretty_label(mode)
                         print(f"  Running {moveset_label(fast_id, charged_ids)} "
-                              f"with opp IVs: {other_mode}...")
+                              f"({mode_label})...")
                         t0 = time.time()
                         _, n2, cs2, _ = iv_sweep(
                             args.species, fast_id, charged_ids, args.league, args.shadow,
                             opponents, opp_movesets_full, shield_scenarios,
-                            opp_iv_mode=other_mode,
+                            opp_iv_mode=mode,
                         )
                         elapsed = time.time() - t0
                         print(f"    {n2:,} sims in {elapsed:.1f}s")
-                        scores_by_mode[other_mode] = cs2
+                        scores_by_mode[mode] = cs2
                     new_results.append((fast_id, charged_ids, results,
                                         scores_by_mode, cm))
                 all_moveset_results = new_results
