@@ -972,3 +972,56 @@ def test_default_moveset_shadow_runs():
                       charged_policy_0=pvpoke_dp,
                       charged_policy_1=pvpoke_dp)
     assert result.winner in (0, 1, -1)
+
+
+# ---------------------------------------------------------------------------
+# No-bait oracle tests — sourced from HSH #iv-tech deep dive references
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+@pytest.mark.parametrize("bait_shields", [True, False])
+def test_corviknight_max_def_wins_1v1_vs_default_shadow_sableye(bait_shields):
+    """Oracle test from `docs/corviknight_deep_dive_reference.md`:
+
+        "135.46 defense (max defense) ... flips the 1 without baiting"
+
+    Max-def Corviknight (0/15/2, def=135.47) vs default-IV Shadow Sableye
+    (4/15/15 @ level 47, PvPoke defaults) should win the 1-shield scenario
+    in both bait modes. The reference specifically calls out that the win
+    is achievable *without* baiting, which is what ``bait_shields=False``
+    tests directly.
+
+    Parametrized over both modes to document that bait_shields=True also
+    wins here (568 score) — the two modes differ in first-throw choice
+    (Sky Attack bait vs Payback best-DPE) but converge to the same winner.
+
+    Note: the reference also claims Corvi flips the 2s "if you bait twice,"
+    but our pvpoke_dp has Corvi losing 2v2 with both bait modes (288 score,
+    Corvi dies before reaching Payback energy). See DEVELOPER_NOTES.md for
+    the divergence writeup.
+    """
+    from functools import partial
+    bp_corvi = _make_battle_pokemon(
+        'Corviknight', 'SAND_ATTACK', ['SKY_ATTACK', 'PAYBACK'],
+        'great', shields=1, atk_iv=0, def_iv=15, sta_iv=2)
+    # Shadow Sableye PvPoke default: [47, 4, 15, 15]
+    bp_sab = _make_battle_pokemon(
+        'Sableye', 'SHADOW_CLAW', ['FOUL_PLAY', 'SHADOW_SNEAK'],
+        'great', shields=1, atk_iv=4, def_iv=15, sta_iv=15,
+        max_level=47.0, shadow=True)
+
+    focal_policy = (pvpoke_dp if bait_shields
+                    else partial(pvpoke_dp, bait_shields=False))
+    result = simulate(bp_corvi, bp_sab,
+                      charged_policy_0=focal_policy,
+                      charged_policy_1=pvpoke_dp,
+                      shield_policy_0=pvpoke_simulate_shield,
+                      shield_policy_1=pvpoke_simulate_shield)
+
+    assert result.winner == 0, (
+        f"bait_shields={bait_shields}: expected Corviknight to win the 1s, "
+        f"got winner={result.winner}, HP left: {result.hp_remaining}")
+    corvi_score = result.pvpoke_score(0)
+    assert corvi_score >= 500, (
+        f"bait_shields={bait_shields}: Corvi score {corvi_score:.1f} < 500 "
+        f"(matchup not flipped)")
