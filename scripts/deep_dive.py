@@ -2768,41 +2768,49 @@ def _aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
 
 def _find_matchup_boundaries(scores_flat, nIvs, nS, nO,
                               data_obj, scenarios, opponents,
+                              sweep_stat='def',
                               win_threshold=500,
                               pass_winrate_min=0.75, fail_winrate_max=0.25,
                               min_passing=3):
-    """Find the matchup-flipping def (+ optional HP) boundary per opponent.
+    """Find the matchup-flipping stat boundary per opponent.
 
-    For each (opponent, scenario), sweep def thresholds to find the minimum
-    def at which "IVs with def >= threshold" cleanly win and "IVs with
-    def < threshold" cleanly lose. This finds the *actual stat target* a
-    player needs, which is usually higher than the damage-tier boundary
-    because multiple damage reductions must accumulate to flip a battle.
+    For each (opponent, scenario), sweep the chosen stat (def or atk)
+    thresholds to find the minimum value at which "IVs with stat >= threshold"
+    cleanly win and "IVs with stat < threshold" cleanly lose. This finds the
+    *actual stat target* a player needs, which is usually higher than the
+    damage-tier boundary because multiple damage changes must accumulate
+    across a full battle to flip the result.
 
-    When no single-def partition is clean, tries adding HP co-conditions
-    at each candidate def threshold (same approach as the anchor HP search).
+    When no single-stat partition is clean, tries adding HP co-conditions
+    at each candidate threshold (same approach as the anchor HP search).
+
+    Args:
+        sweep_stat: 'def' or 'atk' — which stat to sweep as the partition.
 
     Returns a list of dicts:
         {
           'opponent': str,
           'scenarios': [(s0, s1), ...],
-          'def_threshold': float,
+          'threshold': float,
+          'stat': 'def' | 'atk',
           'hp_threshold': int | None,
           'n_passing': int,  # how many IVs meet the spec
         }
 
     Only emits for (opponent, scenario_group) combinations where the
-    partition is clean. Scenarios that flip at the same def+HP threshold
+    partition is clean. Scenarios that flip at the same threshold+HP
     are grouped.
     """
     if nIvs == 0 or nO == 0:
         return []
 
-    # Pre-sort IVs by def ascending for the sweep
-    def_vals = data_obj['ivDef']
+    # Choose which stat to sweep
+    if sweep_stat == 'atk':
+        stat_vals = data_obj['ivAtk']
+    else:
+        stat_vals = data_obj['ivDef']
     hp_vals = data_obj.get('ivHp', [])
-    iv_by_def = sorted(range(nIvs), key=lambda iv: def_vals[iv])
-    unique_defs = sorted({def_vals[iv] for iv in range(nIvs)})
+    unique_stats = sorted({stat_vals[iv] for iv in range(nIvs)})
 
     results = []
 
@@ -2821,19 +2829,17 @@ def _find_matchup_boundaries(scores_flat, nIvs, nS, nO,
             if total_wins == 0 or total_wins == nIvs:
                 continue  # everyone wins or everyone loses — no flip
 
-            best_def = None
+            best_stat = None
             best_hp = None
 
-            # Walk unique_defs ascending. At each threshold, passing =
-            # IVs with def >= threshold. We want the LOWEST def where
+            # Walk unique_stats ascending. At each threshold, passing =
+            # IVs with stat >= threshold. We want the LOWEST value where
             # the partition is clean.
-            # Build cumulative: n_below[d] = count of IVs with def < d
-            # and wins_below[d] = count of winning IVs with def < d.
-            for def_thresh in unique_defs:
+            for stat_thresh in unique_stats:
                 passing = [iv for iv in range(nIvs)
-                           if def_vals[iv] >= def_thresh]
+                           if stat_vals[iv] >= stat_thresh]
                 failing = [iv for iv in range(nIvs)
-                           if def_vals[iv] < def_thresh]
+                           if stat_vals[iv] < stat_thresh]
                 if len(passing) < min_passing or not failing:
                     continue
 
@@ -2841,36 +2847,35 @@ def _find_matchup_boundaries(scores_flat, nIvs, nS, nO,
                 fw = sum(1 for iv in failing if wins[iv]) / len(failing)
 
                 if pw >= pass_winrate_min and fw <= fail_winrate_max:
-                    best_def = def_thresh
+                    best_stat = stat_thresh
                     best_hp = None
-                    break  # found minimum def — done
+                    break  # found minimum — done
 
-            # If no single-def threshold works, try def + HP
-            if best_def is None and hp_vals:
-                for def_thresh in unique_defs:
-                    def_passing = [iv for iv in range(nIvs)
-                                   if def_vals[iv] >= def_thresh]
-                    def_failing = [iv for iv in range(nIvs)
-                                   if def_vals[iv] < def_thresh]
-                    if len(def_passing) < min_passing or not def_failing:
+            # If no single-stat threshold works, try stat + HP
+            if best_stat is None and hp_vals:
+                for stat_thresh in unique_stats:
+                    s_passing = [iv for iv in range(nIvs)
+                                 if stat_vals[iv] >= stat_thresh]
+                    s_failing = [iv for iv in range(nIvs)
+                                 if stat_vals[iv] < stat_thresh]
+                    if len(s_passing) < min_passing or not s_failing:
                         continue
                     # Check if there's ANY signal — do the passing IVs
                     # win more often than failing ones?
-                    pw_raw = sum(1 for iv in def_passing if wins[iv])
-                    fw_raw = sum(1 for iv in def_failing if wins[iv])
+                    pw_raw = sum(1 for iv in s_passing if wins[iv])
                     if pw_raw == 0:
                         continue  # no wins in passing set at all
-                    if pw_raw / len(def_passing) < 0.3:
+                    if pw_raw / len(s_passing) < 0.3:
                         continue  # too low to be tightenable
 
-                    # Try HP thresholds within the def-passing set
-                    pass_hps = sorted({hp_vals[iv] for iv in def_passing})
+                    # Try HP thresholds within the stat-passing set
+                    pass_hps = sorted({hp_vals[iv] for iv in s_passing})
                     found_hp = None
                     for hp_floor in reversed(pass_hps):
-                        sub_pass = [iv for iv in def_passing
+                        sub_pass = [iv for iv in s_passing
                                     if hp_vals[iv] >= hp_floor]
-                        sub_fail = def_failing + [
-                            iv for iv in def_passing
+                        sub_fail = s_failing + [
+                            iv for iv in s_passing
                             if hp_vals[iv] < hp_floor]
                         if len(sub_pass) < min_passing or not sub_fail:
                             continue
@@ -2885,32 +2890,34 @@ def _find_matchup_boundaries(scores_flat, nIvs, nS, nO,
                             if found_hp is not None:
                                 break
                     if found_hp is not None:
-                        best_def = def_thresh
+                        best_stat = stat_thresh
                         best_hp = found_hp
-                        break  # found minimum def+HP — done
+                        break  # found minimum stat+HP — done
 
-            if best_def is not None:
+            if best_stat is not None:
                 n_pass = sum(
                     1 for iv in range(nIvs)
-                    if def_vals[iv] >= best_def
+                    if stat_vals[iv] >= best_stat
                     and (best_hp is None or hp_vals[iv] >= best_hp)
                 )
                 results.append({
                     'opponent': opp,
                     'scenario': scenarios[si],
-                    'def_threshold': best_def,
+                    'threshold': best_stat,
+                    'stat': sweep_stat,
                     'hp_threshold': best_hp,
                     'n_passing': n_pass,
                 })
 
-    # Group scenarios that flip at the same (opponent, def, hp) threshold
+    # Group scenarios that flip at the same (opponent, threshold, hp) spec
     grouped: dict = {}
     for r in results:
-        key = (r['opponent'], r['def_threshold'], r['hp_threshold'])
+        key = (r['opponent'], r['threshold'], r['hp_threshold'])
         if key not in grouped:
             grouped[key] = {
                 'opponent': r['opponent'],
-                'def_threshold': r['def_threshold'],
+                'threshold': r['threshold'],
+                'stat': r['stat'],
                 'hp_threshold': r['hp_threshold'],
                 'n_passing': r['n_passing'],
                 'scenarios': [],
@@ -2918,7 +2925,7 @@ def _find_matchup_boundaries(scores_flat, nIvs, nS, nO,
         grouped[key]['scenarios'].append(r['scenario'])
 
     return sorted(grouped.values(),
-                  key=lambda r: (r['def_threshold'], r['opponent']))
+                  key=lambda r: (r['threshold'], r['opponent']))
 
 
 def _render_matchup_boundary_bullets(boundaries):
@@ -2934,9 +2941,10 @@ def _render_matchup_boundary_bullets(boundaries):
         if b.get('hp_threshold') is not None:
             hp_str = (f' + <span class="dd-strong">'
                       f'{b["hp_threshold"]} HP</span>')
+        stat_label = 'Atk' if b.get('stat') == 'atk' else 'Def'
         lines.append(
             f'<li><span class="dd-strong">'
-            f'{b["def_threshold"]:.2f} Def</span>{hp_str} '
+            f'{b["threshold"]:.2f} {stat_label}</span>{hp_str} '
             f'flips <b>{b["opponent"]}</b> '
             f'(<span class="dd-gain">{scen_str}</span>) '
             f'<span class="dd-small">[{b["n_passing"]} IVs]</span></li>'
@@ -3056,14 +3064,11 @@ def _auto_derive_tiers(anchor_flip_records, data_obj,
     """Synthesize threshold tiers from anchor-flip records + matchup boundaries.
 
     Two sources feed tier derivation:
-    1. Anchor-flip records → atk-side tiers (per-opponent breakpoints)
-    2. Matchup boundaries → def-side tiers (clustered by def threshold)
-
-    For def-side, the matchup boundaries' def_thresholds are clustered by
-    gap detection: sorted ascending, a gap > 2.0 starts a new cluster.
-    Each cluster becomes a tier named after the opponents it covers. The
-    highest cluster corresponds to acidArisen's "GH Great", the next to
-    "GH Good", etc.
+    1. Anchor-flip records → per-opponent atk/def damage-tier boundaries.
+    2. Matchup boundaries → full-battle stat targets on def OR atk, clustered
+       by IV-count drop + threshold gap within each stat. The highest-
+       selectivity cluster corresponds to acidArisen's "GH Great", the
+       next to "GH Good", etc.
 
     Returns a list of tier dicts matching the shape ``data_obj['tiers']``
     expects: ``{name, color, attack, defense, stamina, desc}``.
@@ -3181,80 +3186,106 @@ def _auto_derive_tiers(anchor_flip_records, data_obj,
                     f'({n_scen} scenario flip{"s" if n_scen != 1 else ""}).',
         })
 
-    # --- Def-side tiers from matchup boundaries ---
-    # Sort boundaries by def threshold ascending and pick tier breaks
-    # where the number of qualifying IVs drops significantly — these
+    # --- Matchup-boundary-driven tiers (def-side + atk-side) ---
+    # Sort boundaries by threshold ascending within each stat and pick tier
+    # breaks where the number of qualifying IVs drops significantly — these
     # correspond to acidArisen-style tiers like "GH Good" (many IVs)
     # vs "GH Great" (few IVs, stricter spec).
-    if matchup_boundaries:
-        # Dedup by def_threshold (take max n_passing at each def level)
-        mb_by_def: dict = {}
-        for mb in matchup_boundaries:
-            dt = mb['def_threshold']
-            mb_by_def.setdefault(dt, []).append(mb)
-
-        # Build candidate tier entries: one per unique def threshold,
-        # with the opponents/scenarios at that threshold.
-        candidates = []
-        for dt in sorted(mb_by_def.keys()):
-            mbs = mb_by_def[dt]
-            opps = sorted({mb['opponent'] for mb in mbs})
-            total_scens = sum(len(mb['scenarios']) for mb in mbs)
-            hp_vals_in = [mb['hp_threshold'] for mb in mbs
-                          if mb.get('hp_threshold') is not None]
+    def _mb_candidates(mbs):
+        by_thresh: dict = {}
+        for mb in mbs:
+            by_thresh.setdefault(mb['threshold'], []).append(mb)
+        cands = []
+        for t in sorted(by_thresh.keys()):
+            group = by_thresh[t]
+            opps = sorted({m['opponent'] for m in group})
+            total_scens = sum(len(m['scenarios']) for m in group)
+            hp_vals_in = [m['hp_threshold'] for m in group
+                          if m.get('hp_threshold') is not None]
             hp_cut = max(hp_vals_in) if hp_vals_in else 0
-            n_pass = max(mb['n_passing'] for mb in mbs)
-            candidates.append({
-                'def': dt, 'hp': hp_cut, 'opps': opps,
+            n_pass = max(m['n_passing'] for m in group)
+            cands.append({
+                'threshold': t, 'hp': hp_cut, 'opps': opps,
                 'n_scens': total_scens, 'n_pass': n_pass,
             })
+        return cands
 
-        if len(candidates) >= 2:
-            # Pick tier breaks by two signals:
-            # 1. Significant IV-count drop: n_passing < 40% of high-water mark
-            # 2. Def gap: > 2 def points from the previous pick AND n < 50%
-            # These catch both the "same def neighborhood, sharply fewer IVs"
-            # pattern (e.g. 502→79) and the "jump to a new def region"
-            # pattern (e.g. 140→143).
-            tier_picks = [candidates[0]]  # floor
-            hwm = candidates[0]['n_pass']
-            for i in range(1, len(candidates)):
-                curr_n = candidates[i]['n_pass']
-                hwm = max(hwm, curr_n)
-                iv_drop = hwm > 0 and curr_n < hwm * 0.4
-                def_gap = (candidates[i]['def'] - tier_picks[-1]['def'] > 2.0
-                           and hwm > 0 and curr_n < hwm * 0.5)
-                if iv_drop or def_gap:
-                    tier_picks.append(candidates[i])
-                    hwm = curr_n
+    def _pick_tier_breaks(candidates):
+        if len(candidates) < 2:
+            return candidates if candidates else []
+        # Pick tier breaks by two signals:
+        # 1. Significant IV-count drop: n_passing < 40% of high-water mark
+        # 2. Threshold gap: > 2 points from previous pick AND n < 50%
+        picks = [candidates[0]]  # floor
+        hwm = candidates[0]['n_pass']
+        for i in range(1, len(candidates)):
+            curr_n = candidates[i]['n_pass']
+            hwm = max(hwm, curr_n)
+            iv_drop = hwm > 0 and curr_n < hwm * 0.4
+            gap = (candidates[i]['threshold'] - picks[-1]['threshold'] > 2.0
+                   and hwm > 0 and curr_n < hwm * 0.5)
+            if iv_drop or gap:
+                picks.append(candidates[i])
+                hwm = curr_n
+        # Skip the floor (too many IVs, not selective) unless it's the only one.
+        if len(picks) > 1:
+            picks = picks[1:]
+        return picks
 
-            # Skip the floor (too many IVs, not selective) unless it's
-            # the only one.
-            if len(tier_picks) > 1:
-                tier_picks = tier_picks[1:]
+    if matchup_boundaries:
+        # Partition by sweep stat
+        def_mbs = [mb for mb in matchup_boundaries
+                   if mb.get('stat', 'def') == 'def']
+        atk_mbs = [mb for mb in matchup_boundaries
+                   if mb.get('stat') == 'atk']
 
-            for pick in tier_picks:
-                opp_str = ', '.join(pick['opps'][:3])
-                if len(pick['opps']) > 3:
-                    opp_str += f' +{len(pick["opps"]) - 3}'
-                # Avoid duplicates with existing anchor-derived tiers
-                already_exists = any(
-                    abs((t.get('defense', 0) or 0) - pick['def']) < 1.0
-                    for t in tiers
-                )
-                if already_exists:
-                    continue
-                tiers.append({
-                    'name': f'Bulk {pick["def"]:.0f}+',
-                    'color': _next_color(),
-                    'attack': 0,
-                    'defense': pick['def'],
-                    'stamina': pick['hp'],
-                    'desc': f'Matchup flips vs {opp_str} '
-                            f'({pick["n_scens"]} scenario'
-                            f'{"s" if pick["n_scens"] != 1 else ""}, '
-                            f'{pick["n_pass"]} IVs).',
-                })
+        # Def-side: produce "Bulk N+" tiers
+        for pick in _pick_tier_breaks(_mb_candidates(def_mbs)):
+            opp_str = ', '.join(pick['opps'][:3])
+            if len(pick['opps']) > 3:
+                opp_str += f' +{len(pick["opps"]) - 3}'
+            already_exists = any(
+                abs((t.get('defense', 0) or 0) - pick['threshold']) < 1.0
+                and not (t.get('attack', 0) or 0)
+                for t in tiers
+            )
+            if already_exists:
+                continue
+            tiers.append({
+                'name': f'Bulk {pick["threshold"]:.0f}+',
+                'color': _next_color(),
+                'attack': 0,
+                'defense': pick['threshold'],
+                'stamina': pick['hp'],
+                'desc': f'Matchup flips vs {opp_str} '
+                        f'({pick["n_scens"]} scenario'
+                        f'{"s" if pick["n_scens"] != 1 else ""}, '
+                        f'{pick["n_pass"]} IVs).',
+            })
+
+        # Atk-side: produce "Atk N+" tiers
+        for pick in _pick_tier_breaks(_mb_candidates(atk_mbs)):
+            opp_str = ', '.join(pick['opps'][:3])
+            if len(pick['opps']) > 3:
+                opp_str += f' +{len(pick["opps"]) - 3}'
+            already_exists = any(
+                abs((t.get('attack', 0) or 0) - pick['threshold']) < 1.0
+                and not (t.get('defense', 0) or 0)
+                for t in tiers
+            )
+            if already_exists:
+                continue
+            tiers.append({
+                'name': f'Atk {pick["threshold"]:.0f}+',
+                'color': _next_color(),
+                'attack': pick['threshold'],
+                'defense': 0,
+                'stamina': pick['hp'],
+                'desc': f'Matchup flips vs {opp_str} '
+                        f'({pick["n_scens"]} scenario'
+                        f'{"s" if pick["n_scens"] != 1 else ""}, '
+                        f'{pick["n_pass"]} IVs).',
+            })
 
     # Rank all non-General tiers by selectivity (fewest qualifying IVs
     # first). The most selective tiers are the ones experts hand-identify
@@ -3514,15 +3545,18 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
         if matchup_boundaries:
             tier_mbs = []
             for mb in matchup_boundaries:
-                mb_def = mb['def_threshold']
+                mb_thresh = mb['threshold']
+                mb_stat = mb.get('stat', 'def')
                 mb_hp = mb.get('hp_threshold')
                 # Does this tier's spec cover this boundary?
-                if def_cut > 0 and def_cut < mb_def:
-                    continue  # tier's def isn't high enough
+                if mb_stat == 'def':
+                    if def_cut <= 0 or def_cut < mb_thresh:
+                        continue  # tier has no def cutoff or too low
+                else:  # atk
+                    if atk_cut <= 0 or atk_cut < mb_thresh:
+                        continue  # tier has no atk cutoff or too low
                 if mb_hp is not None and hp_cut > 0 and hp_cut < mb_hp:
                     continue  # tier's hp isn't high enough
-                if def_cut <= 0 and mb_def > 0:
-                    continue  # tier has no def cutoff
                 tier_mbs.append(mb)
             # Filter out opponents already shown by anchor bullets
             anchor_opps = {r['opponent'] for r in tier_records}
@@ -4034,7 +4068,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                     anchor_flip_records.append(rec)
             print(f"  Anchor-flip aggregator ({_mode}): {_debug}")
 
-    # -- Compute matchup-flipping boundaries (def/HP sweep) --
+    # -- Compute matchup-flipping boundaries (def and atk sweeps) --
     # Run before tier cards so they can include boundary bullets.
     all_matchup_boundaries = []
     _mb_seen: set = set()
@@ -4044,19 +4078,26 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         _scores = score_arrays.get(_key, [])
         if not _scores:
             continue
-        _mbs = _find_matchup_boundaries(
-            _scores, nIvs, nS, nO,
-            data_obj, scenarios, opponents,
-        )
-        for mb in _mbs:
-            dedup_key = (mb['opponent'], mb['def_threshold'],
-                         mb.get('hp_threshold'),
-                         frozenset(tuple(s) for s in mb['scenarios']))
-            if dedup_key not in _mb_seen:
-                _mb_seen.add(dedup_key)
-                all_matchup_boundaries.append(mb)
+        for _sweep in ('def', 'atk'):
+            _mbs = _find_matchup_boundaries(
+                _scores, nIvs, nS, nO,
+                data_obj, scenarios, opponents,
+                sweep_stat=_sweep,
+            )
+            for mb in _mbs:
+                dedup_key = (mb['opponent'], mb['stat'], mb['threshold'],
+                             mb.get('hp_threshold'),
+                             frozenset(tuple(s) for s in mb['scenarios']))
+                if dedup_key not in _mb_seen:
+                    _mb_seen.add(dedup_key)
+                    all_matchup_boundaries.append(mb)
     if all_matchup_boundaries:
-        print(f"  Matchup boundaries: {len(all_matchup_boundaries)} found")
+        _n_def = sum(1 for m in all_matchup_boundaries
+                     if m.get('stat') == 'def')
+        _n_atk = sum(1 for m in all_matchup_boundaries
+                     if m.get('stat') == 'atk')
+        print(f"  Matchup boundaries: {len(all_matchup_boundaries)} found "
+              f"({_n_def} def, {_n_atk} atk)")
 
     # -- Threshold Tiers (RyanSwag-style, stat-target-forward) --
     effective_tiers = data_obj.get('tiers') or []
@@ -4780,15 +4821,21 @@ function ddToggleTagsCompactCell(event) {
     # -- Matchup-Flipping Boundaries (flat list) --
     # all_matchup_boundaries was computed earlier (before tier cards).
     if all_matchup_boundaries:
-        mb_bullets = _render_matchup_boundary_bullets(all_matchup_boundaries)
+        # Group by stat so def and atk don't interleave in the flat list.
+        _sorted_mbs = sorted(
+            all_matchup_boundaries,
+            key=lambda m: (0 if m.get('stat', 'def') == 'def' else 1,
+                           m['threshold'], m['opponent']),
+        )
+        mb_bullets = _render_matchup_boundary_bullets(_sorted_mbs)
         if mb_bullets:
             results_parts.append(
                 '<h3 class="dd-h3">Matchup-Flipping Boundaries</h3>\n')
             results_parts.append(
-                '<p>The minimum def (+ HP) at which a matchup outcome '
+                '<p>The minimum def or atk (+ HP) at which a matchup outcome '
                 'actually changes from loss to win. These are higher than '
-                'damage-tier boundaries because multiple damage reductions '
-                'must accumulate across a full battle to flip the result. '
+                'damage-tier boundaries because multiple damage changes must '
+                'accumulate across a full battle to flip the result. '
                 f'Vs {opp_label} opponents.</p>\n'
             )
             results_parts.append('<ul class="dd-threshold-list">\n')
