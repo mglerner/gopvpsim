@@ -424,7 +424,77 @@ function loadCollection(csvText) {
   if (offGridCount > 0) parts.push(offGridCount + ' off-grid (not in simulated set)');
   setCollectionStatus(parts.join(' \u00b7 '), '#9be89b');
   updateTierCardCounts(tierCounts);
+  renderMatchesList();
   updateView();
+}
+
+// Render a grouped-by-tier list of matching mons with CURRENT CP
+// (from the CSV), so the user can find them in-game at a glance.
+// Each tier gets its own table; within a tier, rows are sorted by
+// current CP descending. Lucky mons get a gold row tint; shadow
+// mons get a purple row tint.
+function renderMatchesList() {
+  var el = document.getElementById('collection-matches');
+  if (!el) return;
+  if (!state.userRecords || state.userRecords.length === 0) {
+    el.innerHTML = '';
+    return;
+  }
+  if (!DATA.collection || !DATA.collection.tierNames) return;
+  var tierNames = DATA.collection.tierNames;
+  // Group qualifying records by tier. A mon that qualifies for
+  // multiple tiers appears once per tier (most common case: a Rank 1
+  // spread clears every tier, and the user wants to see it in each
+  // card so they don't wonder why it "disappeared" from the strict
+  // list).
+  var byTier = {};
+  for (var i = 0; i < tierNames.length; i++) byTier[tierNames[i]] = [];
+  for (var r = 0; r < state.userRecords.length; r++) {
+    var rec = state.userRecords[r];
+    for (var m = 0; m < rec.matched.length; m++) {
+      var tn = rec.matched[m];
+      if (byTier[tn]) byTier[tn].push(rec);
+    }
+  }
+  var html = '';
+  for (var ti = 0; ti < tierNames.length; ti++) {
+    var name = tierNames[ti];
+    var recs = byTier[name] || [];
+    if (recs.length === 0) continue;
+    recs.sort(function(a, b) { return b.mon.cp - a.mon.cp; });
+    html += '<h5>' + escapeHtml(name) + ' \u2014 ' + recs.length +
+            ' of yours qualify</h5>';
+    html += '<table><tr><th>Current CP</th><th>Level</th><th>IVs</th>' +
+            '<th>Species</th><th>Max CP</th><th>Max L</th></tr>';
+    for (var k = 0; k < recs.length; k++) {
+      var rc = recs[k];
+      var cls = '';
+      if (rc.mon.is_shadow) cls += ' shadow';
+      if (rc.mon.lucky) cls += ' lucky';
+      html += '<tr' + (cls ? ' class="' + cls.trim() + '"' : '') + '>';
+      html += '<td><b>CP ' + rc.mon.cp + '</b></td>';
+      html += '<td>L' + rc.mon.level + '</td>';
+      html += '<td>' + rc.mon.atk_iv + '/' + rc.mon.def_iv + '/' + rc.mon.sta_iv + '</td>';
+      html += '<td>' + escapeHtml(rc.csvSpecies || '') +
+              (rc.mon.lucky ? ' \u2728' : '') + '</td>';
+      html += '<td>' + (rc.stats ? rc.stats.cp : '?') + '</td>';
+      html += '<td>L' + (rc.stats ? rc.stats.level : '?') + '</td>';
+      html += '</tr>';
+    }
+    html += '</table>';
+  }
+  if (html === '') {
+    html = '<p style="font-size:12px;color:#888;margin:8px 0">' +
+           'No mons in your collection qualify for any of the dive\'s tiers.</p>';
+  }
+  el.innerHTML = html;
+}
+
+// Minimal HTML escape for values that go into innerHTML (species names,
+// tier names). Prevents a stray '<' in a custom TOML tier name from
+// breaking the match list layout.
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function clearCollection() {
@@ -436,6 +506,7 @@ function clearCollection() {
   if (ta) ta.value = '';
   setCollectionStatus('', '#aaa');
   updateTierCardCounts({});
+  renderMatchesList();
   updateView();
 }
 
@@ -719,7 +790,16 @@ function buildTraces() {
   var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff');
   if (anchorTrace) traces.push(anchorTrace);
 
-  // ---- User collection overlay ----
+  // Tier traces go next so they render on top of slayer/anchor overlays.
+  // Sort largest first so smallest tiers (most selective) draw on top.
+  if (typeof _tierTraces !== 'undefined') {
+    _tierTraces.sort(function(a, b) { return b.x.length - a.x.length; });
+    for (var _ti = 0; _ti < _tierTraces.length; _ti++) {
+      traces.push(_tierTraces[_ti]);
+    }
+  }
+
+  // ---- User collection overlay (z-order: TOP, above tier traces) ----
   //
   // Two traces: one for mons that qualify for ≥1 tier ("Your IVs
   // (qualifying)") drawn prominently, and one for owned-but-non-
@@ -729,8 +809,15 @@ function buildTraces() {
   // in the dive's simulated set, so there's no (x, y) to place them
   // at. The status line reports the off-grid count separately.
   //
-  // Border color is magenta to be distinct from slayer (gold) and
-  // anchor (cyan) overlays.
+  // These MUST render after tier traces — solid tier-color circles
+  // at size 7 opacity 0.9 would otherwise completely cover the
+  // transparent-fill user rings. Appending last puts them on top
+  // regardless of tier density.
+  //
+  // Border color is bright white (qualifying) and light gray (owned)
+  // rather than magenta — magenta rings on magenta/red tier colors
+  // disappeared in testing; white reads cleanly against every
+  // existing tier color and against the Viridis background.
   if (state.userRecords && state.userRecords.length > 0) {
     var qualX=[], qualY=[], qualText=[];
     var ownX=[],  ownY=[],  ownText=[];
@@ -741,12 +828,23 @@ function buildTraces() {
       var sp = DATA.spRanks[iv], yv = yValues[iv];
       if (currentYIsSparse && !isFinite(yv)) continue;
       // Hover text: reuse the standard one and append user-specific rows.
+      // Current CP (from the CSV) is shown prominently because that's
+      // what the user sees in-game when searching their storage; the
+      // max-at-cap CP is also shown so they know where the mon lands
+      // after full power-up.
       var lines = buildHoverText(iv);
+      var maxCp = (rec.stats && rec.stats.cp != null) ? rec.stats.cp : '?';
+      var lvlNow = (rec.mon.level != null) ? rec.mon.level : '?';
+      var lvlMax = (rec.stats && rec.stats.level != null) ? rec.stats.level : '?';
       var userLines = [
         '',
-        '<b>Yours:</b> ' + (rec.mon.is_shadow ? 'Shadow ' : '') +
-          (rec.csvSpecies || '') + ' CP' + rec.mon.cp,
-        '  Rows IVs: ' + rec.mon.atk_iv + '/' + rec.mon.def_iv + '/' + rec.mon.sta_iv,
+        '<b>\u2605 Yours:</b> ' +
+          (rec.mon.is_shadow ? 'Shadow ' : '') +
+          (rec.csvSpecies || ''),
+        '  <b>Current CP ' + rec.mon.cp + '</b> @ L' + lvlNow +
+          '  \u2192  max CP ' + maxCp + ' @ L' + lvlMax,
+        '  IVs: ' + rec.mon.atk_iv + '/' + rec.mon.def_iv + '/' + rec.mon.sta_iv +
+          (rec.mon.lucky ? ' (lucky)' : ''),
       ];
       if (rec.matched.length > 0) {
         userLines.push('  Qualifies for: ' + rec.matched.join(', '));
@@ -765,8 +863,8 @@ function buildTraces() {
         name: 'Your IVs (owned)', x: ownX, y: ownY, text: ownText,
         mode: 'markers', type: 'scatter', hoverinfo: 'text',
         marker: {
-          size: 6, color: 'rgba(255,64,255,0.08)', symbol: 'circle-open',
-          opacity: 0.7, line: { width: 1, color: '#ff40ff' }
+          size: 8, color: 'rgba(0,0,0,0)', symbol: 'circle-open',
+          opacity: 0.9, line: { width: 1.5, color: '#cccccc' }
         }
       });
     }
@@ -775,19 +873,10 @@ function buildTraces() {
         name: 'Your IVs (qualifying)', x: qualX, y: qualY, text: qualText,
         mode: 'markers', type: 'scatter', hoverinfo: 'text',
         marker: {
-          size: 10, color: 'rgba(255,64,255,0.0)', symbol: 'circle-open',
-          opacity: 1.0, line: { width: 2, color: '#ff40ff' }
+          size: 14, color: 'rgba(0,0,0,0)', symbol: 'circle-open',
+          opacity: 1.0, line: { width: 3, color: '#ffffff' }
         }
       });
-    }
-  }
-
-  // Tier traces go LAST so they render on top of overlays.
-  // Sort largest first so smallest tiers (most selective) draw on top.
-  if (typeof _tierTraces !== 'undefined') {
-    _tierTraces.sort(function(a, b) { return b.x.length - a.x.length; });
-    for (var _ti = 0; _ti < _tierTraces.length; _ti++) {
-      traces.push(_tierTraces[_ti]);
     }
   }
 
