@@ -6702,6 +6702,22 @@ def main():
                     metric=args.mirror_slayer_metric,
                     iv_floor=args.iv_floor,
                 )
+                # Early-exit shapes from iterative_slayer_discovery return
+                # a dict with only an 'error' key (e.g. when the initial
+                # opponent IV is pruned by --species-iv-floor). Convert
+                # to an empty-but-valid stub so the downstream slayer
+                # processing block runs as a no-op rather than crashing
+                # on missing keys ('rounds_run', 'history', etc.).
+                if 'error' in slayer_iter_result:
+                    print(f"    Slayer iteration skipped: "
+                          f"{slayer_iter_result['error']}")
+                    slayer_iter_result = {
+                        'history': [], 'final': [],
+                        'rounds_run': 0, 'converged': False,
+                        'cache_stats': '(skipped)',
+                        'resolved_anchors': [],
+                        'categories': {},
+                    }
                 # Stash the metric/rounds for HTML rendering
                 slayer_iter_result['metric'] = args.mirror_slayer_metric
                 slayer_iter_result['max_rounds_arg'] = args.mirror_slayer_rounds
