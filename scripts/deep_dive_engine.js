@@ -6,6 +6,18 @@ var state = {
   oppIvMode: '__OPP_IV_MODE_DEFAULT__',
   colorMode: 'threshold',
   yAxisMode: 'avgScore',
+  // User-collection state — populated by loadCollection() after the
+  // user pastes/uploads a Poke Genie CSV. Null until then.
+  //   userRecords: array of {mon, stats, matched, canonicalIvIdx, onGrid}
+  //                where canonicalIvIdx is the index into DATA.ivA/D/S
+  //                for this mon's IV triple, or -1 if the exact triple
+  //                isn't one of the dive's simulated IVs.
+  //   userStatus:  short text for the status-line span.
+  //   showOnlyMine: when true, the scatter filters to ONLY user-owned
+  //                 IVs (base traces drop points for non-owned IVs).
+  userRecords: null,
+  userStatus: '',
+  showOnlyMine: false,
 };
 var yValues, yRanks, refYValues, refYRanks;
 // Updated by computeView() based on the active y-axis mode. Read by
@@ -264,12 +276,256 @@ function appendMatchupDiff(lines, mi1, iv1, mi2, iv2) {
   }
 }
 
+// ---- User collection ----
+//
+// Lazy-init: called the first time the user loads a CSV. Sets up the
+// POGOCollection module constants from DATA.collection (CPM table,
+// shadow multipliers). Idempotent.
+var _collectionInitDone = false;
+function ensureCollectionReady() {
+  if (_collectionInitDone) return true;
+  if (!DATA.collection) return false;
+  if (typeof POGOCollection === 'undefined') {
+    console.error('POGOCollection module missing — paste-box will not work');
+    return false;
+  }
+  POGOCollection.setConstants({
+    cpm:            DATA.collection.cpm,
+    shadowAtkBonus: DATA.collection.shadowAtkBonus,
+    shadowDefMult:  DATA.collection.shadowDefMult,
+  });
+  _collectionInitDone = true;
+  return true;
+}
+
+// Build a canonical-IV-index lookup on first use. This maps "a,d,s" →
+// index into DATA.ivA/D/S, so we can find the scatter-plot position
+// of any user-owned IV that happens to be in the dive's simulated set.
+var _canonicalIvIdx = null;
+function getCanonicalIvIdx() {
+  if (_canonicalIvIdx != null) return _canonicalIvIdx;
+  var out = {};
+  for (var i = 0; i < nIvs; i++) {
+    out[DATA.ivA[i] + ',' + DATA.ivD[i] + ',' + DATA.ivS[i]] = i;
+  }
+  _canonicalIvIdx = out;
+  return out;
+}
+
+// Parse CSV text + run matchMons against the dive's thresholds, then
+// build a per-record overlay list. Records carry both qualifying and
+// non-qualifying mons (non-qualifying = owned but doesn't hit any
+// tier) so the UI can show them as a distinct marker. Off-grid mons
+// (exact IV triple not in dive's simulated set) get canonicalIvIdx = -1.
+function loadCollection(csvText) {
+  if (!ensureCollectionReady()) {
+    setCollectionStatus('collection support unavailable for this dive', '#ff6b6b');
+    return;
+  }
+  var mons;
+  try {
+    mons = POGOCollection.parseCsvText(csvText);
+  } catch (e) {
+    setCollectionStatus('Parse error: ' + e.message, '#ff6b6b');
+    return;
+  }
+  if (mons.length === 0) {
+    setCollectionStatus('No rows parsed (empty CSV?)', '#ff6b6b');
+    return;
+  }
+
+  // matchMons returns ONLY mons that hit at least one tier. To surface
+  // non-qualifying-but-owned mons too, we also walk every mon through
+  // the same stat-calc path and record an empty `matched` list when
+  // nothing hits. The code below mirrors matchMons' internal logic
+  // but is deliberately local — we need the "didn't match anything"
+  // branch too.
+  var coll = DATA.collection;
+  var speciesKey = coll.speciesKey;
+  var leagueLabel = coll.leagueLabel;
+  var thresholds = coll.thresholds;
+  var pokemonIndex = coll.pokemonIndex;
+  var preToFinals = coll.preToFinals;
+  var rankLookup = coll.rankLookup;
+  var leagueCap = coll.leagueCap;
+  var maxLevel = coll.maxLevel;
+  var speciesThresholds = thresholds[speciesKey][leagueLabel];
+
+  var tierNames = coll.tierNames || [];
+  var tierCounts = {};
+  for (var ti = 0; ti < tierNames.length; ti++) tierCounts[tierNames[ti]] = 0;
+
+  var ivIdxMap = getCanonicalIvIdx();
+  var records = [];
+  var ownedCount = 0, qualifyingCount = 0, offGridCount = 0;
+
+  for (var mi = 0; mi < mons.length; mi++) {
+    var mon = mons[mi];
+    var csvSpecies = POGOCollection.getSpeciesName(mon.name, mon.form, mon.is_shadow);
+    // Does this mon pertain to the dive's species? Direct match or
+    // walkup via preToFinals.
+    var matches = (csvSpecies === speciesKey);
+    if (!matches) {
+      var finals = POGOCollection.getFinalForms(csvSpecies, preToFinals);
+      if (finals.indexOf(speciesKey) >= 0) matches = true;
+    }
+    if (!matches) continue;
+
+    var base = pokemonIndex[speciesKey];
+    var stats = POGOCollection.ivsToStatsAtCap(
+      base.atk, base.def, base.hp,
+      mon.atk_iv, mon.def_iv, mon.sta_iv,
+      { shadow: mon.is_shadow, maxLevel: maxLevel, maxCp: leagueCap }
+    );
+    if (stats == null) continue;
+
+    // Rank (for hover / onlytop). Default 4096 if lookup missing.
+    var ivKey = mon.atk_iv + ',' + mon.def_iv + ',' + mon.sta_iv;
+    var rank = 4096;
+    var rlSpecies = rankLookup && rankLookup[speciesKey];
+    var rlBranch  = rlSpecies && rlSpecies[mon.is_shadow ? 'shadow' : 'normal'];
+    if (rlBranch && rlBranch[ivKey] != null) rank = rlBranch[ivKey];
+    stats.rank = rank;
+
+    var matched = [];
+    for (var tname in speciesThresholds) {
+      if (!speciesThresholds.hasOwnProperty(tname)) continue;
+      var t = speciesThresholds[tname];
+      if (stats.attack  < (t.attack  || 0)) continue;
+      if (stats.defense < (t.defense || 0)) continue;
+      if (stats.stamina < (t.stamina || 0)) continue;
+      matched.push(tname);
+    }
+    for (var k = 0; k < matched.length; k++) {
+      if (tierCounts[matched[k]] != null) tierCounts[matched[k]]++;
+    }
+
+    var canonicalIdx = ivIdxMap[ivKey];
+    if (canonicalIdx == null) canonicalIdx = -1;
+    if (canonicalIdx < 0) offGridCount++;
+    ownedCount++;
+    if (matched.length > 0) qualifyingCount++;
+    records.push({
+      mon:             mon,
+      csvSpecies:      csvSpecies,
+      stats:           stats,
+      matched:         matched,
+      canonicalIvIdx:  canonicalIdx,
+      ivKey:           ivKey,
+    });
+  }
+
+  state.userRecords = records;
+
+  // Status line + tier-card counts.
+  var parts = [mons.length + ' rows parsed'];
+  parts.push(ownedCount + ' match this dive');
+  parts.push(qualifyingCount + ' qualify for \u2265 1 tier');
+  if (offGridCount > 0) parts.push(offGridCount + ' off-grid (not in simulated set)');
+  setCollectionStatus(parts.join(' \u00b7 '), '#9be89b');
+  updateTierCardCounts(tierCounts);
+  updateView();
+}
+
+function clearCollection() {
+  state.userRecords = null;
+  state.showOnlyMine = false;
+  var chk = document.getElementById('collection-only-chk');
+  if (chk) chk.checked = false;
+  var ta = document.getElementById('collection-csv');
+  if (ta) ta.value = '';
+  setCollectionStatus('', '#aaa');
+  updateTierCardCounts({});
+  updateView();
+}
+
+function setCollectionStatus(text, color) {
+  var el = document.getElementById('collection-status');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = color || '#aaa';
+}
+
+// Fill in "N of yours qualify" annotations on tier cards. Tier cards
+// emit empty spans with ids `tier-card-yours-<slug>` where slug is
+// the tier name lowercased with non-alphanumerics replaced with '-'.
+// If a card's span is missing (older template or filtered out), this
+// is a silent no-op.
+function updateTierCardCounts(tierCounts) {
+  if (!DATA.collection || !DATA.collection.tierNames) return;
+  var names = DATA.collection.tierNames;
+  for (var i = 0; i < names.length; i++) {
+    var n = names[i];
+    var slug = n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    var el = document.getElementById('tier-card-yours-' + slug);
+    if (!el) continue;
+    var c = tierCounts[n];
+    if (c == null || !state.userRecords) {
+      el.textContent = '';
+      el.style.display = 'none';
+    } else {
+      el.textContent = c + ' of yours qualify';
+      el.style.display = '';
+    }
+  }
+}
+
+// Wire up DOM event handlers once, on init. Guarded against being
+// called twice in dev reload scenarios.
+var _collectionHandlersWired = false;
+function wireCollectionHandlers() {
+  if (_collectionHandlersWired) return;
+  if (!DATA.collection) return;
+  var panel = document.getElementById('collection-panel');
+  if (!panel) return;
+  _collectionHandlersWired = true;
+
+  document.getElementById('collection-load-btn').addEventListener('click', function() {
+    var ta = document.getElementById('collection-csv');
+    loadCollection(ta.value);
+  });
+  document.getElementById('collection-clear-btn').addEventListener('click', clearCollection);
+  document.getElementById('collection-file-btn').addEventListener('click', function() {
+    document.getElementById('collection-file-input').click();
+  });
+  document.getElementById('collection-file-input').addEventListener('change', function(ev) {
+    var file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var text = e.target.result;
+      document.getElementById('collection-csv').value = text;
+      loadCollection(text);
+    };
+    reader.readAsText(file);
+  });
+  document.getElementById('collection-only-chk').addEventListener('change', function(ev) {
+    state.showOnlyMine = ev.target.checked;
+    updateView();
+  });
+}
+
 // ---- Build Plotly traces ----
 function buildTraces() {
   computeView();
   var cm = state.colorMode || 'threshold';
   var hasTiers = tierNames.length > 0;
   var traces = [];
+
+  // --- User collection state captured for this frame ---
+  // `ownedIdxSet` maps canonicalIvIdx → the record so the user overlay
+  // can look up hover info. `isOwned` is the filter predicate used by
+  // every trace loop when "Show only my mons" is active.
+  var ownedIdxSet = {};
+  if (state.userRecords) {
+    for (var _ur = 0; _ur < state.userRecords.length; _ur++) {
+      var _rec = state.userRecords[_ur];
+      if (_rec.canonicalIvIdx >= 0) ownedIdxSet[_rec.canonicalIvIdx] = _rec;
+    }
+  }
+  function isOwnedFilter(iv) {
+    return !state.showOnlyMine || (ownedIdxSet[iv] != null);
+  }
 
   // otherMin/Max are computed during the threshold-mode "Other" trace
   // build below and reused by the slayer overlay so untiered slayer
@@ -282,6 +538,7 @@ function buildTraces() {
     var otherX=[], otherY=[], otherText=[], otherColor=[];
     for (var iv=0; iv<nIvs; iv++) {
       if (currentYIsSparse && !isFinite(yValues[iv])) continue;
+      if (!isOwnedFilter(iv)) continue;
       if (!DATA.ivAllTiers[iv] || DATA.ivAllTiers[iv].length === 0) {
         otherX.push(DATA.spRanks[iv]);
         otherY.push(yValues[iv]);
@@ -306,6 +563,7 @@ function buildTraces() {
       var tx=[], ty=[], tt=[];
       for (var iv=0; iv<nIvs; iv++) {
         if (currentYIsSparse && !isFinite(yValues[iv])) continue;
+        if (!isOwnedFilter(iv)) continue;
         if (DATA.ivAllTiers[iv] && DATA.ivAllTiers[iv].indexOf(ti) >= 0) {
           tx.push(DATA.spRanks[iv]);
           ty.push(yValues[iv]);
@@ -328,6 +586,7 @@ function buildTraces() {
     var cLabel = 'Avg Score';
     for (var iv=0; iv<nIvs; iv++) {
       if (currentYIsSparse && !isFinite(yValues[iv])) continue;
+      if (!isOwnedFilter(iv)) continue;
       ax.push(DATA.spRanks[iv]);
       ay.push(yValues[iv]);
       at.push(buildHoverText(iv));
@@ -459,6 +718,69 @@ function buildTraces() {
   if (slayerTrace) traces.push(slayerTrace);
   var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff');
   if (anchorTrace) traces.push(anchorTrace);
+
+  // ---- User collection overlay ----
+  //
+  // Two traces: one for mons that qualify for ≥1 tier ("Your IVs
+  // (qualifying)") drawn prominently, and one for owned-but-non-
+  // qualifying mons ("Your IVs (owned)") drawn faintly so the user
+  // can see what they already own vs what they're missing. Off-grid
+  // mons (canonicalIvIdx === -1) are not plotted — their IV wasn't
+  // in the dive's simulated set, so there's no (x, y) to place them
+  // at. The status line reports the off-grid count separately.
+  //
+  // Border color is magenta to be distinct from slayer (gold) and
+  // anchor (cyan) overlays.
+  if (state.userRecords && state.userRecords.length > 0) {
+    var qualX=[], qualY=[], qualText=[];
+    var ownX=[],  ownY=[],  ownText=[];
+    for (var ur = 0; ur < state.userRecords.length; ur++) {
+      var rec = state.userRecords[ur];
+      var iv = rec.canonicalIvIdx;
+      if (iv < 0) continue;
+      var sp = DATA.spRanks[iv], yv = yValues[iv];
+      if (currentYIsSparse && !isFinite(yv)) continue;
+      // Hover text: reuse the standard one and append user-specific rows.
+      var lines = buildHoverText(iv);
+      var userLines = [
+        '',
+        '<b>Yours:</b> ' + (rec.mon.is_shadow ? 'Shadow ' : '') +
+          (rec.csvSpecies || '') + ' CP' + rec.mon.cp,
+        '  Rows IVs: ' + rec.mon.atk_iv + '/' + rec.mon.def_iv + '/' + rec.mon.sta_iv,
+      ];
+      if (rec.matched.length > 0) {
+        userLines.push('  Qualifies for: ' + rec.matched.join(', '));
+      } else {
+        userLines.push('  No tier match');
+      }
+      var fullText = lines + '<br>' + userLines.join('<br>');
+      if (rec.matched.length > 0) {
+        qualX.push(sp); qualY.push(yv); qualText.push(fullText);
+      } else {
+        ownX.push(sp); ownY.push(yv); ownText.push(fullText);
+      }
+    }
+    if (ownX.length > 0) {
+      traces.push({
+        name: 'Your IVs (owned)', x: ownX, y: ownY, text: ownText,
+        mode: 'markers', type: 'scatter', hoverinfo: 'text',
+        marker: {
+          size: 6, color: 'rgba(255,64,255,0.08)', symbol: 'circle-open',
+          opacity: 0.7, line: { width: 1, color: '#ff40ff' }
+        }
+      });
+    }
+    if (qualX.length > 0) {
+      traces.push({
+        name: 'Your IVs (qualifying)', x: qualX, y: qualY, text: qualText,
+        mode: 'markers', type: 'scatter', hoverinfo: 'text',
+        marker: {
+          size: 10, color: 'rgba(255,64,255,0.0)', symbol: 'circle-open',
+          opacity: 1.0, line: { width: 2, color: '#ff40ff' }
+        }
+      });
+    }
+  }
 
   // Tier traces go LAST so they render on top of overlays.
   // Sort largest first so smallest tiers (most selective) draw on top.
@@ -651,3 +973,7 @@ function reattachLegendHandlers() {
 
 // ---- Init ----
 updateView();
+// Hook up the collection panel handlers now that updateView has run
+// once (nIvs, DATA, etc. are all in scope). Safe even if DATA.collection
+// is null — the wire function bails early in that case.
+wireCollectionHandlers();
