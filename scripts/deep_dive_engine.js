@@ -1006,28 +1006,40 @@ function buildTraces() {
         ownX.push(sp); ownY.push(yv); ownText.push(fullText);
       }
     }
-    // Plotly circle-open: marker.color IS the stroke color (there's
-    // no separate fill since the marker is "open"). line.color/width
-    // are rendered as a second outer stroke. To make the rings
-    // *actually* visible we set color to a solid high-contrast value
-    // and let line.width amplify the stroke thickness.
+    // Hit-box note: earlier versions used symbol:'circle-open' for the
+    // ring-only visual, but that produces a hollow hit area in
+    // Plotly's hover system — hovering the INTERIOR of the ring (where
+    // a tier marker sits underneath) missed the user trace and
+    // misfired on the tier trace below, with inconsistent results
+    // because we were mixing svg 'scatter' here with scattergl tier
+    // traces. Fix: use the standard filled 'circle' symbol with a
+    // nearly-transparent fill so the FULL disk catches hover, plus a
+    // visible stroke via `line` that still reads as a ring. Also
+    // switch to scattergl so the trace type matches the tier traces
+    // and hover hit-detection is consistent across overlaps.
     if (ownX.length > 0) {
       traces.push({
         name: 'Your IVs (owned)', x: ownX, y: ownY, text: ownText,
-        mode: 'markers', type: 'scatter', hoverinfo: 'text',
+        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
-          size: 9, color: '#cccccc', symbol: 'circle-open',
-          opacity: 0.9, line: { width: 2, color: '#cccccc' }
+          size: 12,
+          color: 'rgba(204, 204, 204, 0.05)',  // barely-visible fill for hit box
+          symbol: 'circle',
+          opacity: 1.0,
+          line: { width: 2, color: '#cccccc' }  // visible ring
         }
       });
     }
     if (qualX.length > 0) {
       traces.push({
         name: 'Your IVs (qualifying)', x: qualX, y: qualY, text: qualText,
-        mode: 'markers', type: 'scatter', hoverinfo: 'text',
+        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
-          size: 16, color: '#ffffff', symbol: 'circle-open',
-          opacity: 1.0, line: { width: 3, color: '#ffffff' }
+          size: 18,
+          color: 'rgba(255, 255, 255, 0.05)',  // barely-visible fill for hit box
+          symbol: 'circle',
+          opacity: 1.0,
+          line: { width: 3, color: '#ffffff' }
         }
       });
     }
