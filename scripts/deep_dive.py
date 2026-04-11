@@ -3521,6 +3521,11 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
         n_members = len(tier_ivs)
 
         color = t.get('color', '#888')
+        # Slug for the "N of yours qualify" placeholder. Must match the
+        # JS computation in deep_dive_engine.js updateTierCardCounts.
+        import re as _re
+        _tier_slug = _re.sub(r'^-|-$', '',
+                             _re.sub(r'[^a-z0-9]+', '-', t['name'].lower()))
         parts.append('<div class="dd-rec-card">\n')
         parts.append(
             f'<h4>'
@@ -3530,7 +3535,10 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
             f'· {cutoffs_str}</span> '
             f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
             f'({n_members} IV{"s" if n_members != 1 else ""})'
-            f'</span>'
+            f'</span> '
+            f'<span id="tier-card-yours-{_tier_slug}" '
+            f'class="dd-small" '
+            f'style="font-weight:400;color:#ff40ff;display:none"></span>'
             f'</h4>\n'
         )
         # --- Auto-generated prose summary for the card ---
@@ -5227,7 +5235,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               shield_scenarios=None, opponent_names=None,
                               opp_iv_modes=None, reference_idx=-1,
                               standalone=False, slayer_iter_result=None,
-                              cli_args_str=None, has_toml_tiers=False):
+                              cli_args_str=None, has_toml_tiers=False,
+                              shadow=False):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -5537,6 +5546,99 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     else:
         _bait_meta = ''
 
+    # ---- User-collection support data ----
+    #
+    # Everything the browser-side JS port of user_collection.py needs to
+    # parse the user's Poke Genie CSV and match it against this dive's
+    # auto-derived tiers — without any server round-trip and without
+    # loading the full gamemaster on the client. The JS module lives at
+    # scripts/deep_dive_user_collection.js and is injected into the HTML
+    # alongside the engine JS. Keys mirror the Python API 1:1.
+    #
+    # The shadow flag controls three things:
+    #   * speciesKey: 'Tinkaton' vs 'Tinkaton (Shadow)' — this is the
+    #     threshold-dict key the JS builds on CSV load. A user's shadow
+    #     Tinkaton in the CSV resolves via get_species_name to
+    #     'Tinkaton (Shadow)', which must match the speciesKey we picked
+    #     for the dive.
+    #   * which gamemaster entry supplies base stats (non-shadow and
+    #     shadow share base stats in PvPoke's gamemaster, but we key on
+    #     the same name consistently so the matcher's dict lookups work).
+    #   * which shadow branch of the rank lookup we precompute.
+    from gopvpsim.evolution_lines import _load_pre_to_finals
+    from gopvpsim.pokemon import (
+        CPM as _CPM, SHADOW_ATK_BONUS as _SAB, SHADOW_DEF_MULT as _SDM,
+        get_pokemon_index as _get_pkidx,
+    )
+    from gopvpsim.user_collection import compute_rank_lookup as _rank_lookup
+    _collection_species_key = f'{species} (Shadow)' if shadow else species
+    _collection_data = None
+    _pkidx = _get_pkidx()
+    if _collection_species_key in _pkidx:
+        _base = _pkidx[_collection_species_key]
+        # Pre-evo subset: only keys whose list of possible final forms
+        # includes THIS dive's species. For a Tinkaton dive, that gives
+        # {Tinkatink: [Tinkaton], Tinkatuff: [Tinkaton], Tinkaton: [Tinkaton]}.
+        # Branching pre-evos (Eevee → 8 eeveelutions) contribute only if
+        # the dive is one of the branches — e.g. an Umbreon dive gets
+        # {Eevee: [Umbreon], Umbreon: [Umbreon]} rather than the full 8.
+        _pre_to_finals_full = _load_pre_to_finals()
+        _pre_to_finals_subset = {}
+        for _pre, _finals in _pre_to_finals_full.items():
+            _relevant = [_f for _f in _finals if _f == _collection_species_key]
+            if _relevant:
+                _pre_to_finals_subset[_pre] = _relevant
+        # Rank lookup: {'normal' or 'shadow' → {ivKey → rank}}. The JS
+        # matcher reads from this to populate stats.rank, which in turn
+        # powers the hover display and any 'onlytop' target in the
+        # future. Scope is small (one species, 4096 IVs).
+        _ranked = _rank_lookup(
+            _collection_species_key, league=league,
+            max_level=51.0, shadow=shadow)
+        _rank_shadow_key = 'shadow' if shadow else 'normal'
+        _rank_table = {f'{a},{d},{s}': r for (a, d, s), r in _ranked.items()}
+        # Build the threshold dict in the same shape Python's match_mons
+        # expects, from the tier info already computed above. This is
+        # the dict the JS constructs at CSV-load time; we could build
+        # it in JS instead but pre-baking here keeps the JS simpler and
+        # guarantees identical behavior to match_mons' dict-schema path.
+        _league_label = league.capitalize()
+        _collection_thresholds = {
+            _collection_species_key: {
+                _league_label: {
+                    t['name']: {
+                        'attack':  t['attack'],
+                        'defense': t['defense'],
+                        'stamina': t['stamina'],
+                    }
+                    for t in tier_info
+                }
+            }
+        }
+        _collection_data = {
+            'speciesKey':      _collection_species_key,
+            'isShadow':        shadow,
+            'leagueLabel':     _league_label,
+            'leagueCap':       LEAGUE_CAPS[league],
+            'maxLevel':        51.0,
+            'shadowAtkBonus':  _SAB,
+            'shadowDefMult':   _SDM,
+            # CPM table: keys are stringified floats so json.dumps emits
+            # a regular JS object. The JS module's cpmAt() handles both
+            # '50' and '50.0' key variants.
+            'cpm':             {str(k): v for k, v in _CPM.items()},
+            'pokemonIndex': {
+                _collection_species_key: {
+                    'atk': _base['atk'], 'def': _base['def'], 'hp': _base['hp'],
+                }
+            },
+            'preToFinals':     _pre_to_finals_subset,
+            'rankLookup':      {_collection_species_key: {_rank_shadow_key: _rank_table}},
+            'thresholds':      _collection_thresholds,
+            'tierNames':       [t['name'] for t in tier_info],
+        }
+    data_obj['collection'] = _collection_data
+
     # --- Build HTML ---
     plotly_tag = _plotly_script_tag(standalone)
     # Embed the equivalent CLI invocation as an HTML comment near the top so
@@ -5580,6 +5682,25 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .threshold-info span {{ font-weight: bold; }}
   .methodology {{ color: #888; font-size: 12px; max-width: 800px;
                   margin: 10px 0 30px 0; line-height: 1.6; }}
+  details.collection-panel {{ background: #16213e; padding: 10px 14px;
+                              border-radius: 6px; margin-bottom: 15px; }}
+  details.collection-panel > summary {{ cursor: pointer; color: #e0e0e0;
+                                         font-size: 13px; }}
+  .collection-body {{ margin-top: 10px; }}
+  .collection-instructions {{ font-size: 12px; color: #aaa;
+                              margin-bottom: 8px; line-height: 1.5; }}
+  #collection-csv {{ width: 100%; background: #0f3460; color: #e0e0e0;
+                     border: 1px solid #1a3a6e; border-radius: 4px;
+                     padding: 6px 8px; font-size: 11px;
+                     font-family: monospace; resize: vertical;
+                     box-sizing: border-box; }}
+  .collection-buttons {{ display: flex; gap: 8px; align-items: center;
+                         margin-top: 8px; flex-wrap: wrap; }}
+  .collection-buttons button {{ background: #0f3460; color: #e0e0e0;
+                                border: 1px solid #1a3a6e; border-radius: 4px;
+                                padding: 4px 10px; font-size: 12px;
+                                cursor: pointer; }}
+  .collection-buttons button:hover {{ background: #1a3a6e; }}
 </style>
 </head>
 <body>
@@ -5647,6 +5768,45 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         html += '  <span style="font-size:11px;color:#888;margin-left:8px">Threshold tiers shown in graph legend. Hover to isolate; click to lock.</span>\n'
     html += '</div>\n'
 
+    # "Your collection" paste-box. Hidden (display:none) until DOMContentLoaded
+    # — the engine JS reveals it only if DATA.collection was populated
+    # (i.e. the dive species was found in the gamemaster). Privacy note
+    # reinforces that no upload happens; the textarea + FileReader both
+    # run fully client-side.
+    if _collection_data is not None:
+        html += (
+            '<details id="collection-panel" class="collection-panel" open>\n'
+            '  <summary><b>Check my collection</b> '
+            '<span style="font-size:11px;color:#888">'
+            '— Your collection stays in your browser; nothing is uploaded.'
+            '</span></summary>\n'
+            '  <div class="collection-body">\n'
+            '    <div class="collection-instructions">\n'
+            '      Paste your Poke Genie CSV export below, or click '
+            '<b>Choose file\u2026</b> to load one from disk. '
+            'You\u2019ll see which of your '
+            f'{species}{"s" if not species.endswith("s") else ""} '
+            '(and pre-evolutions) qualify for each tier, overlaid on the '
+            'scatter plot.\n'
+            '    </div>\n'
+            '    <textarea id="collection-csv" rows="4" '
+            'placeholder="Paste CSV here (first row: Name,Form,CP,...)"></textarea>\n'
+            '    <div class="collection-buttons">\n'
+            '      <button id="collection-load-btn" type="button">Load</button>\n'
+            '      <button id="collection-file-btn" type="button">Choose file\u2026</button>\n'
+            '      <input id="collection-file-input" type="file" accept=".csv,text/csv" '
+            'style="display:none">\n'
+            '      <button id="collection-clear-btn" type="button">Clear</button>\n'
+            '      <label style="font-size:12px;color:#aaa">'
+            '<input type="checkbox" id="collection-only-chk"> Show only my mons'
+            '</label>\n'
+            '      <span id="collection-status" '
+            'style="font-size:12px;color:#aaa;margin-left:6px"></span>\n'
+            '    </div>\n'
+            '  </div>\n'
+            '</details>\n'
+        )
+
     # Plot first, then summary table below
     html += '<div id="plot" class="plot-container" style="height:550px;"></div>\n'
     html += '<div id="summary" class="summary"></div>\n'
@@ -5692,6 +5852,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 })();
 """
     html += '</script>\n'
+
+    # User-collection JS module (POGOCollection global). Injected BEFORE
+    # the engine so the engine can reference POGOCollection.parseCsvText
+    # etc. on init. Kept as a separate <script> block — if the module
+    # file is missing (dev moved it, etc.) the engine still loads and
+    # the paste-box simply stays hidden via the DATA.collection null
+    # guard in the engine init.
+    _uc_js_path = os.path.join(os.path.dirname(__file__),
+                               'deep_dive_user_collection.js')
+    try:
+        with open(_uc_js_path) as _ucf:
+            html += '<script>\n' + _ucf.read() + '\n</script>\n'
+    except FileNotFoundError:
+        pass
 
     # JS engine
     html += '<script>\n'
@@ -6683,6 +6857,7 @@ def main():
                 slayer_iter_result=main_slayer_iter_result,
                 cli_args_str=cli_args_str,
                 has_toml_tiers=_toml_tiers_loaded,
+                shadow=args.shadow,
             )
         else:
             # Static mode (original behavior)
