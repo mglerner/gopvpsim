@@ -304,14 +304,16 @@ def _slayer_iter_worker(args):
     return results
 
 
-def _build_focal_meta(species, league, shadow):
+def _build_focal_meta(species, league, shadow, iv_floor=None):
     """Compute (atk, def, hp, iv_idx) for all valid focal IVs.
 
     Returns (iv_to_idx, iv_meta_tuples) where iv_meta_tuples is a list of
     (a, d, s, atk, def, hp). Thin wrapper around compute_iv_metadata for
-    backwards compatibility with the slayer iteration code.
+    backwards compatibility with the slayer iteration code. ``iv_floor``
+    is passed through to prune the focal IV space.
     """
-    iv_meta_dicts = compute_iv_metadata(species, league, shadow=shadow)
+    iv_meta_dicts = compute_iv_metadata(species, league, shadow=shadow,
+                                        iv_floor=iv_floor)
     iv_to_idx = {}
     iv_meta = []
     for idx, m in enumerate(iv_meta_dicts):
@@ -324,7 +326,7 @@ def _build_focal_meta(species, league, shadow):
 def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                                 shield_scenarios, initial_opp_iv,
                                 max_rounds=4, top_per_round=10, cache=None,
-                                metric='all'):
+                                metric='all', iv_floor=None):
     """
     Iterative slayer discovery: find IVs that beat the mirror match through
     Nash-style iteration.
@@ -347,7 +349,8 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from slayer_cache import SlayerCache
 
-    iv_to_idx, iv_meta = _build_focal_meta(species, league, shadow)
+    iv_to_idx, iv_meta = _build_focal_meta(species, league, shadow,
+                                            iv_floor=iv_floor)
     n_focal = len(iv_meta)
 
     fast_moves_db, charged_moves_db = get_moves()
@@ -1332,7 +1335,7 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
 _worker_state = {}
 
 
-def compute_iv_metadata(species, league, shadow=False):
+def compute_iv_metadata(species, league, shadow=False, iv_floor=None):
     """
     Compute metadata for all valid IV spreads of a species/league.
 
@@ -1340,16 +1343,27 @@ def compute_iv_metadata(species, league, shadow=False):
         atk_iv, def_iv, sta_iv, level, cp, atk, def_, hp, stat_product
     The list is in canonical iteration order (a=0..15, d=0..15, s=0..15),
     skipping IVs that exceed CP cap at level 1.
+
+    When ``iv_floor`` is a tuple ``(atk_floor, def_floor, sta_floor)``,
+    any IV with ``atk<atk_floor``, ``def<def_floor``, or
+    ``sta<sta_floor`` is pruned at enumeration time. This is used by
+    ``deep_dive.py --species-iv-floor ATK,DEF,STA`` to trim the focal
+    species' IV space for tight-league dives (e.g. UL at 13/13/13
+    collapses 4096 candidates to 27).
     """
     from gopvpsim.pokemon import SHADOW_ATK_BONUS, SHADOW_DEF_MULT
     base = get_species(species)
     base_atk, base_def, base_sta = base['atk'], base['def'], base['hp']
     max_cp = LEAGUE_CAPS[league]
 
+    a_floor = d_floor = s_floor = 0
+    if iv_floor is not None:
+        a_floor, d_floor, s_floor = iv_floor
+
     iv_meta = []
-    for a in range(16):
-        for d in range(16):
-            for s in range(16):
+    for a in range(a_floor, 16):
+        for d in range(d_floor, 16):
+            for s in range(s_floor, 16):
                 lv = best_level(base_atk, base_def, base_sta, a, d, s,
                                 max_cp=max_cp, max_level=51.0)
                 if lv is None:
@@ -1454,7 +1468,8 @@ def _sweep_worker(profile_chunk):
 
 
 def iv_sweep(species, fast_id, charged_ids, league, shadow,
-             opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke'):
+             opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke',
+             iv_floor=None):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
@@ -1505,7 +1520,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         })
 
     # Pre-compute IV metadata and group by stat profile (focal-side dedup)
-    iv_meta = compute_iv_metadata(species, league, shadow=shadow)
+    iv_meta = compute_iv_metadata(species, league, shadow=shadow,
+                                  iv_floor=iv_floor)
     profile_to_indices, profile_data = group_ivs_by_stat_profile(iv_meta)
     profile_list = [(pk, dat[0], dat[1], dat[2]) for pk, dat in profile_data.items()]
 
@@ -6185,6 +6201,16 @@ def main():
                              'auto-derived tiers + anchor discovery from '
                              'opponent analysis, no TOML-prescribed spreads. '
                              'Has no effect if --thresholds is passed.')
+    parser.add_argument('--species-iv-floor', default=None, metavar='ATK,DEF,STA',
+                        help='Prune focal species IVs below this floor at '
+                             'enumeration time. Comma-separated (e.g. "13,13,13" '
+                             'for UL tight-spread dives — trims 4096 IVs to 27). '
+                             'Applies ONLY to the focal species; opponents still '
+                             'use their default / rank1 / cohort selection. The '
+                             'scatter plot, tier derivation, and anchor analysis '
+                             'all operate on the pruned set; the paste-box '
+                             'matches list will not find user mons below the '
+                             'floor even if owned.')
     parser.add_argument('--anchor-file', default=None, metavar='FILE', action='append',
                         dest='anchor_files',
                         help='Additional threshold file merged on top of --thresholds. '
@@ -6255,12 +6281,31 @@ def main():
 
     args = parser.parse_args()
 
+    # Parse --species-iv-floor "ATK,DEF,STA" into a (atk, def, sta) tuple
+    # of ints. Empty / None stays None (no floor applied).
+    _iv_floor = None
+    if args.species_iv_floor:
+        try:
+            _parts = [int(p) for p in args.species_iv_floor.split(',')]
+            if len(_parts) != 3 or any(p < 0 or p > 15 for p in _parts):
+                parser.error(
+                    '--species-iv-floor must be ATK,DEF,STA with three '
+                    'integers in [0, 15] (e.g. "13,13,13")')
+            _iv_floor = tuple(_parts)
+        except ValueError:
+            parser.error('--species-iv-floor must parse as three integers '
+                         '(e.g. "13,13,13")')
+    args.iv_floor = _iv_floor
+
     # Capture the equivalent command line for forensic reproducibility.
     # Printed to console and embedded in HTML output so any future reader can
     # see exactly what flags produced a given dive (including defaults that
     # have since changed).
     cli_args_str = format_cli_args(args, parser)
     print(f"CLI: {cli_args_str}")
+    if args.iv_floor is not None:
+        print(f"  IV floor: atk>={args.iv_floor[0]}, def>={args.iv_floor[1]}, "
+              f"sta>={args.iv_floor[2]} (focal species only)")
 
     # Parse shield scenarios
     ALL_NINE = [(s0, s1) for s0 in range(3) for s1 in range(3)]
@@ -6553,6 +6598,7 @@ def main():
             args.species, fast_id, charged_ids, args.league, args.shadow,
             opponents, opp_movesets_full, shield_scenarios,
             opp_iv_mode=opp_iv_mode,
+            iv_floor=args.iv_floor,
         )
 
         elapsed = time.time() - t0
@@ -6654,6 +6700,7 @@ def main():
                     top_per_round=args.mirror_slayer_pool,
                     cache=slayer_cache,
                     metric=args.mirror_slayer_metric,
+                    iv_floor=args.iv_floor,
                 )
                 # Stash the metric/rounds for HTML rendering
                 slayer_iter_result['metric'] = args.mirror_slayer_metric
@@ -6895,6 +6942,7 @@ def main():
                             args.species, fast_id, charged_ids, args.league, args.shadow,
                             opponents, opp_movesets_full, shield_scenarios,
                             opp_iv_mode=mode,
+                            iv_floor=args.iv_floor,
                         )
                         elapsed = time.time() - t0
                         rate = n_sims / elapsed if elapsed > 0 else 0
@@ -6925,6 +6973,7 @@ def main():
                             args.species, fast_id, charged_ids, args.league, args.shadow,
                             opponents, opp_movesets_full, shield_scenarios,
                             opp_iv_mode=mode,
+                            iv_floor=args.iv_floor,
                         )
                         elapsed = time.time() - t0
                         print(f"    {n2:,} sims in {elapsed:.1f}s")
@@ -6957,6 +7006,7 @@ def main():
                             args.species, ref_fast, ref_charged, args.league, args.shadow,
                             opponents, opp_movesets_full, shield_scenarios,
                             opp_iv_mode=mode,
+                            iv_floor=args.iv_floor,
                         )
                         elapsed = time.time() - t0
                         rate = ref_n / elapsed if elapsed > 0 else 0
