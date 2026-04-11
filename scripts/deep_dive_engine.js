@@ -207,6 +207,33 @@ function computeView() {
 // opponent list is in the dive metadata anyway.
 function shortName(name) { return name.split('(')[0].trim().substring(0, 4); }
 
+// Push a label + comma-separated item list to `lines`, wrapping
+// onto multiple lines when a single line would exceed `maxWidth`
+// chars. Continuation lines get an indent matching the label's
+// visual width, so "Clears: a, b, c" wraps as:
+//     Clears: a, b,
+//             c, d
+// instead of a single ultra-wide line that forces the whole hover
+// tooltip to expand horizontally.
+function appendWrappedListLines(lines, label, items, maxWidth) {
+  if (!items || items.length === 0) return;
+  var indent = new Array(label.length + 2).join(' ');  // "Clears:".length + 1 space
+  var current = label + ' ';
+  var first = true;
+  for (var i = 0; i < items.length; i++) {
+    var sep = (i < items.length - 1) ? ', ' : '';
+    var token = items[i] + sep;
+    if (!first && (current.length + token.length) > maxWidth) {
+      lines.push(current.replace(/\s+$/, ''));
+      current = indent + token;
+    } else {
+      current += token;
+      first = false;
+    }
+  }
+  lines.push(current.replace(/\s+$/, ''));
+}
+
 function buildHoverText(iv) {
   var a = DATA.ivA[iv], d = DATA.ivD[iv], s = DATA.ivS[iv];
   // Format the y-value line based on the active mode. Wins-based modes
@@ -237,8 +264,11 @@ function buildHoverText(iv) {
   }
   // Anchor-clear membership: which named anchors (mirror BP, etc.) the
   // IV passes among those for which we emitted a matchup-flip bullet.
+  // Line-wrapped so the tooltip doesn't balloon horizontally when an
+  // IV clears many anchors — breaks on comma boundaries once a line
+  // exceeds ~45 chars, with an indent continuation.
   if (DATA.anchorClearByIv && DATA.anchorClearByIv[iv]) {
-    lines.push('Clears: '+DATA.anchorClearByIv[iv].join(', '));
+    appendWrappedListLines(lines, 'Clears:', DATA.anchorClearByIv[iv], 45);
   }
 
   // User collection annotation: if the user has any mons at this exact
