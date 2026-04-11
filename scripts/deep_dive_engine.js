@@ -613,7 +613,7 @@ function annotateAnchorBullets() {
       if (ownedRec) hits.push(ownedRec);
     }
     if (hits.length === 0) {
-      span.textContent = ' \u2014 none of yours';
+      span.textContent = ' - none of yours';
       span.style.color = '#6c7a89';
       span.removeAttribute('title');
       continue;
@@ -625,7 +625,7 @@ function annotateAnchorBullets() {
       return 'CP' + h.mon.cp + ' ' + h.mon.atk_iv + '/' + h.mon.def_iv + '/' + h.mon.sta_iv;
     }).join(', ');
     var extra = hits.length > 3 ? (' +' + (hits.length - 3) + ' more') : '';
-    span.textContent = ' \u2014 yours: ' + shown + extra;
+    span.textContent = ' - yours: ' + shown + extra;
     span.style.color = '#9be89b';
     // Full list in the title tooltip for power users.
     var fullList = hits.map(function(h) {
@@ -722,7 +722,7 @@ function renderMatchesList() {
       return b.mon.cp - a.mon.cp;
     });
     var sid = 'matches-section-' + (sectionIdx++);
-    var h = '<h5>' + heading + ' \u2014 ' + recs.length + ' of yours</h5>';
+    var h = '<h5>' + heading + ' - ' + recs.length + ' of yours</h5>';
     h += '<table><tr><th>#</th><th>Current CP</th><th>IVs</th>' +
          '<th>Species</th><th>Power-up</th><th>Max CP</th>';
     if (extraHeader) h += '<th>' + escapeHtml(extraHeader) + '</th>';
@@ -773,7 +773,7 @@ function renderMatchesList() {
     slayerRecs,
     'Slayer type',
     function(rc) {
-      return escapeHtml((rc.slayerCats || []).join(', ') || '\u2014');
+      return escapeHtml((rc.slayerCats || []).join(', ') || '-');
     }
   );
 
@@ -1152,6 +1152,29 @@ function buildTraces() {
   if (state.userRecords && state.userRecords.length > 0) {
     var qualX=[], qualY=[], qualText=[];
     var ownX=[],  ownY=[],  ownText=[];
+    // Tiny y-offset so user-overlay points aren't at the EXACT same
+    // (x, y) as the underlying tier / slayer / anchor markers. When
+    // 5 traces overlap at a single coordinate (tier 0 + tier 1 +
+    // slayer + anchor + user overlay) Plotly scattergl's hover
+    // hit-detection gives up and shows nothing on hover. Nudging
+    // the user ring by ~0.02 y-units (under 0.5 pixel at typical
+    // plot heights) gives each user ring a distinct closest point
+    // for hit detection without any visible offset. See the
+    // iv=3648 debugging session for the full story.
+    var yRange = 1;
+    if (yValues.length >= 2) {
+      var _yMin = Infinity, _yMax = -Infinity;
+      for (var _yi = 0; _yi < yValues.length; _yi++) {
+        var _yv = yValues[_yi];
+        if (isFinite(_yv)) {
+          if (_yv < _yMin) _yMin = _yv;
+          if (_yv > _yMax) _yMax = _yv;
+        }
+      }
+      yRange = Math.max(1, _yMax - _yMin);
+    }
+    var Y_NUDGE = yRange * 0.0005;
+
     // Iterate unique owned IV indices (not userRecords) so we hit each
     // scatter point once. The ownedByIv cache groups records by IV,
     // so anyMatched is just "does any record in this IV's group have
@@ -1171,10 +1194,15 @@ function buildTraces() {
           anyMatched = true; break;
         }
       }
+      // Apply the nudge upward (positive y direction) so the user
+      // ring sits just above the base marker. "Above" is chosen so
+      // the matchup-diff block (which renders under the cursor by
+      // default in Plotly) has more space below the hovered point.
+      var nudgedY = yv + Y_NUDGE;
       if (anyMatched) {
-        qualX.push(sp); qualY.push(yv); qualText.push(fullText);
+        qualX.push(sp); qualY.push(nudgedY); qualText.push(fullText);
       } else {
-        ownX.push(sp); ownY.push(yv); ownText.push(fullText);
+        ownX.push(sp); ownY.push(nudgedY); ownText.push(fullText);
       }
     }
     // Hover strategy: user-overlay traces carry their own
@@ -1194,7 +1222,7 @@ function buildTraces() {
     // original motivation for 'skip' is fixed, so 'text' is safe.
     if (ownX.length > 0) {
       traces.push({
-        name: 'Your IVs (owned)', x: ownX, y: ownY, text: ownText,
+        name: 'Yours - below tier', x: ownX, y: ownY, text: ownText,
         mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
           size: 9, color: '#cccccc', symbol: 'circle-open',
@@ -1205,7 +1233,7 @@ function buildTraces() {
     }
     if (qualX.length > 0) {
       traces.push({
-        name: 'Your IVs (qualifying)', x: qualX, y: qualY, text: qualText,
+        name: 'Yours - meets tier', x: qualX, y: qualY, text: qualText,
         mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
           size: 13, color: '#ffffff', symbol: 'circle-open',
@@ -1251,11 +1279,11 @@ function updateSummaryTable() {
     h += '<td>'+DATA.ivLv[iv]+'</td><td>'+DATA.ivCp[iv]+'</td>';
     h += '<td>'+DATA.ivAtk[iv].toFixed(2)+'</td><td>'+DATA.ivDef[iv].toFixed(2)+'</td>';
     h += '<td>'+DATA.ivHp[iv]+'</td><td>#'+DATA.spRanks[iv]+'</td>';
-    h += '<td>'+(isFinite(yValues[iv]) ? yValues[iv].toFixed(1) : '\u2014')+'</td>';
+    h += '<td>'+(isFinite(yValues[iv]) ? yValues[iv].toFixed(1) : '-')+'</td>';
     if (hasTiers) {
       if (tier >= 0) {
         h += '<td><span class="tier-badge" style="background:'+tierColors[tier]+';color:#000">'+tierNames[tier]+'</span></td>';
-      } else h += '<td>\u2014</td>';
+      } else h += '<td>-</td>';
     }
     h += '</tr>';
   }
