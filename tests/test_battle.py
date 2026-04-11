@@ -978,46 +978,52 @@ def test_default_moveset_shadow_runs():
 # No-bait oracle tests — sourced from HSH #iv-tech deep dive references
 # ---------------------------------------------------------------------------
 
-@pytest.mark.integration
-@pytest.mark.parametrize("bait_shields", [True, False])
-def test_corviknight_max_def_wins_1v1_vs_default_shadow_sableye(bait_shields):
-    """Oracle test from `docs/corviknight_deep_dive_reference.md`:
+def _corvi_vs_shadow_sableye(shields, bait_shields):
+    """Build and simulate max-def Corvi vs default Shadow Sableye.
 
-        "135.46 defense (max defense) ... flips the 1 without baiting"
-
-    Max-def Corviknight (0/15/2, def=135.47) vs default-IV Shadow Sableye
-    (4/15/15 @ level 47, PvPoke defaults) should win the 1-shield scenario
-    in both bait modes. The reference specifically calls out that the win
-    is achievable *without* baiting, which is what ``bait_shields=False``
-    tests directly.
-
-    Parametrized over both modes to document that bait_shields=True also
-    wins here (568 score) — the two modes differ in first-throw choice
-    (Sky Attack bait vs Payback best-DPE) but converge to the same winner.
-
-    Note: the reference also claims Corvi flips the 2s "if you bait twice,"
-    but our pvpoke_dp has Corvi losing 2v2 with both bait modes (288 score,
-    Corvi dies before reaching Payback energy). See DEVELOPER_NOTES.md for
-    the divergence writeup.
+    Both sides use PvPoke's default move sets for Great League, fetched
+    via ``get_default_moveset`` so the test tracks PvPoke's rankings
+    automatically (never hardcode move IDs — see CLAUDE.md "Testing").
     """
     from functools import partial
+    corvi_fast, corvi_charged = get_default_moveset('Corviknight', 'great')
+    sab_fast, sab_charged = get_default_moveset('Sableye', 'great', shadow=True)
     bp_corvi = _make_battle_pokemon(
-        'Corviknight', 'SAND_ATTACK', ['SKY_ATTACK', 'PAYBACK'],
-        'great', shields=1, atk_iv=0, def_iv=15, sta_iv=2)
-    # Shadow Sableye PvPoke default: [47, 4, 15, 15]
+        'Corviknight', corvi_fast, corvi_charged,
+        'great', shields=shields, atk_iv=0, def_iv=15, sta_iv=2)
+    # Shadow Sableye PvPoke default IVs: [47, 4, 15, 15]
     bp_sab = _make_battle_pokemon(
-        'Sableye', 'SHADOW_CLAW', ['FOUL_PLAY', 'SHADOW_SNEAK'],
-        'great', shields=1, atk_iv=4, def_iv=15, sta_iv=15,
+        'Sableye', sab_fast, sab_charged,
+        'great', shields=shields, atk_iv=4, def_iv=15, sta_iv=15,
         max_level=47.0, shadow=True)
 
     focal_policy = (pvpoke_dp if bait_shields
                     else partial(pvpoke_dp, bait_shields=False))
-    result = simulate(bp_corvi, bp_sab,
-                      charged_policy_0=focal_policy,
-                      charged_policy_1=pvpoke_dp,
-                      shield_policy_0=pvpoke_simulate_shield,
-                      shield_policy_1=pvpoke_simulate_shield)
+    return simulate(bp_corvi, bp_sab,
+                    charged_policy_0=focal_policy,
+                    charged_policy_1=pvpoke_dp,
+                    shield_policy_0=pvpoke_simulate_shield,
+                    shield_policy_1=pvpoke_simulate_shield)
 
+
+@pytest.mark.integration
+@pytest.mark.parametrize("bait_shields", [True, False])
+def test_corviknight_max_def_wins_1v1_vs_default_shadow_sableye(bait_shields):
+    """Oracle test from `docs/corviknight_deep_dive_reference.md:58`:
+
+        "135.46 defense (max defense) ... flips the 1 without baiting"
+
+    Max-def Corviknight (0/15/2, def=135.47) vs default-IV Shadow Sableye
+    (4/15/15 @ level 47) wins the 1-shield scenario in both bait modes.
+    The reference specifically calls out that the win is achievable
+    *without* baiting — bait_shields=False tests that directly.
+
+    Parametrized over both modes to document that bait_shields=True also
+    wins here — the two modes differ in first-throw choice (Air Cutter
+    bait vs Payback best-DPE) but converge to the same winner. Expected
+    scores (2026-04-12): bait_on=603, bait_off=551.
+    """
+    result = _corvi_vs_shadow_sableye(shields=1, bait_shields=bait_shields)
     assert result.winner == 0, (
         f"bait_shields={bait_shields}: expected Corviknight to win the 1s, "
         f"got winner={result.winner}, HP left: {result.hp_remaining}")
@@ -1025,3 +1031,37 @@ def test_corviknight_max_def_wins_1v1_vs_default_shadow_sableye(bait_shields):
     assert corvi_score >= 500, (
         f"bait_shields={bait_shields}: Corvi score {corvi_score:.1f} < 500 "
         f"(matchup not flipped)")
+
+
+@pytest.mark.integration
+def test_corviknight_2v2_vs_default_shadow_sableye_flips_with_bait():
+    """Oracle test from `docs/corviknight_deep_dive_reference.md:58`:
+
+        "135.46 defense ... flips the 2s if you bait twice"
+
+    This is the *directional* half of the Corvi vs Shadow Sableye oracle:
+    in the 2-shield scenario, the matchup outcome FLIPS with bait mode.
+    With baiting enabled, Corvi wins (throws Air Cutter twice to burn
+    both Sableye shields, then lands Payback for the KO). Without
+    baiting, Corvi throws Payback twice into shields and dies before
+    reaching a third charge.
+
+    This is the strongest oracle we have for the ``bait_shields``
+    parameter: if the gate regresses or pvpoke_dp's farm-down bait
+    branch stops firing, this test will flip and catch it.
+
+    Expected scores (2026-04-12): bait_on=531, bait_off=288.
+    """
+    # With baiting: Corvi wins (Air Cutter x2 bait → Payback lands)
+    result_bait = _corvi_vs_shadow_sableye(shields=2, bait_shields=True)
+    assert result_bait.winner == 0, (
+        f"bait_on 2v2: expected Corviknight to win via bait-twice, "
+        f"got winner={result_bait.winner}, HP={result_bait.hp_remaining}")
+    assert result_bait.pvpoke_score(0) >= 500
+
+    # Without baiting: Sableye wins (Corvi throws Payback into shields)
+    result_nobait = _corvi_vs_shadow_sableye(shields=2, bait_shields=False)
+    assert result_nobait.winner == 1, (
+        f"bait_off 2v2: expected Sableye to win, got "
+        f"winner={result_nobait.winner}, HP={result_nobait.hp_remaining}")
+    assert result_nobait.pvpoke_score(0) < 500

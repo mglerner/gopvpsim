@@ -79,15 +79,16 @@
      132+ hp flips the 1s vs the rank #1 altaria *without baits* by
      reducing sky attack damage."
 
-  5. **Corviknight vs default-IV Shadow Sableye 1-shield** —
-     `docs/corviknight_deep_dive_reference.md:58`. ✅ **Done 2026-04-12**
-     (`test_corviknight_max_def_wins_1v1_vs_default_shadow_sableye`
-     parametrized over both bait modes). The 1v1 "flips without baiting"
-     half verified; the 2v2 "flips with bait twice" claim diverges from
-     our sim — see `DEVELOPER_NOTES.md` "Known divergences" for the
-     writeup. Open followup: round-trip 2v2 at pvpoke.com/battle to
-     diagnose whether it's a pvpoke_dp gap, a human-only micro-strategy,
-     or outdated reference.
+  5. **Corviknight vs default-IV Shadow Sableye** — ✅ **Done 2026-04-12**
+     `docs/corviknight_deep_dive_reference.md:58`. Both halves of the
+     reference claim verified by:
+     - `test_corviknight_max_def_wins_1v1_vs_default_shadow_sableye`
+       (parametrized over bait modes — 1v1 "flips without baiting")
+     - `test_corviknight_2v2_vs_default_shadow_sableye_flips_with_bait`
+       (2v2 "flips with bait twice" — directional A/B: bait-on wins
+       531, bait-off loses 288). This is the strongest oracle we have
+       for the `bait_shields` gate: if farm-down baiting regresses, the
+       2v2 test flips and catches it.
 
   Each test should parametrize over `bait_shields=[True, False]`
   when the reference makes a directional claim (cases 1, 5
