@@ -1015,40 +1015,41 @@ function buildTraces() {
         ownX.push(sp); ownY.push(yv); ownText.push(fullText);
       }
     }
-    // Hit-box note: earlier versions used symbol:'circle-open' for the
-    // ring-only visual, but that produces a hollow hit area in
-    // Plotly's hover system — hovering the INTERIOR of the ring (where
-    // a tier marker sits underneath) missed the user trace and
-    // misfired on the tier trace below, with inconsistent results
-    // because we were mixing svg 'scatter' here with scattergl tier
-    // traces. Fix: use the standard filled 'circle' symbol with a
-    // nearly-transparent fill so the FULL disk catches hover, plus a
-    // visible stroke via `line` that still reads as a ring. Also
-    // switch to scattergl so the trace type matches the tier traces
-    // and hover hit-detection is consistent across overlaps.
+    // Hover strategy: the user-overlay traces are VISUAL-ONLY. Hover
+    // hit detection is explicitly disabled via hoverinfo:'skip' so
+    // they never catch a tooltip themselves — instead, the underlying
+    // base trace (Other / tier / slayer / anchor) always wins hover
+    // at that (x, y) position. The base trace's hover text already
+    // includes the "★ Yours:" block (see buildHoverText), so the
+    // user still gets their mon info without the user trace ever
+    // competing for the hit.
+    //
+    // Why this works when the previous attempts didn't: Plotly's
+    // scattergl hit detection with multiple stacked traces at the
+    // exact same (x, y) is unpredictable — it picks "the closest"
+    // but tiebreaker behavior varies. By making user traces
+    // non-interactive, we eliminate the tie entirely.
+    //
+    // circle-open (hollow stroke) is fine here because we no longer
+    // care about hit-box shape — nothing about hover depends on
+    // this trace.
     if (ownX.length > 0) {
       traces.push({
         name: 'Your IVs (owned)', x: ownX, y: ownY, text: ownText,
-        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+        mode: 'markers', type: 'scattergl', hoverinfo: 'skip',
         marker: {
-          size: 12,
-          color: 'rgba(204, 204, 204, 0.05)',  // barely-visible fill for hit box
-          symbol: 'circle',
-          opacity: 1.0,
-          line: { width: 2, color: '#cccccc' }  // visible ring
+          size: 12, color: '#cccccc', symbol: 'circle-open',
+          opacity: 0.9, line: { width: 2, color: '#cccccc' }
         }
       });
     }
     if (qualX.length > 0) {
       traces.push({
         name: 'Your IVs (qualifying)', x: qualX, y: qualY, text: qualText,
-        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+        mode: 'markers', type: 'scattergl', hoverinfo: 'skip',
         marker: {
-          size: 18,
-          color: 'rgba(255, 255, 255, 0.05)',  // barely-visible fill for hit box
-          symbol: 'circle',
-          opacity: 1.0,
-          line: { width: 3, color: '#ffffff' }
+          size: 18, color: '#ffffff', symbol: 'circle-open',
+          opacity: 1.0, line: { width: 3, color: '#ffffff' }
         }
       });
     }
