@@ -6179,6 +6179,12 @@ def main():
                              'Accepts .toml (full schema; see docs/threshold_schema.md) '
                              'or legacy .json (flat stat-cutoff form, no anchors). '
                              'Extension auto-detected.')
+    parser.add_argument('--no-thresholds', action='store_true',
+                        help='Skip the thresholds/<species>.toml auto-load. '
+                             'Use for "clean" dives that rely only on '
+                             'auto-derived tiers + anchor discovery from '
+                             'opponent analysis, no TOML-prescribed spreads. '
+                             'Has no effect if --thresholds is passed.')
     parser.add_argument('--anchor-file', default=None, metavar='FILE', action='append',
                         dest='anchor_files',
                         help='Additional threshold file merged on top of --thresholds. '
@@ -6295,6 +6301,11 @@ def main():
         except Exception as e:
             print(f"  Warning: failed to load {args.thresholds}: {e}")
             threshold_registry = None
+    elif args.no_thresholds:
+        # Explicit opt-out: no TOML, no auto-load. Falls through to the
+        # auto-derive path which reads anchor records from opponent
+        # analysis only. Printed so the log is unambiguous.
+        print('  --no-thresholds: skipping auto-load of species TOML')
     else:
         # Auto-discover: look for thresholds/<species>.toml (case-insensitive)
         # so the user doesn't have to remember --thresholds every run.
