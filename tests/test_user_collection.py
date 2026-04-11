@@ -17,7 +17,7 @@ from gopvpsim.evolution_lines import (
 from gopvpsim.pokemon import Pokemon, get_pokemon_index, iv_rank
 from gopvpsim.user_collection import (
     FORM_MAP, check_thresholds, compute_rank_lookup, get_species_name,
-    ivs_to_stats_at_cap, parse_csv,
+    ivs_to_stats_at_cap, match_mons, parse_csv, parse_csv_text,
 )
 
 
@@ -309,6 +309,83 @@ def test_check_thresholds_ivs_whitelist():
     for r in results.get('Tinkaton', []):
         ivs = (r['mon']['atk_iv'], r['mon']['def_iv'], r['mon']['sta_iv'])
         assert ivs in [(0, 14, 14), (0, 15, 15)]
+
+
+# ---------------------------------------------------------------------------
+# parse_csv_text + match_mons — the decoupled API used by the JS port
+# ---------------------------------------------------------------------------
+
+_MINI_CSV = (
+    "Name,Form,CP,Atk IV,Def IV,Sta IV,Level Min,Shadow/Purified,Lucky\n"
+    "Tinkatink,,500,0,15,15,20.0,0,0\n"
+    "Tinkaton,,1498,0,14,14,26.5,0,0\n"
+    # Garbage row — missing CP — should be skipped silently.
+    "Tinkaton,,,1,2,3,25.0,0,0\n"
+)
+
+
+def test_parse_csv_text_parses_inline_string():
+    mons = parse_csv_text(_MINI_CSV)
+    assert len(mons) == 2  # bad row skipped
+    assert mons[0]['name'] == 'Tinkatink'
+    assert mons[0]['atk_iv'] == 0
+    assert mons[0]['is_shadow'] is False
+    assert mons[1]['name'] == 'Tinkaton'
+    assert mons[1]['cp'] == 1498
+
+
+def test_parse_csv_text_strips_utf8_bom():
+    # Simulate what a browser textarea receives if the user pasted content
+    # that still has a leading BOM.
+    mons = parse_csv_text('\ufeff' + _MINI_CSV)
+    assert len(mons) == 2
+    assert mons[0]['name'] == 'Tinkatink'
+
+
+def test_parse_csv_and_parse_csv_text_agree_on_fixture():
+    """The file-based and string-based parsers must produce identical
+    results for the same content — this is the guarantee the JS port
+    will rely on."""
+    path = _fixture_or_skip()
+    via_path = parse_csv(str(path))
+    via_text = parse_csv_text(path.read_text(encoding='utf-8-sig'))
+    assert via_path == via_text
+
+
+def test_match_mons_matches_check_thresholds_on_fixture():
+    """match_mons(parse_csv(...)) must return the same result as the
+    check_thresholds convenience wrapper."""
+    path = _fixture_or_skip()
+    thresholds = {
+        'Tinkaton': {
+            'Great': {
+                'Any': {'attack': 90, 'defense': 0, 'stamina': 0},
+            },
+        },
+    }
+    via_wrapper = check_thresholds(str(path), thresholds, league='great')
+    via_parts = match_mons(parse_csv(str(path)), thresholds, league='great')
+    assert via_wrapper == via_parts
+
+
+def test_match_mons_on_inline_csv():
+    """End-to-end on a tiny in-memory CSV — no fixture file needed."""
+    thresholds = {
+        'Tinkaton': {
+            'Great': {
+                'Permissive': {'attack': 0, 'defense': 0, 'stamina': 0},
+            },
+        },
+    }
+    results = match_mons(parse_csv_text(_MINI_CSV), thresholds, league='great')
+    assert 'Tinkaton' in results
+    matched = results['Tinkaton']
+    # Both the Tinkatink (pre-evo walkup) and the Tinkaton should qualify.
+    assert len(matched) == 2
+    csv_species = {r['csv_species'] for r in matched}
+    assert csv_species == {'Tinkatink', 'Tinkaton'}
+    pre_evo_flags = {r['is_pre_evo'] for r in matched}
+    assert pre_evo_flags == {True, False}
 
 
 def test_check_thresholds_include_empty_returns_unmatched_species():

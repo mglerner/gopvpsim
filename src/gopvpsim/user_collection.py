@@ -7,17 +7,22 @@ This module is **shared** between pogo-simulator and gobattlekit (see
 
 Typical flow for a "check my collection against IV targets" workflow::
 
-    from gopvpsim.user_collection import parse_csv, check_thresholds
-    from gopvpsim.evolution_lines import load_evolution_lines
+    from gopvpsim.user_collection import check_thresholds
 
-    mons = parse_csv('/path/to/pokegenie_export.csv')
     results = check_thresholds(
         '/path/to/pokegenie_export.csv',
         thresholds,                 # {species: {League: {name: {...}}}}
         league='great',
-        evolution_lines=load_evolution_lines(),
     )
     # results is {species_name: [{mon, stats, matched, ...}, ...]}
+
+For in-memory use (browser textarea, test fixtures, app state),
+parse once and match separately::
+
+    from gopvpsim.user_collection import parse_csv_text, match_mons
+
+    mons = parse_csv_text(csv_string_from_textarea)
+    results = match_mons(mons, thresholds, league='great')
 
 CSV format: Poke Genie export. The parser reads these columns by name
 and ignores everything else, so it works on any CSV with at least::
@@ -48,10 +53,10 @@ need re-verification for shadow-form species.
 """
 
 import csv
+import io
 import math
 
-from .data import load_gamemaster
-from .evolution_lines import get_final_forms, load_evolution_lines
+from .evolution_lines import get_final_forms
 from .pokemon import (
     CPM, LEAGUE_CAPS, SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
     battle_stats, best_level, cp as compute_cp, get_pokemon_index,
@@ -121,8 +126,12 @@ def get_species_name(name: str, form: str, is_shadow: bool) -> str:
 # Poke Genie CSV parser
 # ---------------------------------------------------------------------------
 
-def parse_csv(csv_path: str) -> list:
-    """Parse a Poke Genie CSV export into a list of mon dicts.
+def parse_csv_text(text: str) -> list:
+    """Parse Poke Genie CSV content (as a string) into a list of mon dicts.
+
+    Same schema and row semantics as :func:`parse_csv`; use this when
+    the CSV content is already in memory (textarea, HTTP body, test
+    fixture string) rather than on disk.
 
     Each dict carries::
 
@@ -133,32 +142,48 @@ def parse_csv(csv_path: str) -> list:
 
     Rows with missing required columns or unparseable values are
     silently skipped (Poke Genie occasionally emits partial rows for
-    unseen forms). The BOM-aware ``utf-8-sig`` encoding is used since
-    Poke Genie's Android export writes a UTF-8 BOM.
+    unseen forms). The parser only reads the named columns, so any CSV
+    with at least the required fields works — the full Poke Genie
+    export (50+ columns) parses fine, as does a hand-trimmed subset.
 
-    The parser only reads the named columns, so any CSV with at least
-    the required fields works — the full Poke Genie export (50+
-    columns) parses fine, as does a hand-trimmed subset.
+    This function is the reference implementation for the browser-side
+    JS parser (see ``scripts/deep_dive.py`` for the JS port); the two
+    must agree row-for-row on the same input.
     """
     mons: list = []
-    with open(csv_path, newline='', encoding='utf-8-sig') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            try:
-                mons.append({
-                    'name':      row['Name'].strip(),
-                    'form':      row['Form'].strip(),
-                    'cp':        int(row['CP']),
-                    'atk_iv':    int(row['Atk IV']),
-                    'def_iv':    int(row['Def IV']),
-                    'sta_iv':    int(row['Sta IV']),
-                    'level':     float(row['Level Min']),
-                    'is_shadow': row['Shadow/Purified'].strip() == '1',
-                    'lucky':     row['Lucky'].strip() == '1',
-                })
-            except (KeyError, ValueError):
-                continue
+    # Strip a leading UTF-8 BOM if the caller passed raw file bytes
+    # decoded as plain utf-8 (Poke Genie's Android export writes one).
+    if text.startswith('\ufeff'):
+        text = text[1:]
+    reader = csv.DictReader(io.StringIO(text))
+    for row in reader:
+        try:
+            mons.append({
+                'name':      row['Name'].strip(),
+                'form':      row['Form'].strip(),
+                'cp':        int(row['CP']),
+                'atk_iv':    int(row['Atk IV']),
+                'def_iv':    int(row['Def IV']),
+                'sta_iv':    int(row['Sta IV']),
+                'level':     float(row['Level Min']),
+                'is_shadow': row['Shadow/Purified'].strip() == '1',
+                'lucky':     row['Lucky'].strip() == '1',
+            })
+        except (KeyError, ValueError):
+            continue
     return mons
+
+
+def parse_csv(csv_path: str) -> list:
+    """Parse a Poke Genie CSV file into a list of mon dicts.
+
+    Thin wrapper around :func:`parse_csv_text` that reads ``csv_path``
+    with the BOM-aware ``utf-8-sig`` encoding (Poke Genie's Android
+    export writes a UTF-8 BOM). See :func:`parse_csv_text` for the row
+    schema and skipped-row semantics.
+    """
+    with open(csv_path, encoding='utf-8-sig') as f:
+        return parse_csv_text(f.read())
 
 
 # ---------------------------------------------------------------------------
@@ -247,58 +272,30 @@ def _match_target(stats: dict, iv_tuple: tuple, target: dict) -> bool:
     return True
 
 
-def check_thresholds(
-    csv_path: str, thresholds: dict, *,
+def match_mons(
+    mons: list, thresholds: dict, *,
     league: str = 'great', max_level: float = 51.0,
-    evolution_lines: "dict | None" = None, include_empty: bool = False,
+    include_empty: bool = False,
 ) -> dict:
-    """Parse a Poke Genie CSV and match each mon against an IV target dict.
+    """Match a pre-parsed list of mons against an IV target dict.
 
-    For each row in the CSV:
+    This is the matching half of :func:`check_thresholds`, decoupled
+    from CSV parsing so callers can feed mons from any source (the
+    browser-side JS port, an in-memory test fixture, a live app
+    state, etc.). See :func:`check_thresholds` for the full semantics,
+    ``thresholds`` schema, and return shape — this function shares
+    them exactly.
 
-    1. Resolve the species name (form + shadow suffix).
-    2. If the resolved name isn't in ``thresholds``, walk its evolution
-       chain via :func:`gopvpsim.evolution_lines.get_final_forms` and
-       check each possible final form. Branching pre-evos like Eevee
-       are tried against every reachable final.
-    3. Compute max-level battle stats under the league CP cap
-       (shadow-adjusted if applicable).
-    4. Look up the mon's stat-product rank for the target species.
-    5. For each target under ``thresholds[species][league_label]``,
-       check attack / defense / stamina floors, the optional ``ivs``
-       whitelist, and the optional ``onlytop`` rank cap. Collect names
-       of all matching targets.
-    6. If any targets match, append a result record under the target
-       species. A single mon can appear under multiple species if its
-       evolution has multiple branches (e.g. an Eevee that qualifies
-       for both Umbreon and Sylveon targets).
-
-    ``thresholds`` schema::
-
-        {species_name: {LeagueLabel: {target_name: {attack, defense,
-                                                     stamina, ivs?,
-                                                     onlytop?}}}}
-
-    Returns ``{species_name: [result_record, ...]}`` where each record
-    is::
-
-        {'mon':            parsed mon dict,
-         'csv_species':    species as resolved from the CSV row,
-         'final_species':  target species matched against,
-         'is_pre_evo':     True if csv_species != final_species,
-         'stats':          output of ivs_to_stats_at_cap + 'rank',
-         'matched':        list of target_name strings}
-
-    When ``include_empty=True``, species that appear in ``thresholds``
-    but have no matching mons in the CSV get an empty list entry in
-    the result (useful for UI rendering).
+    The ``mons`` argument must be a list of dicts matching the shape
+    produced by :func:`parse_csv` / :func:`parse_csv_text`.
     """
     max_cp = LEAGUE_CAPS[league]
-    if evolution_lines is None:
-        evolution_lines = load_evolution_lines()
-
     pokemon_index = get_pokemon_index()
-    mons = parse_csv(csv_path)
+    # NOTE: ``thresholds`` keys are the *capitalized* league label
+    # ('Great'/'Ultra'/'Master') for compatibility with gobattlekit's
+    # historical schema, while the rest of the gopvpsim API uses a
+    # lowercase ``league`` argument. We bridge with .capitalize() —
+    # the JS port must mirror this exactly.
     league_label = league.capitalize()
 
     # Lazy rank-table cache: species -> (shadow_flag) -> lookup dict.
@@ -371,3 +368,62 @@ def check_thresholds(
                 results[species] = []
 
     return results
+
+
+def check_thresholds(
+    csv_path: str, thresholds: dict, *,
+    league: str = 'great', max_level: float = 51.0,
+    include_empty: bool = False,
+) -> dict:
+    """Parse a Poke Genie CSV and match each mon against an IV target dict.
+
+    Convenience wrapper that calls :func:`parse_csv` then
+    :func:`match_mons`. The matching logic (and all semantics below)
+    lives in :func:`match_mons` — callers that already have parsed
+    mons (e.g. a JS-agreement verification harness, a live UI state,
+    an in-memory test) should call that directly.
+
+    For each row in the CSV:
+
+    1. Resolve the species name (form + shadow suffix).
+    2. If the resolved name isn't in ``thresholds``, walk its evolution
+       chain via :func:`gopvpsim.evolution_lines.get_final_forms` and
+       check each possible final form. Branching pre-evos like Eevee
+       are tried against every reachable final.
+    3. Compute max-level battle stats under the league CP cap
+       (shadow-adjusted if applicable).
+    4. Look up the mon's stat-product rank for the target species.
+    5. For each target under ``thresholds[species][league_label]``,
+       check attack / defense / stamina floors, the optional ``ivs``
+       whitelist, and the optional ``onlytop`` rank cap. Collect names
+       of all matching targets.
+    6. If any targets match, append a result record under the target
+       species. A single mon can appear under multiple species if its
+       evolution has multiple branches (e.g. an Eevee that qualifies
+       for both Umbreon and Sylveon targets).
+
+    ``thresholds`` schema::
+
+        {species_name: {LeagueLabel: {target_name: {attack, defense,
+                                                     stamina, ivs?,
+                                                     onlytop?}}}}
+
+    Returns ``{species_name: [result_record, ...]}`` where each record
+    is::
+
+        {'mon':            parsed mon dict,
+         'csv_species':    species as resolved from the CSV row,
+         'final_species':  target species matched against,
+         'is_pre_evo':     True if csv_species != final_species,
+         'stats':          output of ivs_to_stats_at_cap + 'rank',
+         'matched':        list of target_name strings}
+
+    When ``include_empty=True``, species that appear in ``thresholds``
+    but have no matching mons in the CSV get an empty list entry in
+    the result (useful for UI rendering).
+    """
+    mons = parse_csv(csv_path)
+    return match_mons(
+        mons, thresholds,
+        league=league, max_level=max_level, include_empty=include_empty,
+    )
