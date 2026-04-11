@@ -55,6 +55,15 @@ Pluggable policy. Simulate all three shield scenarios (0-0, 1-1, 2-2).
 ## Testing
 - `python -m pytest tests/test_battle.py -q` — run all battle tests (99/102 passing)
 - Tests verify scores against PvPoke ground truth from pvpoke.com/battle/
+- **Default movesets** — when a test or sim needs "the default moveset" for a
+  species in a given league, ALWAYS call `gopvpsim.data.get_default_moveset(
+  species, league, shadow=False)` which reads PvPoke's rankings file. Never
+  guess from the gamemaster's `fastMoves`/`chargedMoves` lists — those are
+  the legal-move *pool* (everything the species can learn), not PvPoke's
+  meta recommendation. Guessing from the pool silently produces off-meta
+  movesets that look plausible but don't match PvPoke's UI defaults, which
+  turns oracle tests against reference writeups into noise. (Learned the
+  hard way 2026-04-12 on the Corviknight vs Shadow Sableye oracle test.)
 
 ## Documentation
 - `docs/concepts.md` — vocabulary used in deep-dive HTML outputs and threshold files
