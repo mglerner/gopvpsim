@@ -54,20 +54,32 @@
   in `docs/*.md`. Candidates (each asserts that `bait_shields=False`
   still wins the cited matchup):
 
-  1. **Tinkaton vs rank #1 Medicham 1-1** —
+  1. **Tinkaton vs Medicham 1-1** — ✅ **Done 2026-04-12**
      `docs/tinkaton_deep_dive_reference.md:25`. "141.66 defense with
-     138 hp lets you shield a dynamic punch & survive two more … win
-     the 1s *without baiting*." Candidate IVs: Tinkaton 0/12/11
-     (def=141.68, hp=142); Medicham rank #1 (likely 0/15/15 or
-     0/14/13 non best-buddy, max_level=50). Needs verified moveset
-     (likely Fairy Wind + Gigaton Hammer + Bulldoze vs Counter + Ice
-     Punch + Psychic). Confirm against pvpoke.com/battle before
-     committing the exact scores.
+     138 hp lets you … win the 1s *without baiting*." Covered by
+     `test_tinkaton_wins_1v1_vs_medicham_no_bait` parametrized over
+     both rank #1 (5/15/15 NBB) and default (7/15/14) Medicham and
+     both bait modes. Tinkaton 1/14/14 (def=141.66 exactly, hp=143)
+     wins all 4 cases at score 520. Note: `bait_shields` has no
+     observable effect here (near-KO DP phase bypasses farm-down bait
+     branches); the test confirms bait-off doesn't break the matchup.
+     **Open followup**: our sim has a more forgiving win threshold
+     than the reference — many Tinkaton spreads below def=141.66 also
+     win the 1v1 (e.g. 0/10/15 at def=138.96 wins). The reference's
+     141.66 threshold may be overly conservative, or our sim is
+     missing a nuance. Worth round-tripping at pvpoke.com/battle.
 
-  2. **Tinkaton vs rank #1 Azumarill 1-2** —
-     `docs/tinkaton_deep_dive_reference.md:27`. "143.03 defense
-     gives a bulkpoint vs rank #1 azu which flips the 1-2s (*no
-     baiting required*)."
+  2. **Tinkaton vs rank #1 Azumarill 1-2** — ✅ **Done 2026-04-12**
+     `docs/tinkaton_deep_dive_reference.md:27`. "143.03 defense gives
+     a bulkpoint vs rank #1 azu which flips the 1-2s (*no baiting
+     required*)." Covered by
+     `test_tinkaton_def_143_flips_1v2_vs_rank1_azumarill` which
+     asserts the directional def-bulkpoint flip: Tink 1/14/14
+     (def=141.66) LOSES 1v2 at score 397; Tink 0/14/9 (def=143.04)
+     WINS 1v2 at score 535. Crossing def=143.03 flips the matchup as
+     predicted. The "no baiting required" qualifier is verified by
+     parametrizing over both bait modes (bait_shields irrelevant in
+     this matchup, same scores either way).
 
   3. **Tinkaton vs rank #1 shadow Altaria 0-1** —
      `docs/tinkaton_deep_dive_reference.md:31`. "143.04 defense with
