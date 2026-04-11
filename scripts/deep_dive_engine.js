@@ -207,6 +207,31 @@ function computeView() {
 // opponent list is in the dive metadata anyway.
 function shortName(name) { return name.split('(')[0].trim().substring(0, 4); }
 
+// Abbreviate Python-side anchor parent ids like "corviknight_shadow"
+// for display in the "Clears:" hover line. 4-char base + "_s" suffix
+// for shadow variants preserves the shadow distinction without
+// blowing up the tooltip width:
+//   corviknight          -> corv
+//   dusknoir_shadow      -> dusk_s
+//   stunfisk_galarian    -> stun
+//   feraligatr_shadow    -> fera_s
+function shortParentName(name) {
+  if (!name) return '';
+  var n = String(name);
+  var isShadow = false;
+  var suf = '_shadow';
+  if (n.length > suf.length && n.substring(n.length - suf.length) === suf) {
+    isShadow = true;
+    n = n.substring(0, n.length - suf.length);
+  }
+  // Strip any trailing form suffix like "_galarian" / "_alola" — we
+  // lose the form distinction, but 4 chars is already lossy and the
+  // focal point of the Clears line is just rough opponent identity.
+  n = n.split('_')[0];
+  n = n.split(' ')[0].split('(')[0].trim().substring(0, 4);
+  return isShadow ? n + '_s' : n;
+}
+
 // Push a label + comma-separated item list to `lines`, wrapping
 // onto multiple lines when a single line would exceed `maxWidth`
 // chars. Continuation lines get an indent matching the label's
@@ -264,11 +289,12 @@ function buildHoverText(iv) {
   }
   // Anchor-clear membership: which named anchors (mirror BP, etc.) the
   // IV passes among those for which we emitted a matchup-flip bullet.
-  // Line-wrapped so the tooltip doesn't balloon horizontally when an
-  // IV clears many anchors — breaks on comma boundaries once a line
-  // exceeds ~45 chars, with an indent continuation.
+  // Names are abbreviated via shortParentName (4-char base + _s for
+  // shadow) and the resulting list is line-wrapped on comma boundaries
+  // so the tooltip stays compact even when an IV clears many anchors.
   if (DATA.anchorClearByIv && DATA.anchorClearByIv[iv]) {
-    appendWrappedListLines(lines, 'Clears:', DATA.anchorClearByIv[iv], 45);
+    var clears = DATA.anchorClearByIv[iv].map(shortParentName);
+    appendWrappedListLines(lines, 'Clears:', clears, 45);
   }
 
   // User collection annotation: if the user has any mons at this exact
