@@ -5773,9 +5773,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .collection-matches tr.lucky td {{ color: #ffd966; }}
   .collection-matches tr.shadow td {{ color: #b084e0; }}
   .collection-matches td.rank {{ color: #9be89b; font-weight: 600; }}
-  .collection-matches td.powerup-big {{ color: #e94560; }}
-  .collection-matches td.powerup-med {{ color: #d29922; }}
-  .collection-matches td.powerup-ready {{ color: #9be89b; font-weight: 600; }}
   span.user-anchor-hits {{ font-size: 11px; font-style: italic;
                            margin-left: 6px; }}
 </style>
@@ -6148,6 +6145,16 @@ def main():
                              '(e.g. championshipseries). Fetched from GitHub, '
                              'cached locally. Known groups: '
                              f'{", ".join(KNOWN_GROUPS[:8])}...')
+    parser.add_argument('--opponents-file', default=None, metavar='FILE',
+                        help='Read opponent species names from a file, one '
+                             'per line (blank lines and # comments ignored). '
+                             'Used instead of --opponents/--group when you '
+                             'need a custom opponent pool (e.g. top-50 rankings '
+                             'union championshipseries). Species must match '
+                             'the PvPoke speciesName exactly, e.g. '
+                             '"Tinkaton" or "Altaria (Shadow)". Movesets are '
+                             'resolved the same way as the --opponents path '
+                             '(PvPoke default moveset per species).')
     parser.add_argument('--top-movesets', type=int, default=5, metavar='N',
                         help='Keep top N movesets after Phase 1 screening (default: 5). '
                              'Screening sims the stat-product rank 1 IV against '
@@ -6387,6 +6394,8 @@ def main():
     # Get opponents — from group or rankings
     # Always include the focal species so we can do mirror slayer analysis.
     opponent_label = None
+    if args.group and args.opponents_file:
+        parser.error('--group and --opponents-file are mutually exclusive')
     focal_in_opponents = False
     if args.group:
         group_entries = load_group(args.group)
@@ -6410,6 +6419,35 @@ def main():
                 pass
         opponent_label = f"PvPoke group: {args.group} ({len(opponents)} mons)"
         print(f"  Opponents: {opponent_label}")
+    elif args.opponents_file:
+        # Read a custom opponent list from a text file (one species per
+        # line, # comments / blank lines ignored). Same downstream
+        # handling as --opponents: moveset per species resolved via
+        # get_default_moveset, focal species appended if missing.
+        path = args.opponents_file
+        with open(path) as f:
+            opponents = [
+                line.strip() for line in f
+                if line.strip() and not line.lstrip().startswith('#')
+            ]
+        if args.species not in opponents:
+            opponents.append(args.species)
+            print(f"  (added {args.species} to opponents for mirror analysis)")
+        focal_in_opponents = True
+        opponent_label = (f"Custom pool from {os.path.basename(path)} "
+                          f"({len(opponents)} mons)")
+        print(f"  {len(opponents)} opponents from {path}")
+        opp_movesets_full = []
+        to_remove = []
+        for opp in opponents:
+            try:
+                opp_fast, opp_charged = get_default_moveset(opp, league=args.league)
+                opp_movesets_full.append((opp_fast, opp_charged))
+            except (KeyError, ValueError) as _e:
+                print(f"  [warn] skipping {opp}: {_e}")
+                to_remove.append(opp)
+        for opp in to_remove:
+            opponents.remove(opp)
     else:
         screen_n = args.screen_opponents or args.opponents
         opponents = get_top_opponents(args.league, args.opponents)

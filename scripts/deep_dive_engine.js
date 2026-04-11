@@ -541,20 +541,16 @@ function renderMatchesList() {
     }
   }
 
-  function powerUpClass(curLv, maxLv) {
-    if (curLv == null || maxLv == null) return '';
-    var d = maxLv - curLv;
-    if (d <= 0) return 'powerup-ready';
-    if (d <= 5) return 'powerup-med';
-    return 'powerup-big';
-  }
   function powerUpText(curLv, maxLv) {
+    // Compact form: "✓" for ready, "+N ½L" for half-level delta.
+    // One half-level = one power-up action (candy+dust increment).
+    // Dropped earlier red/gold/green color tiers — it was too much
+    // visual noise on rows that already tint lucky/shadow.
     if (curLv == null || maxLv == null) return '?';
     var d = maxLv - curLv;
-    if (d <= 0) return 'READY';
-    // Show level delta in half-level steps (each step is 1 power-up).
-    var steps = Math.round(d * 2);
-    return 'L' + curLv + ' \u2192 L' + maxLv + ' (' + steps + ' steps)';
+    if (d <= 0) return '\u2713';
+    var halfLevels = Math.round(d * 2);
+    return '+' + halfLevels + ' \u00bdL';
   }
 
   var html = '';
@@ -588,8 +584,7 @@ function renderMatchesList() {
               (rc.mon.is_shadow ? ' \u263d' : '') + '</td>';
       var curLv = rc.mon.level;
       var maxLv = rc.stats ? rc.stats.level : null;
-      var puCls = powerUpClass(curLv, maxLv);
-      html += '<td class="' + puCls + '">' + powerUpText(curLv, maxLv) + '</td>';
+      html += '<td>' + powerUpText(curLv, maxLv) + '</td>';
       html += '<td>' + (rc.stats ? rc.stats.cp : '?') + '</td>';
       html += '</tr>';
     }
