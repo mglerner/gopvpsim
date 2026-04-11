@@ -721,7 +721,8 @@ def _dp_insert_not_ready(queue: list, ns: "_DPState", *,
 
 
 def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
-              *, intended_pruning: bool = False) -> "int | None":
+              *, intended_pruning: bool = False,
+              bait_shields: bool = True) -> "int | None":
     """
     PvPoke's DP charged-move AI (ActionLogic.js port, no-buff case).
 
@@ -748,6 +749,17 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         farm-down blocking are functional (using our real ``.hp`` and
         ``.shields`` fields).  This prevents dominated states from
         accumulating in the queue.
+
+    bait_shields:
+        True (default) — PvPoke's simulate-mode default: the attacker
+        may throw a cheap charged move first to burn an opponent shield,
+        setting up a high-DPE follow-up.  Mirrors ``battle.baitShields=true``.
+
+        False — "never bait." The attacker never deliberately throws a
+        sub-optimal move to draw a shield. Farm-down always selects
+        ``bestChargedMove``; bait-wait is disabled; near-KO plans prefer
+        the max-damage move as the first throw. Useful for "can I win
+        this without needing the bait to be called?" analysis.
     """
     fast_turns       = attacker.fast_move.get('_turns', 1)
     fast_energy      = attacker.fast_move.get('energyGain', 5)
@@ -903,7 +915,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
 
         # Bait only if opponent has shields AND would shield the best move.
         # cms is sorted by energy, so the cheapest is index 0.
-        if (defender.shields > 0 and n_cms > 1
+        # Gated on bait_shields — no-bait mode always keeps selected_idx=best_idx.
+        if (bait_shields
+                and defender.shields > 0 and n_cms > 1
                 and not cms[0].get('selfDebuffing', False)
                 and would_shield(attacker, defender, best_cm)):
             selected_idx = 0
@@ -1068,7 +1082,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # If shields are up and we can't yet afford cms[1] but it has better DPE
     # than our planned first move → wait for cms[1] instead.
     # PvPoke uses raw dpe (power/energy) here.
-    if defender.shields > 0 and n_cms > 1:
+    # Skipped entirely when bait_shields=False (never delay a ready shot to
+    # set up a bait).
+    if bait_shields and defender.shields > 0 and n_cms > 1:
         cm1 = cms[1]
         if (attacker.energy < cm_energy[1]
                 and raw_dpe(cm1) > raw_dpe(cms[final_first_thrown])
@@ -1087,7 +1103,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # PvPoke sorts plan by damage descending only when baitShields is falsy or
     # when opponent.shields == 0 AND no debuffing move (ActionLogic.js lines 850-858).
     # In scalar form: first_idx = max_dmg_idx (sort branch) or first_thrown.
-    if defender.shields == 0 and not has_debuffing_move:
+    if (not bait_shields) or (defender.shields == 0 and not has_debuffing_move):
         first_idx = final_max_dmg_idx
     else:
         first_idx = final_first_thrown
@@ -1097,7 +1113,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # final_state.moves[0] (= first thrown) for fm0_dpe, then mutates
     # moves[0] = 1 — only takes effect when shields > 0 (so the sort branch
     # above does NOT fire), so we override `first_idx` directly here.
-    if defender.shields > 0 and n_cms > 1:
+    # Skipped in no-bait mode: the plan-sort branch above already forced
+    # max_dmg_idx, and no-bait never rewrites the first throw for bait reasons.
+    if bait_shields and defender.shields > 0 and n_cms > 1:
         cm1 = cms[1]
         fm0_dpe = actual_dpe(final_first_thrown)
         if fm0_dpe > 0 and attacker.energy >= cm_energy[1]:
@@ -1179,7 +1197,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         first_move = cms[first_idx]
 
     # [886] Don't bait with self-debuffing moves (raw dpe)
-    if defender.shields > 0 and len(cms) > 1:
+    # Gated on bait_shields — the whole bandaid is about rerouting a bait
+    # choice, which is a no-op in no-bait mode.
+    if bait_shields and defender.shields > 0 and len(cms) > 1:
         cm1 = cms[1]
         if (attacker.energy >= cm1['energy']
                 and raw_dpe(cm1) > raw_dpe(first_move)
@@ -1197,7 +1217,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         if (cms[0].get('selfDebuffing', False)
                 and not cms[1].get('selfBuffing', False)):
             # Is attacker baiting or will debuffing move not come close to KO?
-            if (True  # baitShields is always true in simulate mode
+            if (bait_shields
                     or defender.hp - attacker.charged_move_damage(cms[0], defender) > 10):
                 # Is the second move close in energy and DPE? (raw dpe)
                 if (cms[1]['energy'] - cms[0]['energy'] <= 10

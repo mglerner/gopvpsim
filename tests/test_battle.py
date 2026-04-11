@@ -123,6 +123,45 @@ def test_bait_returns_none_when_cant_afford_any():
 
 
 # ---------------------------------------------------------------------------
+# pvpoke_dp bait_shields gate (farm-down path)
+# ---------------------------------------------------------------------------
+
+def _make_farm_down_attacker():
+    """Attacker with enough HP that farm-down triggers, two charged moves,
+    energy enough to fire either. cms are sorted energy-asc internally, so
+    the cheap move is the bait target."""
+    cheap     = make_charged(power=50,  energy=35)
+    expensive = make_charged(power=100, energy=60)
+    a = make_bp(atk=150.0, hp=300,
+                charged=[cheap, expensive])
+    a.energy = 100  # can afford either move
+    return a
+
+def test_pvpoke_dp_baits_cheapest_when_bait_shields_on():
+    attacker = _make_farm_down_attacker()
+    defender = make_bp(atk=100.0, def_=100.0, hp=300, shields=2)
+    # Farm-down path: defender hp large, bait_shields default True →
+    # picks cms[0] (cheap) because would_shield is true for the big move.
+    idx = pvpoke_dp(attacker, defender)
+    assert idx == 0, f"expected bait to cheap move (index 0), got {idx}"
+
+def test_pvpoke_dp_no_bait_fires_best_when_bait_shields_off():
+    attacker = _make_farm_down_attacker()
+    defender = make_bp(atk=100.0, def_=100.0, hp=300, shields=2)
+    # Same setup but bait_shields=False → picks best move (expensive, index 1).
+    idx = pvpoke_dp(attacker, defender, bait_shields=False)
+    assert idx == 1, f"expected max-DPE expensive move (index 1), got {idx}"
+
+def test_pvpoke_dp_no_bait_matches_default_when_no_shields():
+    attacker = _make_farm_down_attacker()
+    defender = make_bp(atk=100.0, def_=100.0, hp=300, shields=0)
+    # Without shields, bait_shields is irrelevant — both modes pick the best.
+    idx_on  = pvpoke_dp(attacker, defender, bait_shields=True)
+    idx_off = pvpoke_dp(attacker, defender, bait_shields=False)
+    assert idx_on == idx_off == 1
+
+
+# ---------------------------------------------------------------------------
 # BattlePokemon state
 # ---------------------------------------------------------------------------
 
