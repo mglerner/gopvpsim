@@ -425,14 +425,82 @@ function loadCollection(csvText) {
   setCollectionStatus(parts.join(' \u00b7 '), '#9be89b');
   updateTierCardCounts(tierCounts);
   renderMatchesList();
+  annotateAnchorBullets();
   updateView();
 }
 
-// Render a grouped-by-tier list of matching mons with CURRENT CP
-// (from the CSV), so the user can find them in-game at a glance.
-// Each tier gets its own table; within a tier, rows are sorted by
-// current CP descending. Lucky mons get a gold row tint; shadow
-// mons get a purple row tint.
+// For each anchor-flip bullet in the analysis layer, look up which of
+// the user's owned IVs land in the bullet's precomputed passing set
+// and fill the placeholder '<span data-anchor-id="…">' with a short
+// "— yours: 0/15/15, 1/14/14" annotation (first 3 hits + "+N more").
+// Called from loadCollection after state.userRecords is populated.
+// Clears all spans when userRecords is null (called from
+// clearCollection).
+function annotateAnchorBullets() {
+  var spans = document.querySelectorAll('span.user-anchor-hits[data-anchor-id]');
+  if (!spans || spans.length === 0) return;
+
+  if (!state.userRecords || state.userRecords.length === 0 ||
+      !DATA.anchorFlipSets) {
+    for (var i = 0; i < spans.length; i++) {
+      spans[i].textContent = '';
+      spans[i].removeAttribute('title');
+    }
+    return;
+  }
+
+  // Owned canonical indices → user record (for IV display).
+  var ownedByIdx = {};
+  for (var r = 0; r < state.userRecords.length; r++) {
+    var rec = state.userRecords[r];
+    if (rec.canonicalIvIdx >= 0) ownedByIdx[rec.canonicalIvIdx] = rec;
+  }
+
+  for (var s = 0; s < spans.length; s++) {
+    var span = spans[s];
+    var anchorId = span.getAttribute('data-anchor-id');
+    var passing = DATA.anchorFlipSets[anchorId] || [];
+    var hits = [];
+    for (var p = 0; p < passing.length; p++) {
+      var ivIdx = passing[p];
+      var ownedRec = ownedByIdx[ivIdx];
+      if (ownedRec) hits.push(ownedRec);
+    }
+    if (hits.length === 0) {
+      span.textContent = ' \u2014 none of yours';
+      span.style.color = '#6c7a89';
+      span.removeAttribute('title');
+      continue;
+    }
+    // Sort hits by current CP descending so the highest-CP mon the
+    // user already owns leads the list (best in-game search target).
+    hits.sort(function(a, b) { return b.mon.cp - a.mon.cp; });
+    var shown = hits.slice(0, 3).map(function(h) {
+      return 'CP' + h.mon.cp + ' ' + h.mon.atk_iv + '/' + h.mon.def_iv + '/' + h.mon.sta_iv;
+    }).join(', ');
+    var extra = hits.length > 3 ? (' +' + (hits.length - 3) + ' more') : '';
+    span.textContent = ' \u2014 yours: ' + shown + extra;
+    span.style.color = '#9be89b';
+    // Full list in the title tooltip for power users.
+    var fullList = hits.map(function(h) {
+      return 'CP' + h.mon.cp + ' ' + h.mon.atk_iv + '/' + h.mon.def_iv + '/' + h.mon.sta_iv;
+    }).join(', ');
+    span.setAttribute('title', fullList);
+  }
+}
+
+// Render a grouped-by-tier list of matching mons so the user can
+// decide which to power up. Each tier is its own table sorted by
+// battle rank ascending (best first, not current CP) because "rank
+// in this dive" is the real answer to "should I power this up?".
+// Current CP is shown prominently because that's how the user
+// searches in-game. The power-up cost column flags mons as
+// "ready" (already maxed), "cheap", or "expensive" based on level
+// delta — critical for the UL candy-constrained case.
+//
+// Each record is also annotated with its yRank (battle rank in the
+// active moveset/scenario) so the tier list answers "which of mine
+// is actually rank #1" at a glance.
 function renderMatchesList() {
   var el = document.getElementById('collection-matches');
   if (!el) return;
@@ -456,29 +524,73 @@ function renderMatchesList() {
       if (byTier[tn]) byTier[tn].push(rec);
     }
   }
+
+  // Attach battle rank (yRank) to each record. yRanks is populated
+  // by computeView() on every updateView; if it's not yet populated
+  // (first render before updateView), fall back to stat product rank.
+  var useBattleRank = (typeof yRanks !== 'undefined' && yRanks != null);
+  for (var r2 = 0; r2 < state.userRecords.length; r2++) {
+    var rec2 = state.userRecords[r2];
+    var iv = rec2.canonicalIvIdx;
+    if (iv >= 0 && useBattleRank) {
+      rec2._rank = yRanks[iv];
+    } else if (iv >= 0) {
+      rec2._rank = DATA.spRanks[iv];
+    } else {
+      rec2._rank = 99999;
+    }
+  }
+
+  function powerUpClass(curLv, maxLv) {
+    if (curLv == null || maxLv == null) return '';
+    var d = maxLv - curLv;
+    if (d <= 0) return 'powerup-ready';
+    if (d <= 5) return 'powerup-med';
+    return 'powerup-big';
+  }
+  function powerUpText(curLv, maxLv) {
+    if (curLv == null || maxLv == null) return '?';
+    var d = maxLv - curLv;
+    if (d <= 0) return 'READY';
+    // Show level delta in half-level steps (each step is 1 power-up).
+    var steps = Math.round(d * 2);
+    return 'L' + curLv + ' \u2192 L' + maxLv + ' (' + steps + ' steps)';
+  }
+
   var html = '';
   for (var ti = 0; ti < tierNames.length; ti++) {
     var name = tierNames[ti];
     var recs = byTier[name] || [];
     if (recs.length === 0) continue;
-    recs.sort(function(a, b) { return b.mon.cp - a.mon.cp; });
+    // Sort: best battle rank first. Ties broken by current CP desc
+    // (the user will power up the higher-CP one first since it's
+    // cheaper in candy to finish).
+    recs.sort(function(a, b) {
+      if (a._rank !== b._rank) return a._rank - b._rank;
+      return b.mon.cp - a.mon.cp;
+    });
     html += '<h5>' + escapeHtml(name) + ' \u2014 ' + recs.length +
             ' of yours qualify</h5>';
-    html += '<table><tr><th>Current CP</th><th>Level</th><th>IVs</th>' +
-            '<th>Species</th><th>Max CP</th><th>Max L</th></tr>';
+    html += '<table><tr><th>#</th><th>Current CP</th><th>IVs</th>' +
+            '<th>Species</th><th>Power-up</th><th>Max CP</th></tr>';
     for (var k = 0; k < recs.length; k++) {
       var rc = recs[k];
       var cls = '';
       if (rc.mon.is_shadow) cls += ' shadow';
       if (rc.mon.lucky) cls += ' lucky';
       html += '<tr' + (cls ? ' class="' + cls.trim() + '"' : '') + '>';
+      var rankTxt = (rc._rank != null && rc._rank < 99999) ? ('#' + rc._rank) : '?';
+      html += '<td class="rank">' + rankTxt + '</td>';
       html += '<td><b>CP ' + rc.mon.cp + '</b></td>';
-      html += '<td>L' + rc.mon.level + '</td>';
       html += '<td>' + rc.mon.atk_iv + '/' + rc.mon.def_iv + '/' + rc.mon.sta_iv + '</td>';
       html += '<td>' + escapeHtml(rc.csvSpecies || '') +
-              (rc.mon.lucky ? ' \u2728' : '') + '</td>';
+              (rc.mon.lucky ? ' \u2728' : '') +
+              (rc.mon.is_shadow ? ' \u263d' : '') + '</td>';
+      var curLv = rc.mon.level;
+      var maxLv = rc.stats ? rc.stats.level : null;
+      var puCls = powerUpClass(curLv, maxLv);
+      html += '<td class="' + puCls + '">' + powerUpText(curLv, maxLv) + '</td>';
       html += '<td>' + (rc.stats ? rc.stats.cp : '?') + '</td>';
-      html += '<td>L' + (rc.stats ? rc.stats.level : '?') + '</td>';
       html += '</tr>';
     }
     html += '</table>';
@@ -507,6 +619,7 @@ function clearCollection() {
   setCollectionStatus('', '#aaa');
   updateTierCardCounts({});
   renderMatchesList();
+  annotateAnchorBullets();
   updateView();
 }
 
@@ -858,13 +971,18 @@ function buildTraces() {
         ownX.push(sp); ownY.push(yv); ownText.push(fullText);
       }
     }
+    // Plotly circle-open: marker.color IS the stroke color (there's
+    // no separate fill since the marker is "open"). line.color/width
+    // are rendered as a second outer stroke. To make the rings
+    // *actually* visible we set color to a solid high-contrast value
+    // and let line.width amplify the stroke thickness.
     if (ownX.length > 0) {
       traces.push({
         name: 'Your IVs (owned)', x: ownX, y: ownY, text: ownText,
         mode: 'markers', type: 'scatter', hoverinfo: 'text',
         marker: {
-          size: 8, color: 'rgba(0,0,0,0)', symbol: 'circle-open',
-          opacity: 0.9, line: { width: 1.5, color: '#cccccc' }
+          size: 9, color: '#cccccc', symbol: 'circle-open',
+          opacity: 0.9, line: { width: 2, color: '#cccccc' }
         }
       });
     }
@@ -873,10 +991,18 @@ function buildTraces() {
         name: 'Your IVs (qualifying)', x: qualX, y: qualY, text: qualText,
         mode: 'markers', type: 'scatter', hoverinfo: 'text',
         marker: {
-          size: 14, color: 'rgba(0,0,0,0)', symbol: 'circle-open',
+          size: 16, color: '#ffffff', symbol: 'circle-open',
           opacity: 1.0, line: { width: 3, color: '#ffffff' }
         }
       });
+    }
+    // Dev log: one line per render so if the overlay stays invisible
+    // the browser console explains why.
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('[collection] render:',
+                  'records=' + state.userRecords.length,
+                  'qual=' + qualX.length,
+                  'owned=' + ownX.length);
     }
   }
 
