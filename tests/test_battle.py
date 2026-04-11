@@ -1033,6 +1033,145 @@ def test_corviknight_max_def_wins_1v1_vs_default_shadow_sableye(bait_shields):
         f"(matchup not flipped)")
 
 
+def _tinkaton_vs_medicham(tink_ivs, med_scenario, shields, bait_shields):
+    """Build and simulate Tinkaton vs Medicham using PvPoke default movesets.
+
+    med_scenario: 'rank1' (non-best-buddy rank 1 by stat product, max_level=50)
+                  or 'default' (PvPoke default IVs + level).
+    """
+    from functools import partial
+    from gopvpsim.pokemon import iv_rank, pvpoke_default_ivs
+
+    tink_fast, tink_charged = get_default_moveset('Tinkaton', 'great')
+    med_fast, med_charged = get_default_moveset('Medicham', 'great')
+
+    bp_tink = _make_battle_pokemon(
+        'Tinkaton', tink_fast, tink_charged,
+        'great', shields=shields,
+        atk_iv=tink_ivs[0], def_iv=tink_ivs[1], sta_iv=tink_ivs[2])
+
+    if med_scenario == 'rank1':
+        r1 = iv_rank('Medicham', league='great', max_level=50)[0]
+        bp_med = _make_battle_pokemon(
+            'Medicham', med_fast, med_charged,
+            'great', shields=shields,
+            atk_iv=r1['atk_iv'], def_iv=r1['def_iv'], sta_iv=r1['sta_iv'],
+            max_level=50.0)
+    else:  # 'default'
+        lv, a, d, s = pvpoke_default_ivs('Medicham', league='great')
+        bp_med = _make_battle_pokemon(
+            'Medicham', med_fast, med_charged,
+            'great', shields=shields,
+            atk_iv=a, def_iv=d, sta_iv=s, max_level=lv)
+
+    focal_policy = (pvpoke_dp if bait_shields
+                    else partial(pvpoke_dp, bait_shields=False))
+    return simulate(bp_tink, bp_med,
+                    charged_policy_0=focal_policy,
+                    charged_policy_1=pvpoke_dp,
+                    shield_policy_0=pvpoke_simulate_shield,
+                    shield_policy_1=pvpoke_simulate_shield)
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("med_scenario", ['rank1', 'default'])
+@pytest.mark.parametrize("bait_shields", [True, False])
+def test_tinkaton_wins_1v1_vs_medicham_no_bait(med_scenario, bait_shields):
+    """Oracle from `docs/tinkaton_deep_dive_reference.md:25`:
+
+        "141.66 defense with 138 hp lets you shield a dynamic punch &
+         survive two more against the rank #1 medicham (non best buddy)
+         and default iv medicham to win the 1s without baiting"
+
+    Tinkaton 1/14/14 (def=141.66 exactly, hp=143, atk=105.23) wins the
+    1-shield scenario against both rank #1 non-best-buddy Medicham
+    (5/15/15 @ lvl 50) and PvPoke-default Medicham (7/15/14 @ lvl 49)
+    in both bait modes. The reference's "win the 1s without baiting"
+    claim is tested via bait_shields=False.
+
+    Note: bait_shields has no observable effect in this matchup (same
+    score 520 regardless) because pvpoke_dp enters near-KO DP phase
+    early — Tinkaton's Gigaton Hammer (130 power / 60 energy) dominates
+    actual-DPE, so there's no farm-down baiting opportunity. This test
+    exercises the no-bait code path but doesn't demonstrate directional
+    difference; for that see `test_corviknight_2v2_...`.
+
+    Caveat: our sim has a more forgiving win threshold than the
+    reference implies — many Tinkaton spreads below def=141.66 also
+    win the 1v1. That's not tested here but is worth follow-up. The
+    reference asserts SUFFICIENT conditions, which is what we test.
+    """
+    result = _tinkaton_vs_medicham(
+        tink_ivs=(1, 14, 14), med_scenario=med_scenario,
+        shields=1, bait_shields=bait_shields)
+    assert result.winner == 0, (
+        f"med_scenario={med_scenario} bait_shields={bait_shields}: "
+        f"expected Tinkaton to win the 1s, got winner={result.winner}, "
+        f"HP={result.hp_remaining}")
+    assert result.pvpoke_score(0) >= 500
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("bait_shields", [True, False])
+def test_tinkaton_def_143_flips_1v2_vs_rank1_azumarill(bait_shields):
+    """Oracle from `docs/tinkaton_deep_dive_reference.md:27`:
+
+        "143.03 defense gives a bulkpoint vs rank #1 azu which flips
+         the 1-2s (no baiting required)"
+
+    **Directional def bulkpoint test.** Same Tinkaton vs same rank #1
+    Azumarill (0/15/15 @ lvl 45.5), same moves (Fairy Wind / Gigaton
+    Hammer + Bulldoze vs Bubble / Ice Beam + Play Rough), same 1-2
+    shield scenario — only the Tinkaton defense changes:
+
+      - Tink 1/14/14 (def=141.66): LOSES 1v2 (score 397 < 500)
+      - Tink 0/14/9  (def=143.04): WINS  1v2 (score 535 ≥ 500)
+
+    Crossing def=143.03 flips the matchup outcome. Parametrized over
+    bait modes to verify the "no baiting required" qualifier — bait-off
+    produces the same flip as bait-on, because pvpoke_dp enters near-KO
+    DP immediately in this matchup and doesn't use farm-down baiting.
+    """
+    from gopvpsim.pokemon import iv_rank
+    from functools import partial
+
+    tink_fast, tink_charged = get_default_moveset('Tinkaton', 'great')
+    azu_fast, azu_charged = get_default_moveset('Azumarill', 'great')
+    azu_r1 = iv_rank('Azumarill', league='great')[0]
+
+    def run(tink_ivs):
+        bp_tink = _make_battle_pokemon(
+            'Tinkaton', tink_fast, tink_charged, 'great', shields=1,
+            atk_iv=tink_ivs[0], def_iv=tink_ivs[1], sta_iv=tink_ivs[2])
+        bp_azu = _make_battle_pokemon(
+            'Azumarill', azu_fast, azu_charged, 'great', shields=2,
+            atk_iv=azu_r1['atk_iv'], def_iv=azu_r1['def_iv'],
+            sta_iv=azu_r1['sta_iv'], max_level=azu_r1['level'])
+        pol = (pvpoke_dp if bait_shields
+               else partial(pvpoke_dp, bait_shields=False))
+        return simulate(bp_tink, bp_azu,
+                        charged_policy_0=pol,
+                        charged_policy_1=pvpoke_dp,
+                        shield_policy_0=pvpoke_simulate_shield,
+                        shield_policy_1=pvpoke_simulate_shield)
+
+    # Below the def=143.03 threshold: Tinkaton loses 1v2
+    r_below = run((1, 14, 14))  # def=141.66
+    assert r_below.winner == 1, (
+        f"bait_shields={bait_shields}: expected Tinkaton (def=141.66) "
+        f"to LOSE 1v2 below the bulkpoint, got winner={r_below.winner}, "
+        f"HP={r_below.hp_remaining}")
+    assert r_below.pvpoke_score(0) < 500
+
+    # At/above the def=143.03 threshold: Tinkaton wins 1v2
+    r_at = run((0, 14, 9))  # def=143.04
+    assert r_at.winner == 0, (
+        f"bait_shields={bait_shields}: expected Tinkaton (def=143.04) "
+        f"to WIN 1v2 at the bulkpoint, got winner={r_at.winner}, "
+        f"HP={r_at.hp_remaining}")
+    assert r_at.pvpoke_score(0) >= 500
+
+
 @pytest.mark.integration
 def test_corviknight_2v2_vs_default_shadow_sableye_flips_with_bait():
     """Oracle test from `docs/corviknight_deep_dive_reference.md:58`:
