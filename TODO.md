@@ -1,3 +1,36 @@
+## Deferred cleanup: backwards-compatibility removal pass
+
+Once we've verified all the oracle/sim tests (including direct human
+review by Michael), run a dedicated session to **remove
+backwards-compatibility shims, historical artifacts, and
+"just-in-case" abstractions** that accumulated during feature work.
+The goal is to simplify the code now that we've confirmed the new
+behavior is right.
+
+Concrete candidates to audit (grows as we spot them):
+
+- **`gopvpsim.evolution_lines.get_final_form()`** — kept alongside the
+  new `get_final_forms()` for callers that "know they're dealing with
+  unambiguous chains." Delete once nothing in the codebase calls it.
+  Currently used only by tests.
+- **`pvpoke_dp(intended_pruning=...)`** — the flag toggles between
+  "PvPoke's actual JS behavior (dead-code dominance checks)" and
+  "apparently intended behavior." If we're confident one branch is
+  right, collapse to that and drop the flag.
+- **Anything flagged with "historical" / "legacy" / "backcompat"** in
+  code comments — grep for these when the session starts.
+- **Gobattlekit threshold schema compatibility** in
+  `gopvpsim.user_collection.check_thresholds` — once gobattlekit has
+  actually migrated to use the shared module and we've confirmed it
+  works, we may want to simplify the dict schema or unify with
+  pogo-simulator's TOML anchor schema. But not before gobattlekit's
+  migration lands.
+
+Do NOT start this cleanup pass until Michael has explicitly signed
+off that the current oracle tests pass human verification. This rule
+exists because "simplification" mid-feature-work tends to silently
+break invariants that weren't yet nailed down by tests.
+
 ## Battle simulator
 
 * **File PvPoke bug reports** — Two bugs found in PvPoke's JS:
