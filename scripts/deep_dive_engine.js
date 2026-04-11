@@ -775,7 +775,8 @@ function buildTraces() {
       traces.push({
         name:'Other', x:otherX, y:otherY, text:otherText,
         mode:'markers', type:'scattergl', hoverinfo:'text',
-        marker:{size:2, color:otherColor, colorscale:'Viridis', opacity:0.4}
+        marker:{size:2, color:otherColor, colorscale:'Viridis', opacity:0.4},
+        hoverlabel:{bordercolor:'#888'}
       });
     }
     // Tier traces are collected separately and appended AFTER the
@@ -799,7 +800,8 @@ function buildTraces() {
           x:tx, y:ty, text:tt,
           mode:'markers', type:'scattergl', hoverinfo:'text',
           marker:{size:7, color:tierColors[ti], opacity:0.9,
-                   line:{width:1, color:'#000'}}
+                   line:{width:1, color:'#000'}},
+          hoverlabel:{bordercolor:tierColors[ti]}
         });
       }
     }
@@ -825,7 +827,8 @@ function buildTraces() {
       mode:'markers', type:'scattergl', hoverinfo:'text',
       marker:{size:3.5, color:ac, colorscale:cscale, opacity:0.6,
                colorbar:{title:cLabel, len:0.6},
-               reversescale: (cm === 'atk')}
+               reversescale: (cm === 'atk')},
+      hoverlabel:{bordercolor:'#888'}
     });
   }
 
@@ -942,7 +945,8 @@ function buildTraces() {
         symbol: osym,
         opacity: 0.85,
         line: { width: 1, color: borderColor }
-      }
+      },
+      hoverlabel: { bordercolor: borderColor }
     };
   }
 
@@ -1208,9 +1212,15 @@ function updateView() {
     },
     // Explicit hoverlabel so tooltip sizing and font are deterministic
     // — namelength:-1 disables trace-name truncation so we see the
-    // full "★ Yours:" block.
+    // full "★ Yours:" block. Background and font are uniform across
+    // traces, but the BORDER color is set per-trace (via
+    // trace.hoverlabel.bordercolor) so each trace's tooltip picks up
+    // a color matching its marker — tier color for tier traces,
+    // gold for slayer, cyan for anchor, gray for Other, white for
+    // user overlay. The layout-level bordercolor here is just a
+    // fallback for traces that forget to set one.
     hoverlabel: {
-      bgcolor: '#2a2a4a', bordercolor: '#e94560',
+      bgcolor: '#2a2a4a', bordercolor: '#888',
       font: { size: 11, color: '#e0e0e0', family: 'monospace' },
       namelength: -1, align: 'left',
     },
