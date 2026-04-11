@@ -5789,6 +5789,12 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .collection-matches tr.lucky td {{ color: #ffd966; }}
   .collection-matches tr.shadow td {{ color: #b084e0; }}
   .collection-matches td.rank {{ color: #9be89b; font-weight: 600; }}
+  .collection-matches tr.matches-hidden-row {{ display: none; }}
+  .matches-toggle-btn {{ background: #0f3460; color: #9be89b;
+                         border: 1px solid #1a3a6e; border-radius: 4px;
+                         padding: 3px 10px; font-size: 11px; cursor: pointer;
+                         margin: 4px 0 8px 0; }}
+  .matches-toggle-btn:hover {{ background: #1a3a6e; }}
   span.user-anchor-hits {{ font-size: 11px; font-style: italic;
                            margin-left: 6px; }}
 </style>

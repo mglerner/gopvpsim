@@ -406,17 +406,46 @@ function loadCollection(csvText) {
   var coll = DATA.collection;
   var speciesKey = coll.speciesKey;
   var leagueLabel = coll.leagueLabel;
-  var thresholds = coll.thresholds;
   var pokemonIndex = coll.pokemonIndex;
   var preToFinals = coll.preToFinals;
   var rankLookup = coll.rankLookup;
   var leagueCap = coll.leagueCap;
   var maxLevel = coll.maxLevel;
-  var speciesThresholds = thresholds[speciesKey][leagueLabel];
 
-  var tierNames = coll.tierNames || [];
+  // Build the species thresholds dict from the LIVE DATA.tiers array
+  // (populated after generate_analysis_sections ran), not from the
+  // stale snapshot in coll.thresholds. The snapshot was taken before
+  // auto-derive kicked in, so any dive without a TOML (or with a
+  // TOML for a different league than the dive) had empty tier
+  // names — every user mon fell through to "no qualification" even
+  // when the scatter legend showed real tiers.
+  var liveTiers = DATA.tiers || [];
+  var tierNames = [];
+  var speciesThresholds = {};
+  for (var lti = 0; lti < liveTiers.length; lti++) {
+    var lt = liveTiers[lti];
+    if (!lt || !lt.name) continue;
+    tierNames.push(lt.name);
+    speciesThresholds[lt.name] = {
+      attack:  lt.attack  || 0,
+      defense: lt.defense || 0,
+      stamina: lt.stamina || 0,
+    };
+  }
+
   var tierCounts = {};
   for (var ti = 0; ti < tierNames.length; ti++) tierCounts[tierNames[ti]] = 0;
+
+  // Slayer membership: mons whose canonical IV index is in the dive's
+  // DATA.slayerIvs set are "slayer" even if they don't hit any tier.
+  // DATA.slayerCatsByIv gives the specific Atk/Bulk/CMP labels per IV.
+  var slayerIvSet = {};
+  if (DATA.slayerIvs) {
+    for (var sii = 0; sii < DATA.slayerIvs.length; sii++) {
+      slayerIvSet[DATA.slayerIvs[sii]] = true;
+    }
+  }
+  var slayerCount = 0;
 
   var ivIdxMap = getCanonicalIvIdx();
   var records = [];
@@ -468,9 +497,19 @@ function loadCollection(csvText) {
     if (canonicalIdx < 0) offGridCount++;
     ownedCount++;
     if (matched.length > 0) qualifyingCount++;
+
+    // Slayer membership: check if this canonical IV is in the
+    // dive's slayerIvSet and pull category labels.
+    var slayerCats = null;
+    if (canonicalIdx >= 0 && slayerIvSet[canonicalIdx]) {
+      slayerCats = (DATA.slayerCatsByIv && DATA.slayerCatsByIv[canonicalIdx]) || [];
+      slayerCount++;
+    }
+
     records.push({
       mon:             mon,
       csvSpecies:      csvSpecies,
+      slayerCats:      slayerCats,
       stats:           stats,
       matched:         matched,
       canonicalIvIdx:  canonicalIdx,
@@ -497,6 +536,7 @@ function loadCollection(csvText) {
   var parts = [mons.length + ' rows parsed'];
   parts.push(ownedCount + ' match this dive');
   parts.push(qualifyingCount + ' qualify for \u2265 1 tier');
+  if (slayerCount > 0) parts.push(slayerCount + ' slayer');
   if (offGridCount > 0) parts.push(offGridCount + ' off-grid (not in simulated set)');
   setCollectionStatus(parts.join(' \u00b7 '), '#9be89b');
   updateTierCardCounts(tierCounts);
@@ -584,13 +624,19 @@ function renderMatchesList() {
     el.innerHTML = '';
     return;
   }
-  if (!DATA.collection || !DATA.collection.tierNames) return;
-  var tierNames = DATA.collection.tierNames;
+
+  // Tier names come from the LIVE DATA.tiers array (populated after
+  // analysis sections ran), not DATA.collection.tierNames (which is
+  // the stale pre-analysis snapshot and was empty on auto-derive
+  // dives). This mirrors the fix in loadCollection.
+  var liveTiers = DATA.tiers || [];
+  var tierNames = [];
+  for (var lti = 0; lti < liveTiers.length; lti++) {
+    if (liveTiers[lti] && liveTiers[lti].name) tierNames.push(liveTiers[lti].name);
+  }
+
   // Group qualifying records by tier. A mon that qualifies for
-  // multiple tiers appears once per tier (most common case: a Rank 1
-  // spread clears every tier, and the user wants to see it in each
-  // card so they don't wonder why it "disappeared" from the strict
-  // list).
+  // multiple tiers appears once per tier.
   var byTier = {};
   for (var i = 0; i < tierNames.length; i++) byTier[tierNames[i]] = [];
   for (var r = 0; r < state.userRecords.length; r++) {
@@ -599,6 +645,13 @@ function renderMatchesList() {
       var tn = rec.matched[m];
       if (byTier[tn]) byTier[tn].push(rec);
     }
+  }
+  // Slayer group: mons whose IV hit slayer categories, regardless of
+  // whether they hit any tier. These are the "not strictly qualifying
+  // but still worth powering up for mirror-match slaying" candidates.
+  var slayerRecs = [];
+  for (var rS = 0; rS < state.userRecords.length; rS++) {
+    if (state.userRecords[rS].slayerCats) slayerRecs.push(state.userRecords[rS]);
   }
 
   // Attach battle rank (yRank) to each record. yRanks is populated
@@ -618,10 +671,6 @@ function renderMatchesList() {
   }
 
   function powerUpText(curLv, maxLv) {
-    // Compact form: "✓" for ready, "+N ½L" for half-level delta.
-    // One half-level = one power-up action (candy+dust increment).
-    // Dropped earlier red/gold/green color tiers — it was too much
-    // visual noise on rows that already tint lucky/shadow.
     if (curLv == null || maxLv == null) return '?';
     var d = maxLv - curLv;
     if (d <= 0) return '\u2713';
@@ -629,48 +678,98 @@ function renderMatchesList() {
     return '+' + halfLevels + ' \u00bdL';
   }
 
-  var html = '';
-  for (var ti = 0; ti < tierNames.length; ti++) {
-    var name = tierNames[ti];
-    var recs = byTier[name] || [];
-    if (recs.length === 0) continue;
-    // Sort: best battle rank first. Ties broken by current CP desc
-    // (the user will power up the higher-CP one first since it's
-    // cheaper in candy to finish).
+  var sectionIdx = 0;
+  var MAX_VISIBLE = 5;
+
+  // Render one grouped section. `extraCol` is an optional per-row
+  // override function that returns an extra cell (used for slayer
+  // section to show category labels). `extraHeader` is the column
+  // header for that extra column.
+  function renderSection(heading, recs, extraHeader, extraCell) {
+    if (!recs || recs.length === 0) return '';
     recs.sort(function(a, b) {
       if (a._rank !== b._rank) return a._rank - b._rank;
       return b.mon.cp - a.mon.cp;
     });
-    html += '<h5>' + escapeHtml(name) + ' \u2014 ' + recs.length +
-            ' of yours qualify</h5>';
-    html += '<table><tr><th>#</th><th>Current CP</th><th>IVs</th>' +
-            '<th>Species</th><th>Power-up</th><th>Max CP</th></tr>';
+    var sid = 'matches-section-' + (sectionIdx++);
+    var h = '<h5>' + heading + ' \u2014 ' + recs.length + ' of yours</h5>';
+    h += '<table><tr><th>#</th><th>Current CP</th><th>IVs</th>' +
+         '<th>Species</th><th>Power-up</th><th>Max CP</th>';
+    if (extraHeader) h += '<th>' + escapeHtml(extraHeader) + '</th>';
+    h += '</tr>';
     for (var k = 0; k < recs.length; k++) {
       var rc = recs[k];
       var cls = '';
       if (rc.mon.is_shadow) cls += ' shadow';
       if (rc.mon.lucky) cls += ' lucky';
-      html += '<tr' + (cls ? ' class="' + cls.trim() + '"' : '') + '>';
+      if (k >= MAX_VISIBLE) cls += ' matches-hidden-row';
+      var attr = ' data-section="' + sid + '"';
+      if (cls) attr += ' class="' + cls.trim() + '"';
+      h += '<tr' + attr + '>';
       var rankTxt = (rc._rank != null && rc._rank < 99999) ? ('#' + rc._rank) : '?';
-      html += '<td class="rank">' + rankTxt + '</td>';
-      html += '<td><b>CP ' + rc.mon.cp + '</b></td>';
-      html += '<td>' + rc.mon.atk_iv + '/' + rc.mon.def_iv + '/' + rc.mon.sta_iv + '</td>';
-      html += '<td>' + escapeHtml(rc.csvSpecies || '') +
-              (rc.mon.lucky ? ' \u2728' : '') +
-              (rc.mon.is_shadow ? ' \u263d' : '') + '</td>';
+      h += '<td class="rank">' + rankTxt + '</td>';
+      h += '<td><b>CP ' + rc.mon.cp + '</b></td>';
+      h += '<td>' + rc.mon.atk_iv + '/' + rc.mon.def_iv + '/' + rc.mon.sta_iv + '</td>';
+      h += '<td>' + escapeHtml(rc.csvSpecies || '') +
+           (rc.mon.lucky ? ' \u2728' : '') +
+           (rc.mon.is_shadow ? ' \u263d' : '') + '</td>';
       var curLv = rc.mon.level;
       var maxLv = rc.stats ? rc.stats.level : null;
-      html += '<td>' + powerUpText(curLv, maxLv) + '</td>';
-      html += '<td>' + (rc.stats ? rc.stats.cp : '?') + '</td>';
-      html += '</tr>';
+      h += '<td>' + powerUpText(curLv, maxLv) + '</td>';
+      h += '<td>' + (rc.stats ? rc.stats.cp : '?') + '</td>';
+      if (extraCell) h += '<td>' + extraCell(rc) + '</td>';
+      h += '</tr>';
     }
-    html += '</table>';
+    h += '</table>';
+    // Show/hide toggle for sections with more than MAX_VISIBLE rows.
+    if (recs.length > MAX_VISIBLE) {
+      var hiddenCount = recs.length - MAX_VISIBLE;
+      h += '<button class="matches-toggle-btn" ' +
+           'onclick="toggleMatchesSection(\'' + sid + '\', this)" ' +
+           'data-hidden-count="' + hiddenCount + '">' +
+           'Show ' + hiddenCount + ' more \u2193</button>';
+    }
+    return h;
   }
+
+  var html = '';
+  for (var ti = 0; ti < tierNames.length; ti++) {
+    html += renderSection(escapeHtml(tierNames[ti]), byTier[tierNames[ti]]);
+  }
+  // Slayer section comes after tiers. Extra column shows the specific
+  // slayer categories (Atk / Bulk / CMP) for each mon.
+  html += renderSection(
+    'Slayer IVs',
+    slayerRecs,
+    'Slayer type',
+    function(rc) {
+      return escapeHtml((rc.slayerCats || []).join(', ') || '\u2014');
+    }
+  );
+
   if (html === '') {
     html = '<p style="font-size:12px;color:#888;margin:8px 0">' +
-           'No mons in your collection qualify for any of the dive\'s tiers.</p>';
+           'No mons in your collection qualify for any tier or slayer category.</p>';
   }
   el.innerHTML = html;
+}
+
+// Show/hide toggle handler for the collapsible matches-list sections.
+// Flips the matches-hidden-row class off for rows in `sid` and swaps
+// the button text. Global so onclick can reach it.
+function toggleMatchesSection(sid, btn) {
+  var rows = document.querySelectorAll('tr[data-section="' + sid + '"]');
+  if (rows.length === 0) return;
+  var isHidden = btn.textContent.indexOf('Show') === 0;
+  for (var i = 0; i < rows.length; i++) {
+    if (isHidden) {
+      rows[i].classList.remove('matches-hidden-row');
+    } else if (i >= 5) {
+      rows[i].classList.add('matches-hidden-row');
+    }
+  }
+  var count = btn.getAttribute('data-hidden-count');
+  btn.textContent = isHidden ? ('Hide ' + count + ' \u2191') : ('Show ' + count + ' more \u2193');
 }
 
 // Minimal HTML escape for values that go into innerHTML (species names,
@@ -708,10 +807,14 @@ function setCollectionStatus(text, color) {
 // If a card's span is missing (older template or filtered out), this
 // is a silent no-op.
 function updateTierCardCounts(tierCounts) {
-  if (!DATA.collection || !DATA.collection.tierNames) return;
-  var names = DATA.collection.tierNames;
-  for (var i = 0; i < names.length; i++) {
-    var n = names[i];
+  // Read from live DATA.tiers (post-analysis) rather than the stale
+  // pre-analysis DATA.collection.tierNames snapshot — same reason as
+  // the fix in loadCollection/renderMatchesList.
+  var liveTiers = DATA.tiers || [];
+  for (var i = 0; i < liveTiers.length; i++) {
+    var t = liveTiers[i];
+    if (!t || !t.name) continue;
+    var n = t.name;
     var slug = n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     var el = document.getElementById('tier-card-yours-' + slug);
     if (!el) continue;
@@ -1225,8 +1328,11 @@ function updateView() {
 
   var layout = {
     title: DATA.movesets[state.movesetIdx].prettyLabel,
-    xaxis: {title:'Stat Product Rank (1=best)', range:[xMax+xPad, xMin-xPad], fixedrange:true},
-    yaxis: {title:currentYLabel, range:[yMin-yPad, yMax+yPad], fixedrange:true},
+    // fixedrange:false enables Plotly's native drag-to-zoom and
+    // double-click-to-reset on both axes. Useful for drilling into
+    // dense clusters without click-to-pin from the matches list.
+    xaxis: {title:'Stat Product Rank (1=best)', range:[xMax+xPad, xMin-xPad]},
+    yaxis: {title:currentYLabel, range:[yMin-yPad, yMax+yPad]},
     paper_bgcolor:'#1a1a2e', plot_bgcolor:'#16213e',
     font:{color:'#e0e0e0'}, hovermode:'closest',
     // Legend pinned explicitly OUTSIDE the plot area so it never
