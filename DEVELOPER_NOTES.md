@@ -40,6 +40,46 @@ Two bugs were found and fixed:
    set and cancel if `use_priority` and attacker was KO'd by a charged
    move.
 
+## Known divergences vs iv-tech reference writeups
+
+### Corviknight 2v2 bait-twice vs Shadow Sableye (2026-04-12)
+
+`docs/corviknight_deep_dive_reference.md:58` claims that max-def
+Corviknight (0/15/2, def=135.47, "135.46 def") flips the 2-shield
+matchup against default-IV Shadow Sableye (4/15/15 @ lvl 47) *"if you
+bait twice"*. Our `pvpoke_dp` sim has Corviknight LOSING the 2s
+regardless of bait mode (score 288, Corvi 0 HP, Sableye 53 HP):
+
+- **bait_shields=True**:  Corvi throws Sky Attack at T17 and T30 (both
+  shielded), then dies to Sableye Shadow Sneak at T37.
+- **bait_shields=False**: Corvi throws Sky Attack at T15 and T28 (both
+  shielded), then dies to Sableye Shadow Sneak at T37.
+
+In neither mode does Corvi reach Payback (60 energy) — it dies before
+accumulating the energy, so the "bait twice with Sky Attack then land a
+big Payback" strategy the reference describes is unreachable in our sim.
+Possible causes:
+
+1. Our `pvpoke_dp` near-KO DP doesn't find a micro-optimal plan that
+   squeezes in the Payback reach. This is plausible — PvPoke's real JS
+   has a bunch of `optimizeMoveTiming` + DP knobs that interact in
+   subtle ways and our port is exact for the cases we've tested but
+   could have gaps.
+2. The reference's claim is based on a human-optimal baiting strategy
+   that neither PvPoke nor we can actually find via simulation.
+3. The reference predates Sky Attack / Payback balance changes and no
+   longer reflects the current matchup math.
+
+The 1v1 claim from the same reference ("flips the 1 without baiting")
+DOES match our sim — Corvi wins 1v1 in both bait modes. That's covered
+by `test_corviknight_max_def_wins_1v1_vs_default_shadow_sableye` in
+`tests/test_battle.py`.
+
+Followup: consider round-tripping the 2v2 matchup at pvpoke.com/battle
+to see which of the three hypotheses is correct. If it's (1), it's a
+genuine pvpoke_dp gap to fix. If it's (2) or (3), we should update the
+reference doc with a "divergence confirmed" note.
+
 ## PvPoke bugs found
 
 ### 1. BattleState .hp/.oppHealth naming inconsistency
