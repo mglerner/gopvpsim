@@ -234,6 +234,50 @@ function buildHoverText(iv) {
     lines.push('Clears: '+DATA.anchorClearByIv[iv].join(', '));
   }
 
+  // User collection annotation: if the user has any mons at this exact
+  // canonical IV triple, append a "Yours:" block here so the info
+  // appears on EVERY trace's hover (base Other, tier, slayer, anchor,
+  // AND user overlay) instead of only on the user overlay. Previously
+  // only the user overlay trace constructed this text, so hovering a
+  // base/tier point would silently omit user info even if owned.
+  if (state.userRecords && state.userRecords.length > 0) {
+    var owned = [];
+    for (var urH = 0; urH < state.userRecords.length; urH++) {
+      var urHR = state.userRecords[urH];
+      if (urHR.canonicalIvIdx === iv) owned.push(urHR);
+    }
+    if (owned.length > 0) {
+      // Sort by current CP descending so the best in-game search
+      // target leads.
+      owned.sort(function(a, b) { return b.mon.cp - a.mon.cp; });
+      lines.push('');
+      lines.push('<b>\u2605 Yours (' + owned.length + '):</b>');
+      for (var urL = 0; urL < Math.min(owned.length, 4); urL++) {
+        var rcL = owned[urL];
+        var mc = (rcL.stats && rcL.stats.cp != null) ? rcL.stats.cp : '?';
+        var ml = (rcL.stats && rcL.stats.level != null) ? rcL.stats.level : '?';
+        var parts = [
+          '  <b>CP ' + rcL.mon.cp + '</b> @ L' + rcL.mon.level +
+          ' \u2192 CP ' + mc + ' @ L' + ml,
+        ];
+        if (rcL.csvSpecies && rcL.csvSpecies !== DATA.species) {
+          parts.push('    (' + (rcL.mon.is_shadow ? 'Shadow ' : '') +
+                     rcL.csvSpecies + ')');
+        } else if (rcL.mon.is_shadow) {
+          parts.push('    (Shadow)');
+        }
+        if (rcL.mon.lucky) parts[parts.length - 1] += ' \u2728';
+        if (rcL.matched && rcL.matched.length > 0) {
+          parts.push('    Qualifies: ' + rcL.matched.join(', '));
+        }
+        for (var pp = 0; pp < parts.length; pp++) lines.push(parts[pp]);
+      }
+      if (owned.length > 4) {
+        lines.push('  +' + (owned.length - 4) + ' more');
+      }
+    }
+  }
+
   // Diff vs reference IV (PvPoke default or rank 1, depending on opp IV mode)
   var refIv = (state.oppIvMode === 'rank1') ? DATA.rank1RefIvIdx : DATA.pvpokeRefIvIdx;
   var refDesc = (state.oppIvMode === 'rank1') ? 'SP Rank 1' : 'Default IVs';
@@ -929,38 +973,34 @@ function buildTraces() {
   if (state.userRecords && state.userRecords.length > 0) {
     var qualX=[], qualY=[], qualText=[];
     var ownX=[],  ownY=[],  ownText=[];
+    // Dedup by canonicalIvIdx so one ring per unique IV (two mons at
+    // the same spread share a single scatter point). The "Yours:"
+    // block inside buildHoverText already lists every owned mon at
+    // that IV, so the hover shows all of them regardless.
+    var seenIvs = {};
     for (var ur = 0; ur < state.userRecords.length; ur++) {
       var rec = state.userRecords[ur];
       var iv = rec.canonicalIvIdx;
       if (iv < 0) continue;
+      if (seenIvs[iv]) continue;
+      seenIvs[iv] = true;
       var sp = DATA.spRanks[iv], yv = yValues[iv];
       if (currentYIsSparse && !isFinite(yv)) continue;
-      // Hover text: reuse the standard one and append user-specific rows.
-      // Current CP (from the CSV) is shown prominently because that's
-      // what the user sees in-game when searching their storage; the
-      // max-at-cap CP is also shown so they know where the mon lands
-      // after full power-up.
-      var lines = buildHoverText(iv);
-      var maxCp = (rec.stats && rec.stats.cp != null) ? rec.stats.cp : '?';
-      var lvlNow = (rec.mon.level != null) ? rec.mon.level : '?';
-      var lvlMax = (rec.stats && rec.stats.level != null) ? rec.stats.level : '?';
-      var userLines = [
-        '',
-        '<b>\u2605 Yours:</b> ' +
-          (rec.mon.is_shadow ? 'Shadow ' : '') +
-          (rec.csvSpecies || ''),
-        '  <b>Current CP ' + rec.mon.cp + '</b> @ L' + lvlNow +
-          '  \u2192  max CP ' + maxCp + ' @ L' + lvlMax,
-        '  IVs: ' + rec.mon.atk_iv + '/' + rec.mon.def_iv + '/' + rec.mon.sta_iv +
-          (rec.mon.lucky ? ' (lucky)' : ''),
-      ];
-      if (rec.matched.length > 0) {
-        userLines.push('  Qualifies for: ' + rec.matched.join(', '));
-      } else {
-        userLines.push('  No tier match');
+      // Hover text comes from the shared buildHoverText — it already
+      // includes the "Yours:" block now (see hover builder above),
+      // so no overlay-specific text construction needed.
+      var fullText = buildHoverText(iv);
+      // Qualifying = any record at this IV hit a tier. We find the
+      // "best" record (highest current CP among matched) to decide
+      // which ring bucket this dedup'd point lands in.
+      var anyMatched = false;
+      for (var urD = 0; urD < state.userRecords.length; urD++) {
+        var rcD = state.userRecords[urD];
+        if (rcD.canonicalIvIdx === iv && rcD.matched && rcD.matched.length > 0) {
+          anyMatched = true; break;
+        }
       }
-      var fullText = lines + '<br>' + userLines.join('<br>');
-      if (rec.matched.length > 0) {
+      if (anyMatched) {
         qualX.push(sp); qualY.push(yv); qualText.push(fullText);
       } else {
         ownX.push(sp); ownY.push(yv); ownText.push(fullText);
