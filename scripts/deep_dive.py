@@ -6038,28 +6038,36 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += results_html
     html += analysis_html
 
-    # Embed data. Scores are packed as base64 uint16 arrays to reduce
-    # file size (~44% smaller than JSON integer arrays). The JS decoder
-    # at the top of the engine unpacks them back to regular arrays.
+    # Embed data. Scores are JSON arrays, gzip-compressed, then base64-
+    # encoded (~86% smaller than the old uint16→base64 approach).  The JS
+    # decoder inflates via DecompressionStream, then JSON.parse.
     import base64
-    import struct
+    import gzip
     packed_scores = {}
     for key, arr in score_arrays.items():
-        # Clamp to uint16 range (scores are 0-1000 integers)
-        clamped = [max(0, min(65535, int(v))) for v in arr]
-        raw = struct.pack(f'<{len(clamped)}H', *clamped)
-        packed_scores[key] = base64.b64encode(raw).decode('ascii')
+        json_bytes = json.dumps([int(v) for v in arr]).encode('utf-8')
+        gz = gzip.compress(json_bytes, compresslevel=9)
+        packed_scores[key] = base64.b64encode(gz).decode('ascii')
     html += f'<script>var DATA = {json.dumps(data_obj)};\n'
-    html += f'var SCORES_B64 = {json.dumps(packed_scores)};\n'
+    html += f'var SCORES_GZ = {json.dumps(packed_scores)};\n'
     html += """var SCORES = {};
-(function() {
-  for (var key in SCORES_B64) {
-    var bin = atob(SCORES_B64[key]);
-    var arr = new Uint16Array(bin.length / 2);
-    for (var i = 0; i < arr.length; i++) {
-      arr[i] = bin.charCodeAt(i*2) | (bin.charCodeAt(i*2+1) << 8);
+var _scoresReady = (async function() {
+  for (var key in SCORES_GZ) {
+    var bin = Uint8Array.from(atob(SCORES_GZ[key]), function(c) { return c.charCodeAt(0); });
+    var ds = new DecompressionStream('gzip');
+    var writer = ds.writable.getWriter();
+    writer.write(bin);
+    writer.close();
+    var chunks = [];
+    var reader = ds.readable.getReader();
+    while (true) {
+      var r = await reader.read();
+      if (r.done) break;
+      chunks.push(r.value);
     }
-    SCORES[key] = Array.from(arr);
+    var blob = new Blob(chunks);
+    var text = await blob.text();
+    SCORES[key] = JSON.parse(text);
   }
 })();
 """
@@ -6079,14 +6087,17 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     except FileNotFoundError:
         pass
 
-    # JS engine
+    # JS engine — wrapped in an async IIFE that waits for gzip
+    # decompression of score arrays to finish before initializing.
     html += '<script>\n'
+    html += '(async function() {\nawait _scoresReady;\n'
     # Use data_obj['tiers'] (may have been updated by generate_analysis_sections
     # with auto-derived tiers) rather than the original tier_info.
     final_tier_info = data_obj.get('tiers', tier_info) or tier_info
     html += _interactive_js_engine(n_scenarios, n_opponents, opp_iv_modes,
                                    reference_idx, final_tier_info, opp_desc,
                                    league, shield_scenarios)
+    html += '\n})();\n'
     html += '</script>\n'
 
     # Footer: equivalent CLI invocation + rankings data fingerprint, kept
