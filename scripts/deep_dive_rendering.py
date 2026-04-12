@@ -9,6 +9,7 @@ import math
 import re
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 import deep_dive_analysis as analysis
 
@@ -16,6 +17,165 @@ import deep_dive_analysis as analysis
 # ---------------------------------------------------------------------------
 # Shared data types and utilities
 # ---------------------------------------------------------------------------
+
+
+@dataclass
+class AnalysisContext:
+    """Read-only bundle of pre-computed data for analysis section renderers.
+
+    Built once by ``generate_analysis_sections`` in deep_dive.py, then
+    passed to each ``render_*`` function in this module.  No renderer
+    mutates the context (``anchor_passing_sink`` is populated as a
+    documented side-effect by the results renderer).
+    """
+    data_obj: dict
+    scores_flat: list
+    nIvs: int
+    nS: int
+    nO: int
+    scenarios: list
+    opponents: list
+    opp_iv_mode: str
+    opp_label: str
+    moveset_idx: int
+    moveset_label: str
+    ref_iv: int
+    ref_atk: float
+    ref_def: float
+    score_arrays: dict
+    scene_ranks: list
+    avg_ranks: list
+    avg_scores: list
+    ranked: list
+    flips: dict
+    flip_summary: list
+    flip_map: dict
+    rec_candidates: list
+    hp_list: list
+    anchor_flip_records: list
+    all_matchup_boundaries: list
+    effective_tiers: list
+    has_toml_tiers: bool
+    slayer_iter_result: Optional[dict]
+    resolved_anchors_top: list
+    opp_info_cache: dict
+    focal_types: list
+    focal_moves: list
+    anchor_passing_sink: Optional[dict]
+
+
+# ---------------------------------------------------------------------------
+# Deep dive CSS
+# ---------------------------------------------------------------------------
+
+DEEP_DIVE_CSS = """
+.dd-section { background: #16213e; padding: 16px 20px; border-radius: 8px; margin: 20px 0; }
+.dd-h2 { color: #e94560; font-size: 1.3rem; margin: 0 0 12px 0; border-bottom: 1px solid #0f3460; padding-bottom: 6px; }
+.dd-h3 { color: #58a6ff; font-size: 1rem; margin: 14px 0 8px 0; }
+.dd-table { border-collapse: collapse; margin: 8px 0 12px; font-size: 0.82rem; width: 100%; }
+.dd-table.dd-narrow { width: auto; }
+.dd-table th, .dd-table td { padding: 4px 8px; border: 1px solid #0f3460; text-align: left; }
+.dd-table th { background: #0f3460; color: #58a6ff; font-weight: 600; }
+.dd-table td { background: #1a1a2e; }
+.dd-table tr:hover td { background: #16213e; }
+.dd-gain { color: #3fb950; }
+.dd-loss { color: #f85149; }
+.dd-strong { font-weight: 700; color: #FFD700; }
+.dd-rank-good { color: #3fb950; font-weight: 600; }
+.dd-rank-bad { color: #f85149; }
+.dd-small { font-size: 0.82rem; color: #8b949e; margin: 4px 0; }
+.dd-callout { background: #0f3460; border-left: 3px solid #58a6ff; padding: 8px 12px; margin: 10px 0; border-radius: 0 4px 4px 0; font-size: 0.85rem; }
+.dd-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; }
+.dd-methods-dl { margin: 8px 0; }
+.dd-methods-dl dt { color: #58a6ff; font-weight: 600; margin-top: 8px; }
+.dd-methods-dl dd { margin-left: 16px; font-size: 0.88rem; color: #aaa; }
+.dd-flip-detail { margin: 6px 0; }
+.dd-flip-detail summary { cursor: pointer; padding: 4px 0; font-size: 0.9rem; }
+.dd-flip-detail summary:hover { color: #58a6ff; }
+.dd-rec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 12px; margin: 12px 0; }
+.dd-rec-card { background: #0f3460; border: 1px solid #1a3a6e; border-radius: 6px; padding: 12px; }
+.dd-rec-card h4 { color: #e94560; margin: 0 0 6px; font-size: 1rem; }
+.dd-rec-card p { margin: 3px 0; font-size: 0.88rem; }
+.dd-prose { font-size: 0.88rem; color: #b0b8c4; margin: 4px 0 8px 0; font-style: italic; }
+.dd-threshold-list { list-style: none; padding: 0; margin: 8px 0; }
+.dd-threshold-list li { padding: 4px 0 4px 12px; border-left: 2px solid #0f3460; margin: 4px 0; font-size: 0.88rem; }
+.dd-threshold-list .dd-loss-item { border-left-color: #f85149; }
+.dd-opp-label { color: #8b949e; font-size: 0.75rem; }
+.dd-slayer-top td { background: #1e2d4a; }
+.dd-slayer-top td:first-child { border-left: 3px solid #58a6ff; }
+.dd-slayer-hidden { display: none; }
+.dd-slayer-hidden.dd-slayer-shown { display: table-row; }
+.dd-slayer-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
+  padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
+  margin-top:4px; }
+.dd-slayer-toggle:hover { background:#1a3a6e; color:#fff; }
+.dd-anchor-tag { display:inline-block; background:#0f3460; color:#58a6ff;
+  padding:1px 6px; border-radius:3px; font-size:0.72rem; margin:1px 2px 1px 0;
+  font-family:monospace; cursor:help; }
+.dd-anchor-tag:hover { background:#1a3a6e; color:#fff; }
+.dd-anchor-tag-count { color:#d29922; font-weight:600; }
+.dd-anchor-tags-cell { max-width: 480px; }
+.dd-anchor-tags-cell .dd-anchor-tag { vertical-align: baseline; }
+/* The badges live inside an inner <div> rather than directly in the <td>
+   because <td> uses display: table-cell, which silently ignores max-height
+   in every major browser. Capping the cell to ~2 lines requires a real
+   block-level wrapper. The wrapper itself is click-toggleable: clicking
+   anywhere on the cell whitespace flips that one cell between compact
+   and expanded; clicking a specific badge triggers its hover tooltip
+   instead (badges keep cursor:help to signal hover-only). */
+.dd-anchor-tags-inner { white-space: normal; line-height: 1.5;
+  cursor: pointer; }
+/* Compact mode: cap tag cells at ~2 lines so survivor rows stay readable.
+   The "Expand all tags" toggle in the slayer section header removes this
+   class from every inner div to reveal the full badge wall. */
+.dd-anchor-tags-inner.dd-tags-compact { max-height: 3em; overflow: hidden;
+  position: relative; }
+.dd-anchor-tags-inner.dd-tags-compact::after { content: ""; position: absolute;
+  bottom: 0; left: 0; right: 0; height: 1.5em; pointer-events: none;
+  background: linear-gradient(transparent, #16213e); }
+.dd-tags-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
+  padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
+  margin:6px 0; }
+.dd-tags-toggle:hover { background:#1a3a6e; color:#fff; }
+.dd-filter-hidden { display: none !important; }
+.dd-filter-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
+  padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
+  margin:6px 0 4px 0; }
+.dd-filter-toggle:hover { background:#1a3a6e; color:#fff; }
+.dd-filter-panel { background:#0a1a30; border:1px solid #1a3a6e; border-radius:4px;
+  padding:8px 10px; margin:4px 0 8px 0; font-size:0.78rem; }
+.dd-filter-panel-group { margin-bottom:6px; padding-bottom:4px;
+  border-bottom:1px solid #16213e; }
+.dd-filter-panel-group:last-child { border-bottom:none; }
+.dd-filter-master { font-weight:600; color:#58a6ff; display:block; }
+.dd-filter-children { margin:2px 0 0 18px; display:flex; flex-wrap:wrap;
+  gap:4px 10px; }
+.dd-filter-children label { font-family:monospace; font-size:0.72rem;
+  color:#b0b8c4; cursor:pointer; }
+.dd-filter-children label:hover { color:#fff; }
+.dd-filter-controls { margin-top:6px; padding-top:6px; border-top:1px solid #16213e;
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.dd-filter-controls button { background:#1a3a6e; color:#fff; border:none;
+  padding:3px 8px; border-radius:3px; cursor:pointer; font-size:0.75rem; }
+.dd-filter-controls button:hover { background:#264a8a; }
+.dd-filter-status { color:#8b949e; font-size:0.72rem; margin-left:auto; }
+.dd-auto-marker { color:#d29922; font-size:0.7rem; font-weight:400;
+  font-style:italic; }
+/* Notable IVs section: dd-notable-only is a section-level class that
+   hides every dd-not-notable card. The header checkbox toggles the
+   class via ddNotableToggle(); default state is "only notable". */
+.dd-notable-only .dd-not-notable { display: none; }
+.dd-rec-card.dd-notable { border-color: #d29922; }
+/* Per-card "Show all N" expand: overflow members render with
+   dd-iv-hidden and become visible when ddNotableExpand() adds
+   dd-iv-shown. Same pattern as the slayer-card row expand. */
+.dd-rec-card .dd-iv-hidden { display: none; }
+.dd-rec-card .dd-iv-hidden.dd-iv-shown { display: block; }
+.dd-iv-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
+  padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
+  margin-top:6px; }
+.dd-iv-toggle:hover { background:#1a3a6e; color:#fff; }
+"""
 
 def parse_mode(composite_mode):
     """Decompose a composite mode string into (opp_iv_mode, bait_mode).
