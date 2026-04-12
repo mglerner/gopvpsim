@@ -5290,19 +5290,51 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += results_html
     html += analysis_html
 
-    # Embed data. Scores are JSON arrays, gzip-compressed, then base64-
-    # encoded (~86% smaller than the old uint16→base64 approach).  The JS
-    # decoder inflates via DecompressionStream, then JSON.parse.
+    # Embed data. Scores are packed as little-endian uint16, gzip-
+    # compressed, then base64-encoded for inline embedding. The JS
+    # decoder inflates via DecompressionStream and reads the result
+    # as a Uint16Array.
     import base64
     import gzip
+    import struct
     packed_scores = {}
     for key, arr in score_arrays.items():
-        json_bytes = json.dumps([int(v) for v in arr]).encode('utf-8')
-        gz = gzip.compress(json_bytes, compresslevel=9)
+        clamped = [max(0, min(65535, int(v))) for v in arr]
+        raw = struct.pack(f'<{len(clamped)}H', *clamped)
+        gz = gzip.compress(raw, compresslevel=9)
         packed_scores[key] = base64.b64encode(gz).decode('ascii')
     html += f'<script>var DATA = {json.dumps(data_obj)};\n'
     html += f'var SCORES_GZ = {json.dumps(packed_scores)};\n'
-    html += """var SCORES = {};
+    html += """
+// -------------------------------------------------------------------
+// How SCORES_GZ works (for the curious / paranoid):
+//
+// Each value in SCORES_GZ is a base64 string that encodes gzip-
+// compressed battle-simulation scores.  The pipeline that created it:
+//
+//   Python side (scripts/deep_dive.py):
+//     1. Simulate every IV spread vs every opponent in every shield
+//        scenario.  Each sim produces an integer score 0-1000.
+//     2. Pack the scores as little-endian unsigned 16-bit integers
+//        (2 bytes each, same byte order your browser uses natively).
+//     3. Gzip-compress the packed bytes (shrinks ~5-8x).
+//     4. Base64-encode the gzip output so it can live inside HTML
+//        (browsers can't embed raw binary in a <script> tag).
+//
+//   JS side (right here, runs when the page loads):
+//     1. Base64-decode each string back to raw bytes.
+//     2. Gzip-decompress via the browser's built-in DecompressionStream.
+//     3. Interpret the result as a Uint16Array (the original scores).
+//     4. Copy into a plain Array so the rest of the page can use it.
+//
+// Nothing is hidden or obfuscated -- the compression is purely to keep
+// file sizes manageable (a full deep dive with 60+ opponents would be
+// ~100 MB uncompressed).  You can verify the scores by running the
+// same deep_dive.py command shown in the footer of this page and
+// comparing the output.
+// -------------------------------------------------------------------
+
+var SCORES = {};
 var _scoresReady = (async function() {
   for (var key in SCORES_GZ) {
     var bin = Uint8Array.from(atob(SCORES_GZ[key]), function(c) { return c.charCodeAt(0); });
@@ -5317,9 +5349,14 @@ var _scoresReady = (async function() {
       if (r.done) break;
       chunks.push(r.value);
     }
-    var blob = new Blob(chunks);
-    var text = await blob.text();
-    SCORES[key] = JSON.parse(text);
+    var total = chunks.reduce(function(s, c) { return s + c.byteLength; }, 0);
+    var merged = new Uint8Array(total);
+    var offset = 0;
+    for (var i = 0; i < chunks.length; i++) {
+      merged.set(chunks[i], offset);
+      offset += chunks[i].byteLength;
+    }
+    SCORES[key] = Array.from(new Uint16Array(merged.buffer));
   }
 })();
 """
