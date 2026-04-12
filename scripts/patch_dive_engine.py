@@ -88,14 +88,21 @@ def _patch_bait_dropdown(html, data):
     parts.append(
         '  <label>Bait: '
         '<select id="bait-sel" onchange="updateView()">\n'
-        '    <option value="bait">On</option>\n'
-        '    <option value="nobait">Off</option>\n'
+        '    <option value="bait">Selective</option>\n'
+        '    <option value="nobait">Never</option>\n'
         '  </select></label>\n')
     replacement = ''.join(parts)
 
-    # Replace the fused dropdown. Two patterns: "Scenario:" (bait+oppiv)
-    # or "Opponent IVs:" (oppiv only, but with :nobait values — shouldn't
-    # happen, but be safe).
+    # Remove any existing bait-sel dropdown first (idempotent re-patch).
+    bait_re = re.compile(
+        r'  <label>Bait: '
+        r'<select id="bait-sel" onchange="updateView\(\)">\n'
+        r'(?:    <option[^<]*</option>\n)+'
+        r'  </select></label>\n')
+    html = bait_re.sub('', html)
+
+    # Replace the fused dropdown. Two patterns: "Scenario:" (first patch)
+    # or "Opponent IVs:" (re-patch of an already-split file).
     fused_re = re.compile(
         r'  <label>(?:Scenario|Opponent IVs): '
         r'<select id="oppiv-sel" onchange="updateView\(\)">\n'
@@ -103,7 +110,7 @@ def _patch_bait_dropdown(html, data):
         r'  </select></label>\n')
     html, n = fused_re.subn(replacement, html, count=1)
     if n == 0:
-        return html  # already patched or structure doesn't match
+        return html  # structure doesn't match — skip
 
     # Remove the "Bait: on/off selector" meta hint — the dropdown is
     # self-documenting now.
