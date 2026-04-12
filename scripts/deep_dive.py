@@ -55,7 +55,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from gopvpsim.pokemon import (
     Pokemon, get_pokemon_entry, get_species, iv_rank, CPM, best_level,
-    LEAGUE_CAPS, cp as calc_cp, pvpoke_default_ivs,
+    LEAGUE_CAPS, LEAGUE_MAX_LEVEL, cp as calc_cp, pvpoke_default_ivs,
 )
 from gopvpsim.moves import get_moves, type_effectiveness, stab
 from gopvpsim.data import (
@@ -1345,7 +1345,8 @@ def compute_iv_metadata(species, league, shadow=False, iv_floor=None):
         for d in range(d_floor, 16):
             for s in range(s_floor, 16):
                 lv = best_level(base_atk, base_def, base_sta, a, d, s,
-                                max_cp=max_cp, max_level=51.0)
+                                max_cp=max_cp,
+                                max_level=LEAGUE_MAX_LEVEL.get(league, 51.0))
                 if lv is None:
                     continue
                 cpm = CPM[lv]
@@ -4980,7 +4981,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         # future. Scope is small (one species, 4096 IVs).
         _ranked = _rank_lookup(
             _collection_species_key, league=league,
-            max_level=51.0, shadow=shadow)
+            max_level=LEAGUE_MAX_LEVEL.get(league, 51.0), shadow=shadow)
         _rank_shadow_key = 'shadow' if shadow else 'normal'
         _rank_table = {f'{a},{d},{s}': r for (a, d, s), r in _ranked.items()}
         # Build the threshold dict in the same shape Python's match_mons

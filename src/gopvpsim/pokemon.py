@@ -59,6 +59,17 @@ LEAGUE_CP = {
     'master': 10000,
 }
 
+# Max power-up level per league.  Best-buddy adds +1 level but only
+# one mon can be best-buddied at a time, so the default excludes it
+# for GL/UL.  Master League keeps 51 because best-buddy matters more
+# in an uncapped format.
+LEAGUE_MAX_LEVEL = {
+    'little': 51.0,
+    'great':  50.0,
+    'ultra':  50.0,
+    'master': 51.0,
+}
+
 # Sorted level list, built once
 _LEVELS = sorted(CPM.keys())
 
@@ -184,13 +195,15 @@ class Pokemon:
 
     @classmethod
     def at_best_level(cls, species_name, atk_iv, def_iv, sta_iv,
-                      *, league='great', max_level=51.0, shadow=False):
+                      *, league='great', max_level=None, shadow=False):
         """Create a Pokemon at the highest level that fits under the league CP cap."""
         base = get_species(species_name)
         base_atk = base['atk']
         base_def = base['def']
         base_sta = base['hp']
         max_cp = LEAGUE_CAPS[league]
+        if max_level is None:
+            max_level = LEAGUE_MAX_LEVEL.get(league, 51.0)
         level = best_level(base_atk, base_def, base_sta,
                            atk_iv, def_iv, sta_iv,
                            max_cp=max_cp, max_level=max_level)
@@ -207,7 +220,7 @@ class Pokemon:
 # IV ranking
 # ---------------------------------------------------------------------------
 
-def iv_rank(species_name: str, *, league: str = 'great', max_level: float = 51.0,
+def iv_rank(species_name: str, *, league: str = 'great', max_level: float = None,
             shadow: bool = False) -> list[dict]:
     """
     Return all 4096 IV combinations (0–15 each) for a species, ranked by
@@ -224,6 +237,8 @@ def iv_rank(species_name: str, *, league: str = 'great', max_level: float = 51.0
     base_def = base['def']
     base_sta = base['hp']
     max_cp   = LEAGUE_CAPS[league]
+    if max_level is None:
+        max_level = LEAGUE_MAX_LEVEL.get(league, 51.0)
 
     shadow_atk_mult = SHADOW_ATK_BONUS if shadow else 1.0
     shadow_def_mult = SHADOW_DEF_MULT  if shadow else 1.0
