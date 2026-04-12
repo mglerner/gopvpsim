@@ -258,7 +258,7 @@ class TestRenderAnchorFlipBullets:
         )
         rec = {'anchor': anchor, 'opponent': 'Annihilape',
                'scenarios': [(2, 2), (2, 1), (0, 0)], 'direction': 'gain'}
-        out = deep_dive._render_anchor_flip_bullets([rec])
+        out = deep_dive.rendering.render_anchor_flip_bullets([rec])
         assert len(out) == 1
         bullet = out[0]
         assert '127.23 Atk' in bullet
@@ -277,13 +277,13 @@ class TestRenderAnchorFlipBullets:
         )
         rec = {'anchor': anchor, 'opponent': 'Annihilape',
                'scenarios': [(2, 2)], 'direction': 'gain'}
-        out = deep_dive._render_anchor_flip_bullets([rec])
+        out = deep_dive.rendering.render_anchor_flip_bullets([rec])
         assert '103.54 Def' in out[0]
         assert 'mirror bulk' in out[0]
         assert '2v2' in out[0]
 
     def test_empty_input(self):
-        assert deep_dive._render_anchor_flip_bullets([]) == []
+        assert deep_dive.rendering.render_anchor_flip_bullets([]) == []
 
     def test_sub_anchors_same_move_collapse_to_min_threshold(self):
         # Two Level 3 sub-anchors of the same parent + same move (different
@@ -307,7 +307,7 @@ class TestRenderAnchorFlipBullets:
             {'anchor': a2, 'opponent': 'Annihilape',
              'scenarios': [(1, 1), (2, 2)], 'direction': 'gain'},
         ]
-        out = deep_dive._render_anchor_flip_bullets(recs)
+        out = deep_dive.rendering.render_anchor_flip_bullets(recs)
         assert len(out) == 1
         bullet = out[0]
         # Min threshold only — higher tier is subsumed.
@@ -338,7 +338,7 @@ class TestRenderAnchorFlipBullets:
             {'anchor': a1, 'opponent': 'Annihilape',
              'scenarios': [(2, 2)], 'direction': 'gain'},
         ]
-        out = deep_dive._render_anchor_flip_bullets(recs)
+        out = deep_dive.rendering.render_anchor_flip_bullets(recs)
         assert len(out) == 2
         # Within the family, ascending threshold: Counter (121.39)
         # comes before Close Combat (123.07).
@@ -364,7 +364,7 @@ class TestRenderAnchorFlipBullets:
             {'anchor': a2, 'opponent': 'Annihilape',
              'scenarios': [(2, 2)], 'direction': 'gain'},
         ]
-        out = deep_dive._render_anchor_flip_bullets(recs)
+        out = deep_dive.rendering.render_anchor_flip_bullets(recs)
         assert len(out) == 2
 
     def test_same_parent_different_opponent_stays_separate(self):
@@ -384,7 +384,7 @@ class TestRenderAnchorFlipBullets:
             {'anchor': a2, 'opponent': 'Lickitung',
              'scenarios': [(2, 2)], 'direction': 'gain'},
         ]
-        out = deep_dive._render_anchor_flip_bullets(recs)
+        out = deep_dive.rendering.render_anchor_flip_bullets(recs)
         assert len(out) == 2
 
     def test_no_move_id_omits_move_list(self):
@@ -397,7 +397,7 @@ class TestRenderAnchorFlipBullets:
         )
         rec = {'anchor': a, 'opponent': 'Annihilape',
                'scenarios': [(2, 2)], 'direction': 'gain'}
-        out = deep_dive._render_anchor_flip_bullets([rec])
+        out = deep_dive.rendering.render_anchor_flip_bullets([rec])
         # No "()" left over from an empty move list
         assert '()' not in out[0]
         assert '127.23 Atk' in out[0]
@@ -450,7 +450,7 @@ class TestRenderThresholdTierCards:
         records = [{'anchor': anchor, 'opponent': 'Lickitung',
                     'scenarios': [(1, 1)], 'direction': 'gain'}]
 
-        html = deep_dive._render_threshold_tier_cards(
+        html = deep_dive.rendering.render_threshold_tier_cards(
             data_obj, records,
             avg_ranks={0: 1, 1: 2, 2: 3},
             flip_map={0: (2, 0, 2), 1: (1, 0, 1), 2: (0, 0, 0)},
@@ -482,7 +482,7 @@ class TestRenderThresholdTierCards:
         )
         records = [{'anchor': anchor, 'opponent': 'Foo',
                     'scenarios': [(2, 2)], 'direction': 'gain'}]
-        html = deep_dive._render_threshold_tier_cards(
+        html = deep_dive.rendering.render_threshold_tier_cards(
             data_obj, records,
             avg_ranks={0: 1, 1: 2},
             flip_map={},
@@ -507,7 +507,7 @@ class TestRenderThresholdTierCards:
         )
         records = [{'anchor': anchor, 'opponent': 'Lickitung',
                     'scenarios': [(2, 2)], 'direction': 'gain'}]
-        html = deep_dive._render_threshold_tier_cards(
+        html = deep_dive.rendering.render_threshold_tier_cards(
             data_obj, records,
             avg_ranks={0: 1, 1: 2},
             flip_map={},
@@ -517,7 +517,7 @@ class TestRenderThresholdTierCards:
 
     def test_empty_tiers_returns_empty(self):
         data_obj = {'tiers': [], 'nIvs': 0}
-        html = deep_dive._render_threshold_tier_cards(data_obj, [], {}, {})
+        html = deep_dive.rendering.render_threshold_tier_cards(data_obj, [], {}, {})
         assert html == ''
 
     def test_auto_derived_tiers_render_with_bullets(self):
@@ -554,7 +554,7 @@ class TestRenderThresholdTierCards:
         assert 'General' in names
 
         # Render with override_tiers — should produce bullets
-        html = deep_dive._render_threshold_tier_cards(
+        html = deep_dive.rendering.render_threshold_tier_cards(
             data_obj, records,
             avg_ranks={0: 1, 1: 2, 2: 3, 3: 4},
             flip_map={},
@@ -574,7 +574,7 @@ class TestRenderThresholdTierCards:
             def_vals=[100],
             hp_vals=[140],
         )
-        html = deep_dive._render_threshold_tier_cards(
+        html = deep_dive.rendering.render_threshold_tier_cards(
             data_obj, [],
             avg_ranks={0: 1},
             flip_map={},
