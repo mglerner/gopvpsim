@@ -3187,7 +3187,7 @@ def _auto_derive_tiers(anchor_flip_records, data_obj,
     1. Anchor-flip records → per-opponent atk/def damage-tier boundaries.
     2. Matchup boundaries → full-battle stat targets on def OR atk, clustered
        by IV-count drop + threshold gap within each stat. The highest-
-       selectivity cluster corresponds to acidArisen's "GH Great", the
+       selectivity cluster corresponds to acidicArisen's "GH Great", the
        next to "GH Good", etc.
 
     Returns a list of tier dicts matching the shape ``data_obj['tiers']``
@@ -3309,7 +3309,7 @@ def _auto_derive_tiers(anchor_flip_records, data_obj,
     # --- Matchup-boundary-driven tiers (def-side + atk-side) ---
     # Sort boundaries by threshold ascending within each stat and pick tier
     # breaks where the number of qualifying IVs drops significantly — these
-    # correspond to acidArisen-style tiers like "GH Good" (many IVs)
+    # correspond to acidicArisen-style tiers like "GH Good" (many IVs)
     # vs "GH Great" (few IVs, stricter spec).
     def _mb_candidates(mbs):
         by_thresh: dict = {}
@@ -3439,7 +3439,7 @@ def _probe_tier_cutoff_flips(data_obj, score_arrays_all, moveset_idx,
     they meet ALL of the tier's cutoffs and check win-rate cleanliness.
     Returns a list of dicts: {opponent, scenario, opp_iv_mode, pass_wr,
     fail_wr}. This catches matchup flips at the tier boundary that fall
-    between Level 3 sub-anchor thresholds (e.g. acidArisen's 143.03 def
+    between Level 3 sub-anchor thresholds (e.g. acidicArisen's 143.03 def
     vs Azu, which lies between the damage tiers at 142.34 and 144.41).
     """
     nIvs = data_obj.get('nIvs', 0)
@@ -3709,7 +3709,7 @@ def _render_threshold_tier_cards(data_obj, anchor_flip_records,
 
         # --- Tier-cutoff probe: matchup flips at the tier's own spec ---
         # Catches flips that fall between Level 3 sub-anchor thresholds
-        # (e.g. acidArisen's 143.03 def vs Azu lives between damage
+        # (e.g. acidicArisen's 143.03 def vs Azu lives between damage
         # tiers at 142.34 and 144.41).
         if score_arrays and (atk_cut > 0 or def_cut > 0):
             probe_results = _probe_tier_cutoff_flips(
@@ -4181,7 +4181,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # -- Compute anchor-flip records (used by Threshold Tiers, the flat
     #    Anchor-Driven Matchup Flips section, and Notable IVs below) --
     # Run the aggregator against every opp_iv_mode (pvpoke, rank1, or both)
-    # and union the results. acidArisen-style thresholds are often against
+    # and union the results. acidicArisen-style thresholds are often against
     # rank-1 opponent IVs; running only against pvpoke defaults would miss
     # them. Dedup by (anchor.name, opponent, frozenset(scenarios)) so a
     # record that fires in both modes doesn't appear twice.

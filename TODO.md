@@ -596,9 +596,9 @@ reduction. 26 commits. Key design decisions:
 `_auto_derive_tiers` consumes both anchor-flip records (atk-side) and
 matchup boundaries (def-side). Tiers ranked by selectivity (fewest
 qualifying IVs first); General excluded from scatter plot coloring.
-Tinkaton clean dive produces tiers at ~143 def (≈acidArisen GH Great),
+Tinkaton clean dive produces tiers at ~143 def (≈acidicArisen GH Great),
 ~140 def (≈GH Good), ~138 def (intermediate). Validated against 4/6
-acidArisen findings.
+acidicArisen findings.
 
 ### Open threads for next sessions
 - **Atk-side matchup-flipping boundaries**: `_find_matchup_boundaries`
@@ -610,7 +610,7 @@ acidArisen findings.
   options (`--energy-lead 1` etc.), re-sweep matchup boundaries under
   those conditions. The two-layer display (damage tier + matchup flip)
   is designed for this.
-- **Shadow / atk-weighted opponent IVs**: acidArisen's Shadow Drapion
+- **Shadow / atk-weighted opponent IVs**: acidicArisen's Shadow Drapion
   (140.21 def) uses "attack-weighted" opponent IVs, not rank-1 or
   PvPoke default. Our system doesn't simulate arbitrary opponent IV
   spreads. Possible fix: `--opp-ivs custom:119.80` in the TOML or CLI.
@@ -618,7 +618,7 @@ acidArisen findings.
   co-conditions. Atk-side anchors theoretically could too (HP affects
   whether a fast-move damage increase translates to a KO), but no
   known case warrants it yet.
-- **CMP anchor schema shorthand**: acidArisen's CMP thresholds
+- **CMP anchor schema shorthand**: acidicArisen's CMP thresholds
   (105.58 Corviknight, 105.79 Lickilicky, etc.) can't be expressed as
   CMP anchors without an IV-list spread. Need a `opponent_species`
   shorthand that resolves the opponent's rank-1 atk automatically.
