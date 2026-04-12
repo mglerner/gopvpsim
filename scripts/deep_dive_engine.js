@@ -737,11 +737,13 @@ function renderMatchesList() {
   var sectionIdx = 0;
   var MAX_VISIBLE = 5;
 
-  // Render one grouped section. `extraCol` is an optional per-row
-  // override function that returns an extra cell (used for slayer
-  // section to show category labels). `extraHeader` is the column
-  // header for that extra column.
-  function renderSection(heading, recs, extraHeader, extraCell) {
+  // Render one grouped section. `extras` is an optional list of
+  // {header, cell} objects where `cell(rc)` returns HTML for that
+  // row's extra cell. Used to add cross-info columns — e.g. the
+  // slayer section shows both "Slayer type" and "Also in" (which
+  // tiers the slayer mon ALSO clears), and tier sections could
+  // optionally show a "Slayer?" column too.
+  function renderSection(heading, recs, extras) {
     if (!recs || recs.length === 0) return '';
     recs.sort(function(a, b) {
       if (a._rank !== b._rank) return a._rank - b._rank;
@@ -751,7 +753,11 @@ function renderMatchesList() {
     var h = '<h5>' + heading + ' - ' + recs.length + ' of yours</h5>';
     h += '<table><tr><th>#</th><th>Current CP</th><th>IVs</th>' +
          '<th>Species</th><th>Power-up</th><th>Max CP</th>';
-    if (extraHeader) h += '<th>' + escapeHtml(extraHeader) + '</th>';
+    if (extras) {
+      for (var xh = 0; xh < extras.length; xh++) {
+        h += '<th>' + escapeHtml(extras[xh].header) + '</th>';
+      }
+    }
     h += '</tr>';
     for (var k = 0; k < recs.length; k++) {
       var rc = recs[k];
@@ -773,7 +779,11 @@ function renderMatchesList() {
       var maxLv = rc.stats ? rc.stats.level : null;
       h += '<td>' + powerUpText(curLv, maxLv) + '</td>';
       h += '<td>' + (rc.stats ? rc.stats.cp : '?') + '</td>';
-      if (extraCell) h += '<td>' + extraCell(rc) + '</td>';
+      if (extras) {
+        for (var xc = 0; xc < extras.length; xc++) {
+          h += '<td>' + extras[xc].cell(rc) + '</td>';
+        }
+      }
       h += '</tr>';
     }
     h += '</table>';
@@ -788,19 +798,53 @@ function renderMatchesList() {
     return h;
   }
 
+  // Helper: list-or-dash cell for tier/slayer cross-info columns.
+  function listOrDash(arr) {
+    return (arr && arr.length > 0) ? escapeHtml(arr.join(', ')) : '-';
+  }
+  // Helper: filter out the current tier from a mon's matched list so
+  // the "Also in" column for a tier section doesn't list the tier
+  // itself (redundant with the section heading).
+  function otherTiersExcept(rc, excludeTier) {
+    var out = [];
+    for (var ot = 0; ot < (rc.matched || []).length; ot++) {
+      if (rc.matched[ot] !== excludeTier) out.push(rc.matched[ot]);
+    }
+    return out;
+  }
+
   var html = '';
   for (var ti = 0; ti < tierNames.length; ti++) {
-    html += renderSection(escapeHtml(tierNames[ti]), byTier[tierNames[ti]]);
+    // Per-tier section. "Also in" shows other tiers this mon clears
+    // + any slayer categories it hits, so the user can see at a
+    // glance whether a tier-qualifying mon is also a mirror-match
+    // specialist. Closure captures the current tier name.
+    (function(currentTierName) {
+      html += renderSection(
+        escapeHtml(currentTierName),
+        byTier[currentTierName],
+        [
+          { header: 'Also in', cell: function(rc) {
+              var also = otherTiersExcept(rc, currentTierName);
+              if (rc.slayerCats && rc.slayerCats.length > 0) {
+                also = also.concat(rc.slayerCats);
+              }
+              return listOrDash(also);
+          } }
+        ]
+      );
+    })(tierNames[ti]);
   }
-  // Slayer section comes after tiers. Extra column shows the specific
-  // slayer categories (Atk / Bulk / CMP) for each mon.
+  // Slayer section: two extra columns — specific slayer categories
+  // AND which tiers this slayer mon ALSO clears (blank for slayer-
+  // only mons, populated for mons that are both slayer + tier).
   html += renderSection(
     'Slayer IVs',
     slayerRecs,
-    'Slayer type',
-    function(rc) {
-      return escapeHtml((rc.slayerCats || []).join(', ') || '-');
-    }
+    [
+      { header: 'Slayer type', cell: function(rc) { return listOrDash(rc.slayerCats); } },
+      { header: 'Also in',     cell: function(rc) { return listOrDash(rc.matched); } }
+    ]
   );
 
   if (html === '') {
