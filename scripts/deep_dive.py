@@ -5947,8 +5947,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         if _has_bait_axis:
             html += ('  <label>Bait: '
                      '<select id="bait-sel" onchange="updateView()">\n')
-            html += '    <option value="bait">On</option>\n'
-            html += '    <option value="nobait">Off</option>\n'
+            html += '    <option value="bait">Selective</option>\n'
+            html += '    <option value="nobait">Never</option>\n'
             html += '  </select></label>\n'
     if len(y_axis_modes) > 1:
         html += '  <label>Y-axis: <select id="yaxis-sel" onchange="updateView()">\n'
