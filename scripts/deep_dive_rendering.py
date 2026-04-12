@@ -681,10 +681,8 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
     return ''.join(parts)
 
 
-_aggregate_flips_by_anchor = analysis.aggregate_flips_by_anchor
 
 
-_find_matchup_boundaries = analysis.find_matchup_boundaries
 
 
 
@@ -916,7 +914,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         # (e.g. acidicArisen's 143.03 def vs Azu lives between damage
         # tiers at 142.34 and 144.41).
         if score_arrays and (atk_cut > 0 or def_cut > 0):
-            probe_results = _probe_tier_cutoff_flips(
+            probe_results = analysis.probe_tier_cutoff_flips(
                 data_obj, score_arrays, moveset_idx,
                 atk_cut, def_cut, hp_cut,
                 scenarios, opponents,
@@ -1152,15 +1150,10 @@ def scenario_ranks(scores_flat, nIvs, nS, nO):
 
 
 
-_pvp_damage = analysis.pvp_damage
 
 
-_narrate_flip = analysis.narrate_flip
 
 
-_build_move_tuples = analysis.build_move_tuples
-_pretty_name = analysis.pretty_name
-_pretty_moveset = analysis.pretty_moveset
 
 
 
@@ -1228,7 +1221,6 @@ def detect_clusters(scores, data):
 
 
 
-_find_flips = analysis.find_flips
 
 
 def pearson_r(xs, ys):
