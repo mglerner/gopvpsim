@@ -781,6 +781,8 @@ def compute_iv_metadata(species, league, shadow=False, iv_floor=None):
                 })
     return iv_meta
 
+slayer.compute_iv_metadata = compute_iv_metadata
+
 
 def group_ivs_by_stat_profile(iv_meta_list):
     """

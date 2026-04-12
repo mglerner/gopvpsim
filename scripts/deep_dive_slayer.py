@@ -20,6 +20,9 @@ from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp, pvpoke_simulate_
 from gopvpsim.anchors import resolve_anchors, tag_iv, ResolvedAnchor
 
 
+# Injected by deep_dive.py after import (defined there, used here).
+compute_iv_metadata = None
+
 # Shared worker state for multiprocessing pool
 _worker_state = {}
 
