@@ -5305,19 +5305,98 @@ function ddToggleTagsCompactCell(event) {
 # Interactive HTML output
 # ---------------------------------------------------------------------------
 
+def _moveset_slug(label: str) -> str:
+    """Slugify a moveset label for use in a filename.
+
+    "COUNTER / CLOSE_COMBAT, PAYBACK" → "counter_close_combat_payback"
+    """
+    import re
+    slug = label.lower()
+    slug = re.sub(r'[^a-z0-9]+', '_', slug)
+    return slug.strip('_')
+
+
+def _filter_moveset_data_for_split(moveset_data, current_idx, reference_idx):
+    """Return (filtered_moveset_data, new_reference_idx) for a split-mode file.
+
+    Each split file embeds only the moveset being displayed. The "vs Ref"
+    hover diff is intentionally dropped in split mode — the ref moveset's
+    scores would need all opp-iv/bait modes embedded to cover mode
+    switches, roughly doubling each non-reference file's size (~24 MB →
+    ~47 MB for a GL 61-opponent dive). Since these files are for "pick
+    a mon to build", and cross-moveset comparisons belong in the
+    write-up prose rather than an inline hover diff, skipping the embed
+    keeps disk usage roughly flat with the pre-split single file.
+
+    Always returns (``[current_md]``, -1). The helper exists so the
+    caller site stays readable and so any future policy change (e.g.
+    re-enabling a lightweight single-mode ref embed) has one place to
+    live.
+    """
+    return [moveset_data[current_idx]], -1
+
+
+def _build_split_file_list(moveset_data, reference_idx, base_html_path):
+    """Plan per-moveset output files for --split-movesets.
+
+    Returns a list of dicts, one per moveset, in the order of ``moveset_data``:
+        {'url': '...', 'label': '...', 'pretty_label': '...',
+         'path': '...',                    # absolute filesystem path
+         'moveset_idx': int,                # index into original moveset_data
+         'is_reference': bool}
+
+    Naming: the reference moveset (or moveset 0 when no reference resolved)
+    becomes ``{stem}.html``; all others become
+    ``{stem}_m{moveset_idx}_{slug}.html``. URLs are relative filenames so
+    the dropdown navigates correctly regardless of where the files are
+    opened from.
+    """
+    import os as _os
+    directory = _os.path.dirname(base_html_path) or '.'
+    stem, ext = _os.path.splitext(_os.path.basename(base_html_path))
+    landing_idx = reference_idx if reference_idx >= 0 else 0
+    files = []
+    for mi, md in enumerate(moveset_data):
+        pretty = _pretty_moveset(md['label'])
+        ref_tag = ' (reference)' if mi == reference_idx else ''
+        if mi == landing_idx:
+            fname = f'{stem}{ext}'
+        else:
+            fname = f'{stem}_m{mi}_{_moveset_slug(md["label"])}{ext}'
+        files.append({
+            'url': fname,                            # relative — same dir
+            'path': _os.path.join(directory, fname),
+            'label': md['label'],
+            'pretty_label': f'{pretty}{ref_tag}',
+            'moveset_idx': mi,
+            'is_reference': (mi == reference_idx),
+        })
+    return files
+
+
 def generate_interactive_html(species, league, moveset_data, html_path,
                               thresholds=None, opponent_label=None,
                               shield_scenarios=None, opponent_names=None,
                               opp_iv_modes=None, reference_idx=-1,
                               standalone=False, slayer_iter_result=None,
                               cli_args_str=None, has_toml_tiers=False,
-                              shadow=False):
+                              shadow=False, split_info=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
         'label': str (e.g. "COUNTER / DYNAMIC_PUNCH, ICE_PUNCH")
         'scores': dict of opp_iv_mode -> flat score list (canonical order)
         'meta': canonical_meta list (shared across modes for same moveset)
+
+    split_info: optional dict for --split-movesets mode. When present, the
+        moveset dropdown is replaced with a URL-navigating selector that
+        jumps between sibling per-moveset HTML files. Shape:
+          {'files':  [{'url': '...', 'label': '...', 'pretty_label': '...'}],
+           'current': int}    # index into 'files' of the file being written
+        The caller is responsible for pre-filtering ``moveset_data`` down to
+        this file's slice (typically [current] for the reference file, or
+        [current, reference] for non-reference files so the "vs Ref" hover
+        diff keeps working).
     """
     opp_iv_modes = opp_iv_modes or ['pvpoke']
     shield_scenarios = shield_scenarios or [(1, 1)]
@@ -5818,7 +5897,26 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 
     # Controls
     html += '<div class="controls">\n'
-    if len(moveset_data) > 1:
+    if split_info is not None:
+        # URL-navigating dropdown: onchange jumps to a sibling HTML file
+        # for the selected moveset. Uses a distinct id ('moveset-nav-sel')
+        # so the engine's updateView() — which looks up 'moveset-sel' and
+        # parseInt()'s its value — stays quiet and leaves state.movesetIdx
+        # at its default (0, the current-file moveset). The CSV paste-box
+        # state lives in this page's DOM and is lost on navigation; we
+        # flag that inline next to the selector rather than trying to
+        # persist it across files.
+        cur = split_info['current']
+        html += '  <label>Moveset: <select id="moveset-nav-sel" onchange="if(this.value)window.location.href=this.value">\n'
+        for fi, finfo in enumerate(split_info['files']):
+            sel = ' selected' if fi == cur else ''
+            html += (f'    <option value="{finfo["url"]}"{sel}>'
+                     f'{finfo["pretty_label"]}</option>\n')
+        html += '  </select></label>\n'
+        html += ('  <span style="font-size:11px;color:#888">'
+                 'Switching movesets reloads the page; pasted CSV will need to be re-loaded.'
+                 '</span>\n')
+    elif len(moveset_data) > 1:
         html += '  <label>Moveset: <select id="moveset-sel" onchange="updateView()">\n'
         for mi, md in enumerate(moveset_data):
             ref_tag = ' (reference)' if mi == reference_idx else ''
@@ -6274,6 +6372,18 @@ def main():
                              '(default 20).')
     parser.add_argument('--no-cache', action='store_true',
                         help='Disable disk cache for slayer iteration')
+    parser.add_argument('--split-movesets', action='store_true',
+                        help='Emit one HTML file per moveset instead of one '
+                             'big multi-moveset file. The moveset dropdown '
+                             'navigates between files via window.location '
+                             'rather than swapping data in-page. Reference '
+                             'moveset becomes the landing page ({base}.html); '
+                             'other movesets get {base}_m{idx}_{slug}.html. '
+                             'Per-file size drops ~4x on multi-moveset dives. '
+                             'Non-reference files still embed the reference '
+                             'moveset scores so the "vs Ref" hover diff keeps '
+                             'working. Ignored for single-moveset dives. '
+                             'Interactive mode only.')
     parser.add_argument('--bait', default='on', choices=['on', 'off', 'both'],
                         help="Focal-side bait-shields policy: "
                              "'on' (default) uses PvPoke simulate-mode DP "
@@ -7053,19 +7163,51 @@ def main():
                     'meta': meta,
                 })
 
-            generate_interactive_html(
-                args.species, args.league, moveset_data, args.html,
-                thresholds=thresholds, opponent_label=opponent_label,
-                shield_scenarios=shield_scenarios,
-                opponent_names=opponents,
-                opp_iv_modes=opp_iv_modes_to_run,
-                reference_idx=reference_idx,
-                standalone=args.standalone,
-                slayer_iter_result=main_slayer_iter_result,
-                cli_args_str=cli_args_str,
-                has_toml_tiers=_toml_tiers_loaded,
-                shadow=args.shadow,
-            )
+            if args.split_movesets and len(moveset_data) > 1:
+                # Per-moveset split: emit N files, one per moveset. The
+                # filesystem plan is computed up-front so every file
+                # knows every sibling's URL for its navigation dropdown.
+                split_files = _build_split_file_list(
+                    moveset_data, reference_idx, args.html,
+                )
+                print(f"  Split mode: emitting {len(split_files)} per-moveset HTML files")
+                for finfo in split_files:
+                    mi = finfo['moveset_idx']
+                    filtered_md, filtered_ref_idx = _filter_moveset_data_for_split(
+                        moveset_data, mi, reference_idx,
+                    )
+                    split_info = {'files': split_files, 'current': mi}
+                    generate_interactive_html(
+                        args.species, args.league, filtered_md, finfo['path'],
+                        thresholds=thresholds, opponent_label=opponent_label,
+                        shield_scenarios=shield_scenarios,
+                        opponent_names=opponents,
+                        opp_iv_modes=opp_iv_modes_to_run,
+                        reference_idx=filtered_ref_idx,
+                        standalone=args.standalone,
+                        slayer_iter_result=main_slayer_iter_result,
+                        cli_args_str=cli_args_str,
+                        has_toml_tiers=_toml_tiers_loaded,
+                        shadow=args.shadow,
+                        split_info=split_info,
+                    )
+            else:
+                if args.split_movesets:
+                    print("  --split-movesets: only one moveset surviving — "
+                          "writing a single file")
+                generate_interactive_html(
+                    args.species, args.league, moveset_data, args.html,
+                    thresholds=thresholds, opponent_label=opponent_label,
+                    shield_scenarios=shield_scenarios,
+                    opponent_names=opponents,
+                    opp_iv_modes=opp_iv_modes_to_run,
+                    reference_idx=reference_idx,
+                    standalone=args.standalone,
+                    slayer_iter_result=main_slayer_iter_result,
+                    cli_args_str=cli_args_str,
+                    has_toml_tiers=_toml_tiers_loaded,
+                    shadow=args.shadow,
+                )
         else:
             # Static mode (original behavior)
             generate_html(args.species, args.league, all_moveset_results, args.html,
