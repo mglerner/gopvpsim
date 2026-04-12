@@ -7,6 +7,8 @@ groups (Atk Slayer, CMP Slayer, Bulk Slayer) based on their stat profiles
 and anchor pass/fail patterns.
 """
 import multiprocessing
+import os
+import sys
 
 from gopvpsim.pokemon import (
     Pokemon, get_species, best_level, CPM,
