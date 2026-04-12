@@ -59,7 +59,12 @@ def _build_evolution_lines() -> dict:
         roots = [m for m in members if not m.get('parent')]
         lines: list = []
 
+        visited: set = set()
+
         def traverse(sid: str, path: list) -> None:
+            if sid in visited:
+                return
+            visited.add(sid)
             node = id_map.get(sid)
             if not node:
                 return
