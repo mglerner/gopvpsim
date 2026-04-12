@@ -15,7 +15,7 @@ from gopvpsim.pokemon import (
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL,
 )
 from gopvpsim.moves import get_moves, type_effectiveness
-from gopvpsim.data import load_rankings, get_default_moveset, parse_types
+from gopvpsim.data import load_gamemaster, load_rankings, get_default_moveset, parse_types
 from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp, pvpoke_simulate_shield
 from gopvpsim.anchors import resolve_anchors, tag_iv, ResolvedAnchor
 
