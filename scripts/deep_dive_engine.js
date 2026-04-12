@@ -1205,6 +1205,13 @@ function buildTraces() {
     for (var k = 0; k < ivList.length; k++) {
       var iv = ivList[k];
       if (typeof iv !== 'number' || iv < 0 || iv >= nIvs) continue;
+      // "Show only my mons" filter: slayer/anchor overlay traces
+      // must obey the same filter as the base Other/tier traces.
+      // Without this, the wins-vs-rank1 y-axis mode (where most
+      // visible points are slayer/anchor rather than Other) makes
+      // the filter look broken — it was filtering the base trace
+      // correctly, just not the overlays.
+      if (!isOwnedFilter(iv)) continue;
       var sp = DATA.spRanks[iv];
       var av = yValues[iv];
       if (typeof sp !== 'number' || typeof av !== 'number') continue;
