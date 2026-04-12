@@ -3590,7 +3590,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # (always uses moveset_idx=0), so the caller can pass a shared dict
     # via _precomputed_analysis. On the first call (dict is empty), we
     # compute and populate it; subsequent calls read from the cache.
-    if _precomputed_analysis is not None and _precomputed_analysis:
+    if _precomputed_analysis is not None and 'css' in _precomputed_analysis:
         analysis_css = _precomputed_analysis['css']
         results_html = _precomputed_analysis['results_html']
         analysis_html = _precomputed_analysis['analysis_html']
