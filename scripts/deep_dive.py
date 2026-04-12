@@ -73,6 +73,7 @@ from gopvpsim.anchors import (
     resolve_anchors, tag_iv, ResolvedAnchor, build_auto_anchors,
     derive_short_name,
 )
+sys.path.insert(0, os.path.dirname(__file__))
 import deep_dive_analysis as analysis
 
 # ---------------------------------------------------------------------------
