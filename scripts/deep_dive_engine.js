@@ -1592,6 +1592,10 @@ function reattachLegendHandlers() {
 }
 
 // ---- Init ----
+// Expose updateView globally so inline onchange="updateView()" handlers
+// work even when the engine runs inside an async IIFE (for gzip score
+// decompression).
+window.updateView = updateView;
 updateView();
 // Hook up the collection panel handlers now that updateView has run
 // once (nIvs, DATA, etc. are all in scope). Safe even if DATA.collection
