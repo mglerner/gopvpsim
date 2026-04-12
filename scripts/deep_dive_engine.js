@@ -790,9 +790,14 @@ function renderMatchesList() {
       var cls = '';
       if (rc.mon.is_shadow) cls += ' shadow';
       if (rc.mon.lucky) cls += ' lucky';
-      if (k >= MAX_VISIBLE) cls += ' matches-hidden-row';
+      // Inline display:none for rows past MAX_VISIBLE. Was previously
+      // done via a .matches-hidden-row CSS class, but that CSS lives
+      // in the Python HTML generator — existing dives patched via
+      // patch_dive_engine.py didn't get the CSS update, so the class
+      // toggled with no visual effect. Inline style is self-contained.
       var attr = ' data-section="' + sid + '"';
       if (cls) attr += ' class="' + cls.trim() + '"';
+      if (k >= MAX_VISIBLE) attr += ' style="display:none"';
       h += '<tr' + attr + '>';
       var brTxt = (rc._battleRank != null) ? ('#' + rc._battleRank) : '-';
       var spTxt = (rc._spRank != null)     ? ('#' + rc._spRank)     : '-';
@@ -883,21 +888,18 @@ function renderMatchesList() {
 }
 
 // Show/hide toggle handler for the collapsible matches-list sections.
-// Flips the matches-hidden-row class off for rows in `sid` and swaps
-// the button text. Global so onclick can reach it.
+// Uses inline display style on rows (skipping the first 5, which
+// always stay visible). Global so the button's onclick handler can
+// reach it from the renderMatchesList output.
 function toggleMatchesSection(sid, btn) {
   var rows = document.querySelectorAll('tr[data-section="' + sid + '"]');
   if (rows.length === 0) return;
-  var isHidden = btn.textContent.indexOf('Show') === 0;
-  for (var i = 0; i < rows.length; i++) {
-    if (isHidden) {
-      rows[i].classList.remove('matches-hidden-row');
-    } else if (i >= 5) {
-      rows[i].classList.add('matches-hidden-row');
-    }
+  var isExpanding = btn.textContent.indexOf('Show') === 0;
+  for (var i = 5; i < rows.length; i++) {
+    rows[i].style.display = isExpanding ? '' : 'none';
   }
   var count = btn.getAttribute('data-hidden-count');
-  btn.textContent = isHidden ? ('Hide ' + count + ' \u2191') : ('Show ' + count + ' more \u2193');
+  btn.textContent = isExpanding ? ('Hide ' + count + ' \u2191') : ('Show ' + count + ' more \u2193');
 }
 
 // Minimal HTML escape for values that go into innerHTML (species names,
