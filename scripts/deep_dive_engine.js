@@ -505,7 +505,7 @@ function loadCollection(csvText) {
 
   var ivIdxMap = getCanonicalIvIdx();
   var records = [];
-  var ownedCount = 0, qualifyingCount = 0, offGridCount = 0;
+  var ownedCount = 0, qualifyingCount = 0, offGridCount = 0, overCapCount = 0;
 
   for (var mi = 0; mi < mons.length; mi++) {
     var mon = mons[mi];
@@ -552,6 +552,24 @@ function loadCollection(csvText) {
     if (canonicalIdx == null) canonicalIdx = -1;
     if (canonicalIdx < 0) offGridCount++;
     ownedCount++;
+
+    // Over-cap detection: if the mon's CURRENT level (from the CSV)
+    // is higher than the best fitted level we just computed, it means
+    // evolving this mon at its current level would produce a final
+    // form whose CP exceeds the league cap. Since Pokemon GO has no
+    // way to reduce a mon's level, that makes it INELIGIBLE for this
+    // league entirely — the stats we computed above are for a
+    // hypothetical lower level the mon can't actually reach.
+    //
+    // We flag these with isOverCap=true so the UI can mark them
+    // clearly (the power-up column shows "OVER" instead of the
+    // misleading "✓"). They still show up in tier matches because
+    // the cross-league comparison is sometimes useful ("this spread
+    // would clear GH Great if it fit, but it doesn't — consider UL
+    // instead").
+    var isOverCap = (mon.level != null && stats.level != null &&
+                     mon.level > stats.level);
+    if (isOverCap) overCapCount++;
     if (matched.length > 0) qualifyingCount++;
 
     // Slayer membership: check if this canonical IV is in the
@@ -566,6 +584,7 @@ function loadCollection(csvText) {
       mon:             mon,
       csvSpecies:      csvSpecies,
       slayerCats:      slayerCats,
+      isOverCap:       isOverCap,
       stats:           stats,
       matched:         matched,
       canonicalIvIdx:  canonicalIdx,
@@ -591,8 +610,9 @@ function loadCollection(csvText) {
   // Status line + tier-card counts.
   var parts = [mons.length + ' rows parsed'];
   parts.push(ownedCount + ' match this dive');
-  parts.push(qualifyingCount + ' qualify for \u2265 1 tier');
+  parts.push(qualifyingCount + ' qualify for >= 1 tier');
   if (slayerCount > 0) parts.push(slayerCount + ' slayer');
+  if (overCapCount > 0) parts.push(overCapCount + ' already over cap');
   if (offGridCount > 0) parts.push(offGridCount + ' off-grid (not in simulated set)');
   setCollectionStatus(parts.join(' \u00b7 '), '#9be89b');
   updateTierCardCounts(tierCounts);
@@ -749,7 +769,10 @@ function renderMatchesList() {
     else rec2._rank = 99999;
   }
 
-  function powerUpText(curLv, maxLv) {
+  function powerUpText(rc) {
+    if (rc.isOverCap) return '<span style="color:#e94560">OVER</span>';
+    var curLv = rc.mon.level;
+    var maxLv = rc.stats ? rc.stats.level : null;
     if (curLv == null || maxLv == null) return '?';
     var d = maxLv - curLv;
     if (d <= 0) return '\u2713';
@@ -808,9 +831,7 @@ function renderMatchesList() {
       h += '<td>' + escapeHtml(rc.csvSpecies || '') +
            (rc.mon.lucky ? ' \u2728' : '') +
            (rc.mon.is_shadow ? ' \u263d' : '') + '</td>';
-      var curLv = rc.mon.level;
-      var maxLv = rc.stats ? rc.stats.level : null;
-      h += '<td>' + powerUpText(curLv, maxLv) + '</td>';
+      h += '<td>' + powerUpText(rc) + '</td>';
       h += '<td>' + (rc.stats ? rc.stats.cp : '?') + '</td>';
       if (extras) {
         for (var xc = 0; xc < extras.length; xc++) {
