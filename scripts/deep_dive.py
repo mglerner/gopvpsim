@@ -1458,10 +1458,6 @@ _aggregate_flips_by_anchor = analysis.aggregate_flips_by_anchor
 _find_matchup_boundaries = analysis.find_matchup_boundaries
 _auto_derive_tiers = analysis.auto_derive_tiers
 
-# Aliases still referenced by tests (deep_dive._render_* etc.)
-_render_threshold_tier_cards = rendering.render_threshold_tier_cards
-_render_notable_ivs_section = rendering.render_notable_ivs_section
-_render_anchor_flip_bullets = rendering.render_anchor_flip_bullets
 
 
 def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,

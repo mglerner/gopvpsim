@@ -256,7 +256,7 @@ def test_render_notable_ivs_emits_composite_card():
     data_obj = _make_render_data_obj()
     slayer = _make_slayer_categories(data_obj)
     cats = deep_dive.build_iv_categories(data_obj, slayer)
-    html = deep_dive._render_notable_ivs_section(cats, data_obj, 'pvpoke')
+    html = deep_dive.rendering.render_notable_ivs_section(cats, data_obj, 'pvpoke')
 
     assert html  # non-empty
     # Composite card title is present
@@ -275,7 +275,7 @@ def test_render_notable_ivs_returns_empty_when_no_targets():
     """No composites and no matchups → empty section."""
     data_obj = _make_render_data_obj()
     cats = deep_dive.build_iv_categories(data_obj)  # tier-only
-    html = deep_dive._render_notable_ivs_section(cats, data_obj, 'pvpoke')
+    html = deep_dive.rendering.render_notable_ivs_section(cats, data_obj, 'pvpoke')
     assert html == ''
 
 
@@ -297,7 +297,7 @@ def test_render_notable_ivs_includes_matchup_card():
     cats = deep_dive.build_iv_categories(
         data_obj, matchup_data=matchup_data
     )
-    html = deep_dive._render_notable_ivs_section(cats, data_obj, 'rank1')
+    html = deep_dive.rendering.render_notable_ivs_section(cats, data_obj, 'rank1')
     assert 'Beats rank 1 Lickitung in the 2v2' in html
     assert 'bait dim. not yet swept' in html
     assert '15/5/10' in html  # IV 1's triple
@@ -335,7 +335,7 @@ def test_render_notable_ivs_card_expand_button():
         data_obj, matchup_data=matchup_data
     )
     # 7 winners (IVs 1-7), max_members_shown defaults to 5 → 2 hidden
-    html = deep_dive._render_notable_ivs_section(cats, data_obj, 'pvpoke')
+    html = deep_dive.rendering.render_notable_ivs_section(cats, data_obj, 'pvpoke')
 
     # Every winning IV's triple is in the HTML, even ones beyond
     # max_members_shown.
