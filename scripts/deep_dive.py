@@ -1415,20 +1415,7 @@ Atk &times; Def &times; HP.
 
 _hover_text = rendering.hover_text
 _threshold_desc = rendering.threshold_desc
-_iv_label = rendering.iv_label
-_tier_badge_html = rendering.tier_badge_html
-_prose_flip_summary = rendering.prose_flip_summary
-_format_stat_cutoffs = rendering.format_stat_cutoffs
-_composite_tradeoff_prose = rendering.composite_tradeoff_prose
-_matchup_subtitle = rendering.matchup_subtitle
-_opp_importance = rendering.opp_importance
-_render_matchup_boundary_bullets = rendering.render_matchup_boundary_bullets
-_anchor_group_id = rendering.anchor_group_id
-_render_anchor_flip_bullets = rendering.render_anchor_flip_bullets
-_render_notable_ivs_section = rendering.render_notable_ivs_section
 _scenario_ranks = rendering.scenario_ranks
-_detect_banding = rendering.detect_banding
-_detect_clusters = rendering.detect_clusters
 
 
 # ---------------------------------------------------------------------------
@@ -1463,8 +1450,6 @@ def resolve_reference_moveset(species, league, shadow, ref_arg):
 
 # Aliases for extracted analysis functions (deep_dive_analysis.py)
 _find_flips = analysis.find_flips
-_pvp_damage = analysis.pvp_damage
-_narrate_flip = analysis.narrate_flip
 _build_move_tuples = analysis.build_move_tuples
 _pretty_name = analysis.pretty_name
 _pretty_moveset = analysis.pretty_moveset
@@ -1472,13 +1457,11 @@ _stat_cutoffs_from_anchors = analysis.stat_cutoffs_from_anchors
 _aggregate_flips_by_anchor = analysis.aggregate_flips_by_anchor
 _find_matchup_boundaries = analysis.find_matchup_boundaries
 _auto_derive_tiers = analysis.auto_derive_tiers
-_probe_tier_cutoff_flips = analysis.probe_tier_cutoff_flips
-TIER_COLORS_AUTO = analysis.TIER_COLORS_AUTO
 
-# Aliases for extracted rendering functions (deep_dive_rendering.py)
-_pearson_r = rendering.pearson_r
+# Aliases still referenced by tests (deep_dive._render_* etc.)
 _render_threshold_tier_cards = rendering.render_threshold_tier_cards
-_generate_threshold_descriptions = rendering.generate_threshold_descriptions
+_render_notable_ivs_section = rendering.render_notable_ivs_section
+_render_anchor_flip_bullets = rendering.render_anchor_flip_bullets
 
 
 def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
