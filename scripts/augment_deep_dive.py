@@ -765,15 +765,10 @@ def main():
     if plot_marker in html_out:
         # Add a toggle button + the analysis sections
         toggle_html = """
-<div style="margin: 10px 0;">
-  <button onclick="var s=document.getElementById('dd-analysis');s.style.display=s.style.display==='none'?'block':'none';this.textContent=s.style.display==='none'?'Show Analysis':'Hide Analysis'"
-          style="background:#e94560;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:14px">
-    Show Analysis
-  </button>
-</div>
-<div id="dd-analysis" style="display:none">
+<details class="dd-collapsible" id="dd-analysis">
+<summary class="dd-h3" style="cursor:pointer">Deep Dive Analysis</summary>
 """
-        analysis_block = toggle_html + analysis_html + '</div>\n'
+        analysis_block = toggle_html + analysis_html + '</details>\n'
         html_out = html_out.replace(plot_marker, analysis_block + plot_marker, 1)
     else:
         print("  Warning: could not find injection point, appending before </body>")

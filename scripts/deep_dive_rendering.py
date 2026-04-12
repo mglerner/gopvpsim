@@ -176,6 +176,12 @@ DEEP_DIVE_CSS = """
   padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
   margin-top:6px; }
 .dd-iv-toggle:hover { background:#1a3a6e; color:#fff; }
+.dd-collapsible { margin: 4px 0; }
+.dd-collapsible > summary { list-style: none; }
+.dd-collapsible > summary::-webkit-details-marker { display: none; }
+.dd-collapsible > summary::before { content: "\\25b6"; display: inline-block;
+  margin-right: 6px; font-size: 0.7em; transition: transform 0.15s; color: #58a6ff; }
+.dd-collapsible[open] > summary::before { transform: rotate(90deg); }
 """
 
 def parse_mode(composite_mode):
@@ -655,7 +661,8 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None):
 def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
                                   notable_max_pct=0.05,
                                   notable_max_count=5,
-                                  max_members_shown=5):
+                                  max_members_shown=5,
+                                  recommendations_html=''):
     """Render the "Notable IVs" HTML section from a list of IVCategory.
 
     Surfaces composite (slayer ∩ tier) and matchup categories — the
@@ -698,8 +705,18 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
     kind_order = {'composite': 0, 'matchup': 1}
     target.sort(key=lambda c: (kind_order.get(c.kind, 99), len(c.members), c.name))
 
+    n_notable = sum(1 for c in target
+                    if len(c.members) <= notable_max_count
+                    or len(c.members) <= notable_max_pct * n_ivs)
+
     parts = []
-    parts.append('<h3 class="dd-h3" id="dd-notable-ivs">Notable IVs</h3>\n')
+    parts.append(
+        f'<details class="dd-collapsible" id="dd-notable-ivs">'
+        f'<summary class="dd-h3" style="cursor:pointer">'
+        f'Notable IVs &amp; Recommendations '
+        f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+        f'({n_notable} notable of {len(target)} categories)</span>'
+        f'</summary>\n')
     parts.append(
         '<p class="dd-small">Cross-category IVs and notable matchup '
         'wins. Composite cards (slayer&nbsp;∩&nbsp;tier) surface IVs '
@@ -839,6 +856,14 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
 
     parts.append('</div>\n')  # rec-grid
     parts.append('</div>\n')  # dd-notable-ivs-section
+
+    # Recommendations sub-section is injected by the caller via
+    # the recommendations_html parameter (rendered separately because
+    # the data it needs lives in render_results_section's scope).
+    if recommendations_html:
+        parts.append(recommendations_html)
+
+    parts.append('</details>\n')  # dd-collapsible
     return ''.join(parts)
 
 
@@ -1417,7 +1442,6 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
         return ''
     parts = []
 
-    parts.append('<h3 class="dd-h3">Mirror Slayer Iteration</h3>\n')
     metric_label = slayer_iter_result.get('metric', 'all')
     max_rounds_arg = slayer_iter_result.get('max_rounds_arg', 4)
     metric_explain = {
@@ -1429,9 +1453,13 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
     converged = slayer_iter_result.get('converged', False)
     final_pool = len(slayer_iter_result.get('final', []))
     parts.append(
-        f'<p class="dd-small">{final_pool} survivors after '
-        f'{rounds_run} round{"s" if rounds_run != 1 else ""} '
-        f'({"converged" if converged else "max rounds reached"}).</p>\n'
+        f'<details class="dd-collapsible">'
+        f'<summary class="dd-h3" style="cursor:pointer">'
+        f'Mirror Slayer Iteration '
+        f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+        f'({final_pool} survivors, {rounds_run} round{"s" if rounds_run != 1 else ""}, '
+        f'{"converged" if converged else "max rounds reached"})</span>'
+        f'</summary>\n'
     )
 
     # Iteration details -- collapsed by default
@@ -2006,6 +2034,7 @@ function ddToggleTagsCompactCell(event) {
                 parts.append('</table>\n')
                 parts.append('</details>\n')
 
+    parts.append('</details>\n')  # dd-collapsible
     return ''.join(parts)
 
 
@@ -2299,6 +2328,60 @@ def render_analysis_methods_html(nIvs, nS, nO, data_obj, moveset_label,
 """
 
 
+def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
+                               ref_iv, ref_atk, ref_def, opp_info_cache,
+                               focal_moves, focal_types):
+    """Render the top-3 IV recommendation cards as an HTML fragment.
+
+    Returned HTML is injected into the Notable IVs & Recommendations
+    section by ``render_results_section``.
+    """
+    if not rec_candidates:
+        return ''
+    parts = []
+    parts.append('<h4 class="dd-h3" style="margin-top:18px">Recommended IVs</h4>\n')
+    parts.append(
+        f'<p class="dd-small">Top candidates by average score, matchup flips, '
+        f'and rank stability vs {opp_label} opponents.</p>\n')
+    parts.append('<div class="dd-rec-grid">\n')
+    for rc in rec_candidates[:3]:
+        iv = rc['iv']
+        nc = 'dd-gain' if rc['net'] > 0 else ('dd-loss' if rc['net'] < 0 else '')
+        fd = flips.get(iv, {'gains': [], 'losses': []})
+        prose = prose_flip_summary(fd, max_gains=2, max_losses=1)
+        parts.append('<div class="dd-rec-card">\n')
+        parts.append(f'<h4>{rc["style"]}: {iv_label(data_obj, iv)}{tier_badge_html(data_obj, iv)}</h4>\n')
+        parts.append(f'<p>Atk={data_obj["ivAtk"][iv]:.2f}, Def={data_obj["ivDef"][iv]:.2f}, HP={data_obj["ivHp"][iv]}, SP #{data_obj["spRanks"][iv]}</p>\n')
+        parts.append(f'<p>Avg score rank: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f})</p>\n')
+        parts.append(f'<p>Flips vs {opp_label} ref: <span class="dd-gain">+{rc["gains"]}</span>/<span class="dd-loss">-{rc["losses"]}</span> = <span class="{nc}"><b>{rc["net"]:+d}</b></span></p>\n')
+        parts.append(f'<p class="dd-prose">{prose}</p>\n')
+        focal_atk_rc = data_obj['ivAtk'][iv]
+        focal_def_rc = data_obj['ivDef'][iv]
+        focal_hp_rc = data_obj['ivHp'][iv]
+        ref_hp_val = data_obj['ivHp'][ref_iv]
+        bp_lines = []
+        for is_gain, entries in [(True, fd.get('gains', [])[:2]), (False, fd.get('losses', [])[:1])]:
+            for e in entries:
+                opp_name = e['opponent']
+                if opp_name in opp_info_cache and focal_moves:
+                    oi = opp_info_cache[opp_name]
+                    narr = analysis.narrate_flip(
+                        focal_atk_rc, focal_def_rc, focal_hp_rc,
+                        ref_atk, ref_def, ref_hp_val,
+                        oi['atk'], oi['def_'], opp_name,
+                        focal_moves, oi['moves'],
+                        focal_types, oi['types'],
+                        is_gain=is_gain,
+                    )
+                    if narr:
+                        bp_lines.append(narr)
+        if bp_lines:
+            parts.append(f'<p class="dd-small"><b style="color:#58a6ff">Key changes</b><br>{"<br>".join(bp_lines)}</p>\n')
+        parts.append('</div>\n')
+    parts.append('</div>\n')
+    return ''.join(parts)
+
+
 # ---------------------------------------------------------------------------
 # Results section renderer
 # ---------------------------------------------------------------------------
@@ -2339,7 +2422,12 @@ def render_results_section(data_obj, moveset_label, opp_label,
         if tier_cards_html:
             parts.append(tier_cards_html)
 
-    # -- Notable IVs --
+    # -- IV Recommendations (rendered first, injected into Notable IVs) --
+    rec_html = _render_iv_recommendations(
+        rec_candidates, flips, opp_label, data_obj, ref_iv, ref_atk,
+        ref_def, opp_info_cache, focal_moves, focal_types)
+
+    # -- Notable IVs & Recommendations --
     from deep_dive import build_iv_categories
     slayer_categories_for_ivcat = None
     if slayer_iter_result:
@@ -2358,7 +2446,8 @@ def render_results_section(data_obj, moveset_label, opp_label,
         matchup_data=matchup_data_for_ivcat,
     )
     notable_html = render_notable_ivs_section(
-        iv_categories_all, data_obj, opp_iv_mode
+        iv_categories_all, data_obj, opp_iv_mode,
+        recommendations_html=rec_html,
     )
     if notable_html:
         parts.append(notable_html)
@@ -2370,59 +2459,9 @@ def render_results_section(data_obj, moveset_label, opp_label,
     if slayer_html:
         parts.append(slayer_html)
 
-    # -- IV Recommendations (top-3 by composite score) --
-    parts.append('<h3 class="dd-h3">IV Recommendations</h3>\n')
-    parts.append(
-        f'<p class="dd-small">Top candidates by average score, matchup flips, '
-        f'and rank stability vs {opp_label} opponents.</p>\n')
-    parts.append('<div class="dd-rec-grid">\n')
-    for i, rc in enumerate(rec_candidates[:3]):
-        iv = rc['iv']
-        nc = 'dd-gain' if rc['net'] > 0 else ('dd-loss' if rc['net'] < 0 else '')
-        fd = flips.get(iv, {'gains': [], 'losses': []})
-        prose = prose_flip_summary(fd, max_gains=2, max_losses=1)
-        parts.append('<div class="dd-rec-card">\n')
-        parts.append(f'<h4>{rc["style"]}: {iv_label(data_obj, iv)}{tier_badge_html(data_obj, iv)}</h4>\n')
-        parts.append(f'<p>Atk={data_obj["ivAtk"][iv]:.2f}, Def={data_obj["ivDef"][iv]:.2f}, HP={data_obj["ivHp"][iv]}, SP #{data_obj["spRanks"][iv]}</p>\n')
-        parts.append(f'<p>Avg score rank: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f})</p>\n')
-        parts.append(f'<p>Flips vs {opp_label} ref: <span class="dd-gain">+{rc["gains"]}</span>/<span class="dd-loss">-{rc["losses"]}</span> = <span class="{nc}"><b>{rc["net"]:+d}</b></span></p>\n')
-        parts.append(f'<p class="dd-prose">{prose}</p>\n')
-        focal_atk_rc = data_obj['ivAtk'][iv]
-        focal_def_rc = data_obj['ivDef'][iv]
-        focal_hp_rc = data_obj['ivHp'][iv]
-        ref_hp_val = data_obj['ivHp'][ref_iv]
-        bp_lines = []
-        for is_gain, entries in [(True, fd.get('gains', [])[:2]), (False, fd.get('losses', [])[:1])]:
-            for e in entries:
-                opp_name = e['opponent']
-                if opp_name in opp_info_cache and focal_moves:
-                    oi = opp_info_cache[opp_name]
-                    narr = analysis.narrate_flip(
-                        focal_atk_rc, focal_def_rc, focal_hp_rc,
-                        ref_atk, ref_def, ref_hp_val,
-                        oi['atk'], oi['def_'], opp_name,
-                        focal_moves, oi['moves'],
-                        focal_types, oi['types'],
-                        is_gain=is_gain,
-                    )
-                    if narr:
-                        bp_lines.append(narr)
-        if bp_lines:
-            parts.append(f'<p class="dd-small"><b style="color:#58a6ff">Key changes</b><br>{"<br>".join(bp_lines)}</p>\n')
-        parts.append('</div>\n')
-    parts.append('</div>\n')
-
-    # -- Key Matchup Thresholds --
+    # -- Stat Thresholds & Matchup Flips (merged section) --
     threshold_descs = generate_threshold_descriptions(flips, data_obj, avg_scores, ranked, opp_iv_mode)
-    if threshold_descs:
-        parts.append('<h3 class="dd-h3">Key Matchup Thresholds</h3>\n')
-        parts.append(f'<p>Matchups that flip vs {opp_label} opponents, '
-                     f'ordered by how many top IVs benefit:</p>\n')
-        parts.append('<ul class="dd-threshold-list">\n')
-        parts.append('\n'.join(threshold_descs))
-        parts.append('\n</ul>\n')
-
-    # -- Matchup-Flipping Boundaries (flat list) --
+    mb_bullets = []
     if all_matchup_boundaries:
         _sorted_mbs = sorted(
             all_matchup_boundaries,
@@ -2430,9 +2469,49 @@ def render_results_section(data_obj, moveset_label, opp_label,
                            m['threshold'], m['opponent']),
         )
         mb_bullets = render_matchup_boundary_bullets(_sorted_mbs)
+    anchor_bullets = []
+    if anchor_flip_records:
+        anchor_bullets = render_anchor_flip_bullets(
+            anchor_flip_records, anchor_passing_sink=anchor_passing_sink)
+
+    has_any_threshold = threshold_descs or mb_bullets or anchor_bullets
+    if has_any_threshold:
+        # Summary counts for the collapsed header
+        summary_parts = []
+        if threshold_descs:
+            summary_parts.append(f'{len(threshold_descs)} key flips')
+        if mb_bullets:
+            summary_parts.append(f'{len(mb_bullets)} boundaries')
+        if anchor_bullets:
+            summary_parts.append(f'{len(anchor_bullets)} anchors')
+        summary_text = ', '.join(summary_parts)
+
+        parts.append(
+            f'<details class="dd-collapsible">'
+            f'<summary class="dd-h3" style="cursor:pointer">'
+            f'Stat Thresholds &amp; Matchup Flips '
+            f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+            f'({summary_text})</span>'
+            f'</summary>\n')
+
+        # Key Matchup Thresholds — the high-level overview, always visible on expand
+        if threshold_descs:
+            parts.append('<h4 class="dd-h3">Key Matchup Thresholds</h4>\n')
+            parts.append(f'<p>Matchups that flip vs {opp_label} opponents, '
+                         f'ordered by how many top IVs benefit:</p>\n')
+            parts.append('<ul class="dd-threshold-list">\n')
+            parts.append('\n'.join(threshold_descs))
+            parts.append('\n</ul>\n')
+
+        # Matchup-Flipping Boundaries — nested collapsible
         if mb_bullets:
             parts.append(
-                '<h3 class="dd-h3">Matchup-Flipping Boundaries</h3>\n')
+                f'<details class="dd-collapsible">'
+                f'<summary class="dd-h3" style="cursor:pointer">'
+                f'Matchup-Flipping Boundaries '
+                f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+                f'({len(mb_bullets)} boundaries)</span>'
+                f'</summary>\n')
             parts.append(
                 '<p>The minimum def or atk (+ HP) at which a matchup outcome '
                 'actually changes from loss to win. These are higher than '
@@ -2443,15 +2522,19 @@ def render_results_section(data_obj, moveset_label, opp_label,
             parts.append('<ul class="dd-threshold-list">\n')
             parts.append('\n'.join(mb_bullets))
             parts.append('\n</ul>\n')
+            parts.append('</details>\n')
 
-    # -- Anchor-Driven Matchup Flips (flat list of every anchor) --
-    if anchor_flip_records:
-        anchor_bullets = render_anchor_flip_bullets(
-            anchor_flip_records, anchor_passing_sink=anchor_passing_sink)
+        # Anchor-Driven Matchup Flips — nested collapsible
         if anchor_bullets:
-            parts.append('<h3 class="dd-h3">Anchor-Driven Matchup Flips</h3>\n')
             parts.append(
-                '<p>Damage-tier boundaries from named anchors — the def/atk '
+                f'<details class="dd-collapsible">'
+                f'<summary class="dd-h3" style="cursor:pointer">'
+                f'Anchor-Driven Matchup Flips '
+                f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+                f'({len(anchor_bullets)} anchors)</span>'
+                f'</summary>\n')
+            parts.append(
+                '<p>Damage-tier boundaries from named anchors - the def/atk '
                 'at which a specific move\'s damage steps up or down by 1. '
                 'These are necessary but not always sufficient to flip a '
                 'matchup (see Matchup-Flipping Boundaries above for the '
@@ -2460,6 +2543,9 @@ def render_results_section(data_obj, moveset_label, opp_label,
             parts.append('<ul class="dd-threshold-list">\n')
             parts.append('\n'.join(anchor_bullets))
             parts.append('\n</ul>\n')
+            parts.append('</details>\n')
+
+        parts.append('</details>\n')  # outer collapsible
 
     parts.append('</div>\n')
 

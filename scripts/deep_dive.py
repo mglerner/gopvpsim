@@ -1716,15 +1716,10 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # ======== ANALYSIS section (behind toggle) ========
     analysis_parts = []
 
-    # -- Toggle button --
+    # -- Collapsible analysis section --
     analysis_parts.append("""
-<div style="margin: 10px 0;">
-  <button onclick="var s=document.getElementById('dd-analysis');s.style.display=s.style.display==='none'?'block':'none';this.textContent=s.style.display==='none'?'Show Deep Dive Analysis':'Hide Deep Dive Analysis'"
-          style="background:#e94560;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:14px">
-    Show Deep Dive Analysis
-  </button>
-</div>
-<div id="dd-analysis" style="display:none">
+<details class="dd-collapsible" id="dd-analysis">
+<summary class="dd-h3" style="cursor:pointer">Deep Dive Analysis</summary>
 """)
 
     # -- Alpha features (banding + clusters) -- hidden by default --
@@ -1755,8 +1750,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         nIvs, nS, nO, data_obj, moveset_label, opp_iv_mode, ref_iv,
         opp_label))
 
-    # Close the analysis toggle div
-    analysis_parts.append('</div>\n')
+    # Close the analysis details element
+    analysis_parts.append('</details>\n')
 
     return css, results_html, ''.join(analysis_parts)
 
@@ -2622,6 +2617,30 @@ var _scoresReady = (async function() {
                                    league, shield_scenarios)
     html += '\n})();\n'
     html += '</script>\n'
+
+    # About / Credits section
+    html += '<details class="meta" style="margin-top:30px;border-top:1px solid #0f3460;padding-top:10px">'
+    html += '<summary>About &amp; Credits</summary>'
+    html += '<div style="margin:8px 0;font-size:0.85rem;color:#b0b8c4;line-height:1.6">'
+    html += '<p><b>PoGo PvP IV Deep Dive</b> - a stat-threshold analysis tool '
+    html += 'for Pokemon GO PvP IVs.</p>'
+    html += '<p><b>Data &amp; Simulation Reference</b></p>'
+    html += '<ul style="margin:4px 0 8px 20px">'
+    html += '<li><b>PvPoke</b> (pvpoke.com) - species data (gamemaster.json), '
+    html += 'meta rankings, and battle simulation reference. '
+    html += 'PvPoke is open-source: github.com/pvpoke/pvpoke.</li>'
+    html += '<li><b>RyanSwag</b> - mirror slayer IV framework '
+    html += '(Pure Slayer / Bulky Slayer / CMP Slayer categories).</li>'
+    html += '</ul>'
+    html += '<p><b>Methodology</b></p>'
+    html += '<ul style="margin:4px 0 8px 20px">'
+    html += '<li>Damage formula: floor(0.5 x 1.3 x Power x Atk/Def x Effectiveness x STAB) + 1</li>'
+    html += '<li>Breakpoints and bulkpoints are derived from the damage formula; '
+    html += 'matchup-flipping boundaries are found by sweeping stat thresholds against full battle simulations.</li>'
+    html += '<li>Mirror slayer iteration uses Nash-style convergence to discover IVs '
+    html += 'that beat the mirror matchup.</li>'
+    html += '</ul>'
+    html += '</div></details>\n'
 
     # Footer: equivalent CLI invocation + rankings data fingerprint, kept
     # at the bottom of the page so they're discoverable but don't compete
