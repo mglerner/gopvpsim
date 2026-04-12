@@ -710,20 +710,43 @@ function renderMatchesList() {
     if (state.userRecords[rS].slayerCats) slayerRecs.push(state.userRecords[rS]);
   }
 
-  // Attach battle rank (yRank) to each record. yRanks is populated
-  // by computeView() on every updateView; if it's not yet populated
-  // (first render before updateView), fall back to stat product rank.
+  // Attach ranks to each record. Two separate ranks:
+  //
+  //   _battleRank: battle (y-axis) rank in the active plot moveset /
+  //                scenario / opp-iv mode. Dive-dependent — requires
+  //                the IV to actually be in the simulated set. Set to
+  //                null for off-grid mons.
+  //
+  //   _spRank: stat product rank across ALL 4096 IV triples for the
+  //            species, pure-math and independent of the dive. Always
+  //            available via DATA.collection.rankLookup (or via
+  //            DATA.spRanks for on-grid mons). Used as the
+  //            sort-fallback when battle rank isn't available.
   var useBattleRank = (typeof yRanks !== 'undefined' && yRanks != null);
+  var rankLookup = (DATA.collection && DATA.collection.rankLookup) || {};
+  var collSpecies = (DATA.collection && DATA.collection.speciesKey) || '';
+  function lookupSpRank(rec) {
+    // On-grid: use DATA.spRanks — same data, cheaper lookup.
+    if (rec.canonicalIvIdx >= 0) return DATA.spRanks[rec.canonicalIvIdx];
+    // Off-grid: consult the precomputed rank lookup.
+    var spBlock = rankLookup[collSpecies];
+    if (!spBlock) return null;
+    var branch = spBlock[rec.mon.is_shadow ? 'shadow' : 'normal'];
+    if (!branch) return null;
+    var key = rec.mon.atk_iv + ',' + rec.mon.def_iv + ',' + rec.mon.sta_iv;
+    var r = branch[key];
+    return (r != null) ? r : null;
+  }
   for (var r2 = 0; r2 < state.userRecords.length; r2++) {
     var rec2 = state.userRecords[r2];
     var iv = rec2.canonicalIvIdx;
-    if (iv >= 0 && useBattleRank) {
-      rec2._rank = yRanks[iv];
-    } else if (iv >= 0) {
-      rec2._rank = DATA.spRanks[iv];
-    } else {
-      rec2._rank = 99999;
-    }
+    rec2._battleRank = (iv >= 0 && useBattleRank) ? yRanks[iv] : null;
+    rec2._spRank = lookupSpRank(rec2);
+    // _rank is the primary sort key: battle rank when available, SP
+    // rank otherwise. Null-safe: records without either end up last.
+    if (rec2._battleRank != null) rec2._rank = rec2._battleRank;
+    else if (rec2._spRank != null) rec2._rank = rec2._spRank;
+    else rec2._rank = 99999;
   }
 
   function powerUpText(curLv, maxLv) {
@@ -751,7 +774,10 @@ function renderMatchesList() {
     });
     var sid = 'matches-section-' + (sectionIdx++);
     var h = '<h5>' + heading + ' - ' + recs.length + ' of yours</h5>';
-    h += '<table><tr><th>#</th><th>Current CP</th><th>IVs</th>' +
+    h += '<table><tr>' +
+         '<th title="Battle rank in the active moveset / opp-IV mode. Dash for off-grid mons whose exact IV was not simulated.">Battle</th>' +
+         '<th title="Stat product rank (pure math, computed for all 4096 IV triples). Always available.">SP</th>' +
+         '<th>Current CP</th><th>IVs</th>' +
          '<th>Species</th><th>Power-up</th><th>Max CP</th>';
     if (extras) {
       for (var xh = 0; xh < extras.length; xh++) {
@@ -768,8 +794,10 @@ function renderMatchesList() {
       var attr = ' data-section="' + sid + '"';
       if (cls) attr += ' class="' + cls.trim() + '"';
       h += '<tr' + attr + '>';
-      var rankTxt = (rc._rank != null && rc._rank < 99999) ? ('#' + rc._rank) : '?';
-      h += '<td class="rank">' + rankTxt + '</td>';
+      var brTxt = (rc._battleRank != null) ? ('#' + rc._battleRank) : '-';
+      var spTxt = (rc._spRank != null)     ? ('#' + rc._spRank)     : '-';
+      h += '<td class="rank">' + brTxt + '</td>';
+      h += '<td class="rank-sp">' + spTxt + '</td>';
       h += '<td><b>CP ' + rc.mon.cp + '</b></td>';
       h += '<td>' + rc.mon.atk_iv + '/' + rc.mon.def_iv + '/' + rc.mon.sta_iv + '</td>';
       h += '<td>' + escapeHtml(rc.csvSpecies || '') +
