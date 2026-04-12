@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import deep_dive_analysis as analysis
+from gopvpsim.anchors import derive_short_name
 
 
 # ---------------------------------------------------------------------------
@@ -1393,3 +1394,616 @@ def pearson_r(xs, ys):
     dx = math.sqrt(sum((x - mx)**2 for x in xs))
     dy = math.sqrt(sum((y - my)**2 for y in ys))
     return num / (dx * dy) if dx and dy else 0.0
+
+
+# ---------------------------------------------------------------------------
+# Mirror slayer iteration HTML
+# ---------------------------------------------------------------------------
+
+def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
+                              data_obj=None, moveset_idx=0):
+    """Render the Mirror Slayer Iteration section of the Results pane.
+
+    Accepts either an ``AnalysisContext`` as the first positional arg or
+    explicit keyword args (``slayer_iter_result``, ``data_obj``,
+    ``moveset_idx``).  Returns an HTML string (empty if no slayer
+    iteration ran).
+    """
+    if ctx_or_slayer is not None and isinstance(ctx_or_slayer, AnalysisContext):
+        slayer_iter_result = ctx_or_slayer.slayer_iter_result
+        data_obj = ctx_or_slayer.data_obj
+        moveset_idx = ctx_or_slayer.moveset_idx
+    if not slayer_iter_result or not slayer_iter_result.get('final'):
+        return ''
+    parts = []
+
+    parts.append('<h3 class="dd-h3">Mirror Slayer Iteration</h3>\n')
+    metric_label = slayer_iter_result.get('metric', 'all')
+    max_rounds_arg = slayer_iter_result.get('max_rounds_arg', 4)
+    metric_explain = {
+        'all': 'all 9 shield scenarios count toward win totals',
+        'even': 'only even shields (0v0/1v1/2v2) count toward win totals',
+        'even-strict': 'only IVs that win ALL three even shields against an opponent get credit',
+    }.get(metric_label, '')
+    rounds_run = slayer_iter_result.get('rounds_run', 0)
+    converged = slayer_iter_result.get('converged', False)
+    final_pool = len(slayer_iter_result.get('final', []))
+    parts.append(
+        f'<p class="dd-small">{final_pool} survivors after '
+        f'{rounds_run} round{"s" if rounds_run != 1 else ""} '
+        f'({"converged" if converged else "max rounds reached"}).</p>\n'
+    )
+
+    # Iteration details -- collapsed by default
+    parts.append(
+        '<details class="dd-flip-detail">'
+        '<summary>Iteration details</summary>\n'
+    )
+    parts.append(f'<p>Nash-style iterative discovery of IVs that beat the '
+                 f'{data_obj.get("species", "mirror")} mirror match. '
+                 f'Each round tests focal IVs against the previous round\'s top winners. '
+                 f'Survivors are classified into RyanSwag\'s three patterns.</p>\n')
+    parts.append(f'<p class="dd-small"><b>Metric:</b> <code>{metric_label}</code> '
+                 f'({metric_explain}) | <b>Max rounds:</b> {max_rounds_arg}</p>\n')
+    parts.append(f'<p class="dd-small">'
+                 f'{slayer_iter_result.get("cache_stats", "")}</p>\n')
+    history = slayer_iter_result.get('history', [])
+    if history:
+        parts.append('<table class="dd-table dd-narrow">\n')
+        parts.append('<tr><th>Round</th><th>Survivors</th><th>Max Wins</th><th>Top Avg Score</th></tr>\n')
+        for ri, top in enumerate(history):
+            if not top:
+                continue
+            parts.append(f'<tr><td>{ri}</td><td>{len(top)}</td>'
+                         f'<td>{top[0]["total_wins"]}</td>'
+                         f'<td>{top[0]["avg_score"]:.1f}</td></tr>\n')
+        parts.append('</table>\n')
+    parts.append('</details>\n')
+
+    # Categorized survivors
+    categories = slayer_iter_result.get('categories', {})
+    resolved_anchors = slayer_iter_result.get('resolved_anchors', []) or []
+
+    # Summarize resolved anchors (for the intro paragraph and
+    # Level 3 sub-anchor distribution report).
+    anchor_parents: dict[str, list] = {}
+    for a in resolved_anchors:
+        anchor_parents.setdefault(a.parent, []).append(a)
+
+    CATEGORY_DESCRIPTIONS = {
+        'Atk Slayer': 'IVs that clear at least one named damage '
+                      'breakpoint against a notable opponent. Membership '
+                      'is binary per breakpoint: an IV is in this '
+                      'category iff its effective attack reaches the '
+                      'minimum needed to deal one extra damage with some '
+                      'move against some named opponent &mdash; not just '
+                      '&ldquo;has higher attack than other survivors.&rdquo; '
+                      'Each row&rsquo;s Tags column lists the specific '
+                      'breakpoint(s) cleared (hover for the move&nbsp;+&nbsp;'
+                      'tier detail). <strong>Hidden if no survivor '
+                      'clears any named breakpoint</strong> &mdash; an '
+                      'empty Atk Slayer box means no anchors fired '
+                      'against the current opponent set.',
+        'Bulk Slayer': 'IVs that either (a) have HP and defense both at '
+                       'or above the survivor-pool median (structural '
+                       'high-bulk pool, always shown) <strong>or</strong> '
+                       '(b) clear at least one named <em>bulkpoint</em> '
+                       'anchor against a notable opponent &mdash; '
+                       'reaching a defense tier at which one of the '
+                       'opponent&rsquo;s threat moves deals strictly '
+                       'less damage to the focal. Each row&rsquo;s Tags '
+                       'column shows which bulkpoint(s) the IV clears '
+                       '(badges with the &ldquo;b&rdquo; suffix or '
+                       '&ldquo;&uarr;&rdquo; reference markers); hover '
+                       'for the move&nbsp;+&nbsp;damage&nbsp;tier '
+                       'detail. The structural pool is the default '
+                       'fallback when no bulkpoint anchors are '
+                       'configured for the species.',
+        'CMP Slayer': 'IVs whose raw attack beats at least one named '
+                      'CMP anchor (e.g., the max attack of a reference '
+                      'cohort). Wins Charge Move Priority against the '
+                      'cohort when both fire a charged move on the same '
+                      'turn. <strong>Hidden if no survivor clears any '
+                      'CMP anchor</strong>.',
+    }
+
+    if categories:
+        # Build a map of IV -> set of non-empty categories it appears in
+        iv_categories = {}
+        for cat_name, cat_ivs in categories.items():
+            if not cat_ivs:
+                continue
+            for r in cat_ivs:
+                iv_categories.setdefault(r['iv'], set()).add(cat_name)
+
+        if resolved_anchors:
+            n_parents = len(anchor_parents)
+            n_subs = len(resolved_anchors)
+            parts.append(
+                f'<p class="dd-small">Each survivor is tagged with the '
+                f'set of named anchors it passes. {n_parents} parent '
+                f'anchor(s) resolved to {n_subs} concrete threshold '
+                f'check(s) — Level&nbsp;3 discover-mode anchors expand '
+                f'into a family of sub-anchors (one per discovered '
+                f'(move,&nbsp;tier) breakpoint). See the Tags column in '
+                f'each category for per-IV detail. IVs that fit '
+                f'<em>multiple</em> categories are marked with extra '
+                f'cross-category badges.</p>\n'
+            )
+        else:
+            parts.append(
+                '<p class="dd-small">No named anchors are configured '
+                'for this species/league (or none resolved against the '
+                'survivor cohort). Atk Slayer and CMP Slayer will be '
+                'empty; Bulk Slayer remains as a structural '
+                'HP+def-above-median view. Add anchors to the species '
+                '<code>thresholds/*.toml</code> file to enable '
+                'breakpoint-based categorization.</p>\n'
+            )
+
+        # JS for the filter panel -- defined once, used by all cards.
+        parts.append("""<script>
+function ddSlayerApplyFilter(cardId) {
+  var table = document.getElementById(cardId + '-table');
+  if (!table) return;
+  var checked = new Set();
+  document.querySelectorAll('.dd-anchor-cb[data-card="' + cardId + '"]:checked').forEach(function(cb) {
+    checked.add(cb.getAttribute('data-anchor-idx'));
+  });
+  var showAllCb = document.querySelector('.dd-show-all-mons[data-card="' + cardId + '"]');
+  var showAll = showAllCb ? showAllCb.checked : false;
+  var visible = 0, total = 0;
+  table.querySelectorAll('tr[data-anchors]').forEach(function(row) {
+    total++;
+    var passes;
+    if (showAll) {
+      passes = true;
+    } else {
+      var raw = row.getAttribute('data-anchors') || '';
+      var rowAnchors = raw.split(' ').filter(Boolean);
+      if (rowAnchors.length === 0) {
+        passes = false;
+      } else {
+        passes = rowAnchors.some(function(a) { return checked.has(a); });
+      }
+    }
+    row.classList.toggle('dd-filter-hidden', !passes);
+    if (passes) visible++;
+  });
+  document.querySelectorAll('.dd-anchor-master[data-card="' + cardId + '"]').forEach(function(master) {
+    var grp = master.getAttribute('data-parent-grp');
+    var children = document.querySelectorAll('.dd-anchor-cb[data-card="' + cardId + '"][data-parent-grp="' + grp + '"]');
+    var n = 0, t = 0;
+    children.forEach(function(c) { t++; if (c.checked) n++; });
+    master.checked = (n === t);
+    master.indeterminate = (n > 0 && n < t);
+  });
+  var counter = document.getElementById(cardId + '-visible-count');
+  if (counter) counter.textContent = visible + ' / ' + total;
+}
+function ddSlayerToggleMaster(cb) {
+  var card = cb.getAttribute('data-card');
+  var grp = cb.getAttribute('data-parent-grp');
+  var checked = cb.checked;
+  document.querySelectorAll('.dd-anchor-cb[data-card="' + card + '"][data-parent-grp="' + grp + '"]').forEach(function(c) { c.checked = checked; });
+  ddSlayerApplyFilter(card);
+}
+function ddSlayerResetFilter(cardId, defaultShowAll) {
+  document.querySelectorAll('.dd-anchor-cb[data-card="' + cardId + '"]').forEach(function(c) { c.checked = true; });
+  var sa = document.querySelector('.dd-show-all-mons[data-card="' + cardId + '"]');
+  if (sa) sa.checked = defaultShowAll;
+  ddSlayerApplyFilter(cardId);
+}
+function ddSlayerToggleFilterPanel(cardId) {
+  var p = document.getElementById(cardId + '-filter');
+  if (!p) return;
+  var hidden = (p.style.display === 'none' || p.style.display === '');
+  p.style.display = hidden ? 'block' : 'none';
+}
+function ddToggleTagsCompact(btn) {
+  // Toggle the dd-tags-compact class on every inner tag wrapper across all
+  // slayer cards. The wrapper is a <div> nested inside the <td> because
+  // <td> uses display:table-cell which ignores max-height. Default state
+  // is "compact" (capped at ~2 lines with a fade gradient at the bottom).
+  // Click expands to full height so the badge wall is fully visible.
+  // Mixed prior state (some cells individually toggled) is collapsed onto
+  // a single state based on the first cell's current class.
+  var inners = document.querySelectorAll('.dd-anchor-tags-inner');
+  if (!inners.length) return;
+  var nowExpanded = inners[0].classList.contains('dd-tags-compact');
+  inners.forEach(function(c) { c.classList.toggle('dd-tags-compact', !nowExpanded); });
+  btn.textContent = nowExpanded ? 'Compact tags' : 'Expand all tags';
+}
+function ddToggleTagsCompactCell(event) {
+  // Per-cell click toggle. Flips the dd-tags-compact class on just the
+  // clicked inner wrapper. Ignores clicks that originated inside an
+  // anchor badge so badge hover tooltips keep working without
+  // accidentally collapsing or expanding the cell. The bulk button
+  // still works on top of any per-cell state -- it forces every cell to
+  // a single state based on the first cell.
+  if (event.target.closest('.dd-anchor-tag')) return;
+  event.currentTarget.classList.toggle('dd-tags-compact');
+}
+</script>
+""")
+
+        parts.append(
+            '<button class="dd-tags-toggle" '
+            'onclick="ddToggleTagsCompact(this)">Expand all tags</button>\n'
+        )
+        parts.append('<div class="dd-rec-grid">\n')
+        CAT_ABBREV = {'Atk Slayer': 'A', 'Bulk Slayer': 'B', 'CMP Slayer': 'C'}
+        CAT_COLORS = {'Atk Slayer': '#f85149', 'Bulk Slayer': '#3fb950',
+                      'CMP Slayer': '#d29922'}
+        # Unique ID per card to scope filter JS -- moveset index + category index.
+        _table_uid = 0
+        _ms_prefix = f"ms{moveset_idx}"
+        for cat_name, cat_ivs in categories.items():
+            if not cat_ivs:
+                continue  # hide empty categories (Atk/CMP when no anchors fired)
+            desc = CATEGORY_DESCRIPTIONS.get(cat_name, '')
+            n_total = len(cat_ivs)
+            n_visible = min(n_total, 10)  # top N visible by default
+            # Top-quartile highlighting: first ceil(n_total / 4) rows
+            n_quartile = max(1, (n_total + 3) // 4)
+
+            _table_uid += 1
+            card_id = f"{_ms_prefix}-slayer-{_table_uid}"
+
+            # Determine which anchor kinds apply to this category card.
+            # Bulk Slayer surfaces all kinds (bulkpoint anchors are its
+            # native kind; bp/cmp tags also show as cross-info).
+            want_kinds = {
+                'Atk Slayer': {'damage_breakpoint'},
+                'CMP Slayer': {'cmp'},
+                'Bulk Slayer': {'damage_breakpoint', 'cmp', 'bulkpoint'},
+            }.get(cat_name, {'damage_breakpoint', 'cmp', 'bulkpoint'})
+
+            # Build the per-card sub-anchor index. anchor_parents was computed
+            # earlier from resolved_anchors. We filter to only sub-anchors
+            # whose kind matches this category, and assign each a stable
+            # integer index for the data-anchors row attribute and the
+            # filter checkboxes. Order: parent name asc, then threshold asc.
+            card_anchor_index: dict[tuple, int] = {}
+            card_parent_to_subs: dict[str, list] = {}
+            for parent in sorted(anchor_parents.keys()):
+                relevant_subs = [s_ for s_ in anchor_parents[parent]
+                                 if s_.kind in want_kinds]
+                if not relevant_subs:
+                    continue
+                relevant_subs.sort(key=lambda x: x.threshold_value)
+                for sub in relevant_subs:
+                    key = (parent, sub.label or sub.name)
+                    if key in card_anchor_index:
+                        continue
+                    idx = len(card_anchor_index)
+                    card_anchor_index[key] = idx
+                    card_parent_to_subs.setdefault(parent, []).append((idx, sub))
+
+            # Per-card default for "show all mons":
+            # Bulk Slayer is structural, so untagged rows must be visible by
+            # default. Atk/CMP Slayer membership requires anchor pass, so
+            # default off.
+            any_tagless = any(
+                not any(
+                    any(s_.kind in want_kinds for s_ in subs)
+                    for subs in r.get('_anchor_tags', {}).values()
+                )
+                for r in cat_ivs
+            )
+            default_show_all = any_tagless
+            show_all_attr = ' checked' if default_show_all else ''
+
+            parts.append(f'<div class="dd-rec-card">\n')
+            parts.append(
+                f'<h4>{cat_name} '
+                f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+                f'({n_total} survivor{"s" if n_total != 1 else ""})'
+                f'</span></h4>\n'
+            )
+            if desc:
+                parts.append(f'<p class="dd-small dd-prose">{desc}</p>\n')
+
+            # Filter panel toggle button + collapsed panel body
+            if card_anchor_index:
+                n_anchors_total = len(card_anchor_index)
+                parts.append(
+                    f'<button class="dd-filter-toggle" '
+                    f'onclick="ddSlayerToggleFilterPanel(\'{card_id}\')">'
+                    f'Filter anchors ({n_anchors_total})'
+                    f'</button>\n'
+                )
+                parts.append(
+                    f'<div class="dd-filter-panel" id="{card_id}-filter" '
+                    f'style="display:none">\n'
+                )
+                for parent, subs_list in card_parent_to_subs.items():
+                    parts.append('<div class="dd-filter-panel-group">\n')
+                    is_auto = parent.startswith('auto_')
+                    auto_marker = (
+                        ' <span class="dd-auto-marker">(auto)</span>'
+                        if is_auto else ''
+                    )
+                    parts.append(
+                        f'<label class="dd-filter-master">'
+                        f'<input type="checkbox" class="dd-anchor-master" '
+                        f'data-card="{card_id}" data-parent-grp="{parent}" '
+                        f'checked '
+                        f'onchange="ddSlayerToggleMaster(this)"> '
+                        f'{parent} ({len(subs_list)}){auto_marker}'
+                        f'</label>\n'
+                    )
+                    parts.append('<div class="dd-filter-children">\n')
+                    for idx, sub in subs_list:
+                        label = sub.label or sub.name
+                        parts.append(
+                            f'<label><input type="checkbox" class="dd-anchor-cb" '
+                            f'data-card="{card_id}" data-parent-grp="{parent}" '
+                            f'data-anchor-idx="{idx}" checked '
+                            f'onchange="ddSlayerApplyFilter(\'{card_id}\')"> '
+                            f'{label}</label>\n'
+                        )
+                    parts.append('</div>\n')  # children
+                    parts.append('</div>\n')  # group
+                # Controls row
+                sa_default_js = 'true' if default_show_all else 'false'
+                parts.append('<div class="dd-filter-controls">\n')
+                parts.append(
+                    f'<button onclick="ddSlayerResetFilter(\'{card_id}\', '
+                    f'{sa_default_js})">Reset</button>\n'
+                )
+                parts.append(
+                    f'<label><input type="checkbox" class="dd-show-all-mons" '
+                    f'data-card="{card_id}"{show_all_attr} '
+                    f'onchange="ddSlayerApplyFilter(\'{card_id}\')"> '
+                    f'Show all mons (ignore filter)</label>\n'
+                )
+                parts.append(
+                    f'<span class="dd-filter-status">visible: '
+                    f'<span id="{card_id}-visible-count">{n_total} / {n_total}</span>'
+                    f'</span>\n'
+                )
+                parts.append('</div>\n')  # controls
+                parts.append('</div>\n')  # filter-panel
+
+            # Table
+            parts.append(
+                f'<table class="dd-table dd-narrow" id="{card_id}-table">\n'
+            )
+            parts.append(
+                '<tr><th>IVs</th><th>Atk</th><th>Def</th><th>HP</th>'
+                '<th>Wins</th><th>Avg</th><th>Also</th><th>Tags</th></tr>\n'
+            )
+            for idx, r in enumerate(cat_ivs):
+                a, d, s = r['iv']
+                # Cross-category badges
+                others = sorted(iv_categories.get(r['iv'], set()) - {cat_name})
+                badges = ''
+                for o in others:
+                    ab = CAT_ABBREV.get(o, '?')
+                    col = CAT_COLORS.get(o, '#888')
+                    badges += (
+                        f'<span class="dd-badge" '
+                        f'style="background:{col};color:#000" '
+                        f'title="{o}">{ab}</span> '
+                    )
+
+                # Ultra-short tag rendering: one badge per parent.
+                # Badge VISIBLE TEXT uses derive_short_name() -- typically
+                # 3-6 characters (e.g. "lic", "mirb", "lic^lur", "c:lur").
+                # The badge HOVER tooltip carries the long form
+                # (parent_display_name) plus the per-sub-anchor labels
+                # (e.g. "close_combat->125, rage_fist->78"), so the
+                # abbreviation stays decipherable. The cell-level title=
+                # also includes the full parent name for fallback hover.
+                tag_bits = []
+                row_anchor_indices = []
+                # Per-row counters for the cell-level summary tooltip.
+                # Each parent contributes once to its kind bucket and
+                # n_subs to the total sub-anchor count.
+                n_parents_by_kind = {
+                    'damage_breakpoint': 0,
+                    'bulkpoint': 0,
+                    'cmp': 0,
+                }
+                n_total_subs = 0
+                for parent in sorted(r.get('_anchor_tags', {}).keys()):
+                    subs = r['_anchor_tags'][parent]
+                    relevant = [s_ for s_ in subs if s_.kind in want_kinds]
+                    if not relevant:
+                        continue
+                    labels = sorted({s_.label or s_.name for s_ in relevant})
+                    for s_ in relevant:
+                        key = (parent, s_.label or s_.name)
+                        if key in card_anchor_index:
+                            row_anchor_indices.append(card_anchor_index[key])
+                    # Long form (filter panel + tooltip) and short form
+                    # (visible badge text). Both derive from the parent
+                    # name; long form is also stored on the resolved
+                    # anchor as parent_display_name in case the TOML
+                    # set it explicitly.
+                    long_name = (relevant[0].parent_display_name or parent)
+                    short = derive_short_name(parent)
+                    n_subs = len(labels)
+                    if n_subs == 1:
+                        badge_text = short
+                        sub_labels_text = labels[0]
+                        # For single-sub-anchor parents (Level 1, Level 2,
+                        # CMP) the badge has no count suffix and the
+                        # tooltip leads with "clears <single sub-anchor>".
+                        hover_first_line = (
+                            f'{long_name} \u00b7 clears {sub_labels_text}'
+                        )
+                    else:
+                        badge_text = (f'{short}'
+                                      f'<span class="dd-anchor-tag-count">'
+                                      f'\u00d7{n_subs}</span>')
+                        sub_labels_text = ", ".join(labels)
+                        # For Level 3 discover-mode parents the badge
+                        # shows "<short>xN"; the tooltip explains that
+                        # xN means "this IV passes N of the parent's
+                        # sub-anchors" so the abbreviation isn't cryptic.
+                        hover_first_line = (
+                            f'{long_name} \u00b7 '
+                            f'clears {n_subs} sub-anchors'
+                        )
+                    # Hover tooltip on the badge: long display name +
+                    # explicit count meaning + full anchor name +
+                    # the sub-anchor labels.
+                    hover_text_str = (
+                        f'{hover_first_line}\n'
+                        f'{parent}\n'
+                        f'{sub_labels_text}'
+                    )
+                    hover_attr = hover_text_str.replace('"', '&quot;')
+                    tag_bits.append(
+                        f'<span class="dd-anchor-tag" title="{hover_attr}">'
+                        f'{badge_text}</span>'
+                    )
+                    # Tally for the cell-level summary tooltip. Use the
+                    # kind from the first relevant ResolvedAnchor (all
+                    # share kind for a given parent).
+                    kind = relevant[0].kind
+                    if kind in n_parents_by_kind:
+                        n_parents_by_kind[kind] += 1
+                    n_total_subs += n_subs
+                tags_cell = ' '.join(tag_bits) if tag_bits else '&mdash;'
+                # Cell-level title is now a one-line summary instead of
+                # the previous per-parent dump (which was 2000+ chars
+                # and literally taller than a screen for rows with 40+
+                # parents). Per-badge tooltips still hold the per-anchor
+                # detail, so this summary just gives an at-a-glance
+                # signal of how many parents the row clears and the
+                # kind breakdown.
+                n_total_parents = sum(n_parents_by_kind.values())
+                if n_total_parents == 0:
+                    cell_title_attr = 'No anchors cleared'
+                else:
+                    kind_parts = []
+                    if n_parents_by_kind['damage_breakpoint']:
+                        kind_parts.append(
+                            f"{n_parents_by_kind['damage_breakpoint']} brkp"
+                        )
+                    if n_parents_by_kind['bulkpoint']:
+                        kind_parts.append(
+                            f"{n_parents_by_kind['bulkpoint']} blkp"
+                        )
+                    if n_parents_by_kind['cmp']:
+                        kind_parts.append(
+                            f"{n_parents_by_kind['cmp']} cmp"
+                        )
+                    cell_title_attr = (
+                        f'Clears {n_total_parents} anchors '
+                        f'({" \u00b7 ".join(kind_parts)}) '
+                        f'\u00b7 {n_total_subs} sub-anchors total. '
+                        f'Hover any badge for per-anchor detail.'
+                    )
+                data_anchors = ' '.join(str(i) for i in sorted(set(row_anchor_indices)))
+
+                # Row classes: collapse-hidden beyond top N until expanded;
+                # highlighted if in the top quartile.
+                row_cls_parts = []
+                if idx < n_quartile:
+                    row_cls_parts.append('dd-slayer-top')
+                if idx >= n_visible:
+                    row_cls_parts.append('dd-slayer-hidden')
+                row_cls = f'class="{" ".join(row_cls_parts)}" ' if row_cls_parts else ''
+
+                parts.append(
+                    f'<tr {row_cls}data-anchors="{data_anchors}">'
+                    f'<td>{a}/{d}/{s}</td>'
+                    f'<td>{r["atk"]:.2f}</td>'
+                    f'<td>{r["def_"]:.2f}</td>'
+                    f'<td>{r["hp"]}</td>'
+                    f'<td class="dd-gain">{r["total_wins"]}</td>'
+                    f'<td>{r["avg_score"]:.1f}</td>'
+                    f'<td>{badges}</td>'
+                    f'<td class="dd-anchor-tags-cell" '
+                    f'title="{cell_title_attr}">'
+                    f'<div class="dd-anchor-tags-inner dd-tags-compact" '
+                    f'onclick="ddToggleTagsCompactCell(event)">'
+                    f'{tags_cell}</div></td></tr>\n'
+                )
+            parts.append('</table>\n')
+
+            # Expand-all toggle if there are hidden rows
+            if n_total > n_visible:
+                parts.append(
+                    f'<button class="dd-slayer-toggle" '
+                    f'onclick="(function(btn){{'
+                    f'var t=document.getElementById(\'{card_id}-table\');'
+                    f'var rows=t.querySelectorAll(\'tr.dd-slayer-hidden\');'
+                    f'var shown=rows.length>0 && rows[0].classList.contains(\'dd-slayer-shown\');'
+                    f'rows.forEach(function(r){{r.classList.toggle(\'dd-slayer-shown\', !shown);}});'
+                    f'btn.textContent=shown?\'Show all {n_total}\':\'Collapse to top {n_visible}\';'
+                    f'}})(this)" >'
+                    f'Show all {n_total}'
+                    f'</button>\n'
+                )
+            parts.append('</div>\n')  # rec-card
+        parts.append('</div>\n')  # rec-grid
+
+        # Level 3 sub-anchor distribution: for each Level 3 parent, show
+        # how many survivors clear each sub-anchor. This is the
+        # "discover-mode" output -- what BPs and bulkpoints actually
+        # matter here. Includes both damage_breakpoint (atk-side) and
+        # bulkpoint (def-side) Level 3 parents; the per-row "Threshold"
+        # cell is annotated with " atk" or " def" so the two kinds are
+        # visually distinct in a single combined table.
+        level3_parents = []
+        for parent, subs in anchor_parents.items():
+            if len(subs) > 1 and all(
+                s_.kind in ('damage_breakpoint', 'bulkpoint') for s_ in subs
+            ):
+                level3_parents.append((parent, subs))
+        if level3_parents and slayer_iter_result.get('final'):
+            all_survivors = slayer_iter_result['final']
+            parts.append(
+                '<h4 class="dd-h3" style="margin-top:16px">'
+                'Level&nbsp;3 sub-anchor distribution '
+                '(breakpoints + bulkpoints)</h4>\n'
+            )
+            parts.append(
+                '<p class="dd-small">For each discover-mode anchor, how '
+                'many survivors in the full cohort clear each '
+                '(move,&nbsp;tier) sub-anchor. Atk-side rows are '
+                'breakpoints (focal&nbsp;atk needed to deal more damage); '
+                'def-side rows are bulkpoints (focal&nbsp;def needed to '
+                'take less damage). Use this to identify which '
+                'sub-anchors actually matter for this species — '
+                'high-count rows are the ones worth promoting '
+                'to Level&nbsp;1 in the TOML.</p>\n'
+            )
+            for parent, subs in sorted(level3_parents):
+                parts.append(
+                    f'<details class="dd-flip-detail">'
+                    f'<summary><strong>{parent}</strong> '
+                    f'<span class="dd-small">({len(subs)} sub-anchors)'
+                    f'</span></summary>\n'
+                )
+                parts.append('<table class="dd-table dd-narrow">\n')
+                parts.append(
+                    '<tr><th>Sub-anchor</th><th>Threshold</th>'
+                    '<th>Clears</th><th>%</th></tr>\n'
+                )
+                # Sort sub-anchors by threshold ascending (easier tiers first)
+                subs_sorted = sorted(subs, key=lambda x: x.threshold_value)
+                for sub in subs_sorted:
+                    n_clear = sum(
+                        1 for sv in all_survivors
+                        if sub.passes(sv['atk'], sv['def_'])
+                    )
+                    pct = 100.0 * n_clear / len(all_survivors) if all_survivors else 0
+                    # Annotate threshold with which stat it targets so
+                    # bp/blkp aren't visually conflated.
+                    stat_label = 'atk' if sub.target_stat == 'atk' else 'def'
+                    parts.append(
+                        f'<tr><td>{sub.label}</td>'
+                        f'<td>{sub.threshold_value:.2f} {stat_label}</td>'
+                        f'<td>{n_clear}/{len(all_survivors)}</td>'
+                        f'<td>{pct:.0f}%</td></tr>\n'
+                    )
+                parts.append('</table>\n')
+                parts.append('</details>\n')
+
+    return ''.join(parts)
