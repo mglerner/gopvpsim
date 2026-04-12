@@ -56,6 +56,63 @@ def _subs_from_data(data):
     }
 
 
+def _patch_bait_dropdown(html, data):
+    """Replace the fused Scenario/OppIV dropdown with separate Opponent IVs
+    and Bait dropdowns. Also removes the 'Bait: on/off selector' meta hint
+    since the dropdown is now self-documenting."""
+    opp_iv_modes = data.get('oppIvModes', ['pvpoke']) or ['pvpoke']
+
+    # Determine axes present
+    base_modes = list(dict.fromkeys(
+        m.split(':')[0] for m in opp_iv_modes))
+    bait_values = {('nobait' if ':nobait' in m else 'bait')
+                   for m in opp_iv_modes}
+    has_bait = 'nobait' in bait_values and 'bait' in bait_values
+    has_oppiv = len(base_modes) > 1
+
+    if not has_bait:
+        return html  # nothing to patch
+
+    # Build replacement dropdown(s)
+    parts = []
+    if has_oppiv:
+        oppiv_labels = {'pvpoke': 'PvPoke Defaults', 'rank1': 'Rank 1'}
+        opts = ''.join(
+            f'    <option value="{b}">{oppiv_labels.get(b, b)}</option>\n'
+            for b in base_modes)
+        parts.append(
+            '  <label>Opponent IVs: '
+            '<select id="oppiv-sel" onchange="updateView()">\n'
+            + opts +
+            '  </select></label>\n')
+    parts.append(
+        '  <label>Bait: '
+        '<select id="bait-sel" onchange="updateView()">\n'
+        '    <option value="bait">On</option>\n'
+        '    <option value="nobait">Off</option>\n'
+        '  </select></label>\n')
+    replacement = ''.join(parts)
+
+    # Replace the fused dropdown. Two patterns: "Scenario:" (bait+oppiv)
+    # or "Opponent IVs:" (oppiv only, but with :nobait values — shouldn't
+    # happen, but be safe).
+    fused_re = re.compile(
+        r'  <label>(?:Scenario|Opponent IVs): '
+        r'<select id="oppiv-sel" onchange="updateView\(\)">\n'
+        r'(?:    <option[^<]*</option>\n)+'
+        r'  </select></label>\n')
+    html, n = fused_re.subn(replacement, html, count=1)
+    if n == 0:
+        return html  # already patched or structure doesn't match
+
+    # Remove the "Bait: on/off selector" meta hint — the dropdown is
+    # self-documenting now.
+    html = html.replace(
+        ' | <b style="color:#e94560">Bait: on/off selector</b>', '')
+
+    return html
+
+
 def patch_one(html_path, engine_src):
     """Patch a single dive HTML in-place. Returns True on success."""
     with open(html_path) as f:
@@ -92,6 +149,9 @@ def patch_one(html_path, engine_src):
     new_html = (html[:old_m.start()] +
                 '<script>\n' + new_engine + '\n</script>' +
                 html[old_m.end():])
+
+    # Patch the fused bait/oppiv dropdown into separate controls
+    new_html = _patch_bait_dropdown(new_html, data)
 
     with open(html_path, 'w') as f:
         f.write(new_html)

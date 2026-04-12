@@ -5695,8 +5695,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     _bait_axis_values = {parse_mode(m)[1] for m in (opp_iv_modes or ['pvpoke'])}
     if _bait_axis_values == {'nobait'}:
         _bait_meta = ' | <b style="color:#e94560">Bait: OFF</b>'
-    elif 'nobait' in _bait_axis_values and 'bait' in _bait_axis_values:
-        _bait_meta = ' | <b style="color:#e94560">Bait: on/off selector</b>'
     else:
         _bait_meta = ''
 
@@ -5932,15 +5930,26 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         html += '  </select></label>\n'
 
     if len(opp_iv_modes) > 1:
-        # Detect whether bait axis is in play (any composite mode has :nobait).
-        _any_nobait = any(':nobait' in m for m in opp_iv_modes)
-        _label_text = 'Scenario' if _any_nobait else 'Opponent IVs'
-        html += (f'  <label>{_label_text}: '
-                 '<select id="oppiv-sel" onchange="updateView()">\n')
-        for mode in opp_iv_modes:
-            label = mode_pretty_label(mode)
-            html += f'    <option value="{mode}">{label}</option>\n'
-        html += '  </select></label>\n'
+        _base_modes = list(dict.fromkeys(
+            parse_mode(m)[0] for m in opp_iv_modes))
+        _has_bait_axis = ('nobait' in _bait_axis_values
+                          and 'bait' in _bait_axis_values)
+        _has_oppiv_axis = len(_base_modes) > 1
+        if _has_oppiv_axis:
+            html += ('  <label>Opponent IVs: '
+                     '<select id="oppiv-sel" onchange="updateView()">\n')
+            _oppiv_labels = {'pvpoke': 'PvPoke Defaults',
+                             'rank1': 'Rank 1'}
+            for base in _base_modes:
+                lbl = _oppiv_labels.get(base, base)
+                html += f'    <option value="{base}">{lbl}</option>\n'
+            html += '  </select></label>\n'
+        if _has_bait_axis:
+            html += ('  <label>Bait: '
+                     '<select id="bait-sel" onchange="updateView()">\n')
+            html += '    <option value="bait">On</option>\n'
+            html += '    <option value="nobait">Off</option>\n'
+            html += '  </select></label>\n'
     if len(y_axis_modes) > 1:
         html += '  <label>Y-axis: <select id="yaxis-sel" onchange="updateView()">\n'
         for ym in y_axis_modes:

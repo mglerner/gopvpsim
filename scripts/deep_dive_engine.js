@@ -1448,7 +1448,12 @@ function updateView() {
   var ssel = document.getElementById('scenario-sel');
   if (ssel) state.scenarioMode = ssel.value;
   var osel = document.getElementById('oppiv-sel');
-  if (osel) state.oppIvMode = osel.value;
+  var bsel = document.getElementById('bait-sel');
+  if (osel || bsel) {
+    var base = osel ? osel.value : (DATA.oppIvModes[0] || 'pvpoke').split(':')[0];
+    var bait = bsel ? bsel.value : 'bait';
+    state.oppIvMode = (bait === 'nobait') ? (base + ':nobait') : base;
+  }
   var csel = document.getElementById('color-sel');
   if (csel) state.colorMode = csel.value;
   var ysel = document.getElementById('yaxis-sel');
