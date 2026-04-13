@@ -10,7 +10,7 @@
 #     the Lurgan baseline for CMP wins and BP security.
 
 [Annihilape]
-sources = "Mirror slayer iteration (2026-04-07) + community Lurgan Ape + mercuryish testimony (2026-04-08)"
+sources = "Mirror slayer iteration (2026-04-07) + community Lurgan Ape + Discord expert testimony (2026-04-08)"
 
 # ─────────────────────────────────────────────────────────────────────
 # Spreads — stat-cutoff form (preserved from the legacy JSON file so
@@ -54,7 +54,7 @@ treat as a historical anchor, not a current target. Current expert advice
 is to go higher attack than this baseline for CMP wins and BP security
 against the mirror and Lickitung.
 """
-source = "Community spread (lurganrocket); mercuryish testimony 2026-04-08 (atk 127.2, def 102.9)"
+source = "Community spread (lurganrocket); Discord expert testimony 2026-04-08 (atk 127.2, def 102.9)"
 ivs = [
     [11, 10, 2],
     [15, 12, 5],
@@ -93,7 +93,7 @@ ivs = [
 # check that's robust to game changes (e.g. level cap shifts).
 [Annihilape.Great.spreads.lurgan_ape_stat]
 description = "Stat-cutoff form of the Lurgan Ape spread (atk >= 127.2, def >= 102.9). Equivalent to the lurgan_ape IV list at GL CP cap, generative form."
-source = "mercuryish testimony 2026-04-08"
+source = "Discord expert testimony 2026-04-08"
 attack = 127.2
 defense = 102.9
 stamina = 0
@@ -119,7 +119,7 @@ description = "Win CMP ties against the community Lurgan Ape spread. Pushing foc
 kind = "damage_breakpoint"
 opponent = "Lickitung"
 above_atk = 127.2
-description = "Smallest atk > 127.2 at which any focal move's damage to default Lickitung steps up. Reproduces the historical Lurgan-era 'Lickitung BP' calibration; 127.2 is mercuryish-confirmed as the original Lurgan atk minimum."
+description = "Smallest atk > 127.2 at which any focal move's damage to default Lickitung steps up. Reproduces the historical Lurgan-era 'Lickitung BP' calibration; 127.2 is the confirmed original Lurgan atk minimum."
 
 # Level 3: discover and tag every Lickitung BP in the survivor range.
 [Annihilape.Great.anchors.lickitung_brkp_any]
@@ -133,7 +133,7 @@ description = "Enumerate every Lickitung damage breakpoint in the survivor atk r
 [Annihilape.Great.anchors.cresselia_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Cresselia"
-description = "Discover all Cresselia damage breakpoints. Mercuryish recalled Cresselia as a possible original Lurgan calibration point — Level 3 lets us find which BP that was."
+description = "Discover all Cresselia damage breakpoints. Cresselia was a possible original Lurgan calibration point - Level 3 lets us find which BP that was."
 
 # Level 3: Umbreon — ditto.
 [Annihilape.Great.anchors.umbreon_brkp_any]

@@ -6,7 +6,7 @@
 #   - Legacy JSON thresholds (GH Great / GH Good bulk cutoffs)
 
 [Tinkaton]
-sources = "acidicArisen (HSH Discord #iv-tech); legacy JSON thresholds"
+sources = "HomeSliceHenry's Discord #iv-tech; legacy JSON thresholds"
 
 # ─────────────────────────────────────────────────────────────────────
 # Spreads — stat-cutoff tiers from the acidicArisen summary
@@ -46,7 +46,7 @@ source = "HomeSliceHenry's Discord"
 [Tinkaton.Great.anchors.jellicent_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Jellicent"
-description = "Discover all Jellicent damage breakpoints. acidicArisen: 106.20 atk flips the 1-0."
+description = "Discover all Jellicent damage breakpoints. 106.20 atk flips the 1-0."
 source = "HomeSliceHenry's Discord"
 
 # Level 3: discover all Annihilape BPs. acidicArisen notes 106.58 atk
@@ -54,7 +54,7 @@ source = "HomeSliceHenry's Discord"
 [Tinkaton.Great.anchors.annihilape_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Annihilape"
-description = "Discover all Annihilape damage breakpoints. acidicArisen: 106.58 atk gives a BP."
+description = "Discover all Annihilape damage breakpoints. 106.58 atk gives a BP."
 source = "HomeSliceHenry's Discord"
 
 # ─────────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ source = "HomeSliceHenry's Discord"
 [Tinkaton.Great.anchors.azumarill_blkp_any]
 kind = "bulkpoint"
 opponent = "Azumarill"
-description = "Discover all Azumarill bulkpoints. acidicArisen: 143.03 def flips 1-2."
+description = "Discover all Azumarill bulkpoints. 143.03 def flips 1-2."
 source = "HomeSliceHenry's Discord"
 
 # Level 3: discover all Medicham bulkpoints. acidicArisen: 141.66 def +
@@ -77,7 +77,7 @@ source = "HomeSliceHenry's Discord"
 [Tinkaton.Great.anchors.medicham_blkp_any]
 kind = "bulkpoint"
 opponent = "Medicham"
-description = "Discover all Medicham bulkpoints. acidicArisen: 141.66 def + 138 hp flips 1s."
+description = "Discover all Medicham bulkpoints. 141.66 def + 138 hp flips 1s."
 source = "HomeSliceHenry's Discord"
 
 # Level 3: discover all Corsola (Galarian) bulkpoints. acidicArisen:
@@ -85,7 +85,7 @@ source = "HomeSliceHenry's Discord"
 [Tinkaton.Great.anchors.corsola_galarian_blkp_any]
 kind = "bulkpoint"
 opponent = "Corsola (Galarian)"
-description = "Discover all G-Corsola bulkpoints. acidicArisen: 143.04 def + 140 hp flips 0s."
+description = "Discover all G-Corsola bulkpoints. 143.04 def + 140 hp flips 0s."
 source = "HomeSliceHenry's Discord"
 
 # Level 3: discover all Shadow Altaria bulkpoints. acidicArisen:
@@ -93,7 +93,7 @@ source = "HomeSliceHenry's Discord"
 [Tinkaton.Great.anchors.altaria_shadow_blkp_any]
 kind = "bulkpoint"
 opponent = "Altaria (Shadow)"
-description = "Discover all Shadow Altaria bulkpoints. acidicArisen: 143.04 def + 141 hp flips 0-1. High shadow IV variance."
+description = "Discover all Shadow Altaria bulkpoints. 143.04 def + 141 hp flips 0-1. High shadow IV variance."
 source = "HomeSliceHenry's Discord"
 
 # Level 3: discover all Corviknight bulkpoints (the mirror).
@@ -123,14 +123,14 @@ description = "Discover all mirror Tinkaton bulkpoints."
 [Tinkaton.Great.anchors.shadow_drapion_blkp_any]
 kind = "bulkpoint"
 opponent = "Drapion (Shadow)"
-description = "Discover all Shadow Drapion bulkpoints. acidicArisen: 140.21 def flips 0-1."
+description = "Discover all Shadow Drapion bulkpoints. 140.21 def flips 0-1."
 source = "HomeSliceHenry's Discord"
 
 # Shadow Politoed: 140.91 def bulkpoint flips 0s.
 [Tinkaton.Great.anchors.shadow_politoed_blkp_any]
 kind = "bulkpoint"
 opponent = "Politoed (Shadow)"
-description = "Discover all Shadow Politoed bulkpoints. acidicArisen: 140.91 def flips 0s."
+description = "Discover all Shadow Politoed bulkpoints. 140.91 def flips 0s."
 source = "HomeSliceHenry's Discord"
 
 # Annihilape: already covered by the atk-side BP above.
