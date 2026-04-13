@@ -1011,8 +1011,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
 # Colors for threshold tiers — most restrictive first, then less restrictive.
 # "Other" (no threshold) uses the Viridis colorscale fallback.
 THRESHOLD_COLORS = [
-    '#FFD700',  # gold — most restrictive tier
-    '#00E676',  # bright green — next tier
+    '#00E676',  # bright green — most restrictive tier ("best")
+    '#FFD700',  # gold — next tier
     '#FF6D00',  # orange
     '#E040FB',  # purple
     '#00B0FF',  # blue
