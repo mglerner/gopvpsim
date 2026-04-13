@@ -2987,16 +2987,16 @@ def main():
                              'moveset scores so the "vs Ref" hover diff keeps '
                              'working. Ignored for single-moveset dives. '
                              'Interactive mode only.')
-    parser.add_argument('--bait', default='on', choices=['on', 'off', 'both'],
+    parser.add_argument('--bait', default='both', choices=['on', 'off', 'both'],
                         help="Focal-side bait-shields policy: "
-                             "'on' (default) uses PvPoke simulate-mode DP "
+                             "'on' uses PvPoke simulate-mode DP "
                              "with baiting enabled. "
                              "'off' runs with pvpoke_dp bait_shields=False "
                              "(focal never baits; opponent still baits). "
-                             "'both' runs both modes in a single dive and "
-                             "adds a bait selector to the interactive HTML "
-                             "(answers 'can I win this without needing my "
-                             "bait to be called?'). Doubles compute time. "
+                             "'both' (default) runs both modes in a single "
+                             "dive, adds a bait selector to the interactive "
+                             "HTML, and annotates bait-dependent matchup "
+                             "flips. Doubles compute time. "
                              "Interactive mode only.")
 
     args = parser.parse_args()
