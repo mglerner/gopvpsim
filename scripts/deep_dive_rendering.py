@@ -66,6 +66,36 @@ class AnalysisContext:
 
 
 # ---------------------------------------------------------------------------
+# Opponent color-coding
+# ---------------------------------------------------------------------------
+
+_OPP_COLORS = [
+    '#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff',
+    '#ff922b', '#cc5de8', '#20c997', '#74c0fc',
+    '#ff8787', '#ffe066', '#8ce99a', '#91a7ff',
+    '#ffa94d', '#e599f7', '#63e6be', '#a5d8ff',
+]
+
+
+def _opp_color(name):
+    """Deterministic color for an opponent name (case-insensitive)."""
+    h = int(hashlib.md5(name.lower().encode()).hexdigest(), 16)
+    return _OPP_COLORS[h % len(_OPP_COLORS)]
+
+
+def _opp_b(name):
+    """Wrap an opponent name in a colored <b> tag."""
+    return f'<b style="color:{_opp_color(name)}">{name}</b>'
+
+
+def _opp_strong(color_key, display_text=None):
+    """Wrap text in a colored <strong> tag using the opponent's color."""
+    if display_text is None:
+        display_text = color_key
+    return f'<strong style="color:{_opp_color(color_key)}">{display_text}</strong>'
+
+
+# ---------------------------------------------------------------------------
 # Deep dive CSS
 # ---------------------------------------------------------------------------
 
@@ -505,16 +535,20 @@ def matchup_subtitle(cat):
 
 
 
-def render_matchup_boundary_bullets(boundaries, has_bait_axis=False):
+def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
+                                     toggle_id=None, top_n=10):
     """Render matchup-flipping boundaries as HTML <li> bullets.
 
     Format: "141.66 Def + 138 HP flips Medicham (1v1, 1v2 no bait) [85 IVs]"
 
     When *has_bait_axis* is True and a boundary only fires in one bait
     mode, the scenario string is annotated with "no bait" or "with bait".
+
+    When *toggle_id* is set and there are more than *top_n* bullets,
+    the excess are hidden behind a show/hide toggle button.
     """
     lines = []
-    for b in boundaries:
+    for i, b in enumerate(boundaries):
         scen_str = ', '.join(
             f'{s[0]}v{s[1]}' for s in sorted(b['scenarios']))
         bait_modes = b.get('bait_modes', set())
@@ -526,12 +560,31 @@ def render_matchup_boundary_bullets(boundaries, has_bait_axis=False):
             hp_str = (f' + <span class="dd-strong">'
                       f'{b["hp_threshold"]} HP</span>')
         stat_label = 'Atk' if b.get('stat') == 'atk' else 'Def'
+        hidden = ''
+        if toggle_id and i >= top_n:
+            hidden = f' class="dd-iv-hidden" data-tier-card="{toggle_id}"'
         lines.append(
-            f'<li><span class="dd-strong">'
+            f'<li{hidden}><span class="dd-strong">'
             f'{b["threshold"]:.2f} {stat_label}</span>{hp_str} '
-            f'flips <b>{b["opponent"]}</b> '
+            f'flips {_opp_b(b["opponent"])} '
             f'(<span class="dd-gain">{scen_str}</span>) '
             f'<span class="dd-small">[{b["n_passing"]} IVs]</span></li>'
+        )
+    if toggle_id and len(boundaries) > top_n:
+        n = len(boundaries)
+        lines.append(
+            f'<button class="dd-iv-toggle" onclick="'
+            f"(function(btn){{"
+            f"var items=document.querySelectorAll("
+            f"'[data-tier-card=&quot;{toggle_id}&quot;]');"
+            f"var shown=items.length>0&&"
+            f"items[0].classList.contains('dd-iv-shown');"
+            f"items.forEach(function(r){{"
+            f"r.classList.toggle('dd-iv-shown',!shown);}});"
+            f"btn.textContent=shown?"
+            f"'Show all {n} boundaries':'Collapse to top {top_n}';"
+            f"}})(this)"
+            f'">Show all {n} boundaries</button>'
         )
     return lines
 
@@ -684,10 +737,13 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
                     f'data-anchor-id="{anchor_id}"></span>'
                 )
 
+            opp_name = recs[0]["opponent"]
+            opp_c = _opp_color(opp_name)
             lines.append(
                 f'<li><span class="dd-strong">{min_thresh:.2f} {stat_label}</span>'
                 f'{hp_str} '
-                f'for <b>{anchor_label}</b>{move_str} vs {recs[0]["opponent"]} '
+                f'for <b style="color:{opp_c}">{anchor_label}</b>'
+                f'{move_str} vs {_opp_b(opp_name)} '
                 f'(<span class="dd-gain">{scen_strs}</span>)'
                 f'{anchor_span}</li>'
             )
@@ -1123,7 +1179,8 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                        if mb['opponent'] not in anchor_opps]
             if new_mbs:
                 mb_bullets = render_matchup_boundary_bullets(
-                    new_mbs, has_bait_axis=has_bait_axis)
+                    new_mbs, has_bait_axis=has_bait_axis,
+                    toggle_id=f'mb-tier-{ti}', top_n=10)
                 if mb_bullets:
                     parts.append(
                         '<p class="dd-small" style="margin-top:6px">'
@@ -1167,7 +1224,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                         scens = sorted(_probe_opps[opp])
                         scen_str = ', '.join(f'{s[0]}v{s[1]}' for s in scens)
                         parts.append(
-                            f'<li>vs <b>{opp}</b> '
+                            f'<li>vs {_opp_b(opp)} '
                             f'(<span class="dd-gain">{scen_str}</span>)'
                             f'</li>\n'
                         )
@@ -1347,8 +1404,9 @@ def generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode
             elif bm == {'nobait'}:
                 bait_badge = ' <span class="dd-badge" style="background:#1a3a6e;color:#58a6ff">[no-bait only]</span>'
 
+        opp_c = _opp_color(opp)
         lines.append(
-            f'<li><b>{opp} {scene}</b> &mdash; '
+            f'<li><b style="color:{opp_c}">{opp} {scene}</b> &mdash; '
             f'{n} of top IVs gain this matchup vs {opp_label} opponent '
             f'(avg +{avg_delta:.0f} score){stat_note}{bait_badge}</li>'
         )
@@ -1360,7 +1418,7 @@ def generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode
         loss_parts = []
         for (opp, scene), iv_deltas in loss_counts[:4]:
             n = len(iv_deltas)
-            loss_parts.append(f'{opp} {scene} ({n} IVs)')
+            loss_parts.append(f'{_opp_b(opp)} {scene} ({n} IVs)')
         lines.append(', '.join(loss_parts) + '</li>')
 
     return lines
@@ -2055,9 +2113,10 @@ function ddToggleTagsCompactCell(event) {
                 'to Level&nbsp;1 in the TOML.</p>\n'
             )
             for parent, subs in sorted(level3_parents):
+                opp_name = subs[0].opponent if subs[0].opponent else parent
                 parts.append(
                     f'<details class="dd-flip-detail">'
-                    f'<summary><strong>{parent}</strong> '
+                    f'<summary>{_opp_strong(opp_name, parent)} '
                     f'<span class="dd-small">({len(subs)} sub-anchors)'
                     f'</span></summary>\n'
                 )
@@ -2521,8 +2580,10 @@ def render_results_section(data_obj, moveset_label, opp_label,
             seen_parents.add(a.parent)
             stat_label = 'Atk' if a.target_stat == 'atk' else 'Def'
             desc = a.description or f'{a.opponent} {a.kind}'
+            opp_c = _opp_color(a.opponent)
             expert_summary_bullets.append(
-                f'<li><span class="dd-strong">{a.opponent}</span> '
+                f'<li><span class="dd-strong" style="color:{opp_c}">'
+                f'{a.opponent}</span> '
                 f'({stat_label}-side) - {desc}</li>'
             )
         if expert_summary_bullets:
@@ -2680,7 +2741,8 @@ def render_results_section(data_obj, moveset_label, opp_label,
                            m['threshold'], m['opponent']),
         )
         mb_bullets = render_matchup_boundary_bullets(
-            _sorted_mbs, has_bait_axis=has_bait_axis)
+            _sorted_mbs, has_bait_axis=has_bait_axis,
+            toggle_id='mb-standalone', top_n=10)
     anchor_bullets = []
     if anchor_flip_records:
         anchor_bullets = render_anchor_flip_bullets(
