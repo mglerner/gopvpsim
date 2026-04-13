@@ -57,6 +57,7 @@ class ResolvedAnchor:
     strict: bool = True                  # True = strict `>`, False = `>=`
     label: str = ""                      # short human-readable label
     description: str = ""
+    source: str = ""                     # expert attribution (e.g. "acidicArisen")
     parent_display_name: str = ""        # short HTML badge label for the parent
 
     # Extra metadata for damage_breakpoint / bulkpoint anchors:
@@ -366,6 +367,7 @@ def _resolve_cmp_anchor(
         strict=anchor.strict,
         label=anchor.name,
         description=anchor.description,
+        source=anchor.source,
         parent_display_name=display,
     )
 
@@ -447,6 +449,7 @@ def _resolve_bp_anchor(
             strict=False,   # >=: "deals at least N"
             label=label,
             description=anchor.description,
+            source=anchor.source,
             parent_display_name=parent_display,
             move_id=move['moveId'],
             damage=anchor.deals_at_least,
@@ -483,6 +486,7 @@ def _resolve_bp_anchor(
             strict=False,
             label=label,
             description=anchor.description,
+            source=anchor.source,
             parent_display_name=parent_display,
             move_id=move['moveId'],
             damage=dmg,
@@ -507,6 +511,7 @@ def _resolve_bp_anchor(
                 strict=False,
                 label=label,
                 description=anchor.description,
+                source=anchor.source,
                 parent_display_name=parent_display,
                 move_id=move['moveId'],
                 damage=bp.damage,
@@ -641,6 +646,7 @@ def _resolve_bulkpoint_anchor(
             strict=True,   # def > threshold → damage <= takes_at_most
             label=label,
             description=anchor.description,
+            source=anchor.source,
             parent_display_name=parent_display,
             move_id=move['moveId'],
             damage=anchor.takes_at_most,
@@ -673,6 +679,7 @@ def _resolve_bulkpoint_anchor(
             strict=True,
             label=label,
             description=anchor.description,
+            source=anchor.source,
             parent_display_name=parent_display,
             move_id=move['moveId'],
             damage=dmg,
@@ -697,6 +704,7 @@ def _resolve_bulkpoint_anchor(
                 strict=True,
                 label=label,
                 description=anchor.description,
+                source=anchor.source,
                 parent_display_name=parent_display,
                 move_id=move['moveId'],
                 damage=bp.damage,

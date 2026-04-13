@@ -128,6 +128,25 @@ levels — see the table in [`concepts.md`](concepts.md) for the side-by-side. T
 schema is designed so additional kinds can be added later without disturbing
 existing files.
 
+### Optional fields on all anchor kinds
+
+All anchor kinds accept these optional fields:
+
+```toml
+[Species.Great.anchors.example]
+kind = "..."
+description = "..."          # human-readable; appears in HTML output
+source = "acidicArisen"      # expert attribution; controls HTML zone routing
+display_name = "..."         # short label for HTML badges; auto-derived if absent
+```
+
+The `source` field serves two purposes:
+
+1. **Attribution**: displayed in the Expert Analysis zone header of the deep dive HTML.
+2. **Zone routing**: anchors (and spreads) with `source` set appear in the Expert
+   Analysis zone. Items without `source` appear in the Simulation Deep Dive zone.
+   When no items have `source`, the output has a single zone (backwards compatible).
+
 ### CMP anchors
 
 ```toml

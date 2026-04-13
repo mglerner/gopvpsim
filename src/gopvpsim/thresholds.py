@@ -85,6 +85,7 @@ class CmpAnchor:
     spread: str                       # name of a spread (possibly qualified)
     strict: bool = True
     description: str = ""
+    source: str = ""
     display_name: Optional[str] = None  # short label for HTML badges; auto-derived if None
 
     @property
@@ -117,6 +118,7 @@ class DamageBreakpointAnchor:
     opponent_ivs: Optional[tuple[int, int, int]] = None
     opponent_spread: Optional[str] = None
     description: str = ""
+    source: str = ""
     display_name: Optional[str] = None  # short label for HTML badges; auto-derived if None
 
     @property
@@ -162,6 +164,7 @@ class BulkpointAnchor:
     opponent_ivs: Optional[tuple[int, int, int]] = None
     opponent_spread: Optional[str] = None
     description: str = ""
+    source: str = ""
     display_name: Optional[str] = None  # short label for HTML badges; auto-derived if None
 
     @property
@@ -381,7 +384,7 @@ def _parse_spread(name: str, raw: dict, *, path: str) -> Spread:
 
 
 def _parse_bulkpoint_anchor(
-    name: str, raw: dict, *, path: str, description: str,
+    name: str, raw: dict, *, path: str, description: str, source: str = "",
 ) -> "BulkpointAnchor":
     """Parse a bulkpoint anchor — symmetric to the damage_breakpoint branch."""
     opponent = raw.get("opponent")
@@ -465,6 +468,7 @@ def _parse_bulkpoint_anchor(
         opponent_ivs=opponent_ivs,
         opponent_spread=opponent_spread,
         description=description,
+        source=source,
         display_name=display_name,
     )
 
@@ -478,6 +482,7 @@ def _parse_anchor(name: str, raw: dict, *, path: str) -> Anchor:
         path=path,
     )
     description = raw.get("description", "")
+    source = raw.get("source", "")
 
     if kind == "cmp":
         spread = raw.get("spread")
@@ -497,10 +502,12 @@ def _parse_anchor(name: str, raw: dict, *, path: str) -> Anchor:
             _require(isinstance(display_name, str),
                      f"{name}.display_name must be a string", path=path)
         return CmpAnchor(name=name, spread=spread, strict=strict,
-                         description=description, display_name=display_name)
+                         description=description, source=source,
+                         display_name=display_name)
 
     if kind == "bulkpoint":
-        return _parse_bulkpoint_anchor(name, raw, path=path, description=description)
+        return _parse_bulkpoint_anchor(name, raw, path=path,
+                                       description=description, source=source)
 
     # damage_breakpoint
     opponent = raw.get("opponent")
@@ -589,6 +596,7 @@ def _parse_anchor(name: str, raw: dict, *, path: str) -> Anchor:
         opponent_ivs=opponent_ivs,
         opponent_spread=opponent_spread,
         description=description,
+        source=source,
         display_name=display_name,
     )
 
@@ -747,6 +755,8 @@ def as_legacy_dict(registry: ThresholdRegistry, species: str,
                 "attack": spread.attack,
                 "defense": spread.defense,
                 "stamina": spread.stamina,
+                "source": spread.source,
+                "description": spread.description,
             }
     return out
 
