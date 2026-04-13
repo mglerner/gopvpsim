@@ -465,7 +465,7 @@ def composite_tradeoff_prose(member_idx, comp_cat, parent_categories, data_obj):
 
 def matchup_subtitle(cat):
     """Render an IVCategory.matchup_conditions list as a one-line summary
-    (e.g. ``rank 1 Lickitung · 0v0 · no-bait dim. not yet swept``).
+    (e.g. ``rank 1 Lickitung · 0v0 · win`` or ``· no bait`` when nobait).
     Returns '' for non-matchup categories."""
     if not cat.matchup_conditions:
         return ''
@@ -479,24 +479,29 @@ def matchup_subtitle(cat):
         bait = c.get('bait')
         outcome = c.get('outcome', 'win')
         b = f'{oppiv_label} {opp} · {scen[0]}v{scen[1]} · {outcome}'
-        if bait is None:
-            b += ' (bait dim. not yet swept)'
-        else:
-            b += f' · {bait}'
+        if bait is not None and bait != 'bait':
+            b += ' · no bait'
         bits.append(b)
     return ' | '.join(bits)
 
 
 
-def render_matchup_boundary_bullets(boundaries):
+def render_matchup_boundary_bullets(boundaries, has_bait_axis=False):
     """Render matchup-flipping boundaries as HTML <li> bullets.
 
-    Format: "141.66 Def + 138 HP flips Medicham (1v1, 1v2) [85 IVs]"
+    Format: "141.66 Def + 138 HP flips Medicham (1v1, 1v2 no bait) [85 IVs]"
+
+    When *has_bait_axis* is True and a boundary only fires in one bait
+    mode, the scenario string is annotated with "no bait" or "with bait".
     """
     lines = []
     for b in boundaries:
         scen_str = ', '.join(
             f'{s[0]}v{s[1]}' for s in sorted(b['scenarios']))
+        bait_modes = b.get('bait_modes', set())
+        if has_bait_axis and len(bait_modes) == 1:
+            bait_tag = 'no bait' if 'nobait' in bait_modes else 'with bait'
+            scen_str += f' {bait_tag}'
         hp_str = ''
         if b.get('hp_threshold') is not None:
             hp_str = (f' + <span class="dd-strong">'
@@ -525,7 +530,8 @@ def anchor_group_id(parent, opponent, target_stat, move_id):
 
 
 
-def render_anchor_flip_bullets(records, anchor_passing_sink=None):
+def render_anchor_flip_bullets(records, anchor_passing_sink=None,
+                               has_bait_axis=False):
     """Render anchor-flip records as RyanSwag-style HTML <li> bullets.
 
     Grouping grain is ``(parent, opponent, target_stat, move_id)``.
@@ -541,6 +547,10 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None):
         "96.62 Def for lickilicky bulk (Hyper Beam) vs Lickilicky (0v1, 1v2)"
     Sub-anchors with no ``move_id`` (Level 1/2 anchors) keep their
     own bullet and omit the move parenthetical entirely.
+
+    When *has_bait_axis* is True and a flip only fires in one bait
+    mode, the scenario string is annotated with "no bait" or
+    "with bait".
 
     Bullets are sorted within each (parent, opponent) family by
     threshold ascending so increasing-stat bulkpoints read top-to-bottom
@@ -611,6 +621,15 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None):
                 for s in r['scenarios']:
                     scen_set.add(tuple(s))
             scen_strs = ', '.join(f'{s[0]}v{s[1]}' for s in sorted(scen_set))
+
+            # Bait modes: union across sub-anchors (same pattern).
+            bait_union = set()
+            for r in recs:
+                bait_union |= r.get('bait_modes', set())
+            if has_bait_axis and len(bait_union) == 1:
+                bait_tag = ('no bait' if 'nobait' in bait_union
+                            else 'with bait')
+                scen_strs += f' {bait_tag}'
 
             # HP co-condition: if any record in the group carries an
             # hp_threshold, show it alongside the def threshold.
@@ -727,9 +746,7 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
         '(opponent,&nbsp;scenario)&nbsp;partitions for selective '
         'matchups. Pure slayer cards live in the Mirror Slayer '
         'Iteration block below; pure tier cards in the Threshold Tiers '
-        'section above. The bait-axis dimension is not yet swept '
-        '— see TODO &ldquo;Baiting policy as a deep-dive sim '
-        'axis.&rdquo;</p>\n'
+        'section above.</p>\n'
     )
 
     # Notability filter checkbox. Default ON: show only small,
@@ -886,7 +903,8 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                                   moveset_idx=0,
                                   flips_detail=None,
                                   matchup_boundaries=None,
-                                  anchor_passing_sink=None):
+                                  anchor_passing_sink=None,
+                                  has_bait_axis=False):
     """RyanSwag-style threshold tier cards.
 
     Each tier becomes a card whose headline is the tier's stat-target spec
@@ -997,7 +1015,8 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             tier_opps = sorted({r['opponent'] for r in tier_records})
             # Count only — no sink here; the actual rendered bullets
             # below populate the sink.
-            n_bullets = len(render_anchor_flip_bullets(tier_records))
+            n_bullets = len(render_anchor_flip_bullets(
+                tier_records, has_bait_axis=has_bait_axis))
             scen_set = set()
             for r in tier_records:
                 for s in r['scenarios']:
@@ -1027,7 +1046,8 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         max_bullets_visible = 5
         if tier_records:
             bullets = render_anchor_flip_bullets(
-                tier_records, anchor_passing_sink=anchor_passing_sink)
+                tier_records, anchor_passing_sink=anchor_passing_sink,
+                has_bait_axis=has_bait_axis)
             if bullets:
                 tier_card_uid = f'dd-tier-{ti}'
                 n_vis = min(len(bullets), max_bullets_visible)
@@ -1083,7 +1103,8 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             new_mbs = [mb for mb in tier_mbs
                        if mb['opponent'] not in anchor_opps]
             if new_mbs:
-                mb_bullets = render_matchup_boundary_bullets(new_mbs)
+                mb_bullets = render_matchup_boundary_bullets(
+                    new_mbs, has_bait_axis=has_bait_axis)
                 if mb_bullets:
                     parts.append(
                         '<p class="dd-small" style="margin-top:6px">'
@@ -2395,7 +2416,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
                            ref_atk, ref_def, ref_iv, opp_iv_mode,
                            scores_flat, nS, nO, scenarios, opponents,
                            anchor_passing_sink, has_toml_tiers, ranked,
-                           hp_list, nIvs):
+                           hp_list, nIvs, has_bait_axis=False):
     """Render the always-visible Deep Dive Results section.
 
     Returns an HTML string. Computation (anchor aggregation, tier
@@ -2418,6 +2439,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
             flips_detail=flips,
             matchup_boundaries=all_matchup_boundaries,
             anchor_passing_sink=anchor_passing_sink,
+            has_bait_axis=has_bait_axis,
         )
         if tier_cards_html:
             parts.append(tier_cards_html)
@@ -2468,11 +2490,13 @@ def render_results_section(data_obj, moveset_label, opp_label,
             key=lambda m: (0 if m.get('stat', 'def') == 'def' else 1,
                            m['threshold'], m['opponent']),
         )
-        mb_bullets = render_matchup_boundary_bullets(_sorted_mbs)
+        mb_bullets = render_matchup_boundary_bullets(
+            _sorted_mbs, has_bait_axis=has_bait_axis)
     anchor_bullets = []
     if anchor_flip_records:
         anchor_bullets = render_anchor_flip_bullets(
-            anchor_flip_records, anchor_passing_sink=anchor_passing_sink)
+            anchor_flip_records, anchor_passing_sink=anchor_passing_sink,
+            has_bait_axis=has_bait_axis)
 
     has_any_threshold = threshold_descs or mb_bullets or anchor_bullets
     if has_any_threshold:

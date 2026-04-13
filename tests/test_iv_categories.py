@@ -224,7 +224,7 @@ def test_matchup_categories_emit_non_trivial_partitions():
         'opponent': 'Lickitung',
         'opponent_ivs': 'rank1',
         'scenario': (0, 0),
-        'bait': None,
+        'bait': 'bait',
         'outcome': 'win',
     }]
     assert lic.member_meta[0]['score'] == 600
@@ -299,7 +299,8 @@ def test_render_notable_ivs_includes_matchup_card():
     )
     html = deep_dive.rendering.render_notable_ivs_section(cats, data_obj, 'rank1')
     assert 'Beats rank 1 Lickitung in the 2v2' in html
-    assert 'bait dim. not yet swept' in html
+    # bait='bait' (default) should NOT add a 'no bait' annotation
+    assert 'no bait' not in html
     assert '15/5/10' in html  # IV 1's triple
 
 
