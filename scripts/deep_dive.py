@@ -1755,12 +1755,20 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     )
 
     # ======== IV FLAVOR GUIDE (narrative prose zone) ========
+    # The narrative zone always uses auto-derived tiers (the simulator's
+    # own opinion), even when TOML tiers exist. This keeps the purple
+    # zone independent of hand-curated expert content (gold zone).
     from deep_dive_narrative import (derive_narrative_flavors,
                                      compute_flavor_tradeoffs,
                                      render_narrative_zone)
-    if effective_tiers:
+    narrative_tiers = effective_tiers
+    if has_toml_tiers and anchor_flip_records:
+        narrative_tiers = _auto_derive_tiers(
+            anchor_flip_records, data_obj,
+            matchup_boundaries=all_matchup_boundaries) or []
+    if narrative_tiers:
         flavors = derive_narrative_flavors(
-            effective_tiers, all_matchup_boundaries, data_obj)
+            narrative_tiers, all_matchup_boundaries, data_obj)
         if flavors:
             tradeoffs = (compute_flavor_tradeoffs(
                 flavors, data_obj, score_arrays, moveset_idx,
