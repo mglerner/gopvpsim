@@ -411,7 +411,7 @@ def build_iv_categories(data_obj, slayer_categories=None,
                             'opponent': opp_name,
                             'opponent_ivs': opp_iv_mode,
                             'scenario': (scen[0], scen[1]),
-                            'bait': None,  # reserved for bait-axis TODO
+                            'bait': parse_mode(opp_iv_mode)[1],
                             'outcome': 'win',
                         }],
                         member_meta=member_meta,
@@ -1494,6 +1494,11 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 
     print("  Generating analysis sections...")
 
+    # Determine whether both bait modes were swept (for bait annotations).
+    _all_opp_modes = data_obj.get('oppIvModes', [opp_iv_mode])
+    _bait_values = {parse_mode(m)[1] for m in _all_opp_modes}
+    has_bait_axis = ('bait' in _bait_values and 'nobait' in _bait_values)
+
     # Resolved anchors are needed by both the slayer-iteration block (much
     # further down) and the new anchor-driven matchup-flip section (rendered
     # right after Key Matchup Thresholds). Extract once here.
@@ -1607,9 +1612,10 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # record that fires in both modes doesn't appear twice.
     anchor_flip_records = []
     if resolved_anchors_top:
-        _seen_keys: set = set()
+        _seen: dict = {}  # dedup_key -> rec (merge bait_modes on collision)
         all_modes = data_obj.get('oppIvModes', [opp_iv_mode])
         for _mode in all_modes:
+            bait_mode = parse_mode(_mode)[1]
             _key = f'{moveset_idx}_{_mode}'
             _scores = score_arrays.get(_key, [])
             if not _scores:
@@ -1621,19 +1627,23 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 debug_stats=_debug,
             )
             for rec in _recs:
+                rec['bait_modes'] = {bait_mode}
                 dedup_key = (rec['anchor'].name, rec['opponent'],
                              frozenset(tuple(s) for s in rec['scenarios']))
-                if dedup_key not in _seen_keys:
-                    _seen_keys.add(dedup_key)
+                if dedup_key in _seen:
+                    _seen[dedup_key]['bait_modes'] |= rec['bait_modes']
+                else:
+                    _seen[dedup_key] = rec
                     anchor_flip_records.append(rec)
             print(f"  Anchor-flip aggregator ({_mode}): {_debug}")
 
     # -- Compute matchup-flipping boundaries (def and atk sweeps) --
     # Run before tier cards so they can include boundary bullets.
     all_matchup_boundaries = []
-    _mb_seen: set = set()
+    _mb_seen: dict = {}  # dedup_key -> mb (merge bait_modes on collision)
     all_modes = data_obj.get('oppIvModes', [opp_iv_mode])
     for _mode in all_modes:
+        bait_mode = parse_mode(_mode)[1]
         _key = f'{moveset_idx}_{_mode}'
         _scores = score_arrays.get(_key, [])
         if not _scores:
@@ -1645,11 +1655,14 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 sweep_stat=_sweep,
             )
             for mb in _mbs:
+                mb['bait_modes'] = {bait_mode}
                 dedup_key = (mb['opponent'], mb['stat'], mb['threshold'],
                              mb.get('hp_threshold'),
                              frozenset(tuple(s) for s in mb['scenarios']))
-                if dedup_key not in _mb_seen:
-                    _mb_seen.add(dedup_key)
+                if dedup_key in _mb_seen:
+                    _mb_seen[dedup_key]['bait_modes'] |= mb['bait_modes']
+                else:
+                    _mb_seen[dedup_key] = mb
                     all_matchup_boundaries.append(mb)
     if all_matchup_boundaries:
         _n_def = sum(1 for m in all_matchup_boundaries
@@ -1715,6 +1728,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         opponents=opponents, anchor_passing_sink=anchor_passing_sink,
         has_toml_tiers=has_toml_tiers, ranked=ranked,
         hp_list=hp_list, nIvs=nIvs,
+        has_bait_axis=has_bait_axis,
     )
 
     # ======== ANALYSIS section (behind toggle) ========
