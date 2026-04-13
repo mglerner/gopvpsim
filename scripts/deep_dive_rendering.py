@@ -217,6 +217,10 @@ DEEP_DIVE_CSS = """
 .dd-expert-source { color: #8b949e; font-size: 0.82rem; font-style: italic; margin: 0 0 12px 0; }
 .dd-expert-anchors { margin: 10px 0; }
 .dd-expert-anchors li { margin: 4px 0; }
+.dd-narrative-zone { border-left: 4px solid #9b59b6; padding: 12px 0 12px 16px; margin: 20px 0; }
+.dd-narrative-prose { font-size: 0.9rem; color: #c8ccd4; line-height: 1.6; margin: 6px 0; }
+.dd-narrative-rec { color: #3fb950; font-weight: 600; }
+.dd-narrative-loss { color: #f85149; font-size: 0.88rem; font-style: italic; margin: 8px 0 4px 0; }
 .dd-sim-zone { border-left: 4px solid #58a6ff; padding-left: 16px; margin: 16px 0; }
 .dd-sim-zone > h3 { color: #58a6ff; margin: 0 0 10px 0; }
 """

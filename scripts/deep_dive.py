@@ -1754,6 +1754,25 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         has_bait_axis=has_bait_axis,
     )
 
+    # ======== IV FLAVOR GUIDE (narrative prose zone) ========
+    from deep_dive_narrative import (derive_narrative_flavors,
+                                     compute_flavor_tradeoffs,
+                                     render_narrative_zone)
+    if effective_tiers:
+        flavors = derive_narrative_flavors(
+            effective_tiers, all_matchup_boundaries, data_obj)
+        if flavors:
+            tradeoffs = (compute_flavor_tradeoffs(
+                flavors, data_obj, score_arrays, moveset_idx,
+                scenarios, opponents,
+                all_matchup_boundaries=all_matchup_boundaries)
+                if len(flavors) >= 2 else {})
+            narrative_html = render_narrative_zone(
+                flavors, tradeoffs, all_matchup_boundaries,
+                data_obj, opp_label, has_bait_axis=has_bait_axis)
+            if narrative_html:
+                results_html += narrative_html
+
     # ======== ANALYSIS section (behind toggle) ========
     analysis_parts = []
 
