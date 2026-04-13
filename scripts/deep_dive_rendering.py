@@ -479,8 +479,10 @@ def matchup_subtitle(cat):
         bait = c.get('bait')
         outcome = c.get('outcome', 'win')
         b = f'{oppiv_label} {opp} · {scen[0]}v{scen[1]} · {outcome}'
-        if bait is not None and bait != 'bait':
+        if bait == 'nobait':
             b += ' · no bait'
+        elif bait == 'bait' and 'only' in cat.name:
+            b += ' · with bait'
         bits.append(b)
     return ' | '.join(bits)
 
@@ -2467,6 +2469,79 @@ def render_results_section(data_obj, moveset_label, opp_label,
         slayer_categories=slayer_categories_for_ivcat,
         matchup_data=matchup_data_for_ivcat,
     )
+
+    # -- Bait-differential matchup cards --
+    # When both bait modes were swept, find (opponent, scenario) pairs
+    # where the win set differs between bait-on and bait-off. Emit
+    # categories for "only wins with bait" and "only wins without bait".
+    if has_bait_axis and score_arrays is not None:
+        nobait_mode = compose_mode(parse_mode(opp_iv_mode)[0], 'nobait')
+        nobait_key = f'{moveset_idx}_{nobait_mode}'
+        nobait_scores = score_arrays.get(nobait_key, [])
+        n_ivs = data_obj['nIvs']
+        win_threshold = 500
+        opp_iv_base = parse_mode(opp_iv_mode)[0]
+        opp_iv_label = ('PvPoke default' if opp_iv_base == 'pvpoke'
+                        else 'rank 1')
+        iv_a = data_obj.get('ivA', [])
+        iv_d = data_obj.get('ivD', [])
+        iv_s = data_obj.get('ivS', [])
+        if nobait_scores and len(nobait_scores) >= n_ivs * nS * nO:
+            for oi, opp_name in enumerate(opponents):
+                if oi >= nO:
+                    break
+                for si, scen in enumerate(scenarios):
+                    if si >= nS:
+                        break
+                    bait_wins = set()
+                    nobait_wins = set()
+                    for iv in range(n_ivs):
+                        idx = iv * nS * nO + si * nO + oi
+                        if scores_flat[idx] >= win_threshold:
+                            bait_wins.add(iv)
+                        if nobait_scores[idx] >= win_threshold:
+                            nobait_wins.add(iv)
+                    # "Only wins with bait" = bait_wins - nobait_wins
+                    only_bait = sorted(bait_wins - nobait_wins)
+                    # "Only wins without bait" = nobait_wins - bait_wins
+                    only_nobait = sorted(nobait_wins - bait_wins)
+                    scen_label = f'{scen[0]}v{scen[1]}'
+                    for members, bait_tag, bait_val in [
+                        (only_bait, 'with bait', 'bait'),
+                        (only_nobait, 'no bait', 'nobait'),
+                    ]:
+                        if not members or len(members) == n_ivs:
+                            continue
+                        meta = {}
+                        for iv in members:
+                            s_bait = scores_flat[iv * nS * nO + si * nO + oi]
+                            s_nobait = nobait_scores[iv * nS * nO + si * nO + oi]
+                            meta[iv] = {
+                                'iv': ((iv_a[iv], iv_d[iv], iv_s[iv])
+                                       if iv < len(iv_a) else None),
+                                'score': s_bait if bait_val == 'bait' else s_nobait,
+                            }
+                        name = (f'Beats {opp_iv_label} {opp_name} '
+                                f'in the {scen_label} {bait_tag} only')
+                        iv_categories_all.append(IVCategory(
+                            name=name,
+                            kind='matchup',
+                            members=members,
+                            description=(
+                                f'IVs that beat {opp_iv_label} {opp_name} '
+                                f'in the {scen_label} only {bait_tag} '
+                                f'(lose in the other bait mode).'
+                            ),
+                            matchup_conditions=[{
+                                'opponent': opp_name,
+                                'opponent_ivs': opp_iv_mode,
+                                'scenario': (scen[0], scen[1]),
+                                'bait': bait_val,
+                                'outcome': 'win',
+                            }],
+                            member_meta=meta,
+                        ))
+
     notable_html = render_notable_ivs_section(
         iv_categories_all, data_obj, opp_iv_mode,
         recommendations_html=rec_html,
