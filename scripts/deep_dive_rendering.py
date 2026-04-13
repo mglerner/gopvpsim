@@ -182,6 +182,13 @@ DEEP_DIVE_CSS = """
 .dd-collapsible > summary::before { content: "\\25b6"; display: inline-block;
   margin-right: 6px; font-size: 0.7em; transition: transform 0.15s; color: #58a6ff; }
 .dd-collapsible[open] > summary::before { transform: rotate(90deg); }
+.dd-expert-zone { border-left: 4px solid #d29922; padding-left: 16px; margin: 16px 0; }
+.dd-expert-zone h3 { color: #d29922; margin: 0 0 10px 0; }
+.dd-expert-source { color: #8b949e; font-size: 0.82rem; font-style: italic; margin: 0 0 12px 0; }
+.dd-expert-anchors { margin: 10px 0; }
+.dd-expert-anchors li { margin: 4px 0; }
+.dd-sim-zone { margin: 16px 0; }
+.dd-sim-zone > h3 { color: #58a6ff; margin: 0 0 10px 0; }
 """
 
 def parse_mode(composite_mode):
@@ -2463,19 +2470,94 @@ def render_results_section(data_obj, moveset_label, opp_label,
     parts.append(f'<p>Moveset: {analysis.pretty_moveset(moveset_label)}. '
                  f'Vs {opp_label} opponents.</p>\n')
 
-    # -- Threshold Tier Cards --
-    if effective_tiers:
-        tier_cards_html = render_threshold_tier_cards(
-            data_obj, anchor_flip_records, avg_ranks, flip_map,
-            override_tiers=effective_tiers,
+    # -- Partition by source for two-zone rendering --
+    expert_tiers = [t for t in effective_tiers if t.get('source')]
+    sim_tiers = [t for t in effective_tiers if not t.get('source')]
+    expert_anchor_recs = [r for r in anchor_flip_records
+                          if r['anchor'].source]
+    sim_anchor_recs = [r for r in anchor_flip_records
+                       if not r['anchor'].source]
+    has_expert_content = bool(expert_tiers) or bool(expert_anchor_recs)
+
+    # Collect unique source attributions for the expert zone header
+    expert_sources = set()
+    for t in expert_tiers:
+        if t.get('source'):
+            expert_sources.add(t['source'])
+    for r in expert_anchor_recs:
+        if r['anchor'].source:
+            expert_sources.add(r['anchor'].source)
+
+    # ================================================================
+    # Expert Analysis zone
+    # ================================================================
+    if has_expert_content:
+        source_label = ', '.join(sorted(expert_sources))
+        parts.append('<div class="dd-expert-zone">\n')
+        parts.append(f'<h3>Expert Analysis ({source_label})</h3>\n')
+
+        # Expert tier cards
+        if expert_tiers:
+            expert_tier_cards = render_threshold_tier_cards(
+                data_obj, expert_anchor_recs, avg_ranks, flip_map,
+                override_tiers=expert_tiers,
+                score_arrays=score_arrays, moveset_idx=moveset_idx,
+                flips_detail=flips,
+                matchup_boundaries=all_matchup_boundaries,
+                anchor_passing_sink=anchor_passing_sink,
+                has_bait_axis=has_bait_axis,
+            )
+            if expert_tier_cards:
+                parts.append(expert_tier_cards)
+
+        # Expert anchor summaries with TOML descriptions
+        # Group by parent anchor name to avoid duplicates from Level 3 expansion
+        seen_parents = set()
+        expert_summary_bullets = []
+        for rec in expert_anchor_recs:
+            a = rec['anchor']
+            if a.parent in seen_parents:
+                continue
+            seen_parents.add(a.parent)
+            stat_label = 'Atk' if a.target_stat == 'atk' else 'Def'
+            desc = a.description or f'{a.opponent} {a.kind}'
+            expert_summary_bullets.append(
+                f'<li><span class="dd-strong">{a.opponent}</span> '
+                f'({stat_label}-side) - {desc}</li>'
+            )
+        if expert_summary_bullets:
+            parts.append('<ul class="dd-expert-anchors">\n')
+            parts.append('\n'.join(expert_summary_bullets))
+            parts.append('\n</ul>\n')
+            parts.append(
+                '<p class="dd-small" style="color:#8b949e">'
+                'Full breakpoint details in '
+                '<a href="#dd-stat-thresholds" style="color:#58a6ff">'
+                'Stat Thresholds &amp; Matchup Flips</a> below.</p>\n'
+            )
+
+        parts.append('</div>\n')  # end expert zone
+
+    # ================================================================
+    # Simulation Deep Dive zone
+    # ================================================================
+    if has_expert_content:
+        parts.append('<div class="dd-sim-zone">\n')
+        parts.append('<h3>Simulation Deep Dive</h3>\n')
+
+    # -- Sim-only Tier Cards (if any auto-derived tiers exist) --
+    if sim_tiers:
+        sim_tier_cards = render_threshold_tier_cards(
+            data_obj, sim_anchor_recs, avg_ranks, flip_map,
+            override_tiers=sim_tiers,
             score_arrays=score_arrays, moveset_idx=moveset_idx,
             flips_detail=flips,
             matchup_boundaries=all_matchup_boundaries,
             anchor_passing_sink=anchor_passing_sink,
             has_bait_axis=has_bait_axis,
         )
-        if tier_cards_html:
-            parts.append(tier_cards_html)
+        if sim_tier_cards:
+            parts.append(sim_tier_cards)
 
     # -- IV Recommendations (rendered first, injected into Notable IVs) --
     rec_html = _render_iv_recommendations(
@@ -2619,7 +2701,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
         summary_text = ', '.join(summary_parts)
 
         parts.append(
-            f'<details class="dd-collapsible">'
+            f'<details class="dd-collapsible" id="dd-stat-thresholds">'
             f'<summary class="dd-h3" style="cursor:pointer">'
             f'Stat Thresholds &amp; Matchup Flips '
             f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
@@ -2678,6 +2760,9 @@ def render_results_section(data_obj, moveset_label, opp_label,
             parts.append('</details>\n')
 
         parts.append('</details>\n')  # outer collapsible
+
+    if has_expert_content:
+        parts.append('</div>\n')  # end sim zone
 
     parts.append('</div>\n')
 

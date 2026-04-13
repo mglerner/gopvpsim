@@ -1915,6 +1915,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             'defense': thresh['defense'],
             'stamina': thresh['stamina'],
             'desc': _threshold_desc(thresh),
+            'source': thresh.get('source', ''),
+            'toml_description': thresh.get('description', ''),
         })
 
     # Build the DATA object for JS
