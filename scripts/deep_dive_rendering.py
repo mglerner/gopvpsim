@@ -187,7 +187,7 @@ DEEP_DIVE_CSS = """
 .dd-expert-source { color: #8b949e; font-size: 0.82rem; font-style: italic; margin: 0 0 12px 0; }
 .dd-expert-anchors { margin: 10px 0; }
 .dd-expert-anchors li { margin: 4px 0; }
-.dd-sim-zone { margin: 16px 0; }
+.dd-sim-zone { border-left: 4px solid #58a6ff; padding-left: 16px; margin: 16px 0; }
 .dd-sim-zone > h3 { color: #58a6ff; margin: 0 0 10px 0; }
 """
 
@@ -2541,9 +2541,8 @@ def render_results_section(data_obj, moveset_label, opp_label,
     # ================================================================
     # Simulation Deep Dive zone
     # ================================================================
-    if has_expert_content:
-        parts.append('<div class="dd-sim-zone">\n')
-        parts.append('<h3>Simulation Deep Dive</h3>\n')
+    parts.append('<div class="dd-sim-zone">\n')
+    parts.append('<h3>Simulation Deep Dive</h3>\n')
 
     # -- Sim-only Tier Cards (if any auto-derived tiers exist) --
     if sim_tiers:
@@ -2761,8 +2760,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
 
         parts.append('</details>\n')  # outer collapsible
 
-    if has_expert_content:
-        parts.append('</div>\n')  # end sim zone
+    parts.append('</div>\n')  # end sim zone
 
     parts.append('</div>\n')
 
