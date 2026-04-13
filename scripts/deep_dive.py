@@ -1450,6 +1450,7 @@ def resolve_reference_moveset(species, league, shadow, ref_arg):
 
 # Aliases for extracted analysis functions (deep_dive_analysis.py)
 _find_flips = analysis.find_flips
+_merge_flip_dicts = analysis.merge_flip_dicts
 _build_move_tuples = analysis.build_move_tuples
 _pretty_name = analysis.pretty_name
 _pretty_moveset = analysis.pretty_moveset
@@ -1495,8 +1496,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     print("  Generating analysis sections...")
 
     # Determine whether both bait modes were swept (for bait annotations).
-    _all_opp_modes = data_obj.get('oppIvModes', [opp_iv_mode])
-    _bait_values = {parse_mode(m)[1] for m in _all_opp_modes}
+    all_modes = data_obj.get('oppIvModes', [opp_iv_mode])
+    _bait_values = {parse_mode(m)[1] for m in all_modes}
     has_bait_axis = ('bait' in _bait_values and 'nobait' in _bait_values)
 
     # Resolved anchors are needed by both the slayer-iteration block (much
@@ -1563,7 +1564,17 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         if data_obj['ivTiers'][iv] >= 0:
             test_set.add(iv)
     test_set.discard(ref_iv)
-    flips = _find_flips(scores_flat, nIvs, nS, nO, ref_iv, sorted(test_set), scenarios, opponents)
+    flips = {}
+    _sorted_test = sorted(test_set)
+    for _mode in all_modes:
+        _key = f'{moveset_idx}_{_mode}'
+        _sf = score_arrays.get(_key, [])
+        if not _sf:
+            continue
+        _, _bm = parse_mode(_mode)
+        _mode_flips = _find_flips(_sf, nIvs, nS, nO, ref_iv, _sorted_test,
+                                  scenarios, opponents, bait_mode=_bm)
+        flips = _merge_flip_dicts(flips, _mode_flips)
     flip_summary = [(iv, len(f['gains']), len(f['losses']), len(f['gains']) - len(f['losses'])) for iv, f in flips.items()]
     flip_summary.sort(key=lambda x: (-x[3], -x[1]))
     flip_map = {iv: (g, l, net) for iv, g, l, net in flip_summary}
@@ -1574,7 +1585,14 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     for iv in ranked[:50]:
         g, l, net = flip_map.get(iv, (0, 0, 0))
         rng = max(scene_ranks[si][iv] for si in range(nS)) - min(scene_ranks[si][iv] for si in range(nS))
-        score = -avg_ranks[iv] + net * 3 - rng * 0.001
+        if has_bait_axis and iv in flips:
+            fd = flips[iv]
+            net_both = sum(1 for e in fd.get('gains', []) if len(e.get('bait_modes', set())) > 1) \
+                     - sum(1 for e in fd.get('losses', []) if len(e.get('bait_modes', set())) > 1)
+            net_single = net - net_both
+            score = -avg_ranks[iv] + net_both * 3 + net_single * 1.5 - rng * 0.001
+        else:
+            score = -avg_ranks[iv] + net * 3 - rng * 0.001
         rec_candidates.append({'iv': iv, 'avg_rank': avg_ranks[iv], 'avg_score': avg_scores[iv],
                                 'gains': g, 'losses': l, 'net': net, 'range': rng, 'score': score})
     rec_candidates.sort(key=lambda x: x['score'], reverse=True)
@@ -1586,6 +1604,13 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         pop_atk = sum(data_obj['ivAtk'][i] for i in ranked[:20]) / 20
         pop_def = sum(data_obj['ivDef'][i] for i in ranked[:20]) / 20
         pop_hp = sum(data_obj['ivHp'][i] for i in ranked[:20]) / 20
+        # "Bait Robust" — all flips fire in both bait modes and net is positive
+        if has_bait_axis and iv in flips and rc['net'] > 0:
+            fd = flips[iv]
+            all_entries = fd.get('gains', []) + fd.get('losses', [])
+            if all_entries and all(len(e.get('bait_modes', set())) > 1 for e in all_entries):
+                rc['style'] = 'Bait Robust'
+                continue
         if atk > pop_atk + 0.5:
             rc['style'] = 'Attack Weight'
         elif def_ > pop_def + 2:
@@ -1613,7 +1638,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     anchor_flip_records = []
     if resolved_anchors_top:
         _seen: dict = {}  # dedup_key -> rec (merge bait_modes on collision)
-        all_modes = data_obj.get('oppIvModes', [opp_iv_mode])
         for _mode in all_modes:
             bait_mode = parse_mode(_mode)[1]
             _key = f'{moveset_idx}_{_mode}'
@@ -1641,7 +1665,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # Run before tier cards so they can include boundary bullets.
     all_matchup_boundaries = []
     _mb_seen: dict = {}  # dedup_key -> mb (merge bait_modes on collision)
-    all_modes = data_obj.get('oppIvModes', [opp_iv_mode])
     for _mode in all_modes:
         bait_mode = parse_mode(_mode)[1]
         _key = f'{moveset_idx}_{_mode}'
@@ -1762,7 +1785,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     analysis_parts.append(rendering.render_analysis_flips_html(
         data_obj, flip_summary, flips, avg_scores, ranked, ref_iv,
         opp_label, opp_info_cache, focal_moves, focal_types, ref_atk,
-        ref_def))
+        ref_def, has_bait_axis=has_bait_axis))
 
     analysis_parts.append(rendering.render_analysis_methods_html(
         nIvs, nS, nO, data_obj, moveset_label, opp_iv_mode, ref_iv,
