@@ -2339,7 +2339,7 @@ def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
     if not rec_candidates:
         return ''
     parts = []
-    parts.append('<h4 class="dd-h3" style="margin-top:18px">Recommended IVs</h4>\n')
+    parts.append('<h4 class="dd-h3" style="margin-top:18px">Top Picks</h4>\n')
     parts.append(
         f'<p class="dd-small">Top candidates by average score, matchup flips, '
         f'and rank stability vs {opp_label} opponents.</p>\n')
