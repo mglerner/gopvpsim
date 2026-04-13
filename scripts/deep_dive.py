@@ -1594,6 +1594,10 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         else:
             rc['style'] = 'Balanced'
 
+    # Store top-3 recommended IV indices so the JS engine can render
+    # them as a distinct overlay trace on the scatter plot.
+    data_obj['recIvs'] = [rc['iv'] for rc in rec_candidates[:3]]
+
     # -- Compute anchor-flip records (used by Threshold Tiers, the flat
     #    Anchor-Driven Matchup Flips section, and Notable IVs below) --
     # Run the aggregator against every opp_iv_mode (pvpoke, rank1, or both)

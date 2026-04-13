@@ -1165,6 +1165,12 @@ function buildTraces() {
       anchorSet[DATA.anchorClearIvs[asi]] = true;
     }
   }
+  var recSet = {};
+  if (DATA.recIvs) {
+    for (var rsi = 0; rsi < DATA.recIvs.length; rsi++) {
+      recSet[DATA.recIvs[rsi]] = true;
+    }
+  }
 
   // Per-IV color: matches "what the point would look like in its base
   // trace." In threshold mode, tier color if tiered or per-point Viridis
@@ -1185,10 +1191,12 @@ function buildTraces() {
   function overlaySymbol(iv) {
     var inSlayer = !!slayerSet[iv];
     var inAnchor = !!anchorSet[iv];
+    var inRec = !!recSet[iv];
     // 'star' replaces 'hexagram' because hexagram isn't supported in
     // scattergl and we need this trace to be gl to match tier +
     // Other + user-overlay traces — mixing svg and gl trace types
     // breaks hover hit detection on overlapping points.
+    if (inRec) return 'diamond';
     if (inSlayer && inAnchor) return 'star';
     if (inSlayer) return 'triangle-down';
     return 'triangle-up';  // anchor only
@@ -1248,6 +1256,8 @@ function buildTraces() {
   if (slayerTrace) traces.push(slayerTrace);
   var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff');
   if (anchorTrace) traces.push(anchorTrace);
+  var recTrace = buildOverlayTrace('Top Picks', DATA.recIvs, '#e94560');
+  if (recTrace) traces.push(recTrace);
 
   // Tier traces go next so they render on top of slayer/anchor overlays.
   // Sort largest first so smallest tiers (most selective) draw on top.
@@ -1305,8 +1315,9 @@ function buildTraces() {
 
     // Iterate unique owned IV indices (not userRecords) so we hit each
     // scatter point once. The ownedByIv cache groups records by IV,
-    // so anyMatched is just "does any record in this IV's group have
-    // a non-empty matched list" — no nested O(n) scan needed.
+    // so anyQualified is "does any record in this IV's group have a
+    // non-empty matched list OR slayer category" — tier hits and
+    // slayer membership both earn the white-circle treatment.
     var ownedByIv = state.ownedByIv || {};
     for (var ivKey in ownedByIv) {
       if (!ownedByIv.hasOwnProperty(ivKey)) continue;
@@ -1316,10 +1327,13 @@ function buildTraces() {
       if (currentYIsSparse && !isFinite(yv)) continue;
       var fullText = buildHoverText(iv);
       var recsAtIv = ownedByIv[ivKey];
-      var anyMatched = false;
-      for (var urD = 0; urD < recsAtIv.length; urD++) {
-        if (recsAtIv[urD].matched && recsAtIv[urD].matched.length > 0) {
-          anyMatched = true; break;
+      var anyQualified = !!recSet[iv];
+      if (!anyQualified) {
+        for (var urD = 0; urD < recsAtIv.length; urD++) {
+          if ((recsAtIv[urD].matched && recsAtIv[urD].matched.length > 0)
+              || (recsAtIv[urD].slayerCats && recsAtIv[urD].slayerCats.length > 0)) {
+            anyQualified = true; break;
+          }
         }
       }
       // Apply the nudge upward (positive y direction) so the user
@@ -1327,7 +1341,7 @@ function buildTraces() {
       // the matchup-diff block (which renders under the cursor by
       // default in Plotly) has more space below the hovered point.
       var nudgedY = yv + Y_NUDGE;
-      if (anyMatched) {
+      if (anyQualified) {
         qualX.push(sp); qualY.push(nudgedY); qualText.push(fullText);
       } else {
         ownX.push(sp); ownY.push(nudgedY); ownText.push(fullText);
@@ -1350,7 +1364,7 @@ function buildTraces() {
     // original motivation for 'skip' is fixed, so 'text' is safe.
     if (ownX.length > 0) {
       traces.push({
-        name: 'Yours - below tier', x: ownX, y: ownY, text: ownText,
+        name: 'Yours - other', x: ownX, y: ownY, text: ownText,
         mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
           size: 9, color: '#cccccc', symbol: 'circle-open',
@@ -1361,7 +1375,7 @@ function buildTraces() {
     }
     if (qualX.length > 0) {
       traces.push({
-        name: 'Yours - meets tier', x: qualX, y: qualY, text: qualText,
+        name: 'Yours - notable', x: qualX, y: qualY, text: qualText,
         mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
           size: 13, color: '#ffffff', symbol: 'circle-open',
