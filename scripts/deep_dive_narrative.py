@@ -71,13 +71,13 @@ def _flavor_name_for_tier(name, atk, def_):
         if opp:
             return f'{opp} Slayer'
         if name.startswith('Atk '):
-            return f'Attack Weight ({name})'
+            return 'Attack Weight'
     elif def_ > 0:
         opp = _opponent_from_tier_name(name)
         if opp:
             return f'Fortified {opp}'
         if name.startswith('Bulk '):
-            return f'High Bulk ({name})'
+            return 'High Bulk'
 
     # TOML-defined or unrecognized name: pass through
     return name
@@ -129,11 +129,28 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
         if f['is_general']:
             f['recommended'] = True
 
-    # Sort: General/recommended first, then by selectivity
+    # Sort: General/recommended first, then by selectivity (fewest
+    # qualifying IVs = most interesting).  Cap at 4 total (General + 3)
+    # to keep the narrative scannable - RyanSwag typically wrote 2-3.
     general = [f for f in flavors if f['is_general']]
     rest = sorted([f for f in flavors if not f['is_general']],
                   key=lambda f: f['n_qualifying'])
-    return general + rest
+    result = general + rest[:3]
+
+    # Disambiguate duplicate names by appending stat info
+    seen = {}
+    for f in result:
+        seen.setdefault(f['name'], []).append(f)
+    for name, group in seen.items():
+        if len(group) > 1:
+            for f in group:
+                primary_stat = (f'{f["def_cut"]:.0f}+ Def' if f['def_cut'] > 0
+                                else f'{f["atk_cut"]:.0f}+ Atk' if f['atk_cut'] > 0
+                                else '')
+                if primary_stat:
+                    f['name'] = f'{name} ({primary_stat})'
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -459,12 +476,17 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
                      if flavor['recommended'] else '')
         is_first = (i == 0)
 
+        # Skip stat_sig in the summary when the name already embeds it
+        # (e.g. "High Bulk (142+ Def)" already has the def threshold)
+        name_has_stat = ('+' in fname and ('Def' in fname or 'Atk' in fname))
+        summary_label = fname if name_has_stat else f'{fname} ({stat_sig})'
+
         # General flavor is open by default
         open_attr = ' open' if is_first else ''
         parts.append(
             f'<details class="dd-collapsible"{open_attr}>\n'
             f'<summary style="font-weight:600;color:#e0d0f0;cursor:pointer">'
-            f'{fname} ({stat_sig}){rec_badge}</summary>\n'
+            f'{summary_label}{rec_badge}</summary>\n'
         )
 
         td = tradeoffs.get(fname, {})
