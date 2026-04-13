@@ -77,8 +77,13 @@ def stat_cutoffs_from_anchors(anchor_objs):
 
 # ---- Core analysis functions ----
 
-def find_flips(scores_flat, nIvs, nS, nO, ref_iv, test_ivs, scenarios, opponents):
-    """Find matchup flips (crossing 500-point boundary) for test IVs vs reference."""
+def find_flips(scores_flat, nIvs, nS, nO, ref_iv, test_ivs, scenarios, opponents,
+               bait_mode='bait'):
+    """Find matchup flips (crossing 500-point boundary) for test IVs vs reference.
+
+    Each gain/loss entry includes a ``bait_modes`` set so callers can tell
+    which bait policy produced the flip after merging across modes.
+    """
     flips = {}
     for iv in test_ivs:
         if iv == ref_iv:
@@ -90,11 +95,39 @@ def find_flips(scores_flat, nIvs, nS, nO, ref_iv, test_ivs, scenarios, opponents
                 ts = scores_flat[iv * nS * nO + si * nO + oi]
                 if (rs >= 500) != (ts >= 500):
                     entry = {'scenario': f'{scenarios[si][0]}v{scenarios[si][1]}',
-                             'opponent': opponents[oi], 'ref_score': rs, 'iv_score': ts}
+                             'opponent': opponents[oi], 'ref_score': rs, 'iv_score': ts,
+                             'bait_modes': {bait_mode}}
                     (gains if ts >= 500 else losses).append(entry)
         if gains or losses:
             flips[iv] = {'gains': gains, 'losses': losses}
     return flips
+
+
+def merge_flip_dicts(base, new):
+    """Merge two flip dicts, unioning ``bait_modes`` on (opponent, scenario) collision.
+
+    Each dict maps ``iv -> {'gains': [...], 'losses': [...]}``.  Entries from
+    *new* are merged into *base* in-place.  When the same (opponent, scenario)
+    flip appears in both dicts for the same IV and direction, the ``bait_modes``
+    sets are unioned rather than creating a duplicate entry.
+
+    Returns *base* for convenience.
+    """
+    for iv, fd in new.items():
+        if iv not in base:
+            base[iv] = fd
+            continue
+        for direction in ('gains', 'losses'):
+            existing = base[iv][direction]
+            idx = {(e['opponent'], e['scenario']): i for i, e in enumerate(existing)}
+            for entry in fd[direction]:
+                key = (entry['opponent'], entry['scenario'])
+                if key in idx:
+                    existing[idx[key]]['bait_modes'] |= entry['bait_modes']
+                else:
+                    existing.append(entry)
+                    idx[key] = len(existing) - 1
+    return base
 
 
 def narrate_flip(focal_atk, focal_def, focal_hp, ref_atk, ref_def, ref_hp,

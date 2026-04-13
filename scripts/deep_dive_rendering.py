@@ -359,7 +359,17 @@ def tier_badge_html(data, iv):
 
 
 
-def prose_flip_summary(flip_data, max_gains=3, max_losses=2):
+def _bait_suffix(entry):
+    """Return a parenthetical bait-mode suffix for a flip entry, or ''."""
+    bm = entry.get('bait_modes', set())
+    if bm == {'bait'}:
+        return ' (bait only)'
+    elif bm == {'nobait'}:
+        return ' (no-bait only)'
+    return ''
+
+
+def prose_flip_summary(flip_data, max_gains=3, max_losses=2, has_bait_axis=False):
     """Generate a natural-language summary of matchup gains/losses.
 
     Returns a string like "gains Togekiss 1v2, G. Stunfisk 2v0; loses Steelix 0v2, 1v2"
@@ -370,7 +380,7 @@ def prose_flip_summary(flip_data, max_gains=3, max_losses=2):
     if gains:
         # Sort by delta descending
         top = sorted(gains, key=lambda e: e['iv_score'] - e['ref_score'], reverse=True)[:max_gains]
-        gain_strs = [f'{e["opponent"]} {e["scenario"]}' for e in top]
+        gain_strs = [f'{e["opponent"]} {e["scenario"]}{_bait_suffix(e) if has_bait_axis else ""}' for e in top]
         extra = len(gains) - len(top)
         s = 'gains ' + ', '.join(gain_strs)
         if extra > 0:
@@ -378,7 +388,7 @@ def prose_flip_summary(flip_data, max_gains=3, max_losses=2):
         parts.append(s)
     if losses:
         top = sorted(losses, key=lambda e: e['ref_score'] - e['iv_score'], reverse=True)[:max_losses]
-        loss_strs = [f'{e["opponent"]} {e["scenario"]}' for e in top]
+        loss_strs = [f'{e["opponent"]} {e["scenario"]}{_bait_suffix(e) if has_bait_axis else ""}' for e in top]
         extra = len(losses) - len(top)
         s = 'loses ' + ', '.join(loss_strs)
         if extra > 0:
@@ -1264,7 +1274,8 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
     return ''.join(parts)
 
 
-def generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode):
+def generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode,
+                                    has_bait_axis=False):
     """Generate HSH/RyanSwag-style threshold descriptions from flip data.
 
     Returns list of HTML paragraphs describing key stat thresholds with
@@ -1277,13 +1288,16 @@ def generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode
     # Group flips by opponent+scenario to find common themes
     opp_scene_gains = {}  # (opp, scene) -> list of (iv, delta)
     opp_scene_losses = {}
+    opp_scene_bait = {}   # (opp, scene) -> union of bait_modes across entries
     for iv, fd in flips.items():
         for e in fd['gains']:
             key = (e['opponent'], e['scenario'])
             opp_scene_gains.setdefault(key, []).append((iv, e['iv_score'] - e['ref_score']))
+            opp_scene_bait.setdefault(key, set()).update(e.get('bait_modes', set()))
         for e in fd['losses']:
             key = (e['opponent'], e['scenario'])
             opp_scene_losses.setdefault(key, []).append((iv, e['ref_score'] - e['iv_score']))
+            opp_scene_bait.setdefault(key, set()).update(e.get('bait_modes', set()))
 
     lines = []
 
@@ -1318,10 +1332,18 @@ def generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode
         else:
             stat_note = f' (favors lower {dominant[0]}, avg {dominant[2]:.1f})'
 
+        bait_badge = ''
+        if has_bait_axis:
+            bm = opp_scene_bait.get((opp, scene), set())
+            if bm == {'bait'}:
+                bait_badge = ' <span class="dd-badge" style="background:#1a3a6e;color:#58a6ff">[bait only]</span>'
+            elif bm == {'nobait'}:
+                bait_badge = ' <span class="dd-badge" style="background:#1a3a6e;color:#58a6ff">[no-bait only]</span>'
+
         lines.append(
             f'<li><b>{opp} {scene}</b> &mdash; '
             f'{n} of top IVs gain this matchup vs {opp_label} opponent '
-            f'(avg +{avg_delta:.0f} score){stat_note}</li>'
+            f'(avg +{avg_delta:.0f} score){stat_note}{bait_badge}</li>'
         )
 
     # Most common loss matchups
@@ -2254,7 +2276,8 @@ def render_analysis_volatility_html(data_obj, nIvs, nS, scenarios,
 
 def render_analysis_flips_html(data_obj, flip_summary, flips, avg_scores,
                                ranked, ref_iv, opp_label, opp_info_cache,
-                               focal_moves, focal_types, ref_atk, ref_def):
+                               focal_moves, focal_types, ref_atk, ref_def,
+                               has_bait_axis=False):
     """Render the Matchup Flip Table section. Returns an HTML string."""
     parts = []
     parts.append(f'<div class="dd-section" id="dd-flips">\n<h2 class="dd-h2">Matchup Flip Table</h2>\n')
@@ -2271,7 +2294,7 @@ def render_analysis_flips_html(data_obj, flip_summary, flips, avg_scores,
     notable = [x for x in flip_summary if abs(x[3]) >= 3 or x[0] in set(ranked[:5])]
     for iv, g, l, net in notable[:8]:
         fd = flips[iv]
-        prose = prose_flip_summary(fd)
+        prose = prose_flip_summary(fd, has_bait_axis=has_bait_axis)
         parts.append(f'<details class="dd-flip-detail"><summary>{iv_label(data_obj, iv)} &mdash; <span class="dd-gain">+{g}</span>/<span class="dd-loss">-{l}</span> (net {net:+d}){tier_badge_html(data_obj, iv)}</summary>\n')
         parts.append(f'<p class="dd-prose">{prose}</p>\n')
         focal_atk_iv = data_obj['ivAtk'][iv]
@@ -2297,7 +2320,14 @@ def render_analysis_flips_html(data_obj, flip_summary, flips, avg_scores,
                             focal_types, oi['types'],
                             is_gain=is_gain,
                         )
-                    parts.append(f'<tr><td>{e["scenario"]}</td><td>{e["opponent"]}</td><td>{e["ref_score"]}</td><td class="{cls}">{e["iv_score"]}</td><td class="{cls}">{d:+d}</td><td class="dd-small">{narr}</td></tr>\n')
+                    opp_cell = e['opponent']
+                    if has_bait_axis:
+                        ebm = e.get('bait_modes', set())
+                        if ebm == {'bait'}:
+                            opp_cell += ' <span class="dd-badge" style="background:#1a3a6e;color:#58a6ff">[bait only]</span>'
+                        elif ebm == {'nobait'}:
+                            opp_cell += ' <span class="dd-badge" style="background:#1a3a6e;color:#58a6ff">[no-bait only]</span>'
+                    parts.append(f'<tr><td>{e["scenario"]}</td><td>{opp_cell}</td><td>{e["ref_score"]}</td><td class="{cls}">{e["iv_score"]}</td><td class="{cls}">{d:+d}</td><td class="dd-small">{narr}</td></tr>\n')
                 parts.append('</table>\n')
         parts.append('</details>\n')
     parts.append('</div>\n')
@@ -2353,7 +2383,7 @@ def render_analysis_methods_html(nIvs, nS, nO, data_obj, moveset_label,
 
 def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
                                ref_iv, ref_atk, ref_def, opp_info_cache,
-                               focal_moves, focal_types):
+                               focal_moves, focal_types, has_bait_axis=False):
     """Render the top-3 IV recommendation cards as an HTML fragment.
 
     Returned HTML is injected into the Notable IVs & Recommendations
@@ -2371,9 +2401,10 @@ def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
         iv = rc['iv']
         nc = 'dd-gain' if rc['net'] > 0 else ('dd-loss' if rc['net'] < 0 else '')
         fd = flips.get(iv, {'gains': [], 'losses': []})
-        prose = prose_flip_summary(fd, max_gains=2, max_losses=1)
+        prose = prose_flip_summary(fd, max_gains=2, max_losses=1, has_bait_axis=has_bait_axis)
         parts.append('<div class="dd-rec-card">\n')
-        parts.append(f'<h4>{rc["style"]}: {iv_label(data_obj, iv)}{tier_badge_html(data_obj, iv)}</h4>\n')
+        style_color = '#58a6ff' if rc['style'] == 'Bait Robust' else '#e94560'
+        parts.append(f'<h4 style="color:{style_color}">{rc["style"]}: {iv_label(data_obj, iv)}{tier_badge_html(data_obj, iv)}</h4>\n')
         parts.append(f'<p>Atk={data_obj["ivAtk"][iv]:.2f}, Def={data_obj["ivDef"][iv]:.2f}, HP={data_obj["ivHp"][iv]}, SP #{data_obj["spRanks"][iv]}</p>\n')
         parts.append(f'<p>Avg score rank: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f})</p>\n')
         parts.append(f'<p>Flips vs {opp_label} ref: <span class="dd-gain">+{rc["gains"]}</span>/<span class="dd-loss">-{rc["losses"]}</span> = <span class="{nc}"><b>{rc["net"]:+d}</b></span></p>\n')
@@ -2449,7 +2480,8 @@ def render_results_section(data_obj, moveset_label, opp_label,
     # -- IV Recommendations (rendered first, injected into Notable IVs) --
     rec_html = _render_iv_recommendations(
         rec_candidates, flips, opp_label, data_obj, ref_iv, ref_atk,
-        ref_def, opp_info_cache, focal_moves, focal_types)
+        ref_def, opp_info_cache, focal_moves, focal_types,
+        has_bait_axis=has_bait_axis)
 
     # -- Notable IVs & Recommendations --
     from deep_dive import build_iv_categories
@@ -2557,7 +2589,8 @@ def render_results_section(data_obj, moveset_label, opp_label,
         parts.append(slayer_html)
 
     # -- Stat Thresholds & Matchup Flips (merged section) --
-    threshold_descs = generate_threshold_descriptions(flips, data_obj, avg_scores, ranked, opp_iv_mode)
+    threshold_descs = generate_threshold_descriptions(flips, data_obj, avg_scores, ranked, opp_iv_mode,
+                                                      has_bait_axis=has_bait_axis)
     mb_bullets = []
     if all_matchup_boundaries:
         _sorted_mbs = sorted(
