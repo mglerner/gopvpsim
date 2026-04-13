@@ -169,6 +169,17 @@ def compute_flavor_tradeoffs(flavors, data_obj, score_arrays, moveset_idx,
     if not general:
         return {}
 
+    # First, compute what General itself gains (used for loss detection)
+    general_results = probe_tier_cutoff_flips(
+        data_obj, score_arrays, moveset_idx,
+        general['atk_cut'], general['def_cut'], general['hp_cut'],
+        scenarios, opponents,
+    )
+    general_gains = {}  # opp -> set of scenario tuples
+    for r in general_results:
+        general_gains.setdefault(r['opponent'], set()).add(
+            tuple(r['scenario']))
+
     tradeoffs = {}
     for flavor in flavors:
         if flavor['is_general']:
@@ -188,12 +199,19 @@ def compute_flavor_tradeoffs(flavors, data_obj, score_arrays, moveset_idx,
             gains_by_opp.setdefault(r['opponent'], set()).add(
                 tuple(r['scenario']))
 
-        # Now find losses: matchups where General wins but this flavor loses.
-        # Partition: IVs meeting General but NOT this flavor's cuts.
-        # Use the General tier's cuts as baseline.
+        # Find losses via two methods:
+        # 1. Direct: partition IVs by flavor vs general-only, check win rates
         losses = _find_losses_vs_general(
             flavor, general, data_obj, score_arrays, moveset_idx,
             scenarios, opponents)
+        # 2. Indirect: matchups General gains that this flavor does NOT gain.
+        #    This catches cases where the flavor's stricter cuts narrow the
+        #    IV pool so much that the win-rate test can't fire cleanly.
+        for opp, gen_scens in general_gains.items():
+            flavor_scens = gains_by_opp.get(opp, set())
+            lost_scens = gen_scens - flavor_scens
+            if lost_scens:
+                losses.setdefault(opp, set()).update(lost_scens)
 
         gains_list = [{'opponent': opp, 'scenarios': sorted(scens)}
                       for opp, scens in sorted(gains_by_opp.items())]
@@ -204,6 +222,14 @@ def compute_flavor_tradeoffs(flavors, data_obj, score_arrays, moveset_idx,
             'gains': gains_list,
             'losses': losses_list,
         }
+
+    # Store General's gains for the narrative intro
+    general_gains_list = [{'opponent': opp, 'scenarios': sorted(scens)}
+                          for opp, scens in sorted(general_gains.items())]
+    tradeoffs[general['name']] = {
+        'gains': general_gains_list,
+        'losses': [],
+    }
 
     # Attach relevant matchup boundaries to all flavors (including general)
     if all_matchup_boundaries:
@@ -358,15 +384,32 @@ def _loss_prose(losses):
         return f'{shown}, among others'
 
 
-def _boundary_bullets_for_flavor(flavor, tradeoffs, has_bait_axis=False):
-    """Render opponent-centric boundary bullets for a flavor."""
+def _boundary_bullets_for_flavor(flavor, tradeoffs, has_bait_axis=False,
+                                  general_boundaries=None):
+    """Render opponent-centric boundary bullets for a flavor.
+
+    When *general_boundaries* is provided, skip boundaries that are
+    already shown in the General flavor's bullets (dedup by opponent +
+    threshold + stat).
+    """
     td = tradeoffs.get(flavor['name'], {})
     boundaries = td.get('boundaries', [])
     if not boundaries:
         return ''
 
+    # Build a set of (opponent, stat, threshold) keys already in General
+    gen_keys = set()
+    if general_boundaries:
+        for gb in general_boundaries:
+            gen_keys.add((gb['opponent'], gb.get('stat', 'def'),
+                          round(gb['threshold'], 2)))
+
     lines = []
-    for b in boundaries[:8]:
+    for b in boundaries[:12]:  # check more, cap output at 8
+        bkey = (b['opponent'], b.get('stat', 'def'),
+                round(b['threshold'], 2))
+        if bkey in gen_keys:
+            continue
         stat_label = 'Atk' if b.get('stat') == 'atk' else 'Def'
         scen_str = ', '.join(f'{s[0]}-{s[1]}' for s in sorted(b['scenarios']))
         bait_modes = b.get('bait_modes', set())
@@ -382,6 +425,8 @@ def _boundary_bullets_for_flavor(flavor, tradeoffs, has_bait_axis=False):
             f'for the Rank 1 {_opp_colored(opp)} '
             f'({scen_str})</li>'
         )
+        if len(lines) >= 8:
+            break
     return '\n'.join(lines)
 
 
@@ -468,6 +513,10 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
         f'potential with a balance of bulk and coverage.</p>\n'
     )
 
+    # Collect General's boundaries for dedup in specialist bullets
+    gen_td = tradeoffs.get(general['name'], {})
+    gen_boundaries = gen_td.get('boundaries', [])
+
     # Per-flavor sections
     for i, flavor in enumerate(flavors):
         fname = flavor['name']
@@ -496,11 +545,12 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
         if flavor['is_general']:
             # General flavor prose
             _render_general_flavor(parts, flavor, all_matchup_boundaries,
-                                   species, has_bait_axis)
+                                   species, has_bait_axis, tradeoffs)
         else:
             # Specialist flavor prose
             _render_specialist_flavor(parts, flavor, gains, losses,
-                                     tradeoffs, species, has_bait_axis)
+                                     tradeoffs, species, has_bait_axis,
+                                     general_boundaries=gen_boundaries)
 
         parts.append('</details>\n')
 
@@ -509,7 +559,7 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
 
 
 def _render_general_flavor(parts, flavor, all_matchup_boundaries,
-                           species, has_bait_axis):
+                           species, has_bait_axis, tradeoffs=None):
     """Render prose for the General/Premium Bulk flavor."""
     stat_parts = []
     if flavor['def_cut'] > 0:
@@ -521,20 +571,35 @@ def _render_general_flavor(parts, flavor, all_matchup_boundaries,
         baseline = ' and '.join(stat_parts)
         parts.append(
             f'<p class="dd-narrative-prose">'
-            f'{baseline} is a safe baseline for {species}. ')
+            f'{baseline} is a safe baseline for {species}')
     else:
         parts.append(
             f'<p class="dd-narrative-prose">'
-            f'The bulk-weighted build is a safe baseline for {species}. ')
+            f'The bulk-weighted build is a safe baseline for {species}')
 
     if flavor['atk_cut'] > 0:
         parts.append(
-            f'An attack floor of {flavor["atk_cut"]:.2f} Atk provides '
-            f'coverage against key opponents. ')
+            f', with an attack floor of {flavor["atk_cut"]:.2f} Atk '
+            f'for coverage against key opponents')
 
-    parts.append(
-        f'IVs at or above these thresholds cover the broadest set of '
-        f'matchups without needing to specialize.</p>\n')
+    # Mention specific matchups the General tier covers
+    td = (tradeoffs or {}).get(flavor['name'], {})
+    gen_gains = td.get('gains', [])
+    if gen_gains:
+        opp_names = [g['opponent'] for g in gen_gains[:4]]
+        if len(opp_names) == 1:
+            matchup_list = opp_names[0]
+        elif len(opp_names) <= 3:
+            matchup_list = (', '.join(opp_names[:-1])
+                            + f', and {opp_names[-1]}')
+        else:
+            matchup_list = (', '.join(opp_names[:3])
+                            + f', among others')
+        parts.append(
+            f', playing up {species}\'s potential vs '
+            f'{matchup_list}')
+
+    parts.append(f'.</p>\n')
 
     # Boundary bullets
     bullets = _general_boundary_bullets(
@@ -545,7 +610,8 @@ def _render_general_flavor(parts, flavor, all_matchup_boundaries,
 
 
 def _render_specialist_flavor(parts, flavor, gains, losses,
-                              tradeoffs, species, has_bait_axis):
+                              tradeoffs, species, has_bait_axis,
+                              general_boundaries=None):
     """Render prose for a specialist (Slayer/Fortified) flavor."""
     # Opening prose
     if flavor['atk_cut'] > 0:
@@ -590,9 +656,10 @@ def _render_specialist_flavor(parts, flavor, gains, losses,
                 parts.append(f' with {int(flavor["hp_cut"])} HP')
             parts.append(f'.</p>\n')
 
-    # Opponent-centric boundary bullets
+    # Opponent-centric boundary bullets (deduplicated vs General)
     bullets = _boundary_bullets_for_flavor(
-        flavor, tradeoffs, has_bait_axis)
+        flavor, tradeoffs, has_bait_axis,
+        general_boundaries=general_boundaries)
     if bullets:
         parts.append(
             f'<ul class="dd-threshold-list">\n{bullets}\n</ul>\n')
