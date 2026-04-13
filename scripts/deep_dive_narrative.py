@@ -118,6 +118,30 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
             'n_qualifying': _count_qualifying(data_obj, atk, def_, hp),
         })
 
+    # Enrich flavors with HP co-conditions from matchup boundaries.
+    # Per-opponent tiers from auto_derive_tiers don't carry HP, but the
+    # matchup boundaries at nearby thresholds often do.
+    if all_matchup_boundaries:
+        for f in flavors:
+            if f['hp_cut'] > 0:
+                continue  # already has HP
+            stat = 'def' if f['def_cut'] > 0 else 'atk' if f['atk_cut'] > 0 else None
+            cut = f['def_cut'] or f['atk_cut']
+            if not stat or not cut:
+                continue
+            # Find matchup boundaries near this flavor's threshold
+            hp_vals = []
+            for mb in all_matchup_boundaries:
+                if mb.get('stat', 'def') == stat and abs(mb['threshold'] - cut) < 5.0:
+                    if mb.get('hp_threshold') is not None:
+                        hp_vals.append(mb['hp_threshold'])
+            if hp_vals:
+                hp = min(hp_vals)  # most inclusive HP requirement
+                f['hp_cut'] = hp
+                f['stat_sig'] = _stat_signature(f['atk_cut'], f['def_cut'], hp)
+                f['n_qualifying'] = _count_qualifying(data_obj,
+                                                      f['atk_cut'], f['def_cut'], hp)
+
     # If no tier is named General, promote the broadest one
     has_general = any(f['is_general'] for f in flavors)
     if not has_general and flavors:
@@ -144,8 +168,8 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
     for name, group in seen.items():
         if len(group) > 1:
             for f in group:
-                primary_stat = (f'{f["def_cut"]:.0f}+ Def' if f['def_cut'] > 0
-                                else f'{f["atk_cut"]:.0f}+ Atk' if f['atk_cut'] > 0
+                primary_stat = (f'{f["def_cut"]:.2f}+ Def' if f['def_cut'] > 0
+                                else f'{f["atk_cut"]:.2f}+ Atk' if f['atk_cut'] > 0
                                 else '')
                 if primary_stat:
                     f['name'] = f'{name} ({primary_stat})'
@@ -480,7 +504,7 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
     parts = []
     parts.append('<div class="dd-narrative-zone">\n')
     parts.append(f'<h3 style="color:#9b59b6;margin:0 0 10px 0">'
-                 f'IV Flavor Guide</h3>\n')
+                 f'IV Flavor Guide (Simulation)</h3>\n')
 
     # Single-flavor case: just a stat baseline summary
     if len(flavors) == 1:

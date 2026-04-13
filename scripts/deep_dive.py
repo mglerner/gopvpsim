@@ -1779,7 +1779,13 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 flavors, tradeoffs, all_matchup_boundaries,
                 data_obj, opp_label, has_bait_axis=has_bait_axis)
             if narrative_html:
-                results_html += narrative_html
+                # Insert before the Simulation Deep Dive zone
+                sim_marker = '<div class="dd-sim-zone">'
+                if sim_marker in results_html:
+                    results_html = results_html.replace(
+                        sim_marker, narrative_html + sim_marker, 1)
+                else:
+                    results_html += narrative_html
 
     # ======== ANALYSIS section (behind toggle) ========
     analysis_parts = []
