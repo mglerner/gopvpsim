@@ -2532,7 +2532,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
             parts.append(
                 '<p class="dd-small" style="color:#8b949e">'
                 'Full breakpoint details in '
-                '<a href="#dd-stat-thresholds" style="color:#58a6ff">'
+                '<a href="#dd-stat-thresholds" style="color:#58a6ff" onclick="var el=document.getElementById(\'dd-stat-thresholds\');if(el)el.open=true;">'
                 'Stat Thresholds &amp; Matchup Flips</a> below.</p>\n'
             )
 
