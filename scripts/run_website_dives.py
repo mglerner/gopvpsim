@@ -50,7 +50,7 @@ DIVES = [
         'league': 'ultra',
         'slug': 'tinkaton-ultra-league-nofloor',
         'html_base': 'tinkaton_ul_nofloor.html',
-        'opponents': 20,
+        'opponents': 60,
         'no_thresholds': True,
     },
 ]

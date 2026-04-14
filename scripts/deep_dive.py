@@ -1461,6 +1461,75 @@ _auto_derive_tiers = analysis.auto_derive_tiers
 
 
 
+def _rename_plotly_tiers(data_obj, flavors):
+    """Rename Plotly tier entries to match narrative flavor names.
+
+    For each non-General flavor, find the matching tier in data_obj['tiers']
+    by stat threshold and rename it.  Also sync HP cutoffs from the narrative
+    (which enriches HP from matchup boundaries) into the tier.
+
+    Legend entries get two-line names: narrative flavor name on top,
+    original tier-card name in smaller text below.
+    """
+    plot_tiers = data_obj.get('tiers', [])
+    if not plot_tiers:
+        return
+
+    for flavor in flavors:
+        if flavor['is_general']:
+            continue  # General is excluded from the Plotly legend
+        # Match by primary stat threshold
+        matched_tier = None
+        for tier in plot_tiers:
+            t_atk = tier.get('attack', 0) or 0
+            t_def = tier.get('defense', 0) or 0
+            if flavor['atk_cut'] > 0 and abs(t_atk - flavor['atk_cut']) < 0.1:
+                matched_tier = tier
+                break
+            elif flavor['def_cut'] > 0 and abs(t_def - flavor['def_cut']) < 0.1:
+                matched_tier = tier
+                break
+        if not matched_tier:
+            continue
+
+        old_name = matched_tier['name']
+        new_name = flavor['name']
+        if old_name == new_name:
+            continue
+
+        # Two-line legend: narrative name + original tier name
+        matched_tier['name'] = f'{new_name}<br>  ({old_name})'
+
+        # Sync HP cutoff from narrative enrichment
+        if flavor['hp_cut'] > 0 and not (matched_tier.get('stamina') or 0):
+            matched_tier['stamina'] = flavor['hp_cut']
+            # Recompute ivTiers assignments with the new HP cutoff
+            _recompute_tier_assignments(data_obj, plot_tiers)
+
+
+def _recompute_tier_assignments(data_obj, plot_tiers):
+    """Recompute ivTiers and ivAllTiers after modifying tier cutoffs."""
+    n = data_obj.get('nIvs', 0)
+    iv_tiers = [-1] * n
+    iv_all_tiers = [[] for _ in range(n)]
+    for ti, t in enumerate(plot_tiers):
+        ac = t.get('attack', 0) or 0
+        dc = t.get('defense', 0) or 0
+        hc = t.get('stamina', 0) or 0
+        for iv in range(n):
+            if ac > 0 and data_obj['ivAtk'][iv] < ac:
+                continue
+            if dc > 0 and data_obj['ivDef'][iv] < dc:
+                continue
+            if hc > 0 and data_obj['ivHp'][iv] < hc:
+                continue
+            iv_all_tiers[iv].append(ti)
+            if iv_tiers[iv] < 0:
+                iv_tiers[iv] = ti
+    data_obj['ivTiers'] = iv_tiers
+    data_obj['ivAllTiers'] = iv_all_tiers
+
+
 def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
                                     scenarios, opponents, opp_iv_modes,
                                     has_toml_tiers, resolved_anchors=None):
@@ -1545,12 +1614,12 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
             matchup_boundaries=all_matchup_boundaries) or []
 
     if not effective_tiers:
-        return ''
+        return '', []
 
     flavors = derive_narrative_flavors(
         effective_tiers, all_matchup_boundaries, data_obj)
     if not flavors:
-        return ''
+        return '', []
 
     tradeoffs = (compute_flavor_tradeoffs(
         flavors, data_obj, score_arrays, moveset_idx,
@@ -1558,9 +1627,10 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
         all_matchup_boundaries=all_matchup_boundaries)
         if len(flavors) >= 2 else {})
     refine_flavor_names(flavors, tradeoffs)
-    return render_narrative_zone(
+    nar_html = render_narrative_zone(
         flavors, tradeoffs, all_matchup_boundaries,
         data_obj, opp_label, has_bait_axis=has_bait_axis) or ''
+    return nar_html, flavors
 
 
 def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
@@ -2677,21 +2747,30 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     if slayer_iter_result:
         _resolved_anchors = slayer_iter_result.get('resolved_anchors') or None
     narrative_blocks = []
+    moveset0_flavors = []
     n_movesets = len(data_obj.get('movesets', [{}]))
     for mi in range(n_movesets):
-        nar_html = _generate_narrative_for_moveset(
+        nar_html, flavors = _generate_narrative_for_moveset(
             data_obj, score_arrays, mi,
             scenarios_list, opponent_names or [],
             opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
             has_toml_tiers,
             resolved_anchors=_resolved_anchors if mi == 0 else None,
         )
+        if mi == 0:
+            moveset0_flavors = flavors
         if nar_html:
             vis = 'block' if mi == 0 else 'none'
             narrative_blocks.append(
                 f'<div class="dd-narrative-moveset" data-moveset="{mi}" '
                 f'style="display:{vis}">\n{nar_html}\n</div>'
             )
+
+    # Rename Plotly tier entries to match narrative flavor names and
+    # sync HP cutoffs.  The legend shows two lines: narrative name on
+    # top, original tier-card name below.
+    if moveset0_flavors and 'tiers' in data_obj:
+        _rename_plotly_tiers(data_obj, moveset0_flavors)
     if narrative_blocks:
         narrative_combined = '\n'.join(narrative_blocks)
         placeholder = '<!-- NARRATIVE_ZONE_PLACEHOLDER -->'
