@@ -61,6 +61,18 @@ break invariants that weren't yet nailed down by tests.
   3. bestChargedMove recomputed per-turn vs PvPoke's init-time cache --
      keeping ours (intentional, more correct; see DEVELOPER_NOTES.md)
 
+* **Audit existing oracle tests against the PvPoke harness** — Now
+  that `scripts/pvpoke_trace.js` + `scripts/verify_pvpoke_harness.py`
+  exist and 27/27 pass, extend the verify script to cover ALL
+  PvPoke-oracle test cases currently in `tests/test_battle.py` (and
+  anywhere else we've hand-typed a PvPoke score or move sequence into
+  a test/docstring/comment). Typos and user-entry errors may have
+  silently crept in over time; the harness is cheap to run and gives
+  a definitive check against PvPoke. Scope: enumerate all existing
+  fixtures, feed each to the harness, flag any where the harness
+  disagrees with the recorded PvPoke numbers. Fix typos; separately
+  flag genuine PvPoke divergences for follow-up.
+
 * **Forretress/Azu 0-shield score divergence** — Re-investigated
   2026-04-15 with the new headless Node harness (`scripts/pvpoke_trace.js`,
   validated 27/27 oracle cases). Divergence localized to Forretress's
