@@ -131,17 +131,34 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
                 f"  shield({defender.species} sh=0 vs {move.get('moveId')}): False (no shields)")
         return False
 
-    # PvPoke Battle.js lines 1083-1094: only use wouldShield heuristic for
-    # moves with precomputed selfBuffing flag (requires buffApplyChance==1)
-    # or selfDefenseDebuffing flag (requires buffApplyChance>=0.5).
-    # Chance-buff moves like Air Cutter (30%) are NOT selfBuffing in PvPoke,
-    # so they are always shielded.
+    # PvPoke Battle.js lines 1083-1101: use wouldShield heuristic for
+    # self-buffing moves and guaranteed opponent-def-debuff moves.
+    # PvPoke's selfBuffing flag (GameMaster.js:873) covers both; the shield
+    # check (Battle.js:1090) sub-filters to self-atk-buff or opp-def-debuff.
+    # Our selfBuffing only covers self-buffs.  For opponent-def-debuff, we
+    # gate on the attacker having a threatening charged move (dmg >= hp/1.4).
+    # Without a threatening follow-up the debuff warrants shielding on its
+    # own; with one, the debuff is bait and wouldShield decides.
     self_buffing        = move.get('selfBuffing', False)
     self_def_debuffing  = move.get('selfDefenseDebuffing', False)
-    if self_buffing or self_def_debuffing:
+    # For guaranteed opponent-def-debuff moves (Psychic Fangs, Sand Tomb,
+    # Acid Spray, etc.): PvPoke sets selfBuffing=true on these
+    # (GameMaster.js:873) and routes through wouldShield (Battle.js:1090).
+    # Our selfBuffing flag only covers self-targeting buffs, so we check
+    # opponent-def-debuff explicitly.
+    buffs = move.get('buffs')
+    opp_def_debuff = bool(
+        buffs
+        and move.get('buffTarget') == 'opponent'
+        and float(move.get('buffApplyChance', 0) or 0) == 1
+        and buffs[1] < 0)
+    use_heuristic = self_buffing or self_def_debuffing or opp_def_debuff
+    if use_heuristic:
         result = would_shield(attacker, defender, move)
         if _shield_trace:
-            tag = "selfBuff" if self_buffing else "selfDefDebuff"
+            tag = ("selfBuff" if self_buffing
+                   else "selfDefDebuff" if self_def_debuffing
+                   else "oppDefDebuff")
             _policy_log.append(
                 f"  shield({defender.species} sh={defender.shields} vs"
                 f" {move.get('moveId')} [{tag}]): → wouldShield={result}")
