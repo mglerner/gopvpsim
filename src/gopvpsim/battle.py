@@ -1026,10 +1026,18 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             return None
 
     # PvPoke's bestChargedMove selection (Pokemon.js lines 791-822):
-    # Start with cheapest move (cms[0], sorted by energy); only switch to a
+    # Start with cheapest move (cms[0], priority-shuffled); only switch to a
     # more expensive move if its actual DPE exceeds the current best by >0.03
     # (or >0.3 when current best is selfBuffing / move is SUPER_POWER).
     # When DPE is close, prefer guaranteed buff effects over chance buffs.
+    #
+    # INTENTIONAL DIVERGENCE (Divergence 3 in DEVELOPER_NOTES.md):
+    # PvPoke computes bestChargedMove once at init (and on self form change).
+    # We recompute per-turn using current damage values, which responds to
+    # stat stage changes and opponent form changes.  This is more correct:
+    # PvPoke's stale cache uses Ice Beam against Aegislash Blade form even
+    # when Play Rough has higher DPE after the form change.  Known impact:
+    # +134 delta on Aegislash 1v2/2v2 scenarios.
     # Always favor OBSTRUCT.
     best_idx = 0
     for _i in range(n_cms):
