@@ -1177,9 +1177,17 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 and raw_dpe(cm1) > raw_dpe(cms[final_first_thrown])
                 and not cm1.get('selfDebuffing', False)):
             bait = True
-            # Don't bait if an effective self-buffing move exists (line 826)
-            if (raw_dpe(cm1) / raw_dpe(cms[0]) <= 1.5
-                    and cms[0].get('selfBuffing', False)):
+            # Don't bait if an effective self-buffing move exists (line 826).
+            # PvPoke's selfBuffing includes guaranteed opponent debuffs
+            # (GameMaster.js:873), and uses buff-adjusted DPE (initializeMove
+            # lines 849-864).  We approximate by also checking opp-def-debuff.
+            _cm0 = cms[0]
+            _cm0_effective = (_cm0.get('selfBuffing', False)
+                             or ((_cm0.get('buffs') or [0,0])[1] < 0
+                                 and _cm0.get('buffTarget') == 'opponent'
+                                 and float(_cm0.get('buffApplyChance', 0) or 0) == 1))
+            if (actual_dpe(1) / max(actual_dpe(0), 0.001) <= 1.5
+                    and _cm0_effective):
                 bait = False
             if bait:
                 if _dp_trace:
