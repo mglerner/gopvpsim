@@ -789,18 +789,27 @@ function renderMatchesList() {
   // slayer section shows both "Slayer type" and "Also in" (which
   // tiers the slayer mon ALSO clears), and tier sections could
   // optionally show a "Slayer?" column too.
-  function renderSection(heading, recs, extras) {
+  function renderSection(heading, recs, extras, sortKey) {
     if (!recs || recs.length === 0) return '';
-    recs.sort(function(a, b) {
-      if (a._rank !== b._rank) return a._rank - b._rank;
-      return b.mon.cp - a.mon.cp;
-    });
+    if (sortKey === 'atk') {
+      recs.sort(function(a, b) {
+        var aa = (a.stats ? a.stats.atk : 0), ba = (b.stats ? b.stats.atk : 0);
+        if (aa !== ba) return ba - aa;
+        return a._rank - b._rank;
+      });
+    } else {
+      recs.sort(function(a, b) {
+        if (a._rank !== b._rank) return a._rank - b._rank;
+        return b.mon.cp - a.mon.cp;
+      });
+    }
     var sid = 'matches-section-' + (sectionIdx++);
     var h = '<h5>' + heading + ' - ' + recs.length + ' of yours</h5>';
     h += '<table><tr>' +
          '<th title="Battle rank in the active moveset / opp-IV mode. Dash for off-grid mons whose exact IV was not simulated.">Battle</th>' +
          '<th title="Stat product rank (pure math, computed for all 4096 IV triples). Always available.">SP</th>' +
          '<th>Current CP</th><th>IVs</th>' +
+         '<th>Atk</th><th>Def</th><th>HP</th>' +
          '<th>Species</th><th>Power-up</th><th>Max CP</th>';
     if (extras) {
       for (var xh = 0; xh < extras.length; xh++) {
@@ -828,6 +837,9 @@ function renderMatchesList() {
       h += '<td class="rank-sp">' + spTxt + '</td>';
       h += '<td><b>CP ' + rc.mon.cp + '</b></td>';
       h += '<td>' + rc.mon.atk_iv + '/' + rc.mon.def_iv + '/' + rc.mon.sta_iv + '</td>';
+      h += '<td>' + (rc.stats ? rc.stats.atk.toFixed(2) : '?') + '</td>';
+      h += '<td>' + (rc.stats ? rc.stats.def.toFixed(2) : '?') + '</td>';
+      h += '<td>' + (rc.stats ? rc.stats.hp : '?') + '</td>';
       h += '<td>' + escapeHtml(rc.csvSpecies || '') +
            (rc.mon.lucky ? ' \u2728' : '') +
            (rc.mon.is_shadow ? ' \u263d' : '') + '</td>';
@@ -873,7 +885,10 @@ function renderMatchesList() {
     // + any slayer categories it hits, so the user can see at a
     // glance whether a tier-qualifying mon is also a mirror-match
     // specialist. Closure captures the current tier name.
-    (function(currentTierName) {
+    (function(currentTierName, tierIdx) {
+      // Def-side tiers sort by Atk desc (contrarian stat); atk-side by battle rank
+      var tier = liveTiers[tierIdx];
+      var isDefTier = tier && (tier.defense || 0) > 0 && !(tier.attack || 0);
       html += renderSection(
         escapeHtml(currentTierName),
         byTier[currentTierName],
@@ -885,9 +900,10 @@ function renderMatchesList() {
               }
               return listOrDash(also);
           } }
-        ]
+        ],
+        isDefTier ? 'atk' : null
       );
-    })(tierNames[ti]);
+    })(tierNames[ti], ti);
   }
   // Slayer section: two extra columns — specific slayer categories
   // AND which tiers this slayer mon ALSO clears (blank for slayer-
