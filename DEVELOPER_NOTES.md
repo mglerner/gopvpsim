@@ -110,6 +110,63 @@ found no OMT trigger, farm-down delay, or decision-ordering issue
 that would explain the delay. May require running PvPoke locally
 with debug logging.
 
+## Known divergences from PvPoke implementation
+
+Places where our code intentionally does NOT match PvPoke's
+implementation. Each is a potential source of score mismatches if we
+hit an edge case. Fix these before assuming a score difference is a
+PvPoke bug.
+
+### 1. selfBuffing flag scope
+
+**PvPoke**: `selfBuffing` (GameMaster.js:873) covers guaranteed
+self-buffs AND guaranteed opponent debuffs (buffTarget="opponent",
+buffApplyChance==1). Used in: shield policy (Battle.js:1090),
+bestChargedMove selection (Pokemon.js:800), bait-wait cancellation
+(ActionLogic.js:826), and several DP bandaids.
+
+**Our code**: `selfBuffing` in `moves.py` only covers self-targeting
+buffs. We work around this in `pvpoke_simulate_shield` and the
+bait-wait cancellation by checking for opponent-def-debuff explicitly.
+But other uses of `selfBuffing` (bestChargedMove selection, DP
+bandaids) don't have the workaround.
+
+**Risk**: any code path that checks `selfBuffing` and we haven't
+patched will behave differently for opponent-debuff moves like
+Psychic Fangs, Sand Tomb, Acid Spray.
+
+### 2. Bait-wait DPE ratio uses actual_dpe, not buff-adjusted DPE
+
+**PvPoke**: bait-wait cancellation (ActionLogic.js:826) compares
+`move.dpe` values that include a buff multiplier from
+`initializeMove` (Pokemon.js:849-864). The multiplier estimates the
+move's buff/debuff value: `(buffDivisor + |buff_stages| * (80/energy)
+* chance) / buffDivisor`. This makes debuff moves like Psychic Fangs
+have higher effective DPE, narrowing the ratio vs the nuke move.
+
+**Our code**: uses `actual_dpe` (damage/energy, includes type
+effectiveness and STAB but no buff adjustment). Happened to give the
+right result for Morpeko (ratio 1.46 < 1.5) but could cross the 1.5
+threshold differently in other matchups.
+
+**Risk**: a matchup where actual_dpe ratio is > 1.5 but buff-adjusted
+would be <= 1.5 (or vice versa) would produce wrong bait-wait behavior.
+
+### 3. bestChargedMove computed per-turn, not cached at init
+
+**PvPoke**: `bestChargedMove` is computed once at init (and on self
+form change via `resetMoves`). Not updated when the opponent changes
+form or when stat stages change.
+
+**Our code**: `best_idx` is recomputed every call to `pvpoke_dp` using
+current damage values. This is arguably more correct (responds to
+stat changes) but produces different results when the opponent form-
+changes mid-battle (Aegislash Shield→Blade changes defender's def,
+shifting DPE thresholds).
+
+**Risk**: any matchup involving opponent form changes where the 0.03
+DPE threshold is near the boundary.
+
 ## Threshold model: damage tiers vs matchup boundaries
 
 The deep dive reports two kinds of stat threshold (2026-04-09/10):
