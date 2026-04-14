@@ -117,55 +117,52 @@ implementation. Each is a potential source of score mismatches if we
 hit an edge case. Fix these before assuming a score difference is a
 PvPoke bug.
 
-### 1. selfBuffing flag scope
+### RESOLVED: selfBuffing flag scope
 
-**PvPoke**: `selfBuffing` (GameMaster.js:873) covers guaranteed
-self-buffs AND guaranteed opponent debuffs (buffTarget="opponent",
-buffApplyChance==1). Used in: shield policy (Battle.js:1090),
-bestChargedMove selection (Pokemon.js:800), bait-wait cancellation
-(ActionLogic.js:826), and several DP bandaids.
+**Fixed 2026-04-14.** Our `selfBuffing` flag in `moves.py` now matches
+PvPoke's GameMaster.js:873 definition: guaranteed positive self-buffs
+AND guaranteed opponent debuffs (buffTarget="opponent",
+buffApplyChance==1). Previously only covered self-targeting buffs;
+workarounds in shield policy and bait-wait were removed. All 8
+selfBuffing usage sites now use the broadened flag consistently.
 
-**Our code**: `selfBuffing` in `moves.py` only covers self-targeting
-buffs. We work around this in `pvpoke_simulate_shield` and the
-bait-wait cancellation by checking for opponent-def-debuff explicitly.
-But other uses of `selfBuffing` (bestChargedMove selection, DP
-bandaids) don't have the workaround.
+### RESOLVED: activeChargedMoves priority-shuffle
 
-**Risk**: any code path that checks `selfBuffing` and we haven't
-patched will behave differently for opponent-debuff moves like
-Psychic Fangs, Sand Tomb, Acid Spray.
+**Fixed 2026-04-14.** PvPoke's `resetMoves` (Pokemon.js:711-787)
+reorders `activeChargedMoves` after the energy sort based on
+buff/debuff properties. The priority-shuffle uses buff-adjusted DPE
+(`initializeMove`, Pokemon.js:849-864) for one clause. Our code now
+replicates all shuffle clauses in `pvpoke_dp`.
 
-### 2. Bait-wait DPE ratio uses actual_dpe, not buff-adjusted DPE
+**Historical note (corrected):** Divergence 2 was originally
+documented as "bait-wait DPE ratio uses actual_dpe, not buff-adjusted
+DPE." This was incorrect. PvPoke's `selectBestChargedMove`
+(Pokemon.js:791-796) *overwrites* `.dpe` to raw `damage/energy` on
+all `activeChargedMoves` after the priority-shuffle, so the bait-wait
+1.5 ratio check (ActionLogic.js:843) also uses raw `damage/energy`,
+same as our `actual_dpe`. The buff-adjusted DPE only affects the
+priority-shuffle ordering (lines 711-787), not the ratio check itself.
 
-**PvPoke**: bait-wait cancellation (ActionLogic.js:826) compares
-`move.dpe` values that include a buff multiplier from
-`initializeMove` (Pokemon.js:849-864). The multiplier estimates the
-move's buff/debuff value: `(buffDivisor + |buff_stages| * (80/energy)
-* chance) / buffDivisor`. This makes debuff moves like Psychic Fangs
-have higher effective DPE, narrowing the ratio vs the nuke move.
-
-**Our code**: uses `actual_dpe` (damage/energy, includes type
-effectiveness and STAB but no buff adjustment). Happened to give the
-right result for Morpeko (ratio 1.46 < 1.5) but could cross the 1.5
-threshold differently in other matchups.
-
-**Risk**: a matchup where actual_dpe ratio is > 1.5 but buff-adjusted
-would be <= 1.5 (or vice versa) would produce wrong bait-wait behavior.
-
-### 3. bestChargedMove computed per-turn, not cached at init
+### 3. bestChargedMove computed per-turn, not cached at init (intentional)
 
 **PvPoke**: `bestChargedMove` is computed once at init (and on self
 form change via `resetMoves`). Not updated when the opponent changes
 form or when stat stages change.
 
 **Our code**: `best_idx` is recomputed every call to `pvpoke_dp` using
-current damage values. This is arguably more correct (responds to
-stat changes) but produces different results when the opponent form-
-changes mid-battle (Aegislash Shield→Blade changes defender's def,
-shifting DPE thresholds).
+current damage values. We believe this is more correct: it responds to
+stat stage changes mid-battle and to opponent form changes (e.g.,
+Aegislash Shield->Blade dramatically changes defender's def, shifting
+DPE thresholds). PvPoke's stale cache produces suboptimal move choices
+when opponent stats change, as documented in PvPoke bug #2 above.
 
-**Risk**: any matchup involving opponent form changes where the 0.03
-DPE threshold is near the boundary.
+**Impact**: +134 delta on Aegislash 1v2/2v2 — our Azu correctly
+switches to Play Rough (higher DPE against Blade form) while PvPoke
+keeps using Ice Beam (cached against Shield form's def).
+
+**Decision**: keep our per-turn recomputation. The only known
+mismatches are in Aegislash scenarios where PvPoke's cached selection
+is demonstrably worse.
 
 ## Threshold model: damage tiers vs matchup boundaries
 

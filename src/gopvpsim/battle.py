@@ -790,18 +790,91 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     opp_fast_damage  = defender.fast_move_damage(attacker)
     wins_cmp         = attacker.atk >= defender.atk
 
-    # PvPoke's activeChargedMoves is sorted by energy (cheapest first).
-    # Sort a copy so bandaid indices match PvPoke's convention.
+    # PvPoke's activeChargedMoves is sorted by energy (cheapest first),
+    # then reordered by a priority-shuffle (Pokemon.js lines 711-787).
     cms = sorted(attacker.charged_moves, key=lambda m: m['energy'])
     n_cms = len(cms)
 
-    # Hoist per-cm constants into parallel arrays so the hot DP loop can
-    # do array lookups instead of dict accesses + method calls. The damage
-    # cache (BattlePokemon._cached_charged_dmgs) was populated by the
-    # fast_move_damage() call above. Map sorted cms back through that.
+    # Damage cache was populated by fast_move_damage() above.
     a_charged = attacker.charged_moves
     a_cm_dmgs = attacker._cached_charged_dmgs
     a_idx_map = attacker._cm_id_to_idx
+
+    # --- Priority-shuffle (PvPoke Pokemon.js lines 711-787) ---
+    # Reorder cms based on buff/debuff properties.  PvPoke runs this once
+    # at init; we apply it after energy sort each call.  Uses buff-adjusted
+    # DPE for the selfBuffing-promotion clause (line 758).
+    if n_cms > 1:
+        def _get_dmg(m):
+            return a_cm_dmgs[a_idx_map[id(m)]]
+
+        # Buff-adjusted DPE per PvPoke initializeMove (Pokemon.js:849-864).
+        # Only self-atk-buff and opp-def-debuff get the multiplier.
+        def _buff_adj_dpe(m):
+            raw = _get_dmg(m) / m['energy']
+            buffs = m.get('buffs')
+            if not buffs:
+                return raw
+            bt = m.get('buffTarget', '')
+            chance = float(m.get('buffApplyChance', 0) or 0)
+            eff = 0.0
+            if bt == 'self' and buffs[0] > 0:
+                eff = buffs[0] * (80 / m['energy'])
+            elif bt == 'opponent' and buffs[1] < 0:
+                eff = abs(buffs[1]) * (80 / m['energy'])
+            if eff > 0:
+                return raw * (4 + eff * chance) / 4
+            return raw
+
+        # Line 715-722: same energy — prefer buff or higher damage
+        if (cms[1]['energy'] == cms[0]['energy']
+                and not cms[1].get('selfDebuffing', False)):
+            if cms[1].get('buffs') or _get_dmg(cms[1]) > _get_dmg(cms[0]):
+                cms[0], cms[1] = cms[1], cms[0]
+
+        # Line 726-730: same energy — prefer higher buffApplyChance
+        if (cms[1]['energy'] == cms[0]['energy']
+                and cms[0].get('buffs') and cms[1].get('buffs')
+                and not cms[1].get('selfDebuffing', False)
+                and (cms[1].get('buffApplyChance', 0) or 0) > (cms[0].get('buffApplyChance', 0) or 0)):
+            cms[0], cms[1] = cms[1], cms[0]
+
+        # Line 734-744: Zap Cannon / Registeel clause
+        if (cms[0].get('moveId') == 'FOCUS_BLAST'
+                and cms[1].get('moveId') == 'ZAP_CANNON'):
+            if _buff_adj_dpe(cms[1]) - _buff_adj_dpe(cms[0]) > -0.3:
+                cms[0]['buffs'] = [0, 0]
+                cms[0]['buffTarget'] = 'self'
+                cms[0]['selfDebuffing'] = True
+            else:
+                cms[0].pop('buffs', None)
+                cms[0].pop('buffTarget', None)
+                cms[0].pop('selfDebuffing', None)
+
+        # Line 756-762: similar energy — promote selfBuffing move
+        if (cms[1]['energy'] - cms[0]['energy'] <= 10
+                and not cms[1].get('selfDebuffing', False)
+                and cms[1].get('selfBuffing', False)
+                and _buff_adj_dpe(cms[0]) - _buff_adj_dpe(cms[1]) < 0.3):
+            cms[0], cms[1] = cms[1], cms[0]
+
+        # Line 767-771: demote selfAttackDebuffing
+        if (cms[1]['energy'] - cms[0]['energy'] <= 10
+                and cms[0].get('selfAttackDebuffing', False)
+                and not cms[1].get('selfDebuffing', False)):
+            cms[0], cms[1] = cms[1], cms[0]
+
+        # Line 775-779: demote expensive (>50 energy) selfDebuffing
+        if (cms[1]['energy'] - cms[0]['energy'] <= 10
+                and cms[0].get('selfDebuffing', False)
+                and cms[0]['energy'] > 50
+                and not cms[1].get('selfDebuffing', False)):
+            cms[0], cms[1] = cms[1], cms[0]
+
+        # Line 783-787: promote close-energy selfBuffing as bait
+        if (cms[1]['energy'] - cms[0]['energy'] <= 5
+                and cms[1].get('selfBuffing', False)):
+            cms[0], cms[1] = cms[1], cms[0]
     cm_dmgs    = [a_cm_dmgs[a_idx_map[id(m)]] for m in cms]
     cm_energy  = [m['energy'] for m in cms]
     # original-charged-moves index for each sorted entry — used by callers
@@ -1171,10 +1244,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 and not cm1.get('selfDebuffing', False)):
             bait = True
             # Don't bait if an effective self-buffing move exists (line 826).
-            # KNOWN DIVERGENCE (see DEVELOPER_NOTES.md "Known divergences"):
-            #  PvPoke uses buff-adjusted DPE (initializeMove:849-864);
-            #  we use actual_dpe (damage/energy).  Could cross the 1.5
-            #  threshold differently in other matchups.
+            # PvPoke also uses raw damage/energy here (selectBestChargedMove
+            # overwrites initializeMove's buff-adjusted dpe).
             _cm0 = cms[0]
             _cm0_effective = _cm0.get('selfBuffing', False)
             if (actual_dpe(1) / max(actual_dpe(0), 0.001) <= 1.5
