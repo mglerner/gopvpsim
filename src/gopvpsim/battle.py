@@ -1178,9 +1178,12 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 and not cm1.get('selfDebuffing', False)):
             bait = True
             # Don't bait if an effective self-buffing move exists (line 826).
-            # PvPoke's selfBuffing includes guaranteed opponent debuffs
-            # (GameMaster.js:873), and uses buff-adjusted DPE (initializeMove
-            # lines 849-864).  We approximate by also checking opp-def-debuff.
+            # KNOWN DIVERGENCE (see DEVELOPER_NOTES.md "Known divergences"):
+            #  1. PvPoke's selfBuffing includes guaranteed opponent debuffs;
+            #     we check for opp-def-debuff explicitly as a workaround.
+            #  2. PvPoke uses buff-adjusted DPE (initializeMove:849-864);
+            #     we use actual_dpe (damage/energy).  Could cross the 1.5
+            #     threshold differently in other matchups.
             _cm0 = cms[0]
             _cm0_effective = (_cm0.get('selfBuffing', False)
                              or ((_cm0.get('buffs') or [0,0])[1] < 0
