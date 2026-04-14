@@ -560,7 +560,7 @@ def auto_derive_tiers(anchor_flip_records, data_obj,
     Returns a list of tier dicts matching the shape ``data_obj['tiers']``
     expects: ``{name, color, attack, defense, stamina, desc}``.
     """
-    if not anchor_flip_records:
+    if not anchor_flip_records and not matchup_boundaries:
         return []
 
     # Collect per-opponent, per-stat minimum thresholds
@@ -577,7 +577,7 @@ def auto_derive_tiers(anchor_flip_records, data_obj,
             opp_stat_min[key] = tv
         opp_stat_records.setdefault(key, []).append(rec)
 
-    if not opp_stat_min:
+    if not opp_stat_min and not matchup_boundaries:
         return []
 
     # Separate into atk-side and def-side opponent groups

@@ -413,17 +413,15 @@ def refine_flavor_names(flavors, tradeoffs):
         if not consolidated:
             continue
         old_name = flavor['name']
-        if old_name == 'Attack Weight' and len(consolidated) >= 1:
-            # Name after the opponent with the most scenario flips
+        if old_name.startswith('Attack Weight') and len(consolidated) >= 1:
             best = max(consolidated,
                        key=lambda g: len(g['scenarios']))
             base = _base_species(best['opponent'])
             new_name = f'{base} Slayer'
             flavor['name'] = new_name
-            # Update tradeoffs key
             if old_name in tradeoffs:
                 tradeoffs[new_name] = tradeoffs.pop(old_name)
-        elif old_name == 'High Bulk' and len(consolidated) >= 1:
+        elif old_name.startswith('High Bulk') and len(consolidated) >= 1:
             best = max(consolidated,
                        key=lambda g: len(g['scenarios']))
             base = _base_species(best['opponent'])

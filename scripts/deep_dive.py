@@ -1461,6 +1461,108 @@ _auto_derive_tiers = analysis.auto_derive_tiers
 
 
 
+def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
+                                    scenarios, opponents, opp_iv_modes,
+                                    has_toml_tiers, resolved_anchors=None):
+    """Generate narrative HTML for one moveset.
+
+    Computes matchup boundaries (and optionally anchor-flip records if
+    resolved_anchors are provided), auto-derives tiers, and renders the
+    SwagTips-style IV Flavor Guide zone.
+
+    Returns narrative HTML string (may be empty).
+    """
+    from deep_dive_narrative import (derive_narrative_flavors,
+                                     compute_flavor_tradeoffs,
+                                     refine_flavor_names,
+                                     render_narrative_zone)
+    nIvs = data_obj['nIvs']
+    nS = len(scenarios)
+    nO = len(opponents)
+    _bait_values = {parse_mode(m)[1] for m in opp_iv_modes}
+    has_bait_axis = ('bait' in _bait_values and 'nobait' in _bait_values)
+    opp_label = data_obj.get('oppLabel', 'opponent')
+
+    # Compute anchor-flip records if we have resolved anchors
+    anchor_flip_records = []
+    if resolved_anchors:
+        _seen = {}
+        for _mode in opp_iv_modes:
+            bait_mode = parse_mode(_mode)[1]
+            _key = f'{moveset_idx}_{_mode}'
+            _scores = score_arrays.get(_key, [])
+            if not _scores:
+                continue
+            _recs = _aggregate_flips_by_anchor(
+                _scores, nIvs, nS, nO,
+                resolved_anchors, data_obj, scenarios, opponents,
+            )
+            for rec in _recs:
+                rec['bait_modes'] = {bait_mode}
+                dedup_key = (rec['anchor'].name, rec['opponent'],
+                             frozenset(tuple(s) for s in rec['scenarios']))
+                if dedup_key in _seen:
+                    _seen[dedup_key]['bait_modes'] |= rec['bait_modes']
+                else:
+                    _seen[dedup_key] = rec
+                    anchor_flip_records.append(rec)
+
+    # Compute matchup boundaries (always available, no anchors needed)
+    all_matchup_boundaries = []
+    _mb_seen = {}
+    for _mode in opp_iv_modes:
+        bait_mode = parse_mode(_mode)[1]
+        _key = f'{moveset_idx}_{_mode}'
+        _scores = score_arrays.get(_key, [])
+        if not _scores:
+            continue
+        for _sweep in ('def', 'atk'):
+            _mbs = _find_matchup_boundaries(
+                _scores, nIvs, nS, nO,
+                data_obj, scenarios, opponents,
+                sweep_stat=_sweep,
+            )
+            for mb in _mbs:
+                mb['bait_modes'] = {bait_mode}
+                dedup_key = (mb['opponent'], mb['stat'], mb['threshold'],
+                             mb.get('hp_threshold'),
+                             frozenset(tuple(s) for s in mb['scenarios']))
+                if dedup_key in _mb_seen:
+                    _mb_seen[dedup_key]['bait_modes'] |= mb['bait_modes']
+                else:
+                    _mb_seen[dedup_key] = mb
+                    all_matchup_boundaries.append(mb)
+
+    # Derive tiers fresh for this moveset - don't reuse data_obj['tiers']
+    # which may contain moveset 0's auto-derived tiers.
+    effective_tiers = []
+    if has_toml_tiers and not anchor_flip_records and not all_matchup_boundaries:
+        # TOML tiers with no sim data for this moveset - use TOML as-is
+        effective_tiers = data_obj.get('tiers') or []
+    elif anchor_flip_records or all_matchup_boundaries:
+        effective_tiers = _auto_derive_tiers(
+            anchor_flip_records, data_obj,
+            matchup_boundaries=all_matchup_boundaries) or []
+
+    if not effective_tiers:
+        return ''
+
+    flavors = derive_narrative_flavors(
+        effective_tiers, all_matchup_boundaries, data_obj)
+    if not flavors:
+        return ''
+
+    tradeoffs = (compute_flavor_tradeoffs(
+        flavors, data_obj, score_arrays, moveset_idx,
+        scenarios, opponents,
+        all_matchup_boundaries=all_matchup_boundaries)
+        if len(flavors) >= 2 else {})
+    refine_flavor_names(flavors, tradeoffs)
+    return render_narrative_zone(
+        flavors, tradeoffs, all_matchup_boundaries,
+        data_obj, opp_label, has_bait_axis=has_bait_axis) or ''
+
+
 def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                shield_scenarios, opponent_names,
                                slayer_iter_result=None,
@@ -1755,39 +1857,15 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     )
 
     # ======== IV FLAVOR GUIDE (narrative prose zone) ========
-    # The narrative zone always uses auto-derived tiers (the simulator's
-    # own opinion), even when TOML tiers exist. This keeps the purple
-    # zone independent of hand-curated expert content (gold zone).
-    from deep_dive_narrative import (derive_narrative_flavors,
-                                     compute_flavor_tradeoffs,
-                                     refine_flavor_names,
-                                     render_narrative_zone)
-    narrative_tiers = effective_tiers
-    if has_toml_tiers and anchor_flip_records:
-        narrative_tiers = _auto_derive_tiers(
-            anchor_flip_records, data_obj,
-            matchup_boundaries=all_matchup_boundaries) or []
-    if narrative_tiers:
-        flavors = derive_narrative_flavors(
-            narrative_tiers, all_matchup_boundaries, data_obj)
-        if flavors:
-            tradeoffs = (compute_flavor_tradeoffs(
-                flavors, data_obj, score_arrays, moveset_idx,
-                scenarios, opponents,
-                all_matchup_boundaries=all_matchup_boundaries)
-                if len(flavors) >= 2 else {})
-            refine_flavor_names(flavors, tradeoffs)
-            narrative_html = render_narrative_zone(
-                flavors, tradeoffs, all_matchup_boundaries,
-                data_obj, opp_label, has_bait_axis=has_bait_axis)
-            if narrative_html:
-                # Insert before the Simulation Deep Dive zone
-                sim_marker = '<div class="dd-sim-zone">'
-                if sim_marker in results_html:
-                    results_html = results_html.replace(
-                        sim_marker, narrative_html + sim_marker, 1)
-                else:
-                    results_html += narrative_html
+    # Narrative generation is now done per-moveset in the main HTML
+    # assembly loop (_generate_narrative_for_moveset), not here.
+    # This block only inserts a placeholder marker for the narrative
+    # zone so the per-moveset divs can be injected there later.
+    sim_marker = '<div class="dd-sim-zone">'
+    narrative_placeholder = '<!-- NARRATIVE_ZONE_PLACEHOLDER -->'
+    if sim_marker in results_html:
+        results_html = results_html.replace(
+            sim_marker, narrative_placeholder + sim_marker, 1)
 
     # ======== ANALYSIS section (behind toggle) ========
     analysis_parts = []
@@ -2593,6 +2671,39 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     data_obj['anchorFlipSets'] = anchor_passing_sink
     # Inject analysis CSS into the style block (replace closing tag we already emitted)
     html = html.replace('</style>\n</head>', analysis_css + '\n</style>\n</head>', 1)
+    # Generate per-moveset narrative zones
+    scenarios_list = [tuple(s) for s in data_obj['scenarios']]
+    _resolved_anchors = None
+    if slayer_iter_result:
+        _resolved_anchors = slayer_iter_result.get('resolved_anchors') or None
+    narrative_blocks = []
+    n_movesets = len(data_obj.get('movesets', [{}]))
+    for mi in range(n_movesets):
+        nar_html = _generate_narrative_for_moveset(
+            data_obj, score_arrays, mi,
+            scenarios_list, opponent_names or [],
+            opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
+            has_toml_tiers,
+            resolved_anchors=_resolved_anchors if mi == 0 else None,
+        )
+        if nar_html:
+            vis = 'block' if mi == 0 else 'none'
+            narrative_blocks.append(
+                f'<div class="dd-narrative-moveset" data-moveset="{mi}" '
+                f'style="display:{vis}">\n{nar_html}\n</div>'
+            )
+    if narrative_blocks:
+        narrative_combined = '\n'.join(narrative_blocks)
+        placeholder = '<!-- NARRATIVE_ZONE_PLACEHOLDER -->'
+        if placeholder in results_html:
+            results_html = results_html.replace(placeholder, narrative_combined, 1)
+        else:
+            # Fallback: insert before sim zone
+            sim_marker = '<div class="dd-sim-zone">'
+            if sim_marker in results_html:
+                results_html = results_html.replace(
+                    sim_marker, narrative_combined + sim_marker, 1)
+
     # Results section is always visible; analysis is behind a toggle
     html += results_html
     html += analysis_html

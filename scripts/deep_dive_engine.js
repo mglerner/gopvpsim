@@ -1474,6 +1474,12 @@ function updateView() {
   if (ysel) state.yAxisMode = ysel.value;
   lockedIdx = -1;
 
+  // Swap per-moveset narrative zones
+  var narDivs = document.querySelectorAll('.dd-narrative-moveset');
+  for (var i = 0; i < narDivs.length; i++) {
+    narDivs[i].style.display = (parseInt(narDivs[i].getAttribute('data-moveset')) === state.movesetIdx) ? 'block' : 'none';
+  }
+
   var traces = buildTraces();
   origOpacities = traces.map(function(t) { return t.marker.opacity; });
 
