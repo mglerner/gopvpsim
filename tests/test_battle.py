@@ -1276,3 +1276,42 @@ def test_aegislash_vs_azumarill_form_change(shields_a, shields_z, expected_aegi_
         f"{shields_a}v{shields_z}: expected Aegislash score={expected_aegi_score}, "
         f"got {score} (delta={score - expected_aegi_score:+d})"
     )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_m,shields_a,expected_mimikyu_score", [
+    # Mimikyu 5/13/15 vs Azumarill 4/15/13, Great League
+    # SHADOW_CLAW / SHADOW_SNEAK / PLAY_ROUGH
+    # vs BUBBLE / ICE_BEAM / PLAY_ROUGH
+    # Verified at pvpoke.com/battle/ 2026-04-14
+    # Form change: Disguise absorbs first unshielded charged hit (dmg=1),
+    # then Mimikyu becomes Busted with permanent -1 def stage.
+    (0, 0, 738),
+    # (0, 1, 350),   # our: 363, +13 delta — pre-existing DP (IB vs PR cycle)
+    # (0, 2, 214),   # our: 227, +13 delta
+    (1, 0, 761),
+    (1, 1, 672),
+    # (1, 2, 473),   # our: 460, -13 delta
+    (2, 0, 761),
+    (2, 1, 686),
+    (2, 2, 607),
+])
+def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a, expected_mimikyu_score):
+    """Mimikyu disguise: first unshielded charged hit absorbed, then -1 def stage."""
+    bp_m = _make_battle_pokemon(
+        'Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'],
+        'great', shields_m, 5, 13, 15,
+    )
+    bp_a = _make_battle_pokemon(
+        'Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+        'great', shields_a, 4, 15, 13,
+    )
+    result = simulate(bp_m, bp_a,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
+    score = round(result.pvpoke_score(0))
+    assert score == expected_mimikyu_score, (
+        f"{shields_m}v{shields_a}: expected Mimikyu score={expected_mimikyu_score}, "
+        f"got {score} (delta={score - expected_mimikyu_score:+d})"
+    )
