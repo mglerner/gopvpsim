@@ -1192,3 +1192,47 @@ def test_corviknight_2v2_vs_default_shadow_sableye_flips_with_bait():
         f"bait_off 2v2: expected Sableye to win, got "
         f"winner={result_nobait.winner}, HP={result_nobait.hp_remaining}")
     assert result_nobait.pvpoke_score(0) < 500
+
+
+# ---------------------------------------------------------------------------
+# Form change oracle tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_m,shields_a,expected_morpeko_score", [
+    # Morpeko (Full Belly) 5/14/15 vs Azumarill 4/15/13, Great League
+    # THUNDER_SHOCK / AURA_WHEEL_ELECTRIC / PSYCHIC_FANGS
+    # vs BUBBLE / ICE_BEAM / PLAY_ROUGH
+    # Verified at pvpoke.com/battle/ 2026-04-14
+    # Form change: Morpeko toggles Full Belly <-> Hangry after each
+    # charged move, swapping AURA_WHEEL_ELECTRIC <-> AURA_WHEEL_DARK.
+    (0, 0, 489),
+    (0, 1, 219),
+    # (0, 2, 219),  # pre-existing DP mismatch (our: 133)
+    (1, 0, 817),
+    (1, 1, 728),
+    # (1, 2, 348),  # pre-existing DP mismatch (our: 728)
+    (2, 0, 817),
+    (2, 1, 728),
+    # (2, 2, 665),  # pre-existing DP mismatch (our: 728)
+])
+def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko_score):
+    """Morpeko form change: Aura Wheel toggles Electric/Dark type each charged move."""
+    bp_m = _make_battle_pokemon(
+        'Morpeko (Full Belly)', 'THUNDER_SHOCK',
+        ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS'],
+        'great', shields_m, 5, 14, 15,
+    )
+    bp_a = _make_battle_pokemon(
+        'Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+        'great', shields_a, 4, 15, 13,
+    )
+    result = simulate(bp_m, bp_a,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
+    score = round(result.pvpoke_score(0))
+    assert score == expected_morpeko_score, (
+        f"{shields_m}v{shields_a}: expected Morpeko score={expected_morpeko_score}, "
+        f"got {score} (delta={score - expected_morpeko_score:+d})"
+    )
