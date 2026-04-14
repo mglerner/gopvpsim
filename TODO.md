@@ -40,6 +40,14 @@ break invariants that weren't yet nailed down by tests.
   4. Aegislash selects Gyro Ball over Shadow Ball (same cost, strictly less damage)
   5. Mimikyu delays Shadow Sneak by 1 SC (suboptimal timing, costs 13 score points)
 
+* **Resolve known PvPoke divergences** — Three intentional implementation
+  differences tracked in DEVELOPER_NOTES.md "Known divergences" section.
+  Each could cause score mismatches in edge cases:
+  1. selfBuffing flag scope (ours excludes opponent debuffs — patched in
+     shield policy and bait-wait but not bestChargedMove/DP bandaids)
+  2. Bait-wait DPE ratio uses actual_dpe, not PvPoke's buff-adjusted DPE
+  3. bestChargedMove recomputed per-turn vs PvPoke's init-time cache
+
 ## Policies to add
 
 * **PvPoke "Selective" baiting** — PvPoke's UI offers a bait toggle; "Selective"
