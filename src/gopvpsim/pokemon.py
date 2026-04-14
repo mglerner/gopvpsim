@@ -124,6 +124,7 @@ def best_level(base_atk, base_def, base_sta, atk_iv, def_iv, sta_iv,
 
 _pokemon_index = None
 _gm_entry_index = None
+_gm_id_index = None
 
 
 def get_pokemon_index():
@@ -142,6 +143,19 @@ def get_pokemon_entry(name: str) -> dict:
         gm = load_gamemaster()
         _gm_entry_index = {mon['speciesName']: mon for mon in gm['pokemon']}
     return _gm_entry_index[name]
+
+
+def get_pokemon_entry_by_id(species_id: str) -> dict:
+    """Return the full gamemaster entry for a species by speciesId.
+
+    The formChange.alternativeFormId field uses speciesId (e.g. 'aegislash_blade'),
+    so this lookup is needed to resolve form change targets.
+    """
+    global _gm_id_index
+    if _gm_id_index is None:
+        gm = load_gamemaster()
+        _gm_id_index = {mon['speciesId']: mon for mon in gm['pokemon']}
+    return _gm_id_index[species_id]
 
 
 def get_species(name):

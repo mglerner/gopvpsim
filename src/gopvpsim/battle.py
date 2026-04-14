@@ -1371,6 +1371,11 @@ class BattlePokemon:
     _cached_charged_dmgs: list      = field(init=False, repr=False)
     _cm_id_to_idx:        dict      = field(init=False, repr=False)
 
+    # Form change state (None for Pokemon without form changes)
+    _form_change:          "FormChangeConfig | None" = field(init=False, repr=False)
+    _form_is_alt:          bool = field(init=False, repr=False)
+    _form_disguise_active: bool = field(init=False, repr=False)
+
     def __post_init__(self):
         self.hp                = self.max_hp
         self.energy            = min(ENERGY_CAP, max(0, self.initial_energy))
@@ -1390,16 +1395,22 @@ class BattlePokemon:
         # its precomputed entry even when the policy passes a sorted copy
         # of self.charged_moves (same dict objects, different order).
         self._cm_id_to_idx = {id(cm): i for i, cm in enumerate(self.charged_moves)}
+        # Form change state
+        self._form_change = None
+        self._form_is_alt = False
+        self._form_disguise_active = False
 
     @classmethod
     def from_pokemon(cls, pokemon, fast_move: dict, charged_moves: list[dict],
-                     shields: int = 2, initial_energy: int = 0) -> "BattlePokemon":
+                     shields: int = 2, initial_energy: int = 0,
+                     league_cp: int | None = None) -> "BattlePokemon":
         """Build a BattlePokemon from a Pokemon dataclass + move dicts."""
         from .data import load_gamemaster
+        from .formchange import build_form_change_state
         gm  = load_gamemaster()
         mon = next(m for m in gm['pokemon'] if m['speciesName'] == pokemon.species)
         types = parse_types(mon)
-        return cls(
+        bp = cls(
             species        = pokemon.species,
             types          = types,
             atk            = pokemon.atk,
@@ -1410,6 +1421,31 @@ class BattlePokemon:
             shields        = shields,
             initial_energy = initial_energy,
         )
+        # Set up form change if applicable
+        if league_cp is None:
+            league_cp = 1500  # default to GL
+        fc = build_form_change_state(
+            mon, pokemon.atk_iv, pokemon.def_iv, pokemon.sta_iv,
+            pokemon.level, league_cp, pokemon.shadow,
+            fast_move, charged_moves,
+        )
+        if fc is not None:
+            bp._form_change = fc
+            if fc.effect == 'protect':
+                bp._form_disguise_active = True
+        return bp
+
+    @property
+    def current_form_trigger(self) -> str | None:
+        """Return the trigger for changing FROM the current form, or None."""
+        if self._form_change is None:
+            return None
+        return self._form_change.forms[int(self._form_is_alt)].trigger
+
+    def change_form(self, opponent: "BattlePokemon") -> None:
+        """Apply the form change to this BattlePokemon."""
+        from .formchange import apply_form_change
+        apply_form_change(self, opponent)
 
     def _ensure_dmg_cache(self, defender: "BattlePokemon") -> None:
         """Populate _cached_fast_dmg and _cached_charged_dmgs vs `defender`
@@ -1727,16 +1763,42 @@ def simulate(
 
             attacker.energy -= move['energy']
 
+            # Form change: activate_charged (Aegislash Shield -> Blade)
+            # Fires BEFORE damage so charged move uses new form's attack.
+            _trigger = attacker.current_form_trigger
+            if _trigger == 'activate_charged':
+                _fc_mid = attacker._form_change.forms[int(attacker._form_is_alt)].move_id
+                if _fc_mid == 'ANY' or _fc_mid == move['moveId']:
+                    attacker.change_form(defender)
+                    log_event(f"{attacker.species} changed form")
+
             _, shield_pol = policies[1 - actor_idx]
             use_shield    = shield_pol(attacker, defender, move)
 
             if use_shield and defender.shields > 0:
                 dmg = 1
                 defender.shields -= 1
+
+                # Form change: activate_shield (Aegislash Blade -> Shield)
+                if defender.current_form_trigger == 'activate_shield':
+                    defender.change_form(attacker)
+                    log_event(f"{defender.species} changed form (shielded)")
+
                 log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → SHIELDED (1 dmg)")
             else:
                 dmg = attacker.charged_move_damage(move, defender)
-                log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → {dmg} dmg")
+
+                # Form change: charged_move_damage / Mimikyu disguise
+                if (defender._form_disguise_active
+                        and defender.current_form_trigger == 'charged_move_damage'
+                        and defender._form_change is not None
+                        and defender._form_change.effect == 'protect'):
+                    dmg = 1
+                    defender._form_disguise_active = False
+                    defender.change_form(attacker)
+                    log_event(f"{defender.species} disguise busted (1 dmg)")
+                else:
+                    log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → {dmg} dmg")
 
             defender.hp = max(0, defender.hp - dmg)
             if defender.hp <= 0:
@@ -1744,6 +1806,14 @@ def simulate(
 
             # Apply stat stage buffs/debuffs (fires even when shielded)
             _apply_move_buffs(attacker, defender, move)
+
+            # Form change: charged_move (Morpeko toggle)
+            _trigger = attacker.current_form_trigger
+            if _trigger == 'charged_move':
+                _fc_mid = attacker._form_change.forms[int(attacker._form_is_alt)].move_id
+                if _fc_mid == 'ANY' or _fc_mid == move['moveId']:
+                    attacker.change_form(defender)
+                    log_event(f"{attacker.species} changed form")
 
         # After any charged move this turn, fire "floating" fast moves then reset.
         # PvPoke Battle.js: a fast move queued in the same turn as a charged move
