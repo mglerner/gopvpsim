@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Run deep dives for all website entries (or a filtered subset).
+"""Run deep dives for the website, sequentially.
 
-Reads meta.toml from each userdata/website/<slug>/ directory, extracts
-the [dive] section, and runs scripts/deep_dive.py with those args.
+Dive configurations live in the DIVES list below. Each entry specifies
+the species, league, output slug, and any non-default flags. The script
+builds the full deep_dive.py command and runs dives one at a time.
 
 Usage:
     python scripts/run_website_dives.py                  # all dives
@@ -16,70 +17,67 @@ import subprocess
 import sys
 import time
 
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib  # Python < 3.11
 
-
-WEBSITE_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    'userdata', 'website',
-)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+WEBSITE_DIR = os.path.join(REPO_ROOT, 'userdata', 'website')
 DEEP_DIVE = os.path.join(SCRIPT_DIR, 'deep_dive.py')
 
+# ---- Dive configurations ----
+# Each dict must have: species, league, slug, html_base
+# Optional overrides (defaults shown):
+#   opponents: 20            (top N from rankings)
+#   opponents_file: None     (overrides opponents)
+#   top_movesets: 5
+#   opp_ivs: 'both'
+#   bait: 'both'
+#   reference: 'auto'
+#   no_thresholds: False
+#   shadow: False
+#   extra_args: []           (escape hatch for unusual flags)
 
-def find_dives(filter_str=None):
-    """Yield (slug, meta_dict) for each dive with a [dive] section."""
-    if not os.path.isdir(WEBSITE_DIR):
-        print(f"Website directory not found: {WEBSITE_DIR}", file=sys.stderr)
-        return
-    for slug in sorted(os.listdir(WEBSITE_DIR)):
-        meta_path = os.path.join(WEBSITE_DIR, slug, 'meta.toml')
-        if not os.path.isfile(meta_path):
-            continue
-        if filter_str and filter_str.lower() not in slug.lower():
-            continue
-        with open(meta_path, 'rb') as f:
-            meta = tomllib.load(f)
-        if 'dive' not in meta:
-            print(f"  [skip] {slug}: no [dive] section in meta.toml")
-            continue
-        yield slug, meta
+DIVES = [
+    {
+        'species': 'Tinkaton',
+        'league': 'great',
+        'slug': 'tinkaton-great-league',
+        'html_base': 'tinkaton_gl_toml.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'reference': 'FAIRY_WIND,BULLDOZE,PLAY_ROUGH',
+    },
+    {
+        'species': 'Tinkaton',
+        'league': 'ultra',
+        'slug': 'tinkaton-ultra-league-nofloor',
+        'html_base': 'tinkaton_ul_nofloor.html',
+        'opponents': 20,
+        'no_thresholds': True,
+    },
+]
 
 
-def build_command(slug, meta):
-    """Build the deep_dive.py command list from meta.toml [dive] section."""
-    dive = meta['dive']
-    species = dive['species']
-    league = dive['league']
-    html_base = dive.get('html_base', f'{slug}.html')
-    html_path = os.path.join(WEBSITE_DIR, slug, html_base)
+def build_command(dive):
+    """Build the deep_dive.py command list from a dive config dict."""
+    html_path = os.path.join(WEBSITE_DIR, dive['slug'], dive['html_base'])
 
-    cmd = [sys.executable, DEEP_DIVE, species, '--league', league]
+    cmd = [sys.executable, DEEP_DIVE, dive['species'],
+           '--league', dive['league']]
 
-    # Optional args with defaults matching our standard website config
-    if 'opponents' in dive:
-        cmd += ['--opponents', str(dive['opponents'])]
     if 'opponents_file' in dive:
         cmd += ['--opponents-file', dive['opponents_file']]
+    elif 'opponents' in dive:
+        cmd += ['--opponents', str(dive['opponents'])]
+
     cmd += ['--top-movesets', str(dive.get('top_movesets', 5))]
     cmd += ['--opp-ivs', dive.get('opp_ivs', 'both')]
     cmd += ['--bait', dive.get('bait', 'both')]
-
-    if dive.get('reference'):
-        cmd += ['--reference', dive['reference']]
-    else:
-        cmd += ['--reference', 'auto']
+    cmd += ['--reference', dive.get('reference', 'auto')]
 
     if dive.get('no_thresholds'):
         cmd += ['--no-thresholds']
-
     if dive.get('shadow'):
         cmd += ['--shadow']
 
-    # Standard flags for website output
     cmd += [
         '--html', html_path,
         '--interactive',
@@ -92,7 +90,6 @@ def build_command(slug, meta):
         '--split-movesets',
     ]
 
-    # Extra raw args (escape hatch for unusual flags)
     if 'extra_args' in dive:
         cmd += dive['extra_args']
 
@@ -100,29 +97,34 @@ def build_command(slug, meta):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('filter', nargs='?', default=None,
                         help='Substring filter on slug (e.g. "tinkaton", "ultra")')
     parser.add_argument('--dry-run', action='store_true',
                         help='Print commands without running them')
     args = parser.parse_args()
 
-    dives = list(find_dives(args.filter))
+    dives = DIVES
+    if args.filter:
+        dives = [d for d in dives
+                 if args.filter.lower() in d['slug'].lower()]
+
     if not dives:
         print("No matching dives found.")
         return
 
     print(f"Found {len(dives)} dive(s) to run:\n")
-    for slug, _ in dives:
-        print(f"  - {slug}")
+    for d in dives:
+        print(f"  - {d['slug']}")
     print()
 
-    for i, (slug, meta) in enumerate(dives):
-        cmd = build_command(slug, meta)
+    for i, dive in enumerate(dives):
+        cmd = build_command(dive)
         cmd_str = ' '.join(cmd)
         print(f"{'='*60}")
-        print(f"[{i+1}/{len(dives)}] {slug}")
+        print(f"[{i+1}/{len(dives)}] {dive['slug']}")
         print(f"{'='*60}")
         print(f"  {cmd_str}\n")
 
@@ -130,10 +132,10 @@ def main():
             continue
 
         t0 = time.time()
-        result = subprocess.run(cmd, cwd=os.path.dirname(SCRIPT_DIR))
+        result = subprocess.run(cmd, cwd=REPO_ROOT)
         elapsed = time.time() - t0
         if result.returncode != 0:
-            print(f"\n  [FAILED] {slug} (exit code {result.returncode})")
+            print(f"\n  [FAILED] {dive['slug']} (exit code {result.returncode})")
             print(f"  Stopping. Fix the issue and re-run.")
             sys.exit(1)
         print(f"\n  Done in {elapsed/60:.1f} min\n")
