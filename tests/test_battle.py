@@ -1208,13 +1208,13 @@ def test_corviknight_2v2_vs_default_shadow_sableye_flips_with_bait():
     # charged move, swapping AURA_WHEEL_ELECTRIC <-> AURA_WHEEL_DARK.
     (0, 0, 489),
     (0, 1, 219),
-    # (0, 2, 219),  # pre-existing DP mismatch (our: 133)
+    pytest.param(0, 2, 219, marks=pytest.mark.xfail(reason="DP cycle-timing: our 133, would_shield difference")),
     (1, 0, 817),
     (1, 1, 728),
-    # (1, 2, 348),  # pre-existing DP mismatch (our: 728)
+    pytest.param(1, 2, 348, marks=pytest.mark.xfail(reason="DP cycle-timing: our 728, Azu tanks PF to save shield for AW")),
     (2, 0, 817),
     (2, 1, 728),
-    # (2, 2, 665),  # pre-existing DP mismatch (our: 728)
+    pytest.param(2, 2, 665, marks=pytest.mark.xfail(reason="DP cycle-timing: our 728")),
 ])
 def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko_score):
     """Morpeko form change: Aura Wheel toggles Electric/Dark type each charged move."""
@@ -1246,15 +1246,15 @@ def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko
     # Verified at pvpoke.com/battle/ 2026-04-14
     # Form change: Shield -> Blade on charged move (activate_charged),
     # Blade -> Shield on shield use (activate_shield).
-    # (0, 0, 773),   # our: 784, +11 delta — investigating
-    # (0, 1, 374),   # our: 353, -21 delta
-    # (0, 2, 112),   # our: 91, -21 delta
-    # (1, 0, 773),   # our: 784, +11 delta
-    # (1, 1, 640),   # our: 521, -119 delta
+    pytest.param(0, 0, 773, marks=pytest.mark.xfail(reason="DP cycle-timing: our 784, +11 (IB vs PR selection)")),
+    pytest.param(0, 1, 374, marks=pytest.mark.xfail(reason="DP cycle-timing: our 353, -21")),
+    pytest.param(0, 2, 112, marks=pytest.mark.xfail(reason="DP cycle-timing: our 91, -21")),
+    pytest.param(1, 0, 773, marks=pytest.mark.xfail(reason="DP cycle-timing: our 784, +11")),
+    pytest.param(1, 1, 640, marks=pytest.mark.xfail(reason="DP cycle-timing: our 521, -119")),
     (1, 2, 376),
-    # (2, 0, 773),   # our: 784, +11 delta
-    # (2, 1, 640),   # our: 651, +11 delta
-    # (2, 2, 376),   # our: 521, +145 delta
+    pytest.param(2, 0, 773, marks=pytest.mark.xfail(reason="DP cycle-timing: our 784, +11")),
+    pytest.param(2, 1, 640, marks=pytest.mark.xfail(reason="DP cycle-timing: our 651, +11")),
+    pytest.param(2, 2, 376, marks=pytest.mark.xfail(reason="DP cycle-timing: our 521, +145"))
 ])
 def test_aegislash_vs_azumarill_form_change(shields_a, shields_z, expected_aegi_score):
     """Aegislash form change: Shield<->Blade on charged move / shield use."""
@@ -1287,11 +1287,11 @@ def test_aegislash_vs_azumarill_form_change(shields_a, shields_z, expected_aegi_
     # Form change: Disguise absorbs first unshielded charged hit (dmg=1),
     # then Mimikyu becomes Busted with permanent -1 def stage.
     (0, 0, 738),
-    # (0, 1, 350),   # our: 363, +13 delta — pre-existing DP (IB vs PR cycle)
-    # (0, 2, 214),   # our: 227, +13 delta
+    pytest.param(0, 1, 350, marks=pytest.mark.xfail(reason="DP cycle-timing: our 363, +13 (IB vs PR)")),
+    pytest.param(0, 2, 214, marks=pytest.mark.xfail(reason="DP cycle-timing: our 227, +13")),
     (1, 0, 761),
     (1, 1, 672),
-    # (1, 2, 473),   # our: 460, -13 delta
+    pytest.param(1, 2, 473, marks=pytest.mark.xfail(reason="DP cycle-timing: our 460, -13")),
     (2, 0, 761),
     (2, 1, 686),
     (2, 2, 607),
