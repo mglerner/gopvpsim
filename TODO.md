@@ -61,20 +61,20 @@ break invariants that weren't yet nailed down by tests.
   3. bestChargedMove recomputed per-turn vs PvPoke's init-time cache --
      keeping ours (intentional, more correct; see DEVELOPER_NOTES.md)
 
-* **Forretress/Azu 0-shield score divergence** — Investigated 2026-04-15.
-  After Divergences 1+2 shipped, Forretress (VS/Sand Tomb/Rock Tomb) vs
-  Azu (Bubble/IB/HP) in GL still diverges from PvPoke by +36 in 0v0 and
-  +117 in 0v1.  Azu 1-shield and 2-shield rows match (except 1v0 -100,
-  a known pre-existing gap).  Pattern: our Azu (0 shields) throws 2 CMs
-  (IB shielded + HP unshielded) while PvPoke's Azu appears to throw
-  only 1 CM.  Confirmed by setting `bait_shields=False` on Azu's policy:
-  our 0v1 score drops from 429 to 296 (PvPoke=312, delta -16).  So our
-  DP is "too eager to bait" in this matchup.  Root cause probably in
-  how PvPoke's DP tracks `finalState.moves` (the full sequence) vs our
-  scalar first_idx -- PvPoke may pick a HP-first plan at 77 energy
-  where we pick an IB-then-HP plan.  Needs a PvPoke battle trace to
-  confirm the divergence point.  Deferred: needs user to run the
-  matchup in PvPoke and share the turn-by-turn trace.
+* **Forretress/Azu 0-shield score divergence** — Re-investigated
+  2026-04-15 with the new headless Node harness (`scripts/pvpoke_trace.js`,
+  validated 27/27 oracle cases). Divergence localized to Forretress's
+  SECOND charged-move choice, not Azumarill's. PvPoke's Forretress
+  throws Sand Tomb, Sand Tomb, Sand Tomb (three Sand Tombs, never Rock
+  Tomb). Ours throws Sand Tomb then Rock Tomb. At T26 after the first
+  ST+IB exchange, PvPoke's DP returns `finalState.moves = [SAND_TOMB,
+  SAND_TOMB]` and fires; ours returns `first=ROCK_TOMB max_dmg=ROCK_TOMB`
+  and near-KO-waits for RT. The earlier hypothesis ("PvPoke's Azu
+  throws 1 CM, ours throws 2") was inverted -- Azu's moves actually
+  match; it's Forr that diverges. See DEVELOPER_NOTES.md "Forretress/
+  Azumarill DP plan-selection" for the full probe readout. Follow-up
+  session should read our `pvpoke_dp` first_idx selection against
+  PvPoke's `ActionLogic.decideAction` plan-pick branch to find the fix.
 
 ## Policies to add
 

@@ -143,6 +143,59 @@ all `activeChargedMoves` after the priority-shuffle, so the bait-wait
 same as our `actual_dpe`. The buff-adjusted DPE only affects the
 priority-shuffle ordering (lines 711-787), not the ratio check itself.
 
+### ACTIVE: Forretress/Azumarill DP plan-selection (pvpoke_dp first_idx)
+
+**Investigated 2026-04-15 via the new headless Node harness
+(`scripts/pvpoke_trace.js` + `scripts/verify_pvpoke_harness.py`,
+validated 27/27 on recorded oracle cases).**
+
+**Matchup:** Azumarill 4/15/13 (Bubble / Ice Beam / Hydro Pump) vs
+Forretress 5/15/13 (Volt Switch / Sand Tomb / Rock Tomb) in Great
+League.
+
+**Our Python: Azu=429 at 0v1. PvPoke: Azu=312 at 0v1.** Delta +117.
+
+**Localized divergence (turn-by-turn diff against PvPoke harness):**
+
+| Turn | Our Python                         | PvPoke                                                   |
+| ---- | ---------------------------------- | -------------------------------------------------------- |
+| T17  | Forr throws Sand Tomb              | Forr throws Sand Tomb                                    |
+| T21  | Azu throws Ice Beam (shielded)     | Azu throws Ice Beam (shielded)                           |
+| T26  | **Forr throws Rock Tomb (50 dmg)** | **Forr throws Sand Tomb, plans another Sand Tomb after** |
+
+PvPoke's Forretress throws **three** Sand Tombs over the match. Our
+Forretress throws Sand Tomb then Rock Tomb. This inverts the earlier
+(pre-harness) hypothesis recorded in TODO.md, which had claimed
+PvPoke's Forr threw only 1 charged move and ours threw 2.
+
+**Probe readouts at the divergence point:**
+
+- **PvPoke** `ActionLogic.decideAction` @ T26 for Forr:
+  `finalState.moves = [SAND_TOMB, SAND_TOMB]`, `energy=8`
+  (plan-terminal), `oppHealth=-8`. Thrown immediately.
+- **Our Python** `pvpoke_dp` @ T18 for Forr:
+  `raw plan first=ROCK_TOMB max_dmg=ROCK_TOMB has_deb=False`. Near-KO
+  waits for Rock Tomb (energy 24/50) instead of firing Sand Tomb.
+
+**Hypothesis (for next session to test):** after Forr's first Sand Tomb
+throw, our DP picks Rock Tomb as the plan's `first_idx` / `max_dmg_idx`,
+whereas PvPoke's DP prefers a two-Sand-Tomb plan. RT has higher raw
+damage (50 vs 22) so our `max_dmg_idx` points to RT; this appears to
+steer `first_idx` to RT too. PvPoke's DP presumably values the 2 x ST
+plan's faster KO (lower energy, opp-def debuff stack) over RT's
+higher per-throw damage. Sand Tomb is `selfBuffing=true` after the
+2026-04-14 Divergence 1 broadening, but the DP's first_idx selection
+may not be weighting that correctly.
+
+**Artifacts (in-repo):**
+- `scripts/pvpoke_trace.js` - headless Node harness for PvPoke.
+- `scripts/verify_pvpoke_harness.py` - oracle smoke-test (27 cases).
+
+**Out-of-scope for the investigation:** the actual Python fix to
+`pvpoke_dp`'s first_idx selection. Scope that as a follow-up once the
+DP branch to touch is identified from a direct read of our
+`pvpoke_dp` code against the PvPoke `ActionLogic.decideAction` DP.
+
 ### 3. bestChargedMove computed per-turn, not cached at init (intentional)
 
 **PvPoke**: `bestChargedMove` is computed once at init (and on self
