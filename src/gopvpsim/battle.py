@@ -815,6 +815,24 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         return m['power'] / m['energy']
 
     # ------------------------------------------------------------------ #
+    # Break Mimikyu disguise ASAP (ActionLogic.js lines 236-241)
+    # When facing a Pokemon with a protect effect and active disguise,
+    # throw cheapest non-self-debuffing charged move immediately.
+    # ------------------------------------------------------------------ #
+    if (defender._form_change is not None
+            and defender._form_change.effect == 'protect'
+            and defender._form_disguise_active
+            and defender.shields == 0):
+        for _n in range(n_cms):
+            if (attacker.energy >= cm_energy[_n]
+                    and not cms[_n].get('selfDebuffing', False)):
+                if _policy_debug:
+                    _policy_log.append(
+                        f"  DP[break_disguise]: {attacker.species} fires "
+                        f"{cms[_n].get('moveId')} to break disguise")
+                return cm_orig_idx[_n]
+
+    # ------------------------------------------------------------------ #
     # turnsToLive: fire highest-damage move now if about to be KO'd
     # Port of ActionLogic.js lines 38-207
     # ------------------------------------------------------------------ #
