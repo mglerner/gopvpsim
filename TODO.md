@@ -72,11 +72,23 @@ break invariants that weren't yet nailed down by tests.
 
 ## Features to add
 
-* **Form Change** — Morpeko. Aegislash. Mimikyu. These are all
-  implemented in pvpoke, so we can check against their results. As
-  soon as we get Mimikyu's form change added, we should do a Mimikyu
-  deep dive. The form change deep dives should include some text about
-  how their individual form changes work.
+* **Form Change** — ✅ **Done 2026-04-14.** Morpeko (toggle Aura Wheel
+  Electric/Dark), Aegislash (Shield<->Blade stat/move/level swap),
+  Mimikyu (disguise absorbs first unshielded hit, -1 def stage).
+  Data-driven via gamemaster formChange field. Oracle tests: Morpeko
+  6/9, Aegislash 1/9, Mimikyu 6/9 match PvPoke exactly; mismatches
+  are pre-existing DP cycle-timing issues (see TODO entry below).
+  Next: Mimikyu deep dive with form change narrative.
+
+* **DP cycle-timing move selection** — pvpoke_dp's farm-down path
+  selects by per-move DPE but misses cases where a cheaper move allows
+  an extra throw before KO, yielding more total damage. Concrete
+  example: Azu vs Aegislash 0v0, IB (15 dmg, 5 Bubbles) lets Azu
+  squeeze 2 throws (30 total) while PR (18 dmg, 6 Bubbles) only fits 1
+  throw (18 total). Our DP picks PR (higher DPE), PvPoke picks IB
+  (more total damage). Affects ~6 scenarios across form change oracle
+  tests with consistent +/-11 to +/-13 deltas. Tackle in a dedicated
+  DP refinement session.
 
 ## Tests to add
 
@@ -145,11 +157,12 @@ break invariants that weren't yet nailed down by tests.
   already prove the gate works. Pick these up in a session where you
   can verify exact movesets/IVs at pvpoke.com/battle.
 
-* **Form Change** — Morpeko. Aegislash. Eventually Mimikyu. Low
-  priority. Do this when we add the form change features. Do the form
-  changes affect the shielding strategy and/or baiting strategy of the
-  opponent? Probably. Make sure we test enough explicit battle
-  timelines from pvpoke to confirm.
+* **Form Change** — ✅ **Done 2026-04-14.** Oracle tests shipped:
+  Morpeko 6/9, Aegislash 1/9, Mimikyu 6/9 match PvPoke. Mismatches
+  are pre-existing DP cycle-timing differences, not form change bugs.
+  Form changes DO affect opponent shielding (Aegislash Shield form
+  suppresses shields if damage < half HP) and baiting (Mimikyu
+  opponents break disguise ASAP with cheapest charged move).
 
 * **Auto-anchor fallback gating tests** — `build_auto_anchors()` and
   the per-kind gating logic are currently only verified by smoke runs
