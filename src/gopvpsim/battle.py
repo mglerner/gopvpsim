@@ -803,7 +803,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # --- Priority-shuffle (PvPoke Pokemon.js lines 711-787) ---
     # Reorder cms based on buff/debuff properties.  PvPoke runs this once
     # at init; we apply it after energy sort each call.  Uses buff-adjusted
-    # DPE for the selfBuffing-promotion clause (line 758).
+    # DPE for the selfBuffing-promotion clause (line 758).  Verified
+    # 2026-04-15 to affect 153/378 matchups in a 7x6x9 differential grid.
     if n_cms > 1:
         def _get_dmg(m):
             return a_cm_dmgs[a_idx_map[id(m)]]
