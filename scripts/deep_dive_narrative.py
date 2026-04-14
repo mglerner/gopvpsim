@@ -7,7 +7,44 @@ renders them as accessible prose in a purple-bordered HTML zone.
 Modeled on RyanSwag's GamePress PvP IV Deep Dive series.
 """
 
+import math
+
 from deep_dive_analysis import probe_tier_cutoff_flips
+
+
+# ---------------------------------------------------------------------------
+# Catch probability (geometric distribution)
+# ---------------------------------------------------------------------------
+
+def _catches_for_probability(n_qualifying, total_ivs, p):
+    """Number of catches needed for probability p of at least one qualifying IV.
+
+    Uses the geometric distribution:  k = ceil(log(1-p) / log(1 - n/total))
+    Returns None if n_qualifying <= 0 or >= total_ivs.
+    """
+    if n_qualifying <= 0 or n_qualifying >= total_ivs:
+        return None
+    q = 1 - n_qualifying / total_ivs
+    if q <= 0 or q >= 1:
+        return None
+    return math.ceil(math.log(1 - p) / math.log(q))
+
+
+def _catch_phrase(n_qualifying, total_ivs):
+    """Human-readable catch probability string like '~14-28 for a 50-75% chance'.
+
+    Returns '' if the math doesn't apply.
+    """
+    k50 = _catches_for_probability(n_qualifying, total_ivs, 0.50)
+    k75 = _catches_for_probability(n_qualifying, total_ivs, 0.75)
+    if k50 is None:
+        return ''
+    if k50 <= 1:
+        return 'almost any will do'
+    noun = 'catch' if k50 == 1 else 'catches'
+    if k50 == k75 or k75 is None:
+        return f'~{k50} {noun} for a 50% chance'
+    return f'~{k50}-{k75} for a 50-75% chance'
 
 
 # ---------------------------------------------------------------------------
@@ -763,6 +800,36 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
         f'may be the flavor of choice{intro_tail}.</p>\n'
     )
 
+    # IV overview table
+    total_ivs = data_obj.get('nIvs', 4096)
+    overview_rows = []
+    for f in flavors:
+        n = f['n_qualifying']
+        pct = n / total_ivs * 100 if total_ivs > 0 else 0
+        cp = _catch_phrase(n, total_ivs)
+        rec = ' [Recommended]' if f['recommended'] else ''
+        name_str = f['name']
+        overview_rows.append(
+            f'<tr><td style="color:#e0d0f0;font-weight:600">{name_str}{rec}</td>'
+            f'<td style="text-align:right">{n}</td>'
+            f'<td style="text-align:right">{pct:.1f}%</td>'
+            f'<td>{cp}</td></tr>'
+        )
+    if overview_rows:
+        parts.append(
+            '<table class="dd-narrative-overview" style="margin:8px 0 12px 0;'
+            'border-collapse:collapse;font-size:0.85rem;width:100%">\n'
+            '<tr style="color:#8b949e;border-bottom:1px solid #30363d">'
+            '<th style="text-align:left;padding:2px 8px">Flavor</th>'
+            '<th style="text-align:right;padding:2px 8px">IVs</th>'
+            '<th style="text-align:right;padding:2px 8px">%</th>'
+            '<th style="text-align:left;padding:2px 8px">Catches needed</th>'
+            '</tr>\n'
+        )
+        for row in overview_rows:
+            parts.append(row + '\n')
+        parts.append('</table>\n')
+
     # Collect General's boundaries for dedup in specialist bullets
     gen_td = tradeoffs.get(general['name'], {})
     gen_boundaries = gen_td.get('boundaries', [])
@@ -932,9 +999,9 @@ def _render_specialist_flavor(parts, flavor, gains, losses,
             f'<p class="dd-narrative-loss">'
             f'Note: {reason} will cost several matchups, '
             f'such as the {loss_text}.</p>\n')
-    elif flavor['def_cut'] > 0 and flavor['n_qualifying'] > 0:
-        # No detected losses but strict def requirement - note IV scarcity
+    elif flavor['n_qualifying'] > 0 and flavor['n_qualifying'] < 50:
+        # No detected losses but strict stat requirement - note IV scarcity
         parts.append(
             f'<p class="dd-narrative-loss">'
             f'Note: Only {flavor["n_qualifying"]} IV spreads reach this '
-            f'Def target, so it may require specific IV luck.</p>\n')
+            f'target, so it may require specific IV luck.</p>\n')
