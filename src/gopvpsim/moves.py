@@ -187,10 +187,14 @@ def get_moves():
             # selfAttackDebuffing / selfDefenseDebuffing: subsets of selfDebuffing
             m['selfAttackDebuffing']  = bool(m['selfDebuffing'] and buffs[0] < 0)
             m['selfDefenseDebuffing'] = bool(m['selfDebuffing'] and buffs[1] < 0)
-            # selfBuffing: guaranteed (chance == 1) positive self-buff (PvPoke line 873)
+            # selfBuffing: PvPoke GameMaster.js:873 — guaranteed positive
+            # self-buff OR guaranteed opponent debuff (any kind).  The name is
+            # misleading but PvPoke uses the same flag for both categories
+            # (Psychic Fangs, Sand Tomb, Acid Spray, etc. all count).
             m['selfBuffing'] = bool(
                 buffs and chance == 1
-                and bt == 'self' and (buffs[0] > 0 or buffs[1] > 0))
+                and ((bt == 'opponent')
+                     or (bt == 'self' and (buffs[0] > 0 or buffs[1] > 0))))
     return _fast_moves, _charged_moves
 
 
