@@ -419,9 +419,8 @@ def test_simulate_never_shield_means_no_shields_used():
 def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
                           atk_iv, def_iv, sta_iv, max_level=51.0, shadow=False):
     """Helper: build a BattlePokemon from the real gamemaster."""
-    from gopvpsim.pokemon import Pokemon
+    from gopvpsim.pokemon import Pokemon, LEAGUE_CAPS
     from gopvpsim.moves import get_moves
-    from gopvpsim.data import load_gamemaster
 
     pokemon = Pokemon.at_best_level(species, atk_iv, def_iv, sta_iv,
                                     league=league, max_level=max_level,
@@ -430,15 +429,9 @@ def _make_battle_pokemon(species, fast_id, charged_ids, league, shields,
     fm  = dict(fast_moves[fast_id])
     cms = [dict(charged_moves[cid]) for cid in charged_ids]
 
-    gm  = load_gamemaster()
-    mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
-    from gopvpsim.data import parse_types
-    types = parse_types(mon)
-
-    return BattlePokemon(
-        species=species, types=types,
-        atk=pokemon.atk, def_=pokemon.def_, max_hp=pokemon.hp,
-        fast_move=fm, charged_moves=cms, shields=shields,
+    return BattlePokemon.from_pokemon(
+        pokemon, fm, cms, shields=shields,
+        league_cp=LEAGUE_CAPS[league],
     )
 
 
@@ -921,9 +914,9 @@ def test_corviknight_mirror_both_buff(shields_0, shields_1,
 
 def _make_battle_pokemon_default(species, league, shields, shadow=False):
     """Build a BattlePokemon using PvPoke's default moveset and default IVs (15/15/15)."""
-    from gopvpsim.pokemon import Pokemon
+    from gopvpsim.pokemon import Pokemon, LEAGUE_CAPS
     from gopvpsim.moves import get_moves
-    from gopvpsim.data import load_gamemaster, parse_types, get_default_moveset
+    from gopvpsim.data import get_default_moveset
 
     fast_id, charged_ids = get_default_moveset(species, league=league, shadow=shadow)
     pokemon = Pokemon.at_best_level(species, 15, 15, 15,
@@ -932,14 +925,9 @@ def _make_battle_pokemon_default(species, league, shields, shadow=False):
     fm  = dict(fast_moves[fast_id])
     cms = [dict(charged_moves[cid]) for cid in charged_ids]
 
-    gm  = load_gamemaster()
-    mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
-    types = parse_types(mon)
-
-    return BattlePokemon(
-        species=species, types=types,
-        atk=pokemon.atk, def_=pokemon.def_, max_hp=pokemon.hp,
-        fast_move=fm, charged_moves=cms, shields=shields,
+    return BattlePokemon.from_pokemon(
+        pokemon, fm, cms, shields=shields,
+        league_cp=LEAGUE_CAPS[league],
     )
 
 

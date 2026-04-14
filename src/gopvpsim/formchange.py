@@ -233,6 +233,12 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
     )
 
     alt_trigger = alt_fc.get('trigger')
+    # For toggle types, the alt form should use the same trigger as the default
+    # so it can toggle back (e.g. Morpeko Hangry has no formChange in gamemaster
+    # but needs to toggle back to Full Belly on the next charged move).
+    form_type = fc.get('type')
+    if form_type == 'toggle' and alt_trigger is None:
+        alt_trigger = trigger
     alt_fd = FormData(
         species=alt_entry['speciesName'],
         species_id=alt_species_id,
@@ -242,7 +248,7 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         fast_move=alt_fast_move,
         charged_moves=alt_charged_moves,
         trigger=alt_trigger if alt_trigger != 'none' else None,
-        move_id=alt_fc.get('moveId'),
+        move_id=fc.get('moveId') if form_type == 'toggle' and alt_fc.get('moveId') is None else alt_fc.get('moveId'),
         native_stat_buffs=alt_native_buffs,
     )
 
