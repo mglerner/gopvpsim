@@ -134,3 +134,19 @@ Reference deep dives that *should* live in the repo (e.g., the
 validation HTMLs under `docs/validations/`) are a separate category —
 those are checked in deliberately as point-in-time evidence and don't
 follow this convention.
+
+## All-in-one vs split-moveset HTML
+
+The all-in-one interactive HTML (`--interactive` without `--split-movesets`)
+generates the Deep Dive Results section (tier cards, anchor-flip bullets,
+matchup boundaries, notable IVs) once for the top-ranked moveset only.
+When the moveset dropdown changes, the Plotly scatter updates (score
+data is embedded for all movesets) and the IV Flavor Guide narrative
+zone swaps (per-moveset narratives are pre-rendered in hidden divs),
+but the rest of the analysis stays fixed on the top moveset.
+
+In `--split-movesets` mode each HTML file gets its own full call to
+`generate_analysis_sections` with that file's moveset, so every section
+reflects the correct moveset. This is the intended experience for the
+website — all-in-one is primarily for quick interactive score-distribution
+comparison during development.
