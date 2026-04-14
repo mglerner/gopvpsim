@@ -413,22 +413,33 @@ def refine_flavor_names(flavors, tradeoffs):
         if not consolidated:
             continue
         old_name = flavor['name']
+        new_name = None
+        naming_opp = None
         if old_name.startswith('Attack Weight') and len(consolidated) >= 1:
             best = max(consolidated,
                        key=lambda g: len(g['scenarios']))
-            base = _base_species(best['opponent'])
-            new_name = f'{base} Slayer'
-            flavor['name'] = new_name
-            if old_name in tradeoffs:
-                tradeoffs[new_name] = tradeoffs.pop(old_name)
+            naming_opp = _base_species(best['opponent'])
+            new_name = f'{naming_opp} Slayer'
         elif old_name.startswith('High Bulk') and len(consolidated) >= 1:
             best = max(consolidated,
                        key=lambda g: len(g['scenarios']))
-            base = _base_species(best['opponent'])
-            new_name = f'Fortified {base}'
+            naming_opp = _base_species(best['opponent'])
+            new_name = f'Fortified {naming_opp}'
+
+        if new_name:
             flavor['name'] = new_name
             if old_name in tradeoffs:
                 tradeoffs[new_name] = tradeoffs.pop(old_name)
+            # Move the naming opponent to the front of the gains list
+            # so it's guaranteed to appear in the prose summary.
+            td = tradeoffs.get(new_name, {})
+            gains = td.get('gains', [])
+            if gains and naming_opp:
+                front = [g for g in gains
+                         if _base_species(g['opponent']) == naming_opp]
+                rest = [g for g in gains
+                        if _base_species(g['opponent']) != naming_opp]
+                td['gains'] = front + rest
 
     # Drop flavors whose gains are a strict subset of another flavor
     # on the same stat axis.  E.g. "Fortified Lickilicky" (gains: Lickilicky,
