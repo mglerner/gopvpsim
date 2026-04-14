@@ -357,6 +357,81 @@ def _attach_boundaries(flavors, tradeoffs, all_matchup_boundaries):
         td['boundaries'] = relevant
 
 
+def refine_flavor_names(flavors, tradeoffs):
+    """Rename generic flavors based on their dominant tradeoff gains.
+
+    "Attack Weight" -> "{Opp} Slayer" when one opponent dominates gains.
+    "High Bulk" -> "Fortified {Opp}" when one opponent dominates gains.
+    Must be called after compute_flavor_tradeoffs.
+    """
+    for flavor in flavors:
+        if flavor['is_general']:
+            continue
+        td = tradeoffs.get(flavor['name'], {})
+        gains = td.get('gains', [])
+        if not gains:
+            continue
+        # Consolidate shadow variants for counting
+        consolidated = _consolidate_shadow(gains)
+        if not consolidated:
+            continue
+        old_name = flavor['name']
+        if old_name == 'Attack Weight' and len(consolidated) >= 1:
+            # Name after the opponent with the most scenario flips
+            best = max(consolidated,
+                       key=lambda g: len(g['scenarios']))
+            base = _base_species(best['opponent'])
+            new_name = f'{base} Slayer'
+            flavor['name'] = new_name
+            # Update tradeoffs key
+            if old_name in tradeoffs:
+                tradeoffs[new_name] = tradeoffs.pop(old_name)
+        elif old_name == 'High Bulk' and len(consolidated) >= 1:
+            best = max(consolidated,
+                       key=lambda g: len(g['scenarios']))
+            base = _base_species(best['opponent'])
+            new_name = f'Fortified {base}'
+            flavor['name'] = new_name
+            if old_name in tradeoffs:
+                tradeoffs[new_name] = tradeoffs.pop(old_name)
+
+    # Drop flavors whose gains are a strict subset of another flavor
+    # on the same stat axis.  E.g. "Fortified Lickilicky" (gains: Lickilicky,
+    # Sealeo) is redundant when "Fortified Corviknight" (gains: Corviknight,
+    # Lickilicky, Sealeo) exists.
+    to_remove = set()
+    non_general = [f for f in flavors if not f['is_general']]
+    for i, fi in enumerate(non_general):
+        td_i = tradeoffs.get(fi['name'], {})
+        gains_i = {g['opponent'] for g in td_i.get('gains', [])}
+        if not gains_i:
+            continue
+        for j, fj in enumerate(non_general):
+            if i == j:
+                continue
+            td_j = tradeoffs.get(fj['name'], {})
+            gains_j = {g['opponent'] for g in td_j.get('gains', [])}
+            # fi's gains are a strict subset of fj's gains
+            if gains_i < gains_j:
+                to_remove.add(fi['name'])
+                break
+    if to_remove:
+        flavors[:] = [f for f in flavors if f['name'] not in to_remove]
+
+    # Re-disambiguate names after renaming
+    seen = {}
+    for f in flavors:
+        seen.setdefault(f['name'], []).append(f)
+    for name, group in seen.items():
+        if len(group) > 1:
+            for f in group:
+                primary_stat = (f'{f["def_cut"]:.2f}+ Def' if f['def_cut'] > 0
+                                else f'{f["atk_cut"]:.2f}+ Atk' if f['atk_cut'] > 0
+                                else '')
+                if primary_stat:
+                    f['name'] = f'{name} ({primary_stat})'
+
+
 # ---------------------------------------------------------------------------
 # Prose rendering
 # ---------------------------------------------------------------------------
@@ -375,17 +450,72 @@ def _opp_colored(name):
     return f'<span style="color:{colors[idx]};font-weight:600">{name}</span>'
 
 
+def _base_species(name):
+    """Strip Shadow/XL/etc. suffixes to get the base species name."""
+    for suffix in (' (Shadow)', ' (XL)'):
+        if name.endswith(suffix):
+            return name[:-len(suffix)]
+    return name
+
+
+def _consolidate_shadow(entries):
+    """Merge shadow and non-shadow entries that share a base species + scenarios.
+
+    Input: list of {opponent, scenarios} dicts.
+    Output: list of {opponent, scenarios, shadow_note} dicts where shadow
+    variants with identical scenario sets are folded in.
+    """
+    from collections import OrderedDict
+    grouped = OrderedDict()
+    for e in entries:
+        base = _base_species(e['opponent'])
+        is_shadow = e['opponent'] != base
+        scen_key = tuple(tuple(s) for s in sorted(e['scenarios']))
+        if base not in grouped:
+            grouped[base] = {'base': base, 'scenarios': {},
+                             'has_normal': False, 'has_shadow': False}
+        g = grouped[base]
+        g['scenarios'].setdefault(scen_key, set())
+        if is_shadow:
+            g['has_shadow'] = True
+            g['scenarios'][scen_key].add('shadow')
+        else:
+            g['has_normal'] = True
+            g['scenarios'][scen_key].add('normal')
+
+    result = []
+    for base, g in grouped.items():
+        # If both normal + shadow exist with identical scenarios, consolidate
+        all_scens = set(g['scenarios'].keys())
+        both_forms = g['has_normal'] and g['has_shadow']
+        all_same = both_forms and all(
+            {'normal', 'shadow'} <= forms for forms in g['scenarios'].values())
+        if all_same:
+            scens = sorted(set(s for sk in all_scens for s in sk))
+            result.append({'opponent': base, 'scenarios': scens,
+                           'shadow_note': ''})
+        else:
+            # Emit separately but in order
+            for e in entries:
+                if _base_species(e['opponent']) == base:
+                    result.append({'opponent': e['opponent'],
+                                   'scenarios': e['scenarios'],
+                                   'shadow_note': ''})
+    return result
+
+
 def _gain_prose(gains):
     """Generate prose describing matchup gains."""
     if not gains:
         return ''
+    consolidated = _consolidate_shadow(gains)
     items = []
-    for g in gains[:5]:
+    for g in consolidated[:5]:
         scen = _scenario_str(g['scenarios'])
-        items.append(f'the {g["opponent"]} {scen}')
-    if len(gains) == 1:
+        items.append(f'the {g["opponent"]}{g["shadow_note"]} {scen}')
+    if len(consolidated) == 1:
         return f'pick up {items[0]}'
-    elif len(gains) <= 3:
+    elif len(consolidated) <= 4:
         all_items = ', '.join(items[:-1]) + f', and {items[-1]}'
         return f'gain {all_items}'
     else:
@@ -397,11 +527,12 @@ def _loss_prose(losses):
     """Generate prose describing matchup losses."""
     if not losses:
         return ''
+    consolidated = _consolidate_shadow(losses)
     items = []
-    for l in losses[:5]:
-        scen = _scenario_str(l['scenarios'])
-        items.append(f'{l["opponent"]} {scen}')
-    if len(losses) <= 3:
+    for entry in consolidated[:5]:
+        scen = _scenario_str(entry['scenarios'])
+        items.append(f'{entry["opponent"]}{entry["shadow_note"]} {scen}')
+    if len(consolidated) <= 3:
         return ', '.join(items[:-1]) + f', and {items[-1]}' if len(items) > 1 else items[0]
     else:
         shown = ', '.join(items[:3])
@@ -421,37 +552,59 @@ def _boundary_bullets_for_flavor(flavor, tradeoffs, has_bait_axis=False,
     if not boundaries:
         return ''
 
-    # Build a set of (opponent, stat, threshold) keys already in General
+    # Build a set of (base_opponent, stat, threshold) keys already in General
     gen_keys = set()
     if general_boundaries:
         for gb in general_boundaries:
-            gen_keys.add((gb['opponent'], gb.get('stat', 'def'),
+            gen_keys.add((_base_species(gb['opponent']),
+                          gb.get('stat', 'def'),
                           round(gb['threshold'], 2)))
 
+    # Group by (threshold, stat) to consolidate shadow variants
+    by_key = {}
+    for b in boundaries:
+        key = (round(b['threshold'], 2), b.get('stat', 'def'))
+        by_key.setdefault(key, []).append(b)
+
     lines = []
-    for b in boundaries[:12]:  # check more, cap output at 8
-        bkey = (b['opponent'], b.get('stat', 'def'),
-                round(b['threshold'], 2))
-        if bkey in gen_keys:
-            continue
-        stat_label = 'Atk' if b.get('stat') == 'atk' else 'Def'
-        scen_str = ', '.join(f'{s[0]}-{s[1]}' for s in sorted(b['scenarios']))
-        bait_modes = b.get('bait_modes', set())
-        if has_bait_axis and len(bait_modes) == 1:
-            bait_tag = ' no bait' if 'nobait' in bait_modes else ' with bait'
-            scen_str += bait_tag
-        hp_str = ''
-        if b.get('hp_threshold') is not None:
-            hp_str = f' with {b["hp_threshold"]} HP'
-        opp = b['opponent']
-        lines.append(
-            f'<li>{b["threshold"]:.2f} {stat_label}{hp_str} '
-            f'for the Rank 1 {_opp_colored(opp)} '
-            f'({scen_str})</li>'
-        )
+    for (thresh, stat), group in sorted(by_key.items()):
+        stat_label = 'Atk' if stat == 'atk' else 'Def'
+        # Merge opponents at this threshold
+        opp_info = {}
+        hp_vals = []
+        bait_sets = set()
+        for b in group:
+            base = _base_species(b['opponent'])
+            is_shadow = b['opponent'] != base
+            # Skip if already in General
+            if (base, stat, thresh) in gen_keys:
+                continue
+            opp_info.setdefault(base, {'scens': set(), 'shadow': False})
+            for s in b['scenarios']:
+                opp_info[base]['scens'].add(tuple(s))
+            if is_shadow:
+                opp_info[base]['shadow'] = True
+            if b.get('hp_threshold') is not None:
+                hp_vals.append(b['hp_threshold'])
+            bait_sets.update(b.get('bait_modes', set()))
+
+        for opp_base, info in opp_info.items():
+            scen_str = ', '.join(f'{s[0]}-{s[1]}' for s in sorted(info['scens']))
+            if has_bait_axis and len(bait_sets) == 1:
+                bait_tag = ' no bait' if 'nobait' in bait_sets else ' with bait'
+                scen_str += bait_tag
+            hp_str = ''
+            if hp_vals:
+                hp_str = f' with {min(hp_vals)} HP'
+            shadow_note = ' (incl. Shadow)' if info['shadow'] else ''
+            lines.append(
+                f'<li>{group[0]["threshold"]:.2f} {stat_label}{hp_str} '
+                f'for the {_opp_colored(opp_base)}{shadow_note} '
+                f'({scen_str})</li>'
+            )
         if len(lines) >= 8:
             break
-    return '\n'.join(lines)
+    return '\n'.join(lines[:8])
 
 
 def _general_boundary_bullets(all_matchup_boundaries, flavor, has_bait_axis=False):
@@ -468,22 +621,62 @@ def _general_boundary_bullets(all_matchup_boundaries, flavor, has_bait_axis=Fals
 
     # Sort by threshold ascending
     relevant.sort(key=lambda b: b['threshold'])
+    # Consolidate shadow variants at the same threshold
+    by_thresh = {}
+    for b in relevant:
+        key = round(b['threshold'], 2)
+        by_thresh.setdefault(key, []).append(b)
+
     lines = []
-    for b in relevant[:8]:
-        scen_str = ', '.join(f'{s[0]}-{s[1]}' for s in sorted(b['scenarios']))
-        bait_modes = b.get('bait_modes', set())
-        if has_bait_axis and len(bait_modes) == 1:
-            bait_tag = ' no bait' if 'nobait' in bait_modes else ' with bait'
-            scen_str += bait_tag
+    for thresh_key in sorted(by_thresh.keys()):
+        group = by_thresh[thresh_key]
+        # Merge opponents sharing this threshold
+        opp_scens = {}
+        hp_vals = []
+        bait_sets = set()
+        for b in group:
+            base = _base_species(b['opponent'])
+            is_shadow = b['opponent'] != base
+            opp_scens.setdefault(base, {'scens': set(), 'shadow': False})
+            for s in b['scenarios']:
+                opp_scens[base]['scens'].add(tuple(s))
+            if is_shadow:
+                opp_scens[base]['shadow'] = True
+            if b.get('hp_threshold') is not None:
+                hp_vals.append(b['hp_threshold'])
+            bait_sets.update(b.get('bait_modes', set()))
+
         hp_str = ''
-        if b.get('hp_threshold') is not None:
-            hp_str = f' with {b["hp_threshold"]}+ HP'
-        lines.append(
-            f'<li>{b["threshold"]:.2f} Def{hp_str} '
-            f'flips {_opp_colored(b["opponent"])} '
-            f'({scen_str})</li>'
-        )
-    return '\n'.join(lines)
+        if hp_vals:
+            hp_str = f' with {min(hp_vals)}+ HP'
+
+        # When multiple opponents share the same threshold, group them
+        opp_items = list(opp_scens.items())
+        if len(opp_items) > 1:
+            opp_parts = []
+            for opp_base, info in opp_items:
+                scen_str = ', '.join(f'{s[0]}-{s[1]}' for s in sorted(info['scens']))
+                shadow_note = ' (incl. Shadow)' if info['shadow'] else ''
+                opp_parts.append(f'{_opp_colored(opp_base)}{shadow_note} ({scen_str})')
+            lines.append(
+                f'<li>{group[0]["threshold"]:.2f} Def{hp_str} '
+                f'for {", ".join(opp_parts)}</li>'
+            )
+        else:
+            opp_base, info = opp_items[0]
+            scen_str = ', '.join(f'{s[0]}-{s[1]}' for s in sorted(info['scens']))
+            if has_bait_axis and len(bait_sets) == 1:
+                bait_tag = ' no bait' if 'nobait' in bait_sets else ' with bait'
+                scen_str += bait_tag
+            shadow_note = ' (incl. Shadow)' if info['shadow'] else ''
+            lines.append(
+                f'<li>{group[0]["threshold"]:.2f} Def{hp_str} '
+                f'for the {_opp_colored(opp_base)}{shadow_note} '
+                f'({scen_str})</li>'
+            )
+        if len(lines) >= 8:
+            break
+    return '\n'.join(lines[:8])
 
 
 def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
@@ -529,12 +722,45 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
                        + f', and {flavor_names[-1]}')
 
     general = next((f for f in flavors if f['is_general']), flavors[0])
+
+    # Build opponent list for the intro from General's gains + boundary opponents
+    gen_td = tradeoffs.get(general['name'], {})
+    gen_gains = gen_td.get('gains', [])
+    gen_opp_names = []
+    if gen_gains:
+        consolidated = _consolidate_shadow(gen_gains)
+        gen_opp_names = [f'{g["opponent"]}{g["shadow_note"]}'
+                         for g in consolidated[:5]]
+    # If gains are sparse, supplement from matchup boundary opponents
+    if len(gen_opp_names) < 3 and all_matchup_boundaries:
+        boundary_opps = set()
+        for mb in all_matchup_boundaries:
+            if mb.get('stat', 'def') == 'def':
+                boundary_opps.add(_base_species(mb['opponent']))
+        for opp in sorted(boundary_opps):
+            if opp not in gen_opp_names:
+                gen_opp_names.append(opp)
+            if len(gen_opp_names) >= 5:
+                break
+    if gen_opp_names:
+        if len(gen_opp_names) == 1:
+            opp_phrase = gen_opp_names[0]
+        elif len(gen_opp_names) <= 3:
+            opp_phrase = (', '.join(gen_opp_names[:-1])
+                          + f', and {gen_opp_names[-1]}')
+        else:
+            opp_phrase = (', '.join(gen_opp_names[:3])
+                          + f', among others')
+        intro_tail = (f', as it plays up {species}\'s potential vs '
+                      f'{opp_phrase}')
+    else:
+        intro_tail = (f', as it balances bulk and attack coverage')
+
     parts.append(
         f'<p class="dd-narrative-prose">'
         f'In {league_display}, {species} has {len(flavors)} flavors: '
         f'{flavor_list}. In general, the {general["name"]} variation '
-        f'may be the flavor of choice, as it plays up {species}\'s '
-        f'potential with a balance of bulk and coverage.</p>\n'
+        f'may be the flavor of choice{intro_tail}.</p>\n'
     )
 
     # Collect General's boundaries for dedup in specialist bullets
@@ -606,24 +832,31 @@ def _render_general_flavor(parts, flavor, all_matchup_boundaries,
             f', with an attack floor of {flavor["atk_cut"]:.2f} Atk '
             f'for coverage against key opponents')
 
-    # Mention specific matchups the General tier covers
-    td = (tradeoffs or {}).get(flavor['name'], {})
-    gen_gains = td.get('gains', [])
-    if gen_gains:
-        opp_names = [g['opponent'] for g in gen_gains[:4]]
-        if len(opp_names) == 1:
-            matchup_list = opp_names[0]
-        elif len(opp_names) <= 3:
-            matchup_list = (', '.join(opp_names[:-1])
-                            + f', and {opp_names[-1]}')
-        else:
-            matchup_list = (', '.join(opp_names[:3])
-                            + f', among others')
-        parts.append(
-            f', playing up {species}\'s potential vs '
-            f'{matchup_list}')
-
     parts.append(f'.</p>\n')
+
+    # HP significance callout
+    if flavor['hp_cut'] > 0 and all_matchup_boundaries:
+        hp_opps = set()
+        for mb in all_matchup_boundaries:
+            if mb.get('hp_threshold') is not None:
+                hp_opps.add(_base_species(mb['opponent']))
+        # Also check if species appears as mirror
+        mirror_name = species.lower().replace(' ', '_')
+        has_mirror = any(_base_species(mb['opponent']).lower().replace(' ', '_') == mirror_name
+                         for mb in (all_matchup_boundaries or [])
+                         if mb.get('hp_threshold') is not None)
+        if hp_opps or has_mirror:
+            hp_sentence = f'{int(flavor["hp_cut"])} HP is also a safe spot'
+            opp_list = sorted(hp_opps)[:3]
+            if has_mirror:
+                hp_sentence += f', helping secure the mirror'
+                if opp_list:
+                    hp_sentence += (f' and key matchups vs '
+                                    + ', '.join(opp_list[:2]))
+            elif opp_list:
+                hp_sentence += (f', enabling key matchups vs '
+                                + ', '.join(opp_list[:3]))
+            parts.append(f'<p class="dd-narrative-prose">{hp_sentence}.</p>\n')
 
     # Boundary bullets
     bullets = _general_boundary_bullets(
@@ -697,5 +930,11 @@ def _render_specialist_flavor(parts, flavor, gains, losses,
             reason = 'The higher stat requirement'
         parts.append(
             f'<p class="dd-narrative-loss">'
-            f'Note: {reason} will lose several matchups, '
+            f'Note: {reason} will cost several matchups, '
             f'such as the {loss_text}.</p>\n')
+    elif flavor['def_cut'] > 0 and flavor['n_qualifying'] > 0:
+        # No detected losses but strict def requirement - note IV scarcity
+        parts.append(
+            f'<p class="dd-narrative-loss">'
+            f'Note: Only {flavor["n_qualifying"]} IV spreads reach this '
+            f'Def target, so it may require specific IV luck.</p>\n')

@@ -1760,6 +1760,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # zone independent of hand-curated expert content (gold zone).
     from deep_dive_narrative import (derive_narrative_flavors,
                                      compute_flavor_tradeoffs,
+                                     refine_flavor_names,
                                      render_narrative_zone)
     narrative_tiers = effective_tiers
     if has_toml_tiers and anchor_flip_records:
@@ -1775,6 +1776,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 scenarios, opponents,
                 all_matchup_boundaries=all_matchup_boundaries)
                 if len(flavors) >= 2 else {})
+            refine_flavor_names(flavors, tradeoffs)
             narrative_html = render_narrative_zone(
                 flavors, tradeoffs, all_matchup_boundaries,
                 data_obj, opp_label, has_bait_axis=has_bait_axis)
