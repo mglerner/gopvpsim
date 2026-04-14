@@ -55,6 +55,61 @@ We added an `intended_pruning` flag to `pvpoke_dp` that toggles between
 PvPoke's actual behavior (dead-code pruning, `False`) and the apparently
 intended behavior (functional pruning, `True`).
 
+### 2. bestChargedMove not recomputed on opponent form change
+
+**File**: `Pokemon.js:791-822` (selectBestChargedMove) and
+`Pokemon.js:2344` (changeForm calls resetMoves on self only)
+
+PvPoke computes `bestChargedMove` at init time using actual damage
+against the opponent's current stats, then caches it on the Pokemon
+object. When the **opponent** changes form (e.g., Aegislash
+Shield->Blade, dramatically changing defense), the attacker's
+`bestChargedMove` is NOT recomputed. Only the form-changing Pokemon's
+own `resetMoves()` is called.
+
+Concrete example: Azu's IB (15 dmg, 55 energy, DPE 0.273) vs PR
+(18 dmg, 60 energy, DPE 0.300) against Aegislash Shield form. DPE
+diff is 0.027 < 0.03 threshold, so PvPoke picks IB (cheaper, locked
+at init). Against Blade form (low def), DPE diff grows to 0.062 >
+0.03, and PR becomes clearly better - but PvPoke still uses IB. Our
+code recomputes per turn, which we believe is more correct.
+
+### 3. Aegislash selects Gyro Ball over Shadow Ball
+
+**File**: `ActionLogic.js` (near-KO DP or bestChargedMove selection)
+
+PvPoke selects Gyro Ball (Steel, 80 power, 50 energy) over Shadow
+Ball (Ghost, 100 power, 50 energy) for Aegislash vs Azumarill in
+multi-shield scenarios. Both moves cost identical energy, have the
+same type effectiveness (1.0x) and STAB (1.2x) against Water/Fairy.
+SB does strictly more damage (49 vs 39 in Shield form, 101 vs 81 in
+Blade form). Confirmed: Aegislash with SB-only scores 429 vs 376
+with SB+GB in the 1v2 scenario, meaning GB availability actively
+hurts Aegislash's score. Root cause unclear - may be in the near-KO
+DP's plan selection or a bandaid condition.
+
+### 4. Mimikyu SS timing: delayed by 1 Shadow Claw
+
+**File**: Unknown - may be in fast-move damage delivery timing
+
+PvPoke delays Mimikyu's first Shadow Sneak by one extra Shadow Claw
+(8 SCs instead of 7 before firing SS) in the Mimikyu vs Azumarill
+matchup. Mimikyu reaches 56 energy (50 needed for SS) after 7 SCs at
+turn 14, and should fire SS at turn 15. Instead PvPoke queues an 8th
+SC, lets Azu's IB break the disguise, then fires SS afterward.
+
+Our code fires SS at the first opportunity (7 SCs), which is strictly
+better for Mimikyu: it burns Azu's shield sooner, shortening the
+battle by ~2 turns and landing 1 extra Shadow Claw (5 dmg = 13 score
+points). Confirmed by score comparison: our Mimikyu gets 363 vs
+PvPoke's 350 in the 0v1 scenario, and the +/-13 delta is consistent
+across all three affected shield scenarios.
+
+Exact root cause in PvPoke's code unclear - extensive code reading
+found no OMT trigger, farm-down delay, or decision-ordering issue
+that would explain the delay. May require running PvPoke locally
+with debug logging.
+
 ## Threshold model: damage tiers vs matchup boundaries
 
 The deep dive reports two kinds of stat threshold (2026-04-09/10):
