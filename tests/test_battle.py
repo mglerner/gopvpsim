@@ -1215,7 +1215,7 @@ def test_corviknight_2v2_vs_default_shadow_sableye_flips_with_bait():
     (0, 2, 219),
     (1, 0, 817),
     (1, 1, 728),
-    pytest.param(1, 2, 348, marks=pytest.mark.xfail(reason="Morpeko 1v2: our 342 (-6), small would_shield difference")),
+    (1, 2, 348),
     (2, 0, 817),
     (2, 1, 728),
     (2, 2, 665),
