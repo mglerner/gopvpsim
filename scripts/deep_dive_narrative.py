@@ -539,7 +539,7 @@ def _consolidate_shadow(entries):
         if all_same:
             scens = sorted(set(s for sk in all_scens for s in sk))
             result.append({'opponent': base, 'scenarios': scens,
-                           'shadow_note': ''})
+                           'shadow_note': ' (incl. Shadow)'})
         else:
             # Emit separately but in order
             for e in entries:
