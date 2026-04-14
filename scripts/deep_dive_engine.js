@@ -793,7 +793,7 @@ function renderMatchesList() {
     if (!recs || recs.length === 0) return '';
     if (sortKey === 'atk') {
       recs.sort(function(a, b) {
-        var aa = (a.stats ? a.stats.atk : 0), ba = (b.stats ? b.stats.atk : 0);
+        var aa = (a.stats ? a.stats.attack : 0), ba = (b.stats ? b.stats.attack : 0);
         if (aa !== ba) return ba - aa;
         return a._rank - b._rank;
       });
@@ -837,9 +837,9 @@ function renderMatchesList() {
       h += '<td class="rank-sp">' + spTxt + '</td>';
       h += '<td><b>CP ' + rc.mon.cp + '</b></td>';
       h += '<td>' + rc.mon.atk_iv + '/' + rc.mon.def_iv + '/' + rc.mon.sta_iv + '</td>';
-      h += '<td>' + (rc.stats ? rc.stats.atk.toFixed(2) : '?') + '</td>';
-      h += '<td>' + (rc.stats ? rc.stats.def.toFixed(2) : '?') + '</td>';
-      h += '<td>' + (rc.stats ? rc.stats.hp : '?') + '</td>';
+      h += '<td>' + (rc.stats ? rc.stats.attack.toFixed(2) : '?') + '</td>';
+      h += '<td>' + (rc.stats ? rc.stats.defense.toFixed(2) : '?') + '</td>';
+      h += '<td>' + (rc.stats ? rc.stats.stamina : '?') + '</td>';
       h += '<td>' + escapeHtml(rc.csvSpecies || '') +
            (rc.mon.lucky ? ' \u2728' : '') +
            (rc.mon.is_shadow ? ' \u263d' : '') + '</td>';
