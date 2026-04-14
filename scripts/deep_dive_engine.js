@@ -983,17 +983,18 @@ function sortMatchesTable(tblId, colIdx, thEl) {
     var bv = bc ? parseFloat(bc.getAttribute('data-sort') || '99999') : 99999;
     return dir === 'asc' ? av - bv : bv - av;
   });
-  // Re-append sorted rows and show all (expand if collapsed)
+  // Check if table was collapsed before sorting (any row past 5 hidden)
+  var wasCollapsed = rows.length > 5 && rows[5].style.display === 'none';
+  // Re-append in sorted order
   var tbody = rows[0].parentNode;
   for (var r = 0; r < rows.length; r++) {
-    rows[r].style.display = '';
     tbody.appendChild(rows[r]);
-  }
-  // Update toggle button to reflect expanded state
-  var btn = tbl.parentNode.querySelector('.matches-toggle-btn');
-  if (btn) {
-    var count = btn.getAttribute('data-hidden-count');
-    btn.textContent = 'Hide ' + count + ' \u2191';
+    // Preserve collapsed state: hide rows past 5 if it was collapsed
+    if (wasCollapsed) {
+      rows[r].style.display = (r < 5) ? '' : 'none';
+    } else {
+      rows[r].style.display = '';
+    }
   }
 }
 
