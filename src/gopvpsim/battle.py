@@ -133,32 +133,25 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
 
     # PvPoke Battle.js lines 1083-1101: use wouldShield heuristic for
     # self-buffing moves and guaranteed opponent-def-debuff moves.
-    # PvPoke's selfBuffing flag (GameMaster.js:873) covers both; the shield
-    # check (Battle.js:1090) sub-filters to self-atk-buff or opp-def-debuff.
-    # Our selfBuffing only covers self-buffs.  For opponent-def-debuff, we
-    # gate on the attacker having a threatening charged move (dmg >= hp/1.4).
-    # Without a threatening follow-up the debuff warrants shielding on its
-    # own; with one, the debuff is bait and wouldShield decides.
+    # PvPoke's selfBuffing flag (GameMaster.js:873) covers all guaranteed
+    # opponent debuffs AND positive self-buffs.  The shield check
+    # (Battle.js:1090-1101) sub-filters to self-atk-buff or opp-def-debuff
+    # before routing to wouldShield.  We replicate that sub-filter here.
     self_buffing        = move.get('selfBuffing', False)
     self_def_debuffing  = move.get('selfDefenseDebuffing', False)
-    # For guaranteed opponent-def-debuff moves (Psychic Fangs, Sand Tomb,
-    # Acid Spray, etc.): PvPoke sets selfBuffing=true on these
-    # (GameMaster.js:873) and routes through wouldShield (Battle.js:1090).
-    # Our selfBuffing flag only covers self-targeting buffs, so we check
-    # opponent-def-debuff explicitly.
     buffs = move.get('buffs')
-    opp_def_debuff = bool(
-        buffs
-        and move.get('buffTarget') == 'opponent'
-        and float(move.get('buffApplyChance', 0) or 0) == 1
-        and buffs[1] < 0)
-    use_heuristic = self_buffing or self_def_debuffing or opp_def_debuff
+    bt    = move.get('buffTarget')
+    # PvPoke Battle.js:1091-1092 sub-filter: self-atk-buff or opp-def-debuff
+    sb_subroute = (self_buffing and buffs is not None
+                   and ((bt == 'self' and buffs[0] > 0)
+                        or (bt == 'opponent' and buffs[1] < 0)))
+    use_heuristic = sb_subroute or self_def_debuffing
     if use_heuristic:
         result = would_shield(attacker, defender, move)
         if _shield_trace:
-            tag = ("selfBuff" if self_buffing
-                   else "selfDefDebuff" if self_def_debuffing
-                   else "oppDefDebuff")
+            tag = ("selfDefDebuff" if self_def_debuffing
+                   else "oppDefDebuff" if bt == 'opponent'
+                   else "selfBuff")
             _policy_log.append(
                 f"  shield({defender.species} sh={defender.shields} vs"
                 f" {move.get('moveId')} [{tag}]): → wouldShield={result}")
@@ -1179,16 +1172,11 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             bait = True
             # Don't bait if an effective self-buffing move exists (line 826).
             # KNOWN DIVERGENCE (see DEVELOPER_NOTES.md "Known divergences"):
-            #  1. PvPoke's selfBuffing includes guaranteed opponent debuffs;
-            #     we check for opp-def-debuff explicitly as a workaround.
-            #  2. PvPoke uses buff-adjusted DPE (initializeMove:849-864);
-            #     we use actual_dpe (damage/energy).  Could cross the 1.5
-            #     threshold differently in other matchups.
+            #  PvPoke uses buff-adjusted DPE (initializeMove:849-864);
+            #  we use actual_dpe (damage/energy).  Could cross the 1.5
+            #  threshold differently in other matchups.
             _cm0 = cms[0]
-            _cm0_effective = (_cm0.get('selfBuffing', False)
-                             or ((_cm0.get('buffs') or [0,0])[1] < 0
-                                 and _cm0.get('buffTarget') == 'opponent'
-                                 and float(_cm0.get('buffApplyChance', 0) or 0) == 1))
+            _cm0_effective = _cm0.get('selfBuffing', False)
             if (actual_dpe(1) / max(actual_dpe(0), 0.001) <= 1.5
                     and _cm0_effective):
                 bait = False
