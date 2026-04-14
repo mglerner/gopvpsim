@@ -805,12 +805,20 @@ function renderMatchesList() {
     }
     var sid = 'matches-section-' + (sectionIdx++);
     var h = '<h5>' + heading + ' - ' + recs.length + ' of yours</h5>';
-    h += '<table><tr>' +
-         '<th title="Battle rank in the active moveset / opp-IV mode. Dash for off-grid mons whose exact IV was not simulated.">Battle</th>' +
-         '<th title="Stat product rank (pure math, computed for all 4096 IV triples). Always available.">SP</th>' +
-         '<th>Current CP</th><th>IVs</th>' +
-         '<th>Atk</th><th>Def</th><th>HP</th>' +
-         '<th>Species</th><th>Power-up</th><th>Max CP</th>';
+    h += '<table data-section="' + sid + '-tbl"><tr>';
+    var sortHdr = function(label, colIdx, title) {
+      var t = title ? ' title="' + title + '"' : '';
+      return '<th style="cursor:pointer" onclick="sortMatchesTable(\'' + sid + '-tbl\',' + colIdx + ',this)"' + t + '>' + label + '</th>';
+    };
+    h += sortHdr('Battle', 0, 'Battle rank in the active moveset / opp-IV mode. Dash for off-grid mons whose exact IV was not simulated.');
+    h += sortHdr('SP', 1, 'Stat product rank (pure math, computed for all 4096 IV triples). Always available.');
+    h += sortHdr('Current CP', 2);
+    h += '<th>IVs</th>';
+    h += sortHdr('Atk', 4);
+    h += sortHdr('Def', 5);
+    h += sortHdr('HP', 6);
+    h += '<th>Species</th><th>Power-up</th>';
+    h += sortHdr('Max CP', 9);
     if (extras) {
       for (var xh = 0; xh < extras.length; xh++) {
         h += '<th>' + escapeHtml(extras[xh].header) + '</th>';
@@ -831,20 +839,24 @@ function renderMatchesList() {
       if (cls) attr += ' class="' + cls.trim() + '"';
       if (k >= MAX_VISIBLE) attr += ' style="display:none"';
       h += '<tr' + attr + '>';
-      var brTxt = (rc._battleRank != null) ? ('#' + rc._battleRank) : '-';
-      var spTxt = (rc._spRank != null)     ? ('#' + rc._spRank)     : '-';
-      h += '<td class="rank">' + brTxt + '</td>';
-      h += '<td class="rank-sp">' + spTxt + '</td>';
-      h += '<td><b>CP ' + rc.mon.cp + '</b></td>';
+      var brVal = (rc._battleRank != null) ? rc._battleRank : 99999;
+      var spVal = (rc._spRank != null) ? rc._spRank : 99999;
+      var atkVal = rc.stats ? rc.stats.attack : 0;
+      var defVal = rc.stats ? rc.stats.defense : 0;
+      var hpVal = rc.stats ? rc.stats.stamina : 0;
+      var mcpVal = rc.stats ? rc.stats.cp : 0;
+      h += '<td class="rank" data-sort="' + brVal + '">' + (brVal < 99999 ? '#' + brVal : '-') + '</td>';
+      h += '<td class="rank-sp" data-sort="' + spVal + '">' + (spVal < 99999 ? '#' + spVal : '-') + '</td>';
+      h += '<td data-sort="' + rc.mon.cp + '"><b>CP ' + rc.mon.cp + '</b></td>';
       h += '<td>' + rc.mon.atk_iv + '/' + rc.mon.def_iv + '/' + rc.mon.sta_iv + '</td>';
-      h += '<td>' + (rc.stats ? rc.stats.attack.toFixed(2) : '?') + '</td>';
-      h += '<td>' + (rc.stats ? rc.stats.defense.toFixed(2) : '?') + '</td>';
-      h += '<td>' + (rc.stats ? rc.stats.stamina : '?') + '</td>';
+      h += '<td data-sort="' + atkVal.toFixed(4) + '">' + (rc.stats ? atkVal.toFixed(2) : '?') + '</td>';
+      h += '<td data-sort="' + defVal.toFixed(4) + '">' + (rc.stats ? defVal.toFixed(2) : '?') + '</td>';
+      h += '<td data-sort="' + hpVal + '">' + (rc.stats ? hpVal : '?') + '</td>';
       h += '<td>' + escapeHtml(rc.csvSpecies || '') +
            (rc.mon.lucky ? ' \u2728' : '') +
            (rc.mon.is_shadow ? ' \u263d' : '') + '</td>';
       h += '<td>' + powerUpText(rc) + '</td>';
-      h += '<td>' + (rc.stats ? rc.stats.cp : '?') + '</td>';
+      h += '<td data-sort="' + mcpVal + '">' + (rc.stats ? rc.stats.cp : '?') + '</td>';
       if (extras) {
         for (var xc = 0; xc < extras.length; xc++) {
           h += '<td>' + extras[xc].cell(rc) + '</td>';
@@ -937,6 +949,52 @@ function toggleMatchesSection(sid, btn) {
   }
   var count = btn.getAttribute('data-hidden-count');
   btn.textContent = isExpanding ? ('Hide ' + count + ' \u2191') : ('Show ' + count + ' more \u2193');
+}
+
+// Sort a matches table by clicking column headers. Toggles asc/desc.
+function sortMatchesTable(tblId, colIdx, thEl) {
+  var tbl = document.querySelector('table[data-section="' + tblId + '"]');
+  if (!tbl) return;
+  var rows = Array.prototype.slice.call(tbl.querySelectorAll('tr[data-section]'));
+  if (rows.length === 0) return;
+  // Determine sort direction: toggle if same column clicked again
+  var prevCol = tbl.getAttribute('data-sort-col');
+  var prevDir = tbl.getAttribute('data-sort-dir') || 'asc';
+  var dir;
+  if (prevCol === String(colIdx)) {
+    dir = (prevDir === 'asc') ? 'desc' : 'asc';
+  } else {
+    // Ranks sort asc by default (lower = better), stats sort desc (higher = better)
+    dir = (colIdx <= 1) ? 'asc' : 'desc';
+  }
+  tbl.setAttribute('data-sort-col', colIdx);
+  tbl.setAttribute('data-sort-dir', dir);
+  // Update header arrows
+  var ths = tbl.querySelectorAll('th');
+  for (var i = 0; i < ths.length; i++) {
+    var txt = ths[i].textContent.replace(/ [\u25B2\u25BC]$/, '');
+    ths[i].textContent = txt;
+  }
+  thEl.textContent = thEl.textContent + (dir === 'asc' ? ' \u25B2' : ' \u25BC');
+  // Sort rows by data-sort attribute on the target column
+  rows.sort(function(a, b) {
+    var ac = a.cells[colIdx], bc = b.cells[colIdx];
+    var av = ac ? parseFloat(ac.getAttribute('data-sort') || '99999') : 99999;
+    var bv = bc ? parseFloat(bc.getAttribute('data-sort') || '99999') : 99999;
+    return dir === 'asc' ? av - bv : bv - av;
+  });
+  // Re-append sorted rows and show all (expand if collapsed)
+  var tbody = rows[0].parentNode;
+  for (var r = 0; r < rows.length; r++) {
+    rows[r].style.display = '';
+    tbody.appendChild(rows[r]);
+  }
+  // Update toggle button to reflect expanded state
+  var btn = tbl.parentNode.querySelector('.matches-toggle-btn');
+  if (btn) {
+    var count = btn.getAttribute('data-hidden-count');
+    btn.textContent = 'Hide ' + count + ' \u2191';
+  }
 }
 
 // Minimal HTML escape for values that go into innerHTML (species names,
