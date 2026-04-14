@@ -146,6 +146,17 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
                 f"  shield({defender.species} sh={defender.shields} vs"
                 f" {move.get('moveId')} [{tag}]): → wouldShield={result}")
         return result
+    # Aegislash Shield form: don't waste shields if damage < half HP
+    # PvPoke Battle.js:1119
+    if (defender._form_change is not None
+            and defender._form_change.forms[int(defender._form_is_alt)].species_id == 'aegislash_shield'
+            and attacker.charged_move_damage(move, defender) * 2 < defender.hp):
+        if _shield_trace:
+            _policy_log.append(
+                f"  shield({defender.species} sh={defender.shields} vs"
+                f" {move.get('moveId')}): False (Aegislash Shield suppression)")
+        return False
+
     if _shield_trace:
         _policy_log.append(
             f"  shield({defender.species} sh={defender.shields} vs"
@@ -899,6 +910,19 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # ------------------------------------------------------------------ #
     if _optimize_move_timing(attacker, defender):
         return None
+
+    # Aegislash Shield form: farm energy before throwing charged moves.
+    # PvPoke ActionLogic.js:957-961: delay unless the move would KO.
+    if (attacker._form_change is not None
+            and attacker._form_change.forms[int(attacker._form_is_alt)].species_id == 'aegislash_shield'
+            and attacker.energy < 100 - (fast_energy / 2)):
+        best_cm_dmg = max(cm_dmgs[n] for n in range(n_cms) if attacker.energy >= cm_energy[n]) if any(attacker.energy >= cm_energy[n] for n in range(n_cms)) else 0
+        if best_cm_dmg < defender.hp:
+            if _policy_debug:
+                _policy_log.append(
+                    f"  DP[aegislash_farm]: {attacker.species} farms energy "
+                    f"(energy={attacker.energy}, threshold={100 - fast_energy // 2})")
+            return None
 
     best_idx = max(range(n_cms), key=actual_dpe)
     best_cm  = cms[best_idx]
