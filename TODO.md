@@ -33,12 +33,23 @@ break invariants that weren't yet nailed down by tests.
 
 ## Battle simulator
 
-* **File PvPoke bug reports** — Five bugs found in PvPoke's JS:
+* **File PvPoke bug reports** — Six bugs found in PvPoke's JS:
   1. BattleState `.hp`/`.oppHealth` naming inconsistency (dead-code dominance checks)
   2. bestChargedMove using `move.damage` (undefined at init) instead of `move.power`
   3. bestChargedMove not recomputed on opponent form change (stale DPE cache)
   4. Aegislash selects Gyro Ball over Shadow Ball (same cost, strictly less damage)
   5. Mimikyu delays Shadow Sneak by 1 SC (suboptimal timing, costs 13 score points)
+  6. initializeMove's buff-adjusted `move.dpe` is overwritten by
+     selectBestChargedMove before use. Pokemon.js:849-864 computes a
+     buff multiplier that inflates DPE for self-atk-buff and opp-def-
+     debuff moves, but Pokemon.js:791-796 (inside the same `resetMoves`
+     call) immediately resets `move.dpe = move.damage / move.energy`
+     on every activeChargedMove. So the buff-adjusted DPE only affects
+     the priority-shuffle ordering (lines 711-787); it never reaches
+     the bait-wait ratio check (ActionLogic.js:843) or any later
+     consumer, despite looking like it should. Likely intent was for
+     the buff adjustment to persist through the ratio check. Discovered
+     2026-04-14 while resolving our Divergence 2.
 
 * **Resolve known PvPoke divergences** — ~~Three~~ One remaining intentional
   implementation difference tracked in DEVELOPER_NOTES.md "Known divergences."
