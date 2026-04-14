@@ -33,9 +33,12 @@ break invariants that weren't yet nailed down by tests.
 
 ## Battle simulator
 
-* **File PvPoke bug reports** — Two bugs found in PvPoke's JS:
+* **File PvPoke bug reports** — Five bugs found in PvPoke's JS:
   1. BattleState `.hp`/`.oppHealth` naming inconsistency (dead-code dominance checks)
   2. bestChargedMove using `move.damage` (undefined at init) instead of `move.power`
+  3. bestChargedMove not recomputed on opponent form change (stale DPE cache)
+  4. Aegislash selects Gyro Ball over Shadow Ball (same cost, strictly less damage)
+  5. Mimikyu delays Shadow Sneak by 1 SC (suboptimal timing, costs 13 score points)
 
 ## Policies to add
 

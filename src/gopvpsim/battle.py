@@ -942,7 +942,34 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                     f"(energy={attacker.energy}, threshold={100 - fast_energy // 2})")
             return None
 
-    best_idx = max(range(n_cms), key=actual_dpe)
+    # PvPoke's bestChargedMove selection (Pokemon.js lines 791-822):
+    # Start with cheapest move (cms[0], sorted by energy); only switch to a
+    # more expensive move if its actual DPE exceeds the current best by >0.03
+    # (or >0.3 when current best is selfBuffing / move is SUPER_POWER).
+    # When DPE is close, prefer guaranteed buff effects over chance buffs.
+    # Always favor OBSTRUCT.
+    best_idx = 0
+    for _i in range(n_cms):
+        _m = cms[_i]
+        _dpe_diff = actual_dpe(_i) - actual_dpe(best_idx)
+        if ((_dpe_diff > 0.03 and _m.get('moveId') != 'SUPER_POWER')
+                or _dpe_diff > 0.3):
+            if (not cms[best_idx].get('selfBuffing', False)
+                    or _dpe_diff > 0.3):
+                best_idx = _i
+        if (abs(actual_dpe(_i) - actual_dpe(best_idx)) < 0.03
+                and cms[best_idx].get('buffs')
+                and _m.get('buffs')
+                and _m.get('buffApplyChance', 0) > cms[best_idx].get('buffApplyChance', 0)
+                and not _m.get('selfDebuffing', False)):
+            best_idx = _i
+        if _m.get('moveId') == 'OBSTRUCT':
+            best_idx = _i
+    if (n_cms > 0 and cms[0].get('moveId') == 'OBSTRUCT'
+            and cm_energy[0] - cm_energy[best_idx] <= 5
+            and actual_dpe(best_idx) > 0
+            and actual_dpe(0) / actual_dpe(best_idx) > 0.2):
+        best_idx = 0
     best_cm  = cms[best_idx]
 
     # bestCycleDamage: fast moves needed to charge from 0 + one charge move
@@ -955,13 +982,14 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     if defender.hp > 2 * best_cycle_dmg:
         selected_idx = best_idx
 
-        # Bait only if opponent has shields AND would shield the best move.
-        # cms is sorted by energy, so the cheapest is index 0.
+        # Bait: if opponent would shield the expensive move, throw the cheap
+        # one instead.  PvPoke checks activeChargedMoves[1] (the more expensive
+        # move), not bestChargedMove (ActionLogic.js line 383).
         # Gated on bait_shields — no-bait mode always keeps selected_idx=best_idx.
         if (bait_shields
                 and defender.shields > 0 and n_cms > 1
                 and not cms[0].get('selfDebuffing', False)
-                and would_shield(attacker, defender, best_cm)):
+                and would_shield(attacker, defender, cms[1])):
             selected_idx = 0
 
         if attacker.energy < cm_energy[selected_idx]:
