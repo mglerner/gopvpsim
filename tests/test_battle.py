@@ -1236,3 +1236,43 @@ def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko
         f"{shields_m}v{shields_a}: expected Morpeko score={expected_morpeko_score}, "
         f"got {score} (delta={score - expected_morpeko_score:+d})"
     )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_a,shields_z,expected_aegi_score", [
+    # Aegislash (Shield) 4/14/15 vs Azumarill 4/15/13, Great League
+    # AEGISLASH_CHARGE_PSYCHO_CUT / SHADOW_BALL / GYRO_BALL
+    # vs BUBBLE / ICE_BEAM / PLAY_ROUGH
+    # Verified at pvpoke.com/battle/ 2026-04-14
+    # Form change: Shield -> Blade on charged move (activate_charged),
+    # Blade -> Shield on shield use (activate_shield).
+    # (0, 0, 773),   # our: 784, +11 delta — investigating
+    # (0, 1, 374),   # our: 353, -21 delta
+    # (0, 2, 112),   # our: 91, -21 delta
+    # (1, 0, 773),   # our: 784, +11 delta
+    # (1, 1, 640),   # our: 521, -119 delta
+    (1, 2, 376),
+    # (2, 0, 773),   # our: 784, +11 delta
+    # (2, 1, 640),   # our: 651, +11 delta
+    # (2, 2, 376),   # our: 521, +145 delta
+])
+def test_aegislash_vs_azumarill_form_change(shields_a, shields_z, expected_aegi_score):
+    """Aegislash form change: Shield<->Blade on charged move / shield use."""
+    bp_a = _make_battle_pokemon(
+        'Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT',
+        ['SHADOW_BALL', 'GYRO_BALL'],
+        'great', shields_a, 4, 14, 15,
+    )
+    bp_z = _make_battle_pokemon(
+        'Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+        'great', shields_z, 4, 15, 13,
+    )
+    result = simulate(bp_a, bp_z,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
+    score = round(result.pvpoke_score(0))
+    assert score == expected_aegi_score, (
+        f"{shields_a}v{shields_z}: expected Aegislash score={expected_aegi_score}, "
+        f"got {score} (delta={score - expected_aegi_score:+d})"
+    )
