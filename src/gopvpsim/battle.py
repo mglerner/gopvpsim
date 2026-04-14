@@ -1442,19 +1442,24 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                     first_idx  = 0
                     first_move = cm0
 
+    # final_state summarizes the DP-selected plan as scalars
+    # (first_idx + max_dmg_idx); there is no list-of-moves "plan" here.
+    plan_first = cms[final_state.first_idx].get('moveId')
+    plan_max   = cms[final_state.max_dmg_idx].get('moveId')
     if attacker.energy < first_move['energy']:
         if _policy_debug:
             _policy_log.append(
                 f"  DP[near-ko]: {attacker.species} waits for "
                 f"{first_move.get('moveId')} (energy={attacker.energy}/"
-                f"{first_move['energy']}, plan={[cms[i].get('moveId') for i in plan]})"
+                f"{first_move['energy']}, plan_first={plan_first}"
+                f" max_dmg={plan_max})"
             )
         return None   # wait until affordable
     if _policy_debug:
         _policy_log.append(
             f"  DP[near-ko]: {attacker.species} fires "
             f"{first_move.get('moveId')} (energy={attacker.energy}, "
-            f"plan={[cms[i].get('moveId') for i in plan]})"
+            f"plan_first={plan_first} max_dmg={plan_max})"
         )
     return _orig_idx(first_move)
 
