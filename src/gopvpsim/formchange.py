@@ -287,6 +287,9 @@ def apply_form_change(bp, opponent):
     bp.atk = fd.atk
     bp.def_ = fd.def_
     bp.fast_move = fd.fast_move
+    # Ensure _turns is set on the new fast move (normally set in simulate() setup)
+    if '_turns' not in bp.fast_move:
+        bp.fast_move['_turns'] = bp.fast_move.get('cooldown', 500) // 500
     bp.charged_moves = list(fd.charged_moves)
 
     # Do NOT change bp.hp or bp.max_hp (PvPoke behavior)
