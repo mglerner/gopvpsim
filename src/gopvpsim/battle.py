@@ -1113,9 +1113,27 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     best_cycle_dmg = fast_damage * fm_to_charge + cm_dmgs[best_idx]
 
     # ------------------------------------------------------------------ #
-    # Farm-down path
+    # Farm-down path (PvPoke ActionLogic.js lines 365-415, "many-cycle"
+    # simpler-move-selection branch).
+    #
+    # PvPoke's threshold is 2 cycles by default, dropped to 1.1 when the
+    # bestChargedMove is self-debuffing AND a cheaper non-debuffing
+    # alternative with comparable DPE exists.  When entering the path with
+    # a self-debuffing bestChargedMove, PvPoke then swaps the selection to
+    # the non-debuffing alt (lines 387-393) so the first throw is the
+    # non-debuff move.  Without this, our code falls through to near-KO DP,
+    # picks the debuffing move, and bandaid [918] waits forever to stack —
+    # the Moltres-G cluster root cause (2026-04-15).
     # ------------------------------------------------------------------ #
-    if defender.hp > 2 * best_cycle_dmg:
+    min_cycle_thr = 2.0
+    if (n_cms > 1
+            and best_cm.get('selfDebuffing', False)
+            and cm_energy[best_idx] > cm_energy[0]
+            and actual_dpe(0) > 0
+            and actual_dpe(best_idx) / actual_dpe(0) < 2.0):
+        min_cycle_thr = 1.1
+
+    if defender.hp > min_cycle_thr * best_cycle_dmg:
         selected_idx = best_idx
 
         # Bait: if opponent would shield the expensive move, throw the cheap
@@ -1127,6 +1145,16 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 and not cms[0].get('selfDebuffing', False)
                 and would_shield(attacker, defender, cms[1])):
             selected_idx = 0
+
+        # Swap selfDebuffing best to a non-debuffing alt whose DPE is within
+        # 2x (PvPoke lines 387-393).  Iterate activeChargedMoves order; last
+        # qualifying alt wins, mirroring PvPoke's loop.
+        if cms[selected_idx].get('selfDebuffing', False):
+            for _i in range(n_cms):
+                if (not cms[_i].get('selfDebuffing', False)
+                        and actual_dpe(_i) > 0
+                        and actual_dpe(selected_idx) / actual_dpe(_i) < 2.0):
+                    selected_idx = _i
 
         if attacker.energy < cm_energy[selected_idx]:
             if _policy_debug:
