@@ -1014,11 +1014,14 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
     parts.append(
         '<p class="dd-small">Stat-target headlines from <code>thresholds/'
         '*.toml</code>, each grouped with the named anchors its spec '
-        'clears and the IV spreads that meet it. Tiers may share bullets '
-        '— a stricter tier above also clears everything a looser tier '
-        'below clears, and the overlap is intentional. The flat list of '
-        'every anchor (regardless of tier) lives in <em>Anchor-Driven '
-        'Matchup Flips</em> below.</p>\n'
+        'clears and the IV spreads that meet it. Within each tier card, '
+        'bullets are grouped by opponent and sorted by the required stat '
+        '(Def or Atk) ascending — read top-to-bottom in the order a '
+        'player would clear them as their stat grows. Tiers may share '
+        'bullets — a stricter tier above also clears everything a looser '
+        'tier below clears, and the overlap is intentional. The flat '
+        'list of every anchor (regardless of tier) lives in '
+        '<em>Anchor-Driven Matchup Flips</em> below.</p>\n'
     )
     parts.append('<div class="dd-rec-grid">\n')
 
