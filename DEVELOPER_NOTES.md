@@ -203,6 +203,23 @@ Revisit only if PvPoke removes line 539 or fixes the
   assertions were added. Future feature audits should include a
   pass over the timeline/log emission paths, not just the
   decision-making code.
+* **2026-04-15 — OMT fast-also-KOs gate dropped.** The OMT KO-override
+  had a `defender.hp > _fast_dmg` gate: if the fast move would ALSO KO,
+  prefer fast over charged (rationale: "score identical, saves energy /
+  animation / post-KO state"). Harness localized Forr vs Azu 1-0 (Δ=-15)
+  to T37: Forr has e=64 (ST affordable) and Azu hp=17; fast_dmg=18>=17
+  so the gate fires and Forr delays for fast. But Forr just fired VS at
+  T36 (floating), so its next fast doesn't land until T40 — three extra
+  turns of Azu damage on Forr. The "score identical" claim held only
+  when the fast could fire immediately; under mid-cooldown timing it
+  fails. Dropped the gate, keeping the self-debuffing clause. GL grid
+  max |Δ| 15→0 across all 405 pairs. UL unchanged (Moltres-G is a
+  different root cause). Test suite: 156 pass (one prior xfail converted
+  to pass — Azu's final Ice Beam in Forr/Azu (2,0) chargedLog now
+  matches PvPoke). Investigation landmark: decideLog entry/return
+  tracing in scripts/pvpoke_trace.js (decideAction-level) was the tool
+  that localized the divergence — earlier score/dpPlan-level traces
+  missed it because the divergence was in OMT, upstream of the DP.
 * **2026-04-15 — Farm-down boost-move override + raw_dpe fix.**
   Two linked DP gaps surfaced when localizing GL Empoleon vs
   Forretress 2-2 (Δ=-204). (1) When the near-KO DP returns a
