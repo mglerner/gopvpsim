@@ -1238,26 +1238,86 @@ def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko
     )
 
 
+# Aegislash bandaid-triage xfails. Each reason pins the specific
+# divergence the chargedLog reveals, not just "scores don't match".
+# Captured 2026-04-15 from scripts/pvpoke_trace.js harness.
+_AEGI_XFAIL_GB_SHIELD_FIRST = pytest.mark.xfail(
+    reason=(
+        "PvPoke bug #3: picks Gyro Ball over Shadow Ball for the first "
+        "(shielded) throw. GB and SB cost the same energy; SB does "
+        "strictly more damage. Since the first throw is shielded, both "
+        "score the same, but the chargedLog disagrees on which move was "
+        "thrown. Our Aegislash correctly picks SB."))
+_AEGI_XFAIL_GB_CASCADE = pytest.mark.xfail(
+    reason=(
+        "PvPoke bug #3 + #2: Aegislash throws 3x Gyro Ball where we "
+        "throw 3x Shadow Ball (with a Play Rough shielded in between). "
+        "Root cause: PvPoke picks GB over SB for Aegislash AND keeps "
+        "Azu's bestChargedMove cached against Shield-form def (IB), so "
+        "Azu never switches to PR after Aegi goes Blade. Our 510 vs "
+        "PvPoke's 376."))
+
+
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_a,shields_z,expected_aegi_score", [
+@pytest.mark.parametrize("shields_a,shields_z,expected_aegi_score,expected_log", [
     # Aegislash (Shield) 4/14/15 vs Azumarill 4/15/13, Great League
     # AEGISLASH_CHARGE_PSYCHO_CUT / SHADOW_BALL / GYRO_BALL
     # vs BUBBLE / ICE_BEAM / PLAY_ROUGH
     # Verified at pvpoke.com/battle/ 2026-04-14
     # Form change: Shield -> Blade on charged move (activate_charged),
     # Blade -> Shield on shield use (activate_shield).
-    (0, 0, 773),
-    (0, 1, 374),
-    (0, 2, 112),
-    (1, 0, 773),
-    (1, 1, 640),
-    pytest.param(1, 2, 376, marks=pytest.mark.xfail(reason="PvPoke bugs: picks GB over SB (same cost, less dmg) + stale bestChargedMove on opponent form change; our 510")),
-    (2, 0, 773),
-    (2, 1, 640),
-    pytest.param(2, 2, 376, marks=pytest.mark.xfail(reason="PvPoke bugs: picks GB over SB (same cost, less dmg) + stale bestChargedMove on opponent form change; our 510"))
+    #
+    # Expected chargedLog is the PvPoke harness ground truth. Cases
+    # where our log disagrees with PvPoke's log get an xfail with a
+    # concrete reason describing the mechanical difference.
+    (0, 0, 773, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    pytest.param(0, 1, 374, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                             'Aegislash (Blade): Gyro Ball (shielded)',
+                             'Aegislash (Blade): Shadow Ball',
+                             'Azumarill: Ice Beam'],
+                 marks=_AEGI_XFAIL_GB_SHIELD_FIRST),
+    pytest.param(0, 2, 112, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                             'Aegislash (Blade): Gyro Ball (shielded)',
+                             'Aegislash (Blade): Shadow Ball (shielded)',
+                             'Azumarill: Ice Beam'],
+                 marks=_AEGI_XFAIL_GB_SHIELD_FIRST),
+    (1, 0, 773, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    pytest.param(1, 1, 640, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                             'Aegislash (Blade): Gyro Ball (shielded)',
+                             'Aegislash (Blade): Shadow Ball (shielded)',
+                             'Azumarill: Ice Beam (shielded)',
+                             'Aegislash (Blade): Shadow Ball'],
+                 marks=_AEGI_XFAIL_GB_SHIELD_FIRST),
+    pytest.param(1, 2, 376, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                             'Aegislash (Blade): Gyro Ball (shielded)',
+                             'Aegislash (Blade): Gyro Ball (shielded)',
+                             'Aegislash (Blade): Gyro Ball'],
+                 marks=_AEGI_XFAIL_GB_CASCADE),
+    (2, 0, 773, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    pytest.param(2, 1, 640, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                             'Aegislash (Blade): Gyro Ball (shielded)',
+                             'Aegislash (Blade): Shadow Ball (shielded)',
+                             'Azumarill: Ice Beam (shielded)',
+                             'Aegislash (Blade): Shadow Ball'],
+                 marks=_AEGI_XFAIL_GB_SHIELD_FIRST),
+    pytest.param(2, 2, 376, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam',
+                             'Aegislash (Blade): Gyro Ball (shielded)',
+                             'Aegislash (Blade): Gyro Ball (shielded)',
+                             'Aegislash (Blade): Gyro Ball'],
+                 marks=_AEGI_XFAIL_GB_CASCADE),
 ])
-def test_aegislash_vs_azumarill_form_change(shields_a, shields_z, expected_aegi_score):
-    """Aegislash form change: Shield<->Blade on charged move / shield use."""
+def test_aegislash_vs_azumarill_form_change(shields_a, shields_z,
+                                            expected_aegi_score, expected_log):
+    """Aegislash form change: Shield<->Blade on charged move / shield use.
+
+    Assertion checks both PvPoke score AND chargedLog (turn-by-turn
+    charged-move sequence). chargedLog is what diagnoses actual
+    behavioral divergence; the score can coincidentally match even when
+    the fights play out differently (e.g. GB vs SB both get shielded).
+    """
     bp_a = _make_battle_pokemon(
         'Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT',
         ['SHADOW_BALL', 'GYRO_BALL'],
@@ -1276,28 +1336,100 @@ def test_aegislash_vs_azumarill_form_change(shields_a, shields_z, expected_aegi_
         f"{shields_a}v{shields_z}: expected Aegislash score={expected_aegi_score}, "
         f"got {score} (delta={score - expected_aegi_score:+d})"
     )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_a}v{shields_z}: chargedLog mismatch vs PvPoke harness"
+    )
+
+
+# Mimikyu bandaid-triage xfails. chargedLog reveals two distinct PvPoke
+# behaviors we disagree with: (1) first-Ice-Beam timing (PvPoke throws
+# an extra opening IB before Mimi's SS), and (2) bug #4 SS-delay (PvPoke
+# delays Mimikyu's first SS by one Shadow Claw). Captured 2026-04-15.
+_MIMI_XFAIL_AZU_OPENING_IB = pytest.mark.xfail(
+    reason=(
+        "PvPoke throws Azumarill's Ice Beam once more than we do — an "
+        "opening IB before Mimikyu's first charged throw. Score "
+        "coincidentally matches because Mimi's SS sequence lands the "
+        "same total damage, but the fight isn't identical. Not yet "
+        "localized: Azu's DP fires earlier in PvPoke than in ours."))
+_MIMI_XFAIL_SS_DELAY = pytest.mark.xfail(
+    reason=(
+        "PvPoke bug #4: Mimikyu delays first Shadow Sneak by one "
+        "Shadow Claw (8 SCs before first SS instead of 7), letting "
+        "Azu's IB break the disguise first. Combined with PvPoke "
+        "throwing an extra opening IB, our log disagrees on both Azu's "
+        "first IB timing AND Mimi's first SS timing. Score matches "
+        "because the two differences offset each other."))
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_m,shields_a,expected_mimikyu_score", [
+@pytest.mark.parametrize("shields_m,shields_a,expected_mimikyu_score,expected_log", [
     # Mimikyu 5/13/15 vs Azumarill 4/15/13, Great League
     # SHADOW_CLAW / SHADOW_SNEAK / PLAY_ROUGH
     # vs BUBBLE / ICE_BEAM / PLAY_ROUGH
     # Verified at pvpoke.com/battle/ 2026-04-14
     # Form change: Disguise absorbs first unshielded charged hit (dmg=1),
     # then Mimikyu becomes Busted with permanent -1 def stage.
-    (0, 0, 738),
-    pytest.param(0, 1, 350, marks=pytest.mark.xfail(reason="Potential PvPoke bug: PvPoke delays Mimikyu SS by 1 SC; our earlier throw is better for Mimikyu (+13)")),
-    pytest.param(0, 2, 214, marks=pytest.mark.xfail(reason="Potential PvPoke bug: Mimikyu SS timing, our 227 (+13)")),
-    (1, 0, 761),
-    (1, 1, 672),
-    pytest.param(1, 2, 473, marks=pytest.mark.xfail(reason="Potential PvPoke bug: Mimikyu SS timing, our 460 (-13)")),
-    (2, 0, 761),
-    (2, 1, 686),
-    (2, 2, 607),
+    #
+    # Expected chargedLog is the PvPoke harness ground truth. Cases
+    # where our log disagrees with PvPoke get an xfail with a specific
+    # reason pinning the behavioral difference.
+    pytest.param(0, 0, 738, ['Azumarill: Ice Beam',
+                             'Mimikyu (Busted): Play Rough',
+                             'Mimikyu (Busted): Shadow Sneak'],
+                 marks=_MIMI_XFAIL_AZU_OPENING_IB),
+    pytest.param(0, 1, 350, ['Azumarill: Ice Beam',
+                             'Mimikyu (Busted): Shadow Sneak (shielded)',
+                             'Mimikyu (Busted): Shadow Sneak',
+                             'Azumarill: Ice Beam'],
+                 marks=_MIMI_XFAIL_SS_DELAY),
+    pytest.param(0, 2, 214, ['Azumarill: Ice Beam',
+                             'Mimikyu (Busted): Shadow Sneak (shielded)',
+                             'Mimikyu (Busted): Play Rough (shielded)',
+                             'Azumarill: Ice Beam'],
+                 marks=_MIMI_XFAIL_SS_DELAY),
+    (1, 0, 761, ['Mimikyu: Play Rough',
+                 'Azumarill: Ice Beam (shielded)',
+                 'Mimikyu: Shadow Sneak']),
+    pytest.param(1, 1, 672, ['Mimikyu: Shadow Sneak (shielded)',
+                             'Azumarill: Ice Beam (shielded)',
+                             'Mimikyu: Shadow Sneak',
+                             'Azumarill: Ice Beam',
+                             'Mimikyu (Busted): Shadow Sneak'],
+                 marks=_MIMI_XFAIL_AZU_OPENING_IB),
+    pytest.param(1, 2, 473, ['Mimikyu: Shadow Sneak (shielded)',
+                             'Azumarill: Ice Beam (shielded)',
+                             'Azumarill: Ice Beam',
+                             'Mimikyu (Busted): Shadow Sneak (shielded)',
+                             'Mimikyu (Busted): Play Rough',
+                             'Azumarill: Ice Beam'],
+                 marks=_MIMI_XFAIL_AZU_OPENING_IB),
+    (2, 0, 761, ['Mimikyu: Play Rough',
+                 'Azumarill: Ice Beam (shielded)',
+                 'Mimikyu: Shadow Sneak']),
+    (2, 1, 686, ['Mimikyu: Shadow Sneak (shielded)',
+                 'Azumarill: Ice Beam (shielded)',
+                 'Mimikyu: Shadow Sneak',
+                 'Azumarill: Play Rough (shielded)',
+                 'Mimikyu: Shadow Sneak']),
+    pytest.param(2, 2, 607, ['Mimikyu: Shadow Sneak (shielded)',
+                             'Azumarill: Ice Beam (shielded)',
+                             'Mimikyu: Shadow Sneak (shielded)',
+                             'Azumarill: Ice Beam (shielded)',
+                             'Mimikyu: Play Rough',
+                             'Azumarill: Ice Beam'],
+                 marks=_MIMI_XFAIL_AZU_OPENING_IB),
 ])
-def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a, expected_mimikyu_score):
-    """Mimikyu disguise: first unshielded charged hit absorbed, then -1 def stage."""
+def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a,
+                                          expected_mimikyu_score, expected_log):
+    """Mimikyu disguise: first unshielded charged hit absorbed, then -1 def stage.
+
+    Assertion checks both PvPoke score AND chargedLog. chargedLog is
+    diagnostic: it reveals the actual SS-delay / Azu-IB-timing
+    divergences, whereas scores can coincidentally align even when the
+    fights play out differently (as they do in the score-match / log-mismatch
+    xfail cases below).
+    """
     bp_m = _make_battle_pokemon(
         'Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'],
         'great', shields_m, 5, 13, 15,
@@ -1314,4 +1446,7 @@ def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a, expected_mimikyu
     assert score == expected_mimikyu_score, (
         f"{shields_m}v{shields_a}: expected Mimikyu score={expected_mimikyu_score}, "
         f"got {score} (delta={score - expected_mimikyu_score:+d})"
+    )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_m}v{shields_a}: chargedLog mismatch vs PvPoke harness"
     )
