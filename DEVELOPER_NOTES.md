@@ -143,58 +143,106 @@ all `activeChargedMoves` after the priority-shuffle, so the bait-wait
 same as our `actual_dpe`. The buff-adjusted DPE only affects the
 priority-shuffle ordering (lines 711-787), not the ratio check itself.
 
-### ACTIVE: Forretress/Azumarill DP plan-selection (pvpoke_dp first_idx)
+### RESOLVED (2026-04-15): Forretress/Azumarill DP plan-selection — atk-stage fix shipped
 
-**Investigated 2026-04-15 via the new headless Node harness
+The fix described below landed in a single commit on 2026-04-15.
+`_DPState` now carries an `atk_stage` field; `pvpoke_dp` precomputes
+a per-stage damage table (indexed stage+4 over [-4..+4]) and scales
+both the charged- and fast-move damage inside the near-KO DP by the
+current state's stage. Chance-1 self-atk-buffs and chance-1
+opp-def-debuffs (via PvPoke's `attackMult -= buffs[1]` trick)
+increment the child state's stage. `_dp_insert_ready` phase-1 dedup
+requires equal `atk_stage` so stacked-buff plans aren't deduped away.
+
+`_dp_jit.py` mirrors the change: kernel takes `cm_buff_delta`,
+`cm_dmgs_stage` (9 x n_cms), `fast_dmg_stage` (9,), and
+`root_atk_stage`; queue arrays gain a parallel `q_atk_stg` slot.
+
+Scoreboard: Azu/Forretress (Sand+Rock) is now 9/9 exact vs PvPoke
+across all shield scenarios (the test file's expected scores were
+updated accordingly). `tests/test_battle.py` 157 passed,
+`scripts/verify_pvpoke_harness.py` 27/27.
+
+**Gotcha worth calling out:** `buffApplyChance` in the raw
+gamemaster is a *string*, not a number. The initial `!= 1`
+comparison was silently false for every move; the production check
+is `float(m.get('buffApplyChance', 0) or 0) != 1.0`.
+
+#### Historical root-cause writeup (pre-fix investigation)
+
+**Investigated 2026-04-15 via the headless Node harness
 (`scripts/pvpoke_trace.js` + `scripts/verify_pvpoke_harness.py`,
 validated 27/27 on recorded oracle cases).**
 
 **Matchup:** Azumarill 4/15/13 (Bubble / Ice Beam / Hydro Pump) vs
 Forretress 5/15/13 (Volt Switch / Sand Tomb / Rock Tomb) in Great
-League.
+League, Azu 0 shields / Forr 1 shield. PvPoke Azu=312, our
+Azu=430. Delta +118.
 
-**Our Python: Azu=429 at 0v1. PvPoke: Azu=312 at 0v1.** Delta +117.
+**The second divergence (T26) is now root-caused.** Instrumented
+PvPoke's `stateList.push(currState)` to dump every terminal popped
+from the DP queue. At Forr's T26 call, exactly one terminal pops:
+`stateTurn=10, energy=8, oppHealth=-8, moves=[SAND_TOMB, SAND_TOMB]`.
+Our DP's first-popped terminal is `turn=13, hp=0, moves=[ROCK_TOMB]`
+(a `[RT]+farm` plan) — strictly later turn, yet our DP accepts it
+because our [ST, ST] plan never becomes terminal in our
+reachable-state space.
 
-**Localized divergence (turn-by-turn diff against PvPoke harness):**
+**Why PvPoke's [ST, ST] KOs at turn 10 while ours doesn't:** PvPoke's
+`BattleState` carries a `buffs` field (the attacker's atk-stage
+delta) that accumulates as the DP stacks moves with chance-1 self-atk
+buffs *or* chance-1 opp-def debuffs (see `ActionLogic.js:519-535` —
+note line 531 `attackMult -= move.buffs[1]`, which effectively
+promotes an opp-def debuff to a self-atk buff inside the DP). When a
+child state is popped, line 471 calls `poke.applyStatBuffs([buffs, 0])`
+and recomputes `moveDamage`/`fastSimulatedDamage` against the buffed
+atk. So in PvPoke's DP, ST1 lands at stage 0 (27 dmg), the two
+buffer VS fast moves land at stage +1 (15 dmg each), and ST2 lands at
+stage +1 (33 dmg). Total 27+30+33 = 90 against Azu's 91 HP — close
+enough that the shield-free `newOppHealth - moveDamage` path
+terminates negative at stateTurn 10 (the `-8` result includes a
+rounding path I didn't reverse in detail).
 
-| Turn | Our Python                         | PvPoke                                                   |
-| ---- | ---------------------------------- | -------------------------------------------------------- |
-| T17  | Forr throws Sand Tomb              | Forr throws Sand Tomb                                    |
-| T21  | Azu throws Ice Beam (shielded)     | Azu throws Ice Beam (shielded)                           |
-| T26  | **Forr throws Rock Tomb (50 dmg)** | **Forr throws Sand Tomb, plans another Sand Tomb after** |
+**Our DP holds `cm_dmgs[]` and `fast_damage` fixed** at the values
+computed from the attacker's actual mid-battle atk_stage for the
+*entire* DP rollout. `_DPState` tracks `has_debuf` and `debuf_count`,
+but those are only used for the dedup tie-break at
+`_dp_insert_ready`; neither scales damage. So our DP sees plan
+[ST, ST] as 27+2*12+27 = 78 damage at turn 10 (hp=13, not terminal),
+misses the stacked-debuff acceleration entirely, and settles for
+[RT]+farm at turn 13.
 
-PvPoke's Forretress throws **three** Sand Tombs over the match. Our
-Forretress throws Sand Tomb then Rock Tomb. This inverts the earlier
-(pre-harness) hypothesis recorded in TODO.md, which had claimed
-PvPoke's Forr threw only 1 charged move and ours threw 2.
+**Proposed fix (for a follow-up session):** add a scalar
+`atk_stage: int` to `_DPState` (initialized from `attacker.atk_stage`
+at the root call). In the near-KO DP loop in `pvpoke_dp` (around
+lines 1155-1209):
 
-**Probe readouts at the divergence point:**
+1. Precompute `_stat_stage_mult` at every reachable stage and derive
+   a per-move damage scaler `mult(stage) / mult(root_stage)`.
+2. When dispatching move `n` from a state at `curr_atk_stage`, use
+   `cm_dmgs[n] * scale(curr_atk_stage)` and
+   `fast_damage * scale(curr_atk_stage)` for the `new_hp`
+   calculation (both ready and not-ready branches).
+3. Compute `new_atk_stage` for the child: `curr + delta(n)` clamped
+   to `[-4, +4]`, where `delta(n)` = +1 for a chance-1 self-atk buff
+   (`buffTarget=='self' && buffs[0]>0`) or a chance-1 opp-def debuff
+   (`buffTarget=='opponent' && buffs[1]<0`), matching PvPoke's
+   `attackMult` update at `ActionLogic.js:519-535`.
+4. Mirror the change in `_dp_jit.py` so numba stays in sync.
+5. Optional: include `atk_stage` in the `_dp_insert_ready` dedup key
+   so plans with better buff accumulation don't get deduped out by
+   same-`(turn,hp,energy)` states at lower buffs.
 
-- **PvPoke** `ActionLogic.decideAction` @ T26 for Forr:
-  `finalState.moves = [SAND_TOMB, SAND_TOMB]`, `energy=8`
-  (plan-terminal), `oppHealth=-8`. Thrown immediately.
-- **Our Python** `pvpoke_dp` @ T18 for Forr:
-  `raw plan first=ROCK_TOMB max_dmg=ROCK_TOMB has_deb=False`. Near-KO
-  waits for Rock Tomb (energy 24/50) instead of firing Sand Tomb.
-
-**Hypothesis (for next session to test):** after Forr's first Sand Tomb
-throw, our DP picks Rock Tomb as the plan's `first_idx` / `max_dmg_idx`,
-whereas PvPoke's DP prefers a two-Sand-Tomb plan. RT has higher raw
-damage (50 vs 22) so our `max_dmg_idx` points to RT; this appears to
-steer `first_idx` to RT too. PvPoke's DP presumably values the 2 x ST
-plan's faster KO (lower energy, opp-def debuff stack) over RT's
-higher per-throw damage. Sand Tomb is `selfBuffing=true` after the
-2026-04-14 Divergence 1 broadening, but the DP's first_idx selection
-may not be weighting that correctly.
+The fix should be scoped as sim-internal only — no threshold or HTML
+changes. Expected effect: Azu=312 exact on this matchup. Run
+`scripts/verify_pvpoke_harness.py` after the change; all 27 cases
+must still match, plus add a new case for this matchup.
 
 **Artifacts (in-repo):**
-- `scripts/pvpoke_trace.js` - headless Node harness for PvPoke.
+- `scripts/pvpoke_trace.js` - harness now also emits `termLog`, an
+  array of every DP terminal-state push (turn, energy, oppHealth,
+  moves) so future divergences can be localized the same way.
 - `scripts/verify_pvpoke_harness.py` - oracle smoke-test (27 cases).
-
-**Out-of-scope for the investigation:** the actual Python fix to
-`pvpoke_dp`'s first_idx selection. Scope that as a follow-up once the
-DP branch to touch is identified from a direct read of our
-`pvpoke_dp` code against the PvPoke `ActionLogic.decideAction` DP.
 
 ### 3. bestChargedMove computed per-turn, not cached at init (intentional)
 

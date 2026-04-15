@@ -452,9 +452,11 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
 # -1 and the other scalars are 0.
 class _DPState:
     __slots__ = ('energy', 'hp', 'turn', 'shields',
-                 'first_idx', 'max_dmg_idx', 'has_debuf', 'debuf_count')
+                 'first_idx', 'max_dmg_idx', 'has_debuf', 'debuf_count',
+                 'atk_stage')
     def __init__(self, energy, hp, turn, shields,
-                 first_idx, max_dmg_idx, has_debuf, debuf_count):
+                 first_idx, max_dmg_idx, has_debuf, debuf_count,
+                 atk_stage=0):
         self.energy      = energy
         self.hp          = hp
         self.turn        = turn
@@ -463,6 +465,7 @@ class _DPState:
         self.max_dmg_idx = max_dmg_idx
         self.has_debuf   = has_debuf
         self.debuf_count = debuf_count
+        self.atk_stage   = atk_stage
 
 
 def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> bool:
@@ -666,10 +669,12 @@ def _dp_insert_ready(queue: list, ns: "_DPState", *,
     ns_hp = ns.hp
     ns_energy = ns.energy
     ns_debuf = ns.debuf_count
+    ns_atk_stage = ns.atk_stage
     while i < n and queue[i].turn == ns_turn:
         q = queue[i]
-        # buffs always 0 → buffs check always matches
-        if q.hp == ns_hp:
+        # buffs check: require same atk_stage — different stacks are genuinely
+        # different states with different future damage trajectories.
+        if q.hp == ns_hp and q.atk_stage == ns_atk_stage:
             if q.energy == ns_energy:
                 # Same energy — compare net debuff counts (precomputed
                 # scalar on each state, no per-comparison list scan)
@@ -886,6 +891,25 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # lookups on each move dispatch.
     cm_self_debuf = [1 if m.get('selfDebuffing', False) else 0 for m in cms]
     cm_debuf_delta = [_cm_debuf_delta(m) for m in cms]
+    # Per-cm atk-stage delta applied to the ATTACKER on throw.
+    # Mirrors PvPoke ActionLogic.js lines 519-535: chance-1 self-atk-buff
+    # increases attackMult, chance-1 opp-def-debuff also increases
+    # attackMult (scaling atk/def). Only chance-1 effects contribute —
+    # PvPoke zeros changeTTKChance unconditionally before the DP.
+    def _cm_buff_delta(m: dict) -> int:
+        buffs = m.get('buffs')
+        if not buffs:
+            return 0
+        # buffApplyChance may be a string in raw gamemaster data.
+        if float(m.get('buffApplyChance', 0) or 0) != 1.0:
+            return 0
+        bt = m.get('buffTarget', '')
+        if bt == 'self' and buffs[0] > 0:
+            return buffs[0]
+        if bt == 'opponent' and buffs[1] < 0:
+            return -buffs[1]
+        return 0
+    cm_buff_delta = [_cm_buff_delta(m) for m in cms]
 
     def _orig_idx(move: dict) -> int:
         """Map a move back to its index in attacker.charged_moves."""
@@ -1105,6 +1129,33 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     final_state: "_DPState | None" = None
     iters = 0
 
+    # Per-atk-stage damage tables for the DP.
+    # atk_stage runs over [-4, +4]; index as stage + 4 → [0..8].
+    # Each entry recomputes damage from raw power/atk/def via calc_damage
+    # (floor semantics) rather than multiplicatively scaling the root-stage
+    # damage — keeps KO thresholds exact at the 1-HP margin.
+    root_atk_stage = attacker.atk_stage
+    def_eff_val = defender.def_ * _stat_stage_mult(defender.def_stage)
+    atk_base = attacker.atk
+    atk_types = attacker.types
+    def_types = defender.types
+    fm_power = attacker.fast_move['power']
+    fm_type  = attacker.fast_move['type']
+    cm_dmgs_by_stage: list[list[int]] = []
+    fast_dmg_by_stage: list[int] = []
+    for _s_off in range(9):         # stage -4 .. +4
+        _s = _s_off - 4
+        _atk_eff = atk_base * _stat_stage_mult(_s)
+        cm_dmgs_by_stage.append([
+            calc_damage(cm['power'], _atk_eff, def_eff_val,
+                        cm['type'], atk_types, def_types)
+            for cm in cms
+        ])
+        fast_dmg_by_stage.append(
+            calc_damage(fm_power, _atk_eff, def_eff_val,
+                        fm_type, atk_types, def_types)
+        )
+
     if _NEAR_KO_DP_JIT is not None:
         # Numba-JIT'd inner DP. Same algorithm as the Python loop below;
         # operates on numpy scalar arrays for ~5-10x inner-loop speedup.
@@ -1112,9 +1163,14 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         cm_energy_np  = _np.asarray(cm_energy, dtype=_np.int64)
         cm_self_db_np = _np.asarray(cm_self_debuf, dtype=_np.int8)
         cm_db_dlt_np  = _np.asarray(cm_debuf_delta, dtype=_np.int8)
+        cm_buff_dlt_np = _np.asarray(cm_buff_delta, dtype=_np.int8)
+        cm_dmgs_stage_np = _np.asarray(cm_dmgs_by_stage, dtype=_np.float64)
+        fast_dmg_stage_np = _np.asarray(fast_dmg_by_stage, dtype=_np.int64)
         (found, _first, _max_idx, _has_deb, _deb_cnt,
          _f_turn, _f_hp, _f_sh, iters) = _NEAR_KO_DP_JIT(
             cm_dmgs_np, cm_energy_np, cm_self_db_np, cm_db_dlt_np,
+            cm_buff_dlt_np, cm_dmgs_stage_np, fast_dmg_stage_np,
+            int(root_atk_stage),
             n_cms,
             int(attacker.energy),
             float(defender.hp),
@@ -1133,7 +1189,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         # JIT in _dp_jit.py — kept here so the project still runs without
         # numba installed.
         queue: list = [_DPState(attacker.energy, float(defender.hp), 0,
-                                 defender.shields, -1, -1, 0, 0)]
+                                 defender.shields, -1, -1, 0, 0,
+                                 root_atk_stage)]
         while queue and iters < 500:
             iters += 1
             curr = queue.pop(0)
@@ -1152,18 +1209,27 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             curr_max_dmg  = cm_dmgs[curr_max_idx] if curr_max_idx >= 0 else -1.0
             curr_has_deb  = curr.has_debuf
             curr_deb_cnt  = curr.debuf_count
+            curr_atk_stage = curr.atk_stage
+            stage_row     = cm_dmgs_by_stage[curr_atk_stage + 4]
+            curr_fast_dmg = fast_dmg_by_stage[curr_atk_stage + 4]
             for n in range(n_cms):
-                move_dmg = cm_dmgs[n]
+                move_dmg = stage_row[n]
                 move_e   = cm_energy[n]
 
                 # Update scalar plan summary for the new state.
                 new_first = curr_first if curr_first >= 0 else n
-                if move_dmg > curr_max_dmg:
+                # max_dmg tracking uses root-stage damage for stable ordering
+                if cm_dmgs[n] > curr_max_dmg:
                     new_max_idx = n
                 else:
                     new_max_idx = curr_max_idx
                 new_has_deb = curr_has_deb | cm_self_debuf[n]
                 new_deb_cnt = curr_deb_cnt + cm_debuf_delta[n]
+                new_atk_stage = curr_atk_stage + cm_buff_delta[n]
+                if new_atk_stage > 4:
+                    new_atk_stage = 4
+                elif new_atk_stage < -4:
+                    new_atk_stage = -4
 
                 if curr_e >= move_e:
                     new_e  = curr_e - move_e
@@ -1178,7 +1244,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                     _dp_insert_ready(
                         queue,
                         _DPState(new_e, new_hp, new_t, new_sh,
-                                 new_first, new_max_idx, new_has_deb, new_deb_cnt),
+                                 new_first, new_max_idx, new_has_deb, new_deb_cnt,
+                                 new_atk_stage),
                         intended_pruning=intended_pruning)
                 else:
                     fm_needed    = math.ceil((move_e - curr_e) / fast_energy)
@@ -1187,25 +1254,27 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                     new_t  = curr_t + turns_needed + 1
                     new_sh = curr_sh
                     if curr_sh > 0:
-                        new_hp = curr_hp - fast_damage * fm_needed - 1
+                        new_hp = curr_hp - curr_fast_dmg * fm_needed - 1
                         new_sh -= 1
                     else:
-                        new_hp = curr_hp - fast_damage * fm_needed - move_dmg
+                        new_hp = curr_hp - curr_fast_dmg * fm_needed - move_dmg
 
                     _dp_insert_not_ready(
                         queue,
                         _DPState(new_e, new_hp, new_t, new_sh,
-                                 new_first, new_max_idx, new_has_deb, new_deb_cnt),
+                                 new_first, new_max_idx, new_has_deb, new_deb_cnt,
+                                 new_atk_stage),
                         intended_pruning=intended_pruning)
 
-            if fast_damage > 0 and curr_hp > 0:
-                fm_to_ko  = math.ceil(curr_hp / fast_damage)
+            if curr_fast_dmg > 0 and curr_hp > 0:
+                fm_to_ko  = math.ceil(curr_hp / curr_fast_dmg)
                 fd_turn   = curr_t + fm_to_ko * fast_turns
                 fd_energy = curr_e + fast_energy * fm_to_ko
                 _dp_insert_farm_down(
                     queue,
                     _DPState(fd_energy, 0.0, fd_turn, curr_sh,
-                             curr_first, curr_max_idx, curr_has_deb, curr_deb_cnt),
+                             curr_first, curr_max_idx, curr_has_deb, curr_deb_cnt,
+                             curr_atk_stage),
                     intended_pruning=intended_pruning)
 
     # ------------------------------------------------------------------ #

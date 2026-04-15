@@ -126,6 +126,14 @@ function evalSource(src, filename) {
 // exact `finalState = ...` lines so that PvPoke drift shows up as a
 // loud "anchor not found" error rather than silently missing a probe.
 function instrumentActionLogic(src) {
+  // Insert a trace hook inside the terminal-state detection for debug.
+  const termAnchor = '\t\t\t\tstateList.push(currState);';
+  if (src.includes(termAnchor)) {
+    src = src.replace(
+      termAnchor,
+      `\t\t\t\tif (typeof global.__pvpoke_term_trace === 'function') { global.__pvpoke_term_trace(battle, poke, currState); }\n${termAnchor}`
+    );
+  }
   const probes = [
     {
       anchor: '\t\t\tfinalState = stateList[0];',
@@ -309,6 +317,17 @@ function main() {
   // each charged-move throw. Each entry captures the planned move
   // sequence so we can localize DP plan-selection divergences.
   const dpPlans = [];
+  const termLog = [];
+  global.__pvpoke_term_trace = (battle, poke, state) => {
+    termLog.push({
+      turn: battle.getTurns(),
+      actor: poke ? poke.speciesId : null,
+      stateTurn: state.turn,
+      energy: state.energy,
+      oppHealth: state.oppHealth,
+      moves: (state.moves || []).map(m => m.moveId),
+    });
+  };
   global.__pvpoke_dp_trace = (battle, poke, opponent, finalState, tag) => {
     dpPlans.push({
       turn:      battle.getTurns(),
@@ -361,7 +380,7 @@ function main() {
   }
 
   process.stdout.write(JSON.stringify({
-    score, winner, turns, chargedLog, decisionLog, dpPlans,
+    score, winner, turns, chargedLog, decisionLog, dpPlans, termLog,
   }, null, 2) + '\n');
 }
 
