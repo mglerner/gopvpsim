@@ -81,20 +81,19 @@ break invariants that weren't yet nailed down by tests.
   disagrees with the recorded PvPoke numbers. Fix typos; separately
   flag genuine PvPoke divergences for follow-up.
 
-* **Forretress/Azu 0-shield score divergence** — Re-investigated
-  2026-04-15 with the new headless Node harness (`scripts/pvpoke_trace.js`,
-  validated 27/27 oracle cases). Divergence localized to Forretress's
-  SECOND charged-move choice, not Azumarill's. PvPoke's Forretress
-  throws Sand Tomb, Sand Tomb, Sand Tomb (three Sand Tombs, never Rock
-  Tomb). Ours throws Sand Tomb then Rock Tomb. At T26 after the first
-  ST+IB exchange, PvPoke's DP returns `finalState.moves = [SAND_TOMB,
-  SAND_TOMB]` and fires; ours returns `first=ROCK_TOMB max_dmg=ROCK_TOMB`
-  and near-KO-waits for RT. The earlier hypothesis ("PvPoke's Azu
-  throws 1 CM, ours throws 2") was inverted -- Azu's moves actually
-  match; it's Forr that diverges. See DEVELOPER_NOTES.md "Forretress/
-  Azumarill DP plan-selection" for the full probe readout. Follow-up
-  session should read our `pvpoke_dp` first_idx selection against
-  PvPoke's `ActionLogic.decideAction` plan-pick branch to find the fix.
+* ~~**Forretress/Azu 0-shield score divergence**~~ — **RESOLVED 2026-04-15.**
+  Not a DP plan-selection bug after all. Root cause: our OMT
+  (`_optimize_move_timing`) had a `defender.hp > _fast_dmg` gate that
+  preferred fast-KO over charged-KO "because scores identical." That
+  assumption held only for instant-fast; under mid-cooldown timing a
+  delayed fast cost 3 turns of Azu damage on Forr (T37 fires charged
+  immediately in PvPoke; ours waits for fast that lands at T40). Gate
+  removed. GL grid max |Δ| 15→0 across all 405 pairs.
+  Investigation landmark: decideLog entry/return tracing added to
+  scripts/pvpoke_trace.js (PvPoke's decideAction-level entry/exit log)
+  was the tool that localized this — earlier dpPlan-level traces missed
+  it because the divergence was upstream of the DP. Full writeup in
+  DEVELOPER_NOTES.md "Resolved divergences" 2026-04-15 OMT entry.
 
 ## Policies to add
 
