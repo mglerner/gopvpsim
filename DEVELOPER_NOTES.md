@@ -138,20 +138,7 @@ combos. Mimi's actual SS timing was correct all along; the
 
 ## Open divergences
 
-### UL Jellicent/Corviknight vs MG [att-shields=0] cluster (2026-04-15)
-
-After the defender-bestCM-selfDefenseDebuffing shield gate landed (see
-"Resolved divergences" 2026-04-15), 7 UL cases still show |Δ|>20, all
-sharing: MG is the defender, attacker has 0 shields, so neither shield
-policy fires. Cases group into two flat sub-clusters:
-- jellicent vs MG sh=[0,*]: d1=-146 across all three MG-shield values
-- corviknight vs MG sh=[0,*]: d1=-118 across all three MG-shield values
-
-The flat-across-MG-shields signature confirms shielding is not on the
-critical path here: MG's shields go unused (jellicent/corv die first,
-or never throw a shielded move). Different root cause than the previous
-shield-gate cluster. Likely DP/timing in MG's many-fast-move farm-down
-phase against Water-attacker hp pools. Investigate separately.
+(none currently outstanding — see "Known divergences" for intentional ones)
 
 ## Known divergences from PvPoke implementation
 
@@ -159,6 +146,47 @@ Places where our code intentionally does NOT match PvPoke's
 implementation. Each is a potential source of score mismatches if we
 hit an edge case. Fix these before assuming a score difference is a
 PvPoke bug.
+
+### Near-KO DP plan choice: nuke-with-self-debuff vs serial-Fly (intentional)
+
+**PvPoke**: in the UL `jellicent`/`corviknight` vs `moltres_galarian`
+`[att-shields=0]` cluster, PvPoke's near-KO DP returns the multi-throw
+non-debuffing plan (e.g. `[Fly, Fly]` or `[Fly, Fly, Fly]`) over the
+single-throw self-debuffing nuke `[Brave Bird]`, even though both plans
+KO the same opponent and the BB plan KOs ~9-12 turns earlier with more
+attacker HP retained.
+
+**Our code**: near-KO DP returns the BB plan, which KOs faster and
+preserves more HP. The bandaid[918] "stack-self-debuff: waiting" path
+times the BB throw to land after opponent has fired their charge so
+the atk-stage debuff is paid against a known-unloaded opponent.
+
+**Outcome comparison** (jellicent vs MG [0,0]):
+- PvPoke: MG wins, KO at T29, MG ends ~45/161 HP, score 360/639
+- Ours:   MG wins, KO at T23, MG ends 92/161 HP, score 214/785
+
+Same winner; ours retains 47 more HP.
+
+**Decision**: keep our DP behavior. Per CLAUDE.md "When our sim
+diverges from PvPoke" policy, PvPoke is **not demonstrably better**
+here — same winner, our outcome preserves more attacker HP for the
+breakpoint/post-KO use case (next-mon energy carry-over, swap-state
+HP). PvPoke's preference for the slower multi-Fly plan appears to be
+arbitrary in the 1v1 score sense (it doesn't change the winner) and
+worse in the post-KO-state sense.
+
+**Impact** (UL harness top-8): 7 cases show |Δ|>20 (jellicent×3 at
+d1=-146, corviknight×3 at d1=-118, lapras×1 at d1=+111 with a winner
+flip — all flat across MG-shield count, confirming the divergence is
+in DP plan selection, not shield policy). Pre-existed before the
+defender-bestCM shield gate port; unmasked when other cluster cleared.
+
+**Revisit** if: (a) we add a shield-state model where post-KO HP
+isn't the only quantity that matters; (b) we discover a case where
+PvPoke's slower plan does change the winner against a different
+opponent; or (c) a probabilistic/random DP mode would prefer
+PvPoke's lower-variance multi-throw plan over our higher-variance
+nuke. Until then, the divergence is in our favor.
 
 ### Closed 2026-04-15: needsBoost — not implementing (PvPoke system is dead code)
 
