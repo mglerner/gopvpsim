@@ -116,6 +116,40 @@ def pvpoke_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: di
         return False
     return would_shield(attacker, defender, move)
 
+def _estimate_best_cm(owner: "BattlePokemon", opponent: "BattlePokemon") -> "tuple[int, dict] | tuple[None, None]":
+    """Approximate PvPoke's bestChargedMove for `owner` vs `opponent`.
+
+    Returns (idx, move) where idx indexes owner.charged_moves. Picks the
+    move with the highest actual damage-per-energy against `opponent` at
+    current stat stages. This mirrors PvPoke's selectBestChargedMove
+    (Pokemon.js:791-822) outcome for the common cases without replicating
+    the full priority shuffle from pvpoke_dp's lines 815-898.
+    """
+    if not owner.charged_moves:
+        return (None, None)
+    best_i = 0
+    best_dpe = owner.charged_move_damage(owner.charged_moves[0], opponent) / owner.charged_moves[0]['energy']
+    for i in range(1, len(owner.charged_moves)):
+        m = owner.charged_moves[i]
+        d = owner.charged_move_damage(m, opponent) / m['energy']
+        if d > best_dpe:
+            best_dpe = d
+            best_i = i
+    return (best_i, owner.charged_moves[best_i])
+
+
+def _cheapest_cm(owner: "BattlePokemon") -> "dict | None":
+    """Approximate PvPoke's activeChargedMoves[0] (priority slot).
+
+    PvPoke's priority shuffle (Pokemon.js:711-787) reorders by buff/cost;
+    the slot-0 move after shuffle is typically the cheapest-energy
+    non-special move. We use cheapest-by-energy as a defensible proxy.
+    """
+    if not owner.charged_moves:
+        return None
+    return min(owner.charged_moves, key=lambda m: m['energy'])
+
+
 def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
     """
     PvPoke's simulate-mode shield policy (Battle.js line 1077).
@@ -123,13 +157,17 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     For standard charged moves: always shield (useShield = true).
     For selfBuffing or selfDefensiveDebuffing moves: use wouldShield heuristic.
     This mirrors Battle.js: useShield = true, then overridden for
-    move.selfBuffing and move.selfDefensiveDebuffing.
+    move.selfBuffing and move.selfDefensiveDebuffing, and for the
+    defender-bestChargedMove-selfDefenseDebuffing branch (Battle.js:1105-1124)
+    where the defender saves shields for the post-self-debuff window.
     """
     if defender.shields <= 0:
         if _shield_trace:
             _policy_log.append(
                 f"  shield({defender.species} sh=0 vs {move.get('moveId')}): False (no shields)")
         return False
+
+    use_shield = True  # Battle.js:1084 default
 
     # PvPoke Battle.js lines 1083-1101: use wouldShield heuristic for
     # self-buffing moves and guaranteed opponent-def-debuff moves.
@@ -145,19 +183,67 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     sb_subroute = (self_buffing and buffs is not None
                    and ((bt == 'self' and buffs[0] > 0)
                         or (bt == 'opponent' and buffs[1] < 0)))
-    use_heuristic = sb_subroute or self_def_debuffing
-    if use_heuristic:
-        result = would_shield(attacker, defender, move)
+    use_heuristic_incoming = sb_subroute or self_def_debuffing
+    if use_heuristic_incoming:
+        use_shield = would_shield(attacker, defender, move)
         if _shield_trace:
             tag = ("selfDefDebuff" if self_def_debuffing
                    else "oppDefDebuff" if bt == 'opponent'
                    else "selfBuff")
             _policy_log.append(
                 f"  shield({defender.species} sh={defender.shields} vs"
-                f" {move.get('moveId')} [{tag}]): → wouldShield={result}")
-        return result
+                f" {move.get('moveId')} [incoming {tag}]): → wouldShield={use_shield}")
+
+    # Battle.js:1105-1124 — defender saves shields for its own post-self-
+    # defense-debuff fragility window.  Fires when defender.bestChargedMove
+    # is selfDefenseDebuffing.  Two sub-branches by attacker.shields.
+    d_best_idx, d_best_cm = _estimate_best_cm(defender, attacker)
+    if d_best_cm is not None and d_best_cm.get('selfDefenseDebuffing', False):
+        sd_value = would_shield(attacker, defender, move)
+        if attacker.shields > 0:
+            use_shield = sd_value
+            if _shield_trace:
+                _policy_log.append(
+                    f"  shield({defender.species} sh={defender.shields} vs"
+                    f" {move.get('moveId')} [defBestCM={d_best_cm.get('moveId')} selfDefDebuff,"
+                    f" attShields={attacker.shields}]): → wouldShield={sd_value}")
+        else:
+            a_first = _cheapest_cm(attacker)
+            if a_first is not None:
+                d_fast_energy = defender.fast_move.get('energyGain', 5)
+                d_fast_turns  = defender.fast_move.get('_turns', 1)
+                d_fast_dmg    = defender.fast_move_damage(attacker)
+                fast_to_next = math.ceil(
+                    max(0, d_best_cm['energy'] - defender.energy) / d_fast_energy)
+                turns_to_next = fast_to_next * d_fast_turns
+                cycle_dmg = (fast_to_next * d_fast_dmg
+                             + defender.charged_move_damage(d_best_cm, attacker))
+
+                a_fast_energy = attacker.fast_move.get('energyGain', 5)
+                a_fast_turns  = attacker.fast_move.get('_turns', 1)
+                att_fast_to_next = math.ceil(
+                    max(0, a_first['energy'] - attacker.energy) / a_fast_energy)
+                att_turns_to_next = att_fast_to_next * a_fast_turns
+                if attacker.atk > defender.atk:
+                    att_turns_to_next -= 1
+
+                if (turns_to_next >= att_turns_to_next
+                        and attacker.hp <= cycle_dmg):
+                    use_shield = sd_value
+                    if _shield_trace:
+                        _policy_log.append(
+                            f"  shield({defender.species} sh={defender.shields} vs"
+                            f" {move.get('moveId')} [defBestCM={d_best_cm.get('moveId')} selfDefDebuff,"
+                            f" attShields=0, cycleKO]): → wouldShield={sd_value}")
+                elif _shield_trace:
+                    _policy_log.append(
+                        f"  shield({defender.species} sh={defender.shields} vs"
+                        f" {move.get('moveId')} [defBestCM={d_best_cm.get('moveId')} selfDefDebuff,"
+                        f" attShields=0, no cycleKO: hp={attacker.hp} cycleDmg={cycle_dmg}"
+                        f" turnsCmp={turns_to_next}vs{att_turns_to_next}]): keep useShield={use_shield}")
+
     # Aegislash Shield form: don't waste shields if damage < half HP
-    # PvPoke Battle.js:1119
+    # PvPoke Battle.js:1126
     if (defender._form_change is not None
             and defender._form_change.forms[int(defender._form_is_alt)].species_id == 'aegislash_shield'
             and attacker.charged_move_damage(move, defender) * 2 < defender.hp):
@@ -167,11 +253,11 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
                 f" {move.get('moveId')}): False (Aegislash Shield suppression)")
         return False
 
-    if _shield_trace:
+    if _shield_trace and not use_heuristic_incoming and not (d_best_cm is not None and d_best_cm.get('selfDefenseDebuffing', False)):
         _policy_log.append(
             f"  shield({defender.species} sh={defender.shields} vs"
             f" {move.get('moveId')}): True (always shield)")
-    return True
+    return use_shield
 
 def use_first_available(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
     """Throw the first charged move we have enough energy for."""

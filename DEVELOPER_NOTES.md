@@ -138,25 +138,20 @@ combos. Mimi's actual SS timing was correct all along; the
 
 ## Open divergences
 
-### UL Moltres-Galarian score-margin cluster (2026-04-15)
+### UL Jellicent/Corviknight vs MG [att-shields=0] cluster (2026-04-15)
 
-After the many-cycle non-debuff swap fix resolved the Lapras vs MG [0,1]
-winner flip, 17 UL harness-grid cases still show |Δ|>20 but NO winner
-flip. All involve MG; the chargedLog order matches PvPoke (e.g., MG vs
-Florges [2,0]: both sims fire CW-shielded → Fly → DV-shielded → BrB in
-the same order). The remaining divergence is timing/fast-move-damage
-granularity, not plan selection. Max remaining |Δ|=230 (MG vs Florges
-[2,0]: ours 776/223 vs pv 546/453). Winner agreement is 250/252; the
-two remaining flips are both score-close (|Δ|~140-170) in shield-
-asymmetric scenarios.
+After the defender-bestCM-selfDefenseDebuffing shield gate landed (see
+"Resolved divergences" 2026-04-15), 7 UL cases still show |Δ|>20, all
+sharing: MG is the defender, attacker has 0 shields, so neither shield
+policy fires. Cases group into two flat sub-clusters:
+- jellicent vs MG sh=[0,*]: d1=-146 across all three MG-shield values
+- corviknight vs MG sh=[0,*]: d1=-118 across all three MG-shield values
 
-Follow-up: trace one of the score-margin cases turn-by-turn (fast-move
-counts, cooldown interleaving) to localize the per-turn damage drift.
-Likely candidates: fast-move cooldown rounding around charged throws,
-OMT firing-turn alignment in MG's 1000ms-vs-500ms matchups, or a
-second-order effect of the new 1.1-threshold swap interacting with
-post-DP bandaids. GL is clean (405/405 max |Δ|=0) so the class of
-issue is UL-specific (larger HP pools amplify timing drift).
+The flat-across-MG-shields signature confirms shielding is not on the
+critical path here: MG's shields go unused (jellicent/corv die first,
+or never throw a shielded move). Different root cause than the previous
+shield-gate cluster. Likely DP/timing in MG's many-fast-move farm-down
+phase against Water-attacker hp pools. Investigate separately.
 
 ## Known divergences from PvPoke implementation
 
@@ -187,6 +182,33 @@ Revisit only if PvPoke removes line 539 or fixes the
 `needsBoost = true` assignment upstream.
 
 ### Resolved divergences (full writeups in CHANGELOG.md)
+
+* **2026-04-15 — Defender-bestCM-selfDefenseDebuffing shield gate
+  (UL Moltres-G score-margin cluster).** Ported PvPoke Battle.js:1105-
+  1124. Our `pvpoke_simulate_shield` was always-shielding standard
+  charged moves; PvPoke instead routes the shield decision through
+  `wouldShield` whenever the **defender's own** `bestChargedMove` is
+  `selfDefenseDebuffing` — defender saves shields for the post-debuff
+  fragility window. Two sub-branches by attacker shields: if attacker
+  has shields, override directly; if attacker has 0 shields, override
+  only when defender's next charged-cycle would KO the attacker
+  (cycleDamage and CMP-aware turn-comparison gates). Helper
+  `_estimate_best_cm` selects the defender's best-actual-DPE charged
+  move; `_cheapest_cm` proxies attacker.activeChargedMoves[0] (full
+  priority shuffle from pvpoke_dp not factored out — pragmatic
+  approximation, sufficient for the cases tested).
+  Probe: MG vs Florges [2,0] previously d1=+230, now d1=0 (same
+  chargedLog as before, but MG correctly skips shielding the second
+  Disarming Voice → 9% HP remaining instead of 55%, matching PvPoke).
+  UL grid: max |Δ| 230→146, |Δ|>20 18→7, winner flips 2→2 (no new
+  flips introduced). GL grid: max |Δ|=0 across 405 pairs unchanged
+  (no top-8 GL species default moveset has a selfDefenseDebuffing
+  charged move). Tests 156p/6xf, oracle 27/27 unchanged.
+  Localization landmark: trace_shields output revealed the gap
+  immediately — `wouldShield(...) → False` followed one turn later
+  by `shield(...): True (always shield)`. The helper text
+  ("[defBestCM=BRAVE_BIRD selfDefDebuff, attShields=0, no cycleKO]")
+  added to trace makes the new gate auditable from log inspection.
 
 * **2026-04-14 — selfBuffing flag scope.** Now matches PvPoke's
   `GameMaster.js:873` definition (positive self-buffs *and*
