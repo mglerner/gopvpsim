@@ -2658,7 +2658,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # sections block).
     html += '  <span id="cluster-toggle-wrapper" style="display:none"><label style="font-size:12px;color:#aaa"><input type="checkbox" id="cluster-chk" onchange="updateView()" style="margin-left:12px"> Show clusters</label></span>\n'
     if thresholds:
-        html += '  <span style="font-size:11px;color:#888;margin-left:8px">Threshold tiers shown in graph legend. Hover to isolate; click to lock.</span>\n'
+        html += '  <span style="font-size:11px;color:#888;margin-left:8px">Threshold tiers (e.g. GH Great / GH Good) are expert stat-cutoff regions defined in <a href="#dd-threshold-tiers" style="color:#58a6ff">Threshold Tiers</a> below. Hover legend to isolate; click to lock.</span>\n'
     html += '</div>\n'
 
     # "Your collection" paste-box. Hidden (display:none) until DOMContentLoaded

@@ -744,6 +744,16 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
     parts.append('<div class="dd-narrative-zone">\n')
     parts.append(f'<h3 style="color:#9b59b6;margin:0 0 10px 0">'
                  f'IV Flavor Guide (Simulation)</h3>\n')
+    parts.append(
+        '<p style="margin:0 0 10px 0;font-size:0.82rem;font-style:italic;'
+        'color:#8b949e;line-height:1.5">'
+        'Auto-generated from simulation matchup data. Flavor names '
+        '(e.g. "Premium Bulk", "Fortified {Opp}", "{Opp} Slayer") are '
+        'derived from which opponents each IV cluster beats, not from '
+        'the expert-authored Threshold Tiers above. The two sections '
+        'answer different questions and may not line up 1:1.'
+        '</p>\n'
+    )
 
     # Single-flavor case: just a stat baseline summary
     if len(flavors) == 1:
