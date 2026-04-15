@@ -32,6 +32,48 @@ a BeeWare mobile app.
 - `battle.py` — battle simulation loop with pluggable shield/bait policies
 - `breakpoints.py` — breakpoint and bulkpoint analysis
 
+## When our sim diverges from PvPoke
+
+**Divergence from PvPoke is not the same as a bug.** PvPoke is the
+reference implementation we cross-check against, but it has known bugs
+(see DEVELOPER_NOTES "PvPoke bugs found"), and many of its choices are
+arbitrary in ways that don't affect the 1v1 score.
+
+Before changing our sim's behavior to match PvPoke's, ask:
+
+1. **Does PvPoke produce a demonstrably better outcome here?** A
+   different chargedLog or move sequence is not, by itself, evidence
+   that PvPoke is right. Check whether scores, winners, and the
+   actual fight outcome differ — and if they don't, PvPoke's choice is
+   cosmetic.
+2. **Does our deviation have a defensible reason?** Examples of
+   intentional deviations already in the codebase: we recompute
+   `bestChargedMove` per-turn instead of caching it (PvPoke bug #2);
+   we throw self-debuffing moves only when fast-KO won't suffice
+   (battle.py:_optimize_move_timing); we fire SS on the optimal turn
+   for Mimikyu instead of delaying. These are all places we believe
+   we're right and PvPoke is wrong or arbitrary.
+3. **Would matching PvPoke make us worse for the actual use case?**
+   The use case is breakpoint / bulkpoint analysis for real PvP
+   teambuilding. PvPoke optimizes for 1v1 score; we sometimes care
+   about post-KO state, multi-mon energy carry-over, etc.
+
+If the answer to all three is "PvPoke isn't better and we have a
+defensible reason," **document the divergence and don't change
+behavior.** Add an xfail with a specific reason (not "PvPoke says X,
+we say Y" but "PvPoke X is arbitrary because Z; we Y because W"), and
+add an inline comment at the relevant code site explaining the gate
+we're keeping.
+
+If the answer is "PvPoke is right and we should match," fix our code
+and update the test fixture to PvPoke ground truth.
+
+Most subtle: when a fix accidentally improves multiple cases (e.g.
+the 2026-04-15 raw_dpe fix made Mimikyu xpass), inspect each XPASS
+case to confirm the fight is actually identical, not just the score.
+Score-coincidence is a real failure mode that the chargedLog
+assertions exist to catch.
+
 ## Key design decisions
 - Core `gopvpsim/` library is pure Python (keeps mobile option open).
   Deep dive scripts (`scripts/`) may use numba/Cython/C extensions for speed.
