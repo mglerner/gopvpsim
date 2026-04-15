@@ -919,8 +919,13 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         return cm_dmgs[i] / cm_energy[i]
 
     def raw_dpe(m: dict) -> float:
-        """PvPoke's move.dpe = power/energy (no type effectiveness)."""
-        return m['power'] / m['energy']
+        """PvPoke's move.dpe (Pokemon.js:792, 796, 845).
+        After selectBestChargedMove runs, move.dpe is overwritten to
+        `move.damage / move.energy` where move.damage is the actual
+        type-effectiveness-aware damage computed in initializeMove
+        against the CURRENT opponent. So it's "raw" in the sense of
+        "not buff-adjusted", but still type-effectiveness-aware."""
+        return a_cm_dmgs[a_idx_map[id(m)]] / m['energy']
 
     # ------------------------------------------------------------------ #
     # Break Mimikyu disguise ASAP (ActionLogic.js lines 236-241)
@@ -1289,12 +1294,41 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         return cm_orig_idx[best_sorted_idx]
 
     if final_state.first_idx < 0:
-        # Farm-down plan: no charged moves needed, just fast-move to KO.
-        # PvPoke returns undefined (no action) in this case.
+        # Farm-down plan: the DP found a fast-move-only KO. PvPoke
+        # (ActionLogic.js:813-823) does NOT just return here — if the
+        # attacker has a "boost move" (a chance-1 buff/debuff charged move
+        # that isn't self-debuffing, per Pokemon.js:1789-1799 getBoostMove),
+        # it force-pushes that move onto the plan so the debuff value lands
+        # on the opponent even when the KO is already guaranteed by fast
+        # moves. The subsequent bandaid chain can then swap in a
+        # higher-DPE charged move of similar/lower energy.
+        #
+        # getBoostMove iterates `self.chargedMoves` (user order) and lets
+        # each match overwrite the prior — i.e., the LAST matching move
+        # wins. Mirrored here.
+        boost_move = None
+        for m in attacker.charged_moves:
+            if (m.get('buffs')
+                    and float(m.get('buffApplyChance', 0) or 0) >= 0.5
+                    and not m.get('selfDebuffing', False)):
+                boost_move = m
+        if boost_move is None:
+            if _dp_trace:
+                _policy_log.append(
+                    f"  DP-trace[{attacker.species}]: farm-down plan (no charged moves)")
+            return None
+        boost_sorted_idx = next(
+            s for s, om in enumerate(cms) if om is boost_move)
         if _dp_trace:
             _policy_log.append(
-                f"  DP-trace[{attacker.species}]: farm-down plan (no charged moves)")
-        return None
+                f"  DP-trace[{attacker.species}]: farm-down → boost-move override:"
+                f" {boost_move.get('moveId')} (sorted_idx={boost_sorted_idx})")
+        final_state = _DPState(
+            final_state.energy, final_state.hp, final_state.turn,
+            final_state.shields,
+            boost_sorted_idx, boost_sorted_idx,
+            final_state.has_debuf, final_state.debuf_count,
+            final_state.atk_stage)
 
     if _dp_trace:
         _policy_log.append(

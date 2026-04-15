@@ -125,6 +125,28 @@ PvPoke bug.
   (Sand+Rock) now matches PvPoke 9/9 exact. Gotcha preserved for
   future readers: raw gamemaster `buffApplyChance` is a string;
   compare via `float(...) != 1.0`.
+* **2026-04-15 — Farm-down boost-move override + raw_dpe fix.**
+  Two linked DP gaps surfaced when localizing GL Empoleon vs
+  Forretress 2-2 (Δ=-204). (1) When the near-KO DP returns a
+  farm-down plan (no charged moves in the winning path), our code
+  returned `None` and the Pokemon never threw. PvPoke
+  (ActionLogic.js:813-823) instead force-pushes `getBoostMove()`
+  — the LAST charged move in user order with chance≥0.5 buff
+  and not selfDebuffing — so the debuff value lands on the
+  opponent even when the KO is guaranteed by fast moves alone.
+  Ported in `pvpoke_dp`: farm-down plans now substitute the
+  boost move as `first_idx` and fall through the existing
+  bandaid chain. (2) `raw_dpe` was `power/energy`, but PvPoke's
+  `move.dpe` is `move.damage/move.energy` (type-effectiveness-
+  aware, set by `selectBestChargedMove` at Pokemon.js:792 and
+  overwriting the buff-adjusted DPE from `initializeMove`). Fixed
+  to use cached actual damage. Together these close the
+  Forretress cluster: GL grid max |Δ| 204→15, |Δ|>20 count
+  16→0, |Δ|>50 count 6→0. UL grid unchanged (Moltres-G cluster
+  has a different root cause). Side effect: 12 log-order test
+  fixtures updated (scores/winners already matched PvPoke; only
+  throw order was stale); 3 Mimikyu xfails now xpass. Oracle
+  27/27 still green.
 
 ### 3. bestChargedMove computed per-turn, not cached at init (intentional)
 
