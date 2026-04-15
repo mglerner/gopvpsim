@@ -2651,23 +2651,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += '    <option value="atk">Attack</option>\n'
     html += '    <option value="score">Score</option>\n'
     html += '  </select></label>\n'
-    # Summary-table controls. Affect only the top-N table below the
-    # scatter, not the scatter itself. "Sort by" defaults to the current
-    # Y-axis metric for continuity with the old behavior.
-    html += '  <label style="margin-left:12px">Table rows: <select id="summary-n-sel" onchange="updateSummaryTable()">\n'
-    html += '    <option value="10">10</option>\n'
-    html += '    <option value="25">25</option>\n'
-    html += '    <option value="50">50</option>\n'
-    html += '    <option value="100">100</option>\n'
-    html += '  </select></label>\n'
-    html += '  <label>Sort by: <select id="summary-sort-sel" onchange="updateSummaryTable()">\n'
-    html += '    <option value="y">Y-axis metric</option>\n'
-    html += '    <option value="sp">Stat Product</option>\n'
-    html += '    <option value="atk">Attack (desc)</option>\n'
-    html += '    <option value="def">Defense (desc)</option>\n'
-    html += '    <option value="hp">HP (desc)</option>\n'
-    html += '    <option value="level">Level (desc)</option>\n'
-    html += '  </select></label>\n'
+    # (Top-IVs table controls live next to the table itself — see the
+    # control strip rendered just before <div id="summary"> below.)
     # "Show clusters" is gated behind the experimental-analysis toggle
     # in the Deep Dive Analysis section — hidden by default, revealed
     # when the user opts into experimental output. The wrapper span is
@@ -2720,6 +2705,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 
     # Plot first, then summary table below
     html += '<div id="plot" class="plot-container" style="height:550px;"></div>\n'
+    # Top-IVs table controls. Sit immediately above the table they
+    # affect (the #summary div). The "Sort by" UX is column-header
+    # clicks (see _summarySortClick in deep_dive_engine.js); only the
+    # row-count selector lives here.
+    html += '<div class="summary-controls" style="margin:10px 0 4px 0;font-size:0.9rem;color:#c9d1d9">\n'
+    html += '  <b style="color:#58a6ff">Top IVs</b>\n'
+    html += '  <label style="margin-left:12px">Rows: <select id="summary-n-sel" onchange="updateSummaryTable()">\n'
+    html += '    <option value="10">10</option>\n'
+    html += '    <option value="25">25</option>\n'
+    html += '    <option value="50">50</option>\n'
+    html += '    <option value="100">100</option>\n'
+    html += '  </select></label>\n'
+    html += '  <span style="margin-left:10px;font-size:11px;color:#888">Click any column header to sort.</span>\n'
+    html += '</div>\n'
     html += '<div id="summary" class="summary"></div>\n'
 
     # Methodology footer

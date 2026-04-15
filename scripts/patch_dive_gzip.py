@@ -157,7 +157,11 @@ var _scoresReady = (async function() {
                     inner = inner.replace(
                         '// ---- Init ----\n',
                         '// ---- Init ----\n'
-                        'window.updateView = updateView;\n',
+                        'window.updateView = updateView;\n'
+                        'if (typeof updateSummaryTable === "function") '
+                        'window.updateSummaryTable = updateSummaryTable;\n'
+                        'if (typeof _summarySortClick === "function") '
+                        'window._summarySortClick = _summarySortClick;\n',
                     )
                 wrapped = (
                     '<script>\n'
