@@ -1474,11 +1474,38 @@ function buildTraces() {
 
 // ---- Summary table ----
 function updateSummaryTable() {
-  // Get top 10 by battle rank
+  // Read optional row-count and sort-key controls (absent in older builds).
+  var nSel = document.getElementById('summary-n-sel');
+  var N = nSel ? parseInt(nSel.value, 10) : 10;
+  if (!isFinite(N) || N <= 0) N = 10;
+
+  var sortSel = document.getElementById('summary-sort-sel');
+  var sortMode = sortSel ? sortSel.value : 'y';
+
+  // Build sort comparator. All non-'y' modes are "higher is better" so
+  // we negate to get descending order. Sparse y-values are handled
+  // inside the 'y' branch (skipped at render time, not at sort time).
+  var cmp;
+  if (sortMode === 'sp') {
+    // Stat Product: spRanks[iv] is 1 = best, so ascending rank = descending SP.
+    cmp = function(a, b) { return DATA.spRanks[a] - DATA.spRanks[b]; };
+  } else if (sortMode === 'atk') {
+    cmp = function(a, b) { return DATA.ivAtk[b] - DATA.ivAtk[a]; };
+  } else if (sortMode === 'def') {
+    cmp = function(a, b) { return DATA.ivDef[b] - DATA.ivDef[a]; };
+  } else if (sortMode === 'hp') {
+    cmp = function(a, b) { return DATA.ivHp[b] - DATA.ivHp[a]; };
+  } else if (sortMode === 'level') {
+    cmp = function(a, b) { return DATA.ivLv[b] - DATA.ivLv[a]; };
+  } else {
+    // 'y' (default): sort by current Y-axis rank (already NaN-aware).
+    cmp = function(a, b) { return yRanks[a] - yRanks[b]; };
+  }
+
   var indices = [];
   for (var i=0; i<nIvs; i++) indices.push(i);
-  indices.sort(function(a,b) { return yRanks[a] - yRanks[b]; });
-  var top = indices.slice(0, 10);
+  indices.sort(cmp);
+  var top = indices.slice(0, N);
 
   var hasTiers = tierNames.length > 0;
   var h = '<table><tr><th>Y Rank</th><th>IVs</th><th>Level</th><th>CP</th>';
@@ -1489,7 +1516,8 @@ function updateSummaryTable() {
     var iv = top[k];
     // In sparse y-modes, the top-by-yRanks list still includes IVs
     // with NaN y-values; skip those so the table only lists ranked IVs.
-    if (currentYIsSparse && !isFinite(yValues[iv])) continue;
+    // Only applies when sorting by Y; other sort modes are always dense.
+    if (sortMode === 'y' && currentYIsSparse && !isFinite(yValues[iv])) continue;
     var tier = DATA.ivTiers[iv];
     h += '<tr><td>#'+yRanks[iv]+'</td>';
     h += '<td>'+DATA.ivA[iv]+'/'+DATA.ivD[iv]+'/'+DATA.ivS[iv]+'</td>';
@@ -1505,6 +1533,14 @@ function updateSummaryTable() {
     h += '</tr>';
   }
   h += '</table>';
+  // Caption: describe what the table shows and how to re-sort.
+  var sortLabel = (sortSel && sortSel.selectedIndex >= 0)
+    ? sortSel.options[sortSel.selectedIndex].text : currentYLabel;
+  var srcLabel = (sortMode === 'y') ? currentYLabel : sortLabel;
+  h += '<p style="font-size:11px;color:#888;margin:4px 0 0 0">'
+    + 'Top ' + N + ' IVs, sorted by <b>' + srcLabel + '</b>. '
+    + 'Change <i>Table rows</i> or <i>Sort by</i> above to reshape.'
+    + '</p>';
   document.getElementById('summary').innerHTML = h;
 }
 

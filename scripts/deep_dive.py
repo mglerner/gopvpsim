@@ -2651,6 +2651,23 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += '    <option value="atk">Attack</option>\n'
     html += '    <option value="score">Score</option>\n'
     html += '  </select></label>\n'
+    # Summary-table controls. Affect only the top-N table below the
+    # scatter, not the scatter itself. "Sort by" defaults to the current
+    # Y-axis metric for continuity with the old behavior.
+    html += '  <label style="margin-left:12px">Table rows: <select id="summary-n-sel" onchange="updateSummaryTable()">\n'
+    html += '    <option value="10">10</option>\n'
+    html += '    <option value="25">25</option>\n'
+    html += '    <option value="50">50</option>\n'
+    html += '    <option value="100">100</option>\n'
+    html += '  </select></label>\n'
+    html += '  <label>Sort by: <select id="summary-sort-sel" onchange="updateSummaryTable()">\n'
+    html += '    <option value="y">Y-axis metric</option>\n'
+    html += '    <option value="sp">Stat Product</option>\n'
+    html += '    <option value="atk">Attack (desc)</option>\n'
+    html += '    <option value="def">Defense (desc)</option>\n'
+    html += '    <option value="hp">HP (desc)</option>\n'
+    html += '    <option value="level">Level (desc)</option>\n'
+    html += '  </select></label>\n'
     # "Show clusters" is gated behind the experimental-analysis toggle
     # in the Deep Dive Analysis section — hidden by default, revealed
     # when the user opts into experimental output. The wrapper span is
