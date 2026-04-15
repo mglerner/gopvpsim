@@ -25,7 +25,8 @@ const USAGE = `Usage: node scripts/pvpoke_trace.js \\
   --p1-shields <N>     --p2-shields <N>
   --cp <1500|2500|10000>
 
-Writes JSON to stdout: {score, winner, turns, decisionLog, dpPlans}.
+Writes JSON to stdout: {score, winner, turns, decisionLog, dpPlans, decideLog}.
+decideLog: per-turn entry + return trace of ActionLogic.decideAction.
 `;
 
 function parseArgs(argv) {
@@ -134,6 +135,49 @@ function instrumentActionLogic(src) {
       `\t\t\t\tif (typeof global.__pvpoke_term_trace === 'function') { global.__pvpoke_term_trace(battle, poke, currState); }\n${termAnchor}`
     );
   }
+
+  // --- decideAction entry/return tracing ---
+  // Stamp every `return;` / `return action;` inside decideAction with a
+  // call to __pvpoke_decide_trace so we can see exactly which code path
+  // fires on turns where no logDecision was emitted. Entry trace is
+  // anchored on the "static decideAction" signature.
+  const decideEntryAnchor = 'static decideAction(battle, poke, opponent){';
+  if (!src.includes(decideEntryAnchor)) {
+    throw new Error('instrumentation anchor not found: decideAction entry');
+  }
+  src = src.replace(
+    decideEntryAnchor,
+    `${decideEntryAnchor}\n\t\tif (typeof global.__pvpoke_decide_trace === 'function') { global.__pvpoke_decide_trace('enter', battle, poke, opponent, null); }`
+  );
+  // Stamp each `return;` and `return action;` within the file. We tag each
+  // call site with its source line so the log distinguishes early-exit
+  // branches. Match whole-line `\t\treturn;` / `\t\treturn action;` to
+  // avoid mangling nested functions (decideRandomAction, etc.).
+  const decideStopAnchor = '// Select a randomized action for this turn';
+  if (!src.includes(decideStopAnchor)) {
+    throw new Error('instrumentation anchor not found: decideAction end');
+  }
+  const stopIdx = src.indexOf(decideStopAnchor);
+  const head = src.slice(0, stopIdx);
+  const tail = src.slice(stopIdx);
+  // Tag returns in `head` (decideAction body). Count line numbers using
+  // the offset from `src` start so the tag is stable for the user.
+  const lines = head.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i];
+    // Match any indentation >=2 tabs, but not `return ... (stuff);` where
+    // the return value is a larger expression we don't want to wrap.
+    const mNull   = ln.match(/^(\t+)return;\s*$/);
+    const mAction = ln.match(/^(\t+)return action;\s*$/);
+    if (mNull) {
+      const indent = mNull[1];
+      lines[i] = `${indent}if (typeof global.__pvpoke_decide_trace === 'function') { global.__pvpoke_decide_trace('return_null', battle, poke, opponent, { line: ${i + 1} }); }\n` + ln;
+    } else if (mAction) {
+      const indent = mAction[1];
+      lines[i] = `${indent}if (typeof global.__pvpoke_decide_trace === 'function') { global.__pvpoke_decide_trace('return_action', battle, poke, opponent, { line: ${i + 1}, action: action }); }\n` + ln;
+    }
+  }
+  src = lines.join('\n') + tail;
   const probes = [
     {
       anchor: '\t\t\tfinalState = stateList[0];',
@@ -328,6 +372,25 @@ function main() {
       moves: (state.moves || []).map(m => m.moveId),
     });
   };
+  const decideLog = [];
+  global.__pvpoke_decide_trace = (event, battle, poke, opponent, extra) => {
+    decideLog.push({
+      event,
+      turn: battle.getTurns(),
+      actor: poke ? poke.speciesId : null,
+      index: poke ? poke.index : null,
+      pokeEnergy: poke ? poke.energy : null,
+      pokeHP:     poke ? poke.hp : null,
+      pokeCooldown: poke ? poke.cooldown : null,
+      oppHP:      opponent ? opponent.hp : null,
+      line: extra && extra.line ? extra.line : null,
+      action: extra && extra.action ? {
+        type:  extra.action.type,
+        value: extra.action.value,
+      } : null,
+    });
+  };
+
   global.__pvpoke_dp_trace = (battle, poke, opponent, finalState, tag) => {
     dpPlans.push({
       turn:      battle.getTurns(),
@@ -394,7 +457,7 @@ function main() {
   }
 
   process.stdout.write(JSON.stringify({
-    score, winner, turns, chargedLog, decisionLog, dpPlans, termLog,
+    score, winner, turns, chargedLog, decisionLog, dpPlans, termLog, decideLog,
   }, null, 2) + '\n');
 }
 
