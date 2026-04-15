@@ -99,6 +99,32 @@ implementation. Each is a potential source of score mismatches if we
 hit an edge case. Fix these before assuming a score difference is a
 PvPoke bug.
 
+### Open: needsBoost not yet ported
+
+PvPoke ActionLogic.js:793-810 picks the highest-`chance` member of
+`stateList` when `opponent.turnsToKO != -1 && poke.turnsToKO >
+opponent.turnsToKO` (logged as "changes its plan because it needs the
+BOOST to win or debuff"). Our `pvpoke_dp` doesn't track `turnsToKO`
+or build a `stateList` of alternative plans — we return the first
+KO-bearing terminal that pops from the priority queue.
+
+**Enumeration 2026-04-15** (per code-review §2 follow-up): grep'd
+the GL/UL top-30 default movesets for any charged move with
+`0 < buffApplyChance < 1` (the only moves that set the `.chance`
+field that `needsBoost` reads). Result:
+
+* GL top-30: **tinkaton (BULLDOZE), corviknight (AIR_CUTTER),
+  clefable (MOONBLAST), drapion_shadow (CRUNCH)**
+* UL top-30: **corviknight, tinkaton, clefable, zygarde_complete
+  (CRUNCH), drapion (CRUNCH)**
+
+So `needsBoost` is NOT dormant. It can fire in real matchups against
+these meta species — particularly Tinkaton and Corviknight, both
+central to current validation work. Implementation queued as a
+dedicated session (port stateList + turnsToKO + needsBoost trigger
+from ActionLogic.js:793-810; cross-check against harness on
+matchups featuring the listed species).
+
 ### Resolved divergences (full writeups in CHANGELOG.md)
 
 * **2026-04-14 — selfBuffing flag scope.** Now matches PvPoke's
