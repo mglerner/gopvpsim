@@ -529,25 +529,9 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expect
     (1, 0, 0, 657, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam']),
     (1, 1, 1, 429, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
     (1, 2, 1, 226, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
-    pytest.param(2, 0, 0, 612,
-                 ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump',
-                  'Forretress: Sand Tomb (shielded)', 'Forretress: Sand Tomb',
-                  'Azumarill: Ice Beam'],
-                 marks=pytest.mark.xfail(reason=(
-                     "INTENTIONAL DIVERGENCE (not a bug). PvPoke's Azu "
-                     "fires a final Ice Beam at T36 ('uses Ice Beam at "
-                     "turn 36 because it KO's or it wants to farm down "
-                     "afterwards' — ActionLogic.js:967). Our Azu skips "
-                     "it because our OMT KO-override (battle.py "
-                     "_optimize_move_timing) gates on `defender.hp > "
-                     "fast_dmg` — when the fast move would ALSO KO, we "
-                     "prefer fast (saves energy, no animation). Both "
-                     "paths produce identical scores (612), identical "
-                     "winners, identical KOs. PvPoke's choice is "
-                     "arbitrary for 1v1 score; ours is no worse and "
-                     "arguably better for multi-mon scenarios that care "
-                     "about post-KO energy state. Documented in "
-                     "battle.py:_optimize_move_timing comments."))),
+    (2, 0, 0, 612, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump',
+                    'Forretress: Sand Tomb (shielded)', 'Forretress: Sand Tomb',
+                    'Azumarill: Ice Beam']),
     (2, 1, 1, 496, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
     (2, 2, 1, 242, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
 ])
