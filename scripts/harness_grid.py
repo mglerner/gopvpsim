@@ -141,9 +141,13 @@ def run_ours(spec1: Spec, spec2: Spec, shields: tuple,
     bp2 = make_bp(spec2, league, shields[1], fast_moves, charged_moves, gm)
     res = simulate(bp1, bp2,
                    charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp)
+    # Preserve None for genuine ties so the winner_flip comparison treats
+    # (None == None) as agreement. Previously mapped to -1, which
+    # spuriously disagreed with the harness's own "winner:1" shortcut on
+    # 500/500 double-KOs.
     return {
         'score':  [int(res.pvpoke_score(0)), int(res.pvpoke_score(1))],
-        'winner': res.winner if res.winner is not None else -1,
+        'winner': res.winner,
         'turns':  res.turns,
     }
 
