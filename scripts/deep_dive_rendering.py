@@ -2558,6 +2558,26 @@ def render_results_section(data_obj, moveset_label, opp_label,
         source_label = ', '.join(sorted(expert_sources))
         parts.append('<div class="dd-expert-zone">\n')
         parts.append(f'<h3>Expert Analysis ({source_label})</h3>\n')
+        parts.append(
+            '<details class="dd-glossary" style="margin:0 0 12px 0;font-size:0.9rem">\n'
+            '<summary style="cursor:pointer;color:#d29922">What am I looking at? (glossary)</summary>\n'
+            '<ul style="margin:8px 0 4px 18px;line-height:1.55;color:#c9d1d9">\n'
+            '<li><b>Tier</b> (a.k.a. <i>spread</i>) &mdash; a named stat-cutoff region, e.g. '
+            '"GH Great = Def &ge; 143.03, HP &ge; 138." Any IV meeting all the cutoffs is in the tier.</li>\n'
+            '<li><b>Anchor</b> &mdash; a yes/no rule applied to one IV, e.g. "clears the Medicham '
+            'Dynamic Punch bulkpoint." Each anchor reduces to a single numeric threshold.</li>\n'
+            '<li><b>Breakpoint</b> &mdash; an <i>attack</i> threshold at which one of your moves '
+            'deals +1 more integer damage to a specific opponent.</li>\n'
+            '<li><b>Bulkpoint</b> &mdash; a <i>defense</i> threshold at which one of an opponent\'s '
+            'moves deals 1 less integer damage to you. The defensive mirror of a breakpoint.</li>\n'
+            '<li><b>Matchup-flipping boundary</b> &mdash; a full-battle stat target: the smallest '
+            'stat increase that turns a simulated loss into a win against a specific opponent and '
+            'shield scenario (not just a damage-tier change).</li>\n'
+            '</ul>\n'
+            '<p style="margin:6px 0 0 0;font-size:0.82rem;color:#8b949e">'
+            'Full definitions in <code>docs/concepts.md</code>.</p>\n'
+            '</details>\n'
+        )
 
         # Expert tier cards
         if expert_tiers:
