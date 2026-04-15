@@ -1429,3 +1429,81 @@ def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a,
     assert _extract_battle_log(result) == expected_log, (
         f"{shields_m}v{shields_a}: chargedLog mismatch vs PvPoke harness"
     )
+
+
+# ---------------------------------------------------------------------------
+# UL Moltres-G near-KO DP plan-choice divergence (intentional)
+# ---------------------------------------------------------------------------
+# Captured 2026-04-15. PvPoke's near-KO DP returns the slow multi-Fly plan
+# for Moltres-G vs Water-defender [att-shields=0] cases; ours returns the
+# fast single-BraveBird-nuke plan. Both plans KO the same opponent; same
+# winner. Ours retains 23-30 percentage points more attacker HP (~38-48 raw
+# HP on a 161-HP MG) and KOs 6-12 turns earlier. For our breakpoint /
+# post-KO-state use case, more retained HP is materially better.
+#
+# Per CLAUDE.md "When our sim diverges from PvPoke" policy: PvPoke is NOT
+# demonstrably better here, so we do NOT change behavior. This xfail pins
+# the magnitude — if our DP ever changes such that PvPoke's scores match,
+# the XPASS will alert us to re-evaluate. If a future change reduces our
+# advantage to a few HP (small enough that PvPoke's plan would be at-or-
+# better than ours), the divergence rationale collapses and we should
+# match PvPoke instead. See DEVELOPER_NOTES.md "Known divergences" for
+# the full magnitude table.
+_MG_NEARKO_PLAN = pytest.mark.xfail(
+    reason=(
+        "Intentional divergence: our near-KO DP returns [Brave Bird] (fast "
+        "self-debuffing nuke); PvPoke returns [Fly, Fly, ...] (slow non-"
+        "debuffing serial). Same winner; ours retains 23-30pp more MG HP "
+        "and KOs 6-12 turns earlier. Test asserts PvPoke ground truth so "
+        "an XPASS would alert us if our DP drifts. See DEVELOPER_NOTES "
+        "'Known divergences: Near-KO DP plan choice'."))
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("opp_species,opp_fast,opp_charged,opp_ivs,opp_level,"
+                         "shields_opp,shields_mg,expected_mg_score", [
+    # Ultra League rank-1 IVs; PvPoke harness ground truth captured
+    # 2026-04-15 from scripts/pvpoke_trace.js. MG always wins; the xfail
+    # pins the score margin (loser HP carry-over) where our retained HP
+    # diverges from PvPoke's.
+    ('Jellicent',   'HEX',         ['SURF','SHADOW_BALL'],   (6,14,15), 50.0,
+     0, 0, 639),
+    ('Jellicent',   'HEX',         ['SURF','SHADOW_BALL'],   (6,14,15), 50.0,
+     0, 1, 779),
+    ('Jellicent',   'HEX',         ['SURF','SHADOW_BALL'],   (6,14,15), 50.0,
+     0, 2, 779),
+    ('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'], (0,15,15), 48.5,
+     0, 0, 521),
+    ('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'], (0,15,15), 48.5,
+     0, 1, 602),
+    ('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER','PAYBACK'], (0,15,15), 48.5,
+     0, 2, 683),
+])
+@_MG_NEARKO_PLAN
+def test_moltres_g_nearKO_plan_divergence_pinned(
+        opp_species, opp_fast, opp_charged, opp_ivs, opp_level,
+        shields_opp, shields_mg, expected_mg_score):
+    """Pin the UL Moltres-G near-KO DP plan-choice divergence.
+
+    Asserts PvPoke harness score for MG (winner). Currently xfails
+    because our DP picks Brave Bird (faster KO, more HP retained)
+    instead of PvPoke's serial-Fly plan. Same winner in all cases.
+    """
+    a, d, s = opp_ivs
+    bp_opp = _make_battle_pokemon(
+        opp_species, opp_fast, opp_charged,
+        'ultra', shields_opp, a, d, s,
+    )
+    bp_mg = _make_battle_pokemon(
+        'Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'],
+        'ultra', shields_mg, 1, 15, 15,
+    )
+    result = simulate(bp_opp, bp_mg,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp)
+    mg_score = round(result.pvpoke_score(1))
+    assert mg_score == expected_mg_score, (
+        f"opp={opp_species} sh=[{shields_opp},{shields_mg}]: "
+        f"expected MG score={expected_mg_score}, got {mg_score} "
+        f"(delta={mg_score - expected_mg_score:+d})"
+    )

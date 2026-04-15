@@ -161,11 +161,23 @@ preserves more HP. The bandaid[918] "stack-self-debuff: waiting" path
 times the BB throw to land after opponent has fired their charge so
 the atk-stage debuff is paid against a known-unloaded opponent.
 
-**Outcome comparison** (jellicent vs MG [0,0]):
-- PvPoke: MG wins, KO at T29, MG ends ~45/161 HP, score 360/639
-- Ours:   MG wins, KO at T23, MG ends 92/161 HP, score 214/785
+**Outcome comparison** — full magnitude across the cluster (UL top-8
+harness, MG max HP=161, all cases MG wins in both sims):
 
-Same winner; ours retains 47 more HP.
+| matchup           | ours MG HP | PvPoke MG HP | gap         |
+| ----------------- | ---------- | ------------ | ----------- |
+| Jellicent   [0,0] | 92  ( 57%) | ~45 ( 28%)   | +47 / +29pp |
+| Jellicent   [0,1] | 137 ( 85%) | ~89 ( 55%)   | +48 / +30pp |
+| Jellicent   [0,2] | 137 ( 85%) | ~89 ( 55%)   | +48 / +30pp |
+| Corviknight [0,0] | 45  ( 28%) | ~7 (  4%)    | +38 / +24pp |
+| Corviknight [0,1] | 71  ( 44%) | ~33 ( 20%)   | +38 / +24pp |
+| Corviknight [0,2] | 97  ( 60%) | ~59 ( 37%)   | +38 / +23pp |
+
+Consistently +23-30 percentage points (~38-48 raw HP). MG also KOs
+6-12 turns earlier in our sim. The magnitude is what makes our
+divergence defensible — if the gap were a few HP, PvPoke's plan
+would be at-or-better than ours and we'd match. At 25-30pp the
+post-KO carry-over difference is material for next-mon analysis.
 
 **Decision**: keep our DP behavior. Per CLAUDE.md "When our sim
 diverges from PvPoke" policy, PvPoke is **not demonstrably better**
