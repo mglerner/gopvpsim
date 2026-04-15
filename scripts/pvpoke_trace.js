@@ -416,7 +416,14 @@ function main() {
 
   const poke = battle.getPokemon();
   const score = [pvpokeScore(poke[0], poke[1]), pvpokeScore(poke[1], poke[0])];
-  const winner = poke[0].hp > 0 ? 0 : 1;
+  // PvPoke's native tie semantics: equal battleRating → no winner.
+  // We surface that as null so harness consumers can distinguish genuine
+  // draws from a p1 "win by default." Only one side dying gives a real
+  // winner; both at <=0 HP with equal ratings is a tie.
+  let winner;
+  if (poke[0].hp > 0 && poke[1].hp <= 0) winner = 0;
+  else if (poke[1].hp > 0 && poke[0].hp <= 0) winner = 1;
+  else winner = null;  // both KO'd simultaneously (500/500 tie)
   const turns = battle.getTurns();
 
   // Derive a Python-compatible chargedLog by classifying each "uses X"

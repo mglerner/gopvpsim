@@ -207,19 +207,23 @@ shield-state / multi-mon model where next-mon HP carry-over isn't the
 only scoring dimension; (c) a probabilistic/random DP mode would
 prefer PvPoke's lower-variance multi-throw plan.
 
-### Tie-break semantics on simultaneous-KO (score=500/500)
+### Tie-break semantics on simultaneous-KO (score=500/500) — resolved 2026-04-15
 
-Two harness cases show up as "winner flips" purely because of
-tie-break semantics, not behavior:
-- GL `wigglytuff vs azumarill [2,2]`: both sims score 500/500
-- UL `corviknight vs moltres_galarian [2,2]`: both sims score 500/500
+Previously two harness cases showed up as "winner flips" on 500/500
+double-KO ties:
+- GL `wigglytuff vs azumarill [2,2]`
+- UL `corviknight vs moltres_galarian [2,2]`
 
-In these draws both Pokemon reach 0 HP in the same turn. Our
-`BattleResult.winner` returns `None` (draw); PvPoke's tie-break
-picks `p1` (index 0). Score margin is exactly 0 in both. Not a
-behavioral divergence — consider adopting PvPoke's tie-break
-("p1 wins ties") if downstream harness tooling trips over the
-`None` case. Low priority; purely cosmetic.
+Root cause was in the harness scripts, not the sim: `pvpoke_trace.js`
+collapsed PvPoke's native tie output (`winner.pokemon = false`) to
+`winner=1` as a shortcut, while our sim correctly returned `None`.
+`harness_grid.py` then mapped `None → -1` for JSON output, producing
+a spurious flip.
+
+Fix: `pvpoke_trace.js` now emits `winner: null` on genuine ties
+(matching PvPoke's native semantics); `harness_grid.py` preserves
+`None` end-to-end. Sim behavior unchanged. GL flips 1 → 0, UL flips
+2 → 1 (the remaining UL flip is the real Lapras [1,2] divergence).
 
 ### Closed 2026-04-15: needsBoost — not implementing (PvPoke system is dead code)
 
