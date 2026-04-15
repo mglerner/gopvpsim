@@ -545,42 +545,17 @@ break invariants that weren't yet nailed down by tests.
   changes direction, you click on another column to sort by that
   column and the arrow from the first column goes away, etc).
 
-* **Threshold Tiers intro: document multi-axis anchor filtering** — The
-  intro copy added 2026-04-15 (`deep_dive_rendering.py:1014-1025`)
-  explains the single-axis case where one tier is a strict subset of
-  another (e.g. Tinkaton GH Great ⊂ GH Good, def-only difference) and
-  correctly states that a stricter tier lists anchors a looser tier
-  doesn't. But the anchor-filter rule is axis-specific: an anchor with
-  `target_stat='atk'` is only listed on tier cards whose `attack`
-  cutoff clears its threshold; same for def. Consequences not yet
-  documented:
-    1. If a tier has no cutoff on the anchor's target axis (e.g. tier
-       A has atk+hp cutoffs but no def cutoff, and the anchor is a def
-       bulkpoint), the anchor is silently excluded from that tier's
-       card even if the tier's IVs all clear the anchor in practice.
-       The exclusion is rendering-layer, not semantics.
-    2. When two tiers have crossed cutoffs (e.g. tier A atk≥110 no
-       def, tier B atk≥105 def≥140) neither is a strict subset of the
-       other. An atk anchor at threshold 107 appears on A's card but
-       not B's; a def anchor at threshold 142 appears on B's but not
-       A's. Current intro copy hints at the subset direction but
-       doesn't cover this.
-    3. Slayer case mercuryish flagged 2026-04-16: a slayer atk anchor
-       might be cleared by an IV that sacrifices def for atk. That IV
-       can sit in a loose tier (atk+hp only) but fail a stricter
-       tier's def cutoff. Both tiers list the atk anchor on their
-       cards (the atk_cut filter fires for both), but the *IV count
-       annotation* on the stricter tier is smaller because the
-       def-sacrificing spreads are excluded from its IV membership.
-       The card-level listing hides this; only the IV-count sub-line
-       exposes it.
-  Scope: extend the Threshold Tiers intro paragraph to cover axes (2)
-  and (3), and consider surfacing IV-count annotations on tier cards
-  more prominently so case (3) is visible at a glance. Case (1) is
-  arguably a rendering bug rather than a doc gap — worth deciding
-  whether the tier card SHOULD list same-IV-cleared anchors when the
-  tier's cutoff is on a different axis (tricky: multi-axis anchor
-  gating). Discovered 2026-04-16 during mercuryish feedback response.
+* ~~**Threshold Tiers intro: document multi-axis anchor filtering**~~ —
+  **Done 2026-04-16** (Lechonk CD prep Session 1). Intro rewritten as
+  short lead + nested `<ul>` covering subset, crossed-cutoff, and
+  slayer-axis IV-count cases. Rendering gained (a) an "Anchors we get
+  for free" collapsed `<details>` per tier, surfacing anchors on axes
+  the tier doesn't cut off but every IV still clears, and (b) a
+  parent-tier diff callout in the header (e.g. `(−73 vs Balanced,
+  def-sacrificing / hp-low spreads excluded)`) when a tier's IVs are
+  a strict subset of a looser tier's. Verified against Annihilape m0
+  (`High Bulk` tier: 5 primary def-bulk bullets, 1 free atk-mirror
+  anchor, −73 vs Balanced callout).
 
 ## Performance
 
