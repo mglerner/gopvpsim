@@ -540,34 +540,33 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     if turns_planned > ttl:
         return False
 
-    # Can KO opponent with a non-self-debuffing charged move (shields == 0 only),
-    # but only if the fast move alone wouldn't also kill (PvPoke ActionLogic.js
-    # lines 298-309: sets .damage on move objects as a side effect used by
-    # bandaid[866] later).
+    # Can KO opponent with a non-self-debuffing charged move (shields == 0 only)
+    # — PvPoke ActionLogic.js lines 298-309: if any charged move would KO now,
+    # don't optimize (fire the charged move, don't delay for timing).
     #
-    # Two intentional deviations from PvPoke kept here (audited 2026-04-15
-    # against the user-direction "don't change solely to match PvPoke when
-    # PvPoke isn't demonstrably right"):
-    #   (a) `defender.hp > _fast_dmg` — when the fast move would ALSO KO,
-    #       prefer the fast throw. PvPoke fires the charged anyway; we save
-    #       energy and animation. Score is identical either way (KO either
-    #       path), but our choice is no worse and arguably better for any
-    #       multi-mon analysis that cares about post-KO energy state.
-    #   (b) `not cm.get('selfDebuffing', False)` — don't self-debuff to KO
-    #       when fast can also KO. PvPoke happily throws HJK / Superpower /
-    #       etc. for the kill. Same logic: same KO outcome, ours leaves the
-    #       attacker un-debuffed for whatever comes next.
-    # Net effect: one log-only divergence (azu_v_forr_sand_rock (2,0); see
-    # the xfail in tests/test_battle.py for the full writeup). Score and
-    # winner identical to PvPoke; only the chargedLog tail differs.
+    # PvPoke itself does not gate this on "fast could also KO" — the fast
+    # move's next-fire turn is governed by cooldown, not available right now,
+    # so the "fast would also KO" shortcut is not equivalent in time to the
+    # charged KO. Dropping that gate 2026-04-15 after harness localization
+    # showed Forr vs Azu (1,0) loses -15 because our Forr at T37 delays fast
+    # (next VS lands at T40) instead of firing ST for the immediate KO.
+    # The earlier "score identical either way" claim held only when fast
+    # could fire immediately; with mid-cooldown timing, delay costs real
+    # turns of incoming opponent damage.
+    #
+    # One intentional deviation kept: `not cm.get('selfDebuffing', False)`.
+    # Don't self-debuff to KO when we could have fast-KO'd instead -- PvPoke
+    # happily throws HJK / Superpower etc. for the kill; we leave the
+    # attacker un-debuffed for whatever comes next. This gate only matters
+    # when a future multi-mon layer reads post-KO state, which PvPoke doesn't
+    # track. Single-mon score is identical either way under this gate because
+    # the self-debuff fires AFTER the KO check.
     if defender.shields == 0:
-        _fast_dmg = attacker.fast_move_damage(defender)
         for cm in attacker.charged_moves:
             if attacker.energy >= cm['energy']:
                 cm['_cached_damage'] = attacker.charged_move_damage(cm, defender)
                 if (cm['_cached_damage'] >= defender.hp
-                        and not cm.get('selfDebuffing', False)
-                        and defender.hp > _fast_dmg):
+                        and not cm.get('selfDebuffing', False)):
                     return False
 
     # Opponent's next charged move can KO within our fast-move window

@@ -73,7 +73,7 @@ TESTS = [
             (1, 0, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam']),
             (1, 1, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
             (1, 2, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
-            (2, 0, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb (shielded)', 'Forretress: Sand Tomb']),
+            (2, 0, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb (shielded)', 'Forretress: Sand Tomb', 'Azumarill: Ice Beam']),
             (2, 1, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
             (2, 2, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
         ],
