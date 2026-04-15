@@ -1019,8 +1019,11 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         '(Def or Atk) ascending — read top-to-bottom in the order a '
         'player would clear them as their stat grows. Tiers may share '
         'bullets — a stricter tier above also clears everything a looser '
-        'tier below clears, and the overlap is intentional. The flat '
-        'list of every anchor (regardless of tier) lives in '
+        'tier below clears, and the overlap is intentional. Conversely, '
+        'a stricter tier may list anchors the looser tier below doesn\'t: '
+        'when an anchor\'s threshold sits above the looser tier\'s cutoff, '
+        'only the stricter tier\'s stats are high enough to clear it. The '
+        'flat list of every anchor (regardless of tier) lives in '
         '<em>Anchor-Driven Matchup Flips</em> below.</p>\n'
     )
     parts.append('<div class="dd-rec-grid">\n')
@@ -1091,6 +1094,18 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             f'style="font-weight:400;color:#ff40ff;display:none"></span>'
             f'</h4>\n'
         )
+        # --- Goal line from the TOML `description` field ---
+        # Rendered first, styled as the authored goal statement (mirrors
+        # the Flavor Guide's tone). Distinct from the auto-generated
+        # "Clears N anchors ..." summary below, which is a mechanical
+        # count.
+        toml_desc = (t.get('toml_description') or '').strip()
+        if toml_desc:
+            parts.append(
+                f'<p class="dd-prose" style="color:#d29922;font-style:italic;'
+                f'margin-bottom:4px">Goal: {toml_desc}</p>\n'
+            )
+
         # --- Auto-generated prose summary for the card ---
         if tier_records:
             # Collect unique opponents whose anchors this tier clears
