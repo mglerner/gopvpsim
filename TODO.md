@@ -95,6 +95,24 @@ break invariants that weren't yet nailed down by tests.
   it because the divergence was upstream of the DP. Full writeup in
   DEVELOPER_NOTES.md "Resolved divergences" 2026-04-15 OMT entry.
 
+* **Near-KO DP non-debuf swap (Lapras [1,2] flip)** — Discovered
+  2026-04-15. Our near-KO DP picks self-debuffing nukes (Brave Bird)
+  even when a comparable-DPE non-debuffing alt (Fly) exists. In 6 of
+  7 UL MG cluster cases this is a net win (faster KO, +23-30pp HP
+  retained). In 1 case (Lapras [1,2]) the atk debuff post-BB loses a
+  close fight PvPoke wins by throwing Fly three times instead. Real
+  design gap: commit `b457c0a` ported PvPoke's many-cycle non-debuf
+  swap into the **farm-down** branch (`hp > 1.1 * best_cycle_dmg`),
+  but the **near-KO** branch has no symmetric preference. Candidate
+  fix: when near-KO DP returns a plan whose first throw is
+  `selfDebuffing`, and a comparable-DPE non-debuf alt reaches KO in
+  comparable time with the opponent's charged threat still live,
+  swap the first throw. Needs careful probing against the full MG
+  cluster (Jellicent x3, Corv x3) to make sure we don't regress the
+  6 clear-win cases. See DEVELOPER_NOTES.md "Known divergences:
+  Near-KO DP plan choice" for the outcome magnitude table. Pinned
+  with xfails under `_MG_NEARKO_PLAN` / `_MG_NEARKO_PLAN_FLIP`.
+
 ## Policies to add
 
 * **PvPoke "Selective" baiting** — PvPoke's UI offers a bait toggle; "Selective"
