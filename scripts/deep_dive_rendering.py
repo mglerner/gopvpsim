@@ -1017,21 +1017,64 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         'clears and the IV spreads that meet it. Within each tier card, '
         'bullets are grouped by opponent and sorted by the required stat '
         '(Def or Atk) ascending — read top-to-bottom in the order a '
-        'player would clear them as their stat grows. Tiers may share '
-        'bullets — a stricter tier above also clears everything a looser '
-        'tier below clears, and the overlap is intentional. Conversely, '
-        'a stricter tier may list anchors the looser tier below doesn\'t: '
-        'when an anchor\'s threshold sits above the looser tier\'s cutoff, '
-        'only the stricter tier\'s stats are high enough to clear it. The '
-        'flat list of every anchor (regardless of tier) lives in '
-        '<em>Anchor-Driven Matchup Flips</em> below.</p>\n'
+        'player would clear them as their stat grows. The flat list of '
+        'every anchor (regardless of tier) lives in <em>Anchor-Driven '
+        'Matchup Flips</em> below. A tier\'s anchors come from two '
+        'passes over the anchor list:</p>\n'
+        '<ul class="dd-small" style="margin-top:2px">\n'
+        '<li><b>Primary bullets</b> — the tier has a cutoff on the '
+        "anchor's target axis (atk or def) that meets or exceeds the "
+        'anchor\'s threshold. Consequences:\n'
+        '<ul>\n'
+        '<li><i>Subset case:</i> if tier A is strictly stricter than '
+        'tier B on the anchor axis, A\'s bullet list is a superset of '
+        'B\'s. Overlap is intentional.</li>\n'
+        '<li><i>Crossed-cutoff case:</i> tier A has only an atk cutoff, '
+        'tier B has only a def cutoff — neither is a subset of the '
+        'other. Atk anchors appear only on A; def anchors only on B.</li>\n'
+        '<li><i>Slayer-axis IV-count case:</i> two tiers can list the '
+        'same atk anchor but have different member-IV counts because a '
+        'stricter tier\'s def cutoff excludes def-sacrificing spreads '
+        'that the looser tier keeps. Check the (−N vs parent) callout '
+        'on the tier header to spot this at a glance.</li>\n'
+        '</ul></li>\n'
+        '<li><b>Anchors we get for free</b> (collapsed) — the tier has '
+        'no cutoff on the anchor\'s target axis, but every IV in the '
+        'tier clears the anchor\'s threshold anyway. These would be '
+        'silently dropped by the primary filter; we surface them in a '
+        'separate collapsed block so the card isn\'t misleading.</li>\n'
+        '</ul>\n'
     )
     parts.append('<div class="dd-rec-grid">\n')
 
+    # --- First pass: compute tier_ivs for every tier so we can detect
+    # parent/superset relationships in the main pass.
+    tier_ivs_by_idx: list = []
+    tier_cutoffs_by_idx: list = []
+    for ti_pre, t_pre in enumerate(tiers):
+        atk_cut_p = t_pre.get('attack', 0) or 0
+        def_cut_p = t_pre.get('defense', 0) or 0
+        hp_cut_p = t_pre.get('stamina', 0) or 0
+        tier_cutoffs_by_idx.append((atk_cut_p, def_cut_p, hp_cut_p))
+        if iv_tiers_precomputed is not None:
+            tier_ivs_p = [iv for iv in range(n_ivs)
+                          if iv_tiers_precomputed[iv] == ti_pre]
+        else:
+            tier_ivs_p = []
+            for iv in range(n_ivs):
+                meets = True
+                if atk_cut_p > 0 and data_obj['ivAtk'][iv] < atk_cut_p:
+                    meets = False
+                if def_cut_p > 0 and data_obj['ivDef'][iv] < def_cut_p:
+                    meets = False
+                if hp_cut_p > 0 and data_obj['ivHp'][iv] < hp_cut_p:
+                    meets = False
+                if meets:
+                    tier_ivs_p.append(iv)
+        tier_ivs_by_idx.append(set(tier_ivs_p))
+
     for ti, t in enumerate(tiers):
-        atk_cut = t.get('attack', 0) or 0
-        def_cut = t.get('defense', 0) or 0
-        hp_cut = t.get('stamina', 0) or 0
+        atk_cut, def_cut, hp_cut = tier_cutoffs_by_idx[ti]
         cutoff_bits = []
         if atk_cut > 0:
             cutoff_bits.append(f'atk≥{atk_cut:.2f}')
@@ -1041,7 +1084,12 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             cutoff_bits.append(f'hp≥{hp_cut:g}')
         cutoffs_str = ', '.join(cutoff_bits) if cutoff_bits else 'no cutoff'
 
-        # Filter: which anchor records does this tier clear?
+        tier_ivs = sorted(tier_ivs_by_idx[ti])
+        n_members = len(tier_ivs)
+        tier_iv_set = tier_ivs_by_idx[ti]
+
+        # --- Filter 1: primary records — tier has a cutoff on the
+        # anchor's axis that meets/exceeds the threshold.
         tier_records = []
         for rec in anchor_flip_records:
             a = rec['anchor']
@@ -1054,24 +1102,81 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             elif stat == 'def' and def_cut > 0 and def_cut >= tv:
                 tier_records.append(rec)
 
-        # Tier membership: use precomputed ivTiers when available (TOML path),
-        # else compute on the fly from stat cutoffs (auto-derive path).
-        if iv_tiers_precomputed is not None:
-            tier_ivs = [iv for iv in range(n_ivs)
-                        if iv_tiers_precomputed[iv] == ti]
-        else:
-            tier_ivs = []
-            for iv in range(n_ivs):
-                meets = True
-                if atk_cut > 0 and data_obj['ivAtk'][iv] < atk_cut:
-                    meets = False
-                if def_cut > 0 and data_obj['ivDef'][iv] < def_cut:
-                    meets = False
-                if hp_cut > 0 and data_obj['ivHp'][iv] < hp_cut:
-                    meets = False
-                if meets:
-                    tier_ivs.append(iv)
-        n_members = len(tier_ivs)
+        # --- Filter 2: "anchors we get for free" — tier has no cutoff on
+        # the anchor's axis, but every IV in tier_ivs still clears the
+        # threshold. Empty tiers skip this (vacuous-truth avoidance).
+        free_records = []
+        if tier_ivs:
+            # Build a set of primary (parent, opponent, target_stat, move_id)
+            # keys so we don't duplicate a bullet that's already primary.
+            primary_keys = {
+                (r['anchor'].parent, r['opponent'],
+                 r['anchor'].target_stat, r['anchor'].move_id)
+                for r in tier_records
+            }
+            for rec in anchor_flip_records:
+                a = rec['anchor']
+                tv = getattr(a, 'threshold_value', None)
+                if tv is None:
+                    continue
+                stat = a.target_stat
+                # Only consider axes where the tier has NO cutoff.
+                if stat == 'atk' and atk_cut > 0:
+                    continue
+                if stat == 'def' and def_cut > 0:
+                    continue
+                key = (a.parent, rec['opponent'], stat, a.move_id)
+                if key in primary_keys:
+                    continue
+                # Check every IV in tier clears this threshold.
+                stat_arr = (data_obj['ivAtk'] if stat == 'atk'
+                            else data_obj['ivDef'] if stat == 'def'
+                            else None)
+                if stat_arr is None:
+                    continue
+                if all(stat_arr[iv] >= tv for iv in tier_ivs):
+                    free_records.append(rec)
+
+        # --- Parent-tier diff: find the smallest strict superset tier and
+        # compute the IV-count delta. Used for a "−N IVs vs ParentName"
+        # header callout that exposes the slayer-axis case.
+        parent_idx = None
+        parent_size = None
+        for tj in range(len(tiers)):
+            if tj == ti:
+                continue
+            other = tier_ivs_by_idx[tj]
+            if len(other) <= n_members:
+                continue
+            if tier_iv_set.issubset(other):
+                if parent_size is None or len(other) < parent_size:
+                    parent_size = len(other)
+                    parent_idx = tj
+        parent_diff_html = ''
+        if parent_idx is not None and parent_size is not None:
+            delta = parent_size - n_members
+            parent_name = tiers[parent_idx].get('name', f'tier {parent_idx}')
+            # Identify which axes this tier tightens vs the parent.
+            p_atk, p_def, p_hp = tier_cutoffs_by_idx[parent_idx]
+            tighter_axes = []
+            if atk_cut > 0 and (p_atk == 0 or atk_cut > p_atk):
+                tighter_axes.append('atk-sacrificing')
+            if def_cut > 0 and (p_def == 0 or def_cut > p_def):
+                tighter_axes.append('def-sacrificing')
+            if hp_cut > 0 and (p_hp == 0 or hp_cut > p_hp):
+                tighter_axes.append('hp-low')
+            axis_note = ''
+            if tighter_axes:
+                axis_note = f' ({" / ".join(tighter_axes)} spreads excluded)'
+            parent_diff_html = (
+                f' <span class="dd-small" '
+                f'style="font-weight:400;color:#d29922" '
+                f'title="This tier is a strict subset of the '
+                f'&quot;{parent_name}&quot; tier on IV membership. '
+                f'The primary-bullet list may look similar, but '
+                f'member IVs differ.">'
+                f'(−{delta} vs {parent_name}{axis_note})</span>'
+            )
 
         color = t.get('color', '#888')
         # Slug for the "N of yours qualify" placeholder. Must match the
@@ -1088,7 +1193,8 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             f'· {cutoffs_str}</span> '
             f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
             f'({n_members} IV{"s" if n_members != 1 else ""})'
-            f'</span> '
+            f'</span>'
+            f'{parent_diff_html} '
             f'<span id="tier-card-yours-{_tier_slug}" '
             f'class="dd-small" '
             f'style="font-weight:400;color:#ff40ff;display:none"></span>'
@@ -1177,6 +1283,51 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 '<p class="dd-small">No named anchors fall within '
                 "this tier's spec.</p>\n"
             )
+
+        # --- "Anchors we get for free" — anchors on axes this tier
+        # doesn't cutoff, but every IV in tier clears anyway. Collapsed.
+        if free_records:
+            free_bullets = render_anchor_flip_bullets(
+                free_records, has_bait_axis=has_bait_axis)
+            if free_bullets:
+                free_top_n = 3
+                free_uid = f'dd-tier-free-{ti}'
+                parts.append(
+                    f'<details class="dd-flip-detail" '
+                    f'style="margin-top:6px">'
+                    f'<summary><b style="color:#58a6ff">'
+                    f'Anchors we get for free</b> '
+                    f'<span class="dd-small" style="color:#8b949e">'
+                    f'({len(free_bullets)} cleared by every IV in this tier '
+                    f'despite no cutoff on the relevant axis)'
+                    f'</span></summary>\n'
+                )
+                n_vis_free = min(len(free_bullets), free_top_n)
+                parts.append('<ul class="dd-threshold-list">\n')
+                parts.append('\n'.join(free_bullets[:n_vis_free]))
+                if len(free_bullets) > free_top_n:
+                    for b in free_bullets[free_top_n:]:
+                        parts.append(
+                            f'\n<li class="dd-iv-hidden" '
+                            f'data-tier-card="{free_uid}">{b[4:]}'
+                        )
+                    parts.append('\n</ul>\n')
+                    n_hidden_free = len(free_bullets) - free_top_n
+                    parts.append(
+                        f'<button class="dd-slayer-toggle" '
+                        f'onclick="(function(btn){{'
+                        f'var items=document.querySelectorAll('
+                        f'\'[data-tier-card=\\&quot;{free_uid}\\&quot;]\');'
+                        f'var shown=items.length>0&&items[0].classList.contains(\'dd-iv-shown\');'
+                        f'items.forEach(function(r){{r.classList.toggle(\'dd-iv-shown\',!shown);}});'
+                        f'btn.textContent=shown'
+                        f'?\'Show all {len(free_bullets)} free anchors\''
+                        f':\'Collapse to top {n_vis_free}\';'
+                        f'}})(this)">Show all {len(free_bullets)} free anchors</button>\n'
+                    )
+                else:
+                    parts.append('\n</ul>\n')
+                parts.append('</details>\n')
 
         # --- Matchup-flipping boundaries covered by this tier ---
         if matchup_boundaries:
