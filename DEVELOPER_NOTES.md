@@ -179,26 +179,47 @@ divergence defensible — if the gap were a few HP, PvPoke's plan
 would be at-or-better than ours and we'd match. At 25-30pp the
 post-KO carry-over difference is material for next-mon analysis.
 
-**Decision**: keep our DP behavior. Per CLAUDE.md "When our sim
-diverges from PvPoke" policy, PvPoke is **not demonstrably better**
-here — same winner, our outcome preserves more attacker HP for the
-breakpoint/post-KO use case (next-mon energy carry-over, swap-state
-HP). PvPoke's preference for the slower multi-Fly plan appears to be
-arbitrary in the 1v1 score sense (it doesn't change the winner) and
-worse in the post-KO-state sense.
+**Caveat — Lapras [1,2] winner flip**: 1 of 7 cluster cases is a real
+edge case where our plan is worse. Same root cause (MG picks BB, PvPoke
+picks Fly-Fly-Fly), but Lapras is bulky enough (234 HP) that our BB's
+atk debuff bites AND PvPoke's 3 Fly throws add up:
+- Ours: Lapras barely wins 502/497 (MG 0 HP, Lapras 1 HP, 1-HP margin)
+- PvPoke: MG wins 608/391 (MG ~34 HP, Lapras 0)
+
+Here PvPoke's slower plan **is demonstrably better** — it correctly
+predicts MG wins a close fight that our BB-nuke loses by 1 HP. Pinned
+as its own xfail in `tests/test_battle.py` under `_MG_NEARKO_PLAN_FLIP`.
+
+**Decision**: keep our DP behavior, net. Rationale is 6:1 weight of
+clear-win cases (ours retains 23-30pp more HP) against 1 close-fight
+flip. Per CLAUDE.md "When our sim diverges from PvPoke" policy: PvPoke
+is better for close/bulky matchups, ours is better for clear-win HP
+retention. Neither plan is universally right.
 
 **Impact** (UL harness top-8): 7 cases show |Δ|>20 (jellicent×3 at
-d1=-146, corviknight×3 at d1=-118, lapras×1 at d1=+111 with a winner
-flip — all flat across MG-shield count, confirming the divergence is
-in DP plan selection, not shield policy). Pre-existed before the
-defender-bestCM shield gate port; unmasked when other cluster cleared.
+d1=-146, corviknight×3 at d1=-118, lapras×1 at d1=+111 with winner
+flip). All MG-involving, all defender=MG or bulky-water-attacker.
+GL unaffected (no top-8 GL species has this matchup shape).
 
-**Revisit** if: (a) we add a shield-state model where post-KO HP
-isn't the only quantity that matters; (b) we discover a case where
-PvPoke's slower plan does change the winner against a different
-opponent; or (c) a probabilistic/random DP mode would prefer
-PvPoke's lower-variance multi-throw plan over our higher-variance
-nuke. Until then, the divergence is in our favor.
+**Revisit** if: (a) wider harness sampling adds more bulky opponents
+that produce close-fight flips (shifts the 6:1 ratio); (b) we add a
+shield-state / multi-mon model where next-mon HP carry-over isn't the
+only scoring dimension; (c) a probabilistic/random DP mode would
+prefer PvPoke's lower-variance multi-throw plan.
+
+### Tie-break semantics on simultaneous-KO (score=500/500)
+
+Two harness cases show up as "winner flips" purely because of
+tie-break semantics, not behavior:
+- GL `wigglytuff vs azumarill [2,2]`: both sims score 500/500
+- UL `corviknight vs moltres_galarian [2,2]`: both sims score 500/500
+
+In these draws both Pokemon reach 0 HP in the same turn. Our
+`BattleResult.winner` returns `None` (draw); PvPoke's tie-break
+picks `p1` (index 0). Score margin is exactly 0 in both. Not a
+behavioral divergence — consider adopting PvPoke's tie-break
+("p1 wins ties") if downstream harness tooling trips over the
+`None` case. Low priority; purely cosmetic.
 
 ### Closed 2026-04-15: needsBoost — not implementing (PvPoke system is dead code)
 
