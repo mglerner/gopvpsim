@@ -136,6 +136,28 @@ combos. Mimi's actual SS timing was correct all along; the
 (also fixed 2026-04-15), not from SS timing. See the 2026-04-15
 "Localization meta-finding" entry below for the broader lesson.
 
+## Open divergences
+
+### UL Moltres-Galarian score-margin cluster (2026-04-15)
+
+After the many-cycle non-debuff swap fix resolved the Lapras vs MG [0,1]
+winner flip, 17 UL harness-grid cases still show |Δ|>20 but NO winner
+flip. All involve MG; the chargedLog order matches PvPoke (e.g., MG vs
+Florges [2,0]: both sims fire CW-shielded → Fly → DV-shielded → BrB in
+the same order). The remaining divergence is timing/fast-move-damage
+granularity, not plan selection. Max remaining |Δ|=230 (MG vs Florges
+[2,0]: ours 776/223 vs pv 546/453). Winner agreement is 250/252; the
+two remaining flips are both score-close (|Δ|~140-170) in shield-
+asymmetric scenarios.
+
+Follow-up: trace one of the score-margin cases turn-by-turn (fast-move
+counts, cooldown interleaving) to localize the per-turn damage drift.
+Likely candidates: fast-move cooldown rounding around charged throws,
+OMT firing-turn alignment in MG's 1000ms-vs-500ms matchups, or a
+second-order effect of the new 1.1-threshold swap interacting with
+post-DP bandaids. GL is clean (405/405 max |Δ|=0) so the class of
+issue is UL-specific (larger HP pools amplify timing drift).
+
 ## Known divergences from PvPoke implementation
 
 Places where our code intentionally does NOT match PvPoke's
@@ -203,6 +225,27 @@ Revisit only if PvPoke removes line 539 or fixes the
   assertions were added. Future feature audits should include a
   pass over the timeline/log emission paths, not just the
   decision-making code.
+* **2026-04-15 — Many-cycle non-debuff swap (Moltres-G cluster winner flip).**
+  Ported PvPoke's ActionLogic.js lines 371-393: when bestChargedMove is
+  selfDebuffing AND a cheaper non-debuffing alt exists with DPE ratio
+  < 2x, drop the farm-down threshold from 2.0x to 1.1x cycles AND swap
+  the first-throw to the non-debuffing alt. Without this, our near-KO DP
+  picked the debuffing nuke (BrB) and bandaid [918] stacked, letting
+  Lapras KO first. Concrete case: Lapras vs Moltres-G [0,1] at MG energy
+  49 (Fly affordable, BrB not). PvPoke's MG throws Fly (61 free damage,
+  no atk debuff, Lapras has 0 shields); our MG waited for BrB and died.
+  Fix: compute min_cycle_thr=1.1 when the debuffing-best-with-cheaper-
+  non-debuf-alt condition holds, and swap selected_idx to the non-debuf
+  alt in the farm-down path. UL harness-grid max |Δ| 352→230, winner
+  flips 4→2 (the Lapras[0,1] flip and one other resolved). Remaining
+  MG-cluster deltas are score-margin only (same chargedLog order),
+  investigated separately — see "Open divergences" below. GL grid
+  unchanged (max |Δ|=0 across 405 pairs). Tests 156p/6xf, oracle 27/27.
+  Localization landmark: instrumenting PvPoke ActionLogic.js with
+  `console.error` at the many-cycle entry revealed that PvPoke's
+  bestChargedMove computation uses raw `damage/energy` (post-STAB,
+  post-effectiveness), not `power/energy` — an easy misread when
+  eyeballing DPE.
 * **2026-04-15 — OMT fast-also-KOs gate dropped.** The OMT KO-override
   had a `defender.hp > _fast_dmg` gate: if the fast move would ALSO KO,
   prefer fast over charged (rationale: "score identical, saves energy /
