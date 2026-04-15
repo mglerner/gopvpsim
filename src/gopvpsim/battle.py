@@ -544,6 +544,22 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     # but only if the fast move alone wouldn't also kill (PvPoke ActionLogic.js
     # lines 298-309: sets .damage on move objects as a side effect used by
     # bandaid[866] later).
+    #
+    # Two intentional deviations from PvPoke kept here (audited 2026-04-15
+    # against the user-direction "don't change solely to match PvPoke when
+    # PvPoke isn't demonstrably right"):
+    #   (a) `defender.hp > _fast_dmg` — when the fast move would ALSO KO,
+    #       prefer the fast throw. PvPoke fires the charged anyway; we save
+    #       energy and animation. Score is identical either way (KO either
+    #       path), but our choice is no worse and arguably better for any
+    #       multi-mon analysis that cares about post-KO energy state.
+    #   (b) `not cm.get('selfDebuffing', False)` — don't self-debuff to KO
+    #       when fast can also KO. PvPoke happily throws HJK / Superpower /
+    #       etc. for the kill. Same logic: same KO outcome, ours leaves the
+    #       attacker un-debuffed for whatever comes next.
+    # Net effect: one log-only divergence (azu_v_forr_sand_rock (2,0); see
+    # the xfail in tests/test_battle.py for the full writeup). Score and
+    # winner identical to PvPoke; only the chargedLog tail differs.
     if defender.shields == 0:
         _fast_dmg = attacker.fast_move_damage(defender)
         for cm in attacker.charged_moves:
