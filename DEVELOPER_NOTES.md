@@ -149,17 +149,44 @@ PvPoke bug.
 
 ### Near-KO DP plan choice: nuke-with-self-debuff vs serial-Fly (intentional)
 
-**PvPoke**: in the UL `jellicent`/`corviknight` vs `moltres_galarian`
-`[att-shields=0]` cluster, PvPoke's near-KO DP returns the multi-throw
-non-debuffing plan (e.g. `[Fly, Fly]` or `[Fly, Fly, Fly]`) over the
-single-throw self-debuffing nuke `[Brave Bird]`, even though both plans
-KO the same opponent and the BB plan KOs ~9-12 turns earlier with more
-attacker HP retained.
+**Mechanism (localized 2026-04-15 followup session):** The divergence
+is NOT a difference in the near-KO DP's plan output — both sims' DPs
+return `[BRAVE_BIRD]` as `finalState`. The divergence is in a
+**post-DP bandaid**: PvPoke's ActionLogic.js line 885-887 (our port:
+battle.py:1541-1558, bandaid[866]) swaps `finalState.moves[0]` from
+the self-debuffing nuke to `activeChargedMoves[0]` (Fly) whenever:
 
-**Our code**: near-KO DP returns the BB plan, which KOs faster and
-preserves more HP. The bandaid[918] "stack-self-debuff: waiting" path
-times the BB throw to land after opponent has fired their charge so
-the atk-stage debuff is paid against a known-unloaded opponent.
+    opp.shields == 0
+    AND finalState.moves[0].selfDebuffing
+    AND finalState.moves[0].energy > 50
+    AND poke.hp / poke.stats.hp > 0.5
+    AND finalState.moves[0].damage / opp.hp < 0.8
+
+PvPoke's `move.damage` field is set as a side effect of OMT line 320
+(`activeChargedMoves[n].damage = DamageCalculator.damage(...)`),
+which runs unconditionally per-move whenever `opponent.shields == 0`.
+Our port caches damage at battle.py:652 but subgates the assignment
+on `attacker.energy >= cm['energy']` — so in the Moltres-G cluster
+(energy < BB's 55 at the T20 DP-entry state) our `_cached_damage`
+stays `None`, bandaid[866] skips its `_cached_dmg / opp.hp < 0.8`
+test, the DP plan is left alone, and bandaid[918] stacks BB until
+energy reaches 100 → single-BB nuke instead of Fly-chain.
+
+**Why we don't fix it:** faithfully mirroring PvPoke's OMT side
+effect (so bandaid[866] fires when PvPoke's bandaid[885] would) swaps
+BB → Fly in **all** MG cluster cases, not just Lapras. The bandaid's
+`damage/opp.hp < 0.8` test doesn't discriminate:
+
+- Lapras [1,2]:   BB 99 / hp 142 = 0.70 → fires (PvPoke's Fly plan wins; ours loses by 1 HP)
+- Jellicent [0,0]: BB 99 / hp ~160 = 0.62 → fires (PvPoke's Fly plan worse by ~47 HP)
+- Corviknight cluster: similar 0.6-0.7 ratios → fires (PvPoke's Fly plan worse by ~38 HP)
+
+So the fix is all-or-nothing against a 6:1 weighting; matching PvPoke
+inverts the ratio rather than improving it. Per CLAUDE.md "When our
+sim diverges from PvPoke": PvPoke isn't demonstrably better overall,
+and our deviation has a defensible reason (better HP retention in 6
+of 7 cases). Keep the `_cached_damage` subgate as the intentional
+deviation that implements this choice.
 
 **Outcome comparison** — full magnitude across the cluster (UL top-8
 harness, MG max HP=161, all cases MG wins in both sims):
@@ -205,7 +232,17 @@ GL unaffected (no top-8 GL species has this matchup shape).
 that produce close-fight flips (shifts the 6:1 ratio); (b) we add a
 shield-state / multi-mon model where next-mon HP carry-over isn't the
 only scoring dimension; (c) a probabilistic/random DP mode would
-prefer PvPoke's lower-variance multi-throw plan.
+prefer PvPoke's lower-variance multi-throw plan; (d) we find a
+discriminator that separates Lapras-style bulky-comeback matchups
+from Jellicent/Corv-style clear-wins (bandaid[885]'s existing
+`damage/opp.hp < 0.8` test doesn't — all 6 cluster cases land in the
+0.6-0.7 band alongside Lapras at 0.70).
+
+**Closed lead (2026-04-15 followup):** "Port a non-debuf swap into
+the near-KO DP branch" was the original session hypothesis. The
+localization found the mechanism is PvPoke's post-DP bandaid[885],
+not a near-KO plan-selection difference — so porting a near-KO swap
+would diverge from PvPoke, not match it. Issue retired.
 
 ### Tie-break semantics on simultaneous-KO (score=500/500) — resolved 2026-04-15
 
