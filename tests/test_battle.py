@@ -514,25 +514,21 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expect
     #   Azu 1s:        657      429      226
     #   Azu 2s:        612      496      242
     #
-    # Azu 1s row: PvPoke confirmed 2026-04-14 that Azu does NOT shield Sand
-    # Tomb (wouldShield routes through heuristic for guaranteed opponent-def-
-    # debuff moves).  Score divergence remains in 1v0 (557 vs 657) due to
-    # buff-adjusted DPE differences (Divergence 2).
-    # Azu 2s row: 3 exact matches.
-    # Azu 0s row: Forretress now correctly leads with Sand Tomb (matching
-    # PvPoke) after selfBuffing flag broadening.  Remaining score divergence
-    # is from buff-adjusted DPE (Divergence 2) and DP bandaid interactions.
+    # After the atk_stage DP fix (2026-04-15), our scores match PvPoke
+    # exactly in all 9 shield scenarios: the near-KO DP now accumulates
+    # chance-1 opp-def-debuffs (Sand Tomb) as attacker atk-stage and
+    # recognises stacked-ST plans that KO faster than bestChargedMove.
     #
     # Our scores:        Forr 0s  Forr 1s  Forr 2s
-    #   Azu 0 shields:    528      429      226
-    #   Azu 1 shields:    557      496      242
+    #   Azu 0 shields:    492      312      222
+    #   Azu 1 shields:    657      429      226
     #   Azu 2 shields:    612      496      242
-    (0, 0, 0, 528, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb', 'Azumarill: Ice Beam']),
-    (0, 1, 1, 429, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump']),
-    (0, 2, 1, 226, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb', 'Azumarill: Hydro Pump (shielded)']),
-    (1, 0, 0, 557, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb (shielded)', 'Forretress: Sand Tomb']),
-    (1, 1, 1, 496, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
-    (1, 2, 1, 242, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
+    (0, 0, 1, 492, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb', 'Forretress: Sand Tomb']),
+    (0, 1, 1, 312, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb', 'Azumarill: Ice Beam', 'Forretress: Sand Tomb']),
+    (0, 2, 1, 222, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb']),
+    (1, 0, 0, 657, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam']),
+    (1, 1, 1, 429, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
+    (1, 2, 1, 226, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
     (2, 0, 0, 612, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb (shielded)', 'Forretress: Sand Tomb']),
     (2, 1, 1, 496, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
     (2, 2, 1, 242, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
