@@ -1473,73 +1473,126 @@ function buildTraces() {
 }
 
 // ---- Summary table ----
+// Persistent sort state across re-renders. Default: ascending Y Rank
+// (== descending Y-axis metric, the prior behavior).
+//   col: 'yrank' | 'level' | 'cp' | 'atk' | 'def' | 'hp' | 'sp' | 'yval'
+//   dir: 'asc' | 'desc'
+var summarySort = { col: 'yrank', dir: 'asc' };
+
+// Per-column descriptors. defaultDir = direction picked on FIRST click;
+// clicking the already-active column toggles. value(iv) returns the
+// numeric sort key. label is the column header text (yval column uses
+// currentYLabel at render time since the Y-axis metric is dynamic).
+function _summaryColumns() {
+  return [
+    { id: 'yrank', label: 'Y Rank',  defaultDir: 'asc',  value: function(iv){ return yRanks[iv]; } },
+    { id: 'ivs',   label: 'IVs',     defaultDir: null,   value: null },
+    { id: 'level', label: 'Level',   defaultDir: 'desc', value: function(iv){ return DATA.ivLv[iv]; } },
+    { id: 'cp',    label: 'CP',      defaultDir: 'desc', value: function(iv){ return DATA.ivCp[iv]; } },
+    { id: 'atk',   label: 'Atk',     defaultDir: 'desc', value: function(iv){ return DATA.ivAtk[iv]; } },
+    { id: 'def',   label: 'Def',     defaultDir: 'desc', value: function(iv){ return DATA.ivDef[iv]; } },
+    { id: 'hp',    label: 'HP',      defaultDir: 'desc', value: function(iv){ return DATA.ivHp[iv]; } },
+    { id: 'sp',    label: 'SP Rank', defaultDir: 'asc',  value: function(iv){ return DATA.spRanks[iv]; } },
+    { id: 'yval',  label: null,      defaultDir: 'desc', value: function(iv){ return yValues[iv]; } },
+    // 'tier' deliberately not sortable: most IVs have tier === -1.
+    { id: 'tier',  label: 'Tier',    defaultDir: null,   value: null },
+  ];
+}
+
+function _summarySortClick(colId) {
+  var cols = _summaryColumns();
+  var col = null;
+  for (var i = 0; i < cols.length; i++) if (cols[i].id === colId) { col = cols[i]; break; }
+  if (!col || !col.defaultDir) return;  // unsortable column
+  if (summarySort.col === colId) {
+    summarySort.dir = (summarySort.dir === 'asc') ? 'desc' : 'asc';
+  } else {
+    summarySort.col = colId;
+    summarySort.dir = col.defaultDir;
+  }
+  updateSummaryTable();
+}
+
 function updateSummaryTable() {
-  // Read optional row-count and sort-key controls (absent in older builds).
   var nSel = document.getElementById('summary-n-sel');
   var N = nSel ? parseInt(nSel.value, 10) : 10;
   if (!isFinite(N) || N <= 0) N = 10;
 
-  var sortSel = document.getElementById('summary-sort-sel');
-  var sortMode = sortSel ? sortSel.value : 'y';
+  var cols = _summaryColumns();
+  var hasTiers = tierNames.length > 0;
 
-  // Build sort comparator. All non-'y' modes are "higher is better" so
-  // we negate to get descending order. Sparse y-values are handled
-  // inside the 'y' branch (skipped at render time, not at sort time).
-  var cmp;
-  if (sortMode === 'sp') {
-    // Stat Product: spRanks[iv] is 1 = best, so ascending rank = descending SP.
-    cmp = function(a, b) { return DATA.spRanks[a] - DATA.spRanks[b]; };
-  } else if (sortMode === 'atk') {
-    cmp = function(a, b) { return DATA.ivAtk[b] - DATA.ivAtk[a]; };
-  } else if (sortMode === 'def') {
-    cmp = function(a, b) { return DATA.ivDef[b] - DATA.ivDef[a]; };
-  } else if (sortMode === 'hp') {
-    cmp = function(a, b) { return DATA.ivHp[b] - DATA.ivHp[a]; };
-  } else if (sortMode === 'level') {
-    cmp = function(a, b) { return DATA.ivLv[b] - DATA.ivLv[a]; };
-  } else {
-    // 'y' (default): sort by current Y-axis rank (already NaN-aware).
-    cmp = function(a, b) { return yRanks[a] - yRanks[b]; };
+  // Resolve active sort column.
+  var activeCol = null;
+  for (var i = 0; i < cols.length; i++) if (cols[i].id === summarySort.col) { activeCol = cols[i]; break; }
+  if (!activeCol || !activeCol.value) {
+    summarySort.col = 'yrank'; summarySort.dir = 'asc';
+    activeCol = cols[0];
   }
 
+  // Comparator. NaN-tolerant: NaN values sort to the end regardless of dir.
+  var sign = (summarySort.dir === 'asc') ? 1 : -1;
+  var getv = activeCol.value;
+  var cmp = function(a, b) {
+    var va = getv(a), vb = getv(b);
+    var na = isNaN(va), nb = isNaN(vb);
+    if (na && nb) return 0;
+    if (na) return 1;
+    if (nb) return -1;
+    return sign * (va - vb);
+  };
+
   var indices = [];
-  for (var i=0; i<nIvs; i++) indices.push(i);
+  for (var k = 0; k < nIvs; k++) indices.push(k);
   indices.sort(cmp);
   var top = indices.slice(0, N);
 
-  var hasTiers = tierNames.length > 0;
-  var h = '<table><tr><th>Y Rank</th><th>IVs</th><th>Level</th><th>CP</th>';
-  h += '<th>Atk</th><th>Def</th><th>HP</th><th>SP Rank</th><th>'+currentYLabel+'</th>';
-  if (hasTiers) h += '<th>Tier</th>';
+  var arrow = (summarySort.dir === 'asc') ? ' \u25B2' : ' \u25BC';
+
+  var h = '<table>';
+  h += '<tr>';
+  for (var ci = 0; ci < cols.length; ci++) {
+    var c = cols[ci];
+    if (c.id === 'tier' && !hasTiers) continue;
+    var label = (c.id === 'yval') ? currentYLabel : c.label;
+    var sortable = !!c.defaultDir;
+    var isActive = (summarySort.col === c.id);
+    var content = label + (isActive ? arrow : '');
+    if (sortable) {
+      h += '<th style="cursor:pointer;user-select:none" onclick="_summarySortClick(\'' + c.id + '\')" title="Click to sort">' + content + '</th>';
+    } else {
+      h += '<th>' + content + '</th>';
+    }
+  }
   h += '</tr>';
-  for (var k=0; k<top.length; k++) {
-    var iv = top[k];
-    // In sparse y-modes, the top-by-yRanks list still includes IVs
-    // with NaN y-values; skip those so the table only lists ranked IVs.
-    // Only applies when sorting by Y; other sort modes are always dense.
-    if (sortMode === 'y' && currentYIsSparse && !isFinite(yValues[iv])) continue;
+
+  for (var k2 = 0; k2 < top.length; k2++) {
+    var iv = top[k2];
+    // Skip IVs with NaN y-values when sorting by yval/yrank in a sparse
+    // Y-axis mode (e.g. winsMirror).
+    if (currentYIsSparse && (summarySort.col === 'yrank' || summarySort.col === 'yval')
+        && !isFinite(yValues[iv])) continue;
     var tier = DATA.ivTiers[iv];
-    h += '<tr><td>#'+yRanks[iv]+'</td>';
-    h += '<td>'+DATA.ivA[iv]+'/'+DATA.ivD[iv]+'/'+DATA.ivS[iv]+'</td>';
-    h += '<td>'+DATA.ivLv[iv]+'</td><td>'+DATA.ivCp[iv]+'</td>';
-    h += '<td>'+DATA.ivAtk[iv].toFixed(2)+'</td><td>'+DATA.ivDef[iv].toFixed(2)+'</td>';
-    h += '<td>'+DATA.ivHp[iv]+'</td><td>#'+DATA.spRanks[iv]+'</td>';
-    h += '<td>'+(isFinite(yValues[iv]) ? yValues[iv].toFixed(1) : '-')+'</td>';
+    h += '<tr>';
+    h += '<td>#' + yRanks[iv] + '</td>';
+    h += '<td>' + DATA.ivA[iv] + '/' + DATA.ivD[iv] + '/' + DATA.ivS[iv] + '</td>';
+    h += '<td>' + DATA.ivLv[iv] + '</td><td>' + DATA.ivCp[iv] + '</td>';
+    h += '<td>' + DATA.ivAtk[iv].toFixed(2) + '</td><td>' + DATA.ivDef[iv].toFixed(2) + '</td>';
+    h += '<td>' + DATA.ivHp[iv] + '</td><td>#' + DATA.spRanks[iv] + '</td>';
+    h += '<td>' + (isFinite(yValues[iv]) ? yValues[iv].toFixed(1) : '-') + '</td>';
     if (hasTiers) {
       if (tier >= 0) {
-        h += '<td><span class="tier-badge" style="background:'+tierColors[tier]+';color:#000">'+tierNames[tier]+'</span></td>';
+        h += '<td><span class="tier-badge" style="background:' + tierColors[tier] + ';color:#000">' + tierNames[tier] + '</span></td>';
       } else h += '<td>-</td>';
     }
     h += '</tr>';
   }
   h += '</table>';
-  // Caption: describe what the table shows and how to re-sort.
-  var sortLabel = (sortSel && sortSel.selectedIndex >= 0)
-    ? sortSel.options[sortSel.selectedIndex].text : currentYLabel;
-  var srcLabel = (sortMode === 'y') ? currentYLabel : sortLabel;
+
+  var activeLabel = (activeCol.id === 'yval') ? currentYLabel : activeCol.label;
+  var dirWord = (summarySort.dir === 'asc') ? 'ascending' : 'descending';
   h += '<p style="font-size:11px;color:#888;margin:4px 0 0 0">'
-    + 'Top ' + N + ' IVs, sorted by <b>' + srcLabel + '</b>. '
-    + 'Change <i>Table rows</i> or <i>Sort by</i> above to reshape.'
+    + 'Top ' + N + ' IVs, sorted by <b>' + activeLabel + '</b> (' + dirWord + '). '
+    + 'Click another column header to re-sort; click the active column again to reverse.'
     + '</p>';
   document.getElementById('summary').innerHTML = h;
 }
@@ -1727,6 +1780,8 @@ function reattachLegendHandlers() {
 // work even when the engine runs inside an async IIFE (for gzip score
 // decompression).
 window.updateView = updateView;
+window.updateSummaryTable = updateSummaryTable;
+window._summarySortClick = _summarySortClick;
 updateView();
 // Hook up the collection panel handlers now that updateView has run
 // once (nIvs, DATA, etc. are all in scope). Safe even if DATA.collection
