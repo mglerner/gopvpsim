@@ -63,9 +63,11 @@ suppresses shields when damage < half HP) and baiting (Mimikyu
 opponents break disguise ASAP with the cheapest charged move).
 
 Oracle tests: Morpeko 6/9, Aegislash 1/9, Mimikyu 6/9 match PvPoke
-exactly. Remaining mismatches are pre-existing DP cycle-timing
-differences (see `TODO.md` "DP cycle-timing move selection"), not
-form-change bugs. Plan file: `quizzical-hatching-kahan.md`.
+exactly. Remaining mismatches were initially attributed to a "DP
+cycle-timing" gap; that lead was subsequently closed 2026-04-15
+(Azu vs Aegislash 0v0 now throws IB twice, matching PvPoke; all
+9 0v0 form-change fixtures land on harness score). Plan file:
+`quizzical-hatching-kahan.md`.
 
 **Open follow-ups** (tracked in `TODO.md`): Mimikyu deep dive with
 form-change narrative; Goodra / Aegislash test-drive dives for the

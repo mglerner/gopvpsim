@@ -148,19 +148,23 @@ break invariants that weren't yet nailed down by tests.
   Electric/Dark), Aegislash (Shield<->Blade stat/move/level swap),
   Mimikyu (disguise absorbs first unshielded hit, -1 def stage).
   Data-driven via gamemaster formChange field. Oracle tests: Morpeko
-  6/9, Aegislash 1/9, Mimikyu 6/9 match PvPoke exactly; mismatches
-  are pre-existing DP cycle-timing issues (see TODO entry below).
-  Next: Mimikyu deep dive with form change narrative.
+  6/9, Aegislash 1/9, Mimikyu 6/9 match PvPoke exactly; remaining
+  mismatches are the GB/SB cascade (PvPoke bug #3) and Mimikyu SS
+  timing (PvPoke bug #5), pinned as xfails. Next: Mimikyu deep dive
+  with form change narrative.
 
-* **DP cycle-timing move selection** — pvpoke_dp's farm-down path
-  selects by per-move DPE but misses cases where a cheaper move allows
-  an extra throw before KO, yielding more total damage. Concrete
-  example: Azu vs Aegislash 0v0, IB (15 dmg, 5 Bubbles) lets Azu
-  squeeze 2 throws (30 total) while PR (18 dmg, 6 Bubbles) only fits 1
-  throw (18 total). Our DP picks PR (higher DPE), PvPoke picks IB
-  (more total damage). Affects ~6 scenarios across form change oracle
-  tests with consistent +/-11 to +/-13 deltas. Tackle in a dedicated
-  DP refinement session.
+* ~~**DP cycle-timing move selection**~~ — **CLOSED 2026-04-15,
+  not an actual issue.** Original claim: our DP picks PR over IB in
+  Azu vs Aegislash 0v0 where IB yields more total damage via an extra
+  throw. Verified independently in two sessions (2026-04-15): current
+  sim throws Ice Beam twice in Azu vs Aegislash 0v0 and lands on the
+  same score PvPoke does (773). The concrete example was resolved
+  incidentally by one or more of: the bestChargedMove DPE threshold
+  port (fca1b7c), the activeChargedMoves priority-shuffle port
+  (68a306d), and the raw-DPE / atk_stage fixes around 2026-04-15. The
+  full oracle audit (115/115 matches PvPoke harness) shows no
+  remaining cycle-timing symptoms in any form-change or basic 0v0
+  fixture. Do NOT re-queue without a new concrete failing case.
 
 ## Tests to add
 
@@ -230,8 +234,8 @@ break invariants that weren't yet nailed down by tests.
   can verify exact movesets/IVs at pvpoke.com/battle.
 
 * **Form Change** — ✅ **Done 2026-04-14.** Oracle tests shipped:
-  Morpeko 6/9, Aegislash 1/9, Mimikyu 6/9 match PvPoke. Mismatches
-  are pre-existing DP cycle-timing differences, not form change bugs.
+  Morpeko 9/9, Aegislash 5/9 + 4 xfails (PvPoke bug #3 GB/SB cascade),
+  Mimikyu 9/9 match PvPoke harness.
   Form changes DO affect opponent shielding (Aegislash Shield form
   suppresses shields if damage < half HP) and baiting (Mimikyu
   opponents break disguise ASAP with cheapest charged move).
