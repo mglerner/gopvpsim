@@ -33,7 +33,7 @@ break invariants that weren't yet nailed down by tests.
 
 ## Battle simulator
 
-* **File PvPoke bug reports** — Six bugs found in PvPoke's JS:
+* **File PvPoke bug reports** — Seven bugs found in PvPoke's JS:
   1. BattleState `.hp`/`.oppHealth` naming inconsistency (dead-code dominance checks)
   2. bestChargedMove using `move.damage` (undefined at init) instead of `move.power`
   3. bestChargedMove not recomputed on opponent form change (stale DPE cache)
@@ -50,6 +50,14 @@ break invariants that weren't yet nailed down by tests.
      consumer, despite looking like it should. Likely intent was for
      the buff adjustment to persist through the ratio check. Discovered
      2026-04-14 while resolving our Divergence 2.
+  7. needsBoost / non-guaranteed-buff plan selection is dead code.
+     ActionLogic.js:539 unconditionally zeros `changeTTKChance`, so
+     `stateList` never accumulates chance-<1 plans; and `needsBoost`
+     (line 793) is never assigned `true`, so the line 868 plan-reorder
+     gate is inert. Empirically 0 "needs the BOOST" log hits across
+     the 4 GL meta species whose default moveset has a chance-<1
+     charged move (Tinkaton, Corviknight, Clefable, Drapion).
+     Discovered 2026-04-15; writeup in DEVELOPER_NOTES.md §7.
 
 * **Resolve known PvPoke divergences** — ~~Three~~ One remaining intentional
   implementation difference tracked in DEVELOPER_NOTES.md "Known divergences."
