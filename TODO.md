@@ -417,18 +417,14 @@ break invariants that weren't yet nailed down by tests.
 
 ## Deep-dive narrative
 
-* **SwagTips narrative renderer (new third HTML zone)** — planned in
-  `~/.claude/plans/flickering-swinging-micali.md`. Adds a purple-bordered
-  "IV Flavor Guide" zone between the gold Expert Analysis and blue
-  Simulation Deep Dive. New module `scripts/deep_dive_narrative.py`
-  (mirroring `deep_dive_slayer.py`'s self-contained-module precedent)
-  derives 2-4 named "flavors" (`Premium Bulk`, `{Opponent} Slayer`,
-  `Fortified {Opponent}`) from existing tier/anchor data and renders
-  them as RyanSwag-style opponent-centric prose for a general audience.
-  Touch points: `deep_dive_rendering.py` gets ~15 lines (CSS classes
-  + `render_narrative_zone()` call); no changes to `deep_dive.py` or
-  `deep_dive_analysis.py`. Part of the 3-session SwagTips arc:
-  (1) renderer, (2) Goodra test-drive, (3) Aegislash form-change dive.
+* **SwagTips narrative follow-ups (Goodra + Aegislash dives)** — the
+  renderer module `scripts/deep_dive_narrative.py` (1016 lines, purple
+  "IV Flavor Guide" zone between Expert Analysis gold and Simulation
+  Deep Dive blue) is in place. Remaining in the 3-session SwagTips arc
+  per `~/.claude/plans/flickering-swinging-micali.md`: (2) Goodra
+  test-drive dive exercising the narrative output against real matchup
+  data, and (3) Aegislash form-change dive that stress-tests narrative
+  generation when the species swaps moves/stats mid-battle.
 
 * **Export Notable IVs cards to external scanner tool** — The user has a
   separate tool that scans their existing pokemon collection against
