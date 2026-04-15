@@ -2070,6 +2070,7 @@ def simulate(
                     dmg = 1
                     defender._form_disguise_active = False
                     defender.change_form(attacker)
+                    log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → {dmg} dmg")
                     log_event(f"{defender.species} disguise busted (1 dmg)")
                 else:
                     log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → {dmg} dmg")

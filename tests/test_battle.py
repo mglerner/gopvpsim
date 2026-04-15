@@ -1341,27 +1341,6 @@ def test_aegislash_vs_azumarill_form_change(shields_a, shields_z,
     )
 
 
-# Mimikyu bandaid-triage xfails. chargedLog reveals two distinct PvPoke
-# behaviors we disagree with: (1) first-Ice-Beam timing (PvPoke throws
-# an extra opening IB before Mimi's SS), and (2) bug #4 SS-delay (PvPoke
-# delays Mimikyu's first SS by one Shadow Claw). Captured 2026-04-15.
-_MIMI_XFAIL_AZU_OPENING_IB = pytest.mark.xfail(
-    reason=(
-        "PvPoke throws Azumarill's Ice Beam once more than we do — an "
-        "opening IB before Mimikyu's first charged throw. Score "
-        "coincidentally matches because Mimi's SS sequence lands the "
-        "same total damage, but the fight isn't identical. Not yet "
-        "localized: Azu's DP fires earlier in PvPoke than in ours."))
-_MIMI_XFAIL_SS_DELAY = pytest.mark.xfail(
-    reason=(
-        "PvPoke bug #4: Mimikyu delays first Shadow Sneak by one "
-        "Shadow Claw (8 SCs before first SS instead of 7), letting "
-        "Azu's IB break the disguise first. Combined with PvPoke "
-        "throwing an extra opening IB, our log disagrees on both Azu's "
-        "first IB timing AND Mimi's first SS timing. Score matches "
-        "because the two differences offset each other."))
-
-
 @pytest.mark.integration
 @pytest.mark.parametrize("shields_m,shields_a,expected_mimikyu_score,expected_log", [
     # Mimikyu 5/13/15 vs Azumarill 4/15/13, Great League
@@ -1371,39 +1350,38 @@ _MIMI_XFAIL_SS_DELAY = pytest.mark.xfail(
     # Form change: Disguise absorbs first unshielded charged hit (dmg=1),
     # then Mimikyu becomes Busted with permanent -1 def stage.
     #
-    # Expected chargedLog is the PvPoke harness ground truth. Cases
-    # where our log disagrees with PvPoke get an xfail with a specific
-    # reason pinning the behavioral difference.
-    pytest.param(0, 0, 738, ['Azumarill: Ice Beam',
-                             'Mimikyu (Busted): Play Rough',
-                             'Mimikyu (Busted): Shadow Sneak'],
-                 marks=_MIMI_XFAIL_AZU_OPENING_IB),
-    pytest.param(0, 1, 350, ['Azumarill: Ice Beam',
-                             'Mimikyu (Busted): Shadow Sneak (shielded)',
-                             'Mimikyu (Busted): Shadow Sneak',
-                             'Azumarill: Ice Beam'],
-                 marks=_MIMI_XFAIL_SS_DELAY),
-    pytest.param(0, 2, 214, ['Azumarill: Ice Beam',
-                             'Mimikyu (Busted): Shadow Sneak (shielded)',
-                             'Mimikyu (Busted): Play Rough (shielded)',
-                             'Azumarill: Ice Beam'],
-                 marks=_MIMI_XFAIL_SS_DELAY),
+    # Expected chargedLog is the PvPoke harness ground truth. All 9
+    # cases now match PvPoke exactly. The previously-suspected "PvPoke
+    # bug #4" (Mimi delays first SS by 1 SC) turned out to be a
+    # phantom — our disguise-bust branch was just missing the
+    # "Azumarill uses Ice Beam → 1 dmg" log line, so chargedLog
+    # appeared to disagree on Azu's IB timing when the underlying sim
+    # was correct. Fixed 2026-04-15; xfails removed.
+    (0, 0, 738, ['Azumarill: Ice Beam',
+                 'Mimikyu (Busted): Play Rough',
+                 'Mimikyu (Busted): Shadow Sneak']),
+    (0, 1, 350, ['Azumarill: Ice Beam',
+                 'Mimikyu (Busted): Shadow Sneak (shielded)',
+                 'Mimikyu (Busted): Shadow Sneak',
+                 'Azumarill: Ice Beam']),
+    (0, 2, 214, ['Azumarill: Ice Beam',
+                 'Mimikyu (Busted): Shadow Sneak (shielded)',
+                 'Mimikyu (Busted): Play Rough (shielded)',
+                 'Azumarill: Ice Beam']),
     (1, 0, 761, ['Mimikyu: Play Rough',
                  'Azumarill: Ice Beam (shielded)',
                  'Mimikyu: Shadow Sneak']),
-    pytest.param(1, 1, 672, ['Mimikyu: Shadow Sneak (shielded)',
-                             'Azumarill: Ice Beam (shielded)',
-                             'Mimikyu: Shadow Sneak',
-                             'Azumarill: Ice Beam',
-                             'Mimikyu (Busted): Shadow Sneak'],
-                 marks=_MIMI_XFAIL_AZU_OPENING_IB),
-    pytest.param(1, 2, 473, ['Mimikyu: Shadow Sneak (shielded)',
-                             'Azumarill: Ice Beam (shielded)',
-                             'Azumarill: Ice Beam',
-                             'Mimikyu (Busted): Shadow Sneak (shielded)',
-                             'Mimikyu (Busted): Play Rough',
-                             'Azumarill: Ice Beam'],
-                 marks=_MIMI_XFAIL_AZU_OPENING_IB),
+    (1, 1, 672, ['Mimikyu: Shadow Sneak (shielded)',
+                 'Azumarill: Ice Beam (shielded)',
+                 'Mimikyu: Shadow Sneak',
+                 'Azumarill: Ice Beam',
+                 'Mimikyu (Busted): Shadow Sneak']),
+    (1, 2, 473, ['Mimikyu: Shadow Sneak (shielded)',
+                 'Azumarill: Ice Beam (shielded)',
+                 'Azumarill: Ice Beam',
+                 'Mimikyu (Busted): Shadow Sneak (shielded)',
+                 'Mimikyu (Busted): Play Rough',
+                 'Azumarill: Ice Beam']),
     (2, 0, 761, ['Mimikyu: Play Rough',
                  'Azumarill: Ice Beam (shielded)',
                  'Mimikyu: Shadow Sneak']),
@@ -1412,13 +1390,12 @@ _MIMI_XFAIL_SS_DELAY = pytest.mark.xfail(
                  'Mimikyu: Shadow Sneak',
                  'Azumarill: Play Rough (shielded)',
                  'Mimikyu: Shadow Sneak']),
-    pytest.param(2, 2, 607, ['Mimikyu: Shadow Sneak (shielded)',
-                             'Azumarill: Ice Beam (shielded)',
-                             'Mimikyu: Shadow Sneak (shielded)',
-                             'Azumarill: Ice Beam (shielded)',
-                             'Mimikyu: Play Rough',
-                             'Azumarill: Ice Beam'],
-                 marks=_MIMI_XFAIL_AZU_OPENING_IB),
+    (2, 2, 607, ['Mimikyu: Shadow Sneak (shielded)',
+                 'Azumarill: Ice Beam (shielded)',
+                 'Mimikyu: Shadow Sneak (shielded)',
+                 'Azumarill: Ice Beam (shielded)',
+                 'Mimikyu: Play Rough',
+                 'Azumarill: Ice Beam']),
 ])
 def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a,
                                           expected_mimikyu_score, expected_log):

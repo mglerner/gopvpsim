@@ -76,27 +76,21 @@ with SB+GB in the 1v2 scenario, meaning GB availability actively
 hurts Aegislash's score. Root cause unclear - may be in the near-KO
 DP's plan selection or a bandaid condition.
 
-### 4. Mimikyu SS timing: delayed by 1 Shadow Claw
+### 4. Mimikyu SS timing — RETRACTED 2026-04-15
 
-**File**: Unknown - may be in fast-move damage delivery timing
-
-PvPoke delays Mimikyu's first Shadow Sneak by one extra Shadow Claw
-(8 SCs instead of 7 before firing SS) in the Mimikyu vs Azumarill
-matchup. Mimikyu reaches 56 energy (50 needed for SS) after 7 SCs at
-turn 14, and should fire SS at turn 15. Instead PvPoke queues an 8th
-SC, lets Azu's IB break the disguise, then fires SS afterward.
-
-Our code fires SS at the first opportunity (7 SCs), which is strictly
-better for Mimikyu: it burns Azu's shield sooner, shortening the
-battle by ~2 turns and landing 1 extra Shadow Claw (5 dmg = 13 score
-points). Confirmed by score comparison: our Mimikyu gets 363 vs
-PvPoke's 350 in the 0v1 scenario, and the +/-13 delta is consistent
-across all three affected shield scenarios.
-
-Exact root cause in PvPoke's code unclear - extensive code reading
-found no OMT trigger, farm-down delay, or decision-ordering issue
-that would explain the delay. May require running PvPoke locally
-with debug logging.
+This was a phantom bug. We thought our Mimi threw Shadow Sneak one
+turn earlier than PvPoke (363 vs 350), but harness localization
+revealed the divergence was in our timeline OUTPUT, not behavior.
+Our `simulate()` disguise-bust branch logged only "disguise busted"
+without emitting the standard `X uses Y → Z dmg` line for the
+throw that triggered it. So `_extract_battle_log` saw N-1 entries
+where PvPoke's harness saw N — making it look like PvPoke threw an
+"extra" opening Ice Beam. Once the missing log line was added, our
+chargedLog matches PvPoke's exactly across all 9 Mimi vs Azu shield
+combos. Mimi's actual SS timing was correct all along; the
+"363 vs 350" score difference came from earlier raw_dpe issues
+(also fixed 2026-04-15), not from SS timing. See the 2026-04-15
+"Localization meta-finding" entry below for the broader lesson.
 
 ## Known divergences from PvPoke implementation
 
@@ -125,6 +119,25 @@ PvPoke bug.
   (Sand+Rock) now matches PvPoke 9/9 exact. Gotcha preserved for
   future readers: raw gamemaster `buffApplyChance` is a string;
   compare via `float(...) != 1.0`.
+* **2026-04-15 — Mimikyu disguise-bust missing log line (meta-lesson).**
+  Pinned via the new chargedLog test assertions: when Azu's "break
+  Mimi's disguise" charged throw lands on a still-disguised Mimikyu,
+  the `simulate()` loop's disguise-bust branch (battle.py:2066-2075)
+  emits `Mimikyu (Busted) disguise busted (1 dmg)` but skipped the
+  standard `Azumarill uses Ice Beam → 1 dmg` line. So
+  `_extract_battle_log` lost one entry, and PvPoke's chargedLog
+  appeared to have one extra Azu IB at the front. Fix: emit the
+  "uses" line in the disguise branch too. All 6 Mimikyu xfails (4
+  AZU_OPENING_IB + 2 SS_DELAY) flipped to clean passes; PvPoke "bug
+  #4" was retracted (see above). **Meta-lesson:** the audit in
+  docs/validations/2026-04-15_harness_code_review.md correctly
+  identified the disguise-handling DP path as implemented, but
+  audited DP/policy features rather than the throw-dispatch logger.
+  Log emission is downstream of the DP and isn't covered by oracle
+  score tests, so divergences there were silent until chargedLog
+  assertions were added. Future feature audits should include a
+  pass over the timeline/log emission paths, not just the
+  decision-making code.
 * **2026-04-15 — Farm-down boost-move override + raw_dpe fix.**
   Two linked DP gaps surfaced when localizing GL Empoleon vs
   Forretress 2-2 (Δ=-204). (1) When the near-KO DP returns a
