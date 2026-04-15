@@ -22,23 +22,11 @@ remaining failures are all Mienfoo vs Medicham, root-caused to a
 - **Both-side buffs**: Corviknight mirror (Air Cutter only) 9/9. Both mons'
   buffApplyMeter fires independently; unbuffed Air Cutter does 18, buffed does 23.
 
-### Previously failing: Mienfoo vs Medicham — FIXED (all 9/9)
+### Previously failing matchups — all fixed
 
-Two bugs were found and fixed:
-
-1. **wouldShield buff reset ordering** (battle.py `would_shield`):
-   The charged-move threat loop ran BEFORE resetting the temporarily-
-   applied stat buffs, inflating damage predictions. PvPoke resets
-   buffs first (ActionLogic.js:1136-1140), then evaluates charged-move
-   threat (lines 1145-1165). Fix: moved the reset before the loop.
-
-2. **CMP (Charge Move Priority) cancellation** (battle.py `simulate`):
-   When both Pokemon fire charged moves simultaneously, the lower-ATK
-   Pokemon's move should be canceled if it was KO'd by the higher-ATK
-   Pokemon's charged move (PvPoke Battle.js:464-467). Our code had an
-   exception that always allowed both to fire. Fix: track `charged_ko`
-   set and cancel if `use_priority` and attacker was KO'd by a charged
-   move.
+Mienfoo vs Medicham (9/9) resolved by the `would_shield` buff-reset
+ordering and CMP cancellation fixes. Full root-cause writeup in
+`CHANGELOG.md` under `2026-04-04 to 2026-04-06`.
 
 ## PvPoke bugs found
 
@@ -117,132 +105,26 @@ implementation. Each is a potential source of score mismatches if we
 hit an edge case. Fix these before assuming a score difference is a
 PvPoke bug.
 
-### RESOLVED: selfBuffing flag scope
+### Resolved divergences (full writeups in CHANGELOG.md)
 
-**Fixed 2026-04-14.** Our `selfBuffing` flag in `moves.py` now matches
-PvPoke's GameMaster.js:873 definition: guaranteed positive self-buffs
-AND guaranteed opponent debuffs (buffTarget="opponent",
-buffApplyChance==1). Previously only covered self-targeting buffs;
-workarounds in shield policy and bait-wait were removed. All 8
-selfBuffing usage sites now use the broadened flag consistently.
-
-### RESOLVED: activeChargedMoves priority-shuffle
-
-**Fixed 2026-04-14.** PvPoke's `resetMoves` (Pokemon.js:711-787)
-reorders `activeChargedMoves` after the energy sort based on
-buff/debuff properties. The priority-shuffle uses buff-adjusted DPE
-(`initializeMove`, Pokemon.js:849-864) for one clause. Our code now
-replicates all shuffle clauses in `pvpoke_dp`.
-
-**Historical note (corrected):** Divergence 2 was originally
-documented as "bait-wait DPE ratio uses actual_dpe, not buff-adjusted
-DPE." This was incorrect. PvPoke's `selectBestChargedMove`
-(Pokemon.js:791-796) *overwrites* `.dpe` to raw `damage/energy` on
-all `activeChargedMoves` after the priority-shuffle, so the bait-wait
-1.5 ratio check (ActionLogic.js:843) also uses raw `damage/energy`,
-same as our `actual_dpe`. The buff-adjusted DPE only affects the
-priority-shuffle ordering (lines 711-787), not the ratio check itself.
-
-### RESOLVED (2026-04-15): Forretress/Azumarill DP plan-selection — atk-stage fix shipped
-
-The fix described below landed in a single commit on 2026-04-15.
-`_DPState` now carries an `atk_stage` field; `pvpoke_dp` precomputes
-a per-stage damage table (indexed stage+4 over [-4..+4]) and scales
-both the charged- and fast-move damage inside the near-KO DP by the
-current state's stage. Chance-1 self-atk-buffs and chance-1
-opp-def-debuffs (via PvPoke's `attackMult -= buffs[1]` trick)
-increment the child state's stage. `_dp_insert_ready` phase-1 dedup
-requires equal `atk_stage` so stacked-buff plans aren't deduped away.
-
-`_dp_jit.py` mirrors the change: kernel takes `cm_buff_delta`,
-`cm_dmgs_stage` (9 x n_cms), `fast_dmg_stage` (9,), and
-`root_atk_stage`; queue arrays gain a parallel `q_atk_stg` slot.
-
-Scoreboard: Azu/Forretress (Sand+Rock) is now 9/9 exact vs PvPoke
-across all shield scenarios (the test file's expected scores were
-updated accordingly). `tests/test_battle.py` 157 passed,
-`scripts/verify_pvpoke_harness.py` 27/27.
-
-**Gotcha worth calling out:** `buffApplyChance` in the raw
-gamemaster is a *string*, not a number. The initial `!= 1`
-comparison was silently false for every move; the production check
-is `float(m.get('buffApplyChance', 0) or 0) != 1.0`.
-
-#### Historical root-cause writeup (pre-fix investigation)
-
-**Investigated 2026-04-15 via the headless Node harness
-(`scripts/pvpoke_trace.js` + `scripts/verify_pvpoke_harness.py`,
-validated 27/27 on recorded oracle cases).**
-
-**Matchup:** Azumarill 4/15/13 (Bubble / Ice Beam / Hydro Pump) vs
-Forretress 5/15/13 (Volt Switch / Sand Tomb / Rock Tomb) in Great
-League, Azu 0 shields / Forr 1 shield. PvPoke Azu=312, our
-Azu=430. Delta +118.
-
-**The second divergence (T26) is now root-caused.** Instrumented
-PvPoke's `stateList.push(currState)` to dump every terminal popped
-from the DP queue. At Forr's T26 call, exactly one terminal pops:
-`stateTurn=10, energy=8, oppHealth=-8, moves=[SAND_TOMB, SAND_TOMB]`.
-Our DP's first-popped terminal is `turn=13, hp=0, moves=[ROCK_TOMB]`
-(a `[RT]+farm` plan) — strictly later turn, yet our DP accepts it
-because our [ST, ST] plan never becomes terminal in our
-reachable-state space.
-
-**Why PvPoke's [ST, ST] KOs at turn 10 while ours doesn't:** PvPoke's
-`BattleState` carries a `buffs` field (the attacker's atk-stage
-delta) that accumulates as the DP stacks moves with chance-1 self-atk
-buffs *or* chance-1 opp-def debuffs (see `ActionLogic.js:519-535` —
-note line 531 `attackMult -= move.buffs[1]`, which effectively
-promotes an opp-def debuff to a self-atk buff inside the DP). When a
-child state is popped, line 471 calls `poke.applyStatBuffs([buffs, 0])`
-and recomputes `moveDamage`/`fastSimulatedDamage` against the buffed
-atk. So in PvPoke's DP, ST1 lands at stage 0 (27 dmg), the two
-buffer VS fast moves land at stage +1 (15 dmg each), and ST2 lands at
-stage +1 (33 dmg). Total 27+30+33 = 90 against Azu's 91 HP — close
-enough that the shield-free `newOppHealth - moveDamage` path
-terminates negative at stateTurn 10 (the `-8` result includes a
-rounding path I didn't reverse in detail).
-
-**Our DP holds `cm_dmgs[]` and `fast_damage` fixed** at the values
-computed from the attacker's actual mid-battle atk_stage for the
-*entire* DP rollout. `_DPState` tracks `has_debuf` and `debuf_count`,
-but those are only used for the dedup tie-break at
-`_dp_insert_ready`; neither scales damage. So our DP sees plan
-[ST, ST] as 27+2*12+27 = 78 damage at turn 10 (hp=13, not terminal),
-misses the stacked-debuff acceleration entirely, and settles for
-[RT]+farm at turn 13.
-
-**Proposed fix (for a follow-up session):** add a scalar
-`atk_stage: int` to `_DPState` (initialized from `attacker.atk_stage`
-at the root call). In the near-KO DP loop in `pvpoke_dp` (around
-lines 1155-1209):
-
-1. Precompute `_stat_stage_mult` at every reachable stage and derive
-   a per-move damage scaler `mult(stage) / mult(root_stage)`.
-2. When dispatching move `n` from a state at `curr_atk_stage`, use
-   `cm_dmgs[n] * scale(curr_atk_stage)` and
-   `fast_damage * scale(curr_atk_stage)` for the `new_hp`
-   calculation (both ready and not-ready branches).
-3. Compute `new_atk_stage` for the child: `curr + delta(n)` clamped
-   to `[-4, +4]`, where `delta(n)` = +1 for a chance-1 self-atk buff
-   (`buffTarget=='self' && buffs[0]>0`) or a chance-1 opp-def debuff
-   (`buffTarget=='opponent' && buffs[1]<0`), matching PvPoke's
-   `attackMult` update at `ActionLogic.js:519-535`.
-4. Mirror the change in `_dp_jit.py` so numba stays in sync.
-5. Optional: include `atk_stage` in the `_dp_insert_ready` dedup key
-   so plans with better buff accumulation don't get deduped out by
-   same-`(turn,hp,energy)` states at lower buffs.
-
-The fix should be scoped as sim-internal only — no threshold or HTML
-changes. Expected effect: Azu=312 exact on this matchup. Run
-`scripts/verify_pvpoke_harness.py` after the change; all 27 cases
-must still match, plus add a new case for this matchup.
-
-**Artifacts (in-repo):**
-- `scripts/pvpoke_trace.js` - harness now also emits `termLog`, an
-  array of every DP terminal-state push (turn, energy, oppHealth,
-  moves) so future divergences can be localized the same way.
-- `scripts/verify_pvpoke_harness.py` - oracle smoke-test (27 cases).
+* **2026-04-14 — selfBuffing flag scope.** Now matches PvPoke's
+  `GameMaster.js:873` definition (positive self-buffs *and*
+  guaranteed opponent debuffs).
+* **2026-04-14 — activeChargedMoves priority-shuffle.** All
+  `resetMoves` shuffle clauses replicated in `pvpoke_dp`. **Keep in
+  mind** when revisiting bait-wait: PvPoke's
+  `selectBestChargedMove` overwrites `.dpe` to raw `damage/energy`
+  *after* the priority-shuffle, so the 1.5 ratio check
+  (`ActionLogic.js:843`) uses raw DPE, same as our `actual_dpe`.
+  Buff-adjusted DPE only affects the shuffle ordering, not the
+  ratio check.
+* **2026-04-15 — Forretress/Azumarill DP plan-selection.** Near-KO
+  DP now tracks attacker `atk_stage` and recomputes charged/fast
+  damage at every reachable stage so stacked chance-1 opp-def
+  debuffs accelerate plans the way PvPoke does. Azu/Forr
+  (Sand+Rock) now matches PvPoke 9/9 exact. Gotcha preserved for
+  future readers: raw gamemaster `buffApplyChance` is a string;
+  compare via `float(...) != 1.0`.
 
 ### 3. bestChargedMove computed per-turn, not cached at init (intentional)
 

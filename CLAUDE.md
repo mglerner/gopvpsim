@@ -14,6 +14,12 @@ Mention briefly in your first substantive reply that you've read them
 (e.g., "Caught up on TODO.md and DEVELOPER_NOTES.md.") so the user
 knows the startup happened.
 
+**`CHANGELOG.md` is NOT part of the session-startup read.** It holds
+completed/shipped work for historical reference (dates, commit SHAs,
+root-cause writeups of old bugs). Consult it on-demand when the user
+asks "when did we ship X" or "why did we fix Y," not as routine
+context.
+
 ## Project goal
 A pure Python library for Pokemon Go PvP battle simulation, focused on
 breakpoint/bulkpoint analysis. Will be used by CLI scripts and eventually
