@@ -95,23 +95,19 @@ break invariants that weren't yet nailed down by tests.
   it because the divergence was upstream of the DP. Full writeup in
   DEVELOPER_NOTES.md "Resolved divergences" 2026-04-15 OMT entry.
 
-* **Near-KO DP non-debuf swap (Lapras [1,2] flip)** — Discovered
-  2026-04-15. Our near-KO DP picks self-debuffing nukes (Brave Bird)
-  even when a comparable-DPE non-debuffing alt (Fly) exists. In 6 of
-  7 UL MG cluster cases this is a net win (faster KO, +23-30pp HP
-  retained). In 1 case (Lapras [1,2]) the atk debuff post-BB loses a
-  close fight PvPoke wins by throwing Fly three times instead. Real
-  design gap: commit `b457c0a` ported PvPoke's many-cycle non-debuf
-  swap into the **farm-down** branch (`hp > 1.1 * best_cycle_dmg`),
-  but the **near-KO** branch has no symmetric preference. Candidate
-  fix: when near-KO DP returns a plan whose first throw is
-  `selfDebuffing`, and a comparable-DPE non-debuf alt reaches KO in
-  comparable time with the opponent's charged threat still live,
-  swap the first throw. Needs careful probing against the full MG
-  cluster (Jellicent x3, Corv x3) to make sure we don't regress the
-  6 clear-win cases. See DEVELOPER_NOTES.md "Known divergences:
-  Near-KO DP plan choice" for the outcome magnitude table. Pinned
-  with xfails under `_MG_NEARKO_PLAN` / `_MG_NEARKO_PLAN_FLIP`.
+* ~~**Near-KO DP non-debuf swap (Lapras [1,2] flip)**~~ — **Closed
+  2026-04-15 followup, not fixing.** Original hypothesis ("near-KO
+  branch needs a symmetric non-debuf swap") was wrong. The actual
+  mechanism is PvPoke's post-DP bandaid[885] (our port: bandaid[866]
+  at battle.py:1541), which relies on a `.damage` side effect from
+  OMT line 320. Faithfully mirroring PvPoke fires the swap in ALL 6
+  MG cluster cases — the `damage/opp.hp < 0.8` test doesn't separate
+  Lapras (0.70) from Jellicent (0.62) / Corv (~0.6). Net: matching
+  PvPoke inverts the 6:1 ratio (resolves Lapras, regresses 6 cluster
+  clear-wins). Per CLAUDE.md divergence policy, ours is defensibly
+  better overall. Keeping the `_cached_damage` subgate at
+  battle.py:652 as the intentional deviation; xfails stay. Full
+  writeup in DEVELOPER_NOTES.md "Near-KO DP plan choice".
 
 ## Policies to add
 
