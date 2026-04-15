@@ -750,8 +750,11 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
         'Auto-generated from simulation matchup data. Flavor names '
         '(e.g. "Premium Bulk", "Fortified {Opp}", "{Opp} Slayer") are '
         'derived from which opponents each IV cluster beats, not from '
-        'the expert-authored Threshold Tiers above. The two sections '
-        'answer different questions and may not line up 1:1.'
+        'the expert-authored '
+        '<a href="#dd-threshold-tiers" style="color:#a78bca">Threshold '
+        'Tiers</a> section above. This IV Flavor Guide and the '
+        'Threshold Tiers answer different questions and may not line '
+        'up 1:1.'
         '</p>\n'
     )
 
