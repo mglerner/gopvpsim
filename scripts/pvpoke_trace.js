@@ -363,7 +363,14 @@ function main() {
   for (const p of poke) {
     for (const m of (p.chargedMoves || [])) chargedNames.add(m.name);
   }
+  // Pair each charged "uses X" with the immediate "blocks with a shield"
+  // entry from the OPPOSITE pokemon. Track consumed shield-block indices so
+  // a single shield never attributes to multiple throws (which silently
+  // happened when two charged moves resolve on the same turn — e.g. CMP
+  // tie, both throw, only one is shielded; the second was being marked
+  // shielded too).
   const chargedLog = [];
+  const consumedShields = new Set();
   for (let i = 0; i < decisionLog.length; i++) {
     const e = decisionLog[i];
     const m = e.msg.match(/^\s*uses\s+(.+)$/);
@@ -372,9 +379,16 @@ function main() {
     if (!chargedNames.has(moveName)) continue;
     let shielded = false;
     for (let j = i + 1; j < decisionLog.length && j <= i + 4; j++) {
-      if (decisionLog[j].msg.includes('blocks with a shield')) {
-        shielded = true; break;
-      }
+      if (consumedShields.has(j)) continue;
+      if (!decisionLog[j].msg.includes('blocks with a shield')) continue;
+      // The shielder must be the OPPOSITE pokemon from the thrower.
+      // Use player index (0/1), not speciesId — mirror matchups have
+      // identical speciesIds on both sides.
+      if (decisionLog[j].index !== null && e.index !== null
+          && decisionLog[j].index === e.index) continue;
+      shielded = true;
+      consumedShields.add(j);
+      break;
     }
     chargedLog.push(`${e.name}: ${moveName}${shielded ? ' (shielded)' : ''}`);
   }

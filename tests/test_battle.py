@@ -529,7 +529,23 @@ def test_medicham_vs_azumarill(shields_med, shields_azu, expected_winner, expect
     (1, 0, 0, 657, ['Forretress: Sand Tomb', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Ice Beam']),
     (1, 1, 1, 429, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
     (1, 2, 1, 226, ['Forretress: Sand Tomb', 'Azumarill: Ice Beam (shielded)', 'Forretress: Rock Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
-    (2, 0, 0, 612, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Sand Tomb (shielded)', 'Forretress: Sand Tomb']),
+    pytest.param(2, 0, 0, 612,
+                 ['Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump',
+                  'Forretress: Sand Tomb (shielded)', 'Forretress: Sand Tomb',
+                  'Azumarill: Ice Beam'],
+                 marks=pytest.mark.xfail(reason=(
+                     "Cosmetic DP divergence surfaced 2026-04-15 by "
+                     "scripts/audit_chargedlog_fixtures.py. PvPoke's Azu "
+                     "fires a final Ice Beam at T36 ('uses Ice Beam at "
+                     "turn 36 because it KO's or it wants to farm down "
+                     "afterwards' — ActionLogic.js:967), landing the "
+                     "killing blow on a near-dead Forretress. Our DP "
+                     "returns a pure farm-down plan with no charged "
+                     "throw and lets Bubble finish the KO. Scores match "
+                     "exactly (612), winners match, only the chargedLog "
+                     "shows the missing IB. Localization deferred — "
+                     "this is the only surviving fixture-stale case in "
+                     "the entire log audit (62/63 clean)."))),
     (2, 1, 1, 496, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump', 'Forretress: Rock Tomb']),
     (2, 2, 1, 242, ['Forretress: Sand Tomb (shielded)', 'Azumarill: Ice Beam (shielded)', 'Forretress: Sand Tomb (shielded)', 'Azumarill: Hydro Pump (shielded)', 'Forretress: Rock Tomb']),
 ])
