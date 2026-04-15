@@ -18,6 +18,11 @@ var state = {
   userRecords: null,
   userStatus: '',
   showOnlyMine: false,
+  // Parsed mons from the last CSV load (empty array until Load is clicked).
+  csvMons: [],
+  // Mons the user entered one-at-a-time via the manual-entry form. These
+  // are additive with csvMons: every reprocess combines the two lists.
+  manualMons: [],
 };
 var yValues, yRanks, refYValues, refYRanks;
 // Updated by computeView() based on the active y-axis mode. Read by
@@ -441,13 +446,18 @@ function loadCollection(csvText) {
     setCollectionStatus('collection support unavailable for this dive', '#ff6b6b');
     return;
   }
-  var mons;
-  try {
-    mons = POGOCollection.parseCsvText(csvText);
-  } catch (e) {
-    setCollectionStatus('Parse error: ' + e.message, '#ff6b6b');
-    return;
+  // csvText === null means "reprocess with the current csvMons + manualMons"
+  // (used by the manual-entry add/remove path). A string argument means
+  // "reparse this CSV and replace csvMons."
+  if (csvText != null) {
+    try {
+      state.csvMons = POGOCollection.parseCsvText(csvText);
+    } catch (e) {
+      setCollectionStatus('Parse error: ' + e.message, '#ff6b6b');
+      return;
+    }
   }
+  var mons = (state.csvMons || []).concat(state.manualMons || []);
   if (mons.length === 0) {
     setCollectionStatus('No rows parsed (empty CSV?)', '#ff6b6b');
     return;
@@ -608,7 +618,12 @@ function loadCollection(csvText) {
   state.ownedByIv = ownedByIv;
 
   // Status line + tier-card counts.
-  var parts = [mons.length + ' rows parsed'];
+  var nCsv = (state.csvMons || []).length;
+  var nManual = (state.manualMons || []).length;
+  var rowLabel = (nManual > 0)
+    ? (mons.length + ' rows (' + nCsv + ' csv, ' + nManual + ' manual)')
+    : (mons.length + ' rows parsed');
+  var parts = [rowLabel];
   parts.push(ownedCount + ' match this dive');
   parts.push(qualifyingCount + ' qualify for >= 1 tier');
   if (slayerCount > 0) parts.push(slayerCount + ' slayer');
@@ -1009,6 +1024,8 @@ function clearCollection() {
   state.userRecords = null;
   state.ownedByIv = null;
   state.showOnlyMine = false;
+  state.csvMons = [];
+  state.manualMons = [];
   var chk = document.getElementById('collection-only-chk');
   if (chk) chk.checked = false;
   var ta = document.getElementById('collection-csv');
@@ -1017,7 +1034,144 @@ function clearCollection() {
   updateTierCardCounts({});
   renderMatchesList();
   annotateAnchorBullets();
+  renderManualList();
   updateView();
+}
+
+// ---- Manual one-at-a-time IV entry ----
+//
+// Users can add Pokemon one row at a time without pasting a CSV. Each
+// manual entry builds the same mon object shape as the CSV parser
+// (name, form, cp, atk_iv, def_iv, sta_iv, level, is_shadow, lucky)
+// and stacks into state.manualMons. loadCollection(null) reprocesses
+// the merged csvMons + manualMons list.
+
+function populateManualSpeciesSelect() {
+  var sel = document.getElementById('manual-species');
+  if (!sel || !DATA.collection) return;
+  var speciesKey = DATA.collection.speciesKey;
+  var preToFinals = DATA.collection.preToFinals || {};
+  // Valid species = the dive's species itself, plus any pre-evolution
+  // whose finals include it. Tinkaton dive → Tinkatink, Tinkatuff, Tinkaton.
+  var options = [speciesKey];
+  for (var k in preToFinals) {
+    if (!preToFinals.hasOwnProperty(k)) continue;
+    if (k === speciesKey) continue;
+    var finals = preToFinals[k] || [];
+    if (finals.indexOf(speciesKey) >= 0) options.push(k);
+  }
+  // Final species first, then pre-evolutions alphabetical.
+  options.sort(function(a, b) {
+    if (a === speciesKey) return -1;
+    if (b === speciesKey) return 1;
+    return a.localeCompare(b);
+  });
+  sel.innerHTML = '';
+  for (var i = 0; i < options.length; i++) {
+    var opt = document.createElement('option');
+    opt.value = options[i];
+    opt.textContent = options[i];
+    sel.appendChild(opt);
+  }
+}
+
+// Parse the manual-entry form into a mon object matching parseCsvText's
+// output shape. Returns null on invalid input; the caller surfaces an
+// error to the status line.
+function readManualForm() {
+  function intVal(id) { return parseInt(document.getElementById(id).value, 10); }
+  function floatVal(id) { return parseFloat(document.getElementById(id).value); }
+  var species = document.getElementById('manual-species').value || '';
+  var atkIv = intVal('manual-atk');
+  var defIv = intVal('manual-def');
+  var staIv = intVal('manual-hp');
+  var level = floatVal('manual-level');
+  var isShadow = document.getElementById('manual-shadow').checked;
+  if (!isFinite(atkIv) || atkIv < 0 || atkIv > 15) return null;
+  if (!isFinite(defIv) || defIv < 0 || defIv > 15) return null;
+  if (!isFinite(staIv) || staIv < 0 || staIv > 15) return null;
+  if (!isFinite(level) || level < 1 || level > 51) return null;
+  // Dropdown values are full species keys ("Tinkaton", "Tinkatink",
+  // "Corsola (Galarian)"). Split back into name + form for the mon
+  // object; is_shadow comes from the checkbox, not the species string.
+  var name = species;
+  var form = '';
+  var m = species.match(/^(.*)\s+\((.*)\)$/);
+  if (m && m[2] !== 'Shadow') { name = m[1]; form = m[2]; }
+  return {
+    name: name,
+    form: form,
+    cp: 0,
+    atk_iv: atkIv,
+    def_iv: defIv,
+    sta_iv: staIv,
+    level: level,
+    is_shadow: isShadow,
+    lucky: false,
+  };
+}
+
+function addManualMon() {
+  var mon = readManualForm();
+  if (mon == null) {
+    setCollectionStatus('Manual entry invalid - check IVs (0-15) and level.', '#ff6b6b');
+    return;
+  }
+  if (!state.manualMons) state.manualMons = [];
+  state.manualMons.push(mon);
+  renderManualList();
+  loadCollection(null);
+}
+
+function removeManualMon(idx) {
+  if (!state.manualMons) return;
+  if (idx < 0 || idx >= state.manualMons.length) return;
+  state.manualMons.splice(idx, 1);
+  renderManualList();
+  // If removing the last manual mon with no csv loaded, loadCollection
+  // hits the "no rows" bail and never clears state. Do the cleanup here.
+  if (state.manualMons.length === 0 && (!state.csvMons || state.csvMons.length === 0)) {
+    state.userRecords = null;
+    state.ownedByIv = null;
+    setCollectionStatus('', '#aaa');
+    updateTierCardCounts({});
+    renderMatchesList();
+    annotateAnchorBullets();
+    updateView();
+    return;
+  }
+  loadCollection(null);
+}
+
+function renderManualList() {
+  var el = document.getElementById('manual-list');
+  if (!el) return;
+  var mons = state.manualMons || [];
+  if (mons.length === 0) { el.innerHTML = ''; return; }
+  var html = '<b>Manual entries (' + mons.length + '):</b> ';
+  var chips = [];
+  for (var i = 0; i < mons.length; i++) {
+    var m = mons[i];
+    var label = (m.is_shadow ? 'S ' : '') + escapeHtml(m.name) +
+                (m.form ? ' (' + escapeHtml(m.form) + ')' : '') +
+                ' ' + m.atk_iv + '/' + m.def_iv + '/' + m.sta_iv +
+                ' L' + m.level;
+    chips.push(
+      '<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;' +
+      'background:#24314d;border-radius:3px">' + label +
+      ' <a href="#" data-manual-idx="' + i + '" class="manual-remove" ' +
+      'style="color:#ff6b6b;text-decoration:none;margin-left:4px">&times;</a></span>'
+    );
+  }
+  el.innerHTML = html + chips.join('');
+  var links = el.querySelectorAll('a.manual-remove');
+  for (var j = 0; j < links.length; j++) {
+    links[j].addEventListener('click', function(ev) {
+      ev.preventDefault();
+      var idx = parseInt(ev.currentTarget.getAttribute('data-manual-idx'), 10);
+      removeManualMon(idx);
+    });
+  }
 }
 
 function setCollectionStatus(text, color) {
@@ -1088,6 +1242,10 @@ function wireCollectionHandlers() {
     state.showOnlyMine = ev.target.checked;
     updateView();
   });
+  // Manual entry: populate species options, wire Add button.
+  populateManualSpeciesSelect();
+  var addBtn = document.getElementById('manual-add-btn');
+  if (addBtn) addBtn.addEventListener('click', addManualMon);
 }
 
 // ---- Build Plotly traces ----
