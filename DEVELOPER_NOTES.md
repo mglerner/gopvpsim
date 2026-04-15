@@ -76,6 +76,50 @@ with SB+GB in the 1v2 scenario, meaning GB availability actively
 hurts Aegislash's score. Root cause unclear - may be in the near-KO
 DP's plan selection or a bandaid condition.
 
+### 7. needsBoost / non-guaranteed-buff plan selection is dead code
+
+**File**: `ActionLogic.js:515-539, 793-810, 868` (decideAction DP)
+
+PvPoke's code looks like it accumulates a `stateList` of KO-bearing
+terminal DP states tagged with `.chance` (product of `buffApplyChance`
+values along the path), then picks the highest-chance plan when
+`opponent.turnsToKO != -1 && poke.turnsToKO > opponent.turnsToKO`
+(logged as "changes its plan because it needs the BOOST to win or
+debuff"). Line 868 gates a downstream plan-reorder on the same flag.
+
+Two independent faults render the whole system inert in simulate mode:
+
+1. **Line 539: `changeTTKChance = 0;`** (unconditional, with comment
+   "DISABLE THE NON-GUARANTEED BUFF EVALUATION SYSTEM"). This fires
+   at the top of every move-evaluation iteration, after lines 519-536
+   would have set `changeTTKChance` to the move's `buffApplyChance`.
+   Every chance-<1 DPQueue push (lines 613, 631, 661, 680, 710, 728,
+   756, 774) is gated on `if (changeTTKChance != 0)` → always false.
+   So `stateList` only ever accumulates chance-1 plans.
+2. **`needsBoost` is declared `false` on line 793 and is never
+   assigned `true` anywhere in the file** (grep confirms). The
+   "else if (... poke.turnsToKO > opponent.turnsToKO)" branch picks
+   `bestPlan` but doesn't flip the flag. So the `if (!needsBoost)`
+   gate at line 868 always fires — the plan-reorder branch is never
+   actually gated.
+
+**Empirical confirmation 2026-04-15**: ran `scripts/pvpoke_trace.js`
+across all 9 shield scenarios for the four GL species carrying
+`0 < buffApplyChance < 1` moves in their default movesets (Tinkaton+
+Bulldoze, Corviknight+AirCutter, Clefable+Moonblast, Drapion+Crunch)
+vs common opponents. The "needs the BOOST" decision log message never
+fired — 0 hits across 36 sims. Matches the static analysis.
+
+**Our stance**: we intentionally do NOT port stateList accumulation
+or the needsBoost trigger. Doing so would *diverge* from PvPoke's
+actual observable behavior in the direction of a feature PvPoke has
+explicitly disabled. Our first-KO-terminal pick matches PvPoke's
+effective single-plan behavior.
+
+If PvPoke ever removes line 539 or fixes the `needsBoost = true`
+assignment, revisit — the enumeration of affected meta species above
+still applies.
+
 ### 4. Mimikyu SS timing — RETRACTED 2026-04-15
 
 This was a phantom bug. We thought our Mimi threw Shadow Sneak one
@@ -99,31 +143,26 @@ implementation. Each is a potential source of score mismatches if we
 hit an edge case. Fix these before assuming a score difference is a
 PvPoke bug.
 
-### Open: needsBoost not yet ported
+### Closed 2026-04-15: needsBoost — not implementing (PvPoke system is dead code)
 
-PvPoke ActionLogic.js:793-810 picks the highest-`chance` member of
-`stateList` when `opponent.turnsToKO != -1 && poke.turnsToKO >
-opponent.turnsToKO` (logged as "changes its plan because it needs the
-BOOST to win or debuff"). Our `pvpoke_dp` doesn't track `turnsToKO`
-or build a `stateList` of alternative plans — we return the first
-KO-bearing terminal that pops from the priority queue.
+Originally flagged as an open port. Full root-cause writeup is in
+"PvPoke bugs found" §7 above. Short version: PvPoke's code looks
+like it picks alternative plans from a `stateList` accumulated over
+chance-<1 buff states, but (a) line 539 unconditionally zeros
+`changeTTKChance` so no chance-<1 states ever reach `stateList`, and
+(b) the `needsBoost` flag is never assigned `true`. Empirically
+verified 0 "needs the BOOST" log hits across 36 sims covering every
+GL-meta species whose default moveset includes a `buffApplyChance<1`
+charged move (Tinkaton, Corviknight, Clefable, Drapion).
 
-**Enumeration 2026-04-15** (per code-review §2 follow-up): grep'd
-the GL/UL top-30 default movesets for any charged move with
-`0 < buffApplyChance < 1` (the only moves that set the `.chance`
-field that `needsBoost` reads). Result:
+**Our single-plan behavior already matches PvPoke's observable
+behavior.** Porting stateList+needsBoost would diverge from the
+reference in the direction of a feature PvPoke has explicitly
+disabled — exactly the anti-pattern the CLAUDE.md "When our sim
+diverges from PvPoke" policy warns against.
 
-* GL top-30: **tinkaton (BULLDOZE), corviknight (AIR_CUTTER),
-  clefable (MOONBLAST), drapion_shadow (CRUNCH)**
-* UL top-30: **corviknight, tinkaton, clefable, zygarde_complete
-  (CRUNCH), drapion (CRUNCH)**
-
-So `needsBoost` is NOT dormant. It can fire in real matchups against
-these meta species — particularly Tinkaton and Corviknight, both
-central to current validation work. Implementation queued as a
-dedicated session (port stateList + turnsToKO + needsBoost trigger
-from ActionLogic.js:793-810; cross-check against harness on
-matchups featuring the listed species).
+Revisit only if PvPoke removes line 539 or fixes the
+`needsBoost = true` assignment upstream.
 
 ### Resolved divergences (full writeups in CHANGELOG.md)
 
