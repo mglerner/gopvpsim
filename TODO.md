@@ -81,6 +81,9 @@ break invariants that weren't yet nailed down by tests.
   disagrees with the recorded PvPoke numbers. Fix typos; separately
   flag genuine PvPoke divergences for follow-up.
 
+* **Speed test** -- compare our speed vs the PvPoke JS code, look for
+  ways we can speed ours up.
+
 * ~~**Forretress/Azu 0-shield score divergence**~~ — **RESOLVED 2026-04-15.**
   Not a DP plan-selection bug after all. Root cause: our OMT
   (`_optimize_move_timing`) had a `defender.hp > _fast_dmg` gate that
@@ -446,10 +449,41 @@ break invariants that weren't yet nailed down by tests.
   renderer module `scripts/deep_dive_narrative.py` (1016 lines, purple
   "IV Flavor Guide" zone between Expert Analysis gold and Simulation
   Deep Dive blue) is in place. Remaining in the 3-session SwagTips arc
-  per `~/.claude/plans/flickering-swinging-micali.md`: (2) Goodra
-  test-drive dive exercising the narrative output against real matchup
-  data, and (3) Aegislash form-change dive that stress-tests narrative
-  generation when the species swaps moves/stats mid-battle.
+  per `~/.claude/plans/flickering-swinging-micali.md`: (2) ~~Goodra
+  test-drive dive~~ **Done 2026-04-16** (Lechonk CD prep Session 2;
+  see "Narrative renderer polish gated on Oinkologne" below for items
+  logged but not fixed), and (3) Aegislash form-change dive that
+  stress-tests narrative generation when the species swaps moves/stats
+  mid-battle.
+
+* **Narrative renderer polish gated on Oinkologne** — surfaced during
+  the Goodra test-drive (2026-04-16, Lechonk CD prep Session 2). Items
+  are cosmetic; holding until Session 4 (Oinkologne deep dive) reveals
+  which actually bite on a different species before fixing
+  speculatively.
+  1. **General-tier 3-stat signature** — `Premium Bulk (116.30 Atk,
+     125.35 Def, 109 HP)` on moveset 0 shows atk, def, and HP even
+     though the "Premium Bulk" name signals bulk is the narrative
+     anchor. `_stat_signature` suppresses the non-primary axis only
+     for specialist flavors (those with `primary_axis` set by tier
+     name); General tiers keep all populated axes. Rule for "when
+     should a General tier treat one axis as primary" is unclear —
+     maybe "if tier name contains 'Bulk'/'Slayer'/etc.", but General
+     is by definition unnamed. Revisit on Oinkologne if the General
+     signature reads confusingly.
+  2. **22-IV catch-phrase edge case** — `_catch_phrase` caps at 500
+     catches as "very rare". The 22-IV Altaria Slayer on Goodra
+     moveset 4 shows `~129-258 for a 50-75% chance`, which is under
+     the cap but still a large number; arguably should have a middle
+     "rare" tier. Wait for Oinkologne to see what catch counts
+     actually land in the 50-300 range before adding a tier.
+  3. **Session 2 validation note** — most Goodra narrative thresholds
+     that diverge from RyanSwag's June 2024 reference are explained
+     by opponent-pool shift (Lickitung/Gligar/Mantine/Pelipper no
+     longer in PvPoke GL top-21), not renderer bugs. Session 4 /
+     Oinkologne should not re-litigate these; they are expected data
+     differences per the existing "format and reasoning style, not
+     exact stats" principle.
 
 * **Export Notable IVs cards to external scanner tool** — The user has a
   separate tool that scans their existing pokemon collection against

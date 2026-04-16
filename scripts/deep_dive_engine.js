@@ -1440,7 +1440,7 @@ function buildTraces() {
   // (e.g. an IV triple that wasn't translated to a canonical index)
   // would otherwise produce undefined x/y values and cause Plotly to
   // silently fail to render the *entire* plot.
-  function buildOverlayTrace(name, ivList, borderColor) {
+  function buildOverlayTrace(name, ivList, borderColor, subdued) {
     if (!ivList || ivList.length === 0) return null;
     var ox = [], oy = [], ot = [], ocol = [], osym = [];
     for (var k = 0; k < ivList.length; k++) {
@@ -1475,20 +1475,25 @@ function buildTraces() {
       // of this same fix.
       mode: 'markers', type: 'scattergl', hoverinfo: 'text',
       marker: {
-        size: 6,
+        size: subdued ? 5 : 6,
         color: ocol,
         symbol: osym,
-        opacity: 0.85,
-        line: { width: 1, color: borderColor }
+        opacity: subdued ? 0.65 : 0.85,
+        line: { width: subdued ? 0 : 1, color: borderColor }
       },
       hoverlabel: { bordercolor: borderColor }
     };
   }
 
+  // Push the anchor overlay FIRST so slayer/top-picks draw on top of
+  // it. Anchor IVs are typically a much larger set (often hundreds)
+  // and with full-size/full-opacity markers they visually dominate
+  // the plot; subdued styling keeps them visible as context without
+  // overwhelming the rarer slayer + recommended sets.
+  var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff', true);
+  if (anchorTrace) traces.push(anchorTrace);
   var slayerTrace = buildOverlayTrace('Slayer IVs', DATA.slayerIvs, '#FFD700');
   if (slayerTrace) traces.push(slayerTrace);
-  var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff');
-  if (anchorTrace) traces.push(anchorTrace);
   var recTrace = buildOverlayTrace('Top Picks', DATA.recIvs, '#e94560');
   if (recTrace) traces.push(recTrace);
 

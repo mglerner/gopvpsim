@@ -41,6 +41,8 @@ def _catch_phrase(n_qualifying, total_ivs):
         return ''
     if k50 <= 1:
         return 'almost any will do'
+    if (k75 if k75 is not None else k50) > 500:
+        return 'very rare'
     noun = 'catch' if k50 == 1 else 'catches'
     if k50 == k75 or k75 is None:
         return f'~{k50} {noun} for a 50% chance'
@@ -66,12 +68,17 @@ def _opponent_from_tier_name(name):
     return None
 
 
-def _stat_signature(atk, def_, hp):
-    """Format a stat signature string like '135.72 Def, 117 HP'."""
+def _stat_signature(atk, def_, hp, primary_axis=None):
+    """Format a stat signature string like '135.72 Def, 117 HP'.
+
+    primary_axis: 'atk', 'def', or None. If set, suppresses the other
+    axis so specialist flavors advertise only their headline stat.
+    General/unlabeled flavors (primary_axis=None) show all populated axes.
+    """
     parts = []
-    if atk > 0:
+    if atk > 0 and primary_axis != 'def':
         parts.append(f'{atk:.2f} Atk')
-    if def_ > 0:
+    if def_ > 0 and primary_axis != 'atk':
         parts.append(f'{def_:.2f} Def')
     if hp > 0:
         parts.append(f'{int(hp)} HP')
@@ -140,7 +147,13 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
         name = t.get('name', '')
         is_general = (name == 'General')
         flavor_name = _flavor_name_for_tier(name, atk, def_)
-        stat_sig = _stat_signature(atk, def_, hp)
+        primary_axis = None
+        if not is_general:
+            if name.endswith(' Atk') or name.startswith('Atk '):
+                primary_axis = 'atk'
+            elif name.endswith(' Bulk') or name.startswith('Bulk '):
+                primary_axis = 'def'
+        stat_sig = _stat_signature(atk, def_, hp, primary_axis)
 
         flavors.append({
             'name': flavor_name,
@@ -148,6 +161,7 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
             'atk_cut': atk,
             'def_cut': def_,
             'hp_cut': hp,
+            'primary_axis': primary_axis,
             'is_general': is_general,
             'recommended': False,
             'tier_color': t.get('color', '#888'),
@@ -175,7 +189,8 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
             if hp_vals:
                 hp = min(hp_vals)  # most inclusive HP requirement
                 f['hp_cut'] = hp
-                f['stat_sig'] = _stat_signature(f['atk_cut'], f['def_cut'], hp)
+                f['stat_sig'] = _stat_signature(f['atk_cut'], f['def_cut'], hp,
+                                                 f.get('primary_axis'))
                 f['n_qualifying'] = _count_qualifying(data_obj,
                                                       f['atk_cut'], f['def_cut'], hp)
 
@@ -440,6 +455,34 @@ def refine_flavor_names(flavors, tradeoffs):
                 rest = [g for g in gains
                         if _base_species(g['opponent']) != naming_opp]
                 td['gains'] = front + rest
+
+    # Drop wash specialists: if the naming opponent appears in losses at
+    # >= the gain-scenario count, the "slayer/fortified" label is
+    # misleading (e.g. gains Forretress 1-1 but loses Forretress 2-2).
+    to_remove_wash = set()
+    for f in flavors:
+        if f['is_general']:
+            continue
+        name = f['name']
+        if name.endswith(' Slayer'):
+            naming_opp = name[:-len(' Slayer')]
+        elif name.startswith('Fortified '):
+            naming_opp = name[len('Fortified '):]
+        else:
+            continue
+        td = tradeoffs.get(name, {})
+        gain_scens = {tuple(s) for g in td.get('gains', [])
+                      for s in g.get('scenarios', [])
+                      if _base_species(g['opponent']) == naming_opp}
+        loss_scens = {tuple(s) for l in td.get('losses', [])
+                      for s in l.get('scenarios', [])
+                      if _base_species(l['opponent']) == naming_opp}
+        if loss_scens and len(loss_scens) >= len(gain_scens):
+            to_remove_wash.add(name)
+    if to_remove_wash:
+        flavors[:] = [f for f in flavors if f['name'] not in to_remove_wash]
+        for name in to_remove_wash:
+            tradeoffs.pop(name, None)
 
     # Drop flavors whose gains are a strict subset of another flavor
     # on the same stat axis.  E.g. "Fortified Lickilicky" (gains: Lickilicky,
