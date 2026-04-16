@@ -1,0 +1,21 @@
+# Cross-species shared spreads and anchors.
+#
+# Entries here are referenced by name from per-species TOML files
+# (e.g. `shared.Great.spreads.medicham_atk_weighted`). On name collision
+# the per-species entry wins — see docs/threshold_schema.md "Top-level
+# (cross-species) anchors and spreads".
+#
+# Convention used by the opponent-pool loader (scripts/deep_dive.py):
+# when a shared spread is named `<species_lower>_atk_weighted` and the
+# species appears in the dive's opponent pool, the loader also sims
+# an additional opponent-pool entry labelled "<Species> (atk-weighted)"
+# using the spread's IV list. This is how we surface meta-relevant
+# attack-weighted opponent variants alongside the PvPoke rank-1 default.
+
+[shared]
+sources = "RyanSwag 'How to do your own PVP IV analysis' methodology video (video-confirmed 2026-04-16 — see docs/ryanswag_methodology_gap_analysis.md §2 Canonical consolidated list)"
+
+[shared.Great.spreads.medicham_atk_weighted]
+description = "RyanSwag's preferred 'Best of Both Worlds' Medicham at 7/15/14, 106.92 atk. Higher-attack variant than rank-1 NBB (5/15/15, 105.88 atk); a meta-relevant focal for Oinkologne / other GL species to prepare against."
+source = "RyanSwag 'How to do your own PVP IV analysis' methodology video"
+ivs = [[7, 15, 14]]

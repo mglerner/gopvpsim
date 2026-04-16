@@ -39,44 +39,83 @@ Techniques are ordered roughly as they appear in the transcript. `✅` = we do t
 
 ## 2. Numeric-claim verification list
 
-**Policy:** the transcript is voice-to-text, and numeric strings like "051 12" or "75.0843 point5" have visible artifacts. Per `project_swagtips_narrative_sessions.md` and the arc's bail-policy note, **treat every number below as provisional until Michael confirms from the source video.** Do not drive S4a / S13 / S14 design off any of these until confirmed.
+**Policy:** the transcript is voice-to-text, and numeric strings like "051 12" or "75.0843 point5" have visible artifacts. Per `project_swagtips_narrative_sessions.md` and the arc's bail-policy note, transcript numbers are provisional until Michael confirms them from the source video.
 
-Format: `transcript ~line N: <claim> — please confirm from the video?`
+**Status 2026-04-16:** Michael watched the focal-IV and opponent-IV segments of the video and confirmed all IV spreads (both originally-flagged and three additional hand-picks the transcript didn't name explicitly). Stat-threshold and debuff-mechanic numbers remain unconfirmed — flag each at point-of-use in S14/S15 and re-ask.
 
-### Focal Wigglytuff IV spreads shown
+Format below: original transcript line preserved for audit, `**Video-confirmed (2026-04-16):**` line underneath with the correct value. `?` = still unconfirmed.
 
-- transcript ~line 47–48: rank-1 Wigglytuff via "hitting maximize" is written as `"051 12"` — please confirm the actual IVs against the video? (`0/15/15` would be normal rank-1 max; `0/5/15` is unusual.)
-- transcript ~line 51: HP-weighted Wigglytuff shown as `"0915"` — probably `0/9/15`? Please confirm.
-- transcript ~line 400: "11 15.44% five" when discussing expanded-pool atk — voice artifact; unclear whether this is an IV spread or an attack-stat number. Please confirm?
+### Focal Wigglytuff IV spreads shown — ✅ confirmed
 
-### Focal Wigglytuff stat thresholds
+- transcript ~line 47–48: rank-1 Wigglytuff via "hitting maximize" is written as `"051 12"`.
+  **Video-confirmed (2026-04-16):** `0/15/12`. (The transcript garble "051 12" was "0 15 12" mis-spaced; rank-1 Wigglytuff via PvPoke's maximize button is L51 BB at `0/15/12`, not L50 NBB at `0/15/15`.)
+- transcript ~line 51: HP-weighted Wigglytuff shown as `"0915"`.
+  **Video-confirmed (2026-04-16):** `0/9/15`.
+- transcript ~line 56–57: "maximum defense by hitting you know defense and maximize" — no IV spelled out in transcript.
+  **Video-confirmed (2026-04-16):** `0/15/2`.
+- transcript ~line 58–65: "slight attack weight... just a little baby attack weight" — no IV spelled out.
+  **Video-confirmed (2026-04-16):** `6/14/15`.
+- transcript ~line 66–67: "wigly tff with a pretty huge attack weight" — no IV spelled out.
+  **Video-confirmed (2026-04-16):** `14/14/15`.
+- transcript ~line 400: "11 15.44% five" when discussing expanded-pool atk — voice artifact; unclear whether this is an IV spread or an attack-stat number.
+  **Status:** `?` — not in the IV-focal segment Michael watched; re-confirm when S5a touches rank-1 self-check text.
 
-- transcript ~line 149: "115.2 for attack stat" to gain the Mantine attack BP — confirm 115.2?
-- transcript ~line 262: "losing by just 2 HP so 224 HP could be a good baseline" vs Lantern 2-1 — confirm 224?
-- transcript ~line 269: "this Wigglytuff has 74.8 defense" with Thunderbolt dealing 78 — confirm 74.8 def and 78 damage?
-- transcript ~line 271: "if we had 75.4[s] then we might need one less HP, 223 could fit the bill" — confirm 75.4 def threshold and 223 HP?
-- transcript ~line 279: "unless you're popping 75 plus defense, 225 HP could be more consistent" — confirm 75 def / 225 HP?
-- transcript ~line 306: "74.2 defense" — Wigglytuff def needed vs rank-1 Lickitung 0-1 — confirm 74.2?
-- transcript ~line 336: "75.0843 point5" — def vs atk-weighted Lickitung variants. Voice-to-text garble; please confirm the two def thresholds (likely two numbers like `75.08` and `75.45`)?
-- transcript ~line 352: "73.41" — def needed vs rank-1 Metacham counter BP — confirm 73.41?
-- transcript ~line 372: "74.1 three" — def needed vs RyanSwag's preferred Metacham — confirm 74.13?
-- transcript ~line 398–419: final conclusions "75.1 def, 225 HP preferred; 224 HP OK if rank-1-adjacent; up to 229 HP in expanded pool" — confirm 75.1, 224, 225, 229?
+### Focal Wigglytuff stat thresholds — **still unconfirmed**
 
-### Opponent attack-weighted IV spreads (**directly feeds S4a**)
+- transcript ~line 149: "115.2 for attack stat" to gain the Mantine attack BP — `?`
+- transcript ~line 262: "losing by just 2 HP so 224 HP could be a good baseline" vs Lantern 2-1 — `?`
+- transcript ~line 269: "this Wigglytuff has 74.8 defense" with Thunderbolt dealing 78 — `?`
+- transcript ~line 271: "if we had 75.4[s] then we might need one less HP, 223 could fit the bill" — `?`
+- transcript ~line 279: "unless you're popping 75 plus defense, 225 HP could be more consistent" — `?`
+- transcript ~line 306: "74.2 defense" — Wigglytuff def needed vs rank-1 Lickitung 0-1 — `?`
+- transcript ~line 336: "75.0843 point5" — def vs atk-weighted Lickitung variants. Voice-to-text garble; likely two numbers. `?`
+- transcript ~line 352: "73.41" — def needed vs rank-1 Metacham counter BP — `?`
+- transcript ~line 372: "74.1 three" — def needed vs RyanSwag's preferred Metacham — `?`
+- transcript ~line 398–419: final conclusions "75.1 def, 225 HP preferred; 224 HP OK if rank-1-adjacent; up to 229 HP in expanded pool" — `?`
 
-- transcript ~line 140: rank-1 Mantine written as `"0514"` — `0/5/14`? Please confirm.
-- transcript ~line 332–333: "10 1514 lickong ... 98.2 attack stat" — `10/15/14` Lickitung at 98.2 atk? Please confirm both IV and atk stat.
-- transcript ~line 334: atk-weighted Lickitung "10413 right so 98.5 attack" — voice garble; probably `10/4/13`? Or `10/14/13`? Please confirm the IV spread and 98.5 atk.
-- transcript ~line 360–361: RyanSwag's "Best of Both Worlds" Metacham "71514 with the 106.9 attack stat" — `7/15/14` at 106.9 atk? Please confirm.
-- transcript ~line 370–374: "axe'n Metacham and axen-adjacent Metacham which have a high attack stat" — no numeric spread given; please confirm the axe'n-Metacham IVs from RyanSwag's Metacham Slayer dive if he names them, or from the video.
-- transcript ~line 378: rank-1 Metacham variant written as `"16 15 14"` — IV max is 15, so this is voice garble; probably `6/15/14`? Please confirm.
+These feed S14/S15 (post-debuff breakpoints) and the S5a rank-1 self-check. Confirm before driving design.
 
-### Debuff-mechanic numbers (**directly feeds S14**)
+### Opponent IV spreads (**directly feeds S4a/S4b**) — ✅ confirmed
 
-- transcript ~line 221–223: "7 right for each spark, and then you got the icy wind now it's changing to five for each spark" — the pre-debuff/post-debuff Lantern spark damage is `7 → 5` on the higher-def Wigglytuff variant. Please confirm both damage values?
-- transcript ~line 226: "rank-1 here with its lower defense you got the seven and the seven is only changing to a six" — rank-1 Wigglytuff post-IW goes `7 → 6`. Please confirm?
+- transcript ~line 140: rank-1 Mantine written as `"0514"`.
+  **Video-confirmed (2026-04-16):** `0/15/14` (transcript garble for "0 15 14"; not `0/5/14`).
+- transcript ~line 332–333: "10 1514 lickong ... 98.2 attack stat".
+  **Video-confirmed (2026-04-16):** `10/15/14` Lickitung — swag uses this instead of rank-1 `8/14/15` when preparing for atk-weighted Lickitung.
+- transcript ~line 334: atk-weighted Lickitung "10413 right so 98.5 attack".
+  **Video-confirmed (2026-04-16):** `10/14/13` (second atk-weighted Lickitung variant he considers).
+- transcript ~line 360–361: RyanSwag's "Best of Both Worlds" Metacham "71514 with the 106.9 attack stat".
+  **Video-confirmed (2026-04-16):** `7/15/14` at 106.9 atk (self-consistency check: `gopvpsim.pokemon.Pokemon.at_best_level('Medicham', 7, 15, 14)` → atk=106.9184). **This is the S4a end-to-end validation spread.**
+- transcript ~line 370–374: "axe'n Metacham and axen-adjacent Metacham which have a high attack stat" — no numeric spread given.
+  **Status:** `?` — not named in video per Michael's watch. If S4b wants axe'n variants, pull from RyanSwag's Metacham Slayer dive (not this transcript).
+- transcript ~line 378: rank-1 Metacham variant written as `"16 15 14"` — IV max is 15, so this was voice garble.
+  **Video-confirmed (2026-04-16):** `5/15/15` (rank-1 NBB Medicham; the transcript's "16 15 14" was "5 15 15" mis-transcribed). Self-consistency: `Medicham 5/15/15 GL` → atk=105.88, hp=142, matches typical rank-1 baseline.
 
-If any of these numbers differ from the video, the Tier A items in §3 may need re-shaping.
+### Debuff-mechanic numbers (**directly feeds S14**) — **still unconfirmed**
+
+- transcript ~line 221–223: Lantern spark damage `7 → 5` on higher-def Wigglytuff post-IW — `?`
+- transcript ~line 226: Lantern spark damage `7 → 6` on rank-1 Wigglytuff post-IW — `?`
+
+Confirm before S14 design uses them as a canonical oracle.
+
+### Canonical consolidated list (for downstream use)
+
+Ready-to-paste for TOML authoring. League is Great unless noted.
+
+**Wigglytuff focal hand-picks** (Wiggly rank-1 is computed, not authored):
+- Rank-1: `0/15/12` (L51 BB via PvPoke maximize)
+- HP-weighted: `0/9/15`
+- Max-def: `0/15/2`
+- Slight atk-weight: `6/14/15`
+- Larger atk-weight: `14/14/15`
+
+**Opponent variants RyanSwag uses against Wigglytuff:**
+- Mantine rank-1: `0/15/14`
+- Lickitung atk-weighted (primary): `10/15/14` (~98.2 atk)
+- Lickitung atk-weighted (secondary): `10/14/13` (~98.5 atk)
+- Medicham rank-1: `5/15/15` (~105.88 atk, NBB)
+- Medicham atk-weighted: `7/15/14` (~106.92 atk) — **S4a validation spread**
+
+If any of the still-unconfirmed stat/damage numbers above differ from the video when later checked, the Tier A items in §3 may need re-shaping.
 
 ---
 
@@ -118,7 +157,8 @@ Gaps are already sequenced in `~/.claude/plans/post-s5-oinkologne-arc.md` as S4a
 
 ## 4. Handoff
 
-- S4a session prompt should reference `§1 T9`, `§2 "Opponent attack-weighted IV spreads"`, and confirm the Metacham `7/15/14 @ 106.9 atk` number before using it as the end-to-end validation case.
-- S5a session prompt should reference `§1 T10 + T4` for the rank-1 self-check and fast-mover-framing additions.
+- S4a session prompt should reference `§1 T9` and the confirmed `§2 "Canonical consolidated list"`. Metacham `7/15/14 @ 106.9 atk` is the validation spread.
+- S4b session prompt should reference the confirmed Lickitung `10/15/14` and `10/14/13` variants for the broader authoring pass. Axe'n-Metacham variants are still unconfirmed and should come from RyanSwag's Metacham Slayer dive rather than this transcript.
+- S5a session prompt should reference `§1 T10 + T4` for the rank-1 self-check and fast-mover-framing additions. Wigglytuff rank-1 `0/15/12` is confirmed if an example is needed.
 - S13 session prompt should reference `§1 T7` and cite the transcript's Venusaur FP-vs-LT example at ~lines 165–207 as the canonical test case.
-- S14 / S15 session prompts should reference `§1 T8` and the Lantern spark 7→5 / 7→6 example at `§2 "Debuff-mechanic numbers"`; numbers must be confirmed before implementation.
+- S14 / S15 session prompts should reference `§1 T8` and the Lantern spark 7→5 / 7→6 example at `§2 "Debuff-mechanic numbers"`; **those damage numbers are still unconfirmed** and must be checked against the video before implementation.
