@@ -1,0 +1,13 @@
+# Oinkologne -- Great League thresholds and article link.
+#
+# CD article: articles/oinkologne_cd_2026_05.toml
+# Deep dive: userdata/website/oinkologne-great-league/
+#
+# This file is populated after the two-moveset deep dive (current default
+# TACKLE vs CD move MUD_SLAP). Threshold data added from dive results.
+
+[Oinkologne]
+sources = "pogo-simulator deep dive (2026-04-16); pre-CD Mud Slap analysis"
+
+[Oinkologne.article]
+slug = "oinkologne-cd-2026-05"
