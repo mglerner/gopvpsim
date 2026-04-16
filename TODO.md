@@ -768,45 +768,12 @@ Round 3 (numba JIT for the inner sim loop) was deprioritized because
 fastmath was confirmed a dead-end and the workload is no longer the
 bottleneck.
 
-* **Deep-dive analysis+narrative phase is 20+ min single-threaded**
-  *(own post-ship arc, not in current plan)* — Profile from
-  2026-04-17 small Oinkologne dive (1 moveset, 15 opponents,
-  `--opp-ivs both --bait both`, `--reserve-cpus 1`) with the new
-  S5a breadcrumb logger:
-  ```
-  Sim phase (multiprocessing):     8   min   (4 sweeps)
-  Analysis sections (single-thr): 11   min
-  Narrative compute (single-thr):  9.7 min
-  HTML write:                     <1   s
-  Total:                         ~30   min
-  ```
-  Both single-threaded hotspots scale with
-  `n_ivs × scenarios × opponents × modes × flavors`. For a full dive
-  (50+ opponents, 4 modes) they grow super-linearly since every
-  flavor triggers a fresh `probe_tier_cutoff_flips` scan and
-  `compute_flavor_tradeoffs` also runs `_find_losses_vs_general`
-  per flavor.
-  **Candidate targets** (highest-leverage first):
-    1. **`probe_tier_cutoff_flips`** in `scripts/deep_dive_analysis.py`
-       — vectorise the IV × scenario × opponent win-rate partition
-       with numpy (pure-Python inner loop today). Called 3-4× per
-       moveset; likely the single biggest chunk of narrative time.
-    2. **`_find_losses_vs_general`** in `scripts/deep_dive_narrative.py`
-       — same shape as #1 plus an additional partition-by-IV step;
-       numba-compilable after #1 lands.
-    3. **`render_results_section`** in `scripts/deep_dive_rendering.py`
-       — 11-min block is suspicious; likely has its own hotspot
-       (envelope-position metric iterates anchor-flip records × IVs).
-       Profile with cProfile once #1 and #2 are fast; may be
-       unblocked by them.
-  **Minimum ship**: #1 vectorised with a measurable speedup
-  (target: narrative phase 9.7 → 2 min). #2 + #3 can slip.
-  **Out of scope for post-S5 arc** (the ship target is Oinkologne
-  article; perf is quality-of-life, not a ship blocker). Open as
-  its own arc after S10. Add `--reserve-cpus 1` to `deep_dive.py`
-  (shipped 2026-04-17) does NOT help the single-threaded phases.
-  Cross-refs: `feedback_reserve_cpu_for_dives.md` (convention),
-  S5a breadcrumb logging in `deep_dive.py:2040-2127`.
+* ~~**Deep-dive analysis+narrative phase is 20+ min single-threaded**~~
+  *(pulled into current plan as S8a on 2026-04-17)* — profile numbers
+  and candidate targets live in `~/.claude/plans/post-s5-oinkologne-arc.md`
+  §S8a. Pulled forward because S9+S10 full dives both benefit from the
+  speedup; scope is contained (two vectorisation targets). Not post-ship
+  anymore.
 
 * **HTML file size** -- Are our deep dive/interactive HTML files
   getting too big? Latest fresh Annihilape HTML is ~25 MB; explicit is
