@@ -854,3 +854,172 @@ def probe_tier_cutoff_flips(data_obj, score_arrays_all, moveset_idx,
                         'fail_wr': fw,
                     })
     return results
+
+
+# ---- Envelope-position metric (S4) ----
+
+def compute_envelope_positions(categories, sp_ranks, avg_scores,
+                               anchor_iv_indices,
+                               *,
+                               k_nearest=20,
+                               min_members=3,
+                               min_anchors=5,
+                               shape_ratio=1.5):
+    """Per-category envelope position vs the Anchor IVs band at matching SP rank.
+
+    For each named IV category, compare each member's battle score against
+    the local mean of the Anchor IVs band at the same stat-product rank.
+    The per-member deltas have:
+        mean_delta - signed distance from the band (+ = above, - = below)
+        spread     - stdev of deltas (how tightly members hug an edge vs
+                     scatter across it)
+        shape      - descriptor:
+                       envelope-rider-top     |mean_delta|>=shape_ratio*spread, mean>0
+                       envelope-rider-bottom  |mean_delta|>=shape_ratio*spread, mean<0
+                       elevated-band-crosser  otherwise, mean>0
+                       depressed-band-crosser otherwise, mean<=0
+                       sparse                 too few members or too few anchors
+
+    Inputs:
+        categories: iterable of IVCategory-like objects (each must have
+            ``.name`` and ``.members`` — a list of canonical IV indices).
+        sp_ranks: sequence indexable by canonical IV index -> sp_rank (int,
+            1 = best). Produced by deep_dive.py at data_obj build time.
+        avg_scores: sequence indexable by canonical IV index -> avg battle
+            score (float). The caller picks which moveset / opp-iv mode
+            the average is taken over.
+        anchor_iv_indices: sequence of canonical IV indices in the Anchor
+            IVs overlay. Empty or too-small collections produce 'sparse'
+            classifications for every category.
+
+    Returns a dict keyed by category name, shape:
+        {cat_name: {
+            'mean_delta': float,
+            'spread':     float,   # 0.0 when spread undefined (n_members==1)
+            'shape':      str,
+            'n_members':  int,
+            'n_anchors':  int,     # total anchor band size
+        }}
+
+    Pure function: no I/O, no globals. Categories with zero members are
+    skipped entirely.
+
+    The metric is decoupled from the scatter renderer on purpose - the
+    S6+ article generator can consume it as a structured fact without
+    caring about HTML.
+    """
+    anchor_set = set(anchor_iv_indices)
+    n_anchors = len(anchor_set)
+
+    # Pre-sort anchors by sp_rank once; per-member lookups are
+    # binary-search + slice.
+    anchor_rank_score = sorted(
+        ((sp_ranks[a], avg_scores[a]) for a in anchor_set
+         if 0 <= a < len(sp_ranks) and 0 <= a < len(avg_scores)),
+        key=lambda p: p[0],
+    )
+    anchor_ranks = [p[0] for p in anchor_rank_score]
+    anchor_score_arr = [p[1] for p in anchor_rank_score]
+    n_anchor_band = len(anchor_ranks)
+
+    def _expected_at_rank(rank):
+        """Mean of the K anchor scores whose sp_rank is closest to ``rank``.
+
+        Ties on distance are resolved by rank order (sorted list already
+        reflects it). Returns None when the band is empty.
+        """
+        if n_anchor_band == 0:
+            return None
+        k = min(k_nearest, n_anchor_band)
+        # Binary search for insertion point.
+        lo, hi = 0, n_anchor_band
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if anchor_ranks[mid] < rank:
+                lo = mid + 1
+            else:
+                hi = mid
+        # Two-pointer expand around ``lo`` until we have k entries,
+        # always picking the closer neighbor.
+        left = lo - 1
+        right = lo
+        total = 0.0
+        picked = 0
+        while picked < k and (left >= 0 or right < n_anchor_band):
+            if left < 0:
+                total += anchor_score_arr[right]
+                right += 1
+            elif right >= n_anchor_band:
+                total += anchor_score_arr[left]
+                left -= 1
+            else:
+                d_left = rank - anchor_ranks[left]
+                d_right = anchor_ranks[right] - rank
+                if d_left <= d_right:
+                    total += anchor_score_arr[left]
+                    left -= 1
+                else:
+                    total += anchor_score_arr[right]
+                    right += 1
+            picked += 1
+        return total / picked if picked else None
+
+    def _mean(vals):
+        return sum(vals) / len(vals)
+
+    def _stdev(vals, mean):
+        if len(vals) < 2:
+            return 0.0
+        var = sum((v - mean) ** 2 for v in vals) / len(vals)
+        return var ** 0.5
+
+    out = {}
+    for cat in categories:
+        name = getattr(cat, 'name', None)
+        members = getattr(cat, 'members', None) or []
+        if not name or not members:
+            continue
+        if n_anchor_band < min_anchors or len(members) < min_members:
+            out[name] = {
+                'mean_delta': 0.0,
+                'spread': 0.0,
+                'shape': 'sparse',
+                'n_members': len(members),
+                'n_anchors': n_anchor_band,
+            }
+            continue
+
+        deltas = []
+        for iv in members:
+            if iv < 0 or iv >= len(sp_ranks) or iv >= len(avg_scores):
+                continue
+            expected = _expected_at_rank(sp_ranks[iv])
+            if expected is None:
+                continue
+            deltas.append(avg_scores[iv] - expected)
+        if not deltas:
+            out[name] = {
+                'mean_delta': 0.0,
+                'spread': 0.0,
+                'shape': 'sparse',
+                'n_members': len(members),
+                'n_anchors': n_anchor_band,
+            }
+            continue
+
+        mean_delta = _mean(deltas)
+        spread = _stdev(deltas, mean_delta)
+        if abs(mean_delta) >= shape_ratio * spread:
+            shape = ('envelope-rider-top' if mean_delta > 0
+                     else 'envelope-rider-bottom')
+        else:
+            shape = ('elevated-band-crosser' if mean_delta > 0
+                     else 'depressed-band-crosser')
+        out[name] = {
+            'mean_delta': mean_delta,
+            'spread': spread,
+            'shape': shape,
+            'n_members': len(members),
+            'n_anchors': n_anchor_band,
+        }
+    return out

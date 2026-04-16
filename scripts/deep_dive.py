@@ -1936,6 +1936,22 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         has_bait_axis=has_bait_axis,
     )
 
+    # Log envelope-position metric summary (S4). render_results_section
+    # stashes per-category metrics on data_obj['envelopePositions'] so
+    # the article generator (S6+) can consume them; this log line makes
+    # them visible in per-run dive logs for spot-checking.
+    _envelope_map = (data_obj.get('envelopePositions') or {}).get(
+        str(moveset_idx))
+    if _envelope_map:
+        for _name, _ep in _envelope_map.items():
+            logger.info(
+                "  Envelope [%s] %s: mean_delta=%+.2f spread=%.2f "
+                "(n=%d, anchors=%d)",
+                _ep.get('shape', '?'), _name,
+                _ep.get('mean_delta', 0.0), _ep.get('spread', 0.0),
+                _ep.get('n_members', 0), _ep.get('n_anchors', 0),
+            )
+
     # ======== IV FLAVOR GUIDE (narrative prose zone) ========
     # Narrative generation is now done per-moveset in the main HTML
     # assembly loop (_generate_narrative_for_moveset), not here.
@@ -2692,6 +2708,14 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += '    <option value="def">Defense</option>\n'
     html += '    <option value="atk">Attack</option>\n'
     html += '    <option value="score">Score</option>\n'
+    html += '  </select></label>\n'
+    # Anchor IVs overlay mode: 'filled' is the shipped subdued cyan blob;
+    # 'outline' swaps fill for ring markers so the envelope edge reads
+    # clearly and named-category traces riding the top/bottom show up
+    # against it instead of fighting the fill.
+    html += '  <label>Anchors: <select id="anchor-display-sel" onchange="updateView()">\n'
+    html += '    <option value="filled">Filled</option>\n'
+    html += '    <option value="outline">Outline</option>\n'
     html += '  </select></label>\n'
     # (Top-IVs table controls live next to the table itself — see the
     # control strip rendered just before <div id="summary"> below.)
