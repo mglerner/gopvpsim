@@ -591,6 +591,27 @@ break invariants that weren't yet nailed down by tests.
   (`High Bulk` tier: 5 primary def-bulk bullets, 1 free atk-mirror
   anchor, −73 vs Balanced callout).
 
+## Diagnostics / observability
+
+* **Switch deep_dive.py from print statements to a structured logger**
+  *(two sessions: planning + implementation)* — Recurring friction during
+  dive runs: stdout buffering makes live monitoring unreliable (analysis
+  phase goes silent for minutes while CPU is at 100%); piping through
+  `head` or `tee` introduces SIGPIPE / buffer-sync issues; no per-run
+  log file means `tail -f` races against the TTY; cache conflicts
+  between parallel dives (prevented by policy, but not diagnosable when
+  it happens); and no way to distinguish "stalled" from "working but
+  quiet." A real logger (Python `logging` module or structured JSON
+  logger) would give: (a) per-run log files with unique run IDs,
+  (b) timestamps on every message for elapsed-time reasoning,
+  (c) unbuffered writes to the log file (bypassing stdout pipe
+  buffering), (d) severity levels (progress vs. warnings vs. results),
+  (e) a machine-readable format for post-hoc analysis of run times.
+  **Planning session**: audit all print() calls, classify by severity,
+  design the log format and file layout. **Implementation session**:
+  port prints to logger calls, add per-run log file rotation, verify
+  `tail -f` works cleanly on the log file during a real dive.
+
 ## Performance
 
 **Architecture note (2026-04-07)**: The BeeWare/iOS-pure-Python constraint
