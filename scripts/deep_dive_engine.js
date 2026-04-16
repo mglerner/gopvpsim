@@ -1901,6 +1901,190 @@ function updateView() {
   reattachLegendHandlers();
   updateSummaryTable();
   updateMethodology();
+  updateHistograms();
+}
+
+// ---- Histograms ----
+//
+// PvPoke-style per-matchup battle-rating histogram. For the reference
+// IV (PvPoke default or rank-1, matching the Opponent-IVs dropdown),
+// bin the score against each (opponent, scenario) pair under the
+// active Shields / Opp-IVs / Bait state. Shape mirrors PvPoke's
+// "Overall Results" multi-battle histogram so articles can link to
+// our page and readers see comparable numbers.
+//
+// Only the active moveset's block is visible; anchor ids per moveset
+// remain so articles can deep-link to `#histogram-<slug>` and the
+// page-load hook will switch the moveset dropdown to match.
+var HISTO_BIN_SIZE = 50;
+var HISTO_N_BINS = 20;  // 0-1000 in 50-point bins — matches PvPoke
+
+// Viridis-ish gradient from purple (low) through red to blue (high),
+// matching PvPoke's coloring instinct (losses on the red/purple side,
+// wins on the blue/teal side). One color per bin center.
+var HISTO_STOPS = [
+  [0.00, [88,  28, 135]],  // deep purple
+  [0.25, [145, 40, 140]],  // magenta
+  [0.50, [180, 60, 120]],  // dusty rose (tie region)
+  [0.55, [110, 90, 170]],  // transition through lavender
+  [0.75, [70, 120, 185]],  // mid blue
+  [1.00, [50, 175, 210]],  // teal
+];
+function histoBinColor(t) {
+  if (!isFinite(t) || t <= 0) return 'rgb(88,28,135)';
+  if (t >= 1) return 'rgb(50,175,210)';
+  for (var i = 1; i < HISTO_STOPS.length; i++) {
+    if (t <= HISTO_STOPS[i][0]) {
+      var t0 = HISTO_STOPS[i-1][0], t1 = HISTO_STOPS[i][0];
+      var c0 = HISTO_STOPS[i-1][1], c1 = HISTO_STOPS[i][1];
+      var f = (t - t0) / (t1 - t0);
+      return 'rgb(' +
+        Math.round(c0[0] + f * (c1[0] - c0[0])) + ',' +
+        Math.round(c0[1] + f * (c1[1] - c0[1])) + ',' +
+        Math.round(c0[2] + f * (c1[2] - c0[2])) + ')';
+    }
+  }
+  return 'rgb(50,175,210)';
+}
+
+// Per-matchup score list for the reference IV at moveset `mi`, active
+// scenarios, active opp-IV mode (with bait suffix). One value per
+// (opponent, scenario) pair. This is the "Matches" distribution
+// PvPoke's histogram bins.
+function collectMatchScores(mi) {
+  var scores = getScores(mi, state.oppIvMode);
+  if (!scores) return null;
+  var refIv = (parse_oppiv_base(state.oppIvMode) === 'rank1')
+    ? DATA.rank1RefIvIdx : DATA.pvpokeRefIvIdx;
+  if (refIv == null || refIv < 0) {
+    // Fall back to rank-1-stat-product (yRank=1 under avgScore is not
+    // necessarily the scatter's reference IV, but it's a reasonable
+    // default if the Python side didn't populate a ref index).
+    for (var iv = 0; iv < nIvs; iv++) {
+      if (DATA.spRanks[iv] === 1) { refIv = iv; break; }
+    }
+  }
+  if (refIv == null || refIv < 0) return null;
+  var sis = getActiveScenarioIndices();
+  var out = [];
+  for (var k = 0; k < sis.length; k++) {
+    var si = sis[k];
+    var base = refIv * nS * nO + si * nO;
+    for (var oi = 0; oi < nO; oi++) out.push(scores[base + oi]);
+  }
+  return {scores: out, refIv: refIv};
+}
+
+function parse_oppiv_base(mode) {
+  if (!mode) return 'pvpoke';
+  var i = mode.indexOf(':');
+  return i >= 0 ? mode.substring(0, i) : mode;
+}
+
+function updateHistograms() {
+  var blocks = document.querySelectorAll('.dd-histogram-moveset');
+  if (!blocks.length) return;
+  for (var i = 0; i < blocks.length; i++) {
+    var block = blocks[i];
+    var mi = parseInt(block.getAttribute('data-moveset'));
+    var active = (mi === state.movesetIdx);
+    block.style.display = active ? 'block' : 'none';
+    if (!active) continue;
+    var plotDiv = block.querySelector('.dd-histogram-plot');
+    var captionDiv = block.querySelector('.dd-histogram-caption');
+    if (!plotDiv) continue;
+    var gathered = collectMatchScores(mi);
+    if (!gathered) continue;
+    var matchScores = gathered.scores;
+    var counts = new Array(HISTO_N_BINS);
+    for (var b0 = 0; b0 < HISTO_N_BINS; b0++) counts[b0] = 0;
+    var wins = 0, losses = 0, draws = 0, sum = 0, nMatches = 0;
+    for (var m = 0; m < matchScores.length; m++) {
+      var v = matchScores[m];
+      if (!isFinite(v)) continue;
+      var bi = Math.floor(v / HISTO_BIN_SIZE);
+      if (bi < 0) bi = 0;
+      if (bi >= HISTO_N_BINS) bi = HISTO_N_BINS - 1;
+      counts[bi]++;
+      nMatches++;
+      sum += v;
+      if (v > 500) wins++;
+      else if (v < 500) losses++;
+      else draws++;
+    }
+    var x = [], colors = [], hov = [];
+    for (var b = 0; b < HISTO_N_BINS; b++) {
+      var lo = b * HISTO_BIN_SIZE, hi = lo + HISTO_BIN_SIZE;
+      var mid = lo + HISTO_BIN_SIZE / 2;
+      x.push(mid);
+      colors.push(histoBinColor(mid / 1000));
+      hov.push('Rating ' + lo + '-' + hi + ': ' + counts[b] + ' matches');
+    }
+    var avg = nMatches > 0 ? Math.round(sum / nMatches) : 0;
+    var trace = {
+      type: 'bar', x: x, y: counts,
+      // hovertext (not text) keeps the labels in the tooltip only — `text`
+      // would render inside the bars when Plotly auto-picks textposition.
+      hovertext: hov, hoverinfo: 'text', textposition: 'none',
+      marker: {color: colors, line: {width: 0}},
+      width: new Array(HISTO_N_BINS).fill(HISTO_BIN_SIZE * 0.92),
+    };
+    var layout = {
+      xaxis: {title: 'Battle Rating (Avg: ' + avg + ')',
+              range: [0, 1000], tickvals: [0, 250, 500, 750, 1000],
+              fixedrange: true, showgrid: false, zeroline: false},
+      yaxis: {title: 'Matches', rangemode: 'tozero',
+              fixedrange: true, showgrid: false, zeroline: false},
+      paper_bgcolor: '#1a1a2e', plot_bgcolor: '#16213e',
+      font: {color: '#e0e0e0', size: 11},
+      margin: {t: 10, b: 48, l: 56, r: 16},
+      bargap: 0.04,
+      shapes: [{
+        type: 'line', x0: 500, x1: 500,
+        yref: 'paper', y0: 0, y1: 1,
+        line: {color: '#e0e0e0', width: 1, dash: 'dash'},
+      }],
+    };
+    Plotly.react(plotDiv, [trace], layout,
+                 {responsive: true, displayModeBar: false});
+    if (captionDiv) {
+      var pct = function(n) {
+        return nMatches > 0
+          ? ' (' + (100 * n / nMatches).toFixed(1) + '%)'
+          : '';
+      };
+      var refLabel = (parse_oppiv_base(state.oppIvMode) === 'rank1')
+        ? 'Rank 1' : 'PvPoke default';
+      var refIvStr = DATA.ivA[gathered.refIv] + '/' +
+                     DATA.ivD[gathered.refIv] + '/' +
+                     DATA.ivS[gathered.refIv];
+      captionDiv.innerHTML =
+        '<b style="color:#63b375">Wins: ' + wins + pct(wins) + '</b> &nbsp; ' +
+        '<b style="color:#e94560">Losses: ' + losses + pct(losses) + '</b> &nbsp; ' +
+        '<b>Draws: ' + draws + pct(draws) + '</b>' +
+        '<div style="font-size:11px;color:#888;margin-top:2px">' +
+        'reference IV: ' + refLabel + ' (' + refIvStr + '), ' +
+        nMatches + ' total matchups' +
+        '</div>';
+    }
+  }
+}
+
+// On first load, if the URL hash points at a histogram block, switch
+// the moveset dropdown to that block's moveset before the first
+// updateView() fires so the anchored block is the visible one.
+function applyHistogramHash() {
+  var h = (window.location.hash || '').replace(/^#/, '');
+  if (!h) return;
+  var block = document.getElementById(h);
+  if (!block || !block.classList.contains('dd-histogram-moveset')) return;
+  var mi = parseInt(block.getAttribute('data-moveset'));
+  if (isNaN(mi)) return;
+  var msel = document.getElementById('moveset-sel');
+  if (msel) {
+    msel.value = String(mi);
+  }
+  state.movesetIdx = mi;
 }
 
 // ---- Legend hover/click ----
@@ -1945,6 +2129,7 @@ function reattachLegendHandlers() {
 window.updateView = updateView;
 window.updateSummaryTable = updateSummaryTable;
 window._summarySortClick = _summarySortClick;
+applyHistogramHash();
 updateView();
 // Hook up the collection panel handlers now that updateView has run
 // once (nIvs, DATA, etc. are all in scope). Safe even if DATA.collection

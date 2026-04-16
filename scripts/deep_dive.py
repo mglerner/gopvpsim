@@ -2791,6 +2791,46 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # Methodology footer
     html += '<div id="methodology" class="methodology"></div>\n'
 
+    # Battle-rating histogram. One block per moveset, but only the
+    # active moveset is visible at any time (mirrors the narrative-zone
+    # display-swap at dd-narrative-moveset). Bins the reference IV's
+    # per-matchup scores (opponent x scenario, under the active
+    # Shields/Opponent-IVs/Bait state) so the shape is comparable to
+    # PvPoke's multi-battle histogram. Anchor ids (`histogram-<slug>`)
+    # stay per-moveset so articles can deep-link, and a small hook on
+    # page load switches the moveset dropdown to the anchored moveset.
+    html += ('<section class="histogram-section" '
+             'style="margin:20px 0">\n')
+    html += ('<h3 style="color:#58a6ff;margin:0 0 6px 0;'
+             'font-size:1.0rem">Battle-Rating Distribution</h3>\n')
+    html += ('<p style="font-size:12px;color:#aaa;margin:0 0 10px 0">'
+             'Per-matchup battle-rating distribution for the reference '
+             'IV (PvPoke default or Rank 1, matching the Opponent-IVs '
+             'dropdown) across the opponent pool, under the currently-'
+             'selected Shields / Opponent-IVs / Bait.</p>\n')
+    for _mi, _md in enumerate(moveset_data):
+        _slug = _moveset_slug(_md['label'])
+        _pretty = _pretty_moveset(_md['label'])
+        _vis = 'block' if _mi == 0 else 'none'
+        # max-width keeps the plot from stretching across the full page
+        # on wide monitors — narrower histograms read better and match
+        # PvPoke's visual density.
+        html += (
+            f'<div id="histogram-{_slug}" class="dd-histogram-moveset" '
+            f'data-moveset="{_mi}" data-moveset-slug="{_slug}" '
+            f'style="display:{_vis};scroll-margin-top:20px;'
+            'max-width:600px;margin:0 auto">\n'
+            f'  <div style="text-align:center;color:#c9d1d9;'
+            f'margin:0 0 4px 0;font-size:0.9rem">{_pretty}</div>\n'
+            f'  <div class="dd-histogram-plot" '
+            'style="height:260px"></div>\n'
+            f'  <div class="dd-histogram-caption" '
+            'style="text-align:center;margin:6px 0 0 0;font-size:12px;'
+            'color:#c9d1d9"></div>\n'
+            '</div>\n'
+        )
+    html += '</section>\n'
+
     # Deep dive analysis sections (banding, clusters, flips, etc.)
     # The anchor_passing_sink accumulates {anchor_id: [passing_iv_idx]}
     # for every anchor-flip bullet rendered inside the analysis layer.
