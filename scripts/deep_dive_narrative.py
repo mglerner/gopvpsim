@@ -208,8 +208,11 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
     # Sort: General/recommended first, then by selectivity (fewest
     # qualifying IVs = most interesting).  Cap at 4 total (General + 3)
     # to keep the narrative scannable - RyanSwag typically wrote 2-3.
+    # Drop flavors with 0 qualifying IVs -- the stat threshold is
+    # unreachable at this league's CP cap, so the tier is meaningless.
     general = [f for f in flavors if f['is_general']]
-    rest = sorted([f for f in flavors if not f['is_general']],
+    rest = sorted([f for f in flavors if not f['is_general']
+                   and f['n_qualifying'] > 0],
                   key=lambda f: f['n_qualifying'])
     result = general + rest[:3]
 
