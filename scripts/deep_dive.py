@@ -2060,7 +2060,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               standalone=False, slayer_iter_result=None,
                               cli_args_str=None, has_toml_tiers=False,
                               shadow=False, split_info=None,
-                              _precomputed_analysis=None):
+                              _precomputed_analysis=None,
+                              article_slug=''):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -2571,6 +2572,25 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 <p class="meta">Opponents: {opp_desc}
 | Shield scenario(s): {shield_desc} | Policy: pvpoke_dp{_bait_meta}</p>
 """
+
+    # Related article link (bidirectional link contract: docs/article_schema.md)
+    if article_slug:
+        _article_link = f'../articles/{article_slug}/'
+        _articles_dir = Path(html_path).resolve().parent.parent / 'articles' / article_slug
+        _article_meta = _articles_dir / 'meta.toml'
+        if _article_meta.exists():
+            import tomllib as _tl
+            with open(_article_meta, 'rb') as _f:
+                _am = _tl.load(_f)
+            _article_title = _am.get('title', 'Community Day Article')
+        else:
+            _article_title = f'{species} Community Day Article'
+        html += (
+            '<div style="background:#16213e;padding:12px 16px;border-radius:6px;'
+            'margin:10px 0;border-left:3px solid #d4a017">'
+            f'Expert Analysis: <a href="{_article_link}">{_article_title}</a>'
+            '</div>\n'
+        )
 
     # Opponent list
     if opponent_names:
@@ -3326,6 +3346,7 @@ def main():
     #     IV-list spreads are skipped (they have no stat-cutoff equivalent).
     thresholds = None
     threshold_registry = None
+    _article_slug = ''
     if args.thresholds:
         try:
             threshold_registry = load_threshold_file(
@@ -3354,6 +3375,17 @@ def main():
             except Exception as e:
                 print(f"  Warning: auto-load {_auto_toml.name} failed: {e}")
                 threshold_registry = None
+            # Extract article slug if the TOML has a [Species.article] section
+            try:
+                import tomllib as _tomllib
+                with open(_auto_toml, 'rb') as _f:
+                    _raw_toml = _tomllib.load(_f)
+                _article_table = _raw_toml.get(args.species, {}).get('article', {})
+                _article_slug = _article_table.get('slug', '')
+                if _article_slug:
+                    print(f"  Article link: articles/{_article_slug}/")
+            except Exception:
+                _article_slug = ''
 
     # Overlay --anchor-file files on top (repeatable; later wins on collision)
     if threshold_registry is not None and args.anchor_files:
@@ -4069,6 +4101,7 @@ def main():
                         shadow=args.shadow,
                         split_info=split_info,
                         _precomputed_analysis=_cached_analysis,
+                        article_slug=_article_slug,
                     )
             else:
                 if args.split_movesets:
@@ -4086,6 +4119,7 @@ def main():
                     cli_args_str=cli_args_str,
                     has_toml_tiers=_toml_tiers_loaded,
                     shadow=args.shadow,
+                    article_slug=_article_slug,
                 )
         else:
             # Static mode (original behavior)

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Regenerate userdata/website/index.html from per-dive meta.toml files.
+"""Regenerate userdata/website/index.html from per-dive and article meta.toml files.
 
-Scans userdata/website/*/meta.toml and emits a single landing page with
-one entry per dive. The website staging directory is gitignored (it
-lives under userdata/) and is the deliverable we rsync to mglerner.com.
+Scans userdata/website/*/meta.toml for deep dives and
+userdata/website/articles/*/meta.toml for articles. Emits a single
+landing page with separate sections for each content type.
 
-Dive metadata schema (per subdir ``meta.toml``):
+Dive/article metadata schema (per subdir ``meta.toml``):
 
     title       = "Tinkaton - Great League IV Deep Dive"
     description = "Free text, can be multi-line."
@@ -27,13 +27,16 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
+ARTICLES_DIR = WEBSITE_DIR / 'articles'
 INDEX_PATH = WEBSITE_DIR / 'index.html'
 
 
-def load_dives(website_dir: Path) -> list[dict]:
-    """Return one dict per valid dive subdir, sorted by title."""
-    dives = []
-    for sub in sorted(website_dir.iterdir()):
+def load_entries(base_dir: Path, *, href_prefix: str = '') -> list[dict]:
+    """Return one dict per valid subdir with a meta.toml, sorted by title."""
+    if not base_dir.exists():
+        return []
+    entries = []
+    for sub in sorted(base_dir.iterdir()):
         if not sub.is_dir():
             continue
         meta_path = sub / 'meta.toml'
@@ -54,30 +57,45 @@ def load_dives(website_dir: Path) -> list[dict]:
                   f"{meta['landing']!r} does not exist",
                   file=sys.stderr)
             continue
-        dives.append({
+        entries.append({
             'slug': sub.name,
             'title': meta['title'],
             'description': meta['description'].strip(),
             'landing': meta['landing'],
-            'href': f"{sub.name}/{meta['landing']}",
+            'href': f"{href_prefix}{sub.name}/{meta['landing']}",
         })
-    dives.sort(key=lambda d: d['title'].lower())
-    return dives
+    entries.sort(key=lambda d: d['title'].lower())
+    return entries
 
 
-def render_index(dives: list[dict]) -> str:
-    entries_html = []
-    for d in dives:
-        entries_html.append(
+def _render_entry_list(entries: list[dict], empty_msg: str) -> str:
+    items = []
+    for d in entries:
+        items.append(
             '  <li class="dive">\n'
             f'    <a href="{html.escape(d["href"])}">'
             f'<b>{html.escape(d["title"])}</b></a>\n'
             f'    <p>{html.escape(d["description"])}</p>\n'
             '  </li>'
         )
-    if not entries_html:
-        entries_html.append('  <li><i>No dives published yet.</i></li>')
-    body = '\n'.join(entries_html)
+    if not items:
+        items.append(f'  <li><i>{html.escape(empty_msg)}</i></li>')
+    return '\n'.join(items)
+
+
+def render_index(dives: list[dict], articles: list[dict]) -> str:
+    dives_html = _render_entry_list(dives, 'No dives published yet.')
+    articles_html = _render_entry_list(articles, 'No articles published yet.')
+
+    articles_section = ''
+    if articles:
+        articles_section = (
+            '\n<h2>Articles</h2>\n'
+            '<ul>\n'
+            f'{articles_html}\n'
+            '</ul>\n'
+        )
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -88,6 +106,8 @@ def render_index(dives: list[dict]) -> str:
          sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px;
          background: #1a1a2e; color: #e0e0e0; line-height: 1.5; }}
   h1 {{ color: #e94560; }}
+  h2 {{ color: #c8a2d0; border-bottom: 1px solid #0f3460;
+        padding-bottom: 6px; }}
   a {{ color: #9be89b; text-decoration: none; }}
   a:hover {{ text-decoration: underline; }}
   ul {{ list-style: none; padding: 0; }}
@@ -103,9 +123,11 @@ def render_index(dives: list[dict]) -> str:
 <p>Interactive IV / moveset deep dives generated from a homebrew battle
 simulator that matches PvPoke's simulate-mode scores. Click a title to
 open the dive. Each page is self-contained and runs in your browser.</p>
+<h2>Deep Dives</h2>
 <ul>
-{body}
+{dives_html}
 </ul>
+{articles_section}
 <p class="about">Built with <a href="https://github.com/pvpoke/pvpoke">PvPoke</a>
 game data. If you find something broken or surprising, email me.</p>
 </body>
@@ -117,12 +139,15 @@ def main() -> int:
     if not WEBSITE_DIR.exists():
         print(f"error: {WEBSITE_DIR} does not exist", file=sys.stderr)
         return 1
-    dives = load_dives(WEBSITE_DIR)
-    index_html = render_index(dives)
+    dives = load_entries(WEBSITE_DIR)
+    articles = load_entries(ARTICLES_DIR, href_prefix='articles/')
+    index_html = render_index(dives, articles)
     INDEX_PATH.write_text(index_html)
-    print(f"Wrote {INDEX_PATH} ({len(dives)} dive(s))")
+    print(f"Wrote {INDEX_PATH} ({len(dives)} dive(s), {len(articles)} article(s))")
     for d in dives:
-        print(f"  - {d['title']} -> {d['href']}")
+        print(f"  - [dive] {d['title']} -> {d['href']}")
+    for a in articles:
+        print(f"  - [article] {a['title']} -> {a['href']}")
     return 0
 
 

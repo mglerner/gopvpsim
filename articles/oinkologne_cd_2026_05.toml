@@ -1,0 +1,75 @@
+# Oinkologne Community Day — Mud Slap move-comparison article.
+#
+# Source TOML for the CD article page. Rendered by scripts/render_article.py
+# into userdata/website/articles/oinkologne-cd-2026-05/.
+#
+# Schema: docs/article_schema.md
+# Link contract: docs/article_schema.md "Bidirectional link contract"
+
+title       = "Oinkologne Community Day: Is Mud Slap Worth It?"
+species     = "Oinkologne"
+cd_date     = "2026-05-09"
+author      = "mglerner"
+description = """
+A PvP analysis of Mud Slap on Community Day Oinkologne. Compares the \
+new fast move against the existing Tackle/Take Down options across \
+Great League and Ultra League, with IV recommendations.
+"""
+
+cd_move     = "Mud Slap"
+framing     = "sidegrade"
+authorship  = "auto"
+
+[obsolescence]
+status  = "current"
+as_of   = "2026-04-16"
+note    = ""
+
+[links]
+deep_dive_slug = "oinkologne-great-league"
+
+# ── Content sections ──────────────────────────────────────────────────
+# Placeholder structure modeled on JRE's Tinkaton CD article.
+# Session 5 fills these with real analysis from the Session 4 dive data.
+
+[[sections]]
+heading = "Introduction"
+body    = """
+PLACEHOLDER — Session 5. Brief intro: Oinkologne gets Mud Slap on \
+Community Day (May 9, 2026). What does that mean for PvP?
+"""
+
+[[sections]]
+heading = "Movesets Before and After"
+body    = """
+PLACEHOLDER — Session 5. Compare existing fast moves (Tackle, Take Down) \
+against Mud Slap. Energy generation vs damage tradeoffs.
+"""
+
+[[sections]]
+heading = "Great League Performance"
+body    = """
+PLACEHOLDER — Session 5. How does Mud Slap Oinkologne perform in GL? \
+Key matchup flips, IV thresholds that matter.
+"""
+
+[[sections]]
+heading = "Ultra League Performance"
+body    = """
+PLACEHOLDER — Session 5. UL analysis if applicable, or note that \
+Oinkologne's stat product doesn't favor UL.
+"""
+
+[[sections]]
+heading = "IV Recommendations"
+body    = """
+PLACEHOLDER — Session 5. Which IVs to target for CD catches. \
+Reference the deep dive for the full IV grid.
+"""
+
+[[sections]]
+heading = "Verdict"
+body    = """
+PLACEHOLDER — Session 5. Sidegrade, upgrade, or skip? \
+Catch recommendations for CD day.
+"""
