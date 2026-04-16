@@ -266,6 +266,15 @@ convention.
 - `scripts/clean_logs.py` — new small script (likely <100 lines).
   Dry-run default; `--execute` required. See §3 "Periodic cleanup"
   for flag list. Can be cron'd if you want set-and-forget.
+- `DEVELOPER_NOTES.md` — add a "Log file layout" subsection parallel
+  to the existing "Deep dive output file layout" section. Content:
+  where logs live (`userdata/logs/YYYY-MM/`), the `latest.log`
+  symlink convention, how to tail live runs, and a short
+  `clean_logs.py` usage example (dry-run first, `--execute` to
+  actually delete). This is the "how it works once shipped"
+  counterpart to this S1 doc's "why it's shaped this way" focus —
+  S1 stays as the design record; DEVELOPER_NOTES captures the
+  steady-state reference material future sessions will read.
 
 ### S2 does NOT touch
 - Core library `gopvpsim/` — out of scope.
