@@ -2583,12 +2583,24 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             with open(_article_meta, 'rb') as _f:
                 _am = _tl.load(_f)
             _article_title = _am.get('title', 'Community Day Article')
+            _authorship = _am.get('authorship', 'auto')
         else:
             _article_title = f'{species} Community Day Article'
+            _authorship = 'auto'
+        # Label and color match the article's authorship level
+        if _authorship == 'expert':
+            _link_label = 'Expert Analysis'
+            _border_color = '#d4a017'  # gold
+        elif _authorship == 'both':
+            _link_label = 'Analysis'
+            _border_color = '#7db87d'  # green
+        else:
+            _link_label = 'Related Article'
+            _border_color = '#5b8dd9'  # blue
         html += (
             '<div style="background:#16213e;padding:12px 16px;border-radius:6px;'
-            'margin:10px 0;border-left:3px solid #d4a017">'
-            f'Expert Analysis: <a href="{_article_link}">{_article_title}</a>'
+            f'margin:10px 0;border-left:3px solid {_border_color}">'
+            f'{_link_label}: <a href="{_article_link}">{_article_title}</a>'
             '</div>\n'
         )
 

@@ -188,9 +188,11 @@ def render_html(article: dict) -> str:
 def write_meta_toml(slug_dir: Path, article: dict) -> None:
     title = article['title']
     desc = article['description'].strip()
+    authorship = article.get('authorship', 'auto')
     meta_content = (
         f'title = {_toml_string(title)}\n'
         f'description = {_toml_string(desc)}\n'
+        f'authorship = {_toml_string(authorship)}\n'
         f'landing = "index.html"\n'
     )
     (slug_dir / 'meta.toml').write_text(meta_content)

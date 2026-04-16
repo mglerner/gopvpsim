@@ -484,6 +484,25 @@ break invariants that weren't yet nailed down by tests.
      Oinkologne should not re-litigate these; they are expected data
      differences per the existing "format and reasoning style, not
      exact stats" principle.
+  4. **Identical-stat flavors not merged** — surfaced on Oinkologne
+     Tackle moveset (Session 4): "Quagsire Slayer" and "Quagsire
+     (Shadow) Slayer" have identical stat signatures (123.97 Atk,
+     153 HP) and 0 IVs each. When two opponent-derived flavors share
+     the same stat thresholds, they should be merged into one flavor
+     named after both opponents (e.g. "Quagsire / Shadow Quagsire
+     Slayer"). The merge should happen in the narrative renderer's
+     flavor-derivation logic, not downstream.
+  5. **Narrative flavors not reflected in Plotly scatter tiers** —
+     surfaced on Oinkologne Tackle moveset (Session 4): the IV Flavor
+     Guide derives 4 flavors (Premium Bulk, Quag Slayer, Shadow Quag
+     Slayer, G-Corsola Slayer) but the Plotly scatter only shows
+     "Top 5%" because the anchor-flip aggregation system found too
+     few records to derive named tiers. The two tier systems (anchor-
+     flip-derived plot tiers and narrative-derived flavors) are
+     independent; when the anchor system falls back to "Top 5%" only,
+     the plot loses all the structure the narrative found. Consider
+     feeding narrative flavors back as plot tier annotations, at least
+     as a fallback when anchor-derived tiers are sparse.
 
 * **Export Notable IVs cards to external scanner tool** — The user has a
   separate tool that scans their existing pokemon collection against
