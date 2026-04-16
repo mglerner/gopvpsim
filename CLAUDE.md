@@ -121,6 +121,33 @@ Pluggable policy. Simulate all three shield scenarios (0-0, 1-1, 2-2).
 - `DEVELOPER_NOTES.md` — verification status, PvPoke comparison, bugs found.
 - `docs/validations/` — point-in-time experiment writeups.
 
+## Debugging conventions (deep-dive scripts)
+
+`scripts/deep_dive.py` and `scripts/deep_dive_slayer.py` emit progress
+through the structured logger in `scripts/deep_dive_logging.py`
+(see `docs/structured_logger_design.md` and DEVELOPER_NOTES "Log file
+layout"). Do **not** introduce new `print()` calls that end up in a
+commit — they bypass the log file, they don't honor `--quiet`/`--verbose`,
+and they buffer badly when emitted from a multiprocessing worker.
+
+`print()` is fine for live iteration inside a session. To keep it from
+sneaking into a commit, prefix every ad-hoc debug print with the literal
+sigil `XXX:` — e.g. `print(f"XXX: got {result}")`. The rule:
+
+- **During a session:** use `print("XXX: ...")` freely wherever it helps.
+- **Before committing:** grep for `XXX:` in touched files. For each hit,
+  either delete it or convert to `logger.debug(...)` (gated by
+  `--verbose`) if the signal deserves to live. Commit should contain
+  zero `XXX:` markers.
+- **For worker processes:** never commit bare `print()` from a
+  multiprocessing worker. Always route through `logger.*()` so the
+  record lands in the file with the rest.
+
+Permanent progress messages use `logger.info(...)`, warnings use
+`logger.warning(...)`, final-output tables and the species banner use
+`logger.result(...)` (plain formatter, no timestamp). DEBUG records only
+reach the file handler when `--verbose` is passed.
+
 ## Markdown formatting
 All `*.md` files in this project should be formatted by `scripts/format_md.py`,
 which keeps them readable in a raw text editor (currently: pads pipe-table cells

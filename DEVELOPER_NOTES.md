@@ -538,6 +538,77 @@ validation HTMLs under `docs/validations/`) are a separate category —
 those are checked in deliberately as point-in-time evidence and don't
 follow this convention.
 
+## Log file layout
+
+`scripts/deep_dive.py` and `scripts/deep_dive_slayer.py` route all
+progress, warnings, and final-output tables through a structured logger
+(`scripts/deep_dive_logging.py`). Rationale and the per-call-site
+classification live in `docs/structured_logger_design.md`; this section
+is the steady-state reference.
+
+**Per-run log file.** Every dive opens
+`userdata/logs/YYYY-MM/YYYYMMDD_HHMMSS_<species>_<league>[_shadow].log`
+and writes every INFO/WARNING/RESULT record (plus DEBUG when
+`--verbose` is passed). The monthly subdir is created on demand. File
+records carry a full `[YYYY-MM-DD HH:MM:SS.mmm] LEVEL   deep_dive: ...`
+prefix so `grep -E '\] WARNING' userdata/logs/2026-04/*.log` is a
+reasonable forensic starting point. As with `userdata/dives/`, the whole
+`userdata/logs/` tree is gitignored — logs persist across reboots but
+never enter the repo.
+
+**Latest-run symlink.** Right after the file is opened, the logger
+atomically refreshes `userdata/logs/latest.log` to point at the current
+run. Canonical monitoring command:
+
+```
+tail -f userdata/logs/latest.log
+```
+
+The symlink is swapped via `rename(2)`, so a long-running `tail -f` from
+another terminal never lands on a broken link mid-update — the previous
+run's file stays open on the old inode until you stop tailing it.
+
+**CLI flags** (on `scripts/deep_dive.py`):
+
+- `--verbose` — promotes aggregator DEBUG records to the log file.
+  Stdout is unchanged.
+- `--quiet` — suppresses INFO on stdout; WARNINGs and the Top-20 /
+  banner RESULT records still appear. The log file is unaffected.
+- `--log-file PATH` — overrides the auto-generated log path. Use
+  `/dev/null` to disable the file handler entirely.
+- `--log-dir DIR` — relocates the logs root. Useful for batch runs
+  that want their own dated directory. Ignored when `--log-file` is
+  given.
+
+**Worker processes.** Spawn-mode pool workers (default on macOS) do not
+inherit the parent logger's handlers. Each pool's initializer calls
+`deep_dive_logging.worker_log_setup(log_path, verbose=...)` — a bare
+`print()` from a worker bypasses the log file *and* stdout buffering
+kicks in. If you add a new multiprocessing surface, thread `log_path`
+and `verbose` through `initargs` alongside the existing state. See
+CLAUDE.md "Debugging conventions" for the commit-time rules around
+ad-hoc debug prints.
+
+**Periodic cleanup** via `scripts/clean_logs.py` (dry-run default):
+
+```
+# Preview what would go away
+python scripts/clean_logs.py --older-than 30d
+
+# Actually delete
+python scripts/clean_logs.py --older-than 30d --execute
+
+# Archive (move to userdata/logs/archive/YYYY-MM/) instead of deleting
+python scripts/clean_logs.py --older-than 60d --archive --execute
+
+# Keep only the 50 most recent runs across all months
+python scripts/clean_logs.py --keep-last 50 --execute
+```
+
+No auto-purge inside `deep_dive.py` — deletions happen only when you
+run the cleanup script with `--execute`. The archive subtree is
+gitignored the same way the live tree is.
+
 ## All-in-one vs split-moveset HTML
 
 The all-in-one interactive HTML (`--interactive` without `--split-movesets`)
