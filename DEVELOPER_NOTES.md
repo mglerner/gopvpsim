@@ -566,7 +566,7 @@ When a CD move turns out to be strictly better/worse than the sidegrade
 framing claimed, or the meta shifts enough that the analysis no longer
 applies:
 
-1. Edit the article TOML (e.g. `articles/oinkologne_cd_2026_05.toml`).
+1. Edit the article TOML (e.g. `articles/oinkologne-cd-2026-05.toml`).
 2. Change `[obsolescence]` fields:
    ```toml
    [obsolescence]
@@ -574,7 +574,7 @@ applies:
    as_of  = "2026-06-15"       # date you're marking it obsolete
    note   = "Mud Slap is strictly better in GL; sidegrade framing no longer applies."
    ```
-3. Re-render: `python scripts/render_article.py articles/oinkologne_cd_2026_05.toml`
+3. Re-render: `python scripts/render_article.py articles/oinkologne-cd-2026-05.toml`
 4. Republish: `scripts/publish_website.sh --push`
 
 The renderer shows a red banner at the top of the page with the note

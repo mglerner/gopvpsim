@@ -2,7 +2,7 @@
 """Render a CD article TOML into a self-contained HTML page.
 
 Usage:
-    python scripts/render_article.py articles/oinkologne_cd_2026_05.toml
+    python scripts/render_article.py articles/oinkologne-cd-2026-05.toml
 
 Output lands in userdata/website/articles/<slug>/ with:
   - index.html  (the article page)
