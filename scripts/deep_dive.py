@@ -646,17 +646,121 @@ def resolve_opp_ivs(species_name, league, shadow, opp_iv_mode):
         return a, d, s
 
 
+# Variant-suffix plumbing for attack-weighted opponent sweeps.
+#
+# Opponents are passed around as display strings. Shadow variants use the
+# ' (Shadow)' suffix (handled inline at call sites); attack-weighted variants
+# use the parallel suffix below. The parser pulls the base species back out so
+# gamemaster lookups keep working; the variant tag signals to the opp_cache
+# builder that the IVs should come from the shared spread registry rather than
+# resolve_opp_ivs().
+ATK_WEIGHTED_SUFFIX = ' (atk-weighted)'
+
+
+def parse_opponent_spec(opp_name):
+    """Split an opponents-list entry into (species, variant, is_shadow).
+
+    Handles three forms:
+      'Medicham'                 -> ('Medicham', None,           False)
+      'Medicham (Shadow)'        -> ('Medicham', None,           True)
+      'Medicham (atk-weighted)'  -> ('Medicham', 'atk_weighted', False)
+
+    Shadow + atk-weighted in the same entry is not supported (no meta-relevant
+    opponent today is both).
+    """
+    variant = None
+    name = opp_name
+    if name.endswith(ATK_WEIGHTED_SUFFIX):
+        name = name[:-len(ATK_WEIGHTED_SUFFIX)]
+        variant = 'atk_weighted'
+    is_shadow = name.endswith(' (Shadow)')
+    if is_shadow:
+        name = name[:-len(' (Shadow)')]
+    return name, variant, is_shadow
+
+
+def _atk_weighted_spread_name(species):
+    """Canonical shared-spread name for a species's atk-weighted variant."""
+    return f"{species.lower().replace(' ', '_').replace('(', '').replace(')', '')}_atk_weighted"
+
+
+def variant_ivs(species, variant, league, threshold_registry):
+    """Return (atk_iv, def_iv, sta_iv) for a named variant, or None if absent.
+
+    Today only 'atk_weighted' is defined; future variants can follow the same
+    shared-spread naming convention.
+    """
+    if variant != 'atk_weighted' or threshold_registry is None:
+        return None
+    spread = threshold_registry.get_spread(
+        species, league.capitalize(), _atk_weighted_spread_name(species),
+    )
+    if spread is None:
+        return None
+    ivs = getattr(spread, 'ivs', None)
+    if not ivs:
+        return None
+    # IvListSpread.ivs is a tuple of (a,d,s) tuples; take the first entry.
+    # Multi-IV spreads are an S4b concern; for S4a one spread = one variant.
+    return ivs[0]
+
+
+def expand_opponents_with_variants(opponents, opp_movesets, threshold_registry, league):
+    """Append attack-weighted variants for species with a matching shared spread.
+
+    For each base species in ``opponents``, check whether
+    ``shared.<League>.spreads.<species>_atk_weighted`` exists. If so, append
+    ``'<Species> (atk-weighted)'`` to the opponents list using the same
+    moveset as the base entry. Silent on species without a matching spread.
+
+    Returns (opponents_out, opp_movesets_out, added_labels).
+    """
+    if threshold_registry is None:
+        return list(opponents), list(opp_movesets), []
+    league_key = league.capitalize()
+    already_present = set()
+    for name in opponents:
+        species, variant, _ = parse_opponent_spec(name)
+        if variant == 'atk_weighted':
+            already_present.add(species)
+
+    opponents_out = list(opponents)
+    opp_movesets_out = list(opp_movesets)
+    added = []
+    for idx, name in enumerate(list(opponents)):
+        species, variant, is_shadow = parse_opponent_spec(name)
+        if variant is not None:
+            continue
+        if is_shadow:
+            continue
+        if species in already_present:
+            continue
+        spread_name = _atk_weighted_spread_name(species)
+        if threshold_registry.get_spread(species, league_key, spread_name) is None:
+            continue
+        variant_label = f"{species}{ATK_WEIGHTED_SUFFIX}"
+        opponents_out.append(variant_label)
+        opp_movesets_out.append(opp_movesets[idx])
+        added.append(variant_label)
+        already_present.add(species)
+    return opponents_out, opp_movesets_out, added
+
+
 def sim_score(focal_species, fast_id, charged_ids, league, shields_focal,
               shields_opp, atk_iv, def_iv, sta_iv, shadow,
               opp_species, opp_fast, opp_charged, opp_shadow=False,
-              opp_iv_mode='pvpoke'):
+              opp_iv_mode='pvpoke', threshold_registry=None):
     """Run one sim and return the focal mon's PvPoke score (0-1000)."""
     bp0 = make_battle_pokemon(focal_species, fast_id, charged_ids, league,
                               shields_focal, atk_iv, def_iv, sta_iv, shadow)
 
-    opp_is_shadow = opp_shadow or opp_species.endswith(' (Shadow)')
-    opp_name = opp_species.replace(' (Shadow)', '') if opp_is_shadow else opp_species
-    oa, od, os_ = resolve_opp_ivs(opp_name, league, opp_is_shadow, opp_iv_mode)
+    opp_name, variant, parsed_shadow = parse_opponent_spec(opp_species)
+    opp_is_shadow = opp_shadow or parsed_shadow
+    variant_iv = variant_ivs(opp_name, variant, league, threshold_registry)
+    if variant_iv is not None:
+        oa, od, os_ = variant_iv
+    else:
+        oa, od, os_ = resolve_opp_ivs(opp_name, league, opp_is_shadow, opp_iv_mode)
     bp1 = make_battle_pokemon(opp_name, opp_fast, opp_charged, league,
                               shields_opp, oa, od, os_, shadow=opp_is_shadow)
 
@@ -683,7 +787,8 @@ def moveset_label_raw(fast_id, charged_ids):
 # ---------------------------------------------------------------------------
 
 def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
-                    shield_scenarios, top_n, opp_iv_mode='pvpoke'):
+                    shield_scenarios, top_n, opp_iv_mode='pvpoke',
+                    threshold_registry=None):
     """
     Quick screen: sim rank-1 IVs for each moveset against opponents.
     Return the top N movesets by average score.
@@ -710,7 +815,8 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
                 score = sim_score(species, fast_id, charged_ids, league,
                                   s_focal, s_opp, a_iv, d_iv, s_iv, shadow,
                                   opp_name, opp_fast, opp_charged,
-                                  opp_iv_mode=opp_iv_mode)
+                                  opp_iv_mode=opp_iv_mode,
+                                  threshold_registry=threshold_registry)
                 total += score
                 count += 1
         avg = total / count if count else 0
@@ -877,7 +983,8 @@ def _sweep_worker(profile_chunk):
 
 def iv_sweep(species, fast_id, charged_ids, league, shadow,
              opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke',
-             iv_floor=None, log_path=None, verbose=False):
+             iv_floor=None, log_path=None, verbose=False,
+             threshold_registry=None):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
@@ -911,9 +1018,12 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     # Cache opponent stats (BattlePokemon is mutated by simulate, but stats are fixed)
     opp_cache = []
     for opp_name, (opp_fast, opp_charged) in zip(opponents, opp_movesets):
-        opp_is_shadow = '_shadow' in opp_name.lower().replace(' ', '_')
-        opp_clean = opp_name
-        oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode_simple)
+        opp_clean, variant, opp_is_shadow = parse_opponent_spec(opp_name)
+        variant_iv = variant_ivs(opp_clean, variant, league, threshold_registry)
+        if variant_iv is not None:
+            oa, od, os_ = variant_iv
+        else:
+            oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode_simple)
         opp_pokemon = Pokemon.at_best_level(opp_clean, oa, od, os_,
                                             league=league, shadow=opp_is_shadow)
         opp_mon = next(m for m in gm['pokemon'] if m['speciesName'] == opp_clean)
@@ -1647,7 +1757,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                shield_scenarios, opponent_names,
                                slayer_iter_result=None,
                                has_toml_tiers=False,
-                               anchor_passing_sink=None):
+                               anchor_passing_sink=None,
+                               threshold_registry=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
@@ -1702,9 +1813,12 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     league = data_obj.get('league', 'great')
     for opp_name in opponents:
         try:
-            opp_clean = opp_name
-            opp_is_shadow = '_shadow' in opp_name.lower().replace(' ', '_')
-            oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode)
+            opp_clean, variant, opp_is_shadow = parse_opponent_spec(opp_name)
+            variant_iv = variant_ivs(opp_clean, variant, league, threshold_registry)
+            if variant_iv is not None:
+                oa, od, os_ = variant_iv
+            else:
+                oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode)
             opp_pokemon = Pokemon.at_best_level(opp_clean, oa, od, os_,
                                                 league=league, shadow=opp_is_shadow)
             opp_entry = next((m for m in gm['pokemon']
@@ -2087,7 +2201,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               cli_args_str=None, has_toml_tiers=False,
                               shadow=False, split_info=None,
                               _precomputed_analysis=None,
-                              article_slug=''):
+                              article_slug='',
+                              threshold_registry=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -2877,7 +2992,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             shield_scenarios, opponent_names,
             slayer_iter_result=slayer_iter_result,
             has_toml_tiers=has_toml_tiers,
-            anchor_passing_sink=anchor_passing_sink)
+            anchor_passing_sink=anchor_passing_sink,
+            threshold_registry=threshold_registry)
         if _precomputed_analysis is not None:
             _precomputed_analysis.update({
                 'css': analysis_css,
@@ -3500,6 +3616,23 @@ def main():
             except Exception:
                 _article_slug = ''
 
+    # Auto-load cross-species shared spreads / anchors from thresholds/_shared.toml
+    # so per-species TOMLs (and the opponent-pool variant expansion below) can
+    # reference shared entries. Skipped when --no-thresholds opts out explicitly.
+    if not args.no_thresholds:
+        _shared_toml = Path(__file__).resolve().parent.parent / 'thresholds' / '_shared.toml'
+        if _shared_toml.exists():
+            try:
+                from gopvpsim.thresholds import load_toml as _load_shared
+                _shared_reg = _load_shared(str(_shared_toml))
+                if threshold_registry is None:
+                    threshold_registry = _shared_reg
+                else:
+                    threshold_registry = threshold_registry.merge(_shared_reg)
+                logger.info(f"  Auto-loaded shared thresholds: {_shared_toml.name}")
+            except Exception as e:
+                logger.warning(f"auto-load {_shared_toml.name} failed: {e}")
+
     # Overlay --anchor-file files on top (repeatable; later wins on collision)
     if threshold_registry is not None and args.anchor_files:
         from gopvpsim.thresholds import load_toml as _load_toml_overlay
@@ -3692,6 +3825,17 @@ def main():
                         logger.info(f"  (added {len(_added)} TOML anchor opponent(s): "
                                     f"{', '.join(_added)})")
 
+    # Append attack-weighted opponent variants for any species that has a
+    # `<species>_atk_weighted` shared spread defined. This is how RyanSwag-style
+    # atk-weighted sweeps surface alongside rank-1 defaults without editing
+    # each per-species TOML. See docs/ryanswag_methodology_gap_analysis.md §1 T9.
+    opponents, opp_movesets_full, _atk_added = expand_opponents_with_variants(
+        opponents, opp_movesets_full, threshold_registry, args.league,
+    )
+    if _atk_added:
+        logger.info(f"  (added {len(_atk_added)} atk-weighted variant(s): "
+                    f"{', '.join(_atk_added)})")
+
     opp_iv_labels = {'pvpoke': 'PvPoke defaults', 'rank1': 'rank 1 (stat product)', 'both': 'both (PvPoke + rank 1)'}
     opp_iv_label = opp_iv_labels.get(args.opp_ivs, args.opp_ivs)
     logger.info(f"  Shield scenario(s): {shield_scenarios}")
@@ -3716,6 +3860,7 @@ def main():
         args.species, movesets, args.league, args.shadow,
         screen_opponents, screen_opp_movesets, shield_scenarios,
         args.top_movesets, opp_iv_mode=opp_iv_mode,
+        threshold_registry=threshold_registry,
     )
 
     # Phase 2: Full IV sweep for each surviving moveset
@@ -3734,6 +3879,7 @@ def main():
             opp_iv_mode=opp_iv_mode,
             iv_floor=args.iv_floor,
             log_path=log_path, verbose=args.verbose,
+            threshold_registry=threshold_registry,
         )
 
         elapsed = time.time() - t0
@@ -4099,6 +4245,7 @@ def main():
                             opp_iv_mode=mode,
                             iv_floor=args.iv_floor,
                             log_path=log_path, verbose=args.verbose,
+                            threshold_registry=threshold_registry,
                         )
                         elapsed = time.time() - t0
                         rate = n_sims / elapsed if elapsed > 0 else 0
@@ -4131,6 +4278,7 @@ def main():
                             opp_iv_mode=mode,
                             iv_floor=args.iv_floor,
                             log_path=log_path, verbose=args.verbose,
+                            threshold_registry=threshold_registry,
                         )
                         elapsed = time.time() - t0
                         logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
@@ -4165,6 +4313,7 @@ def main():
                             opp_iv_mode=mode,
                             iv_floor=args.iv_floor,
                             log_path=log_path, verbose=args.verbose,
+                            threshold_registry=threshold_registry,
                         )
                         elapsed = time.time() - t0
                         rate = ref_n / elapsed if elapsed > 0 else 0
@@ -4224,6 +4373,7 @@ def main():
                         split_info=split_info,
                         _precomputed_analysis=_cached_analysis,
                         article_slug=_article_slug,
+                        threshold_registry=threshold_registry,
                     )
             else:
                 if args.split_movesets:
@@ -4242,6 +4392,7 @@ def main():
                     has_toml_tiers=_toml_tiers_loaded,
                     shadow=args.shadow,
                     article_slug=_article_slug,
+                    threshold_registry=threshold_registry,
                 )
         else:
             # Static mode (original behavior)
