@@ -443,6 +443,72 @@ break invariants that weren't yet nailed down by tests.
   to mistakenly run a smoke test without `--interactive` and conclude
   nothing rendered.
 
+## CD article generator (new, 2026-04-16)
+
+* **Python article generator** *(design + implementation, replaces the
+  Claude-authored-prose path that was scrapped mid-S5)* — the article
+  page must be a Python-generated, simulation-data-derived artifact,
+  not prose written by Claude mimicking JRE's GamePress/pokemongohub
+  writing style. JRE writes for money; shipping Claude prose in his
+  voice is not acceptable. Target state:
+
+  **Default path** — `scripts/generate_article.py <species> <league> <cd_move>`
+  reads the threshold TOML, the deep dive data (or re-runs it), and
+  the gamemaster, then emits mechanical article content:
+  - **Move comparison table**: fast moves side-by-side (power, energy,
+    turns, DPT, EPT, type, STAB flag)
+  - **Meta coverage summary**: avg battle rating per moveset, wins vs
+    rank-1 meta opponents in each shield scenario (numbers, not prose)
+  - **Matchup delta table**: per-opponent score diff between the new
+    CD move and the old default (Mud Slap vs Tackle), highlighting
+    flips
+  - **IV recommendations**: rendered directly from `thresholds/<sp>.toml`
+    (tiers, named anchors, with the existing threshold-tier renderer)
+  - **Links**: each moveset mention links to either (a) our deep-dive
+    split-moveset page, (b) PvPoke's multi-battle page (URL format
+    `pvpoke.com/battle/multi/<cp>/all/<mon>/<shields>/<fmIdx>-<cm1Idx>-<cm2Idx>/<ivLevel>`),
+    or both
+  - **Verdict**: template-selected from avg-score delta sign and
+    magnitude ("clear upgrade" if Δ > 10%, "sidegrade" if |Δ| < 5%, etc.)
+  No hand-authored prose; reads as a spec sheet + data tables.
+
+  **Optional augmentation path** — the existing `articles/*.toml`
+  `[[sections]]` prose slots become an opt-in override. Renderer
+  precedence: if `authorship="expert"` or `"both"` and a section has
+  body text, use it; if `authorship="auto"`, use the Python-generated
+  default for that section. Lets a human (or Claude-in-a-session,
+  with genuine review) write real analysis without blocking on it.
+
+  **Related work that should land before / alongside this:**
+  - **Battle-rating histogram** as a new deep-dive section: JRE's
+    articles link to PvPoke's multi-battle histogram (wins/losses
+    distribution across the meta) per moveset. Our dive already has
+    the underlying `score1` data at 0-1000 scale; binning it into a
+    Plotly histogram per moveset is the minimum viable feature. Lets
+    the article link to a local histogram instead of PvPoke, which
+    matters because our sim has real divergences from PvPoke and we
+    want the article's numbers to match what the linked page shows.
+  - **Slug convention fix**: the `articles/*.toml` filename uses
+    underscores, but `thresholds/*.toml`'s `[Species.article] slug`
+    field and the `userdata/website/<dive>/` directories use hyphens.
+    Decide whether to rename article TOMLs to use hyphens (matches
+    convention + makes `render_article.py`'s stem-derived slug work
+    without threshold-slug drift) or change the threshold slug to
+    underscores (makes the existing filename work). The deep-dive
+    "Related Article" link currently 404s because of this mismatch.
+  - **Female Oinkologne dive**: the May 2026 CD affects both Male and
+    Female Oinkologne, which have meaningfully different base stats
+    (186/153/242 vs 169/162/251) and the generator needs to handle
+    both. See memory `project_female_oinkologne.md`.
+
+  **Paced as a separate arc**, not squeezed into the remaining
+  Lechonk CD prep sessions. Realistic structure: (1) design doc +
+  histogram feature, (2) generator skeleton + move-table + verdict,
+  (3) matchup-delta table + PvPoke-link helper, (4) Female dive
+  integration + site-index update. Oinkologne CD (May 9) is the
+  natural ship target but not a hard deadline if the work needs more
+  time.
+
 ## Deep-dive narrative
 
 * **SwagTips narrative follow-ups (Goodra + Aegislash dives)** — the
