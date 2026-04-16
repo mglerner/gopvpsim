@@ -2937,7 +2937,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += '    <option value="50">50</option>\n'
     html += '    <option value="100">100</option>\n'
     html += '  </select></label>\n'
-    html += '  <span style="margin-left:10px;font-size:11px;color:#888">Click any column header to sort.</span>\n'
+    html += ('  <span style="margin-left:10px;font-size:11px;color:#888">'
+             "Ranked by this dive's battle simulation (not fetched from "
+             'PvPoke). Click any column header to sort.</span>\n')
     html += '</div>\n'
     html += '<div id="summary" class="summary"></div>\n'
 
