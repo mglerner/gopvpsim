@@ -10,6 +10,7 @@ Modeled on RyanSwag's GamePress PvP IV Deep Dive series.
 import math
 
 from deep_dive_analysis import probe_tier_cutoff_flips
+from fast_move_class import charmer_context_line, is_charmer_fast_move
 
 
 # ---------------------------------------------------------------------------
@@ -68,17 +69,30 @@ def _opponent_from_tier_name(name):
     return None
 
 
-def _stat_signature(atk, def_, hp, primary_axis=None):
-    """Format a stat signature string like '135.72 Def, 117 HP'.
+def _axis_shape(atk, def_, hp):
+    """Return the constrained-axis shape as a string ('ADH', 'DH', 'A', ...)."""
+    s = ''
+    if atk > 0:
+        s += 'A'
+    if def_ > 0:
+        s += 'D'
+    if hp > 0:
+        s += 'H'
+    return s
 
-    primary_axis: 'atk', 'def', or None. If set, suppresses the other
-    axis so specialist flavors advertise only their headline stat.
-    General/unlabeled flavors (primary_axis=None) show all populated axes.
+
+def _stat_signature(atk, def_, hp):
+    """Format a stat signature like '135.72 Def, 117 HP'.
+
+    Shows every actively-constrained axis (value > 0); omits axes where
+    the value is zero. Per STYLE_ANALYSIS.md "Stat Signature Rule", the
+    signature must reflect the real constraint set -- any 2-axis pair is
+    valid (Atk+Def without HP, Atk+HP without Def, Def+HP without Atk).
     """
     parts = []
-    if atk > 0 and primary_axis != 'def':
+    if atk > 0:
         parts.append(f'{atk:.2f} Atk')
-    if def_ > 0 and primary_axis != 'atk':
+    if def_ > 0:
         parts.append(f'{def_:.2f} Def')
     if hp > 0:
         parts.append(f'{int(hp)} HP')
@@ -99,24 +113,47 @@ def _count_qualifying(data_obj, atk_cut, def_cut, hp_cut):
     return n
 
 
-def _flavor_name_for_tier(name, atk, def_):
-    """Map a tier name to a SwagTips-style flavor name.
+def _flavor_name_for_tier(name, atk, def_, hp):
+    """Map a tier name + final axis shape to a SwagTips-style flavor name.
 
-    Auto-derived tier names (General, Lickitung Atk, Bulk 140+) get
-    transformed.  TOML-defined names (GH Great, etc.) pass through
-    as-is since the user chose them deliberately.
+    Per STYLE_ANALYSIS.md "Stat Signature Rule" the tier name family must
+    match the constraint-set shape:
+
+        Name family             Signature shape
+        ----------------------- -----------------
+        `* Bulk` / `Fortified`  DH (or D, H)
+        `* Slayer` (pure)       AH or AD
+        `* Slayer` (BP-paired)  ADH
+        `General Good`          ADH
+        `Attack Weight`         A only
+        `Premium Bulk`          DH (or D, H)
+
+    The axis shape (atk/def/hp) is computed *after* HP enrichment so the
+    name reflects the final constraint set, not the raw auto-derived tier
+    cuts.
+
+    TOML-defined names (GL-General Good, Slight Atk Weight, etc.) pass
+    through as-is since the user chose them deliberately.
     """
+    shape = _axis_shape(atk, def_, hp)
+
     if name == 'General':
+        # Bulk family requires DH / D / H. Anything with Atk becomes
+        # General Good (ADH) or Attack Weight (A-only).
+        if 'A' in shape and ('D' in shape or 'H' in shape):
+            return 'General Good'
+        if shape == 'A':
+            return 'Attack Weight'
         return 'Premium Bulk'
 
     # Auto-derived opponent-specific patterns
-    if atk > 0:
+    if 'A' in shape:
         opp = _opponent_from_tier_name(name)
         if opp:
             return f'{opp} Slayer'
         if name.startswith('Atk '):
             return 'Attack Weight'
-    elif def_ > 0:
+    elif 'D' in shape:
         opp = _opponent_from_tier_name(name)
         if opp:
             return f'Fortified {opp}'
@@ -139,6 +176,8 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
     if not effective_tiers:
         return []
 
+    # Stage 1: build preliminary flavor dicts; defer name + stat_sig until
+    # after HP enrichment so both can be picked from the final axis shape.
     flavors = []
     for t in effective_tiers:
         atk = t.get('attack', 0) or 0
@@ -146,22 +185,14 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
         hp = t.get('stamina', 0) or 0
         name = t.get('name', '')
         is_general = (name == 'General')
-        flavor_name = _flavor_name_for_tier(name, atk, def_)
-        primary_axis = None
-        if not is_general:
-            if name.endswith(' Atk') or name.startswith('Atk '):
-                primary_axis = 'atk'
-            elif name.endswith(' Bulk') or name.startswith('Bulk '):
-                primary_axis = 'def'
-        stat_sig = _stat_signature(atk, def_, hp, primary_axis)
 
         flavors.append({
-            'name': flavor_name,
-            'stat_sig': stat_sig,
+            'tier_name': name,
+            'name': '',
+            'stat_sig': '',
             'atk_cut': atk,
             'def_cut': def_,
             'hp_cut': hp,
-            'primary_axis': primary_axis,
             'is_general': is_general,
             'recommended': False,
             'tier_color': t.get('color', '#888'),
@@ -169,7 +200,7 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
             'n_qualifying': _count_qualifying(data_obj, atk, def_, hp),
         })
 
-    # Enrich flavors with HP co-conditions from matchup boundaries.
+    # Stage 2: enrich flavors with HP co-conditions from matchup boundaries.
     # Per-opponent tiers from auto_derive_tiers don't carry HP, but the
     # matchup boundaries at nearby thresholds often do.
     if all_matchup_boundaries:
@@ -180,7 +211,6 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
             cut = f['def_cut'] or f['atk_cut']
             if not stat or not cut:
                 continue
-            # Find matchup boundaries near this flavor's threshold
             hp_vals = []
             for mb in all_matchup_boundaries:
                 if mb.get('stat', 'def') == stat and abs(mb['threshold'] - cut) < 5.0:
@@ -189,10 +219,16 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
             if hp_vals:
                 hp = min(hp_vals)  # most inclusive HP requirement
                 f['hp_cut'] = hp
-                f['stat_sig'] = _stat_signature(f['atk_cut'], f['def_cut'], hp,
-                                                 f.get('primary_axis'))
-                f['n_qualifying'] = _count_qualifying(data_obj,
-                                                      f['atk_cut'], f['def_cut'], hp)
+                f['n_qualifying'] = _count_qualifying(
+                    data_obj, f['atk_cut'], f['def_cut'], hp)
+
+    # Stage 3: name and signature are two views of the same final
+    # constraint set; compute them together from the enriched axis shape.
+    for f in flavors:
+        f['name'] = _flavor_name_for_tier(
+            f['tier_name'], f['atk_cut'], f['def_cut'], f['hp_cut'])
+        f['stat_sig'] = _stat_signature(
+            f['atk_cut'], f['def_cut'], f['hp_cut'])
 
     # If no tier is named General, promote the broadest one
     has_general = any(f['is_general'] for f in flavors)
@@ -525,6 +561,283 @@ def refine_flavor_names(flavors, tradeoffs):
 
 
 # ---------------------------------------------------------------------------
+# Namesake guarantee (item 1 from post-S5 S5a plan)
+# ---------------------------------------------------------------------------
+
+def _naming_opponents(flavor_name):
+    """Extract naming opponent(s) from a Slayer / Fortified flavor name.
+
+    Handles:
+      "Lapras Slayer"                       -> ["Lapras"]
+      "Fortified Lapras"                    -> ["Lapras"]
+      "Lapras / Shadow Lapras Slayer"       -> ["Lapras", "Lapras (Shadow)"]
+      "Lapras Slayer (123.74+ Atk)"         -> ["Lapras"]
+
+    Returns an empty list for non-opponent-named flavors (Premium Bulk,
+    General Good, Attack Weight, High Bulk, etc.).
+    """
+    name = flavor_name
+    paren = name.find(' (')
+    if paren >= 0 and (name.endswith(' Def)') or name.endswith(' Atk)')):
+        name = name[:paren]
+    name = name.strip()
+
+    def _expand_part(part):
+        part = part.strip()
+        if not part:
+            return None
+        if part.startswith('Shadow '):
+            return part[len('Shadow '):] + ' (Shadow)'
+        return part
+
+    if name.endswith(' Slayer'):
+        stub = name[:-len(' Slayer')].strip()
+    elif name.startswith('Fortified '):
+        stub = name[len('Fortified '):].strip()
+    else:
+        return []
+
+    opps = []
+    for part in stub.split(' / '):
+        expanded = _expand_part(part)
+        if expanded and expanded not in opps:
+            opps.append(expanded)
+    return opps
+
+
+def _synthesize_namesake_gain(flavor, naming_opp, all_matchup_boundaries,
+                               anchor_flip_records=None):
+    """Find the closest gain source against naming_opp to add to gains.
+
+    Searches two data streams:
+      1. Matchup boundaries (stat-sweep based)
+      2. Anchor-flip records (resolved-TOML-anchor based)
+    An opponent-named tier that made it into the narrative is evidence
+    that one of these streams carries the matchup; we just need to pull
+    the closest entry. Returns a gain entry ``{opponent, scenarios}`` or
+    ``None`` if no suitable source exists.
+    """
+    cut_stat = 'atk' if flavor['atk_cut'] > 0 else 'def'
+    cut_val = flavor['atk_cut'] or flavor['def_cut']
+
+    best = None  # (distance, opponent, scenarios_tuple_list)
+    if all_matchup_boundaries:
+        for mb in all_matchup_boundaries:
+            if _base_species(mb['opponent']) != naming_opp:
+                continue
+            if mb.get('stat', 'def') != cut_stat:
+                continue
+            dist = abs(mb['threshold'] - cut_val) if cut_val else 0
+            if cut_val and dist > 10.0:
+                continue
+            scens = sorted(tuple(s) for s in mb.get('scenarios', []))
+            if not scens:
+                continue
+            if best is None or dist < best[0]:
+                best = (dist, mb['opponent'], scens)
+
+    if anchor_flip_records:
+        for rec in anchor_flip_records:
+            if _base_species(rec['opponent']) != naming_opp:
+                continue
+            anchor = rec.get('anchor')
+            target = getattr(anchor, 'target_stat', None) if anchor else None
+            if target and target != cut_stat:
+                continue
+            thresh = getattr(anchor, 'threshold_value', None) if anchor else None
+            dist = abs(thresh - cut_val) if (thresh and cut_val) else 0
+            if cut_val and thresh and dist > 10.0:
+                continue
+            scens = sorted(tuple(s) for s in rec.get('scenarios', []))
+            if not scens:
+                continue
+            if best is None or dist < best[0]:
+                best = (dist, rec['opponent'], scens)
+
+    if not best:
+        return None
+    return {'opponent': best[1], 'scenarios': best[2]}
+
+
+def enforce_namesake_guarantee(flavors, tradeoffs, all_matchup_boundaries,
+                                anchor_flip_records=None):
+    """Ensure every opponent-named flavor has that opponent in its gains.
+
+    Per STYLE_CONFORMANCE_CHECKLIST.md C2: a tier named after an opponent
+    must reference at least one matchup against that opponent in its
+    gains/prose. If the matchup-flip layer didn't attribute a gain to the
+    namesake, synthesize one from the closest relevant matchup boundary
+    or anchor-flip record and prepend it so the opening prose mentions
+    the namesake.
+
+    The tier's *name* already encodes the opponent (auto_derive_tiers
+    built it from one of these two streams), so at least one of them
+    should carry a usable entry. If neither does, leave gains as-is.
+    """
+    for flavor in flavors:
+        if flavor['is_general']:
+            continue
+        naming_opps = _naming_opponents(flavor['name'])
+        if not naming_opps:
+            continue
+        td = tradeoffs.setdefault(flavor['name'], {'gains': [], 'losses': []})
+        gains = td.setdefault('gains', [])
+        gain_bases = {_base_species(g['opponent']) for g in gains}
+        # Compare at base-species level. A flavor named
+        # "Fortified Quagsire (Shadow)" is satisfied by a gain against
+        # either Quagsire or Quagsire (Shadow) -- both collapse to
+        # base 'Quagsire'. Without this strip the check always misses
+        # for shadow-suffixed tier names.
+        naming_bases = [_base_species(n) for n in naming_opps]
+        for naming_base in naming_bases:
+            if naming_base in gain_bases:
+                continue
+            synth = _synthesize_namesake_gain(
+                flavor, naming_base, all_matchup_boundaries,
+                anchor_flip_records=anchor_flip_records)
+            if synth:
+                gains.insert(0, synth)
+                gain_bases.add(_base_species(synth['opponent']))
+        # Even when the namesake is already present, it may be buried
+        # behind alphabetically-earlier opponents. Front-move every
+        # namesake entry so the opening prose leads with "the {namesake}".
+        if naming_bases:
+            nb_set = set(naming_bases)
+            front = [g for g in gains if _base_species(g['opponent']) in nb_set]
+            rest = [g for g in gains if _base_species(g['opponent']) not in nb_set]
+            if front and rest:
+                td['gains'] = front + rest
+
+
+# ---------------------------------------------------------------------------
+# Identical-stat flavor merge (item 2 / C5 from checklist)
+# ---------------------------------------------------------------------------
+
+def _stat_sig_key(flavor):
+    """Tuple key for stat-signature equality."""
+    return (round(flavor['atk_cut'], 2),
+            round(flavor['def_cut'], 2),
+            int(flavor['hp_cut']))
+
+
+def _gains_sig_key(td):
+    """Frozenset key for gains-list equality, keyed on (opponent, scenarios).
+
+    Opponent includes shadow flag so Lapras vs Lapras (Shadow) gains don't
+    collide when they're really separate matchups.
+    """
+    entries = []
+    for g in td.get('gains', []):
+        scens = tuple(sorted(tuple(s) for s in g.get('scenarios', [])))
+        entries.append((g['opponent'], scens))
+    return frozenset(entries)
+
+
+def _merge_flavor_names(names):
+    """Combine Slayer/Fortified names sharing a family into one.
+
+    "Lapras Slayer" + "Lapras (Shadow) Slayer" -> "Lapras / Shadow Lapras Slayer"
+    "Fortified Altaria" + "Fortified Altaria (Shadow)" ->
+        "Fortified Altaria / Shadow Altaria"
+
+    Returns None if names don't share a family.
+    """
+    if not names:
+        return None
+
+    def _normalize_opp(stub):
+        if stub.endswith(' (Shadow)'):
+            return 'Shadow ' + stub[:-len(' (Shadow)')].strip()
+        return stub.strip()
+
+    if all(n.endswith(' Slayer') for n in names):
+        stubs = [n[:-len(' Slayer')].strip() for n in names]
+        parts = []
+        for s in stubs:
+            for p in s.split(' / '):
+                norm = _normalize_opp(p)
+                if norm and norm not in parts:
+                    parts.append(norm)
+        return ' / '.join(parts) + ' Slayer'
+
+    if all(n.startswith('Fortified ') for n in names):
+        stubs = [n[len('Fortified '):].strip() for n in names]
+        parts = []
+        for s in stubs:
+            for p in s.split(' / '):
+                norm = _normalize_opp(p)
+                if norm and norm not in parts:
+                    parts.append(norm)
+        return 'Fortified ' + ' / '.join(parts)
+
+    return None
+
+
+def merge_identical_stat_flavors(flavors, tradeoffs):
+    """Merge flavors sharing stat signature AND gains list.
+
+    Canonical Oinkologne case: Lapras Slayer + Lapras (Shadow) Slayer at
+    identical (123.74 Atk, 149 HP) with identical gains -> "Lapras /
+    Shadow Lapras Slayer".
+
+    Negative test: Fortified Lapras (105.19 Def, 153 HP) has a different
+    stat signature and MUST NOT merge. Guard: merge key is
+    ``(stat_sig, gains_sig)`` exact equality, so DH-axis flavors don't
+    collide with AH-axis flavors.
+    """
+    if len(flavors) < 2:
+        return
+
+    groups = {}
+    for f in flavors:
+        if f['is_general']:
+            continue
+        td = tradeoffs.get(f['name'], {})
+        key = (_stat_sig_key(f), _gains_sig_key(td))
+        groups.setdefault(key, []).append(f)
+
+    merged_away = set()  # id()s of flavors absorbed into their group primary
+    for key, group in groups.items():
+        if len(group) < 2:
+            continue
+        combined = _merge_flavor_names([g['name'] for g in group])
+        if not combined:
+            continue  # family mismatch -- leave separate
+
+        primary, others = group[0], group[1:]
+        old_name = primary['name']
+        primary_td = tradeoffs.get(old_name, {})
+        if old_name != combined:
+            tradeoffs[combined] = primary_td
+            tradeoffs.pop(old_name, None)
+        primary['name'] = combined
+
+        for other in others:
+            other_td = tradeoffs.pop(other['name'], {}) or {}
+            primary_td.setdefault('losses', [])
+            primary_td.setdefault('boundaries', [])
+            existing_loss_keys = {
+                (e['opponent'],
+                 tuple(sorted(tuple(s) for s in e.get('scenarios', []))))
+                for e in primary_td['losses']
+            }
+            for lost in other_td.get('losses', []):
+                lost_key = (
+                    lost['opponent'],
+                    tuple(sorted(tuple(s) for s in lost.get('scenarios', [])))
+                )
+                if lost_key not in existing_loss_keys:
+                    primary_td['losses'].append(lost)
+                    existing_loss_keys.add(lost_key)
+            for mb in other_td.get('boundaries', []):
+                if mb not in primary_td['boundaries']:
+                    primary_td['boundaries'].append(mb)
+            merged_away.add(id(other))
+
+    flavors[:] = [f for f in flavors if id(f) not in merged_away]
+
+
+# ---------------------------------------------------------------------------
 # Prose rendering
 # ---------------------------------------------------------------------------
 
@@ -772,7 +1085,8 @@ def _general_boundary_bullets(all_matchup_boundaries, flavor, has_bait_axis=Fals
 
 
 def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
-                          data_obj, opp_label, has_bait_axis=False):
+                          data_obj, opp_label, has_bait_axis=False,
+                          moveset_idx=0):
     """Render the SwagTips-style IV Flavor Guide as an HTML string.
 
     Returns HTML string, or '' if there's nothing interesting to narrate.
@@ -803,6 +1117,24 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
         'up 1:1.'
         '</p>\n'
     )
+
+    # Charmer-class fast move framing (post-S5 S5a item 4). When the
+    # moveset's fast move is a charmer (Charm / Razor Leaf / Waterfall /
+    # Dragon Breath / Fairy Wind), stat product usually matters more than
+    # Atk breakpoints. Surface that default so readers don't chase atk
+    # weight on a species that wants bulk.
+    ms_list = data_obj.get('movesets') or []
+    if 0 <= moveset_idx < len(ms_list):
+        label = ms_list[moveset_idx].get('label', '')
+        fast_part = label.split(' / ')[0] if ' / ' in label else label
+        if is_charmer_fast_move(fast_part):
+            parts.append(
+                f'<p class="dd-narrative-prose" '
+                f'style="margin:0 0 10px 0;font-size:0.88rem;'
+                f'color:#c9d1d9">'
+                f'{charmer_context_line(species)}'
+                f'</p>\n'
+            )
 
     # Single-flavor case: just a stat baseline summary
     if len(flavors) == 1:
@@ -939,8 +1271,92 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
 
         parts.append('</details>\n')
 
+    # Rank-1 self-check line (RyanSwag addition per post-S5 S5a plan).
+    # Compare the stat-product rank-1 IV's own spread against each tier's
+    # cuts so the reader can see at a glance whether they're trading stat
+    # product for threshold reach or not.
+    rank1_line = _render_rank1_self_check(flavors, data_obj, species)
+    if rank1_line:
+        parts.append(rank1_line)
+
     parts.append('</div>\n')
     return ''.join(parts)
+
+
+def _render_rank1_self_check(flavors, data_obj, species):
+    """Render a one-line rank-1 self-check against the recommended tier.
+
+    Per RyanSwag's Wigglytuff walk-through, the section ends with a
+    check of rank-1's own spread against the tier's thresholds so the
+    reader can decide whether rank-1 is "good enough" or whether they
+    need a specific IV target.
+
+    Returns an empty string when rank-1 info isn't available.
+    """
+    ref_iv = data_obj.get('rank1RefIvIdx', -1)
+    if ref_iv < 0 or 'ivAtk' not in data_obj:
+        return ''
+    try:
+        r_atk_iv = data_obj['ivA'][ref_iv]
+        r_def_iv = data_obj['ivD'][ref_iv]
+        r_hp_iv = data_obj['ivS'][ref_iv]
+    except (KeyError, IndexError, TypeError):
+        # IV triple fields may not be present; fall back to skipping.
+        r_atk_iv = r_def_iv = r_hp_iv = None
+
+    r_atk = data_obj['ivAtk'][ref_iv]
+    r_def = data_obj['ivDef'][ref_iv]
+    r_hp = data_obj['ivHp'][ref_iv]
+
+    recommended = next((f for f in flavors if f.get('recommended')), None)
+    if not recommended:
+        recommended = next((f for f in flavors if f['is_general']), None)
+    if not recommended:
+        return ''
+
+    shortfalls = []  # list of (axis_label, need, have)
+    if recommended['atk_cut'] > 0 and r_atk < recommended['atk_cut']:
+        shortfalls.append(('Atk', f'{recommended["atk_cut"]:.2f}',
+                           f'{r_atk:.2f}'))
+    if recommended['def_cut'] > 0 and r_def < recommended['def_cut']:
+        shortfalls.append(('Def', f'{recommended["def_cut"]:.2f}',
+                           f'{r_def:.2f}'))
+    if recommended['hp_cut'] > 0 and r_hp < recommended['hp_cut']:
+        shortfalls.append(('HP', f'{int(recommended["hp_cut"])}',
+                           f'{int(r_hp)}'))
+
+    # Format the rank-1 spread. Prefer IV triple (e.g. "0/15/15") if
+    # available; fall back to stat triple.
+    if r_atk_iv is not None and r_def_iv is not None and r_hp_iv is not None:
+        spread_str = f'{r_atk_iv}/{r_def_iv}/{r_hp_iv}'
+    else:
+        spread_str = f'{r_atk:.2f}/{r_def:.2f}/{int(r_hp)}'
+
+    if not shortfalls:
+        return (
+            f'<p class="dd-narrative-prose" '
+            f'style="margin-top:10px;font-size:0.88rem">'
+            f'Rank-1 {species} ({spread_str}) meets the '
+            f'{recommended["name"]} thresholds.'
+            f'</p>\n'
+        )
+
+    # Summarize shortfalls; keep it readable when multiple axes fall short.
+    if len(shortfalls) == 1:
+        axis, need, have = shortfalls[0]
+        delta_clause = f'falls short on {axis} (needs {need}, has {have})'
+    else:
+        phrases = [f'{a} (needs {n}, has {h})' for a, n, h in shortfalls]
+        delta_clause = 'falls short on ' + ', '.join(phrases[:-1]) + f' and {phrases[-1]}'
+
+    return (
+        f'<p class="dd-narrative-prose" '
+        f'style="margin-top:10px;font-size:0.88rem">'
+        f'Rank-1 {species} ({spread_str}) {delta_clause} vs the '
+        f'{recommended["name"]} threshold. If you have rank-1, '
+        f'you are trading threshold reach for max stat product.'
+        f'</p>\n'
+    )
 
 
 def _render_general_flavor(parts, flavor, all_matchup_boundaries,

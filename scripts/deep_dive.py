@@ -984,7 +984,7 @@ def _sweep_worker(profile_chunk):
 def iv_sweep(species, fast_id, charged_ids, league, shadow,
              opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke',
              iv_floor=None, log_path=None, verbose=False,
-             threshold_registry=None):
+             threshold_registry=None, reserve_cpus=0):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
@@ -1046,7 +1046,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     # Parallel sim: ~100 chunks across the worker pool. imap_unordered
     # hands chunks out as workers free up — finer granularity gives more
     # frequent progress reports and better load balancing.
-    n_workers = min(multiprocessing.cpu_count(), 16)
+    n_workers = min(max(1, multiprocessing.cpu_count() - reserve_cpus), 16)
     n_chunks_target = 100
     chunk_size = max(1, (len(profile_list) + n_chunks_target - 1) // n_chunks_target)
     chunks = [profile_list[i:i+chunk_size] for i in range(0, len(profile_list), chunk_size)]
@@ -1664,6 +1664,8 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
     from deep_dive_narrative import (derive_narrative_flavors,
                                      compute_flavor_tradeoffs,
                                      refine_flavor_names,
+                                     enforce_namesake_guarantee,
+                                     merge_identical_stat_flavors,
                                      render_narrative_zone)
     nIvs = data_obj['nIvs']
     nS = len(scenarios)
@@ -1747,9 +1749,14 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
         all_matchup_boundaries=all_matchup_boundaries)
         if len(flavors) >= 2 else {})
     refine_flavor_names(flavors, tradeoffs)
+    enforce_namesake_guarantee(
+        flavors, tradeoffs, all_matchup_boundaries,
+        anchor_flip_records=anchor_flip_records)
+    merge_identical_stat_flavors(flavors, tradeoffs)
     nar_html = render_narrative_zone(
         flavors, tradeoffs, all_matchup_boundaries,
-        data_obj, opp_label, has_bait_axis=has_bait_axis) or ''
+        data_obj, opp_label, has_bait_axis=has_bait_axis,
+        moveset_idx=moveset_idx) or ''
     return nar_html, flavors
 
 
@@ -2031,6 +2038,10 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             data_obj['ivTiers'] = _iv_tiers
             data_obj['ivAllTiers'] = _iv_all_tiers
     # ======== RESULTS section (always visible) ========
+    import time as _time
+    _rr_start = _time.time()
+    logger.info(f"  Rendering results section (moveset {moveset_idx}: "
+                f"{moveset_label})...")
     results_html = rendering.render_results_section(
         data_obj=data_obj, moveset_label=moveset_label, opp_label=opp_label,
         effective_tiers=effective_tiers,
@@ -2049,6 +2060,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         hp_list=hp_list, nIvs=nIvs,
         has_bait_axis=has_bait_axis,
     )
+    logger.info(f"  Results section rendered in "
+                f"{_time.time() - _rr_start:.1f}s")
 
     # Log envelope-position metric summary (S4). render_results_section
     # stashes per-category metrics on data_obj['envelopePositions'] so
@@ -2116,6 +2129,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 
     # Close the analysis details element
     analysis_parts.append('</details>\n')
+    logger.info(f"  Analysis sections complete (moveset {moveset_idx})")
 
     return css, results_html, ''.join(analysis_parts)
 
@@ -3012,7 +3026,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     narrative_blocks = []
     moveset0_flavors = []
     n_movesets = len(data_obj.get('movesets', [{}]))
+    import time as _time
+    _nar_start = _time.time()
+    logger.info(f"  Generating narrative for {n_movesets} moveset(s)...")
     for mi in range(n_movesets):
+        _mi_start = _time.time()
         nar_html, flavors = _generate_narrative_for_moveset(
             data_obj, score_arrays, mi,
             scenarios_list, opponent_names or [],
@@ -3020,6 +3038,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             has_toml_tiers,
             resolved_anchors=_resolved_anchors if mi == 0 else None,
         )
+        logger.info(f"    Narrative moveset {mi+1}/{n_movesets} rendered in "
+                    f"{_time.time() - _mi_start:.1f}s")
         if mi == 0:
             moveset0_flavors = flavors
         if nar_html:
@@ -3028,6 +3048,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                 f'<div class="dd-narrative-moveset" data-moveset="{mi}" '
                 f'style="display:{vis}">\n{nar_html}\n</div>'
             )
+    logger.info(f"  All narratives rendered in "
+                f"{_time.time() - _nar_start:.1f}s "
+                f"({len(narrative_blocks)} non-empty block(s))")
 
     # Rename Plotly tier entries to match narrative flavor names and
     # sync HP cutoffs.  The legend shows two lines: narrative name on
@@ -3218,9 +3241,14 @@ var _scoresReady = (async function() {
 
     html += '</body>\n</html>\n'
 
+    import time as _time
+    _write_start = _time.time()
+    logger.info(f"  Writing HTML ({len(html) / 1024 / 1024:.1f} MB) "
+                f"to {html_path}...")
     with open(html_path, 'w') as f:
         f.write(html)
-    logger.result(f"  Interactive HTML written to {html_path}")
+    logger.result(f"  Interactive HTML written to {html_path} "
+                  f"({_time.time() - _write_start:.1f}s)")
 
 
 _JS_ENGINE_PATH = os.path.join(os.path.dirname(__file__), 'deep_dive_engine.js')
@@ -3504,6 +3532,11 @@ def main():
                              'subdirs and the YYYYMMDD_HHMMSS_<species>_<league>.log '
                              'filename are derived from this base. Ignored when '
                              '--log-file is given. Default: userdata/logs/.')
+    parser.add_argument('--reserve-cpus', type=int, default=0, metavar='N',
+                        help='Leave N CPUs idle so other local work stays '
+                             'responsive. Default 0 (use up to min(cpu_count, 16)). '
+                             'Applies to both the per-moveset sim sweep and the '
+                             'slayer iteration pool.')
 
     args = parser.parse_args()
 
@@ -3880,6 +3913,7 @@ def main():
             iv_floor=args.iv_floor,
             log_path=log_path, verbose=args.verbose,
             threshold_registry=threshold_registry,
+            reserve_cpus=args.reserve_cpus,
         )
 
         elapsed = time.time() - t0
@@ -3983,6 +4017,7 @@ def main():
                     metric=args.mirror_slayer_metric,
                     iv_floor=args.iv_floor,
                     log_path=log_path, verbose=args.verbose,
+                    reserve_cpus=args.reserve_cpus,
                 )
                 # Early-exit shapes from iterative_slayer_discovery return
                 # a dict with only an 'error' key (e.g. when the initial
@@ -4246,6 +4281,7 @@ def main():
                             iv_floor=args.iv_floor,
                             log_path=log_path, verbose=args.verbose,
                             threshold_registry=threshold_registry,
+                            reserve_cpus=args.reserve_cpus,
                         )
                         elapsed = time.time() - t0
                         rate = n_sims / elapsed if elapsed > 0 else 0
@@ -4279,6 +4315,7 @@ def main():
                             iv_floor=args.iv_floor,
                             log_path=log_path, verbose=args.verbose,
                             threshold_registry=threshold_registry,
+                            reserve_cpus=args.reserve_cpus,
                         )
                         elapsed = time.time() - t0
                         logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
@@ -4314,6 +4351,7 @@ def main():
                             iv_floor=args.iv_floor,
                             log_path=log_path, verbose=args.verbose,
                             threshold_registry=threshold_registry,
+                            reserve_cpus=args.reserve_cpus,
                         )
                         elapsed = time.time() - t0
                         rate = ref_n / elapsed if elapsed > 0 else 0
