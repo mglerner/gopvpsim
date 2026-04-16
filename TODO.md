@@ -249,6 +249,26 @@ break invariants that weren't yet nailed down by tests.
 
 ## Analysis goals
 
+* **RyanSwag atk-weighted spreads may be outdated** — The
+  `thresholds/_shared.toml` atk-weighted variants (Medicham 7/15/14,
+  Lickitung 10/15/14 + 10/14/13) are sourced from RyanSwag's 2024
+  methodology video and archived GamePress deep dives. Moves and meta
+  have shifted since (Counter nerf, Rage Fist, Low Kick buff, new
+  species). Periodically re-evaluate:
+  1. Is the species itself still meta-relevant? (Lickitung dropped out
+     of the GL top-50 in the current pool; Lickilicky is more common.)
+  2. Is the *atk-weighted* variant still the one competitive players
+     prepare against, or has the community shifted to a different
+     high-atk IV?
+  3. Does the variant's atk stat still cross meaningful breakpoints
+     against current focal species, or did a move rebalance collapse
+     the BP distinction?
+  Not urgent — the current spreads work as "the 2024 community-cited
+  variants RyanSwag uses, verified by the methodology video." But the
+  longer the spreads sit without review, the more likely they drift
+  from the live meta. Revisit whenever a new atk-weighted variant
+  lands in a future deep dive, or annually.
+
 * **RyanSwag-style matchup-flip annotations + wins-based y-axis**
   *(in progress 2026-04-09)* — Extend deep dives to call out *which
   specific matchups flip at which IV thresholds, in which shield

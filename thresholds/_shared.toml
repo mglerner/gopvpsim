@@ -11,11 +11,39 @@
 # an additional opponent-pool entry labelled "<Species> (atk-weighted)"
 # using the spread's IV list. This is how we surface meta-relevant
 # attack-weighted opponent variants alongside the PvPoke rank-1 default.
+#
+# FRESHNESS CAVEAT: RyanSwag's methodology video and archived GamePress
+# deep dives are ~2 years old (most recent ~mid-2024). Moves and meta
+# have shifted since (Counter nerf, Rage Fist introduction, Low Kick
+# buff, species releases). The IV spreads below were video/dive-authored
+# against the 2024 opponent pool; the *atk stat* is what matters for
+# the BP/bulkpoint calculus and that's stable, but whether the species
+# itself (and its attack-weighted variant) is still meta-relevant under
+# the current gamemaster should be re-evaluated periodically. See
+# TODO.md "RyanSwag atk-weighted spreads may be outdated".
 
 [shared]
 sources = "RyanSwag 'How to do your own PVP IV analysis' methodology video (video-confirmed 2026-04-16 — see docs/ryanswag_methodology_gap_analysis.md §2 Canonical consolidated list)"
 
 [shared.Great.spreads.medicham_atk_weighted]
-description = "RyanSwag's preferred 'Best of Both Worlds' Medicham at 7/15/14, 106.92 atk. Higher-attack variant than rank-1 NBB (5/15/15, 105.88 atk); a meta-relevant focal for Oinkologne / other GL species to prepare against."
+description = "RyanSwag's preferred 'Best of Both Worlds' Medicham at 7/15/14, 106.92 atk. Higher-attack variant than rank-1 NBB (5/15/15, 105.88 atk); a meta-relevant focal for Oinkologne / other GL species to prepare against. Note: PvPoke's cp1500 default for Medicham is already 7/15/14, so under --opp-ivs=pvpoke this variant sims identically to the default column; distinctive only under --opp-ivs=rank1."
 source = "RyanSwag 'How to do your own PVP IV analysis' methodology video"
 ivs = [[7, 15, 14]]
+
+[shared.Great.spreads.lickitung_atk_weighted]
+description = """
+RyanSwag's attack-weighted Lickitung spreads, cited in his methodology
+video as the variants to prepare for when atk-weighted Lickitung upsets
+tournaments. Two video-confirmed IV spreads exist at distinct attack
+tiers: 10/15/14 (primary, 98.27 atk, most commonly cited) and 10/14/13
+(secondary, 98.57 atk, higher-atk threshold from the same family). Both
+cleanly separate from PvPoke's cp1500 default (7/15/15, 96.63 atk). The
+archived RyanSwag Annihilape deep dive cites both as the focal-def
+calibration points for its Lickitung Slayer tier (102.26 Def covers the
+primary, 102.55 Def covers the secondary). S4a's variant_ivs() helper
+picks ivs[0] today (primary), so the secondary is documented here for
+downstream multi-IV support; listing both keeps the canonical record
+complete without breaking current sims.
+"""
+source = "RyanSwag 'How to do your own PVP IV analysis' methodology video; cross-referenced in RyanSwag's archived Annihilape GamePress deep dive"
+ivs = [[10, 15, 14], [10, 14, 13]]
