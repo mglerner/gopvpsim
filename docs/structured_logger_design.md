@@ -142,27 +142,42 @@ Default. No `structlog`, no JSON. Reasons:
 
 ### Per-run log file — location and naming
 
-**Default location:** `userdata/logs/` (gitignored; persists across
-reboots; matches `userdata/dives/` convention in
-`DEVELOPER_NOTES.md` §"Deep dive output file layout").
-
-**Open question for Michael (deferred to S2 with a default):**
-`userdata/logs/` vs `/tmp/`. S2 should default to `userdata/logs/`
-and document the CLI override so the choice is reversible without
-re-porting call sites. See §7.
+**Location:** `userdata/logs/YYYY-MM/{run_id}.log` (gitignored;
+persists across reboots; matches `userdata/dives/` convention in
+`DEVELOPER_NOTES.md` §"Deep dive output file layout"). Monthly
+subdirs so the live directory never grows past ~50-100 files and
+bulk-delete of an old month is a one-liner
+(`rm -rf userdata/logs/2025-04/`).
 
 **File name format:**
-`{YYYYMMDD}_{HHMMSS}_{species}_{league}[{_shadow}].log`
+`{YYYYMMDD}_{HHMMSS}_{species}_{league}[_shadow].log`
 
-Example: `20260416_143052_oinkologne_great.log`
+Example: `userdata/logs/2026-04/20260416_143052_oinkologne_great.log`
 
-Sortable by timestamp; `ls userdata/logs/` is self-explanatory;
+Sortable by timestamp; `ls` in a month subdir is self-explanatory;
 shadow runs distinguishable. CLI override: `--log-file PATH`.
 
-**Rotation:** none. One file per run is the unit. Housekeeping is
-manual (`rm userdata/logs/*.log`) or a future tiny cleanup script.
-No `RotatingFileHandler`, no date-based rollover. Avoid complexity
-until it bites.
+**Latest-run symlink:** the logger init also maintains
+`userdata/logs/latest.log` as a symlink pointing at the current run's
+log file. Canonical monitoring command becomes
+`tail -f userdata/logs/latest.log`, no globbing needed. Create the
+symlink atomically (write `latest.log.new` then `rename`) so a
+concurrent `tail -f` never lands on a broken symlink mid-switch.
+
+**Rotation:** none at the handler level. One file per run is the unit.
+
+**Periodic cleanup:** new `scripts/clean_logs.py`, dry-run by default.
+Flags:
+- `--execute` — required to actually delete/move anything (safety gate).
+- `--older-than Nd` — target anything older than N days (mtime-based,
+  not filename-based, so it's robust to any future format changes).
+- `--archive` — instead of deleting, move matched content to
+  `userdata/logs/archive/YYYY-MM/` (cold storage; also gitignored).
+- `--keep-last N` — alternative policy: keep the N most recent logs
+  across all months, purge/archive everything else.
+
+No auto-purge inside `deep_dive.py`. Explicit beats implicit;
+silent deletions on every dive start would surprise.
 
 ### Stdout vs log file routing
 
@@ -239,13 +254,18 @@ convention.
 - `scripts/deep_dive.py` — port all 86 `print(` sites to `logger.*()`.
   Add logger-init helper (probably a new `deep_dive_logging.py` module
   since `scripts/` doesn't have a shared utility file; or inline at the
-  top of `deep_dive.py`, which is fine too — decision in S2).
+  top of `deep_dive.py`, which is fine too — decision in S2). Logger
+  init also creates the monthly subdir if missing and refreshes the
+  `userdata/logs/latest.log` symlink.
 - `scripts/deep_dive_slayer.py` — port all 5 sites. Re-use the same
   logger-init from `deep_dive.py`; worker processes need a
   per-process logger re-init (multiprocessing caveat — workers don't
   inherit handlers from parent; S2 needs to pass the log path to
   worker init and re-open a FileHandler per worker, or have workers
   log to stdout and let the parent's handler multiplex).
+- `scripts/clean_logs.py` — new small script (likely <100 lines).
+  Dry-run default; `--execute` required. See §3 "Periodic cleanup"
+  for flag list. Can be cron'd if you want set-and-forget.
 
 ### S2 does NOT touch
 - Core library `gopvpsim/` — out of scope.
@@ -345,16 +365,14 @@ Pass criteria:
 
 ---
 
-## 7. Open question for Michael
+## 7. Resolved questions
 
-**Log file default location: `userdata/logs/` or `/tmp/`?**
+**Log file default location (2026-04-16):** `userdata/logs/` with
+monthly subdirs (`YYYY-MM/`). Confirmed by Michael. `--log-dir`
+overrides if you want to point a specific run elsewhere.
 
-S1 defaults to `userdata/logs/` based on the "logs have real debugging
-value for repro" argument and matching the `userdata/dives/`
-convention. `/tmp/` is the alternative if the expectation is "logs are
-genuinely throwaway and don't need to survive a reboot."
-
-If Michael's preference is `/tmp/`, S2 flips the default in one line;
-the `--log-dir DIR` override handles the other case either way. Not
-blocking — S2 can start with the current default and revisit if
-needed.
+**Periodic cleanup (2026-04-16):** explicit script
+(`scripts/clean_logs.py`), dry-run by default. No auto-purge inside
+`deep_dive.py`. Rationale: silent deletions are surprising; explicit
+`--execute` gate means you only delete when you mean to. See §3
+"Periodic cleanup" for the flag list.
