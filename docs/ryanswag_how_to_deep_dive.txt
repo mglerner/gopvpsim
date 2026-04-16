@@ -1,0 +1,462 @@
+it's the turn of the year and you may 
+ have noticed that my content flow has 
+ slowed down quite a bit rather than 
+ pumping out a PVP IV Deep dive once a 
+ week I'm now pumping one out like every 
+ other week right so that can be a little 
+ bit frustrating if you want to know what 
+ the most optimal PVP IVs are for a 
+ particular species that you want to use 
+ in GBL or for a tournament or something 
+ like that right well in celebration for 
+ the new year here I figured I'd uh give 
+ you some tips on how to do your own sort 
+ of PVP IV analysis uh Fe featuring our 
+ Pokemon Wigglytuff cuz it's shiny and 
+ it's got a little ribbon with the New 
+ Year event so yeah I hope this video 
+ kind of helps you figure out how to do 
+ your own sort of light PVP IV analysis 
+ so you don't have to rely so much on me 
+ especially when I'm not putting out as 
+ much content as I usually am if there's 
+ anything important to know about this 
+ event Beyond you know shiny ribbon 
+ Pokemon is that party hat wormo is 
+ coming back to one star raids so you 
+ know me and my wife are going to be 
+ keeping our eyes peeled for that one and 
+ then we also have uh this delectable 
+ head accessory now too so starting note 
+ I go to pvpoke.com I go to battle and 
+ then I go to the Matrix section uh here 
+ I got the play Pokemon championship 
+ series set up but you can use the great 
+ League custom group or any custom group 
+ you want to often I find that these 
+ groups don't cover everything I want to 
+ look at so you can always add more 
+ Pokemon to if you want to look at some 
+ other specific matchups that you think 
+ might be important for the Target 
+ Pokémon here then here on the side you 
+ can see I got several Wiggly tffs are 
+ these the secret swag IVs for Wigglytuff 
+ well not exactly uh first off here I 
+ have the rank one Wigglytuff which you 
+ can do by hitting maximize uh 051 
+ 12 then I have a Wigglytuff that has a 
+ higher HP weight than that Wigglytuff so 
+ here I'm using the 
+ 0915 um unfortunately pvpoke doesn't 
+ have a auto button for maximum HP but I 
+ feel like slightly HP weight usually 
+ works out a little bit better than 
+ maximum HP does anyways and then I also 
+ have one that has uh maximum defense by 
+ hitting you know defense and maximize 
+ and then I got one in here that has like 
+ a slight attack weight you know you want 
+ to get CMP on something maybe you're 
+ trying to think about the general Wiggly 
+ tough you're probably going to run into 
+ not the Wily tough you want to get which 
+ is you know super high stat product uh 
+ you know just a little baby attack 
+ weight right and then I got a wigly tff 
+ with a pretty huge attack weight and 
+ then you just run this simulation 
+ against the various Shield situations 
+ now a quick thing a little little tip 
+ from the Swagman that has some 
+ experience here when it comes to fast 
+ move heavy Pokemon like you know charm 
+ waterfall Razor Leaf kind of attacks 
+ typically those Pokemon are going to 
+ favor having a higher stat product 
+ because more often than not you know 
+ getting that extra attack in that extra 
+ charm you know is going to be more 
+ impactful than them dealing one extra 
+ damage per charm right right or them 
+ being able to survive to get to one of 
+ their charge moves because they've got 
+ lower energy gains so typically that is 
+ the case there are exceptions so if you 
+ checked out my uh Shadow Victory Bell 
+ PVP IV Deep dive link above and 
+ description cases do come up where 
+ having an attack weight is you know 
+ important enough against enough 
+ important matchups where having that 
+ slight attack weighted Pokemon could be 
+ very important for outcomes but when it 
+ comes to Charmers uh more often than not 
+ we are looking at the high stat product 
+ here that means the question you got to 
+ ask yourself is well what's the minimum 
+ bulk that I'm going to want to have on 
+ this Pokemon for it to be functional 
+ unless you've got a map or a scanner 
+ pointing you directly to the GPS 
+ coordinates of the rank one Wigglytuff 
+ which Wigglytuff that you actually have 
+ is going to be uh rank one enough so 
+ that aside scrolling on down you can 
+ check out the matchup changes here where 
+ you can see that these uh variant Wiggly 
+ tffs are getting a Mantine break point 
+ and they are often losing against the 
+ charm shadow alolan and Ninetails keep 
+ in mind that the opponents here are 
+ maximum stat product and when it comes 
+ to a lot of charm versus charm matchups 
+ it is mostly going to be a duel of stat 
+ product because well you want to have 
+ enough defense to lower their charm 
+ damage you want to have enough HP so 
+ their charms don't wear you down uh so 
+ more often than not it is just going to 
+ be like a bulk based thing and these are 
+ Shadow alola Ninetails so you're 
+ probably not going to be up against the 
+ rank one Shadow Lola Ninetails but you 
+ can see that even this slight attack 
+ weighted Wigglytuff is getting a 
+ breakpoint on the mantin if you go up 
+ here you check out break points it'll 
+ highlight which Pokemon you could be 
+ getting attack breakpoint against uh the 
+ glar one that looks kind of spicy for 
+ some Dynamic situations Skarmory also a 
+ little tasty um but we are seeing that 
+ we're getting this matchup Advantage 
+ with the Mantine which could warrant 
+ some further investigation so you click 
+ on this to pull up Mantine um obviously 
+ we're getting the breakpoint here and 
+ then you want to click on this matchup 
+ itself to see what the attack stat is so 
+ against this rank one Mantine the 0514 
+ so a little bit defense weighted on the 
+ Mantine to begin with and Mantine does 
+ have similar attack break points as the 
+ knock towel does so there are incentives 
+ to run an attack weighted Mantine as 
+ well um but should you be up against the 
+ uh you know rank one big defense kind of 
+ Mantine here uh you'll be wanting to 
+ have a 115.2 for attack stat to gain 
+ this Advantage now to track this usually 
+ I take a spreadsheet here or you use a 
+ pen and paper at home and uh yeah so you 
+ can see that it's 11 
+ 15.44% and take him out regardless of 
+ the shield scenario is a pretty good 
+ thing if you can you know come out of 
+ that with a shield advantage or not 
+ worrying about spending your Shields 
+ yeah you can see here mantin situation 
+ still matters even in the one two and 
+ it's just charm damage so they're 
+ probably not even making it to the 
+ second Shield anyways right um then you 
+ check out the 2 two Shield scenario and 
+ you can see that we're losing these 
+ Superior matchups and this is a pitfall 
+ of PV poke if you're just trying to do 
+ some simple IV analys without actually 
+ looking at the matchups because if you 
+ pull up the rank one matchup and you 
+ pull up the not rank one matchup right 
+ so here we got the rank one Superior is 
+ thrown out three frenzy plants and we're 
+ taking out with the charm damage but if 
+ you check out the not rank one all of a 
+ sudden it changes up its strategy the 
+ game plan has shifted and is now using a 
+ leaf tornado and is getting the two 
+ attack debuff which allows it to get to 
+ this you know Victorious outcome here so 
+ if you were to take this and you were to 
+ make that just a frenzy plant then you'd 
+ see that we are maintaining the same 
+ exact wind condition so when it comes to 
+ like a volume-based approach for 
+ checking out how many wins and losses 
+ shift between different IV spreads and 
+ shield scenarios uh make sure you're 
+ checking out how the matchup plays out 
+ in particular because uh sometimes funny 
+ stuff like this happens where you should 
+ be winning but PV poke uh changed how it 
+ plays the matchup and if you check here 
+ and you make this into a leaf tornado 
+ against the rank one you can see that it 
+ has the same exact wind con for Superior 
+ right or I think it'd have to like use a 
+ leaf tornado there but it's 50 damage so 
+ it KO anyways regardless it is the same 
+ wind condition for a superior as it is 
+ against the variant IV spreads so when 
+ you are looking at these matchup changes 
+ make sure you're actually looking at the 
+ matchup changes because you might be a 
+ little bit misled into thinking a 
+ particular IV spread is better or worse 
+ than what it actually is in practice 
+ then when it comes to this sparkk 
+ Lantern situ situation this is another 
+ complicated thing when it comes to these 
+ debuff Pokémon if you check out the rank 
+ one situation you could see that Lantern 
+ is barely beating it by 2 Hp and if you 
+ go over here you can see that we're 
+ winning out by 3 HP but we got 
+ significantly less HP and we're not 
+ getting a defense break point against 
+ the spark damage so what's happening 
+ here well you have the post debuff 
+ breakpoint to think about so you can see 
+ here the seven right for each spark and 
+ then you got the icy wind now it's 
+ changing to five for each spark where if 
+ you go over to the rank one here with 
+ its lower defense you got the seven and 
+ the Seven is only changing to a six so 
+ when it comes to uh you know post debuff 
+ break points that gets to be uh very 
+ confusing to try to figure out because 
+ pvpoke currently doesn't have a nice 
+ simplified way for us to uh take a peek 
+ at that but it is worth noting should a 
+ higher defense variant of Wigglytuff 
+ become the preferred uh you know 
+ variation of Wigglytuff based B off of 
+ what else you find out in the analysis 
+ and then also if you're going into a 
+ particular meta where you know the spark 
+ lanterns are common um well if you 
+ happen to have a very high defense 
+ Wigglytuff you might prefer bringing 
+ that one into that kind of competition 
+ knowing that you could possibly get this 
+ post debuff breakpoint Advantage so I'd 
+ go under Wigglytuff and then I'd put 
+ like high 
+ defense post 
+ IW um Lance spark 
+ Lantern just so I know to check it out 
+ later should it interest me but finding 
+ out the post debuff break points 
+ especially against higher attack 
+ weighted iterations of a species it gets 
+ to be uh very annoying to to try to 
+ hammer down then we check out the 21 
+ Shield scenario and you can see we're 
+ losing against the spark Lantern here 
+ with this lower quality of bulk so how 
+ much bulk do we exactly need to survive 
+ the lantern well if you check out the 
+ matchup here you can see that we're 
+ losing this fight by Just 2 Hp so 224 HP 
+ could be a good Baseline so keep that 
+ 224 in your mind but you can see that we 
+ are getting hit by a single Thunderbolt 
+ here dealing 78 damage this Wigglytuff 
+ has 74.8 defense if you scroll down here 
+ and you change that spark to the 
+ Thunderbolt um our 74.8 is giving us 
+ that 97 right but if we had the um 
+ 75.4 s then we might need one less HP 
+ you know 223 could be fit in the bill 
+ here another thing to keep in mind 
+ though is that we are only 74.8 so if 
+ there is even the slightest attack 
+ weight on this lantern that Thunderbolt 
+ is going to be dealing one extra damage 
+ so overall unless you're like you know 
+ popping 75 plus defense uh 225 hp could 
+ be more consistent so for that 
+ I would uh copy that go back to the 
+ sheet and I'd say like 
+ Lantern spark 
+ Lantern 
+ 21 and then 224 HP 
+ with defense and then go like 
+ 225 more consistent then we also have 
+ Superior popping up again which is 
+ likely the same situation we saw in the 
+ other Shield scenario 
+ then we pop on over to the 01 Shield 
+ scenario you can see that we're losing 
+ against liong and Meacham and that's 
+ pretty alarming right like losing the 
+ liong as a normal type Pokemon using you 
+ know a nutral attack that seems a 
+ little whack you check out bulk points 
+ and you see that it's getting a break 
+ point on our lower defense iterations 
+ but you can see here that it's not super 
+ strict the 5145 is getting the defense 
+ break point point so what is the defense 
+ break point right so if you click on it 
+ you'll see against the rank one lickong 
+ that we need 
+ 74.2 
+ defense and that's where the 
+ liong uh 01 right but this is liong and 
+ if you checked out my liong PVP IV Deep 
+ dive link up above and description if 
+ you haven't checked it out yet you know 
+ that I prefer the attack weighted liong 
+ and experience has taught me time and 
+ time again that attack weighted Li 
+ tongue is often you know a really good 
+ lick tongue like I've seen people at the 
+ play Pokemon tournaments get kind of 
+ frustrated that you know liongue dealt 
+ one extra power whip damage like their 
+ Shadow uh alolan sand slash so that 
+ upset like the z00 for them and stuff 
+ like that like attack weighted liong is 
+ the thing that you know that's out there 
+ but you really hope it isn't sometimes 
+ right uh well when I do my deep Dives I 
+ try to prepare for the attack weighted 
+ look at 
+ when I see a liongue matchup change so 
+ the 10 1514 is an example of one such 
+ lickong um you can see it's got the 98.2 
+ attack stat if you want to prepare 
+ against like a even slightly higher 
+ attack weighted version you can go like 
+ 10413 right so 98.5 attack how much 
+ defense do we need for that well 
+ 75.0843 point5 attack 
+ liong 
+ and then sometimes I like to reference 
+ what IV I use so I can check it out 
+ later and then because I make these 
+ guides you know I try to explain 
+ everything as well in the guide so 
+ that's the lick tongue and now we got 
+ meta Cham what's going with meta Cham 
+ well meta's getting a counter break 
+ point on us I know Meacham has seen 
+ better days with the current update but 
+ it is still out there it is still a 
+ threat and uh yeah having a bit higher 
+ defense could help us beat this Pokemon 
+ we're a fairy type pokemon we should be 
+ beating Meacham right uh 73.4 one but 
+ this is the rank one meta Cham if you 
+ checked out my meta Cham PVP IV Deep 
+ dive or my meta Cham Slayer PvP IV Deep 
+ dive um I'll link to both in the 
+ description uh one in front of your face 
+ I guess um but you'll know that my 
+ favored Best of Both Worlds kind of meta 
+ Cham is going to be like the 71514 with 
+ the 106.9 attack stat so I feel like 
+ preparing for a slightly attack weighted 
+ metam might be a little bit more sober 
+ than preparing for the rank one that 
+ brings us to a 
+ 7413 defense stat on top of that there 
+ are meta Cham out there that have even 
+ higher attack stats than this for 
+ example in the meta Cham Slayer PvP IV 
+ Deep dive I highlight The axen Meta Cham 
+ and axen adjacent Meacham which have a 
+ high attack stat so they can get break 
+ points on opposing meta chams so having 
+ an even higher defense stat than the 
+ 74.1 three could be important for the uh 
+ Wiggly tough here so go like 74 plus 
+ defense and then it's the 
+ Meacham uh 01 right and then against 16 
+ 15 14 then we got the 0 Shield 
+ scenario uh Li tongue rear in its head 
+ once again uh so liongue 01 and 0 and 
+ you can see that we're now taking the 
+ wiggly tough mirror matchup probably 
+ because it's CMP based I'd have to guess 
+ based off of this and that and all of 
+ them kind of making it so CMP for the 
+ z00 not bad and then we are also running 
+ into a peler situation which uh break 
+ points are involved so it's probably 
+ like a very tight high-end bulk point 
+ that we're considering there and yeah 
+ Meacham rear in its head once again so 
+ with this investigation here what can we 
+ conclude about the Wigglytuff well it's 
+ pretty clear to say that we probably 
+ want to have at least a 7 5 defense stat 
+ and then when it comes to the HP 
+ probably good to have 224 at a base 225 
+ could be even cooler and if we happen to 
+ have the 11 
+ 15.44% five and then for defense we're 
+ looking at 75 right and then uh is a 
+ little bit more than 75 so like 
+ 75.1 let's 
+ say and then expand 
+ this yeah and you can see here that 
+ these are the 11 different IV spreads 
+ that meet the condition of having at 
+ least 225 hp with at least 75.1 defense 
+ so if you're keeping your eyes peeled 
+ for a particular Wigglytuff these might 
+ be the wiggly toughs you want to look 
+ out for man what's the rank one got 
+ going on is rank one 224 yeah the rank 
+ one's 224 so if you happen to have a 
+ high enough defense stat then you know 
+ 224 is probably a okay so that can 
+ expand your options to 
+ 229 just keep in mind that the ones that 
+ got the lower end of the defense stick 
+ like this one here might not work out 
+ with the 224 on the HP stat and you can 
+ also see that precisely zero of these IV 
+ spreads have a high enough attack weight 
+ for the rank one Mantine but once again 
+ is it that big of a deal because rank 
+ one Mantine you know Mantine kind of 
+ likes having a little bit of an attack 
+ weight so you might be getting that 
+ break point anyways and then of course 
+ you'd run this stuff once again against 
+ the uh default IVs so you can get an 
+ idea of like more random IV Pokemon not 
+ just the rank one Pokemon and then also 
+ spot checks specific matchups where you 
+ know there could be you know well-known 
+ IV variations like I did with the 
+ lickong and the The Meta Cham so with 
+ that information at your disposal I hope 
+ you uh have some happy Hunting finding 
+ some big bulk Wiggly tuffs out there 
+ this new year and uh I hope this helps 
+ you do your own sort of PVP IV analysis 
+ in the future should I not be able to 
+ cover a particular Pokemon you want in 
+ time for you to use it for like you know 
+ GBL or a tournament or something like 
+ that anyway that's all I got to say 
+ about the new year right now if you got 
+ any questions on this content of course 
+ comment below let me know what's up and 
+ I'll be happy to help you out if you 
+ enjoyed this kind of content you want to 
+ see more like it make sure to subscribe 
+ to swag 
+ tips swag 
+ tips I'd also like to give a special 
+ shout out to these Patron supporters if 
+ you want s Swagman on patreon link in 
+ the description there do come 
+ cases there do come cases um cases do 
+ come up where having an attack weight
