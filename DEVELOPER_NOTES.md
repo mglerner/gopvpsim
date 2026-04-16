@@ -553,3 +553,41 @@ In `--split-movesets` mode each HTML file gets its own full call to
 reflects the correct moveset. This is the intended experience for the
 website — all-in-one is primarily for quick interactive score-distribution
 comparison during development.
+
+## Article lifecycle
+
+Articles live in `articles/*.toml` (source TOML, checked in) and render
+to `userdata/website/articles/<slug>/` via `scripts/render_article.py`.
+Full schema: `docs/article_schema.md`.
+
+### Marking an article obsolete
+
+When a CD move turns out to be strictly better/worse than the sidegrade
+framing claimed, or the meta shifts enough that the analysis no longer
+applies:
+
+1. Edit the article TOML (e.g. `articles/oinkologne_cd_2026_05.toml`).
+2. Change `[obsolescence]` fields:
+   ```toml
+   [obsolescence]
+   status = "obsolete"
+   as_of  = "2026-06-15"       # date you're marking it obsolete
+   note   = "Mud Slap is strictly better in GL; sidegrade framing no longer applies."
+   ```
+3. Re-render: `python scripts/render_article.py articles/oinkologne_cd_2026_05.toml`
+4. Republish: `scripts/publish_website.sh --push`
+
+The renderer shows a red banner at the top of the page with the note
+text and date. No other files need to change.
+
+### Changing authorship level
+
+The `authorship` field tracks content origin. Update it as the article
+evolves:
+
+- `auto` — scaffold / auto-generated placeholder content
+- `both` — human has edited the prose, but it's backed by sim data
+- `expert` — fully human-written analysis
+
+Edit the field in the article TOML and re-render. The banner color
+changes automatically (blue -> green -> gold).
