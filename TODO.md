@@ -128,22 +128,18 @@ break invariants that weren't yet nailed down by tests.
   an estimated P(opponent shields). P~0 → fire best-DPE move; P~1 → bait with
   cheapest.
 
-* **Baiting policy as a deep-dive sim axis** — Currently, baiting is a
-  property baked into a single simulation run, not an output dimension
-  swept across the IV grid. RyanSwag-style threshold callouts mix
-  shield count with bait mode ("2-2 *no bait*, 2-1 *farm*") and even
-  move-restriction ("0-0 *Ice Punch only*"). To reproduce that
-  editorial nuance faithfully, the deep dive sims need a baiting-policy
-  axis (and ideally a move-restriction axis) alongside the existing
-  shield-scenario axis. Open design questions: which bait modes to
-  enumerate (no-bait / always-bait / Selective / EV-based?), does the
-  existing PvPoke "Selective" implementation suffice, where in the UI
-  do we expose the new dropdown, how badly does the multiplied sim
-  count hurt runtime. Cross-ref: the "RyanSwag-style matchup-flip
-  annotations" Phase 1 work intentionally ships *without* this axis;
-  this TODO is the natural follow-up that lets the bullet format
-  upgrade from "(2-2, 2-1, 0-0)" to "(2-2 no bait, 2-1 farm, 0-0 Ice
-  Punch only)". Discovered 2026-04-09 while scoping Phase 1.
+* ~~**Baiting policy as a deep-dive sim axis**~~ — **SHIPPED.** `--bait
+  {on,off,both}` sweeps the selected modes; with `--bait both` the HTML
+  renders a Bait dropdown (`deep_dive.py:2678-2683`) alongside Shields
+  and Opponent-IVs. Scatter, threshold/flip aggregator, anchor-clear
+  overlay, and bait-differential matchup cards
+  (`deep_dive_rendering.py:2840-2910`) all consume `state.oppIvMode`
+  with the `:nobait` suffix so they react to the dropdown. Confirmed
+  2026-04-16 while scoping S3 histogram. Remaining open items are
+  policy-enumeration (Selective, EV-based) under "Policies to add"
+  above — distinct from the axis plumbing. S16/S17 in the post-S5 arc
+  still tracks post-ship design polish (named bait modes in bullets),
+  but nothing is blocking.
 
 ## Features to add
 
@@ -599,15 +595,16 @@ break invariants that weren't yet nailed down by tests.
   useful on Tinkaton + 1-2 more species — single point of data
   doesn't yet justify the schema work.
 
-* **Bait-axis matchup categories** — Round 1 of structured IV
-  categories shipped `kind='matchup'` cards keyed by
-  `(opponent, scenario)` with the `bait` field on `matchup_conditions`
-  reserved as `None`. Once the "Baiting policy as a deep-dive sim
-  axis" TODO above lands, the matchup-category builder needs to also
-  iterate the bait dimension so we get cards like "Beats rank-1
-  Lickitung in the 2v2 no-bait." The data model already handles this
-  cleanly — only the builder loop and the `_matchup_subtitle()`
-  renderer need updating.
+* ~~**Bait-axis matchup categories**~~ — **SHIPPED.** Confirmed
+  2026-04-16 while scoping S3 histogram. Non-bait matchup cards
+  populate `bait` from `parse_mode(opp_iv_mode)[1]`
+  (`deep_dive.py:415-423`); the bait-differential builder in
+  `deep_dive_rendering.py:2840-2910` emits "Beats … with bait only" /
+  "… no bait only" cards keyed on `(opponent, scenario, bait)`; and
+  `matchup_subtitle()` at `deep_dive_rendering.py:517-538` renders the
+  ``· no bait`` / ``· with bait`` suffix. Follow-up UX polish (richer
+  narrative phrasing, merging adjacent bait cards) lives in S17 of the
+  post-S5 arc, not here.
 
 ## Reproducibility
 
