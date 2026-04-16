@@ -6,6 +6,15 @@ var state = {
   oppIvMode: '__OPP_IV_MODE_DEFAULT__',
   colorMode: 'threshold',
   yAxisMode: 'avgScore',
+  // Anchor IVs overlay rendering mode:
+  //   'filled'  - cyan fill, opacity 0.65 (current default; context
+  //               layer that doesn't overwhelm slayer / top-picks)
+  //   'outline' - transparent fill with a cyan border ring; the band
+  //               stays visible as an envelope rather than a blob, so
+  //               named-category traces riding the top/bottom edge
+  //               (e.g. Annihilape Bulk in a Tinkaton dive) read
+  //               clearly against it. Opt-in toggle, not default.
+  anchorDisplayMode: 'filled',
   // User-collection state — populated by loadCollection() after the
   // user pastes/uploads a Poke Genie CSV. Null until then.
   //   userRecords: array of {mon, stats, matched, canonicalIvIdx, onGrid}
@@ -1440,7 +1449,12 @@ function buildTraces() {
   // (e.g. an IV triple that wasn't translated to a canonical index)
   // would otherwise produce undefined x/y values and cause Plotly to
   // silently fail to render the *entire* plot.
-  function buildOverlayTrace(name, ivList, borderColor, subdued) {
+  //
+  // outlineOnly flag is honored for the Anchor IVs overlay only: when
+  // state.anchorDisplayMode === 'outline', the filled markers become
+  // transparent rings so the named-category traces drawing on top can
+  // be read against the envelope edge instead of fighting fill.
+  function buildOverlayTrace(name, ivList, borderColor, subdued, outlineOnly) {
     if (!ivList || ivList.length === 0) return null;
     var ox = [], oy = [], ot = [], ocol = [], osym = [];
     for (var k = 0; k < ivList.length; k++) {
@@ -1465,6 +1479,20 @@ function buildTraces() {
       osym.push(overlaySymbol(iv));
     }
     if (ox.length === 0) return null;
+    // Outline-only rendering: replace the per-point fill array with a
+    // single transparent color so Plotly draws rings, and force a 1px
+    // border in the legend color. Size bumps from 5 -> 6 to compensate
+    // for losing the fill as a visual anchor.
+    var markerColor = ocol;
+    var markerOpacity = subdued ? 0.65 : 0.85;
+    var markerLineWidth = subdued ? 0 : 1;
+    var markerSize = subdued ? 5 : 6;
+    if (outlineOnly) {
+      markerColor = 'rgba(0,0,0,0)';
+      markerOpacity = 0.9;
+      markerLineWidth = 1;
+      markerSize = 6;
+    }
     return {
       name: name,
       x: ox, y: oy, text: ot,
@@ -1475,11 +1503,11 @@ function buildTraces() {
       // of this same fix.
       mode: 'markers', type: 'scattergl', hoverinfo: 'text',
       marker: {
-        size: subdued ? 5 : 6,
-        color: ocol,
+        size: markerSize,
+        color: markerColor,
         symbol: osym,
-        opacity: subdued ? 0.65 : 0.85,
-        line: { width: subdued ? 0 : 1, color: borderColor }
+        opacity: markerOpacity,
+        line: { width: markerLineWidth, color: borderColor }
       },
       hoverlabel: { bordercolor: borderColor }
     };
@@ -1490,7 +1518,8 @@ function buildTraces() {
   // and with full-size/full-opacity markers they visually dominate
   // the plot; subdued styling keeps them visible as context without
   // overwhelming the rarer slayer + recommended sets.
-  var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff', true);
+  var anchorOutline = (state.anchorDisplayMode === 'outline');
+  var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff', true, anchorOutline);
   if (anchorTrace) traces.push(anchorTrace);
   var slayerTrace = buildOverlayTrace('Slayer IVs', DATA.slayerIvs, '#FFD700');
   if (slayerTrace) traces.push(slayerTrace);
@@ -1799,6 +1828,8 @@ function updateView() {
   if (csel) state.colorMode = csel.value;
   var ysel = document.getElementById('yaxis-sel');
   if (ysel) state.yAxisMode = ysel.value;
+  var asel = document.getElementById('anchor-display-sel');
+  if (asel) state.anchorDisplayMode = asel.value;
   lockedIdx = -1;
 
   // Swap per-moveset narrative zones

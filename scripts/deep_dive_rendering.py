@@ -2909,6 +2909,21 @@ def render_results_section(data_obj, moveset_label, opp_label,
                             member_meta=meta,
                         ))
 
+    # -- Envelope-position metric (S4) --
+    # Per-category position relative to the Anchor IVs band at matching
+    # SP rank. Stashed on data_obj so the S6+ article generator can pull
+    # it without re-running the aggregator. Keyed by moveset_idx because
+    # the band + category membership differ per moveset.
+    anchor_iv_indices = data_obj.get('anchorClearIvs') or []
+    sp_ranks = data_obj.get('spRanks') or []
+    if anchor_iv_indices and sp_ranks and avg_scores:
+        envelope_positions = analysis.compute_envelope_positions(
+            iv_categories_all, sp_ranks, avg_scores, anchor_iv_indices,
+        )
+        data_obj.setdefault('envelopePositions', {})[str(moveset_idx)] = (
+            envelope_positions
+        )
+
     notable_html = render_notable_ivs_section(
         iv_categories_all, data_obj, opp_iv_mode,
         recommendations_html=rec_html,

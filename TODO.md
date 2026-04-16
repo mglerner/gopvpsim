@@ -505,6 +505,16 @@ break invariants that weren't yet nailed down by tests.
   natural ship target but not a hard deadline if the work needs more
   time.
 
+  **Watch item for S8 (envelope-position annotation surfacing):** when
+  the per-category envelope-position metric (S4) gets surfaced as
+  in-card annotations in the IV recommendations section, audit whether
+  `render_notable_ivs_section`'s existing UX caps
+  (`notable_max_count=5`, `max_members_shown=5`) still feel right with
+  an extra shape-tag line per card. Not an action item yet — S4's
+  metric doesn't add new category *types*, only a classification, so
+  the cap isn't currently under pressure. Flagging so the audit
+  doesn't get discovered at render-time in S8.
+
 ## Deep-dive narrative
 
 * **SwagTips narrative follow-ups (Goodra + Aegislash dives)** — the
