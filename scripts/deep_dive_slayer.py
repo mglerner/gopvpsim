@@ -19,6 +19,11 @@ from gopvpsim.data import load_gamemaster, load_rankings, get_default_moveset, p
 from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp, pvpoke_simulate_shield
 from gopvpsim.anchors import resolve_anchors, tag_iv, ResolvedAnchor
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from deep_dive_logging import get_logger, worker_log_setup
+
+logger = get_logger()
+
 
 # Injected by deep_dive.py after import (defined there, used here).
 compute_iv_metadata = None
@@ -116,7 +121,8 @@ _slayer_state = {}
 
 def slayer_worker_init(species, focal_types, base_atk, base_def, base_sta,
                          max_cp, shadow, fm_template, cms_template,
-                         shield_scenarios):
+                         shield_scenarios, log_path=None, verbose=False):
+    worker_log_setup(log_path, verbose=verbose)
     _slayer_state['species'] = species
     _slayer_state['focal_types'] = focal_types
     _slayer_state['base_atk'] = base_atk
@@ -196,7 +202,8 @@ def build_focal_meta(species, league, shadow, iv_floor=None):
 def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                                 shield_scenarios, initial_opp_iv,
                                 max_rounds=4, top_per_round=10, cache=None,
-                                metric='all', iv_floor=None):
+                                metric='all', iv_floor=None,
+                                log_path=None, verbose=False):
     """
     Iterative slayer discovery: find IVs that beat the mirror match through
     Nash-style iteration.
@@ -301,10 +308,10 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
         n_round_sims = n_profiles * len(opps_needing_sim) * n_scen
 
         if opps_needing_sim:
-            print(f"    Round {round_idx}: {len(opp_data_list)} opponents "
-                  f"({len(opps_needing_sim)} need sim), "
-                  f"{n_profiles} unique focal profiles, "
-                  f"~{n_round_sims:,} sims to run", flush=True)
+            logger.info(f"    Round {round_idx}: {len(opp_data_list)} opponents "
+                        f"({len(opps_needing_sim)} need sim), "
+                        f"{n_profiles} unique focal profiles, "
+                        f"~{n_round_sims:,} sims to run")
 
             # Build the focal profile chunks. We sim each unique (atk, def, hp)
             # exactly once per opponent. After workers return, we expand the
@@ -320,7 +327,8 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
             chunks = [profile_list[i:i+chunk_size] for i in range(0, len(profile_list), chunk_size)]
 
             init_args = (species, focal_types, base_atk, base_def, base_sta,
-                         max_cp, shadow, fm_template, cms_template, shield_scenarios)
+                         max_cp, shadow, fm_template, cms_template,
+                         shield_scenarios, log_path, verbose)
             sim_start = _time.time()
             with multiprocessing.Pool(
                 processes=n_workers,
@@ -341,14 +349,14 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                         elapsed = now - sim_start
                         frac = completed / len(chunks)
                         eta = (elapsed / frac) * (1 - frac) if frac > 0 else 0
-                        print(f"      sim progress: {completed}/{len(chunks)} chunks "
-                              f"({frac*100:.0f}%), elapsed {elapsed:.0f}s, "
-                              f"eta {eta:.0f}s", flush=True)
+                        logger.info(f"      sim progress: {completed}/{len(chunks)} chunks "
+                                    f"({frac*100:.0f}%), elapsed {elapsed:.0f}s, "
+                                    f"eta {eta:.0f}s")
                         last_print = now
 
             sim_elapsed = _time.time() - sim_start
-            print(f"      sim done in {sim_elapsed:.1f}s "
-                  f"({n_round_sims / max(sim_elapsed, 0.01):,.0f} sims/s)", flush=True)
+            logger.info(f"      sim done in {sim_elapsed:.1f}s "
+                        f"({n_round_sims / max(sim_elapsed, 0.01):,.0f} sims/s)")
 
             # Merge into cache, expanding profile results to all matching focal IVs
             merge_start = _time.time()
@@ -358,10 +366,9 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                         cache.put(focal_idx, opp_idx, scores)
             merge_elapsed = _time.time() - merge_start
             if merge_elapsed > 1.0:
-                print(f"      cache merge: {merge_elapsed:.1f}s", flush=True)
+                logger.info(f"      cache merge: {merge_elapsed:.1f}s")
         else:
-            print(f"    Round {round_idx}: {len(opp_data_list)} opponents, all cache hits",
-                  flush=True)
+            logger.info(f"    Round {round_idx}: {len(opp_data_list)} opponents, all cache hits")
 
         # Identify even-scenario indices for the metric
         even_indices = [i for i, (s0, s1) in enumerate(shield_scenarios) if s0 == s1]

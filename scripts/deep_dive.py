@@ -77,6 +77,11 @@ sys.path.insert(0, os.path.dirname(__file__))
 import deep_dive_analysis as analysis
 import deep_dive_rendering as rendering
 import deep_dive_slayer as slayer
+from deep_dive_logging import (
+    init_logger, worker_log_setup, get_logger,
+)
+
+logger = get_logger()
 
 # ---------------------------------------------------------------------------
 # PvPoke custom group loading (via cached fetch from GitHub)
@@ -128,8 +133,8 @@ def load_group(group_name):
         result.append((species_name, fast_move, charged_moves, is_shadow))
 
     if skipped:
-        print(f"  Warning: skipped {len(skipped)} group entries not in gamemaster: "
-              f"{', '.join(skipped[:5])}{'...' if len(skipped) > 5 else ''}")
+        logger.warning(f"skipped {len(skipped)} group entries not in gamemaster: "
+                       f"{', '.join(skipped[:5])}{'...' if len(skipped) > 5 else ''}")
 
     return result
 
@@ -538,8 +543,8 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None):
         if user_fast not in fast_moves_db:
             sys.exit(f"Unknown fast move {user_fast!r} (not in gamemaster)")
         if user_fast not in legal_fast:
-            print(f"  Note: {user_fast} is not in {species_name}'s current move pool "
-                  f"(CD/legacy move?)")
+            logger.warning(f"{user_fast} is not in {species_name}'s current move pool "
+                           f"(CD/legacy move?)")
         fast_candidates = [user_fast]
     else:
         fast_candidates = list(legal_fast)
@@ -551,8 +556,8 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None):
             if cm not in charged_moves_db:
                 sys.exit(f"Unknown charged move {cm!r} (not in gamemaster)")
             if cm not in legal_charged:
-                print(f"  Note: {cm} is not in {species_name}'s current move pool "
-                      f"(CD/legacy move?)")
+                logger.warning(f"{cm} is not in {species_name}'s current move pool "
+                               f"(CD/legacy move?)")
         charged_pairs = [tuple(sorted(user_charged))]
     elif user_charged and len(user_charged) == 1:
         # One charged move specified — pair it with all legal partners
@@ -560,8 +565,8 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None):
         if fixed not in charged_moves_db:
             sys.exit(f"Unknown charged move {fixed!r} (not in gamemaster)")
         if fixed not in legal_charged:
-            print(f"  Note: {fixed} is not in {species_name}'s current move pool "
-                  f"(CD/legacy move?)")
+            logger.warning(f"{fixed} is not in {species_name}'s current move pool "
+                           f"(CD/legacy move?)")
         # Include the fixed move in the partner pool
         all_charged = list(set(legal_charged) | {fixed})
         charged_pairs = []
@@ -684,11 +689,11 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
     Return the top N movesets by average score.
     """
     if top_n == 0 or len(movesets) <= top_n:
-        print(f"  {len(movesets)} moveset(s) — skipping screen phase.\n")
+        logger.info(f"  {len(movesets)} moveset(s) — skipping screen phase.")
         return movesets
 
-    print(f"  Phase 1: Screening {len(movesets)} movesets (rank-1 IVs, "
-          f"{len(opponents)} opponents, {len(shield_scenarios)} scenario(s))...")
+    logger.info(f"  Phase 1: Screening {len(movesets)} movesets (rank-1 IVs, "
+                f"{len(opponents)} opponents, {len(shield_scenarios)} scenario(s))...")
     t0 = time.time()
 
     # Use rank-1 IVs for screening
@@ -713,12 +718,11 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
 
     scored.sort(reverse=True)
     elapsed = time.time() - t0
-    print(f"  Screened in {elapsed:.1f}s. Top movesets:")
+    logger.info(f"  Screened in {elapsed:.1f}s. Top movesets:")
     for i, (avg, fast_id, charged_ids) in enumerate(scored[:top_n]):
-        print(f"    {i+1:3d}. {moveset_label(fast_id, charged_ids):<45s} avg={avg:.0f}")
+        logger.info(f"    {i+1:3d}. {moveset_label(fast_id, charged_ids):<45s} avg={avg:.0f}")
     if len(scored) > top_n:
-        print(f"    ... ({len(scored) - top_n} more pruned)")
-    print()
+        logger.info(f"    ... ({len(scored) - top_n} more pruned)")
 
     return [(fast_id, charged_ids) for _, fast_id, charged_ids in scored[:top_n]]
 
@@ -804,8 +808,13 @@ def group_ivs_by_stat_profile(iv_meta_list):
 
 
 def _sweep_worker_init(species, focal_types, fm_template, cms_template,
-                       opp_cache, shield_scenarios, focal_bait=True):
+                       opp_cache, shield_scenarios, focal_bait=True,
+                       log_path=None, verbose=False):
     """Initialize shared state in each sweep worker process."""
+    # Spawn-mode workers (default on macOS) do not inherit the parent
+    # logger's handlers; re-attach a FileHandler so any worker-side
+    # log record lands in the same per-run file.
+    worker_log_setup(log_path, verbose=verbose)
     _worker_state['species'] = species
     _worker_state['focal_types'] = focal_types
     _worker_state['fm_template'] = fm_template
@@ -868,7 +877,7 @@ def _sweep_worker(profile_chunk):
 
 def iv_sweep(species, fast_id, charged_ids, league, shadow,
              opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke',
-             iv_floor=None):
+             iv_floor=None, log_path=None, verbose=False):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
@@ -939,7 +948,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         processes=n_workers,
         initializer=_sweep_worker_init,
         initargs=(species, focal_types, fm_template, cms_template,
-                  opp_cache, shield_scenarios, focal_bait),
+                  opp_cache, shield_scenarios, focal_bait,
+                  log_path, verbose),
     ) as pool:
         last_print = sim_start
         completed = 0
@@ -951,8 +961,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                 elapsed = now - sim_start
                 frac = completed / len(chunks)
                 eta = (elapsed / frac) * (1 - frac)
-                print(f"      progress: {completed}/{len(chunks)} chunks "
-                      f"({frac*100:.0f}%), eta {eta:.0f}s", flush=True)
+                logger.info(f"      progress: {completed}/{len(chunks)} chunks "
+                            f"({frac*100:.0f}%), eta {eta:.0f}s")
                 last_print = now
 
     # Merge profile results
@@ -1032,7 +1042,7 @@ def _plotly_script_tag(standalone):
     import urllib.request
     import ssl
     import certifi
-    print("  Downloading Plotly.js for standalone HTML...")
+    logger.info("  Downloading Plotly.js for standalone HTML...")
     ctx = ssl.create_default_context(cafile=certifi.where())
     with urllib.request.urlopen(PLOTLY_CDN, context=ctx) as r:
         plotly_src = r.read().decode()
@@ -1410,7 +1420,7 @@ Atk &times; Def &times; HP.
 
     with open(html_path, 'w') as f:
         f.write(html)
-    print(f"  HTML written to {html_path}")
+    logger.result(f"  HTML written to {html_path}")
 
 
 _hover_text = rendering.hover_text
@@ -1434,8 +1444,8 @@ def resolve_reference_moveset(species, league, shadow, ref_arg):
             fast, charged = get_default_moveset(species, league=league, shadow=shadow)
             return fast, charged
         except KeyError:
-            print(f"  Warning: no default moveset for {species} in {league} rankings; "
-                  f"skipping reference")
+            logger.warning(f"no default moveset for {species} in {league} rankings; "
+                           f"skipping reference")
             return None
     # Explicit: FAST,CHARGED1,CHARGED2
     parts = [p.strip() for p in ref_arg.split(',')]
@@ -1665,7 +1675,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     if ref_iv < 0:
         ref_iv = 0
 
-    print("  Generating analysis sections...")
+    logger.info("  Generating analysis sections...")
 
     # Determine whether both bait modes were swept (for bait annotations).
     all_modes = data_obj.get('oppIvModes', [opp_iv_mode])
@@ -1831,7 +1841,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 else:
                     _seen[dedup_key] = rec
                     anchor_flip_records.append(rec)
-            print(f"  Anchor-flip aggregator ({_mode}): {_debug}")
+            logger.debug(f"  Anchor-flip aggregator ({_mode}): {_debug}")
 
     # -- Compute matchup-flipping boundaries (def and atk sweeps) --
     # Run before tier cards so they can include boundary bullets.
@@ -1864,8 +1874,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                      if m.get('stat') == 'def')
         _n_atk = sum(1 for m in all_matchup_boundaries
                      if m.get('stat') == 'atk')
-        print(f"  Matchup boundaries: {len(all_matchup_boundaries)} found "
-              f"({_n_def} def, {_n_atk} atk)")
+        logger.info(f"  Matchup boundaries: {len(all_matchup_boundaries)} found "
+                    f"({_n_def} def, {_n_atk} atk)")
 
     # -- Threshold Tiers (RyanSwag-style, stat-target-forward) --
     effective_tiers = data_obj.get('tiers') or []
@@ -1876,8 +1886,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             anchor_flip_records, data_obj,
             matchup_boundaries=all_matchup_boundaries)
         if effective_tiers:
-            print(f"  Auto-derived {len(effective_tiers)} threshold tier(s) "
-                  f"from anchor-flip records")
+            logger.info(f"  Auto-derived {len(effective_tiers)} threshold tier(s) "
+                        f"from anchor-flip records")
             # Inject auto-derived tiers into data_obj for scatter plot
             # coloring. Exclude the "General" tier — it's too broad (catches
             # ~all IVs) and kills the contrast that makes selective tiers
@@ -3030,7 +3040,7 @@ var _scoresReady = (async function() {
 
     with open(html_path, 'w') as f:
         f.write(html)
-    print(f"  Interactive HTML written to {html_path}")
+    logger.result(f"  Interactive HTML written to {html_path}")
 
 
 _JS_ENGINE_PATH = os.path.join(os.path.dirname(__file__), 'deep_dive_engine.js')
@@ -3298,6 +3308,22 @@ def main():
                              "HTML, and annotates bait-dependent matchup "
                              "flips. Doubles compute time. "
                              "Interactive mode only.")
+    parser.add_argument('--verbose', action='store_true',
+                        help='Route DEBUG-level aggregator diagnostics to the '
+                             'log file (stdout unchanged).')
+    parser.add_argument('--quiet', action='store_true',
+                        help='Suppress INFO-level progress on stdout. WARNINGs '
+                             'and the final Top-20 table still appear. The log '
+                             'file is unaffected.')
+    parser.add_argument('--log-file', default=None, metavar='PATH',
+                        help='Explicit per-run log file. Use /dev/null to '
+                             'disable file logging entirely. Default: '
+                             'userdata/logs/YYYY-MM/YYYYMMDD_HHMMSS_<species>_<league>.log.')
+    parser.add_argument('--log-dir', default=None, metavar='DIR',
+                        help='Root directory for per-run log files. Monthly '
+                             'subdirs and the YYYYMMDD_HHMMSS_<species>_<league>.log '
+                             'filename are derived from this base. Ignored when '
+                             '--log-file is given. Default: userdata/logs/.')
 
     args = parser.parse_args()
 
@@ -3317,15 +3343,26 @@ def main():
                          '(e.g. "13,13,13")')
     args.iv_floor = _iv_floor
 
+    # Initialize the per-run logger BEFORE anything else emits output. The
+    # file handler is opened before the first CLI echo so `tail -f` on
+    # userdata/logs/latest.log catches the whole run.
+    _, log_path = init_logger(
+        args.species, args.league, shadow=args.shadow,
+        verbose=args.verbose, quiet=args.quiet,
+        log_file=args.log_file, log_dir=args.log_dir,
+    )
+    if log_path is not None:
+        logger.info(f"Log file: {log_path}")
+
     # Capture the equivalent command line for forensic reproducibility.
     # Printed to console and embedded in HTML output so any future reader can
     # see exactly what flags produced a given dive (including defaults that
     # have since changed).
     cli_args_str = format_cli_args(args, parser)
-    print(f"CLI: {cli_args_str}")
+    logger.info(f"CLI: {cli_args_str}")
     if args.iv_floor is not None:
-        print(f"  IV floor: atk>={args.iv_floor[0]}, def>={args.iv_floor[1]}, "
-              f"sta>={args.iv_floor[2]} (focal species only)")
+        logger.info(f"  IV floor: atk>={args.iv_floor[0]}, def>={args.iv_floor[1]}, "
+                    f"sta>={args.iv_floor[2]} (focal species only)")
 
     # Parse shield scenarios
     ALL_NINE = [(s0, s1) for s0 in range(3) for s1 in range(3)]
@@ -3365,13 +3402,13 @@ def main():
                 args.thresholds, species=args.species, league=args.league.capitalize(),
             )
         except Exception as e:
-            print(f"  Warning: failed to load {args.thresholds}: {e}")
+            logger.warning(f"failed to load {args.thresholds}: {e}")
             threshold_registry = None
     elif args.no_thresholds:
         # Explicit opt-out: no TOML, no auto-load. Falls through to the
         # auto-derive path which reads anchor records from opponent
-        # analysis only. Printed so the log is unambiguous.
-        print('  --no-thresholds: skipping auto-load of species TOML')
+        # analysis only. Logged so the log is unambiguous.
+        logger.info('  --no-thresholds: skipping auto-load of species TOML')
     else:
         # Auto-discover: look for thresholds/<species>.toml (case-insensitive)
         # so the user doesn't have to remember --thresholds every run.
@@ -3383,9 +3420,9 @@ def main():
                     str(_auto_toml), species=args.species,
                     league=args.league.capitalize(),
                 )
-                print(f"  Auto-loaded thresholds: {_auto_toml.name}")
+                logger.info(f"  Auto-loaded thresholds: {_auto_toml.name}")
             except Exception as e:
-                print(f"  Warning: auto-load {_auto_toml.name} failed: {e}")
+                logger.warning(f"auto-load {_auto_toml.name} failed: {e}")
                 threshold_registry = None
             # Extract article slug if the TOML has a [Species.article] section
             try:
@@ -3395,7 +3432,7 @@ def main():
                 _article_table = _raw_toml.get(args.species, {}).get('article', {})
                 _article_slug = _article_table.get('slug', '')
                 if _article_slug:
-                    print(f"  Article link: articles/{_article_slug}/")
+                    logger.info(f"  Article link: articles/{_article_slug}/")
             except Exception:
                 _article_slug = ''
 
@@ -3406,9 +3443,9 @@ def main():
             try:
                 overlay = _load_toml_overlay(overlay_path)
                 threshold_registry = threshold_registry.merge(overlay)
-                print(f"  Merged anchor-file overlay: {overlay_path}")
+                logger.info(f"  Merged anchor-file overlay: {overlay_path}")
             except Exception as e:
-                print(f"  Warning: failed to merge {overlay_path}: {e}")
+                logger.warning(f"failed to merge {overlay_path}: {e}")
 
     # Allow --anchor / --anchor-file to work without --thresholds by
     # starting from an empty registry.
@@ -3429,7 +3466,7 @@ def main():
             try:
                 a_name, anchor = parse_inline_anchor(spec)
             except Exception as e:
-                print(f"  Warning: --anchor {spec!r}: {e}")
+                logger.warning(f"--anchor {spec!r}: {e}")
                 continue
             # If an inline cmp anchor carried its own IV list, inject a
             # synthetic spread that the anchor points at.
@@ -3442,7 +3479,7 @@ def main():
                     description=f"Inline cohort for --anchor {a_name}",
                 )
             lt_overlay.anchors[a_name] = anchor
-            print(f"  Inline anchor: {a_name} ({anchor.kind})")
+            logger.info(f"  Inline anchor: {a_name} ({anchor.kind})")
         if lt_overlay.spreads or lt_overlay.anchors:
             sp_overlay = SpeciesThresholds(
                 species=args.species,
@@ -3467,17 +3504,19 @@ def main():
             if lt is not None:
                 n_anchors = len(lt.anchors)
         if args.thresholds:
-            print(f"  Thresholds: {n_spreads} stat-cutoff spread(s), "
-                  f"{n_anchors} anchor(s) (from {args.thresholds})")
+            logger.info(f"  Thresholds: {n_spreads} stat-cutoff spread(s), "
+                        f"{n_anchors} anchor(s) (from {args.thresholds})")
 
-    print(f"\n{'='*60}")
-    print(f"  {args.species}{'  (Shadow)' if args.shadow else ''} — "
-          f"{args.league.title()} League IV Deep Dive")
-    print(f"{'='*60}\n")
+    logger.result('')
+    logger.result('=' * 60)
+    logger.result(f"  {args.species}{'  (Shadow)' if args.shadow else ''} — "
+                  f"{args.league.title()} League IV Deep Dive")
+    logger.result('=' * 60)
+    logger.result('')
 
     # Enumerate movesets
     movesets = enumerate_movesets(args.species, args.fast, user_charged)
-    print(f"  {len(movesets)} moveset combination(s) to evaluate")
+    logger.info(f"  {len(movesets)} moveset combination(s) to evaluate")
 
     # Get opponents — from group or rankings
     # Always include the focal species so we can do mirror slayer analysis.
@@ -3502,11 +3541,11 @@ def main():
                 opponents.append(args.species)
                 opp_movesets_full.append((focal_fast, focal_charged))
                 focal_in_opponents = True
-                print(f"  (added {args.species} to opponents for mirror analysis)")
+                logger.info(f"  (added {args.species} to opponents for mirror analysis)")
             except (KeyError, ValueError):
                 pass
         opponent_label = f"PvPoke group: {args.group} ({len(opponents)} mons)"
-        print(f"  Opponents: {opponent_label}")
+        logger.info(f"  Opponents: {opponent_label}")
     elif args.opponents_file:
         # Read a custom opponent list from a text file (one species per
         # line, # comments / blank lines ignored). Same downstream
@@ -3520,11 +3559,11 @@ def main():
             ]
         if args.species not in opponents:
             opponents.append(args.species)
-            print(f"  (added {args.species} to opponents for mirror analysis)")
+            logger.info(f"  (added {args.species} to opponents for mirror analysis)")
         focal_in_opponents = True
         opponent_label = (f"Custom pool from {os.path.basename(path)} "
                           f"({len(opponents)} mons)")
-        print(f"  {len(opponents)} opponents from {path}")
+        logger.info(f"  {len(opponents)} opponents from {path}")
         opp_movesets_full = []
         to_remove = []
         for opp in opponents:
@@ -3532,7 +3571,7 @@ def main():
                 opp_fast, opp_charged = get_default_moveset(opp, league=args.league)
                 opp_movesets_full.append((opp_fast, opp_charged))
             except (KeyError, ValueError) as _e:
-                print(f"  [warn] skipping {opp}: {_e}")
+                logger.warning(f"skipping {opp}: {_e}")
                 to_remove.append(opp)
         for opp in to_remove:
             opponents.remove(opp)
@@ -3542,10 +3581,10 @@ def main():
         # Always include focal species for mirror analysis (append if not in top N)
         if args.species not in opponents:
             opponents.append(args.species)
-            print(f"  (added {args.species} to opponents for mirror analysis)")
+            logger.info(f"  (added {args.species} to opponents for mirror analysis)")
         focal_in_opponents = True
         opponent_label = f"Top {len(opponents)} from {args.league} rankings"
-        print(f"  {len(opponents)} meta opponents (top from {args.league} rankings)")
+        logger.info(f"  {len(opponents)} meta opponents (top from {args.league} rankings)")
 
         # Resolve opponent movesets from rankings defaults
         opp_movesets_full = []
@@ -3555,7 +3594,7 @@ def main():
                 opp_fast, opp_charged = get_default_moveset(opp, league=args.league)
                 opp_movesets_full.append((opp_fast, opp_charged))
             except KeyError:
-                print(f"  Warning: skipping {opp} (no default moveset)")
+                logger.warning(f"skipping {opp} (no default moveset)")
                 to_remove.append(opp)
         for opp in to_remove:
             idx = opponents.index(opp)
@@ -3581,22 +3620,21 @@ def main():
                         opponents.append(_opp)
                         opp_movesets_full.append((_opp_fast, _opp_charged))
                     except (KeyError, ValueError):
-                        print(f"  Warning: TOML anchor opponent {_opp} "
-                              f"has no default moveset, skipping")
+                        logger.warning(f"TOML anchor opponent {_opp} "
+                                       f"has no default moveset, skipping")
                 if _toml_opps:
                     _added = sorted(_toml_opps & set(opponents))
                     if _added:
-                        print(f"  (added {len(_added)} TOML anchor opponent(s): "
-                              f"{', '.join(_added)})")
+                        logger.info(f"  (added {len(_added)} TOML anchor opponent(s): "
+                                    f"{', '.join(_added)})")
 
     opp_iv_labels = {'pvpoke': 'PvPoke defaults', 'rank1': 'rank 1 (stat product)', 'both': 'both (PvPoke + rank 1)'}
     opp_iv_label = opp_iv_labels.get(args.opp_ivs, args.opp_ivs)
-    print(f"  Shield scenario(s): {shield_scenarios}")
-    print(f"  Opponent IVs: {opp_iv_label}")
+    logger.info(f"  Shield scenario(s): {shield_scenarios}")
+    logger.info(f"  Opponent IVs: {opp_iv_label}")
     if thresholds:
         for name, thresh in thresholds.items():
-            print(f"  Threshold: {name} — {_threshold_desc(thresh)}")
-    print()
+            logger.info(f"  Threshold: {name} — {_threshold_desc(thresh)}")
 
     # Determine screen opponents
     if args.group:
@@ -3621,9 +3659,9 @@ def main():
     main_slayer_iter_result = None  # populated by first moveset's --mirror-slayer pass
     for mi, (fast_id, charged_ids) in enumerate(surviving):
         label = moveset_label(fast_id, charged_ids)
-        print(f"  Phase 2 [{mi+1}/{len(surviving)}]: {label}")
-        print(f"    Simming 4096 IVs × {len(opponents)} opponents "
-              f"× {len(shield_scenarios)} scenario(s)...")
+        logger.info(f"  Phase 2 [{mi+1}/{len(surviving)}]: {label}")
+        logger.info(f"    Simming 4096 IVs × {len(opponents)} opponents "
+                    f"× {len(shield_scenarios)} scenario(s)...")
         t0 = time.time()
 
         results, n_sims, canonical_scores, canonical_meta = iv_sweep(
@@ -3631,20 +3669,21 @@ def main():
             opponents, opp_movesets_full, shield_scenarios,
             opp_iv_mode=opp_iv_mode,
             iv_floor=args.iv_floor,
+            log_path=log_path, verbose=args.verbose,
         )
 
         elapsed = time.time() - t0
         rate = n_sims / elapsed if elapsed > 0 else 0
-        print(f"    {n_sims:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
+        logger.info(f"    {n_sims:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
 
         # Auto-discover thresholds from the first moveset if none provided
         if thresholds is None and mi == 0:
             auto = auto_discover_thresholds(results)
             if auto:
                 thresholds = auto
-                print(f"    Auto-discovered {len(thresholds)} threshold tier(s):")
+                logger.info(f"    Auto-discovered {len(thresholds)} threshold tier(s):")
                 for name, thresh in thresholds.items():
-                    print(f"      {name}: {_threshold_desc(thresh)}")
+                    logger.info(f"      {name}: {_threshold_desc(thresh)}")
 
         # Slayer discovery: always check for mirror slayer thresholds on first moveset
         if mi == 0:
@@ -3673,15 +3712,15 @@ def main():
                     n_scen = len(shield_scenarios)
 
                     if slayer_thresh and any(v > 0 for v in slayer_thresh.values()):
-                        print(f"    {slayer_name}: {n_winners}/{n_total} IVs win {max_wins}/{n_scen} mirror scenarios")
-                        print(f"      Required floor: {_threshold_desc(slayer_thresh)}")
+                        logger.info(f"    {slayer_name}: {n_winners}/{n_total} IVs win {max_wins}/{n_scen} mirror scenarios")
+                        logger.info(f"      Required floor: {_threshold_desc(slayer_thresh)}")
                         # Cost analysis: best slayer IV's avg score vs best avg score IV
                         top_slayer = slayer_scored[0][2]
                         top_avg_iv = results[0]
                         avg_diff = top_slayer['avg_score'] - top_avg_iv['avg_score']
-                        print(f"      Best slayer IV: {top_slayer['atk_iv']}/{top_slayer['def_iv']}/{top_slayer['sta_iv']} "
-                              f"(avg score {top_slayer['avg_score']:.1f}, "
-                              f"vs avg-best {top_avg_iv['avg_score']:.1f}, cost {avg_diff:+.1f})")
+                        logger.info(f"      Best slayer IV: {top_slayer['atk_iv']}/{top_slayer['def_iv']}/{top_slayer['sta_iv']} "
+                                    f"(avg score {top_slayer['avg_score']:.1f}, "
+                                    f"vs avg-best {top_avg_iv['avg_score']:.1f}, cost {avg_diff:+.1f})")
                         if thresholds is None:
                             thresholds = {}
                         if slayer_name not in thresholds:
@@ -3689,18 +3728,18 @@ def main():
                             new_thresholds.update(thresholds)
                             thresholds = new_thresholds
                     elif max_wins == n_scen:
-                        print(f"    {slayer_name}: all IVs win the mirror — no slayer threshold needed")
+                        logger.info(f"    {slayer_name}: all IVs win the mirror — no slayer threshold needed")
                     elif max_wins == 0:
-                        print(f"    {slayer_name}: no IV beats the mirror")
+                        logger.info(f"    {slayer_name}: no IV beats the mirror")
                     else:
-                        print(f"    {slayer_name}: {n_winners}/{n_total} IVs win {max_wins}/{n_scen} mirror scenarios "
-                              f"but no clear stat floor distinguishes them")
+                        logger.info(f"    {slayer_name}: {n_winners}/{n_total} IVs win {max_wins}/{n_scen} mirror scenarios "
+                                    f"but no clear stat floor distinguishes them")
 
         # Iterative slayer discovery (Nash-style) on the first moveset
         slayer_iter_result = None
         if mi == 0 and args.mirror_slayer and mirror_idx is not None:
-            print(f"  Mirror slayer iteration (metric={args.mirror_slayer_metric}, "
-                  f"max_rounds={args.mirror_slayer_rounds}):")
+            logger.info(f"  Mirror slayer iteration (metric={args.mirror_slayer_metric}, "
+                        f"max_rounds={args.mirror_slayer_rounds}):")
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
             from slayer_cache import SlayerCache, compute_cache_key
             base = get_species(args.species)
@@ -3733,6 +3772,7 @@ def main():
                     cache=slayer_cache,
                     metric=args.mirror_slayer_metric,
                     iv_floor=args.iv_floor,
+                    log_path=log_path, verbose=args.verbose,
                 )
                 # Early-exit shapes from iterative_slayer_discovery return
                 # a dict with only an 'error' key (e.g. when the initial
@@ -3741,8 +3781,8 @@ def main():
                 # processing block runs as a no-op rather than crashing
                 # on missing keys ('rounds_run', 'history', etc.).
                 if 'error' in slayer_iter_result:
-                    print(f"    Slayer iteration skipped: "
-                          f"{slayer_iter_result['error']}")
+                    logger.warning(f"Slayer iteration skipped: "
+                                   f"{slayer_iter_result['error']}")
                     slayer_iter_result = {
                         'history': [], 'final': [],
                         'rounds_run': 0, 'converged': False,
@@ -3755,9 +3795,9 @@ def main():
                 slayer_iter_result['max_rounds_arg'] = args.mirror_slayer_rounds
                 slayer_cache.save()
                 elapsed_iter = time.time() - t_iter
-                print(f"    {slayer_iter_result['rounds_run']} rounds in {elapsed_iter:.1f}s "
-                      f"({'converged' if slayer_iter_result['converged'] else 'max rounds'})")
-                print(f"    {slayer_iter_result['cache_stats']}")
+                logger.info(f"    {slayer_iter_result['rounds_run']} rounds in {elapsed_iter:.1f}s "
+                            f"({'converged' if slayer_iter_result['converged'] else 'max rounds'})")
+                logger.info(f"    {slayer_iter_result['cache_stats']}")
                 # Show per-round top counts
                 for ri, top in enumerate(slayer_iter_result['history']):
                     if not top:
@@ -3766,10 +3806,10 @@ def main():
                     n_at_max = sum(1 for r in top if r['total_wins'] == max_w)
                     # How many unique stat profiles (deduped opponents for next round)
                     n_unique = len({(round(r['atk'], 4), round(r['def_'], 4), int(r['hp'])) for r in top})
-                    print(f"    Round {ri}: {len(top)} IVs in pool "
-                          f"({n_unique} unique stat profiles, "
-                          f"{n_at_max} at max wins {max_w}, "
-                          f"top avg score: {top[0]['avg_score']:.1f})")
+                    logger.info(f"    Round {ri}: {len(top)} IVs in pool "
+                                f"({n_unique} unique stat profiles, "
+                                f"{n_at_max} at max wins {max_w}, "
+                                f"top avg score: {top[0]['avg_score']:.1f})")
 
                 # Resolve anchors so categorize_slayers can tag each survivor
                 # with what it clears. Two layers feed the resolver:
@@ -3865,11 +3905,11 @@ def main():
                                 r.parent for r in resolved
                                 if r.parent.startswith('auto_')
                             })
-                            print(f"    Resolved {len(resolved)} anchors "
-                                  f"({n_parents} parents, "
-                                  f"{n_auto_parents} auto-generated)")
+                            logger.info(f"    Resolved {len(resolved)} anchors "
+                                        f"({n_parents} parents, "
+                                        f"{n_auto_parents} auto-generated)")
                     except Exception as e:
-                        print(f"    Warning: anchor resolution failed: {e}")
+                        logger.warning(f"anchor resolution failed: {e}")
                         resolved = []
 
                 # Stash on the iter_result for HTML rendering
@@ -3884,14 +3924,14 @@ def main():
                     for r in civs:
                         iv_categories.setdefault(r['iv'], set()).add(cn)
                 CAT_AB = {'Atk Slayer': 'A', 'Bulk Slayer': 'B', 'CMP Slayer': 'C'}
-                print(f"    Final survivors classified into "
-                      f"{sum(1 for v in categories.values() if v)} categories:")
+                logger.info(f"    Final survivors classified into "
+                            f"{sum(1 for v in categories.values() if v)} categories:")
                 for cat_name, cat_ivs in categories.items():
                     if not cat_ivs:
                         continue
                     # Console view: show top `mirror_slayer_show` per category
                     shown = cat_ivs[:args.mirror_slayer_show]
-                    print(f"      {cat_name} ({len(shown)} of {len(cat_ivs)}):")
+                    logger.debug(f"      {cat_name} ({len(shown)} of {len(cat_ivs)}):")
                     for r in shown:
                         a, d, s = r['iv']
                         others = sorted(iv_categories.get(r['iv'], set()) - {cat_name})
@@ -3902,11 +3942,11 @@ def main():
                             labels = [a.label or a.name for a in subs]
                             tag_bits.append(f"{parent}[{','.join(labels)}]")
                         tag_str = ' ' + ' '.join(tag_bits) if tag_bits else ''
-                        print(f"        {a:2d}/{d:2d}/{s:2d}  "
-                              f"atk={r['atk']:.2f} def={r['def_']:.2f} hp={r['hp']}  "
-                              f"wins {r['total_wins']}/"
-                              f"{r['n_pairs']*len(shield_scenarios)} "
-                              f"avg {r['avg_score']:.1f}{also}{tag_str}")
+                        logger.debug(f"        {a:2d}/{d:2d}/{s:2d}  "
+                                     f"atk={r['atk']:.2f} def={r['def_']:.2f} hp={r['hp']}  "
+                                     f"wins {r['total_wins']}/"
+                                     f"{r['n_pairs']*len(shield_scenarios)} "
+                                     f"avg {r['avg_score']:.1f}{also}{tag_str}")
                 # Stash for HTML rendering
                 slayer_iter_result['categories'] = categories
                 main_slayer_iter_result = slayer_iter_result
@@ -3920,17 +3960,20 @@ def main():
                 t = r.get('_tier')
                 if t:
                     tier_counts[t] = tier_counts.get(t, 0) + 1
-            print(f"    Threshold hits: {tier_counts if tier_counts else 'none'}")
+            logger.info(f"    Threshold hits: {tier_counts if tier_counts else 'none'}")
 
-        # Print top 20
-        print(f"\n    Top 20 IV spreads by average battle score:")
+        # Emit the top-20 table as RESULT records so the console output
+        # stays column-aligned (no timestamp prefix); the file handler
+        # still captures each line with full detail.
+        logger.result('')
+        logger.result(f"    Top 20 IV spreads by average battle score:")
         hdr = (f"    {'Rank':>4s}  {'IVs':>8s}  {'Lvl':>5s}  {'CP':>4s}  "
                f"{'Atk':>7s}  {'Def':>7s}  {'HP':>3s}  "
                f"{'SP Rank':>7s}  {'Avg Score':>9s}")
         if thresholds:
             hdr += f"  {'Tier':>12s}"
-        print(hdr)
-        print(f"    {'-' * (70 + (14 if thresholds else 0))}")
+        logger.result(hdr)
+        logger.result(f"    {'-' * (70 + (14 if thresholds else 0))}")
         for r in results[:20]:
             line = (f"    {r['battle_rank']:4d}  "
                     f"{r['atk_iv']:2d}/{r['def_iv']:2d}/{r['sta_iv']:2d}  "
@@ -3940,8 +3983,8 @@ def main():
             if thresholds:
                 tier = r.get('_tier', '')
                 line += f"  {tier or '':>12s}"
-            print(line)
-        print()
+            logger.result(line)
+        logger.result('')
 
         all_moveset_results.append((fast_id, charged_ids, results,
                                      canonical_scores, canonical_meta))
@@ -3973,7 +4016,7 @@ def main():
 
             # Force all shield scenarios for interactive mode
             if shield_scenarios == [(1, 1)]:
-                print("  Interactive mode: auto-expanding to all 9 shield scenarios")
+                logger.info("  Interactive mode: auto-expanding to all 9 shield scenarios")
                 shield_scenarios = ALL_NINE
                 # Re-run sweeps with all scenarios
                 all_moveset_results = []
@@ -3983,18 +4026,19 @@ def main():
                     meta = None
                     for mode in opp_iv_modes_to_run:
                         mode_label = mode_pretty_label(mode)
-                        print(f"  Interactive sweep [{mi+1}/{len(surviving)}] "
-                              f"{label} ({mode_label}, all shields)...")
+                        logger.info(f"  Interactive sweep [{mi+1}/{len(surviving)}] "
+                                    f"{label} ({mode_label}, all shields)...")
                         t0 = time.time()
                         results, n_sims, cs, cm = iv_sweep(
                             args.species, fast_id, charged_ids, args.league, args.shadow,
                             opponents, opp_movesets_full, shield_scenarios,
                             opp_iv_mode=mode,
                             iv_floor=args.iv_floor,
+                            log_path=log_path, verbose=args.verbose,
                         )
                         elapsed = time.time() - t0
                         rate = n_sims / elapsed if elapsed > 0 else 0
-                        print(f"    {n_sims:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
+                        logger.info(f"    {n_sims:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
                         scores_by_mode[mode] = cs
                         if meta is None:
                             meta = cm
@@ -4014,17 +4058,18 @@ def main():
                         if mode in scores_by_mode:
                             continue
                         mode_label = mode_pretty_label(mode)
-                        print(f"  Running {moveset_label(fast_id, charged_ids)} "
-                              f"({mode_label})...")
+                        logger.info(f"  Running {moveset_label(fast_id, charged_ids)} "
+                                    f"({mode_label})...")
                         t0 = time.time()
                         _, n2, cs2, _ = iv_sweep(
                             args.species, fast_id, charged_ids, args.league, args.shadow,
                             opponents, opp_movesets_full, shield_scenarios,
                             opp_iv_mode=mode,
                             iv_floor=args.iv_floor,
+                            log_path=log_path, verbose=args.verbose,
                         )
                         elapsed = time.time() - t0
-                        print(f"    {n2:,} sims in {elapsed:.1f}s")
+                        logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
                         scores_by_mode[mode] = cs2
                     new_results.append((fast_id, charged_ids, results,
                                         scores_by_mode, cm))
@@ -4045,7 +4090,7 @@ def main():
                         break
                 if reference_idx < 0:
                     # Run reference sweep
-                    print(f"  Reference sweep: {ref_label}")
+                    logger.info(f"  Reference sweep: {ref_label}")
                     ref_scores_by_mode = {}
                     ref_meta = None
                     for mode in opp_iv_modes_to_run:
@@ -4055,10 +4100,11 @@ def main():
                             opponents, opp_movesets_full, shield_scenarios,
                             opp_iv_mode=mode,
                             iv_floor=args.iv_floor,
+                            log_path=log_path, verbose=args.verbose,
                         )
                         elapsed = time.time() - t0
                         rate = ref_n / elapsed if elapsed > 0 else 0
-                        print(f"    {ref_n:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
+                        logger.info(f"    {ref_n:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
                         ref_scores_by_mode[mode] = ref_cs
                         if ref_meta is None:
                             ref_meta = ref_cm
@@ -4085,7 +4131,7 @@ def main():
                 split_files = _build_split_file_list(
                     moveset_data, reference_idx, args.html,
                 )
-                print(f"  Split mode: emitting {len(split_files)} per-moveset HTML files")
+                logger.info(f"  Split mode: emitting {len(split_files)} per-moveset HTML files")
                 # Precompute analysis on the first file — it always uses
                 # moveset_idx=0 scores so the result is identical across
                 # all split files. Avoids re-running the expensive anchor
@@ -4117,8 +4163,8 @@ def main():
                     )
             else:
                 if args.split_movesets:
-                    print("  --split-movesets: only one moveset surviving — "
-                          "writing a single file")
+                    logger.warning("--split-movesets: only one moveset surviving — "
+                                   "writing a single file")
                 generate_interactive_html(
                     args.species, args.league, moveset_data, args.html,
                     thresholds=thresholds, opponent_label=opponent_label,
@@ -4142,7 +4188,7 @@ def main():
                           standalone=args.standalone,
                           cli_args_str=cli_args_str)
 
-    print("Done.\n")
+    logger.info("Done.")
 
 
 if __name__ == '__main__':
