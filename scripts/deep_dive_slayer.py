@@ -203,7 +203,8 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                                 shield_scenarios, initial_opp_iv,
                                 max_rounds=4, top_per_round=10, cache=None,
                                 metric='all', iv_floor=None,
-                                log_path=None, verbose=False):
+                                log_path=None, verbose=False,
+                                reserve_cpus=0):
     """
     Iterative slayer discovery: find IVs that beat the mirror match through
     Nash-style iteration.
@@ -273,7 +274,7 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     converged = False
 
     import time as _time
-    n_workers = min(multiprocessing.cpu_count(), 16)
+    n_workers = min(max(1, multiprocessing.cpu_count() - reserve_cpus), 16)
     total_round_sims = 0  # accumulated across rounds for an estimate
 
     for round_idx in range(max_rounds):
