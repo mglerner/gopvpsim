@@ -1030,6 +1030,58 @@ def _render_iv_recommendations_section(cd_move: str, species: str,
     return intro + '\n<div class="iv-rec-grid">' + '\n'.join(cards) + '</div>'
 
 
+def _derive_framing(species: str, league: str, cd_move: str,
+                    dive: dict | None) -> str | None:
+    """Return a one-word framing tag ('upgrade' / 'downgrade' / 'sidegrade')
+    derived from the same scenario-count classifier the Verdict section
+    uses. Keeps the header pill and the Verdict line from disagreeing
+    when the TOML's hand-set ``framing`` predates the dive data.
+
+    Returns None if the dive data isn't available or best movesets
+    can't be resolved - in which case the caller should fall back to
+    the TOML's framing field.
+    """
+    if dive is None:
+        return None
+    gm = load_gamemaster()
+    cd_entry = _lookup_move(gm, cd_move)
+    if cd_entry is None:
+        return None
+    cd_id = cd_entry['moveId']
+    try:
+        default_fast_id, _ = get_default_moveset(species, league)
+    except KeyError:
+        return None
+    cd_ms = [m for m in dive['movesets']
+             if _moveset_fast_move(m['label']) == cd_id]
+    df_ms = [m for m in dive['movesets']
+             if _moveset_fast_move(m['label']) == default_fast_id]
+    if not cd_ms or not df_ms:
+        return None
+    best_cd = max(cd_ms, key=lambda m: m['win_rate'])
+    best_df = max(df_ms, key=lambda m: m['win_rate'])
+    wins = losses = 0
+    for cd_r, df_r in zip(best_cd['per_scenario_win_rate'],
+                          best_df['per_scenario_win_rate']):
+        if cd_r > df_r:
+            wins += 1
+        elif cd_r < df_r:
+            losses += 1
+    total = len(best_cd['per_scenario_win_rate'])
+    if total == 0:
+        return None
+    majority = (2 * total + 2) // 3
+    if wins == total:
+        return 'upgrade'
+    if losses == total:
+        return 'downgrade'
+    if wins >= majority and wins > losses:
+        return 'upgrade'
+    if losses >= majority and losses > wins:
+        return 'downgrade'
+    return 'sidegrade'
+
+
 def render_intro_section(article: dict) -> str:
     """Template-rendered intro paragraph from front-matter.
 
@@ -1097,7 +1149,6 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
     cd_move_disp = html.escape(cd_move or article.get('cd_move', ''))
     cd_date = html.escape(article.get('cd_date', ''))
     author = html.escape(article.get('author', ''))
-    framing = html.escape(article.get('framing', ''))
     league_disp = html.escape(league.capitalize() + ' League')
 
     obsolescence = article.get('obsolescence') or {
@@ -1117,6 +1168,25 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
         dive = None
 
     species_name = article.get('species', '')
+    toml_framing = (article.get('framing') or '').strip()
+    derived_framing = _derive_framing(species_name, league, cd_move, dive)
+    if authorship == 'auto' and derived_framing:
+        framing_plain = derived_framing
+    elif derived_framing and not toml_framing:
+        framing_plain = derived_framing
+    else:
+        framing_plain = toml_framing
+    if derived_framing and toml_framing and derived_framing != toml_framing \
+            and authorship != 'auto':
+        logger.warning(
+            'Front-matter framing %r disagrees with the sim-derived %r; '
+            'keeping the TOML value because authorship=%s. Under '
+            'authorship=auto the derived value would override.',
+            toml_framing, derived_framing, authorship)
+    framing = html.escape(framing_plain)
+    article = dict(article)  # shallow copy to avoid mutating caller's dict
+    article['framing'] = framing_plain
+
     sections_html = '\n\n'.join(
         render_section(sid, heading, todo, article, overrides,
                        species=species_name, league=league, cd_move=cd_move,
