@@ -1,0 +1,39 @@
+# Male vs Female Oinkologne comparison for the 2026-05 CD article.
+#
+# The Oinkologne forms share the Community Day fast move (Mud Slap) and
+# default charged moveset (Body Slam + Trailblaze) but have meaningfully
+# different base stats (Male 186/153/242 vs Female 169/162/251). This
+# spec drives scripts/compare_loadouts.py to generate the pairwise
+# win-rate delta fragment inlined by the CD article.
+#
+# Output: userdata/website/comparisons/oinkologne-male-vs-female/
+# Schema: scripts/compare_loadouts.py docstring.
+
+slug   = "oinkologne-male-vs-female"
+title  = "Male vs Female Oinkologne: Mud Slap Body Slam / Trailblaze"
+league = "great"
+author = "mglerner"
+
+summary = """
+Both Oinkologne forms get Mud Slap on Community Day (2026-05-09) and \
+both favor the same Body Slam + Trailblaze coverage. Base stats are \
+where they diverge: Male is the higher-attack form, Female the bulkier \
+one. This is the pairwise win-rate read on whether that bulk-for-attack \
+trade changes which matchups you win.
+"""
+
+[[loadouts]]
+label         = "Male"
+species       = "Oinkologne"
+dive_slug     = "oinkologne-great-league"
+fast_move     = "MUD_SLAP"
+charged_moves = ["BODY_SLAM", "TRAILBLAZE"]
+shadow        = false
+
+[[loadouts]]
+label         = "Female"
+species       = "Oinkologne (Female)"
+dive_slug     = "oinkologne-female-great-league"
+fast_move     = "MUD_SLAP"
+charged_moves = ["BODY_SLAM", "TRAILBLAZE"]
+shadow        = false
