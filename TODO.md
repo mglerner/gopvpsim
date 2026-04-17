@@ -888,6 +888,55 @@ bottleneck.
   shouldn't take long once started; the risk is multiprocessing
   worker resolution and CSS-string fragment positioning.
 
+## User-facing documentation (post-arc)
+
+* **Explainer docs for expert-but-non-programmer readers** *(queue
+  after the post-S5 Oinkologne arc ships)* — audience is roughly
+  RyanSwag's level of PvP game understanding, but with no programming
+  background or interest. Separate audience from everything in
+  `docs/` today (which assumes the reader is reading source).
+  **The full topic list is a conversation Michael wants to have at the
+  start of the task, not a fixed scope** — the five topics below are a
+  starting draft captured during S8 (2026-04-17) so the idea doesn't
+  get lost, and Michael explicitly asked that they not be removed, but
+  a first-pass planning session should (a) add topics we haven't
+  thought of yet, (b) reorder by what's causing the most reader
+  confusion at the time the task starts, (c) decide screenshot
+  authoring cadence, and (d) decide whether each topic gets its own
+  page or whether related topics merge into a single guide. Starting
+  draft, in current priority order:
+  1. **Envelope-position metric** (S4) — what "elevated-band-crosser"
+     means for a category, why it matters when you're deciding which
+     IV to chase, what the `mean_delta` / `spread` / `shape` tuple
+     says about the category in plain language. Needs **annotated
+     screenshots** of the Notable IVs section with the envelope
+     annotation visible, plus a contrasting screenshot of a category
+     with a very different shape.
+  2. **Threshold Tiers** — tier vs category vs anchor, what the stat
+     cutoff bullets mean, why overlapping tiers are intentional. The
+     current in-page intro (rewritten 2026-04-16, Session 1) is good
+     enough for an expert scanning the page but lacks the worked
+     example a non-programmer needs. Screenshots of a tier card with
+     each part labeled.
+  3. **IV Flavor Guide** — what the purple "IV Flavor Guide" zone
+     does, how to read a flavor, what a "namesake" is, why two flavors
+     with the same stat signature merge. Owe this to acidicArisen per
+     `project_acidic_arisen_writeup_commitment.md`.
+  4. **CD article page** — how to read the matchup-delta table,
+     what the PvPoke multi-battle link does when you click it, what
+     "flip" means here. Short; mostly a figure tour.
+  5. **Deep-dive scatter plot** — color modes, hover cards, the
+     Shields / Opponent-IVs / Bait dropdowns, what "anchor-clear
+     overlay" shows.
+  Shape: `docs/guides/*.md` (new subdir) or a landing page at
+  `userdata/website/guides/`. Decide placement when the first guide
+  lands. Screenshots authored manually; keep them under
+  `docs/guides/screenshots/` (or `userdata/website/guides/images/`)
+  and compress before committing — the existing policy against
+  embedding large binaries still applies.
+  Not urgent until a second user starts engaging with the tool; until
+  then the primary reader is Michael, who can read source.
+
 ## Low priority
 
 * **Team/multi-mon simulation** — currently only 1v1; real PvP is 3v3 with

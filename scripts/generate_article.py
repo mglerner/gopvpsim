@@ -213,6 +213,7 @@ def _load_one_dive_file(path: Path) -> dict:
         'per_opponent_win_rate': per_opponent_rate,
         'scenarios': data['scenarios'],
         'opponents': data['opponents'],
+        'opponent_label': data.get('opponentLabel') or '',
         'tiers': data.get('tiers') or [],
         'iv_tiers': data.get('ivTiers') or [],
         'n_ivs': n_ivs,
@@ -244,10 +245,16 @@ def _load_dive_data(dive_dir: Path) -> dict:
             scenarios = parsed['scenarios']
         if opponents is None:
             opponents = parsed['opponents']
+    opponent_label = ''
+    for m in movesets:
+        if m.get('opponent_label'):
+            opponent_label = m['opponent_label']
+            break
     return {
         'movesets': movesets,
         'scenarios': scenarios,
         'opponents': opponents,
+        'opponent_label': opponent_label,
     }
 
 
@@ -662,16 +669,34 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
                     f'view on PvPoke multi-battle</a></li>')
         return f'<li><code>{label}</code></li>'
 
+    pool_label = (dive.get('opponent_label') or '').strip()
+    pool_line = ''
+    if pool_label:
+        pool_line = (
+            f'<p class="matchup-delta-pool"><strong>Opponents:</strong> '
+            f'{len(opponents)} species - {html.escape(pool_label)}. '
+            f'This is the opponent pool the deep dive was simulated against; '
+            f'pool recipes live in <code>opponent_pools/</code>. '
+            f'For the Great League default (<code>gl_top50_plus_cs.txt</code>) '
+            f'that is the top 50 overall PvPoke rankings unioned with the '
+            f'Championship Series group, plus the focal species itself and any '
+            f'atk-weighted IV variants the shared thresholds file specifies.</p>'
+        )
+
     header_lines = [
         '<p class="matchup-delta-intro">Best CD-move moveset vs best old-default moveset, '
         'by overall win rate. Per-opponent win rate averaged across all 9 shield scenarios '
         'and 4096 IV spreads. "Flip" marks rows where the winner changes across the 50% axis '
-        '(the same threshold the verdict section uses).</p>',
+        '(the same threshold the verdict section uses). Click a column header to sort.</p>',
+    ]
+    if pool_line:
+        header_lines.append(pool_line)
+    header_lines.extend([
         '<ul class="matchup-delta-movesets">',
         _link_item(best_cd, cd_url),
         _link_item(best_default, df_url),
         '</ul>',
-    ]
+    ])
 
     rows = []
     cd_rates = best_cd['per_opponent_win_rate']
@@ -710,13 +735,13 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
         default_entry.get('name', default_fast_id) if default_entry else default_fast_id)
 
     table = (
-        '<table class="matchup-delta">'
+        '<table class="matchup-delta sortable" data-default-sort="3" data-default-dir="desc">'
         '<thead><tr>'
-        '<th scope="col">Opponent</th>'
-        f'<th scope="col">{default_name} WR</th>'
-        f'<th scope="col">{cd_name} WR</th>'
-        '<th scope="col">&#916; (pp)</th>'
-        '<th scope="col">Flip?</th>'
+        '<th scope="col" data-sort="str">Opponent</th>'
+        f'<th scope="col" data-sort="pct">{default_name} WR</th>'
+        f'<th scope="col" data-sort="pct">{cd_name} WR</th>'
+        '<th scope="col" data-sort="num">&#916; (pp)</th>'
+        '<th scope="col" data-sort="bool">Flip?</th>'
         '</tr></thead>'
         '<tbody>' + ''.join(body_rows) + '</tbody>'
         '</table>'
@@ -978,6 +1003,15 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   table.matchup-delta .flip-badge {{ display: inline-block; background: #5b3d6d;
         color: #e8c8f0; padding: 1px 6px; border-radius: 10px; font-size: 11px;
         font-weight: 600; text-transform: uppercase; }}
+  p.matchup-delta-pool {{ background: #16213e; border-left: 3px solid #5b8dd9;
+        padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #b8c4d8;
+        margin: 8px 0; }}
+  table.sortable thead th {{ cursor: pointer; user-select: none; }}
+  table.sortable thead th:hover {{ background: #1e2b4a; }}
+  table.sortable thead th.sort-asc::after {{ content: " \\25B2"; color: #9be89b;
+        font-size: 10px; }}
+  table.sortable thead th.sort-desc::after {{ content: " \\25BC"; color: #9be89b;
+        font-size: 10px; }}
   p.iv-rec-intro {{ font-size: 14px; color: #b8c4d8; }}
   div.iv-rec-grid {{ display: grid; gap: 10px;
                      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1013,6 +1047,63 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   <code>scripts/generate_article.py</code>. Built with
   <a href="https://github.com/pvpoke/pvpoke">PvPoke</a> game data.
 </footer>
+<script>
+(function() {{
+  function parseCell(cell, kind) {{
+    var t = cell.textContent.trim();
+    if (kind === 'num') {{
+      return parseFloat(t.replace(/[+,]/g, '')) || 0;
+    }}
+    if (kind === 'pct') {{
+      return parseFloat(t.replace('%', '')) || 0;
+    }}
+    if (kind === 'bool') {{
+      return t.length > 0 ? 1 : 0;
+    }}
+    return t.toLowerCase();
+  }}
+  function sortTable(table, colIdx, kind, dir) {{
+    var tbody = table.querySelector('tbody');
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    var sign = dir === 'desc' ? -1 : 1;
+    rows.sort(function(a, b) {{
+      var va = parseCell(a.cells[colIdx], kind);
+      var vb = parseCell(b.cells[colIdx], kind);
+      if (va < vb) return -1 * sign;
+      if (va > vb) return 1 * sign;
+      return 0;
+    }});
+    rows.forEach(function(r) {{ tbody.appendChild(r); }});
+    var ths = table.querySelectorAll('thead th');
+    ths.forEach(function(th) {{
+      th.classList.remove('sort-asc');
+      th.classList.remove('sort-desc');
+    }});
+    ths[colIdx].classList.add(dir === 'desc' ? 'sort-desc' : 'sort-asc');
+  }}
+  document.querySelectorAll('table.sortable').forEach(function(table) {{
+    var ths = table.querySelectorAll('thead th');
+    ths.forEach(function(th, idx) {{
+      var kind = th.getAttribute('data-sort') || 'str';
+      th.addEventListener('click', function() {{
+        var current = th.classList.contains('sort-asc') ? 'asc'
+                    : th.classList.contains('sort-desc') ? 'desc' : null;
+        var next;
+        if (current === 'asc') next = 'desc';
+        else if (current === 'desc') next = 'asc';
+        else next = (kind === 'num' || kind === 'pct' || kind === 'bool') ? 'desc' : 'asc';
+        sortTable(table, idx, kind, next);
+      }});
+    }});
+    // Apply default sort indicator if specified.
+    var defIdx = parseInt(table.getAttribute('data-default-sort') || '', 10);
+    var defDir = table.getAttribute('data-default-dir') || 'desc';
+    if (!isNaN(defIdx) && ths[defIdx]) {{
+      ths[defIdx].classList.add(defDir === 'desc' ? 'sort-desc' : 'sort-asc');
+    }}
+  }});
+}})();
+</script>
 </body>
 </html>
 """
