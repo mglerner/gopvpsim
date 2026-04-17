@@ -21,13 +21,18 @@ rule.
 from __future__ import annotations
 
 import argparse
+import base64
+import gzip
 import html
+import json
 import logging
+import struct
 import sys
 import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 
 from render_article import (  # type: ignore[import-not-found]
     format_body,
@@ -37,6 +42,8 @@ from render_article import (  # type: ignore[import-not-found]
     ARTICLES_DIR,
     _toml_string,
 )
+
+from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 THRESHOLDS_DIR = REPO_ROOT / 'thresholds'
@@ -119,6 +126,138 @@ def resolve_dive_dir(article: dict, dive_dir_override: Path | None) -> Path:
     return WEBSITE_DIR / slug
 
 
+def _extract_js_assignment(content: str, var_name: str) -> str:
+    """Return the JSON literal assigned to `var <var_name> = ...;` in content.
+
+    Slices between the `var <name> = ` token and the first `;\n` after it.
+    Raises ValueError if the marker isn't found.
+    """
+    marker = f'var {var_name} = '
+    i = content.find(marker)
+    if i < 0:
+        marker = f'{var_name} = '
+        i = content.find(marker)
+        if i < 0:
+            raise ValueError(f'{var_name} assignment not found')
+    start = i + len(marker)
+    end = content.index(';\n', start)
+    return content[start:end]
+
+
+def _decompress_scores(b64: str) -> list[int]:
+    """Decode one SCORES_GZ entry into a flat list of uint16 scores."""
+    raw = gzip.decompress(base64.b64decode(b64))
+    n = len(raw) // 2
+    return list(struct.unpack(f'<{n}H', raw))
+
+
+def _load_one_dive_file(path: Path) -> dict:
+    """Parse one dive HTML sibling into {label, avg_score, per_scenario_avg}.
+
+    Reads the embedded DATA JSON blob for labels + scenario shape, then
+    decompresses SCORES_GZ['0_pvpoke'] to compute cohort-mean scores. The
+    pvpoke mode (not nobait) is the default scatter-plot source; we mirror
+    it so the verdict reflects what a dive reader sees on landing.
+    """
+    content = path.read_text()
+    data_blob = _extract_js_assignment(content, 'DATA')
+    data = json.loads(data_blob)
+
+    if not data.get('movesets'):
+        raise ValueError(f'{path}: no movesets in DATA')
+    moveset = data['movesets'][0]
+    label = moveset.get('label') or ''
+    pretty = moveset.get('prettyLabel') or label
+
+    scores_blob = _extract_js_assignment(content, 'SCORES_GZ')
+    scores_gz = json.loads(scores_blob)
+    key = '0_pvpoke'
+    if key not in scores_gz:
+        raise ValueError(f'{path}: SCORES_GZ missing {key!r}')
+    scores = _decompress_scores(scores_gz[key])
+
+    n_ivs = data['nIvs']
+    n_s = data['nScenarios']
+    n_o = data['nOpponents']
+    expected = n_ivs * n_s * n_o
+    if len(scores) != expected:
+        raise ValueError(
+            f'{path}: score length {len(scores)} != nIvs*nS*nO={expected}')
+
+    per_scenario_sum = [0] * n_s
+    per_scenario_n = n_ivs * n_o
+    total = 0
+    for iv in range(n_ivs):
+        base_iv = iv * n_s * n_o
+        for si in range(n_s):
+            base = base_iv + si * n_o
+            s = 0
+            for oi in range(n_o):
+                s += scores[base + oi]
+            per_scenario_sum[si] += s
+            total += s
+    per_scenario_avg = [s / per_scenario_n for s in per_scenario_sum]
+    avg = total / expected
+
+    return {
+        'label': label,
+        'pretty_label': pretty,
+        'avg_score': avg,
+        'per_scenario_avg': per_scenario_avg,
+        'scenarios': data['scenarios'],
+    }
+
+
+def _load_dive_data(dive_dir: Path) -> dict:
+    """Load dive summary across all sibling HTML files in dive_dir.
+
+    Returns:
+        {
+          'movesets': [ {label, pretty_label, avg_score, per_scenario_avg, scenarios}, ... ],
+          'scenarios': list of [shields_a, shields_b] pairs,
+        }
+    """
+    if not dive_dir.is_dir():
+        sys.exit(f'Dive directory does not exist: {dive_dir}')
+    # Pick up index.html + index_m*.html (split-moveset siblings).
+    files = sorted(dive_dir.glob('index.html')) + sorted(dive_dir.glob('index_m*.html'))
+    if not files:
+        sys.exit(f'No index*.html dive files in {dive_dir}')
+    movesets = []
+    scenarios = None
+    for f in files:
+        parsed = _load_one_dive_file(f)
+        movesets.append(parsed)
+        if scenarios is None:
+            scenarios = parsed['scenarios']
+    return {'movesets': movesets, 'scenarios': scenarios}
+
+
+def _moveset_fast_move(label: str) -> str:
+    """Extract the fast move id from a moveset label like 'FAST / CM1, CM2'."""
+    return label.split('/', 1)[0].strip()
+
+
+def _lookup_move(gm: dict, move_id_or_name: str) -> dict | None:
+    """Case-insensitive lookup by moveId or display name in gamemaster moves."""
+    target = move_id_or_name.strip().lower()
+    for m in gm['moves']:
+        if m.get('moveId', '').lower() == target:
+            return m
+        if m.get('name', '').lower() == target:
+            return m
+    return None
+
+
+def _species_types(gm: dict, species: str) -> list[str]:
+    """Return the lowercase type list for a species (display form)."""
+    species_id = species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+    for p in gm['pokemon']:
+        if p.get('speciesId') == species_id:
+            return parse_types(p)
+    return []
+
+
 def build_override_map(article: dict, authorship: str) -> dict[str, str]:
     """Collect expert-supplied section bodies keyed by heading.
 
@@ -154,6 +293,191 @@ def render_placeholder(section_id: str, heading: str, todo: str) -> str:
     )
 
 
+def _format_move_stats(move: dict, species_types: list[str]) -> dict:
+    """Shape a gamemaster move dict into display stats for the comparison table."""
+    power = move.get('power', 0)
+    energy_gain = move.get('energyGain', 0)
+    cooldown_ms = move.get('cooldown', 500)
+    turns = move.get('turns')
+    if turns is None:
+        turns = max(1, int(round(cooldown_ms / 500)))
+    dpt = power / turns if turns else 0.0
+    ept = energy_gain / turns if turns else 0.0
+    move_type = (move.get('type') or '').lower()
+    stab = move_type in species_types
+    return {
+        'name': move.get('name', move.get('moveId', '')),
+        'type': move_type or '',
+        'power': power,
+        'energy_gain': energy_gain,
+        'turns': turns,
+        'dpt': dpt,
+        'ept': ept,
+        'stab': stab,
+    }
+
+
+def _render_move_comparison_section(cd_move: str, species: str,
+                                    league: str) -> str:
+    """Render the fast-move comparison table (CD move vs PvPoke default)."""
+    gm = load_gamemaster()
+    cd = _lookup_move(gm, cd_move)
+    if cd is None:
+        return render_placeholder(
+            'move-comparison', 'Move Comparison',
+            f'Move {cd_move!r} not found in gamemaster; cannot render table.')
+
+    try:
+        default_fast_id, _ = get_default_moveset(species, league)
+    except KeyError as exc:
+        return render_placeholder(
+            'move-comparison', 'Move Comparison',
+            f'No PvPoke default moveset: {exc}')
+    default_move = _lookup_move(gm, default_fast_id)
+    if default_move is None:
+        return render_placeholder(
+            'move-comparison', 'Move Comparison',
+            f'Default fast move {default_fast_id!r} not found in gamemaster.')
+
+    types = _species_types(gm, species)
+    old = _format_move_stats(default_move, types)
+    new = _format_move_stats(cd, types)
+
+    def fmt_val(key: str, info: dict) -> str:
+        if key == 'stab':
+            return 'yes' if info['stab'] else 'no'
+        if key in ('dpt', 'ept'):
+            return f'{info[key]:.2f}'
+        return html.escape(str(info[key]))
+
+    rows = [
+        ('Fast move', 'name'),
+        ('Type', 'type'),
+        ('Power', 'power'),
+        ('Energy gain', 'energy_gain'),
+        ('Turns (500ms each)', 'turns'),
+        ('DPT (damage/turn)', 'dpt'),
+        ('EPT (energy/turn)', 'ept'),
+        ('STAB', 'stab'),
+    ]
+    header = (
+        '<thead><tr>'
+        '<th scope="col">Stat</th>'
+        f'<th scope="col">Old default: {html.escape(old["name"])}</th>'
+        f'<th scope="col">CD move: {html.escape(new["name"])}</th>'
+        '</tr></thead>'
+    )
+    body_rows = []
+    for label, key in rows:
+        body_rows.append(
+            f'<tr><th scope="row">{html.escape(label)}</th>'
+            f'<td>{fmt_val(key, old)}</td>'
+            f'<td>{fmt_val(key, new)}</td></tr>'
+        )
+    table = (
+        '<table class="move-compare">'
+        + header
+        + '<tbody>' + ''.join(body_rows) + '</tbody>'
+        + '</table>'
+    )
+    note = (
+        f'<p class="move-compare-note">Stats from PvPoke gamemaster. '
+        f'STAB flags match against {html.escape(species)} types: '
+        f'{html.escape(", ".join(types) or "unknown")}.</p>'
+    )
+    return table + note
+
+
+def _classify_verdict(delta_pct: float, wins_for_cd: int, losses_for_cd: int,
+                      total_scenarios: int) -> str:
+    """Pick the verdict template line from the avg-score delta.
+
+    Cutoffs per TODO.md: >10% clear upgrade, <5% sidegrade, middle mixed.
+    """
+    if delta_pct > 10:
+        return (
+            f'Clear upgrade. Best CD moveset lifts the cohort-mean PvPoke score '
+            f'by {delta_pct:+.1f}% over the old default.'
+        )
+    if delta_pct < -10:
+        return (
+            f'Clear downgrade. Best CD moveset drops the cohort-mean PvPoke score '
+            f'by {delta_pct:+.1f}% versus the old default.'
+        )
+    if abs(delta_pct) < 5:
+        return (
+            f'Sidegrade. Cohort-mean PvPoke score shifts {delta_pct:+.1f}% '
+            f'between the best CD moveset and the old default (inside the +/-5% band).'
+        )
+    return (
+        f'Mixed ({delta_pct:+.1f}% cohort-mean). Best CD moveset is an upgrade '
+        f'in {wins_for_cd}/{total_scenarios} shield scenarios and a sidegrade '
+        f'(or worse) in {losses_for_cd}/{total_scenarios}.'
+    )
+
+
+def _render_verdict_section(cd_move: str, species: str, league: str,
+                            dive: dict) -> str:
+    """One-line verdict from avg-score deltas across movesets."""
+    gm = load_gamemaster()
+    cd_move_entry = _lookup_move(gm, cd_move)
+    if cd_move_entry is None:
+        return render_placeholder(
+            'verdict', 'Verdict',
+            f'Move {cd_move!r} not found in gamemaster; cannot score.')
+    cd_move_id = cd_move_entry['moveId']
+
+    try:
+        default_fast_id, _ = get_default_moveset(species, league)
+    except KeyError as exc:
+        return render_placeholder('verdict', 'Verdict',
+                                  f'No default moveset: {exc}')
+
+    cd_movesets = [m for m in dive['movesets']
+                   if _moveset_fast_move(m['label']) == cd_move_id]
+    default_movesets = [m for m in dive['movesets']
+                        if _moveset_fast_move(m['label']) == default_fast_id]
+
+    if not cd_movesets:
+        return render_placeholder(
+            'verdict', 'Verdict',
+            f'No CD-move ({cd_move_id}) moveset in dive data; cannot score.')
+    if not default_movesets:
+        sys.exit(
+            f"Dive has no old-default-moveset ({default_fast_id}); rebuild the "
+            f"dive with the reference moveset included "
+            f"(e.g. --reference {default_fast_id},<cm1>,<cm2>) so the verdict "
+            f"can compare against it.")
+
+    best_cd = max(cd_movesets, key=lambda m: m['avg_score'])
+    best_default = max(default_movesets, key=lambda m: m['avg_score'])
+    delta = best_cd['avg_score'] - best_default['avg_score']
+    delta_pct = 100.0 * delta / best_default['avg_score'] if best_default['avg_score'] else 0.0
+
+    wins = losses = 0
+    for cd_s, df_s in zip(best_cd['per_scenario_avg'], best_default['per_scenario_avg']):
+        if cd_s > df_s:
+            wins += 1
+        elif cd_s < df_s:
+            losses += 1
+    total = len(best_cd['per_scenario_avg'])
+
+    verdict_line = _classify_verdict(delta_pct, wins, losses, total)
+
+    summary = (
+        f'<p class="verdict-line"><strong>{html.escape(verdict_line)}</strong></p>'
+    )
+    detail = (
+        f'<p class="verdict-detail">Best CD moveset: '
+        f'<code>{html.escape(best_cd["pretty_label"])}</code> '
+        f'(avg {best_cd["avg_score"]:.1f}). '
+        f'Old default: <code>{html.escape(best_default["pretty_label"])}</code> '
+        f'(avg {best_default["avg_score"]:.1f}). '
+        f'Delta {delta:+.1f} ({delta_pct:+.2f}%).</p>'
+    )
+    return summary + detail
+
+
 def render_intro_section(article: dict) -> str:
     """Template-rendered intro paragraph from front-matter.
 
@@ -174,11 +498,17 @@ def render_intro_section(article: dict) -> str:
 
 
 def render_section(section_id: str, heading: str, todo: str,
-                   article: dict, overrides: dict[str, str]) -> str:
+                   article: dict, overrides: dict[str, str],
+                   *, species: str, league: str, cd_move: str,
+                   dive: dict | None) -> str:
     if heading in overrides:
         body_html = format_body(overrides[heading])
     elif section_id == 'intro':
         body_html = render_intro_section(article)
+    elif section_id == 'move-comparison':
+        body_html = _render_move_comparison_section(cd_move, species, league)
+    elif section_id == 'verdict' and dive is not None:
+        body_html = _render_verdict_section(cd_move, species, league, dive)
     else:
         body_html = render_placeholder(section_id, heading, todo)
     return (
@@ -223,8 +553,17 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
 
     overrides = build_override_map(article, authorship)
 
+    try:
+        dive = _load_dive_data(dive_dir)
+    except (ValueError, KeyError) as exc:
+        logger.warning('Could not load dive data from %s: %s', dive_dir, exc)
+        dive = None
+
+    species_name = article.get('species', '')
     sections_html = '\n\n'.join(
-        render_section(sid, heading, todo, article, overrides)
+        render_section(sid, heading, todo, article, overrides,
+                       species=species_name, league=league, cd_move=cd_move,
+                       dive=dive)
         for sid, heading, todo in CANONICAL_SECTIONS
     )
 
@@ -265,6 +604,18 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   .todo-placeholder {{ background: #1a2333; border: 1px dashed #5b8dd9;
                        border-radius: 6px; padding: 10px 14px; color: #8ab4f8;
                        font-size: 14px; margin: 10px 0; }}
+  table.move-compare {{ border-collapse: collapse; margin: 12px 0;
+                        width: 100%; font-size: 14px; }}
+  table.move-compare th, table.move-compare td {{ border: 1px solid #0f3460;
+        padding: 6px 10px; text-align: left; }}
+  table.move-compare thead th {{ background: #16213e; color: #c8a2d0; }}
+  table.move-compare tbody th {{ background: #12192e; color: #9ab0d8;
+                                 font-weight: 500; }}
+  table.move-compare tbody td {{ background: #0f162a; color: #e0e0e0; }}
+  p.move-compare-note {{ color: #8ea1bd; font-size: 13px; margin-top: 4px; }}
+  p.verdict-line {{ background: #1a2e1f; border-left: 3px solid #7db87d;
+                    padding: 10px 14px; color: #cfe8cf; border-radius: 6px; }}
+  p.verdict-detail {{ color: #8ea1bd; font-size: 13px; margin-top: 6px; }}
   footer {{ color: #666; font-size: 13px; margin-top: 40px;
             border-top: 1px solid #0f3460; padding-top: 12px; }}
 </style>
