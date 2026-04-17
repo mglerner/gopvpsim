@@ -28,6 +28,13 @@ note    = ""
 [links]
 deep_dive_slug = "oinkologne-great-league"
 
+# Form-comparison section (Male vs Female). scripts/compare_loadouts.py
+# reads the referenced spec TOML and emits a pairwise win-rate delta
+# fragment inlined between Matchup Delta and IV Recommendations. Omit
+# this block to drop the section.
+[form_comparison]
+spec = "comparisons/oinkologne-male-vs-female.toml"
+
 # ── Content sections ──────────────────────────────────────────────────
 # Placeholder structure modeled on JRE's Tinkaton CD article.
 # Session 5 fills these with real analysis from the Session 4 dive data.
