@@ -1,3 +1,66 @@
+## CD-prep tracking (2026-04-17)
+
+Pre-CD dives silently drop the incoming CD move when PvPoke's gamemaster
+doesn't list it on the focal species. Observed on 2026-04-17: the
+gamemaster cache refresh (CACHE_TTL=24h) between the 2026-04-16 Male
+Oinkologne dive (18 moveset combos, 4 Mud Slap + 1 Tackle in top 5) and
+the 2026-04-17 Female dive (12 combos, 0 Mud Slap) caused the Female
+dive to answer the wrong question. Workaround used for S9: pass
+`--fast MUD_SLAP` on the CLI, which `enumerate_movesets` supports
+(validates against gamemaster move DB, not species legal list).
+
+**Permanent fix.** Add a `cd_prep` table to per-species threshold TOMLs
+as the single source of truth for "this species is in CD prep":
+
+```toml
+[Species.cd_prep]
+event = "Mud Slap Community Day 2026-05"
+fast_moves = ["MUD_SLAP"]       # optional
+charged_moves = ["MUD_SHOT"]    # optional
+```
+
+Wire `deep_dive.py` to read the focal species' `cd_prep` and inject
+any listed moves into `enumerate_movesets` by extending
+`legal_fast` / `legal_charged` with them (logged loudly so the dive
+output reproducibly shows it). `thresholds/oinkologne.toml` and
+`thresholds/oinkologne_female.toml` already have the `cd_prep`
+sections populated — they just aren't read yet.
+
+Delete the TOML `cd_prep` section after the CD ships, or after PvPoke
+stably lists the move for 2+ gamemaster refreshes.
+
+**Why not just keep passing `--fast` on the CLI.** It's easy to forget
+(proven today); it doesn't handle species with multiple incoming
+moves; and the intent (this species is being prepped for a CD event)
+isn't discoverable from the repo state. A TOML field is both
+self-documenting and mechanically enforced.
+
+## S9a checkpoint observations (2026-04-17)
+
+Items surfaced during the S9 Female Oinkologne dive. Read during S9a
+before committing to the S10 ship.
+
+- **CLI-comment logger reconstructs `--mirror-slayer` incorrectly.** In
+  the log header and the top-of-HTML `<!-- CLI: ... -->` comment,
+  `deep_dive_logging.py`'s argv reconstruction emits `--mirror-slayer
+  True` even when the actual invocation used only `--mirror-slayer` (a
+  `BooleanOptionalAction` flag, which argparse rejects with a literal
+  `True` argument — reproducibly verified: pasting the logged CLI back
+  into a shell errors with `unrecognized arguments: True`). Effect:
+  cosmetic but breaks copy-paste reproducibility of past dives.
+  Likely cause: the reconstruction formats bool flags as
+  `--flag <value>` instead of `--flag` / `--no-flag`. Low-risk fix in
+  the logger. Not a blocker for S10; worth spending 10 min on if
+  S9a has capacity, otherwise punt post-ship.
+- **Female dive output layout matches Male.** 5 split-moveset HTMLs
+  (top moveset → `index.html`, others → `index_mN_<moves>.html`),
+  ~20-22 MB each. No new rendering shapes observed that S5a's
+  validation-on-Male wouldn't have caught.
+- **Narrative generation completed cleanly** for all 5 movesets
+  (~90s per moveset with S8a's 6.1x speedup). No renderer
+  exceptions or suspicious "1 non-empty block(s)" shortfalls beyond
+  the expected one-moveset-per-split-page pattern.
+
 ## Deferred cleanup: backwards-compatibility removal pass
 
 Once we've verified all the oracle/sim tests (including direct human
