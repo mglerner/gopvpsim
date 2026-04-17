@@ -6,6 +6,55 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-04-18 — S10: Oinkologne CD article + Male-vs-Female comparator
+
+**Ship session for the post-S5 Oinkologne arc.** Wires the Female dive
+data into the CD article, adds a Male-vs-Female form-comparison
+section, extends the site index, verifies bidirectional links, and
+deletes the archived Lechonk CD prep plan.
+
+**What shipped:**
+
+1. `scripts/compare_loadouts.py` — MVP pairwise loadout comparator.
+   Loadout-list-keyed data model (`loadouts: list[LoadoutSpec]`,
+   pairwise deltas via `itertools.combinations`) so N=3 / N=4 are a
+   renderer extension rather than a rewrite. MVP ships N=2 only.
+   Output: `userdata/website/comparisons/<slug>/index.html` plus an
+   importable `build_comparison_fragment()` that `generate_article.py`
+   inlines.
+2. `comparisons/oinkologne-male-vs-female.toml` — comparator spec for
+   the Oinkologne CD arc.
+3. `generate_article.py` — new canonical `form-comparison` section
+   between Matchup Delta and IV Recommendations, gated on a
+   `[form_comparison]` block in the article TOML. Absent the block the
+   section drops out cleanly.
+4. Site-index updated with both Oinkologne dives, the article, and
+   the comparison page. (Site index at `userdata/website/index.html`
+   is gitignored, so the edit is local-only by design.)
+
+**Reconciliation vs `~/.claude/plans/archive/lechonk-cd-prep.md`:**
+
+The archived Lechonk plan scoped six sessions targeting a JRE-style
+prose article by 2026-04-22. The actual ship happened through the
+post-S5 Oinkologne arc (S1-S10), with three documented scope shifts:
+
+- **JRE-style prose → Python-generated spec sheet.** Rationale: JRE
+  writes for money; shipping Claude prose mimicking his voice is not
+  acceptable. Tracked in TODO.md "CD article generator" (2026-04-16).
+- **One dive → Male + Female dives.** Oinkologne forms have
+  meaningfully different base stats (186/153/242 vs 169/162/251);
+  both receive Mud Slap on the same CD, so both need threshold data.
+  Tracked in memory `project_female_oinkologne.md`.
+- **No comparator → compare_loadouts.py MVP.** Added this session to
+  make the Male-vs-Female section a reusable tool rather than inline
+  article code. Tracked in memory `project_ab_comparator_timing.md`
+  and TODO.md "Moveset / variant comparison tool".
+
+Aegislash form-change dive (floating beat in the old plan) remains
+pending under TODO.md "SwagTips narrative follow-ups".
+
+Archived plan deleted post-reconciliation.
+
 ## 2026-04-15 — Forretress/Azumarill DP plan-selection (atk-stage fix)
 
 **Context:** our Azu vs Forr (Sand+Rock) score matrix diverged from
