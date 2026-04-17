@@ -11,3 +11,20 @@ sources = "pogo-simulator deep dive (2026-04-16); pre-CD Mud Slap analysis"
 
 [Oinkologne.article]
 slug = "oinkologne-cd-2026-05"
+
+# Community Day preparation. PvPoke's gamemaster adds/removes upcoming CD
+# moves unpredictably; when it's absent from the species' fast/charged
+# pool, the dive silently enumerates only current-default movesets,
+# defeating the purpose of a pre-CD analysis. Listing the incoming move
+# here is the single source of truth for "this species is in CD prep"
+# and should be read by deep_dive.py to inject the move into
+# enumerate_movesets even when the gamemaster lags.
+#
+# TODO(deep_dive.py): wire cd_prep.fast_moves / cd_prep.charged_moves
+# into enumerate_movesets. Until then, callers must pass --fast MUD_SLAP
+# manually (see TODO.md "CD-prep tracking"). Delete this section after
+# the CD ships (2026-05) or after PvPoke stably lists the move.
+[Oinkologne.cd_prep]
+event = "Mud Slap Community Day 2026-05"
+fast_moves = ["MUD_SLAP"]
+notes = "Gamemaster dropped MUD_SLAP between 2026-04-16 23:05 and 2026-04-17 13:22; was present in rankings at Male dive time, absent at Female dive time."

@@ -1,0 +1,23 @@
+# Oinkologne (Female) -- Great League thresholds and article link.
+#
+# CD article: articles/oinkologne-cd-2026-05.toml (shared with male form)
+# Deep dive: userdata/website/oinkologne-female-great-league/
+#
+# Female Oinkologne has different base stats from Male (169/162/251 vs
+# 186/153/242) but shares the CD-move (Mud Slap) and default moveset
+# (Tackle / Body Slam, Trailblaze). This stub mirrors oinkologne.toml;
+# threshold data is auto-discovered from the dive and rendered into
+# the HTML.
+
+["Oinkologne (Female)"]
+sources = "pogo-simulator deep dive (2026-04-17); pre-CD Mud Slap analysis (female form)"
+
+["Oinkologne (Female)".article]
+slug = "oinkologne-cd-2026-05"
+
+# See thresholds/oinkologne.toml cd_prep for the shared rationale.
+# Female and Male share the same incoming CD move.
+["Oinkologne (Female)".cd_prep]
+event = "Mud Slap Community Day 2026-05"
+fast_moves = ["MUD_SLAP"]
+notes = "Must pass --fast MUD_SLAP to deep_dive.py until cd_prep auto-injection lands; otherwise the dive enumerates only Tackle/Take Down variants."
