@@ -535,6 +535,20 @@ break invariants that weren't yet nailed down by tests.
   the cap isn't currently under pressure. Flagging so the audit
   doesn't get discovered at render-time in S8.
 
+  **S8 envelope-annotation wiring skipped (2026-04-17), follow-up
+  logged:** S4's `envelopePositions` dict is embedded in the dive DATA
+  blob keyed by Notable-IVs category name (`Atk Slayer`, `Lapras Atk`,
+  etc.). The article's IV Recommendations section currently renders
+  `tier` cards (stat-cutoff-based, from `data_obj['tiers']`) not
+  category cards, so the annotations don't have a natural slot. Two
+  paths for a future session: (a) add a Notable-IVs card block to the
+  article IV-recs section and annotate those directly, or (b) build a
+  tier-name → category-name mapping and attach the envelope annotation
+  to whichever tier exposes the anchor that backs the category. (a) is
+  simpler but duplicates dive content; (b) reuses the existing
+  presentation but needs a naming bridge. Defer until someone has an
+  opinion about which surface to annotate.
+
 ## Deep-dive narrative
 
 * **SwagTips narrative follow-ups (Goodra + Aegislash dives)** — the
