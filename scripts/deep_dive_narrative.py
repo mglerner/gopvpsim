@@ -9,7 +9,13 @@ Modeled on RyanSwag's GamePress PvP IV Deep Dive series.
 
 import math
 
-from deep_dive_analysis import probe_tier_cutoff_flips
+import numpy as np
+
+from deep_dive_analysis import (
+    _np_scores,
+    _np_stats,
+    probe_tier_cutoff_flips,
+)
 from fast_move_class import charmer_context_line, is_charmer_fast_move
 
 
@@ -359,56 +365,48 @@ def _find_losses_vs_general(flavor, general, data_obj, score_arrays,
     nIvs = data_obj.get('nIvs', 0)
     nS = len(scenarios)
     nO = len(opponents)
+    if nIvs == 0 or nO == 0:
+        return {}
 
-    # Partition: "general only" = meets General cuts but not flavor cuts
-    # "flavor" = meets flavor cuts
-    flavor_ivs = []
-    general_only_ivs = []
-    for iv in range(nIvs):
-        meets_flavor = True
-        meets_general = True
-        if flavor['atk_cut'] > 0 and data_obj['ivAtk'][iv] < flavor['atk_cut']:
-            meets_flavor = False
-        if flavor['def_cut'] > 0 and data_obj['ivDef'][iv] < flavor['def_cut']:
-            meets_flavor = False
-        if flavor['hp_cut'] > 0 and data_obj['ivHp'][iv] < flavor['hp_cut']:
-            meets_flavor = False
-        if general['atk_cut'] > 0 and data_obj['ivAtk'][iv] < general['atk_cut']:
-            meets_general = False
-        if general['def_cut'] > 0 and data_obj['ivDef'][iv] < general['def_cut']:
-            meets_general = False
-        if general['hp_cut'] > 0 and data_obj['ivHp'][iv] < general['hp_cut']:
-            meets_general = False
+    iv_atk, iv_def, iv_hp = _np_stats(data_obj)
 
-        if meets_flavor:
-            flavor_ivs.append(iv)
-        elif meets_general:
-            general_only_ivs.append(iv)
+    def _meets_cuts(ac, dc, hc):
+        m = np.ones(nIvs, dtype=bool)
+        if ac > 0:
+            m &= iv_atk >= ac
+        if dc > 0:
+            m &= iv_def >= dc
+        if hc > 0:
+            m &= iv_hp >= hc
+        return m
 
-    if not flavor_ivs or not general_only_ivs:
+    flavor_mask = _meets_cuts(flavor['atk_cut'], flavor['def_cut'],
+                              flavor['hp_cut'])
+    general_mask = _meets_cuts(general['atk_cut'], general['def_cut'],
+                               general['hp_cut'])
+    general_only_mask = general_mask & ~flavor_mask
+
+    n_flavor = int(flavor_mask.sum())
+    n_general_only = int(general_only_mask.sum())
+    if n_flavor == 0 or n_general_only == 0:
         return {}
 
     losses = {}  # opp -> set of scenario tuples
     all_modes = data_obj.get('oppIvModes', ['pvpoke'])
     for mode in all_modes:
-        key = f'{moveset_idx}_{mode}'
-        scores_flat = score_arrays.get(key, [])
-        if not scores_flat:
+        scores = _np_scores(score_arrays, moveset_idx, mode, nIvs, nS, nO)
+        if scores is None:
             continue
-        for si, scen in enumerate(scenarios):
-            for oi, opp in enumerate(opponents):
-                # Flavor IVs should mostly LOSE
-                flavor_wr = sum(
-                    1 for iv in flavor_ivs
-                    if scores_flat[iv * nS * nO + si * nO + oi] >= 500
-                ) / len(flavor_ivs)
-                # General-only IVs should mostly WIN
-                general_wr = sum(
-                    1 for iv in general_only_ivs
-                    if scores_flat[iv * nS * nO + si * nO + oi] >= 500
-                ) / len(general_only_ivs)
-                if general_wr >= 0.75 and flavor_wr <= 0.25:
-                    losses.setdefault(opp, set()).add(tuple(scen))
+        wins = scores >= 500
+        flavor_wr = wins[flavor_mask].sum(axis=0) / n_flavor
+        general_wr = wins[general_only_mask].sum(axis=0) / n_general_only
+        sel = (general_wr >= 0.75) & (flavor_wr <= 0.25)
+        if not sel.any():
+            continue
+        si_arr, oi_arr = np.where(sel)
+        for si_i, oi_i in zip(si_arr.tolist(), oi_arr.tolist()):
+            losses.setdefault(opponents[oi_i], set()).add(
+                tuple(scenarios[si_i]))
 
     return losses
 
