@@ -684,10 +684,11 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
         )
 
     header_lines = [
-        '<p class="matchup-delta-intro">Best CD-move moveset vs best old-default moveset, '
-        'by overall win rate. Per-opponent win rate averaged across all 9 shield scenarios '
-        'and 4096 IV spreads. "Flip" marks rows where the winner changes across the 50% axis '
-        '(the same threshold the verdict section uses). Click a column header to sort.</p>',
+        '<p class="matchup-delta-intro">Per-opponent breakdown of how the '
+        'Community Day moveset compares to the old default, aggregated '
+        'across all shield scenarios and every IV spread of the focal '
+        'species. Click a column header to sort; column definitions are '
+        'below.</p>',
     ]
     if pool_line:
         header_lines.append(pool_line)
@@ -713,11 +714,33 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
 
     rows.sort(key=lambda r: r[3], reverse=True)
 
+    cd_name_plain = cd_entry.get('name', cd_move)
+    default_entry_for_flip = _lookup_move(gm, default_fast_id)
+    default_name_plain = (default_entry_for_flip.get('name', default_fast_id)
+                          if default_entry_for_flip else default_fast_id)
+
     body_rows = []
     for name, cd_r, df_r, delta_pp, flip in rows:
-        row_class = 'matchup-delta-flip' if flip else ''
-        flip_cell = ('<span class="flip-badge">Flip</span>'
-                     if flip else '')
+        if flip:
+            flip_dir = 'pos' if delta_pp > 0 else 'neg'
+            row_class = f'matchup-delta-flip matchup-delta-flip-{flip_dir}'
+            if delta_pp > 0:
+                badge_title = (f'{cd_name_plain} wins this matchup where '
+                               f'{default_name_plain} loses it (aggregate '
+                               f'win rate crosses the 50% line).')
+                badge_html = (f'<span class="flip-badge flip-pos" '
+                              f'title="{html.escape(badge_title)}">'
+                              f'+Flip</span>')
+            else:
+                badge_title = (f'{default_name_plain} wins this matchup where '
+                               f'{cd_name_plain} loses it (aggregate win '
+                               f'rate crosses the 50% line).')
+                badge_html = (f'<span class="flip-badge flip-neg" '
+                              f'title="{html.escape(badge_title)}">'
+                              f'-Flip</span>')
+        else:
+            row_class = ''
+            badge_html = ''
         delta_class = 'delta-pos' if delta_pp > 0 else 'delta-neg' if delta_pp < 0 else ''
         body_rows.append(
             f'<tr class="{row_class}">'
@@ -725,32 +748,60 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
             f'<td>{100 * df_r:.1f}%</td>'
             f'<td>{100 * cd_r:.1f}%</td>'
             f'<td class="{delta_class}">{delta_pp:+.1f}</td>'
-            f'<td>{flip_cell}</td>'
+            f'<td>{badge_html}</td>'
             f'</tr>'
         )
 
-    cd_name = html.escape(cd_entry.get('name', cd_move))
-    default_entry = _lookup_move(gm, default_fast_id)
-    default_name = html.escape(
-        default_entry.get('name', default_fast_id) if default_entry else default_fast_id)
+    cd_name = html.escape(cd_name_plain)
+    default_name = html.escape(default_name_plain)
+
+    legend = (
+        '<details class="matchup-delta-legend" open>'
+        '<summary><strong>What the columns mean</strong></summary>'
+        '<ul>'
+        f'<li><strong>{default_name} Win Rate</strong> / '
+        f'<strong>{cd_name} Win Rate</strong>: percentage of simulated '
+        f'matchups the moveset wins against that opponent. Each opponent '
+        f'is simulated against all 4096 IV spreads of the focal species '
+        f'across all 9 shield scenarios (0-0, 0-1, 0-2, 1-0, 1-1, 1-2, '
+        f'2-0, 2-1, 2-2), so each cell is the fraction of '
+        f'4096 &times; 9 = 36,864 simulations that scored a win '
+        f'(battle rating &ge; 500).</li>'
+        f'<li><strong>&Delta; (pp)</strong>: change in win rate from the '
+        f'{default_name} moveset to the {cd_name} moveset, in '
+        f'<em>percentage points</em> (so 20.0% &rarr; 68.0% reads as '
+        f'<code>+48.0</code>). "pp" is the standard shorthand for '
+        f'percentage-point differences.</li>'
+        f'<li><strong>Flip?</strong>: whether the aggregate win rate '
+        f'against this opponent crosses the 50% line between the two '
+        f'movesets, i.e. the matchup changes from an overall loss to an '
+        f'overall win or vice versa. <span class="flip-badge flip-pos">'
+        f'+Flip</span> means {cd_name} wins the matchup where {default_name} '
+        f'loses it; <span class="flip-badge flip-neg">-Flip</span> means '
+        f'{default_name} wins where {cd_name} loses. The flip line is the '
+        f'same 50% threshold used in the Verdict section.</li>'
+        '</ul>'
+        '</details>'
+    )
 
     table = (
         '<table class="matchup-delta sortable" data-default-sort="3" data-default-dir="desc">'
         '<thead><tr>'
         '<th scope="col" data-sort="str">Opponent</th>'
-        f'<th scope="col" data-sort="pct">{default_name} WR</th>'
-        f'<th scope="col" data-sort="pct">{cd_name} WR</th>'
-        '<th scope="col" data-sort="num">&#916; (pp)</th>'
-        '<th scope="col" data-sort="bool">Flip?</th>'
+        f'<th scope="col" data-sort="pct" title="Win rate with {default_name} moveset (4096 IVs x 9 shield scenarios, win = battle rating >= 500).">{default_name} Win Rate</th>'
+        f'<th scope="col" data-sort="pct" title="Win rate with {cd_name} moveset (4096 IVs x 9 shield scenarios, win = battle rating >= 500).">{cd_name} Win Rate</th>'
+        '<th scope="col" data-sort="num" title="Change in win rate, in percentage points (CD win rate minus old-default win rate).">&#916; (pp)</th>'
+        '<th scope="col" data-sort="bool" title="Aggregate matchup crosses the 50% win line: +Flip = CD wins where old default lost, -Flip = old default wins where CD loses.">Flip?</th>'
         '</tr></thead>'
         '<tbody>' + ''.join(body_rows) + '</tbody>'
         '</table>'
     )
     summary = (
         f'<p class="matchup-delta-summary">{flip_count} of '
-        f'{len(opponents)} opponents flip across the 50% win axis.</p>'
+        f'{len(opponents)} opponents flip across the 50% win line between '
+        f'these two movesets.</p>'
     )
-    return '\n'.join(header_lines) + '\n' + table + '\n' + summary
+    return '\n'.join(header_lines) + '\n' + legend + '\n' + table + '\n' + summary
 
 
 def _render_iv_recommendations_section(cd_move: str, species: str,
@@ -996,13 +1047,24 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
         padding: 5px 9px; text-align: left; }}
   table.matchup-delta thead th {{ background: #16213e; color: #c8a2d0; }}
   table.matchup-delta tbody td {{ background: #0f162a; color: #e0e0e0; }}
-  table.matchup-delta tr.matchup-delta-flip td {{ background: #2a2333;
-        border-color: #5b3d6d; }}
+  table.matchup-delta tr.matchup-delta-flip td {{ border-color: #5b3d6d; }}
   table.matchup-delta td.delta-pos {{ color: #9be89b; font-weight: 600; }}
   table.matchup-delta td.delta-neg {{ color: #e89b9b; font-weight: 600; }}
-  table.matchup-delta .flip-badge {{ display: inline-block; background: #5b3d6d;
-        color: #e8c8f0; padding: 1px 6px; border-radius: 10px; font-size: 11px;
-        font-weight: 600; text-transform: uppercase; }}
+  .flip-badge {{ display: inline-block; padding: 1px 6px; border-radius: 10px;
+        font-size: 11px; font-weight: 600; text-transform: uppercase; }}
+  .flip-badge.flip-pos {{ background: #1f3a1f; color: #9be89b;
+        border: 1px solid #7db87d; }}
+  .flip-badge.flip-neg {{ background: #3a1f1f; color: #e89b9b;
+        border: 1px solid #b87d7d; }}
+  table.matchup-delta tr.matchup-delta-flip-pos td {{ background: #152b1a; }}
+  table.matchup-delta tr.matchup-delta-flip-neg td {{ background: #2b1515; }}
+  details.matchup-delta-legend {{ background: #12192e; border-left: 3px solid #c8a2d0;
+        border-radius: 4px; padding: 8px 12px; font-size: 13px; color: #b8c4d8;
+        margin: 8px 0; }}
+  details.matchup-delta-legend summary {{ cursor: pointer; color: #c8a2d0;
+        font-weight: 500; }}
+  details.matchup-delta-legend ul {{ margin: 8px 0 0 0; padding-left: 20px; }}
+  details.matchup-delta-legend li {{ margin: 4px 0; }}
   p.matchup-delta-pool {{ background: #16213e; border-left: 3px solid #5b8dd9;
         padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #b8c4d8;
         margin: 8px 0; }}
