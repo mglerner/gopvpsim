@@ -45,9 +45,17 @@ from render_article import (  # type: ignore[import-not-found]
 
 from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
 
+from compare_loadouts import (  # type: ignore[import-not-found]
+    COMPARE_CSS,
+    build_comparison_fragment,
+    load_loadout_data,
+    parse_spec as parse_comparison_spec,
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 THRESHOLDS_DIR = REPO_ROOT / 'thresholds'
 ARTICLES_SRC_DIR = REPO_ROOT / 'articles'
+COMPARISONS_SRC_DIR = REPO_ROOT / 'comparisons'
 
 logger = logging.getLogger('generate_article')
 
@@ -61,6 +69,8 @@ CANONICAL_SECTIONS = [
      'S7/S8: per-moveset avg score + win counts by shield scenario.'),
     ('matchup-delta', 'Matchup Delta',
      'S8: per-opponent score diff between CD moveset and old default; flip highlights.'),
+    ('form-comparison', 'Male vs Female',
+     'S10: pairwise win-rate delta between forms. Source: [form_comparison].spec in the article TOML.'),
     ('iv-recommendations', 'IV Recommendations',
      'S8: threshold-tier cards from thresholds/<species>.toml; optional envelope annotations.'),
     ('verdict', 'Verdict',
@@ -1101,6 +1111,40 @@ def render_intro_section(article: dict) -> str:
     )
 
 
+def _load_form_comparison_spec(article: dict) -> dict | None:
+    """Read the [form_comparison] block and resolve the referenced spec TOML.
+
+    Returns the parsed compare-spec dict (with loadout_specs). Absent block
+    or missing spec file returns None; bad schemas fail loudly.
+    """
+    block = article.get('form_comparison')
+    if not block:
+        return None
+    spec_ref = block.get('spec')
+    if not spec_ref:
+        sys.exit('[form_comparison] is set but missing the spec field.')
+    spec_path = (REPO_ROOT / spec_ref).resolve()
+    if not spec_path.exists():
+        sys.exit(f'[form_comparison].spec path not found: {spec_path}')
+    return parse_comparison_spec(spec_path)
+
+
+def _render_form_comparison_section(article: dict) -> str | None:
+    """Return the form-comparison fragment, or None when nothing is wired."""
+    spec = _load_form_comparison_spec(article)
+    if spec is None:
+        return None
+    loadouts_data = [load_loadout_data(s) for s in spec['loadout_specs']]
+    gm = load_gamemaster()
+    return build_comparison_fragment(
+        loadouts_data=loadouts_data,
+        league=spec['league'],
+        gm=gm,
+        title=spec.get('title', ''),
+        summary=spec.get('summary', ''),
+    )
+
+
 def render_section(section_id: str, heading: str, todo: str,
                    article: dict, overrides: dict[str, str],
                    *, species: str, league: str, cd_move: str,
@@ -1113,6 +1157,13 @@ def render_section(section_id: str, heading: str, todo: str,
         body_html = _render_move_comparison_section(cd_move, species, league)
     elif section_id == 'matchup-delta' and dive is not None:
         body_html = _render_matchup_delta_section(cd_move, species, league, dive)
+    elif section_id == 'form-comparison':
+        fragment = _render_form_comparison_section(article)
+        if fragment is None:
+            return ''
+        body_html = fragment
+        block = article.get('form_comparison') or {}
+        heading = block.get('heading', heading)
     elif section_id == 'iv-recommendations' and dive is not None:
         body_html = _render_iv_recommendations_section(
             cd_move, species, league, dive, article)
@@ -1187,12 +1238,13 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
     article = dict(article)  # shallow copy to avoid mutating caller's dict
     article['framing'] = framing_plain
 
-    sections_html = '\n\n'.join(
+    rendered_sections = [
         render_section(sid, heading, todo, article, overrides,
                        species=species_name, league=league, cd_move=cd_move,
                        dive=dive)
         for sid, heading, todo in CANONICAL_SECTIONS
-    )
+    ]
+    sections_html = '\n\n'.join(s for s in rendered_sections if s.strip())
 
     return f"""<!DOCTYPE html>
 <html>
@@ -1206,6 +1258,7 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   h1 {{ color: #e94560; margin-bottom: 6px; }}
   h2 {{ color: #c8a2d0; border-bottom: 1px solid #0f3460;
         padding-bottom: 6px; margin-top: 30px; }}
+  h3 {{ color: #c8a2d0; margin-top: 18px; font-size: 1.05em; }}
   a {{ color: #9be89b; text-decoration: none; }}
   a:hover {{ text-decoration: underline; }}
   p {{ margin: 10px 0; }}
@@ -1301,7 +1354,7 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
                    font-size: 12px; }}
   footer {{ color: #666; font-size: 13px; margin-top: 40px;
             border-top: 1px solid #0f3460; padding-top: 12px; }}
-</style>
+{COMPARE_CSS}</style>
 </head>
 <body>
 <h1>{title}</h1>
