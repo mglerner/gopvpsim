@@ -6,7 +6,56 @@ rendering — that stays in deep_dive.py.
 """
 import math
 
+import numpy as np
+
 from gopvpsim.moves import type_effectiveness
+
+
+# Module-level caches for numpy conversions of per-dive IV/score arrays.
+# The narrative + tier-cutoff probes are called repeatedly with the same
+# data_obj / score_arrays dicts within a dive; converting once amortises
+# the ~25ms-per-score-array asarray+reshape over all calls. Keyed by
+# id() of the host dict: dive processes are one-shot so a stale id after
+# gc would only matter if another dict of the same shape reused the id,
+# which is fine here because the cache value is correct for that shape.
+_STAT_NP_CACHE: dict = {}
+_SCORE_NP_CACHE: dict = {}
+
+
+def _np_stats(data_obj):
+    """Return (ivAtk, ivDef, ivHp) as numpy arrays, cached per data_obj."""
+    key = id(data_obj)
+    cached = _STAT_NP_CACHE.get(key)
+    if cached is not None:
+        return cached
+    atk = np.asarray(data_obj['ivAtk'])
+    def_ = np.asarray(data_obj['ivDef'])
+    hp = np.asarray(data_obj['ivHp'])
+    _STAT_NP_CACHE[key] = (atk, def_, hp)
+    return (atk, def_, hp)
+
+
+def _np_scores(score_arrays_all, moveset_idx, mode, nIvs, nS, nO):
+    """Return reshaped (nIvs, nS, nO) score array, or None if missing.
+
+    Caches per (id(score_arrays_all), moveset_idx, mode).
+    """
+    key = (id(score_arrays_all), moveset_idx, mode)
+    cached = _SCORE_NP_CACHE.get(key)
+    if cached is not None:
+        return cached
+    raw = score_arrays_all.get(f'{moveset_idx}_{mode}')
+    if raw is None or len(raw) == 0:
+        return None
+    arr = np.asarray(raw).reshape(nIvs, nS, nO)
+    _SCORE_NP_CACHE[key] = arr
+    return arr
+
+
+def _invalidate_np_caches():
+    """Clear the module-level numpy caches. Tests call this between fixtures."""
+    _STAT_NP_CACHE.clear()
+    _SCORE_NP_CACHE.clear()
 
 
 # ---- Utility helpers ----
@@ -815,44 +864,41 @@ def probe_tier_cutoff_flips(data_obj, score_arrays_all, moveset_idx,
     if nIvs == 0 or nO == 0:
         return []
 
-    passing = []
-    failing = []
-    for iv in range(nIvs):
-        meets = True
-        if atk_cut > 0 and data_obj['ivAtk'][iv] < atk_cut:
-            meets = False
-        if def_cut > 0 and data_obj['ivDef'][iv] < def_cut:
-            meets = False
-        if hp_cut > 0 and data_obj['ivHp'][iv] < hp_cut:
-            meets = False
-        (passing if meets else failing).append(iv)
+    iv_atk, iv_def, iv_hp = _np_stats(data_obj)
+    meets = np.ones(nIvs, dtype=bool)
+    if atk_cut > 0:
+        meets &= iv_atk >= atk_cut
+    if def_cut > 0:
+        meets &= iv_def >= def_cut
+    if hp_cut > 0:
+        meets &= iv_hp >= hp_cut
 
-    if not passing or not failing:
+    n_pass = int(meets.sum())
+    n_fail = nIvs - n_pass
+    if n_pass == 0 or n_fail == 0:
         return []
 
     results = []
     all_modes = data_obj.get('oppIvModes', ['pvpoke'])
     for mode in all_modes:
-        key = f'{moveset_idx}_{mode}'
-        scores_flat = score_arrays_all.get(key, [])
-        if not scores_flat:
+        scores = _np_scores(score_arrays_all, moveset_idx, mode, nIvs, nS, nO)
+        if scores is None:
             continue
-        for si, scen in enumerate(scenarios):
-            for oi, opp in enumerate(opponents):
-                pw = sum(1 for iv in passing
-                         if scores_flat[iv * nS * nO + si * nO + oi] >= 500
-                         ) / len(passing)
-                fw = sum(1 for iv in failing
-                         if scores_flat[iv * nS * nO + si * nO + oi] >= 500
-                         ) / len(failing)
-                if pw >= pass_winrate_min and fw <= fail_winrate_max:
-                    results.append({
-                        'opponent': opp,
-                        'scenario': scen,
-                        'opp_iv_mode': mode,
-                        'pass_wr': pw,
-                        'fail_wr': fw,
-                    })
+        wins = scores >= 500
+        pw = wins[meets].sum(axis=0) / n_pass
+        fw = wins[~meets].sum(axis=0) / n_fail
+        sel = (pw >= pass_winrate_min) & (fw <= fail_winrate_max)
+        if not sel.any():
+            continue
+        si_arr, oi_arr = np.where(sel)
+        for si_i, oi_i in zip(si_arr.tolist(), oi_arr.tolist()):
+            results.append({
+                'opponent': opponents[oi_i],
+                'scenario': scenarios[si_i],
+                'opp_iv_mode': mode,
+                'pass_wr': float(pw[si_i, oi_i]),
+                'fail_wr': float(fw[si_i, oi_i]),
+            })
     return results
 
 
