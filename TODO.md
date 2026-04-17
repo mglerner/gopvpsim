@@ -888,35 +888,54 @@ bottleneck.
   shouldn't take long once started; the risk is multiprocessing
   worker resolution and CSS-string fragment positioning.
 
-## Moveset / variant comparison tool (post-arc)
+## Moveset / variant comparison tool
 
-* **Generalise the article generator into a two-moveset comparator**
+* **Generalise the article generator into a loadout comparator**
   *(follow-up from the Oinkologne CD article arc)* — most of the
   infrastructure built for `scripts/generate_article.py` is really a
-  "compare moveset A vs moveset B" pipeline with a CD framing bolted
-  on. Worth a dedicated session after the post-S5 arc to repurpose
-  the same rendering for other two-way comparisons that come up in
-  normal team-building. Concrete user questions this should answer:
+  "compare loadout A vs loadout B" pipeline with a CD framing bolted
+  on. Concrete user questions this should answer:
   - "I'm playing in a Championship Series event and want to know if
     I should run Forretress with Volt Switch or Bug Bite." (Two fast
     moves on the same species.)
   - "I want to see the difference between Shadow Forretress and
     normal Forretress." (Same moveset, different base form /
     stat-multiplier pair.)
+  - "Which Forretress do I want on my team — Volt Switch Shadow, Volt
+    Switch normal, Bug Bite Shadow, or Bug Bite normal?" (2 fast-move
+    options × 2 form options = 4 loadouts.)
   - CD catches that weren't tied to a new move announcement — just
     "is the shadow worth chasing for this slot."
+
+  **Scoped into S10 at MVP (2-loadout) scope, design extensible to
+  N=4.** Details in
+  `~/.claude/projects/.../memory/project_ab_comparator_timing.md`.
+  MVP: same league / CP cap, two `LoadoutSpec`s, matchup-delta HTML
+  fragment written to `userdata/website/comparisons/<slug>/`. The
+  Male-vs-Female Oinkologne section for S10 becomes an invocation of
+  this tool rather than inline article code.
+
+  **Design constraint:** stay loadout-list-keyed, not A/B-keyed. Use
+  `loadouts: list[LoadoutSpec]` in the data model even at N=2; use
+  pairwise-delta iteration (`itertools.combinations`) rather than
+  `a - b` shortcuts. Upgrade to N=4 is then a renderer extension, not
+  a data-model rewrite.
+
+  **N=4 ceiling:** 4 covers the canonical (moveset × form) cross
+  (Forretress case above). More than 4 makes the matchup-delta table
+  unreadable and the verdict ambiguous. Don't design past this.
+
+  **Remaining post-S10 work:** N=3 and N=4 renderer support, verdict
+  templating for N-way ranking (MVP keeps verdict simple, just for
+  Male-vs-Female). Update this entry after S10 lands with what
+  actually shipped vs what's still open.
+
   Reuse of the S8 work: matchup-delta table, per-opponent win-rate
   diff, +Flip/No-flip/-Flip pills, PvPoke single-battle drill-through
-  links, move-stat side-by-side table. What changes: no "old default"
-  vs "new CD move" framing; instead a generic "moveset A vs moveset
-  B" (or "form A vs form B") comparison, with the user picking both
-  sides. Probably a new entrypoint
-  `scripts/compare_loadouts.py <species_a> <moveset_a> <species_b>
-  <moveset_b> --league great` that writes to
-  `userdata/website/comparisons/<slug>/`. Verdict section probably
-  drops (no single framing), replaced with a raw scenario-count
-  summary. Article-style front-matter optional. Flagged 2026-04-17
-  by Michael after seeing the Oinkologne article render.
+  links, move-stat side-by-side table. What changes vs CD article: no
+  "old default" vs "new CD move" framing; instead a generic loadout
+  comparison with the user picking all sides. Flagged 2026-04-17 by
+  Michael after seeing the Oinkologne article render.
 
 ## User-facing documentation (post-arc)
 
