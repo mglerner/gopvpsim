@@ -152,12 +152,13 @@ def _decompress_scores(b64: str) -> list[int]:
 
 
 def _load_one_dive_file(path: Path) -> dict:
-    """Parse one dive HTML sibling into {label, avg_score, per_scenario_avg}.
+    """Parse one dive HTML sibling into win-rate summaries.
 
-    Reads the embedded DATA JSON blob for labels + scenario shape, then
-    decompresses SCORES_GZ['0_pvpoke'] to compute cohort-mean scores. The
-    pvpoke mode (not nobait) is the default scatter-plot source; we mirror
-    it so the verdict reflects what a dive reader sees on landing.
+    Reads the embedded DATA JSON for labels + scenario shape, decompresses
+    SCORES_GZ['0_pvpoke'], and counts wins (score >= 500, matching the
+    scatter plot's `winsPvpoke` y-axis definition). pvpoke (bait-on) is
+    the default dive view; mirroring it keeps the verdict consistent with
+    what a dive reader sees on landing.
     """
     content = path.read_text()
     data_blob = _extract_js_assignment(content, 'DATA')
@@ -184,26 +185,27 @@ def _load_one_dive_file(path: Path) -> dict:
         raise ValueError(
             f'{path}: score length {len(scores)} != nIvs*nS*nO={expected}')
 
-    per_scenario_sum = [0] * n_s
+    per_scenario_wins = [0] * n_s
     per_scenario_n = n_ivs * n_o
-    total = 0
+    total_wins = 0
     for iv in range(n_ivs):
         base_iv = iv * n_s * n_o
         for si in range(n_s):
             base = base_iv + si * n_o
-            s = 0
+            w = 0
             for oi in range(n_o):
-                s += scores[base + oi]
-            per_scenario_sum[si] += s
-            total += s
-    per_scenario_avg = [s / per_scenario_n for s in per_scenario_sum]
-    avg = total / expected
+                if scores[base + oi] >= 500:
+                    w += 1
+            per_scenario_wins[si] += w
+            total_wins += w
+    per_scenario_rate = [w / per_scenario_n for w in per_scenario_wins]
+    win_rate = total_wins / expected
 
     return {
         'label': label,
         'pretty_label': pretty,
-        'avg_score': avg,
-        'per_scenario_avg': per_scenario_avg,
+        'win_rate': win_rate,
+        'per_scenario_win_rate': per_scenario_rate,
         'scenarios': data['scenarios'],
     }
 
@@ -388,37 +390,37 @@ def _render_move_comparison_section(cd_move: str, species: str,
     return table + note
 
 
-def _classify_verdict(delta_pct: float, wins_for_cd: int, losses_for_cd: int,
-                      total_scenarios: int) -> str:
-    """Pick the verdict template line from the avg-score delta.
+def _scenario_label(scenario: list[int]) -> str:
+    """Format a [shields_a, shields_b] pair as '0 shields vs 2 shields' etc."""
+    a, b = scenario
+    a_str = '1 shield' if a == 1 else f'{a} shields'
+    b_str = '1 shield' if b == 1 else f'{b} shields'
+    return f'{a_str} vs {b_str}'
 
-    Cutoffs per TODO.md: >10% clear upgrade, <5% sidegrade, middle mixed.
+
+def _classify_verdict(wins: int, ties: int, losses: int, total: int,
+                      cd_move_name: str) -> str:
+    """Lead-line text from per-scenario win counts.
+
+    Scenario count is the natural axis for the headline; the overall win-
+    rate delta is reported in the detail line below the headline.
     """
-    if delta_pct > 10:
-        return (
-            f'Clear upgrade. Best CD moveset lifts the cohort-mean PvPoke score '
-            f'by {delta_pct:+.1f}% over the old default.'
-        )
-    if delta_pct < -10:
-        return (
-            f'Clear downgrade. Best CD moveset drops the cohort-mean PvPoke score '
-            f'by {delta_pct:+.1f}% versus the old default.'
-        )
-    if abs(delta_pct) < 5:
-        return (
-            f'Sidegrade. Cohort-mean PvPoke score shifts {delta_pct:+.1f}% '
-            f'between the best CD moveset and the old default (inside the +/-5% band).'
-        )
-    return (
-        f'Mixed ({delta_pct:+.1f}% cohort-mean). Best CD moveset is an upgrade '
-        f'in {wins_for_cd}/{total_scenarios} shield scenarios and a sidegrade '
-        f'(or worse) in {losses_for_cd}/{total_scenarios}.'
-    )
+    majority = (2 * total + 2) // 3  # >=2/3, rounded up: 6 of 9, 7 of 10, etc.
+    if wins == total:
+        return f'Clear upgrade: {cd_move_name} wins every shield scenario.'
+    if losses == total:
+        return 'Clear downgrade: the old default wins every shield scenario.'
+    if wins >= majority and wins > losses:
+        return f'Upgrade in {wins} of {total} shield scenarios.'
+    if losses >= majority and losses > wins:
+        return f'Downgrade in {losses} of {total} shield scenarios.'
+    return (f'Mixed: {wins} of {total} scenarios favor {cd_move_name}, '
+            f'{losses} favor the old default.')
 
 
 def _render_verdict_section(cd_move: str, species: str, league: str,
                             dive: dict) -> str:
-    """One-line verdict from avg-score deltas across movesets."""
+    """One-line verdict from per-scenario win-rate deltas."""
     gm = load_gamemaster()
     cd_move_entry = _lookup_move(gm, cd_move)
     if cd_move_entry is None:
@@ -449,33 +451,57 @@ def _render_verdict_section(cd_move: str, species: str, league: str,
             f"(e.g. --reference {default_fast_id},<cm1>,<cm2>) so the verdict "
             f"can compare against it.")
 
-    best_cd = max(cd_movesets, key=lambda m: m['avg_score'])
-    best_default = max(default_movesets, key=lambda m: m['avg_score'])
-    delta = best_cd['avg_score'] - best_default['avg_score']
-    delta_pct = 100.0 * delta / best_default['avg_score'] if best_default['avg_score'] else 0.0
+    best_cd = max(cd_movesets, key=lambda m: m['win_rate'])
+    best_default = max(default_movesets, key=lambda m: m['win_rate'])
 
-    wins = losses = 0
-    for cd_s, df_s in zip(best_cd['per_scenario_avg'], best_default['per_scenario_avg']):
-        if cd_s > df_s:
+    wins = ties = losses = 0
+    exception_scenarios: list[tuple[list[int], float, float]] = []
+    for sc, cd_rate, df_rate in zip(
+        dive['scenarios'],
+        best_cd['per_scenario_win_rate'],
+        best_default['per_scenario_win_rate'],
+    ):
+        if cd_rate > df_rate:
             wins += 1
-        elif cd_s < df_s:
+        elif cd_rate < df_rate:
             losses += 1
-    total = len(best_cd['per_scenario_avg'])
+            exception_scenarios.append((sc, cd_rate, df_rate))
+        else:
+            ties += 1
+            exception_scenarios.append((sc, cd_rate, df_rate))
+    total = len(best_cd['per_scenario_win_rate'])
 
-    verdict_line = _classify_verdict(delta_pct, wins, losses, total)
+    headline = _classify_verdict(wins, ties, losses, total,
+                                 cd_move_entry.get('name', cd_move))
 
-    summary = (
-        f'<p class="verdict-line"><strong>{html.escape(verdict_line)}</strong></p>'
+    delta_pp = 100.0 * (best_cd['win_rate'] - best_default['win_rate'])
+    body = (
+        f'<code>{html.escape(best_cd["pretty_label"])}</code> wins '
+        f'{100 * best_cd["win_rate"]:.1f}% of simulated matchups vs '
+        f'<code>{html.escape(best_default["pretty_label"])}</code>\'s '
+        f'{100 * best_default["win_rate"]:.1f}% ({delta_pp:+.1f} percentage points).'
     )
-    detail = (
-        f'<p class="verdict-detail">Best CD moveset: '
-        f'<code>{html.escape(best_cd["pretty_label"])}</code> '
-        f'(avg {best_cd["avg_score"]:.1f}). '
-        f'Old default: <code>{html.escape(best_default["pretty_label"])}</code> '
-        f'(avg {best_default["avg_score"]:.1f}). '
-        f'Delta {delta:+.1f} ({delta_pct:+.2f}%).</p>'
+    exception_text = ''
+    if exception_scenarios:
+        parts = []
+        for sc, cd_rate, df_rate in exception_scenarios:
+            label = _scenario_label(sc)
+            if cd_rate == df_rate == 0:
+                parts.append(f'{label}, where neither moveset wins any matchup')
+            elif cd_rate == df_rate:
+                parts.append(f'{label}, tied at {100 * cd_rate:.1f}%')
+            else:
+                parts.append(
+                    f'{label} ({100 * cd_rate:.1f}% vs {100 * df_rate:.1f}%)')
+        exception_text = f' The exception: {"; ".join(parts)}.'
+
+    return (
+        f'<p class="verdict-line">'
+        f'<strong>{html.escape(headline)}</strong> '
+        f'{body}'
+        f'{html.escape(exception_text)}'
+        f'</p>'
     )
-    return summary + detail
 
 
 def render_intro_section(article: dict) -> str:
@@ -615,7 +641,6 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   p.move-compare-note {{ color: #8ea1bd; font-size: 13px; margin-top: 4px; }}
   p.verdict-line {{ background: #1a2e1f; border-left: 3px solid #7db87d;
                     padding: 10px 14px; color: #cfe8cf; border-radius: 6px; }}
-  p.verdict-detail {{ color: #8ea1bd; font-size: 13px; margin-top: 6px; }}
   footer {{ color: #666; font-size: 13px; margin-top: 40px;
             border-top: 1px solid #0f3460; padding-top: 12px; }}
 </style>
