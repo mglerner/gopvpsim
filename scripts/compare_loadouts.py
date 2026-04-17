@@ -562,6 +562,17 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
                 f'simulations (4096 focal IVs x 9 shield scenarios) where '
                 f'the focal species scores at least 500.</p>')
 
+    dive_items = []
+    for ld in loadouts_data:
+        label = html.escape(ld['spec'].label)
+        slug = ld['spec'].dive_slug
+        species = html.escape(ld['spec'].species)
+        dive_items.append(
+            f'<li><strong>{label}:</strong> {species} '
+            f'(<a href="../../{slug}/">deep dive</a>)</li>'
+        )
+    bits.append('<ul class="compare-dives">' + ''.join(dive_items) + '</ul>')
+
     if summary:
         summary_html = html.escape(summary.strip()).replace('\n\n', '</p><p>')
         bits.append(f'<p class="compare-summary">{summary_html}</p>')
@@ -618,6 +629,8 @@ span.move-aside { color: #8ea1bd; font-size: 12px; }
 p.compare-lead { font-size: 14px; color: #b8c4d8; }
 p.compare-summary { font-size: 14px; color: #cfe8cf; background: #1a2e1f;
   border-left: 3px solid #7db87d; padding: 10px 14px; border-radius: 6px; }
+ul.compare-dives { margin: 6px 0 10px 20px; padding: 0; font-size: 14px; }
+ul.compare-dives li { margin: 2px 0; }
 """
 
 
