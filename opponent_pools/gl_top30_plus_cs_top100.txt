@@ -1,0 +1,46 @@
+# Top 30 GL overall rankings (PvPoke) union championshipseries members ranked <= 100. 42 unique species.
+# Generated 2026-04-17 by scripts/build_opponent_pool.py
+# Format: one PvPoke speciesName per line; blank lines and # comments ignored.
+
+Quagsire
+Quagsire (Shadow)
+Tinkaton
+Corviknight
+Jellicent
+Wigglytuff
+Empoleon
+Forretress
+Altaria
+Altaria (Shadow)
+Azumarill
+Forretress (Shadow)
+Empoleon (Shadow)
+Feraligatr
+Lickilicky
+Medicham
+Corsola (Galarian)
+Talonflame
+Lapras
+Sealeo
+Malamar
+Clodsire
+Dusclops
+Sealeo (Shadow)
+Clefable
+Drapion (Shadow)
+Stunfisk
+Annihilape
+Blastoise
+Dusclops (Shadow)
+Charjabug
+Florges
+Furret
+Gourgeist (Super)
+Guzzlord
+Moltres (Galarian)
+Ninetales (Alolan)
+Politoed (Shadow)
+Shelgon
+Stunfisk (Galarian)
+Weezing (Galarian) (Shadow)
+Diggersby

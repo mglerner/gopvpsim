@@ -72,8 +72,35 @@ def recipe_gl_top50_plus_cs():
                    f'championshipseries group. {len(union)} unique species.')
 
 
+def recipe_gl_top30_plus_cs_top100():
+    """Top 30 GL rankings union championshipseries members ranked <= 100.
+
+    Smaller opponent pool for faster deep dives. Drops the deepest CS
+    entries (Politoed #101, Togekiss #106, Steelix #147, Piloswines
+    #235/#256) while keeping every CS mon within realistic meta reach.
+    Lands at ~42 species vs 61 for gl_top50_plus_cs. Deep dives scale
+    worse than O(N^2), so trimming the pool is a large time win.
+    Shadow/non-shadow pairs are deliberately both kept when both fall
+    inside the cuts — the stat-multiplier shifts make them distinct
+    prep targets, not near-duplicates.
+    """
+    rankings = load_rankings('great')
+    rank = {r['speciesName']: i + 1 for i, r in enumerate(rankings)}
+    top30 = [r['speciesName'] for r in rankings[:30]]
+    cs_filt = [n for n in _cs_names() if rank.get(n, 10**9) <= 100]
+    seen, union = set(), []
+    for n in top30 + cs_filt:
+        if n not in seen:
+            seen.add(n)
+            union.append(n)
+    return union, (f'Top 30 GL overall rankings (PvPoke) union '
+                   f'championshipseries members ranked <= 100. '
+                   f'{len(union)} unique species.')
+
+
 RECIPES = {
     'gl_top50_plus_cs': recipe_gl_top50_plus_cs,
+    'gl_top30_plus_cs_top100': recipe_gl_top30_plus_cs_top100,
 }
 
 
