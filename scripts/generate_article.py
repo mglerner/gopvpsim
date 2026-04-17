@@ -187,6 +187,8 @@ def _load_one_dive_file(path: Path) -> dict:
 
     per_scenario_wins = [0] * n_s
     per_scenario_n = n_ivs * n_o
+    per_opponent_wins = [0] * n_o
+    per_opponent_n = n_ivs * n_s
     total_wins = 0
     for iv in range(n_ivs):
         base_iv = iv * n_s * n_o
@@ -196,9 +198,11 @@ def _load_one_dive_file(path: Path) -> dict:
             for oi in range(n_o):
                 if scores[base + oi] >= 500:
                     w += 1
+                    per_opponent_wins[oi] += 1
             per_scenario_wins[si] += w
             total_wins += w
     per_scenario_rate = [w / per_scenario_n for w in per_scenario_wins]
+    per_opponent_rate = [w / per_opponent_n for w in per_opponent_wins]
     win_rate = total_wins / expected
 
     return {
@@ -206,33 +210,45 @@ def _load_one_dive_file(path: Path) -> dict:
         'pretty_label': pretty,
         'win_rate': win_rate,
         'per_scenario_win_rate': per_scenario_rate,
+        'per_opponent_win_rate': per_opponent_rate,
         'scenarios': data['scenarios'],
+        'opponents': data['opponents'],
+        'tiers': data.get('tiers') or [],
+        'iv_tiers': data.get('ivTiers') or [],
+        'n_ivs': n_ivs,
     }
 
 
 def _load_dive_data(dive_dir: Path) -> dict:
     """Load dive summary across all sibling HTML files in dive_dir.
 
-    Returns:
-        {
-          'movesets': [ {label, pretty_label, avg_score, per_scenario_avg, scenarios}, ... ],
-          'scenarios': list of [shields_a, shields_b] pairs,
-        }
+    Each moveset entry carries its own per-opponent/per-scenario win-rate
+    arrays plus the ``tiers`` / ``ivTiers`` blobs from that sibling's
+    DATA. The top-level ``opponents`` list is the canonical opponent
+    order shared across all siblings (they re-use the same scenario
+    grid), so the article generator can trust index-alignment when
+    comparing two movesets.
     """
     if not dive_dir.is_dir():
         sys.exit(f'Dive directory does not exist: {dive_dir}')
-    # Pick up index.html + index_m*.html (split-moveset siblings).
     files = sorted(dive_dir.glob('index.html')) + sorted(dive_dir.glob('index_m*.html'))
     if not files:
         sys.exit(f'No index*.html dive files in {dive_dir}')
     movesets = []
     scenarios = None
+    opponents = None
     for f in files:
         parsed = _load_one_dive_file(f)
         movesets.append(parsed)
         if scenarios is None:
             scenarios = parsed['scenarios']
-    return {'movesets': movesets, 'scenarios': scenarios}
+        if opponents is None:
+            opponents = parsed['opponents']
+    return {
+        'movesets': movesets,
+        'scenarios': scenarios,
+        'opponents': opponents,
+    }
 
 
 def _moveset_fast_move(label: str) -> str:
@@ -504,6 +520,304 @@ def _render_verdict_section(cd_move: str, species: str, league: str,
     )
 
 
+LEAGUE_CP = {'great': 1500, 'ultra': 2500, 'master': 10000}
+
+
+def _species_id(gm: dict, species: str) -> str | None:
+    """Return the gamemaster speciesId for a display-form name."""
+    target = species.strip().lower()
+    for p in gm['pokemon']:
+        if (p.get('speciesName') or '').lower() == target:
+            return p.get('speciesId')
+    for p in gm['pokemon']:
+        if (p.get('speciesId') or '').lower() == target.replace(' ', '_'):
+            return p.get('speciesId')
+    return None
+
+
+def _species_move_pools(gm: dict, species_id: str) -> tuple[list[str], list[str]]:
+    """Return (fastMovePool, chargedMovePool) sorted by moveId ascending.
+
+    Mirrors PvPoke's Pokemon.js sort at the bottom of the pool setup, which
+    determines the moveset indices used in battle/multi URLs.
+    """
+    for p in gm['pokemon']:
+        if p.get('speciesId') == species_id:
+            fm = sorted(p.get('fastMoves') or [])
+            cm = sorted(p.get('chargedMoves') or [])
+            return fm, cm
+    return [], []
+
+
+def pvpoke_multi_battle_url(gm: dict, species_id: str, league: str,
+                            shields: tuple[int, int],
+                            fast_move_id: str,
+                            charged_move_ids: list[str]) -> str | None:
+    """Build a pvpoke.com battle/multi URL for this species + moveset.
+
+    URL shape follows PvPoke's own RankingInterface.js construction:
+        battle/multi/<cp>/all/<species>/<shields>/<fm>-<cm1>-<cm2>/2-1/
+    where:
+        - cp is league-capped (1500 / 2500 / 10000)
+        - shields concatenates both starting shield counts (e.g. "11")
+        - fm is the 0-based index into the species' sorted fastMovePool
+        - cm1 / cm2 are 1-based indices into the sorted chargedMovePool
+          (0 is reserved as an empty slot in PvPoke)
+        - "2-1" = chargedMoveCount=2, shieldBaiting=1 (copied from
+          PvPoke's own rankings link, so the landed page matches what
+          users see from the rankings UI)
+
+    Returns None if any index can't be resolved (falls back to a
+    plain-text moveset label on the caller's side).
+    """
+    cp = LEAGUE_CP.get(league)
+    if cp is None:
+        return None
+    fm_pool, cm_pool = _species_move_pools(gm, species_id)
+    if not fm_pool or not cm_pool:
+        return None
+    if fast_move_id not in fm_pool:
+        return None
+    fm_idx = fm_pool.index(fast_move_id)
+    cm_idxs = []
+    for cm in charged_move_ids:
+        if cm not in cm_pool:
+            return None
+        cm_idxs.append(cm_pool.index(cm) + 1)
+    while len(cm_idxs) < 2:
+        cm_idxs.append(0)
+    move_str = f'{fm_idx}-{cm_idxs[0]}-{cm_idxs[1]}'
+    shields_str = f'{shields[0]}{shields[1]}'
+    return (f'https://pvpoke.com/battle/multi/{cp}/all/'
+            f'{species_id}/{shields_str}/{move_str}/2-1/')
+
+
+def _parse_moveset_label(label: str) -> tuple[str, list[str]]:
+    """Split 'FAST / CM1, CM2' into (fast_id, [cm1_id, cm2_id])."""
+    if '/' not in label:
+        return label.strip(), []
+    fast, rest = label.split('/', 1)
+    charged = [c.strip() for c in rest.split(',') if c.strip()]
+    return fast.strip(), charged
+
+
+def _render_matchup_delta_section(cd_move: str, species: str, league: str,
+                                  dive: dict) -> str:
+    """Per-opponent win-rate diff between best CD and best old-default moveset.
+
+    Rows sort by signed Δ descending so the biggest CD improvements lead.
+    A "flip" badge marks rows where the sign crosses the 50% win axis in
+    either direction - same axis the verdict section uses, so callouts are
+    consistent across the article.
+    """
+    gm = load_gamemaster()
+    cd_entry = _lookup_move(gm, cd_move)
+    if cd_entry is None:
+        return render_placeholder(
+            'matchup-delta', 'Matchup Delta',
+            f'Move {cd_move!r} not found in gamemaster; cannot render table.')
+    cd_id = cd_entry['moveId']
+
+    try:
+        default_fast_id, _ = get_default_moveset(species, league)
+    except KeyError as exc:
+        return render_placeholder('matchup-delta', 'Matchup Delta',
+                                  f'No default moveset: {exc}')
+
+    cd_movesets = [m for m in dive['movesets']
+                   if _moveset_fast_move(m['label']) == cd_id]
+    default_movesets = [m for m in dive['movesets']
+                        if _moveset_fast_move(m['label']) == default_fast_id]
+    if not cd_movesets or not default_movesets:
+        return render_placeholder(
+            'matchup-delta', 'Matchup Delta',
+            f'Dive missing CD ({cd_id}) or default ({default_fast_id}) moveset.')
+
+    best_cd = max(cd_movesets, key=lambda m: m['win_rate'])
+    best_default = max(default_movesets, key=lambda m: m['win_rate'])
+
+    opponents = dive['opponents']
+    if (len(best_cd['per_opponent_win_rate']) != len(opponents)
+            or len(best_default['per_opponent_win_rate']) != len(opponents)):
+        return render_placeholder(
+            'matchup-delta', 'Matchup Delta',
+            'Per-opponent arrays do not match opponent list length.')
+
+    species_id = _species_id(gm, species)
+    shields_pair = (1, 1)
+    cd_fast, cd_cms = _parse_moveset_label(best_cd['label'])
+    df_fast, df_cms = _parse_moveset_label(best_default['label'])
+    cd_url = (pvpoke_multi_battle_url(gm, species_id, league, shields_pair,
+                                      cd_fast, cd_cms)
+              if species_id else None)
+    df_url = (pvpoke_multi_battle_url(gm, species_id, league, shields_pair,
+                                      df_fast, df_cms)
+              if species_id else None)
+
+    def _link_item(ms: dict, url: str | None) -> str:
+        label = html.escape(ms['pretty_label'] or ms['label'])
+        if url:
+            return (f'<li><code>{label}</code> - '
+                    f'<a href="{html.escape(url)}" target="_blank" rel="noopener">'
+                    f'view on PvPoke multi-battle</a></li>')
+        return f'<li><code>{label}</code></li>'
+
+    header_lines = [
+        '<p class="matchup-delta-intro">Best CD-move moveset vs best old-default moveset, '
+        'by overall win rate. Per-opponent win rate averaged across all 9 shield scenarios '
+        'and 4096 IV spreads. "Flip" marks rows where the winner changes across the 50% axis '
+        '(the same threshold the verdict section uses).</p>',
+        '<ul class="matchup-delta-movesets">',
+        _link_item(best_cd, cd_url),
+        _link_item(best_default, df_url),
+        '</ul>',
+    ]
+
+    rows = []
+    cd_rates = best_cd['per_opponent_win_rate']
+    df_rates = best_default['per_opponent_win_rate']
+    flip_count = 0
+    for name, cd_r, df_r in zip(opponents, cd_rates, df_rates):
+        delta_pp = 100.0 * (cd_r - df_r)
+        cd_wins_side = cd_r >= 0.5
+        df_wins_side = df_r >= 0.5
+        flip = cd_wins_side != df_wins_side
+        if flip:
+            flip_count += 1
+        rows.append((name, cd_r, df_r, delta_pp, flip))
+
+    rows.sort(key=lambda r: r[3], reverse=True)
+
+    body_rows = []
+    for name, cd_r, df_r, delta_pp, flip in rows:
+        row_class = 'matchup-delta-flip' if flip else ''
+        flip_cell = ('<span class="flip-badge">Flip</span>'
+                     if flip else '')
+        delta_class = 'delta-pos' if delta_pp > 0 else 'delta-neg' if delta_pp < 0 else ''
+        body_rows.append(
+            f'<tr class="{row_class}">'
+            f'<td>{html.escape(name)}</td>'
+            f'<td>{100 * df_r:.1f}%</td>'
+            f'<td>{100 * cd_r:.1f}%</td>'
+            f'<td class="{delta_class}">{delta_pp:+.1f}</td>'
+            f'<td>{flip_cell}</td>'
+            f'</tr>'
+        )
+
+    cd_name = html.escape(cd_entry.get('name', cd_move))
+    default_entry = _lookup_move(gm, default_fast_id)
+    default_name = html.escape(
+        default_entry.get('name', default_fast_id) if default_entry else default_fast_id)
+
+    table = (
+        '<table class="matchup-delta">'
+        '<thead><tr>'
+        '<th scope="col">Opponent</th>'
+        f'<th scope="col">{default_name} WR</th>'
+        f'<th scope="col">{cd_name} WR</th>'
+        '<th scope="col">&#916; (pp)</th>'
+        '<th scope="col">Flip?</th>'
+        '</tr></thead>'
+        '<tbody>' + ''.join(body_rows) + '</tbody>'
+        '</table>'
+    )
+    summary = (
+        f'<p class="matchup-delta-summary">{flip_count} of '
+        f'{len(opponents)} opponents flip across the 50% win axis.</p>'
+    )
+    return '\n'.join(header_lines) + '\n' + table + '\n' + summary
+
+
+def _render_iv_recommendations_section(cd_move: str, species: str,
+                                       league: str, dive: dict,
+                                       article: dict) -> str:
+    """Minimal tier-card view from the dive's embedded DATA.
+
+    The full anchor-flip-backed renderer (render_threshold_tier_cards in
+    scripts/deep_dive_rendering.py) needs the deep-dive pipeline's
+    precomputed anchor_flip_records / flip_map / matchup_boundaries,
+    which are not embedded in the dive DATA blob. For S8 we render a
+    condensed tier view - stat cutoffs, member counts, per-tier
+    description - and link out to the dive's full Threshold Tiers
+    section for the bullet-level detail.
+    """
+    gm = load_gamemaster()
+    cd_entry = _lookup_move(gm, cd_move)
+    if cd_entry is None:
+        return render_placeholder(
+            'iv-recommendations', 'IV Recommendations',
+            f'Move {cd_move!r} not found in gamemaster; cannot pick best CD moveset.')
+    cd_id = cd_entry['moveId']
+
+    cd_movesets = [m for m in dive['movesets']
+                   if _moveset_fast_move(m['label']) == cd_id]
+    if not cd_movesets:
+        return render_placeholder(
+            'iv-recommendations', 'IV Recommendations',
+            f'No CD-move ({cd_id}) moveset in dive data.')
+    best_cd = max(cd_movesets, key=lambda m: m['win_rate'])
+
+    tiers = best_cd.get('tiers') or []
+    iv_tiers = best_cd.get('iv_tiers') or []
+    n_ivs = best_cd.get('n_ivs', 0)
+    if not tiers:
+        return render_placeholder(
+            'iv-recommendations', 'IV Recommendations',
+            'Dive data has no tiers for the best CD moveset.')
+
+    member_counts = [0] * len(tiers)
+    for ti in iv_tiers:
+        if 0 <= ti < len(tiers):
+            member_counts[ti] += 1
+
+    dive_slug = article.get('links', {}).get('deep_dive_slug', '')
+    fast, charged = _parse_moveset_label(best_cd['label'])
+    moveset_file = (
+        f'index_m0_{fast.lower()}_{"_".join(c.lower() for c in charged)}.html'
+    )
+    dive_href = f'../../{dive_slug}/{moveset_file}#dd-threshold-tiers' if dive_slug else ''
+
+    cards = []
+    for t, members in zip(tiers, member_counts):
+        name = (t.get('name') or '').replace('<br>', ' - ')
+        atk = t.get('attack') or 0
+        def_ = t.get('defense') or 0
+        hp = t.get('stamina') or 0
+        cutoff_bits = []
+        if atk:
+            cutoff_bits.append(f'atk&ge;{atk:.2f}')
+        if def_:
+            cutoff_bits.append(f'def&ge;{def_:.2f}')
+        if hp:
+            cutoff_bits.append(f'hp&ge;{hp:g}')
+        cutoffs = ', '.join(cutoff_bits) if cutoff_bits else 'no cutoff'
+        desc = (t.get('toml_description') or t.get('desc') or '').strip()
+        pct = (100.0 * members / n_ivs) if n_ivs else 0.0
+        cards.append(
+            '<div class="iv-rec-card">'
+            f'<h3>{html.escape(name)}</h3>'
+            f'<p class="iv-rec-cutoffs">Cutoff: {cutoffs}</p>'
+            f'<p class="iv-rec-members">{members} of {n_ivs} IVs qualify '
+            f'({pct:.1f}%).</p>'
+            + (f'<p class="iv-rec-desc">{html.escape(desc)}</p>' if desc else '')
+            + '</div>'
+        )
+    pretty = html.escape(best_cd['pretty_label'] or best_cd['label'])
+    intro = (
+        f'<p class="iv-rec-intro">Tier cutoffs from the best CD moveset '
+        f'(<code>{pretty}</code>). Each tier is a named band of IV spreads '
+        f'sharing a stat target. For the per-anchor matchup bullets backing '
+        f'each tier, follow through to the deep dive\'s '
+    )
+    if dive_href:
+        intro += (f'<a href="{html.escape(dive_href)}">Threshold Tiers '
+                  f'section</a>.</p>')
+    else:
+        intro += 'Threshold Tiers section.</p>'
+
+    return intro + '\n<div class="iv-rec-grid">' + '\n'.join(cards) + '</div>'
+
+
 def render_intro_section(article: dict) -> str:
     """Template-rendered intro paragraph from front-matter.
 
@@ -533,6 +847,11 @@ def render_section(section_id: str, heading: str, todo: str,
         body_html = render_intro_section(article)
     elif section_id == 'move-comparison':
         body_html = _render_move_comparison_section(cd_move, species, league)
+    elif section_id == 'matchup-delta' and dive is not None:
+        body_html = _render_matchup_delta_section(cd_move, species, league, dive)
+    elif section_id == 'iv-recommendations' and dive is not None:
+        body_html = _render_iv_recommendations_section(
+            cd_move, species, league, dive, article)
     elif section_id == 'verdict' and dive is not None:
         body_html = _render_verdict_section(cd_move, species, league, dive)
     else:
@@ -641,6 +960,38 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   p.move-compare-note {{ color: #8ea1bd; font-size: 13px; margin-top: 4px; }}
   p.verdict-line {{ background: #1a2e1f; border-left: 3px solid #7db87d;
                     padding: 10px 14px; color: #cfe8cf; border-radius: 6px; }}
+  p.matchup-delta-intro {{ font-size: 14px; color: #b8c4d8; }}
+  p.matchup-delta-summary {{ font-size: 13px; color: #9bb0d0; margin-top: 8px; }}
+  ul.matchup-delta-movesets {{ margin: 4px 0 10px 20px; padding: 0;
+                               font-size: 14px; }}
+  ul.matchup-delta-movesets li {{ margin: 2px 0; }}
+  table.matchup-delta {{ border-collapse: collapse; margin: 10px 0;
+                         width: 100%; font-size: 13px; }}
+  table.matchup-delta th, table.matchup-delta td {{ border: 1px solid #0f3460;
+        padding: 5px 9px; text-align: left; }}
+  table.matchup-delta thead th {{ background: #16213e; color: #c8a2d0; }}
+  table.matchup-delta tbody td {{ background: #0f162a; color: #e0e0e0; }}
+  table.matchup-delta tr.matchup-delta-flip td {{ background: #2a2333;
+        border-color: #5b3d6d; }}
+  table.matchup-delta td.delta-pos {{ color: #9be89b; font-weight: 600; }}
+  table.matchup-delta td.delta-neg {{ color: #e89b9b; font-weight: 600; }}
+  table.matchup-delta .flip-badge {{ display: inline-block; background: #5b3d6d;
+        color: #e8c8f0; padding: 1px 6px; border-radius: 10px; font-size: 11px;
+        font-weight: 600; text-transform: uppercase; }}
+  p.iv-rec-intro {{ font-size: 14px; color: #b8c4d8; }}
+  div.iv-rec-grid {{ display: grid; gap: 10px;
+                     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                     margin: 10px 0; }}
+  div.iv-rec-card {{ background: #0f162a; border: 1px solid #0f3460;
+                     border-left: 3px solid #c8a2d0; border-radius: 6px;
+                     padding: 10px 12px; font-size: 13px; }}
+  div.iv-rec-card h3 {{ color: #c8a2d0; font-size: 14px; margin: 0 0 4px 0;
+                        border-bottom: none; padding-bottom: 0; }}
+  p.iv-rec-cutoffs {{ color: #9ab0d8; margin: 2px 0; font-family: monospace;
+                      font-size: 12px; }}
+  p.iv-rec-members {{ color: #b8c4d8; margin: 2px 0; }}
+  p.iv-rec-desc {{ color: #8ea1bd; margin: 4px 0 0 0; font-style: italic;
+                   font-size: 12px; }}
   footer {{ color: #666; font-size: 13px; margin-top: 40px;
             border-top: 1px solid #0f3460; padding-top: 12px; }}
 </style>
