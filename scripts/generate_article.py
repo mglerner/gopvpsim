@@ -556,6 +556,40 @@ def _species_move_pools(gm: dict, species_id: str) -> tuple[list[str], list[str]
     return [], []
 
 
+def _pvpoke_move_segment(gm: dict, species_id: str,
+                         fast_move_id: str,
+                         charged_move_ids: list[str]) -> str | None:
+    """Build the '<fm>-<cm1>-<cm2>' segment PvPoke uses in battle URLs.
+
+    Default encoding: fast index is 0-based into the sorted
+    fastMovePool; charged indices are 1-based into the sorted
+    chargedMovePool (PvPoke reserves 0 as the empty slot). Whenever a
+    move isn't in the species' pool - typical for unreleased CD moves
+    that haven't been added to the gamemaster upstream - PvPoke falls
+    back to embedding the moveId string directly (Pokemon.js:2102-2117,
+    the ``isCustom || hardMovesetLinks`` branch). The rendered CD-move
+    segment looks like ``MUD_SLAP-1-3`` instead of ``0-1-3``; the
+    server-side router accepts both forms. Returns None only when the
+    species pool itself can't be resolved.
+    """
+    fm_pool, cm_pool = _species_move_pools(gm, species_id)
+    if not fm_pool or not cm_pool:
+        return None
+    if fast_move_id in fm_pool:
+        fm_part = str(fm_pool.index(fast_move_id))
+    else:
+        fm_part = fast_move_id  # custom / unreleased: moveId string
+    cm_parts: list[str] = []
+    for cm in charged_move_ids:
+        if cm in cm_pool:
+            cm_parts.append(str(cm_pool.index(cm) + 1))
+        else:
+            cm_parts.append(cm)
+    while len(cm_parts) < 2:
+        cm_parts.append('0')
+    return f'{fm_part}-{cm_parts[0]}-{cm_parts[1]}'
+
+
 def pvpoke_multi_battle_url(gm: dict, species_id: str, league: str,
                             shields: tuple[int, int],
                             fast_move_id: str,
@@ -567,36 +601,75 @@ def pvpoke_multi_battle_url(gm: dict, species_id: str, league: str,
     where:
         - cp is league-capped (1500 / 2500 / 10000)
         - shields concatenates both starting shield counts (e.g. "11")
-        - fm is the 0-based index into the species' sorted fastMovePool
-        - cm1 / cm2 are 1-based indices into the sorted chargedMovePool
-          (0 is reserved as an empty slot in PvPoke)
+        - moveset segment is built by ``_pvpoke_move_segment``, which
+          embeds moveIds directly for unreleased/custom moves
         - "2-1" = chargedMoveCount=2, shieldBaiting=1 (copied from
           PvPoke's own rankings link, so the landed page matches what
           users see from the rankings UI)
 
-    Returns None if any index can't be resolved (falls back to a
-    plain-text moveset label on the caller's side).
+    Returns None only when the species' move pool can't be resolved.
     """
     cp = LEAGUE_CP.get(league)
     if cp is None:
         return None
-    fm_pool, cm_pool = _species_move_pools(gm, species_id)
-    if not fm_pool or not cm_pool:
+    move_str = _pvpoke_move_segment(gm, species_id, fast_move_id, charged_move_ids)
+    if move_str is None:
         return None
-    if fast_move_id not in fm_pool:
-        return None
-    fm_idx = fm_pool.index(fast_move_id)
-    cm_idxs = []
-    for cm in charged_move_ids:
-        if cm not in cm_pool:
-            return None
-        cm_idxs.append(cm_pool.index(cm) + 1)
-    while len(cm_idxs) < 2:
-        cm_idxs.append(0)
-    move_str = f'{fm_idx}-{cm_idxs[0]}-{cm_idxs[1]}'
     shields_str = f'{shields[0]}{shields[1]}'
     return (f'https://pvpoke.com/battle/multi/{cp}/all/'
             f'{species_id}/{shields_str}/{move_str}/2-1/')
+
+
+def _resolve_opponent_for_url(display_name: str) -> tuple[str, str, bool]:
+    """Split an opponent row label into (url_species_id, base_species_name, is_shadow).
+
+    - "Steelix"                  -> ("steelix", "Steelix", False)
+    - "Steelix (Shadow)"         -> ("steelix_shadow", "Steelix", True)
+    - "Medicham (atk-weighted)"  -> ("medicham", "Medicham", False)
+    The URL species id matches PvPoke's aliasId for the battle page. The
+    base species name is the one we feed to ``get_default_moveset`` to
+    look up the reference moveset.
+    """
+    name = display_name
+    if name.endswith(' (atk-weighted)'):
+        name = name[:-len(' (atk-weighted)')]
+    is_shadow = name.endswith(' (Shadow)')
+    if is_shadow:
+        name = name[:-len(' (Shadow)')]
+    slug = name.lower().replace(' ', '_').replace('(', '').replace(')', '')
+    if is_shadow:
+        slug = slug + '_shadow'
+    return slug, name, is_shadow
+
+
+def pvpoke_single_battle_url(gm: dict, league: str, shields: tuple[int, int],
+                             focal_species_id: str,
+                             focal_fast_id: str,
+                             focal_charged_ids: list[str],
+                             opp_species_id: str,
+                             opp_fast_id: str,
+                             opp_charged_ids: list[str]) -> str | None:
+    """Build a pvpoke.com single-battle URL for a specific 1v1 at default IVs.
+
+    Shape mirrors PvPoke's RankingInterface.js:1090:
+        battle/<cp>/<focal>/<opp>/<shields>/<fm1-cm1-cm2>/<fm2-cm1-cm2>/
+    Both move index triples follow the same encoding as multi-battle
+    URLs (fast 0-based, charged 1-based) but sourced from each species'
+    own sorted move pool. Returns None if any pool lookup fails.
+    """
+    cp = LEAGUE_CP.get(league)
+    if cp is None:
+        return None
+    focal_moves = _pvpoke_move_segment(
+        gm, focal_species_id, focal_fast_id, focal_charged_ids)
+    opp_moves = _pvpoke_move_segment(
+        gm, opp_species_id, opp_fast_id, opp_charged_ids)
+    if focal_moves is None or opp_moves is None:
+        return None
+    shields_str = f'{shields[0]}{shields[1]}'
+    return (f'https://pvpoke.com/battle/{cp}/'
+            f'{focal_species_id}/{opp_species_id}/{shields_str}/'
+            f'{focal_moves}/{opp_moves}/')
 
 
 def _parse_moveset_label(label: str) -> tuple[str, list[str]]:
@@ -719,28 +792,76 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
     default_name_plain = (default_entry_for_flip.get('name', default_fast_id)
                           if default_entry_for_flip else default_fast_id)
 
+    drill_shields = (1, 1)
+    link_suffix = (
+        f'1-1 shields, {species} at PvPoke-default IVs with '
+        f'{cd_name_plain}, opponent at PvPoke-default IVs and moveset. '
+        f'The aggregate table row averages over all 4096 {species} IVs '
+        f'and all 9 shield scenarios, so a single battle may not land '
+        f'on the majority side.'
+    )
+
     body_rows = []
     for name, cd_r, df_r, delta_pp, flip in rows:
+        opp_slug, opp_base, opp_is_shadow = _resolve_opponent_for_url(name)
+        opp_url = None
+        if species_id is not None:
+            try:
+                opp_fast_id, opp_charged_ids = get_default_moveset(
+                    opp_base, league, shadow=opp_is_shadow)
+            except KeyError:
+                opp_fast_id, opp_charged_ids = None, None
+            if opp_fast_id:
+                opp_url = pvpoke_single_battle_url(
+                    gm, league, drill_shields,
+                    focal_species_id=species_id,
+                    focal_fast_id=cd_fast, focal_charged_ids=cd_cms,
+                    opp_species_id=opp_slug,
+                    opp_fast_id=opp_fast_id,
+                    opp_charged_ids=list(opp_charged_ids or []),
+                )
+
         if flip:
             flip_dir = 'pos' if delta_pp > 0 else 'neg'
             row_class = f'matchup-delta-flip matchup-delta-flip-{flip_dir}'
+            badge_class = f'flip-badge flip-{flip_dir}'
             if delta_pp > 0:
-                badge_title = (f'{cd_name_plain} wins this matchup where '
-                               f'{default_name_plain} loses it (aggregate '
-                               f'win rate crosses the 50% line).')
-                badge_html = (f'<span class="flip-badge flip-pos" '
-                              f'title="{html.escape(badge_title)}">'
-                              f'+Flip</span>')
+                label = '+Flip'
+                verdict = (f'{cd_name_plain} wins this matchup where '
+                           f'{default_name_plain} loses it (aggregate win '
+                           f'rate crosses the 50% line).')
             else:
-                badge_title = (f'{default_name_plain} wins this matchup where '
-                               f'{cd_name_plain} loses it (aggregate win '
-                               f'rate crosses the 50% line).')
-                badge_html = (f'<span class="flip-badge flip-neg" '
-                              f'title="{html.escape(badge_title)}">'
-                              f'-Flip</span>')
+                label = '-Flip'
+                verdict = (f'{default_name_plain} wins this matchup where '
+                           f'{cd_name_plain} loses it (aggregate win rate '
+                           f'crosses the 50% line).')
         else:
             row_class = ''
-            badge_html = ''
+            badge_class = 'flip-badge flip-none'
+            label = 'No flip'
+            if cd_r >= 0.5 and df_r >= 0.5:
+                verdict = (f'Both movesets win this matchup on aggregate '
+                           f'(both above 50%).')
+            elif cd_r < 0.5 and df_r < 0.5:
+                verdict = (f'Both movesets lose this matchup on aggregate '
+                           f'(both below 50%).')
+            else:
+                verdict = 'No flip across the 50% line.'
+
+        tooltip = f'{verdict} Opens in PvPoke: {link_suffix}'
+        if opp_url:
+            badge_html = (
+                f'<a class="{badge_class}" href="{html.escape(opp_url)}" '
+                f'target="_blank" rel="noopener" '
+                f'title="{html.escape(tooltip)}">{label}</a>'
+            )
+        else:
+            badge_html = (
+                f'<span class="{badge_class} flip-unlinked" '
+                f'title="{html.escape(verdict)} (PvPoke link unavailable '
+                f'for this opponent.)">{label}</span>'
+            )
+
         delta_class = 'delta-pos' if delta_pp > 0 else 'delta-neg' if delta_pp < 0 else ''
         body_rows.append(
             f'<tr class="{row_class}">'
@@ -785,8 +906,16 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
         f'{cd_name} wins the matchup where {default_name} loses it '
         f'(old win rate below 50%, new at or above); '
         f'<span class="flip-badge flip-neg">-Flip</span> means '
-        f'{default_name} wins where {cd_name} loses. The flip line is '
-        f'the same 50% threshold used in the Verdict section.</li>'
+        f'{default_name} wins where {cd_name} loses; '
+        f'<span class="flip-badge flip-none">No flip</span> means both '
+        f'movesets land on the same side of the 50% line. Each badge '
+        f'is a link to PvPoke\'s single-battle page for that matchup at '
+        f'1-1 shields, {species_name} and opponent both at PvPoke-default '
+        f'IVs, using the {cd_name} moveset. The single-battle view shows '
+        f'only one of the 36,864 simulations averaged into this row, so '
+        f'the on-page outcome can land in the minority side of the '
+        f'aggregate win rate; use the link to inspect the matchup, '
+        f'not to confirm the aggregate.</li>'
         '</ul>'
         '</details>'
     )
@@ -1057,12 +1186,17 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   table.matchup-delta tr.matchup-delta-flip td {{ border-color: #5b3d6d; }}
   table.matchup-delta td.delta-pos {{ color: #9be89b; font-weight: 600; }}
   table.matchup-delta td.delta-neg {{ color: #e89b9b; font-weight: 600; }}
-  .flip-badge {{ display: inline-block; padding: 1px 6px; border-radius: 10px;
-        font-size: 11px; font-weight: 600; text-transform: uppercase; }}
+  .flip-badge {{ display: inline-block; padding: 1px 8px; border-radius: 10px;
+        font-size: 11px; font-weight: 600; text-transform: uppercase;
+        text-decoration: none; }}
+  a.flip-badge:hover {{ text-decoration: underline; filter: brightness(1.15); }}
   .flip-badge.flip-pos {{ background: #1f3a1f; color: #9be89b;
         border: 1px solid #7db87d; }}
   .flip-badge.flip-neg {{ background: #3a1f1f; color: #e89b9b;
         border: 1px solid #b87d7d; }}
+  .flip-badge.flip-none {{ background: #1a2333; color: #8ea1bd;
+        border: 1px solid #3d5580; }}
+  .flip-badge.flip-unlinked {{ opacity: 0.75; cursor: help; }}
   table.matchup-delta tr.matchup-delta-flip-pos td {{ background: #152b1a; }}
   table.matchup-delta tr.matchup-delta-flip-neg td {{ background: #2b1515; }}
   details.matchup-delta-legend {{ background: #12192e; border-left: 3px solid #c8a2d0;
