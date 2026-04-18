@@ -432,6 +432,175 @@ def _scenario_label(scenario: list[int]) -> str:
     return f'{a_str} vs {b_str}'
 
 
+def _scenario_short(scenario: list[int]) -> str:
+    """Tight column header for a shield scenario: ``0v0``, ``0v1``, etc."""
+    return f'{scenario[0]}v{scenario[1]}'
+
+
+def _wr_cell(wr: float) -> str:
+    """Table cell for a win rate value. Green >50%, red <50%, neutral =50%.
+    Uses the same delta-pos / delta-neg color classes as the matchup
+    delta table so the article reads consistently.
+    """
+    cls = 'delta-pos' if wr > 0.5 else 'delta-neg' if wr < 0.5 else ''
+    return f'<td class="num {cls}">{100 * wr:.1f}%</td>'
+
+
+def _render_meta_coverage_per_form_section(cd_move: str, forms: list[dict],
+                                           gm: dict) -> str:
+    """Compact per-form x per-shield-scenario win-rate grid.
+
+    Rows: one per form (each running its best CD moveset). Columns: the
+    9 shield scenarios (0v0 through 2v2). Cells: win rate as a percentage,
+    colored green above 50%, red below, neutral at exactly 50%. Keeps
+    the view to 2 rows x 9 columns for two-form articles so readers can
+    scan "where is each form strongest?" at a glance.
+    """
+    cd_entry = _lookup_move(gm, cd_move)
+    cd_name = cd_entry.get('name', cd_move) if cd_entry else cd_move
+    scenarios = forms[0]['best_cd'].get('scenarios') or []
+    if not scenarios:
+        return render_placeholder(
+            'meta-coverage', 'Meta Coverage',
+            'Dive data missing scenarios list; cannot render grid.')
+
+    per_form_counts = sorted({len(f.get('opponents') or []) for f in forms})
+    n_ivs = forms[0]['best_cd'].get('n_ivs', 0)
+    if len(per_form_counts) == 1:
+        n_opponents = per_form_counts[0]
+        pool_phrase = f'{n_opponents} opponents'
+        per_cell_sims = n_ivs * n_opponents
+        sims_phrase = f' = {per_cell_sims:,} simulated matchups'
+    else:
+        pool_phrase = (f'{per_form_counts[0]}-{per_form_counts[-1]} '
+                       f'opponents depending on form')
+        sims_phrase = ''
+
+    intro = (
+        f'<p class="meta-coverage-intro">Each form\'s <code>'
+        f'{html.escape(cd_name)}</code> win rate across all 9 shield '
+        f'scenarios. Green above 50%, red below. Shield asymmetry '
+        f'dominates the extremes - 2v0 is essentially a free win and '
+        f'0v2 essentially a free loss regardless of species or form - '
+        f'so the interesting reading is <em>within a column</em>: does '
+        f'form choice swing the outcome at a given shield count? Most '
+        f'players give the even-shield scenarios (0v0, 1v1, 2v2) more '
+        f'weight when team-building, though shield use varies by '
+        f'playstyle.</p>'
+        f'<p class="meta-coverage-intro">Each cell averages <strong>'
+        f'{n_ivs:,} focal IVs &times; {pool_phrase}</strong>'
+        f'{sims_phrase} at that shield count. Opponents are held fixed '
+        f'at PvPoke-default IVs (and moves) with bait-on behavior; '
+        f'cells are <em>not</em> restricted to the rank-1 focal IV, '
+        f'and they are <em>not</em> collapsed to a single default-vs-'
+        f'default battle. Win = battle rating &ge; 500. Each form uses '
+        f'its own dive\'s opponent pool (including a self-mirror but '
+        f'not yet the sibling form as an opponent, which is why the '
+        f'Matchup Delta table above reports a slightly smaller '
+        f'intersection count).</p>'
+    )
+
+    header_cells = ['<th scope="col">Form</th>']
+    for sc in scenarios:
+        header_cells.append(
+            f'<th scope="col" class="num" '
+            f'title="{html.escape(_scenario_label(sc))}">'
+            f'{_scenario_short(sc)}</th>'
+        )
+
+    body_rows = []
+    for f in forms:
+        col_cls = FORM_COL_CLASS.get(f['label'], '')
+        col_suffix = f' {col_cls}' if col_cls else ''
+        short = FORM_SYMBOLS.get(f['label'], html.escape(f['label']))
+        row_cells = [
+            f'<th scope="row" class="{col_cls}" title="{html.escape(f["label"])}">'
+            f'{short}</th>'
+        ]
+        rates = f['best_cd'].get('per_scenario_win_rate') or []
+        for wr in rates:
+            # Same delta-pos/neg coloring as matchup-delta; no form-tint
+            # on the cell background (the row header carries the form cue,
+            # and tinting every cell would fight the green/red signal).
+            row_cells.append(_wr_cell(wr))
+        body_rows.append(
+            f'<tr class="meta-row{col_suffix}">' + ''.join(row_cells) + '</tr>'
+        )
+
+    table = (
+        '<table class="meta-coverage">'
+        '<thead><tr>' + ''.join(header_cells) + '</tr></thead>'
+        '<tbody>' + ''.join(body_rows) + '</tbody>'
+        '</table>'
+    )
+    return intro + '\n' + table
+
+
+def _render_meta_coverage_section(cd_move: str, species: str,
+                                  league: str, dive: dict) -> str:
+    """Single-form fallback: one row showing the best CD moveset's WR per
+    scenario. Used when no ``[form_comparison]`` is set in the article TOML.
+    """
+    cd_entry = _lookup_move(gm := load_gamemaster(), cd_move)
+    cd_name = cd_entry.get('name', cd_move) if cd_entry else cd_move
+    cd_id = cd_entry['moveId'] if cd_entry else None
+    if cd_id is None:
+        return render_placeholder(
+            'meta-coverage', 'Meta Coverage',
+            f'Move {cd_move!r} not found in gamemaster.')
+
+    cd_movesets = [m for m in dive['movesets']
+                   if _moveset_fast_move(m['label']) == cd_id]
+    if not cd_movesets:
+        return render_placeholder(
+            'meta-coverage', 'Meta Coverage',
+            f'No CD-move ({cd_id}) moveset in dive data.')
+    best_cd = max(cd_movesets, key=lambda m: m['win_rate'])
+    scenarios = dive.get('scenarios') or []
+    if not scenarios:
+        return render_placeholder(
+            'meta-coverage', 'Meta Coverage',
+            'Dive data missing scenarios list; cannot render grid.')
+
+    n_ivs = best_cd.get('n_ivs', 0)
+    n_opponents = len(dive.get('opponents') or [])
+    per_cell_sims = n_ivs * n_opponents
+    intro = (
+        f'<p class="meta-coverage-intro"><code>{html.escape(cd_name)}</code> '
+        f'win rate across all 9 shield scenarios. Green above 50%, red '
+        f'below. Shield asymmetry dominates the extremes - 2v0 is '
+        f'essentially a free win and 0v2 essentially a free loss - '
+        f'and most players give the even-shield columns (0v0, 1v1, '
+        f'2v2) more weight when team-building, though shield use '
+        f'varies by playstyle.</p>'
+        f'<p class="meta-coverage-intro">Each cell averages <strong>'
+        f'{n_ivs:,} focal IVs &times; {n_opponents} opponents</strong> '
+        f'= {per_cell_sims:,} simulated matchups at that shield count, '
+        f'with opponents held fixed at PvPoke-default IVs (and moves) '
+        f'with bait-on behavior. Win = battle rating &ge; 500. '
+        f'Per-opponent detail is in the Matchup Delta table above.</p>'
+    )
+    header_cells = ['<th scope="col">Moveset</th>']
+    for sc in scenarios:
+        header_cells.append(
+            f'<th scope="col" class="num" '
+            f'title="{html.escape(_scenario_label(sc))}">'
+            f'{_scenario_short(sc)}</th>'
+        )
+    row_cells = [
+        f'<th scope="row">{html.escape(best_cd["pretty_label"] or best_cd["label"])}</th>'
+    ]
+    for wr in (best_cd.get('per_scenario_win_rate') or []):
+        row_cells.append(_wr_cell(wr))
+    table = (
+        '<table class="meta-coverage">'
+        '<thead><tr>' + ''.join(header_cells) + '</tr></thead>'
+        '<tbody><tr>' + ''.join(row_cells) + '</tr></tbody>'
+        '</table>'
+    )
+    return intro + '\n' + table
+
+
 def _classify_verdict(wins: int, ties: int, losses: int, total: int,
                       cd_move_name: str) -> str:
     """Lead-line text from per-scenario win counts.
@@ -1648,6 +1817,15 @@ def render_section(section_id: str, heading: str, todo: str,
         body_html = render_intro_section(article)
     elif section_id == 'move-comparison':
         body_html = _render_move_comparison_section(cd_move, species, league)
+    elif section_id == 'meta-coverage' and dive is not None:
+        form_spec = _load_form_comparison_spec(article)
+        mc_forms = (_collect_per_form_best_movesets(form_spec, cd_move, load_gamemaster())
+                    if form_spec else None)
+        if mc_forms and len(mc_forms) >= 2:
+            body_html = _render_meta_coverage_per_form_section(
+                cd_move, mc_forms, load_gamemaster())
+        else:
+            body_html = _render_meta_coverage_section(cd_move, species, league, dive)
     elif section_id == 'matchup-delta' and dive is not None:
         form_spec = _load_form_comparison_spec(article)
         forms = (_collect_per_form_best_movesets(form_spec, cd_move, load_gamemaster())
@@ -1800,6 +1978,21 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
                                  font-weight: 500; }}
   table.move-compare tbody td {{ background: #0f162a; color: #e0e0e0; }}
   p.move-compare-note {{ color: #8ea1bd; font-size: 13px; margin-top: 4px; }}
+  p.meta-coverage-intro {{ font-size: 14px; color: #b8c4d8; }}
+  table.meta-coverage {{ border-collapse: collapse; margin: 12px 0;
+         width: 100%; font-size: 13px; }}
+  table.meta-coverage th, table.meta-coverage td {{
+         border: 1px solid #0f3460; padding: 5px 9px; text-align: left; }}
+  table.meta-coverage thead th {{ background: #16213e; color: #c8a2d0; }}
+  table.meta-coverage tbody th {{ background: #12192e; color: #9ab0d8;
+         font-weight: 500; font-size: 15px; }}
+  table.meta-coverage tbody td {{ background: #0f162a; color: #e0e0e0; }}
+  table.meta-coverage th.num, table.meta-coverage td.num {{
+         text-align: right; font-variant-numeric: tabular-nums; }}
+  table.meta-coverage td.delta-pos {{ color: #9be89b; font-weight: 600; }}
+  table.meta-coverage td.delta-neg {{ color: #e89b9b; font-weight: 600; }}
+  table.meta-coverage tbody th.male {{ color: rgba(91,141,217,1); }}
+  table.meta-coverage tbody th.female {{ color: rgba(217,108,145,1); }}
   p.verdict-line {{ background: #1a2e1f; border-left: 3px solid #7db87d;
                     padding: 10px 14px; color: #cfe8cf; border-radius: 6px; }}
   p.matchup-delta-intro {{ font-size: 14px; color: #b8c4d8; }}
