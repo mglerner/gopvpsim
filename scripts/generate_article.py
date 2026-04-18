@@ -50,6 +50,8 @@ from compare_loadouts import (  # type: ignore[import-not-found]
     build_comparison_fragment,
     load_loadout_data,
     parse_spec as parse_comparison_spec,
+    _render_base_stats_table,
+    _species_base_stats,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -63,6 +65,12 @@ logger = logging.getLogger('generate_article')
 CANONICAL_SECTIONS = [
     ('intro', 'Introduction',
      'S6 (template)'),
+    ('stats-at-a-glance', 'Stats at a Glance',
+     'F-stats-block: promoted base-stat table so readers see the '
+     'species numbers immediately after the intro. Multi-form dives '
+     'get one column per form; single-form dives get a single '
+     'column. Section is skipped when base stats cannot be resolved '
+     '(no gamemaster entry).'),
     ('meta-role', 'Meta Role',
      'F1: three-paragraph strengths / weaknesses / team-role block. '
      'Sourced from article TOML [meta_role]. Section is skipped '
@@ -2278,6 +2286,71 @@ def render_intro_section(article: dict) -> str:
     )
 
 
+def _render_stats_at_a_glance_section(article: dict, species_fallback: str,
+                                       gm: dict) -> str:
+    """Promoted base-stats table (F-stats-block).
+
+    When the article has a [form_comparison] spec, builds a per-form
+    column table reusing compare_loadouts._render_base_stats_table.
+    Without a form_comparison, falls back to a single-column table
+    for the focal species. Returns empty string if base stats cannot
+    be resolved (e.g., species not in gamemaster), so the dispatch
+    can skip the section wrapper.
+
+    Intentional scope for the first pass: BASE stats only (uncapped,
+    from gamemaster). Per-league CP-capped stats and rank-1 IVs are a
+    nice-to-have follow-up -- JRE's articles lead with CP-capped
+    stats which are directly actionable for PvP, but base stats are
+    still useful context ("Male is the higher-attack form") and
+    don't require wiring the rank-1 IV pipeline through the article
+    generator.
+    """
+    # Multi-form path via form_comparison spec. parse_comparison_spec
+    # returns a dict whose `loadout_specs` field is a list of
+    # LoadoutSpec dataclasses; load_loadout_data expands each into the
+    # dict shape _render_base_stats_table expects.
+    spec = _load_form_comparison_spec(article)
+    if spec is not None:
+        try:
+            loadouts_data = [load_loadout_data(s)
+                             for s in spec['loadout_specs']]
+        except Exception as exc:
+            logger.warning('stats-at-a-glance: could not load form-comparison '
+                           'data (%s); falling back to single-form.', exc)
+        else:
+            if loadouts_data:
+                table = _render_base_stats_table(loadouts_data, gm)
+                return (
+                    '<p class="stats-at-a-glance-note">Base stats from '
+                    'PvPoke gamemaster. Per-form differences drive the '
+                    'matchup deltas below.</p>' + table
+                )
+
+    # Single-form fallback.
+    species = (article.get('species') or species_fallback or '').strip()
+    if not species:
+        return ''
+    stats = _species_base_stats(gm, species) or {}
+    if not stats:
+        logger.warning('stats-at-a-glance: no gamemaster base stats for %r; '
+                       'skipping section.', species)
+        return ''
+    table = (
+        '<table class="base-stat-compare"><thead><tr>'
+        f'<th scope="col">Base Stat</th>'
+        f'<th scope="col">{html.escape(species)}</th>'
+        '</tr></thead><tbody>'
+        f'<tr><th scope="row">Attack</th><td>{stats.get("atk", "")}</td></tr>'
+        f'<tr><th scope="row">Defense</th><td>{stats.get("def", "")}</td></tr>'
+        f'<tr><th scope="row">Stamina</th><td>{stats.get("hp", "")}</td></tr>'
+        '</tbody></table>'
+    )
+    return (
+        '<p class="stats-at-a-glance-note">Base stats from PvPoke '
+        'gamemaster.</p>' + table
+    )
+
+
 def _render_meta_role_section(article: dict) -> str:
     """Render the Meta Role section body (F1).
 
@@ -2386,6 +2459,11 @@ def render_section(section_id: str, heading: str, todo: str,
         body_html = format_body(overrides[heading])
     elif section_id == 'intro':
         body_html = render_intro_section(article)
+    elif section_id == 'stats-at-a-glance':
+        body_html = _render_stats_at_a_glance_section(
+            article, species, load_gamemaster())
+        if not body_html.strip():
+            return ''  # skip section when base stats cannot be resolved
     elif section_id == 'meta-role':
         body_html = _render_meta_role_section(article)
         if not body_html.strip():
@@ -2535,6 +2613,8 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   code {{ background: #16213e; padding: 2px 5px; border-radius: 3px;
           font-size: 0.9em; }}
   section#meta-role p {{ margin: 12px 0; line-height: 1.55; }}
+  p.stats-at-a-glance-note {{ font-size: 13px; color: #8ea1bd;
+                              margin: 4px 0 8px 0; }}
   div.key-flips {{ background: #16213e; border-left: 3px solid #7db87d;
                    padding: 10px 14px; border-radius: 6px; margin: 12px 0; }}
   div.key-flips h3.key-flips-title {{ margin: 0 0 4px 0; font-size: 1em;
