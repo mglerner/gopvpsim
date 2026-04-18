@@ -509,17 +509,19 @@ def _render_meta_coverage_per_form_section(cd_move: str, forms: list[dict],
         f'players give the even-shield scenarios (0v0, 1v1, 2v2) more '
         f'weight when team-building, though shield use varies by '
         f'playstyle.</p>'
-        f'<p class="meta-coverage-intro">Each cell averages <strong>'
-        f'{n_ivs:,} focal IVs &times; {pool_phrase}</strong>'
-        f'{sims_phrase} at that shield count. Opponents are held fixed '
-        f'at PvPoke-default IVs (and moves) with bait-on behavior; '
-        f'cells are <em>not</em> restricted to the rank-1 focal IV, '
-        f'and they are <em>not</em> collapsed to a single default-vs-'
-        f'default battle. Win = battle rating &ge; 500. Each form uses '
-        f'its own dive\'s opponent pool (including a self-mirror but '
-        f'not yet the sibling form as an opponent, which is why the '
-        f'Matchup Delta table above reports a slightly smaller '
-        f'intersection count).</p>'
+        f'<details class="methodology-details">'
+        f'<summary>How the numbers are computed</summary>'
+        f'<p>Each cell averages <strong>{n_ivs:,} focal IVs &times; '
+        f'{pool_phrase}</strong>{sims_phrase} at that shield count. '
+        f'Opponents are held fixed at PvPoke-default IVs (and moves) '
+        f'with bait-on behavior; cells are <em>not</em> restricted to '
+        f'the rank-1 focal IV, and they are <em>not</em> collapsed to '
+        f'a single default-vs-default battle. Win = battle rating '
+        f'&ge; 500. Each form uses its own dive\'s opponent pool '
+        f'(including a self-mirror but not yet the sibling form as an '
+        f'opponent, which is why the Matchup Delta table above reports '
+        f'a slightly smaller intersection count).</p>'
+        f'</details>'
     )
 
     header_cells = ['<th scope="col">Form</th>']
@@ -588,15 +590,18 @@ def _render_opp_iv_toggle_control() -> str:
         f'<select class="article-opp-iv-mode">{oppiv_options}</select></label>'
         '<label><span class="control-label">Bait:</span> '
         f'<select class="article-bait-mode">{bait_options}</select></label>'
-        '<p class="article-opp-iv-caption">This toggle rewrites the '
-        'numbers in <strong>Meta Coverage</strong> (below) and '
-        '<strong>Matchup Delta</strong> (next section). <strong>Verdict'
-        '</strong>, <strong>Form Comparison</strong>, <strong>IV '
-        'Recommendations</strong>, and <strong>Move Comparison</strong> '
-        'stay at PvPoke-default opponent IVs with bait on, independent '
-        'of this control. "Rank 1" uses each opponent\'s highest-'
-        'stat-product IVs; "Never" disables bait-first shielding in the '
-        'sim.</p>'
+        '<p class="article-opp-iv-caption">Rewrites numbers in '
+        '<strong>Meta Coverage</strong> and <strong>Matchup Delta</strong>. '
+        'Other sections stay at PvPoke-default + bait-on. '
+        '<details class="article-opp-iv-help" style="display:inline">'
+        '<summary>What these options mean</summary>'
+        '<span> "<em>Rank 1</em>" uses each opponent\'s highest-stat-'
+        'product IVs instead of the PvPoke-default IV spread; "<em>Never'
+        '</em>" disables bait-first shielding so the opponent never '
+        'shields a bait-move. Affected sections: Meta Coverage and '
+        'Matchup Delta. Unaffected (fixed at PvPoke-default + bait-on): '
+        'Verdict, Form Comparison, IV Recommendations, Move Comparison.'
+        '</span></details></p>'
         '</div>'
     )
 
@@ -638,12 +643,15 @@ def _render_meta_coverage_section(cd_move: str, species: str,
         f'and most players give the even-shield columns (0v0, 1v1, '
         f'2v2) more weight when team-building, though shield use '
         f'varies by playstyle.</p>'
-        f'<p class="meta-coverage-intro">Each cell averages <strong>'
-        f'{n_ivs:,} focal IVs &times; {n_opponents} opponents</strong> '
-        f'= {per_cell_sims:,} simulated matchups at that shield count, '
-        f'with opponents held fixed at PvPoke-default IVs (and moves) '
-        f'with bait-on behavior. Win = battle rating &ge; 500. '
-        f'Per-opponent detail is in the Matchup Delta table above.</p>'
+        f'<details class="methodology-details">'
+        f'<summary>How the numbers are computed</summary>'
+        f'<p>Each cell averages <strong>{n_ivs:,} focal IVs &times; '
+        f'{n_opponents} opponents</strong> = {per_cell_sims:,} '
+        f'simulated matchups at that shield count, with opponents '
+        f'held fixed at PvPoke-default IVs (and moves) with bait-on '
+        f'behavior. Win = battle rating &ge; 500. Per-opponent detail '
+        f'is in the Matchup Delta table above.</p>'
+        f'</details>'
     )
     header_cells = ['<th scope="col">Moveset</th>']
     for sc in scenarios:
@@ -1422,16 +1430,19 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
     n_scenarios = len(forms[0]['best_cd'].get('scenarios') or []) or 9
     per_cell_sims = n_ivs * n_scenarios
     intro_lines.append(
-        f'<p class="matchup-delta-intro">Each cell averages <strong>'
-        f'{n_ivs:,} focal IVs &times; {n_scenarios} shield scenarios '
-        f'= {per_cell_sims:,} simulated matchups</strong> at one (form, '
-        f'opponent) pair. Cells are <em>not</em> restricted to the '
-        f'rank-1 focal IV and <em>not</em> collapsed to a single '
-        f'default-vs-default battle. The Opponent IVs / Bait toggle '
-        f'above Meta Coverage rewrites these numbers to alternate '
-        f'variants (Rank 1 opponents, bait-off shielding, etc.); the '
-        f'default view shows PvPoke-default opponent IVs with bait on. '
-        f'Win = battle rating &ge; 500.</p>'
+        f'<details class="methodology-details">'
+        f'<summary>How the numbers are computed</summary>'
+        f'<p>Each cell averages <strong>{n_ivs:,} focal IVs &times; '
+        f'{n_scenarios} shield scenarios = {per_cell_sims:,} simulated '
+        f'matchups</strong> at one (form, opponent) pair. Cells are '
+        f'<em>not</em> restricted to the rank-1 focal IV and <em>not'
+        f'</em> collapsed to a single default-vs-default battle. The '
+        f'Opponent IVs / Bait toggle above Meta Coverage rewrites '
+        f'these numbers to alternate variants (Rank 1 opponents, '
+        f'bait-off shielding, etc.); the default view shows PvPoke-'
+        f'default opponent IVs with bait on. Win = battle rating '
+        f'&ge; 500.</p>'
+        f'</details>'
     )
 
     moveset_lines = ['<ul class="matchup-delta-movesets">']
@@ -2158,7 +2169,17 @@ def render_section(section_id: str, heading: str, todo: str,
             return ''
         body_html = fragment
         block = article.get('form_comparison') or {}
-        heading = block.get('heading', heading)
+        # Heading priority: explicit TOML override -> auto-derived from
+        # the comparisons spec's loadout order (keeps h2 consistent
+        # with column order when the `order` knob is set) -> hard-coded
+        # CANONICAL_SECTIONS default.
+        spec = _load_form_comparison_spec(article)
+        auto_heading = None
+        if spec:
+            labels = [lo.label for lo in spec['loadout_specs']]
+            if len(labels) >= 2:
+                auto_heading = ' vs '.join(labels)
+        heading = block.get('heading', auto_heading or heading)
     elif section_id == 'iv-recommendations' and dive is not None:
         form_spec = _load_form_comparison_spec(article)
         iv_forms = (_collect_per_form_best_movesets(form_spec, cd_move, load_gamemaster())
@@ -2307,6 +2328,18 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
          font-size: 13px; margin-left: 4px; }}
   p.article-opp-iv-caption {{ font-size: 12px; color: #8ea1bd;
          margin: 6px 0 0 0; }}
+  details.article-opp-iv-help summary {{ display: inline; cursor: pointer;
+         color: #c8a2d0; font-size: 11px; margin-left: 6px; }}
+  details.article-opp-iv-help[open] summary {{ display: block; }}
+  details.article-opp-iv-help > span {{ display: block; margin-top: 6px;
+         font-size: 12px; color: #8ea1bd; }}
+  details.methodology-details {{ background: #12192e;
+         border-left: 3px solid #5b8dd9; border-radius: 4px;
+         padding: 8px 12px; font-size: 13px; color: #b8c4d8;
+         margin: 8px 0; }}
+  details.methodology-details summary {{ cursor: pointer;
+         color: #c8a2d0; font-weight: 500; }}
+  details.methodology-details p {{ margin: 8px 0 0 0; }}
   table.meta-coverage {{ border-collapse: collapse; margin: 12px 0;
          width: 100%; font-size: 13px; }}
   table.meta-coverage th, table.meta-coverage td {{
