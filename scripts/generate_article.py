@@ -44,6 +44,7 @@ from render_article import (  # type: ignore[import-not-found]
 )
 
 from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
+from gopvpsim.pokemon import iv_rank  # type: ignore[import-not-found]
 
 from compare_loadouts import (  # type: ignore[import-not-found]
     COMPARE_CSS,
@@ -2286,68 +2287,157 @@ def render_intro_section(article: dict) -> str:
     )
 
 
-def _render_stats_at_a_glance_section(article: dict, species_fallback: str,
-                                       gm: dict) -> str:
-    """Promoted base-stats table (F-stats-block).
+def _rank1_cp_capped(species: str, league: str) -> dict | None:
+    """Find rank-1 (highest-stat-product) IVs for a species in a league.
 
-    When the article has a [form_comparison] spec, builds a per-form
-    column table reusing compare_loadouts._render_base_stats_table.
-    Without a form_comparison, falls back to a single-column table
-    for the focal species. Returns empty string if base stats cannot
-    be resolved (e.g., species not in gamemaster), so the dispatch
-    can skip the section wrapper.
+    Returns a dict with the actual at-league-CP stats (atk, def, hp),
+    the IVs producing them, and the CP / level at which they're
+    achieved. Wraps gopvpsim.pokemon.iv_rank -- entry 0 of the
+    stat-product-descending ranking is what PvPoke reports as the
+    "rank 1" IV build for that species + league, and is the
+    directly-actionable at-1500-CP (or 2500/etc) number a reader
+    filters for in their IV checker. Returns None on any failure so
+    the caller can gracefully omit the section.
 
-    Intentional scope for the first pass: BASE stats only (uncapped,
-    from gamemaster). Per-league CP-capped stats and rank-1 IVs are a
-    nice-to-have follow-up -- JRE's articles lead with CP-capped
-    stats which are directly actionable for PvP, but base stats are
-    still useful context ("Male is the higher-attack form") and
-    don't require wiring the rank-1 IV pipeline through the article
-    generator.
+    Known limitations (follow-ups, not blockers for current CDs):
+
+    * iv_rank defaults max_level=51 for every league, which INCLUDES
+      Best Buddy (level 51) in the search. PvPoke's UI typically
+      defaults to non-BB (level 50). For low-level species (e.g.
+      Oinkologne at level 22-23) this doesn't matter; for bulk-first
+      UL species like Cresselia, rank-1 differs between BB and non-
+      BB and we'd want a TOML knob to pick.
+    * shadow=False is hardcoded. A future CD article whose focal
+      species is a Shadow variant would need this plumbed through.
+      Tracked in TODO.md "P5. Stats at a Glance follow-ups".
     """
-    # Multi-form path via form_comparison spec. parse_comparison_spec
-    # returns a dict whose `loadout_specs` field is a list of
-    # LoadoutSpec dataclasses; load_loadout_data expands each into the
-    # dict shape _render_base_stats_table expects.
+    try:
+        entries = iv_rank(species, league=league)
+    except Exception as exc:
+        logger.warning('rank-1 lookup for %r in %s failed: %s',
+                       species, league, exc)
+        return None
+    if not entries:
+        return None
+    top = entries[0]
+    return {
+        'atk': top['atk'],
+        'def': top['def_'],
+        'hp': top['hp'],
+        'ivs': (top['atk_iv'], top['def_iv'], top['sta_iv']),
+        'cp': top['cp'],
+        'level': top['level'],
+    }
+
+
+def _render_stats_at_a_glance_section(article: dict, species_fallback: str,
+                                       gm: dict, league: str) -> str:
+    """Rank-1 CP-capped stats table (F-stats-block, enhanced).
+
+    Displays each form's Atk / Def / HP at its rank-1 (highest stat
+    product) IVs, capped to the league CP, with a rank-1 IV / CP /
+    Level annotation line underneath. This matches JRE's "Stats and
+    Moves" block pattern and gives readers the directly-actionable
+    at-cap numbers rather than the uncapped base stats.
+
+    Base stats (the uncapped gamemaster values) are still visible
+    further down in the Female vs Male section's stat table; the
+    two serve different questions:
+
+    * Top (this section): what does this Pokemon look like at
+      1500 CP? The numbers a reader will see in battle.
+    * Female vs Male: where do the forms diverge at base? The raw
+      stat spread that explains the form trade-off.
+
+    Returns empty string if rank-1 lookup fails for all forms (or
+    the focal species, in the single-form fallback path), so the
+    dispatch can skip the section wrapper.
+    """
+    league_eff = (league or 'great').strip().lower()
+
+    # Multi-form path via form_comparison spec. The spec may declare
+    # its own league (used for the CD-vs-default comparison); prefer
+    # that over the generator's league argument when both are set.
     spec = _load_form_comparison_spec(article)
     if spec is not None:
-        try:
-            loadouts_data = [load_loadout_data(s)
-                             for s in spec['loadout_specs']]
-        except Exception as exc:
-            logger.warning('stats-at-a-glance: could not load form-comparison '
-                           'data (%s); falling back to single-form.', exc)
-        else:
-            if loadouts_data:
-                table = _render_base_stats_table(loadouts_data, gm)
-                return (
-                    '<p class="stats-at-a-glance-note">Base stats from '
-                    'PvPoke gamemaster. Per-form differences drive the '
-                    'matchup deltas below.</p>' + table
-                )
+        league_eff = (spec.get('league') or league_eff).strip().lower()
+        rank1_by_form: list[tuple[str, str, dict]] = []  # (label, species, r1)
+        for s in spec['loadout_specs']:
+            r1 = _rank1_cp_capped(s.species, league_eff)
+            if r1 is None:
+                logger.warning('stats-at-a-glance: rank-1 missing for %r; '
+                               'skipping form in top table.', s.species)
+                continue
+            rank1_by_form.append((s.label, s.species, r1))
+        if rank1_by_form:
+            return _render_rank1_table(rank1_by_form, league_eff)
 
-    # Single-form fallback.
+    # Single-form fallback: focal species only.
     species = (article.get('species') or species_fallback or '').strip()
     if not species:
         return ''
-    stats = _species_base_stats(gm, species) or {}
-    if not stats:
-        logger.warning('stats-at-a-glance: no gamemaster base stats for %r; '
-                       'skipping section.', species)
+    r1 = _rank1_cp_capped(species, league_eff)
+    if r1 is None:
         return ''
-    table = (
-        '<table class="base-stat-compare"><thead><tr>'
-        f'<th scope="col">Base Stat</th>'
-        f'<th scope="col">{html.escape(species)}</th>'
-        '</tr></thead><tbody>'
-        f'<tr><th scope="row">Attack</th><td>{stats.get("atk", "")}</td></tr>'
-        f'<tr><th scope="row">Defense</th><td>{stats.get("def", "")}</td></tr>'
-        f'<tr><th scope="row">Stamina</th><td>{stats.get("hp", "")}</td></tr>'
-        '</tbody></table>'
+    return _render_rank1_table([(species, species, r1)], league_eff)
+
+
+def _render_rank1_table(rank1_by_form: list[tuple[str, str, dict]],
+                        league: str) -> str:
+    """Render the rank-1 CP-capped stats table + IV annotation line.
+
+    rank1_by_form is a list of (label, species, rank1_dict) tuples,
+    one per form. label = short display name ("Female" / "Male") used
+    as the column header; species = display name used inside the IV
+    annotation line; rank1_dict has atk / def / hp / ivs / cp / level.
+    """
+    league_cap_label = {
+        'great': 'Great League (1500 CP cap)',
+        'ultra': 'Ultra League (2500 CP cap)',
+        'master': 'Master League',
+    }.get(league, f'{league.capitalize()} League')
+
+    # Header: one column per form.
+    headers = ['<th scope="col">Stat</th>'] + [
+        f'<th scope="col">{html.escape(label)}</th>'
+        for label, _, _ in rank1_by_form
+    ]
+    # Rows: Attack, Defense, HP. Atk/Def shown to 1 decimal; HP is
+    # already an integer from the floor() in iv_rank.
+    def _row(label: str, key: str, fmt: str) -> str:
+        cells = [f'<th scope="row">{label}</th>']
+        for _, _, r1 in rank1_by_form:
+            cells.append(f'<td>{fmt.format(r1[key])}</td>')
+        return '<tr>' + ''.join(cells) + '</tr>'
+    body = (
+        _row('Attack', 'atk', '{:.1f}')
+        + _row('Defense', 'def', '{:.1f}')
+        + _row('HP', 'hp', '{}')
     )
+    table = (
+        '<table class="base-stat-compare">'
+        f'<thead><tr>{"".join(headers)}</tr></thead>'
+        f'<tbody>{body}</tbody>'
+        '</table>'
+    )
+
+    # IV annotation line under the table.
+    iv_items = []
+    for label, species, r1 in rank1_by_form:
+        a, d, s = r1['ivs']
+        iv_items.append(
+            f'<strong>{html.escape(label)}</strong>: '
+            f'{a}/{d}/{s}, CP {r1["cp"]}, Level {r1["level"]:g}'
+        )
+    iv_line = (
+        f'<p class="stats-rank1-ivs">Rank-1 IVs (highest stat product): '
+        + ' &nbsp;&middot;&nbsp; '.join(iv_items) + '</p>'
+    )
+
     return (
-        '<p class="stats-at-a-glance-note">Base stats from PvPoke '
-        'gamemaster.</p>' + table
+        f'<p class="stats-at-a-glance-note">{league_cap_label} stats at '
+        f'rank-1 IVs. Base stats are in the Female vs Male section '
+        f'further down.</p>' + table + iv_line
     )
 
 
@@ -2461,7 +2551,7 @@ def render_section(section_id: str, heading: str, todo: str,
         body_html = render_intro_section(article)
     elif section_id == 'stats-at-a-glance':
         body_html = _render_stats_at_a_glance_section(
-            article, species, load_gamemaster())
+            article, species, load_gamemaster(), league)
         if not body_html.strip():
             return ''  # skip section when base stats cannot be resolved
     elif section_id == 'meta-role':
@@ -2615,6 +2705,8 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   section#meta-role p {{ margin: 12px 0; line-height: 1.55; }}
   p.stats-at-a-glance-note {{ font-size: 13px; color: #8ea1bd;
                               margin: 4px 0 8px 0; }}
+  p.stats-rank1-ivs {{ font-size: 12px; color: #9ab0d8;
+                       margin: 6px 0 0 0; line-height: 1.6; }}
   div.key-flips {{ background: #16213e; border-left: 3px solid #7db87d;
                    padding: 10px 14px; border-radius: 6px; margin: 12px 0; }}
   div.key-flips h3.key-flips-title {{ margin: 0 0 4px 0; font-size: 1em;

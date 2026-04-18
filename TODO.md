@@ -255,6 +255,35 @@ handlers in each dive — those construct PvPoke URLs at runtime
 and can't be statically verified. Add a targeted onclick scan if
 a regression ever surfaces; not worth building until then.
 
+### P5. Stats at a Glance follow-ups
+
+The CP-capped rank-1 stats section shipped 2026-04-18 (part of
+F-stats-block enhancement). Two known limitations in the
+`_rank1_cp_capped` helper in `scripts/generate_article.py`:
+
+1. **Best Buddy (level 51) is included in the rank-1 search.** The
+   underlying `gopvpsim.pokemon.iv_rank` defaults `max_level=51`
+   for every league, so rank-1 computation implicitly picks the
+   Best Buddy-option IV spread when that produces a better stat
+   product. PvPoke's UI defaults to non-BB (level 50). For low-
+   level species (Oinkologne rank-1 lands at level 22-23) this is
+   a non-issue. For UL bulk-first species (Cresselia, Registeel,
+   Guzzlord, etc.) rank-1 IVs differ between BB and non-BB and
+   our displayed numbers may not match a reader's PvPoke-defaults
+   view. Fix: add a TOML knob (`stats_at_a_glance.best_buddy =
+   true|false`, default false to match PvPoke) and thread through
+   to `iv_rank(..., max_level=50 or 51)`.
+
+2. **Shadow focal species aren't supported.** `_rank1_cp_capped`
+   hardcodes `shadow=False` in the `iv_rank` call. Any future CD
+   article whose focal Pokemon is a Shadow variant (e.g. a
+   hypothetical Shadow Oinkologne CD) would display non-Shadow
+   rank-1 stats. Fix: detect shadow from the article's species
+   name or a TOML flag; pass `shadow=True` to `iv_rank`.
+
+Neither blocks current CD-article generation. Pull into a session
+when a species that actually needs either hits the queue.
+
 ## Pre-ship: cross-form opponent coverage for Oinkologne (2026-04-18)
 
 Surfaced during S10 while the Male-vs-Female matchup-delta section was
