@@ -348,7 +348,13 @@ forms on CD, so the opposing team can show up with either one.
    GL opponent pool (`opponent_pools/gl_top50_plus_cs.txt` or a
    species-specific supplement) so each dive includes the sibling
    form as an opponent.
-2. Re-run both dives with `--fast MUD_SLAP` and the updated pool.
+2. Re-run both dives serially with the updated pool. The `cd_prep`
+   TOML block (shipped 2026-04-18, commit e61c14e) auto-injects
+   `MUD_SLAP` into the legal-move list, so the old `--fast MUD_SLAP`
+   workaround is no longer needed — the re-dive is the validation
+   pass for that code path. See the overnight re-dive wrapper at
+   `scripts/overnight_redive.sh` (uncommitted scaffolding; intent is
+   to run serially with `--reserve-cpus 1`).
 3. Regenerate the article (`scripts/generate_article.py`) and the
    standalone comparison page (`scripts/compare_loadouts.py`). The
    per-form matchup-delta table will then include rows for both
@@ -847,71 +853,40 @@ break invariants that weren't yet nailed down by tests.
   to mistakenly run a smoke test without `--interactive` and conclude
   nothing rendered.
 
-## CD article generator (new, 2026-04-16)
+## CD article generator (2026-04-16; SHIPPED Post-S5 S6-S10)
 
-* **Python article generator** *(design + implementation, replaces the
-  Claude-authored-prose path that was scrapped mid-S5)* — the article
-  page must be a Python-generated, simulation-data-derived artifact,
-  not prose written by Claude mimicking JRE's GamePress/pokemongohub
-  writing style. JRE writes for money; shipping Claude prose in his
-  voice is not acceptable. Target state:
+* ~~**Python article generator**~~ — **SHIPPED** across Post-S5
+  Sessions S6-S10 (2026-04-17 to 2026-04-18). Default path is live at
+  `scripts/generate_article.py`; the Oinkologne CD article ships from
+  `articles/oinkologne-cd-2026-05.toml` to `userdata/website/articles/
+  oinkologne-cd-2026-05/index.html`. Move-comparison table, meta-
+  coverage summary, matchup-delta, IV recommendations, verdict,
+  PvPoke-link helper, per-form rendering, and opponent-IV / bait
+  toggle are all implemented. The authorship-gated override layer
+  (`expert` / `both` / `auto`) also shipped — F1 Meta Role, F2 key-
+  flips callout, F4 Verdict augment, and F-intro are the currently
+  authored surfaces.
 
-  **Default path** — `scripts/generate_article.py <species> <league> <cd_move>`
-  reads the threshold TOML, the deep dive data (or re-runs it), and
-  the gamemaster, then emits mechanical article content:
-  - **Move comparison table**: fast moves side-by-side (power, energy,
-    turns, DPT, EPT, type, STAB flag)
-  - **Meta coverage summary**: avg battle rating per moveset, wins vs
-    rank-1 meta opponents in each shield scenario (numbers, not prose)
-  - **Matchup delta table**: per-opponent score diff between the new
-    CD move and the old default (Mud Slap vs Tackle), highlighting
-    flips
-  - **IV recommendations**: rendered directly from `thresholds/<sp>.toml`
-    (tiers, named anchors, with the existing threshold-tier renderer)
-  - **Links**: each moveset mention links to either (a) our deep-dive
-    split-moveset page, (b) PvPoke's multi-battle page (URL format
-    `pvpoke.com/battle/multi/<cp>/all/<mon>/<shields>/<fmIdx>-<cm1Idx>-<cm2Idx>/<ivLevel>`),
-    or both
-  - **Verdict**: template-selected from avg-score delta sign and
-    magnitude ("clear upgrade" if Δ > 10%, "sidegrade" if |Δ| < 5%, etc.)
-  No hand-authored prose; reads as a spec sheet + data tables.
+  **Related work now resolved:**
+  - ~~Battle-rating histogram~~ — SHIPPED `af56cb6`.
+  - ~~Slug convention fix~~ — resolved; article TOML
+    (`articles/oinkologne-cd-2026-05.toml`) and threshold slug
+    (`thresholds/oinkologne.toml:13` `slug = "oinkologne-cd-2026-05"`)
+    both use hyphens. Dive "Related Article" link renders at
+    `scripts/deep_dive.py:2783` — re-verify during ship if a 404 is
+    observed in the field.
+  - ~~Female Oinkologne dive~~ — SHIPPED 2026-04-18 (S10);
+    `userdata/website/oinkologne-female-great-league/` live with 10
+    split-moveset HTMLs.
 
-  **Optional augmentation path** — the existing `articles/*.toml`
-  `[[sections]]` prose slots become an opt-in override. Renderer
-  precedence: if `authorship="expert"` or `"both"` and a section has
-  body text, use it; if `authorship="auto"`, use the Python-generated
-  default for that section. Lets a human (or Claude-in-a-session,
-  with genuine review) write real analysis without blocking on it.
-
-  **Related work that should land before / alongside this:**
-  - **Battle-rating histogram** as a new deep-dive section: JRE's
-    articles link to PvPoke's multi-battle histogram (wins/losses
-    distribution across the meta) per moveset. Our dive already has
-    the underlying `score1` data at 0-1000 scale; binning it into a
-    Plotly histogram per moveset is the minimum viable feature. Lets
-    the article link to a local histogram instead of PvPoke, which
-    matters because our sim has real divergences from PvPoke and we
-    want the article's numbers to match what the linked page shows.
-  - **Slug convention fix**: the `articles/*.toml` filename uses
-    underscores, but `thresholds/*.toml`'s `[Species.article] slug`
-    field and the `userdata/website/<dive>/` directories use hyphens.
-    Decide whether to rename article TOMLs to use hyphens (matches
-    convention + makes `render_article.py`'s stem-derived slug work
-    without threshold-slug drift) or change the threshold slug to
-    underscores (makes the existing filename work). The deep-dive
-    "Related Article" link currently 404s because of this mismatch.
-  - **Female Oinkologne dive**: the May 2026 CD affects both Male and
-    Female Oinkologne, which have meaningfully different base stats
-    (186/153/242 vs 169/162/251) and the generator needs to handle
-    both. See memory `project_female_oinkologne.md`.
-
-  **Paced as a separate arc**, not squeezed into the remaining
-  Lechonk CD prep sessions. Realistic structure: (1) design doc +
-  histogram feature, (2) generator skeleton + move-table + verdict,
-  (3) matchup-delta table + PvPoke-link helper, (4) Female dive
-  integration + site-index update. Oinkologne CD (May 9) is the
-  natural ship target but not a hard deadline if the work needs more
-  time.
+  **Still open on top of the shipped generator:**
+  - Envelope-position annotation wiring into IV Recommendations
+    cards — see S8 envelope-annotation follow-up below (unchanged).
+  - Shape 2 migration of narrative FROM the article TO the dive,
+    flagged 2026-04-19 — see "Shape 2 migration" block at the top of
+    this file. That is not a regression in the article generator; it
+    is a deliberate re-homing of narrative prose so per-species dives
+    are readable on their own.
 
   **Watch item for S8 (envelope-position annotation surfacing):** when
   the per-category envelope-position metric (S4) gets surfaced as
@@ -1136,24 +1111,16 @@ break invariants that weren't yet nailed down by tests.
 
 ## Diagnostics / observability
 
-* **Switch deep_dive.py from print statements to a structured logger**
-  *(two sessions: planning + implementation)* — Recurring friction during
-  dive runs: stdout buffering makes live monitoring unreliable (analysis
-  phase goes silent for minutes while CPU is at 100%); piping through
-  `head` or `tee` introduces SIGPIPE / buffer-sync issues; no per-run
-  log file means `tail -f` races against the TTY; cache conflicts
-  between parallel dives (prevented by policy, but not diagnosable when
-  it happens); and no way to distinguish "stalled" from "working but
-  quiet." A real logger (Python `logging` module or structured JSON
-  logger) would give: (a) per-run log files with unique run IDs,
-  (b) timestamps on every message for elapsed-time reasoning,
-  (c) unbuffered writes to the log file (bypassing stdout pipe
-  buffering), (d) severity levels (progress vs. warnings vs. results),
-  (e) a machine-readable format for post-hoc analysis of run times.
-  **Planning session**: audit all print() calls, classify by severity,
-  design the log format and file layout. **Implementation session**:
-  port prints to logger calls, add per-run log file rotation, verify
-  `tail -f` works cleanly on the log file during a real dive.
+* ~~**Switch deep_dive.py from print statements to a structured
+  logger**~~ — **SHIPPED Post-S5 S2a-S2d** (2026-04-15/16). Helper
+  module at `scripts/deep_dive_logging.py` (commit `e300862`);
+  `deep_dive.py` + `deep_dive_slayer.py` ported (`1261d33`); log-
+  cleanup utility at `scripts/clean_logs.py` (`ca089bb`); docs
+  reference in `CLAUDE.md` "Debugging conventions" and
+  `DEVELOPER_NOTES.md` "Log file layout" (`6510c69`). Per-run log
+  files land under `userdata/logs/YYYY-MM/`, canonical live-monitor
+  command is `tail -f userdata/logs/latest.log`, workers route
+  through `worker_log_setup` instead of bare prints.
 
 ## Performance
 
@@ -1295,13 +1262,13 @@ bottleneck.
   - CD catches that weren't tied to a new move announcement — just
     "is the shadow worth chasing for this slot."
 
-  **Scoped into S10 at MVP (2-loadout) scope, design extensible to
-  N=4.** Details in
-  `~/.claude/projects/.../memory/project_ab_comparator_timing.md`.
-  MVP: same league / CP cap, two `LoadoutSpec`s, matchup-delta HTML
-  fragment written to `userdata/website/comparisons/<slug>/`. The
-  Male-vs-Female Oinkologne section for S10 becomes an invocation of
-  this tool rather than inline article code.
+  **MVP (N=2) SHIPPED 2026-04-18 (S10)** at
+  `scripts/compare_loadouts.py`; commits `ebba13f` (MVP),
+  `8530f19` (wired into CD article), `21d3393` (source-dive
+  listing), `69bdf64` (spec `order` field), `53d7050` (Oinkologne
+  spec puts Female first). Output lands at
+  `userdata/website/comparisons/<slug>/index.html`; the Oinkologne
+  M-vs-F comparison is live at `.../oinkologne-male-vs-female/`.
 
   **Design constraint:** stay loadout-list-keyed, not A/B-keyed. Use
   `loadouts: list[LoadoutSpec]` in the data model even at N=2; use
@@ -1315,8 +1282,7 @@ bottleneck.
 
   **Remaining post-S10 work:** N=3 and N=4 renderer support, verdict
   templating for N-way ranking (MVP keeps verdict simple, just for
-  Male-vs-Female). Update this entry after S10 lands with what
-  actually shipped vs what's still open.
+  Male-vs-Female).
 
   Reuse of the S8 work: matchup-delta table, per-opponent win-rate
   diff, +Flip/No-flip/-Flip pills, PvPoke single-battle drill-through
