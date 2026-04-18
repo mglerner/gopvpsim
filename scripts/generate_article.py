@@ -702,8 +702,21 @@ def _classify_verdict(wins: int, ties: int, losses: int, total: int,
 
 
 def _render_verdict_section(cd_move: str, species: str, league: str,
-                            dive: dict) -> str:
-    """One-line verdict from per-scenario win-rate deltas."""
+                            dive: dict, article: dict) -> str:
+    """Mechanical verdict line + optional expert-authored augment (F4).
+
+    The mechanical verdict (first paragraph) is always rendered from
+    per-scenario win-rate deltas. If the article TOML has a [verdict]
+    table with non-empty `editorial` and/or `outlook` fields, they
+    append as additional paragraphs after the mechanical line.
+
+    Schema for the expert augment lives in docs/article_schema.md
+    "Verdict augment" (parallel to the Meta Role block's shape).
+    Authorship modes expert / both / auto are supported by the schema;
+    only expert is wired today. Both / auto log a warning and render
+    whatever expert fields are populated (same deferral pattern as
+    [meta_role]).
+    """
     gm = load_gamemaster()
     cd_move_entry = _lookup_move(gm, cd_move)
     if cd_move_entry is None:
@@ -778,13 +791,55 @@ def _render_verdict_section(cd_move: str, species: str, league: str,
                     f'{label} ({100 * cd_rate:.1f}% vs {100 * df_rate:.1f}%)')
         exception_text = f' The exception: {"; ".join(parts)}.'
 
-    return (
+    mechanical = (
         f'<p class="verdict-line">'
         f'<strong>{html.escape(headline)}</strong> '
         f'{body}'
         f'{html.escape(exception_text)}'
         f'</p>'
     )
+
+    # F4 augment: optional [verdict] block from the article TOML.
+    # Shape mirrors [meta_role]: authorship + two structured fields
+    # (editorial, outlook). Expert mode only today; both / auto fall
+    # through with a warning.
+    augment = _render_verdict_augment(article)
+    if augment:
+        return mechanical + '\n' + augment
+    return mechanical
+
+
+def _render_verdict_augment(article: dict) -> str:
+    """Render the [verdict] block's editorial + outlook paragraphs (F4).
+
+    Returns empty string when the block is absent or both fields are
+    empty. Never emits a section wrapper / heading; the parent
+    Verdict section already carries those.
+    """
+    block = article.get('verdict')
+    if not block:
+        return ''
+    authorship = (block.get('authorship') or 'expert').strip().lower()
+    if authorship not in {'expert', 'both', 'auto'}:
+        logger.warning(
+            '[verdict].authorship=%r is unrecognized; treating as expert.',
+            authorship)
+        authorship = 'expert'
+    if authorship != 'expert':
+        logger.warning(
+            '[verdict].authorship=%r is not yet implemented; rendering '
+            'provided fields as if expert.', authorship)
+
+    editorial = (block.get('editorial') or '').strip()
+    outlook = (block.get('outlook') or '').strip()
+    parts = []
+    if editorial:
+        parts.append(editorial)
+    if outlook:
+        parts.append(outlook)
+    if not parts:
+        return ''
+    return format_body('\n\n'.join(parts))
 
 
 LEAGUE_CP = {'great': 1500, 'ultra': 2500, 'master': 10000}
@@ -2268,7 +2323,7 @@ def render_section(section_id: str, heading: str, todo: str,
             body_html = _render_iv_recommendations_section(
                 cd_move, species, league, dive, article)
     elif section_id == 'verdict' and dive is not None:
-        body_html = _render_verdict_section(cd_move, species, league, dive)
+        body_html = _render_verdict_section(cd_move, species, league, dive, article)
     else:
         body_html = render_placeholder(section_id, heading, todo)
     return (
