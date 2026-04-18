@@ -112,9 +112,33 @@ Michael approval; **do not auto-execute**.
 - **F1 + F-typing + F-stats-block** — bundled: new "Meta Role /
   Strengths & Weaknesses" article section type, typing paragraph,
   stats-at-a-glance promotion near top. Highest-leverage pre-ship
-  add. Expert-authored TOML + generator fallback modes. Single
-  session. Architectural design choice between "freeform prose
-  block" vs "structured sub-fields" still open — see comparison §6.
+  add. Single session.
+
+  **Schema decision made 2026-04-18: Design 2 + freeform escape
+  hatch.** `[meta_role]` block with three optional string fields
+  (`good_at`, `bad_at`, `team_role`) rendered as three unlabeled
+  `<p>` blocks, plus an optional `body` field that overrides the
+  three for the species where the split feels forced. Three
+  authorship modes (`expert` / `both` / `auto`); auto-skeleton data
+  sources per-field (wins-by-type, losses-by-type, cluster
+  analysis).
+
+  Schema spec: `docs/article_schema.md` "Meta Role section"
+  (added 2026-04-18). Stub (commented) in
+  `articles/oinkologne-cd-2026-05.toml`. Decision rationale:
+  `docs/jre_ryanswag_comparison.md` §6.
+
+  **Next-session brief:** (1) implement the renderer in
+  `scripts/generate_article.py` — read `article.get('meta_role')`,
+  emit `<section id="meta-role">` positioned between Intro and
+  Move Comparison; (2) implement the `expert` mode end-to-end
+  first (easiest path to ship); (3) author Oinkologne's three
+  paragraphs in `expert` mode using the comparison's
+  matchup-delta data; (4) leave `both` / `auto` modes as TODOs —
+  they matter for Aegislash and future species, not for the
+  Oinkologne ship; (5) bundle F-typing paragraph + F-stats-block
+  promotion into the same session since they touch adjacent
+  template code.
 - **F2** — key-matchup callout prose narrating top 3-5 impactful
   flips (heuristic: top-2 by |delta|, top-2 by opponent meta rank,
   top-1 by flip-significance). Data already in Matchup Delta

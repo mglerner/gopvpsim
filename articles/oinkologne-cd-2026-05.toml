@@ -35,6 +35,31 @@ deep_dive_slug = "oinkologne-great-league"
 [form_comparison]
 spec = "comparisons/oinkologne-male-vs-female.toml"
 
+# ── Meta Role (F1, schema stubbed 2026-04-18; renderer pending) ──────
+# Design 2 + freeform escape hatch. Decision record:
+# docs/jre_ryanswag_comparison.md §6; schema: docs/article_schema.md
+# "Meta Role section". The renderer doesn't read this block yet; it
+# will be implemented in the next F1 session.
+#
+# Uncomment and author for the Oinkologne ship (F1 step: expert mode,
+# three fields populated). Keep the fields in this order.
+#
+# [meta_role]
+# authorship = "expert"
+# good_at = """
+# One paragraph on what Mud Slap Oinkologne shines against.
+# """
+# bad_at = """
+# One paragraph on what it struggles against. Omit if no distinctive
+# vulnerability.
+# """
+# team_role = """
+# One paragraph on how it fits on a team (opener / closer / pivot /
+# shield-pressure role).
+# """
+# # Escape hatch. If non-empty, overrides the three fields above.
+# body = ""
+
 # ── Content sections ──────────────────────────────────────────────────
 # Placeholder structure modeled on JRE's Tinkaton CD article.
 # Session 5 fills these with real analysis from the Session 4 dive data.

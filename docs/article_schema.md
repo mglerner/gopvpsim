@@ -94,6 +94,79 @@ No full Markdown parser -- keep it simple.
 | `sections.heading`     | yes      | string | Section heading text.                                          |
 | `sections.body`        | yes      | string | Section body text.                                             |
 
+## Meta Role section (F1, schema only as of 2026-04-18)
+
+A dedicated "Meta Role / Strengths & Weaknesses" section positioned
+after the article's intro (and after the stats-at-a-glance block
+if / when F-stats-block ships) and before Move Comparison. Added
+per `docs/jre_ryanswag_comparison.md` §3.O — both reference styles
+(JRE, RyanSwag) spend significant article space on this framing,
+ours currently has none.
+
+**Schema shape (Design 2 + freeform escape hatch, decided 2026-04-18):**
+
+```toml
+[meta_role]
+authorship = "expert"   # or "both" | "auto" — see authorship modes below
+
+# Preferred default: three structured fields, each rendered as one
+# <p> block with NO visible label. The reader sees three flowing
+# paragraphs. Field names are authoring ergonomics only.
+good_at    = """Paragraph on what this species / CD-move combo is
+strong against. Cite specific matchups by name where useful."""
+bad_at     = """Paragraph on what it's weak against. May be omitted
+if there is no distinctive vulnerability."""
+team_role  = """Paragraph on how it fits on a team: opener /
+closer / pivot / shield-pressure role / etc."""
+
+# Escape hatch. If `body` is a non-empty string, it overrides the
+# three structured fields entirely and is rendered as freeform
+# paragraphs (split on blank lines). Use sparingly, only when the
+# three-slot structure feels forced for a particular species.
+body = ""
+```
+
+### Authorship modes
+
+- `expert`: the three fields (or `body`) are human-authored. No
+  auto-generation. Missing fields are rendered as nothing (not an
+  error).
+- `both`: per-field fallback. If any of `good_at` / `bad_at` /
+  `team_role` is empty AND `body` is empty, the renderer emits an
+  auto-generated skeleton for that specific field, tagged inline
+  so the reader can see which bits are expert vs auto. Human can
+  override any single field without disturbing the rest.
+- `auto`: all three fields are generated from simulation data,
+  labeled as auto-generated in the rendered output. Used for
+  scaffolding / preview.
+
+### Auto-skeleton data sources (for `both` and `auto` modes)
+
+- `good_at` ← wins-by-type synthesis from the Matchup Delta table
+  (count wins per opponent type + surface the CD-move-driven flips).
+- `bad_at` ← losses-by-type synthesis from the same table.
+- `team_role` ← threshold-tier cluster analysis + envelope position
+  (e.g., "bulk-first role" vs "attack-weighted closer").
+
+### Rendering
+
+Output is a `<section id="meta-role">` with `<h2>Meta Role</h2>` and
+three `<p class="meta-role-para">` blocks (or N paragraphs if `body`
+is set). No visible field labels — the prose itself carries the
+structure.
+
+### Field reference (Meta Role)
+
+| Field                  | Required | Type   | Notes                                                              |
+| ---------------------- | -------- | ------ | ------------------------------------------------------------------ |
+| `meta_role.authorship` | yes¹     | string | `expert` / `both` / `auto`. ¹Required if `[meta_role]` present.    |
+| `meta_role.good_at`    | no       | string | One paragraph. Omit or leave empty to skip / auto-fill.            |
+| `meta_role.bad_at`     | no       | string | One paragraph. Omit or leave empty to skip / auto-fill.            |
+| `meta_role.team_role`  | no       | string | One paragraph. Omit or leave empty to skip / auto-fill.            |
+| `meta_role.body`       | no       | string | Escape hatch. If non-empty, overrides the three structured fields. |
+
+Omitting the entire `[meta_role]` block skips the section.
+
 ## Obsolescence semantics
 
 - `current` -- the article's framing (sidegrade/upgrade/etc.) still holds.
