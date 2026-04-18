@@ -1258,7 +1258,8 @@ def _build_variants_payload(forms: list[dict]) -> dict:
 
 
 def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
-                                           gm: dict) -> str:
+                                           gm: dict,
+                                           article: dict | None = None) -> str:
     """Wide per-form matchup-delta table: each form contributes 4 columns
     (old WR, CD WR, signed delta, flip badge) alongside the shared opponent
     column. Rows sort by the mean delta across forms so the biggest
@@ -1594,13 +1595,115 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
                f'Flips across the 50% win line by form (out of '
                f'{len(entries)} opponents): {summary_bits}.</p>')
 
-    return ('\n'.join(intro_lines) + '\n'
-            + '\n'.join(moveset_lines) + '\n'
-            + table + '\n' + summary + '\n' + toggle_script)
+    # F2: key-flips callout. Top-N opponents ranked by max(|delta|)
+    # across forms (not mean, so an asymmetric flip — one form swings
+    # hard, the other barely moves — still surfaces). Rendered as a
+    # compact bulleted list between the moveset list and the full
+    # sortable table, so a reader sees the high-leverage flips before
+    # (optionally) drilling into the per-opponent detail below. Pure
+    # numeric callouts, no auto-synthesized prose.
+    md_cfg = ((article or {}).get('matchup_delta') or {})
+    target_pos = int(md_cfg.get('key_flips_pos', 3))
+    target_neg = int(md_cfg.get('key_flips_neg', 3))
+    key_flips_block = _render_key_flips_callout(
+        entries, forms, target_pos=target_pos, target_neg=target_neg)
 
     return ('\n'.join(intro_lines) + '\n'
             + '\n'.join(moveset_lines) + '\n'
-            + table + '\n' + summary)
+            + key_flips_block + '\n'
+            + table + '\n' + summary + '\n' + toggle_script)
+
+
+def _render_key_flips_callout(entries: list, forms: list[dict],
+                               target_pos: int = 3,
+                               target_neg: int = 3) -> str:
+    """Render the F2 key-flips callout as a compact bulleted list.
+
+    entries is the per-opponent data already collected for the matchup
+    delta table: (opp_name, per_form_cells, mean_delta) where
+    per_form_cells = [(form_dict, cd_r, df_r, delta_pp), ...]. Returns
+    empty string if there are fewer than 2 forms or entries is empty
+    (callout only makes sense for multi-form dives; single-form
+    section uses the non-per-form matchup-delta renderer which doesn't
+    invoke this function).
+
+    Heuristic: guarantee both-direction representation. Partition by
+    whether the largest-magnitude per-form delta is positive or
+    negative, sort each bucket by max(|delta|), take top-N from each.
+    If either bucket is short, fill the remaining budget from the
+    other. Rendered with positives first (wins the CD move creates),
+    then negatives (losses the CD move creates), each group sorted by
+    magnitude — readers scan "what you gain / what you lose" without
+    having to compute signs from the numbers.
+    """
+    if not entries or len(forms) < 2:
+        return ''
+
+    def _max_abs_delta(entry) -> float:
+        _, cells, _ = entry
+        return max(abs(d) for _, _, _, d in cells)
+
+    def _dominant_sign(entry) -> int:
+        _, cells, _ = entry
+        dominant = max((d for _, _, _, d in cells), key=lambda d: abs(d))
+        return 1 if dominant >= 0 else -1
+
+    pos = sorted((e for e in entries if _dominant_sign(e) > 0),
+                 key=_max_abs_delta, reverse=True)
+    neg = sorted((e for e in entries if _dominant_sign(e) < 0),
+                 key=_max_abs_delta, reverse=True)
+    total = target_pos + target_neg
+
+    top_pos = pos[:target_pos]
+    top_neg = neg[:target_neg]
+    shortfall = total - len(top_pos) - len(top_neg)
+    if shortfall > 0:
+        pad = pos[len(top_pos):] + neg[len(top_neg):]
+        pad.sort(key=_max_abs_delta, reverse=True)
+        # Pad into whichever bucket still has capacity, preferring
+        # to keep group ordering natural when we render below.
+        for e in pad[:shortfall]:
+            if _dominant_sign(e) > 0:
+                top_pos.append(e)
+            else:
+                top_neg.append(e)
+        top_pos.sort(key=_max_abs_delta, reverse=True)
+        top_neg.sort(key=_max_abs_delta, reverse=True)
+
+    top = top_pos + top_neg
+
+    items: list[str] = []
+    for opp, per_form_cells, _ in top:
+        form_bits: list[str] = []
+        for f, cd_r, df_r, delta_pp in per_form_cells:
+            cd_wins = cd_r >= 0.5
+            df_wins = df_r >= 0.5
+            flip_tag = ''
+            if cd_wins != df_wins:
+                if delta_pp > 0:
+                    flip_tag = ' <span class="flip-badge flip-pos">+Flip</span>'
+                else:
+                    flip_tag = ' <span class="flip-badge flip-neg">-Flip</span>'
+            form_bits.append(
+                f'<strong>{html.escape(f["label"])}:</strong> '
+                f'{100 * df_r:.1f}% &rarr; {100 * cd_r:.1f}% '
+                f'({delta_pp:+.1f} pp){flip_tag}'
+            )
+        items.append(
+            f'<li><strong>{html.escape(opp)}</strong> &mdash; '
+            + '; '.join(form_bits) + '</li>'
+        )
+
+    return (
+        '<div class="key-flips">'
+        f'<h3 class="key-flips-title">Biggest flips</h3>'
+        f'<p class="key-flips-note">Up to {target_pos} biggest wins '
+        f'the CD move creates and {target_neg} biggest losses it '
+        f'creates, out of {len(entries)} opponents. Ranked by largest '
+        f'per-form win-rate swing. Full sortable table below.</p>'
+        '<ul class="key-flips-list">' + ''.join(items) + '</ul>'
+        '</div>'
+    )
 
 
 def _render_matchup_delta_section(cd_move: str, species: str, league: str,
@@ -2304,7 +2407,7 @@ def render_section(section_id: str, heading: str, todo: str,
                  if form_spec else None)
         if forms and len(forms) >= 2:
             body_html = _render_matchup_delta_per_form_section(
-                cd_move, forms, load_gamemaster())
+                cd_move, forms, load_gamemaster(), article)
         else:
             body_html = _render_matchup_delta_section(cd_move, species, league, dive)
     elif section_id == 'form-comparison':
@@ -2432,6 +2535,16 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   code {{ background: #16213e; padding: 2px 5px; border-radius: 3px;
           font-size: 0.9em; }}
   section#meta-role p {{ margin: 12px 0; line-height: 1.55; }}
+  div.key-flips {{ background: #16213e; border-left: 3px solid #7db87d;
+                   padding: 10px 14px; border-radius: 6px; margin: 12px 0; }}
+  div.key-flips h3.key-flips-title {{ margin: 0 0 4px 0; font-size: 1em;
+                                      color: #c8a2d0; border: none;
+                                      padding: 0; }}
+  p.key-flips-note {{ font-size: 12px; color: #8ea1bd;
+                      margin: 0 0 8px 0; }}
+  ul.key-flips-list {{ margin: 4px 0 0 0; padding-left: 22px;
+                       font-size: 13px; }}
+  ul.key-flips-list li {{ margin: 5px 0; line-height: 1.5; }}
   .meta {{ color: #888; font-size: 14px; margin-bottom: 20px; }}
   .related {{ background: #16213e; padding: 12px 16px; border-radius: 6px;
               margin: 16px 0; border-left: 3px solid #9be89b; }}
