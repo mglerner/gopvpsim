@@ -35,6 +35,43 @@ moves; and the intent (this species is being prepped for a CD event)
 isn't discoverable from the repo state. A TOML field is both
 self-documenting and mechanically enforced.
 
+## Pre-ship: cross-form opponent coverage for Oinkologne (2026-04-18)
+
+Surfaced during S10 while the Male-vs-Female matchup-delta section was
+being assembled. Both Oinkologne deep dives currently list 63
+opponents, but the intersection is 62 because each dive auto-includes
+its own focal species as a self-mirror and nothing else from the
+form pair:
+
+- Male dive opponents include `Oinkologne` (self) but NOT
+  `Oinkologne (Female)`.
+- Female dive opponents include `Oinkologne (Female)` (self) but NOT
+  `Oinkologne`.
+
+Effect: the per-form matchup-delta table in the CD article silently
+drops both forms from the cross-form view, so a reader cannot see
+"how does Male do against Female Oinkologne on the other team?" or
+vice versa. Real teambuilding needs that answer: players catch both
+forms on CD, so the opposing team can show up with either one.
+
+**Fix before ship (before 2026-05-09 CD):**
+
+1. Add both `Oinkologne` and `Oinkologne (Female)` to the Oinkologne
+   GL opponent pool (`opponent_pools/gl_top50_plus_cs.txt` or a
+   species-specific supplement) so each dive includes the sibling
+   form as an opponent.
+2. Re-run both dives with `--fast MUD_SLAP` and the updated pool.
+3. Regenerate the article (`scripts/generate_article.py`) and the
+   standalone comparison page (`scripts/compare_loadouts.py`). The
+   per-form matchup-delta table will then include rows for both
+   Oinkologne forms, with the intersection count jumping from 62 to
+   ~64 (opponent pool size + both focal forms).
+4. (Optional longer-term) Consider teaching `deep_dive.py` to
+   auto-include sibling forms when a species has known alternate
+   forms in the gamemaster (and `cd_prep` is set on multiple of
+   them, or a `form_siblings` hint is present in the threshold TOML).
+   Not required for the Oinkologne ship.
+
 ## S9a checkpoint observations (2026-04-17)
 
 Items surfaced during the S9 Female Oinkologne dive. Read during S9a
