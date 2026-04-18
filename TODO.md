@@ -229,19 +229,31 @@ not threshold tier, so the article would need either a
 category-card surface or a tier-name to category-name mapping.
 Design question before implementation.
 
-### P4. Pre-ship link verification pass
+### P4. Pre-ship link verification pass — TOOL SHIPPED 2026-04-18
 
-After all content changes settle (especially the cross-form re-
-dive), do one mechanical scan of every href in:
-- `userdata/website/index.html` (site index)
-- `userdata/website/articles/oinkologne-cd-2026-05/index.html`
-- Both dive landing pages + all moveset split files
-- `userdata/website/comparisons/oinkologne-male-vs-female/index.html`
+Tool: `scripts/verify_article_links.py`. Usage:
 
-Verify: no broken internal refs, no stale `index_m{1-4}_tackle_*`
-links, all PvPoke outbound URLs resolve, every tier-card anchor
-(`#tier-card-<slug>`) actually exists on the target page.
-Mechanical; script-able if worth scripting.
+    python scripts/verify_article_links.py --ship
+    # or against specific files:
+    python scripts/verify_article_links.py path/to/index.html [...]
+
+The `--ship` flag scans the Oinkologne pre-ship surface set
+automatically (site index, CD article, both dive landings, all
+moveset split files under each, the standalone compare page).
+Exit code 0 = no broken internal refs; 1 = errors found.
+
+First run 2026-04-18: 18 files, 252 hrefs (36 internal, 24 anchor,
+192 external, 0 other). No broken refs. Article had zero stale
+`tackle_*` references — all dive-split links land on Mud Slap
+movesets. The `tackle_*` files only cross-reference each other in
+the moveset dropdown nav, which is self-consistent.
+
+**Re-run before ship** (after the cross-form re-dive lands, since
+any regeneration can introduce new link shapes). The script uses
+stdlib `html.parser` so it correctly skips the ~1000 `onclick`
+handlers in each dive — those construct PvPoke URLs at runtime
+and can't be statically verified. Add a targeted onclick scan if
+a regression ever surfaces; not worth building until then.
 
 ## Pre-ship: cross-form opponent coverage for Oinkologne (2026-04-18)
 
