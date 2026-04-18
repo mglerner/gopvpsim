@@ -194,6 +194,47 @@ structure.
 
 Omitting the entire `[meta_role]` block skips the section.
 
+## Intro augment (F-intro, schema shipped 2026-04-18)
+
+The Introduction section has a default template that fires from
+front-matter fields (species + CD move + CD date + framing + reader-
+guidance sentence). It's proof-of-life prose, not authored. The
+**augment** is an optional expert-authored override that replaces
+the template entirely. Added per
+`docs/jre_ryanswag_comparison.md` §3.A / §4 F-intro — JRE and
+RyanSwag both open with 1-3 sentence hooks that include an upfront
+verdict and a species-specific angle; the default template can't
+do that.
+
+**Schema shape (simpler than Meta Role / Verdict — one field):**
+
+```toml
+[intro]
+# The intro prose. 2-3 sentences, species-specific, ideally with
+# an upfront verdict and a hook to a specific matchup or angle.
+# Renders as one or more <p> blocks (split on blank lines per
+# format_body). If empty / missing, the default template fires.
+body = """..."""
+```
+
+No `authorship` field — the intro is either template (no block /
+empty body) or expert (body populated). Auto-synthesis beyond the
+existing template isn't on the roadmap; a human-written intro is
+the whole point of the augment.
+
+Voice target: same as Meta Role / Verdict — RyanSwag-adjacent, NOT
+JRE. Keep it tight; the intro shouldn't repeat what Meta Role and
+Verdict will say.
+
+### Field reference (Intro augment)
+
+| Field        | Required | Type   | Notes                                         |
+| ------------ | -------- | ------ | --------------------------------------------- |
+| `intro.body` | no       | string | If non-empty, overrides the default template. |
+
+Omitting the entire `[intro]` block (or leaving `body` empty) falls
+back to the default template.
+
 ## Verdict augment (F4, schema shipped 2026-04-18)
 
 The Verdict section always renders a mechanical line (upgrade /
