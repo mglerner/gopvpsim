@@ -148,6 +148,33 @@ body = ""
 - `team_role` ← threshold-tier cluster analysis + envelope position
   (e.g., "bulk-first role" vs "attack-weighted closer").
 
+### Voice target for `auto` / `both` synthesis
+
+Auto-synthesised prose should target **RyanSwag's voice**, not JRE's.
+Conversational, lightly hedged ("may be the flavor of choice"),
+direct reader address where it fits, matchup-level specificity over
+high-level generalities. See `docs/reference_deep_dives/ryanswag/`
+for the archive and `docs/jre_ryanswag_comparison.md` §7 for the
+full voice framing.
+
+Rationale: RyanSwag is retired from PvP content production, so our
+auto-synthesis filling that register fills a vacuum rather than
+competing with an active writer. JRE is actively writing; mimicking
+his voice would substitute for live work (separately, his wordy
+tangential style is a poor fit for our density goals — see the
+JRE-specific out-of-scope in the comparison doc).
+
+**Calibration warning — do not overstate meta viability.** When
+synthesising prose, lead with the mechanical claim the sim actually
+supports (aggregate win rate, delta magnitude, flip count) before
+reaching for archetype language like "opener," "closer," or "pivot".
+Game-flow archetypes aren't derivable from the sim's per-matchup
+flip data; committing to one anyway is confabulation. If a species'
+aggregate win rate is below 50%, framing it as a meta staple is
+overstatement — the honest framing is "anti-meta counter-pick"
+(recurring lesson from the Oinkologne F1 authoring session,
+2026-04-18).
+
 ### Rendering
 
 Output is a `<section id="meta-role">` with `<h2>Meta Role</h2>` and

@@ -1,5 +1,10 @@
 # CD article generator — design
 
+This doc covers the generator's **internals** (pipeline, inputs,
+section merging, authorship precedence). For the **human-facing
+workflow** — how to go from "we want an article on species X" to a
+shipped page — see `docs/article_authoring_workflow.md`.
+
 `scripts/generate_article.py` converts simulation + threshold data into
 a Community-Day move-comparison article page. The page is a spec-sheet,
 not prose: every claim traces back to a number in the sim or a field in
