@@ -78,6 +78,15 @@ CANONICAL_SECTIONS = [
      'entirely when the block is absent or all fields are empty.'),
     ('move-comparison', 'Move Comparison',
      'S7: move-by-move stat table (power, energy, turns, DPT, EPT, type, STAB).'),
+    ('fast-moves', 'Fast Moves',
+     'F-fast-moves: full legal fast-move pool with DPT / EPT / cooldown '
+     '/ STAB and a tag column (CD / default / other). Includes cd_prep '
+     'moves injected from thresholds/<species>.toml when the gamemaster '
+     "hasn't listed the incoming CD move yet."),
+    ('charged-moves', 'Charged Moves',
+     'F-charge-moves: full legal charged-move pool with power / energy '
+     '/ STAB / buff-debuff effects and a tag column. Same cd_prep '
+     'injection as Fast Moves.'),
     ('meta-coverage', 'Meta Coverage',
      'S7/S8: per-moveset avg score + win counts by shield scenario.'),
     ('matchup-delta', 'Matchup Delta',
@@ -455,6 +464,233 @@ def _render_move_comparison_section(cd_move: str, species: str,
         f'<p class="move-compare-note">Stats from PvPoke gamemaster. '
         f'STAB flags match against {html.escape(species)} types: '
         f'{html.escape(", ".join(types) or "unknown")}.</p>'
+    )
+    return table + note
+
+
+def _load_cd_prep(species: str) -> dict:
+    """Read the [<Species>.cd_prep] block from thresholds/<species>.toml.
+
+    Returns {} if the file or block is missing. Shape mirrors what
+    deep_dive.py reads: keys 'event' (str), 'fast_moves' (list[str]),
+    'charged_moves' (list[str]), 'notes' (str).
+    """
+    lower = species.split(' (')[0].strip().lower()
+    path = THRESHOLDS_DIR / f'{lower}.toml'
+    if not path.exists():
+        return {}
+    try:
+        with open(path, 'rb') as f:
+            raw = tomllib.load(f)
+    except Exception:
+        return {}
+    # Species key in TOML may differ in casing -- scan for a matching
+    # top-level block.
+    for k, v in raw.items():
+        if k.lower() == species.split(' (')[0].strip().lower():
+            return (v or {}).get('cd_prep') or {}
+    return {}
+
+
+def _format_charged_move_stats(move: dict, species_types: list[str]) -> dict:
+    """Shape a charged-move gamemaster dict into display stats.
+
+    Charged moves differ from fast moves: power is per-throw damage,
+    energy is the cost (not gain), and buff/debuff metadata rides
+    along as an effect string.
+    """
+    power = move.get('power', 0)
+    energy = move.get('energy', 0)
+    move_type = (move.get('type') or '').lower()
+    stab = move_type in species_types
+    effect = _charged_move_effect_phrase(move)
+    return {
+        'name': move.get('name', move.get('moveId', '')),
+        'type': move_type or '',
+        'power': power,
+        'energy': energy,
+        'stab': stab,
+        'effect': effect,
+    }
+
+
+def _charged_move_effect_phrase(move: dict) -> str:
+    """Human-readable phrase for a charged move's buff / debuff."""
+    buffs = move.get('buffs')
+    if not buffs:
+        return ''
+    target = (move.get('buffTarget') or '').lower()
+    try:
+        chance_raw = move.get('buffApplyChance', '0')
+        chance = float(chance_raw)
+    except (TypeError, ValueError):
+        chance = 0.0
+    atk_delta, def_delta = (buffs + [0, 0])[:2]
+
+    parts: list[str] = []
+    for label, delta in (('Atk', atk_delta), ('Def', def_delta)):
+        if delta == 0:
+            continue
+        sign = '+' if delta > 0 else '-'
+        parts.append(f'{label} {sign}{abs(delta)}')
+    if not parts:
+        return ''
+    subject = 'user' if target == 'self' else 'opponent'
+    stages = ' / '.join(parts)
+    if chance >= 1.0:
+        return f'{subject} {stages}'
+    if chance > 0:
+        return f'{int(round(chance * 100))}% {subject} {stages}'
+    return ''
+
+
+def _render_move_pool_section(article: dict, species: str, league: str,
+                              kind: str) -> str:
+    """Render a full legal-move-pool table for fast or charged moves.
+
+    kind is 'fast' or 'charged'. Combines the species's gamemaster
+    move pool with any [<Species>.cd_prep] injected moves, tags each
+    as CD / default / other, and renders a compact table. No prose
+    per move -- expert-authored blurbs are a follow-up if ever
+    desired; for now the table stands on its own.
+    """
+    gm = load_gamemaster()
+    # Resolve species entry to get the legal pool. Falls back to
+    # empty if the species isn't in gamemaster (hard fail earlier
+    # in the pipeline would have surfaced this already).
+    pool_key = 'fastMoves' if kind == 'fast' else 'chargedMoves'
+    poke = None
+    target = species.strip().lower()
+    for p in gm['pokemon']:
+        if (p.get('speciesName') or '').lower() == target:
+            poke = p
+            break
+    if poke is None:
+        return ''
+    pool: list[str] = list(poke.get(pool_key) or [])
+
+    # Inject cd_prep moves (CD move not yet in gamemaster).
+    cd_prep = _load_cd_prep(species)
+    inject_key = 'fast_moves' if kind == 'fast' else 'charged_moves'
+    for mv in (cd_prep.get(inject_key) or []):
+        if mv not in pool:
+            pool.append(mv)
+
+    if not pool:
+        return ''
+
+    cd_move_name = (article.get('cd_move') or '').strip()
+    cd_entry = _lookup_move(gm, cd_move_name) if cd_move_name else None
+    cd_id = (cd_entry or {}).get('moveId', '').upper()
+
+    try:
+        default_fast_id, default_charged_ids = get_default_moveset(
+            species, league)
+    except KeyError:
+        default_fast_id, default_charged_ids = None, ()
+
+    default_ids: set[str] = set()
+    if kind == 'fast' and default_fast_id:
+        default_ids = {default_fast_id.upper()}
+    elif kind == 'charged' and default_charged_ids:
+        default_ids = {m.upper() for m in default_charged_ids}
+
+    types = _species_types(gm, species)
+
+    def _tag(move_id: str) -> str:
+        mid = move_id.upper()
+        tags: list[str] = []
+        if cd_id and mid == cd_id:
+            tags.append('CD')
+        if mid in default_ids:
+            tags.append('default')
+        return ', '.join(tags) or '—'
+
+    # Build rows, sorted by DPT (fast) or Power (charged) descending
+    # so the best-by-raw-stats sit at the top. Ties broken by name.
+    rows: list[tuple[dict, str]] = []  # (formatted_stats, tag)
+    for mv in pool:
+        move = _lookup_move(gm, mv)
+        if move is None:
+            logger.warning('%s pool: move %r not in gamemaster; skipping.',
+                           kind, mv)
+            continue
+        if kind == 'fast':
+            stats = _format_move_stats(move, types)
+        else:
+            stats = _format_charged_move_stats(move, types)
+        rows.append((stats, _tag(move.get('moveId', ''))))
+
+    if not rows:
+        return ''
+
+    if kind == 'fast':
+        rows.sort(key=lambda r: (-r[0]['dpt'], r[0]['name']))
+        headers = ('Move', 'Type', 'Power', 'Energy gain',
+                   'Turns', 'DPT', 'EPT', 'STAB', 'Tag')
+    else:
+        rows.sort(key=lambda r: (-r[0]['power'], r[0]['name']))
+        headers = ('Move', 'Type', 'Power', 'Energy',
+                   'STAB', 'Effect', 'Tag')
+
+    thead = ('<thead><tr>'
+             + ''.join(f'<th scope="col">{html.escape(h)}</th>'
+                       for h in headers)
+             + '</tr></thead>')
+
+    body_rows: list[str] = []
+    for stats, tag in rows:
+        if kind == 'fast':
+            cells = [
+                html.escape(stats['name']),
+                html.escape(stats['type']),
+                str(stats['power']),
+                str(stats['energy_gain']),
+                str(stats['turns']),
+                f'{stats["dpt"]:.2f}',
+                f'{stats["ept"]:.2f}',
+                'yes' if stats['stab'] else 'no',
+                tag,
+            ]
+        else:
+            cells = [
+                html.escape(stats['name']),
+                html.escape(stats['type']),
+                str(stats['power']),
+                str(stats['energy']),
+                'yes' if stats['stab'] else 'no',
+                html.escape(stats['effect'] or '—'),
+                tag,
+            ]
+        body_rows.append(
+            '<tr>'
+            + ''.join(f'<td>{c}</td>' for c in cells)
+            + '</tr>'
+        )
+
+    table = (
+        '<table class="move-pool">'
+        + thead
+        + '<tbody>' + ''.join(body_rows) + '</tbody>'
+        + '</table>'
+    )
+
+    injected = [m for m in (cd_prep.get(inject_key) or [])
+                if m not in (poke.get(pool_key) or [])]
+    inject_note = ''
+    if injected:
+        inject_note = (
+            f' Includes {len(injected)} move(s) injected from '
+            f'<code>cd_prep</code> (not yet in the gamemaster): '
+            f'{", ".join(html.escape(m) for m in injected)}.'
+        )
+
+    note = (
+        f'<p class="move-pool-note">All legal {kind} moves from PvPoke '
+        f'gamemaster. STAB against {html.escape(species)} types: '
+        f'{html.escape(", ".join(types) or "unknown")}. Sorted by '
+        f'{"DPT" if kind == "fast" else "power"} descending.'
+        f'{inject_note}</p>'
     )
     return table + note
 
@@ -2560,6 +2796,14 @@ def render_section(section_id: str, heading: str, todo: str,
             return ''  # skip section entirely when block is absent/empty
     elif section_id == 'move-comparison':
         body_html = _render_move_comparison_section(cd_move, species, league)
+    elif section_id == 'fast-moves':
+        body_html = _render_move_pool_section(article, species, league, 'fast')
+        if not body_html.strip():
+            return ''  # skip if species has no fast-move pool
+    elif section_id == 'charged-moves':
+        body_html = _render_move_pool_section(article, species, league, 'charged')
+        if not body_html.strip():
+            return ''  # skip if species has no charged-move pool
     elif section_id == 'meta-coverage' and dive is not None:
         form_spec = _load_form_comparison_spec(article)
         mc_forms = (_collect_per_form_best_movesets(form_spec, cd_move, load_gamemaster())
@@ -2707,6 +2951,15 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
                               margin: 4px 0 8px 0; }}
   p.stats-rank1-ivs {{ font-size: 12px; color: #9ab0d8;
                        margin: 6px 0 0 0; line-height: 1.6; }}
+  table.move-pool {{ border-collapse: collapse; margin: 12px 0;
+                     width: 100%; font-size: 13px; }}
+  table.move-pool th, table.move-pool td {{
+                     border: 1px solid #0f3460; padding: 5px 9px;
+                     text-align: left; }}
+  table.move-pool thead th {{ background: #16213e; color: #c8a2d0; }}
+  table.move-pool tbody td {{ background: #0f162a; color: #e0e0e0; }}
+  p.move-pool-note {{ font-size: 12px; color: #8ea1bd;
+                      margin: 4px 0 0 0; }}
   div.key-flips {{ background: #16213e; border-left: 3px solid #7db87d;
                    padding: 10px 14px; border-radius: 6px; margin: 12px 0; }}
   div.key-flips h3.key-flips-title {{ margin: 0 0 4px 0; font-size: 1em;
