@@ -23,7 +23,7 @@ author = "mglerner"
 # [[loadouts]] below. Set explicitly rather than auto-deriving from
 # aggregate win rate so small-margin differences don't silently flip
 # column order between re-dives.
-# order = ["Female", "Male"]
+order = ["Female", "Male"]
 
 summary = """
 Both Oinkologne forms get Mud Slap on Community Day (2026-05-09) and \
