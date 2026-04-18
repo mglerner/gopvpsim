@@ -522,12 +522,19 @@ def get_legal_moves(species_name):
     return entry['fastMoves'], entry['chargedMoves']
 
 
-def enumerate_movesets(species_name, user_fast=None, user_charged=None):
+def enumerate_movesets(species_name, user_fast=None, user_charged=None,
+                       cd_prep_fast=None, cd_prep_charged=None):
     """
     Enumerate moveset combinations based on what the user specified.
 
     user_fast:    a single fast move ID, or None
     user_charged: list of 1 or 2 charged move IDs, or None
+    cd_prep_fast: list of fast move IDs to inject into legal_fast
+                  (validated against gamemaster; used when a species'
+                  threshold TOML has a [Species.cd_prep] table so pre-CD
+                  dives include the incoming move even when PvPoke's
+                  gamemaster hasn't added it to the species pool yet).
+    cd_prep_charged: parallel list for charged moves.
 
     Returns list of (fast_id, [charged_id1, charged_id2]) tuples.
     Single charged move movesets are included too (some mons only need one).
@@ -537,6 +544,29 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None):
     """
     legal_fast, legal_charged = get_legal_moves(species_name)
     fast_moves_db, charged_moves_db = get_moves()
+
+    # Extend legal lists with cd_prep moves (deduplicated, gamemaster-
+    # validated). Logged loudly so the HTML output's CLI-comment / log
+    # file make it obvious which moves came from the TOML vs the
+    # species' native legal list.
+    if cd_prep_fast:
+        for mv in cd_prep_fast:
+            if mv not in fast_moves_db:
+                sys.exit(f"cd_prep fast move {mv!r} not in gamemaster")
+            if mv not in legal_fast:
+                legal_fast = list(legal_fast) + [mv]
+                logger.info(
+                    f"  cd_prep: injected fast move {mv} (not in "
+                    f"{species_name}'s current legal pool)")
+    if cd_prep_charged:
+        for mv in cd_prep_charged:
+            if mv not in charged_moves_db:
+                sys.exit(f"cd_prep charged move {mv!r} not in gamemaster")
+            if mv not in legal_charged:
+                legal_charged = list(legal_charged) + [mv]
+                logger.info(
+                    f"  cd_prep: injected charged move {mv} (not in "
+                    f"{species_name}'s current legal pool)")
 
     # Determine fast move candidates
     if user_fast:
@@ -3611,6 +3641,8 @@ def main():
     thresholds = None
     threshold_registry = None
     _article_slug = ''
+    _cd_prep_fast: list[str] = []
+    _cd_prep_charged: list[str] = []
     if args.thresholds:
         try:
             threshold_registry = load_threshold_file(
@@ -3650,6 +3682,22 @@ def main():
                     logger.info(f"  Article link: articles/{_article_slug}/")
             except Exception:
                 _article_slug = ''
+            # Extract cd_prep block so pre-CD dives include the
+            # incoming move even when PvPoke's gamemaster hasn't added
+            # it yet. The actual injection happens in enumerate_movesets
+            # below; logging here lets the reader see the event / fast /
+            # charged trio that drove the moveset enumeration.
+            _cd_prep = _raw_toml.get(args.species, {}).get('cd_prep', {})
+            if _cd_prep:
+                _event = _cd_prep.get('event', '').strip()
+                _cd_prep_fast = list(_cd_prep.get('fast_moves') or [])
+                _cd_prep_charged = list(_cd_prep.get('charged_moves') or [])
+                if _event:
+                    logger.info(f"  cd_prep: {_event}")
+                if _cd_prep_fast:
+                    logger.info(f"  cd_prep fast moves: {', '.join(_cd_prep_fast)}")
+                if _cd_prep_charged:
+                    logger.info(f"  cd_prep charged moves: {', '.join(_cd_prep_charged)}")
 
     # Auto-load cross-species shared spreads / anchors from thresholds/_shared.toml
     # so per-species TOMLs (and the opponent-pool variant expansion below) can
@@ -3746,8 +3794,13 @@ def main():
     logger.result('=' * 60)
     logger.result('')
 
-    # Enumerate movesets
-    movesets = enumerate_movesets(args.species, args.fast, user_charged)
+    # Enumerate movesets. cd_prep_fast/charged come from the focal
+    # species' [cd_prep] TOML block (populated when the species is in CD
+    # prep and PvPoke's gamemaster may lag on the incoming move); an
+    # empty list here is the default no-op.
+    movesets = enumerate_movesets(args.species, args.fast, user_charged,
+                                  cd_prep_fast=_cd_prep_fast,
+                                  cd_prep_charged=_cd_prep_charged)
     logger.info(f"  {len(movesets)} moveset combination(s) to evaluate")
 
     # Get opponents — from group or rankings

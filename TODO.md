@@ -1,39 +1,22 @@
-## CD-prep tracking (2026-04-17)
+## CD-prep tracking (2026-04-17, fix shipped 2026-04-18)
 
-Pre-CD dives silently drop the incoming CD move when PvPoke's gamemaster
-doesn't list it on the focal species. Observed on 2026-04-17: the
-gamemaster cache refresh (CACHE_TTL=24h) between the 2026-04-16 Male
-Oinkologne dive (18 moveset combos, 4 Mud Slap + 1 Tackle in top 5) and
-the 2026-04-17 Female dive (12 combos, 0 Mud Slap) caused the Female
-dive to answer the wrong question. Workaround used for S9: pass
-`--fast MUD_SLAP` on the CLI, which `enumerate_movesets` supports
-(validates against gamemaster move DB, not species legal list).
+**SHIPPED.** Per-species `[cd_prep]` TOML block is now read by
+`deep_dive.py`: any listed `fast_moves` / `charged_moves` are injected
+into `enumerate_movesets`' legal lists with a loud log line per
+injected move, so pre-CD dives include the incoming move even when
+PvPoke's gamemaster lags. Implementation in the
+``enumerate_movesets(..., cd_prep_fast=, cd_prep_charged=)`` signature
+plus the auto-discover block that reads the focal species' TOML.
 
-**Permanent fix.** Add a `cd_prep` table to per-species threshold TOMLs
-as the single source of truth for "this species is in CD prep":
+Original problem (kept here until the Oinkologne CD ships and we
+delete the cd_prep blocks): pre-CD dives silently dropped the
+incoming CD move when the gamemaster cache refresh flipped between
+runs. Observed on 2026-04-17 for the Male/Female Oinkologne pair.
+Manual workaround was `--fast MUD_SLAP`; the permanent fix removes
+the need to remember that flag.
 
-```toml
-[Species.cd_prep]
-event = "Mud Slap Community Day 2026-05"
-fast_moves = ["MUD_SLAP"]       # optional
-charged_moves = ["MUD_SHOT"]    # optional
-```
-
-Wire `deep_dive.py` to read the focal species' `cd_prep` and inject
-any listed moves into `enumerate_movesets` by extending
-`legal_fast` / `legal_charged` with them (logged loudly so the dive
-output reproducibly shows it). `thresholds/oinkologne.toml` and
-`thresholds/oinkologne_female.toml` already have the `cd_prep`
-sections populated — they just aren't read yet.
-
-Delete the TOML `cd_prep` section after the CD ships, or after PvPoke
-stably lists the move for 2+ gamemaster refreshes.
-
-**Why not just keep passing `--fast` on the CLI.** It's easy to forget
-(proven today); it doesn't handle species with multiple incoming
-moves; and the intent (this species is being prepped for a CD event)
-isn't discoverable from the repo state. A TOML field is both
-self-documenting and mechanically enforced.
+Delete the TOML `cd_prep` section after the CD ships, or after
+PvPoke stably lists the move for 2+ gamemaster refreshes.
 
 ## Pre-ship: cross-form opponent coverage for Oinkologne (2026-04-18)
 
