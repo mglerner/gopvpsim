@@ -18,6 +18,64 @@ the need to remember that flag.
 Delete the TOML `cd_prep` section after the CD ships, or after
 PvPoke stably lists the move for 2+ gamemaster refreshes.
 
+## Pre-ship: article text-density pass (2026-04-18)
+
+Surfaced during S10 UI polish: our article has noticeably more
+explanatory / clarifying prose than JRE's GamePress CD articles or
+RyanSwag's GamePress deep dives. Much of it answers first-time-reader
+questions but repeats on every visit; a second-time reader or
+multi-article reader wants to skim faster.
+
+**First-pass fix (shippable now, item 3 of the post-S10 polish):**
+wrap the obviously-over-explained paragraphs in `<details>` default-
+closed with a short one-line summary that stays visible. Targets:
+
+- Meta Coverage's "Each cell averages 4,096 focal IVs x N opponents"
+  methodology paragraph.
+- Matchup Delta's equivalent "Each cell averages 4,096 x 9 = 36,864
+  sims" paragraph.
+- Opp-IV / Bait toggle caption (keep the dropdowns visible; collapse
+  the "which sections this affects" prose into a tooltip / detail).
+
+The existing `<details>` on the &Delta; column is already default-
+closed, so no change there.
+
+**Broader pass (after the JRE / RyanSwag comparison, pre-ship):**
+once the density gap is quantified, do a structural edit pass. The
+question isn't "wrap this paragraph in `<details>`" but "which three
+of these six paragraphs can go entirely?" - that requires the
+benchmark to answer. Comparison tracked under "Pre-ship: JRE /
+RyanSwag / ours comparison" below.
+
+## Pre-ship: JRE / RyanSwag / ours comparison (2026-04-18)
+
+Before the CD ships (2026-05-09), do a side-by-side read of our
+auto-generated article + deep dive against:
+
+- JRE's CD-article template (e.g. the Tinkaton CD article on
+  pokemongohub.net).
+- 2-3 RyanSwag GamePress deep dives from
+  `reference_ryanswag_deep_dives/`.
+
+Goals:
+
+- Identify structural patterns we're missing (sections we don't
+  emit but they do) and patterns we over-emit (padding / repeat
+  context).
+- Classify every divergence as ours-right / theirs-right / both-
+  defensible. Follow the standard PvPoke-divergence discipline
+  (feedback_pvpoke_divergence_principle).
+- Output: a short action list of concrete changes to make before
+  ship, plus a note of anything we consciously decline to match.
+
+Touches both the article (generate_article.py) and the narrative
+renderer in the deep dive (deep_dive_narrative.py). Cross-reference
+docs/ryanswag_methodology_gap_analysis.md (S0a output) for the
+already-known gaps.
+
+Not urgent; do after (1) cross-form re-dive has given us the final
+data to evaluate against.
+
 ## Pre-ship: cross-form opponent coverage for Oinkologne (2026-04-18)
 
 Surfaced during S10 while the Male-vs-Female matchup-delta section was
