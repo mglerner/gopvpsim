@@ -49,32 +49,75 @@ RyanSwag / ours comparison" below.
 
 ## Pre-ship: JRE / RyanSwag / ours comparison (2026-04-18)
 
-Before the CD ships (2026-05-09), do a side-by-side read of our
-auto-generated article + deep dive against:
+Scoped in `~/.claude/plans/jre-ryanswag-comparison.md`. Full
+execution plan, classification scheme, and already-likely
+follow-ups live there; this TODO entry is just a pointer.
 
-- JRE's CD-article template (e.g. the Tinkaton CD article on
-  pokemongohub.net).
-- 2-3 RyanSwag GamePress deep dives from
-  `reference_ryanswag_deep_dives/`.
+Framing shift from the initial note: the comparison is two-way
+(things we have that they don't, things they have that we don't)
+and leans heavily into the second half -- Michael wants more
+analytical prose (strengths/weaknesses paragraphs, meta-role
+claims, key-matchup narration). Aegislash will be the first real
+test case for that pattern since it's new to the meta.
 
-Goals:
+Hide-vs-remove discipline: when the comparison finds content we
+have and they don't, **default action is hide behind `<details>`,
+not delete.** The plan doc's output separates "safe-to-execute
+hides/adds" from "removal candidates that need Michael's per-item
+approval."
 
-- Identify structural patterns we're missing (sections we don't
-  emit but they do) and patterns we over-emit (padding / repeat
-  context).
-- Classify every divergence as ours-right / theirs-right / both-
-  defensible. Follow the standard PvPoke-divergence discipline
-  (feedback_pvpoke_divergence_principle).
-- Output: a short action list of concrete changes to make before
-  ship, plus a note of anything we consciously decline to match.
+Execute after the cross-form re-dive so the comparison reads
+against final content.
 
-Touches both the article (generate_article.py) and the narrative
-renderer in the deep dive (deep_dive_narrative.py). Cross-reference
-docs/ryanswag_methodology_gap_analysis.md (S0a output) for the
-already-known gaps.
+## Post-ship (article + dive polish, 2026-04-18)
 
-Not urgent; do after (1) cross-form re-dive has given us the final
-data to evaluate against.
+Items queued from the post-S10 UI polish round that are nice-to-
+have but not required for the Oinkologne CD ship. Pulled-forward
+candidates: after each pre-ship item lands, check whether there's
+capacity to pull one of these in without risking the ship window.
+
+### P1. Tier-card anchors for Notable IVs + Mirror Slayer cards
+
+The tier-card deep-link pattern shipped 2026-04-18 only covers the
+Threshold Tiers section. Notable IVs and Mirror Slayer cards in
+the deep dive also have card-shaped content that external pages
+(the CD article, future cross-species comparisons) could benefit
+from linking to directly. Extends the existing
+`scripts/patch_dive_tier_anchors.py` regex with a Notable-IVs and
+Mirror-Slayer variant and backports the renderer fix in
+`deep_dive_rendering.py` / `deep_dive_narrative.py`.
+
+### P2. Article -> dive per-opponent deep links
+
+The Matchup Delta table's opponent column is plain text. Could
+link each opponent name to the dive's anchor-flip detail for that
+opponent (the dive already has `data-opponent-flips-<slug>` style
+attributes on rows in the Anchor-Driven Matchup Flips section, or
+could gain them). Lets a reader click from "this opponent flipped"
+in the article straight to the per-matchup bullets in the dive.
+
+### P3. Envelope-position annotations in IV Recommendations cards
+
+Previously deferred in the post-S5 arc (see the "S8 envelope-
+annotation wiring skipped" note in the old TODO flow). The S4
+`envelopePositions` dict is keyed by Notable-IVs category name,
+not threshold tier, so the article would need either a
+category-card surface or a tier-name to category-name mapping.
+Design question before implementation.
+
+### P4. Pre-ship link verification pass
+
+After all content changes settle (especially the cross-form re-
+dive), do one mechanical scan of every href in:
+- `userdata/website/index.html` (site index)
+- `userdata/website/articles/oinkologne-cd-2026-05/index.html`
+- Both dive landing pages + all moveset split files
+- `userdata/website/comparisons/oinkologne-male-vs-female/index.html`
+
+Verify: no broken internal refs, no stale `index_m{1-4}_tackle_*`
+links, all PvPoke outbound URLs resolve, every tier-card anchor
+(`#tier-card-<slug>`) actually exists on the target page.
+Mechanical; script-able if worth scripting.
 
 ## Pre-ship: cross-form opponent coverage for Oinkologne (2026-04-18)
 
