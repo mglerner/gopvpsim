@@ -1184,7 +1184,13 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         import re as _re
         _tier_slug = _re.sub(r'^-|-$', '',
                              _re.sub(r'[^a-z0-9]+', '-', t['name'].lower()))
-        parts.append('<div class="dd-rec-card">\n')
+        # Anchor id on the visible card container so external pages (e.g.
+        # the CD article) can deep-link directly to a tier card. The
+        # ``tier-card-yours-`` span below is paste-box machinery and is
+        # display:none until populated, so it cannot be a scroll target.
+        parts.append(
+            f'<div class="dd-rec-card" id="tier-card-{_tier_slug}">\n'
+        )
         parts.append(
             f'<h4>'
             f'<span class="dd-badge" style="background:{color};color:#000">'
