@@ -82,27 +82,92 @@ of these six paragraphs can go entirely?" - that requires the
 benchmark to answer. Comparison tracked under "Pre-ship: JRE /
 RyanSwag / ours comparison" below.
 
-## Pre-ship: JRE / RyanSwag / ours comparison (2026-04-18)
+## Pre-ship: JRE / RyanSwag / ours comparison (2026-04-18) — EXECUTED (against pre-re-dive article)
 
-Scoped in `~/.claude/plans/jre-ryanswag-comparison.md`. Full
-execution plan, classification scheme, and already-likely
-follow-ups live there; this TODO entry is just a pointer.
+Plan: `~/.claude/plans/jre-ryanswag-comparison.md`.
+**Output:** `docs/jre_ryanswag_comparison.md` (written 2026-04-18).
+**Reference archive:** `docs/reference_deep_dives/jre/` — five JRE
+articles archived locally (Tinkaton, Ninetales, Rillaboom,
+Empoleon, Toucannon) so future comparison sessions can skip the
+re-fetch. RyanSwag archive at `docs/reference_deep_dives/ryanswag/`
+(pre-existing).
 
-Framing shift from the initial note: the comparison is two-way
-(things we have that they don't, things they have that we don't)
-and leans heavily into the second half -- Michael wants more
-analytical prose (strengths/weaknesses paragraphs, meta-role
-claims, key-matchup narration). Aegislash will be the first real
-test case for that pattern since it's new to the meta.
+**Note on re-dive ordering:** The comparison was run *before* the
+cross-form re-dive (opposite to the original sequencing plan)
+because the JRE/RyanSwag structural findings don't depend on dive
+data — section layout, prose-vs-data ratio, and meta-role framing
+are all article-level. Numbers quoted in §3.Q of the output doc
+(43.1% win rate, specific IV counts) will shift slightly after the
+re-dive regenerates the article; the F1-F5 follow-up list below is
+unaffected.
 
-Hide-vs-remove discipline: when the comparison finds content we
-have and they don't, **default action is hide behind `<details>`,
-not delete.** The plan doc's output separates "safe-to-execute
-hides/adds" from "removal candidates that need Michael's per-item
-approval."
+### Follow-ups to execute (from comparison §4)
 
-Execute after the cross-form re-dive so the comparison reads
-against final content.
+Listed priority-ordered for the pre-ship window (2026-04-18 to
+2026-05-09). Hide-vs-remove discipline: default action for "content
+we have they don't" is hide-behind-`<details>`, not delete.
+Removal candidates (R1-R3 in comparison §5) require per-item
+Michael approval; **do not auto-execute**.
+
+- **F1 + F-typing + F-stats-block** — bundled: new "Meta Role /
+  Strengths & Weaknesses" article section type, typing paragraph,
+  stats-at-a-glance promotion near top. Highest-leverage pre-ship
+  add. Expert-authored TOML + generator fallback modes. Single
+  session. Architectural design choice between "freeform prose
+  block" vs "structured sub-fields" still open — see comparison §6.
+- **F2** — key-matchup callout prose narrating top 3-5 impactful
+  flips (heuristic: top-2 by |delta|, top-2 by opponent meta rank,
+  top-1 by flip-significance). Data already in Matchup Delta
+  table. 0.5 session for renderer + heuristic.
+- **F4 + F-wrap + F-intro** — verdict augment (editorial "should
+  you invest?" paragraph appended to mechanical verdict line),
+  closing meta-outlook paragraph, intro expansion from 1 sentence
+  to 2-3 sentences. 0.5 session + authoring.
+- **F-fast-moves + F-charge-moves** — bundled: expandable
+  subsections listing every legal move with stats + 1-2 sentence
+  prose analysis per move. Lower priority than F1-F4; defer to
+  post-ship polish if capacity tight. 0.5 session for renderer.
+- **F-hide-methodology** — four specific hide operations
+  identified in comparison §3.Q: Meta Coverage caption split,
+  Female-vs-Male `compare-lead` hide, IV Recommendations intro
+  hide, Matchup Delta pool annotation hide. 0.5 session,
+  mechanical template edits.
+- **[Post-ship] F-tier-name-cleanup** — simplify IV-rec tier card
+  names (current: `Steelix (Shadow) Slayer -   (Wigglytuff Slayer
+  -   (Wigglytuff Atk))`) to RyanSwag's name/signature convention
+  per `docs/reference_deep_dives/ryanswag/STYLE_ANALYSIS.md`.
+  Bundles with S5a rename work in post-S5 arc.
+- **[Post-ship] F-shadow-narrative** — Shadow-variant comparison
+  prose block for species that have shadow forms (not applicable
+  to Oinkologne ship).
+- **[Post-ship, gated ≥3-5 shipped articles] F5** —
+  multi-article-reader cross-linking footer. Not worth building
+  until cross-reference surface is large enough.
+
+### Removal candidates (MICHAEL APPROVAL REQUIRED)
+
+Comparison doc §5 (R1-R3) lists three items proposed for deletion
+rather than hiding. Each has per-item justification + JRE/RyanSwag
+precedent for absence. Nothing ships without explicit sign-off.
+
+- **R1:** "(2 dropped, missing from at least one dive)"
+  parenthetical — becomes factually wrong post-re-dive; propose
+  remove-on-regen.
+- **R2:** IV Recommendations intro "Cards are colored by form (♂
+  blue / ♀ pink)..." self-referent color-coding description.
+- **R3:** Meta Coverage "Shield asymmetry dominates the extremes"
+  explanatory paragraph — start with hide (F-hide-methodology
+  above), escalate to removal only if hide reads as bloat at
+  review time.
+
+### Aegislash test case
+
+F1 ships first on Oinkologne (as part of the pre-ship arc).
+Aegislash deep dive (pending in the SwagTips narrative session
+arc — see `project_swagtips_narrative_sessions`) becomes the
+second test case for the new Meta Role section type, with
+natural relevance since Aegislash is new to the meta and the
+meta-role framing matters more than usual.
 
 ## Post-ship (article + dive polish, 2026-04-18)
 
