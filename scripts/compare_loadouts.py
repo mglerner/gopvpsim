@@ -740,6 +740,32 @@ def parse_spec(spec_path: Path) -> dict:
             charged_moves=tuple(raw['charged_moves']),
             shadow=bool(raw.get('shadow', False)),
         ))
+
+    # Optional `order = [label, ...]` field reorders loadouts for display
+    # (column order in comparison tables, card order in IV recs, etc.).
+    # Labels not present in `order` keep their relative declaration order
+    # at the end, so a partial list still works. Unknown labels fail
+    # loudly so typos don't silently no-op.
+    order = data.get('order')
+    if order is not None:
+        if not isinstance(order, list) or not all(isinstance(x, str) for x in order):
+            sys.exit(f"{spec_path}: 'order' must be a list of label strings.")
+        known = {lo.label for lo in loadouts}
+        unknown = [lbl for lbl in order if lbl not in known]
+        if unknown:
+            sys.exit(
+                f"{spec_path}: 'order' references unknown label(s) "
+                f"{unknown}; known labels: {sorted(known)}.")
+        by_label = {lo.label: lo for lo in loadouts}
+        ordered: list[LoadoutSpec] = []
+        for lbl in order:
+            ordered.append(by_label.pop(lbl))
+        for lo in loadouts:
+            if lo.label in by_label:
+                ordered.append(lo)
+                del by_label[lo.label]
+        loadouts = ordered
+
     data['loadout_specs'] = loadouts
     return data
 

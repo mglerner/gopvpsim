@@ -14,6 +14,17 @@ title  = "Male vs Female Oinkologne: Mud Slap Body Slam / Trailblaze"
 league = "great"
 author = "mglerner"
 
+# Optional display order. A list of loadout labels controls column /
+# card / row order in every comparison table (Matchup Delta, Meta
+# Coverage, IV Recommendations, Base Stats, Moveset, Verdict) in
+# articles that use this spec, plus the standalone comparison page.
+# Put the recommended / higher-winning loadout first so it reads
+# leftmost. Omit the field to keep the declaration order of
+# [[loadouts]] below. Set explicitly rather than auto-deriving from
+# aggregate win rate so small-margin differences don't silently flip
+# column order between re-dives.
+# order = ["Female", "Male"]
+
 summary = """
 Both Oinkologne forms get Mud Slap on Community Day (2026-05-09) and \
 both favor the same Body Slam + Trailblaze coverage. Base stats are \
