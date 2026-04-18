@@ -2145,11 +2145,23 @@ def _derive_framing(species: str, league: str, cd_move: str,
 
 
 def render_intro_section(article: dict) -> str:
-    """Template-rendered intro paragraph from front-matter.
+    """Intro section body.
 
-    S6 uses this as a proof-of-life; S7/S8 may revise once the broader
-    template tone is settled.
+    F-intro augment: if the article TOML has an [intro] block with a
+    non-empty `body` field, that expert-authored prose overrides the
+    template. Otherwise the default template fires (species + CD move
+    + date + framing + reader-guidance sentence) as a proof-of-life
+    fallback for unauthored articles.
+
+    Schema in docs/article_schema.md "Intro augment". Parallel shape to
+    [meta_role] and [verdict] but single-field since the intro is one
+    paragraph with no sub-structure.
     """
+    intro_block = article.get('intro') or {}
+    body = (intro_block.get('body') or '').strip()
+    if body:
+        return format_body(body)
+
     species = html.escape(article.get('species', ''))
     cd_move = html.escape(article.get('cd_move', ''))
     cd_date = html.escape(article.get('cd_date', ''))

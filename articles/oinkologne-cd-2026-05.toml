@@ -35,6 +35,22 @@ deep_dive_slug = "oinkologne-great-league"
 [form_comparison]
 spec = "comparisons/oinkologne-male-vs-female.toml"
 
+# ── Intro override (F-intro, expert-authored 2026-04-18) ──────────────
+# Replaces the default templated intro with a species-specific hook:
+# upfront verdict + named matchup flip + pointer to the sim detail
+# below. See docs/article_schema.md "Intro augment".
+[intro]
+body = """
+Oinkologne picks up Mud Slap on Community Day (2026-05-09). Short \
+version: Mud Slap is a clean upgrade over Tackle (+9.7 pp for Male \
+across 8 of 9 shield scenarios), but it doesn't turn Oinkologne \
+into a new meta staple - aggregate win rate stays sub-50%. The \
+value is counter-pick: Ground coverage flips bulky Steels and \
+Ghost stallers (Empoleon, Steelix, Galarian Stunfisk, Dusclops) \
+from hopeless matchups into real wins. Catch if your team needs \
+that Steel / Ghost niche; full sim breakdown below.
+"""
+
 # ── Meta Role (F1, expert-authored 2026-04-18) ────────────────────────
 # Design 2 + freeform escape hatch. Decision record:
 # docs/jre_ryanswag_comparison.md §6; schema: docs/article_schema.md
