@@ -211,14 +211,33 @@ from linking to directly. Extends the existing
 Mirror-Slayer variant and backports the renderer fix in
 `deep_dive_rendering.py` / `deep_dive_narrative.py`.
 
-### P2. Article -> dive per-opponent deep links
+### P2. Article -> dive per-opponent deep links — SHIPPED 2026-04-18
 
-The Matchup Delta table's opponent column is plain text. Could
-link each opponent name to the dive's anchor-flip detail for that
-opponent (the dive already has `data-opponent-flips-<slug>` style
-attributes on rows in the Anchor-Driven Matchup Flips section, or
-could gain them). Lets a reader click from "this opponent flipped"
-in the article straight to the per-matchup bullets in the dive.
+Each opponent name in the per-form Matchup Delta table is now a
+link to the primary form's dive, landing on that opponent's first
+`#opp-<slug>` anchor inside the Matchup-Flipping Boundaries
+section. Secondary forms get a small trailing symbol link (♂ / ♀)
+in the form's column color. Opponents with no flipping boundary in
+any form's dive (clean sweeps in either direction) stay as plain
+text so clicks never scroll to nowhere.
+
+**Implementation:**
+- `scripts/deep_dive_rendering.py`: `opp_slug()` helper;
+  `render_matchup_boundary_bullets` + `render_anchor_flip_bullets`
+  emit `id="opp-<slug>"` on the first `<li>` per opponent when
+  `emit_opponent_ids=True` (wired only at the standalone call
+  sites to avoid duplicate ids with the tier-card-nested callers).
+- `scripts/patch_dive_opp_anchors.py`: in-place regex backfiller
+  parallel to `patch_dive_tier_anchors.py`; idempotent.
+- `scripts/generate_article.py`: `_load_one_dive_file` extracts
+  `anchored_opps` from each dive file's HTML;
+  `_render_matchup_delta_per_form_section` gates link emission on
+  whether the slug exists in the best-CD moveset's anchor set.
+
+**Follow-up (out of scope this session):** single-form
+`_render_matchup_delta_section` (line 1954) doesn't yet link
+opponent cells — applies to non-CD articles that aren't per-form.
+Extend when the first such article actually ships.
 
 ### P3. Envelope-position annotations in IV Recommendations cards
 
