@@ -194,6 +194,68 @@ structure.
 
 Omitting the entire `[meta_role]` block skips the section.
 
+## Verdict augment (F4, schema shipped 2026-04-18)
+
+The Verdict section always renders a mechanical line (upgrade /
+sidegrade / downgrade classification + win-rate delta + per-scenario
+exceptions) from sim data. The **augment** is an optional
+expert-authored editorial block appended underneath it, answering
+"should you invest?" in the style of JRE's IN SUMMATION or
+RyanSwag's wrap-up paragraph. Added per
+`docs/jre_ryanswag_comparison.md` §3.R / §4 F4.
+
+**Schema shape (parallel to Meta Role):**
+
+```toml
+[verdict]
+authorship = "expert"   # or "both" | "auto"
+
+# The "should you invest?" paragraph. Calibrated to CD
+# catch-priority, Elite TM cost, meta window. Rendered as a single
+# <p> appended after the mechanical verdict line.
+editorial = """One paragraph."""
+
+# Optional meta-outlook closer (2-4 sentences). Rendered as a
+# second <p> after `editorial`. Omit or leave empty to skip.
+outlook = """Optional short paragraph on meta pulse / follow-up
+expectations."""
+```
+
+### Authorship modes (Verdict augment)
+
+Same shape as Meta Role. `expert` is wired today; `both` / `auto`
+log a warning and fall through to expert, pending the next F1
+session that adds auto-synthesis.
+
+### Auto-skeleton data sources (for `both` / `auto`, future)
+
+- `editorial` ← combination of the mechanical verdict (upgrade /
+  sidegrade) + [meta_role]'s team_role framing + CD-logistics
+  front-matter (cd_date, framing).
+- `outlook` ← threshold-tier envelope position + meta-volatility
+  proxies (once wired).
+
+Voice target matches Meta Role: RyanSwag-adjacent, NOT JRE. See
+the voice-target subsection under Meta Role above; it applies
+to Verdict augment identically.
+
+### Rendering
+
+The mechanical `<p class="verdict-line">` renders first, then the
+augment paragraphs follow. No new section wrapper — everything
+lives inside the existing Verdict `<section>`.
+
+### Field reference (Verdict augment)
+
+| Field                | Required | Type   | Notes                                                         |
+| -------------------- | -------- | ------ | ------------------------------------------------------------- |
+| `verdict.authorship` | yes¹     | string | `expert` / `both` / `auto`. ¹Required if `[verdict]` present. |
+| `verdict.editorial`  | no       | string | "Should you invest?" paragraph. Omit to skip.                 |
+| `verdict.outlook`    | no       | string | Short meta-outlook closer. Omit to skip.                      |
+
+Omitting the entire `[verdict]` block leaves only the mechanical
+line (pre-F4 behaviour).
+
 ## Obsolescence semantics
 
 - `current` -- the article's framing (sidegrade/upgrade/etc.) still holds.

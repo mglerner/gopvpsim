@@ -87,6 +87,29 @@ touch.
 # natural for this species.
 body = ""
 
+# ── Verdict augment (F4, expert-authored 2026-04-18) ──────────────────
+# Appended after the mechanical Verdict line. Editorial paragraph
+# answers "should you invest?"; optional outlook adds a short
+# meta-pulse closer (RyanSwag / JRE wrap-up pattern). Voice target:
+# RyanSwag-adjacent. Schema: docs/article_schema.md "Verdict augment".
+[verdict]
+authorship = "expert"
+editorial = """
+Catch it. Lechonk is a common CD spawn and Mud Slap is free during \
+the three-hour window, so the cost is time rather than stardust. If \
+you already run Oinkologne this is a clean +9.7 pp upgrade; if you \
+don't, add one to your Steel / Ghost counter bench - not a \
+core-meta chassis, but a niche nothing else fills at the same level \
+right now. Skip Elite-TMing Mud Slap unless you miss the window; \
+the CD-day path is free.
+"""
+outlook = """
+The counter-niche's value depends on how much Flying / Fire \
+pressure the meta carries - if those types recede, Oinkologne's \
+slot widens; if they surge, the niche narrows. Worth a revisit \
+after the next season rotation.
+"""
+
 # ── Content sections ──────────────────────────────────────────────────
 # Placeholder structure modeled on JRE's Tinkaton CD article.
 # Session 5 fills these with real analysis from the Session 4 dive data.
