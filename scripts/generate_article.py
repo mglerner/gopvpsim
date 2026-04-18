@@ -2969,6 +2969,29 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
     dive_link = resolve_dive_link(article)
     dive_title = html.escape(resolve_dive_title(dive_dir, article.get('species', '')))
 
+    # Multi-form dives: when the article has a [form_comparison] spec, the
+    # primary ``deep_dive_slug`` only covers one form. The top-of-article
+    # "Simulation Deep Dive" link should offer a link per form instead of
+    # a single link that hides the sibling dive behind the species label.
+    form_dive_links_html = ''
+    _form_spec = _load_form_comparison_spec(article)
+    if _form_spec and len(_form_spec.get('loadout_specs') or []) >= 2:
+        _link_bits: list[str] = []
+        for _lo in _form_spec['loadout_specs']:
+            _slug = getattr(_lo, 'dive_slug', None)
+            _label = getattr(_lo, 'label', None) or ''
+            if not _slug:
+                continue
+            _lo_dir = WEBSITE_DIR / _slug
+            _lo_title = resolve_dive_title(_lo_dir, article.get('species', ''))
+            _lo_href = f'../../{_slug}/'
+            _link_bits.append(
+                f'<a href="{html.escape(_lo_href)}">'
+                f'{html.escape(_label)}: {html.escape(_lo_title)}</a>'
+            )
+        if _link_bits:
+            form_dive_links_html = ' &middot; '.join(_link_bits)
+
     overrides = build_override_map(article, authorship)
 
     try:
@@ -3232,7 +3255,7 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
 </div>
 {authorship_banner}{banner}
 <div class="related">
-  Simulation Deep Dive: <a href="{html.escape(dive_link)}">{dive_title}</a>
+  Simulation Deep Dive: {form_dive_links_html or f'<a href="{html.escape(dive_link)}">{dive_title}</a>'}
 </div>
 
 {sections_html}

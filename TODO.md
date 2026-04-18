@@ -109,53 +109,73 @@ we have they don't" is hide-behind-`<details>`, not delete.
 Removal candidates (R1-R3 in comparison §5) require per-item
 Michael approval; **do not auto-execute**.
 
-- **F1 + F-typing + F-stats-block** — bundled: new "Meta Role /
-  Strengths & Weaknesses" article section type, typing paragraph,
-  stats-at-a-glance promotion near top. Highest-leverage pre-ship
-  add. Single session.
+**2026-04-19 status audit:** Most of the pre-ship F-list is already
+shipped. See each item's **SHIPPED** annotation for the commit. Also:
+2026-04-19 decision to move to **Shape 2** (narrative at top of the
+dive, not in the article) — see "Shape 2 migration" block at the
+bottom of this section. The shipped F-list entries below remain
+useful for article-side polish but the primary narrative home is
+shifting to the dive via a new renderer path.
 
-  **Schema decision made 2026-04-18: Design 2 + freeform escape
-  hatch.** `[meta_role]` block with three optional string fields
-  (`good_at`, `bad_at`, `team_role`) rendered as three unlabeled
-  `<p>` blocks, plus an optional `body` field that overrides the
-  three for the species where the split feels forced. Three
-  authorship modes (`expert` / `both` / `auto`); auto-skeleton data
-  sources per-field (wins-by-type, losses-by-type, cluster
-  analysis).
+- **F1 + F-typing + F-stats-block** — SHIPPED. F1 Meta Role `ddf9d19`,
+  F-stats-block `c59a701` + `f6ef6a0`. F-typing is woven into F1's
+  Meta Role `good_at` paragraph for Oinkologne (not a separate
+  block); could split later if another species needs a distinct
+  typing discussion.
 
-  Schema spec: `docs/article_schema.md` "Meta Role section"
-  (added 2026-04-18). Stub (commented) in
-  `articles/oinkologne-cd-2026-05.toml`. Decision rationale:
-  `docs/jre_ryanswag_comparison.md` §6.
+- **F2** — SHIPPED `923f985` (key-flips callout above Matchup Delta,
+  3/3 knob).
 
-  **Next-session brief:** (1) implement the renderer in
-  `scripts/generate_article.py` — read `article.get('meta_role')`,
-  emit `<section id="meta-role">` positioned between Intro and
-  Move Comparison; (2) implement the `expert` mode end-to-end
-  first (easiest path to ship); (3) author Oinkologne's three
-  paragraphs in `expert` mode using the comparison's
-  matchup-delta data; (4) leave `both` / `auto` modes as TODOs —
-  they matter for Aegislash and future species, not for the
-  Oinkologne ship; (5) bundle F-typing paragraph + F-stats-block
-  promotion into the same session since they touch adjacent
-  template code.
-- **F2** — key-matchup callout prose narrating top 3-5 impactful
-  flips (heuristic: top-2 by |delta|, top-2 by opponent meta rank,
-  top-1 by flip-significance). Data already in Matchup Delta
-  table. 0.5 session for renderer + heuristic.
-- **F4 + F-wrap + F-intro** — verdict augment (editorial "should
-  you invest?" paragraph appended to mechanical verdict line),
-  closing meta-outlook paragraph, intro expansion from 1 sentence
-  to 2-3 sentences. 0.5 session + authoring.
-- **F-fast-moves + F-charge-moves** — bundled: expandable
-  subsections listing every legal move with stats + 1-2 sentence
-  prose analysis per move. Lower priority than F1-F4; defer to
-  post-ship polish if capacity tight. 0.5 session for renderer.
-- **F-hide-methodology** — four specific hide operations
-  identified in comparison §3.Q: Meta Coverage caption split,
-  Female-vs-Male `compare-lead` hide, IV Recommendations intro
-  hide, Matchup Delta pool annotation hide. 0.5 session,
-  mechanical template edits.
+- **F4 + F-wrap + F-intro** — SHIPPED. F4 + F-wrap `cbc9b28` (verdict
+  editorial + outlook fields, both expert mode). F-intro `259c493`
+  (BLUF intro override with hooked matchup).
+
+- **F-fast-moves + F-charge-moves** — SHIPPED `8397fa9` (full move-
+  pool tables between Move Comparison and Meta Coverage).
+
+- **F-hide-methodology** — SHIPPED `f9a1fc4` (four `<details>` wraps:
+  Meta Coverage caption split, compare-lead, IV Recommendations
+  intro, Matchup Delta pool annotation).
+
+- **P2 article -> dive per-opponent deep links** — SHIPPED `081cd2a`
+  (see P2 section below).
+
+### Shape 2 migration — narrative moves from article to dive (2026-04-19)
+
+Decision 2026-04-19: primary narrative home for a species is the
+**dive** (RyanSwag-style), not the CD article. Articles continue to
+exist when they do something the dive can't — disambiguating multiple
+forms (Oinkologne M/F, Aegislash Blade/Shield), shadow variants, or
+alt-moveset meta forks (Forretress Volt Switch vs Bug Bite). For
+Oinkologne the CD article stays because M/F comparison is its
+justification; the existing `[intro] / [meta_role] / [verdict]`
+prose will migrate (or be duplicated) into per-form threshold-TOML
+expert-zone fields that a new dive renderer surfaces at the top of
+each dive.
+
+**Schema survey 2026-04-19:** the dive has no free-form authored-
+narrative renderer today. `dd-expert-zone` in `deep_dive_rendering.py`
+renders tier cards + anchors with `source` attribution — it's data-
+driven, not prose. `deep_dive_narrative.py` renders the SwagTips-style
+IV Flavor Guide — also data-driven templating. **Shape 2 requires new
+feature work**, not a copy-paste migration: a new renderer path that
+reads free-form prose from threshold-TOML fields and emits at the top
+of the dive HTML.
+
+**Open design questions for next session:**
+- Where in the dive does the narrative render? Above the interactive
+  dashboard, or between dashboard and data sections?
+- What TOML schema? New top-level `[intro] / [meta_role] / [verdict]`
+  blocks in `thresholds/<species>.toml`, or a single `[narrative]`
+  block, or extend the existing `source`-attributed system?
+- Does the renderer live in `deep_dive_rendering.py` or
+  `deep_dive_narrative.py`?
+- Migrate all narrative out of the article TOML, or just the form-
+  shared parts, keeping the form-comparison framing article-side?
+
+Next session: start with ~15 min of design discussion + user approval,
+then implement.
+
 - **[Post-ship] F-tier-name-cleanup** — simplify IV-rec tier card
   names (current: `Steelix (Shadow) Slayer -   (Wigglytuff Slayer
   -   (Wigglytuff Atk))`) to RyanSwag's name/signature convention
