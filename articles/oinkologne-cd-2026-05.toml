@@ -35,30 +35,57 @@ deep_dive_slug = "oinkologne-great-league"
 [form_comparison]
 spec = "comparisons/oinkologne-male-vs-female.toml"
 
-# ── Meta Role (F1, schema stubbed 2026-04-18; renderer pending) ──────
+# ── Meta Role (F1, expert-authored 2026-04-18) ────────────────────────
 # Design 2 + freeform escape hatch. Decision record:
 # docs/jre_ryanswag_comparison.md §6; schema: docs/article_schema.md
-# "Meta Role section". The renderer doesn't read this block yet; it
-# will be implemented in the next F1 session.
-#
-# Uncomment and author for the Oinkologne ship (F1 step: expert mode,
-# three fields populated). Keep the fields in this order.
-#
-# [meta_role]
-# authorship = "expert"
-# good_at = """
-# One paragraph on what Mud Slap Oinkologne shines against.
-# """
-# bad_at = """
-# One paragraph on what it struggles against. Omit if no distinctive
-# vulnerability.
-# """
-# team_role = """
-# One paragraph on how it fits on a team (opener / closer / pivot /
-# shield-pressure role).
-# """
-# # Escape hatch. If non-empty, overrides the three fields above.
-# body = ""
+# "Meta Role section". Authored from sim data (Matchup Delta table +
+# Meta Coverage grid + threshold-tier aggregate win rates); expected
+# to be human-edited once before ship.
+[meta_role]
+authorship = "expert"
+good_at = """
+Mud Slap turns Oinkologne from a Normal-typed blunt tool into a \
+genuine Steel / Ghost counter-pick. Super-effective Ground damage \
+flips the bulky Steel-subtyped walls - Empoleon (regular and Shadow), \
+Steelix (regular and Shadow), and Galarian Stunfisk - from hopeless \
+Tackle-era losses into aggregate wins, with deltas of +40 to +77 \
+percentage points depending on form. The same pattern holds against \
+Ghost stallers: Dusclops (both forms), Galarian Corsola, and Sableye \
+all move into the win column. The types Oinkologne couldn't scratch \
+before Mud Slap are now the types Mud Slap specifically punishes.
+"""
+bad_at = """
+Mud Slap's Ground typing creates its own problem set. Flying-types \
+resist Ground damage, and Altaria gets noticeably worse across the \
+board: regular Altaria slips by -12 to -25 percentage points (still \
+a loss, just a clearer one), and Shadow Altaria swings all the way \
+from an aggregate Tackle-era win into a decisive loss (-47 pp \
+Female, -41 pp Male). Galarian Moltres worsens by -25 to -33 pp. \
+Fringe losses against Politoed (Shadow) for Female and Dondozo for \
+Female round out the attack-side costs. Anything that resists \
+Ground damage sits opposite Mud Slap's counter-picks.
+"""
+team_role = """
+Mud Slap is an unambiguous upgrade over Tackle (+9.7 pp for Male \
+across the full simulated meta), but it doesn't make Oinkologne a \
+meta staple. Aggregate win rate against the top-50+CS pool still \
+sits below 50% for both forms (Female 46.9%, Male 43.1%). The \
+upgrade's value is anti-meta: Oinkologne now punishes specific \
+parts of the meta - bulky Steels and Ghost stallers - that were \
+previously clean losses. Build it as an answer to a \
+team-composition problem (Steel-core coverage, Ghost-wall \
+pressure), not as the chassis of a team. Female is slightly ahead \
+on aggregate thanks to its Defense and Stamina advantages; Male \
+edges Female in attacker-weighted matchups where raw Attack clears \
+breakpoints, uniquely flipping Wigglytuff, Lickilicky, Dondozo, and \
+regular Stunfisk into wins Female can't reach. Either form wants \
+teammates that cover the Flyer / Fire / Dragon core it still can't \
+touch.
+"""
+# Escape hatch -- if non-empty, overrides the three structured
+# fields above. Left empty for Oinkologne; the three-slot split is
+# natural for this species.
+body = ""
 
 # ── Content sections ──────────────────────────────────────────────────
 # Placeholder structure modeled on JRE's Tinkaton CD article.

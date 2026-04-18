@@ -63,6 +63,10 @@ logger = logging.getLogger('generate_article')
 CANONICAL_SECTIONS = [
     ('intro', 'Introduction',
      'S6 (template)'),
+    ('meta-role', 'Meta Role',
+     'F1: three-paragraph strengths / weaknesses / team-role block. '
+     'Sourced from article TOML [meta_role]. Section is skipped '
+     'entirely when the block is absent or all fields are empty.'),
     ('move-comparison', 'Move Comparison',
      'S7: move-by-move stat table (power, energy, turns, DPT, EPT, type, STAB).'),
     ('meta-coverage', 'Meta Coverage',
@@ -2104,6 +2108,65 @@ def render_intro_section(article: dict) -> str:
     )
 
 
+def _render_meta_role_section(article: dict) -> str:
+    """Render the Meta Role section body (F1).
+
+    Schema in docs/article_schema.md "Meta Role section". Design 2
+    (structured sub-fields) + freeform escape hatch:
+
+    * Three optional string fields -- good_at, bad_at, team_role --
+      render as unlabeled <p> blocks, one per populated field, in a
+      fixed order. A reader sees three flowing paragraphs; field
+      names are authoring ergonomics only.
+    * The body field, if non-empty, overrides the three structured
+      fields and renders as freeform multi-paragraph prose. Split on
+      blank lines per format_body.
+
+    Authorship modes (article[meta_role][authorship]):
+
+    * expert: render the fields verbatim. This is the only mode
+      currently implemented.
+    * both / auto: TODO -- synthesize per-field skeletons from the
+      dive's matchup-delta + tier-cluster data (wins-by-type,
+      losses-by-type, cluster analysis). Falls back to the expert
+      path with a warning for now, so a partial block still renders.
+
+    Returns empty string when the [meta_role] block is absent or all
+    fields (including body) are empty. The dispatch in render_section
+    uses that to skip emitting a section wrapper / heading.
+    """
+    block = article.get('meta_role')
+    if not block:
+        return ''
+
+    authorship = (block.get('authorship') or 'expert').strip().lower()
+    if authorship not in {'expert', 'both', 'auto'}:
+        logger.warning(
+            '[meta_role].authorship=%r is unrecognized; treating as expert.',
+            authorship)
+        authorship = 'expert'
+    if authorship != 'expert':
+        # Next F1 session owns both/auto. Until then, render whatever
+        # expert fields are present, no auto-synthesis.
+        logger.warning(
+            '[meta_role].authorship=%r is not yet implemented; '
+            'rendering provided fields as if expert (no auto-synthesis).',
+            authorship)
+
+    body_override = (block.get('body') or '').strip()
+    if body_override:
+        return format_body(body_override)
+
+    parts = []
+    for field in ('good_at', 'bad_at', 'team_role'):
+        txt = (block.get(field) or '').strip()
+        if txt:
+            parts.append(txt)
+    if not parts:
+        return ''
+    return format_body('\n\n'.join(parts))
+
+
 def _load_form_comparison_spec(article: dict) -> dict | None:
     """Read the [form_comparison] block and resolve the referenced spec TOML.
 
@@ -2153,6 +2216,10 @@ def render_section(section_id: str, heading: str, todo: str,
         body_html = format_body(overrides[heading])
     elif section_id == 'intro':
         body_html = render_intro_section(article)
+    elif section_id == 'meta-role':
+        body_html = _render_meta_role_section(article)
+        if not body_html.strip():
+            return ''  # skip section entirely when block is absent/empty
     elif section_id == 'move-comparison':
         body_html = _render_move_comparison_section(cd_move, species, league)
     elif section_id == 'meta-coverage' and dive is not None:
@@ -2297,6 +2364,7 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   p {{ margin: 10px 0; }}
   code {{ background: #16213e; padding: 2px 5px; border-radius: 3px;
           font-size: 0.9em; }}
+  section#meta-role p {{ margin: 12px 0; line-height: 1.55; }}
   .meta {{ color: #888; font-size: 14px; margin-bottom: 20px; }}
   .related {{ background: #16213e; padding: 12px 16px; border-radius: 6px;
               margin: 16px 0; border-left: 3px solid #9be89b; }}
