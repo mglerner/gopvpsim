@@ -540,7 +540,8 @@ def matchup_subtitle(cat):
 
 
 def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
-                                     toggle_id=None, top_n=10):
+                                     toggle_id=None, top_n=10,
+                                     emit_opponent_ids=False):
     """Render matchup-flipping boundaries as HTML <li> bullets.
 
     Format: "141.66 Def + 138 HP flips Medicham (1v1, 1v2 no bait) [85 IVs]"
@@ -550,8 +551,18 @@ def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
 
     When *toggle_id* is set and there are more than *top_n* bullets,
     the excess are hidden behind a show/hide toggle button.
+
+    When *emit_opponent_ids* is True, the first <li> emitted for each
+    opponent carries ``id="opp-<slug>"`` so external pages (e.g. the CD
+    article's Matchup Delta table) can deep-link directly to that
+    opponent's first boundary bullet. Only enable at the standalone
+    (section-level) call site -- the tier-card-nested call also renders
+    these bullets but enabling ids in both contexts produces duplicate
+    DOM ids and the browser lands in a tier card rather than the
+    standalone section.
     """
     lines = []
+    seen_opponents: set[str] = set()
     for i, b in enumerate(boundaries):
         scen_str = ', '.join(
             f'{s[0]}v{s[1]}' for s in sorted(b['scenarios']))
@@ -567,8 +578,12 @@ def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
         hidden = ''
         if toggle_id and i >= top_n:
             hidden = f' class="dd-iv-hidden" data-tier-card="{toggle_id}"'
+        opp_id = ''
+        if emit_opponent_ids and b['opponent'] not in seen_opponents:
+            seen_opponents.add(b['opponent'])
+            opp_id = f' id="opp-{opp_slug(b["opponent"])}"'
         lines.append(
-            f'<li{hidden}><span class="dd-strong">'
+            f'<li{hidden}{opp_id}><span class="dd-strong">'
             f'{b["threshold"]:.2f} {stat_label}</span>{hp_str} '
             f'flips {_opp_b(b["opponent"])} '
             f'(<span class="dd-gain">{scen_str}</span>) '
@@ -605,9 +620,23 @@ def anchor_group_id(parent, opponent, target_stat, move_id):
     return 'af-' + _hl.md5(key.encode('utf-8')).hexdigest()[:10]
 
 
+def opp_slug(name: str) -> str:
+    """Slugify an opponent display name for deep-link anchor ids.
+
+    'Stunfisk (Galarian)' -> 'stunfisk-galarian'. Shared with
+    ``generate_article.py`` and ``patch_dive_opp_anchors.py`` so the
+    article's Matchup Delta opponent links land on the matching
+    ``#opp-<slug>`` id inside the dive's standalone Matchup-Flipping
+    Boundaries / Anchor-Driven Matchup Flips sections.
+    """
+    return re.sub(r'^-|-$', '',
+                  re.sub(r'[^a-z0-9]+', '-', name.lower()))
+
+
 
 def render_anchor_flip_bullets(records, anchor_passing_sink=None,
-                               has_bait_axis=False):
+                               has_bait_axis=False,
+                               emit_opponent_ids=False):
     """Render anchor-flip records as RyanSwag-style HTML <li> bullets.
 
     Grouping grain is ``(parent, opponent, target_stat, move_id)``.
@@ -676,6 +705,7 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
         )
 
     lines = []
+    seen_opponents: set[str] = set()
     for family in family_order:
         for key in families[family]:
             recs = groups[key]
@@ -743,8 +773,12 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
 
             opp_name = recs[0]["opponent"]
             opp_c = _opp_color(opp_name)
+            opp_id = ''
+            if emit_opponent_ids and opp_name not in seen_opponents:
+                seen_opponents.add(opp_name)
+                opp_id = f' id="opp-{opp_slug(opp_name)}"'
             lines.append(
-                f'<li><span class="dd-strong">{min_thresh:.2f} {stat_label}</span>'
+                f'<li{opp_id}><span class="dd-strong">{min_thresh:.2f} {stat_label}</span>'
                 f'{hp_str} '
                 f'for <b style="color:{opp_c}">{anchor_label}</b>'
                 f'{move_str} vs {_opp_b(opp_name)} '
@@ -2956,12 +2990,14 @@ def render_results_section(data_obj, moveset_label, opp_label,
         )
         mb_bullets = render_matchup_boundary_bullets(
             _sorted_mbs, has_bait_axis=has_bait_axis,
-            toggle_id='mb-standalone', top_n=10)
+            toggle_id='mb-standalone', top_n=10,
+            emit_opponent_ids=True)
     anchor_bullets = []
     if anchor_flip_records:
         anchor_bullets = render_anchor_flip_bullets(
             anchor_flip_records, anchor_passing_sink=anchor_passing_sink,
-            has_bait_axis=has_bait_axis)
+            has_bait_axis=has_bait_axis,
+            emit_opponent_ids=True)
 
     has_any_threshold = threshold_descs or mb_bullets or anchor_bullets
     if has_any_threshold:

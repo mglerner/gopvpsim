@@ -229,6 +229,15 @@ def _load_one_dive_file(path: Path) -> dict:
     data_blob = _extract_js_assignment(content, 'DATA')
     data = json.loads(data_blob)
 
+    # Which opponents have per-opponent anchors in this dive file? The
+    # matchup-delta table uses this to decide whether to wrap an
+    # opponent name in a deep-link (<a href="...#opp-<slug>">) or just
+    # render plain text. Opponents that the dive scored but didn't
+    # produce any flipping boundary or anchor bullet for (clean sweeps
+    # in either direction) have no ``id="opp-..."`` to land on.
+    import re as _re
+    anchored_opps = set(_re.findall(r'id="opp-([a-z0-9-]+)"', content))
+
     if not data.get('movesets'):
         raise ValueError(f'{path}: no movesets in DATA')
     moveset = data['movesets'][0]
@@ -272,6 +281,7 @@ def _load_one_dive_file(path: Path) -> dict:
         'iv_tiers': data.get('ivTiers') or [],
         'iv_all_tiers': data.get('ivAllTiers') or [],
         'n_ivs': n_ivs,
+        'anchored_opps': anchored_opps,
     }
 
 
@@ -1611,6 +1621,26 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
             return -1
         return 0
 
+    # Per-form dive-URL prefixes for the opponent-cell deep links below.
+    # Each opponent name in the body rows becomes an <a> into the primary
+    # form's dive (its #opp-<slug> anchor in the Matchup-Flipping
+    # Boundaries section); secondary forms get a small trailing symbol
+    # link so a reader can jump to any form's dive from a single row.
+    def _short(label: str) -> str:
+        return {'Male': '&#9794;', 'Female': '&#9792;'}.get(label, html.escape(label))
+
+    per_form_dive_prefix: list[str | None] = []
+    for f in forms:
+        if not f.get('dive_slug') or not f.get('best_cd'):
+            per_form_dive_prefix.append(None)
+            continue
+        fast, cms = _parse_moveset_label(f['best_cd']['label'])
+        moveset_file = (
+            f'index_m0_{fast.lower()}_{"_".join(c.lower() for c in cms)}.html'
+        )
+        per_form_dive_prefix.append(
+            f'../../{f["dive_slug"]}/{moveset_file}#opp-')
+
     body_rows = []
     form_split_count = 0
     for opp, per_form_cells, mean_delta in entries:
@@ -1665,10 +1695,46 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
         else:
             row_cls = ''
         split_attr = ' data-form-split="split"' if form_split else ' data-form-split="same"'
+        # Build the opponent cell. If the primary form's best-CD dive has
+        # an ``id="opp-<slug>"`` anchor for this opponent (i.e. at least
+        # one flipping boundary / anchor bullet), wrap the opponent name
+        # in a link to that form's dive. Secondary forms with an anchor
+        # get a small trailing symbol link. Opponents whose matchup is a
+        # clean sweep in every form (no boundaries in any dive) stay as
+        # plain text so the article doesn't emit clicks that scroll to
+        # the top of an unrelated dive.
+        opp_escaped = html.escape(opp)
+        slug = _opp_slug(opp)
+        primary_prefix = per_form_dive_prefix[0] if per_form_dive_prefix else None
+        primary_has_anchor = (
+            primary_prefix is not None
+            and slug in (forms[0]['best_cd'].get('anchored_opps') or set())
+        )
+        if primary_has_anchor:
+            primary_url = html.escape(f'{primary_prefix}{slug}')
+            opp_html = (f'<a href="{primary_url}" '
+                        f'title="Jump to {html.escape(forms[0]["label"])} '
+                        f'dive">{opp_escaped}</a>')
+        else:
+            opp_html = opp_escaped
+        for fi in range(1, len(forms)):
+            prefix = per_form_dive_prefix[fi]
+            if not prefix:
+                continue
+            if slug not in (forms[fi]['best_cd'].get('anchored_opps') or set()):
+                continue
+            f_label = forms[fi]['label']
+            col = _col_class(f_label)
+            sec_cls = f' class="{col}"' if col else ''
+            sec_url = html.escape(f'{prefix}{slug}')
+            opp_html += (
+                f' <a href="{sec_url}"{sec_cls} '
+                f'title="Jump to {html.escape(f_label)} dive" '
+                f'style="text-decoration:none">{_short(f_label)}</a>')
         row = (
             f'<tr class="{row_cls}"{split_attr} '
             f'data-opponent="{html.escape(opp, quote=True)}">'
-            f'<td>{html.escape(opp)}</td>'
+            f'<td>{opp_html}</td>'
             + ''.join(verdict_cells)
             + ''.join(diag_cells)
             + '</tr>'
@@ -1677,10 +1743,9 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
 
     # Header: Opponent | (Δ + Flip) per form | (old WR + new WR) per form.
     # Full form names live in tooltips; short symbols (♂/♀) go in the
-    # visible header to keep the 9-column table compact.
-    def _short(label: str) -> str:
-        return {'Male': '&#9794;', 'Female': '&#9792;'}.get(label, html.escape(label))
-
+    # visible header to keep the 9-column table compact. ``_short`` is
+    # defined earlier in this function (shared with the opponent-cell
+    # deep-link renderer).
     header_cells = ['<th scope="col" data-sort="str">Opponent</th>']
     # Verdict half: Δ and Flip for each form.
     for f in forms:
@@ -2230,6 +2295,18 @@ def _tier_slug(name: str) -> str:
         badge = badge[1:-1].strip()
     slug = re.sub(r'[^a-z0-9]+', '-', badge.lower()).strip('-')
     return slug
+
+
+def _opp_slug(name: str) -> str:
+    """Slugify an opponent display name for dive deep-link anchors.
+
+    'Stunfisk (Galarian)' -> 'stunfisk-galarian'. Must stay in lock-step
+    with ``deep_dive_rendering.opp_slug`` and
+    ``scripts/patch_dive_opp_anchors.opp_slug``; drift produces
+    article-side links that don't resolve.
+    """
+    import re
+    return re.sub(r'[^a-z0-9]+', '-', (name or '').lower()).strip('-')
 
 
 def _tier_card_href(tier_name: str, dive_slug: str,
