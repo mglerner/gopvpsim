@@ -691,6 +691,355 @@ def _parse_moveset_label(label: str) -> tuple[str, list[str]]:
     return fast.strip(), charged
 
 
+def _collect_per_form_best_movesets(form_spec: dict, cd_move: str,
+                                    gm: dict) -> list[dict] | None:
+    """For each loadout in the form_comparison spec, load its dive and pick
+    the best CD-move + best default-fast movesets. Returns one dict per
+    form with aligned opponents / per-opponent win-rate arrays.
+
+    Returns None if any loadout's dive is missing required movesets; the
+    caller falls back to the single-form renderer in that case.
+    """
+    cd_entry = _lookup_move(gm, cd_move)
+    if cd_entry is None:
+        return None
+    cd_id = cd_entry['moveId']
+    league = form_spec['league']
+    forms: list[dict] = []
+    for lo_spec in form_spec['loadout_specs']:
+        dive_dir = WEBSITE_DIR / lo_spec.dive_slug
+        if not dive_dir.is_dir():
+            return None
+        try:
+            dive_data = _load_dive_data(dive_dir)
+        except SystemExit:
+            return None
+        try:
+            default_fast_id, _ = get_default_moveset(lo_spec.species, league)
+        except KeyError:
+            return None
+        cd_ms = [m for m in dive_data['movesets']
+                 if _moveset_fast_move(m['label']) == cd_id]
+        df_ms = [m for m in dive_data['movesets']
+                 if _moveset_fast_move(m['label']) == default_fast_id]
+        if not cd_ms or not df_ms:
+            return None
+        best_cd = max(cd_ms, key=lambda m: m['win_rate'])
+        best_default = max(df_ms, key=lambda m: m['win_rate'])
+        forms.append({
+            'label': lo_spec.label,
+            'species': lo_spec.species,
+            'species_id': _species_id(gm, lo_spec.species),
+            'dive_slug': lo_spec.dive_slug,
+            'league': league,
+            'best_cd': best_cd,
+            'best_default': best_default,
+            'opponents': dive_data['opponents'],
+            'opponent_label': dive_data.get('opponent_label') or '',
+            'default_fast_id': default_fast_id,
+            'cd_id': cd_id,
+        })
+    return forms
+
+
+def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
+                                           gm: dict) -> str:
+    """Wide per-form matchup-delta table: each form contributes 4 columns
+    (old WR, CD WR, signed delta, flip badge) alongside the shared opponent
+    column. Rows sort by the mean delta across forms so the biggest
+    overall improvements lead; readers can click any column header to
+    re-sort.
+    """
+    cd_entry = _lookup_move(gm, cd_move)
+    cd_name = cd_entry.get('name', cd_move) if cd_entry else cd_move
+
+    shared = set(forms[0]['opponents'])
+    for f in forms[1:]:
+        shared &= set(f['opponents'])
+    ordered_opponents = [o for o in forms[0]['opponents'] if o in shared]
+
+    rows = []
+    per_form_flip_count = [0] * len(forms)
+    shields = (1, 1)
+
+    entries = []
+    for opp in ordered_opponents:
+        per_form_cells = []
+        deltas = []
+        for fi, f in enumerate(forms):
+            cd_map = dict(zip(f['opponents'], f['best_cd']['per_opponent_win_rate']))
+            df_map = dict(zip(f['opponents'], f['best_default']['per_opponent_win_rate']))
+            cd_r = cd_map[opp]
+            df_r = df_map[opp]
+            delta_pp = 100.0 * (cd_r - df_r)
+            deltas.append(delta_pp)
+            per_form_cells.append((f, cd_r, df_r, delta_pp))
+        mean_delta = sum(deltas) / len(deltas)
+        entries.append((opp, per_form_cells, mean_delta))
+
+    entries.sort(key=lambda e: e[2], reverse=True)
+
+    def _badge_and_class(f, cd_r, df_r, delta_pp, opp) -> tuple[str, str]:
+        cd_wins = cd_r >= 0.5
+        df_wins = df_r >= 0.5
+        flip = cd_wins != df_wins
+        opp_slug, opp_base, opp_is_shadow = _resolve_opponent_for_url(opp)
+        fast_id = _parse_moveset_label(f['best_cd']['label'])[0]
+        charged_ids = _parse_moveset_label(f['best_cd']['label'])[1]
+        opp_url: str | None = None
+        if f['species_id']:
+            try:
+                opp_fast_id, opp_charged_ids = get_default_moveset(
+                    opp_base, f['league'], shadow=opp_is_shadow)
+            except KeyError:
+                opp_fast_id, opp_charged_ids = None, None
+            if opp_fast_id:
+                opp_url = pvpoke_single_battle_url(
+                    gm, f['league'], shields,
+                    focal_species_id=f['species_id'],
+                    focal_fast_id=fast_id,
+                    focal_charged_ids=charged_ids,
+                    opp_species_id=opp_slug,
+                    opp_fast_id=opp_fast_id,
+                    opp_charged_ids=list(opp_charged_ids or []),
+                )
+
+        form_label = html.escape(f['label'])
+        if flip:
+            flip_dir = 'pos' if delta_pp > 0 else 'neg'
+            cls = f'flip-badge flip-{flip_dir}'
+            text = '+Flip' if delta_pp > 0 else '-Flip'
+            if delta_pp > 0:
+                tip = (f'{form_label}: {cd_name} wins this matchup where the '
+                       f'old default loses it (crosses the 50% line).')
+            else:
+                tip = (f'{form_label}: old default wins this matchup where '
+                       f'{cd_name} loses it (crosses the 50% line).')
+        else:
+            cls = 'flip-badge flip-none'
+            text = 'No flip'
+            if cd_r >= 0.5 and df_r >= 0.5:
+                tip = f'{form_label}: both movesets win on aggregate.'
+            elif cd_r < 0.5 and df_r < 0.5:
+                tip = f'{form_label}: both movesets lose on aggregate.'
+            else:
+                tip = f'{form_label}: no flip across the 50% line.'
+
+        if opp_url:
+            badge = (f'<a class="{cls}" href="{html.escape(opp_url)}" '
+                     f'target="_blank" rel="noopener" '
+                     f'title="{html.escape(tip)}">{text}</a>')
+        else:
+            badge = (f'<span class="{cls} flip-unlinked" '
+                     f'title="{html.escape(tip)}">{text}</span>')
+        return badge, ('flip' if flip else 'noflip')
+
+    def _col_class(label: str) -> str:
+        low = label.lower()
+        return low if low in ('male', 'female') else ''
+
+    def _wr_side(wr: float) -> int:
+        """Three-way classifier for win-rate vs the 50% line.
+        Returns 1 (win), -1 (loss), or 0 (coin-flip, exactly 0.5). Exactly
+        50% is its own bucket so a 55%-vs-50% pair counts as a disagreement
+        rather than both being lumped as wins.
+        """
+        if wr > 0.5:
+            return 1
+        if wr < 0.5:
+            return -1
+        return 0
+
+    body_rows = []
+    form_split_count = 0
+    for opp, per_form_cells, mean_delta in entries:
+        any_flip = False
+        any_positive = False
+        any_negative = False
+        cd_sides = {_wr_side(cd_r) for _, cd_r, _, _ in per_form_cells}
+        form_split = len(cd_sides) > 1
+        if form_split:
+            form_split_count += 1
+        verdict_cells: list[str] = []
+        diag_cells: list[str] = []
+        for fi, (f, cd_r, df_r, delta_pp) in enumerate(per_form_cells):
+            badge, flip_tag = _badge_and_class(f, cd_r, df_r, delta_pp, opp)
+            if flip_tag == 'flip':
+                any_flip = True
+                per_form_flip_count[fi] += 1
+                if delta_pp > 0:
+                    any_positive = True
+                else:
+                    any_negative = True
+            col = _col_class(f['label'])
+            col_suffix = f' {col}' if col else ''
+            delta_cls = ('num delta-pos' if delta_pp > 0
+                         else 'num delta-neg' if delta_pp < 0
+                         else 'num')
+            verdict_cells.append(
+                f'<td class="{delta_cls}{col_suffix}">{delta_pp:+.1f}</td>')
+            flip_td_cls = col if col else ''
+            if flip_td_cls:
+                verdict_cells.append(f'<td class="{flip_td_cls}">{badge}</td>')
+            else:
+                verdict_cells.append(f'<td>{badge}</td>')
+            diag_prefix = ' diag-start' if fi == 0 else ''
+            diag_cells.append(
+                f'<td class="num{diag_prefix}{col_suffix}">{100 * df_r:.1f}%</td>')
+            diag_cells.append(
+                f'<td class="num{col_suffix}">{100 * cd_r:.1f}%</td>')
+        if any_flip and any_positive and not any_negative:
+            row_cls = 'matchup-delta-flip matchup-delta-flip-pos'
+        elif any_flip and any_negative and not any_positive:
+            row_cls = 'matchup-delta-flip matchup-delta-flip-neg'
+        elif any_flip:
+            row_cls = 'matchup-delta-flip'
+        else:
+            row_cls = ''
+        split_attr = ' data-form-split="split"' if form_split else ' data-form-split="same"'
+        row = (
+            f'<tr class="{row_cls}"{split_attr}>'
+            f'<td>{html.escape(opp)}</td>'
+            + ''.join(verdict_cells)
+            + ''.join(diag_cells)
+            + '</tr>'
+        )
+        body_rows.append(row)
+
+    # Header: Opponent | (Δ + Flip) per form | (old WR + new WR) per form.
+    # Full form names live in tooltips; short symbols (♂/♀) go in the
+    # visible header to keep the 9-column table compact.
+    def _short(label: str) -> str:
+        return {'Male': '&#9794;', 'Female': '&#9792;'}.get(label, html.escape(label))
+
+    header_cells = ['<th scope="col" data-sort="str">Opponent</th>']
+    # Verdict half: Δ and Flip for each form.
+    for f in forms:
+        flabel = html.escape(f['label'])
+        fshort = _short(f['label'])
+        col = _col_class(f['label'])
+        col_suffix = f' {col}' if col else ''
+        header_cells.append(
+            f'<th scope="col" class="num{col_suffix}" data-sort="num" '
+            f'title="{flabel} change in win rate in percentage points '
+            f'(CD minus old default).">{fshort} &#916; (pp)</th>'
+        )
+        flip_class_attr = f' class="{col}"' if col else ''
+        header_cells.append(
+            f'<th scope="col"{flip_class_attr} data-sort="bool" '
+            f'title="{flabel}: whether the aggregate matchup crosses '
+            f'the 50% win line.">{fshort} Flip?</th>'
+        )
+    # Diagnostic half: old WR then new WR for each form.
+    for fi, f in enumerate(forms):
+        flabel = html.escape(f['label'])
+        fshort = _short(f['label'])
+        default_name = f['default_fast_id'].replace('_', ' ').title()
+        col = _col_class(f['label'])
+        col_suffix = f' {col}' if col else ''
+        diag_cls = ' diag-start' if fi == 0 else ''
+        header_cells.append(
+            f'<th scope="col" class="num{diag_cls}{col_suffix}" '
+            f'data-sort="pct" '
+            f'title="{flabel} win rate with the old default fast move '
+            f'({default_name}).">{fshort} {default_name} WR</th>'
+        )
+        header_cells.append(
+            f'<th scope="col" class="num{col_suffix}" data-sort="pct" '
+            f'title="{flabel} win rate with the CD move ({html.escape(cd_name)}).">'
+            f'{fshort} {html.escape(cd_name)} WR</th>'
+        )
+
+    # Default sort: the mean-delta column isn't present, so fall back to
+    # the first form's delta (col index 3) which is a useful proxy.
+    intro_lines = [
+        '<p class="matchup-delta-intro">Per-opponent win-rate deltas for '
+        'both Oinkologne forms side-by-side: old-default fast move vs the '
+        'CD fast move. Click any column header to re-sort.</p>'
+    ]
+    pool_label = (forms[0].get('opponent_label') or '').strip()
+    if pool_label:
+        intro_lines.append(
+            f'<p class="matchup-delta-pool"><strong>Opponents:</strong> '
+            f'{len(ordered_opponents)} species shared across both form '
+            f'dives ({html.escape(pool_label)}).</p>'
+        )
+
+    moveset_lines = ['<ul class="matchup-delta-movesets">']
+    for f in forms:
+        flabel = html.escape(f['label'])
+        for which, ms in (('CD', f['best_cd']),
+                          ('Old default', f['best_default'])):
+            fast, cms = _parse_moveset_label(ms['label'])
+            pretty = html.escape(ms['pretty_label'] or ms['label'])
+            url = (pvpoke_multi_battle_url(gm, f['species_id'], f['league'],
+                                           shields, fast, cms)
+                   if f['species_id'] else None)
+            if url:
+                link_txt = (f'<li>{flabel} {which}: <code>{pretty}</code> - '
+                            f'<a href="{html.escape(url)}" target="_blank" '
+                            f'rel="noopener">view on PvPoke multi-battle</a></li>')
+            else:
+                link_txt = f'<li>{flabel} {which}: <code>{pretty}</code></li>'
+            moveset_lines.append(link_txt)
+    moveset_lines.append('</ul>')
+
+    delta_help = (
+        '<details class="matchup-delta-legend">'
+        '<summary>How to read the &#916; column</summary>'
+        '<p>The &#916; measures how much the CD move changed '
+        '<em>this form\'s</em> win rate against this opponent, not which '
+        'form is stronger. A form that was already winning with the old '
+        'move has less room to gain than one that was losing. '
+        'Hypothetical: &#9794; goes 30% &rarr; 50% (&#916; +20), &#9792; '
+        'goes 55% &rarr; 60% (&#916; +5) on the same opponent. &#9792; is '
+        'stronger both before and after, but the CD move was a bigger '
+        'upgrade for &#9794; because &#9794; had more room to grow.</p>'
+        '</details>'
+    )
+    moveset_lines.append(delta_help)
+
+    summary_bits = ', '.join(
+        f'{html.escape(f["label"])}: {per_form_flip_count[fi]}'
+        for fi, f in enumerate(forms)
+    )
+    summary = (f'<p class="matchup-delta-summary">Flips across the 50% '
+               f'win line by form (out of {len(ordered_opponents)} '
+               f'opponents): {summary_bits}.</p>')
+
+    form_labels = ' and '.join(
+        f'<span class="form-label {_col_class(f["label"])}">'
+        f'{_short(f["label"])}</span>'
+        for f in forms
+    )
+    filter_control = (
+        '<p class="mf-split-filter">'
+        '<label><input type="checkbox" class="mf-split-toggle" '
+        'data-target="mf-split-perform"> '
+        f'Show only matchups where {form_labels} disagree at the 50% '
+        f'win line after evolving to {html.escape(cd_name)} - i.e. one '
+        f'form wins on aggregate (above 50%), loses (below 50%), or ties '
+        f'(exactly 50%) while the other lands in a different bucket '
+        f'(<span class="mf-split-count">{form_split_count}</span> of '
+        f'{len(entries)} opponents).</label></p>'
+    )
+    table = (
+        filter_control
+        + '<div class="matchup-delta-scroll">'
+        '<table id="mf-split-perform" '
+        'class="matchup-delta matchup-delta-perform sortable" '
+        'data-default-sort="1" data-default-dir="desc">'
+        '<thead><tr>' + ''.join(header_cells) + '</tr></thead>'
+        '<tbody>' + ''.join(body_rows) + '</tbody>'
+        '</table>'
+        '</div>'
+    )
+
+    return ('\n'.join(intro_lines) + '\n'
+            + '\n'.join(moveset_lines) + '\n'
+            + table + '\n' + summary)
+
+
 def _render_matchup_delta_section(cd_move: str, species: str, league: str,
                                   dive: dict) -> str:
     """Per-opponent win-rate diff between best CD and best old-default moveset.
@@ -950,6 +1299,152 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
     return '\n'.join(header_lines) + '\n' + legend + '\n' + table + '\n' + summary
 
 
+FORM_SYMBOLS = {'Male': '&#9794;', 'Female': '&#9792;'}
+FORM_COL_CLASS = {'Male': 'male', 'Female': 'female'}
+
+
+def _tier_slug(name: str) -> str:
+    """Derive the dive's ``tier-card-yours-<slug>`` id from a tier name.
+
+    The dive renderer emits ids based on the innermost anchor label, e.g.
+    ``Lapras Slayer<br>  (Lapras Atk)`` -> ``lapras-atk``, ``Steelix (Shadow)
+    Slayer<br>  (Wigglytuff Slayer<br>  (Wigglytuff Atk))`` ->
+    ``wigglytuff-atk``. Deepest parenthesised segment after splitting by
+    ``<br>`` wins; plain leaf names (``Talonflame Atk``) slug directly.
+    """
+    import re
+    parts = (name or '').split('<br>')
+    badge = parts[-1].strip()
+    while badge.startswith('(') and badge.endswith(')'):
+        badge = badge[1:-1].strip()
+    slug = re.sub(r'[^a-z0-9]+', '-', badge.lower()).strip('-')
+    return slug
+
+
+def _tier_card_href(tier_name: str, dive_slug: str,
+                    moveset_file: str) -> str | None:
+    """Return a hyperlink anchor for the matching tier card in the dive,
+    or None when either piece is missing. Article dive paths are relative
+    to ``userdata/website/articles/<slug>/index.html``.
+
+    Targets ``#tier-card-<slug>`` (on the visible card ``<div>``), not
+    the legacy ``tier-card-yours-<slug>`` span which is ``display:none``
+    until paste-box populates it and therefore cannot be scrolled to.
+    Older dive HTML is patched in place by
+    ``scripts/patch_dive_tier_anchors.py``; fresh dives emit this id
+    natively.
+    """
+    if not dive_slug or not moveset_file:
+        return None
+    slug = _tier_slug(tier_name)
+    if not slug:
+        return None
+    return f'../../{dive_slug}/{moveset_file}#tier-card-{slug}'
+
+
+def _render_tier_card(tier: dict, members: int, n_ivs: int,
+                      form_label: str = '',
+                      link_href: str | None = None) -> str:
+    """Shared tier-card HTML for both single-form and per-form sections.
+
+    ``link_href`` wraps the card title in an anchor to the corresponding
+    tier card in the relevant dive. The heading keeps its purple color
+    (see CSS ``div.iv-rec-card h3 a`` override) so the link is
+    discoverable on hover without visually competing with the normal
+    green link color used elsewhere.
+    """
+    name = (tier.get('name') or '').replace('<br>', ' - ')
+    atk = tier.get('attack') or 0
+    def_ = tier.get('defense') or 0
+    hp = tier.get('stamina') or 0
+    cutoff_bits = []
+    if atk:
+        cutoff_bits.append(f'atk&ge;{atk:.2f}')
+    if def_:
+        cutoff_bits.append(f'def&ge;{def_:.2f}')
+    if hp:
+        cutoff_bits.append(f'hp&ge;{hp:g}')
+    cutoffs = ', '.join(cutoff_bits) if cutoff_bits else 'no cutoff'
+    desc = (tier.get('toml_description') or tier.get('desc') or '').strip()
+    pct = (100.0 * members / n_ivs) if n_ivs else 0.0
+
+    symbol = FORM_SYMBOLS.get(form_label, '')
+    cls_suffix = ' ' + FORM_COL_CLASS[form_label] if form_label in FORM_COL_CLASS else ''
+    heading_prefix = f'{symbol} ' if symbol else ''
+
+    escaped_name = html.escape(name)
+    if link_href:
+        heading_html = (
+            f'{heading_prefix}<a href="{html.escape(link_href)}" '
+            f'title="Jump to this tier in the deep dive">{escaped_name}</a>'
+        )
+    else:
+        heading_html = f'{heading_prefix}{escaped_name}'
+
+    return (
+        f'<div class="iv-rec-card{cls_suffix}">'
+        f'<h3>{heading_html}</h3>'
+        f'<p class="iv-rec-cutoffs">Cutoff: {cutoffs}</p>'
+        f'<p class="iv-rec-members">{members} of {n_ivs} IVs qualify '
+        f'({pct:.1f}%).</p>'
+        + (f'<p class="iv-rec-desc">{html.escape(desc)}</p>' if desc else '')
+        + '</div>'
+    )
+
+
+def _render_iv_recommendations_per_form_section(cd_move: str,
+                                                forms: list[dict],
+                                                article: dict) -> str:
+    """Tier cards for every form, flowing in a single grid. ♂/♀ symbols
+    and blue/pink tints distinguish form membership.
+    """
+    cards: list[str] = []
+    dive_links: list[tuple[str, str]] = []
+    for f in forms:
+        best_cd = f['best_cd']
+        tiers = best_cd.get('tiers') or []
+        iv_tiers = best_cd.get('iv_tiers') or []
+        n_ivs = best_cd.get('n_ivs', 0)
+        if not tiers:
+            continue
+        member_counts = [0] * len(tiers)
+        for ti in iv_tiers:
+            if 0 <= ti < len(tiers):
+                member_counts[ti] += 1
+        fast, charged = _parse_moveset_label(best_cd['label'])
+        moveset_file = (
+            f'index_m0_{fast.lower()}_{"_".join(c.lower() for c in charged)}.html'
+        )
+        for t, m in zip(tiers, member_counts):
+            href = _tier_card_href(t.get('name') or '', f['dive_slug'], moveset_file)
+            cards.append(_render_tier_card(t, m, n_ivs,
+                                           form_label=f['label'],
+                                           link_href=href))
+        dive_links.append(
+            (f['label'], f'../../{f["dive_slug"]}/{moveset_file}#dd-threshold-tiers')
+        )
+
+    if not cards:
+        return render_placeholder(
+            'iv-recommendations', 'IV Recommendations',
+            'No tier data found for any form\'s best CD moveset.')
+
+    link_items = ', '.join(
+        f'<a href="{html.escape(url)}">{html.escape(label)} dive</a>'
+        for label, url in dive_links
+    )
+    intro = (
+        f'<p class="iv-rec-intro">Tier cutoffs from each form\'s best CD '
+        f'moveset. Cards are colored by form (&#9794; blue / &#9792; pink) '
+        f'and flow together in the grid below. Tier names differ between '
+        f'forms because base stats differ, so there is no 1:1 mapping - '
+        f'read the cards as two separate sets sharing a grid. For the '
+        f'per-anchor matchup bullets backing each tier, follow through '
+        f'to each deep dive\'s Threshold Tiers section: {link_items}.</p>'
+    )
+    return intro + '\n<div class="iv-rec-grid">' + '\n'.join(cards) + '</div>'
+
+
 def _render_iv_recommendations_section(cd_move: str, species: str,
                                        league: str, dive: dict,
                                        article: dict) -> str:
@@ -999,31 +1494,13 @@ def _render_iv_recommendations_section(cd_move: str, species: str,
     )
     dive_href = f'../../{dive_slug}/{moveset_file}#dd-threshold-tiers' if dive_slug else ''
 
-    cards = []
-    for t, members in zip(tiers, member_counts):
-        name = (t.get('name') or '').replace('<br>', ' - ')
-        atk = t.get('attack') or 0
-        def_ = t.get('defense') or 0
-        hp = t.get('stamina') or 0
-        cutoff_bits = []
-        if atk:
-            cutoff_bits.append(f'atk&ge;{atk:.2f}')
-        if def_:
-            cutoff_bits.append(f'def&ge;{def_:.2f}')
-        if hp:
-            cutoff_bits.append(f'hp&ge;{hp:g}')
-        cutoffs = ', '.join(cutoff_bits) if cutoff_bits else 'no cutoff'
-        desc = (t.get('toml_description') or t.get('desc') or '').strip()
-        pct = (100.0 * members / n_ivs) if n_ivs else 0.0
-        cards.append(
-            '<div class="iv-rec-card">'
-            f'<h3>{html.escape(name)}</h3>'
-            f'<p class="iv-rec-cutoffs">Cutoff: {cutoffs}</p>'
-            f'<p class="iv-rec-members">{members} of {n_ivs} IVs qualify '
-            f'({pct:.1f}%).</p>'
-            + (f'<p class="iv-rec-desc">{html.escape(desc)}</p>' if desc else '')
-            + '</div>'
+    cards = [
+        _render_tier_card(
+            t, m, n_ivs,
+            link_href=_tier_card_href(t.get('name') or '', dive_slug, moveset_file),
         )
+        for t, m in zip(tiers, member_counts)
+    ]
     pretty = html.escape(best_cd['pretty_label'] or best_cd['label'])
     intro = (
         f'<p class="iv-rec-intro">Tier cutoffs from the best CD moveset '
@@ -1130,7 +1607,13 @@ def _load_form_comparison_spec(article: dict) -> dict | None:
 
 
 def _render_form_comparison_section(article: dict) -> str | None:
-    """Return the form-comparison fragment, or None when nothing is wired."""
+    """Return the form-comparison fragment, or None when nothing is wired.
+
+    The per-form Matchup Delta table already covers pairwise form-vs-form
+    win rates via its ♂/♀ Mud Slap WR columns, so the form-comparison
+    section drops its own matchup-delta sub-table to avoid duplication.
+    Base stats, moveset, and verdict remain unique to this section.
+    """
     spec = _load_form_comparison_spec(article)
     if spec is None:
         return None
@@ -1142,6 +1625,7 @@ def _render_form_comparison_section(article: dict) -> str | None:
         gm=gm,
         title=spec.get('title', ''),
         summary=spec.get('summary', ''),
+        include_matchup_delta=False,
     )
 
 
@@ -1156,7 +1640,14 @@ def render_section(section_id: str, heading: str, todo: str,
     elif section_id == 'move-comparison':
         body_html = _render_move_comparison_section(cd_move, species, league)
     elif section_id == 'matchup-delta' and dive is not None:
-        body_html = _render_matchup_delta_section(cd_move, species, league, dive)
+        form_spec = _load_form_comparison_spec(article)
+        forms = (_collect_per_form_best_movesets(form_spec, cd_move, load_gamemaster())
+                 if form_spec else None)
+        if forms and len(forms) >= 2:
+            body_html = _render_matchup_delta_per_form_section(
+                cd_move, forms, load_gamemaster())
+        else:
+            body_html = _render_matchup_delta_section(cd_move, species, league, dive)
     elif section_id == 'form-comparison':
         fragment = _render_form_comparison_section(article)
         if fragment is None:
@@ -1165,8 +1656,15 @@ def render_section(section_id: str, heading: str, todo: str,
         block = article.get('form_comparison') or {}
         heading = block.get('heading', heading)
     elif section_id == 'iv-recommendations' and dive is not None:
-        body_html = _render_iv_recommendations_section(
-            cd_move, species, league, dive, article)
+        form_spec = _load_form_comparison_spec(article)
+        iv_forms = (_collect_per_form_best_movesets(form_spec, cd_move, load_gamemaster())
+                    if form_spec else None)
+        if iv_forms and len(iv_forms) >= 2:
+            body_html = _render_iv_recommendations_per_form_section(
+                cd_move, iv_forms, article)
+        else:
+            body_html = _render_iv_recommendations_section(
+                cd_move, species, league, dive, article)
     elif section_id == 'verdict' and dive is not None:
         body_html = _render_verdict_section(cd_move, species, league, dive)
     else:
@@ -1302,6 +1800,45 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   ul.matchup-delta-movesets li {{ margin: 2px 0; }}
   table.matchup-delta {{ border-collapse: collapse; margin: 10px 0;
                          width: 100%; font-size: 13px; }}
+  div.matchup-delta-scroll {{ overflow-x: auto; margin: 10px 0;
+         max-width: 100%; }}
+  table.matchup-delta-perform {{ font-size: 12px; min-width: 640px; }}
+  table.matchup-delta-perform th, table.matchup-delta-perform td {{
+         padding: 4px 6px; }}
+  table.matchup-delta-perform thead th {{ white-space: normal;
+         vertical-align: bottom; line-height: 1.25; }}
+  table.matchup-delta-perform tbody td {{ white-space: nowrap; }}
+  table.matchup-delta-perform th.num,
+  table.matchup-delta-perform td.num {{ text-align: right;
+         font-variant-numeric: tabular-nums; }}
+  table.matchup-delta-perform th.diag-start,
+  table.matchup-delta-perform td.diag-start {{ border-left: 2px solid #3d5580; }}
+  /* M/F column tints. Non-flip rows get a faint blue/pink wash; flip
+     rows layer the same wash on top of their green/red row color via
+     multi-background so the form lane stays visible. */
+  table.matchup-delta-perform td.male {{ background: rgba(91,141,217,0.20); }}
+  table.matchup-delta-perform td.female {{ background: rgba(217,108,145,0.20); }}
+  table.matchup-delta-perform thead th.male {{ background: rgba(91,141,217,0.22); }}
+  table.matchup-delta-perform thead th.female {{ background: rgba(217,108,145,0.22); }}
+  table.matchup-delta-perform tr.matchup-delta-flip-pos td {{ background: #152b1a; }}
+  table.matchup-delta-perform tr.matchup-delta-flip-neg td {{ background: #2b1515; }}
+  table.matchup-delta-perform tr.matchup-delta-flip-pos td.male {{
+        background: linear-gradient(rgba(91,141,217,0.22),rgba(91,141,217,0.22)), #152b1a; }}
+  table.matchup-delta-perform tr.matchup-delta-flip-pos td.female {{
+        background: linear-gradient(rgba(217,108,145,0.22),rgba(217,108,145,0.22)), #152b1a; }}
+  table.matchup-delta-perform tr.matchup-delta-flip-neg td.male {{
+        background: linear-gradient(rgba(91,141,217,0.22),rgba(91,141,217,0.22)), #2b1515; }}
+  table.matchup-delta-perform tr.matchup-delta-flip-neg td.female {{
+        background: linear-gradient(rgba(217,108,145,0.22),rgba(217,108,145,0.22)), #2b1515; }}
+  p.mf-split-filter {{ margin: 10px 0 6px 0; font-size: 13px; color: #b8c4d8;
+         background: #12192e; padding: 8px 12px; border-radius: 4px;
+         border-left: 3px solid #c8a2d0; }}
+  p.mf-split-filter label {{ cursor: pointer; }}
+  p.mf-split-filter input {{ margin-right: 6px; vertical-align: middle; }}
+  span.form-label.male {{ color: rgba(91,141,217,1); font-weight: 600; }}
+  span.form-label.female {{ color: rgba(217,108,145,1); font-weight: 600; }}
+  table.matchup-delta-perform.filter-split tbody tr[data-form-split="same"] {{
+        display: none; }}
   table.matchup-delta th, table.matchup-delta td {{ border: 1px solid #0f3460;
         padding: 5px 9px; text-align: left; }}
   table.matchup-delta thead th {{ background: #16213e; color: #c8a2d0; }}
@@ -1345,8 +1882,17 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   div.iv-rec-card {{ background: #0f162a; border: 1px solid #0f3460;
                      border-left: 3px solid #c8a2d0; border-radius: 6px;
                      padding: 10px 12px; font-size: 13px; }}
+  div.iv-rec-card.male {{ background: linear-gradient(rgba(91,141,217,0.14),
+                          rgba(91,141,217,0.14)), #0f162a;
+                          border-left-color: rgba(91,141,217,0.8); }}
+  div.iv-rec-card.female {{ background: linear-gradient(rgba(217,108,145,0.14),
+                            rgba(217,108,145,0.14)), #0f162a;
+                            border-left-color: rgba(217,108,145,0.8); }}
   div.iv-rec-card h3 {{ color: #c8a2d0; font-size: 14px; margin: 0 0 4px 0;
                         border-bottom: none; padding-bottom: 0; }}
+  div.iv-rec-card h3 a {{ color: inherit; text-decoration: none; }}
+  div.iv-rec-card h3 a:hover {{ text-decoration: underline;
+                                filter: brightness(1.1); }}
   p.iv-rec-cutoffs {{ color: #9ab0d8; margin: 2px 0; font-family: monospace;
                       font-size: 12px; }}
   p.iv-rec-members {{ color: #b8c4d8; margin: 2px 0; }}
@@ -1384,6 +1930,9 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
       return parseFloat(t.replace('%', '')) || 0;
     }}
     if (kind === 'bool') {{
+      if (t.indexOf('+Flip') !== -1) return 2;
+      if (t.indexOf('-Flip') !== -1) return -1;
+      if (t.indexOf('No flip') !== -1) return 0;
       return t.length > 0 ? 1 : 0;
     }}
     return t.toLowerCase();
@@ -1407,6 +1956,13 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
     }});
     ths[colIdx].classList.add(dir === 'desc' ? 'sort-desc' : 'sort-asc');
   }}
+  document.querySelectorAll('.mf-split-toggle').forEach(function(cb) {{
+    cb.addEventListener('change', function(e) {{
+      var id = cb.getAttribute('data-target');
+      var table = document.getElementById(id);
+      if (table) table.classList.toggle('filter-split', e.target.checked);
+    }});
+  }});
   document.querySelectorAll('table.sortable').forEach(function(table) {{
     var ths = table.querySelectorAll('thead th');
     ths.forEach(function(th, idx) {{

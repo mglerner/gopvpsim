@@ -540,12 +540,15 @@ def _render_verdict(loadouts_data: list[dict]) -> str:
 
 def build_comparison_fragment(loadouts_data: list[dict], league: str,
                               gm: dict, title: str,
-                              summary: str = '') -> str:
+                              summary: str = '',
+                              include_matchup_delta: bool = True) -> str:
     """Return the HTML fragment for embedding in an article section.
 
-    Contents: base-stat table, moveset-stat table, verdict, one matchup
-    delta table per unordered pair of loadouts, and an overall flip-count
-    roll-up.
+    Contents: base-stat table, moveset-stat table, verdict, and (when
+    ``include_matchup_delta`` is True) one matchup-delta table per
+    unordered pair of loadouts plus a flip-count roll-up. Articles that
+    already render per-form matchup-delta tables elsewhere should pass
+    ``include_matchup_delta=False`` to avoid duplicating that content.
     """
     shared = _align_opponents(loadouts_data)
     skipped = []
@@ -586,24 +589,23 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
     bits.append('<h3>Verdict</h3>')
     bits.append(_render_verdict(loadouts_data))
 
-    total_flips = 0
-    pairs = list(itertools.combinations(loadouts_data, 2))
-    per_pair_heading = len(pairs) > 1
-    for a, b in pairs:
-        if per_pair_heading:
-            pair_heading = f'{a["spec"].label} vs {b["spec"].label}'
-            bits.append(f'<h3>{html.escape(pair_heading)}</h3>')
-        else:
-            bits.append('<h3>Matchup Delta</h3>')
-        table, flips = _render_pairwise_table(a, b, shared, gm, league)
-        total_flips += flips
-        bits.append(table)
-        bits.append(
-            f'<p class="matchup-delta-summary">{flips} of {len(shared)} '
-            f'opponents flip across the 50% win line between '
-            f'{html.escape(a["spec"].label)} and '
-            f'{html.escape(b["spec"].label)}.</p>'
-        )
+    if include_matchup_delta:
+        pairs = list(itertools.combinations(loadouts_data, 2))
+        per_pair_heading = len(pairs) > 1
+        for a, b in pairs:
+            if per_pair_heading:
+                pair_heading = f'{a["spec"].label} vs {b["spec"].label}'
+                bits.append(f'<h3>{html.escape(pair_heading)}</h3>')
+            else:
+                bits.append('<h3>Matchup Delta</h3>')
+            table, flips = _render_pairwise_table(a, b, shared, gm, league)
+            bits.append(table)
+            bits.append(
+                f'<p class="matchup-delta-summary">{flips} of {len(shared)} '
+                f'opponents flip across the 50% win line between '
+                f'{html.escape(a["spec"].label)} and '
+                f'{html.escape(b["spec"].label)}.</p>'
+            )
 
     return '\n'.join(bits)
 
