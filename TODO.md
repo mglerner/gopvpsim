@@ -1,3 +1,38 @@
+## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
+
+Current thread: pre-ship polish between S10 ship day (2026-04-18) and
+Oinkologne CD (2026-05-09). Canonical ordering, read this first when
+resuming:
+
+1. **Cross-form re-dive** (TODO.md "Pre-ship: cross-form opponent
+   coverage" below). Supervised session, Claude monitors output.
+   Adds both Oinkologne forms to `opponent_pools/gl_top50_plus_cs.txt`,
+   re-dives each serially with `--reserve-cpus 1`, regenerates article
+   + standalone comparison page. `cd_prep` auto-injection (shipped
+   2026-04-18) removes the `--fast MUD_SLAP` workaround; overnight re-
+   dive validates that path. Test article manually after.
+2. **JRE / RyanSwag / ours comparison** (`~/.claude/plans/
+   jre-ryanswag-comparison.md`). Reads external refs + our final
+   article, produces `docs/jre_ryanswag_comparison.md` with classified
+   gap analysis. Two-way framing (hide our padding, add their
+   analytical prose). Default disposition for "we have content they
+   don't" is HIDE behind `<details>`, not remove - see
+   `feedback_hide_not_remove` memory.
+3. **F1-F5 follow-ups** surfaced by the comparison output. Each is
+   its own short session. Likely includes a new "Meta Role /
+   Strengths & Weaknesses" section type (F1) and key-matchup callout
+   prose (F2). Aegislash dive (SwagTips arc) becomes the first test
+   case for F1 once it lands.
+4. **P1-P4 polish** (see "Post-ship (article + dive polish)" section
+   below) - pull forward opportunistically if capacity allows before
+   CD day.
+5. **Link-verification pass** (P4) and **ship**.
+
+Post-ship, the post-S5 arc resumes at S11-S17 in
+`~/.claude/plans/post-s5-oinkologne-arc.md` (HTML file-size,
+matchup-flip attribution, post-debuff breakpoints, bait policy).
+Those are **not pre-ship items** - do not pull forward.
+
 ## CD-prep tracking (2026-04-17, fix shipped 2026-04-18)
 
 **SHIPPED.** Per-species `[cd_prep]` TOML block is now read by
