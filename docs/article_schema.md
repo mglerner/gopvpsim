@@ -297,6 +297,43 @@ lives inside the existing Verdict `<section>`.
 Omitting the entire `[verdict]` block leaves only the mechanical
 line (pre-F4 behaviour).
 
+## Matchup Delta config (F2, shipped 2026-04-18)
+
+The Matchup Delta section auto-generates a "Biggest flips" callout
+between the moveset list and the full sortable table: the top-N
+opponents whose per-form win-rate swung the most after the CD move.
+The heuristic partitions opponents by direction (wins the CD move
+creates vs losses it creates) and takes the N-biggest from each
+bucket, padding from the other if one bucket runs short. Rendered
+as a compact bulleted list — numeric claims only, no auto-prose.
+
+The bucket sizes are tunable per-article via `[matchup_delta]`:
+
+```toml
+[matchup_delta]
+# Up-to-N biggest wins the CD move creates (positive-direction
+# bullets). Default: 3. Set to 0 to suppress the positive side.
+key_flips_pos = 3
+
+# Up-to-N biggest losses the CD move creates (negative-direction
+# bullets). Default: 3. Set to 0 to suppress the negative side.
+key_flips_neg = 3
+```
+
+Omit the block entirely to get the 3-and-3 defaults. Rendering
+policy: always includes both sides when the data supports it;
+3-and-3 is symmetric because we have no principled reason to bias
+toward either direction, and CD moves that create lopsided data
+(e.g., all-positive flips) naturally collapse to all-positive
+callouts via the bucket-padding fallback.
+
+### Field reference (Matchup Delta config)
+
+| Field                         | Required | Type | Notes                                  |
+| ----------------------------- | -------- | ---- | -------------------------------------- |
+| `matchup_delta.key_flips_pos` | no       | int  | Biggest-wins bucket size. Default 3.   |
+| `matchup_delta.key_flips_neg` | no       | int  | Biggest-losses bucket size. Default 3. |
+
 ## Obsolescence semantics
 
 - `current` -- the article's framing (sidegrade/upgrade/etc.) still holds.
