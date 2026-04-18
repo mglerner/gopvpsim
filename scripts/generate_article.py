@@ -501,14 +501,17 @@ def _render_meta_coverage_per_form_section(cd_move: str, forms: list[dict],
     intro = (
         f'<p class="meta-coverage-intro">Each form\'s <code>'
         f'{html.escape(cd_name)}</code> win rate across all 9 shield '
-        f'scenarios. Green above 50%, red below. Shield asymmetry '
-        f'dominates the extremes - 2v0 is essentially a free win and '
-        f'0v2 essentially a free loss regardless of species or form - '
-        f'so the interesting reading is <em>within a column</em>: does '
-        f'form choice swing the outcome at a given shield count? Most '
-        f'players give the even-shield scenarios (0v0, 1v1, 2v2) more '
-        f'weight when team-building, though shield use varies by '
-        f'playstyle.</p>'
+        f'scenarios. Green above 50%, red below.</p>'
+        f'<details class="methodology-details">'
+        f'<summary>How to read this grid</summary>'
+        f'<p>Shield asymmetry dominates the extremes - 2v0 is '
+        f'essentially a free win and 0v2 essentially a free loss '
+        f'regardless of species or form - so the interesting reading '
+        f'is <em>within a column</em>: does form choice swing the '
+        f'outcome at a given shield count? Most players give the '
+        f'even-shield scenarios (0v0, 1v1, 2v2) more weight when '
+        f'team-building, though shield use varies by playstyle.</p>'
+        f'</details>'
         f'<details class="methodology-details">'
         f'<summary>How the numbers are computed</summary>'
         f'<p>Each cell averages <strong>{n_ivs:,} focal IVs &times; '
@@ -1421,9 +1424,12 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
     pool_label = (forms[0].get('opponent_label') or '').strip()
     if pool_label:
         intro_lines.append(
-            f'<p class="matchup-delta-pool"><strong>Opponents:</strong> '
-            f'{len(ordered_opponents)} species shared across both form '
-            f'dives ({html.escape(pool_label)}).</p>'
+            f'<details class="methodology-details">'
+            f'<summary>Opponent pool</summary>'
+            f'<p><strong>{len(ordered_opponents)} species</strong> '
+            f'shared across both form dives '
+            f'({html.escape(pool_label)}).</p>'
+            f'</details>'
         )
 
     n_ivs = forms[0]['best_cd'].get('n_ivs', 0)
@@ -1937,13 +1943,17 @@ def _render_iv_recommendations_per_form_section(cd_move: str,
         for label, url in dive_links
     )
     intro = (
-        f'<p class="iv-rec-intro">Tier cutoffs from each form\'s best CD '
-        f'moveset. Cards are colored by form (&#9794; blue / &#9792; pink) '
-        f'and flow together in the grid below. Tier names differ between '
-        f'forms because base stats differ, so there is no 1:1 mapping - '
-        f'read the cards as two separate sets sharing a grid. For the '
-        f'per-anchor matchup bullets backing each tier, follow through '
-        f'to each deep dive\'s Threshold Tiers section: {link_items}.</p>'
+        f'<p class="iv-rec-intro">Follow through to each deep dive\'s '
+        f'Threshold Tiers section for the per-anchor matchup bullets '
+        f'backing each tier: {link_items}.</p>'
+        f'<details class="methodology-details">'
+        f'<summary>About these tiers</summary>'
+        f'<p>Tier cutoffs are taken from each form\'s best CD moveset. '
+        f'Cards are colored by form (&#9794; blue / &#9792; pink) and '
+        f'flow together in the grid below. Tier names differ between '
+        f'forms because base stats differ, so there is no 1:1 mapping '
+        f'- read the cards as two separate sets sharing a grid.</p>'
+        f'</details>'
     )
     return intro + '\n<div class="iv-rec-grid">' + '\n'.join(cards) + '</div>'
 

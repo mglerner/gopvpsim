@@ -561,9 +561,14 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
     lead = (f'{len(shared)} opponents are common to all loadouts')
     if skipped:
         lead += f' ({len(skipped)} dropped, missing from at least one dive)'
-    bits.append(f'<p class="compare-lead">{lead}. Win rate = fraction of '
-                f'simulations (4096 focal IVs x 9 shield scenarios) where '
-                f'the focal species scores at least 500.</p>')
+    bits.append(
+        f'<details class="methodology-details compare-lead-details">'
+        f'<summary>About these numbers</summary>'
+        f'<p>{lead}. Win rate = fraction of simulations (4096 focal IVs '
+        f'x 9 shield scenarios) where the focal species scores at '
+        f'least 500.</p>'
+        f'</details>'
+    )
 
     dive_items = []
     for ld in loadouts_data:
@@ -633,6 +638,13 @@ p.compare-summary { font-size: 14px; color: #cfe8cf; background: #1a2e1f;
   border-left: 3px solid #7db87d; padding: 10px 14px; border-radius: 6px; }
 ul.compare-dives { margin: 6px 0 10px 20px; padding: 0; font-size: 14px; }
 ul.compare-dives li { margin: 2px 0; }
+details.methodology-details { background: #12192e;
+  border-left: 3px solid #5b8dd9; border-radius: 4px;
+  padding: 8px 12px; font-size: 13px; color: #b8c4d8;
+  margin: 8px 0; }
+details.methodology-details summary { cursor: pointer;
+  color: #c8a2d0; font-weight: 500; }
+details.methodology-details p { margin: 8px 0 0 0; }
 """
 
 
