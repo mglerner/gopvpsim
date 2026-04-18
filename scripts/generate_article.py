@@ -226,6 +226,7 @@ def _load_one_dive_file(path: Path) -> dict:
         'opponent_label': data.get('opponentLabel') or '',
         'tiers': data.get('tiers') or [],
         'iv_tiers': data.get('ivTiers') or [],
+        'iv_all_tiers': data.get('ivAllTiers') or [],
         'n_ivs': n_ivs,
     }
 
@@ -1403,14 +1404,19 @@ def _render_iv_recommendations_per_form_section(cd_move: str,
     for f in forms:
         best_cd = f['best_cd']
         tiers = best_cd.get('tiers') or []
-        iv_tiers = best_cd.get('iv_tiers') or []
+        iv_all_tiers = best_cd.get('iv_all_tiers') or []
         n_ivs = best_cd.get('n_ivs', 0)
         if not tiers:
             continue
+        # Count IVs that CLEAR each tier's cutoffs (not tier-exclusive
+        # assignment). Using ivAllTiers matches the dive's per-tier IV
+        # count so an atk tier whose cutoff is cleared by IVs that ALSO
+        # clear a stricter tier still shows its real clear count.
         member_counts = [0] * len(tiers)
-        for ti in iv_tiers:
-            if 0 <= ti < len(tiers):
-                member_counts[ti] += 1
+        for iv_tier_list in iv_all_tiers:
+            for ti in iv_tier_list:
+                if 0 <= ti < len(tiers):
+                    member_counts[ti] += 1
         fast, charged = _parse_moveset_label(best_cd['label'])
         moveset_file = (
             f'index_m0_{fast.lower()}_{"_".join(c.lower() for c in charged)}.html'
@@ -1475,17 +1481,20 @@ def _render_iv_recommendations_section(cd_move: str, species: str,
     best_cd = max(cd_movesets, key=lambda m: m['win_rate'])
 
     tiers = best_cd.get('tiers') or []
-    iv_tiers = best_cd.get('iv_tiers') or []
+    iv_all_tiers = best_cd.get('iv_all_tiers') or []
     n_ivs = best_cd.get('n_ivs', 0)
     if not tiers:
         return render_placeholder(
             'iv-recommendations', 'IV Recommendations',
             'Dive data has no tiers for the best CD moveset.')
 
+    # Count IVs that clear each tier's cutoffs (matches the dive's own
+    # per-tier count, not the tier-exclusive assignment).
     member_counts = [0] * len(tiers)
-    for ti in iv_tiers:
-        if 0 <= ti < len(tiers):
-            member_counts[ti] += 1
+    for iv_tier_list in iv_all_tiers:
+        for ti in iv_tier_list:
+            if 0 <= ti < len(tiers):
+                member_counts[ti] += 1
 
     dive_slug = article.get('links', {}).get('deep_dive_slug', '')
     fast, charged = _parse_moveset_label(best_cd['label'])
