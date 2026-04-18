@@ -161,14 +161,47 @@ def _decompress_scores(b64: str) -> list[int]:
     return list(struct.unpack(f'<{n}H', raw))
 
 
+OPP_IV_MODE_KEYS = ('pvpoke', 'pvpoke:nobait', 'rank1', 'rank1:nobait')
+
+
+def _aggregate_wins(scores: list[int], n_ivs: int, n_s: int, n_o: int
+                    ) -> dict:
+    """Count wins into per-scenario / per-opponent / total summaries."""
+    per_scenario_wins = [0] * n_s
+    per_opponent_wins = [0] * n_o
+    total_wins = 0
+    for iv in range(n_ivs):
+        base_iv = iv * n_s * n_o
+        for si in range(n_s):
+            base = base_iv + si * n_o
+            w = 0
+            for oi in range(n_o):
+                if scores[base + oi] >= 500:
+                    w += 1
+                    per_opponent_wins[oi] += 1
+            per_scenario_wins[si] += w
+            total_wins += w
+    per_scenario_n = n_ivs * n_o
+    per_opponent_n = n_ivs * n_s
+    expected = n_ivs * n_s * n_o
+    return {
+        'win_rate': total_wins / expected,
+        'per_scenario_win_rate': [w / per_scenario_n for w in per_scenario_wins],
+        'per_opponent_win_rate': [w / per_opponent_n for w in per_opponent_wins],
+    }
+
+
 def _load_one_dive_file(path: Path) -> dict:
     """Parse one dive HTML sibling into win-rate summaries.
 
-    Reads the embedded DATA JSON for labels + scenario shape, decompresses
-    SCORES_GZ['0_pvpoke'], and counts wins (score >= 500, matching the
-    scatter plot's `winsPvpoke` y-axis definition). pvpoke (bait-on) is
-    the default dive view; mirroring it keeps the verdict consistent with
-    what a dive reader sees on landing.
+    Reads the embedded DATA JSON for labels + scenario shape and
+    decompresses every available SCORES_GZ variant to aggregate per
+    (opp_iv_mode, bait_mode) into win-rate summaries. The 'pvpoke'
+    (default-IV, bait-on) view is the top-level `win_rate` /
+    `per_scenario_win_rate` / `per_opponent_win_rate` for backwards
+    compat with callers that predate the toggle. Every variant is
+    available in `variants[mode]` for the article's opponent-IV
+    dropdown.
     """
     content = path.read_text()
     data_blob = _extract_js_assignment(content, 'DATA')
@@ -182,45 +215,34 @@ def _load_one_dive_file(path: Path) -> dict:
 
     scores_blob = _extract_js_assignment(content, 'SCORES_GZ')
     scores_gz = json.loads(scores_blob)
-    key = '0_pvpoke'
-    if key not in scores_gz:
-        raise ValueError(f'{path}: SCORES_GZ missing {key!r}')
-    scores = _decompress_scores(scores_gz[key])
 
     n_ivs = data['nIvs']
     n_s = data['nScenarios']
     n_o = data['nOpponents']
     expected = n_ivs * n_s * n_o
-    if len(scores) != expected:
-        raise ValueError(
-            f'{path}: score length {len(scores)} != nIvs*nS*nO={expected}')
 
-    per_scenario_wins = [0] * n_s
-    per_scenario_n = n_ivs * n_o
-    per_opponent_wins = [0] * n_o
-    per_opponent_n = n_ivs * n_s
-    total_wins = 0
-    for iv in range(n_ivs):
-        base_iv = iv * n_s * n_o
-        for si in range(n_s):
-            base = base_iv + si * n_o
-            w = 0
-            for oi in range(n_o):
-                if scores[base + oi] >= 500:
-                    w += 1
-                    per_opponent_wins[oi] += 1
-            per_scenario_wins[si] += w
-            total_wins += w
-    per_scenario_rate = [w / per_scenario_n for w in per_scenario_wins]
-    per_opponent_rate = [w / per_opponent_n for w in per_opponent_wins]
-    win_rate = total_wins / expected
+    variants: dict[str, dict] = {}
+    for mode in OPP_IV_MODE_KEYS:
+        gz_key = f'0_{mode}'
+        if gz_key not in scores_gz:
+            continue
+        scores = _decompress_scores(scores_gz[gz_key])
+        if len(scores) != expected:
+            raise ValueError(
+                f'{path}: {gz_key} score length {len(scores)} != {expected}')
+        variants[mode] = _aggregate_wins(scores, n_ivs, n_s, n_o)
+
+    if 'pvpoke' not in variants:
+        raise ValueError(f'{path}: SCORES_GZ missing 0_pvpoke')
+    base = variants['pvpoke']
 
     return {
         'label': label,
         'pretty_label': pretty,
-        'win_rate': win_rate,
-        'per_scenario_win_rate': per_scenario_rate,
-        'per_opponent_win_rate': per_opponent_rate,
+        'win_rate': base['win_rate'],
+        'per_scenario_win_rate': base['per_scenario_win_rate'],
+        'per_opponent_win_rate': base['per_opponent_win_rate'],
+        'variants': variants,
         'scenarios': data['scenarios'],
         'opponents': data['opponents'],
         'opponent_label': data.get('opponentLabel') or '',
@@ -513,27 +535,70 @@ def _render_meta_coverage_per_form_section(cd_move: str, forms: list[dict],
         col_cls = FORM_COL_CLASS.get(f['label'], '')
         col_suffix = f' {col_cls}' if col_cls else ''
         short = FORM_SYMBOLS.get(f['label'], html.escape(f['label']))
+        form_label = f['label']
         row_cells = [
-            f'<th scope="row" class="{col_cls}" title="{html.escape(f["label"])}">'
+            f'<th scope="row" class="{col_cls}" title="{html.escape(form_label)}">'
             f'{short}</th>'
         ]
         rates = f['best_cd'].get('per_scenario_win_rate') or []
-        for wr in rates:
+        for si, wr in enumerate(rates):
             # Same delta-pos/neg coloring as matchup-delta; no form-tint
             # on the cell background (the row header carries the form cue,
             # and tinting every cell would fight the green/red signal).
-            row_cells.append(_wr_cell(wr))
+            cls = ('num delta-pos' if wr > 0.5
+                   else 'num delta-neg' if wr < 0.5 else 'num')
+            row_cells.append(
+                f'<td class="{cls}" data-mc-form="{form_label}" '
+                f'data-mc-sc="{si}">{100 * wr:.1f}%</td>'
+            )
         body_rows.append(
             f'<tr class="meta-row{col_suffix}">' + ''.join(row_cells) + '</tr>'
         )
 
+    control = _render_opp_iv_toggle_control()
+
     table = (
-        '<table class="meta-coverage">'
+        '<table class="meta-coverage" id="mc-perform-table">'
         '<thead><tr>' + ''.join(header_cells) + '</tr></thead>'
         '<tbody>' + ''.join(body_rows) + '</tbody>'
         '</table>'
     )
-    return intro + '\n' + table
+    return control + '\n' + intro + '\n' + table
+
+
+def _render_opp_iv_toggle_control() -> str:
+    """Dropdown control that switches Meta Coverage and Matchup Delta
+    between the four (Opponent IVs x Bait) variants. Other sections
+    (Verdict, Form Comparison, IV Recommendations, Move Comparison)
+    stay fixed at PvPoke-default + bait-on and ignore this toggle; the
+    caption below the control calls that out so readers aren't
+    surprised.
+    """
+    oppiv_options = ''.join(
+        f'<option value="{html.escape(mode)}">{html.escape(label)}</option>'
+        for mode, label in OPP_IV_MODE_LABELS.items()
+    )
+    bait_options = ''.join(
+        f'<option value="{html.escape(mode)}">{html.escape(label)}</option>'
+        for mode, label in BAIT_MODE_LABELS.items()
+    )
+    return (
+        '<div class="article-opp-iv-control">'
+        '<label><span class="control-label">Opponent IVs:</span> '
+        f'<select class="article-opp-iv-mode">{oppiv_options}</select></label>'
+        '<label><span class="control-label">Bait:</span> '
+        f'<select class="article-bait-mode">{bait_options}</select></label>'
+        '<p class="article-opp-iv-caption">This toggle rewrites the '
+        'numbers in <strong>Meta Coverage</strong> (below) and '
+        '<strong>Matchup Delta</strong> (next section). <strong>Verdict'
+        '</strong>, <strong>Form Comparison</strong>, <strong>IV '
+        'Recommendations</strong>, and <strong>Move Comparison</strong> '
+        'stay at PvPoke-default opponent IVs with bait on, independent '
+        'of this control. "Rank 1" uses each opponent\'s highest-'
+        'stat-product IVs; "Never" disables bait-first shielding in the '
+        'sim.</p>'
+        '</div>'
+    )
 
 
 def _render_meta_coverage_section(cd_move: str, species: str,
@@ -912,6 +977,216 @@ def _collect_per_form_best_movesets(form_spec: dict, cd_move: str,
     return forms
 
 
+OPP_IV_MODE_LABELS = {
+    'pvpoke': 'PvPoke default',
+    'rank1': 'Rank 1',
+}
+BAIT_MODE_LABELS = {
+    'bait': 'Selective (bait on)',
+    'nobait': 'Never (bait off)',
+}
+
+
+def _article_toggle_script(payload: dict, form_labels: list[str],
+                           cd_name: str, default_name: str,
+                           total_opponents: int) -> str:
+    """Embed the variants payload + toggle JS handler.
+
+    The handler binds ``change`` on the two selects the Meta Coverage
+    section emitted and mutates Meta Coverage / Matchup Delta cells in
+    place. Verdict / Form Comparison / IV Recommendations / Move
+    Comparison are intentionally untouched; the caption above the
+    dropdowns tells readers which sections respond to the control.
+    """
+    payload_json = json.dumps(payload)
+    labels_json = json.dumps(form_labels)
+    cd_json = json.dumps(cd_name)
+    default_json = json.dumps(default_name)
+    # Total count is embedded as a literal since it's stable across
+    # variants (opp-IV mode doesn't add or drop opponents).
+    script = (
+        '<script>\n'
+        f'var ARTICLE_VARIANTS = {payload_json};\n'
+        f'var ARTICLE_FORM_LABELS = {labels_json};\n'
+        f'var ARTICLE_CD_NAME = {cd_json};\n'
+        f'var ARTICLE_DEFAULT_NAME = {default_json};\n'
+        f'var ARTICLE_TOTAL_OPPS = {total_opponents};\n'
+        '(function() {\n'
+        '  function wrSide(wr) {\n'
+        '    if (wr > 0.5) return 1; if (wr < 0.5) return -1; return 0;\n'
+        '  }\n'
+        '  function fmtDelta(d) {\n'
+        "    return (d >= 0 ? '+' : '') + d.toFixed(1);\n"
+        '  }\n'
+        '  function applyMetaCoverage(variant) {\n'
+        '    ARTICLE_FORM_LABELS.forEach(function(lbl) {\n'
+        '      var fd = variant[lbl]; if (!fd) return;\n'
+        '      fd.cd.per_sc.forEach(function(wr, i) {\n'
+        "        var cell = document.querySelector('td[data-mc-form=\"' + lbl + '\"][data-mc-sc=\"' + i + '\"]');\n"
+        '        if (!cell) return;\n'
+        "        cell.textContent = (100 * wr).toFixed(1) + '%';\n"
+        "        cell.classList.remove('delta-pos');\n"
+        "        cell.classList.remove('delta-neg');\n"
+        "        if (wr > 0.5) cell.classList.add('delta-pos');\n"
+        "        else if (wr < 0.5) cell.classList.add('delta-neg');\n"
+        '      });\n'
+        '    });\n'
+        '  }\n'
+        '  function applyMatchupDelta(variant) {\n'
+        "    var table = document.getElementById('mf-split-perform');\n"
+        '    if (!table) return;\n'
+        "    var rows = table.querySelectorAll('tbody tr[data-opponent]');\n"
+        '    var flipsPerForm = {};\n'
+        '    ARTICLE_FORM_LABELS.forEach(function(f) { flipsPerForm[f] = 0; });\n'
+        '    rows.forEach(function(row) {\n'
+        "      var opp = row.getAttribute('data-opponent');\n"
+        '      var anyFlip = false, anyPos = false, anyNeg = false;\n'
+        '      var cdSides = {};\n'
+        '      ARTICLE_FORM_LABELS.forEach(function(lbl) {\n'
+        '        var fd = variant[lbl]; if (!fd) return;\n'
+        '        var cdr = fd.cd.per_opp[opp]; var dfr = fd.df.per_opp[opp];\n'
+        '        if (cdr == null || dfr == null) return;\n'
+        '        var delta = 100 * (cdr - dfr);\n'
+        '        var flip = (cdr >= 0.5) !== (dfr >= 0.5);\n'
+        '        cdSides[String(wrSide(cdr))] = true;\n'
+        '        if (flip) {\n'
+        '          anyFlip = true; flipsPerForm[lbl]++;\n'
+        '          if (delta > 0) anyPos = true; else anyNeg = true;\n'
+        '        }\n'
+        "        var deltaCell = row.querySelector('td[data-md-role=\"' + lbl + '-delta\"]');\n"
+        '        if (deltaCell) {\n'
+        '          deltaCell.textContent = fmtDelta(delta);\n'
+        "          deltaCell.classList.remove('delta-pos');\n"
+        "          deltaCell.classList.remove('delta-neg');\n"
+        "          if (delta > 0) deltaCell.classList.add('delta-pos');\n"
+        "          else if (delta < 0) deltaCell.classList.add('delta-neg');\n"
+        '        }\n'
+        "        var dfCell = row.querySelector('td[data-md-role=\"' + lbl + '-df-wr\"]');\n"
+        "        if (dfCell) dfCell.textContent = (100 * dfr).toFixed(1) + '%';\n"
+        "        var cdCell = row.querySelector('td[data-md-role=\"' + lbl + '-cd-wr\"]');\n"
+        "        if (cdCell) cdCell.textContent = (100 * cdr).toFixed(1) + '%';\n"
+        "        var flipCell = row.querySelector('td[data-md-role=\"' + lbl + '-flip\"]');\n"
+        '        if (flipCell) {\n'
+        "          var badge = flipCell.querySelector('.flip-badge');\n"
+        '          if (badge) {\n'
+        "            var cls, text, tip;\n"
+        '            if (flip) {\n'
+        "              if (delta > 0) {\n"
+        "                cls = 'flip-pos'; text = '+Flip';\n"
+        "                tip = lbl + ': ' + ARTICLE_CD_NAME + ' wins this matchup where the old default loses it (crosses the 50% line).';\n"
+        '              } else {\n'
+        "                cls = 'flip-neg'; text = '-Flip';\n"
+        "                tip = lbl + ': old default wins this matchup where ' + ARTICLE_CD_NAME + ' loses it (crosses the 50% line).';\n"
+        '              }\n'
+        '            } else {\n'
+        "              cls = 'flip-none'; text = 'No flip';\n"
+        "              if (cdr >= 0.5 && dfr >= 0.5) tip = lbl + ': both movesets win on aggregate.';\n"
+        "              else if (cdr < 0.5 && dfr < 0.5) tip = lbl + ': both movesets lose on aggregate.';\n"
+        "              else tip = lbl + ': no flip across the 50% line.';\n"
+        '            }\n'
+        "            var unlinked = badge.classList.contains('flip-unlinked');\n"
+        "            badge.className = 'flip-badge ' + cls + (unlinked ? ' flip-unlinked' : '');\n"
+        '            badge.textContent = text;\n'
+        "            badge.setAttribute('title', tip);\n"
+        '          }\n'
+        '        }\n'
+        '      });\n'
+        "      var rowCls = '';\n"
+        "      if (anyFlip && anyPos && !anyNeg) rowCls = 'matchup-delta-flip matchup-delta-flip-pos';\n"
+        "      else if (anyFlip && anyNeg && !anyPos) rowCls = 'matchup-delta-flip matchup-delta-flip-neg';\n"
+        "      else if (anyFlip) rowCls = 'matchup-delta-flip';\n"
+        '      row.className = rowCls;\n'
+        "      row.setAttribute('data-form-split', Object.keys(cdSides).length > 1 ? 'split' : 'same');\n"
+        '    });\n'
+        "    var summary = document.getElementById('md-perform-summary');\n"
+        '    if (summary) {\n'
+        '      var parts = ARTICLE_FORM_LABELS.map(function(f) {\n'
+        "        return f + ': ' + flipsPerForm[f];\n"
+        "      }).join(', ');\n"
+        "      summary.textContent = 'Flips across the 50% win line by form (out of ' + ARTICLE_TOTAL_OPPS + ' opponents): ' + parts + '.';\n"
+        '    }\n'
+        "    var splitCount = table.querySelectorAll('tbody tr[data-form-split=\"split\"]').length;\n"
+        "    var countSpan = document.querySelector('.mf-split-count');\n"
+        '    if (countSpan) countSpan.textContent = splitCount;\n'
+        '  }\n'
+        '  function applyToggle() {\n'
+        "    var oppSel = document.querySelector('.article-opp-iv-mode');\n"
+        "    var baitSel = document.querySelector('.article-bait-mode');\n"
+        '    if (!oppSel || !baitSel) return;\n'
+        "    var key = baitSel.value === 'nobait' ? oppSel.value + ':nobait' : oppSel.value;\n"
+        '    var variant = ARTICLE_VARIANTS[key];\n'
+        '    if (!variant) return;\n'
+        '    applyMetaCoverage(variant);\n'
+        '    applyMatchupDelta(variant);\n'
+        '  }\n'
+        '  function bind() {\n'
+        "    document.querySelectorAll('.article-opp-iv-mode, .article-bait-mode').forEach(function(sel) {\n"
+        "      sel.addEventListener('change', applyToggle);\n"
+        '    });\n'
+        '  }\n'
+        "  if (document.readyState === 'loading') {\n"
+        "    document.addEventListener('DOMContentLoaded', bind);\n"
+        '  } else {\n'
+        '    bind();\n'
+        '  }\n'
+        '})();\n'
+        '</script>\n'
+    )
+    return script
+
+
+def _build_variants_payload(forms: list[dict]) -> dict:
+    """Return a JSON-serialisable mapping of opp-IV-mode keys to per-form
+    win-rate data for use by the article's opponent-IV dropdown.
+
+    Shape:
+        {
+          'pvpoke': {
+            'Male': {
+              'cd': {'per_opp': {opp: wr, ...}, 'per_sc': [wr, ...], 'wr': x},
+              'df': {...}
+            },
+            'Female': {...}
+          },
+          'pvpoke:nobait': {...}, 'rank1': {...}, 'rank1:nobait': {...}
+        }
+
+    Per-opponent lookup is keyed by opponent name (the same string used
+    in the Matchup Delta rows' ``data-opponent`` attribute) so the JS
+    toggle can address cells without relying on index alignment.
+    """
+    payload: dict[str, dict] = {}
+    modes = set()
+    for f in forms:
+        modes.update((f['best_cd'].get('variants') or {}).keys())
+        modes.update((f['best_default'].get('variants') or {}).keys())
+    for mode in modes:
+        payload[mode] = {}
+        for f in forms:
+            cd = f['best_cd']
+            df = f['best_default']
+            cd_var = (cd.get('variants') or {}).get(mode)
+            df_var = (df.get('variants') or {}).get(mode)
+            if cd_var is None or df_var is None:
+                continue
+            opponents = f['opponents']
+            cd_by_opp = dict(zip(opponents, cd_var['per_opponent_win_rate']))
+            df_by_opp = dict(zip(opponents, df_var['per_opponent_win_rate']))
+            payload[mode][f['label']] = {
+                'cd': {
+                    'wr': cd_var['win_rate'],
+                    'per_sc': cd_var['per_scenario_win_rate'],
+                    'per_opp': cd_by_opp,
+                },
+                'df': {
+                    'wr': df_var['win_rate'],
+                    'per_sc': df_var['per_scenario_win_rate'],
+                    'per_opp': df_by_opp,
+                },
+            }
+    return payload
+
+
 def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
                                            gm: dict) -> str:
     """Wide per-form matchup-delta table: each form contributes 4 columns
@@ -1043,21 +1318,28 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
                     any_negative = True
             col = _col_class(f['label'])
             col_suffix = f' {col}' if col else ''
+            form_label = f['label']
             delta_cls = ('num delta-pos' if delta_pp > 0
                          else 'num delta-neg' if delta_pp < 0
                          else 'num')
             verdict_cells.append(
-                f'<td class="{delta_cls}{col_suffix}">{delta_pp:+.1f}</td>')
+                f'<td class="{delta_cls}{col_suffix}" '
+                f'data-md-role="{form_label}-delta">{delta_pp:+.1f}</td>')
             flip_td_cls = col if col else ''
             if flip_td_cls:
-                verdict_cells.append(f'<td class="{flip_td_cls}">{badge}</td>')
+                verdict_cells.append(
+                    f'<td class="{flip_td_cls}" '
+                    f'data-md-role="{form_label}-flip">{badge}</td>')
             else:
-                verdict_cells.append(f'<td>{badge}</td>')
+                verdict_cells.append(
+                    f'<td data-md-role="{form_label}-flip">{badge}</td>')
             diag_prefix = ' diag-start' if fi == 0 else ''
             diag_cells.append(
-                f'<td class="num{diag_prefix}{col_suffix}">{100 * df_r:.1f}%</td>')
+                f'<td class="num{diag_prefix}{col_suffix}" '
+                f'data-md-role="{form_label}-df-wr">{100 * df_r:.1f}%</td>')
             diag_cells.append(
-                f'<td class="num{col_suffix}">{100 * cd_r:.1f}%</td>')
+                f'<td class="num{col_suffix}" '
+                f'data-md-role="{form_label}-cd-wr">{100 * cd_r:.1f}%</td>')
         if any_flip and any_positive and not any_negative:
             row_cls = 'matchup-delta-flip matchup-delta-flip-pos'
         elif any_flip and any_negative and not any_positive:
@@ -1068,7 +1350,8 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
             row_cls = ''
         split_attr = ' data-form-split="split"' if form_split else ' data-form-split="same"'
         row = (
-            f'<tr class="{row_cls}"{split_attr}>'
+            f'<tr class="{row_cls}"{split_attr} '
+            f'data-opponent="{html.escape(opp, quote=True)}">'
             f'<td>{html.escape(opp)}</td>'
             + ''.join(verdict_cells)
             + ''.join(diag_cells)
@@ -1124,8 +1407,8 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
     # the first form's delta (col index 3) which is a useful proxy.
     intro_lines = [
         '<p class="matchup-delta-intro">Per-opponent win-rate deltas for '
-        'both Oinkologne forms side-by-side: old-default fast move vs the '
-        'CD fast move. Click any column header to re-sort.</p>'
+        'each form side-by-side: old-default fast move vs the CD fast '
+        'move. Click any column header to re-sort.</p>'
     ]
     pool_label = (forms[0].get('opponent_label') or '').strip()
     if pool_label:
@@ -1134,6 +1417,22 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
             f'{len(ordered_opponents)} species shared across both form '
             f'dives ({html.escape(pool_label)}).</p>'
         )
+
+    n_ivs = forms[0]['best_cd'].get('n_ivs', 0)
+    n_scenarios = len(forms[0]['best_cd'].get('scenarios') or []) or 9
+    per_cell_sims = n_ivs * n_scenarios
+    intro_lines.append(
+        f'<p class="matchup-delta-intro">Each cell averages <strong>'
+        f'{n_ivs:,} focal IVs &times; {n_scenarios} shield scenarios '
+        f'= {per_cell_sims:,} simulated matchups</strong> at one (form, '
+        f'opponent) pair. Cells are <em>not</em> restricted to the '
+        f'rank-1 focal IV and <em>not</em> collapsed to a single '
+        f'default-vs-default battle. The Opponent IVs / Bait toggle '
+        f'above Meta Coverage rewrites these numbers to alternate '
+        f'variants (Rank 1 opponents, bait-off shielding, etc.); the '
+        f'default view shows PvPoke-default opponent IVs with bait on. '
+        f'Win = battle rating &ge; 500.</p>'
+    )
 
     moveset_lines = ['<ul class="matchup-delta-movesets">']
     for f in forms:
@@ -1173,9 +1472,6 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
         f'{html.escape(f["label"])}: {per_form_flip_count[fi]}'
         for fi, f in enumerate(forms)
     )
-    summary = (f'<p class="matchup-delta-summary">Flips across the 50% '
-               f'win line by form (out of {len(ordered_opponents)} '
-               f'opponents): {summary_bits}.</p>')
 
     form_labels = ' and '.join(
         f'<span class="form-label {_col_class(f["label"])}">'
@@ -1204,6 +1500,27 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
         '</table>'
         '</div>'
     )
+
+    payload = _build_variants_payload(forms)
+    default_fast_id = forms[0].get('default_fast_id') or ''
+    default_name = default_fast_id.replace('_', ' ').title() if default_fast_id else 'old default'
+    form_labels = [f['label'] for f in forms]
+    toggle_script = _article_toggle_script(
+        payload=payload,
+        form_labels=form_labels,
+        cd_name=cd_name,
+        default_name=default_name,
+        total_opponents=len(entries),
+    )
+    # Give the flip-summary paragraph an id so the JS can rewrite it
+    # when the toggle changes; also the matchup-delta-summary wrapper.
+    summary = (f'<p id="md-perform-summary" class="matchup-delta-summary">'
+               f'Flips across the 50% win line by form (out of '
+               f'{len(entries)} opponents): {summary_bits}.</p>')
+
+    return ('\n'.join(intro_lines) + '\n'
+            + '\n'.join(moveset_lines) + '\n'
+            + table + '\n' + summary + '\n' + toggle_script)
 
     return ('\n'.join(intro_lines) + '\n'
             + '\n'.join(moveset_lines) + '\n'
@@ -1979,6 +2296,17 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   table.move-compare tbody td {{ background: #0f162a; color: #e0e0e0; }}
   p.move-compare-note {{ color: #8ea1bd; font-size: 13px; margin-top: 4px; }}
   p.meta-coverage-intro {{ font-size: 14px; color: #b8c4d8; }}
+  div.article-opp-iv-control {{ background: #16213e; padding: 10px 14px;
+         border-radius: 6px; margin: 10px 0; border-left: 3px solid #5b8dd9; }}
+  div.article-opp-iv-control label {{ display: inline-block;
+         margin-right: 16px; font-size: 13px; color: #b8c4d8; }}
+  div.article-opp-iv-control span.control-label {{ color: #c8a2d0;
+         font-weight: 500; }}
+  div.article-opp-iv-control select {{ background: #0f162a; color: #e0e0e0;
+         border: 1px solid #3d5580; border-radius: 3px; padding: 2px 6px;
+         font-size: 13px; margin-left: 4px; }}
+  p.article-opp-iv-caption {{ font-size: 12px; color: #8ea1bd;
+         margin: 6px 0 0 0; }}
   table.meta-coverage {{ border-collapse: collapse; margin: 12px 0;
          width: 100%; font-size: 13px; }}
   table.meta-coverage th, table.meta-coverage td {{
