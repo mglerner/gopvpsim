@@ -236,6 +236,27 @@ boundary; the CLAUDE.md directive enforces the mental boundary.
 
 Depends on the overnight 2026-04-19 chain having completed.
 
+**No re-dives needed.** All template inputs (scores, matchup deltas,
+notable IVs, anchor flips, threshold tiers) are already embedded in
+the dive HTMLs — `SCORES_B64` blob carries the per-(IV, scenario,
+opponent) scores; tier / anchor / boundary data is also embedded.
+Workflow is **HTML patching, not simulation regeneration**:
+
+- **Dive side:** extend `scripts/patch_dive_species_narrative.py` to
+  (a) decode `SCORES_B64`, (b) run the template, (c) inject generated
+  prose in place of reading from TOML. Same patcher pattern we
+  already use to inject narrative into dive HTMLs. Seconds per dive.
+- **Article side:** `python scripts/generate_article.py Oinkologne
+  great "Mud Slap"` re-reads the dive HTMLs and rebuilds the article
+  in ~5 seconds. No re-dive.
+- **Atk-weight badges:** new patcher (or extend
+  `patch_dive_tier_anchors.py`) that finds each `.dd-rec-card`'s IV
+  spread, classifies, injects a badge. HTML surgery only.
+
+This path also applies to the **dives-1-3 retroactive patch** (morning
+task for the index.html landing-page fix) — same HTML-only surgery;
+no re-dives there either.
+
 **Order of operations:**
 
 1. **Delete 15 B-fields** across 5 TOMLs. Trivial: remove the
