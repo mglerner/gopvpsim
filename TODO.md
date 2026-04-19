@@ -710,6 +710,18 @@ break invariants that weren't yet nailed down by tests.
   IVs of competitive mons against rank 1s, find interesting IV targets, check
   for hidden corebreakers. Consider atk-weighted IVs for CMP tie priority.
 
+* **Reverse-engineer anchor intent from tournament CPs** — dracoviz dumps
+  real per-mon CPs (83% non-1500, 48 distinct values in the Orlando 2026
+  snapshot at `docs/tournament_data/cs_2026_orlando.json`). For each
+  tournament entry, enumerate 4096 IVs × valid levels, filter to matching
+  CP, cluster candidates into anchor categories (rank-1 SP, atk-weighted,
+  def-floor at threshold X, HP-floor, CMP atk-floor). Top-k categories per
+  mon give a best guess at what the player was aiming for, and aggregating
+  across the 156-team field lets us ask "do top-8 Forretress converge on
+  one anchor or spread across flavors?" and "do our TOML-authored
+  thresholds match what elite players actually chase?" Own branch when
+  this lands.
+
 * **Compare to reddit IV spectrum post** —
   https://www.reddit.com/r/TheSilphArena/comments/z11xr0/theorycrafting_iv_spectrum_graphs/
   Reproduce the method (move parameters have changed since then).
