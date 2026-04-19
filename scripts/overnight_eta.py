@@ -46,16 +46,29 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Loose fallback baselines (minutes) for when a bucket has no completed
-# data yet. Calibrated from observation of dive 1 in progress: Phase 2
-# (5 movesets × ~2min), Interactive sweep (5 movesets × several IV/
-# bait/shield sub-sweeps × ~2min each), mirror-slayer (4 rounds × sub-
-# sweeps). Real completions overwrite these quickly; these numbers just
-# keep the ETA from collapsing below reality before any dive completes.
+# Fallback baselines (minutes) for when a bucket has no completed
+# data yet. Recalibrated 2026-04-20 from scripts/summarize_perf.py
+# output against the 2026-04-19 overnight chain's 10 per-dive logs:
+#
+#   gl_full:       median 62.7m across 3 dives (Oink M/F, Tink GL)
+#   ul_full:       mean 76.2m across 2 dives (Tink UL, Aegis Shield UL)
+#   forretress_cs: median 25.3m across 4 dives (skips the 47m Bug Bite
+#                  outlier which appears throughput-limited, not
+#                  structural)
+#
+# Known misclassification: Aegislash Blade UL pins both --fast and
+# --charged so only 1 moveset runs (~26min total), but classify() here
+# puts it in ul_full (expects ~76m). Net effect: overestimates Blade
+# UL's remaining time by ~50min when Blade is the current dive. Bounded
+# impact on the whole-script ETA; fix only if a future chain's Blade-
+# like dive count grows. The summarizer's more precise taxonomy
+# (ul_pinned / forretress_cs / etc.) lives in scripts/summarize_perf.py
+# because it has access to the CLI flags via the logs, which
+# classify() here doesn't.
 FALLBACKS = {
-    'gl_full':    40.0,  # Oinkologne M/F, Tinkaton GL: top-50 + mirror-slayer + all sub-axes
-    'ul_full':    35.0,  # Tinkaton UL, Aegislash Blade/Shield UL: 60 opps, similar scale
-    'forretress': 6.0,   # CS top-32 pool, top-movesets=1, much faster
+    'gl_full':    63.0,
+    'ul_full':    76.0,
+    'forretress': 25.0,
     'post_dive':  5.0,   # total for steps 2-10 of overnight_redive.sh
 }
 
