@@ -18,3 +18,82 @@
 
 ["Aegislash (Blade)"]
 sources = "pogo-simulator hypothetical always-Blade dive (no PvPoke ranking); form-change mechanic is modeled natively by src/gopvpsim/formchange.py but the realistic path starts from Shield."
+
+# Species narrative (Shape 2 Session 3, 2026-04-19). Aegislash (Blade)
+# is a diagnostic hypothetical, not a realistic build target. See
+# docs/threshold_schema.md "Species narrative" for the schema. Drafted
+# from the form-change mechanic framing; no dive numbers yet. All
+# prose is auto-drafted and flagged for expert review. Cross-form
+# comparison framing (Blade profile vs canonical Shield path) belongs
+# in comparisons/aegislash-blade-vs-shield{,-ul}.toml, not here.
+["Aegislash (Blade)".intro]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+body = """
+Aegislash (Blade) is a diagnostic hypothetical, not a realistic \
+build path. The gamemaster exposes Blade form as its own species \
+entry (272 / 97 / 155 stat line, normal Psycho Cut as a real fast \
+move) so the sim can run it as if it were always in Blade form - \
+no form change, no Shield-form opening. No PvP tier list / PvPoke \
+ranking / IV calculator recognizes Aegislash (Blade) as a \
+buildable loadout; the dive exists to answer a single research \
+question: how much of the canonical Aegislash's observed \
+performance comes from the form-change sequencing (Shield bulk \
+opener, Blade damage closer) versus the raw Blade stat line alone?
+"""
+
+["Aegislash (Blade)".meta_role]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+good_at = """
+On paper, always-Blade lands 272-Attack Shadow Ball (100 power, \
+Ghost STAB) and Gyro Ball (80 power, Steel STAB) from turn one, \
+with a real-power Psycho Cut fast move doing damage while it \
+builds energy. Same Fairy-punishing and Ghost-hitting coverage as \
+the canonical Shield path, just without waiting for a charged \
+move to transform. Matchups where Aegislash would win anyway but \
+loses by timing under the Shield-start path are the clearest \
+always-Blade upside.
+"""
+bad_at = """
+97 Defense for the entire fight means every neutral-coverage \
+attacker in the meta pressures Aegislash hard from turn one. \
+Without the Shield-form opener to absorb early chip, always-Blade \
+loses matchups that the realistic Shield path survives on bulk \
+alone. Ground / Fire / Dark / Ghost coverage still shreds the 97 \
+Defense frame, and the loss of the Shield-form energy-banking \
+phase means charged moves come online later than canonical \
+Aegislash needs.
+"""
+team_role = """
+No team role - Aegislash (Blade) isn't a buildable loadout. The \
+dive data's role is diagnostic: reading it alongside the canonical \
+Shield-path dive quantifies how much of Aegislash's observed PvP \
+value comes from the form change versus the raw Blade stats. \
+Readers looking to actually play Aegislash should use the \
+canonical Aegislash (Shield) dive and the form-change guide.
+"""
+body = ""
+
+["Aegislash (Blade)".verdict]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+editorial = """
+Don't invest - this isn't a real build target. Aegislash (Blade) \
+appears in the gamemaster as its own species so the sim can model \
+what an always-Blade profile would do, but players cannot \
+actually bring a Blade-from-turn-one Aegislash into PvP. Any IV \
+recommendations below describe the hypothetical profile, not a \
+buildable catch. Use the numbers to understand what the Blade \
+stat line does in isolation, then return to the canonical \
+Aegislash (Shield) dive and the Blade-vs-Shield comparison page \
+for real build decisions.
+"""
+outlook = """
+The always-Blade hypothetical's signal only matters as long as \
+Aegislash is in the meta. If Aegislash fades from GL / UL \
+rankings, the diagnostic value fades too. Worth re-running when \
+the form-change mechanic itself gets revisited (new moves, \
+balance changes) so the always-Blade counter-factual stays \
+current.
+"""

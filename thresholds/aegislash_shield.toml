@@ -19,3 +19,93 @@
 
 ["Aegislash (Shield)"]
 sources = "pogo-simulator realistic form-change dive (canonical Shield -> Blade path, via the native formchange.py); PvPoke GL/UL rankings (Aegislash (Shield) is the ranking entry for Aegislash)."
+
+# Species narrative (Shape 2 Session 3, 2026-04-19). Renders at the top
+# of the interactive deep dive above the scatter dashboard. See
+# docs/threshold_schema.md "Species narrative" for the schema. Drafted
+# from the form-change mechanic + general PvP role knowledge; no dive
+# numbers yet (Aegislash dives queued for tonight's overnight re-dive).
+# All prose is auto-drafted and flagged for expert review. Cross-form
+# comparison framing (Shield path vs always-Blade) belongs in the
+# comparisons/aegislash-blade-vs-shield{,-ul}.toml pages, not here.
+["Aegislash (Shield)".intro]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+body = """
+Shield-form Aegislash is the canonical Aegislash play pattern: open \
+in a 97 / 272 / 155 tank profile, bank energy with zero-power Psycho \
+Cut (Aegislash Charge variant - fast move is pure energy generation, \
+no damage), then transform to a 272 / 97 / 155 Blade frame on the \
+first charged move and finish the rest of the fight as a glass \
+cannon. Identity is anti-Fairy and anti-Ghost: Gyro Ball hits Fairies \
+(Togekiss, Wigglytuff, Azumarill variants) super-effectively for low \
+cost, Shadow Ball punishes the Ghost / Psychic shell at high power. \
+The form change is the whole species - it's what lets Aegislash \
+survive the early game on Shield bulk and close the late game on \
+Blade damage.
+"""
+
+["Aegislash (Shield)".meta_role]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+good_at = """
+Shield-form bulk (272 Defense) absorbs the early-game Fairy and \
+neutral-coverage pressure that would otherwise force a switch, while \
+zero-power Psycho Cut banks energy cheaply. Once the first charged \
+move fires, the transform lands Blade's 272 Attack on Shadow Ball \
+(100 power, Ghost STAB) and Gyro Ball (80 power, Steel STAB), both \
+at 50 energy - an unusually fast second-charged-move cadence for the \
+damage quantum. Fairy-types are the cleanest counter-pick target: \
+Gyro Ball's Steel STAB lands super-effectively on the Togekiss / \
+Wigglytuff / Alolan-Ninetales / Azumarill bucket that pressure most \
+of the meta. Ghost stallers and a swath of Psychic-types also fold \
+to Shadow Ball's Ghost STAB.
+"""
+bad_at = """
+Post-transform, the 97 Defense frame is fragile. Anything with \
+neutral or super-effective coverage on Steel / Ghost dual-typing \
+(Ground-type moves, Fire, Dark, Ghost) shreds Blade-form Aegislash \
+faster than the fight can close. CMP priority also swings after \
+transform: anything that out-speeds Blade's 272 Attack on a mirror \
+charged move wins the tie, and Aegislash's shift from 97 ATK to 272 \
+ATK inverts the CMP calculus mid-fight. Swampert / Lickitung / \
+Diggersby-class Ground damage, Incineroar-class Fire / Dark, and \
+Giratina / Trevenant Ghost are the problem bucket.
+"""
+team_role = """
+Aegislash is a counter-pick slot, not a core-team chassis - it earns \
+its slot specifically against Fairy-heavy or Ghost-staller teams. \
+The form-change timing makes it a third-slot closer more often than \
+a lead: ideal flow is safe-swap or third-Pokemon, soak an \
+unfavorable opener on Shield bulk, and transform to Blade once the \
+opponent has burned a shield or committed to a moveset that Aegislash \
+resists. Pair with teammates that cover the Ground / Fire / Dark \
+attackers that shred Blade - a Ground-resist core and a Dark / Fire \
+answer keep Aegislash free to do the Fairy-killing / Ghost-killing \
+job it's brought for.
+"""
+body = ""
+
+["Aegislash (Shield)".verdict]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+editorial = """
+Invest in Aegislash if your team has a concrete anti-Fairy or \
+anti-Ghost-staller need. This is a specialist: the 272 / 97 / 155 \
+Blade-form lategame can end fights that a more generalist attacker \
+drags out, but the 97 ATK opener means Aegislash leaks damage to \
+generalist threats before the transform lands. Catch and invest \
+when the rest of the team already has an answer to the Ground / \
+Fire / Dark core; skip when Aegislash would be the team's only \
+answer to those types. See the Notable IVs cards below for \
+IV-targeting cutoffs. The always-Blade hypothetical is not a real \
+build path - see the form-change guide for the Shield-path vs \
+always-Blade win-rate comparison.
+"""
+outlook = """
+Aegislash's counter-pick value tracks Fairy-meta pressure and \
+Ghost-staller prevalence. When Fairies dominate, the Gyro Ball \
+niche widens; when the meta tilts toward Ground / Fire / Dark \
+attackers, the slot narrows. Worth re-reading after each season \
+rotation.
+"""
