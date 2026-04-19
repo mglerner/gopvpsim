@@ -199,9 +199,25 @@ rule
 # Recent products — the 5 most recently modified .html files under
 # userdata/website/. During a dive the main index plus split-moveset
 # files land here incrementally, so this is the "peek at partial
-# output" surface. Paths are repo-relative for easy cmd-click in
-# Terminal.app (which resolves relative paths against PWD).
+# output" surface. Each row is tagged "new" (modified during the
+# current chain run) vs "pre" (older than chain start) so you can
+# tell at a glance what this overnight chain has actually produced
+# vs what was already sitting around from earlier work. Chain-start
+# epoch comes from the wrapper-log filename timestamp, which is
+# stable for the lifetime of the run.
 HTML_ROOT="userdata/website"
+
+CHAIN_START_EPOCH=""
+if [[ -n "$WRAPPER_LOG" ]]; then
+    BN=$(basename "$WRAPPER_LOG")
+    # Expected: overnight_YYYYMMDD_HHMMSS.log
+    if [[ "$BN" =~ overnight_([0-9]{4})([0-9]{2})([0-9]{2})_([0-9]{2})([0-9]{2})([0-9]{2})\.log ]]; then
+        CHAIN_START_EPOCH=$(date -jf "%Y-%m-%d %H:%M:%S" \
+            "${BASH_REMATCH[1]}-${BASH_REMATCH[2]}-${BASH_REMATCH[3]} ${BASH_REMATCH[4]}:${BASH_REMATCH[5]}:${BASH_REMATCH[6]}" \
+            +%s 2>/dev/null)
+    fi
+fi
+
 if [[ -d "$HTML_ROOT" ]]; then
     printf "  %sRecent products:%s\n" "$BOLD" "$RESET"
     NOW_EPOCH=$(date +%s)
@@ -218,14 +234,19 @@ if [[ -d "$HTML_ROOT" ]]; then
             elif (( AGE < 3600 )); then AGE_STR="$((AGE/60))m ago"
             else                         AGE_STR="$((AGE/3600))h$(((AGE%3600)/60))m ago"
             fi
-            # Show path relative to repo root (strip REPO_ROOT prefix if
-            # present, otherwise emit as-is). Truncate to fit width.
+            # Tag as "new" vs "pre" relative to chain start.
+            if [[ -n "$CHAIN_START_EPOCH" && "$MT" -ge "$CHAIN_START_EPOCH" ]]; then
+                TAG="${GREEN}new${RESET}"
+            else
+                TAG="${DIM}pre${RESET}"
+            fi
+            # Show path relative to repo root. Truncate to fit width.
             REL="${FP#$REPO_ROOT/}"
-            MAX=$((WIDTH - 14))
+            MAX=$((WIDTH - 18))
             if (( ${#REL} > MAX )); then
                 REL="...${REL: -$((MAX-3))}"
             fi
-            printf "  %s%-9s%s  %s\n" "$DIM" "$AGE_STR" "$RESET" "$REL"
+            printf "  %s  %s%-9s%s  %s\n" "$TAG" "$DIM" "$AGE_STR" "$RESET" "$REL"
         done
     rule
 fi
