@@ -106,6 +106,40 @@ per-opponent win cells by "flip depends on atk_iv >= N" relationship.
 Implementation-TBD; skip the block on first cut if it's hard to detect
 robustly — the type-grouped list is the core content.
 
+## Bonus A-item: promote narrative flavors to paste-box tiers
+
+**Problem observed 2026-04-19** on the Tinkaton GL dive: the narrative
+zone names four flavors ("General Good," "Fortified Azumarill," "Lapras
+Slayer," "Fortified Blastoise") with specific cutoffs (e.g. Fortified
+Azumarill = def ≥ 143.52, HP ≥ 138). But the "Check my collection"
+paste-box only matches user IVs against `DATA.tiers`, which for this
+dive contains just `GH Great` and `GH Good` — the flavors are
+narrative-prose only, invisible to the membership-check code. A user
+who wants to know "do any of my Tinkatons qualify as Fortified
+Azumarill?" has to eyeball def/HP values against the prose cutoffs
+manually.
+
+**Fix:** the narrative-flavor derivation module already computes each
+flavor's stat cutoffs (`atk_cut`, `def_cut`, `hp_cut` in the
+`FlavorSpec` dict). Emit each flavor as an additional entry in
+`DATA.tiers` with its name + cutoffs, so the paste-box's `byTier`
+grouping picks them up automatically. No paste-box code changes
+needed; the existing `rec.matched[]` logic cross-checks against every
+tier.
+
+**Sequencing with the base auto-gen work:** this is the same module
+(`deep_dive_narrative.py` or wherever flavor derivation lives today),
+just a second output hook. Do it in the same morning session as the
+primary auto-gen work; one commit.
+
+**Deduplication concern:** flavors are derived from underlying
+threshold tiers, so "General Good" (flavor) and "GH Good" (tier) may
+have identical cutoffs. Paste-box would show the user's mon under both
+names — noisy. Resolution: when a flavor maps 1:1 to an existing tier,
+suppress the flavor entry OR label the flavor as a tier-alias so the
+paste-box renders them merged. Implementation detail; decide during
+the morning session once we see the actual overlap pattern.
+
 ## Bonus A-item: atk-weight labels on Notable IVs
 
 **Not replacing existing prose** — adds new rendered content.
@@ -272,6 +306,11 @@ no re-dives there either.
 4. **Atk-weight badges on Notable IVs cards.** Same module, new
    classify_atk_weight function, new render_atk_weight_badge call in
    the Notable IVs card renderer. ~1-2 hours.
+4b. **Promote flavors to paste-box tiers.** Emit each narrative flavor
+   as a DATA.tiers entry with its cutoffs so the "Check my collection"
+   paste-box can report flavor membership. Resolve the dedup question
+   (flavor = tier alias vs suppress) based on actual overlap seen.
+   ~30 min.
 5. **Install pre-commit hook** + **update CLAUDE.md** with the
    ship-mode directive. ~30 min.
 6. **Regenerate Oinkologne article + dives** from the fresh
