@@ -3348,8 +3348,11 @@ def format_cli_args(args, parser) -> str:
 
     Boolean flags are emitted only when True (False is the implicit absence),
     since there's no `--no-X` form for store_true / store_false flags here.
-    Flags whose value is None are skipped because there's no syntax for
-    "explicitly set to None" on the command line.
+    ``BooleanOptionalAction`` flags (which DO have a `--no-X` form) always
+    emit explicitly — `--flag` for True, `--no-flag` for False — so the
+    record round-trips through argparse on paste-back. Flags whose value
+    is None are skipped because there's no syntax for "explicitly set to
+    None" on the command line.
     """
     parts = ["python scripts/deep_dive.py"]
     positional: list[str] = []
@@ -3365,6 +3368,17 @@ def format_cli_args(args, parser) -> str:
                 positional.append(_shell_quote(str(val)))
             continue
         flag = action.option_strings[0]
+        if isinstance(action, argparse.BooleanOptionalAction):
+            # Emit the matching --flag or --no-flag form from the action's
+            # own option_strings; the raw value is a bool that argparse
+            # rejects as a positional on paste-back.
+            want_negative = not val
+            for opt in action.option_strings:
+                is_negative = opt.startswith('--no-')
+                if is_negative == want_negative:
+                    flags.append(opt)
+                    break
+            continue
         if isinstance(action, argparse._StoreTrueAction):
             # store_true: only emit when True (False = absent on the cmdline)
             if val:
