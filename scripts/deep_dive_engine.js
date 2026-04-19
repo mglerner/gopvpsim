@@ -301,6 +301,18 @@ function buildHoverText(iv) {
   if (DATA.slayerCatsByIv && DATA.slayerCatsByIv[iv]) {
     lines.push('Slayer: '+DATA.slayerCatsByIv[iv].join(', '));
   }
+  // XL-candy-decision helpers. Score Δ reacts to dropdowns; Mirror
+  // CMP % is dropdown-independent (atk-based). Only surface when the
+  // numbers are meaningful: Score Δ on rank-1 is 0 (skip; not new
+  // info), Mirror CMP % needs a cohort to exist.
+  var sd = _computeScoreDelta(iv);
+  if (isFinite(sd) && yRanks[iv] !== 1) {
+    lines.push('Δ vs #1: ' + (sd > 0 ? '+' : '') + sd.toFixed(1));
+  }
+  var cmp = _computeMirrorCmpPct(iv);
+  if (isFinite(cmp)) {
+    lines.push('Mirror CMP: beats ' + cmp.toFixed(0) + '% of cohort');
+  }
   // Anchor-clear membership: which named anchors (mirror BP, etc.) the
   // IV passes among those for which we emitted a matchup-flip bullet.
   // Names are abbreviated via shortParentName (4-char base + _s for
@@ -1675,8 +1687,15 @@ var summarySort = { col: 'yrank', dir: 'asc' };
 // clicking the already-active column toggles. value(iv) returns the
 // numeric sort key. label is the column header text (yval column uses
 // currentYLabel at render time since the Y-axis metric is dynamic).
+//
+// 'mirrorCmp' and 'scoreDelta' are the XL-candy-decision helpers
+// (docs/todo.md "XL-candy-decision tool"). Both are optional:
+// mirrorCmp is present only when --mirror-slayer produced a cohort
+// (DATA.mirrorCohortAtk non-empty), scoreDelta is always available
+// as long as yValues is populated.
 function _summaryColumns() {
-  return [
+  var hasCohort = !!(DATA.mirrorCohortAtk && DATA.mirrorCohortAtk.length > 0);
+  var cols = [
     { id: 'yrank', label: 'Y Rank',  defaultDir: 'asc',  value: function(iv){ return yRanks[iv]; } },
     { id: 'ivs',   label: 'IVs',     defaultDir: null,   value: null },
     { id: 'level', label: 'Level',   defaultDir: 'desc', value: function(iv){ return DATA.ivLv[iv]; } },
@@ -1686,9 +1705,52 @@ function _summaryColumns() {
     { id: 'hp',    label: 'HP',      defaultDir: 'desc', value: function(iv){ return DATA.ivHp[iv]; } },
     { id: 'sp',    label: 'SP Rank', defaultDir: 'asc',  value: function(iv){ return DATA.spRanks[iv]; } },
     { id: 'yval',  label: null,      defaultDir: 'desc', value: function(iv){ return yValues[iv]; } },
-    // 'tier' deliberately not sortable: most IVs have tier === -1.
-    { id: 'tier',  label: 'Tier',    defaultDir: null,   value: null },
+    { id: 'scoreDelta', label: 'Δ vs #1', defaultDir: 'desc', value: function(iv){ return _computeScoreDelta(iv); } },
   ];
+  if (hasCohort) {
+    cols.push({ id: 'mirrorCmp', label: 'Mirror CMP %', defaultDir: 'desc',
+                value: function(iv){ return _computeMirrorCmpPct(iv); } });
+  }
+  // 'tier' deliberately not sortable: most IVs have tier === -1.
+  cols.push({ id: 'tier',  label: 'Tier',    defaultDir: null,   value: null });
+  return cols;
+}
+
+// Fraction of the Nash-converged mirror-slayer cohort (DATA.mirrorCohortAtk,
+// sorted ascending) with atk STRICTLY LESS than this IV's atk. Returns
+// a percentage in [0, 100]. Sorted input + linear scan keeps this fast
+// enough to call per-row on every sort (cohorts are typically <=30 mons).
+// Returns NaN when no cohort is available so the sort comparator keeps
+// those IVs at the end.
+function _computeMirrorCmpPct(iv) {
+  var cohort = DATA.mirrorCohortAtk;
+  if (!cohort || cohort.length === 0) return NaN;
+  var myAtk = DATA.ivAtk[iv];
+  if (!isFinite(myAtk)) return NaN;
+  var beaten = 0;
+  for (var i = 0; i < cohort.length; i++) {
+    if (cohort[i] < myAtk) beaten++;
+    else break;  // sorted ascending; stop at first non-match
+  }
+  return (beaten / cohort.length) * 100;
+}
+
+// Difference in avg battle score vs the current rank-1 (lowest yRank)
+// IV, under the ACTIVE Shields/Opp-IVs/Bait combo. Positive = this IV
+// scores better than rank-1; negative = worse. Rank-1 itself returns 0.
+// Uses yValues so the delta reacts to dropdown changes automatically.
+function _computeScoreDelta(iv) {
+  var myScore = yValues[iv];
+  if (!isFinite(myScore)) return NaN;
+  // Find the rank-1 IV for the current Y-axis mode.
+  var rank1Iv = -1;
+  for (var k = 0; k < yRanks.length; k++) {
+    if (yRanks[k] === 1) { rank1Iv = k; break; }
+  }
+  if (rank1Iv < 0) return NaN;
+  var rank1Score = yValues[rank1Iv];
+  if (!isFinite(rank1Score)) return NaN;
+  return myScore - rank1Score;
 }
 
 function _summarySortClick(colId) {
@@ -1740,6 +1802,8 @@ function updateSummaryTable() {
 
   var arrow = (summarySort.dir === 'asc') ? ' \u25B2' : ' \u25BC';
 
+  var hasCohort = !!(DATA.mirrorCohortAtk && DATA.mirrorCohortAtk.length > 0);
+
   var h = '<table>';
   h += '<tr>';
   for (var ci = 0; ci < cols.length; ci++) {
@@ -1771,6 +1835,29 @@ function updateSummaryTable() {
     h += '<td>' + DATA.ivAtk[iv].toFixed(2) + '</td><td>' + DATA.ivDef[iv].toFixed(2) + '</td>';
     h += '<td>' + DATA.ivHp[iv] + '</td><td>#' + DATA.spRanks[iv] + '</td>';
     h += '<td>' + (isFinite(yValues[iv]) ? yValues[iv].toFixed(1) : '-') + '</td>';
+    // Score Δ: show signed delta vs rank-1 under the active Y-axis mode.
+    // Green when positive (beats rank-1), red when negative (trades
+    // score for something else — typically atk or HP), zero for the
+    // rank-1 IV itself.
+    var sd = _computeScoreDelta(iv);
+    if (isFinite(sd)) {
+      var sdStr = (sd > 0 ? '+' : '') + sd.toFixed(1);
+      var sdColor = (sd > 0) ? '#9be89b' : (sd < 0 ? '#e89b9b' : '#c9d1d9');
+      h += '<td style="color:' + sdColor + '">' + sdStr + '</td>';
+    } else {
+      h += '<td>-</td>';
+    }
+    if (hasCohort) {
+      var cmp = _computeMirrorCmpPct(iv);
+      if (isFinite(cmp)) {
+        // Colour by bucket: >=90 green (beats effectively everyone),
+        // 50-90 yellow (beats most), <50 dim (beats a minority).
+        var cmpColor = cmp >= 90 ? '#9be89b' : (cmp >= 50 ? '#d4a017' : '#888');
+        h += '<td style="color:' + cmpColor + '">' + cmp.toFixed(0) + '%</td>';
+      } else {
+        h += '<td>-</td>';
+      }
+    }
     if (hasTiers) {
       if (tier >= 0) {
         h += '<td><span class="tier-badge" style="background:' + tierColors[tier] + ';color:#000">' + tierNames[tier] + '</span></td>';
