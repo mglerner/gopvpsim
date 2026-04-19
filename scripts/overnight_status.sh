@@ -102,6 +102,21 @@ if [[ -n "$WRAPPER_LOG" ]]; then
             "$BOLD" "${DIVE_SLUG:-?}" "$RESET" \
             "$GREEN" "${DIVE_ELAPSED:-?}" "$RESET"
     fi
+
+    # Whole-script ETA: delegate to scripts/overnight_eta.py which buckets
+    # dives by type (GL full / UL full / Forretress pinned), averages
+    # completed dives per bucket with fallback baselines, and subtracts
+    # the current-dive elapsed so the remaining number tracks forward.
+    # Emits two lines on stdout; silent if the log can't be parsed yet.
+    ETA_OUT=$(python3 "$REPO_ROOT/scripts/overnight_eta.py" "$WRAPPER_LOG" 2>/dev/null)
+    if [[ -n "$ETA_OUT" ]]; then
+        ETA_LINE1=$(echo "$ETA_OUT" | head -1)
+        ETA_LINE2=$(echo "$ETA_OUT" | sed -n '2p')
+        printf "  %sScript ETA:%s %s%s%s\n" "$BOLD" "$RESET" "$GREEN" "$ETA_LINE1" "$RESET"
+        if [[ -n "$ETA_LINE2" ]]; then
+            printf "  %s%s%s\n" "$DIM" "$ETA_LINE2" "$RESET"
+        fi
+    fi
 fi
 rule
 
