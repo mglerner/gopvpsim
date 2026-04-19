@@ -3582,6 +3582,24 @@ def main():
 
     args = parser.parse_args()
 
+    # Fail-fast: ensure --html output directory exists (and is writable)
+    # BEFORE running any simulation. Without this, a fresh dive slug
+    # like "aegislash-blade-great-league/" whose parent dir doesn't
+    # exist yet crashes only after 1-6 minutes of simulation when the
+    # final HTML write fails. makedirs(exist_ok=True) is a no-op when
+    # the dir already exists; a permission/typo/bad-mount issue
+    # surfaces immediately here with a clear error.
+    if args.html:
+        _html_parent = os.path.dirname(os.path.abspath(args.html))
+        if _html_parent:
+            try:
+                os.makedirs(_html_parent, exist_ok=True)
+            except OSError as _e:
+                parser.error(
+                    f'Cannot create --html output directory '
+                    f'{_html_parent!r}: {_e}'
+                )
+
     # Parse --species-iv-floor "ATK,DEF,STA" into a (atk, def, sta) tuple
     # of ints. Empty / None stays None (no floor applied).
     _iv_floor = None
