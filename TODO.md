@@ -774,24 +774,17 @@ break invariants that weren't yet nailed down by tests.
   The Color By dropdown (HP/Def/Atk) already reveals banding structure
   visually; the automated analysis should match what users see.
 
-* **Send mercuryish a Discord message about the Lurgan 102.9 def floor**
+* **Send acidicArisen a Discord message about the Lurgan 102.9 def floor**
   — Our 2026-04-08 bulkpoint Level 3 enumeration against the Annihilape
   mirror found that the historical Lurgan Ape `def ≥ 102.9` floor is
   *unrecoverable* from current sims: the next bulkpoint above 102.9
   (`shadow_ball ≤149` at def 103.34) is unreachable for today's
   converged cohort (max def ~101.30). The 102.9 floor predates Rage Fist,
-  so the threat-move set has shifted. Ask mercuryish whether the
+  so the threat-move set has shifted. Ask acidicArisen whether the
   historical calibration was against a Counter or Close Combat tier
   transition, or against something more niche (Shadow Ball / Night Slash).
   This is the missing context that would let us promote a specific
   bulkpoint to a Level 1 anchor with full provenance.
-
-* **Rename `mercuryish` → `acidicArisen` throughout the codebase** —
-  acidicArisen is their preferred username on HSH's Discord; we've been
-  using the older `mercuryish` handle in code, comments, docs, validation
-  writeups, and TOML provenance fields. Sweep the repo (code, docs/,
-  thresholds/, DEVELOPER_NOTES.md, TODO.md, validation writeups) and
-  update references. Discovered 2026-04-09.
 
 ## Slayer card UX (post-bulkpoint shipped 2026-04-08)
 
@@ -864,7 +857,7 @@ break invariants that weren't yet nailed down by tests.
   confirmed.
 
 * **Update `docs/validations/2026-04-07_annihilape_mirror_slayer_iteration.md`**
-  to reflect mercuryish testimony (Discord, 2026-04-08) and the
+  to reflect acidicArisen testimony (Discord, 2026-04-08) and the
   bulkpoint Level 3 enumeration finding (2026-04-09): the community
   Lurgan Ape spread is a *historical anchor* calibrated to a Lickitung
   BP near atk 127.23, predating Counter nerf, Rage Fist addition, and
@@ -1253,7 +1246,7 @@ bottleneck.
   hand-authored file is ~180 lines. Sample size of one species (plus a
   one-line tinkaton stub) is too small to design a simplification
   against — Annihilape is also the *worst* canary because its
-  Lurgan/mercuryish historical provenance pressure makes it
+  Lurgan/acidicArisen historical provenance pressure makes it
   documentation-heavy in ways most species won't be.
   **Action**: when authoring the *next* species TOML (Tinkaton CD prep,
   Goodra, etc.), aim for the smallest file possible — lean on the

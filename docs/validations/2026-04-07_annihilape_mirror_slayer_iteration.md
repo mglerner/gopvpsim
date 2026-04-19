@@ -52,13 +52,13 @@ All survivors have **atk_iv = 15** (max attack). This is the iteration's strong 
 ## Comparison to the community Lurgan Ape spread
 
 The single named community spread for Annihilape is the "Lurgan Ape," popularized
-by lurganrocket on Twitter. Per IV expert mercuryish (Discord, 2026-04-08), the
+by lurganrocket on Twitter. Per IV expert acidicArisen (Discord, 2026-04-08), the
 spread is canonically defined by two cutoffs:
 
-| Cutoff | Value        | Source                                                                   |
-| ------ | ------------ | ------------------------------------------------------------------------ |
-| Atk    | **>= 127.2** | "127.2 attack was the minimum needed for a lurgan ape" — mercuryish      |
-| Def    | **>= 102.9** | "102.9 defense was the goal" — mercuryish ("i do not remember what for") |
+| Cutoff | Value        | Source                                                                     |
+| ------ | ------------ | -------------------------------------------------------------------------- |
+| Atk    | **>= 127.2** | "127.2 attack was the minimum needed for a lurgan ape" — acidicArisen      |
+| Def    | **>= 102.9** | "102.9 defense was the goal" — acidicArisen ("i do not remember what for") |
 
 The 27-IV list popularly screenshotted is the *enumeration* of those two cutoffs at
 GL CP cap. Both forms are now in `thresholds/annihilape.toml` as
@@ -77,7 +77,7 @@ At first glance this looks like a disagreement. It is not.
 
 ### Resolution: Lurgan is a historical floor, not a current target
 
-Per mercuryish:
+Per acidicArisen:
 
 > "the lurgan ape only gets some lickitung. lickitung could keep the bulkpoint with
 > enough defense, so people went for even higher attack iv annihilape to beat lurgan
@@ -87,7 +87,7 @@ Per mercuryish:
 > consistency against the mirror and lickitung"
 
 The Lurgan spread is the **floor** — the minimum atk to clear a specific Lickitung
-damage breakpoint AND the minimum def to keep some bulkpoint mercuryish does not
+damage breakpoint AND the minimum def to keep some bulkpoint acidicArisen does not
 remember the source of. Current community advice is to push *higher* atk than the
 Lurgan baseline for two reasons:
 
@@ -97,7 +97,7 @@ Lurgan baseline for two reasons:
 2. **BP security against Lickitung**: pushing past the strict 127.2 minimum gives
    margin for breakpoints in any move beyond the originally-targeted one.
 
-Our converged cohort (atk 129.44, the maximum possible) is precisely what mercuryish
+Our converged cohort (atk 129.44, the maximum possible) is precisely what acidicArisen
 describes as the "preferred for consistency" target. The convergence is not in
 disagreement with the community — it is in agreement with the *current* community
 view, which has moved past the Lurgan baseline.
@@ -105,13 +105,13 @@ view, which has moved past the Lurgan baseline.
 The original three hypotheses for the apparent disagreement were:
 
 1. **Move parameters changed since Lurgan was published.** Confirmed by
-   mercuryish: "i am pretty sure this predates the counter nerf, addition of rage
+   acidicArisen: "i am pretty sure this predates the counter nerf, addition of rage
    fist, low kick buff, and annihilape almost never even considered running close
    combat." The Lurgan spread was calibrated to a Counter-era Annihilape that no
    longer exists.
 
 2. **The community optimizes against a broader opponent set.** Partially correct
-   but not the main story — mercuryish's framing is that Lurgan was always a floor,
+   but not the main story — acidicArisen's framing is that Lurgan was always a floor,
    and the broader opponent set just shifted the *recommendation* above that floor
    without retiring the floor itself.
 
@@ -126,7 +126,7 @@ The original three hypotheses for the apparent disagreement were:
   side) but no `bulkpoint` (def side) kind. Adding the parallel kind, with the
   same Level 1 / Level 2 / Level 3 precision structure, would let us represent
   the 102.9 floor as a Level 2 anchor and use Level 3 discovery to identify
-  *which* specific bulkpoint mercuryish was targeting (which they don't remember).
+  *which* specific bulkpoint acidicArisen was targeting (which they don't remember).
   Tracked in TODO.md.
 
 - **Re-run with Lurgan as an explicit opponent variant.** Even though the

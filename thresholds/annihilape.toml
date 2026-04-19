@@ -4,7 +4,7 @@
 #   - Iteration findings (mirror slayer Nash convergence, 2026-04-07). See
 #     docs/validations/2026-04-07_annihilape_mirror_slayer_iteration.md
 #   - Community "Lurgan Ape" spread popularized by lurganrocket on Twitter.
-#   - Expert testimony from mercuryish (Discord, 2026-04-08) confirming the
+#   - Expert testimony from acidicArisen (Discord, 2026-04-08) confirming the
 #     Lurgan spread predates the Counter nerf, Rage Fist addition, and Low
 #     Kick buff, and that current expert advice is to go higher attack than
 #     the Lurgan baseline for CMP wins and BP security.
@@ -41,11 +41,11 @@ description = "High-bulk cutoff (legacy)."
 
 [Annihilape.Great.spreads.lurgan_ape]
 description = """
-Community 'Lurgan Ape' spread popularized by lurganrocket. Per mercuryish
-(Discord, 2026-04-08), the spread is defined by two cutoffs:
+Community 'Lurgan Ape' spread popularized by lurganrocket. Per Discord
+expert testimony (2026-04-08), the spread is defined by two cutoffs:
   attack >= 127.2  (minimum atk for the Lickitung damage breakpoint)
-  defense >= 102.9 (def floor; mercuryish does not remember which specific
-                    bulkpoint this preserves — likely a mirror or Lickitung
+  defense >= 102.9 (def floor; which specific bulkpoint this preserves
+                    is not documented — likely a mirror or Lickitung
                     bulkpoint, recoverable via Level 3 bulkpoint discovery
                     once we add the bulkpoint anchor kind)
 The 27 IVs below are the enumeration of those cutoffs at GL CP cap. The
@@ -85,7 +85,7 @@ ivs = [
     [15, 12, 0],
 ]
 
-# Stat-cutoff form of the same Lurgan Ape spread. Per mercuryish
+# Stat-cutoff form of the same Lurgan Ape spread. Per acidicArisen
 # (Discord, 2026-04-08) the spread is canonically defined by the two
 # cutoffs below; the lurgan_ape IV-list above is the enumeration of
 # those cutoffs at GL CP cap. Either form can be referenced from anchors;
@@ -112,7 +112,7 @@ description = "Win CMP ties against the community Lurgan Ape spread. Pushing foc
 # ─────────────────────────────────────────────────────────────────────
 
 # Level 2: reproduce the Lurgan-era community Lickitung BP using the actual
-# 127.2 minimum atk that mercuryish (Discord, 2026-04-08) confirmed as the
+# 127.2 minimum atk that acidicArisen (Discord, 2026-04-08) confirmed as the
 # Lurgan calibration point. Earlier draft used 127.23 — that was a precision
 # error from a screenshot.
 [Annihilape.Great.anchors.lickitung_brkp_above_lurgan]
@@ -127,7 +127,7 @@ kind = "damage_breakpoint"
 opponent = "Lickitung"
 description = "Enumerate every Lickitung damage breakpoint in the survivor atk range and tag each survivor with the sub-anchors it clears."
 
-# Level 3: Cresselia — per mercuryish, rumored to have been one of the
+# Level 3: Cresselia — per acidicArisen, rumored to have been one of the
 # original Lurgan-era calibration points. Discover all BPs so we can see
 # which one matters.
 [Annihilape.Great.anchors.cresselia_brkp_any]
@@ -152,7 +152,7 @@ description = "Discover all damage breakpoints against a default Annihilape. Anc
 # Anchors — bulkpoints (def-side mirror of damage breakpoints)
 # ─────────────────────────────────────────────────────────────────────
 
-# Level 2: reproduce the Lurgan-era 102.9 def floor that mercuryish (Discord,
+# Level 2: reproduce the Lurgan-era 102.9 def floor that acidicArisen (Discord,
 # 2026-04-08) confirmed as the second half of the historical Lurgan calibration.
 # The exact (move, tier) bulkpoint that 102.9 preserves was lost — use the
 # Level 3 mirror_blkp_any anchor below to discover candidates, then promote
@@ -170,7 +170,7 @@ kind = "bulkpoint"
 opponent = "Annihilape"
 description = "Discover and tag every mirror-Annihilape bulkpoint in the survivor def range. Goal: identify which (move, tier) the historical 102.9 def floor was originally calibrated to."
 
-# Level 3: same idea against Lickitung. Mercuryish noted Lickitung as one of
+# Level 3: same idea against Lickitung. acidicArisen noted Lickitung as one of
 # the historical calibration targets; the def floor may also map onto a
 # Lickitung threat move bulkpoint.
 [Annihilape.Great.anchors.lickitung_blkp_any]

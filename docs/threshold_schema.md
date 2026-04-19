@@ -508,8 +508,8 @@ A complete file showing every feature in use.
 sources = """
 Great League iteration findings (mirror slayer Nash convergence, 2026-04-07) +
 community Lurgan Ape spread popularized by lurganrocket on Twitter +
-expert testimony from mercuryish (Discord, 2026-04-08) confirming the Lurgan
-spread predates the Counter nerf, Rage Fist addition, and Low Kick buff.
+Discord expert testimony (2026-04-08) confirming the Lurgan spread predates
+the Counter nerf, Rage Fist addition, and Low Kick buff.
 """
 
 # ─────────────────────────────────────────────────────────────────────
@@ -518,7 +518,7 @@ spread predates the Counter nerf, Rage Fist addition, and Low Kick buff.
 
 [Annihilape.Great.spreads.lurgan_ape]
 description = "Community Slayer Ape spread popularized by lurganrocket. Calibrated to a Lickitung damage breakpoint near atk 127.23. Treated as a historical anchor — current expert advice is to go higher attack than this baseline for CMP wins and BP security."
-source = "Community spread, mercuryish testimony"
+source = "Community spread (lurganrocket); Discord expert testimony 2026-04-08"
 ivs = [
     [11, 10, 2], [15, 12, 5], [11, 11, 0], [15, 13, 4],
     [11, 9, 3],  [11, 9, 2],  [15, 14, 3], [15, 14, 2],
@@ -573,12 +573,12 @@ above_atk = 127.23
 description = "Smallest atk > 127.23 at which any focal move's damage to default Lickitung steps up. Reproduces the historical Lurgan-era 'Lickitung BP' calibration."
 
 # Level 3: discover and tag every Cresselia BP in the survivor range.
-# Per mercuryish, Cresselia was rumored to be one of the original
+# Per acidicArisen, Cresselia was rumored to be one of the original
 # calibration points but the exact (move, tier) was never confirmed.
 [Annihilape.Great.anchors.cresselia_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Cresselia"
-description = "Discover and tag every Cresselia damage breakpoint in the survivor atk range. Mercuryish recalled Cresselia as a possible original calibration point — Level 3 lets us find which BP that was."
+description = "Discover and tag every Cresselia damage breakpoint in the survivor atk range. Cresselia was a possible original calibration point — Level 3 lets us find which BP that was."
 
 # Level 3: same idea for Umbreon.
 [Annihilape.Great.anchors.umbreon_brkp_any]
