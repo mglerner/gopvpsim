@@ -12,6 +12,93 @@ sources = "pogo-simulator deep dive (2026-04-16); pre-CD Mud Slap analysis"
 [Oinkologne.article]
 slug = "oinkologne-cd-2026-05"
 
+# Species narrative (Shape 2, 2026-04-19). Renders at the top of the
+# interactive deep dive above the scatter dashboard. See
+# docs/threshold_schema.md "Species narrative" for the schema and
+# docs/article_schema.md "Per-block author attribution" for the author
+# field convention.
+[Oinkologne.intro]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+body = """
+Male Oinkologne (186/153/242) is a Normal-typed threat that Mud Slap \
+reshapes into a Ground counter-picker. Super-effective Ground damage \
+punishes the bulky Steels (Empoleon, Steelix, Galarian Stunfisk) and \
+Ghost stallers (Dusclops, Sableye, Galarian Corsola) that Tackle \
+couldn't scratch, with per-matchup deltas of +40 to +77 percentage \
+points on those cells. Aggregate win rate against the top-50+CS \
+Great League pool still sits around 43%, so this is anti-meta \
+pressure on a specific Steel / Ghost problem, not a core-team \
+chassis.
+"""
+
+[Oinkologne.meta_role]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+good_at = """
+Mud Slap turns Male Oinkologne from a Normal-typed blunt tool into a \
+genuine Steel / Ghost counter-pick. Super-effective Ground damage \
+flips the bulky Steel-subtyped walls - Empoleon (regular and Shadow), \
+Steelix (regular and Shadow), and Galarian Stunfisk - from hopeless \
+Tackle-era losses into aggregate wins with deltas of +40 to +77 \
+percentage points depending on form. The same pattern holds against \
+Ghost stallers: Dusclops (both forms), Galarian Corsola, and Sableye \
+all move into the win column. Male's 186-Attack frame additionally \
+has the pop to clear specific damage breakpoints on neutral-matchup \
+defenders: Wigglytuff, Lickilicky, Dondozo, and regular Stunfisk \
+flip into wins because Mud Slap's rolls land the extra damage needed \
+to push past the defender's HP threshold in time.
+"""
+bad_at = """
+Mud Slap's Ground typing is resisted by Flyers, Grass-types, and \
+Bug-types, and the move switch creates its own problem set. Regular \
+Altaria slips by -12 to -25 percentage points (still a loss, just a \
+clearer one), and Shadow Altaria swings all the way from an \
+aggregate Tackle-era win into a decisive loss (-41 pp). Galarian \
+Moltres worsens by -25 to -33 pp. Male's thinner Defense (153) \
+means those already-bad matchups bleed faster once Oinkologne starts \
+eating super-effective damage, so expect the Flyer / Fire / Dragon \
+cells to widen rather than hold.
+"""
+team_role = """
+Male Oinkologne's value is anti-meta, not core-chassis. Aggregate \
+win rate against the top-50+CS Great League pool sits around 43%, \
+so this is a counter-pick slot - an answer to a specific team \
+problem (Steel-core coverage, Ghost-wall pressure), not the mon a \
+team is built around. The niche that justifies Male specifically is \
+the raw-Attack tilt: breakpoint-dependent wins against Wigglytuff, \
+Lickilicky, Dondozo, and regular Stunfisk need Mud Slap's rolls to \
+clear the defender's HP threshold on time, and Male's 186 Attack is \
+what buys those rolls. Build Male Oinkologne on teams that already \
+cover the Flying / Fire / Dragon core it still can't touch; pair it \
+with a Fire-resistant anchor and a safe Grass-resist so it's free \
+to chip the Steel / Ghost problem you're bringing it for.
+"""
+body = ""
+
+[Oinkologne.verdict]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+editorial = """
+Male Oinkologne is worth building if your Great League team already \
+has Mud Slap's anti-Steel / anti-Ghost job in mind. The 43% \
+aggregate win rate keeps it out of general-purpose lead duty, but \
+the matchups it flips are durable ones (Empoleon, Steelix, Dusclops \
+don't rotate out of the meta), and the raw-Attack breakpoints \
+against Wigglytuff, Lickilicky, Dondozo, and regular Stunfisk are \
+cells that only a high-Attack IV spread can keep. Target a \
+high-Attack catch to lock those breakpoint-dependent wins; the \
+Notable IVs cards below spell out which cuts matter. Skip \
+Elite-TMing Mud Slap - the CD-day window is free.
+"""
+outlook = """
+Male Oinkologne's counter-pick value rises and falls with the meta's \
+Steel / Ghost surface and its Flyer / Fire / Dragon pressure. If \
+the bulky-Steel core recedes, the niche narrows; if it holds and \
+Flyers stay off the top tables, Male's slot widens. Worth a revisit \
+after the next season rotation.
+"""
+
 # Community Day preparation. PvPoke's gamemaster adds/removes upcoming CD
 # moves unpredictably; when it's absent from the species' fast/charged
 # pool, the dive silently enumerates only current-default movesets,
