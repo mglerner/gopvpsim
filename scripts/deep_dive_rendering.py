@@ -116,7 +116,9 @@ DEEP_DIVE_CSS = """
 .dd-rank-good { color: #3fb950; font-weight: 600; }
 .dd-rank-bad { color: #f85149; }
 .dd-small { font-size: 0.82rem; color: #8b949e; margin: 4px 0; }
-.dd-callout { background: #0f3460; border-left: 3px solid #58a6ff; padding: 8px 12px; margin: 10px 0; border-radius: 0 4px 4px 0; font-size: 0.85rem; }
+.dd-callout { --sidebar-color: #58a6ff; --sidebar-width: 3px;
+  background: #0f3460; padding: 8px 12px 8px 16px; margin: 10px 0;
+  border-radius: 0 4px 4px 0; font-size: 0.85rem; }
 .dd-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; }
 .dd-methods-dl { margin: 8px 0; }
 .dd-methods-dl dt { color: #58a6ff; font-weight: 600; margin-top: 8px; }
@@ -130,8 +132,9 @@ DEEP_DIVE_CSS = """
 .dd-rec-card p { margin: 3px 0; font-size: 0.88rem; }
 .dd-prose { font-size: 0.88rem; color: #b0b8c4; margin: 4px 0 8px 0; font-style: italic; }
 .dd-threshold-list { list-style: none; padding: 0; margin: 8px 0; }
-.dd-threshold-list li { padding: 4px 0 4px 12px; border-left: 2px solid #0f3460; margin: 4px 0; font-size: 0.88rem; }
-.dd-threshold-list .dd-loss-item { border-left-color: #f85149; }
+.dd-threshold-list li { --sidebar-color: #0f3460; --sidebar-width: 2px;
+  padding: 4px 0 4px 14px; margin: 4px 0; font-size: 0.88rem; }
+.dd-threshold-list .dd-loss-item { --sidebar-color: #f85149; }
 .dd-opp-label { color: #8b949e; font-size: 0.75rem; }
 .dd-slayer-top td { background: #1e2d4a; }
 .dd-slayer-top td:first-child { border-left: 3px solid #58a6ff; }
@@ -213,58 +216,81 @@ DEEP_DIVE_CSS = """
 .dd-collapsible > summary::before { content: "\\25b6"; display: inline-block;
   margin-right: 6px; font-size: 0.7em; transition: transform 0.15s; color: #58a6ff; }
 .dd-collapsible[open] > summary::before { transform: rotate(90deg); }
-.dd-expert-zone { border-left: 4px solid #d29922; padding-left: 16px; margin: 16px 0; }
+.dd-expert-zone { --sidebar-color: #d29922;
+  padding: 10px 0 10px 20px; margin: 16px 0; }
 .dd-expert-zone h3 { color: #d29922; margin: 0 0 10px 0; }
 .dd-expert-source { color: #8b949e; font-size: 0.82rem; font-style: italic; margin: 0 0 12px 0; }
 .dd-expert-anchors { margin: 10px 0; }
 .dd-expert-anchors li { margin: 4px 0; }
-.dd-narrative-zone { border-left: 4px solid #9b59b6; padding: 12px 0 12px 16px; margin: 20px 0; }
+.dd-narrative-zone { --sidebar-color: #9b59b6;
+  padding: 12px 0 12px 20px; margin: 20px 0; }
 .dd-narrative-prose { font-size: 0.9rem; color: #c8ccd4; line-height: 1.6; margin: 6px 0; }
 .dd-narrative-rec { color: #3fb950; font-weight: 600; }
 .dd-narrative-loss { color: #f85149; font-size: 0.88rem; font-style: italic; margin: 8px 0 4px 0; }
-.dd-sim-zone { border-left: 4px solid #58a6ff; padding-left: 16px; margin: 16px 0; }
+.dd-sim-zone { --sidebar-color: #58a6ff;
+  padding: 10px 0 10px 20px; margin: 16px 0; }
 .dd-sim-zone > h3 { color: #58a6ff; margin: 0 0 10px 0; }
 .dd-species-narrative { margin: 20px 0; }
-/* Per-block wrapper. The left "sidebar" is a pseudo-element rather
-   than a border so its ends can be rounded and inset from the block
-   edges — this creates a visible gap between adjacent blocks even
-   when they share the same authored_by colour, and the rounded caps
-   read as intentional. Colour encodes who authored the block:
-   gold = human (default), orange = AI-drafted, gold = mixed (a
-   human co-signed). Inner (h2/h3) colour is driven off the same
-   .authored-X modifier. */
 .dd-species-narrative .dd-narrative-block {
-  position: relative;
+  --sidebar-color: #d29922;
   padding: 10px 0 10px 20px;
   margin: 8px 0;
 }
-.dd-species-narrative .dd-narrative-block::before {
+.dd-species-narrative .dd-narrative-block.authored-ai {
+  --sidebar-color: #e8903a;
+}
+.dd-species-narrative .dd-narrative-block > h2,
+.dd-species-narrative .dd-narrative-block > h3 {
+  color: var(--sidebar-color);
+  margin: 0 0 8px 0;
+}
+.dd-species-narrative .dd-narrative-block > h2 { font-size: 1.15rem; }
+.dd-species-narrative .dd-narrative-block > h3 { font-size: 1.0rem; }
+.dd-species-narrative p { margin: 8px 0; }
+.dd-species-narrative .narrative-attribution { color: #8b949e;
+  font-size: 0.82rem; margin: 6px 0 0 0; font-style: italic; }
+
+/* ==== Shared sidebar pattern (2026-04-19 refactor) ====
+ * Any element in the selector list below gets a rounded-cap
+ * pseudo-element sidebar on its left edge instead of a hand-written
+ * border-left. The bar is drawn by ::before as an absolutely-
+ * positioned rectangle with border-radius, inset 4px from the top
+ * and bottom of the element's padding box so adjacent elements
+ * with the same colour still read as distinct blocks.
+ *
+ * Adding a new zone class: add the class name to all three selector
+ * lists (base, ::before, none for colour — use --sidebar-color
+ * directly in the class's own rule), then set --sidebar-color in
+ * that class's own definition. Optional: --sidebar-width override
+ * (defaults to 4px) for narrower nested bars.
+ *
+ * Kept here as a grouped block, adjacent to each zone's
+ * semantic/padding rules above, so a single grep for a zone name
+ * lands on both the class definition and the shared pattern. */
+.dd-expert-zone,
+.dd-narrative-zone,
+.dd-sim-zone,
+.dd-callout,
+.dd-species-narrative .dd-narrative-block,
+.dd-threshold-list li {
+  position: relative;
+  border-left: none;
+}
+.dd-expert-zone::before,
+.dd-narrative-zone::before,
+.dd-sim-zone::before,
+.dd-callout::before,
+.dd-species-narrative .dd-narrative-block::before,
+.dd-threshold-list li::before {
   content: "";
   position: absolute;
   left: 0;
   top: 4px;
   bottom: 4px;
-  width: 4px;
-  background: #d29922;
-  border-radius: 2px;
+  width: var(--sidebar-width, 4px);
+  border-radius: calc(var(--sidebar-width, 4px) / 2);
+  background: var(--sidebar-color, #8b949e);
 }
-.dd-species-narrative .dd-narrative-block.authored-ai::before {
-  background: #e8903a;
-}
-.dd-species-narrative .dd-narrative-block > h2,
-.dd-species-narrative .dd-narrative-block > h3 {
-  color: #d29922;
-  margin: 0 0 8px 0;
-}
-.dd-species-narrative .dd-narrative-block > h2 { font-size: 1.15rem; }
-.dd-species-narrative .dd-narrative-block > h3 { font-size: 1.0rem; }
-.dd-species-narrative .dd-narrative-block.authored-ai > h2,
-.dd-species-narrative .dd-narrative-block.authored-ai > h3 {
-  color: #e8903a;
-}
-.dd-species-narrative p { margin: 8px 0; }
-.dd-species-narrative .narrative-attribution { color: #8b949e;
-  font-size: 0.82rem; margin: 6px 0 0 0; font-style: italic; }
 """
 
 def parse_mode(composite_mode):

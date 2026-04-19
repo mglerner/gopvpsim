@@ -61,48 +61,74 @@ _ALREADY_PATCHED_MARKER = '<section class="dd-species-narrative">'
 _NARRATIVE_CSS_OVERRIDE = """
 <style>
 /* Species-narrative CSS override injected by
-   scripts/patch_dive_species_narrative.py (2026-04-19). Brings an
-   older dive HTML's per-block colour coding up to the current
-   renderer's shape. Safe no-op if the main stylesheet already has
-   the same rules. */
-/* Explicitly zero the outer-section border+padding from the old
-   renderer (pre-2026-04-19 shape) so the old gold bar doesn't still
-   run alongside the new per-block bars. */
+   scripts/patch_dive_species_narrative.py (2026-04-19 refactor).
+   Brings pre-refactor dive HTMLs onto the shared rounded-sidebar
+   pattern so all dive zones (expert, narrative, sim, callout,
+   threshold list, species narrative) render with the same
+   rounded-cap pseudo-element bar. Safe no-op if the main stylesheet
+   already has equivalent rules (later-defined-wins cascade). */
+
+/* Zero the outer .dd-species-narrative's old hard border/padding. */
 .dd-species-narrative {
   margin: 20px 0;
   border-left: none;
   padding: 0;
 }
+
+/* Per-zone colours + spacing. */
+.dd-expert-zone { --sidebar-color: #d29922;
+  padding: 10px 0 10px 20px; margin: 16px 0; }
+.dd-narrative-zone { --sidebar-color: #9b59b6;
+  padding: 12px 0 12px 20px; margin: 20px 0; }
+.dd-sim-zone { --sidebar-color: #58a6ff;
+  padding: 10px 0 10px 20px; margin: 16px 0; }
+.dd-callout { --sidebar-color: #58a6ff; --sidebar-width: 3px;
+  padding: 8px 12px 8px 16px; margin: 10px 0; }
+.dd-threshold-list li { --sidebar-color: #0f3460; --sidebar-width: 2px;
+  padding: 4px 0 4px 14px; margin: 4px 0; }
+.dd-threshold-list .dd-loss-item { --sidebar-color: #f85149; }
 .dd-species-narrative .dd-narrative-block {
-  position: relative;
+  --sidebar-color: #d29922;
   padding: 10px 0 10px 20px;
   margin: 8px 0;
+}
+.dd-species-narrative .dd-narrative-block.authored-ai {
+  --sidebar-color: #e8903a;
+}
+.dd-species-narrative .dd-narrative-block > h2,
+.dd-species-narrative .dd-narrative-block > h3 {
+  color: var(--sidebar-color);
+  margin: 0 0 8px 0;
+}
+.dd-species-narrative .dd-narrative-block > h2 { font-size: 1.15rem; }
+.dd-species-narrative .dd-narrative-block > h3 { font-size: 1.0rem; }
+
+/* Shared pattern: rounded-cap pseudo-element sidebar. */
+.dd-expert-zone,
+.dd-narrative-zone,
+.dd-sim-zone,
+.dd-callout,
+.dd-species-narrative .dd-narrative-block,
+.dd-threshold-list li {
+  position: relative;
   border-left: none;
 }
-.dd-species-narrative .dd-narrative-block::before {
+.dd-expert-zone::before,
+.dd-narrative-zone::before,
+.dd-sim-zone::before,
+.dd-callout::before,
+.dd-species-narrative .dd-narrative-block::before,
+.dd-threshold-list li::before {
   content: "";
   position: absolute;
   left: 0;
   top: 4px;
   bottom: 4px;
-  width: 4px;
-  background: #d29922;
-  border-radius: 2px;
+  width: var(--sidebar-width, 4px);
+  border-radius: calc(var(--sidebar-width, 4px) / 2);
+  background: var(--sidebar-color, #8b949e);
 }
-.dd-species-narrative .dd-narrative-block.authored-ai::before {
-  background: #e8903a;
-}
-.dd-species-narrative .dd-narrative-block > h2,
-.dd-species-narrative .dd-narrative-block > h3 {
-  color: #d29922;
-  margin: 0 0 8px 0;
-}
-.dd-species-narrative .dd-narrative-block > h2 { font-size: 1.15rem; }
-.dd-species-narrative .dd-narrative-block > h3 { font-size: 1.0rem; }
-.dd-species-narrative .dd-narrative-block.authored-ai > h2,
-.dd-species-narrative .dd-narrative-block.authored-ai > h3 {
-  color: #e8903a;
-}
+
 .dd-species-narrative p { margin: 8px 0; }
 .dd-species-narrative .narrative-attribution { color: #8b949e;
   font-size: 0.82rem; margin: 6px 0 0 0; font-style: italic; }
