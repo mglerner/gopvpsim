@@ -33,6 +33,10 @@ GREEN=$'\033[32m'
 YELLOW=$'\033[33m'
 RED=$'\033[31m'
 CYAN=$'\033[36m'
+# Bold bright magenta — reserved for the Script ETA line so it's the
+# first thing the eye lands on in the box. Distinct from the existing
+# green/yellow/cyan palette so it doesn't blur with other status.
+ETA_ACCENT=$'\033[1;95m'
 
 # Top / bottom rule. Auto-detect terminal width (works under watch and
 # plain shells alike) and cap at 140 so ultrawide terminals don't
@@ -112,9 +116,12 @@ if [[ -n "$WRAPPER_LOG" ]]; then
     if [[ -n "$ETA_OUT" ]]; then
         ETA_LINE1=$(echo "$ETA_OUT" | head -1)
         ETA_LINE2=$(echo "$ETA_OUT" | sed -n '2p')
-        printf "  %sScript ETA:%s %s%s%s\n" "$BOLD" "$RESET" "$GREEN" "$ETA_LINE1" "$RESET"
+        # ► leading marker + bold bright magenta draws the eye to ETA as
+        # the answer to "when will this be done?" before anything else
+        # in the box.
+        printf "  %s► SCRIPT ETA: %s%s\n" "$ETA_ACCENT" "$ETA_LINE1" "$RESET"
         if [[ -n "$ETA_LINE2" ]]; then
-            printf "  %s%s%s\n" "$DIM" "$ETA_LINE2" "$RESET"
+            printf "    %s%s%s\n" "$DIM" "$ETA_LINE2" "$RESET"
         fi
     fi
 fi
