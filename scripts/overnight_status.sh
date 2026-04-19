@@ -243,18 +243,32 @@ if [[ -d "$HTML_ROOT" ]]; then
 
     # Classify into new vs pre. Use a portable shell split (no awk
     # dependency on chain-start-epoch being set — skip the threshold
-    # check when epoch is empty and treat everything as pre).
-    NEW_ENTRIES=""
-    PRE_ENTRIES=""
+    # check when epoch is empty and treat everything as pre). Within
+    # each bucket further split by "is this the directory's main
+    # index.html" vs split-moveset / secondary — the main index.html
+    # is the useful landing click; the index_m*.html splits are
+    # secondary. Upstream entries are already mtime-desc so preserving
+    # insertion order keeps each sub-list mtime-desc too.
+    NEW_INDEX=""; NEW_OTHER=""
+    PRE_INDEX=""; PRE_OTHER=""
     while IFS= read -r ENTRY; do
         [[ -z "$ENTRY" ]] && continue
         MT="${ENTRY%% *}"
+        FP="${ENTRY#* }"
+        IS_MAIN_INDEX=false
+        [[ "$FP" == */index.html ]] && IS_MAIN_INDEX=true
         if [[ -n "$CHAIN_START_EPOCH" && "$MT" -ge "$CHAIN_START_EPOCH" ]]; then
-            NEW_ENTRIES+="${ENTRY}"$'\n'
+            if $IS_MAIN_INDEX; then NEW_INDEX+="${ENTRY}"$'\n'
+            else                     NEW_OTHER+="${ENTRY}"$'\n'
+            fi
         else
-            PRE_ENTRIES+="${ENTRY}"$'\n'
+            if $IS_MAIN_INDEX; then PRE_INDEX+="${ENTRY}"$'\n'
+            else                     PRE_OTHER+="${ENTRY}"$'\n'
+            fi
         fi
     done <<< "$ALL_ENTRIES"
+    NEW_ENTRIES="${NEW_INDEX}${NEW_OTHER}"
+    PRE_ENTRIES="${PRE_INDEX}${PRE_OTHER}"
 
     # Build display list: all new (capped), then pre to fill remainder.
     NEW_COUNT=$(printf '%s' "$NEW_ENTRIES" | grep -c . || true)
