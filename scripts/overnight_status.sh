@@ -34,8 +34,12 @@ YELLOW=$'\033[33m'
 RED=$'\033[31m'
 CYAN=$'\033[36m'
 
-# Top / bottom rule
-WIDTH=76
+# Top / bottom rule. Auto-detect terminal width (works under watch and
+# plain shells alike) and cap at 140 so ultrawide terminals don't
+# sprawl. Fall back to 80 when detection fails.
+WIDTH=$(tput cols 2>/dev/null || echo 80)
+if [[ "$WIDTH" -gt 140 ]]; then WIDTH=140; fi
+if [[ "$WIDTH" -lt 60 ]]; then WIDTH=60; fi
 rule() { printf '%s\n' "$(printf '─%.0s' $(seq 1 $WIDTH))"; }
 
 # Header
