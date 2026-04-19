@@ -355,9 +355,9 @@ The optional `authored_by` enum on any narrative block routes a
 per-block border / heading colour on the rendered page, distinct from
 the attribution-line text. Values:
 
-| Value     | Meaning                                | Colour (dive-side)     |
+| Value     | Meaning                                | Colour                 |
 | --------- | -------------------------------------- | ---------------------- |
-| `"human"` | Human-authored (or human-reviewed AI). | Gold (default)         |
+| `"human"` | Human-authored (or human-reviewed AI). | Gold (`#d29922`)       |
 | `"ai"`    | AI-drafted, not yet human-reviewed.    | Orange (`#e8903a`)     |
 | `"mixed"` | Genuinely co-authored by human + AI.   | Gold (human co-signed) |
 
@@ -378,9 +378,14 @@ the `author` string is free-form prose and hard to match robustly:
 reviewed by Michael" are different provenance but share the "Claude"
 substring.
 
-Dive-side styling is live today (`scripts/deep_dive_rendering.py`).
-Article-side colour styling is future work — the field can be set
-now on article TOMLs so it's in place when the renderer picks it up.
+Styling is live on both surfaces: dive-side in
+`scripts/deep_dive_rendering.py` (shipped 2026-04-19 `670f57b`),
+article-side in `scripts/generate_article.py` via the shared
+`.article-narrative-block` wrapper on `render_intro_section` /
+`_render_meta_role_section` / `_render_verdict_augment` (shipped
+2026-04-19 `2112421`). Both sides consume the same
+`authored_by_class` helper in `render_article.py` so the enum-to-
+class mapping stays in one place.
 
 ## Matchup Delta config (F2, shipped 2026-04-18)
 
