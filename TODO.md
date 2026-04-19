@@ -26,7 +26,13 @@ resuming:
 4. **P1-P4 polish** (see "Post-ship (article + dive polish)" section
    below) - pull forward opportunistically if capacity allows before
    CD day.
-5. **Link-verification pass** (P4) and **ship**.
+5. **XL-candy-decision tool** (Mirror CMP % + Score Δ vs rank-1
+   columns + hover on the Top IVs table and scatter). Retrofits to
+   existing dives via HTML patcher; ~3-4 hours. See the "Pre-ship:
+   XL-candy-decision tool" section below. Claude-drafted narrative
+   replacement (docs/auto_gen_narrative_plan.md) should land first
+   since both touch the dive renderer.
+6. **Link-verification pass** (P4) and **ship**.
 
 Post-ship, the post-S5 arc resumes at S11-S17 in
 `~/.claude/plans/post-s5-oinkologne-arc.md` (HTML file-size,
@@ -93,6 +99,92 @@ was running 1h+ elapsed at 2026-04-19 ~22:25 local (tracking near
 other full-sweep dives, so likely just the too-low fallback, not a
 real regression — but confirm against the other full-sweep times
 in the summary and flag if >15% over the GL/UL mean).
+
+## Pre-ship: XL-candy-decision tool (Mirror CMP % + Score Δ vs rank-1)
+
+**Motivation:** deciding which IV to pour stardust and XL candy into
+for a meta-staple species (Tinkaton UL, Medicham GL, Corviknight GL,
+Cresselia UL, Clefable GL, Annihilape GL) requires answering two
+questions simultaneously:
+
+1. Does this IV score near the top of the overall battle ranking?
+2. Does this IV beat the CMP tie-break against the IVs real opponents
+   actually run?
+
+Rank-1-by-stat-product answers (1) trivially but often loses CMP
+(confirmed 2026-04-19 on Tinkaton UL dive 4: rank-1 13/15/15 at
+atk=140.75 is beaten on atk by rows 3, 5, 8, 9, 10 of the Top IVs
+table — atk 141.17 through 142.85 — with battle-score deltas of
+only 0.9-1.6 points vs rank-1). No single IV maximizes both. The
+XL-candy commitment is large enough that eyeballing the table for
+the right trade-off is an honest ~20-minute task per species.
+
+**Two new computed values** (native in the dive HTML, retrofittable
+to existing dives via an HTML patcher — no re-dive required; both
+are pure arithmetic on data already embedded in the dive's `DATA`
+object):
+
+1. **`Mirror CMP %`** — per IV, fraction of the `--mirror-slayer`
+   converged cohort that this IV beats at CMP (higher atk than).
+   The mirror-slayer cohort is already computed for every
+   full-sweep dive in `run_website_dives.py`, and its members'
+   IV/atk values are already in the dive HTML. Compute =
+   `count(cohort[i].atk < this_iv.atk) / len(cohort)`. Uses the
+   Nash-converged cohort (not uniform-random 4096 IVs) so the
+   number reflects what opponents realistically build, not what
+   theoretically exists.
+2. **`Score Δ vs rank-1`** — per IV, `my_score - rank1_score`
+   under the currently-selected Shields / Opp-IV / Bait combo.
+   Negative values = what you give up for the bulk or atk trade.
+   Reacts to the dropdowns, so hovering in 1v1 mode shows the
+   1v1-specific delta.
+
+**Surface these in two places** (both cheap):
+
+- **New sortable columns in the Top IVs table:** `Mirror CMP %`
+  and `Score Δ`. User sorts by `Mirror CMP %` desc, scans down for
+  IVs with `Score Δ` close to 0 (small score sacrifice, high CMP
+  coverage). That row answers "which of my catchable IVs is the
+  right XL target."
+- **Hover tooltip on the scatter plot:** two extra lines per
+  hover showing the same values. Combined with the existing
+  paste-box-CSV-overlay (your collection circled), you can paste
+  your Tinkaton collection, hover each one, and see instantly which
+  meets the "good battle rank + wins mirror CMP" criteria.
+
+**Implementation path:**
+
+- **Client-side JS** (not server-side Python patching) — the
+  computations depend on the currently-selected Shields / Opp-IV /
+  Bait dropdowns, which drive the avg score. Doing it in Python
+  would require re-running the patcher every time those change.
+  ~30 lines of JS in the dive's existing inline script: compute
+  both values at page load and after each dropdown change, inject
+  into the Top IVs table rows + hover tooltips.
+- **Renderer update** (`scripts/deep_dive_rendering.py`): emit
+  the new columns + JS block for every future dive.
+- **Retrofit patcher** (`scripts/patch_dive_mirror_cmp.py`,
+  new): regex-inject the JS into existing dive HTMLs. Idempotent
+  via a comment-fingerprint header. Parallels the existing
+  `patch_dive_species_narrative.py` pattern. Run against the 4
+  existing dive dirs + anything else with an `index_m*.html`.
+
+**Estimated effort:** 3-4 hours (JS computation + table/tooltip
+wiring + renderer change + patcher).
+
+**Generalization note:** this is the "which IV do I XL?" decision
+tool. Applies to every meta-staple species whose candy XL cost is
+nontrivial — Tinkaton UL, Medicham GL, Corviknight GL, Clefable
+GL, Annihilape GL, Cresselia UL, Guzzlord UL, Registeel UL, and
+on. Once built, zero per-species config — every full-sweep dive
+with `--mirror-slayer` gets it for free.
+
+**Optional stretch:** dedicated Pareto-frontier sub-plot — atk
+stat on X-axis, avg score on Y-axis, frontier line highlighted,
+CMP-% contours at 50/75/90%, user collection circled. Pretty and
+information-dense, but the two-column add alone answers the
+question at the cost of less visual polish. Pull in if the
+core add leaves time; skip otherwise.
 
 ## CD-prep tracking (2026-04-17, fix shipped 2026-04-18)
 
