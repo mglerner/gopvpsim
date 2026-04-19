@@ -1,5 +1,10 @@
-# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 61 unique species.
+# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 65 unique species.
 # Generated 2026-04-12 by scripts/build_opponent_pool.py
+# Hand-extended 2026-04-18 with the four dive focal species so each dive's
+# opponent pool includes the cross-form / alt-form partner (Oinkologne M/F,
+# Aegislash Blade/Shield). deep_dive.py auto-appends the focal species for
+# mirror analysis, so having them explicit here just makes the cross-form
+# matchups symmetric across focals.
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
 Quagsire
@@ -63,3 +68,7 @@ Steelix
 Togekiss
 Weezing (Galarian) (Shadow)
 Diggersby
+Oinkologne
+Oinkologne (Female)
+Aegislash (Blade)
+Aegislash (Shield)

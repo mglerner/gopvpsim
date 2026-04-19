@@ -1,0 +1,20 @@
+# Aegislash (Blade) -- stub threshold file.
+#
+# Aegislash (Blade) isn't in PvPoke's GL/UL rankings. The species exists
+# in the gamemaster with atk 272 / def 97 / hp 155 as an "always-Blade"
+# hypothetical form; PvPoke's canonical simulated Aegislash starts in
+# Shield and transforms mid-battle. This stub exists so downstream
+# article/comparison tooling can find an article slug for the form.
+#
+# Deep dive: userdata/website/aegislash-blade-great-league/ (GL),
+#            userdata/website/aegislash-blade-ultra-league/ (UL).
+# Articles:  articles/aegislash-form-change-guide-gl.toml (GL),
+#            articles/aegislash-form-change-guide-ul.toml (UL).
+#
+# deep_dive.py is invoked with `--no-thresholds` for Aegislash so this
+# file isn't auto-loaded into the threshold registry; no attack/defense/
+# stamina spreads are authored here. Upgrade to a full spread file if
+# enough anchor work accumulates to warrant it.
+
+["Aegislash (Blade)"]
+sources = "pogo-simulator hypothetical always-Blade dive (no PvPoke ranking); form-change mechanic is modeled natively by src/gopvpsim/formchange.py but the realistic path starts from Shield."

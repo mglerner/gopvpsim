@@ -1,0 +1,21 @@
+# Aegislash (Shield) -- stub threshold file.
+#
+# Canonical PvPoke Aegislash: starts in Shield (atk 97 / def 272 / hp
+# 155), fast move AEGISLASH_CHARGE_PSYCHO_CUT has power 0 so it purely
+# generates energy, then the first charged move triggers form-change to
+# Blade (atk 272 / def 97 / hp 155) for the rest of the fight. The sim
+# models this via src/gopvpsim/formchange.py using the gamemaster's
+# formChange field.
+#
+# Deep dive: userdata/website/aegislash-shield-great-league/ (GL),
+#            userdata/website/aegislash-shield-ultra-league/ (UL).
+# Articles:  articles/aegislash-form-change-guide-gl.toml (GL),
+#            articles/aegislash-form-change-guide-ul.toml (UL).
+#
+# deep_dive.py is invoked with `--no-thresholds` so this file isn't
+# auto-loaded into the threshold registry; no attack/defense/stamina
+# spreads are authored here. Upgrade to a full spread file if enough
+# anchor work accumulates to warrant it.
+
+["Aegislash (Shield)"]
+sources = "pogo-simulator realistic form-change dive (canonical Shield -> Blade path, via the native formchange.py); PvPoke GL/UL rankings (Aegislash (Shield) is the ranking entry for Aegislash)."
