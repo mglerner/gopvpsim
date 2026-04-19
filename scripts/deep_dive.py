@@ -2208,16 +2208,28 @@ def _build_split_file_list(moveset_data, reference_idx, base_html_path):
          'moveset_idx': int,                # index into original moveset_data
          'is_reference': bool}
 
-    Naming: the reference moveset (or moveset 0 when no reference resolved)
-    becomes ``{stem}.html``; all others become
+    Naming: moveset 0 (the top-scoring moveset from the Phase 2 ranking)
+    always becomes ``{stem}.html``; all others become
     ``{stem}_m{moveset_idx}_{slug}.html``. URLs are relative filenames so
     the dropdown navigates correctly regardless of where the files are
     opened from.
+
+    Landing is decoupled from ``reference_idx`` on purpose: for CD-prep
+    dives the reference is typically the *pre-CD* moveset (the
+    comparison baseline for "vs Ref" hovers), which is exactly what we
+    *don't* want as the landing page — the reader is here to see the
+    CD move. moveset 0 is the top-scoring moveset by the same Phase 2
+    ordering ``--top-movesets`` uses, which for CD dives is the
+    CD-move variant and for non-CD dives is the meta-standard moveset
+    (typically equal to reference). The ``is_reference`` flag stays on
+    whichever moveset matches ``reference_idx`` so the dropdown can
+    tag it, and the "vs Ref" comparison in non-landing files still
+    resolves correctly.
     """
     import os as _os
     directory = _os.path.dirname(base_html_path) or '.'
     stem, ext = _os.path.splitext(_os.path.basename(base_html_path))
-    landing_idx = reference_idx if reference_idx >= 0 else 0
+    landing_idx = 0
     files = []
     for mi, md in enumerate(moveset_data):
         pretty = _pretty_moveset(md['label'])
