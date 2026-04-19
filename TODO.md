@@ -1189,6 +1189,52 @@ bottleneck.
   loses at most one round's worth of sims. Tiny code change, big peace
   of mind.
 
+* **Form-change path speedup (Aegislash Shield, Mimikyu, Morpeko)**
+  — *Discovered 2026-04-19 during the out-of-band Aegislash GL dive
+  against Orlando top-32.* Mirror-slayer Round 1 on Aegislash (Shield)
+  projected ~25-30 min per moveset (~10× the Blade-side baseline) at
+  ~700 sims/s vs the 7,000 sims/s Phase 2 baseline. Correctness is fine
+  (validated by `tests/test_aegislash_vs_azumarill_form_change`); the
+  9.5M-sim scale just magnifies the form-change per-sim overhead.
+
+  **Suspected dominant costs** (unprofiled):
+
+  1. `apply_form_change(bp, opponent)` does a full state swap: base
+     stats (atk/def/hp), active moveset, `bestChargedMove` reselection,
+     per-move cached damage tables invalidated. Fires every time
+     Aegislash (Shield) lands its first charged move, which is nearly
+     every sim in a mirror-slayer scale run.
+  2. Per-turn `attacker.current_form_trigger` / `defender.current_form_trigger`
+     property evaluation on every charged-move event, even for species
+     with no form change (no-ops but not free). Cheap individually;
+     compounded across 9.5M sims it adds up.
+  3. Damage-and-timing caches that key on (attacker form, opponent) get
+     stale on form change and rebuild from scratch the next call. If
+     caching is per-form, the form swap is a mandatory invalidation.
+
+  **Why Shield hits this harder than Blade:** Shield-focal transforms
+  on every charged move (every battle). Blade-focal transforms only
+  when Aegislash *shields* an opponent's charged move — conditional
+  on shield count and policy — so the code path runs much less often.
+
+  **Perf session plan** (~2 hours):
+
+  * `cProfile` or `py-spy` on `scripts/deep_dive.py 'Aegislash (Shield)'`
+    with `--opponents 3 --mirror-slayer-rounds 1`, compare to same
+    command on Aegislash (Blade). Flame graph diff highlights the
+    form-change-only hot path.
+  * Likely interventions: (a) precompute both forms' damage tables
+    up front and swap by pointer, (b) lazy-invalidate damage caches
+    per-opponent rather than per-form, (c) inline the form-trigger
+    checks into a single type-dispatch so non-form-change species
+    pay zero per-turn cost.
+  * Success criterion: Shield mirror-slayer within 2× Blade's rate
+    (rather than today's 10×).
+
+  Deferred because correctness is fine and Aegislash isn't on the
+  pre-ship critical path. Pull forward if Aegislash becomes a frequent
+  dive target post-CD.
+
 ## Schema simplification
 
 * **TOML simplification triggers** *(collect friction, don't act yet)* —
