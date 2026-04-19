@@ -61,19 +61,20 @@ RyanSwag's GamePress deep dives. Much of it answers first-time-reader
 questions but repeats on every visit; a second-time reader or
 multi-article reader wants to skim faster.
 
-**First-pass fix (shippable now, item 3 of the post-S10 polish):**
-wrap the obviously-over-explained paragraphs in `<details>` default-
-closed with a short one-line summary that stays visible. Targets:
+**First-pass fix — SHIPPED.** The three paragraph targets are all
+now click-gated:
 
-- Meta Coverage's "Each cell averages 4,096 focal IVs x N opponents"
-  methodology paragraph.
-- Matchup Delta's equivalent "Each cell averages 4,096 x 9 = 36,864
-  sims" paragraph.
-- Opp-IV / Bait toggle caption (keep the dropdowns visible; collapse
-  the "which sections this affects" prose into a tooltip / detail).
+- Meta Coverage "Each cell averages 4,096 focal IVs x N opponents"
+  methodology paragraph — wrapped by `f9a1fc4` (F-hide-methodology).
+- Matchup Delta legend "What the columns mean" — SHIPPED `a6db157`
+  (removed the default-open `open` attribute so it now collapses
+  like the sibling legends).
+- Opp-IV / Bait toggle caption — SHIPPED `a6db157` (collapsed the
+  visible caption sentence into the adjacent "What these dropdowns
+  change" `<details>` block; dropdowns themselves stay visible).
 
-The existing `<details>` on the &Delta; column is already default-
-closed, so no change there.
+The existing `<details>` on the &Delta; column was already default-
+closed pre-pass.
 
 **Broader pass (after the JRE / RyanSwag comparison, pre-ship):**
 once the density gap is quantified, do a structural edit pass. The
@@ -179,16 +180,21 @@ today with unlabeled Claude-drafted `[intro]` / `[meta_role]` /
 `[verdict]` blocks. Session 2 below unblocks ship — Session 1's
 renderer alone does not (it just made the `author` field possible).
 
-**Session 2 (next, content authoring):** author per-form narrative
-TOMLs for Oinkologne M/F, slim the article prose to CD-scope, mark
-every Claude-drafted block with an `author` line. No dive regen —
-the queued overnight re-dive bakes narrative into fresh HTML. See
-`memory/project_shape2_session1_shipped.md` for the Session 2
-kickoff checklist.
+**Session 2 — SHIPPED `bf05538`.** Per-form Oinkologne M/F narrative
+authored in the threshold TOMLs; article `[intro]` / `[meta_role]` /
+`[verdict]` slimmed to CD-event scope; every Claude-drafted block
+carries `author = "Drafted by Claude (Opus 4.7), not yet
+human-reviewed"`. Tonight's overnight re-dive bakes the narrative
+into the regenerated Oinkologne dive HTMLs.
 
-**Session 3 (Aegislash):** author Aegislash Blade / Shield narrative
-once the Aegislash dives land as rendered HTML (threshold stubs
-exist but no dive HTML to anchor prose against yet).
+**Session 3 (Aegislash) — SHIPPED `bb021fa`.** Blade and Shield
+narrative authored in the threshold TOMLs (Shield = canonical
+realistic play pattern; Blade = always-Blade diagnostic
+hypothetical). Out-of-band Aegislash GL dives against the Orlando
+top-32 pool landed the same day (Blade `14:37`, Shield `15:41`);
+HTMLs were force-patched with the narrative injection. Aegislash UL
+pair runs in tonight's overnight chain and picks up the narrative
+natively.
 
 - **[Post-ship] F-tier-name-cleanup** — simplify IV-rec tier card
   names (current: `Steelix (Shadow) Slayer -   (Wigglytuff Slayer
@@ -208,15 +214,17 @@ Comparison doc §5 (R1-R3) lists three items proposed for deletion
 rather than hiding. Each has per-item justification + JRE/RyanSwag
 precedent for absence. Nothing ships without explicit sign-off.
 
-- **R1:** "(2 dropped, missing from at least one dive)"
-  parenthetical — becomes factually wrong post-re-dive; propose
-  remove-on-regen.
-- **R2:** IV Recommendations intro "Cards are colored by form (♂
-  blue / ♀ pink)..." self-referent color-coding description.
+- **R1 — SHIPPED `934a8a1`.** "(N dropped, missing from at least one
+  dive)" parenthetical removed from `scripts/compare_loadouts.py`
+  along with the unused skipped-opponents loop.
+- **R2 — SHIPPED `934a8a1`.** "Cards are colored by form (♂ blue /
+  ♀ pink)..." self-reference removed from the IV Recommendations
+  tier intro in `scripts/generate_article.py`.
 - **R3:** Meta Coverage "Shield asymmetry dominates the extremes"
   explanatory paragraph — start with hide (F-hide-methodology
   above), escalate to removal only if hide reads as bloat at
-  review time.
+  review time. **Status: still hidden, not removed.** Re-evaluate
+  post-ship.
 
 ### Aegislash test case
 
@@ -234,16 +242,18 @@ have but not required for the Oinkologne CD ship. Pulled-forward
 candidates: after each pre-ship item lands, check whether there's
 capacity to pull one of these in without risking the ship window.
 
-### P1. Tier-card anchors for Notable IVs + Mirror Slayer cards
+### P1. Tier-card anchors for Notable IVs + Mirror Slayer cards — SHIPPED `40d19e9`
 
-The tier-card deep-link pattern shipped 2026-04-18 only covers the
-Threshold Tiers section. Notable IVs and Mirror Slayer cards in
-the deep dive also have card-shaped content that external pages
-(the CD article, future cross-species comparisons) could benefit
-from linking to directly. Extends the existing
-`scripts/patch_dive_tier_anchors.py` regex with a Notable-IVs and
-Mirror-Slayer variant and backports the renderer fix in
-`deep_dive_rendering.py` / `deep_dive_narrative.py`.
+Notable IVs cards now emit `id="notable-<slug>"` (name-slug stable
+across re-dives) and Mirror Slayer cards emit `id="mirror-<slug>"`.
+`scripts/patch_dive_tier_anchors.py` extended with regex-backfill
+variants for both card types (verified: 125 notable + 3 mirror
+per Oinkologne GL dive file). External pages — CD article IV
+Recommendations, cross-species comparisons — can now deep-link
+into the per-card anchor. Article-side wiring is still open; see
+TODO §"S8 envelope-annotation" / the parked form-change-pool
+decision for the design question around which article surface
+should consume these anchors.
 
 ### P2. Article -> dive per-opponent deep links — SHIPPED 2026-04-18
 
