@@ -57,6 +57,80 @@ def format_body(text: str) -> str:
     return '\n'.join(result)
 
 
+def authored_by_class(block: dict) -> str:
+    """Map the optional ``authored_by`` enum to a CSS modifier class.
+
+    Values: ``"human"`` (default, gold), ``"ai"`` (orange),
+    ``"mixed"`` (gold — a human co-signed so treat as human register).
+    Unknown or missing values fall back to ``"human"``. The returned
+    string is always one of ``authored-human``, ``authored-ai``,
+    ``authored-mixed`` (never empty); callers concatenate it into a
+    space-separated class list.
+
+    The enum is explicit because the free-form ``author`` string is
+    too fragile to color-code via substring matching ("Drafted by
+    Claude, not yet human-reviewed" vs "Drafted by Claude, reviewed
+    by Michael" read as different provenance even though both contain
+    "Claude").
+    """
+    val = (block.get('authored_by') or 'human').strip().lower()
+    if val not in {'human', 'ai', 'mixed'}:
+        val = 'human'
+    return f'authored-{val}'
+
+
+# Shared sidebar pattern CSS fragment (2026-04-19 refactor, mirrors the
+# dive-side pattern in deep_dive_rendering.py DEEP_DIVE_CSS).
+#
+# Any element whose class appears in the SIDEBAR_SELECTORS list below
+# gets a rounded-cap ::before pseudo-element bar on its left edge
+# instead of a hand-written border-left. Each class sets its own
+# --sidebar-color (and optional --sidebar-width, default 3px) and
+# drops its `border-left` declaration. Adjust left-padding to roughly
+# (old value + 4px) so text keeps a visible gap from the bar.
+#
+# The article-side pattern uses 3px default width (matching the
+# existing 3px solid borders we're replacing). Dive-side uses 4px;
+# the two pages are allowed to differ stylistically.
+#
+# This string is substituted via .format(selectors_base=..., selectors_before=...)
+# where each file passes its own comma-separated selector list.
+SIDEBAR_CSS_TEMPLATE = """
+/* ==== Shared sidebar pattern (2026-04-19 refactor) ==== */
+{selectors_base} {{
+  position: relative;
+  border-left: none;
+}}
+{selectors_before} {{
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: var(--sidebar-width, 3px);
+  border-radius: calc(var(--sidebar-width, 3px) / 2);
+  background: var(--sidebar-color, #8b949e);
+}}
+"""
+
+
+def sidebar_css(selectors: list[str]) -> str:
+    """Return the shared sidebar ::before CSS block for the given class list.
+
+    ``selectors`` is a list of full CSS selectors (e.g.
+    ``['.related', 'div.key-flips', 'details.methodology-details']``).
+    The template emits a grouped rule that zeroes each element's
+    border-left and gives them ``position: relative``, then a grouped
+    ``::before`` rule that draws the rounded-cap bar. Each affected
+    class still owns its ``--sidebar-color`` + padding.
+    """
+    base = ',\n'.join(selectors)
+    before = ',\n'.join(f'{s}::before' for s in selectors)
+    return SIDEBAR_CSS_TEMPLATE.format(
+        selectors_base=base, selectors_before=before,
+    )
+
+
 def format_block_attribution(block: dict) -> str:
     """Render an optional per-block `author` attribution line.
 
@@ -156,6 +230,9 @@ def render_html(article: dict) -> str:
         sections_html.append(f'<h2>{heading}</h2>\n{body}')
     sections_block = '\n\n'.join(sections_html)
 
+    _sidebar_css = sidebar_css([
+        '.related', '.authorship-banner',
+    ])
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -174,19 +251,20 @@ def render_html(article: dict) -> str:
   code {{ background: #16213e; padding: 2px 5px; border-radius: 3px;
           font-size: 0.9em; }}
   .meta {{ color: #888; font-size: 14px; margin-bottom: 20px; }}
-  .related {{ background: #16213e; padding: 12px 16px; border-radius: 6px;
-              margin: 16px 0; border-left: 3px solid #9be89b; }}
+  .related {{ --sidebar-color: #9be89b;
+              background: #16213e; padding: 12px 16px 12px 20px;
+              border-radius: 6px; margin: 16px 0; }}
   .obsolete-banner {{ background: #3d1f1f; border: 1px solid #e94560;
                       padding: 12px 16px; border-radius: 6px;
                       margin-bottom: 20px; color: #f0a0a0; }}
-  .authorship-banner {{ padding: 10px 16px; border-radius: 6px;
+  .authorship-banner {{ padding: 10px 16px 10px 20px; border-radius: 6px;
                         margin-bottom: 16px; font-size: 14px; }}
-  .authorship-banner.expert {{ background: #2a2000; border-left: 3px solid #d4a017;
-                               color: #e8d48b; }}
-  .authorship-banner.both {{ background: #1f2a1a; border-left: 3px solid #7db87d;
-                             color: #a8d8a8; }}
-  .authorship-banner.auto {{ background: #1a2333; border-left: 3px solid #5b8dd9;
-                             color: #8ab4f8; }}
+  .authorship-banner.expert {{ --sidebar-color: #d4a017;
+                               background: #2a2000; color: #e8d48b; }}
+  .authorship-banner.both {{ --sidebar-color: #7db87d;
+                             background: #1f2a1a; color: #a8d8a8; }}
+  .authorship-banner.auto {{ --sidebar-color: #5b8dd9;
+                             background: #1a2333; color: #8ab4f8; }}
   .framing {{ display: inline-block; padding: 2px 10px; border-radius: 12px;
               font-size: 13px; font-weight: 600; text-transform: uppercase;
               background: #0f3460; color: #8ab4f8; }}
@@ -194,6 +272,7 @@ def render_html(article: dict) -> str:
                             margin: 6px 0 0 0; font-style: italic; }}
   footer {{ color: #666; font-size: 13px; margin-top: 40px;
             border-top: 1px solid #0f3460; padding-top: 12px; }}
+  {_sidebar_css}
 </style>
 </head>
 <body>

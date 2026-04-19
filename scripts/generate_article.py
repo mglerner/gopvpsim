@@ -39,6 +39,7 @@ from render_article import (  # type: ignore[import-not-found]
     format_body,
     render_authorship_banner,
     render_obsolescence_banner,
+    sidebar_css,
     WEBSITE_DIR,
     ARTICLES_DIR,
     _toml_string,
@@ -3028,6 +3029,14 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
     ]
     sections_html = '\n\n'.join(s for s in rendered_sections if s.strip())
 
+    _sidebar_css = sidebar_css([
+        '.related', '.authorship-banner',
+        'div.key-flips', 'div.article-opp-iv-control',
+        'details.methodology-details', 'p.verdict-line',
+        'p.mf-split-filter', 'details.matchup-delta-legend',
+        'p.matchup-delta-pool', 'div.iv-rec-card',
+    ])
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -3060,8 +3069,10 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   table.move-pool tbody td {{ background: #0f162a; color: #e0e0e0; }}
   p.move-pool-note {{ font-size: 12px; color: #8ea1bd;
                       margin: 4px 0 0 0; }}
-  div.key-flips {{ background: #16213e; border-left: 3px solid #7db87d;
-                   padding: 10px 14px; border-radius: 6px; margin: 12px 0; }}
+  div.key-flips {{ --sidebar-color: #7db87d;
+                   background: #16213e;
+                   padding: 10px 14px 10px 18px;
+                   border-radius: 6px; margin: 12px 0; }}
   div.key-flips h3.key-flips-title {{ margin: 0 0 4px 0; font-size: 1em;
                                       color: #c8a2d0; border: none;
                                       padding: 0; }}
@@ -3071,19 +3082,20 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
                        font-size: 13px; }}
   ul.key-flips-list li {{ margin: 5px 0; line-height: 1.5; }}
   .meta {{ color: #888; font-size: 14px; margin-bottom: 20px; }}
-  .related {{ background: #16213e; padding: 12px 16px; border-radius: 6px;
-              margin: 16px 0; border-left: 3px solid #9be89b; }}
+  .related {{ --sidebar-color: #9be89b;
+              background: #16213e; padding: 12px 16px 12px 20px;
+              border-radius: 6px; margin: 16px 0; }}
   .obsolete-banner {{ background: #3d1f1f; border: 1px solid #e94560;
                       padding: 12px 16px; border-radius: 6px;
                       margin-bottom: 20px; color: #f0a0a0; }}
-  .authorship-banner {{ padding: 10px 16px; border-radius: 6px;
+  .authorship-banner {{ padding: 10px 16px 10px 20px; border-radius: 6px;
                         margin-bottom: 16px; font-size: 14px; }}
-  .authorship-banner.expert {{ background: #2a2000; border-left: 3px solid #d4a017;
-                               color: #e8d48b; }}
-  .authorship-banner.both {{ background: #1f2a1a; border-left: 3px solid #7db87d;
-                             color: #a8d8a8; }}
-  .authorship-banner.auto {{ background: #1a2333; border-left: 3px solid #5b8dd9;
-                             color: #8ab4f8; }}
+  .authorship-banner.expert {{ --sidebar-color: #d4a017;
+                               background: #2a2000; color: #e8d48b; }}
+  .authorship-banner.both {{ --sidebar-color: #7db87d;
+                             background: #1f2a1a; color: #a8d8a8; }}
+  .authorship-banner.auto {{ --sidebar-color: #5b8dd9;
+                             background: #1a2333; color: #8ab4f8; }}
   .framing {{ display: inline-block; padding: 2px 10px; border-radius: 12px;
               font-size: 13px; font-weight: 600; text-transform: uppercase;
               background: #0f3460; color: #8ab4f8; }}
@@ -3102,8 +3114,9 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   table.move-compare tbody td {{ background: #0f162a; color: #e0e0e0; }}
   p.move-compare-note {{ color: #8ea1bd; font-size: 13px; margin-top: 4px; }}
   p.meta-coverage-intro {{ font-size: 14px; color: #b8c4d8; }}
-  div.article-opp-iv-control {{ background: #16213e; padding: 10px 14px;
-         border-radius: 6px; margin: 10px 0; border-left: 3px solid #5b8dd9; }}
+  div.article-opp-iv-control {{ --sidebar-color: #5b8dd9;
+         background: #16213e; padding: 10px 14px 10px 18px;
+         border-radius: 6px; margin: 10px 0; }}
   div.article-opp-iv-control label {{ display: inline-block;
          margin-right: 16px; font-size: 13px; color: #b8c4d8; }}
   div.article-opp-iv-control span.control-label {{ color: #c8a2d0;
@@ -3118,9 +3131,9 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   details.article-opp-iv-help[open] summary {{ display: block; }}
   details.article-opp-iv-help > span {{ display: block; margin-top: 6px;
          font-size: 12px; color: #8ea1bd; }}
-  details.methodology-details {{ background: #12192e;
-         border-left: 3px solid #5b8dd9; border-radius: 4px;
-         padding: 8px 12px; font-size: 13px; color: #b8c4d8;
+  details.methodology-details {{ --sidebar-color: #5b8dd9;
+         background: #12192e; border-radius: 4px;
+         padding: 8px 12px 8px 16px; font-size: 13px; color: #b8c4d8;
          margin: 8px 0; }}
   details.methodology-details summary {{ cursor: pointer;
          color: #c8a2d0; font-weight: 500; }}
@@ -3139,8 +3152,10 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   table.meta-coverage td.delta-neg {{ color: #e89b9b; font-weight: 600; }}
   table.meta-coverage tbody th.male {{ color: rgba(91,141,217,1); }}
   table.meta-coverage tbody th.female {{ color: rgba(217,108,145,1); }}
-  p.verdict-line {{ background: #1a2e1f; border-left: 3px solid #7db87d;
-                    padding: 10px 14px; color: #cfe8cf; border-radius: 6px; }}
+  p.verdict-line {{ --sidebar-color: #7db87d;
+                    background: #1a2e1f;
+                    padding: 10px 14px 10px 18px;
+                    color: #cfe8cf; border-radius: 6px; }}
   p.matchup-delta-intro {{ font-size: 14px; color: #b8c4d8; }}
   p.matchup-delta-summary {{ font-size: 13px; color: #9bb0d0; margin-top: 8px; }}
   ul.matchup-delta-movesets {{ margin: 4px 0 10px 20px; padding: 0;
@@ -3178,9 +3193,10 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
         background: linear-gradient(rgba(91,141,217,0.22),rgba(91,141,217,0.22)), #2b1515; }}
   table.matchup-delta-perform tr.matchup-delta-flip-neg td.female {{
         background: linear-gradient(rgba(217,108,145,0.22),rgba(217,108,145,0.22)), #2b1515; }}
-  p.mf-split-filter {{ margin: 10px 0 6px 0; font-size: 13px; color: #b8c4d8;
-         background: #12192e; padding: 8px 12px; border-radius: 4px;
-         border-left: 3px solid #c8a2d0; }}
+  p.mf-split-filter {{ --sidebar-color: #c8a2d0;
+         margin: 10px 0 6px 0; font-size: 13px; color: #b8c4d8;
+         background: #12192e; padding: 8px 12px 8px 16px;
+         border-radius: 4px; }}
   p.mf-split-filter label {{ cursor: pointer; }}
   p.mf-split-filter input {{ margin-right: 6px; vertical-align: middle; }}
   span.form-label.male {{ color: rgba(91,141,217,1); font-weight: 600; }}
@@ -3207,15 +3223,17 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   .flip-badge.flip-unlinked {{ opacity: 0.75; cursor: help; }}
   table.matchup-delta tr.matchup-delta-flip-pos td {{ background: #152b1a; }}
   table.matchup-delta tr.matchup-delta-flip-neg td {{ background: #2b1515; }}
-  details.matchup-delta-legend {{ background: #12192e; border-left: 3px solid #c8a2d0;
-        border-radius: 4px; padding: 8px 12px; font-size: 13px; color: #b8c4d8;
+  details.matchup-delta-legend {{ --sidebar-color: #c8a2d0;
+        background: #12192e; border-radius: 4px;
+        padding: 8px 12px 8px 16px; font-size: 13px; color: #b8c4d8;
         margin: 8px 0; }}
   details.matchup-delta-legend summary {{ cursor: pointer; color: #c8a2d0;
         font-weight: 500; }}
   details.matchup-delta-legend ul {{ margin: 8px 0 0 0; padding-left: 20px; }}
   details.matchup-delta-legend li {{ margin: 4px 0; }}
-  p.matchup-delta-pool {{ background: #16213e; border-left: 3px solid #5b8dd9;
-        padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #b8c4d8;
+  p.matchup-delta-pool {{ --sidebar-color: #5b8dd9;
+        background: #16213e; padding: 8px 12px 8px 16px;
+        border-radius: 4px; font-size: 13px; color: #b8c4d8;
         margin: 8px 0; }}
   table.sortable thead th {{ cursor: pointer; user-select: none; }}
   table.sortable thead th:hover {{ background: #1e2b4a; }}
@@ -3227,15 +3245,16 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   div.iv-rec-grid {{ display: grid; gap: 10px;
                      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
                      margin: 10px 0; }}
-  div.iv-rec-card {{ background: #0f162a; border: 1px solid #0f3460;
-                     border-left: 3px solid #c8a2d0; border-radius: 6px;
-                     padding: 10px 12px; font-size: 13px; }}
-  div.iv-rec-card.male {{ background: linear-gradient(rgba(91,141,217,0.14),
-                          rgba(91,141,217,0.14)), #0f162a;
-                          border-left-color: rgba(91,141,217,0.8); }}
-  div.iv-rec-card.female {{ background: linear-gradient(rgba(217,108,145,0.14),
-                            rgba(217,108,145,0.14)), #0f162a;
-                            border-left-color: rgba(217,108,145,0.8); }}
+  div.iv-rec-card {{ --sidebar-color: #c8a2d0;
+                     background: #0f162a; border: 1px solid #0f3460;
+                     border-radius: 6px;
+                     padding: 10px 12px 10px 16px; font-size: 13px; }}
+  div.iv-rec-card.male {{ --sidebar-color: rgba(91,141,217,0.8);
+                          background: linear-gradient(rgba(91,141,217,0.14),
+                          rgba(91,141,217,0.14)), #0f162a; }}
+  div.iv-rec-card.female {{ --sidebar-color: rgba(217,108,145,0.8);
+                            background: linear-gradient(rgba(217,108,145,0.14),
+                            rgba(217,108,145,0.14)), #0f162a; }}
   div.iv-rec-card h3 {{ color: #c8a2d0; font-size: 14px; margin: 0 0 4px 0;
                         border-bottom: none; padding-bottom: 0; }}
   div.iv-rec-card h3 a {{ color: inherit; text-decoration: none; }}
@@ -3248,7 +3267,9 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
                    font-size: 12px; }}
   footer {{ color: #666; font-size: 13px; margin-top: 40px;
             border-top: 1px solid #0f3460; padding-top: 12px; }}
-{COMPARE_CSS}</style>
+{COMPARE_CSS}
+{_sidebar_css}
+</style>
 </head>
 <body>
 <h1>{title}</h1>
