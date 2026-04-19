@@ -1,0 +1,46 @@
+# Championship Series Orlando 2026, top-32 finishers. 42 unique species from 32 teams, ordered by appearance count (most-used first).
+# Generated 2026-04-19 by scripts/build_opponent_pool.py
+# Format: one PvPoke speciesName per line; blank lines and # comments ignored.
+
+Corviknight
+Quagsire (Shadow)
+Wigglytuff
+Corsola (Galarian)
+Feraligatr
+Guzzlord
+Medicham
+Empoleon
+Forretress (Shadow)
+Forretress
+Aegislash (Shield)
+Gourgeist (Super)
+Diggersby
+Lickilicky
+Altaria
+Florges
+Furret
+Stunfisk
+Togekiss
+Azumarill
+Carbink
+Grumpig
+Altaria (Shadow)
+Clodsire
+Cradily
+Malamar (Shadow)
+Ninetales (Shadow)
+Annihilape
+Dartrix
+Drapion (Shadow)
+Lapras
+Magnezone (Shadow)
+Moltres (Galarian)
+Murkrow
+Ninetales (Alolan)
+Politoed (Shadow)
+Primeape
+Steelix
+Talonflame (Shadow)
+Umbreon
+Weezing (Galarian)
+Weezing (Galarian) (Shadow)
