@@ -329,6 +329,41 @@ no re-dives there either.
 - Installing the pre-commit hook — wait for the B-field delete to land
   so the first commit after install isn't a rejection.
 
+## Quality concern: current flip-detection produces false positives
+
+Spot-checked 2026-04-19 on Tinkaton GL m0: narrative prose says
+"Fortified Azumarill Tinkaton fortifies its bulk to gain several
+matchups including the Azumarill 1-2." But a full 1v2 enumeration of
+the 5 Fortified-qualifying Tinkaton IVs vs PvPoke-default Azumarill
+returns scores 403-410 — all losses, below the 500 win-line. The 8
+General-only IVs (in GH Great but below the Fortified def cutoff)
+also score 403-410 at 1v2. Zero actual flips, but the flavor-
+derivation module flagged this as a "gain." Same pattern held for
+opp-first shield reading ("Azumarill 1-2" = Azum 1s, Tink 2s: both
+groups win ~757-765) and for rank-1 Azumarill (both groups win ~532-
+535).
+
+The heuristic is reporting flips based on aggregated win-rate deltas
+that don't correspond to actual simulated loss-to-win transitions.
+When the morning auto-gen work touches `derive_narrative_flavors`,
+the `good_at` / `bad_at` renderer should:
+
+1. **Require a real loss-to-win transition.** A "gain" claim needs at
+   least one in-group IV to score ≥500 AND at least one out-of-group
+   IV to score <500 for the same (opponent, scenario) cell. The
+   current 75%/25% win-rate threshold can fire on clusters that all
+   sit on the same side of 500 with slight rank-order variation.
+2. **If criterion (1) fails, don't emit the gain claim.** Prefer
+   silence over a false flip.
+3. **Alternative:** replace prose claims with an honest score table
+   ("Fortified: 405 avg at 1v2 vs Azumarill, General-only: 406") and
+   let the reader draw the inference. Less prosey but accurate.
+
+Picked criterion (1) as the morning default — keeps the RyanSwag-
+style prose shape but cleans the false positives. Revisit if the
+resulting flavor blocks become empty for most species (signal-loss
+rabbit hole connects to TODO.md "Slayer-card signal-loss audit").
+
 ## Open questions
 
 - **CMP-spread detection for the atk-weight classifier.** Requires
