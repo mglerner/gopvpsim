@@ -79,7 +79,11 @@ step "Patching per-opponent anchors in all dive dirs" \
         userdata/website/aegislash-blade-great-league \
         userdata/website/aegislash-shield-great-league \
         userdata/website/aegislash-blade-ultra-league \
-        userdata/website/aegislash-shield-ultra-league
+        userdata/website/aegislash-shield-ultra-league \
+        userdata/website/forretress-volt-switch-great-league \
+        userdata/website/forretress-bug-bite-great-league \
+        userdata/website/forretress-shadow-volt-switch-great-league \
+        userdata/website/forretress-shadow-bug-bite-great-league
 
 # 3. Oinkologne CD article (per-form Matchup Delta table needs both
 #    Male and Female dives fresh, which steps 1 + 2 guarantee).
