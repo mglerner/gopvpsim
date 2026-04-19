@@ -31,6 +31,7 @@ sources = "pogo-simulator realistic form-change dive (canonical Shield -> Blade 
 ["Aegislash (Shield)".intro]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 body = """
 Shield-form Aegislash is the canonical Aegislash play pattern: open \
 in a 97 / 272 / 155 tank profile, bank energy with zero-power Psycho \
@@ -48,6 +49,7 @@ Blade damage.
 ["Aegislash (Shield)".meta_role]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 good_at = """
 Shield-form bulk (272 Defense) absorbs the early-game Fairy and \
 neutral-coverage pressure that would otherwise force a switch, while \
@@ -89,6 +91,7 @@ body = ""
 ["Aegislash (Shield)".verdict]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 editorial = """
 Invest in Aegislash if your team has a concrete anti-Fairy or \
 anti-Ghost-staller need. This is a specialist: the 272 / 97 / 155 \

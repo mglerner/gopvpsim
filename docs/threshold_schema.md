@@ -76,21 +76,24 @@ all nested directly under the species table (not under a league):
 sources = "..."
 
 [Species.intro]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authorship  = "expert"
+author      = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"                  # "human" (default) | "ai" | "mixed"
 body = """One-paragraph BLUF intro."""
 
 [Species.meta_role]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authorship  = "expert"
+author      = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 good_at   = """Paragraph on what this species punishes."""
 bad_at    = """Paragraph on what this species loses to."""
 team_role = """Paragraph on build intent / team-slot framing."""
 body      = ""  # optional escape hatch: overrides the three fields above
 
 [Species.verdict]
-authorship = "expert"
-author = "By Michael Lerner"
+authorship  = "expert"
+author      = "By Michael Lerner"
+authored_by = "human"               # default — can omit
 editorial = """The "should you invest?" paragraph."""
 outlook   = """Optional short meta-outlook closer."""
 ```
@@ -100,8 +103,12 @@ outlook   = """Optional short meta-outlook closer."""
 to dive with zero rewrites. See `docs/article_schema.md` for per-field
 semantics. Differences specific to the dive-side usage:
 
-* Rendered above the interactive scatter, inside a gold-bordered
-  `<section class="dd-species-narrative">` block. Intro uses `<h2>Overview</h2>`;
+* Rendered above the interactive scatter, inside a
+  `<section class="dd-species-narrative">` wrapper. Each sub-block
+  (Overview / Meta Role / Verdict) is its own
+  `<div class="dd-narrative-block authored-<value>">` — left-border
+  colour encodes authorship: **gold** for `human` (default) and
+  `mixed`, **orange** for `ai`. Intro uses `<h2>Overview</h2>`;
   Meta Role and Verdict use `<h3>` sub-headings.
 * Any subset of the three sub-tables may be present. Each populated block
   renders; absent blocks are silently skipped. All three absent → the
@@ -112,6 +119,15 @@ semantics. Differences specific to the dive-side usage:
   author attribution" for recommended phrasings. **Reader-visible
   distinction between AI-drafted and human-written prose depends on this
   field being set.**
+* `authored_by` controls the per-block border / heading colour on the
+  dive page. Values: `"human"` (default, gold), `"ai"` (orange), or
+  `"mixed"` (gold — a human co-signed so treat as human register).
+  Omit when unset; unknown values fall back to `"human"`. Colour is
+  an explicit-typed signal because substring-matching on the free-form
+  `author` string is fragile: "Drafted by Claude, not yet human-reviewed"
+  vs "Drafted by Claude, reviewed by Michael" are different provenance
+  but share the "Claude" substring. See `docs/article_schema.md`
+  "Per-block author attribution" for the shared convention.
 * `authorship = "expert"` is the only mode wired today; `both` / `auto`
   log a warning and render verbatim as if `expert` (same as the article
   renderer). Auto-synthesis is future work.

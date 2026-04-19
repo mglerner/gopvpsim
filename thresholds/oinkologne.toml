@@ -20,6 +20,7 @@ slug = "oinkologne-cd-2026-05"
 [Oinkologne.intro]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 body = """
 Male Oinkologne (186/153/242) is a Normal-typed threat that Mud Slap \
 reshapes into a Ground counter-picker. Super-effective Ground damage \
@@ -35,6 +36,7 @@ chassis.
 [Oinkologne.meta_role]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 good_at = """
 Mud Slap turns Male Oinkologne from a Normal-typed blunt tool into a \
 genuine Steel / Ghost counter-pick. Super-effective Ground damage \
@@ -79,6 +81,7 @@ body = ""
 [Oinkologne.verdict]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 editorial = """
 Male Oinkologne is worth building if your Great League team already \
 has Mud Slap's anti-Steel / anti-Ghost job in mind. The 43% \

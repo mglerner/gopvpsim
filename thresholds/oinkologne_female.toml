@@ -23,6 +23,7 @@ slug = "oinkologne-cd-2026-05"
 ["Oinkologne (Female)".intro]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 body = """
 Female Oinkologne (169/162/251) is a bulky Normal-type that Mud Slap \
 turns into a durable Ground counter-picker. Super-effective Ground \
@@ -38,6 +39,7 @@ not a core chassis.
 ["Oinkologne (Female)".meta_role]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 good_at = """
 Mud Slap turns Female Oinkologne from a Normal-typed blunt tool into \
 a genuine Steel / Ghost counter-pick. Super-effective Ground damage \
@@ -83,6 +85,7 @@ body = ""
 ["Oinkologne (Female)".verdict]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 editorial = """
 Female Oinkologne is worth building if your Great League team wants \
 a durable Steel / Ghost counter-pick with forgiving IV targeting. \
