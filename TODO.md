@@ -33,6 +33,37 @@ Post-ship, the post-S5 arc resumes at S11-S17 in
 matchup-flip attribution, post-debuff breakpoints, bait policy).
 Those are **not pre-ship items** - do not pull forward.
 
+## Morning task after overnight 2026-04-19 chain completes
+
+Commit `d3e2aae` fixed the split-movesets landing-page logic
+(index.html now lands on moveset 0 / top-scoring instead of the
+reference moveset). Dives 1-3 in the overnight chain ran before the
+fix landed, so their `index.html` files still point at the reference
+moveset (Tackle for the Oinkologne pair, Play-Rough-variant for
+Tinkaton GL). Dives 4-10 pick up the fix automatically.
+
+**Retroactive patch for dives 1-3 in the morning:**
+
+1. For each affected dive dir (`oinkologne-great-league`,
+   `oinkologne-female-great-league`, `tinkaton-great-league`):
+   - Identify the current `index.html`'s moveset index K (grep for
+     the first primary-moveset string, or infer from the list of
+     `index_m*.html` siblings — the missing m-index is K).
+   - Identify the top-scoring moveset — it's the one with the
+     lowest `_m{N}_` index in the split files' name space, typically
+     m0.
+2. Swap: rename `index.html` → `index_m{K}_{current_slug}.html`, and
+   `index_m0_{top_slug}.html` → `index.html`.
+3. Update the moveset dropdown internals in all 5 HTMLs (the
+   dropdown lists sibling filenames, which now point to renamed
+   files). Script this — don't hand-edit 5 HTMLs per dir.
+
+Easier alternative if the dropdown-rewrite proves fragile:
+regenerate each affected dive's HTML-only via deep_dive.py's
+--html-regen mode if one exists (check), otherwise re-dive those
+three serially (~3 hours of compute; acceptable given the
+post-re-dive review day has capacity).
+
 ## CD-prep tracking (2026-04-17, fix shipped 2026-04-18)
 
 **SHIPPED.** Per-species `[cd_prep]` TOML block is now read by
