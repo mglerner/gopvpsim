@@ -106,6 +106,41 @@ per-opponent win cells by "flip depends on atk_iv >= N" relationship.
 Implementation-TBD; skip the block on first cut if it's hard to detect
 robustly — the type-grouped list is the core content.
 
+## Bonus A-item: compose-with-CMP flavor for XL-candy decisions
+
+**Motivation:** the raw XL-candy-decision data layer (Mirror CMP %
++ Score Δ columns on Top IVs + hover) shipped 2026-04-20 as commit
+`fdbf6ce`. That gives readers the numbers but makes them do the
+cross-filtering by hand ("sort by CMP %, scan for small Δ"). The
+opinionated answer to "I want a General Good tink but I want to win
+CMP" belongs in the narrative zone as a derived flavor.
+
+**New flavor:** "General Good + Mirror CMP winner" (or similar name).
+Cutoffs compose the existing General / "Premium Bulk" tier with a
+CMP threshold:
+
+  pass general_tier.def_cut AND pass general_tier.hp_cut
+  AND mirror_cmp_pct(iv) >= 90
+
+The 90% threshold is tunable; intent is "beats effectively everyone
+in the converged mirror cohort, not just the median." For a cohort
+that's fully atk-converged (single atk value; common for Tinkaton,
+Medicham), CMP % is binary 0/100 so the threshold is equivalent to
+atk > cohort_atk.
+
+**Implementation:** extend `derive_narrative_flavors()` to produce
+an intersection flavor when (a) a General-style tier exists for the
+species AND (b) `DATA.mirrorCohortAtk` is non-empty. Composes the
+existing flavor shapes; no new renderer code beyond wiring one
+extra FlavorSpec entry. The atk_cut / def_cut / hp_cut fields on
+the FlavorSpec accommodate the CMP threshold by setting atk_cut to
+the cohort's max atk + ε.
+
+**Via the flavor→tier promotion bonus item above:** this flavor
+automatically shows up in the "Check my collection" paste-box
+membership check. Paste CSV → see which of your mons qualify as
+"General Good + CMP winner" at a glance. No additional wiring.
+
 ## Bonus A-item: promote narrative flavors to paste-box tiers
 
 **Problem observed 2026-04-19** on the Tinkaton GL dive: the narrative
