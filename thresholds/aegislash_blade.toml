@@ -29,6 +29,7 @@ sources = "pogo-simulator hypothetical always-Blade dive (no PvPoke ranking); fo
 ["Aegislash (Blade)".intro]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 body = """
 Aegislash (Blade) is a diagnostic hypothetical, not a realistic \
 build path. The gamemaster exposes Blade form as its own species \
@@ -45,6 +46,7 @@ opener, Blade damage closer) versus the raw Blade stat line alone?
 ["Aegislash (Blade)".meta_role]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 good_at = """
 On paper, always-Blade lands 272-Attack Shadow Ball (100 power, \
 Ghost STAB) and Gyro Ball (80 power, Steel STAB) from turn one, \
@@ -78,6 +80,7 @@ body = ""
 ["Aegislash (Blade)".verdict]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 editorial = """
 Don't invest - this isn't a real build target. Aegislash (Blade) \
 appears in the gamemaster as its own species so the sim can model \

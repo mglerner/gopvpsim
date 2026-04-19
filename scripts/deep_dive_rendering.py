@@ -224,9 +224,30 @@ DEEP_DIVE_CSS = """
 .dd-narrative-loss { color: #f85149; font-size: 0.88rem; font-style: italic; margin: 8px 0 4px 0; }
 .dd-sim-zone { border-left: 4px solid #58a6ff; padding-left: 16px; margin: 16px 0; }
 .dd-sim-zone > h3 { color: #58a6ff; margin: 0 0 10px 0; }
-.dd-species-narrative { border-left: 4px solid #d29922; padding: 12px 0 12px 16px; margin: 20px 0; }
-.dd-species-narrative > h2 { color: #d29922; margin: 0 0 12px 0; font-size: 1.15rem; }
-.dd-species-narrative > h3 { color: #d29922; margin: 16px 0 6px 0; font-size: 1.0rem; }
+.dd-species-narrative { margin: 20px 0; }
+/* Per-block wrapper. Left border color + heading color encode who
+   authored the block: gold = human (default), orange = AI-drafted,
+   gold = mixed (a human co-signed). Inner (h2/h3) inherits the
+   border color via the same .authored-X modifier. */
+.dd-species-narrative .dd-narrative-block {
+  border-left: 4px solid #d29922;
+  padding: 10px 0 10px 16px;
+  margin: 14px 0;
+}
+.dd-species-narrative .dd-narrative-block.authored-ai {
+  border-left-color: #e8903a;
+}
+.dd-species-narrative .dd-narrative-block > h2,
+.dd-species-narrative .dd-narrative-block > h3 {
+  color: #d29922;
+  margin: 0 0 8px 0;
+}
+.dd-species-narrative .dd-narrative-block > h2 { font-size: 1.15rem; }
+.dd-species-narrative .dd-narrative-block > h3 { font-size: 1.0rem; }
+.dd-species-narrative .dd-narrative-block.authored-ai > h2,
+.dd-species-narrative .dd-narrative-block.authored-ai > h3 {
+  color: #e8903a;
+}
 .dd-species-narrative p { margin: 8px 0; }
 .dd-species-narrative .narrative-attribution { color: #8b949e;
   font-size: 0.82rem; margin: 6px 0 0 0; font-style: italic; }
@@ -691,13 +712,15 @@ def render_species_narrative(narrative: dict) -> str:
     parts = ['<section class="dd-species-narrative">\n']
 
     if intro_body:
+        parts.append(f'<div class="dd-narrative-block {_authored_by_class(intro_block)}">\n')
         parts.append('<h2>Overview</h2>\n')
         parts.append(format_body(intro_body))
         parts.append('\n')
         parts.append(format_block_attribution(intro_block))
-        parts.append('\n')
+        parts.append('\n</div>\n')
 
     if mr_has_content:
+        parts.append(f'<div class="dd-narrative-block {_authored_by_class(meta_role_block)}">\n')
         parts.append('<h3>Meta Role</h3>\n')
         if mr_body_override:
             parts.append(format_body(mr_body_override))
@@ -705,9 +728,10 @@ def render_species_narrative(narrative: dict) -> str:
             parts.append(format_body('\n\n'.join(mr_field_parts)))
         parts.append('\n')
         parts.append(format_block_attribution(meta_role_block))
-        parts.append('\n')
+        parts.append('\n</div>\n')
 
     if verdict_has_content:
+        parts.append(f'<div class="dd-narrative-block {_authored_by_class(verdict_block)}">\n')
         parts.append('<h3>Verdict</h3>\n')
         joined = []
         if verdict_editorial:
@@ -717,10 +741,32 @@ def render_species_narrative(narrative: dict) -> str:
         parts.append(format_body('\n\n'.join(joined)))
         parts.append('\n')
         parts.append(format_block_attribution(verdict_block))
-        parts.append('\n')
+        parts.append('\n</div>\n')
 
     parts.append('</section>\n')
     return ''.join(parts)
+
+
+def _authored_by_class(block: dict) -> str:
+    """Map the optional ``authored_by`` enum to a CSS modifier class.
+
+    Values: ``"human"`` (default, gold), ``"ai"`` (orange),
+    ``"mixed"`` (gold — a human co-signed so treat as human register).
+    Unknown or missing values fall back to ``"human"``. The returned
+    string is always one of ``authored-human``, ``authored-ai``,
+    ``authored-mixed`` (never empty); callers concatenate it into a
+    space-separated class list.
+
+    The enum is explicit because the free-form ``author`` string is
+    too fragile to color-code via substring matching ("Drafted by
+    Claude, not yet human-reviewed" vs "Drafted by Claude, reviewed
+    by Michael" read as different provenance even though both contain
+    "Claude").
+    """
+    val = (block.get('authored_by') or 'human').strip().lower()
+    if val not in {'human', 'ai', 'mixed'}:
+        val = 'human'
+    return f'authored-{val}'
 
 
 def render_anchor_flip_bullets(records, anchor_passing_sink=None,

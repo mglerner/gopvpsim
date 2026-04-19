@@ -94,14 +94,29 @@ def _load_narrative(toml_path: Path, species: str) -> dict:
     return narrative
 
 
-def _patch_html(html: str, narrative_fragment: str) -> tuple[str, bool]:
+def _patch_html(html: str, narrative_fragment: str,
+                force: bool = False) -> tuple[str, bool]:
     """Inject narrative_fragment immediately before the first controls div.
 
-    Returns (patched_html, changed). Idempotent: returns unchanged when
-    the file already has a ``<section class="dd-species-narrative">``.
+    Returns (patched_html, changed). By default idempotent: returns
+    unchanged when the file already has a
+    ``<section class="dd-species-narrative">``. Pass ``force=True``
+    to strip the existing narrative section first and re-inject —
+    useful after a renderer change (e.g. new CSS classes) that the
+    old injected markup doesn't reflect.
     """
     if _ALREADY_PATCHED_MARKER in html:
-        return html, False
+        if not force:
+            return html, False
+        # Strip the existing narrative section before re-injecting.
+        # Match the whole `<section class="dd-species-narrative">…</section>`
+        # via a non-greedy DOTALL regex: lets us rewrite files that were
+        # patched with an older renderer shape.
+        import re as _re
+        html = _re.sub(
+            r'<section class="dd-species-narrative">.*?</section>\s*',
+            '', html, count=1, flags=_re.DOTALL,
+        )
     idx = html.find(_CONTROLS_MARKER)
     if idx < 0:
         return html, False
@@ -127,6 +142,10 @@ def main() -> int:
                         help='Override TOML path (default: thresholds/'
                              '<species_slug>.toml).')
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--force', action='store_true',
+                        help='Strip any existing narrative section before '
+                             're-injecting (useful after a renderer change '
+                             'that needs the new markup).')
     args = parser.parse_args()
 
     total_files = 0
@@ -169,7 +188,7 @@ def main() -> int:
 
         for html_path in _iter_html_files(root):
             html = html_path.read_text()
-            new_html, changed = _patch_html(html, fragment)
+            new_html, changed = _patch_html(html, fragment, force=args.force)
             if not changed:
                 continue
             total_files += 1

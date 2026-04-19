@@ -349,6 +349,39 @@ backwards-compatible with pre-2026-04-19 blocks.
 The page-top `authorship-banner` is coarse-grained and unchanged.
 Per-block attribution is the fine-grained signal.
 
+### Per-block `authored_by` colour coding (schema shipped 2026-04-19)
+
+The optional `authored_by` enum on any narrative block routes a
+per-block border / heading colour on the rendered page, distinct from
+the attribution-line text. Values:
+
+| Value     | Meaning                                | Colour (dive-side)     |
+| --------- | -------------------------------------- | ---------------------- |
+| `"human"` | Human-authored (or human-reviewed AI). | Gold (default)         |
+| `"ai"`    | AI-drafted, not yet human-reviewed.    | Orange (`#e8903a`)     |
+| `"mixed"` | Genuinely co-authored by human + AI.   | Gold (human co-signed) |
+
+Example:
+
+```toml
+[meta_role]
+authorship  = "expert"
+author      = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
+good_at = "..."
+```
+
+Absent / unknown values fall back to `"human"` (gold). The field is
+explicit-typed rather than substring-inferred from `author` because
+the `author` string is free-form prose and hard to match robustly:
+"Drafted by Claude, not yet human-reviewed" and "Drafted by Claude,
+reviewed by Michael" are different provenance but share the "Claude"
+substring.
+
+Dive-side styling is live today (`scripts/deep_dive_rendering.py`).
+Article-side colour styling is future work — the field can be set
+now on article TOMLs so it's in place when the renderer picks it up.
+
 ## Matchup Delta config (F2, shipped 2026-04-18)
 
 The Matchup Delta section auto-generates a "Biggest flips" callout

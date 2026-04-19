@@ -43,6 +43,7 @@ spec = "comparisons/oinkologne-male-vs-female.toml"
 # form. See docs/article_schema.md "Intro augment".
 [intro]
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 body = """
 Oinkologne picks up Mud Slap on Community Day (2026-05-09, 2-5 PM \
 local). Short version: Mud Slap is a clean upgrade over Tackle \
@@ -64,6 +65,7 @@ CD-day decision: catch, Elite TM, and which form to prioritize.
 [meta_role]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 good_at = """
 Mud Slap adds a Ground coverage slot Oinkologne didn't have pre-CD: \
 super-effective damage on bulky Steels and Ghost stallers. Both \
@@ -107,6 +109,7 @@ body = ""
 [verdict]
 authorship = "expert"
 author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+authored_by = "ai"
 editorial = """
 Catch on CD day. Lechonk is a common spawn and Mud Slap is free \
 during the three-hour window (2-5 PM local, 2026-05-09), so the \
