@@ -347,6 +347,48 @@ F-stats-block enhancement). Two known limitations in the
 Neither blocks current CD-article generation. Pull into a session
 when a species that actually needs either hits the queue.
 
+## Status-box generalization (2026-04-19, deferred)
+
+`scripts/overnight_status.sh` + `scripts/overnight_eta.py` shipped
+today as the monitoring UX for the overnight re-dive chain (pinned
+box via `watch -n 5 -c scripts/overnight_status.sh`: PID alive, step,
+Dive [N/M], whole-script ETA in bold-bright-magenta, latest per-dive
+log tail with pinned phase banner, Recent products tagged new/pre
+relative to chain start). The pattern is reusable; several of our
+long-running scripts could benefit from it. But it's tightly coupled
+to `overnight_redive.sh` right now — hardcoded status-file path,
+wrapper-log grep pattern, `pgrep overnight_redive.sh`, and dive
+classifier in `overnight_eta.py`.
+
+**Not extracting a generic core yet.** Per the
+`feedback_defer_infra_refactors` discipline, abstractions wait until
+the second copy exists and the third copy is imminent. One concrete
+use case isn't enough to pick the right abstraction.
+
+**Two small follow-ups to do before the abstraction:**
+
+1. **Make `overnight_status.sh` paths env-var configurable.** Add
+   `STATUS_FILE`, `LOG_DIR`, `HTML_ROOT`, `CHAIN_PGREP_PATTERN`,
+   `WRAPPER_LOG_GLOB` env-var overrides with the current hardcoded
+   values as defaults. This lets us copy-paste-tweak into a
+   `single_dive_status.sh` or `run_website_dives_status.sh` by
+   setting the four env vars instead of rewriting the script. Do
+   this the next time we want a status box for a non-overnight
+   invocation.
+
+2. **Extend the "paste this watch command" hint to other scripts**
+   once each has a compatible status box. Tonight's edit to
+   `overnight_redive.sh` prints the box recipe at startup; do the
+   same in `run_website_dives.py` and `deep_dive.py` when their
+   matching status scripts land. Small (one-line echo at startup).
+
+**Revisit the generic rewrite after the third copy.** By then the
+genuinely-reusable pieces (box drawing, auto-width, product
+listing, new/pre tagging) will be clear vs the genuinely-per-script
+pieces (status-file shape, ETA bucket classifier, phase-banner
+regex). Extract a `scripts/status_core.sh` or similar at that point,
+not before.
+
 ## Pre-ship: cross-form opponent coverage for Oinkologne (2026-04-18)
 
 Surfaced during S10 while the Male-vs-Female matchup-delta section was

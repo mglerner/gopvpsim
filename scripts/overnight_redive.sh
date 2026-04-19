@@ -61,6 +61,11 @@ trap 'rc=$?; log "[FATAL] overnight chain aborted (rc=$rc) at line $LINENO"; sta
 log "=== overnight chain start ==="
 log "log: $LOG"
 log "status: $STATUS"
+log ""
+log "Status box (paste into another terminal pane):"
+log "  watch -n 5 -c scripts/overnight_status.sh              # needs: brew install watch"
+log "  while true; do clear; scripts/overnight_status.sh; sleep 5; done   # no deps"
+log ""
 
 # 1. Eight website dives (serial, per run_website_dives.py).
 step "Running 8 dives via run_website_dives.py" \
