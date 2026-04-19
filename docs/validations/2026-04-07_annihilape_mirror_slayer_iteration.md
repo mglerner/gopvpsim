@@ -55,8 +55,8 @@ The single named community spread for Annihilape is the "Lurgan Ape," popularize
 by lurganrocket on Twitter. Per IV expert tinkaton_expert (Discord, 2026-04-08), the
 spread is canonically defined by two cutoffs:
 
-| Cutoff | Value        | Source                                                                   |
-| ------ | ------------ | ------------------------------------------------------------------------ |
+| Cutoff | Value        | Source                                                                     |
+| ------ | ------------ | -------------------------------------------------------------------------- |
 | Atk    | **>= 127.2** | "127.2 attack was the minimum needed for a lurgan ape" — tinkaton_expert      |
 | Def    | **>= 102.9** | "102.9 defense was the goal" — tinkaton_expert ("i do not remember what for") |
 

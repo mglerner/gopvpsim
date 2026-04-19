@@ -41,11 +41,11 @@ description = "High-bulk cutoff (legacy)."
 
 [Annihilape.Great.spreads.lurgan_ape]
 description = """
-Community 'Lurgan Ape' spread popularized by lurganrocket. Per tinkaton_expert
-(Discord, 2026-04-08), the spread is defined by two cutoffs:
+Community 'Lurgan Ape' spread popularized by lurganrocket. Per Discord
+expert testimony (2026-04-08), the spread is defined by two cutoffs:
   attack >= 127.2  (minimum atk for the Lickitung damage breakpoint)
-  defense >= 102.9 (def floor; tinkaton_expert does not remember which specific
-                    bulkpoint this preserves — likely a mirror or Lickitung
+  defense >= 102.9 (def floor; which specific bulkpoint this preserves
+                    is not documented — likely a mirror or Lickitung
                     bulkpoint, recoverable via Level 3 bulkpoint discovery
                     once we add the bulkpoint anchor kind)
 The 27 IVs below are the enumeration of those cutoffs at GL CP cap. The

@@ -786,13 +786,6 @@ break invariants that weren't yet nailed down by tests.
   This is the missing context that would let us promote a specific
   bulkpoint to a Level 1 anchor with full provenance.
 
-* **Rename `tinkaton_expert` → `tinkaton_expert` throughout the codebase** —
-  tinkaton_expert is their preferred username on HSH's Discord; we've been
-  using the older `tinkaton_expert` handle in code, comments, docs, validation
-  writeups, and TOML provenance fields. Sweep the repo (code, docs/,
-  thresholds/, DEVELOPER_NOTES.md, TODO.md, validation writeups) and
-  update references. Discovered 2026-04-09.
-
 ## Slayer card UX (post-bulkpoint shipped 2026-04-08)
 
 * **Slayer-card signal-loss audit + design discussion** *(needs design
