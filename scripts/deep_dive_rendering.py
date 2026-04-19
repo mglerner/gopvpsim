@@ -915,10 +915,14 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
     if not target:
         return ''
 
-    # Per-card unique counter so the JS expand toggle can address each
-    # card individually. Resets per call to _render_notable_ivs_section,
-    # which is fine because the section is rendered once per page.
+    # Per-card slug is derived from the category name so external pages
+    # (CD article IV Recommendations, cross-species comparisons) can
+    # deep-link to a specific card with a stable href. Name-derived
+    # slugs survive reordering of the category list across re-dives
+    # (unlike the old uid counter). A uid counter is kept only as a
+    # disambiguator when two category names slugify to the same string.
     card_uid = 0
+    seen_slugs: set[str] = set()
 
     # Sort: composites first (the headline), then matchups, with smaller
     # categories first within each kind so the most distinctive cards
@@ -999,7 +1003,11 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
         notable_cls = 'dd-notable' if is_notable else 'dd-not-notable'
 
         card_uid += 1
-        card_id = f'dd-notable-card-{card_uid}'
+        name_slug = opp_slug(cat.name)
+        if not name_slug or name_slug in seen_slugs:
+            name_slug = f'{name_slug or "cat"}-{card_uid}'
+        seen_slugs.add(name_slug)
+        card_id = f'notable-{name_slug}'
         parts.append(f'<div class="dd-rec-card {notable_cls}" id="{card_id}">\n')
         parts.append(
             f'<h4>{cat.name} '
@@ -2089,6 +2097,14 @@ function ddToggleTagsCompactCell(event) {
 
             _table_uid += 1
             card_id = f"{_ms_prefix}-slayer-{_table_uid}"
+            # External-link anchor on the rec-card div, derived from the
+            # category name (e.g. 'mirror-atk-slayer'). card_id above is
+            # kept as the moveset-scoped prefix for filter-panel JS so
+            # the internal handles don't collide across movesets on a
+            # single page; the outer anchor is the stable external
+            # target. Each split-moveset file renders one mirror block,
+            # so category-name slugs are unique within a file.
+            mirror_slug = f'mirror-{opp_slug(cat_name)}'
 
             # Determine which anchor kinds apply to this category card.
             # Bulk Slayer surfaces all kinds (bulkpoint anchors are its
@@ -2134,7 +2150,7 @@ function ddToggleTagsCompactCell(event) {
             default_show_all = any_tagless
             show_all_attr = ' checked' if default_show_all else ''
 
-            parts.append(f'<div class="dd-rec-card">\n')
+            parts.append(f'<div class="dd-rec-card" id="{mirror_slug}">\n')
             parts.append(
                 f'<h4>{cat_name} '
                 f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
