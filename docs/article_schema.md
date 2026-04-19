@@ -187,6 +187,7 @@ structure.
 | Field                  | Required | Type   | Notes                                                              |
 | ---------------------- | -------- | ------ | ------------------------------------------------------------------ |
 | `meta_role.authorship` | yes¹     | string | `expert` / `both` / `auto`. ¹Required if `[meta_role]` present.    |
+| `meta_role.author`     | no       | string | Per-block provenance. See "Per-block author attribution" below.    |
 | `meta_role.good_at`    | no       | string | One paragraph. Omit or leave empty to skip / auto-fill.            |
 | `meta_role.bad_at`     | no       | string | One paragraph. Omit or leave empty to skip / auto-fill.            |
 | `meta_role.team_role`  | no       | string | One paragraph. Omit or leave empty to skip / auto-fill.            |
@@ -228,9 +229,10 @@ Verdict will say.
 
 ### Field reference (Intro augment)
 
-| Field        | Required | Type   | Notes                                         |
-| ------------ | -------- | ------ | --------------------------------------------- |
-| `intro.body` | no       | string | If non-empty, overrides the default template. |
+| Field          | Required | Type   | Notes                                                           |
+| -------------- | -------- | ------ | --------------------------------------------------------------- |
+| `intro.body`   | no       | string | If non-empty, overrides the default template.                   |
+| `intro.author` | no       | string | Per-block provenance. See "Per-block author attribution" below. |
 
 Omitting the entire `[intro]` block (or leaving `body` empty) falls
 back to the default template.
@@ -288,14 +290,64 @@ lives inside the existing Verdict `<section>`.
 
 ### Field reference (Verdict augment)
 
-| Field                | Required | Type   | Notes                                                         |
-| -------------------- | -------- | ------ | ------------------------------------------------------------- |
-| `verdict.authorship` | yes¹     | string | `expert` / `both` / `auto`. ¹Required if `[verdict]` present. |
-| `verdict.editorial`  | no       | string | "Should you invest?" paragraph. Omit to skip.                 |
-| `verdict.outlook`    | no       | string | Short meta-outlook closer. Omit to skip.                      |
+| Field                | Required | Type   | Notes                                                           |
+| -------------------- | -------- | ------ | --------------------------------------------------------------- |
+| `verdict.authorship` | yes¹     | string | `expert` / `both` / `auto`. ¹Required if `[verdict]` present.   |
+| `verdict.author`     | no       | string | Per-block provenance. See "Per-block author attribution" below. |
+| `verdict.editorial`  | no       | string | "Should you invest?" paragraph. Omit to skip.                   |
+| `verdict.outlook`    | no       | string | Short meta-outlook closer. Omit to skip.                        |
 
 Omitting the entire `[verdict]` block leaves only the mechanical
 line (pre-F4 behaviour).
+
+## Per-block author attribution (schema shipped 2026-04-19)
+
+The `authorship` enum (`expert` / `both` / `auto`) controls the
+rendering path — whether a block's authored content is used, whether
+auto-synthesis should fill gaps, which banner color the page gets.
+It does NOT distinguish human-authored expert prose from AI-drafted
+expert prose. Both currently render identically under
+`authorship = "expert"`, which means a reader has no way to tell
+whether "this article is written by a human analyst" means a human
+wrote it or Claude did.
+
+The optional `author = "..."` field on any narrative block
+(`[intro]`, `[meta_role]`, `[verdict]`, and the dive-side
+`[Species.intro]` / `[Species.meta_role]` / `[Species.verdict]`
+blocks) adds reader-visible provenance. When set, the renderer
+appends a muted italic attribution line at the end of the block:
+
+```toml
+[meta_role]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+good_at = "..."
+```
+
+Renders as:
+
+```html
+<p>Good at paragraph...</p>
+<p class="narrative-attribution"><em>Drafted by Claude (Opus 4.7),
+not yet human-reviewed</em></p>
+```
+
+**The string is rendered verbatim (HTML-escaped).** Author owns the
+phrasing; the renderer does not prepend "By" or any conventional
+header. Empty / missing `author` renders no attribution line —
+backwards-compatible with pre-2026-04-19 blocks.
+
+**Recommended phrasings:**
+
+| Source                                 | Suggested `author` value                                 |
+| -------------------------------------- | -------------------------------------------------------- |
+| Claude drafted, not human-reviewed     | `"Drafted by Claude (Opus 4.7), not yet human-reviewed"` |
+| Claude drafted, Michael reviewed       | `"Drafted by Claude (Opus 4.7), reviewed by Michael"`    |
+| Michael wrote from scratch             | `"Michael Lerner"` or `"By Michael Lerner"`              |
+| Michael + Claude genuinely co-authored | `"Michael Lerner and Claude (Opus 4.7)"`                 |
+
+The page-top `authorship-banner` is coarse-grained and unchanged.
+Per-block attribution is the fine-grained signal.
 
 ## Matchup Delta config (F2, shipped 2026-04-18)
 

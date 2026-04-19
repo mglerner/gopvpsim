@@ -57,6 +57,36 @@ def format_body(text: str) -> str:
     return '\n'.join(result)
 
 
+def format_block_attribution(block: dict) -> str:
+    """Render an optional per-block `author` attribution line.
+
+    When a narrative block (`[intro]`, `[meta_role]`, `[verdict]` in the
+    article TOML; or `[Species.intro]` / `[Species.meta_role]` /
+    `[Species.verdict]` in the dive-side threshold TOML) carries an
+    `author = "..."` field, this appends a muted italic paragraph at
+    the end of the block so a reader can tell human-authored prose
+    from AI-drafted prose without relying on the page-top authorship
+    banner.
+
+    Empty or missing `author` returns the empty string; callers
+    unconditionally concatenate, so blocks that predate the field
+    render unchanged.
+
+    Phrasing is author-controlled and rendered verbatim (HTML-escaped).
+    Typical values: "Drafted by Claude (Opus 4.7), not yet human-
+    reviewed" / "Michael Lerner" / "Drafted by Claude, reviewed by
+    Michael". The renderer does not prepend "By" or similar — the
+    TOML author owns the phrasing.
+    """
+    author = (block.get('author') or '').strip()
+    if not author:
+        return ''
+    return (
+        '<p class="narrative-attribution">'
+        f'<em>{html.escape(author)}</em></p>'
+    )
+
+
 def resolve_dive_link(article: dict) -> str:
     slug = article['links']['deep_dive_slug']
     return f'../../{slug}/'
@@ -160,6 +190,8 @@ def render_html(article: dict) -> str:
   .framing {{ display: inline-block; padding: 2px 10px; border-radius: 12px;
               font-size: 13px; font-weight: 600; text-transform: uppercase;
               background: #0f3460; color: #8ab4f8; }}
+  .narrative-attribution {{ color: #8b949e; font-size: 0.85rem;
+                            margin: 6px 0 0 0; font-style: italic; }}
   footer {{ color: #666; font-size: 13px; margin-top: 40px;
             border-top: 1px solid #0f3460; padding-top: 12px; }}
 </style>

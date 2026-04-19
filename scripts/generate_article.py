@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 
 from render_article import (  # type: ignore[import-not-found]
+    format_block_attribution,
     format_body,
     render_authorship_banner,
     render_obsolescence_banner,
@@ -1094,7 +1095,7 @@ def _render_verdict_augment(article: dict) -> str:
         parts.append(outlook)
     if not parts:
         return ''
-    return format_body('\n\n'.join(parts))
+    return format_body('\n\n'.join(parts)) + format_block_attribution(block)
 
 
 LEAGUE_CP = {'great': 1500, 'ultra': 2500, 'master': 10000}
@@ -2585,7 +2586,7 @@ def render_intro_section(article: dict) -> str:
     intro_block = article.get('intro') or {}
     body = (intro_block.get('body') or '').strip()
     if body:
-        return format_body(body)
+        return format_body(body) + format_block_attribution(intro_block)
 
     species = html.escape(article.get('species', ''))
     cd_move = html.escape(article.get('cd_move', ''))
@@ -2801,7 +2802,7 @@ def _render_meta_role_section(article: dict) -> str:
 
     body_override = (block.get('body') or '').strip()
     if body_override:
-        return format_body(body_override)
+        return format_body(body_override) + format_block_attribution(block)
 
     parts = []
     for field in ('good_at', 'bad_at', 'team_role'):
@@ -2810,7 +2811,7 @@ def _render_meta_role_section(article: dict) -> str:
             parts.append(txt)
     if not parts:
         return ''
-    return format_body('\n\n'.join(parts))
+    return format_body('\n\n'.join(parts)) + format_block_attribution(block)
 
 
 def _load_form_comparison_spec(article: dict) -> dict | None:
@@ -3087,6 +3088,8 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   .framing {{ display: inline-block; padding: 2px 10px; border-radius: 12px;
               font-size: 13px; font-weight: 600; text-transform: uppercase;
               background: #0f3460; color: #8ab4f8; }}
+  .narrative-attribution {{ color: #8b949e; font-size: 0.85rem;
+                            margin: 6px 0 0 0; font-style: italic; }}
   .todo-placeholder {{ background: #1a2333; border: 1px dashed #5b8dd9;
                        border-radius: 6px; padding: 10px 14px; color: #8ab4f8;
                        font-size: 14px; margin: 10px 0; }}
