@@ -79,6 +79,21 @@ summary output somewhere durable (docs/perf/ or similar) if the
 data looks interesting, otherwise leave it on disk and the script
 can re-run against a future overnight chain's logs too.
 
+**While you're in there, recalibrate
+`scripts/overnight_eta.py::FALLBACKS`.** Initial values (gl_full=40m,
+ul_full=35m, forretress=6m) were my guess during dive 1's in-flight
+state; observed real numbers for dives 1-3 are consistently ~60-65min
+for GL full-sweep. Bump fallbacks to match so the next overnight
+chain's "SCRIPT ETA" starts accurate instead of collapsing as early
+completions overwrite loose estimates. Take the mean of dives 1-6
+(all full-sweep) for gl_full/ul_full, dives 7-10 for forretress.
+
+**Specific outliers to flag in the summary output:** Tinkaton UL
+was running 1h+ elapsed at 2026-04-19 ~22:25 local (tracking near
+other full-sweep dives, so likely just the too-low fallback, not a
+real regression — but confirm against the other full-sweep times
+in the summary and flag if >15% over the GL/UL mean).
+
 ## CD-prep tracking (2026-04-17, fix shipped 2026-04-18)
 
 **SHIPPED.** Per-species `[cd_prep]` TOML block is now read by
