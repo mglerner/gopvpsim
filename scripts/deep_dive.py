@@ -2451,6 +2451,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         str(idx): sorted(set(cats)) for idx, cats in slayer_cats_by_idx.items()
     }
 
+    # Mirror CMP cohort: atk values of the Nash-converged survivor pool
+    # from --mirror-slayer. Used by the JS to compute each IV's
+    # "Mirror CMP %" (fraction of cohort members this IV beats at CMP).
+    # Sorted ascending for binary-search-friendly lookup. Emits an empty
+    # list when --mirror-slayer wasn't requested or converged to nothing;
+    # the JS guards on length so absent data silently skips the CMP column.
+    mirror_cohort_atk = []
+    if slayer_iter_result and slayer_iter_result.get('final'):
+        mirror_cohort_atk = sorted(
+            float(s['atk']) for s in slayer_iter_result['final']
+            if s.get('atk') is not None
+        )
+    data_obj['mirrorCohortAtk'] = mirror_cohort_atk
+
     # Anchor-clear IV overlay: union the canonical IV indices that pass
     # any anchor for which _aggregate_flips_by_anchor emitted a record.
     # The aggregator runs again inside generate_analysis_sections for
