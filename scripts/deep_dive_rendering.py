@@ -225,17 +225,31 @@ DEEP_DIVE_CSS = """
 .dd-sim-zone { border-left: 4px solid #58a6ff; padding-left: 16px; margin: 16px 0; }
 .dd-sim-zone > h3 { color: #58a6ff; margin: 0 0 10px 0; }
 .dd-species-narrative { margin: 20px 0; }
-/* Per-block wrapper. Left border color + heading color encode who
-   authored the block: gold = human (default), orange = AI-drafted,
-   gold = mixed (a human co-signed). Inner (h2/h3) inherits the
-   border color via the same .authored-X modifier. */
+/* Per-block wrapper. The left "sidebar" is a pseudo-element rather
+   than a border so its ends can be rounded and inset from the block
+   edges — this creates a visible gap between adjacent blocks even
+   when they share the same authored_by colour, and the rounded caps
+   read as intentional. Colour encodes who authored the block:
+   gold = human (default), orange = AI-drafted, gold = mixed (a
+   human co-signed). Inner (h2/h3) colour is driven off the same
+   .authored-X modifier. */
 .dd-species-narrative .dd-narrative-block {
-  border-left: 4px solid #d29922;
-  padding: 10px 0 10px 16px;
-  margin: 14px 0;
+  position: relative;
+  padding: 10px 0 10px 20px;
+  margin: 8px 0;
 }
-.dd-species-narrative .dd-narrative-block.authored-ai {
-  border-left-color: #e8903a;
+.dd-species-narrative .dd-narrative-block::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  background: #d29922;
+  border-radius: 2px;
+}
+.dd-species-narrative .dd-narrative-block.authored-ai::before {
+  background: #e8903a;
 }
 .dd-species-narrative .dd-narrative-block > h2,
 .dd-species-narrative .dd-narrative-block > h3 {

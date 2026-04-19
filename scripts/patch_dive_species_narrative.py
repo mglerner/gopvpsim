@@ -51,6 +51,57 @@ from deep_dive_rendering import render_species_narrative  # type: ignore[import-
 _CONTROLS_MARKER = '<div class="controls">'
 _ALREADY_PATCHED_MARKER = '<section class="dd-species-narrative">'
 
+# CSS override shipped alongside the patched narrative. Fresh dive
+# renders carry this via deep_dive_rendering's main stylesheet; patched
+# HTMLs were generated under an older renderer, so we scope-override
+# here. The rules below have the same selectors as the main sheet so
+# later-defined-wins CSS cascade ensures these take effect.
+# Keep in sync with scripts/deep_dive_rendering.py's
+# ``.dd-species-narrative`` CSS block.
+_NARRATIVE_CSS_OVERRIDE = """
+<style>
+/* Species-narrative CSS override injected by
+   scripts/patch_dive_species_narrative.py (2026-04-19). Brings an
+   older dive HTML's per-block colour coding up to the current
+   renderer's shape. Safe no-op if the main stylesheet already has
+   the same rules. */
+.dd-species-narrative { margin: 20px 0; }
+.dd-species-narrative .dd-narrative-block {
+  position: relative;
+  padding: 10px 0 10px 20px;
+  margin: 8px 0;
+  border-left: none;
+}
+.dd-species-narrative .dd-narrative-block::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  background: #d29922;
+  border-radius: 2px;
+}
+.dd-species-narrative .dd-narrative-block.authored-ai::before {
+  background: #e8903a;
+}
+.dd-species-narrative .dd-narrative-block > h2,
+.dd-species-narrative .dd-narrative-block > h3 {
+  color: #d29922;
+  margin: 0 0 8px 0;
+}
+.dd-species-narrative .dd-narrative-block > h2 { font-size: 1.15rem; }
+.dd-species-narrative .dd-narrative-block > h3 { font-size: 1.0rem; }
+.dd-species-narrative .dd-narrative-block.authored-ai > h2,
+.dd-species-narrative .dd-narrative-block.authored-ai > h3 {
+  color: #e8903a;
+}
+.dd-species-narrative p { margin: 8px 0; }
+.dd-species-narrative .narrative-attribution { color: #8b949e;
+  font-size: 0.82rem; margin: 6px 0 0 0; font-style: italic; }
+</style>
+"""
+
 
 def _infer_species_from_slug(slug: str) -> str | None:
     """Reverse of deep_dive.py's slug convention.
@@ -108,11 +159,18 @@ def _patch_html(html: str, narrative_fragment: str,
     if _ALREADY_PATCHED_MARKER in html:
         if not force:
             return html, False
-        # Strip the existing narrative section before re-injecting.
-        # Match the whole `<section class="dd-species-narrative">…</section>`
-        # via a non-greedy DOTALL regex: lets us rewrite files that were
-        # patched with an older renderer shape.
+        # Strip the existing narrative section (and any CSS override we
+        # previously injected alongside it) before re-injecting. Matches
+        # are non-greedy DOTALL so the section / style tags can span
+        # multiple lines; ``count=1`` on each so we don't accidentally
+        # remove unrelated style tags elsewhere in the HTML.
         import re as _re
+        # Strip any previously-injected CSS override <style> block,
+        # identified by its fingerprint comment.
+        html = _re.sub(
+            r'<style>[^<]*?Species-narrative CSS override injected by.*?</style>\s*',
+            '', html, count=1, flags=_re.DOTALL,
+        )
         html = _re.sub(
             r'<section class="dd-species-narrative">.*?</section>\s*',
             '', html, count=1, flags=_re.DOTALL,
@@ -120,7 +178,7 @@ def _patch_html(html: str, narrative_fragment: str,
     idx = html.find(_CONTROLS_MARKER)
     if idx < 0:
         return html, False
-    patched = html[:idx] + narrative_fragment + html[idx:]
+    patched = html[:idx] + _NARRATIVE_CSS_OVERRIDE + narrative_fragment + html[idx:]
     return patched, True
 
 
