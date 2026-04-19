@@ -64,6 +64,21 @@ regenerate each affected dive's HTML-only via deep_dive.py's
 three serially (~3 hours of compute; acceptable given the
 post-re-dive review day has capacity).
 
+**Also: write `scripts/summarize_perf.py`** against tonight's
+per-dive logs in `userdata/logs/2026-04/20260419_*.log`. The
+deep_dive.py logger already emits `X,XXX,XXX sims in Y.Ys
+(Z sims/s)` at every phase boundary plus chunk-progress ticks at
+~10-12% intervals, so the raw perf data for all 10 dives is
+already on disk. Write a one-off aggregator that walks those logs
+and emits a per-(dive, phase) table of elapsed + sims + throughput
+(CSV or markdown-table). Target audience: the next perf session,
+which doesn't exist yet but can reach for a tidy summary instead
+of regrep-ing raw logs. ~30 min of work against a known-shape
+dataset. The raw logs are gitignored (userdata/) so commit the
+summary output somewhere durable (docs/perf/ or similar) if the
+data looks interesting, otherwise leave it on disk and the script
+can re-run against a future overnight chain's logs too.
+
 ## CD-prep tracking (2026-04-17, fix shipped 2026-04-18)
 
 **SHIPPED.** Per-species `[cd_prep]` TOML block is now read by
