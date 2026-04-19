@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 """Compute whole-script ETA for the overnight re-dive chain.
 
-Reads the overnight wrapper log (argv[1]) and emits two stdout lines:
-  line 1: "~{HhMm} remaining, done ~{HH:MM}"
-  line 2: "{n_done}/{n_total} dives complete; {bucket_avgs}"
+Reads the overnight wrapper log (argv[1]) and emits up to three tagged
+stdout lines:
+
+  SCRIPT: ~{HhMm} remaining, done ~{HH:MM}
+  DIVE: ~{HhMm} remaining, done ~{HH:MM}         (only when a dive is running)
+  BUCKETS: {n_done}/{n_total} dives complete; {bucket_avgs}
+
+Tags let the shell caller grep each independently without position
+coupling. DIVE is suppressed when there is no currently-running dive
+(chain hasn't started, or we're between dives / past the dive block).
 
 Intended to be called from scripts/overnight_status.sh so the pinned
-status box carries a whole-script ETA alongside per-dive progress.
+status box carries both a whole-script ETA and a current-dive ETA
+alongside per-dive progress.
 
 Method:
   * Enumerate all dive slugs in chain order from run_website_dives.py's
@@ -142,24 +150,36 @@ def main(wrapper_log_path: str) -> int:
             bucket_source[b] = 'fallback'
 
     # Sum remaining dive time: current dive gets (avg - elapsed), other
-    # not-yet-started dives get full bucket_avg.
+    # not-yet-started dives get full bucket_avg. Track current-dive
+    # remaining separately so we can surface it as its own line.
     total_remaining_min = 0.0
+    current_dive_remaining: float | None = None
+    current_dive_overshoot: bool = False
     for slug in slugs:
         if slug in completed:
             continue
         est = bucket_avg[classify(slug)]
         if slug == current_dive and current_start is not None:
             elapsed_min = (datetime.now() - current_start).total_seconds() / 60
-            total_remaining_min += max(0.0, est - elapsed_min)
+            if elapsed_min >= est:
+                # We've exceeded the baseline; "0m remaining" is
+                # misleading because the dive is clearly not about to
+                # finish. Flag overshoot so the caller can show a
+                # hedged signal instead of a false-precision number.
+                current_dive_overshoot = True
+                current_dive_remaining = 0.0
+            else:
+                current_dive_remaining = est - elapsed_min
+            total_remaining_min += current_dive_remaining
         else:
             total_remaining_min += est
 
     # Fixed post-dive-pipeline allowance.
     total_remaining_min += FALLBACKS['post_dive']
 
+    now = datetime.now()
     eta_str = _fmt_minutes(total_remaining_min)
-    done_at = datetime.now() + timedelta(minutes=total_remaining_min)
-    done_str = done_at.strftime('%H:%M')
+    done_str = (now + timedelta(minutes=total_remaining_min)).strftime('%H:%M')
 
     n_done = len(completed)
     n_total = len(slugs)
@@ -168,8 +188,20 @@ def main(wrapper_log_path: str) -> int:
     for b in ('gl_full', 'ul_full', 'forretress'):
         bucket_bits.append(f'{b}={bucket_avg[b]:.0f}m ({bucket_source[b]})')
 
-    print(f'~{eta_str} remaining, done ~{done_str}')
-    print(f'{n_done}/{n_total} dives complete; ' + ', '.join(bucket_bits))
+    print(f'SCRIPT: ~{eta_str} remaining, done ~{done_str}')
+    if current_dive_remaining is not None:
+        if current_dive_overshoot:
+            # Past the baseline -- don't claim a number we don't
+            # have. Show how far past, and note the baseline will
+            # recalibrate once this dive completes.
+            elapsed_min = (now - current_start).total_seconds() / 60
+            print(f'DIVE: running long ({_fmt_minutes(elapsed_min)} elapsed vs '
+                  f'{_fmt_minutes(bucket_avg[classify(current_dive)])} baseline)')
+        else:
+            dive_eta_str = _fmt_minutes(current_dive_remaining)
+            dive_done_str = (now + timedelta(minutes=current_dive_remaining)).strftime('%H:%M')
+            print(f'DIVE: ~{dive_eta_str} remaining, done ~{dive_done_str}')
+    print(f'BUCKETS: {n_done}/{n_total} dives complete; ' + ', '.join(bucket_bits))
     return 0
 
 
