@@ -37,21 +37,89 @@ DEEP_DIVE = os.path.join(SCRIPT_DIR, 'deep_dive.py')
 #   extra_args: []           (escape hatch for unusual flags)
 
 DIVES = [
+    # Order is deliberate: Oinkologne pair first so the CD article can
+    # regenerate earliest if the later dives slip. Tinkaton next (GL then
+    # UL). Aegislash pair last, GL before UL per the D2 decision on
+    # 2026-04-18. `--reserve-cpus 1` on every entry per the
+    # `feedback_reserve_cpu_for_dives` discipline so local work stays
+    # responsive if someone else lands on the box mid-run.
+    {
+        'species': 'Oinkologne',
+        'league': 'great',
+        'slug': 'oinkologne-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'reference': 'TACKLE,BODY_SLAM,TRAILBLAZE',
+    },
+    {
+        'species': 'Oinkologne (Female)',
+        'league': 'great',
+        'slug': 'oinkologne-female-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'reference': 'TACKLE,BODY_SLAM,TRAILBLAZE',
+    },
     {
         'species': 'Tinkaton',
         'league': 'great',
         'slug': 'tinkaton-great-league',
-        'html_base': 'tinkaton_gl_toml.html',
+        'html_base': 'index.html',
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'reference': 'FAIRY_WIND,BULLDOZE,PLAY_ROUGH',
     },
     {
         'species': 'Tinkaton',
         'league': 'ultra',
-        'slug': 'tinkaton-ultra-league-nofloor',
-        'html_base': 'tinkaton_ul_nofloor.html',
+        'slug': 'tinkaton-ultra-league',
+        'html_base': 'index.html',
         'opponents': 60,
         'no_thresholds': True,
+    },
+    # Aegislash (Blade) isn't in PvPoke rankings; pass --fast / --charged
+    # explicitly via extra_args and --no-thresholds so the auto-loader
+    # doesn't search for aegislash_blade.toml in the ranking-keyed paths.
+    # Canonical Shield moveset from get_default_moveset is mirrored on
+    # Blade so the hypothetical always-Blade comparison is apples-to-
+    # apples.
+    {
+        'species': 'Aegislash (Blade)',
+        'league': 'great',
+        'slug': 'aegislash-blade-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'no_thresholds': True,
+        'extra_args': ['--fast', 'PSYCHO_CUT',
+                       '--charged', 'SHADOW_BALL,GYRO_BALL'],
+        'reference': 'PSYCHO_CUT,SHADOW_BALL,GYRO_BALL',
+    },
+    {
+        'species': 'Aegislash (Shield)',
+        'league': 'great',
+        'slug': 'aegislash-shield-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'no_thresholds': True,
+        'reference': 'AEGISLASH_CHARGE_PSYCHO_CUT,SHADOW_BALL,GYRO_BALL',
+    },
+    {
+        'species': 'Aegislash (Blade)',
+        'league': 'ultra',
+        'slug': 'aegislash-blade-ultra-league',
+        'html_base': 'index.html',
+        'opponents': 60,
+        'no_thresholds': True,
+        'extra_args': ['--fast', 'PSYCHO_CUT',
+                       '--charged', 'SHADOW_BALL,FLASH_CANNON'],
+        'reference': 'PSYCHO_CUT,SHADOW_BALL,FLASH_CANNON',
+    },
+    {
+        'species': 'Aegislash (Shield)',
+        'league': 'ultra',
+        'slug': 'aegislash-shield-ultra-league',
+        'html_base': 'index.html',
+        'opponents': 60,
+        'no_thresholds': True,
+        'reference': 'AEGISLASH_CHARGE_PSYCHO_CUT,SHADOW_BALL,FLASH_CANNON',
     },
 ]
 
@@ -88,6 +156,7 @@ def build_command(dive):
         '--mirror-slayer-pool', '30',
         '--mirror-slayer-show', '20',
         '--split-movesets',
+        '--reserve-cpus', str(dive.get('reserve_cpus', 1)),
     ]
 
     if 'extra_args' in dive:
