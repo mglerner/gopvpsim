@@ -864,6 +864,23 @@ break invariants that weren't yet nailed down by tests.
   When this is worked, sweep the rest of the slayer/threshold/banding
   output for similar "everyone passes the lowest tier" patterns.
 
+  **Observed instance — Oinkologne GL (2026-04-19).** Dive 1 of the
+  overnight re-dive; Mud Slap / Body Slam / Trailblaze scatter under
+  `userdata/website/oinkologne-great-league/index_m0_*.html`. Slayer
+  IVs (yellow markers) cluster in the top-RIGHT of the scatter — i.e.
+  rank-1-ish stat product *and* high avg battle score — instead of
+  the traditional Lurgan-Ape-style LEFT-cluster where slayers sit at
+  worse bulk in exchange for higher attack. Mechanism: Oinkologne
+  caps at level ~22-23 at GL CP, so the atk range across IV spreads
+  is narrow, *and* Mud Slap's low DPE means the damage step between
+  adjacent atk values is small — so the slayer atk breakpoint lands
+  below where rank-1-bulk IVs already sit, making the "slayer" tag
+  non-discriminating against premium bulk. Concrete real-world
+  instance of the signal-loss concern this TODO flags. Worth using
+  as the first test case when the audit happens; if the chosen
+  remedy doesn't differentiate the Oinkologne scatter, it's not
+  solving the problem.
+
 * **"Show clusters" section is always visible** — it sits above the
   interactive scatter plot but should be gated behind the "Show
   experimental analysis (banding, clusters)" checkbox in the Deep Dive
