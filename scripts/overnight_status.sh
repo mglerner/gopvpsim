@@ -195,4 +195,39 @@ if [[ -n "$WRAPPER_LOG" ]]; then
       done
 fi
 rule
+
+# Recent products — the 5 most recently modified .html files under
+# userdata/website/. During a dive the main index plus split-moveset
+# files land here incrementally, so this is the "peek at partial
+# output" surface. Paths are repo-relative for easy cmd-click in
+# Terminal.app (which resolves relative paths against PWD).
+HTML_ROOT="userdata/website"
+if [[ -d "$HTML_ROOT" ]]; then
+    printf "  %sRecent products:%s\n" "$BOLD" "$RESET"
+    NOW_EPOCH=$(date +%s)
+    # find + stat returns "mtime /path". Sort desc by mtime, top 5,
+    # format each with age-since-mtime and relative path.
+    find "$HTML_ROOT" -name '*.html' -type f -print0 2>/dev/null | \
+        xargs -0 stat -f '%m %N' 2>/dev/null | \
+        sort -rn | head -5 | \
+        while IFS= read -r ENTRY; do
+            MT="${ENTRY%% *}"
+            FP="${ENTRY#* }"
+            AGE=$(( NOW_EPOCH - MT ))
+            if   (( AGE < 60 ));   then AGE_STR="${AGE}s ago"
+            elif (( AGE < 3600 )); then AGE_STR="$((AGE/60))m ago"
+            else                         AGE_STR="$((AGE/3600))h$(((AGE%3600)/60))m ago"
+            fi
+            # Show path relative to repo root (strip REPO_ROOT prefix if
+            # present, otherwise emit as-is). Truncate to fit width.
+            REL="${FP#$REPO_ROOT/}"
+            MAX=$((WIDTH - 14))
+            if (( ${#REL} > MAX )); then
+                REL="...${REL: -$((MAX-3))}"
+            fi
+            printf "  %s%-9s%s  %s\n" "$DIM" "$AGE_STR" "$RESET" "$REL"
+        done
+    rule
+fi
+
 printf "  %srefresh: watch -n 5 -c scripts/overnight_status.sh%s\n" "$DIM" "$RESET"
