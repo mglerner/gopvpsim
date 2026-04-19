@@ -1,0 +1,147 @@
+# Championship Series Orlando 2026, all teams. 143 unique species from 156 teams, ordered by appearance count (most-used first).
+# Generated 2026-04-19 by scripts/build_opponent_pool.py
+# Format: one PvPoke speciesName per line; blank lines and # comments ignored.
+
+Corviknight
+Wigglytuff
+Quagsire (Shadow)
+Medicham
+Forretress
+Feraligatr
+Corsola (Galarian)
+Empoleon
+Guzzlord
+Lickilicky
+Altaria
+Azumarill
+Gourgeist (Super)
+Forretress (Shadow)
+Cradily
+Clodsire
+Diggersby
+Florges
+Stunfisk
+Aegislash (Shield)
+Furret
+Togekiss
+Umbreon
+Jellicent
+Annihilape
+Drapion (Shadow)
+Malamar
+Talonflame
+Clefable
+Ninetales (Alolan)
+Piloswine
+Quagsire
+Altaria (Shadow)
+Charjabug
+Talonflame (Shadow)
+Blastoise
+Carbink
+Feraligatr (Shadow)
+Grumpig
+Lanturn
+Malamar (Shadow)
+Moltres (Galarian)
+Oranguru
+Primeape
+Sableye
+Shelgon
+Stunfisk (Galarian)
+Weezing (Galarian)
+Cresselia
+Lapras
+Ninetales (Shadow)
+Sandslash (Alolan)
+Weezing (Galarian) (Shadow)
+Carnivine
+Charizard
+Gastrodon
+Greninja
+Jolteon
+Ludicolo
+Miltank
+Noctowl
+Sableye (Shadow)
+Skarmory
+Skeledirge
+Steelix (Shadow)
+Swalot
+Tinkaton
+Trevenant
+Turtonator
+Abomasnow
+Bellibolt
+Bellossom
+Bewear
+Bibarel
+Breloom
+Celebi
+Charizard (Shadow)
+Chatot
+Crobat
+Dartrix
+Deoxys (Attack)
+Dewgong
+Diggersby (Shadow)
+Dragalge
+Drifblim
+Dusknoir
+Dusknoir (Shadow)
+Eelektross
+Electrode (Hisuian)
+Empoleon (Shadow)
+Fearow
+Goodra
+Haunter
+Heracross
+Hitmonchan
+Hitmonlee
+Honchkrow
+Hydreigon (Shadow)
+Infernape (Shadow)
+Kingdra
+Klefki
+Latias
+Leafeon
+Lopunny
+Lunatone
+Magneton
+Magnezone (Shadow)
+Mandibuzz
+Marowak
+Meganium
+Melmetal
+Munchlax
+Murkrow
+Obstagoon
+Pangoro
+Perrserker
+Pidgeot
+Piloswine (Shadow)
+Pinsir
+Politoed (Shadow)
+Poliwrath
+Primeape (Shadow)
+Raichu (Alolan)
+Rapidash (Galarian)
+Regidrago
+Runerigus
+Sealeo (Shadow)
+Shiftry
+Sigilyph
+Snorlax
+Steelix
+Sudowoodo
+Swampert
+Sylveon
+Throh
+Toxtricity
+Typhlosion
+Vaporeon
+Wailord
+Walrein
+Whimsicott
+Whiscash
+Zapdos
