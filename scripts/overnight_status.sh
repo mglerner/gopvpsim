@@ -62,6 +62,43 @@ if [[ -f "$STATUS_FILE" ]]; then
     esac
     printf "  Step: %s%s%s\n" "$COLOUR" "$STATUS_LINE" "$RESET"
 fi
+
+# Current dive within the "Running dives" step: grep the wrapper log for
+# the latest "[N/M] slug" banner emitted by run_website_dives.py. Also
+# compute per-dive elapsed from the per-dive log's first line timestamp.
+WRAPPER_LOG=$(ls -t "$LOG_DIR"/overnight_*.log 2>/dev/null | head -1)
+LATEST_LOG=$(ls -t "$LOG_DIR"/20260419_*.log 2>/dev/null | grep -v overnight | head -1)
+
+if [[ -n "$WRAPPER_LOG" ]]; then
+    DIVE_BANNER=$(grep -E '\[[0-9]+/[0-9]+\] [a-z-]+' "$WRAPPER_LOG" 2>/dev/null | tail -1)
+    if [[ -n "$DIVE_BANNER" ]]; then
+        # Extract "[N/M] slug" portion
+        DIVE_NM=$(echo "$DIVE_BANNER" | grep -oE '\[[0-9]+/[0-9]+\]' | head -1)
+        DIVE_SLUG=$(echo "$DIVE_BANNER" | grep -oE '[a-z-]+-(great|ultra|master)-league' | head -1)
+
+        # Per-dive elapsed: derive from the per-dive log's first-line timestamp
+        DIVE_ELAPSED=""
+        if [[ -n "$LATEST_LOG" && -f "$LATEST_LOG" ]]; then
+            FIRST_TS=$(head -1 "$LATEST_LOG" | grep -oE '\[[0-9-]+ [0-9:]+' | tr -d '[')
+            if [[ -n "$FIRST_TS" ]]; then
+                FIRST_EPOCH=$(date -jf "%Y-%m-%d %H:%M:%S" "$FIRST_TS" +%s 2>/dev/null || echo "")
+                if [[ -n "$FIRST_EPOCH" ]]; then
+                    NOW=$(date +%s)
+                    DIFF=$(( NOW - FIRST_EPOCH ))
+                    if (( DIFF < 60 )); then DIVE_ELAPSED="${DIFF}s"
+                    elif (( DIFF < 3600 )); then DIVE_ELAPSED="$((DIFF/60))m$((DIFF%60))s"
+                    else DIVE_ELAPSED="$((DIFF/3600))h$(((DIFF%3600)/60))m"
+                    fi
+                fi
+            fi
+        fi
+
+        printf "  %sDive %s%s%s %s%s%s  elapsed %s%s%s\n" \
+            "$BOLD" "$CYAN" "$DIVE_NM" "$RESET" \
+            "$BOLD" "${DIVE_SLUG:-?}" "$RESET" \
+            "$GREEN" "${DIVE_ELAPSED:-?}" "$RESET"
+    fi
+fi
 rule
 
 # Latest per-dive log
