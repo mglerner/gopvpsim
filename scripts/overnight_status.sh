@@ -114,6 +114,23 @@ if [[ -n "$LATEST_LOG" && -f "$LATEST_LOG" ]]; then
 
     printf "  %sLatest dive log:%s %s\n" "$BOLD" "$RESET" "$BASENAME"
     printf "  %slast line %s ago%s\n" "$DIM" "$AGE_STR" "$RESET"
+
+    # Current phase — the most recent non-progress banner. These lines
+    # mark moveset / sweep / mirror-slayer-round boundaries and
+    # otherwise scroll off within seconds as the progress-% updates
+    # arrive. Pinning the latest match above the tail gives you the
+    # "what coarse sub-step am I in" answer without waiting for the
+    # next banner.
+    PHASE=$(grep -E 'Phase [0-9]|Interactive sweep|Mirror slayer|iteration round|Simming' "$LATEST_LOG" 2>/dev/null | tail -1 | \
+      sed -E 's|^\[[^]]+\] +[A-Z]+ +[a-z_]+: *||')
+    if [[ -n "$PHASE" ]]; then
+        # Truncate
+        if (( ${#PHASE} > WIDTH - 12 )); then
+            PHASE="${PHASE:0:$((WIDTH-15))}..."
+        fi
+        printf "  %sPhase:%s %s%s%s\n" "$BOLD" "$RESET" "$CYAN" "$PHASE" "$RESET"
+    fi
+
     printf '%s\n' "$(printf '─%.0s' $(seq 1 $WIDTH))"
 
     # Show last 6 non-blank lines, each truncated to WIDTH
