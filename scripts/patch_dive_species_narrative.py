@@ -65,7 +65,14 @@ _NARRATIVE_CSS_OVERRIDE = """
    older dive HTML's per-block colour coding up to the current
    renderer's shape. Safe no-op if the main stylesheet already has
    the same rules. */
-.dd-species-narrative { margin: 20px 0; }
+/* Explicitly zero the outer-section border+padding from the old
+   renderer (pre-2026-04-19 shape) so the old gold bar doesn't still
+   run alongside the new per-block bars. */
+.dd-species-narrative {
+  margin: 20px 0;
+  border-left: none;
+  padding: 0;
+}
 .dd-species-narrative .dd-narrative-block {
   position: relative;
   padding: 10px 0 10px 20px;
