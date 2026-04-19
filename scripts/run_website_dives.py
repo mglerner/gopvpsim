@@ -110,6 +110,62 @@ DIVES = [
         'no_thresholds': True,
         'reference': 'AEGISLASH_CHARGE_PSYCHO_CUT,SHADOW_BALL,FLASH_CANNON',
     },
+    # Forretress 4-way: normal vs shadow × Bug Bite vs Volt Switch, same
+    # charged moves (Sand Tomb + Rock Tomb — PvPoke default, also the CS
+    # meta standard for both fast-move variants). Against the Orlando
+    # 2026 top-32 pool. Goal is a fast-move + shadow comparison article
+    # built post-dive via compare_loadouts.py. top_movesets=1 because
+    # fast+charged are both pinned; only one moveset matches.
+    {
+        'species': 'Forretress',
+        'league': 'great',
+        'slug': 'forretress-volt-switch-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'extra_args': ['--fast', 'VOLT_SWITCH',
+                       '--charged', 'SAND_TOMB,ROCK_TOMB'],
+        'reference': 'VOLT_SWITCH,SAND_TOMB,ROCK_TOMB',
+    },
+    {
+        'species': 'Forretress',
+        'league': 'great',
+        'slug': 'forretress-bug-bite-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'extra_args': ['--fast', 'BUG_BITE',
+                       '--charged', 'SAND_TOMB,ROCK_TOMB'],
+        'reference': 'BUG_BITE,SAND_TOMB,ROCK_TOMB',
+    },
+    {
+        'species': 'Forretress',
+        'league': 'great',
+        'slug': 'forretress-shadow-volt-switch-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'shadow': True,
+        'extra_args': ['--fast', 'VOLT_SWITCH',
+                       '--charged', 'SAND_TOMB,ROCK_TOMB'],
+        'reference': 'VOLT_SWITCH,SAND_TOMB,ROCK_TOMB',
+    },
+    {
+        'species': 'Forretress',
+        'league': 'great',
+        'slug': 'forretress-shadow-bug-bite-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'shadow': True,
+        'extra_args': ['--fast', 'BUG_BITE',
+                       '--charged', 'SAND_TOMB,ROCK_TOMB'],
+        'reference': 'BUG_BITE,SAND_TOMB,ROCK_TOMB',
+    },
 ]
 
 
