@@ -228,35 +228,69 @@ if [[ -n "$WRAPPER_LOG" ]]; then
 fi
 
 if [[ -d "$HTML_ROOT" ]]; then
-    printf "  %sRecent products:%s\n" "$BOLD" "$RESET"
+    MAX_PRODUCTS=10
+    # Gather "mtime /path" rows sorted by mtime desc, then split into
+    # new (>= chain start) and pre (< chain start) buckets. Prioritize
+    # new in the display: show all new products (up to MAX_PRODUCTS),
+    # fill any slack with pre so the list is still useful before the
+    # chain has produced much. During an active run the box is
+    # dominated by fresh output; between runs it falls back to "what
+    # did I most recently build." Cap of 10 keeps the box from
+    # dominating vertically.
+    ALL_ENTRIES=$(find "$HTML_ROOT" -name '*.html' -type f -print0 2>/dev/null | \
+        xargs -0 stat -f '%m %N' 2>/dev/null | sort -rn)
     NOW_EPOCH=$(date +%s)
-    # find + stat returns "mtime /path". Sort desc by mtime, top 5,
-    # format each with age-since-mtime and relative path.
-    find "$HTML_ROOT" -name '*.html' -type f -print0 2>/dev/null | \
-        xargs -0 stat -f '%m %N' 2>/dev/null | \
-        sort -rn | head -5 | \
-        while IFS= read -r ENTRY; do
-            MT="${ENTRY%% *}"
-            FP="${ENTRY#* }"
-            AGE=$(( NOW_EPOCH - MT ))
-            if   (( AGE < 60 ));   then AGE_STR="${AGE}s ago"
-            elif (( AGE < 3600 )); then AGE_STR="$((AGE/60))m ago"
-            else                         AGE_STR="$((AGE/3600))h$(((AGE%3600)/60))m ago"
-            fi
-            # Tag as "new" vs "pre" relative to chain start.
-            if [[ -n "$CHAIN_START_EPOCH" && "$MT" -ge "$CHAIN_START_EPOCH" ]]; then
-                TAG="${GREEN}new${RESET}"
-            else
-                TAG="${DIM}pre${RESET}"
-            fi
-            # Show path relative to repo root. Truncate to fit width.
-            REL="${FP#$REPO_ROOT/}"
-            MAX=$((WIDTH - 18))
-            if (( ${#REL} > MAX )); then
-                REL="...${REL: -$((MAX-3))}"
-            fi
-            printf "  %s  %s%-9s%s  %s\n" "$TAG" "$DIM" "$AGE_STR" "$RESET" "$REL"
-        done
+
+    # Classify into new vs pre. Use a portable shell split (no awk
+    # dependency on chain-start-epoch being set — skip the threshold
+    # check when epoch is empty and treat everything as pre).
+    NEW_ENTRIES=""
+    PRE_ENTRIES=""
+    while IFS= read -r ENTRY; do
+        [[ -z "$ENTRY" ]] && continue
+        MT="${ENTRY%% *}"
+        if [[ -n "$CHAIN_START_EPOCH" && "$MT" -ge "$CHAIN_START_EPOCH" ]]; then
+            NEW_ENTRIES+="${ENTRY}"$'\n'
+        else
+            PRE_ENTRIES+="${ENTRY}"$'\n'
+        fi
+    done <<< "$ALL_ENTRIES"
+
+    # Build display list: all new (capped), then pre to fill remainder.
+    NEW_COUNT=$(printf '%s' "$NEW_ENTRIES" | grep -c . || true)
+    if (( NEW_COUNT >= MAX_PRODUCTS )); then
+        DISPLAY=$(printf '%s' "$NEW_ENTRIES" | head -"$MAX_PRODUCTS")
+    else
+        PRE_FILL=$((MAX_PRODUCTS - NEW_COUNT))
+        PRE_HEAD=$(printf '%s' "$PRE_ENTRIES" | head -"$PRE_FILL")
+        DISPLAY="${NEW_ENTRIES}${PRE_HEAD}"
+    fi
+
+    printf "  %sRecent products:%s  %s(new: %d, shown: %d)%s\n" \
+        "$BOLD" "$RESET" "$DIM" "$NEW_COUNT" \
+        "$(printf '%s' "$DISPLAY" | grep -c . || true)" "$RESET"
+
+    while IFS= read -r ENTRY; do
+        [[ -z "$ENTRY" ]] && continue
+        MT="${ENTRY%% *}"
+        FP="${ENTRY#* }"
+        AGE=$(( NOW_EPOCH - MT ))
+        if   (( AGE < 60 ));   then AGE_STR="${AGE}s ago"
+        elif (( AGE < 3600 )); then AGE_STR="$((AGE/60))m ago"
+        else                         AGE_STR="$((AGE/3600))h$(((AGE%3600)/60))m ago"
+        fi
+        if [[ -n "$CHAIN_START_EPOCH" && "$MT" -ge "$CHAIN_START_EPOCH" ]]; then
+            TAG="${GREEN}new${RESET}"
+        else
+            TAG="${DIM}pre${RESET}"
+        fi
+        REL="${FP#$REPO_ROOT/}"
+        MAX=$((WIDTH - 18))
+        if (( ${#REL} > MAX )); then
+            REL="...${REL: -$((MAX-3))}"
+        fi
+        printf "  %s  %s%-9s%s  %s\n" "$TAG" "$DIM" "$AGE_STR" "$RESET" "$REL"
+    done <<< "$DISPLAY"
     rule
 fi
 
