@@ -43,6 +43,7 @@ from gopvpsim.data import (  # type: ignore[import-not-found]
     get_default_moveset,
     parse_types,
 )
+from render_article import sidebar_css  # type: ignore[import-not-found]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
@@ -627,13 +628,14 @@ table.base-stat-compare tbody td, table.moveset-compare tbody td {
 }
 span.move-aside { color: #8ea1bd; font-size: 12px; }
 p.compare-lead { font-size: 14px; color: #b8c4d8; }
-p.compare-summary { font-size: 14px; color: #cfe8cf; background: #1a2e1f;
-  border-left: 3px solid #7db87d; padding: 10px 14px; border-radius: 6px; }
+p.compare-summary { --sidebar-color: #7db87d;
+  font-size: 14px; color: #cfe8cf; background: #1a2e1f;
+  padding: 10px 14px 10px 18px; border-radius: 6px; }
 ul.compare-dives { margin: 6px 0 10px 20px; padding: 0; font-size: 14px; }
 ul.compare-dives li { margin: 2px 0; }
-details.methodology-details { background: #12192e;
-  border-left: 3px solid #5b8dd9; border-radius: 4px;
-  padding: 8px 12px; font-size: 13px; color: #b8c4d8;
+details.methodology-details { --sidebar-color: #5b8dd9;
+  background: #12192e; border-radius: 4px;
+  padding: 8px 12px 8px 16px; font-size: 13px; color: #b8c4d8;
   margin: 8px 0; }
 details.methodology-details summary { cursor: pointer;
   color: #c8a2d0; font-weight: 500; }
@@ -656,6 +658,10 @@ def render_standalone_html(title: str, description: str,
         dive_link_html = f'<div class="related"><strong>Source dives</strong><ul>{items}</ul></div>'
 
     author_html = f'<footer>By {html.escape(authored_by)}</footer>' if authored_by else ''
+    _sidebar_css = sidebar_css([
+        '.related', 'p.verdict-line',
+        'p.compare-summary', 'details.methodology-details',
+    ])
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -674,8 +680,9 @@ def render_standalone_html(title: str, description: str,
   p {{ margin: 10px 0; }}
   code {{ background: #16213e; padding: 2px 5px; border-radius: 3px;
           font-size: 0.9em; }}
-  .related {{ background: #16213e; padding: 12px 16px; border-radius: 6px;
-              margin: 16px 0; border-left: 3px solid #9be89b; }}
+  .related {{ --sidebar-color: #9be89b;
+              background: #16213e; padding: 12px 16px 12px 20px;
+              border-radius: 6px; margin: 16px 0; }}
   .related ul {{ margin: 6px 0 0 0; padding-left: 20px; }}
   table.matchup-delta {{ border-collapse: collapse; margin: 10px 0;
                          width: 100%; font-size: 13px; }}
@@ -698,14 +705,16 @@ def render_standalone_html(title: str, description: str,
   .flip-badge.flip-unlinked {{ opacity: 0.75; cursor: help; }}
   table.matchup-delta tr.matchup-delta-flip-pos td {{ background: #152b1a; }}
   table.matchup-delta tr.matchup-delta-flip-neg td {{ background: #2b1515; }}
-  p.verdict-line {{ background: #1a2e1f; border-left: 3px solid #7db87d;
-                    padding: 10px 14px; color: #cfe8cf; border-radius: 6px; }}
+  p.verdict-line {{ --sidebar-color: #7db87d;
+                    background: #1a2e1f; padding: 10px 14px 10px 18px;
+                    color: #cfe8cf; border-radius: 6px; }}
   p.matchup-delta-summary {{ font-size: 13px; color: #9bb0d0; margin-top: 8px; }}
   table.sortable thead th {{ cursor: pointer; user-select: none; }}
   table.sortable thead th:hover {{ background: #1e2b4a; }}
   footer {{ color: #666; font-size: 13px; margin-top: 40px;
             border-top: 1px solid #0f3460; padding-top: 12px; }}
 {COMPARE_CSS}
+{_sidebar_css}
 </style>
 </head>
 <body>
