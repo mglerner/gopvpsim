@@ -1,5 +1,12 @@
-# Championship Series Orlando 2026, top-32 finishers. 42 unique species from 32 teams, ordered by appearance count (most-used first).
+# Championship Series Orlando 2026, top-32 finishers. 43 unique species from 32 teams, ordered by appearance count (most-used first).
 # Generated 2026-04-19 by scripts/build_opponent_pool.py
+# Hand-extended 2026-04-19 with Aegislash (Blade): the tournament roster
+# lists only Aegislash (Shield) (that's how PvPoke / the game client
+# surface canonical Aegislash), but Shield and Blade are two forms of
+# the same species. Including both forms in the pool lets Aegislash
+# dives see the cross-form sibling symmetrically. Not adding Oinkologne
+# or other non-Aegislash focals - this pool stays Orlando-roster-only
+# aside from the Aegislash form completion.
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
 Corviknight
@@ -44,3 +51,4 @@ Talonflame (Shadow)
 Umbreon
 Weezing (Galarian)
 Weezing (Galarian) (Shadow)
+Aegislash (Blade)
