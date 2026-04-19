@@ -551,16 +551,9 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
     ``include_matchup_delta=False`` to avoid duplicating that content.
     """
     shared = _align_opponents(loadouts_data)
-    skipped = []
-    for ld in loadouts_data:
-        for op in ld['opponents']:
-            if op not in shared and op not in skipped:
-                skipped.append(op)
 
     bits: list[str] = []
     lead = (f'{len(shared)} opponents are common to all loadouts')
-    if skipped:
-        lead += f' ({len(skipped)} dropped, missing from at least one dive)'
     bits.append(
         f'<details class="methodology-details compare-lead-details">'
         f'<summary>About these numbers</summary>'

@@ -2434,10 +2434,9 @@ def _render_iv_recommendations_per_form_section(cd_move: str,
         f'<details class="methodology-details">'
         f'<summary>About these tiers</summary>'
         f'<p>Tier cutoffs are taken from each form\'s best CD moveset. '
-        f'Cards are colored by form (&#9794; blue / &#9792; pink) and '
-        f'flow together in the grid below. Tier names differ between '
-        f'forms because base stats differ, so there is no 1:1 mapping '
-        f'- read the cards as two separate sets sharing a grid.</p>'
+        f'Tier names differ between forms because base stats differ, '
+        f'so there is no 1:1 mapping - read the cards as two separate '
+        f'sets sharing a grid.</p>'
         f'</details>'
     )
     return intro + '\n<div class="iv-rec-grid">' + '\n'.join(cards) + '</div>'
