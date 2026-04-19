@@ -114,15 +114,24 @@ if [[ -n "$WRAPPER_LOG" ]]; then
     # Emits two lines on stdout; silent if the log can't be parsed yet.
     ETA_OUT=$(python3 "$REPO_ROOT/scripts/overnight_eta.py" "$WRAPPER_LOG" 2>/dev/null)
     if [[ -n "$ETA_OUT" ]]; then
-        ETA_LINE1=$(echo "$ETA_OUT" | head -1)
-        ETA_LINE2=$(echo "$ETA_OUT" | sed -n '2p')
-        # ► leading marker + bold bright magenta draws the eye to ETA as
-        # the answer to "when will this be done?" before anything else
-        # in the box.
-        printf "  %s► SCRIPT ETA: %s%s\n" "$ETA_ACCENT" "$ETA_LINE1" "$RESET"
-        if [[ -n "$ETA_LINE2" ]]; then
-            printf "    %s%s%s\n" "$DIM" "$ETA_LINE2" "$RESET"
-        fi
+        # Lines are tagged: SCRIPT: / DIVE: / BUCKETS:. Grep each
+        # independently so reorderings in the Python emitter don't
+        # break the box. DIVE: is optional (absent between dives).
+        ETA_SCRIPT=$(echo "$ETA_OUT" | grep '^SCRIPT:' | sed 's|^SCRIPT: ||')
+        ETA_DIVE=$(echo "$ETA_OUT" | grep '^DIVE:' | sed 's|^DIVE: ||')
+        ETA_BUCKETS=$(echo "$ETA_OUT" | grep '^BUCKETS:' | sed 's|^BUCKETS: ||')
+
+        # Script ETA is the headline number — bold bright magenta, the
+        # answer to "when will this be done?".
+        [[ -n "$ETA_SCRIPT" ]] && \
+            printf "  %s► SCRIPT ETA: %s%s\n" "$ETA_ACCENT" "$ETA_SCRIPT" "$RESET"
+        # Current-dive ETA sits under it in the same accent so the two
+        # ETA lines read as a visual pair, with "dive" in cyan to echo
+        # the Dive [N/M] header above.
+        [[ -n "$ETA_DIVE" ]] && \
+            printf "  %s  dive ETA: %s%s\n" "$CYAN" "$ETA_DIVE" "$RESET"
+        [[ -n "$ETA_BUCKETS" ]] && \
+            printf "    %s%s%s\n" "$DIM" "$ETA_BUCKETS" "$RESET"
     fi
 fi
 rule
