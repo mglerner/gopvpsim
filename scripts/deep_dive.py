@@ -3692,10 +3692,31 @@ def main():
         except Exception:
             _species_narrative = {}
     elif args.no_thresholds:
-        # Explicit opt-out: no TOML, no auto-load. Falls through to the
+        # Explicit opt-out: no TOML registry load. Falls through to the
         # auto-derive path which reads anchor records from opponent
-        # analysis only. Logged so the log is unambiguous.
-        logger.info('  --no-thresholds: skipping auto-load of species TOML')
+        # analysis only. The species-narrative blocks (Shape 2 migration)
+        # are orthogonal to the threshold-registry payload — they're raw
+        # TOML prose extracted alongside, not threshold data — so the
+        # --no-thresholds opt-out should NOT suppress them. Read the
+        # same file the auto-discover path would find, extract just
+        # narrative, leave threshold_registry None.
+        logger.info('  --no-thresholds: skipping threshold registry load')
+        _species_lower = args.species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+        _narr_toml = Path(__file__).resolve().parent.parent / 'thresholds' / f'{_species_lower}.toml'
+        if _narr_toml.exists():
+            try:
+                import tomllib as _tomllib
+                with open(_narr_toml, 'rb') as _f:
+                    _raw_toml = _tomllib.load(_f)
+                _sp = _raw_toml.get(args.species, {})
+                for _key in ('intro', 'meta_role', 'verdict'):
+                    if _key in _sp and isinstance(_sp[_key], dict):
+                        _species_narrative[_key] = _sp[_key]
+                if _species_narrative:
+                    _nkeys = ', '.join(sorted(_species_narrative.keys()))
+                    logger.info(f"  Species narrative blocks: {_nkeys}")
+            except Exception as _e:
+                logger.warning(f"narrative load from {_narr_toml.name} failed: {_e}")
     else:
         # Auto-discover: look for thresholds/<species>.toml (case-insensitive)
         # so the user doesn't have to remember --thresholds every run.
