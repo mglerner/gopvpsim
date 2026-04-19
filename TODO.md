@@ -153,28 +153,42 @@ prose will migrate (or be duplicated) into per-form threshold-TOML
 expert-zone fields that a new dive renderer surfaces at the top of
 each dive.
 
-**Schema survey 2026-04-19:** the dive has no free-form authored-
-narrative renderer today. `dd-expert-zone` in `deep_dive_rendering.py`
-renders tier cards + anchors with `source` attribution — it's data-
-driven, not prose. `deep_dive_narrative.py` renders the SwagTips-style
-IV Flavor Guide — also data-driven templating. **Shape 2 requires new
-feature work**, not a copy-paste migration: a new renderer path that
-reads free-form prose from threshold-TOML fields and emits at the top
-of the dive HTML.
+**Session 1 SHIPPED 2026-04-19 as commit `41bbe6f`** — renderer
+plumbing + per-block `author` attribution schema. Pure code, zero
+content migration. Design decisions resolved in that session:
 
-**Open design questions for next session:**
-- Where in the dive does the narrative render? Above the interactive
-  dashboard, or between dashboard and data sections?
-- What TOML schema? New top-level `[intro] / [meta_role] / [verdict]`
-  blocks in `thresholds/<species>.toml`, or a single `[narrative]`
-  block, or extend the existing `source`-attributed system?
-- Does the renderer live in `deep_dive_rendering.py` or
-  `deep_dive_narrative.py`?
-- Migrate all narrative out of the article TOML, or just the form-
-  shared parts, keeping the form-comparison framing article-side?
+- Render position: **above the interactive dashboard** (after the
+  Related Article link, before the controls bar).
+- TOML schema: **new top-level `[Species.intro] / [Species.meta_role]
+  / [Species.verdict]` blocks** in `thresholds/<species>.toml` —
+  field-for-field mirrors of `articles/*.toml`'s same-named blocks
+  so prose migrates by copy-paste.
+- Renderer location: **`deep_dive_rendering.render_species_narrative()`**
+  alongside the existing gold-zone code, not the Flavor Guide module.
+- Migration scope: **split** — species-scoped prose moves to per-form
+  threshold TOMLs; CD-event-scoped framing (move comparison, form
+  comparison, verdict-on-the-CD-move) stays article-side.
+- Author attribution: **new optional `author = "..."` field** on each
+  narrative block, rendered verbatim as a muted italic line. Reader-
+  visible distinction between AI-drafted and human-written prose.
+  See `docs/article_schema.md` "Per-block author attribution" and
+  `docs/threshold_schema.md` "Species narrative" for full schema.
 
-Next session: start with ~15 min of design discussion + user approval,
-then implement.
+**Pre-ship blocker reminder:** the existing Oinkologne article ships
+today with unlabeled Claude-drafted `[intro]` / `[meta_role]` /
+`[verdict]` blocks. Session 2 below unblocks ship — Session 1's
+renderer alone does not (it just made the `author` field possible).
+
+**Session 2 (next, content authoring):** author per-form narrative
+TOMLs for Oinkologne M/F, slim the article prose to CD-scope, mark
+every Claude-drafted block with an `author` line. No dive regen —
+the queued overnight re-dive bakes narrative into fresh HTML. See
+`memory/project_shape2_session1_shipped.md` for the Session 2
+kickoff checklist.
+
+**Session 3 (Aegislash):** author Aegislash Blade / Shield narrative
+once the Aegislash dives land as rendered HTML (threshold stubs
+exist but no dive HTML to anchor prose against yet).
 
 - **[Post-ship] F-tier-name-cleanup** — simplify IV-rec tier card
   names (current: `Steelix (Shadow) Slayer -   (Wigglytuff Slayer
