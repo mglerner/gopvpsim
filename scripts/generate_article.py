@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 
 from render_article import (  # type: ignore[import-not-found]
+    authored_by_class,
     format_block_attribution,
     format_body,
     render_authorship_banner,
@@ -1071,7 +1072,9 @@ def _render_verdict_augment(article: dict) -> str:
 
     Returns empty string when the block is absent or both fields are
     empty. Never emits a section wrapper / heading; the parent
-    Verdict section already carries those.
+    Verdict section already carries those. The body is wrapped in a
+    ``.article-narrative-block`` div so the shared sidebar pattern
+    can colour-code it by ``authored_by``.
     """
     block = article.get('verdict')
     if not block:
@@ -1096,7 +1099,11 @@ def _render_verdict_augment(article: dict) -> str:
         parts.append(outlook)
     if not parts:
         return ''
-    return format_body('\n\n'.join(parts)) + format_block_attribution(block)
+    body = format_body('\n\n'.join(parts)) + format_block_attribution(block)
+    return (
+        f'<div class="article-narrative-block {authored_by_class(block)}">\n'
+        f'{body}\n</div>'
+    )
 
 
 LEAGUE_CP = {'great': 1500, 'ultra': 2500, 'master': 10000}
@@ -2586,7 +2593,11 @@ def render_intro_section(article: dict) -> str:
     intro_block = article.get('intro') or {}
     body = (intro_block.get('body') or '').strip()
     if body:
-        return format_body(body) + format_block_attribution(intro_block)
+        inner = format_body(body) + format_block_attribution(intro_block)
+        return (
+            f'<div class="article-narrative-block {authored_by_class(intro_block)}">\n'
+            f'{inner}\n</div>'
+        )
 
     species = html.escape(article.get('species', ''))
     cd_move = html.escape(article.get('cd_move', ''))
@@ -2802,7 +2813,11 @@ def _render_meta_role_section(article: dict) -> str:
 
     body_override = (block.get('body') or '').strip()
     if body_override:
-        return format_body(body_override) + format_block_attribution(block)
+        inner = format_body(body_override) + format_block_attribution(block)
+        return (
+            f'<div class="article-narrative-block {authored_by_class(block)}">\n'
+            f'{inner}\n</div>'
+        )
 
     parts = []
     for field in ('good_at', 'bad_at', 'team_role'):
@@ -2811,7 +2826,11 @@ def _render_meta_role_section(article: dict) -> str:
             parts.append(txt)
     if not parts:
         return ''
-    return format_body('\n\n'.join(parts)) + format_block_attribution(block)
+    inner = format_body('\n\n'.join(parts)) + format_block_attribution(block)
+    return (
+        f'<div class="article-narrative-block {authored_by_class(block)}">\n'
+        f'{inner}\n</div>'
+    )
 
 
 def _load_form_comparison_spec(article: dict) -> dict | None:
@@ -3035,6 +3054,7 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
         'details.methodology-details', 'p.verdict-line',
         'p.mf-split-filter', 'details.matchup-delta-legend',
         'p.matchup-delta-pool', 'div.iv-rec-card',
+        'div.article-narrative-block',
     ])
 
     return f"""<!DOCTYPE html>
@@ -3267,6 +3287,14 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
                    font-size: 12px; }}
   footer {{ color: #666; font-size: 13px; margin-top: 40px;
             border-top: 1px solid #0f3460; padding-top: 12px; }}
+  /* Narrative blocks (intro / meta_role / verdict augment). Gold by
+     default; orange when the block was AI-drafted and not yet human-
+     reviewed. Colour is driven by the --sidebar-color custom property
+     from the .authored-{{human,ai,mixed}} modifier, consumed by the
+     shared sidebar ::before rule below. */
+  div.article-narrative-block {{ --sidebar-color: #d29922;
+         padding: 10px 0 10px 20px; margin: 10px 0; }}
+  div.article-narrative-block.authored-ai {{ --sidebar-color: #e8903a; }}
 {COMPARE_CSS}
 {_sidebar_css}
 </style>
