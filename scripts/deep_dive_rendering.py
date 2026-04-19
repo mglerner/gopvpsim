@@ -13,6 +13,7 @@ from typing import Optional
 
 import deep_dive_analysis as analysis
 from gopvpsim.anchors import derive_short_name
+from render_article import format_block_attribution, format_body
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +224,12 @@ DEEP_DIVE_CSS = """
 .dd-narrative-loss { color: #f85149; font-size: 0.88rem; font-style: italic; margin: 8px 0 4px 0; }
 .dd-sim-zone { border-left: 4px solid #58a6ff; padding-left: 16px; margin: 16px 0; }
 .dd-sim-zone > h3 { color: #58a6ff; margin: 0 0 10px 0; }
+.dd-species-narrative { border-left: 4px solid #d29922; padding: 12px 0 12px 16px; margin: 20px 0; }
+.dd-species-narrative > h2 { color: #d29922; margin: 0 0 12px 0; font-size: 1.15rem; }
+.dd-species-narrative > h3 { color: #d29922; margin: 16px 0 6px 0; font-size: 1.0rem; }
+.dd-species-narrative p { margin: 8px 0; }
+.dd-species-narrative .narrative-attribution { color: #8b949e;
+  font-size: 0.82rem; margin: 6px 0 0 0; font-style: italic; }
 """
 
 def parse_mode(composite_mode):
@@ -632,6 +639,88 @@ def opp_slug(name: str) -> str:
     return re.sub(r'^-|-$', '',
                   re.sub(r'[^a-z0-9]+', '-', name.lower()))
 
+
+def render_species_narrative(narrative: dict) -> str:
+    """Render the per-species editorial narrative zone for a dive.
+
+    Consumes free-form prose from the threshold TOML's species table:
+
+        [Species.intro]        body = "..."
+        [Species.meta_role]    good_at / bad_at / team_role / body
+        [Species.verdict]      editorial / outlook
+
+    Field shape mirrors the article TOML's same-named blocks exactly, so
+    prose can migrate from `articles/<slug>.toml` to
+    `thresholds/<species>.toml` with no rewriting. Each block supports the
+    same optional `author = "..."` attribution field (see
+    ``render_article.format_block_attribution``) so AI-drafted prose is
+    visually distinguishable from human-authored prose.
+
+    Render position is the top of the dive (above the interactive
+    scatter/dashboard), matching RyanSwag's lead-with-why pattern.
+    Styled as ``dd-species-narrative`` — gold left border, same visual
+    weight as the downstream gold ``dd-expert-zone`` so a reader
+    recognizes the two as the same editorial register.
+
+    Returns an empty string when none of the three sub-blocks are
+    populated. The caller skips the wrapper entirely in that case so
+    dives without narrative (most species today) render unchanged.
+    """
+    if not narrative:
+        return ''
+
+    intro_block = narrative.get('intro') or {}
+    meta_role_block = narrative.get('meta_role') or {}
+    verdict_block = narrative.get('verdict') or {}
+
+    intro_body = (intro_block.get('body') or '').strip()
+    mr_body_override = (meta_role_block.get('body') or '').strip()
+    mr_field_parts = []
+    for field in ('good_at', 'bad_at', 'team_role'):
+        txt = (meta_role_block.get(field) or '').strip()
+        if txt:
+            mr_field_parts.append(txt)
+    mr_has_content = bool(mr_body_override or mr_field_parts)
+    verdict_editorial = (verdict_block.get('editorial') or '').strip()
+    verdict_outlook = (verdict_block.get('outlook') or '').strip()
+    verdict_has_content = bool(verdict_editorial or verdict_outlook)
+
+    if not (intro_body or mr_has_content or verdict_has_content):
+        return ''
+
+    parts = ['<section class="dd-species-narrative">\n']
+
+    if intro_body:
+        parts.append('<h2>Overview</h2>\n')
+        parts.append(format_body(intro_body))
+        parts.append('\n')
+        parts.append(format_block_attribution(intro_block))
+        parts.append('\n')
+
+    if mr_has_content:
+        parts.append('<h3>Meta Role</h3>\n')
+        if mr_body_override:
+            parts.append(format_body(mr_body_override))
+        else:
+            parts.append(format_body('\n\n'.join(mr_field_parts)))
+        parts.append('\n')
+        parts.append(format_block_attribution(meta_role_block))
+        parts.append('\n')
+
+    if verdict_has_content:
+        parts.append('<h3>Verdict</h3>\n')
+        joined = []
+        if verdict_editorial:
+            joined.append(verdict_editorial)
+        if verdict_outlook:
+            joined.append(verdict_outlook)
+        parts.append(format_body('\n\n'.join(joined)))
+        parts.append('\n')
+        parts.append(format_block_attribution(verdict_block))
+        parts.append('\n')
+
+    parts.append('</section>\n')
+    return ''.join(parts)
 
 
 def render_anchor_flip_bullets(records, anchor_passing_sink=None,

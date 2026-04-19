@@ -65,6 +65,67 @@ Per-species files can reference shared entries by their fully-qualified name (e.
 
 ---
 
+## Species narrative (Shape 2, 2026-04-19)
+
+Species-level editorial prose that renders at the top of the interactive
+deep dive HTML (above the scatter dashboard). Three optional sub-tables,
+all nested directly under the species table (not under a league):
+
+```toml
+[Species]
+sources = "..."
+
+[Species.intro]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+body = """One-paragraph BLUF intro."""
+
+[Species.meta_role]
+authorship = "expert"
+author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
+good_at   = """Paragraph on what this species punishes."""
+bad_at    = """Paragraph on what this species loses to."""
+team_role = """Paragraph on build intent / team-slot framing."""
+body      = ""  # optional escape hatch: overrides the three fields above
+
+[Species.verdict]
+authorship = "expert"
+author = "By Michael Lerner"
+editorial = """The "should you invest?" paragraph."""
+outlook   = """Optional short meta-outlook closer."""
+```
+
+**Field shape is identical to `articles/<slug>.toml`'s same-named blocks**
+(`[intro]` / `[meta_role]` / `[verdict]`) — prose migrates from article
+to dive with zero rewrites. See `docs/article_schema.md` for per-field
+semantics. Differences specific to the dive-side usage:
+
+* Rendered above the interactive scatter, inside a gold-bordered
+  `<section class="dd-species-narrative">` block. Intro uses `<h2>Overview</h2>`;
+  Meta Role and Verdict use `<h3>` sub-headings.
+* Any subset of the three sub-tables may be present. Each populated block
+  renders; absent blocks are silently skipped. All three absent → the
+  narrative wrapper isn't emitted at all.
+* `author` attribution: identical behavior to the article renderer — the
+  string is rendered verbatim (HTML-escaped) as a muted italic line at the
+  end of each populated block. See `docs/article_schema.md` "Per-block
+  author attribution" for recommended phrasings. **Reader-visible
+  distinction between AI-drafted and human-written prose depends on this
+  field being set.**
+* `authorship = "expert"` is the only mode wired today; `both` / `auto`
+  log a warning and render verbatim as if `expert` (same as the article
+  renderer). Auto-synthesis is future work.
+* Per-form species (e.g. Oinkologne Male in `oinkologne.toml` vs Female
+  in `oinkologne_female.toml`) each carry their own narrative, written
+  from that form's vantage. Cross-form comparison framing belongs in the
+  CD article's `[form_comparison]` spec, not the dive's narrative.
+
+Species with no `[Species.intro]` / `[Species.meta_role]` / `[Species.verdict]`
+tables (most species today) render dives unchanged — the Shape 2 renderer
+is a pure-addition, backwards-compatible feature.
+
+---
+
 ## Spreads
 
 A spread is a named set of IVs. It comes in one of two forms, and the two forms are

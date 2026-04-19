@@ -2246,7 +2246,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               shadow=False, split_info=None,
                               _precomputed_analysis=None,
                               article_slug='',
-                              threshold_registry=None):
+                              threshold_registry=None,
+                              species_narrative=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -2795,6 +2796,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         html += f'({len(opponent_names)} mons)</summary><p style="margin:4px 0 8px 12px">'
         html += ', '.join(opponent_names)
         html += '</p></details>\n'
+
+    # Species narrative (Shape 2 migration): free-form expert-authored
+    # prose sourced from thresholds/<species>.toml's
+    # [Species.intro] / [Species.meta_role] / [Species.verdict] blocks.
+    # Renders above the dashboard so a reader gets the "why should I
+    # care" before the interactive scatter (RyanSwag-style). Silent
+    # no-op when no blocks are populated — most species today.
+    if species_narrative:
+        html += rendering.render_species_narrative(species_narrative)
 
     # Threshold info folded into controls (legend shows tier name + desc)
     # No separate threshold-info box needed — graph legend has full detail
@@ -3643,6 +3653,7 @@ def main():
     _article_slug = ''
     _cd_prep_fast: list[str] = []
     _cd_prep_charged: list[str] = []
+    _species_narrative: dict = {}
     if args.thresholds:
         try:
             threshold_registry = load_threshold_file(
@@ -3651,6 +3662,17 @@ def main():
         except Exception as e:
             logger.warning(f"failed to load {args.thresholds}: {e}")
             threshold_registry = None
+        # Extract species narrative from the explicit TOML too.
+        try:
+            import tomllib as _tomllib
+            with open(args.thresholds, 'rb') as _f:
+                _raw_toml = _tomllib.load(_f)
+            _sp = _raw_toml.get(args.species, {})
+            for _key in ('intro', 'meta_role', 'verdict'):
+                if _key in _sp and isinstance(_sp[_key], dict):
+                    _species_narrative[_key] = _sp[_key]
+        except Exception:
+            _species_narrative = {}
     elif args.no_thresholds:
         # Explicit opt-out: no TOML, no auto-load. Falls through to the
         # auto-derive path which reads anchor records from opponent
@@ -3682,6 +3704,22 @@ def main():
                     logger.info(f"  Article link: articles/{_article_slug}/")
             except Exception:
                 _article_slug = ''
+            # Extract optional species narrative blocks (Shape 2 migration).
+            # Same raw-TOML re-read pattern as cd_prep / article — the
+            # ThresholdRegistry parser silently ignores species-level
+            # sub-tables that aren't leagues, so these live outside the
+            # registry and are threaded through to the renderer directly.
+            _species_narrative = {}
+            try:
+                _sp = _raw_toml.get(args.species, {})
+                for _key in ('intro', 'meta_role', 'verdict'):
+                    if _key in _sp and isinstance(_sp[_key], dict):
+                        _species_narrative[_key] = _sp[_key]
+                if _species_narrative:
+                    _nkeys = ', '.join(sorted(_species_narrative.keys()))
+                    logger.info(f"  Species narrative blocks: {_nkeys}")
+            except Exception:
+                _species_narrative = {}
             # Extract cd_prep block so pre-CD dives include the
             # incoming move even when PvPoke's gamemaster hasn't added
             # it yet. The actual injection happens in enumerate_movesets
@@ -4467,6 +4505,7 @@ def main():
                         _precomputed_analysis=_cached_analysis,
                         article_slug=_article_slug,
                         threshold_registry=threshold_registry,
+                        species_narrative=_species_narrative,
                     )
             else:
                 if args.split_movesets:
@@ -4486,6 +4525,7 @@ def main():
                     shadow=args.shadow,
                     article_slug=_article_slug,
                     threshold_registry=threshold_registry,
+                    species_narrative=_species_narrative,
                 )
         else:
             # Static mode (original behavior)
