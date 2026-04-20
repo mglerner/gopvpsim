@@ -14,6 +14,7 @@ from typing import Optional
 import deep_dive_analysis as analysis
 from gopvpsim.anchors import derive_short_name
 from render_article import format_block_attribution, format_body
+from auto_gen_narrative import classify_atk_weight
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +211,19 @@ DEEP_DIVE_CSS = """
   padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
   margin-top:6px; }
 .dd-iv-toggle:hover { background:#1a3a6e; color:#fff; }
+/* Atk-weight badges on Notable IV member rows. Classifies each spread
+   as rank-1 / no-atk / slight / heavy / bulk-max / atk-tilt relative
+   to the stat-product-max IV (RyanSwag T2 vocabulary). Muted colors
+   so badges read as annotation, not emphasis. */
+.dd-atk-weight { display:inline-block; padding:1px 7px; border-radius:3px;
+  font-size:0.72rem; font-weight:500; text-transform:lowercase;
+  margin-left:6px; letter-spacing:0.02em; }
+.dd-atk-weight-rank-1 { background:#1e2d4a; color:#58a6ff; }
+.dd-atk-weight-no-atk-weight { background:#1b2b1b; color:#7db87d; }
+.dd-atk-weight-slight-atk-weight { background:#2a2617; color:#d29922; }
+.dd-atk-weight-heavy-atk-weight { background:#3a1f1f; color:#e94560; }
+.dd-atk-weight-bulk-max { background:#1b2a33; color:#8ed1d1; }
+.dd-atk-weight-atk-tilt { background:#2a1f2a; color:#c8a2d0; }
 .dd-collapsible { margin: 4px 0; }
 .dd-collapsible > summary { list-style: none; }
 .dd-collapsible > summary::-webkit-details-marker { display: none; }
@@ -1016,6 +1030,24 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
     kind_order = {'composite': 0, 'matchup': 1}
     target.sort(key=lambda c: (kind_order.get(c.kind, 99), len(c.members), c.name))
 
+    # Rank-1 (stat-product-max) IV for the atk-weight badge classifier.
+    # Only emitted when spRanks is available; spRanks entries are 1-
+    # indexed (1 == stat-product-max). Fall back silently if the array
+    # is missing so older data-objs still render.
+    _sp_ranks = data_obj.get('spRanks') or []
+    _rank1_idx: Optional[int] = None
+    for _i, _r in enumerate(_sp_ranks):
+        if _r == 1:
+            _rank1_idx = _i
+            break
+    _rank1_stats = None
+    if _rank1_idx is not None:
+        _rank1_stats = {
+            'atk': data_obj['ivAtk'][_rank1_idx],
+            'def': data_obj['ivDef'][_rank1_idx],
+            'sta': data_obj['ivHp'][_rank1_idx],
+        }
+
     n_notable = sum(1 for c in target
                     if len(c.members) <= notable_max_count
                     or len(c.members) <= notable_max_pct * n_ivs)
@@ -1135,8 +1167,17 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
             sp_rank = data_obj['spRanks'][m_idx]
             label = f'{triple[0]}/{triple[1]}/{triple[2]}'
             row_cls = ' class="dd-iv-hidden"' if row_i >= max_members_shown else ''
+            badge = ''
+            if _rank1_stats is not None:
+                _weight = classify_atk_weight(
+                    {'atk': atk, 'def': def_, 'sta': hp},
+                    _rank1_stats,
+                )
+                _slug = _weight.replace(' ', '-')
+                badge = (f' <span class="dd-atk-weight '
+                         f'dd-atk-weight-{_slug}">{_weight}</span>')
             parts.append(
-                f'<p{row_cls}><b>{label}</b> &mdash; '
+                f'<p{row_cls}><b>{label}</b>{badge} &mdash; '
                 f'atk {atk:.2f}, def {def_:.2f}, hp {hp}, '
                 f'SP&nbsp;#{sp_rank}</p>\n'
             )
