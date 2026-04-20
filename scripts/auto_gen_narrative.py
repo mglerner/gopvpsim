@@ -391,17 +391,17 @@ def render_good_at(
         return ''
     cd_display = _gm_move_display(gm, cd_move_fast)
 
-    lines = [f'Wins {species} picks up by adding {cd_display}:']
+    paras = [f'Wins {species} picks up by adding {cd_display}:']
     for type_label, entries in _group_by_primary_type(flipped, gm):
         opp_strs = ', '.join(
             f'{e["display"]} ({_fmt_delta_pp(e["delta_pp"])})'
             for e in entries
         )
         if type_label == 'Other':
-            lines.append(f'- {opp_strs}')
+            paras.append(f'{opp_strs}.')
         else:
-            lines.append(f'- vs {type_label}-type: {opp_strs}')
-    return '\n'.join(lines)
+            paras.append(f'vs {type_label}-type: {opp_strs}.')
+    return '\n\n'.join(paras)
 
 
 def render_bad_at(
@@ -431,17 +431,87 @@ def render_bad_at(
         return ''
     cd_display = _gm_move_display(gm, cd_move_fast)
 
-    lines = [f'Wins {species} gives up by switching to {cd_display}:']
+    paras = [f'Wins {species} gives up by switching to {cd_display}:']
     for type_label, entries in _group_by_primary_type(flipped, gm):
         opp_strs = ', '.join(
             f'{e["display"]} ({_fmt_delta_pp(e["delta_pp"])})'
             for e in entries
         )
         if type_label == 'Other':
-            lines.append(f'- {opp_strs}')
+            paras.append(f'{opp_strs}.')
         else:
-            lines.append(f'- vs {type_label}-type: {opp_strs}')
-    return '\n'.join(lines)
+            paras.append(f'vs {type_label}-type: {opp_strs}.')
+    return '\n\n'.join(paras)
+
+
+# --------------------------------------------------------------------
+# Narrative-dict convenience: fill empty A-fields
+# --------------------------------------------------------------------
+
+def fill_narrative_a_fields(
+    narrative: dict,
+    dive: dict,
+    *,
+    species: str,
+    cd_move_fast: str,
+    baseline_move_fast: str,
+    league: Optional[str] = None,
+    cd_date: Optional[str] = None,
+    form_comparison: bool = False,
+    gm: Optional[dict] = None,
+) -> dict:
+    """Fill empty intro.body / meta_role.good_at / meta_role.bad_at in place.
+
+    Leaves non-empty TOML prose alone (a human override always wins).
+    Strips the ``author`` / ``authored_by`` metadata from any block
+    that gets auto-filled so the rendered output doesn't display a
+    stale "Drafted by Claude..." attribution. Caller is expected to
+    have already cleared the Claude-drafted content per
+    ``docs/auto_gen_narrative_plan.md`` step 3; this helper is
+    robust to either state.
+
+    Returns the same narrative dict for caller chaining.
+    """
+    if not cd_move_fast or not baseline_move_fast:
+        return narrative
+
+    def _auto_fill(block: dict, field: str, value: str) -> None:
+        existing = (block.get(field) or '').strip()
+        if existing:
+            return
+        if not value:
+            return
+        block[field] = value
+        # Drop attribution when we're the author.
+        block.pop('author', None)
+        block.pop('authored_by', None)
+
+    intro = narrative.setdefault('intro', {})
+    _auto_fill(intro, 'body', render_intro(
+        species, dive,
+        cd_move_fast=cd_move_fast,
+        baseline_move_fast=baseline_move_fast,
+        league=league,
+        cd_date=cd_date,
+        form_comparison=form_comparison,
+        gm=gm,
+    ))
+
+    meta_role = narrative.setdefault('meta_role', {})
+    _auto_fill(meta_role, 'good_at', render_good_at(
+        species, dive,
+        cd_move_fast=cd_move_fast,
+        baseline_move_fast=baseline_move_fast,
+        gm=gm,
+    ))
+    _auto_fill(meta_role, 'bad_at', render_bad_at(
+        species, dive,
+        cd_move_fast=cd_move_fast,
+        baseline_move_fast=baseline_move_fast,
+        gm=gm,
+    ))
+
+    return narrative
 
 
 # --------------------------------------------------------------------

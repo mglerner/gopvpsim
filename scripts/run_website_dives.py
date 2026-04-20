@@ -254,6 +254,23 @@ def main():
             sys.exit(1)
         print(f"\n  Done in {elapsed/60:.1f} min\n")
 
+        # Auto-generate the species-narrative block post-dive. The
+        # patcher reads the dive's embedded SCORES_GZ + DATA and fills
+        # empty intro.body / meta_role.good_at / meta_role.bad_at from
+        # templates in scripts/auto_gen_narrative.py. Idempotent with
+        # --force; safe no-op when the species has no cd_prep block
+        # (Aegislash etc.). Runs per-dive so a failure doesn't block
+        # later dives.
+        dive_dir = os.path.join(WEBSITE_DIR, dive['slug'])
+        if os.path.isdir(dive_dir):
+            patcher = os.path.join(SCRIPT_DIR, 'patch_dive_species_narrative.py')
+            patch_cmd = ['python', patcher, dive_dir, '--force']
+            print(f"  Patching narrative: {' '.join(patch_cmd)}")
+            patch_result = subprocess.run(patch_cmd, cwd=REPO_ROOT)
+            if patch_result.returncode != 0:
+                print(f"  [WARN] narrative patch failed for {dive['slug']} "
+                      f"(rc={patch_result.returncode}); continuing.")
+
     if not args.dry_run:
         print(f"\nAll {len(dives)} dive(s) complete.")
         print("Run 'python scripts/build_website_index.py' to rebuild the index.")
