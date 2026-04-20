@@ -66,45 +66,7 @@ Slap's damage can't clear the defender's HP threshold in time. \
 Anything that resists Ground damage now sits opposite the new \
 counter-picks.
 """
-team_role = """
-Female Oinkologne's value is anti-meta, not core-chassis. Aggregate \
-win rate against the top-50+CS Great League pool sits around 47%, \
-so this is a counter-pick slot - an answer to a specific team \
-problem (Steel-core coverage, Ghost-wall pressure), not the mon a \
-team is built around. The niche Female specifically earns is the \
-durable trade: 162 Defense and 251 Stamina buy one extra fast-move \
-window in shield-heavy counter-pick fights, which keeps the \
-Mud-Slap pressure alive against bulky Steels that would time out a \
-frailer spread. Build Female Oinkologne on teams that already cover \
-the Flying / Fire / Dragon core it still can't touch; pair it with \
-a Fire-resistant anchor and a safe Grass-resist so it's free to \
-chip the Steel / Ghost problem you're bringing it for.
-"""
 body = ""
-
-["Oinkologne (Female)".verdict]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
-authored_by = "ai"
-editorial = """
-Female Oinkologne is worth building if your Great League team wants \
-a durable Steel / Ghost counter-pick with forgiving IV targeting. \
-The 47% aggregate win rate keeps it out of general-purpose lead \
-duty, but the matchups it flips are durable ones (Empoleon, \
-Steelix, Dusclops don't rotate out of the meta), and the extra \
-Stamina floor means a broader range of catches hit viable \
-breakpoints - the IV-shopping pressure is lower than on a raw- \
-Attack frame. See the Notable IVs cards below for the specific \
-stat cutoffs. Skip Elite-TMing Mud Slap - the CD-day window is \
-free.
-"""
-outlook = """
-Female Oinkologne's counter-pick value rises and falls with the \
-meta's Steel / Ghost surface and its Flyer / Fire / Dragon \
-pressure. If the bulky-Steel core recedes, the niche narrows; if \
-it holds and Flyers stay off the top tables, the bulky-trade slot \
-widens. Worth a revisit after the next season rotation.
-"""
 
 # See thresholds/oinkologne.toml cd_prep for the shared rationale.
 # Female and Male share the same incoming CD move.

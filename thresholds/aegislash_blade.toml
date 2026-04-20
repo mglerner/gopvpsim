@@ -67,36 +67,4 @@ Defense frame, and the loss of the Shield-form energy-banking \
 phase means charged moves come online later than canonical \
 Aegislash needs.
 """
-team_role = """
-No team role - Aegislash (Blade) isn't a buildable loadout. The \
-dive data's role is diagnostic: reading it alongside the canonical \
-Shield-path dive quantifies how much of Aegislash's observed PvP \
-value comes from the form change versus the raw Blade stats. \
-Readers looking to actually play Aegislash should use the \
-canonical Aegislash (Shield) dive and the form-change guide.
-"""
 body = ""
-
-["Aegislash (Blade)".verdict]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
-authored_by = "ai"
-editorial = """
-Don't invest - this isn't a real build target. Aegislash (Blade) \
-appears in the gamemaster as its own species so the sim can model \
-what an always-Blade profile would do, but players cannot \
-actually bring a Blade-from-turn-one Aegislash into PvP. Any IV \
-recommendations below describe the hypothetical profile, not a \
-buildable catch. Use the numbers to understand what the Blade \
-stat line does in isolation, then return to the canonical \
-Aegislash (Shield) dive and the Blade-vs-Shield comparison page \
-for real build decisions.
-"""
-outlook = """
-The always-Blade hypothetical's signal only matters as long as \
-Aegislash is in the meta. If Aegislash fades from GL / UL \
-rankings, the diagnostic value fades too. Worth re-running when \
-the form-change mechanic itself gets revisited (new moves, \
-balance changes) so the always-Blade counter-factual stays \
-current.
-"""

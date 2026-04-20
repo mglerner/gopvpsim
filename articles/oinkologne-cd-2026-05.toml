@@ -85,49 +85,9 @@ and Galarian Moltres drops by -25 to -33 pp. The CD move is \
 additive: it opens a new counter-pick axis but doesn't fix the old \
 weaknesses.
 """
-team_role = """
-The CD-day question is which form to prioritize, not whether to \
-play Oinkologne at all. Male aggregate win rate sits around 43% \
-(+9.7 pp over Tackle), Female around 47%, both sub-50% - so either \
-form is a counter-pick slot rather than a team anchor. Male's \
-raw-Attack frame buys breakpoint-dependent wins against Wigglytuff, \
-Lickilicky, Dondozo, and regular Stunfisk that Female's softer \
-Attack can't reach; Female's extra Defense and Stamina trade \
-further into durable matchups. The form-comparison fragment below \
-walks through the specific cells that favor each.
-"""
-# Escape hatch -- if non-empty, overrides the three structured
-# fields above. Left empty for Oinkologne; the three-slot split is
-# natural for the CD-move decision.
+# Escape hatch -- if non-empty, overrides the structured fields
+# above. Left empty for Oinkologne.
 body = ""
-
-# ── Verdict augment (F4, expert-authored 2026-04-18) ──────────────────
-# Shape 2 scope (2026-04-19): CD-day verdict only (catch / ETM /
-# form priority). Species-level verdict lives in the per-form deep
-# dives' [Species.verdict] blocks. Voice target: RyanSwag-adjacent.
-# Schema: docs/article_schema.md "Verdict augment".
-[verdict]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
-authored_by = "ai"
-editorial = """
-Catch on CD day. Lechonk is a common spawn and Mud Slap is free \
-during the three-hour window (2-5 PM local, 2026-05-09), so the \
-cost is time rather than stardust. If you already run Oinkologne \
-this is a clean upgrade; if you don't, the bulky-Steel / Ghost \
-counter-pick niche is real enough to justify one bench slot - pick \
-Male for the breakpoint-clearing attacker role, Female for the \
-bulky-trade anti-meta role, or catch both and slot per matchup. \
-Skip Elite-TMing Mud Slap unless you miss the CD window; the \
-CD-day path is free and neither form is so meta-critical that \
-waiting breaks a season.
-"""
-outlook = """
-Oinkologne's counter-niche value depends on how much Flying / Fire \
-pressure the meta carries - if those types recede, the slot \
-widens; if they surge, the niche narrows. Worth a revisit after \
-the next season rotation.
-"""
 
 # ── Content sections ──────────────────────────────────────────────────
 # Placeholder structure modeled on JRE's Tinkaton CD article.
