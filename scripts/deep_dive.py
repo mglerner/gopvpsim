@@ -1657,6 +1657,47 @@ def _rename_plotly_tiers(data_obj, flavors):
             _recompute_tier_assignments(data_obj, plot_tiers)
 
 
+def _promote_flavors_to_paste_tiers(data_obj, flavors):
+    """Augment DATA.pasteTiers with narrative flavors for the paste-box.
+
+    The scatter plot reads ``DATA.tiers`` for its per-tier traces, so
+    adding flavors there would colour the plot with extra buckets that
+    aren't meant to be visible on the scatter. ``DATA.pasteTiers`` is
+    the paste-box-only union: existing plot tiers plus any non-General
+    flavor whose name isn't already represented. General is skipped
+    because its cutoffs are effectively zero (every IV qualifies) and
+    the paste-box would always report every owned mon under it.
+
+    Emits entries shaped like plot tiers so the JS paste-box iterates
+    them uniformly: ``{name, attack, defense, stamina, color, desc}``.
+    """
+    plot_tiers = list(data_obj.get('tiers') or [])
+    existing_names = set()
+    for t in plot_tiers:
+        raw = (t.get('name') or '').split('<br>', 1)[0].strip()
+        if raw:
+            existing_names.add(raw)
+    paste_tiers = list(plot_tiers)
+    for f in flavors:
+        if f.get('is_general'):
+            continue
+        if f.get('n_qualifying', 0) <= 0:
+            continue
+        name = f.get('name', '').strip()
+        if not name or name in existing_names:
+            continue
+        paste_tiers.append({
+            'name': name,
+            'attack': f.get('atk_cut', 0) or 0,
+            'defense': f.get('def_cut', 0) or 0,
+            'stamina': f.get('hp_cut', 0) or 0,
+            'color': f.get('tier_color') or '#888',
+            'desc': f.get('tier_desc') or '',
+        })
+        existing_names.add(name)
+    data_obj['pasteTiers'] = paste_tiers
+
+
 def _recompute_tier_assignments(data_obj, plot_tiers):
     """Recompute ivTiers and ivAllTiers after modifying tier cutoffs."""
     n = data_obj.get('nIvs', 0)
@@ -3125,6 +3166,18 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # top, original tier-card name below.
     if moveset0_flavors and 'tiers' in data_obj:
         _rename_plotly_tiers(data_obj, moveset0_flavors)
+
+    # Promote narrative flavors to paste-box-only tiers. ``DATA.tiers``
+    # feeds the scatter plot AND the paste-box, so adding flavors there
+    # would clutter the scatter legend. Emit a separate ``DATA.pasteTiers``
+    # list (plot tiers ∪ non-General flavors not already represented
+    # by name match) that the JS paste-box prefers when present. Fixes
+    # the Tinkaton-GL gap from docs/auto_gen_narrative_plan.md "Problem
+    # observed 2026-04-19": narrative-only flavors like "Fortified
+    # Azumarill" were invisible to the "Check my collection" membership
+    # check because they had no ``DATA.tiers`` entry.
+    if moveset0_flavors:
+        _promote_flavors_to_paste_tiers(data_obj, moveset0_flavors)
     if narrative_blocks:
         narrative_combined = '\n'.join(narrative_blocks)
         placeholder = '<!-- NARRATIVE_ZONE_PLACEHOLDER -->'
