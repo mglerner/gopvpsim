@@ -74,41 +74,4 @@ ATK inverts the CMP calculus mid-fight. Swampert / Lickitung / \
 Diggersby-class Ground damage, Incineroar-class Fire / Dark, and \
 Giratina / Trevenant Ghost are the problem bucket.
 """
-team_role = """
-Aegislash is a counter-pick slot, not a core-team chassis - it earns \
-its slot specifically against Fairy-heavy or Ghost-staller teams. \
-The form-change timing makes it a third-slot closer more often than \
-a lead: ideal flow is safe-swap or third-Pokemon, soak an \
-unfavorable opener on Shield bulk, and transform to Blade once the \
-opponent has burned a shield or committed to a moveset that Aegislash \
-resists. Pair with teammates that cover the Ground / Fire / Dark \
-attackers that shred Blade - a Ground-resist core and a Dark / Fire \
-answer keep Aegislash free to do the Fairy-killing / Ghost-killing \
-job it's brought for.
-"""
 body = ""
-
-["Aegislash (Shield)".verdict]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
-authored_by = "ai"
-editorial = """
-Invest in Aegislash if your team has a concrete anti-Fairy or \
-anti-Ghost-staller need. This is a specialist: the 272 / 97 / 155 \
-Blade-form lategame can end fights that a more generalist attacker \
-drags out, but the 97 ATK opener means Aegislash leaks damage to \
-generalist threats before the transform lands. Catch and invest \
-when the rest of the team already has an answer to the Ground / \
-Fire / Dark core; skip when Aegislash would be the team's only \
-answer to those types. See the Notable IVs cards below for \
-IV-targeting cutoffs. The always-Blade hypothetical is not a real \
-build path - see the form-change guide for the Shield-path vs \
-always-Blade win-rate comparison.
-"""
-outlook = """
-Aegislash's counter-pick value tracks Fairy-meta pressure and \
-Ghost-staller prevalence. When Fairies dominate, the Gyro Ball \
-niche widens; when the meta tilts toward Ground / Fire / Dark \
-attackers, the slot narrows. Worth re-reading after each season \
-rotation.
-"""
