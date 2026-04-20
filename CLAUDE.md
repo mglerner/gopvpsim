@@ -100,6 +100,15 @@ Pluggable policy. Simulate all three shield scenarios (0-0, 1-1, 2-2).
   Flags: `--stats`, `--show-damage`, `--trace-dp`, `--trace-shields`, `--debug`, `--pvpoke-scores`
 - `scripts/breakpoints.py` — show breakpoints/bulkpoints for a given attacker/move/defender
 
+## Running Python
+This project requires Python **3.13+** (`pyproject.toml` `requires-python =
+">=3.13"`). On Michael's machine, bare `python` resolves to the anaconda
+3.13 install and is the correct interpreter. Bare `python3` resolves to
+the macOS-default `/usr/bin/python3` (3.9.6) and will fail on stdlib
+imports like `tomllib`. **Always invoke `python`, never `python3`**, for
+any project script, `-c` one-liner, or test runner. Script shebangs all
+use `#!/usr/bin/env python` to reinforce this.
+
 ## Testing
 - `python -m pytest tests/test_battle.py -q` — run all battle tests (99/102 passing)
 - Tests verify scores against PvPoke ground truth from pvpoke.com/battle/
