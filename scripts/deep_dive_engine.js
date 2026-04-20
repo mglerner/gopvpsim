@@ -499,14 +499,14 @@ function loadCollection(csvText) {
   var leagueCap = coll.leagueCap;
   var maxLevel = coll.maxLevel;
 
-  // Build the species thresholds dict from the LIVE DATA.tiers array
-  // (populated after generate_analysis_sections ran), not from the
-  // stale snapshot in coll.thresholds. The snapshot was taken before
-  // auto-derive kicked in, so any dive without a TOML (or with a
-  // TOML for a different league than the dive) had empty tier
-  // names — every user mon fell through to "no qualification" even
-  // when the scatter legend showed real tiers.
-  var liveTiers = DATA.tiers || [];
+  // Build the species thresholds dict from the LIVE tiers array
+  // (populated after generate_analysis_sections ran). Prefer
+  // DATA.pasteTiers when present - it's the scatter-plot tiers
+  // plus any narrative flavors that weren't already represented
+  // (non-General only), so paste-box membership picks up flavors
+  // like "Fortified Azumarill" that never made it into
+  // DATA.tiers. Falls back to DATA.tiers on older dives.
+  var liveTiers = DATA.pasteTiers || DATA.tiers || [];
   var tierNames = [];
   var speciesThresholds = {};
   for (var lti = 0; lti < liveTiers.length; lti++) {
@@ -737,11 +737,12 @@ function renderMatchesList() {
     return;
   }
 
-  // Tier names come from the LIVE DATA.tiers array (populated after
-  // analysis sections ran), not DATA.collection.tierNames (which is
-  // the stale pre-analysis snapshot and was empty on auto-derive
-  // dives). This mirrors the fix in loadCollection.
-  var liveTiers = DATA.tiers || [];
+  // Tier names come from the LIVE tiers array (populated after
+  // analysis sections ran). Prefer DATA.pasteTiers so narrative
+  // flavors show up here alongside plot tiers; falls back to
+  // DATA.tiers on older dives. This mirrors the fix in
+  // loadCollection.
+  var liveTiers = DATA.pasteTiers || DATA.tiers || [];
   var tierNames = [];
   for (var lti = 0; lti < liveTiers.length; lti++) {
     if (liveTiers[lti] && liveTiers[lti].name) tierNames.push(liveTiers[lti].name);
@@ -1208,10 +1209,12 @@ function setCollectionStatus(text, color) {
 // If a card's span is missing (older template or filtered out), this
 // is a silent no-op.
 function updateTierCardCounts(tierCounts) {
-  // Read from live DATA.tiers (post-analysis) rather than the stale
-  // pre-analysis DATA.collection.tierNames snapshot — same reason as
-  // the fix in loadCollection/renderMatchesList.
-  var liveTiers = DATA.tiers || [];
+  // Read from the live tiers array (post-analysis) rather than the
+  // stale pre-analysis DATA.collection.tierNames snapshot — same
+  // reason as the fix in loadCollection/renderMatchesList. Prefer
+  // DATA.pasteTiers so narrative-flavor tier cards get their "N of
+  // yours qualify" annotation too.
+  var liveTiers = DATA.pasteTiers || DATA.tiers || [];
   for (var i = 0; i < liveTiers.length; i++) {
     var t = liveTiers[i];
     if (!t || !t.name) continue;
