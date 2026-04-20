@@ -165,5 +165,38 @@ automatically after Edit/Write/MultiEdit. To format manually: `python
 scripts/format_md.py [FILE ...]` (no args = walk the whole repo). The script is
 idempotent.
 
+## Ship-mode narrative policy
+Files under `articles/` and `thresholds/` render into public-facing
+CD articles and per-species deep dives. Their `[intro]`,
+`[meta_role]`, and `[Species.*]` narrative blocks must not carry
+Claude-drafted prose. When drafting for these blocks:
+
+1. **Default to suggesting an auto-gen template** rather than writing
+   prose directly. `scripts/auto_gen_narrative.py` exposes
+   `render_intro` / `render_good_at` / `render_bad_at`; the renderer
+   auto-fills empty fields at dive/article render time.
+2. **If the block can't be auto-gen'd honestly** (teambuilding
+   synergies, editorial catch-priority / XL / ETM judgment, meta
+   speculation), say so and recommend leaving the block empty for
+   the human. Do NOT fill it with Claude prose to make the section
+   look complete.
+3. **A human override always wins.** Non-empty TOML prose beats the
+   auto-gen template; the renderer prefers authored content when
+   present. That's the way to ship expert-authored narrative without
+   fighting the templates.
+
+The `.githooks/pre-commit` hook enforces this by rejecting any
+commit that leaves `authored_by = "ai"` in a ship-tracked TOML. To
+activate the hook, run once per clone:
+
+    git config core.hooksPath .githooks
+
+Exploration-mode is unchanged: session chat, `/tmp/` analysis,
+`docs/` design notes, and plan files can carry Claude prose freely.
+Only the path-gated ship-mode TOMLs are restricted.
+
+See `docs/auto_gen_narrative_plan.md` for the full rollout
+rationale.
+
 ## Out of scope for now
 Adaptive/game-tree search (minimax). Web app UI.
