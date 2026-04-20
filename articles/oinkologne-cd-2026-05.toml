@@ -35,56 +35,19 @@ deep_dive_slug = "oinkologne-great-league"
 [form_comparison]
 spec = "comparisons/oinkologne-male-vs-female.toml"
 
-# ── Intro override (F-intro, expert-authored 2026-04-18) ──────────────
-# Shape 2 scope (2026-04-19): CD-event-scoped BLUF only. Species-level
-# framing now lives in the per-form deep dives
-# (thresholds/oinkologne.toml, thresholds/oinkologne_female.toml).
-# Article intro focuses on the CD-day decision: catch, ETM, which
-# form. See docs/article_schema.md "Intro augment".
+# ── Intro + Meta Role (auto-generated from dive data) ────────────────
+# The intro.body / meta_role.good_at / meta_role.bad_at strings below
+# are populated at render time by scripts/auto_gen_narrative.py (see
+# docs/auto_gen_narrative_plan.md). Set any of them to non-empty prose
+# to override the template; the renderer prefers human-authored
+# content when present. Article-side intro adds a form-comparison
+# sentence when [form_comparison] is defined.
 [intro]
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
-authored_by = "ai"
-body = """
-Oinkologne picks up Mud Slap on Community Day (2026-05-09, 2-5 PM \
-local). Short version: Mud Slap is a clean upgrade over Tackle \
-(+9.7 pp for Male across 8 of 9 shield scenarios, a comparable gain \
-for Female), flipping bulky Steel and Ghost matchups Tackle never \
-threatened. Neither form becomes a meta staple - aggregate win rate \
-stays sub-50% for both - but the counter-pick niche is real and the \
-move is free during the window. Species-level analysis lives in the \
-per-form deep dives linked below; this article focuses on the \
-CD-day decision: catch, Elite TM, and which form to prioritize.
-"""
+body = ""
 
-# ── Meta Role (F1, expert-authored 2026-04-18) ────────────────────────
-# Shape 2 scope (2026-04-19): reframed as CD-move comparison (what
-# Mud Slap adds / doesn't fix / which form to pick). Species-level
-# Meta Role lives in the per-form deep dives' [Species.meta_role]
-# blocks; this block covers only the CD-move decision surface.
-# Schema: docs/article_schema.md "Meta Role section".
 [meta_role]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
-authored_by = "ai"
-good_at = """
-Mud Slap adds a Ground coverage slot Oinkologne didn't have pre-CD: \
-super-effective damage on bulky Steels and Ghost stallers. Both \
-forms share the counter-pick pattern, with Empoleon (regular and \
-Shadow), Steelix (regular and Shadow), Galarian Stunfisk, Dusclops \
-(both forms), Galarian Corsola, and Sableye all flipping from \
-hopeless Tackle-era losses into aggregate wins. Per-form matchup \
-surfaces are covered in the deep dives linked above.
-"""
-bad_at = """
-Mud Slap's Ground typing is resisted by Flyers, Grass-types, and \
-Bug-types, so the CD move doesn't touch Oinkologne's pre-existing \
-Flying / Fire / Dragon problem. Altaria actually worsens across the \
-board (regular -12 to -25 pp; Shadow flips from an aggregate \
-Tackle-era win to a decisive loss, -47 pp Female / -41 pp Male), \
-and Galarian Moltres drops by -25 to -33 pp. The CD move is \
-additive: it opens a new counter-pick axis but doesn't fix the old \
-weaknesses.
-"""
+good_at = ""
+bad_at = ""
 # Escape hatch -- if non-empty, overrides the structured fields
 # above. Left empty for Oinkologne.
 body = ""

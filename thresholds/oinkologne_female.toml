@@ -15,57 +15,18 @@ sources = "pogo-simulator deep dive (2026-04-17); pre-CD Mud Slap analysis (fema
 ["Oinkologne (Female)".article]
 slug = "oinkologne-cd-2026-05"
 
-# Species narrative (Shape 2, 2026-04-19). See docs/threshold_schema.md
-# "Species narrative" and docs/article_schema.md "Per-block author
-# attribution" for the schema / author field convention. Written from
-# the Female-form vantage; cross-form comparison framing (M vs F)
-# lives in the CD article's [form_comparison] spec, not here.
+# Species narrative (Shape 2, 2026-04-19). Renders at the top of the
+# interactive deep dive above the scatter dashboard. The intro / meta_role
+# bodies are auto-generated from dive data by scripts/auto_gen_narrative.py
+# (see docs/auto_gen_narrative_plan.md). Override by setting any of the
+# body / good_at / bad_at fields below to non-empty prose; the renderer
+# prefers human-authored content when present.
 ["Oinkologne (Female)".intro]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
-authored_by = "ai"
-body = """
-Female Oinkologne (169/162/251) is a bulky Normal-type that Mud Slap \
-turns into a durable Ground counter-picker. Super-effective Ground \
-damage punishes the bulky Steels (Empoleon, Steelix, Galarian \
-Stunfisk) and Ghost stallers (Dusclops, Sableye, Galarian Corsola) \
-that Tackle couldn't scratch. Aggregate win rate against the \
-top-50+CS Great League pool sits around 47% - better than a pure \
-Normal-type baseline thanks to the new coverage, but still sub-50% - \
-so this is anti-meta pressure on a specific Steel / Ghost problem, \
-not a core chassis.
-"""
+body = ""
 
 ["Oinkologne (Female)".meta_role]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
-authored_by = "ai"
-good_at = """
-Mud Slap turns Female Oinkologne from a Normal-typed blunt tool into \
-a genuine Steel / Ghost counter-pick. Super-effective Ground damage \
-flips the bulky Steel-subtyped walls - Empoleon (regular and Shadow), \
-Steelix (regular and Shadow), and Galarian Stunfisk - from hopeless \
-Tackle-era losses into aggregate wins with deltas of +40 to +77 \
-percentage points depending on form. The same pattern holds against \
-Ghost stallers: Dusclops (both forms), Galarian Corsola, and Sableye \
-all move into the win column. Female's 162 Defense and 251 Stamina \
-extend those counter-pick fights long enough to land the second \
-Mud-Slap farm-down plus a late charge move, so the bulky-trade path \
-stays open across the shield-depressed scenarios where timing \
-usually breaks down.
-"""
-bad_at = """
-Mud Slap's Ground typing is resisted by Flyers, Grass-types, and \
-Bug-types, and the move switch creates its own problem set. Regular \
-Altaria slips by -12 to -25 percentage points (still a loss, just a \
-clearer one), and Shadow Altaria swings all the way from an \
-aggregate Tackle-era win into a decisive loss (-47 pp). Galarian \
-Moltres worsens by -25 to -33 pp. Female also picks up fringe \
-attack-side losses against Shadow Politoed and Dondozo where Mud \
-Slap's damage can't clear the defender's HP threshold in time. \
-Anything that resists Ground damage now sits opposite the new \
-counter-picks.
-"""
+good_at = ""
+bad_at = ""
 body = ""
 
 # See thresholds/oinkologne.toml cd_prep for the shared rationale.

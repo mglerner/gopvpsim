@@ -43,6 +43,9 @@ sys.path.insert(0, str(REPO_ROOT / 'scripts'))
 sys.path.insert(0, str(REPO_ROOT / 'src'))
 
 from deep_dive_rendering import render_species_narrative  # type: ignore[import-not-found]
+import auto_gen_narrative  # type: ignore[import-not-found]
+from generate_article import _load_dive_data  # type: ignore[import-not-found]
+from gopvpsim.data import get_default_moveset, load_gamemaster  # type: ignore[import-not-found]
 
 
 # Injection marker: the narrative renders immediately before the
@@ -136,25 +139,26 @@ _NARRATIVE_CSS_OVERRIDE = """
 """
 
 
-def _infer_species_from_slug(slug: str) -> str | None:
+def _infer_species_league_from_slug(slug: str) -> tuple[str, str] | None:
     """Reverse of deep_dive.py's slug convention.
 
-    'aegislash-shield-great-league' -> 'Aegislash (Shield)'
-    'oinkologne-female-great-league' -> 'Oinkologne (Female)'
-    'oinkologne-great-league' -> 'Oinkologne'
+    'aegislash-shield-great-league' -> ('Aegislash (Shield)', 'great')
+    'oinkologne-female-great-league' -> ('Oinkologne (Female)', 'great')
+    'oinkologne-great-league' -> ('Oinkologne', 'great')
+    'tinkaton-ultra-league' -> ('Tinkaton', 'ultra')
 
-    Returns None when the league suffix can't be stripped cleanly.
+    Returns None when the slug shape can't be parsed cleanly.
     """
     parts = slug.split('-')
-    # Trim trailing league tokens
     if len(parts) >= 2 and parts[-1] == 'league':
         parts = parts[:-1]
+    league = 'great'
     if parts and parts[-1] in ('great', 'ultra', 'master'):
+        league = parts[-1]
         parts = parts[:-1]
     if not parts:
         return None
 
-    # Known form suffixes land inside parens
     form_tokens = {
         'shield', 'blade', 'female', 'male',
         'busted', 'hangry', 'disguised',
@@ -163,11 +167,25 @@ def _infer_species_from_slug(slug: str) -> str | None:
     if parts[-1].lower() in form_tokens:
         form = parts[-1].capitalize()
         base = ' '.join(p.capitalize() for p in parts[:-1])
-        return f'{base} ({form})' if base else None
-    return ' '.join(p.capitalize() for p in parts)
+        if not base:
+            return None
+        return (f'{base} ({form})', league)
+    return (' '.join(p.capitalize() for p in parts), league)
 
 
-def _load_narrative(toml_path: Path, species: str) -> dict:
+def _infer_species_from_slug(slug: str) -> str | None:
+    """Backwards-compat wrapper returning just the species name."""
+    result = _infer_species_league_from_slug(slug)
+    return result[0] if result else None
+
+
+def _load_narrative_and_cd_prep(toml_path: Path, species: str) -> tuple[dict, dict]:
+    """Load the narrative + cd_prep blocks from a threshold TOML.
+
+    Returns ``(narrative, cd_prep)`` dicts. ``cd_prep`` is empty when
+    the species TOML has no ``[Species.cd_prep]`` block, which is the
+    expected state for non-CD species (templates then skip auto-gen).
+    """
     with open(toml_path, 'rb') as f:
         raw = tomllib.load(f)
     sp = raw.get(species, {})
@@ -175,6 +193,15 @@ def _load_narrative(toml_path: Path, species: str) -> dict:
     for key in ('intro', 'meta_role', 'verdict'):
         if key in sp and isinstance(sp[key], dict):
             narrative[key] = sp[key]
+    cd_prep = sp.get('cd_prep') or {}
+    if not isinstance(cd_prep, dict):
+        cd_prep = {}
+    return narrative, cd_prep
+
+
+def _load_narrative(toml_path: Path, species: str) -> dict:
+    """Backwards-compat wrapper returning just the narrative dict."""
+    narrative, _ = _load_narrative_and_cd_prep(toml_path, species)
     return narrative
 
 
@@ -242,16 +269,26 @@ def main() -> int:
     total_files = 0
     total_patched = 0
 
+    # Gamemaster is expensive to load; keep one handle across roots.
+    gm = None
+
     for root in args.paths:
-        # Resolve species + thresholds path
+        # Resolve species + league + thresholds path.
         species = args.species
+        league = 'great'
         if species is None:
             slug = root.name if root.is_dir() else root.parent.name
-            species = _infer_species_from_slug(slug)
-            if species is None:
+            parsed = _infer_species_league_from_slug(slug)
+            if parsed is None:
                 print(f'[skip] {root}: could not infer species from slug',
                       file=sys.stderr)
                 continue
+            species, league = parsed
+        else:
+            slug = root.name if root.is_dir() else root.parent.name
+            parsed = _infer_species_league_from_slug(slug)
+            if parsed is not None:
+                league = parsed[1]
 
         toml_path = args.thresholds
         if toml_path is None:
@@ -265,9 +302,45 @@ def main() -> int:
                   file=sys.stderr)
             continue
 
-        narrative = _load_narrative(toml_path, species)
+        narrative, cd_prep = _load_narrative_and_cd_prep(toml_path, species)
+
+        # Auto-generate A-field prose from the dive's embedded score
+        # data when cd_prep declares a CD fast move and the species has
+        # a PvPoke default moveset to compare against. Templates in
+        # auto_gen_narrative.py are data-driven and deterministic; they
+        # fill only empty TOML fields (human overrides always win).
+        cd_fast_moves = cd_prep.get('fast_moves') or []
+        cd_fast = cd_fast_moves[0] if cd_fast_moves else None
+        if cd_fast and root.is_dir():
+            try:
+                baseline_fast, _ = get_default_moveset(species, league)
+            except (KeyError, Exception) as exc:
+                baseline_fast = None
+                print(f'[warn] {root}: no default moveset for '
+                      f'{species!r} in {league}: {exc}',
+                      file=sys.stderr)
+            if baseline_fast and baseline_fast != cd_fast:
+                try:
+                    dive_data = _load_dive_data(root)
+                except SystemExit as exc:
+                    dive_data = None
+                    print(f'[warn] {root}: dive data load failed: {exc}',
+                          file=sys.stderr)
+                if dive_data is not None:
+                    if gm is None:
+                        gm = load_gamemaster()
+                    auto_gen_narrative.fill_narrative_a_fields(
+                        narrative, dive_data,
+                        species=species,
+                        cd_move_fast=cd_fast,
+                        baseline_move_fast=baseline_fast,
+                        league=league,
+                        gm=gm,
+                    )
+
         if not narrative:
-            print(f'[skip] {root}: TOML {toml_path.name} has no narrative blocks',
+            print(f'[skip] {root}: TOML {toml_path.name} has no narrative '
+                  f'blocks and no auto-gen content',
                   file=sys.stderr)
             continue
 

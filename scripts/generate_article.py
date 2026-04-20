@@ -48,6 +48,7 @@ from render_article import (  # type: ignore[import-not-found]
 
 from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
 from gopvpsim.pokemon import iv_rank  # type: ignore[import-not-found]
+import auto_gen_narrative  # type: ignore[import-not-found]
 
 from compare_loadouts import (  # type: ignore[import-not-found]
     COMPARE_CSS,
@@ -3021,6 +3022,38 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
         dive = None
 
     species_name = article.get('species', '')
+
+    # Auto-generate the article-side narrative A-fields (intro.body,
+    # meta_role.good_at, meta_role.bad_at) from the dive. Templates
+    # live in scripts/auto_gen_narrative.py; they fill only empty
+    # fields so a human override via non-empty TOML prose always wins.
+    # Silent no-op when the dive load failed or the species has no
+    # PvPoke default moveset to diff against.
+    if dive is not None and species_name:
+        try:
+            _baseline_fast, _ = get_default_moveset(species_name, league)
+        except Exception:
+            _baseline_fast = None
+        _gm_for_autogen = load_gamemaster()
+        _cd_entry = _lookup_move(_gm_for_autogen, cd_move) if cd_move else None
+        _cd_fast_id = (_cd_entry.get('moveId') if _cd_entry else None)
+        if _baseline_fast and _cd_fast_id and _baseline_fast != _cd_fast_id:
+            _intro = article.setdefault('intro', {})
+            _meta_role = article.setdefault('meta_role', {})
+            _form_comparison_present = bool(
+                _form_spec and len(_form_spec.get('loadout_specs') or []) >= 2
+            )
+            auto_gen_narrative.fill_narrative_a_fields(
+                {'intro': _intro, 'meta_role': _meta_role},
+                dive,
+                species=species_name,
+                cd_move_fast=_cd_fast_id,
+                baseline_move_fast=_baseline_fast,
+                league=league,
+                cd_date=article.get('cd_date'),
+                form_comparison=_form_comparison_present,
+                gm=_gm_for_autogen,
+            )
     toml_framing = (article.get('framing') or '').strip()
     derived_framing = _derive_framing(species_name, league, cd_move, dive)
     if authorship == 'auto' and derived_framing:

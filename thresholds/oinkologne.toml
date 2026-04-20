@@ -13,55 +13,17 @@ sources = "pogo-simulator deep dive (2026-04-16); pre-CD Mud Slap analysis"
 slug = "oinkologne-cd-2026-05"
 
 # Species narrative (Shape 2, 2026-04-19). Renders at the top of the
-# interactive deep dive above the scatter dashboard. See
-# docs/threshold_schema.md "Species narrative" for the schema and
-# docs/article_schema.md "Per-block author attribution" for the author
-# field convention.
+# interactive deep dive above the scatter dashboard. The intro / meta_role
+# bodies are auto-generated from dive data by scripts/auto_gen_narrative.py
+# (see docs/auto_gen_narrative_plan.md). Override by setting any of the
+# body / good_at / bad_at fields below to non-empty prose; the renderer
+# prefers human-authored content when present.
 [Oinkologne.intro]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
-authored_by = "ai"
-body = """
-Male Oinkologne (186/153/242) is a Normal-typed threat that Mud Slap \
-reshapes into a Ground counter-picker. Super-effective Ground damage \
-punishes the bulky Steels (Empoleon, Steelix, Galarian Stunfisk) and \
-Ghost stallers (Dusclops, Sableye, Galarian Corsola) that Tackle \
-couldn't scratch, with per-matchup deltas of +40 to +77 percentage \
-points on those cells. Aggregate win rate against the top-50+CS \
-Great League pool still sits around 43%, so this is anti-meta \
-pressure on a specific Steel / Ghost problem, not a core-team \
-chassis.
-"""
+body = ""
 
 [Oinkologne.meta_role]
-authorship = "expert"
-author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"
-authored_by = "ai"
-good_at = """
-Mud Slap turns Male Oinkologne from a Normal-typed blunt tool into a \
-genuine Steel / Ghost counter-pick. Super-effective Ground damage \
-flips the bulky Steel-subtyped walls - Empoleon (regular and Shadow), \
-Steelix (regular and Shadow), and Galarian Stunfisk - from hopeless \
-Tackle-era losses into aggregate wins with deltas of +40 to +77 \
-percentage points depending on form. The same pattern holds against \
-Ghost stallers: Dusclops (both forms), Galarian Corsola, and Sableye \
-all move into the win column. Male's 186-Attack frame additionally \
-has the pop to clear specific damage breakpoints on neutral-matchup \
-defenders: Wigglytuff, Lickilicky, Dondozo, and regular Stunfisk \
-flip into wins because Mud Slap's rolls land the extra damage needed \
-to push past the defender's HP threshold in time.
-"""
-bad_at = """
-Mud Slap's Ground typing is resisted by Flyers, Grass-types, and \
-Bug-types, and the move switch creates its own problem set. Regular \
-Altaria slips by -12 to -25 percentage points (still a loss, just a \
-clearer one), and Shadow Altaria swings all the way from an \
-aggregate Tackle-era win into a decisive loss (-41 pp). Galarian \
-Moltres worsens by -25 to -33 pp. Male's thinner Defense (153) \
-means those already-bad matchups bleed faster once Oinkologne starts \
-eating super-effective damage, so expect the Flyer / Fire / Dragon \
-cells to widen rather than hold.
-"""
+good_at = ""
+bad_at = ""
 body = ""
 
 # Community Day preparation. PvPoke's gamemaster adds/removes upcoming CD
