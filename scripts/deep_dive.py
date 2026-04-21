@@ -1648,22 +1648,44 @@ def _rename_plotly_tiers(data_obj, flavors):
     """Rename Plotly tier entries to match narrative flavor names.
 
     For each non-General flavor, find the matching tier in data_obj['tiers']
-    by stat threshold and rename it.  Also sync HP cutoffs from the narrative
-    (which enriches HP from matchup boundaries) into the tier.
+    by stat threshold and replace its name with the flavor's clean name.
+    Also sync HP cutoffs from the narrative (which enriches HP from matchup
+    boundaries) into the tier.
 
-    Legend entries get two-line names: narrative flavor name on top,
-    original tier-card name in smaller text below.
+    Each tier is renamed at most once per call. When multiple flavors would
+    match the same tier (same stat threshold within 0.1), the first flavor
+    in iteration order wins; downstream flavors fall through to the next
+    unclaimed tier. ``refine_flavor_names`` pre-sorts flavors most-specific-
+    first, so the first-match winner is the narrowest flavor — the one
+    whose name best describes that tier's actual selectivity.
+
+    Prior to 2026-04-21, this function produced compound names like
+    ``"Steelix (Shadow) Slayer<br>  (Wigglytuff Slayer<br>  (Wigglytuff
+    Atk))"`` by concatenating each rename with the previous name via
+    ``<br>``. Tier cards in the IV Recommendations grid convert ``<br>``
+    to ``" - "`` for single-line display, so the compound leaked into
+    the cards as "Steelix (Shadow) Slayer -   (Wigglytuff Slayer -
+    (Wigglytuff Atk))" — visibly wrong and misleading. The fix:
+    narrative names already carry their own stat-signature
+    disambiguation via ``refine_flavor_names`` (line 547-558), so the
+    compound form adds no information and only noise. Plotly scatter
+    legend loses its two-line format as a side effect; the signature-
+    suffix "Lapras Slayer (123.74+ Atk)" carries the same info in one
+    line.
     """
     plot_tiers = data_obj.get('tiers', [])
     if not plot_tiers:
         return
 
+    renamed_ids: set[int] = set()  # Track which tiers have been claimed
     for flavor in flavors:
         if flavor['is_general']:
             continue  # General is excluded from the Plotly legend
-        # Match by primary stat threshold
+        # Match by primary stat threshold, skipping already-renamed tiers.
         matched_tier = None
         for tier in plot_tiers:
+            if id(tier) in renamed_ids:
+                continue
             t_atk = tier.get('attack', 0) or 0
             t_def = tier.get('defense', 0) or 0
             if flavor['atk_cut'] > 0 and abs(t_atk - flavor['atk_cut']) < 0.1:
@@ -1675,13 +1697,20 @@ def _rename_plotly_tiers(data_obj, flavors):
         if not matched_tier:
             continue
 
+        renamed_ids.add(id(matched_tier))
+
         old_name = matched_tier['name']
         new_name = flavor['name']
-        if old_name == new_name:
-            continue
-
-        # Two-line legend: narrative name + original tier name
-        matched_tier['name'] = f'{new_name}<br>  ({old_name})'
+        if old_name != new_name:
+            # Preserve the original tier name so slug-generation in
+            # downstream consumers (generate_article.py:_tier_card_href)
+            # produces the same anchor id as the dive's own tier-card
+            # rendering, which slugs from t['name'] BEFORE this rename
+            # runs. Decouples the visible display name (overwritten
+            # here) from the stable link slug (keyed on the original
+            # auto-derived name).
+            matched_tier['original_name'] = old_name
+            matched_tier['name'] = new_name
 
         # Sync HP cutoff from narrative enrichment
         if flavor['hp_cut'] > 0 and not (matched_tier.get('stamina') or 0):
