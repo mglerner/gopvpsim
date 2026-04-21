@@ -2319,7 +2319,7 @@ def _opp_slug(name: str) -> str:
     return re.sub(r'[^a-z0-9]+', '-', (name or '').lower()).strip('-')
 
 
-def _tier_card_href(tier_name: str, dive_slug: str,
+def _tier_card_href(tier: dict | str, dive_slug: str,
                     moveset_file: str) -> str | None:
     """Return a hyperlink anchor for the matching tier card in the dive,
     or None when either piece is missing. Article dive paths are relative
@@ -2331,10 +2331,21 @@ def _tier_card_href(tier_name: str, dive_slug: str,
     Older dive HTML is patched in place by
     ``scripts/patch_dive_tier_anchors.py``; fresh dives emit this id
     natively.
+
+    Accepts either a tier dict or a bare name string for callers that
+    don't have the dict handy. When a dict is passed, prefers
+    ``original_name`` (set by ``deep_dive._rename_plotly_tiers`` before
+    it overwrites ``name`` with the narrative flavor name) so the slug
+    matches the dive's own tier-card anchor id, which is computed from
+    the pre-rename name.
     """
     if not dive_slug or not moveset_file:
         return None
-    slug = _tier_slug(tier_name)
+    if isinstance(tier, dict):
+        name = tier.get('original_name') or tier.get('name') or ''
+    else:
+        name = tier or ''
+    slug = _tier_slug(name)
     if not slug:
         return None
     return f'../../{dive_slug}/{moveset_file}#tier-card-{slug}'
@@ -2419,7 +2430,7 @@ def _render_iv_recommendations_per_form_section(cd_move: str,
             f'index_m0_{fast.lower()}_{"_".join(c.lower() for c in charged)}.html'
         )
         for t, m in zip(tiers, member_counts):
-            href = _tier_card_href(t.get('name') or '', f['dive_slug'], moveset_file)
+            href = _tier_card_href(t, f['dive_slug'], moveset_file)
             cards.append(_render_tier_card(t, m, n_ivs,
                                            form_label=f['label'],
                                            link_href=href))
@@ -2506,7 +2517,7 @@ def _render_iv_recommendations_section(cd_move: str, species: str,
     cards = [
         _render_tier_card(
             t, m, n_ivs,
-            link_href=_tier_card_href(t.get('name') or '', dive_slug, moveset_file),
+            link_href=_tier_card_href(t, dive_slug, moveset_file),
         )
         for t, m in zip(tiers, member_counts)
     ]
