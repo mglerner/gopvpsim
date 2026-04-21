@@ -729,9 +729,21 @@ def render_standalone_html(title: str, description: str,
 
 
 def _toml_string(s: str) -> str:
+    """Serialise a Python string to TOML basic-string form.
+
+    Escapes backslashes and double-quotes so description fields
+    containing quoted phrases round-trip correctly. Multi-line
+    strings use triple-quoted form (which already handles inner
+    single quotes) with any literal triple-quote run inside the
+    content escaped defensively.
+    """
     if '\n' in s:
-        return f'"""\n{s}\n"""'
-    return f'"{s}"'
+        # Triple-quoted multi-line: only need to guard against a
+        # literal triple-quote run inside the content.
+        escaped = s.replace('"' * 3, '\\"\\"\\"')
+        return f'"""\n{escaped}\n"""'
+    escaped = s.replace('\\', '\\\\').replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def parse_spec(spec_path: Path) -> dict:
