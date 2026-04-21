@@ -63,8 +63,8 @@ log "log: $LOG"
 log "status: $STATUS"
 log ""
 log "Status box (paste into another terminal pane):"
-log "  watch -n 5 -c scripts/overnight_status.sh              # needs: brew install watch"
-log "  while true; do clear; scripts/overnight_status.sh; sleep 5; done   # no deps"
+log "  watch -n 5 'scripts/chain_status.py --chain overnight'              # needs: brew install watch"
+log "  while true; do clear; scripts/chain_status.py --chain overnight; sleep 5; done   # no deps"
 log ""
 
 # 1. Eight website dives (serial, per run_website_dives.py).
