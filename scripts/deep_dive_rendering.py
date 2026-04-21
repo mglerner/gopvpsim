@@ -343,6 +343,9 @@ DEEP_DIVE_CSS = """
 .dd-species-narrative .dd-narrative-block.authored-ai {
   --sidebar-color: #e8903a;
 }
+.dd-species-narrative .dd-narrative-block.authored-auto {
+  --sidebar-color: #5b8dd9;
+}
 .dd-species-narrative .dd-narrative-block > h2,
 .dd-species-narrative .dd-narrative-block > h3 {
   color: var(--sidebar-color);
@@ -895,10 +898,13 @@ def _authored_by_class(block: dict) -> str:
     """Map the optional ``authored_by`` enum to a CSS modifier class.
 
     Values: ``"human"`` (default, gold), ``"ai"`` (orange),
-    ``"mixed"`` (gold — a human co-signed so treat as human register).
-    Unknown or missing values fall back to ``"human"``. The returned
-    string is always one of ``authored-human``, ``authored-ai``,
-    ``authored-mixed`` (never empty); callers concatenate it into a
+    ``"mixed"`` (gold — a human co-signed so treat as human register),
+    ``"auto"`` (blue — deterministically data-derived from dive data
+    by ``scripts/auto_gen_narrative.py``; not human-reviewed and
+    not LLM-drafted). Unknown or missing values fall back to
+    ``"human"``. The returned string is always one of
+    ``authored-human``, ``authored-ai``, ``authored-mixed``,
+    ``authored-auto`` (never empty); callers concatenate it into a
     space-separated class list.
 
     The enum is explicit because the free-form ``author`` string is
@@ -908,7 +914,7 @@ def _authored_by_class(block: dict) -> str:
     "Claude").
     """
     val = (block.get('authored_by') or 'human').strip().lower()
-    if val not in {'human', 'ai', 'mixed'}:
+    if val not in {'human', 'ai', 'mixed', 'auto'}:
         val = 'human'
     return f'authored-{val}'
 

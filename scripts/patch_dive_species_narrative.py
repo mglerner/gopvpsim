@@ -98,6 +98,9 @@ _NARRATIVE_CSS_OVERRIDE = """
 .dd-species-narrative .dd-narrative-block.authored-ai {
   --sidebar-color: #e8903a;
 }
+.dd-species-narrative .dd-narrative-block.authored-auto {
+  --sidebar-color: #5b8dd9;
+}
 .dd-species-narrative .dd-narrative-block > h2,
 .dd-species-narrative .dd-narrative-block > h3 {
   color: var(--sidebar-color);
