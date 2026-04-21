@@ -28,6 +28,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
 ARTICLES_DIR = WEBSITE_DIR / 'articles'
+COMPARISONS_DIR = WEBSITE_DIR / 'comparisons'
 INDEX_PATH = WEBSITE_DIR / 'index.html'
 
 
@@ -203,9 +204,12 @@ def _render_entry_list(entries: list[dict], empty_msg: str) -> str:
     return '\n'.join(items)
 
 
-def render_index(dives: list[dict], articles: list[dict]) -> str:
+def render_index(dives: list[dict],
+                 articles: list[dict],
+                 comparisons: list[dict]) -> str:
     dives_html = _render_entry_list(dives, 'No dives published yet.')
     articles_html = _render_entry_list(articles, 'No articles published yet.')
+    comparisons_html = _render_entry_list(comparisons, 'No comparisons published yet.')
 
     articles_section = ''
     if articles:
@@ -213,6 +217,15 @@ def render_index(dives: list[dict], articles: list[dict]) -> str:
             '\n<h2>Articles</h2>\n'
             '<ul>\n'
             f'{articles_html}\n'
+            '</ul>\n'
+        )
+
+    comparisons_section = ''
+    if comparisons:
+        comparisons_section = (
+            '\n<h2>Comparisons</h2>\n'
+            '<ul>\n'
+            f'{comparisons_html}\n'
             '</ul>\n'
         )
 
@@ -247,7 +260,7 @@ open the dive. Each page is self-contained and runs in your browser.</p>
 <ul>
 {dives_html}
 </ul>
-{articles_section}
+{articles_section}{comparisons_section}
 <p class="about">Built with <a href="https://github.com/pvpoke/pvpoke">PvPoke</a>
 game data. If you find something broken or surprising, email me.</p>
 </body>
@@ -261,13 +274,17 @@ def main() -> int:
         return 1
     dives = load_entries(WEBSITE_DIR)
     articles = load_entries(ARTICLES_DIR, href_prefix='articles/')
-    index_html = render_index(dives, articles)
+    comparisons = load_entries(COMPARISONS_DIR, href_prefix='comparisons/')
+    index_html = render_index(dives, articles, comparisons)
     INDEX_PATH.write_text(index_html)
-    print(f"Wrote {INDEX_PATH} ({len(dives)} dive(s), {len(articles)} article(s))")
+    print(f"Wrote {INDEX_PATH} ({len(dives)} dive(s), "
+          f"{len(articles)} article(s), {len(comparisons)} comparison(s))")
     for d in dives:
         print(f"  - [dive] {d['title']} -> {d['href']}")
     for a in articles:
         print(f"  - [article] {a['title']} -> {a['href']}")
+    for c in comparisons:
+        print(f"  - [comparison] {c['title']} -> {c['href']}")
     return 0
 
 
