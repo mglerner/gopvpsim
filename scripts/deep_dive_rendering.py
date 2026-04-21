@@ -68,6 +68,96 @@ class AnalysisContext:
 
 
 # ---------------------------------------------------------------------------
+# Tooltip registry (deduplicate title= attribute values)
+# ---------------------------------------------------------------------------
+# A single Oinkologne GL dive emits ~87k title= attributes but only
+# ~1.6k unique values (every anchor-tag badge carries the same tooltip
+# across hundreds of IV cells). Rather than interpolate the full text
+# inline, the renderer registers each tooltip here and emits
+# data-t="<short-id>". At page load a DOMContentLoaded pass looks up
+# DATA.tooltips[id] and sets the .title attribute on each tagged node.
+#
+# Saves ~18 MB on an Oinkologne-shape dive, ~300 KB on a Tinkaton-shape
+# dive. See docs/s11_html_size_audit.md for full budget.
+
+
+class _TooltipRegistry:
+    # Base-62 alphabet starting with letters; 62^2=3844 so the common
+    # case (~1.6k unique tooltips) is covered by 2-char ids.
+    _ALPHA = (
+        'abcdefghijklmnopqrstuvwxyz'
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        '0123456789'
+    )
+
+    def __init__(self):
+        self._by_text: dict[str, str] = {}
+        self._ordered: list[str] = []
+
+    def reset(self) -> None:
+        self._by_text.clear()
+        self._ordered.clear()
+
+    def register(self, text: str) -> str:
+        if not text:
+            return ''
+        cached = self._by_text.get(text)
+        if cached is not None:
+            return cached
+        sid = self._encode(len(self._ordered))
+        self._ordered.append(text)
+        self._by_text[text] = sid
+        return sid
+
+    @classmethod
+    def _encode(cls, n: int) -> str:
+        a = cls._ALPHA
+        if n < len(a):
+            return a[n]
+        out = []
+        while n:
+            out.append(a[n % len(a)])
+            n //= len(a)
+        return ''.join(reversed(out))
+
+    def dump(self) -> dict[str, str]:
+        return {self._encode(i): t for i, t in enumerate(self._ordered)}
+
+    def count(self) -> int:
+        return len(self._ordered)
+
+
+_TOOLTIPS = _TooltipRegistry()
+
+
+def reset_tooltip_registry() -> None:
+    _TOOLTIPS.reset()
+
+
+def dump_tooltip_registry() -> dict[str, str]:
+    return _TOOLTIPS.dump()
+
+
+def tooltip_count() -> int:
+    return _TOOLTIPS.count()
+
+
+def tooltip_attr(text: str) -> str:
+    """Return ' data-t="<sid>"' for interpolation into an open HTML tag.
+
+    Registers `text` in the module-global registry; deep_dive.py dumps
+    the registry into DATA.tooltips at emit time, and runtime JS maps
+    data-t back to el.title on DOMContentLoaded.
+
+    Returns '' if text is falsy, so callers can interpolate
+    unconditionally without guard logic.
+    """
+    if not text:
+        return ''
+    return f' data-t="{_TOOLTIPS.register(text)}"'
+
+
+# ---------------------------------------------------------------------------
 # Opponent color-coding
 # ---------------------------------------------------------------------------
 
@@ -1175,12 +1265,9 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
                 )
                 _slug = _weight.replace(' ', '-')
                 _tip = atk_weight_tip(_weight)
-                # title="..." gives the browser a native hover tooltip
-                # with no JS and no CSS-positioning work; ~45 bytes per
-                # instance is acceptable bulk (~2% of dive HTML).
-                _tip_attr = f' title="{_tip}"' if _tip else ''
                 badge = (f' <span class="dd-atk-weight '
-                         f'dd-atk-weight-{_slug}"{_tip_attr}>{_weight}</span>')
+                         f'dd-atk-weight-{_slug}"{tooltip_attr(_tip)}>'
+                         f'{_weight}</span>')
             parts.append(
                 f'<p{row_cls}><b>{label}</b>{badge} &mdash; '
                 f'atk {atk:.2f}, def {def_:.2f}, hp {hp}, '
@@ -1723,7 +1810,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                     f'<td>{data_obj["ivDef"][iv]:.2f}</td>'
                     f'<td>{data_obj["ivHp"][iv]}</td>'
                     f'<td>#{avg_ranks[iv]}</td>'
-                    f'<td class="{nc}" title="{flip_hover}">'
+                    f'<td class="{nc}"{tooltip_attr(flip_hover)}>'
                     f'{net:+d}</td></tr>\n'
                 )
             if n_truncated > 0:
@@ -2372,8 +2459,8 @@ function ddToggleTagsCompactCell(event) {
                     col = CAT_COLORS.get(o, '#888')
                     badges += (
                         f'<span class="dd-badge" '
-                        f'style="background:{col};color:#000" '
-                        f'title="{o}">{ab}</span> '
+                        f'style="background:{col};color:#000"'
+                        f'{tooltip_attr(o)}>{ab}</span> '
                     )
 
                 # Ultra-short tag rendering: one badge per parent.
@@ -2443,9 +2530,9 @@ function ddToggleTagsCompactCell(event) {
                         f'{parent}\n'
                         f'{sub_labels_text}'
                     )
-                    hover_attr = hover_text_str.replace('"', '&quot;')
                     tag_bits.append(
-                        f'<span class="dd-anchor-tag" title="{hover_attr}">'
+                        f'<span class="dd-anchor-tag"'
+                        f'{tooltip_attr(hover_text_str)}>'
                         f'{badge_text}</span>'
                     )
                     # Tally for the cell-level summary tooltip. Use the
@@ -2506,8 +2593,8 @@ function ddToggleTagsCompactCell(event) {
                     f'<td class="dd-gain">{r["total_wins"]}</td>'
                     f'<td>{r["avg_score"]:.1f}</td>'
                     f'<td>{badges}</td>'
-                    f'<td class="dd-anchor-tags-cell" '
-                    f'title="{cell_title_attr}">'
+                    f'<td class="dd-anchor-tags-cell"'
+                    f'{tooltip_attr(cell_title_attr)}>'
                     f'<div class="dd-anchor-tags-inner dd-tags-compact" '
                     f'onclick="ddToggleTagsCompactCell(event)">'
                     f'{tags_cell}</div></td></tr>\n'
@@ -2770,7 +2857,7 @@ def render_analysis_volatility_html(data_obj, nIvs, nS, scenarios,
                 cls = ' class="dd-rank-good"'
             elif r > 1000:
                 cls = ' class="dd-rank-bad"'
-            row += f'<td{cls} title="Rank {r} out of {nIvs}">{r}</td>'
+            row += f'<td{cls}{tooltip_attr(f"Rank {r} out of {nIvs}")}>{r}</td>'
         rng = max(ranks_for_iv) - min(ranks_for_iv)
         row += f'<td><b>{avg_ranks[iv]}</b></td><td>{rng}</td><td>{tier_badge_html(data_obj, iv)}</td></tr>\n'
         parts.append(row)
