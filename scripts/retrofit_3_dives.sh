@@ -69,7 +69,8 @@ log "log: $LOG"
 log "status: $STATUS"
 log ""
 log "Status box (paste into another terminal pane):"
-log "  while true; do clear; scripts/chain_status.py --chain retrofit; sleep 5; done"
+log "  watch -n 5 -c 'scripts/chain_status.py --chain retrofit'             # needs: brew install watch"
+log "  while true; do clear; scripts/chain_status.py --chain retrofit; sleep 5; done   # no deps"
 log ""
 
 # 1. Re-dive the 2 Oinkologne GL dives. run_website_dives.py's

@@ -63,7 +63,7 @@ log "log: $LOG"
 log "status: $STATUS"
 log ""
 log "Status box (paste into another terminal pane):"
-log "  watch -n 5 'scripts/chain_status.py --chain overnight'              # needs: brew install watch"
+log "  watch -n 5 -c 'scripts/chain_status.py --chain overnight'              # needs: brew install watch"
 log "  while true; do clear; scripts/chain_status.py --chain overnight; sleep 5; done   # no deps"
 log ""
 

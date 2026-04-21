@@ -399,7 +399,11 @@ def main() -> int:
     p.add_argument('--no-color', action='store_true')
     args = p.parse_args()
 
-    if args.no_color or not sys.stdout.isatty():
+    # Colors are on by default so `watch -c` renders correctly. Pipe-
+    # through or capture-to-file: pass --no-color. Auto-detecting via
+    # isatty() breaks the primary use case (watch -c), which routes
+    # stdout through watch and reads !isatty().
+    if args.no_color:
         _USE_COLOR = False
 
     # Resolve chain config: preset + per-flag overrides.
@@ -471,7 +475,7 @@ def main() -> int:
 
     refresh_hint = f'scripts/chain_status.py --chain {args.chain}' if args.chain \
         else 'scripts/chain_status.py'
-    print(f'  {dim(f"refresh: watch -n 5 {refresh_hint}")}')
+    print(f'  {dim(f"refresh: watch -n 5 -c {refresh_hint}")}')
     return 0
 
 
