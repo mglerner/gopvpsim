@@ -90,6 +90,23 @@ _NARRATIVE_CSS_OVERRIDE = """
 .dd-threshold-list li { --sidebar-color: #0f3460; --sidebar-width: 2px;
   padding: 4px 0 4px 14px; margin: 4px 0; }
 .dd-threshold-list .dd-loss-item { --sidebar-color: #f85149; }
+.dd-species-narrative-details > summary {
+  cursor: pointer;
+  color: #d29922;
+  font-weight: 600;
+  font-size: 1.0rem;
+  padding: 6px 0 6px 20px;
+  list-style: none;
+}
+.dd-species-narrative-details > summary::-webkit-details-marker { display: none; }
+.dd-species-narrative-details > summary::before {
+  content: "▸ ";
+  display: inline-block;
+}
+.dd-species-narrative-details[open] > summary::before {
+  content: "▾ ";
+}
+.dd-species-narrative-details > summary:hover { color: #e0ae3a; }
 .dd-species-narrative .dd-narrative-block {
   --sidebar-color: #d29922;
   padding: 10px 0 10px 20px;
