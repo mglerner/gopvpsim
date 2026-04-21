@@ -308,13 +308,25 @@ def main() -> int:
         narrative, cd_prep = _load_narrative_and_cd_prep(toml_path, species)
 
         # Auto-generate A-field prose from the dive's embedded score
-        # data when cd_prep declares a CD fast move and the species has
-        # a PvPoke default moveset to compare against. Templates in
-        # auto_gen_narrative.py are data-driven and deterministic; they
-        # fill only empty TOML fields (human overrides always win).
+        # data. Templates in auto_gen_narrative.py are data-driven and
+        # deterministic; they fill only empty TOML fields (human
+        # overrides always win). Two modes:
+        #
+        # * **CD mode** fires when cd_prep declares a CD fast move AND
+        #   a distinct PvPoke-default exists to compare against — the
+        #   templates narrate the CD-vs-baseline delta (Oinkologne,
+        #   Tinkaton, etc.).
+        # * **Standalone mode** fires otherwise (non-CD species like
+        #   Aegislash, or species whose CD move matches the default).
+        #   Templates narrate the species' top-scoring moveset by
+        #   absolute win rate, skipping delta prose.
+        #
+        # The gate is now "does the dive have data" rather than "is
+        # this a CD species" — see docs/jre_ryanswag_comparison.md §10
+        # G5-B for the design motivation.
         cd_fast_moves = cd_prep.get('fast_moves') or []
         cd_fast = cd_fast_moves[0] if cd_fast_moves else None
-        if cd_fast and root.is_dir():
+        if root.is_dir():
             try:
                 baseline_fast, _ = get_default_moveset(species, league)
             except (KeyError, Exception) as exc:
@@ -322,24 +334,28 @@ def main() -> int:
                 print(f'[warn] {root}: no default moveset for '
                       f'{species!r} in {league}: {exc}',
                       file=sys.stderr)
-            if baseline_fast and baseline_fast != cd_fast:
-                try:
-                    dive_data = _load_dive_data(root)
-                except SystemExit as exc:
-                    dive_data = None
-                    print(f'[warn] {root}: dive data load failed: {exc}',
-                          file=sys.stderr)
-                if dive_data is not None:
-                    if gm is None:
-                        gm = load_gamemaster()
-                    auto_gen_narrative.fill_narrative_a_fields(
-                        narrative, dive_data,
-                        species=species,
-                        cd_move_fast=cd_fast,
-                        baseline_move_fast=baseline_fast,
-                        league=league,
-                        gm=gm,
-                    )
+            try:
+                dive_data = _load_dive_data(root)
+            except SystemExit as exc:
+                dive_data = None
+                print(f'[warn] {root}: dive data load failed: {exc}',
+                      file=sys.stderr)
+            if dive_data is not None:
+                if gm is None:
+                    gm = load_gamemaster()
+                # In standalone mode (no cd_fast, or cd_fast equals
+                # baseline_fast), pass None for both so the templates'
+                # internal logic picks the top-scoring moveset.
+                effective_cd = cd_fast if (cd_fast and cd_fast != baseline_fast) else None
+                effective_base = baseline_fast if effective_cd else None
+                auto_gen_narrative.fill_narrative_a_fields(
+                    narrative, dive_data,
+                    species=species,
+                    cd_move_fast=effective_cd,
+                    baseline_move_fast=effective_base,
+                    league=league,
+                    gm=gm,
+                )
 
         if not narrative:
             print(f'[skip] {root}: TOML {toml_path.name} has no narrative '
