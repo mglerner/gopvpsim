@@ -335,6 +335,28 @@ DEEP_DIVE_CSS = """
   padding: 10px 0 10px 20px; margin: 16px 0; }
 .dd-sim-zone > h3 { color: #58a6ff; margin: 0 0 10px 0; }
 .dd-species-narrative { margin: 20px 0; }
+/* Collapsed-by-default narrative wrapper so the Plotly scatter (the
+ * dive's centerpiece) lands at the top of the page; readers expand
+ * for prose. The summary line sits where the old H2/H3 headers
+ * would have been and inherits the same gold accent. */
+.dd-species-narrative-details > summary {
+  cursor: pointer;
+  color: #d29922;
+  font-weight: 600;
+  font-size: 1.0rem;
+  padding: 6px 0 6px 20px;
+  list-style: none;
+}
+.dd-species-narrative-details > summary::-webkit-details-marker { display: none; }
+.dd-species-narrative-details > summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s ease-out;
+}
+.dd-species-narrative-details[open] > summary::before {
+  content: "▾ ";
+}
+.dd-species-narrative-details > summary:hover { color: #e0ae3a; }
 .dd-species-narrative .dd-narrative-block {
   --sidebar-color: #d29922;
   padding: 10px 0 10px 20px;
@@ -856,7 +878,22 @@ def render_species_narrative(narrative: dict) -> str:
     if not (intro_body or mr_has_content or verdict_has_content):
         return ''
 
+    # Build the summary label from the blocks actually present so the
+    # collapsed state tells the reader what's hidden. Default-closed so
+    # the Plotly scatter (the dive's centerpiece) is immediately
+    # visible at the top of the page; one click expands the prose.
+    present_labels = []
+    if intro_body:
+        present_labels.append('Overview')
+    if mr_has_content:
+        present_labels.append('Meta Role')
+    if verdict_has_content:
+        present_labels.append('Verdict')
+    summary_text = ' · '.join(present_labels) if present_labels else 'Species overview'
+
     parts = ['<section class="dd-species-narrative">\n']
+    parts.append('<details class="dd-species-narrative-details">\n')
+    parts.append(f'<summary>{summary_text}</summary>\n')
 
     if intro_body:
         parts.append(f'<div class="dd-narrative-block {_authored_by_class(intro_block)}">\n')
@@ -890,6 +927,7 @@ def render_species_narrative(narrative: dict) -> str:
         parts.append(format_block_attribution(verdict_block))
         parts.append('\n</div>\n')
 
+    parts.append('</details>\n')
     parts.append('</section>\n')
     return ''.join(parts)
 
