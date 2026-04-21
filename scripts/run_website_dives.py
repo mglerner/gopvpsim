@@ -258,9 +258,10 @@ def main():
         # patcher reads the dive's embedded SCORES_GZ + DATA and fills
         # empty intro.body / meta_role.good_at / meta_role.bad_at from
         # templates in scripts/auto_gen_narrative.py. Idempotent with
-        # --force; safe no-op when the species has no cd_prep block
-        # (Aegislash etc.). Runs per-dive so a failure doesn't block
-        # later dives.
+        # --force; fires for every species with dive data (CD species
+        # get the CD-vs-baseline comparison, non-CD species like
+        # Aegislash get the standalone stats rollup via B2 templates).
+        # Runs per-dive so a failure doesn't block later dives.
         dive_dir = os.path.join(WEBSITE_DIR, dive['slug'])
         if os.path.isdir(dive_dir):
             patcher = os.path.join(SCRIPT_DIR, 'patch_dive_species_narrative.py')
