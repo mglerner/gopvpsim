@@ -3052,6 +3052,10 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
                 league=league,
                 cd_date=article.get('cd_date'),
                 form_comparison=_form_comparison_present,
+                # Article has dedicated §meta-coverage / §fast-moves /
+                # §charged-moves sections; suppress the intro's compact
+                # meta-coverage + move-pool paragraphs to avoid duplication.
+                include_supplement=False,
                 gm=_gm_for_autogen,
             )
     toml_framing = (article.get('framing') or '').strip()
