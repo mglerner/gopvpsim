@@ -388,6 +388,50 @@ second test case for the new Meta Role section type, with
 natural relevance since Aegislash is new to the meta and the
 meta-role framing matters more than usual.
 
+### 2026-04-21 refresh follow-ups (comparison doc §10)
+
+Refresh pass 2026-04-21 against shipped F1-F5 state surfaced five
+new gaps the original 2026-04-18 cut did not anticipate. Full
+writeup in `docs/jre_ryanswag_comparison.md` §10.4; short form:
+
+- **[Pre-ship, small mechanical] G4 — `authored-auto` label for
+  auto-gen narrative blocks.** Article currently labels auto-gen
+  intro / meta-role with `authored-human` class — misleading. The
+  Aegislash dive does it right (`authored-ai` + attribution line);
+  auto-gen should have its own class. 0.5 session, pure CSS +
+  renderer patch. No content dependency — ship independently.
+
+- **[Pre-ship, conditional] G5 — Aegislash narrative is orphan
+  ship content.** Prose lives in shipped
+  `aegislash-shield-great-league/index.html:299-317` but
+  `thresholds/aegislash_shield.toml` bodies are empty (wiped by
+  `a1b700d`). Next re-dive or re-render of Aegislash wipes the
+  narrative. If Aegislash ships with Oinkologne CD (or is touched
+  by any overnight chain), reinstate the TOML bodies with
+  Michael-as-author attribution per pre-commit-hook policy. If
+  Aegislash is not re-touched pre-ship, punt to post-ship.
+
+- **[Pre-ship, Michael-decides] G3 — Oinkologne verdict editorial
+  + outlook prose not populated.** `cbc9b28` shipped the F4 schema
+  + renderer hook; article ships with just the mechanical one-liner
+  because verdict editorial is expert-only (no auto-gen template,
+  per `feedback_expert_narrative_not_autogen`). Either 15-30 min
+  of Michael-authored prose pre-ship OR accept the mechanical line
+  as the ship form. Both defensible.
+
+- **[Post-ship, recommended] G1 + G2 + G7 — richer auto-gen prose
+  template.** F1 Meta Role, F2 key-flips callout, and F-fast/charge-
+  moves all shipped as deterministic rollups ("vs Steel-type:
+  Steelix +77pp..." / "Steelix — Male: 0.0% → 76.6% (+76.6 pp)
+  +Flip"). JRE-style prose ("Mud Slap takes Male Oinkologne from
+  0% to 76.6% vs Steelix — the signature upgrade") would close
+  the register gap. Template change, not Claude-drafted prose, so
+  ship-policy-clean. 0.5-1 session. Benefits every future dive.
+
+- **[Post-ship, bundles with G1] Row D — bulk-vs-peers paragraph.**
+  Micro-gap from original §3.D; never made it through F1's auto-
+  gen template. Fold into the G1 template upgrade.
+
 ## Post-ship (article + dive polish, 2026-04-18)
 
 Items queued from the post-S10 UI polish round that are nice-to-
