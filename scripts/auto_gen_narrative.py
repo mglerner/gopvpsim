@@ -482,9 +482,13 @@ def fill_narrative_a_fields(
         if not value:
             return
         block[field] = value
-        # Drop attribution when we're the author.
+        # Drop any prior free-form `author = "..."` attribution, since the
+        # content is now deterministically data-derived; tag provenance via
+        # `authored_by = "auto"` so the renderer picks the neutral
+        # auto-gen sidebar colour instead of the gold "authored-human"
+        # default.
         block.pop('author', None)
-        block.pop('authored_by', None)
+        block['authored_by'] = 'auto'
 
     intro = narrative.setdefault('intro', {})
     _auto_fill(intro, 'body', render_intro(

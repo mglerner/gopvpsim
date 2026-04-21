@@ -3322,12 +3322,15 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
             border-top: 1px solid #0f3460; padding-top: 12px; }}
   /* Narrative blocks (intro / meta_role / verdict augment). Gold by
      default; orange when the block was AI-drafted and not yet human-
-     reviewed. Colour is driven by the --sidebar-color custom property
-     from the .authored-{{human,ai,mixed}} modifier, consumed by the
+     reviewed; blue when the block was auto-generated from dive data
+     by scripts/auto_gen_narrative.py. Colour is driven by the
+     --sidebar-color custom property from the
+     .authored-{{human,ai,mixed,auto}} modifier, consumed by the
      shared sidebar ::before rule below. */
   div.article-narrative-block {{ --sidebar-color: #d29922;
          padding: 10px 0 10px 20px; margin: 10px 0; }}
   div.article-narrative-block.authored-ai {{ --sidebar-color: #e8903a; }}
+  div.article-narrative-block.authored-auto {{ --sidebar-color: #5b8dd9; }}
 {COMPARE_CSS}
 {_sidebar_css}
 </style>
