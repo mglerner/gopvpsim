@@ -14,7 +14,7 @@ from typing import Optional
 import deep_dive_analysis as analysis
 from gopvpsim.anchors import derive_short_name
 from render_article import format_block_attribution, format_body
-from auto_gen_narrative import classify_atk_weight
+from auto_gen_narrative import classify_atk_weight, atk_weight_tip
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ DEEP_DIVE_CSS = """
    so badges read as annotation, not emphasis. */
 .dd-atk-weight { display:inline-block; padding:1px 7px; border-radius:3px;
   font-size:0.72rem; font-weight:500; text-transform:lowercase;
-  margin-left:6px; letter-spacing:0.02em; }
+  margin-left:6px; letter-spacing:0.02em; cursor:help; }
 .dd-atk-weight-rank-1 { background:#1e2d4a; color:#58a6ff; }
 .dd-atk-weight-no-atk-weight { background:#1b2b1b; color:#7db87d; }
 .dd-atk-weight-slight-atk-weight { background:#2a2617; color:#d29922; }
@@ -1174,8 +1174,13 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
                     _rank1_stats,
                 )
                 _slug = _weight.replace(' ', '-')
+                _tip = atk_weight_tip(_weight)
+                # title="..." gives the browser a native hover tooltip
+                # with no JS and no CSS-positioning work; ~45 bytes per
+                # instance is acceptable bulk (~2% of dive HTML).
+                _tip_attr = f' title="{_tip}"' if _tip else ''
                 badge = (f' <span class="dd-atk-weight '
-                         f'dd-atk-weight-{_slug}">{_weight}</span>')
+                         f'dd-atk-weight-{_slug}"{_tip_attr}>{_weight}</span>')
             parts.append(
                 f'<p{row_cls}><b>{label}</b>{badge} &mdash; '
                 f'atk {atk:.2f}, def {def_:.2f}, hp {hp}, '
