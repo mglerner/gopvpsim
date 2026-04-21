@@ -2325,6 +2325,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     n_scenarios = len(shield_scenarios)
     n_opponents = len(opponent_names)
 
+    # Reset so each emitted HTML file has its own tooltip lookup; a
+    # prior file's entries must not leak into this one.
+    rendering.reset_tooltip_registry()
+
     # Build threshold tier info
     tier_names = list(thresholds.keys()) if thresholds else []
     tier_info = []
@@ -3207,6 +3211,12 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         raw = struct.pack(f'<{len(clamped)}H', *clamped)
         gz = gzip.compress(raw, compresslevel=9)
         packed_scores[key] = base64.b64encode(gz).decode('ascii')
+    # Dedup'd tooltip table: renderers register tooltip text as they
+    # emit data-t="<sid>" attrs; we dump {sid: text} here and a
+    # DOMContentLoaded pass (below) populates el.title from the
+    # lookup. Saves ~18 MB on an Oinkologne-shape dive by collapsing
+    # 87k repeated title= values to 1.6k unique strings.
+    data_obj['tooltips'] = rendering.dump_tooltip_registry()
     html += f'<script>var DATA = {json.dumps(data_obj)};\n'
     html += f'var SCORES_GZ = {json.dumps(packed_scores)};\n'
     html += """
@@ -3261,6 +3271,30 @@ var _scoresReady = (async function() {
       offset += chunks[i].byteLength;
     }
     SCORES[key] = Array.from(new Uint16Array(merged.buffer));
+  }
+})();
+
+// Populate title= attributes from DATA.tooltips lookup.
+// Every element with data-t="<sid>" gets its title set from
+// DATA.tooltips[sid]. Runs at DOMContentLoaded so native browser
+// tooltips work without further JS on hover. Decouples per-element
+// tooltip bulk from the HTML source (~18 MB saved on Oinkologne
+// -shape dives; ~300 KB on Tinkaton-shape). See
+// docs/s11_html_size_audit.md.
+(function() {
+  if (!DATA.tooltips) return;
+  var tips = DATA.tooltips;
+  var populate = function() {
+    var nodes = document.querySelectorAll('[data-t]');
+    for (var i = 0; i < nodes.length; i++) {
+      var tip = tips[nodes[i].getAttribute('data-t')];
+      if (tip) nodes[i].setAttribute('title', tip);
+    }
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', populate);
+  } else {
+    populate();
   }
 })();
 """
