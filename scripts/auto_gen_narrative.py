@@ -450,8 +450,9 @@ def render_form_change(species: str, gm: Optional[dict]) -> str:
             ept = eg / turns if turns else 0.0
             fname = fm.get('name') or fid
             parts.append(
-                f'Default fast move {fname} has power 0 — pure energy '
-                f'generation at {ept:.1f} EPT, no damage.'
+                f'Default fast move {fname} has power 0 — 1 damage per '
+                f'hit via PvP\'s minimum-damage floor, primarily energy '
+                f'generation at {ept:.1f} EPT.'
             )
             break
     return ' '.join(parts)
