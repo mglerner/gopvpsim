@@ -14,7 +14,14 @@ Invocation::
 
     scripts/chain_status.py --chain overnight
     scripts/chain_status.py --chain retrofit
+    scripts/chain_status.py --chain single
     watch -n 5 scripts/chain_status.py --chain retrofit
+
+The ``single`` preset watches the most recent standalone
+``python scripts/deep_dive.py ...`` run — it picks the freshest
+per-dive log by mtime, with no wrapper-log required. Dives are run
+serially (see memory ``feedback_serial_dives``), so a bare
+``pgrep deep_dive.py`` unambiguously finds the live dive.
 
 Escape hatch for a one-off chain::
 
@@ -59,6 +66,21 @@ CHAINS = {
         'status_file': 'userdata/logs/retrofit_status.txt',
         'pgrep': 'retrofit_3_dives.sh',
         'wrapper_log_glob': f'{LOG_DIR_GLOB}/retrofit_*.log',
+    },
+    # Single-dive preset: for ad-hoc `python scripts/deep_dive.py ...`
+    # runs that aren't driven by a wrapper script. Sentinel status_file
+    # and wrapper_log_glob keep the main() flow happy; the most-recent
+    # per-dive log (by mtime) is picked automatically because no
+    # chain-start epoch is available to bound the candidate set.
+    #
+    # The pgrep pattern anchors on `python` + `deep_dive.py` so it
+    # doesn't false-match this very invocation's `watch` command
+    # (whose args contain the string `deep_dive.py` when a prior
+    # session used --pgrep with the bare name).
+    'single': {
+        'status_file': '/dev/null',
+        'pgrep': r'python.*deep_dive\.py',
+        'wrapper_log_glob': f'{LOG_DIR_GLOB}/__no_wrapper__.log',
     },
 }
 
@@ -385,7 +407,9 @@ def main() -> int:
 
     p = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     p.add_argument('--chain', choices=list(CHAINS),
-                   help='Preset chain (overnight, retrofit)')
+                   help='Preset chain (overnight, retrofit, single). '
+                        '`single` tracks the most recent ad-hoc '
+                        '`python scripts/deep_dive.py ...` run.')
     p.add_argument('--status-file', type=Path,
                    help='Override: single-line status file')
     p.add_argument('--pgrep', help='Override: pgrep pattern for chain liveness')
