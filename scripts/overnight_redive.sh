@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Overnight re-dive + article regen + comparison + verify pipeline.
 #
-# Runs all 8 website dives serially (per run_website_dives.py), patches
-# per-opponent anchors, regenerates the Oinkologne CD article, renders
-# the two Aegislash form-change comparison pages and the two Aegislash
-# first-draft narrative articles (auto-prose, flag before shipping),
-# rebuilds the site index, and runs the link verifier.
+# Runs all 12 website dives serially (per run_website_dives.py;
+# Oinkologne M/F GL, Tinkaton GL/UL, Aegislash Blade/Shield GL + UL,
+# Forretress normal/shadow x Volt-Switch/Bug-Bite GL),
+# patches per-opponent anchors, regenerates the Oinkologne CD article,
+# renders the two Aegislash form-change comparison pages and the two
+# Aegislash first-draft narrative articles (auto-prose, flag before
+# shipping), rebuilds the site index, and runs the link verifier.
 #
 # Usage:
 #   nohup scripts/overnight_redive.sh &
@@ -67,8 +69,11 @@ log "  watch -n 5 -c 'scripts/chain_status.py --chain overnight'              # 
 log "  while true; do clear; scripts/chain_status.py --chain overnight; sleep 5; done   # no deps"
 log ""
 
-# 1. Eight website dives (serial, per run_website_dives.py).
-step "Running 8 dives via run_website_dives.py" \
+# 1. Twelve website dives (serial, per run_website_dives.py). Aegislash GL
+#    rejoined the chain 2026-04-21 so the 2026-04-21 rename refactor
+#    (drop compound <br> tier names, auto-gen standalone-mode narrative
+#    for non-CD species) reaches every shipped dive.
+step "Running 12 dives via run_website_dives.py" \
     python scripts/run_website_dives.py
 
 # 2. Back-fill per-opponent #opp-<slug> anchors into every dive dir.

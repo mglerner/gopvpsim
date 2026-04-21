@@ -85,14 +85,38 @@ DIVES = [
     # Blade so the hypothetical always-Blade comparison is apples-to-
     # apples.
     #
-    # Aegislash GL dives are intentionally ABSENT from the overnight
-    # chain (decision 2026-04-19): they run out-of-band against the
-    # cs_2026_orlando_top32.txt pool (24+ actual meta species from the
-    # 2026 Orlando CS finals) for a faster / CS-relevant snapshot.
-    # Only the UL pair stays in the overnight DIVES list. If you need
-    # to re-dive Aegislash GL, run deep_dive.py directly against that
-    # pool (see the commit trailing this block for the canonical
-    # command).
+    # Aegislash GL dives rejoined the overnight chain 2026-04-21 (was
+    # previously out-of-band against cs_2026_orlando_top32.txt). The
+    # 2026-04-21 pre-ship rename refactor drops compound <br> tier-card
+    # names and emits auto-gen standalone-mode narrative for non-CD
+    # species; keeping GL Aegislash out of the chain would leave the
+    # shipped GL dives on the old compound format, and the Aegislash
+    # Blade-vs-Shield GL comparison page + form-change guide article
+    # link directly into those GL dives.
+    {
+        'species': 'Aegislash (Blade)',
+        'league': 'great',
+        'slug': 'aegislash-blade-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'top_movesets': 5,
+        'no_thresholds': True,
+        'extra_args': ['--fast', 'PSYCHO_CUT',
+                       '--charged', 'SHADOW_BALL,GYRO_BALL'],
+        'reference': 'PSYCHO_CUT,SHADOW_BALL,GYRO_BALL',
+    },
+    {
+        'species': 'Aegislash (Shield)',
+        'league': 'great',
+        'slug': 'aegislash-shield-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'extra_args': ['--fast', 'AEGISLASH_CHARGE_PSYCHO_CUT',
+                       '--charged', 'SHADOW_BALL,GYRO_BALL'],
+        'reference': 'AEGISLASH_CHARGE_PSYCHO_CUT,SHADOW_BALL,GYRO_BALL',
+    },
     {
         'species': 'Aegislash (Blade)',
         'league': 'ultra',
