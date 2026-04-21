@@ -518,6 +518,21 @@ def fill_narrative_a_fields(
 # Atk-weight classifier for Notable IVs
 # --------------------------------------------------------------------
 
+ATK_WEIGHT_TIPS = {
+    'rank-1': 'Stat-product-max IV for this league',
+    'no atk weight': 'Same Atk as rank-1; bulk within 2 points',
+    'slight atk weight': 'Atk up to +3 over rank-1; bulk -3 to -8',
+    'heavy atk weight': 'Atk >+3 over rank-1; bulk more than -8',
+    'bulk-max': 'Atk ≤ rank-1 with higher bulk',
+    'atk tilt': 'Above rank-1 Atk; other shapes the buckets do not catch',
+}
+
+
+def atk_weight_tip(label: str) -> str:
+    """Short one-line explanation of an atk-weight label, for hover tooltips."""
+    return ATK_WEIGHT_TIPS.get(label, '')
+
+
 def classify_atk_weight(iv: dict, rank1: dict) -> str:
     """Label an IV spread by its attack/bulk tilt relative to rank-1.
 
