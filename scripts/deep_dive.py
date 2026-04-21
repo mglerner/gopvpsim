@@ -1173,10 +1173,42 @@ THRESHOLD_COLORS = [
 
 
 PLOTLY_CDN = "https://cdn.plot.ly/plotly-2.35.2.min.js"
+PLOTLY_FILENAME = "plotly-2.35.2.min.js"
 
 
-def _plotly_script_tag(standalone):
-    """Return the <script> tag for Plotly.js — CDN link or inlined source."""
+def _plotly_script_tag(standalone, shared_plotly_dir=None, html_path=None):
+    """Return the <script> tag for Plotly.js.
+
+    Three modes, picked in order:
+      shared_plotly_dir set: write plotly.min.js there once (idempotent)
+        and emit a relative <script src=...> referencing it. Saves
+        ~4.35 MB per dive file vs --standalone; keeps offline operation
+        as long as the shared dir travels with the dives. Overrides
+        `standalone`.
+      standalone=True: download and inline plotly.min.js (~4.35 MB
+        inline blob; file works in isolation).
+      otherwise: emit a CDN <script src=...> reference.
+    """
+    if shared_plotly_dir is not None:
+        shared = Path(shared_plotly_dir)
+        shared.mkdir(parents=True, exist_ok=True)
+        plotly_path = shared / PLOTLY_FILENAME
+        if not plotly_path.exists():
+            import urllib.request
+            import ssl
+            import certifi
+            logger.info(f"  Downloading Plotly.js to shared dir: {plotly_path}")
+            ctx = ssl.create_default_context(cafile=certifi.where())
+            with urllib.request.urlopen(PLOTLY_CDN, context=ctx) as r:
+                plotly_path.write_bytes(r.read())
+        if html_path:
+            rel = os.path.relpath(
+                str(plotly_path),
+                os.path.dirname(os.path.abspath(html_path)),
+            )
+        else:
+            rel = str(plotly_path)
+        return f'<script src="{rel}"></script>'
     if not standalone:
         return f'<script src="{PLOTLY_CDN}"></script>'
     import urllib.request
@@ -1191,7 +1223,8 @@ def _plotly_script_tag(standalone):
 
 def generate_html(species, league, moveset_results, html_path, thresholds=None,
                   opponent_label=None, shield_scenarios=None, opponent_names=None,
-                  opp_iv_mode='pvpoke', standalone=False, cli_args_str=None):
+                  opp_iv_mode='pvpoke', standalone=False, cli_args_str=None,
+                  shared_plotly_dir=None):
     """
     Generate an interactive HTML file with Plotly.js scatter plots.
 
@@ -1294,7 +1327,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
 <head>
 <meta charset="utf-8">
 <title>{species} {league.title()} League IV Deep Dive</title>
-{_plotly_script_tag(standalone)}
+{_plotly_script_tag(standalone, shared_plotly_dir, html_path)}
 <style>
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
          margin: 20px; background: #1a1a2e; color: #e0e0e0; }}
@@ -2300,7 +2333,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               _precomputed_analysis=None,
                               article_slug='',
                               threshold_registry=None,
-                              species_narrative=None):
+                              species_narrative=None,
+                              shared_plotly_dir=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -2739,7 +2773,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     data_obj['collection'] = _collection_data
 
     # --- Build HTML ---
-    plotly_tag = _plotly_script_tag(standalone)
+    plotly_tag = _plotly_script_tag(standalone, shared_plotly_dir, html_path)
     # Embed the equivalent CLI invocation as an HTML comment near the top so
     # `grep '<!-- CLI:' file.html` works for forensic comparison without
     # adding visible page chrome.
@@ -3633,6 +3667,14 @@ def main():
     parser.add_argument('--standalone', action='store_true',
                         help='Inline Plotly.js into the HTML so the file works '
                              'offline with no CDN dependency (~4MB larger)')
+    parser.add_argument('--shared-plotly', metavar='DIR', default=None,
+                        help='Write Plotly.js once to DIR and emit a '
+                             '<script src=...> reference relative to the '
+                             'HTML output. Saves ~4.35 MB per dive vs '
+                             '--standalone when rendering multiple dives '
+                             'that share a sibling directory (e.g. a '
+                             'website tree). Overrides --standalone. '
+                             'Example: --shared-plotly userdata/website/_shared')
     parser.add_argument('--screen-opponents', type=int, default=None, metavar='N',
                         help='Use only top N opponents for phase 1 screen '
                              '(default: same as --opponents)')
@@ -4672,6 +4714,7 @@ def main():
                         article_slug=_article_slug,
                         threshold_registry=threshold_registry,
                         species_narrative=_species_narrative,
+                        shared_plotly_dir=args.shared_plotly,
                     )
             else:
                 if args.split_movesets:
@@ -4692,6 +4735,7 @@ def main():
                     article_slug=_article_slug,
                     threshold_registry=threshold_registry,
                     species_narrative=_species_narrative,
+                    shared_plotly_dir=args.shared_plotly,
                 )
         else:
             # Static mode (original behavior)
@@ -4700,7 +4744,8 @@ def main():
                           shield_scenarios=shield_scenarios,
                           opponent_names=opponents, opp_iv_mode=opp_iv_mode,
                           standalone=args.standalone,
-                          cli_args_str=cli_args_str)
+                          cli_args_str=cli_args_str,
+                          shared_plotly_dir=args.shared_plotly)
 
     logger.info("Done.")
 
