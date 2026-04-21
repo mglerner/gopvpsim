@@ -12,7 +12,7 @@ Tags let the shell caller grep each independently without position
 coupling. DIVE is suppressed when there is no currently-running dive
 (chain hasn't started, or we're between dives / past the dive block).
 
-Intended to be called from scripts/overnight_status.sh so the pinned
+Intended to be called from scripts/chain_status.py so the pinned
 status box carries both a whole-script ETA and a current-dive ETA
 alongside per-dive progress.
 

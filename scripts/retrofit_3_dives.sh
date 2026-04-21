@@ -69,7 +69,7 @@ log "log: $LOG"
 log "status: $STATUS"
 log ""
 log "Status box (paste into another terminal pane):"
-log "  while true; do clear; scripts/overnight_status.sh; sleep 5; done"
+log "  while true; do clear; scripts/chain_status.py --chain retrofit; sleep 5; done"
 log ""
 
 # 1. Re-dive the 2 Oinkologne GL dives. run_website_dives.py's
