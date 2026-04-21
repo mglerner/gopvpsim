@@ -67,7 +67,7 @@ from pathlib import Path
 # classify() here doesn't.
 FALLBACKS = {
     'gl_full':    63.0,
-    'ul_full':    76.0,
+    'ul_full':    80.0,   # 2026-04-19 overnight chain observed median 79.6 (N=2); was 76.0
     'forretress': 25.0,
     'post_dive':  5.0,   # total for steps 2-10 of overnight_redive.sh
 }
