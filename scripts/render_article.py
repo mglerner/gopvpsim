@@ -1,8 +1,19 @@
 #!/usr/bin/env python3
-"""Render a CD article TOML into a self-contained HTML page.
+"""Render an EXPERT-authored CD article TOML into a self-contained HTML page.
+
+This renderer is ONLY for articles with ``authorship = "expert"`` — it
+emits the TOML's ``[[sections]]`` verbatim with minimal framing. For
+``authorship = "auto"`` or ``"both"`` (data-driven articles), use
+``scripts/generate_article.py`` instead; it renders the full article
+with stats tables, meta coverage grids, matchup deltas, etc., reading
+from the per-species dive data.
+
+Running this script against a non-expert article will clobber a
+richer previously-rendered HTML with a placeholder-only skeleton;
+``main()`` guards against that by refusing to run.
 
 Usage:
-    python scripts/render_article.py articles/oinkologne-cd-2026-05.toml
+    python scripts/render_article.py articles/<expert-slug>.toml
 
 Output lands in userdata/website/articles/<slug>/ with:
   - index.html  (the article page)
@@ -327,6 +338,18 @@ def main() -> int:
 
     article = load_article(args.toml_path)
     slug = args.toml_path.stem
+
+    # Guard: this renderer is for expert-authored articles only. Running
+    # it against an `auto` / `both` article would clobber the richer
+    # generate_article.py output with a placeholder skeleton. Symmetric
+    # with the same check in generate_article.py main() which refuses
+    # `expert` articles.
+    authorship = article.get('authorship', 'expert')
+    if authorship != 'expert':
+        sys.exit(
+            f"Article {slug!r} has authorship={authorship!r}, not 'expert'. "
+            f"Use scripts/generate_article.py instead; this renderer emits "
+            f"[[sections]] verbatim and would clobber the data-driven HTML.")
 
     slug_dir = ARTICLES_DIR / slug
     slug_dir.mkdir(parents=True, exist_ok=True)
