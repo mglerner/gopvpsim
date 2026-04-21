@@ -1359,9 +1359,17 @@ bottleneck.
   speedup; scope is contained (two vectorisation targets). Not post-ship
   anymore.
 
-* **HTML file size** -- Are our deep dive/interactive HTML files
-  getting too big? Latest fresh Annihilape HTML is ~25 MB; explicit is
-  ~23 MB. Mostly the embedded data + the wall of badge spans.
+* ~~**HTML file size**~~ — *S11+S12 shipped 2026-04-21 (commits
+  f839e65 S11 audit, 1fe232a R1 tooltip dedup, 5ad2d4b R2
+  --shared-plotly).* A/B on a small Oinkologne dive:
+  baseline 38.12 MB, R1+R2 21.72 MB (**-43.0%** file size,
+  **-40.5%** gzipped). Byte budget + ranked approach list in
+  `docs/s11_html_size_audit.md`. Deferred follow-ups (not currently
+  painful enough to pursue): lazy per-scenario SCORES_GZ blobs
+  (Rank 3 — regresses `file://` portability), class= dedup
+  (Rank 4 — gzip already captures most), defer-DOM collapsibles
+  (Rank 5 — wrong bottleneck). Reopen only if the post-R1+R2 file
+  size becomes painful again.
 
 * **Better slayer iteration progress reporting** — The current progress
   prints fire only when a `pool.imap_unordered` chunk completes. With
