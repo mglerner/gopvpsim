@@ -1810,13 +1810,56 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 f'<details class="dd-flip-detail">'
                 f'<summary>Member IVs ({n_members})</summary>\n'
             )
+            # Per-shield Score Δ vs rank-1 (0v0, 1v1, 2v2). Uses the
+            # pvpoke-default / bait-on score mode; dropdown reactivity
+            # to Shields / Opp-IV / Bait is future XL-candy-tool work
+            # (see TODO.md "Pre-ship: XL-candy-decision tool" + the
+            # JS-populated Mirror CMP % / Score Δ plan).
+            _target_scens = [(0, 0), (1, 1), (2, 2)]
+            _target_scen_labels = ['0v0', '1v1', '2v2']
+            _scen_list = [tuple(s) for s in data_obj.get('scenarios', [])]
+            _target_scen_idx = []
+            for pair in _target_scens:
+                try:
+                    _target_scen_idx.append(_scen_list.index(pair))
+                except ValueError:
+                    _target_scen_idx.append(None)
+            _scores_flat = (score_arrays.get(f'{moveset_idx}_pvpoke')
+                            if score_arrays else None)
+            _n_opps = data_obj.get('nOpponents', 0)
+            _n_scen = len(_scen_list)
+            _rank1_iv = data_obj.get('rank1RefIvIdx')
+            _per_scen_rank1: list = [None, None, None]
+            _have_per_shield = (_scores_flat is not None
+                                and _rank1_iv is not None
+                                and _n_opps > 0)
+            if _have_per_shield:
+                for i, si in enumerate(_target_scen_idx):
+                    if si is None:
+                        continue
+                    base = _rank1_iv * _n_scen * _n_opps + si * _n_opps
+                    s = sum(_scores_flat[base + oi] for oi in range(_n_opps))
+                    _per_scen_rank1[i] = s / _n_opps
+            # Column count: 6 fixed + 3 per-shield (if available).
+            n_cols = 9 if _have_per_shield else 6
             parts.append('<table class="dd-table dd-narrow">\n')
+            if _have_per_shield:
+                _shield_header = ''.join(
+                    f'<th title="Avg score minus the rank-1-by-stat-product '
+                    f'IV\'s avg score, both at the {lbl} shield scenario. '
+                    f'Positive = this IV outscores rank-1 in {lbl}.">'
+                    f'{lbl} Δ</th>'
+                    for lbl in _target_scen_labels
+                )
+            else:
+                _shield_header = ''
             parts.append(
                 '<tr><th>IV</th><th>Atk</th><th>Def</th><th>HP</th>'
                 '<th>Avg rank</th>'
                 '<th title="Matchup wins gained minus lost vs the '
                 'PvPoke default reference IV. Hover each cell for '
-                'the gain/loss breakdown.">Net flips</th></tr>\n'
+                'the gain/loss breakdown.">Net flips</th>'
+                f'{_shield_header}</tr>\n'
             )
             n_to_render = min(len(tier_ivs), max_members_rendered)
             n_truncated = len(tier_ivs) - n_to_render
@@ -1825,26 +1868,41 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                           data_obj['ivS'][iv])
                 _g, _l, net = flip_map.get(iv, (0, 0, 0))
                 nc = 'dd-gain' if net > 0 else ('dd-loss' if net < 0 else '')
-                # Build hover text with matchup names when available
+                # Build hover text with matchup names when available.
+                # Full list (no truncation) so mirror-specific matchups
+                # like "Tinkaton 1v1" / "Tinkaton 2v2" land visibly
+                # instead of being hidden behind a "+N more" tail — the
+                # person-deciding-which-IV-to-build needs every flip
+                # entry to distinguish lead-vs-closer builds.
                 fd = (flips_detail or {}).get(iv)
                 if fd:
                     hover_lines = []
                     if fd.get('gains'):
                         gain_names = [f"{e['opponent']} {e['scenario']}"
-                                      for e in fd['gains'][:6]]
+                                      for e in fd['gains']]
                         hover_lines.append(f"Gained: {', '.join(gain_names)}")
-                        if len(fd['gains']) > 6:
-                            hover_lines[-1] += f' +{len(fd["gains"])-6} more'
                     if fd.get('losses'):
                         loss_names = [f"{e['opponent']} {e['scenario']}"
-                                      for e in fd['losses'][:6]]
+                                      for e in fd['losses']]
                         hover_lines.append(f"Lost: {', '.join(loss_names)}")
-                        if len(fd['losses']) > 6:
-                            hover_lines[-1] += f' +{len(fd["losses"])-6} more'
                     flip_hover = '\n'.join(hover_lines) if hover_lines else f'net {net:+d}'
                 else:
                     flip_hover = (f'+{_g} gained, -{_l} lost vs reference IV '
                                   f'(net {net:+d})')
+                # Per-shield Δ cells.
+                _shield_cells = ''
+                if _have_per_shield:
+                    for i, si in enumerate(_target_scen_idx):
+                        if si is None or _per_scen_rank1[i] is None:
+                            _shield_cells += '<td class="dd-small">—</td>'
+                            continue
+                        base = iv * _n_scen * _n_opps + si * _n_opps
+                        s = sum(_scores_flat[base + oi] for oi in range(_n_opps))
+                        iv_avg = s / _n_opps
+                        d = iv_avg - _per_scen_rank1[i]
+                        cls = ('dd-gain' if d > 0.05
+                               else ('dd-loss' if d < -0.05 else ''))
+                        _shield_cells += f'<td class="{cls}">{d:+.1f}</td>'
                 row_cls = (' class="dd-slayer-hidden"'
                            if row_i >= max_members_shown else '')
                 parts.append(
@@ -1855,11 +1913,12 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                     f'<td>{data_obj["ivHp"][iv]}</td>'
                     f'<td>#{avg_ranks[iv]}</td>'
                     f'<td class="{nc}"{tooltip_attr(flip_hover)}>'
-                    f'{net:+d}</td></tr>\n'
+                    f'{net:+d}</td>'
+                    f'{_shield_cells}</tr>\n'
                 )
             if n_truncated > 0:
                 parts.append(
-                    f'<tr class="dd-slayer-hidden"><td colspan="6" '
+                    f'<tr class="dd-slayer-hidden"><td colspan="{n_cols}" '
                     f'class="dd-small">… {n_truncated} more not rendered '
                     f'(top {n_to_render} by avg rank shown)</td></tr>\n'
                 )
