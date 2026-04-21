@@ -72,7 +72,10 @@ DIVES = [
         'league': 'ultra',
         'slug': 'tinkaton-ultra-league',
         'html_base': 'index.html',
-        'opponents': 60,
+        # UL top-60 + Aegislash Shield + Blade so Tinkaton UL sees the
+        # Aegislash forms as opponents (they're not in PvPoke UL top-60
+        # on their own). Matches the GL-side hand-extension pattern.
+        'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
         'no_thresholds': True,
     },
     # Aegislash (Blade) isn't in PvPoke rankings; pass --fast / --charged
@@ -95,7 +98,9 @@ DIVES = [
         'league': 'ultra',
         'slug': 'aegislash-blade-ultra-league',
         'html_base': 'index.html',
-        'opponents': 60,
+        # UL top-60 + both Aegislash forms so Blade sees Shield as an
+        # opponent (cross-form matchup for the Blade-vs-Shield article).
+        'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
         'no_thresholds': True,
         'extra_args': ['--fast', 'PSYCHO_CUT',
                        '--charged', 'SHADOW_BALL,FLASH_CANNON'],
@@ -106,7 +111,9 @@ DIVES = [
         'league': 'ultra',
         'slug': 'aegislash-shield-ultra-league',
         'html_base': 'index.html',
-        'opponents': 60,
+        # UL top-60 + both Aegislash forms so Shield sees Blade as an
+        # opponent.
+        'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
         'no_thresholds': True,
         'reference': 'AEGISLASH_CHARGE_PSYCHO_CUT,SHADOW_BALL,FLASH_CANNON',
     },
