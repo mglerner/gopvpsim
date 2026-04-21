@@ -111,6 +111,11 @@ step "Rendering Aegislash Blade-vs-Shield GL comparison" \
 step "Rendering Aegislash Blade-vs-Shield UL comparison" \
     python scripts/compare_loadouts.py comparisons/aegislash-blade-vs-shield-ul.toml
 
+# 5c. Forretress 4-way comparison: fast-move x shadow. Reads data from
+#     the 4 Forretress dive dirs the chain produced in step 1.
+step "Rendering Forretress fast-move x shadow comparison" \
+    python scripts/compare_loadouts.py comparisons/forretress-fast-move-shadow.toml
+
 # 6. Aegislash first-draft narrative articles (one per league). Auto-
 #    generated prose; morning report should flag every authored section
 #    before anything ships.

@@ -1,0 +1,70 @@
+# Forretress 4-way comparison: fast-move choice x shadow toggle (GL).
+#
+# Two independent axes: fast move (Bug Bite vs Volt Switch) and shadow
+# multiplier (normal vs shadow). Same charged moves across all four
+# (Sand Tomb + Rock Tomb — PvPoke default and the CS meta standard for
+# both fast-move variants), so the per-loadout delta isolates the
+# fast-move and shadow effects from each other without confounding
+# them with moveset choice.
+#
+# Output: userdata/website/comparisons/forretress-fast-move-shadow/
+# Schema: scripts/compare_loadouts.py docstring.
+
+slug   = "forretress-fast-move-shadow"
+title  = "Forretress: Bug Bite vs Volt Switch, normal vs shadow (GL)"
+league = "great"
+author = "mglerner"
+
+# Display order (leftmost first). Volt Switch first because it's the
+# newer + more-played CS variant per the Orlando 2026 tournament
+# roster, with shadow before normal within each fast-move pair so the
+# higher-atk row leads. Omit to keep declaration order.
+order = [
+    "Shadow Volt Switch",
+    "Volt Switch",
+    "Shadow Bug Bite",
+    "Bug Bite",
+]
+
+summary = """
+Forretress has two real PvP configurations on each axis: fast-move \
+choice (Bug Bite for defensive cycling, Volt Switch for higher \
+energy pressure) and shadow multiplier (shadow for +20% atk / -17% \
+def, normal for the stat-balanced profile). Charged moves are pinned \
+to the PvPoke default + Orlando-CS-meta standard (Sand Tomb + Rock \
+Tomb) across all four so each pairwise delta isolates a single axis. \
+Use this to decide which of the four Forretress configurations to \
+prep; each has a different matchup coverage shape.
+"""
+
+[[loadouts]]
+label         = "Shadow Volt Switch"
+species       = "Forretress"
+dive_slug     = "forretress-shadow-volt-switch-great-league"
+fast_move     = "VOLT_SWITCH"
+charged_moves = ["SAND_TOMB", "ROCK_TOMB"]
+shadow        = true
+
+[[loadouts]]
+label         = "Volt Switch"
+species       = "Forretress"
+dive_slug     = "forretress-volt-switch-great-league"
+fast_move     = "VOLT_SWITCH"
+charged_moves = ["SAND_TOMB", "ROCK_TOMB"]
+shadow        = false
+
+[[loadouts]]
+label         = "Shadow Bug Bite"
+species       = "Forretress"
+dive_slug     = "forretress-shadow-bug-bite-great-league"
+fast_move     = "BUG_BITE"
+charged_moves = ["SAND_TOMB", "ROCK_TOMB"]
+shadow        = true
+
+[[loadouts]]
+label         = "Bug Bite"
+species       = "Forretress"
+dive_slug     = "forretress-bug-bite-great-league"
+fast_move     = "BUG_BITE"
+charged_moves = ["SAND_TOMB", "ROCK_TOMB"]
+shadow        = false
