@@ -14,6 +14,10 @@ slug   = "forretress-fast-move-shadow"
 title  = "Forretress: Bug Bite vs Volt Switch, normal vs shadow (GL)"
 league = "great"
 author = "mglerner"
+# Summary hand-edited by mglerner 2026-04-22 for the 4-in-row matchup
+# table's framing (the prior auto-friendly wording referenced
+# "pairwise delta" from the earlier N-way pairwise rendering).
+authored_by = "human"
 
 # Display order (leftmost first). Volt Switch first because it's the
 # newer + more-played CS variant per the Orlando 2026 tournament
@@ -28,13 +32,14 @@ order = [
 
 summary = """
 Forretress has two real PvP configurations on each axis: fast-move \
-choice (Bug Bite for defensive cycling, Volt Switch for higher \
-energy pressure) and shadow multiplier (shadow for +20% atk / -17% \
-def, normal for the stat-balanced profile). Charged moves are pinned \
-to the PvPoke default + Orlando-CS-meta standard (Sand Tomb + Rock \
-Tomb) across all four so each pairwise delta isolates a single axis. \
-Use this to decide which of the four Forretress configurations to \
-prep; each has a different matchup coverage shape.
+choice (Bug Bite for fast-move pressure against this meta, Volt \
+Switch for higher energy pressure) and shadow multiplier increased \
+attack pressure. Charged moves are pinned to the PvPoke default + \
+Orlando-CS-meta standard (Sand Tomb + Rock Tomb) across all four \
+loadouts, so per-row win-rate differences below come from fast-move \
+and shadow-toggle alone - not from a confounded moveset pick. Use \
+this to decide which of the four Forretress configurations to prep; \
+each has a different matchup coverage shape.
 """
 
 [[loadouts]]
