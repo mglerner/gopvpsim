@@ -95,6 +95,25 @@ step "Patching per-opponent anchors in all dive dirs" \
         userdata/website/forretress-shadow-volt-switch-great-league \
         userdata/website/forretress-shadow-bug-bite-great-league
 
+# 2a. Retrofit Member IVs tooltip un-truncation + per-shield Δ columns
+#     on any pre-20e7bd1 dive HTMLs. Renderer now emits these natively
+#     for fresh dives; patcher JS is a runtime no-op when the table is
+#     already in the 9-column shape. Idempotent via fingerprint comment.
+step "Patching Member IVs enhance in all dive dirs" \
+    python scripts/patch_dive_member_ivs_enhance.py \
+        userdata/website/oinkologne-great-league \
+        userdata/website/oinkologne-female-great-league \
+        userdata/website/tinkaton-great-league \
+        userdata/website/tinkaton-ultra-league \
+        userdata/website/aegislash-blade-great-league \
+        userdata/website/aegislash-shield-great-league \
+        userdata/website/aegislash-blade-ultra-league \
+        userdata/website/aegislash-shield-ultra-league \
+        userdata/website/forretress-volt-switch-great-league \
+        userdata/website/forretress-bug-bite-great-league \
+        userdata/website/forretress-shadow-volt-switch-great-league \
+        userdata/website/forretress-shadow-bug-bite-great-league
+
 # 3. Oinkologne CD article (per-form Matchup Delta table needs both
 #    Male and Female dives fresh, which steps 1 + 2 guarantee).
 step "Regenerating Oinkologne CD article" \
