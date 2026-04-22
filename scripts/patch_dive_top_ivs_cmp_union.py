@@ -33,13 +33,24 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
 
-FINGERPRINT = '/* TOP_IVS_CMP_UNION_v1 */'
+FINGERPRINT = '/* TOP_IVS_CMP_UNION_v2 */'
+OLD_FINGERPRINT_V1 = '/* TOP_IVS_CMP_UNION_v1 */'
 
 OLD_LINE = 'var top = indices.slice(0, N);'
+
+# Matches the ENTIRE v1 block (from the v1 fingerprint comment through
+# the closing ``var top = _unionList;``). Used to migrate v1-patched
+# HTMLs to v2 in place. Both v1 and v2 blocks end at the same line, so
+# the substitution is clean.
+V1_BLOCK_RE = re.compile(
+    re.escape(OLD_FINGERPRINT_V1) + r'.*?var top = _unionList;',
+    re.DOTALL,
+)
 
 REPLACEMENT = FINGERPRINT + r"""
   // Row-set: union of top-N by the active sort column AND (when a
@@ -47,6 +58,13 @@ REPLACEMENT = FINGERPRINT + r"""
   // Mirror CMP %) top-N by Mirror CMP %. Surfaces IVs picked
   // specifically for CMP coverage. Re-sorted by active column for
   // display order.
+  //
+  // v2: drop IVs with CMP <= 0 from the CMP bucket. v1 sorted all
+  // IVs by CMP desc with stable fallback, which meant that when MOST
+  // IVs had CMP=0 (cohort atk range exceeds their atk), the "top N
+  // by CMP" bucket filled with the first N by IV index (typically
+  // 0/0/X junk). CMP=0 means "beats nothing in the cohort" = not a
+  // tradeoff-frontier row.
   var _seen = {};
   var _unionList = [];
   function _addIfRoomCmp(iv) {
@@ -76,6 +94,8 @@ REPLACEMENT = FINGERPRINT + r"""
     for (var _pi2 = 0, _added2 = 0;
          _pi2 < _cmpIdx.length && _added2 < N;
          _pi2++) {
+      var _cmpVal = _computeMirrorCmpPct(_cmpIdx[_pi2]);
+      if (!isFinite(_cmpVal) || _cmpVal <= 0) break;
       if (_addIfRoomCmp(_cmpIdx[_pi2])) _added2++;
     }
   }
@@ -84,9 +104,25 @@ REPLACEMENT = FINGERPRINT + r"""
 
 
 def patch_html(content: str) -> tuple[str, bool]:
-    """Return (patched_content, changed). Idempotent."""
+    """Return (patched_content, changed). Idempotent across v1 and v2.
+
+    Three cases:
+
+    * Already v2: return unchanged.
+    * v1-patched: substitute the v1 block with the v2 block (both end
+      at ``var top = _unionList;``, so the regex cleanly swaps them).
+    * Unpatched: substitute the original ``var top = indices.slice(0,
+      N);`` with the v2 block.
+    """
     if FINGERPRINT in content:
         return content, False
+    if OLD_FINGERPRINT_V1 in content:
+        new_content, n = V1_BLOCK_RE.subn(REPLACEMENT.lstrip(), content,
+                                          count=1)
+        if n == 0:
+            # v1 fingerprint present but block malformed; give up.
+            return content, False
+        return new_content, True
     if OLD_LINE not in content:
         return content, False  # not a dive HTML that embeds the engine
     new_content = content.replace(OLD_LINE, REPLACEMENT, 1)
