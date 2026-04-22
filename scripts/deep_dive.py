@@ -3040,6 +3040,27 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += '    <option value="filled">Filled</option>\n'
     html += '    <option value="outline">Outline</option>\n'
     html += '  </select></label>\n'
+    # Highlight specific IVs on the scatter. Accepts a comma-separated list
+    # in "a/d/s" form (also "-" or whitespace separated). Matching IVs render
+    # as red diamonds on top and the rest of the plot dims to ~30% opacity
+    # so the highlighted points pop. Orthogonal to the collection paste-box
+    # below — this is an ad-hoc "pin these to the plot" tool, not a
+    # persistent user collection. Enter triggers Apply; Escape triggers Clear.
+    html += (
+        '  <label style="margin-left:12px">Highlight IVs: '
+        '<input id="highlight-input" type="text" '
+        'placeholder="e.g. 15/11/11, 15/14/8" '
+        'style="width:200px;font-size:12px" '
+        'onkeydown="if(event.key===\'Enter\'){applyHighlight();event.preventDefault();} '
+        'else if(event.key===\'Escape\'){clearHighlight();event.preventDefault();}">'
+        '</label>\n'
+        '  <button type="button" onclick="applyHighlight()" '
+        'style="font-size:11px;padding:2px 8px;margin-left:4px">Apply</button>\n'
+        '  <button type="button" onclick="clearHighlight()" '
+        'style="font-size:11px;padding:2px 8px;margin-left:2px">Clear</button>\n'
+        '  <span id="highlight-status" '
+        'style="font-size:11px;color:#aaa;margin-left:8px"></span>\n'
+    )
     # (Top-IVs table controls live next to the table itself — see the
     # control strip rendered just before <div id="summary"> below.)
     # "Show clusters" is gated behind the experimental-analysis toggle

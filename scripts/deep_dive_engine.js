@@ -32,6 +32,12 @@ var state = {
   // Mons the user entered one-at-a-time via the manual-entry form. These
   // are additive with csvMons: every reprocess combines the two lists.
   manualMons: [],
+  // Ad-hoc "pin these IVs on the scatter" feature. Populated by
+  // applyHighlight() from the highlight-input text field. Unlike
+  // userRecords (persistent collection), this is a throwaway query set.
+  // When non-empty, matching IVs render as red diamonds on top and
+  // other traces dim to ~30% opacity.
+  highlightIvs: [],
 };
 var yValues, yRanks, refYValues, refYRanks;
 // Cached top-N same-species atk cohort for Top-Mirror CMP %. Invalidated
@@ -1304,6 +1310,130 @@ function wireCollectionHandlers() {
   if (addBtn) addBtn.addEventListener('click', addManualMon);
 }
 
+// ---- Highlight-specific-IVs feature ----
+//
+// Lazy-built map "a,d,s" -> canonicalIvIdx so applyHighlight can turn
+// user-typed triples into trace indices without rescanning DATA.ivA
+// every call. Built once on first use; cleared if (somehow) DATA
+// changes, but in practice this dive is single-session static data.
+var _ivLookupByTriple = null;
+function _buildIvLookup() {
+  var m = {};
+  for (var i = 0; i < nIvs; i++) {
+    m[DATA.ivA[i] + ',' + DATA.ivD[i] + ',' + DATA.ivS[i]] = i;
+  }
+  return m;
+}
+
+// Parse a user-typed highlight string into {validIdxs, invalidTokens}.
+// Accepted separators within a triple: '/', '-', whitespace. Between
+// triples: comma. Lenient about extra whitespace.
+function _parseHighlightInput(text) {
+  if (_ivLookupByTriple === null) _ivLookupByTriple = _buildIvLookup();
+  var validIdxs = [];
+  var invalidTokens = [];
+  var seen = {};
+  var parts = String(text || '').split(',');
+  for (var p = 0; p < parts.length; p++) {
+    var tok = parts[p].trim();
+    if (!tok) continue;
+    var nums = tok.split(/[\/\-\s]+/).filter(function(s){ return s !== ''; });
+    if (nums.length !== 3) { invalidTokens.push(tok); continue; }
+    var a = parseInt(nums[0], 10), d = parseInt(nums[1], 10), s = parseInt(nums[2], 10);
+    if (!(a >= 0 && a <= 15 && d >= 0 && d <= 15 && s >= 0 && s <= 15)) {
+      invalidTokens.push(tok); continue;
+    }
+    var idx = _ivLookupByTriple[a + ',' + d + ',' + s];
+    if (idx == null) { invalidTokens.push(tok + ' (not in dive grid)'); continue; }
+    if (seen[idx]) continue;
+    seen[idx] = true;
+    validIdxs.push(idx);
+  }
+  return { validIdxs: validIdxs, invalidTokens: invalidTokens };
+}
+
+function applyHighlight() {
+  var inp = document.getElementById('highlight-input');
+  var status = document.getElementById('highlight-status');
+  if (!inp) return;
+  var parsed = _parseHighlightInput(inp.value);
+  state.highlightIvs = parsed.validIdxs;
+  if (status) {
+    var msg = '';
+    if (parsed.validIdxs.length > 0) {
+      msg += 'Highlighting ' + parsed.validIdxs.length + ' IV' +
+             (parsed.validIdxs.length === 1 ? '' : 's');
+    }
+    if (parsed.invalidTokens.length > 0) {
+      if (msg) msg += '; ';
+      msg += 'ignored: ' + parsed.invalidTokens.join(', ');
+      status.style.color = '#e89b9b';
+    } else {
+      status.style.color = '#9be89b';
+    }
+    status.textContent = msg;
+  }
+  updateView();
+}
+
+function clearHighlight() {
+  var inp = document.getElementById('highlight-input');
+  var status = document.getElementById('highlight-status');
+  if (inp) inp.value = '';
+  if (status) { status.textContent = ''; status.style.color = '#aaa'; }
+  state.highlightIvs = [];
+  updateView();
+}
+
+// Build the red-diamond overlay trace for state.highlightIvs. Returns
+// null when the highlight set is empty. Matches the hover-text format
+// used by other traces so tooltips stay consistent.
+//
+// Hit-detection nudge: the diamond y is offset DOWNWARD by the same
+// Y_NUDGE the "Yours" overlays use (but in the opposite direction) so
+// it occupies a distinct closest-point in Plotly's scattergl hover
+// routing. Without this, the diamond collides with both the base
+// trace AND the "Yours - notable" ring at the same IV (for owned
+// IVs), and the hover falls silently on some points -- reproducing
+// the exact same class of bug that the Yours-overlay +Y_NUDGE was
+// introduced to fix. See the comment above qualY at buildTraces
+// (~line 1719) for the full history.
+function _buildHighlightTrace() {
+  if (!state.highlightIvs || state.highlightIvs.length === 0) return null;
+  // Recompute yRange for the nudge magnitude. Same formula used for
+  // the Yours overlays; kept local rather than plumbed through so
+  // _buildHighlightTrace is self-contained.
+  var _yMin = Infinity, _yMax = -Infinity;
+  for (var _yi = 0; _yi < yValues.length; _yi++) {
+    var _yv = yValues[_yi];
+    if (isFinite(_yv)) {
+      if (_yv < _yMin) _yMin = _yv;
+      if (_yv > _yMax) _yMax = _yv;
+    }
+  }
+  var yRange = Math.max(1, _yMax - _yMin);
+  var NUDGE = -yRange * 0.0005;  // downward, opposite of Yours overlays
+  var hx = [], hy = [], ht = [];
+  for (var i = 0; i < state.highlightIvs.length; i++) {
+    var iv = state.highlightIvs[i];
+    if (currentYIsSparse && !isFinite(yValues[iv])) continue;
+    hx.push(DATA.spRanks[iv]);
+    hy.push(yValues[iv] + NUDGE);
+    ht.push(buildHoverText(iv));
+  }
+  if (hx.length === 0) return null;
+  return {
+    name: 'Highlighted',
+    x: hx, y: hy, text: ht,
+    mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+    marker: {
+      size: 14, color: '#e94560', symbol: 'diamond',
+      opacity: 1.0, line: { width: 2, color: '#ffffff' }
+    },
+    hoverlabel: { bordercolor: '#e94560' }
+  };
+}
+
 // ---- Build Plotly traces ----
 function buildTraces() {
   computeView();
@@ -1627,6 +1757,24 @@ function buildTraces() {
     }
     var Y_NUDGE = yRange * 0.0005;
 
+    // Build a set of IV indices currently in the highlight set so we
+    // can skip them in the user-overlay rings. Rationale: the ring
+    // (circle-open) has hollow hit-detection, and when the highlight
+    // diamond sits inside the ring's interior for an owned IV, Plotly
+    // scattergl hover routing silently fails — cursor over the diamond
+    // lands "inside the ring," which catches the hover but resolves to
+    // nothing visible. Semantically the ring is also redundant for a
+    // highlighted IV: the diamond is the explicit "look here" marker,
+    // and the user typed the IV themselves, so they already know it's
+    // in their collection. Dropping the ring for those IVs resolves
+    // the hover bug without touching circle rendering (past bug
+    // sensitivity per user; see commit 0305924).
+    var _highlightSkip = {};
+    if (state.highlightIvs) {
+      for (var _hi = 0; _hi < state.highlightIvs.length; _hi++) {
+        _highlightSkip[state.highlightIvs[_hi]] = true;
+      }
+    }
     // Iterate unique owned IV indices (not userRecords) so we hit each
     // scatter point once. The ownedByIv cache groups records by IV,
     // so anyQualified is "does any record in this IV's group have a
@@ -1637,6 +1785,7 @@ function buildTraces() {
       if (!ownedByIv.hasOwnProperty(ivKey)) continue;
       var iv = parseInt(ivKey, 10);
       if (iv < 0 || iv >= nIvs) continue;
+      if (_highlightSkip[iv]) continue;  // let the highlight diamond own this point
       var sp = DATA.spRanks[iv], yv = yValues[iv];
       if (currentYIsSparse && !isFinite(yv)) continue;
       var fullText = buildHoverText(iv);
@@ -1706,6 +1855,26 @@ function buildTraces() {
                   'qual=' + qualX.length,
                   'owned=' + ownX.length);
     }
+  }
+
+  // Highlight overlay: when the user has pinned specific IVs, dim every
+  // other trace to ~30% opacity and draw the highlighted points on top
+  // as red diamonds. This is additive to the existing "Yours" circle
+  // overlays (they keep their opacity rules, just dimmed along with
+  // everything else). Circle sizing/placement intentionally untouched
+  // — past bugs in that area make it a no-touch zone for features that
+  // don't strictly need to change markers.
+  var _hiTrace = _buildHighlightTrace();
+  if (_hiTrace) {
+    var DIM_FACTOR = 0.3;
+    for (var _di = 0; _di < traces.length; _di++) {
+      var _tm = traces[_di].marker;
+      if (_tm) {
+        var _orig = (_tm.opacity != null) ? _tm.opacity : 1.0;
+        _tm.opacity = _orig * DIM_FACTOR;
+      }
+    }
+    traces.push(_hiTrace);
   }
 
   return traces;
@@ -2483,6 +2652,9 @@ window._summarySortClick = _summarySortClick;
 // and the handlers throw ReferenceError.
 window.toggleMatchesSection = toggleMatchesSection;
 window.sortMatchesTable = sortMatchesTable;
+// Highlight-IVs controls (applied from the plot control strip).
+window.applyHighlight = applyHighlight;
+window.clearHighlight = clearHighlight;
 applyHistogramHash();
 updateView();
 // Hook up the collection panel handlers now that updateView has run
