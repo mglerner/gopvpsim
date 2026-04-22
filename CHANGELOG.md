@@ -6,6 +6,206 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-04-23 — Slayer IVs "of yours" table: column-header tooltips
+
+**Retrofit follow-up on the Mirror CMP reframe (2026-04-22).** The
+Top IVs table's three mirror-adjacent columns already carried `title=`
+hover text via the `help` field on `_summaryColumns()`. The Slayer IVs
+"of yours" table rendered via `renderSection` extras had no equivalent,
+so the same two columns (Top-Mirror CMP % and Matchups Kept) were
+bare.
+
+**What shipped:**
+
+1. Three module-level `HELP_*` constants in `scripts/deep_dive_engine.js`
+   (`HELP_MIRROR_SLAYER_CMP`, `HELP_TOP_MIRROR_CMP`,
+   `HELP_MATCHUPS_KEPT`) so the Top IVs and Slayer IVs tables share
+   one source of truth. The emitted HTML still inlines the full text
+   per `title=` attribute, but the JS source no longer carries three
+   copies of each string.
+2. `renderSection` extras schema extended with an optional `help` field
+   that renders as `<th title="...">`, matching the Top IVs pattern.
+3. `scripts/patch_dive_slayer_help.py` — retrofit patcher, idempotent
+   via `SLAYER_HELP_v1` fingerprint, partial-match safe. Applied
+   in-place to all 41 shipped HTMLs under `userdata/website/*/` so
+   the live site picks up the tooltip without re-diving.
+
+Single commit: `c3edb14`.
+
+## 2026-04-22 — Mirror CMP % semantic reframe + Highlight IVs scatter
+
+**Arc trigger:** on Tinkaton UL the original "Mirror CMP %" column
+wrapped `DATA.mirrorCohortAtk`, which collapsed to 160 entries all
+at atk=142.8509983 (Nash converges on the 15/0/0 L50 atk corner).
+Users sorting by CMP saw only the niche slayer-optimal build path,
+not a general-purpose mirror target. Reframe splits the old column
+into three semantically distinct metrics and adds a scatter
+highlight tool for arbitrary IV lookup.
+
+**What shipped (11 commits):**
+
+1. `6dcc571` — Core reframe. Rename `Mirror CMP %` →
+   `Mirror Slayer CMP %` (keeps the Nash-cohort semantic but labels
+   it explicitly as niche). Add `Top-Mirror CMP %` column (cohort =
+   top-50 same-species IVs by active battle score in THIS dive; IV
+   counted in its own cohort so denominator stays at 50; returns a
+   meaningful 0-100 spread). Add `Matchups Kept` column. Add
+   "About these metrics" collapsible `<details>` box above the Top
+   IVs table explaining all three metrics + the overfit-slayer
+   tradeoff story + when-to-invest heuristic. Ships
+   `DATA.mirrorOppIdxs` server-side so mirror-opponent identification
+   handles shadow/form pools correctly.
+2. `bd226f9` — Extend Slayer IVs "of yours" table with the two new
+   columns. Adds `extras.cls` hint to the collection-matches table
+   schema; wrap CSS tidy so Slayer type and Also in columns break
+   cleanly without blowing column widths.
+3. `32a1c9d` — Fix inert Show/Hide and sort buttons on
+   collection-matches tables (pre-existing bug; handlers were
+   IIFE-scoped and `window.*` registration was missing).
+4. `a771c4e` — Scatter highlight-IVs feature. Text input below the
+   plot; matching IVs render as red diamonds, other traces dim to
+   ~30%. Handles two hover-routing gotchas: Y-nudge opposite to
+   Yours overlays, and skip highlighted IVs from user-overlay ring
+   traces (hollow circle-open hit detection routed cursors wrong).
+5. `6c19e7f` — Collapse multi-mon `Yours (N)` hover block to one
+   CP-list line. Was vertical-clipping the tooltip against the plot
+   bottom edge for owned IVs with 2+ CSV records and full
+   matchup-diff blocks. Single-mon IVs retain full detail.
+6. `2b1af06` — Fix MaxListenersExceededWarning on legend handlers.
+   Plotly's graphDiv is an EventEmitter that persists across
+   `Plotly.react`; `gd.on()` was accumulating listeners every
+   `updateView`. One-shot `_legendHandlersAttached` guard.
+7. `02d9eba` — Shrink Yours-other / Yours-notable ring markers
+   (size 9→6 / 13→9, opacity 0.9→0.7 on "other"). No hover/symbol/
+   text changes.
+8. `81db37d` — Move Highlight-IVs strip from top control strip to
+   below the plot, right-aligned. Tightens the eye path from "I see
+   a diamond I want to investigate" to "let me type a different IV."
+9. `bb6f63e` — Matchups Kept: fractional expected-wins credit.
+   Original "avg score >= 500" rule produced only 5 unique values
+   across 4096 Tinkaton UL IVs; majority-of-scenarios still gave
+   only 7. Final: per-opponent credit = `(scenarios won / nSel)`,
+   summed across non-mirror opponents. Reduces to integer count for
+   single-scenario mode; yields 70 unique 0.1-bins across 4096 IVs
+   in the default avg-across-9 mode. Spot check confirms the metric
+   now ranks 15/11/11 (rank 16) ahead of 15/14/8 (rank 161) —
+   previously both tied at 31 with no signal.
+10. `939162e` — Polish Matchups Kept About-box prose: drop
+    implementation-footnote comparing fractional credit to thresholds;
+    replace with a user-facing explanation of the fractional value.
+11. `f9d760e` / `f5325e2` — added + reverted: attempted to add a
+    `scripts/redive-shipped.sh` helper, but `scripts/overnight_redive.sh`
+    + `scripts/run_website_dives.py` already do that work (plus article
+    regen, comparison rebuild, link verify). Use the existing chain
+    instead.
+
+**Re-dive validation:** full overnight chain 2026-04-22 evening
+exercised every shipped dive against the new JS; 12 dives + 2
+Aegislash auto-articles + Oink CD article + comparison pages +
+link-verify in ~8h.
+
+## 2026-04-21 — S11 + S12: HTML dive file-size reduction (~40%)
+
+**Motivation:** pre-ship, the Oinkologne GL m1 dive was 46 MB
+uncompressed; the Oink files became actively annoying to open in a
+browser or diff. Originally scoped as post-ship in the post-S5 arc
+(S11-S12), fast-tracked when the file size crossed the
+annoying-to-use threshold.
+
+**What shipped (4 commits):**
+
+1. `f839e65` — S11: audit + measurement harness. `docs/s11_html_size_audit.md`
+   is the byte budget writeup: 87k `title=` attributes on anchor
+   badges collapse to 1.6k unique values (18 MB of pure duplication
+   on Oinkologne). Six ranked reduction approaches, recommendation
+   narrows to R1 (tooltip dedup) + R2 (external shared plotly).
+   `scripts/measure_html_size.py` reports uncompressed + gzip-6 +
+   title-dedup projection + plotly inline bytes per file for
+   before/after diffs.
+2. `1fe232a` — S12-R1: dedup `title=` tooltips. Unique tooltip bodies
+   get emitted once into `DATA.tooltips`; each inline `title=` becomes
+   `data-t="<short-id>"`. A `DOMContentLoaded` pass walks `[data-t]`
+   elements and populates `el.title` from the lookup; browsers show
+   the native tooltip on hover, no custom positioning. A/B on a
+   scale-matched 10-opp/1-moveset Oinkologne dive: 38.12 MB →
+   26.07 MB (-31.6% uncompressed, -99.98% of `title=` bytes).
+3. `5ad2d4b` — S12-R2: `--shared-plotly DIR` flag. Third mode of
+   `_plotly_script_tag()`; plotly.min.js is downloaded to DIR once
+   (idempotent) and each dive emits a relative `<script src=...>`
+   referencing it instead of inlining the 4.35 MB source. Overrides
+   `--standalone` for plotly specifically. A/B on the same dive:
+   R1 + R2 = 21.72 MB uncompressed / 6.09 MB gzip (-43.0% / -40.5%
+   vs baseline). Hits the S12 target.
+4. `e2e0737` — TODO.md housekeeping, closes the HTML file-size entry.
+
+**Full-scale validation:** projection on the real 46 MB Oinkologne m1
+dive is ~27.9 MB (-39.4%). Verified by the next overnight re-dive.
+
+**Precedent:** prior HTML size cut (25 MB → 10 MB, 61%) landed
+2026-04-10 as commit `cab0a72` (cap member-IV tables at 50 rows).
+S11/S12 is the second cut, orthogonal to that one (targets the
+title-attribute and plotly-inline tail).
+
+## 2026-04-19 — Shape 2 migration: dive-side species narrative
+
+**Arc trigger:** pre-Oinkologne-ship decision (2026-04-19) that the
+primary narrative home for a species is the **dive**
+(RyanSwag-style), not the CD article. Articles continue to exist
+when they do something the dive can't — disambiguating multiple
+forms (Oinkologne M/F, Aegislash Blade/Shield), shadow variants, or
+alt-moveset meta forks (Forretress Volt Switch vs Bug Bite). For
+Oinkologne the CD article stays because M/F comparison is its
+justification, but the `[intro] / [meta_role] / [verdict]` prose
+now lives per-form in the threshold TOML and renders at the top of
+each dive.
+
+**3-session arc (all shipped 2026-04-19):**
+
+1. `41bbe6f` — Session 1: renderer plumbing + per-block `author`
+   attribution schema. Pure code, zero content migration. Design
+   decisions:
+   - Render position: above the interactive dashboard (after the
+     Related Article link, before the controls bar).
+   - TOML schema: new top-level `[Species.intro] /
+     [Species.meta_role] / [Species.verdict]` blocks in
+     `thresholds/<species>.toml` — field-for-field mirrors of
+     `articles/*.toml`'s same-named blocks so prose migrates
+     by copy-paste.
+   - Renderer: `deep_dive_rendering.render_species_narrative()`
+     alongside the existing gold-zone code.
+   - Author attribution: optional `author = "..."` field per block,
+     rendered as a muted italic line; reader-visible distinction
+     between AI-drafted and human-written prose.
+2. `bf05538` — Session 2: per-form Oinkologne M/F narrative authored
+   in `thresholds/oinkologne.toml` and
+   `thresholds/oinkologne_female.toml`; article
+   `[intro] / [meta_role] / [verdict]` slimmed to CD-event scope.
+   Every Claude-drafted block carries
+   `author = "Drafted by Claude (Opus 4.7), not yet human-reviewed"`.
+   Overnight re-dive bakes the narrative into the regenerated
+   Oinkologne dive HTMLs.
+3. `bb021fa` — Session 3: Aegislash Blade + Shield narrative authored
+   in `thresholds/aegislash_blade.toml` and
+   `thresholds/aegislash_shield.toml` (Shield = canonical realistic
+   play pattern; Blade = always-Blade diagnostic hypothetical).
+   Out-of-band GL dives against the Orlando top-32 pool landed the
+   same day (Blade 14:37, Shield 15:41); HTMLs force-patched with
+   the narrative injection. Aegislash UL pair runs in the overnight
+   chain and picks up the narrative natively. Stress-tests the
+   renderer against mid-battle form/moveset swaps.
+
+**Same-day polish:**
+
+- `670f57b` — Per-block `authored_by` colour coding. Gold =
+  expert-authored, muted = AI-drafted.
+- `464e04a` — Unify all sidebar CSS on one rounded-pseudo-element
+  pattern (cleanup that made the new narrative block visually
+  consistent with the gold Expert Analysis zone).
+
+**Documentation:** `docs/article_schema.md` "Per-block author
+attribution" and `docs/threshold_schema.md` "Species narrative"
+carry the full schema.
+
 ## 2026-04-18 — S10: Oinkologne CD article + Male-vs-Female comparator
 
 **Ship session for the post-S5 Oinkologne arc.** Wires the Female dive
