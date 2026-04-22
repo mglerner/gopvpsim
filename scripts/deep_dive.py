@@ -3040,27 +3040,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += '    <option value="filled">Filled</option>\n'
     html += '    <option value="outline">Outline</option>\n'
     html += '  </select></label>\n'
-    # Highlight specific IVs on the scatter. Accepts a comma-separated list
-    # in "a/d/s" form (also "-" or whitespace separated). Matching IVs render
-    # as red diamonds on top and the rest of the plot dims to ~30% opacity
-    # so the highlighted points pop. Orthogonal to the collection paste-box
-    # below — this is an ad-hoc "pin these to the plot" tool, not a
-    # persistent user collection. Enter triggers Apply; Escape triggers Clear.
-    html += (
-        '  <label style="margin-left:12px">Highlight IVs: '
-        '<input id="highlight-input" type="text" '
-        'placeholder="e.g. 15/11/11, 15/14/8" '
-        'style="width:200px;font-size:12px" '
-        'onkeydown="if(event.key===\'Enter\'){applyHighlight();event.preventDefault();} '
-        'else if(event.key===\'Escape\'){clearHighlight();event.preventDefault();}">'
-        '</label>\n'
-        '  <button type="button" onclick="applyHighlight()" '
-        'style="font-size:11px;padding:2px 8px;margin-left:4px">Apply</button>\n'
-        '  <button type="button" onclick="clearHighlight()" '
-        'style="font-size:11px;padding:2px 8px;margin-left:2px">Clear</button>\n'
-        '  <span id="highlight-status" '
-        'style="font-size:11px;color:#aaa;margin-left:8px"></span>\n'
-    )
+    # (Highlight IVs input lives directly below the plot, right-aligned
+    # under the legend, so the user's eye doesn't jump from the plot
+    # back up to the control strip to pin a specific IV.)
     # (Top-IVs table controls live next to the table itself — see the
     # control strip rendered just before <div id="summary"> below.)
     # "Show clusters" is gated behind the experimental-analysis toggle
@@ -3140,6 +3122,34 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 
     # Plot first, then summary table below
     html += '<div id="plot" class="plot-container" style="height:550px;"></div>\n'
+    # Highlight-IVs strip, right-aligned directly below the plot so it
+    # sits under the legend column visually. Enter applies, Escape
+    # clears (keydown handler on the input); buttons are mouse-friendly
+    # fallbacks. Accepts a comma-separated list of triples in "a/d/s"
+    # form (also "-" or whitespace separated). Matching IVs render as
+    # red diamonds on top and the rest of the plot dims to ~30% opacity.
+    # Orthogonal to the collection paste-box — this is an ad-hoc "pin
+    # these to the plot" tool, not a persistent user collection.
+    html += (
+        '<div class="highlight-strip" '
+        'style="display:flex;justify-content:flex-end;align-items:center;'
+        'gap:4px;margin:6px 20px 0 0;font-size:12px;color:#c9d1d9">\n'
+        '  <label style="display:flex;align-items:center;gap:4px">'
+        'Highlight IVs: '
+        '<input id="highlight-input" type="text" '
+        'placeholder="e.g. 15/11/11, 15/14/8" '
+        'style="width:200px;font-size:12px" '
+        'onkeydown="if(event.key===\'Enter\'){applyHighlight();event.preventDefault();} '
+        'else if(event.key===\'Escape\'){clearHighlight();event.preventDefault();}">'
+        '</label>\n'
+        '  <button type="button" onclick="applyHighlight()" '
+        'style="font-size:11px;padding:2px 8px">Apply</button>\n'
+        '  <button type="button" onclick="clearHighlight()" '
+        'style="font-size:11px;padding:2px 8px">Clear</button>\n'
+        '  <span id="highlight-status" '
+        'style="font-size:11px;color:#aaa;margin-left:8px"></span>\n'
+        '</div>\n'
+    )
     # Top-IVs table controls. Sit immediately above the table they
     # affect (the #summary div). The "Sort by" UX is column-header
     # clicks (see _summarySortClick in deep_dive_engine.js); only the
