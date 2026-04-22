@@ -133,6 +133,26 @@ step "Patching Top IVs CMP union in all dive dirs" \
         userdata/website/forretress-shadow-volt-switch-great-league \
         userdata/website/forretress-shadow-bug-bite-great-league
 
+# 2c. Retrofit the Mirror CMP % tolerance fix: round both sides to 2dp
+#     and count ties as beat. Without this, float drift in cohort atk
+#     (e.g. Tink UL 142.8509983 vs display max 142.85) returns 0% for
+#     every IV even when several tie the slayer benchmark. No-op on
+#     fresh dives via the fingerprint guard.
+step "Patching Mirror CMP tolerance in all dive dirs" \
+    python scripts/patch_dive_mirror_cmp_tolerance.py \
+        userdata/website/oinkologne-great-league \
+        userdata/website/oinkologne-female-great-league \
+        userdata/website/tinkaton-great-league \
+        userdata/website/tinkaton-ultra-league \
+        userdata/website/aegislash-blade-great-league \
+        userdata/website/aegislash-shield-great-league \
+        userdata/website/aegislash-blade-ultra-league \
+        userdata/website/aegislash-shield-ultra-league \
+        userdata/website/forretress-volt-switch-great-league \
+        userdata/website/forretress-bug-bite-great-league \
+        userdata/website/forretress-shadow-volt-switch-great-league \
+        userdata/website/forretress-shadow-bug-bite-great-league
+
 # 3. Oinkologne CD article (per-form Matchup Delta table needs both
 #    Male and Female dives fresh, which steps 1 + 2 guarantee).
 step "Regenerating Oinkologne CD article" \
