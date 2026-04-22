@@ -2880,10 +2880,19 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .collection-matches table {{ border-collapse: collapse; font-size: 11px;
                                 color: #e0e0e0; width: auto; }}
   .collection-matches th, .collection-matches td {{ padding: 2px 10px 2px 0;
-                                                     text-align: left;
-                                                     white-space: nowrap; }}
+                                                     text-align: left; }}
+  /* Body cells stay on one line by default (keeps numeric columns tidy);
+     headers wrap so long labels like "Top-Mirror CMP %" don't blow the
+     column width out. Column widths are set by the body cells. */
+  .collection-matches td {{ white-space: nowrap; }}
   .collection-matches th {{ color: #888; font-weight: 500;
-                             border-bottom: 1px solid #0f3460; }}
+                             border-bottom: 1px solid #0f3460;
+                             white-space: normal;
+                             vertical-align: bottom; }}
+  /* Opt-in wrap class for prose-heavy columns (Slayer type, Also in).
+     Applied via the extras 'cls' hint so only the targeted columns wrap.
+     No word-break override so "Jirachi" stays "Jirachi", not "Jir\\nachi". */
+  .collection-matches td.wrap {{ white-space: normal; max-width: 22em; }}
   .collection-matches tr.lucky td {{ color: #ffd966; }}
   .collection-matches tr.shadow td {{ color: #b084e0; }}
   .collection-matches td.rank {{ color: #9be89b; font-weight: 600; }}

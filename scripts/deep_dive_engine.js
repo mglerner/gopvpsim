@@ -865,7 +865,8 @@ function renderMatchesList() {
     h += sortHdr('Max CP', 9);
     if (extras) {
       for (var xh = 0; xh < extras.length; xh++) {
-        h += '<th>' + escapeHtml(extras[xh].header) + '</th>';
+        var _xhCls = extras[xh].cls ? (' class="' + extras[xh].cls + '"') : '';
+        h += '<th' + _xhCls + '>' + escapeHtml(extras[xh].header) + '</th>';
       }
     }
     h += '</tr>';
@@ -903,7 +904,8 @@ function renderMatchesList() {
       h += '<td data-sort="' + mcpVal + '">' + (rc.stats ? rc.stats.cp : '?') + '</td>';
       if (extras) {
         for (var xc = 0; xc < extras.length; xc++) {
-          h += '<td>' + extras[xc].cell(rc) + '</td>';
+          var _xcCls = extras[xc].cls ? (' class="' + extras[xc].cls + '"') : '';
+          h += '<td' + _xcCls + '>' + extras[xc].cell(rc) + '</td>';
         }
       }
       h += '</tr>';
@@ -949,7 +951,7 @@ function renderMatchesList() {
         escapeHtml(currentTierName),
         byTier[currentTierName],
         [
-          { header: 'Also in', cell: function(rc) {
+          { header: 'Also in', cls: 'wrap', cell: function(rc) {
               var also = otherTiersExcept(rc, currentTierName);
               if (rc.slayerCats && rc.slayerCats.length > 0) {
                 also = also.concat(rc.slayerCats);
@@ -964,12 +966,35 @@ function renderMatchesList() {
   // Slayer section: two extra columns — specific slayer categories
   // AND which tiers this slayer mon ALSO clears (blank for slayer-
   // only mons, populated for mons that are both slayer + tier).
+  // Top-Mirror CMP % / Matchups Kept cell helpers: on-grid only
+  // (canonicalIvIdx >= 0). Off-grid records show '-'. The helpers are
+  // the same ones used by the Top IVs table, so numbers agree. /* SLAYER_NEW_COLS_v1 */
+  function _cellTopMirror(rc) {
+    var iv = rc.canonicalIvIdx;
+    if (iv == null || iv < 0) return '-';
+    var v = _computeTopMirrorCmpPct(iv);
+    if (!isFinite(v)) return '-';
+    var color = v >= 90 ? '#9be89b' : (v >= 50 ? '#d4a017' : '#888');
+    return '<span style="color:' + color + '">' + v.toFixed(0) + '%</span>';
+  }
+  function _cellMatchupsKept(rc) {
+    var iv = rc.canonicalIvIdx;
+    if (iv == null || iv < 0) return '-';
+    var v = _computeMatchupsKept(iv);
+    if (!isFinite(v)) return '-';
+    var den = _matchupsKeptDenom();
+    var frac = den > 0 ? (v / den) : 0;
+    var color = frac >= 0.8 ? '#9be89b' : (frac >= 0.5 ? '#d4a017' : '#888');
+    return '<span style="color:' + color + '">' + v + '/' + den + '</span>';
+  }
   html += renderSection(
     'Slayer IVs',
     slayerRecs,
     [
-      { header: 'Slayer type', cell: function(rc) { return listOrDash(rc.slayerCats); } },
-      { header: 'Also in',     cell: function(rc) { return listOrDash(rc.matched); } }
+      { header: 'Slayer type',      cls: 'wrap', cell: function(rc) { return listOrDash(rc.slayerCats); } },
+      { header: 'Also in',          cls: 'wrap', cell: function(rc) { return listOrDash(rc.matched); } },
+      { header: 'Top-Mirror CMP %', cell: _cellTopMirror },
+      { header: 'Matchups Kept',    cell: _cellMatchupsKept }
     ]
   );
 
