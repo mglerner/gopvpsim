@@ -404,6 +404,20 @@ def _render_moveset_table(loadouts_data: list[dict], gm: dict) -> str:
     )
 
 
+def _opp_anchor_slug(name: str) -> str:
+    """Slugify an opponent display name to match the dive's #opp-<slug> id.
+
+    Must stay in lock-step with ``deep_dive_rendering.opp_slug`` and
+    ``generate_article._opp_slug``: simple ``re.sub`` of non-alphanumeric
+    runs to ``-`` with leading/trailing hyphens stripped. ``Stunfisk
+    (Galarian)`` -> ``stunfisk-galarian``; ``Forretress (Shadow)`` ->
+    ``forretress-shadow``. Drift from the dive-side slugger breaks the
+    anchor-link badges added by the all-in-row matchup table.
+    """
+    import re as _re
+    return _re.sub(r'[^a-z0-9]+', '-', (name or '').lower()).strip('-')
+
+
 def _loadout_abbrev(label: str) -> str:
     """Shorten a loadout label for compact all-in-row table headers.
 
@@ -519,14 +533,36 @@ def _render_all_in_row_matchup_table(
             )
         if is_flip:
             badges = []
-            for lbl, abbr, is_win in zip(labels, abbrevs, wins):
+            # Per-loadout #opp-<slug> deep link into each loadout's own
+            # dive. Matches the pairwise-table precedent: each badge is a
+            # jumping-off point for the reader to drill into "why does
+            # this loadout win/lose this matchup?" on the richer per-
+            # loadout anchor + threshold-tier evidence in the dive.
+            opp_anchor = _opp_anchor_slug(name)
+            for ld, abbr, is_win in zip(loadouts_data, abbrevs, wins):
+                spec = ld['spec']
                 badge_cls = 'flip-pos' if is_win else 'flip-neg'
                 wl = 'W' if is_win else 'L'
-                badges.append(
-                    f'<span class="flip-badge {badge_cls}" '
-                    f'title="{html.escape(lbl)} {wl}">'
-                    f'{html.escape(abbr)} {wl}</span>'
-                )
+                href = None
+                if spec.dive_slug and opp_anchor:
+                    href = (f'../../{spec.dive_slug}/index.html'
+                            f'#opp-{opp_anchor}')
+                if href:
+                    badges.append(
+                        f'<a class="flip-badge {badge_cls}" '
+                        f'href="{html.escape(href)}" '
+                        f'title="{html.escape(spec.label)} {wl} vs '
+                        f'{html.escape(name)} &mdash; jump to this '
+                        f'matchup in the {html.escape(spec.label)} '
+                        f'dive">'
+                        f'{html.escape(abbr)} {wl}</a>'
+                    )
+                else:
+                    badges.append(
+                        f'<span class="flip-badge {badge_cls}" '
+                        f'title="{html.escape(spec.label)} {wl}">'
+                        f'{html.escape(abbr)} {wl}</span>'
+                    )
             flip_cell = (
                 f'<td class="matchup-all-flip">{"".join(badges)}</td>'
             )
