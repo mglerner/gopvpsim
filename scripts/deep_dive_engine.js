@@ -1720,20 +1720,29 @@ function _summaryColumns() {
 }
 
 // Fraction of the Nash-converged mirror-slayer cohort (DATA.mirrorCohortAtk,
-// sorted ascending) with atk STRICTLY LESS than this IV's atk. Returns
-// a percentage in [0, 100]. Sorted input + linear scan keeps this fast
-// enough to call per-row on every sort (cohorts are typically <=30 mons).
-// Returns NaN when no cohort is available so the sort comparator keeps
-// those IVs at the end.
+// sorted ascending) whose atk this IV at least TIES. Returns a percentage
+// in [0, 100]. Sorted input + linear scan keeps this fast enough to call
+// per-row on every sort (cohorts are typically <=30 mons). Returns NaN
+// when no cohort is available so the sort comparator keeps those IVs at
+// the end.
+//
+// Both sides are rounded to 2dp (the dive's display precision) before the
+// compare so float drift doesn't lie. Without this, Tinkaton UL's cohort
+// atk of 142.8509983 would beat the max-atk IV's display atk of 142.85 by
+// 0.001 and return 0% for every IV in the grid -- a numeric, not semantic,
+// difference. Ties count as beating since PvP CMP at exactly-equal atk
+// resolves on move priority or a coin flip, not a guaranteed loss.
 function _computeMirrorCmpPct(iv) {
   var cohort = DATA.mirrorCohortAtk;
   if (!cohort || cohort.length === 0) return NaN;
   var myAtk = DATA.ivAtk[iv];
   if (!isFinite(myAtk)) return NaN;
+  var myAtkR = Math.round(myAtk * 100) / 100;
   var beaten = 0;
   for (var i = 0; i < cohort.length; i++) {
-    if (cohort[i] < myAtk) beaten++;
-    else break;  // sorted ascending; stop at first non-match
+    var cR = Math.round(cohort[i] * 100) / 100;
+    if (cR <= myAtkR) beaten++;
+    else break;  // sorted ascending; stop at first strictly greater
   }
   return (beaten / cohort.length) * 100;
 }
