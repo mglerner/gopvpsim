@@ -1831,23 +1831,30 @@ function buildTraces() {
     // marker. The legend-overlap bug (commit 43d9341) that was the
     // original motivation for 'skip' is fixed, so 'text' is safe.
     if (ownX.length > 0) {
+      // Size and opacity tuned down from 9/0.9 to 6/0.7 so the rings
+      // don't visually dominate a dense scatter. Symbol, hoverinfo,
+      // text, and line.color are unchanged -- past hover bugs make
+      // those the no-touch zone; sizing alone doesn't affect routing.
       traces.push({
         name: 'Yours - other', x: ownX, y: ownY, text: ownText,
         mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
-          size: 9, color: '#cccccc', symbol: 'circle-open',
-          opacity: 0.9, line: { width: 1.5, color: '#cccccc' }
+          size: 6, color: '#cccccc', symbol: 'circle-open',
+          opacity: 0.7, line: { width: 1, color: '#cccccc' }
         },
         hoverlabel: { bordercolor: '#cccccc' }
       });
     }
     if (qualX.length > 0) {
+      // Notable ring: size 13 -> 9, line width 2 -> 1.5. Still larger
+      // and fuller-opacity than "other" so the "worth noticing" visual
+      // hierarchy is preserved.
       traces.push({
         name: 'Yours - notable', x: qualX, y: qualY, text: qualText,
         mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {
-          size: 13, color: '#ffffff', symbol: 'circle-open',
-          opacity: 1.0, line: { width: 2, color: '#ffffff' }
+          size: 9, color: '#ffffff', symbol: 'circle-open',
+          opacity: 1.0, line: { width: 1.5, color: '#ffffff' }
         },
         hoverlabel: { bordercolor: '#ffffff' }
       });
