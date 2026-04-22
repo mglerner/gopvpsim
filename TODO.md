@@ -376,22 +376,23 @@ Refresh pass 2026-04-21 against shipped F1-F5 state surfaced five
 new gaps the original 2026-04-18 cut did not anticipate. Full
 writeup in `docs/jre_ryanswag_comparison.md` §10.4; short form:
 
-- **[Pre-ship, small mechanical] G4 — `authored-auto` label for
-  auto-gen narrative blocks.** Article currently labels auto-gen
-  intro / meta-role with `authored-human` class — misleading. The
-  Aegislash dive does it right (`authored-ai` + attribution line);
-  auto-gen should have its own class. 0.5 session, pure CSS +
-  renderer patch. No content dependency — ship independently.
+- ~~**G4 — `authored-auto` label for auto-gen narrative blocks**~~
+  **SHIPPED 2026-04-21 as commit `284c95b`.** Fourth enum value
+  `auto` added alongside `human` / `ai` / `mixed`; `_auto_fill` sets
+  `authored_by="auto"` when filling; both `authored_by_class`
+  (article) and `_authored_by_class` (dive) map it to the
+  `authored-auto` class (blue sidebar). Verified on the shipped
+  Oinkologne article (4 blocks tagged `authored-auto` correctly).
 
-- **[Pre-ship, conditional] G5 — Aegislash narrative is orphan
-  ship content.** Prose lives in shipped
-  `aegislash-shield-great-league/index.html:299-317` but
-  `thresholds/aegislash_shield.toml` bodies are empty (wiped by
-  `a1b700d`). Next re-dive or re-render of Aegislash wipes the
-  narrative. If Aegislash ships with Oinkologne CD (or is touched
-  by any overnight chain), reinstate the TOML bodies with
-  Michael-as-author attribution per pre-commit-hook policy. If
-  Aegislash is not re-touched pre-ship, punt to post-ship.
+- ~~**G5 — Aegislash narrative is orphan ship content**~~
+  **NOT NEEDED.** Audit 2026-04-23: the shipped Aegislash narrative
+  is `authored-auto` (deterministic rollup from dive data via
+  `auto_gen_narrative.py` standalone mode), not LLM-drafted prose.
+  Every re-render regenerates it from `data_obj` — no orphan risk.
+  The empty `thresholds/aegislash_shield.toml` bodies are correct
+  and expected: the TOML comment on line 23-27 explicitly documents
+  that auto-gen fills them at render time and they stay empty until
+  a human writes species-specific prose.
 
 - **[Pre-ship, Michael-decides] G3 — Oinkologne verdict editorial
   + outlook prose not populated.** `cbc9b28` shipped the F4 schema

@@ -314,6 +314,17 @@ DEEP_DIVE_CSS = """
 .dd-atk-weight-heavy-atk-weight { background:#3a1f1f; color:#e94560; }
 .dd-atk-weight-bulk-max { background:#1b2a33; color:#8ed1d1; }
 .dd-atk-weight-atk-tilt { background:#2a1f2a; color:#c8a2d0; }
+/* Envelope-position tag (category-level, sits right after the card
+   subtitle). Colored by shape: rider-top/elev = above band (green
+   family), rider-bottom/dep = below band (red family). The numeric
+   detail lives in the title= tooltip. */
+.dd-env-tag { font-size:0.82rem; margin:2px 0 4px; padding:3px 8px;
+  border-radius:3px; border-left:3px solid transparent; cursor:help;
+  display:inline-block; }
+.dd-env-rider-top    { background:#132a1c; color:#9be89b; border-left-color:#3fb950; }
+.dd-env-elev-crosser { background:#162318; color:#7db87d; border-left-color:#2f8135; }
+.dd-env-dep-crosser  { background:#2a1e16; color:#d29922; border-left-color:#b07214; }
+.dd-env-rider-bottom { background:#2a181b; color:#e77173; border-left-color:#c04547; }
 .dd-collapsible { margin: 4px 0; }
 .dd-collapsible > summary { list-style: none; }
 .dd-collapsible > summary::-webkit-details-marker { display: none; }
@@ -1113,10 +1124,58 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
 
 
 
+_ENV_SHAPE_LABEL = {
+    'envelope-rider-top':     'Rides top of anchor band',
+    'envelope-rider-bottom':  'Rides bottom of anchor band',
+    'elevated-band-crosser':  'Straddles band (net +)',
+    'depressed-band-crosser': 'Straddles band (net -)',
+    'sparse':                 None,
+}
+_ENV_SHAPE_SLUG = {
+    'envelope-rider-top':     'rider-top',
+    'envelope-rider-bottom':  'rider-bottom',
+    'elevated-band-crosser':  'elev-crosser',
+    'depressed-band-crosser': 'dep-crosser',
+}
+
+
+def _render_envelope_tag(env_entry):
+    """Compact category-level envelope-position annotation for a card.
+
+    Returns an HTML `<p>` (or empty string for sparse / missing data).
+    Five possible shapes from deep_dive_analysis.compute_envelope_positions;
+    'sparse' skips rendering because too-few-members/anchors means the
+    metric is unreliable, not informational.
+    """
+    if not env_entry:
+        return ''
+    shape = env_entry.get('shape')
+    label = _ENV_SHAPE_LABEL.get(shape)
+    if not label:
+        return ''
+    slug = _ENV_SHAPE_SLUG.get(shape, 'default')
+    mean_d = env_entry.get('mean_delta', 0.0)
+    spread = env_entry.get('spread', 0.0)
+    n_members = env_entry.get('n_members', 0)
+    n_anchors = env_entry.get('n_anchors', 0)
+    sign = '+' if mean_d >= 0 else ''
+    tip = (f'Avg battle-score delta vs the anchor-IV band at matching '
+           f'stat-product rank. {sign}{mean_d:.1f} average, spread '
+           f'{spread:.1f} (stdev) across {n_members} members and '
+           f'{n_anchors} anchor IVs.')
+    tip_attr = tip.replace('"', '&quot;')
+    return (f'<p class="dd-env-tag dd-env-{slug}" title="{tip_attr}">'
+            f'<b>Envelope:</b> {label} '
+            f'<span class="dd-small" style="font-weight:400">'
+            f'(avg {sign}{mean_d:.1f}, spread {spread:.1f})'
+            f'</span></p>\n')
+
+
 def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
                                   notable_max_pct=0.05,
                                   notable_max_count=5,
                                   max_members_shown=5,
+                                  envelope_positions=None,
                                   recommendations_html=''):
     """Render the "Notable IVs" HTML section from a list of IVCategory.
 
@@ -1277,6 +1336,20 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
             sub = matchup_subtitle(cat)
             if sub:
                 parts.append(f'<p class="dd-small dd-prose">{sub}</p>\n')
+
+        # Envelope-position annotation (S4/P3): category-level summary
+        # of how this card's members sit vs the anchor-IV band at the
+        # same stat-product rank. Only present when the caller passed an
+        # envelope_positions dict (i.e., anchor band and avg_scores were
+        # available at compute time). Skipped on matchup cards because
+        # those categories are typically huge (thousands of members) with
+        # tiny mean deltas — the envelope metric is designed for small,
+        # curated categories (composite, tier, structural) where the
+        # distinction vs the anchor band is diagnostic.
+        if envelope_positions and cat.kind != 'matchup':
+            env_html = _render_envelope_tag(envelope_positions.get(cat.name))
+            if env_html:
+                parts.append(env_html)
 
         # Member list — sort by total_wins desc when available, else
         # by IV index. Render every member; rows past max_members_shown
@@ -3383,6 +3456,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
     # the band + category membership differ per moveset.
     anchor_iv_indices = data_obj.get('anchorClearIvs') or []
     sp_ranks = data_obj.get('spRanks') or []
+    envelope_positions = None
     if anchor_iv_indices and sp_ranks and avg_scores:
         envelope_positions = analysis.compute_envelope_positions(
             iv_categories_all, sp_ranks, avg_scores, anchor_iv_indices,
@@ -3394,6 +3468,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
     notable_html = render_notable_ivs_section(
         iv_categories_all, data_obj, opp_iv_mode,
         recommendations_html=rec_html,
+        envelope_positions=envelope_positions,
     )
     if notable_html:
         parts.append(notable_html)
