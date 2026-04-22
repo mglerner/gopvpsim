@@ -114,6 +114,25 @@ step "Patching Member IVs enhance in all dive dirs" \
         userdata/website/forretress-shadow-volt-switch-great-league \
         userdata/website/forretress-shadow-bug-bite-great-league
 
+# 2b. Retrofit the Top IVs row-set union (sort + Mirror CMP %) on
+#     pre-f76a33e dive HTMLs. Surfaces CMP-optimal IVs that were
+#     invisible under the default "top 10 by battle score" cut. No-op
+#     on fresh dives via the fingerprint guard.
+step "Patching Top IVs CMP union in all dive dirs" \
+    python scripts/patch_dive_top_ivs_cmp_union.py \
+        userdata/website/oinkologne-great-league \
+        userdata/website/oinkologne-female-great-league \
+        userdata/website/tinkaton-great-league \
+        userdata/website/tinkaton-ultra-league \
+        userdata/website/aegislash-blade-great-league \
+        userdata/website/aegislash-shield-great-league \
+        userdata/website/aegislash-blade-ultra-league \
+        userdata/website/aegislash-shield-ultra-league \
+        userdata/website/forretress-volt-switch-great-league \
+        userdata/website/forretress-bug-bite-great-league \
+        userdata/website/forretress-shadow-volt-switch-great-league \
+        userdata/website/forretress-shadow-bug-bite-great-league
+
 # 3. Oinkologne CD article (per-form Matchup Delta table needs both
 #    Male and Female dives fresh, which steps 1 + 2 guarantee).
 step "Regenerating Oinkologne CD article" \

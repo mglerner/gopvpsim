@@ -1798,14 +1798,65 @@ function updateSummaryTable() {
     return sign * (va - vb);
   };
 
+  var hasCohort = !!(DATA.mirrorCohortAtk && DATA.mirrorCohortAtk.length > 0);
+
   var indices = [];
   for (var k = 0; k < nIvs; k++) indices.push(k);
   indices.sort(cmp);
-  var top = indices.slice(0, N);
+
+  // Row-set: union of top-N by the active sort column AND (when a
+  // Mirror-CMP cohort is available AND the active sort isn't already
+  // Mirror CMP %) top-N by Mirror CMP %. Surfaces IVs picked
+  // specifically for CMP coverage -- those lose the Y Rank ranking
+  // and are invisible under the default "top 10 by battle score"
+  // cut, which is the gap the XL-candy-decision tool closes. The
+  // final row-set is re-sorted by the active column for stable
+  // display order.
+  var seen = {};
+  var unionList = [];
+  function _addIfRoom(iv) {
+    if (seen[iv]) return false;
+    // Respect sparse-mode NaN guard when the active sort is a
+    // y-value-based column (e.g. winsMirror).
+    if (currentYIsSparse &&
+        (summarySort.col === 'yrank' || summarySort.col === 'yval') &&
+        !isFinite(yValues[iv])) {
+      return false;
+    }
+    seen[iv] = true;
+    unionList.push(iv);
+    return true;
+  }
+  // Primary bucket: top-N by the active sort.
+  for (var pi = 0, added = 0; pi < indices.length && added < N; pi++) {
+    if (_addIfRoom(indices[pi])) added++;
+  }
+  // Secondary bucket: top-N by Mirror CMP %, skipped when the
+  // cohort is absent or the active sort already IS Mirror CMP % (so
+  // it's redundant). Same per-bucket cap as the primary bucket.
+  if (hasCohort && summarySort.col !== 'mirrorCmp') {
+    var cmpIdx = [];
+    for (var k3 = 0; k3 < nIvs; k3++) cmpIdx.push(k3);
+    cmpIdx.sort(function(a, b) {
+      var va = _computeMirrorCmpPct(a), vb = _computeMirrorCmpPct(b);
+      var na = isNaN(va), nb = isNaN(vb);
+      if (na && nb) return 0;
+      if (na) return 1;
+      if (nb) return -1;
+      return vb - va;  // descending
+    });
+    for (var pi2 = 0, added2 = 0;
+         pi2 < cmpIdx.length && added2 < N;
+         pi2++) {
+      if (_addIfRoom(cmpIdx[pi2])) added2++;
+    }
+  }
+  // Re-sort the union by the active column so the display order
+  // matches "click column header -> sort direction."
+  unionList.sort(cmp);
+  var top = unionList;
 
   var arrow = (summarySort.dir === 'asc') ? ' \u25B2' : ' \u25BC';
-
-  var hasCohort = !!(DATA.mirrorCohortAtk && DATA.mirrorCohortAtk.length > 0);
 
   var h = '<table>';
   h += '<tr>';
