@@ -76,101 +76,34 @@ log ""
 step "Running 12 dives via run_website_dives.py" \
     python scripts/run_website_dives.py
 
-# 2. Back-fill per-opponent #opp-<slug> anchors into every dive dir.
-#    Idempotent; for brand-new dives the renderer already emitted ids so
-#    this is mostly a no-op, but it's cheap and protects against any
-#    dive that was started before the renderer change.
-step "Patching per-opponent anchors in all dive dirs" \
-    python scripts/patch_dive_opp_anchors.py \
-        userdata/website/oinkologne-great-league \
-        userdata/website/oinkologne-female-great-league \
-        userdata/website/tinkaton-great-league \
-        userdata/website/tinkaton-ultra-league \
-        userdata/website/aegislash-blade-great-league \
-        userdata/website/aegislash-shield-great-league \
-        userdata/website/aegislash-blade-ultra-league \
-        userdata/website/aegislash-shield-ultra-league \
-        userdata/website/forretress-volt-switch-great-league \
-        userdata/website/forretress-bug-bite-great-league \
-        userdata/website/forretress-shadow-volt-switch-great-league \
-        userdata/website/forretress-shadow-bug-bite-great-league
+# The scripts/patch_dive_*.py patchers are retrofit-only tools: they
+# existed to carry a feature (opp anchors, Member IVs enhance, Top IVs
+# CMP union, Mirror CMP tolerance) back into HTMLs shipped before the
+# renderer/engine change landed. All four are now baked into the
+# renderer + engine.js, so a successful Step 1 re-dive produces fresh
+# HTMLs that already carry the behavior. The patchers remain available
+# for ad-hoc retrofits of HTMLs outside this list; they are intentionally
+# NOT in the overnight chain so an unexpected "[no-match]" log line from
+# a healthy overnight doesn't read as a failure.
 
-# 2a. Retrofit Member IVs tooltip un-truncation + per-shield Δ columns
-#     on any pre-20e7bd1 dive HTMLs. Renderer now emits these natively
-#     for fresh dives; patcher JS is a runtime no-op when the table is
-#     already in the 9-column shape. Idempotent via fingerprint comment.
-step "Patching Member IVs enhance in all dive dirs" \
-    python scripts/patch_dive_member_ivs_enhance.py \
-        userdata/website/oinkologne-great-league \
-        userdata/website/oinkologne-female-great-league \
-        userdata/website/tinkaton-great-league \
-        userdata/website/tinkaton-ultra-league \
-        userdata/website/aegislash-blade-great-league \
-        userdata/website/aegislash-shield-great-league \
-        userdata/website/aegislash-blade-ultra-league \
-        userdata/website/aegislash-shield-ultra-league \
-        userdata/website/forretress-volt-switch-great-league \
-        userdata/website/forretress-bug-bite-great-league \
-        userdata/website/forretress-shadow-volt-switch-great-league \
-        userdata/website/forretress-shadow-bug-bite-great-league
-
-# 2b. Retrofit the Top IVs row-set union (sort + Mirror CMP %) on
-#     pre-f76a33e dive HTMLs. Surfaces CMP-optimal IVs that were
-#     invisible under the default "top 10 by battle score" cut. No-op
-#     on fresh dives via the fingerprint guard.
-step "Patching Top IVs CMP union in all dive dirs" \
-    python scripts/patch_dive_top_ivs_cmp_union.py \
-        userdata/website/oinkologne-great-league \
-        userdata/website/oinkologne-female-great-league \
-        userdata/website/tinkaton-great-league \
-        userdata/website/tinkaton-ultra-league \
-        userdata/website/aegislash-blade-great-league \
-        userdata/website/aegislash-shield-great-league \
-        userdata/website/aegislash-blade-ultra-league \
-        userdata/website/aegislash-shield-ultra-league \
-        userdata/website/forretress-volt-switch-great-league \
-        userdata/website/forretress-bug-bite-great-league \
-        userdata/website/forretress-shadow-volt-switch-great-league \
-        userdata/website/forretress-shadow-bug-bite-great-league
-
-# 2c. Retrofit the Mirror CMP % tolerance fix: round both sides to 2dp
-#     and count ties as beat. Without this, float drift in cohort atk
-#     (e.g. Tink UL 142.8509983 vs display max 142.85) returns 0% for
-#     every IV even when several tie the slayer benchmark. No-op on
-#     fresh dives via the fingerprint guard.
-step "Patching Mirror CMP tolerance in all dive dirs" \
-    python scripts/patch_dive_mirror_cmp_tolerance.py \
-        userdata/website/oinkologne-great-league \
-        userdata/website/oinkologne-female-great-league \
-        userdata/website/tinkaton-great-league \
-        userdata/website/tinkaton-ultra-league \
-        userdata/website/aegislash-blade-great-league \
-        userdata/website/aegislash-shield-great-league \
-        userdata/website/aegislash-blade-ultra-league \
-        userdata/website/aegislash-shield-ultra-league \
-        userdata/website/forretress-volt-switch-great-league \
-        userdata/website/forretress-bug-bite-great-league \
-        userdata/website/forretress-shadow-volt-switch-great-league \
-        userdata/website/forretress-shadow-bug-bite-great-league
-
-# 3. Oinkologne CD article (per-form Matchup Delta table needs both
-#    Male and Female dives fresh, which steps 1 + 2 guarantee).
+# 2. Oinkologne CD article (per-form Matchup Delta table needs both
+#    Male and Female dives fresh, which Step 1 guarantees).
 step "Regenerating Oinkologne CD article" \
     python scripts/generate_article.py Oinkologne great "Mud Slap"
 
-# 4. Oinkologne Male-vs-Female comparison page.
+# 3. Oinkologne Male-vs-Female comparison page.
 step "Rendering Oinkologne M-vs-F comparison" \
     python scripts/compare_loadouts.py comparisons/oinkologne-male-vs-female.toml
 
-# 5. Aegislash Blade-vs-Shield comparison pages (GL + UL).
+# 4. Aegislash Blade-vs-Shield comparison pages (GL + UL).
 step "Rendering Aegislash Blade-vs-Shield GL comparison" \
     python scripts/compare_loadouts.py comparisons/aegislash-blade-vs-shield.toml
 
 step "Rendering Aegislash Blade-vs-Shield UL comparison" \
     python scripts/compare_loadouts.py comparisons/aegislash-blade-vs-shield-ul.toml
 
-# 5c. Forretress 4-way comparison: fast-move x shadow. Reads data from
-#     the 4 Forretress dive dirs the chain produced in step 1.
+# 5. Forretress 4-way comparison: fast-move x shadow. Reads data from
+#    the 4 Forretress dive dirs the chain produced in step 1.
 step "Rendering Forretress fast-move x shadow comparison" \
     python scripts/compare_loadouts.py comparisons/forretress-fast-move-shadow.toml
 
