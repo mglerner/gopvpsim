@@ -34,6 +34,10 @@ var state = {
   manualMons: [],
 };
 var yValues, yRanks, refYValues, refYRanks;
+// Cached top-N same-species atk cohort for Top-Mirror CMP %. Invalidated
+// by computeView() whenever yRanks / yValues change (moveset, scenario,
+// or opp-IV dropdown). Null until first use.
+var _topMirrorCohortAtks = null;
 // Updated by computeView() based on the active y-axis mode. Read by
 // hover text, layout title, and the summary table column header so a
 // single source of truth controls how the y-axis labels itself.
@@ -202,6 +206,9 @@ function computeView() {
 
   yValues = computeYValues(state.movesetIdx);
   yRanks = computeRanks(yValues);
+  // Top-Mirror cohort depends on the just-refreshed yRanks; invalidate
+  // the cache so the next Top-Mirror CMP % read rebuilds it lazily.
+  _topMirrorCohortAtks = null;
   if (DATA.referenceIdx >= 0 && DATA.referenceIdx !== state.movesetIdx) {
     refYValues = computeYValues(DATA.referenceIdx);
     refYRanks = computeRanks(refYValues);
@@ -1708,11 +1715,16 @@ function _summaryColumns() {
     { id: 'hp',    label: 'HP',      defaultDir: 'desc', value: function(iv){ return DATA.ivHp[iv]; } },
     { id: 'sp',    label: 'SP Rank', defaultDir: 'asc',  value: function(iv){ return DATA.spRanks[iv]; } },
     { id: 'yval',  label: null,      defaultDir: 'desc', value: function(iv){ return yValues[iv]; } },
-    { id: 'scoreDelta', label: 'Δ vs #1', defaultDir: 'desc', value: function(iv){ return _computeScoreDelta(iv); } },
+    { id: 'scoreDelta',    label: 'Δ vs #1',        defaultDir: 'desc', value: function(iv){ return _computeScoreDelta(iv); } },
+    { id: 'topMirrorCmp',  label: 'Top-Mirror CMP %', defaultDir: 'desc', value: function(iv){ return _computeTopMirrorCmpPct(iv); },
+      help: '% of the top-50 same-species IVs in this dive whose attack you at least tie. Ladder-realistic mirror cohort.' },
+    { id: 'matchupsKept',  label: 'Matchups Kept',    defaultDir: 'desc', value: function(iv){ return _computeMatchupsKept(iv); },
+      help: 'Non-mirror opponents you win (avg score >= 500) under the active blend. Denominator excludes the mirror entry.' },
   ];
   if (hasCohort) {
-    cols.push({ id: 'mirrorCmp', label: 'Mirror CMP %', defaultDir: 'desc',
-                value: function(iv){ return _computeMirrorCmpPct(iv); } });
+    cols.push({ id: 'mirrorCmp', label: 'Mirror Slayer CMP %', defaultDir: 'desc',
+                value: function(iv){ return _computeMirrorCmpPct(iv); },
+                help: '% of the Nash-converged slayer cohort whose attack you at least tie. Niche; often collapses to all-0 or all-100.' });
   }
   // 'tier' deliberately not sortable: most IVs have tier === -1.
   cols.push({ id: 'tier',  label: 'Tier',    defaultDir: null,   value: null });
@@ -1745,6 +1757,91 @@ function _computeMirrorCmpPct(iv) {
     else break;  // sorted ascending; stop at first strictly greater
   }
   return (beaten / cohort.length) * 100;
+}
+
+// Top-Mirror CMP %: fraction of the top-N same-species IVs in THIS dive
+// (ranked by the active yMode's battle score) whose atk this IV at least
+// ties. Unlike Mirror Slayer CMP % — which uses the Nash-converged
+// slayer cohort and can collapse to a single atk value — Top-Mirror
+// builds the cohort from IVs likely to show up on ladder, so the metric
+// returns a meaningful 0-100 spread. Excludes the focal IV itself.
+// Rounds both sides to 2dp and counts ties as beats, same as
+// _computeMirrorCmpPct, so float drift doesn't lie.
+var TOP_MIRROR_N = 50;
+// Build the top-N-by-yRank same-species atk cohort once per view.
+// Focal IV IS included in the cohort: self-compare ties (beats) at
+// the ties-as-beat rule, so the metric reads "of the top-50 realistic
+// mirrors (yourself among them), what fraction do you CMP." Stable
+// denominator, no per-row exclusion bookkeeping.
+function _buildTopMirrorCohort() {
+  var want = TOP_MIRROR_N;
+  var byRank = new Array(want);
+  for (var i = 0; i < want; i++) byRank[i] = -1;
+  for (var iv = 0; iv < nIvs; iv++) {
+    var r = yRanks[iv];
+    if (r >= 1 && r <= want) byRank[r - 1] = iv;
+  }
+  var atks = [];
+  for (var k = 0; k < want; k++) {
+    var ci = byRank[k];
+    if (ci < 0) continue;
+    if (!isFinite(yValues[ci])) continue;
+    var a = DATA.ivAtk[ci];
+    if (!isFinite(a)) continue;
+    atks.push(Math.round(a * 100) / 100);
+  }
+  atks.sort(function(x, y){ return x - y; });  // asc for early-break scan
+  return atks;
+}
+function _computeTopMirrorCmpPct(iv) {
+  var myAtk = DATA.ivAtk[iv];
+  if (!isFinite(myAtk)) return NaN;
+  if (_topMirrorCohortAtks === null) _topMirrorCohortAtks = _buildTopMirrorCohort();
+  var cohort = _topMirrorCohortAtks;
+  if (cohort.length === 0) return NaN;
+  var myAtkR = Math.round(myAtk * 100) / 100;
+  var beaten = 0;
+  for (var j = 0; j < cohort.length; j++) {
+    if (cohort[j] <= myAtkR) beaten++;
+    else break;  // sorted ascending
+  }
+  return (beaten / cohort.length) * 100;
+}
+
+// Matchups Kept: count of non-mirror opponents where this IV's average
+// score across the active scenario blend is >= 500. Uses the active
+// oppIvMode score source (pvpoke / rank1), or pvpoke as a fallback when
+// the active yMode is sparse (winsMirror). Returns a plain integer —
+// the cell renderer pairs it with the "/N" denominator for display.
+function _computeMatchupsKept(iv) {
+  var mirrorSet = {};
+  var mirrorIdxs = DATA.mirrorOppIdxs || [];
+  for (var mi = 0; mi < mirrorIdxs.length; mi++) mirrorSet[mirrorIdxs[mi]] = true;
+  // Pick score source: active oppIvMode normally, pvpoke in sparse
+  // winsMirror mode (slayer-only yMode decouples from a real score).
+  var mode = state.yAxisMode || 'avgScore';
+  var src = (mode === 'winsMirror') ? 'pvpoke' : state.oppIvMode;
+  var scores = getScores(state.movesetIdx, src);
+  if (!scores) return NaN;
+  var sis = getActiveScenarioIndices();
+  var nSel = sis.length;
+  var wins = 0;
+  for (var oi = 0; oi < nO; oi++) {
+    if (mirrorSet[oi]) continue;
+    var sum = 0;
+    for (var k = 0; k < nSel; k++) {
+      sum += scores[iv * nS * nO + sis[k] * nO + oi];
+    }
+    if ((sum / nSel) >= 500) wins++;
+  }
+  return wins;
+}
+
+// Denominator for Matchups Kept display ("K/M"). Cached per-render
+// is overkill — just one subtraction.
+function _matchupsKeptDenom() {
+  var n = (DATA.mirrorOppIdxs || []).length;
+  return nO - n;
 }
 
 // Difference in avg battle score vs the current rank-1 (lowest yRank)
@@ -1874,7 +1971,21 @@ function updateSummaryTable() {
 
   var arrow = (summarySort.dir === 'asc') ? ' \u25B2' : ' \u25BC';
 
-  var h = '<table>';
+  // About-these-metrics box: explains the three mirror-adjacent columns
+  // (Top-Mirror CMP %, Matchups Kept, Mirror Slayer CMP %). Collapsed
+  // by default so regulars are not slowed down; sits above the table so
+  // new readers see it adjacent to the headers.
+  var h = '<details style="margin:0 0 8px 0;background:#1a1f2a;border:1px solid #2a3040;border-radius:4px;padding:6px 10px">'
+    + '<summary style="cursor:pointer;color:#c9d1d9;font-weight:600">About these metrics (Top-Mirror CMP %, Matchups Kept, Mirror Slayer CMP %)</summary>'
+    + '<div style="margin-top:8px;font-size:12px;line-height:1.5;color:#c9d1d9">'
+    + '<p>These three columns all ask "how well does this IV compete in the mirror (same-species) matchup," but they answer it from different angles. Read them together, not individually.</p>'
+    + '<p><b>Top-Mirror CMP %.</b> Of the top 50 IVs of this species in THIS dive (ranked by the active battle-score column), what fraction does this IV at least tie on attack? This is the "realistic ladder mirror" metric: your cohort is the IVs actually likely to appear on ladder, spanning a range of attack values, so the result spreads meaningfully from 0 to 100. The focal IV is counted in its own cohort, so the denominator stays at 50.</p>'
+    + '<p><b>Matchups Kept.</b> Of the non-mirror opponents in this dive\'s pool (N / M, where M = nOpponents minus the mirror entry), how many does this IV win under the active shields + opp-IV + bait combo? A win means average battle score >= 500 across the selected scenarios. The mirror opponent is excluded from the denominator because Top-Mirror CMP % and Mirror Slayer CMP % already cover the mirror axis; counting it here would double-count the same tradeoff.</p>'
+    + '<p><b>Mirror Slayer CMP %.</b> Same atk-comparison idea as Top-Mirror, but against the Nash-converged mirror slayer cohort produced by <code>--mirror-slayer</code>. This cohort often collapses to a single attack value when one corner of the IV grid dominates mirror wins, so the column tends to read 0 or 100 for most rows. It is the niche "build expressly to beat other slayer-optimal builds" metric, not a general-purpose mirror target, and only appears when slayer iteration was requested on this dive.</p>'
+    + '<p><b>Reading the tradeoff.</b> High Top-Mirror CMP % at low Matchups Kept is an overfit slayer build: you out-CMP your mirror peers but give up non-mirror matchups to do it. High on both is the sweet spot, the region a human tuner typically picks from. A high Mirror Slayer CMP % with a low Top-Mirror CMP % means you are optimizing for the Nash corner at the cost of the realistic ladder cohort.</p>'
+    + '<p><b>When to invest.</b> When you expect the mirror to show up often on the ladder (Tinkaton UL, Corviknight GL, common CD species in the weeks after their event), sort by Top-Mirror CMP % to see which IVs are worth an XL-candy investment, an ETM, or a targeted trade. When the mirror is rare in your meta, Matchups Kept carries more weight and Top-Mirror CMP % is mostly informational.</p>'
+    + '</div></details>';
+  h += '<table>';
   h += '<tr>';
   for (var ci = 0; ci < cols.length; ci++) {
     var c = cols[ci];
@@ -1883,8 +1994,14 @@ function updateSummaryTable() {
     var sortable = !!c.defaultDir;
     var isActive = (summarySort.col === c.id);
     var content = label + (isActive ? arrow : '');
+    // Header tooltip: column-specific help text when the column
+    // declares one, or the sort hint otherwise.
+    var tipBase = c.help ? c.help : (sortable ? 'Click to sort' : '');
+    var tip = tipBase.replace(/"/g, '&quot;');
     if (sortable) {
-      h += '<th style="cursor:pointer;user-select:none" onclick="_summarySortClick(\'' + c.id + '\')" title="Click to sort">' + content + '</th>';
+      h += '<th style="cursor:pointer;user-select:none" onclick="_summarySortClick(\'' + c.id + '\')" title="' + tip + '">' + content + '</th>';
+    } else if (tip) {
+      h += '<th title="' + tip + '">' + content + '</th>';
     } else {
       h += '<th>' + content + '</th>';
     }
@@ -1914,6 +2031,25 @@ function updateSummaryTable() {
       var sdStr = (sd > 0 ? '+' : '') + sd.toFixed(1);
       var sdColor = (sd > 0) ? '#9be89b' : (sd < 0 ? '#e89b9b' : '#c9d1d9');
       h += '<td style="color:' + sdColor + '">' + sdStr + '</td>';
+    } else {
+      h += '<td>-</td>';
+    }
+    // Top-Mirror CMP %: same colour buckets as Mirror Slayer CMP %.
+    var tmc = _computeTopMirrorCmpPct(iv);
+    if (isFinite(tmc)) {
+      var tmcColor = tmc >= 90 ? '#9be89b' : (tmc >= 50 ? '#d4a017' : '#888');
+      h += '<td style="color:' + tmcColor + '">' + tmc.toFixed(0) + '%</td>';
+    } else {
+      h += '<td>-</td>';
+    }
+    // Matchups Kept: "K/M" where M is non-mirror opponent count.
+    // Colour by win rate: >=80% green, 50-80% yellow, <50% dim.
+    var mk = _computeMatchupsKept(iv);
+    if (isFinite(mk)) {
+      var mkDen = _matchupsKeptDenom();
+      var mkFrac = mkDen > 0 ? (mk / mkDen) : 0;
+      var mkColor = mkFrac >= 0.8 ? '#9be89b' : (mkFrac >= 0.5 ? '#d4a017' : '#888');
+      h += '<td style="color:' + mkColor + '">' + mk + '/' + mkDen + '</td>';
     } else {
       h += '<td>-</td>';
     }
