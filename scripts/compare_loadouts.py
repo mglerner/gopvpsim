@@ -404,6 +404,172 @@ def _render_moveset_table(loadouts_data: list[dict], gm: dict) -> str:
     )
 
 
+def _loadout_abbrev(label: str) -> str:
+    """Shorten a loadout label for compact all-in-row table headers.
+
+    Strategy: strip a leading ``Shadow `` modifier into an ``S`` prefix,
+    then reduce the remaining content to word-initials (or the first
+    letter if it's a single word). Used only by the all-in-row matchup
+    table — the Base Stats / Moveset tables at the top of a comparison
+    keep the full labels since they have fewer columns.
+
+    Examples:
+      ``Shadow Volt Switch`` -> ``S VS``
+      ``Volt Switch``        -> ``VS``
+      ``Bug Bite``           -> ``BB``
+      ``Mud Slap``           -> ``MS``
+      ``Female``             -> ``F``
+    """
+    if label.startswith('Shadow '):
+        return 'S ' + _loadout_abbrev(label[len('Shadow '):])
+    words = label.split()
+    if not words:
+        return label
+    if len(words) == 1:
+        return words[0][:1].upper()
+    return ''.join(w[:1].upper() for w in words)
+
+
+def _render_abbreviation_note(labels: list[str], abbrevs: list[str]) -> str:
+    """Collapsible explainer for the all-in-row table's abbreviations.
+
+    Lists each loadout label with its abbreviation, plus the standing
+    abbreviations the table header uses (``WR``, ``Flip``).
+    """
+    pairs = []
+    seen = set()
+    for lbl, abbr in zip(labels, abbrevs):
+        if abbr in seen:
+            continue
+        seen.add(abbr)
+        pairs.append((abbr, lbl))
+    pairs.sort(key=lambda p: p[0])
+    items = ''.join(
+        f'<li><strong>{html.escape(a)}</strong> = {html.escape(l)}</li>'
+        for a, l in pairs
+    )
+    return (
+        '<details class="abbrev-note">'
+        '<summary>Abbreviations used in the table below</summary>'
+        '<ul class="abbrev-list">'
+        f'{items}'
+        '<li><strong>WR</strong> = win rate (fraction of 4096 focal IVs '
+        'x 9 shield scenarios where the loadout scores &ge; 500)</li>'
+        '<li><strong>Flip</strong> = loadouts disagree on win/loss for '
+        'this opponent. "No flip (W)" or "No flip (L)" = all loadouts '
+        'land on the same side of the 50% line.</li>'
+        '</ul></details>'
+    )
+
+
+def _render_all_in_row_matchup_table(
+    loadouts_data: list[dict],
+    shared_opponents: list[str],
+    gm: dict,
+    league: str,
+) -> tuple[str, int]:
+    """All-N-in-row matchup delta table for 3+ loadout comparisons.
+
+    One row per shared opponent. Columns: opponent name, one WR column
+    per loadout (color-coded green >= 50%, red < 50%), one Flip column
+    that either reads "No flip (W)" / "No flip (L)" when every loadout
+    lands on the same side of the 50% line, or N per-loadout W/L
+    badges when the split is non-trivial.
+
+    Returns ``(table_html, disagreement_count)``. Caller emits a summary
+    line from the count.
+
+    Headers use the short ``_loadout_abbrev`` form; the full label is
+    available in each column's ``title`` tooltip and in the sibling
+    abbreviation-note collapsible.
+    """
+    labels = [ld['spec'].label for ld in loadouts_data]
+    abbrevs = [_loadout_abbrev(lbl) for lbl in labels]
+    maps = [dict(zip(ld['opponents'], ld['per_opponent_win_rate']))
+            for ld in loadouts_data]
+
+    # Sort opponents by number of loadouts that win (desc), then by
+    # the best loadout's WR (desc). Keeps the "who flips?" rows toward
+    # the middle and the "always wins" / "always loses" blocks at the
+    # ends.
+    def _sort_key(name):
+        wrs = [m[name] for m in maps]
+        n_wins = sum(1 for wr in wrs if wr >= 0.5)
+        return (-n_wins, -max(wrs))
+    sorted_opps = sorted(shared_opponents, key=_sort_key)
+
+    rows = []
+    disagree_count = 0
+    for name in sorted_opps:
+        wrs = [m[name] for m in maps]
+        wins = [wr >= 0.5 for wr in wrs]
+        all_win = all(wins)
+        all_lose = not any(wins)
+        is_flip = not (all_win or all_lose)
+        if is_flip:
+            disagree_count += 1
+
+        cells = [f'<td>{html.escape(name)}</td>']
+        for wr, is_win, lbl in zip(wrs, wins, labels):
+            cls = 'delta-pos' if is_win else 'delta-neg'
+            cells.append(
+                f'<td class="{cls}" title="{html.escape(lbl)}: '
+                f'{100 * wr:.1f}% ({"win" if is_win else "loss"})">'
+                f'{100 * wr:.1f}%</td>'
+            )
+        if is_flip:
+            badges = []
+            for lbl, abbr, is_win in zip(labels, abbrevs, wins):
+                badge_cls = 'flip-pos' if is_win else 'flip-neg'
+                wl = 'W' if is_win else 'L'
+                badges.append(
+                    f'<span class="flip-badge {badge_cls}" '
+                    f'title="{html.escape(lbl)} {wl}">'
+                    f'{html.escape(abbr)} {wl}</span>'
+                )
+            flip_cell = (
+                f'<td class="matchup-all-flip">{"".join(badges)}</td>'
+            )
+        else:
+            overall = 'W' if all_win else 'L'
+            tip = ('All loadouts win this matchup (green row).'
+                   if all_win
+                   else 'All loadouts lose this matchup (red row).')
+            flip_cell = (
+                f'<td class="flip-badge flip-none" '
+                f'title="{html.escape(tip)}">No flip ({overall})</td>'
+            )
+        row_cls = 'matchup-delta-flip' if is_flip else ''
+        rows.append(
+            f'<tr class="{row_cls}">' + ''.join(cells) + flip_cell + '</tr>'
+        )
+
+    header_cells = [
+        '<th scope="col" data-sort="str">Opponent</th>'
+    ]
+    for lbl, abbr in zip(labels, abbrevs):
+        header_cells.append(
+            f'<th scope="col" data-sort="pct" '
+            f'title="{html.escape(lbl)} win rate. Green = win (&ge;50%), '
+            f'red = loss (&lt;50%).">'
+            f'{html.escape(abbr)}</th>'
+        )
+    header_cells.append(
+        '<th scope="col" data-sort="str" '
+        'title="\'No flip (W/L)\' when all loadouts agree; otherwise '
+        'per-loadout W/L badges show which loadouts win and which lose '
+        'this matchup.">'
+        'Flip</th>'
+    )
+    header = '<thead><tr>' + ''.join(header_cells) + '</tr></thead>'
+    body = '<tbody>' + ''.join(rows) + '</tbody>'
+    table = (
+        '<table class="matchup-delta matchup-all sortable">'
+        f'{header}{body}</table>'
+    )
+    return table, disagree_count
+
+
 def _render_pairwise_table(a: dict, b: dict, shared_opponents: list[str],
                            gm: dict, league: str) -> tuple[str, int]:
     a_map = dict(zip(a['opponents'], a['per_opponent_win_rate']))
@@ -589,22 +755,43 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
     bits.append(_render_verdict(loadouts_data))
 
     if include_matchup_delta:
-        pairs = list(itertools.combinations(loadouts_data, 2))
-        per_pair_heading = len(pairs) > 1
-        for a, b in pairs:
-            if per_pair_heading:
-                pair_heading = f'{a["spec"].label} vs {b["spec"].label}'
-                bits.append(f'<h3>{html.escape(pair_heading)}</h3>')
-            else:
-                bits.append('<h3>Matchup Delta</h3>')
-            table, flips = _render_pairwise_table(a, b, shared, gm, league)
+        # For 3+ loadouts render a single all-in-row table rather than
+        # C(N,2) pairwise tables (6 tables for N=4 is too much reading).
+        # N=2 keeps the pairwise format because its inline Δ (pp) +
+        # per-opponent PvPoke deep-link is still the best shape for a
+        # two-way side-by-side.
+        if len(loadouts_data) >= 3:
+            bits.append('<h3>Matchup Delta</h3>')
+            labels = [ld['spec'].label for ld in loadouts_data]
+            abbrevs = [_loadout_abbrev(lbl) for lbl in labels]
+            bits.append(_render_abbreviation_note(labels, abbrevs))
+            table, disagree = _render_all_in_row_matchup_table(
+                loadouts_data, shared, gm, league)
             bits.append(table)
             bits.append(
-                f'<p class="matchup-delta-summary">{flips} of {len(shared)} '
-                f'opponents flip across the 50% win line between '
-                f'{html.escape(a["spec"].label)} and '
-                f'{html.escape(b["spec"].label)}.</p>'
+                f'<p class="matchup-delta-summary">{disagree} of '
+                f'{len(shared)} opponents show a loadout split '
+                f'(at least one loadout wins and at least one loses). '
+                f'The remaining {len(shared) - disagree} opponent(s) '
+                f'resolve the same way for every loadout.</p>'
             )
+        else:
+            pairs = list(itertools.combinations(loadouts_data, 2))
+            per_pair_heading = len(pairs) > 1
+            for a, b in pairs:
+                if per_pair_heading:
+                    pair_heading = f'{a["spec"].label} vs {b["spec"].label}'
+                    bits.append(f'<h3>{html.escape(pair_heading)}</h3>')
+                else:
+                    bits.append('<h3>Matchup Delta</h3>')
+                table, flips = _render_pairwise_table(a, b, shared, gm, league)
+                bits.append(table)
+                bits.append(
+                    f'<p class="matchup-delta-summary">{flips} of {len(shared)} '
+                    f'opponents flip across the 50% win line between '
+                    f'{html.escape(a["spec"].label)} and '
+                    f'{html.escape(b["spec"].label)}.</p>'
+                )
 
     return '\n'.join(bits)
 
@@ -705,6 +892,20 @@ def render_standalone_html(title: str, description: str,
   .flip-badge.flip-unlinked {{ opacity: 0.75; cursor: help; }}
   table.matchup-delta tr.matchup-delta-flip-pos td {{ background: #152b1a; }}
   table.matchup-delta tr.matchup-delta-flip-neg td {{ background: #2b1515; }}
+  /* All-in-row matchup table (N>=3 loadouts): neutral amber row tint
+     for opponents where loadouts disagree on W/L, since there's no
+     single "winning side" to colour toward. */
+  table.matchup-all tr.matchup-delta-flip td {{ background: #2b2615; }}
+  table.matchup-all td.matchup-all-flip {{ padding: 3px 6px; }}
+  table.matchup-all td.matchup-all-flip .flip-badge {{ margin: 1px 2px; }}
+  details.abbrev-note {{ --sidebar-color: #5b8dd9;
+        background: #12192e; border-radius: 4px;
+        padding: 8px 12px 8px 16px; font-size: 13px; color: #b8c4d8;
+        margin: 8px 0; }}
+  details.abbrev-note summary {{ cursor: pointer; color: #c8a2d0;
+        font-weight: 500; }}
+  details.abbrev-note ul.abbrev-list {{ margin: 8px 0 0 0; padding-left: 20px; }}
+  details.abbrev-note ul.abbrev-list li {{ margin: 3px 0; }}
   p.verdict-line {{ --sidebar-color: #7db87d;
                     background: #1a2e1f; padding: 10px 14px 10px 18px;
                     color: #cfe8cf; border-radius: 6px; }}
