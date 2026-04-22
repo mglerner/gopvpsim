@@ -55,6 +55,16 @@ var tierColors = __TIER_COLORS_JS__;
 var tierNames = __TIER_NAMES_JS__;
 var nIvs = DATA.nIvs, nS = DATA.nScenarios, nO = DATA.nOpponents;
 
+// Column-header tooltip strings for the three mirror-adjacent metrics.
+// Declared once so the Top IVs table (_summaryColumns) and the Slayer IVs
+// "of yours" table (renderSection extras) share a single source of truth.
+// Each string appears once in the emitted HTML per table that uses it --
+// the title attribute still inlines the text, but the JS source does not
+// carry duplicate literals that would drift as copy evolves.
+var HELP_MIRROR_SLAYER_CMP = '% of the Nash-converged slayer cohort whose attack you at least tie. Niche; often collapses to all-0 or all-100.';
+var HELP_TOP_MIRROR_CMP = '% of the top-50 same-species IVs in this dive whose attack you at least tie. Ladder-realistic mirror cohort.';
+var HELP_MATCHUPS_KEPT = 'Expected non-mirror matchups won, sampling scenarios uniformly: per opponent, (scenarios won / nSel) summed over opponents. Integer when a single scenario is selected; fractional when averaging. Denominator excludes the mirror entry.';
+
 // ---- Helpers ----
 function getScoreKey(mi, mode) { return mi + '_' + mode; }
 function getScores(mi, mode) { return SCORES[getScoreKey(mi, mode)]; }
@@ -877,7 +887,8 @@ function renderMatchesList() {
     if (extras) {
       for (var xh = 0; xh < extras.length; xh++) {
         var _xhCls = extras[xh].cls ? (' class="' + extras[xh].cls + '"') : '';
-        h += '<th' + _xhCls + '>' + escapeHtml(extras[xh].header) + '</th>';
+        var _xhTitle = extras[xh].help ? (' title="' + extras[xh].help.replace(/"/g, '&quot;') + '"') : '';
+        h += '<th' + _xhCls + _xhTitle + '>' + escapeHtml(extras[xh].header) + '</th>';
       }
     }
     h += '</tr>';
@@ -1005,8 +1016,8 @@ function renderMatchesList() {
     [
       { header: 'Slayer type',      cls: 'wrap', cell: function(rc) { return listOrDash(rc.slayerCats); } },
       { header: 'Also in',          cls: 'wrap', cell: function(rc) { return listOrDash(rc.matched); } },
-      { header: 'Top-Mirror CMP %', cell: _cellTopMirror },
-      { header: 'Matchups Kept',    cell: _cellMatchupsKept }
+      { header: 'Top-Mirror CMP %', cell: _cellTopMirror,    help: HELP_TOP_MIRROR_CMP },
+      { header: 'Matchups Kept',    cell: _cellMatchupsKept, help: HELP_MATCHUPS_KEPT }
     ]
   );
 
@@ -1924,14 +1935,14 @@ function _summaryColumns() {
     { id: 'yval',  label: null,      defaultDir: 'desc', value: function(iv){ return yValues[iv]; } },
     { id: 'scoreDelta',    label: 'Δ vs #1',        defaultDir: 'desc', value: function(iv){ return _computeScoreDelta(iv); } },
     { id: 'topMirrorCmp',  label: 'Top-Mirror CMP %', defaultDir: 'desc', value: function(iv){ return _computeTopMirrorCmpPct(iv); },
-      help: '% of the top-50 same-species IVs in this dive whose attack you at least tie. Ladder-realistic mirror cohort.' },
+      help: HELP_TOP_MIRROR_CMP },
     { id: 'matchupsKept',  label: 'Matchups Kept',    defaultDir: 'desc', value: function(iv){ return _computeMatchupsKept(iv); },
-      help: 'Expected non-mirror matchups won, sampling scenarios uniformly: per opponent, (scenarios won / nSel) summed over opponents. Integer when a single scenario is selected; fractional when averaging. Denominator excludes the mirror entry.' },
+      help: HELP_MATCHUPS_KEPT },
   ];
   if (hasCohort) {
     cols.push({ id: 'mirrorCmp', label: 'Mirror Slayer CMP %', defaultDir: 'desc',
                 value: function(iv){ return _computeMirrorCmpPct(iv); },
-                help: '% of the Nash-converged slayer cohort whose attack you at least tie. Niche; often collapses to all-0 or all-100.' });
+                help: HELP_MIRROR_SLAYER_CMP });
   }
   // 'tier' deliberately not sortable: most IVs have tier === -1.
   cols.push({ id: 'tier',  label: 'Tier',    defaultDir: null,   value: null });
