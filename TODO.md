@@ -2,103 +2,49 @@
 
 Current thread: pre-ship polish between S10 ship day (2026-04-18) and
 Oinkologne CD (2026-05-09). Canonical ordering, read this first when
-resuming:
+resuming. **2026-04-23 refresh:** items 1, 3, 5 have shipped or are
+largely shipped since this list was written; item 2 is legitimately
+open (Michael wants another pass); items 4, 6 are the main remaining
+pre-ship surface.
 
-1. **Cross-form re-dive** (TODO.md "Pre-ship: cross-form opponent
-   coverage" below). Supervised session, Claude monitors output.
-   Adds both Oinkologne forms to `opponent_pools/gl_top50_plus_cs.txt`,
-   re-dives each serially with `--reserve-cpus 1`, regenerates article
-   + standalone comparison page. `cd_prep` auto-injection (shipped
-   2026-04-18) removes the `--fast MUD_SLAP` workaround; overnight re-
-   dive validates that path. Test article manually after.
+1. ~~**Cross-form re-dive**~~ — **SHIPPED** via `scripts/overnight_redive.sh`
+   (2026-04-19/20 chain, ~8h). Both Oinkologne forms in
+   `opponent_pools/gl_top50_plus_cs.txt`, article + standalone
+   comparison page regenerated, `cd_prep` auto-injection path
+   validated. See CHANGELOG 2026-04-19.
 2. **JRE / RyanSwag / ours comparison** (`~/.claude/plans/
-   jre-ryanswag-comparison.md`). Reads external refs + our final
-   article, produces `docs/jre_ryanswag_comparison.md` with classified
-   gap analysis. Two-way framing (hide our padding, add their
-   analytical prose). Default disposition for "we have content they
-   don't" is HIDE behind `<details>`, not remove - see
-   `feedback_hide_not_remove` memory.
-3. **F1-F5 follow-ups** surfaced by the comparison output. Each is
-   its own short session. Likely includes a new "Meta Role /
-   Strengths & Weaknesses" section type (F1) and key-matchup callout
-   prose (F2). Aegislash dive (SwagTips arc) becomes the first test
-   case for F1 once it lands.
+   jre-ryanswag-comparison.md`). **Status: re-run requested
+   2026-04-23.** First pass shipped `docs/jre_ryanswag_comparison.md`
+   (2026-04-18) against the pre-re-dive article; 2026-04-21 refresh
+   surfaced G-series follow-ups (see §10.4). Michael wants another
+   pass now that the article + dives have iterated further — "we
+   always learn more each time."
+3. **F1-F5 follow-ups** surfaced by the comparison output. **Mostly
+   SHIPPED.** F1 Meta Role `ddf9d19`, F2 key-flips callout `923f985`,
+   F4+F-wrap+F-intro `cbc9b28`+`259c493`, F-stats-block `c59a701`+
+   `f6ef6a0`, F-fast/charge-moves `8397fa9`, F-hide-methodology
+   `f9a1fc4`. Post-ship residual: F-tier-name-cleanup, F-shadow-
+   narrative, F5 cross-article footer (gated ≥3-5 articles).
 4. **P1-P4 polish** (see "Post-ship (article + dive polish)" section
-   below) - pull forward opportunistically if capacity allows before
-   CD day.
-5. **XL-candy-decision tool** (Mirror CMP % + Score Δ vs rank-1
-   columns + hover on the Top IVs table and scatter). Retrofits to
-   existing dives via HTML patcher; ~3-4 hours. See the "Pre-ship:
-   XL-candy-decision tool" section below. Claude-drafted narrative
-   replacement (docs/auto_gen_narrative_plan.md) should land first
-   since both touch the dive renderer.
-6. **Link-verification pass** (P4) and **ship**.
+   below). **P1, P2, P4 shipped; P3 (envelope-position annotations)
+   and P5 (Stats at a Glance) remain.** Pull forward opportunistically
+   if capacity allows before CD day.
+5. ~~**XL-candy-decision tool**~~ — **SHIPPED 2026-04-22** as the
+   Mirror CMP semantic reframe arc (11 commits `6dcc571`..`939162e` +
+   Slayer IVs tooltip retrofit `c3edb14` 2026-04-23). Three columns
+   on Top IVs table (Mirror Slayer CMP %, Top-Mirror CMP %, Matchups
+   Kept) + About-these-metrics box + Highlight IVs feature + Slayer
+   IVs "of yours" table gets the same columns + column-header
+   tooltips. All shipped via direct source change; retrofit patchers
+   cover previously-shipped dives.
+6. **Link-verification pass** (P4 tool shipped; run it pre-publish)
+   and **ship**.
 
-Post-ship, the post-S5 arc resumes at S11-S17 in
-`~/.claude/plans/post-s5-oinkologne-arc.md` (HTML file-size,
-matchup-flip attribution, post-debuff breakpoints, bait policy).
-Those are **not pre-ship items** - do not pull forward.
-
-## Morning task after overnight 2026-04-19 chain completes
-
-Commit `d3e2aae` fixed the split-movesets landing-page logic
-(index.html now lands on moveset 0 / top-scoring instead of the
-reference moveset). Dives 1-3 in the overnight chain ran before the
-fix landed, so their `index.html` files still point at the reference
-moveset (Tackle for the Oinkologne pair, Play-Rough-variant for
-Tinkaton GL). Dives 4-10 pick up the fix automatically.
-
-**Retroactive patch for dives 1-3 in the morning:**
-
-1. For each affected dive dir (`oinkologne-great-league`,
-   `oinkologne-female-great-league`, `tinkaton-great-league`):
-   - Identify the current `index.html`'s moveset index K (grep for
-     the first primary-moveset string, or infer from the list of
-     `index_m*.html` siblings — the missing m-index is K).
-   - Identify the top-scoring moveset — it's the one with the
-     lowest `_m{N}_` index in the split files' name space, typically
-     m0.
-2. Swap: rename `index.html` → `index_m{K}_{current_slug}.html`, and
-   `index_m0_{top_slug}.html` → `index.html`.
-3. Update the moveset dropdown internals in all 5 HTMLs (the
-   dropdown lists sibling filenames, which now point to renamed
-   files). Script this — don't hand-edit 5 HTMLs per dir.
-
-Easier alternative if the dropdown-rewrite proves fragile:
-regenerate each affected dive's HTML-only via deep_dive.py's
---html-regen mode if one exists (check), otherwise re-dive those
-three serially (~3 hours of compute; acceptable given the
-post-re-dive review day has capacity).
-
-**Also: write `scripts/summarize_perf.py`** against tonight's
-per-dive logs in `userdata/logs/2026-04/20260419_*.log`. The
-deep_dive.py logger already emits `X,XXX,XXX sims in Y.Ys
-(Z sims/s)` at every phase boundary plus chunk-progress ticks at
-~10-12% intervals, so the raw perf data for all 10 dives is
-already on disk. Write a one-off aggregator that walks those logs
-and emits a per-(dive, phase) table of elapsed + sims + throughput
-(CSV or markdown-table). Target audience: the next perf session,
-which doesn't exist yet but can reach for a tidy summary instead
-of regrep-ing raw logs. ~30 min of work against a known-shape
-dataset. The raw logs are gitignored (userdata/) so commit the
-summary output somewhere durable (docs/perf/ or similar) if the
-data looks interesting, otherwise leave it on disk and the script
-can re-run against a future overnight chain's logs too.
-
-**While you're in there, recalibrate
-`scripts/overnight_eta.py::FALLBACKS`.** Initial values (gl_full=40m,
-ul_full=35m, forretress=6m) were my guess during dive 1's in-flight
-state; observed real numbers for dives 1-3 are consistently ~60-65min
-for GL full-sweep. Bump fallbacks to match so the next overnight
-chain's "SCRIPT ETA" starts accurate instead of collapsing as early
-completions overwrite loose estimates. Take the mean of dives 1-6
-(all full-sweep) for gl_full/ul_full, dives 7-10 for forretress.
-
-**Specific outliers to flag in the summary output:** Tinkaton UL
-was running 1h+ elapsed at 2026-04-19 ~22:25 local (tracking near
-other full-sweep dives, so likely just the too-low fallback, not a
-real regression — but confirm against the other full-sweep times
-in the summary and flag if >15% over the GL/UL mean).
+Post-ship, the post-S5 arc resumes at S13-S17 in
+`~/.claude/plans/post-s5-oinkologne-arc.md` (matchup-flip
+attribution, post-debuff breakpoints, bait policy). S11-S12 (HTML
+file-size) already shipped 2026-04-21, earlier than scoped. The
+remaining S13-S17 are **not pre-ship items** - do not pull forward.
 
 ## Pre-ship: XL-candy-decision tool (Mirror CMP % + Score Δ vs rank-1)
 
@@ -416,14 +362,13 @@ precedent for absence. Nothing ships without explicit sign-off.
   review time. **Status: still hidden, not removed.** Re-evaluate
   post-ship.
 
-### Aegislash test case
+### Aegislash test case — SHIPPED
 
-F1 ships first on Oinkologne (as part of the pre-ship arc).
-Aegislash deep dive (pending in the SwagTips narrative session
-arc — see `project_swagtips_narrative_sessions`) becomes the
-second test case for the new Meta Role section type, with
-natural relevance since Aegislash is new to the meta and the
-meta-role framing matters more than usual.
+F1 shipped on Oinkologne first. Aegislash Blade + Shield narrative
+shipped 2026-04-19 (commit `bb021fa`) as Shape 2 Session 3, serving
+as the second test case for the Meta Role section type. Out-of-band
+GL dives landed same day; UL pair came through the overnight chain.
+See `project_shape2_session1_shipped.md` for the canonical record.
 
 ### 2026-04-21 refresh follow-ups (comparison doc §10)
 
@@ -597,53 +542,21 @@ hint in other wrappers) still stands — `run_website_dives.py` and
 --chain ...'` recipe at startup when the matching status preset
 exists. Small.
 
-## Pre-ship: cross-form opponent coverage for Oinkologne (2026-04-18)
+## Pre-ship: cross-form opponent coverage for Oinkologne (2026-04-18) — SHIPPED
 
-Surfaced during S10 while the Male-vs-Female matchup-delta section was
-being assembled. Both Oinkologne deep dives currently list 63
-opponents, but the intersection is 62 because each dive auto-includes
-its own focal species as a self-mirror and nothing else from the
-form pair:
+Items 1-3 (add both forms to `opponent_pools/gl_top50_plus_cs.txt`,
+re-dive serially, regenerate article + comparison page) shipped via
+the 2026-04-19/20 overnight chain. `cd_prep` TOML auto-injection
+(commit `e61c14e`) replaced the old `--fast MUD_SLAP` workaround;
+re-dive validated that code path.
 
-- Male dive opponents include `Oinkologne` (self) but NOT
-  `Oinkologne (Female)`.
-- Female dive opponents include `Oinkologne (Female)` (self) but NOT
-  `Oinkologne`.
-
-Effect: the per-form matchup-delta table in the CD article silently
-drops both forms from the cross-form view, so a reader cannot see
-"how does Male do against Female Oinkologne on the other team?" or
-vice versa. Real teambuilding needs that answer: players catch both
-forms on CD, so the opposing team can show up with either one.
-
-**Fix before ship (before 2026-05-09 CD):**
-
-1. Add both `Oinkologne` and `Oinkologne (Female)` to the Oinkologne
-   GL opponent pool (`opponent_pools/gl_top50_plus_cs.txt` or a
-   species-specific supplement) so each dive includes the sibling
-   form as an opponent.
-2. Re-run both dives serially with the updated pool. The `cd_prep`
-   TOML block (shipped 2026-04-18, commit e61c14e) auto-injects
-   `MUD_SLAP` into the legal-move list, so the old `--fast MUD_SLAP`
-   workaround is no longer needed — the re-dive is the validation
-   pass for that code path. See the overnight re-dive wrapper at
-   `scripts/overnight_redive.sh` (uncommitted scaffolding; intent is
-   to run serially with `--reserve-cpus 1`).
-3. Regenerate the article (`scripts/generate_article.py`) and the
-   standalone comparison page (`scripts/compare_loadouts.py`). The
-   per-form matchup-delta table will then include rows for both
-   Oinkologne forms, with the intersection count jumping from 62 to
-   ~64 (opponent pool size + both focal forms).
-4. (Optional longer-term) Consider teaching `deep_dive.py` to
-   auto-include sibling forms when a species has known alternate
-   forms in the gamemaster (and `cd_prep` is set on multiple of
-   them, or a `form_siblings` hint is present in the threshold TOML).
-   Not required for the Oinkologne ship.
+**Open tail:** item 4 (auto-form-sibling expansion in
+`build_opponent_pool.py`) — design done but parked pending review of
+rendered Oinkologne article; decide pool-level vs render-level filter
+for hypothetical-form rows. See memory
+`project_form_change_pool_expansion_parked.md`.
 
 ## S9a checkpoint observations (2026-04-17)
-
-Items surfaced during the S9 Female Oinkologne dive. Read during S9a
-before committing to the S10 ship.
 
 - **CLI-comment logger reconstructs `--mirror-slayer` incorrectly.** In
   the log header and the top-of-HTML `<!-- CLI: ... -->` comment,
@@ -655,16 +568,7 @@ before committing to the S10 ship.
   cosmetic but breaks copy-paste reproducibility of past dives.
   Likely cause: the reconstruction formats bool flags as
   `--flag <value>` instead of `--flag` / `--no-flag`. Low-risk fix in
-  the logger. Not a blocker for S10; worth spending 10 min on if
-  S9a has capacity, otherwise punt post-ship.
-- **Female dive output layout matches Male.** 5 split-moveset HTMLs
-  (top moveset → `index.html`, others → `index_mN_<moves>.html`),
-  ~20-22 MB each. No new rendering shapes observed that S5a's
-  validation-on-Male wouldn't have caught.
-- **Narrative generation completed cleanly** for all 5 movesets
-  (~90s per moveset with S8a's 6.1x speedup). No renderer
-  exceptions or suspicious "1 non-empty block(s)" shortfalls beyond
-  the expected one-moveset-per-split-page pattern.
+  the logger.
 
 ## Deferred cleanup: backwards-compatibility removal pass
 
@@ -1178,11 +1082,14 @@ break invariants that weren't yet nailed down by tests.
   **Still open on top of the shipped generator:**
   - Envelope-position annotation wiring into IV Recommendations
     cards — see S8 envelope-annotation follow-up below (unchanged).
-  - Shape 2 migration of narrative FROM the article TO the dive,
-    flagged 2026-04-19 — see "Shape 2 migration" block at the top of
-    this file. That is not a regression in the article generator; it
-    is a deliberate re-homing of narrative prose so per-species dives
-    are readable on their own.
+
+  **Also shipped on top of the generator:**
+  - Shape 2 migration of narrative from article to dive — SHIPPED
+    2026-04-19 across three sessions (commits `41bbe6f`, `bf05538`,
+    `bb021fa`). Per-species narrative now lives in
+    `thresholds/<species>.toml` and renders at the top of each dive
+    via `deep_dive_rendering.render_species_narrative()`. Article
+    `[intro] / [meta_role] / [verdict]` slimmed to CD-event scope.
 
   **Watch item for S8 (envelope-position annotation surfacing):** when
   the per-category envelope-position metric (S4) gets surfaced as
@@ -1210,16 +1117,17 @@ break invariants that weren't yet nailed down by tests.
 
 ## Deep-dive narrative
 
-* **SwagTips narrative follow-ups (Goodra + Aegislash dives)** — the
+* **SwagTips narrative 3-session arc — SHIPPED 2026-04-19.** The
   renderer module `scripts/deep_dive_narrative.py` (1016 lines, purple
   "IV Flavor Guide" zone between Expert Analysis gold and Simulation
-  Deep Dive blue) is in place. Remaining in the 3-session SwagTips arc
-  per `~/.claude/plans/flickering-swinging-micali.md`: (2) ~~Goodra
-  test-drive dive~~ **Done 2026-04-16** (Lechonk CD prep Session 2;
-  see "Narrative renderer polish gated on Oinkologne" below for items
-  logged but not fixed), and (3) Aegislash form-change dive that
-  stress-tests narrative generation when the species swaps moves/stats
-  mid-battle.
+  Deep Dive blue) is in place. All three sessions per
+  `~/.claude/plans/flickering-swinging-micali.md` are done:
+  (1) renderer shipped as Shape 2 Session 1 (commit `41bbe6f`),
+  (2) ~~Goodra test-drive dive~~ done 2026-04-16, and
+  (3) ~~Aegislash form-change dive~~ done 2026-04-19 (commit `bb021fa`,
+  Shape 2 Session 3); narrative generation handles mid-battle form/
+  moveset swaps. See "Narrative renderer polish gated on Oinkologne"
+  below for cosmetic items logged during the Goodra session.
 
 * **Narrative renderer polish gated on Oinkologne** — surfaced during
   the Goodra test-drive (2026-04-16, Lechonk CD prep Session 2). Items
