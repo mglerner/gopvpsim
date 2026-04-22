@@ -2473,6 +2473,17 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'nOpponents': n_opponents,
         'scenarios': [[s0, s1] for s0, s1 in shield_scenarios],
         'opponents': opponent_names,
+        # Indices into opponent_names whose species matches the focal
+        # species (i.e., the mirror entry, or both forms when a pool
+        # carries both normal + shadow of self). Used client-side by
+        # the "Matchups Kept" column to exclude mirror matchups from
+        # the denominator; the mirror axis is already covered by
+        # Mirror Slayer CMP %, and counting it in Matchups Kept double-
+        # counts the same tradeoff.
+        'mirrorOppIdxs': [
+            _i for _i, _n in enumerate(opponent_names)
+            if parse_opponent_spec(_n)[0] == species
+        ],
         'oppIvModes': opp_iv_modes,
         'opponentLabel': opponent_label or 'PvPoke rankings',
         'referenceIdx': reference_idx,
