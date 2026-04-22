@@ -996,7 +996,8 @@ function renderMatchesList() {
     var den = _matchupsKeptDenom();
     var frac = den > 0 ? (v / den) : 0;
     var color = frac >= 0.8 ? '#9be89b' : (frac >= 0.5 ? '#d4a017' : '#888');
-    return '<span style="color:' + color + '">' + v + '/' + den + '</span>';
+    var vStr = (Math.abs(v - Math.round(v)) < 1e-6) ? String(Math.round(v)) : v.toFixed(1);
+    return '<span style="color:' + color + '">' + vStr + '/' + den + '</span>';
   }
   html += renderSection(
     'Slayer IVs',
@@ -1925,7 +1926,7 @@ function _summaryColumns() {
     { id: 'topMirrorCmp',  label: 'Top-Mirror CMP %', defaultDir: 'desc', value: function(iv){ return _computeTopMirrorCmpPct(iv); },
       help: '% of the top-50 same-species IVs in this dive whose attack you at least tie. Ladder-realistic mirror cohort.' },
     { id: 'matchupsKept',  label: 'Matchups Kept',    defaultDir: 'desc', value: function(iv){ return _computeMatchupsKept(iv); },
-      help: 'Non-mirror opponents you win (avg score >= 500) under the active blend. Denominator excludes the mirror entry.' },
+      help: 'Expected non-mirror matchups won, sampling scenarios uniformly: per opponent, (scenarios won / nSel) summed over opponents. Integer when a single scenario is selected; fractional when averaging. Denominator excludes the mirror entry.' },
   ];
   if (hasCohort) {
     cols.push({ id: 'mirrorCmp', label: 'Mirror Slayer CMP %', defaultDir: 'desc',
@@ -2014,11 +2015,23 @@ function _computeTopMirrorCmpPct(iv) {
   return (beaten / cohort.length) * 100;
 }
 
-// Matchups Kept: count of non-mirror opponents where this IV's average
-// score across the active scenario blend is >= 500. Uses the active
-// oppIvMode score source (pvpoke / rank1), or pvpoke as a fallback when
-// the active yMode is sparse (winsMirror). Returns a plain integer —
-// the cell renderer pairs it with the "/N" denominator for display.
+// Matchups Kept: expected number of non-mirror opponents this IV
+// would beat, sampling scenarios uniformly from the selected shield
+// combos. Per opponent, credit = (scenarios won) / nSel; summed over
+// opponents. Float-valued, denominator stays at nO - len(mirrorIdxs).
+//
+// For nSel = 1 (user picked a single shield scenario), credit is
+// exactly {0, 1} and the sum reduces to the integer count of wins.
+// For nSel > 1, the fractional credits give finer discrimination on
+// top-tier species where nearly every IV wins the same set of core
+// opponents -- previous integer thresholds (avg >= 500, then
+// majority-of-scenarios) compressed Tinkaton UL to 5-7 unique values
+// across 4096 IVs, which is too flat to distinguish among top picks.
+// Fractional credit preserves the shield-scenario variance structure
+// that those thresholds discarded.
+//
+// Uses the active oppIvMode score source (pvpoke / rank1), or pvpoke
+// as a fallback when the active yMode is sparse (winsMirror).
 function _computeMatchupsKept(iv) {
   var mirrorSet = {};
   var mirrorIdxs = DATA.mirrorOppIdxs || [];
@@ -2031,16 +2044,16 @@ function _computeMatchupsKept(iv) {
   if (!scores) return NaN;
   var sis = getActiveScenarioIndices();
   var nSel = sis.length;
-  var wins = 0;
+  var credit = 0;
   for (var oi = 0; oi < nO; oi++) {
     if (mirrorSet[oi]) continue;
-    var sum = 0;
+    var sceneWins = 0;
     for (var k = 0; k < nSel; k++) {
-      sum += scores[iv * nS * nO + sis[k] * nO + oi];
+      if (scores[iv * nS * nO + sis[k] * nO + oi] >= 500) sceneWins++;
     }
-    if ((sum / nSel) >= 500) wins++;
+    credit += sceneWins / nSel;
   }
-  return wins;
+  return credit;
 }
 
 // Denominator for Matchups Kept display ("K/M"). Cached per-render
@@ -2186,7 +2199,7 @@ function updateSummaryTable() {
     + '<div style="margin-top:8px;font-size:12px;line-height:1.5;color:#c9d1d9">'
     + '<p>These three columns all ask "how well does this IV compete in the mirror (same-species) matchup," but they answer it from different angles. Read them together, not individually.</p>'
     + '<p><b>Top-Mirror CMP %.</b> Of the top 50 IVs of this species in THIS dive (ranked by the active battle-score column), what fraction does this IV at least tie on attack? This is the "realistic ladder mirror" metric: your cohort is the IVs actually likely to appear on ladder, spanning a range of attack values, so the result spreads meaningfully from 0 to 100. The focal IV is counted in its own cohort, so the denominator stays at 50.</p>'
-    + '<p><b>Matchups Kept.</b> Of the non-mirror opponents in this dive\'s pool (N / M, where M = nOpponents minus the mirror entry), how many does this IV win under the active shields + opp-IV + bait combo? A win means average battle score >= 500 across the selected scenarios. The mirror opponent is excluded from the denominator because Top-Mirror CMP % and Mirror Slayer CMP % already cover the mirror axis; counting it here would double-count the same tradeoff.</p>'
+    + '<p><b>Matchups Kept.</b> Expected number of non-mirror opponents this IV beats, sampling shield scenarios uniformly from the active selection. Per opponent, credit = (scenarios won / total scenarios), summed across opponents; denominator stays at M (nOpponents minus mirror). When a single scenario is selected, the number is an integer count of wins; when averaging across all shield combinations, it is a fractional expected-value (e.g. 34.2 / 59) that preserves shield-scenario variance a naive "avg score >= 500" or "majority of scenarios" threshold would discard. The mirror opponent is excluded because Top-Mirror CMP % and Mirror Slayer CMP % already cover the mirror axis.</p>'
     + '<p><b>Mirror Slayer CMP %.</b> Same atk-comparison idea as Top-Mirror, but against the Nash-converged mirror slayer cohort produced by <code>--mirror-slayer</code>. This cohort often collapses to a single attack value when one corner of the IV grid dominates mirror wins, so the column tends to read 0 or 100 for most rows. It is the niche "build expressly to beat other slayer-optimal builds" metric, not a general-purpose mirror target, and only appears when slayer iteration was requested on this dive.</p>'
     + '<p><b>Reading the tradeoff.</b> High Top-Mirror CMP % at low Matchups Kept is an overfit slayer build: you out-CMP your mirror peers but give up non-mirror matchups to do it. High on both is the sweet spot, the region a human tuner typically picks from. A high Mirror Slayer CMP % with a low Top-Mirror CMP % means you are optimizing for the Nash corner at the cost of the realistic ladder cohort.</p>'
     + '<p><b>When to invest.</b> When you expect the mirror to show up often on the ladder (Tinkaton UL, Corviknight GL, common CD species in the weeks after their event), sort by Top-Mirror CMP % to see which IVs are worth an XL-candy investment, an ETM, or a targeted trade. When the mirror is rare in your meta, Matchups Kept carries more weight and Top-Mirror CMP % is mostly informational.</p>'
@@ -2248,14 +2261,17 @@ function updateSummaryTable() {
     } else {
       h += '<td>-</td>';
     }
-    // Matchups Kept: "K/M" where M is non-mirror opponent count.
+    // Matchups Kept: fractional expected-wins value, displayed to 1dp
+    // (integer when the fractional part is exactly 0, which happens
+    // in single-scenario mode where credit is {0,1} per opponent).
     // Colour by win rate: >=80% green, 50-80% yellow, <50% dim.
     var mk = _computeMatchupsKept(iv);
     if (isFinite(mk)) {
       var mkDen = _matchupsKeptDenom();
       var mkFrac = mkDen > 0 ? (mk / mkDen) : 0;
       var mkColor = mkFrac >= 0.8 ? '#9be89b' : (mkFrac >= 0.5 ? '#d4a017' : '#888');
-      h += '<td style="color:' + mkColor + '">' + mk + '/' + mkDen + '</td>';
+      var mkStr = (Math.abs(mk - Math.round(mk)) < 1e-6) ? String(Math.round(mk)) : mk.toFixed(1);
+      h += '<td style="color:' + mkColor + '">' + mkStr + '/' + mkDen + '</td>';
     } else {
       h += '<td>-</td>';
     }
