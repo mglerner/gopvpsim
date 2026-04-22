@@ -2478,6 +2478,11 @@ function reattachLegendHandlers() {
 window.updateView = updateView;
 window.updateSummaryTable = updateSummaryTable;
 window._summarySortClick = _summarySortClick;
+// Inline onclick handlers on the collection-matches tables reach these
+// via window.*; without the assignments they live inside the engine IIFE
+// and the handlers throw ReferenceError.
+window.toggleMatchesSection = toggleMatchesSection;
+window.sortMatchesTable = sortMatchesTable;
 applyHistogramHash();
 updateView();
 // Hook up the collection panel handlers now that updateView has run
