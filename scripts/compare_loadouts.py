@@ -741,9 +741,26 @@ def _render_verdict(loadouts_data: list[dict]) -> str:
     return f'<p class="verdict-line">{joined}.</p>'
 
 
+def _authored_by_class(authored_by: str) -> str:
+    """Map the optional ``authored_by`` enum to a CSS modifier class.
+
+    Mirrors ``deep_dive_rendering._authored_by_class``; kept local so
+    this module doesn't have to import from the dive renderer. Values:
+    ``human``/``mixed`` (gold), ``ai`` (orange), ``auto`` (blue).
+    Unknown or empty → empty string (no modifier; falls back to the
+    default green ``compare-summary`` look).
+    """
+    val = (authored_by or '').strip().lower()
+    if val in {'human', 'ai', 'mixed', 'auto'}:
+        return f' authored-{val}'
+    return ''
+
+
 def build_comparison_fragment(loadouts_data: list[dict], league: str,
                               gm: dict, title: str,
                               summary: str = '',
+                              authored_by: str = '',
+                              author: str = '',
                               include_matchup_delta: bool = True) -> str:
     """Return the HTML fragment for embedding in an article section.
 
@@ -752,6 +769,13 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
     unordered pair of loadouts plus a flip-count roll-up. Articles that
     already render per-form matchup-delta tables elsewhere should pass
     ``include_matchup_delta=False`` to avoid duplicating that content.
+
+    ``authored_by`` is the enum (``human``/``ai``/``mixed``/``auto``);
+    when set it colours the summary block's left-edge sidebar to match
+    the dive's species-narrative palette so a reader can tell expert-
+    authored framing from Claude-drafted framing at a glance. ``author``
+    is the free-form attribution shown inline below the summary (e.g.
+    ``"mglerner"``); rendered verbatim, HTML-escaped.
     """
     shared = _align_opponents(loadouts_data)
 
@@ -779,7 +803,17 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
 
     if summary:
         summary_html = html.escape(summary.strip()).replace('\n\n', '</p><p>')
-        bits.append(f'<p class="compare-summary">{summary_html}</p>')
+        cls_suffix = _authored_by_class(authored_by)
+        author_line = ''
+        if author.strip():
+            author_line = (
+                '<p class="narrative-attribution"><em>'
+                f'{html.escape(author.strip())}</em></p>'
+            )
+        bits.append(
+            f'<div class="compare-summary{cls_suffix}">'
+            f'<p>{summary_html}</p>{author_line}</div>'
+        )
 
     bits.append('<h3>Base Stats</h3>')
     bits.append(_render_base_stats_table(loadouts_data, gm))
@@ -851,9 +885,22 @@ table.base-stat-compare tbody td, table.moveset-compare tbody td {
 }
 span.move-aside { color: #8ea1bd; font-size: 12px; }
 p.compare-lead { font-size: 14px; color: #b8c4d8; }
-p.compare-summary { --sidebar-color: #7db87d;
+div.compare-summary { --sidebar-color: #7db87d;
   font-size: 14px; color: #cfe8cf; background: #1a2e1f;
   padding: 10px 14px 10px 18px; border-radius: 6px; }
+div.compare-summary p { margin: 0 0 6px 0; }
+div.compare-summary p:last-child { margin-bottom: 0; }
+/* Authorship palette mirrors the dive's Species narrative blocks so a
+ * reader recognises gold=human, orange=AI, blue=auto across the site. */
+div.compare-summary.authored-human,
+div.compare-summary.authored-mixed { --sidebar-color: #d29922;
+  background: #2e2a1a; color: #e8dfcf; }
+div.compare-summary.authored-ai { --sidebar-color: #e8903a;
+  background: #2e241a; color: #e8d4bb; }
+div.compare-summary.authored-auto { --sidebar-color: #5b8dd9;
+  background: #1a222e; color: #cfd8e8; }
+div.compare-summary p.narrative-attribution { color: #8b949e;
+  font-size: 0.82rem; margin: 6px 0 0 0; font-style: italic; }
 ul.compare-dives { margin: 6px 0 10px 20px; padding: 0; font-size: 14px; }
 ul.compare-dives li { margin: 2px 0; }
 details.methodology-details { --sidebar-color: #5b8dd9;
@@ -883,7 +930,7 @@ def render_standalone_html(title: str, description: str,
     author_html = f'<footer>By {html.escape(authored_by)}</footer>' if authored_by else ''
     _sidebar_css = sidebar_css([
         '.related', 'p.verdict-line',
-        'p.compare-summary', 'details.methodology-details',
+        'div.compare-summary', 'details.methodology-details',
     ])
     return f"""<!DOCTYPE html>
 <html>
@@ -1043,6 +1090,8 @@ def run_comparison(spec: dict) -> tuple[str, list[dict]]:
         gm=gm,
         title=spec['title'],
         summary=spec.get('summary', ''),
+        authored_by=spec.get('authored_by', ''),
+        author=spec.get('author', ''),
     )
     return fragment, loadouts_data
 
