@@ -2626,8 +2626,16 @@ function restoreAll() {
 }
 function reattachLegendHandlers() {
   var gd = document.getElementById('plot');
-  gd.on('plotly_legendclick', function() { return false; });
-  gd.on('plotly_legenddoubleclick', function() { return false; });
+  // Plotly's graphDiv is an EventEmitter that persists across
+  // Plotly.react calls, so gd.on() accumulates listeners every time
+  // updateView runs. A node-style MaxListenersExceededWarning fires
+  // around the 11th updateView (default 10 + 1). One-shot guard via
+  // a graphDiv property keeps these listeners at exactly one each.
+  if (!gd._legendHandlersAttached) {
+    gd.on('plotly_legendclick', function() { return false; });
+    gd.on('plotly_legenddoubleclick', function() { return false; });
+    gd._legendHandlersAttached = true;
+  }
   var attempts = 0;
   function tryAttach() {
     var items = gd.querySelectorAll('.legend .traces');
