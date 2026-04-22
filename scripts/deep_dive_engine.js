@@ -1848,6 +1848,13 @@ function updateSummaryTable() {
     for (var pi2 = 0, added2 = 0;
          pi2 < cmpIdx.length && added2 < N;
          pi2++) {
+      // Stop once we hit CMP=0 (or NaN). Those IVs beat nothing in the
+      // cohort, so they are not on the tradeoff frontier — adding them
+      // just fills the union with low-atk noise when the cohort's atk
+      // range exceeds most IVs' atk. cmpIdx is sorted desc, so seeing
+      // zero means every remaining IV is also zero.
+      var _cmpVal = _computeMirrorCmpPct(cmpIdx[pi2]);
+      if (!isFinite(_cmpVal) || _cmpVal <= 0) break;
       if (_addIfRoom(cmpIdx[pi2])) added2++;
     }
   }
