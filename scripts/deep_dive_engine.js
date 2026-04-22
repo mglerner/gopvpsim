@@ -354,29 +354,34 @@ function buildHoverText(iv) {
       // target leads.
       owned.sort(function(a, b) { return b.mon.cp - a.mon.cp; });
       lines.push('');
-      lines.push('<b>\u2605 Yours (' + owned.length + '):</b>');
-      for (var urL = 0; urL < Math.min(owned.length, 4); urL++) {
-        var rcL = owned[urL];
+      if (owned.length === 1) {
+        // Single mon: full detail (CP/level path, shadow/lucky flags,
+        // qualifying tiers). Informative for the common case.
+        lines.push('<b>\u2605 Yours:</b>');
+        var rcL = owned[0];
         var mc = (rcL.stats && rcL.stats.cp != null) ? rcL.stats.cp : '?';
         var ml = (rcL.stats && rcL.stats.level != null) ? rcL.stats.level : '?';
-        var parts = [
-          '  <b>CP ' + rcL.mon.cp + '</b> @ L' + rcL.mon.level +
-          ' \u2192 CP ' + mc + ' @ L' + ml,
-        ];
+        lines.push('  <b>CP ' + rcL.mon.cp + '</b> @ L' + rcL.mon.level +
+                   ' \u2192 CP ' + mc + ' @ L' + ml);
         if (rcL.csvSpecies && rcL.csvSpecies !== DATA.species) {
-          parts.push('    (' + (rcL.mon.is_shadow ? 'Shadow ' : '') +
-                     rcL.csvSpecies + ')');
+          lines.push('    (' + (rcL.mon.is_shadow ? 'Shadow ' : '') +
+                     rcL.csvSpecies + (rcL.mon.lucky ? ' \u2728' : '') + ')');
         } else if (rcL.mon.is_shadow) {
-          parts.push('    (Shadow)');
+          lines.push('    (Shadow' + (rcL.mon.lucky ? ' \u2728' : '') + ')');
+        } else if (rcL.mon.lucky) {
+          lines.push('    \u2728');
         }
-        if (rcL.mon.lucky) parts[parts.length - 1] += ' \u2728';
         if (rcL.matched && rcL.matched.length > 0) {
-          parts.push('    Qualifies: ' + rcL.matched.join(', '));
+          lines.push('    Qualifies: ' + rcL.matched.join(', '));
         }
-        for (var pp = 0; pp < parts.length; pp++) lines.push(parts[pp]);
-      }
-      if (owned.length > 4) {
-        lines.push('  +' + (owned.length - 4) + ' more');
+      } else {
+        // Multi-mon: collapse to a single CP-list line. Per-mon CP/
+        // level/qualifying detail is already in the "of yours" tables
+        // below the scatter, so duplicating it in hover just bloats
+        // the tooltip until it vertical-clips against the plot edge.
+        // One line, CPs descending, primary in-game search handle.
+        var cps = owned.map(function(rc) { return 'CP ' + rc.mon.cp; });
+        lines.push('<b>\u2605 Yours (' + owned.length + '):</b> ' + cps.join(', '));
       }
     }
   }
