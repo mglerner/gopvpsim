@@ -186,6 +186,43 @@ information-dense, but the two-column add alone answers the
 question at the cost of less visual polish. Pull in if the
 core add leaves time; skip otherwise.
 
+## Personal-collection decision tool follow-ups (2026-04-21)
+
+Gaps surfaced during a session helping Michael pick which Tinkaton UL
+to build from his PokeGenie CSV. The XL-candy-decision tool section
+above answers the headline question once shipped; these three items
+are orthogonal polish that became load-bearing when the session tried
+to cross-reference the shipped dive against his collection.
+
+- **Matchup Flip tooltip un-truncation.** The Top IVs table's
+  `Gained` / `Lost` tooltips cap at 6 entries each with a `+N more`
+  tail. For 15/11/11 vs 13/15/15 UL Tinkaton, the hidden "+5 more"
+  losses almost certainly contain `Tinkaton 1v1` and `Tinkaton 2v2` —
+  which is exactly what decides whether the slayer is a lead or a
+  closer choice. Fix options: expand the tooltip cap, or append a
+  click-to-expand `<details>` with the full list below the row. Low
+  effort, directly unblocks the personal-collection decision without
+  needing the bigger XL-candy tool.
+
+- **Per-shield Score Δ column(s) on the Top IVs table.** The SP # and
+  avg-score columns collapse 0v0 / 1v1 / 2v2 into one number. For
+  role-specific builds (lead ≈ 2v2-weighted, closer ≈ 0v0-weighted,
+  mid ≈ 1v1-weighted) the three splits are separate decisions. Data
+  already exists in the dive (the Matchup Delta table has per-shield
+  deltas); this is a rendering add, not a simulation change. Pairs
+  well with the XL-candy tool's `Score Δ` column — extend that to
+  three columns instead of one.
+
+- **`scripts/suggest_builds.py`.** CLI helper: takes `--species`,
+  `--league`, `--roles lead,closer`, path to a PokeGenie CSV export,
+  and the shipped dive HTML. Parses the Top IVs + Anchors + Matchup
+  Flip tables, intersects with the collection, prints a ranked
+  shortlist per role with the key tradeoffs (atk/HP/def, anchor
+  flips, score Δ, XL/dust cost to finish). Essentially automates the
+  manual grep+cross-reference dance. Maybe 2-3 hours; deprioritize if
+  the XL-candy tool lands first and the scatter paste-box overlay
+  turns out to be enough.
+
 ## CD-prep tracking (2026-04-17, fix shipped 2026-04-18)
 
 **SHIPPED.** Per-species `[cd_prep]` TOML block is now read by
