@@ -162,6 +162,31 @@ def resolve_dive_dir(article: dict, dive_dir_override: Path | None) -> Path:
     return WEBSITE_DIR / slug
 
 
+def _find_moveset_file(dive_slug: str, fast: str, charged: list[str]) -> str:
+    """Return the moveset HTML filename inside a dive dir.
+
+    Under the current renderer the top moveset lives at bare
+    ``index.html`` (no ``_mN_`` prefix), and non-top splits live at
+    ``index_m1_*.html``, ``index_m2_*.html``, etc. Older dives used
+    ``index_m0_*.html`` for the top moveset; this helper probes both
+    naming schemes by walking m0..m5 looking for a file matching the
+    requested (fast, charged) combination, and falls back to
+    ``index.html`` when no match is found -- which is the correct
+    answer when the caller's best_cd happens to BE the top moveset,
+    since that's where the top moveset now lives.
+
+    Returning just the filename (not the full path) because callers
+    weave it into ``../../{dive_slug}/{moveset_file}`` hrefs.
+    """
+    slug_moveset = f'{fast.lower()}_{"_".join(c.lower() for c in charged)}'
+    dive_dir = WEBSITE_DIR / dive_slug
+    for n in range(6):
+        candidate = f'index_m{n}_{slug_moveset}.html'
+        if (dive_dir / candidate).exists():
+            return candidate
+    return 'index.html'
+
+
 def _extract_js_assignment(content: str, var_name: str) -> str:
     """Return the JSON literal assigned to `var <var_name> = ...;` in content.
 
@@ -1645,9 +1670,7 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
             per_form_dive_prefix.append(None)
             continue
         fast, cms = _parse_moveset_label(f['best_cd']['label'])
-        moveset_file = (
-            f'index_m0_{fast.lower()}_{"_".join(c.lower() for c in cms)}.html'
-        )
+        moveset_file = _find_moveset_file(f['dive_slug'], fast, cms)
         per_form_dive_prefix.append(
             f'../../{f["dive_slug"]}/{moveset_file}#opp-')
 
@@ -2426,9 +2449,7 @@ def _render_iv_recommendations_per_form_section(cd_move: str,
                 if 0 <= ti < len(tiers):
                     member_counts[ti] += 1
         fast, charged = _parse_moveset_label(best_cd['label'])
-        moveset_file = (
-            f'index_m0_{fast.lower()}_{"_".join(c.lower() for c in charged)}.html'
-        )
+        moveset_file = _find_moveset_file(f['dive_slug'], fast, charged)
         for t, m in zip(tiers, member_counts):
             href = _tier_card_href(t, f['dive_slug'], moveset_file)
             cards.append(_render_tier_card(t, m, n_ivs,
@@ -2509,9 +2530,7 @@ def _render_iv_recommendations_section(cd_move: str, species: str,
 
     dive_slug = article.get('links', {}).get('deep_dive_slug', '')
     fast, charged = _parse_moveset_label(best_cd['label'])
-    moveset_file = (
-        f'index_m0_{fast.lower()}_{"_".join(c.lower() for c in charged)}.html'
-    )
+    moveset_file = _find_moveset_file(dive_slug, fast, charged) if dive_slug else 'index.html'
     dive_href = f'../../{dive_slug}/{moveset_file}#dd-threshold-tiers' if dive_slug else ''
 
     cards = [
