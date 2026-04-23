@@ -2,4 +2,4 @@ title = "Reading a CD Article"
 slug = "cd-article"
 description = "How to read the matchup-delta table, what the PvPoke multi-battle link does when you click it, what 'flip' means here."
 order = 5
-coming_soon = true
+coming_soon = false
