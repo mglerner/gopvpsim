@@ -207,6 +207,16 @@ def _resolve_dive_token(suffix: str, dive: dict | None) -> str | None:
         two digits.
       - ``top_tier_clear_count``: how many of the 4096 IVs clear the
         first tier's cutoffs.
+      - ``envelope_rider_top_count`` / ``envelope_rider_bottom_count``:
+        how many named IV categories on the featured moveset classify
+        as riders above / below the Anchor IVs band. Sourced from
+        ``envelopePositions`` (see ``compute_envelope_positions``).
+      - ``envelope_straddler_count``: how many categories straddle the
+        anchor band (``elevated-band-crosser`` + ``depressed-band-
+        crosser`` combined).
+      - ``envelope_classified_count``: total categories with a
+        non-sparse envelope classification. Equals the sum of the
+        three counts above.
 
     Returns None when the dive is missing or the token isn't known.
     """
@@ -214,6 +224,27 @@ def _resolve_dive_token(suffix: str, dive: dict | None) -> str | None:
         return None
     movesets = dive.get('movesets') or []
     featured = movesets[0] if movesets else None
+    env_map = (dive.get('envelopePositions') or {}).get('0') or {}
+    if suffix.startswith('envelope_'):
+        rt = rb = cross = 0
+        for entry in env_map.values():
+            if not isinstance(entry, dict):
+                continue
+            shape = entry.get('shape')
+            if shape == 'envelope-rider-top':
+                rt += 1
+            elif shape == 'envelope-rider-bottom':
+                rb += 1
+            elif shape in ('elevated-band-crosser', 'depressed-band-crosser'):
+                cross += 1
+        if suffix == 'envelope_rider_top_count':
+            return str(rt)
+        if suffix == 'envelope_rider_bottom_count':
+            return str(rb)
+        if suffix == 'envelope_straddler_count':
+            return str(cross)
+        if suffix == 'envelope_classified_count':
+            return str(rt + rb + cross)
     if suffix == 'species_display':
         # Prefer the hoisted top-level species; fall back to the first
         # moveset's pretty label only if the species field is missing.
