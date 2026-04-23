@@ -1,0 +1,5 @@
+title = "Envelope Position"
+slug = "envelope-position"
+description = "What 'rider' and 'band-crosser' shapes mean for a category, why mean_delta matters when you're picking an IV to chase."
+order = 2
+coming_soon = true

@@ -29,6 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
 ARTICLES_DIR = WEBSITE_DIR / 'articles'
 COMPARISONS_DIR = WEBSITE_DIR / 'comparisons'
+GUIDES_DIR = WEBSITE_DIR / 'guides'
 INDEX_PATH = WEBSITE_DIR / 'index.html'
 
 
@@ -127,19 +128,24 @@ def _fallback_meta_from_html(sub: Path) -> dict | None:
     }
 
 
-def load_entries(base_dir: Path, *, href_prefix: str = '') -> list[dict]:
+def load_entries(base_dir: Path, *, href_prefix: str = '',
+                 exclude: frozenset[str] = frozenset()) -> list[dict]:
     """Return one dict per valid subdir, sorted by title.
 
     Prefers ``meta.toml`` (authored schema) when present; falls back
     to deriving title + landing from the dir's ``index.html`` for
     dives that don't carry a meta.toml yet. Dirs with neither are
-    skipped.
+    skipped. ``exclude`` holds subdir basenames to skip wholesale
+    (used to exclude the ``articles/`` / ``comparisons/`` / ``guides/``
+    container subdirs when scanning the site root for dives).
     """
     if not base_dir.exists():
         return []
     entries = []
     for sub in sorted(base_dir.iterdir()):
         if not sub.is_dir():
+            continue
+        if sub.name in exclude:
             continue
         meta_path = sub / 'meta.toml'
         meta: dict | None = None
@@ -206,7 +212,9 @@ def _render_entry_list(entries: list[dict], empty_msg: str) -> str:
 
 def render_index(dives: list[dict],
                  articles: list[dict],
-                 comparisons: list[dict]) -> str:
+                 comparisons: list[dict],
+                 *,
+                 guides_landing: dict | None = None) -> str:
     dives_html = _render_entry_list(dives, 'No dives published yet.')
     articles_html = _render_entry_list(articles, 'No articles published yet.')
     comparisons_html = _render_entry_list(comparisons, 'No comparisons published yet.')
@@ -226,6 +234,21 @@ def render_index(dives: list[dict],
             '\n<h2>Comparisons</h2>\n'
             '<ul>\n'
             f'{comparisons_html}\n'
+            '</ul>\n'
+        )
+
+    guides_section = ''
+    if guides_landing:
+        title = html.escape(guides_landing.get('title') or "Reader's Guide")
+        desc = html.escape(guides_landing.get('description') or '')
+        href = html.escape(guides_landing.get('href') or 'guides/')
+        desc_html = f'<p>{desc}</p>' if desc else ''
+        guides_section = (
+            '\n<h2>Reader\'s Guide</h2>\n'
+            '<ul>\n'
+            f'<li class="dive"><a href="{href}">{title}</a>\n'
+            f'{desc_html}\n'
+            '</li>\n'
             '</ul>\n'
         )
 
@@ -260,7 +283,7 @@ open the dive. Each page is self-contained and runs in your browser.</p>
 <ul>
 {dives_html}
 </ul>
-{articles_section}{comparisons_section}
+{articles_section}{comparisons_section}{guides_section}
 <p class="about">Built with <a href="https://github.com/pvpoke/pvpoke">PvPoke</a>
 game data. If you find something broken or surprising, email me.</p>
 </body>
@@ -272,10 +295,32 @@ def main() -> int:
     if not WEBSITE_DIR.exists():
         print(f"error: {WEBSITE_DIR} does not exist", file=sys.stderr)
         return 1
-    dives = load_entries(WEBSITE_DIR)
+    dives = load_entries(
+        WEBSITE_DIR,
+        exclude=frozenset({'articles', 'comparisons', 'guides'}),
+    )
     articles = load_entries(ARTICLES_DIR, href_prefix='articles/')
     comparisons = load_entries(COMPARISONS_DIR, href_prefix='comparisons/')
-    index_html = render_index(dives, articles, comparisons)
+
+    # Guides landing-page entry. build_guides.py writes
+    # guides/meta.toml with {title, description, landing}; surface a
+    # single "Reader's Guide" link on the top-level index when present.
+    guides_landing: dict | None = None
+    guides_meta = GUIDES_DIR / 'meta.toml'
+    if guides_meta.is_file():
+        try:
+            with open(guides_meta, 'rb') as f:
+                meta = tomllib.load(f)
+            guides_landing = {
+                'title': meta.get('title') or "Reader's Guide",
+                'description': meta.get('description') or '',
+                'href': 'guides/' + (meta.get('landing') or 'index.html'),
+            }
+        except tomllib.TOMLDecodeError:
+            guides_landing = None
+
+    index_html = render_index(dives, articles, comparisons,
+                              guides_landing=guides_landing)
     INDEX_PATH.write_text(index_html)
     print(f"Wrote {INDEX_PATH} ({len(dives)} dive(s), "
           f"{len(articles)} article(s), {len(comparisons)} comparison(s))")
@@ -285,6 +330,8 @@ def main() -> int:
         print(f"  - [article] {a['title']} -> {a['href']}")
     for c in comparisons:
         print(f"  - [comparison] {c['title']} -> {c['href']}")
+    if guides_landing:
+        print(f"  - [guides] {guides_landing['title']} -> {guides_landing['href']}")
     return 0
 
 

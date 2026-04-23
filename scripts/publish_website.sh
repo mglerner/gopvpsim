@@ -47,6 +47,10 @@ if [ ! -d "$SRC" ]; then
   exit 1
 fi
 
+echo "Regenerating reader guides..."
+python "${REPO_ROOT}/scripts/build_guides.py"
+echo
+
 echo "Regenerating index.html..."
 python "${REPO_ROOT}/scripts/build_website_index.py"
 echo
