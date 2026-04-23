@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
-# Reject authored_by = "ai" in ship-tracked TOMLs.
-#
-# Ship-mode narrative policy (CLAUDE.md "Ship-mode narrative policy"):
-# articles/ and thresholds/ TOMLs that render into public-facing
-# dives or CD articles must not carry Claude-drafted prose with
-# authored_by = "ai". Replace with an auto_gen_narrative.py template
-# (and delete the authored_by marker) or human-author and set
-# authored_by = "human" or "mixed".
+# Project pre-commit checks:
+#   1. Reject authored_by = "ai" in ship-tracked TOMLs
+#      (CLAUDE.md "Ship-mode narrative policy").
+#   2. Verify DEVELOPER_NOTES.md dev-count sentinels against live code
+#      (scripts/verify_dev_counts.py; see Task 1 in the
+#      pre-ship cleanup session).
 #
 # Install by running: git config core.hooksPath .githooks
 set -euo pipefail
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
 
 STAGED=$(git diff --cached --name-only --diff-filter=ACM)
 if [[ -z "$STAGED" ]]; then
     exit 0
 fi
+
+# --- 1. Ship-mode narrative policy -----------------------------------
 
 AI_FILES=""
 while IFS= read -r f; do
@@ -39,6 +41,28 @@ if [[ -n "$AI_FILES" ]]; then
     echo 'See docs/auto_gen_narrative_plan.md and CLAUDE.md' >&2
     echo '"Ship-mode narrative policy" for the full rule.' >&2
     exit 1
+fi
+
+# --- 2. Dev-count sentinel drift -------------------------------------
+
+# Only run when DEVELOPER_NOTES.md or any derivation input is staged:
+# keeps the hook fast for unrelated commits. Derivation inputs are the
+# type chart (src/gopvpsim/moves.py) and the test suite (tests/**).
+needs_dev_count_check=0
+while IFS= read -r f; do
+    case "$f" in
+        DEVELOPER_NOTES.md|src/gopvpsim/moves.py|tests/*|scripts/verify_dev_counts.py)
+            needs_dev_count_check=1
+            ;;
+    esac
+done <<< "$STAGED"
+
+if [[ "$needs_dev_count_check" -eq 1 ]]; then
+    if ! python "$REPO_ROOT/scripts/verify_dev_counts.py" --quiet; then
+        echo >&2
+        echo 'Commit blocked by dev-count drift.' >&2
+        exit 1
+    fi
 fi
 
 exit 0
