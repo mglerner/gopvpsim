@@ -160,6 +160,10 @@ rider-top band vs a straddle.
   same envelope tag as Notable IVs. If a Threshold Tier card says
   "Straddles band," the tier's cutoff is mechanically sound but
   doesn't move the score needle on average.
+- **[Deep-Dive Scatter](../deep-dive-scatter/)** - the Anchor IVs
+  band is an overlay on the scatter plot; the scatter guide covers
+  the Filled / Outline dropdown and how to read the overlay against
+  named category traces.
 - **[How This Works](../how-this-works/)** - if you want the short
   version of how the underlying simulation and scatter plot are
   built.
