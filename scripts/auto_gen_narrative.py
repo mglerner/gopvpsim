@@ -917,15 +917,13 @@ def render_intro(
         if gains:
             sentences.append(
                 'Biggest gains: '
-                + ', '.join(f'{g["display"]} {_fmt_delta_pp(g["delta_pp"])}'
-                            for g in gains)
+                + ', '.join(_opp_str_flip_range(g) for g in gains)
                 + '.'
             )
         if drops:
             sentences.append(
                 'Biggest drops: '
-                + ', '.join(f'{d["display"]} {_fmt_delta_pp(d["delta_pp"])}'
-                            for d in drops)
+                + ', '.join(_opp_str_flip_range(d) for d in drops)
                 + '.'
             )
 
