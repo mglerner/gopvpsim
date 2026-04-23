@@ -2,4 +2,9 @@ title = "IV Flavor Guide"
 slug = "iv-flavor-guide"
 description = "What the purple IV Flavor Guide zone does, how to read a flavor, what a namesake is, why two flavors with the same stat signature merge."
 order = 3
-coming_soon = true
+coming_soon = false
+
+# Reference dive defaults to Oinkologne Male GL (inherited from
+# build_guides.DEFAULT_REFERENCE). Flavor examples cite the reference
+# dive's three flavors (General Good / Fortified Greedent / Lapras
+# Slayer); update when the reference species changes.
