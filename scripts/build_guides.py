@@ -299,12 +299,14 @@ def _build_guide(guide: dict,
     )
     (out_dir / 'meta.toml').write_text(meta_out)
 
+    _order = guide.get('order')
     return {
         'slug': slug,
         'title': title,
         'description': description,
         'coming_soon': coming_soon,
-        'order': int(guide.get('order') or 999),
+        # `or` would treat a legitimate order=0 as missing; explicit None check.
+        'order': 999 if _order is None else int(_order),
     }
 
 
