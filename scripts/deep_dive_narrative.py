@@ -1112,7 +1112,11 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
         '<a href="#dd-threshold-tiers" style="color:#a78bca">Threshold '
         'Tiers</a> section above. This IV Flavor Guide and the '
         'Threshold Tiers answer different questions and may not line '
-        'up 1:1.'
+        'up 1:1. '
+        'New to flavor cards? The '
+        '<a href="../guides/iv-flavor-guide/" style="color:#a78bca">IV '
+        'Flavor Guide</a> walks through the six name families and the '
+        'trade-off layout.'
         '</p>\n'
     )
 

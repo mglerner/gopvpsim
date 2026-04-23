@@ -966,10 +966,20 @@ def render_intro(
         # (older dives predating commit 2b15357 return ''). Substitutes
         # for a static scatter image on the article side per §11.4
         # path (e); see ``docs/jre_ryanswag_comparison.md``.
+        #
+        # Reader's-guide pointer is only emitted for the dive caller
+        # (include_supplement=True); the article caller suppresses this
+        # paragraph entirely via include_supplement=False, so the
+        # dive-relative ../guides/... path is safe.
         featured_idx = _featured_moveset_index(dive, featured_ms)
         if featured_idx is not None:
             env_note = render_envelope_summary(dive, featured_idx)
             if env_note:
+                env_note += (
+                    ' See the [Envelope Position guide]'
+                    '(../guides/envelope-position/) for what '
+                    '"ride above the band" means.'
+                )
                 paragraphs.append(env_note)
 
     return '\n\n'.join(paragraphs)
