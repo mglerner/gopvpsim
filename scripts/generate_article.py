@@ -296,6 +296,13 @@ def _load_one_dive_file(path: Path) -> dict:
         raise ValueError(f'{path}: SCORES_GZ missing 0_pvpoke')
     base = variants['pvpoke']
 
+    # P3 envelope-positions: only stashed on the analyzed moveset (index
+    # 0 within this file's DATA). In split-movesets mode each sibling HTML
+    # carries one moveset, so index 0 here maps to the featured moveset
+    # in index.html and is missing from the m1.. siblings. Propagate it
+    # so the narrative patcher's envelope-shape paragraph (F8) can fire.
+    env_for_moveset = (data.get('envelopePositions') or {}).get('0')
+
     return {
         'label': label,
         'pretty_label': pretty,
@@ -311,6 +318,7 @@ def _load_one_dive_file(path: Path) -> dict:
         'iv_all_tiers': data.get('ivAllTiers') or [],
         'n_ivs': n_ivs,
         'anchored_opps': anchored_opps,
+        'envelope_positions': env_for_moveset,
     }
 
 
@@ -344,11 +352,21 @@ def _load_dive_data(dive_dir: Path) -> dict:
         if m.get('opponent_label'):
             opponent_label = m['opponent_label']
             break
+    # Merge each sibling's per-moveset envelope dict into a top-level
+    # map keyed by combined-moveset index (stringified). Consumers in
+    # auto_gen_narrative (render_envelope_summary, _featured_moveset_index)
+    # expect this shape on the combined dive dict.
+    envelope_positions: dict[str, dict] = {}
+    for idx, m in enumerate(movesets):
+        env = m.get('envelope_positions')
+        if env:
+            envelope_positions[str(idx)] = env
     return {
         'movesets': movesets,
         'scenarios': scenarios,
         'opponents': opponents,
         'opponent_label': opponent_label,
+        'envelopePositions': envelope_positions,
     }
 
 
