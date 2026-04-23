@@ -18,7 +18,12 @@ Guide zone is dive-only), so this patcher leaves articles alone.
 Usage:
     python scripts/patch_dive_flavor_envelope_links.py PATH [PATH ...]
     python scripts/patch_dive_flavor_envelope_links.py --ship
+    python scripts/patch_dive_flavor_envelope_links.py --all-dives
     python scripts/patch_dive_flavor_envelope_links.py --dry-run --ship
+
+``--ship`` matches the project convention (Oinkologne pre-ship set
+only); ``--all-dives`` auto-discovers every dive dir under
+``userdata/website/`` for site-wide polish before publish.
 """
 from __future__ import annotations
 
@@ -128,6 +133,33 @@ def _find_ship_surfaces() -> list[Path]:
     return [s for s in surfaces if s.exists()]
 
 
+def _find_all_dives() -> list[Path]:
+    """All shipped dive HTML files under userdata/website/.
+
+    Walks every immediate subdirectory of ``WEBSITE_DIR``, skipping
+    well-known non-dive dirs (articles, guides, comparisons), and
+    classifies each candidate landing page via ``_is_dive``. For every
+    landing that qualifies, also picks up split-moveset siblings
+    (``index_m*.html``).
+    """
+    if not WEBSITE_DIR.is_dir():
+        return []
+    non_dive = {'articles', 'guides', 'comparisons'}
+    surfaces: list[Path] = []
+    for sub in sorted(WEBSITE_DIR.iterdir()):
+        if not sub.is_dir() or sub.name in non_dive:
+            continue
+        landing = sub / 'index.html'
+        if not landing.is_file():
+            continue
+        if not _is_dive(landing.read_text()):
+            continue
+        surfaces.append(landing)
+        for p in sorted(sub.glob('index_m*.html')):
+            surfaces.append(p)
+    return surfaces
+
+
 def _process(path: Path, *, dry_run: bool) -> bool:
     text = path.read_text()
     if not _is_dive(text):
@@ -150,14 +182,19 @@ def main() -> int:
     parser.add_argument('paths', nargs='*', type=Path)
     parser.add_argument('--ship', action='store_true',
                         help='Patch the Oinkologne pre-ship dive set.')
+    parser.add_argument('--all-dives', action='store_true',
+                        help='Patch every shipped dive under '
+                             'userdata/website/ (auto-discovered).')
     parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
 
     paths: list[Path] = list(args.paths)
+    if args.all_dives:
+        paths = _find_all_dives() + paths
     if args.ship:
         paths = _find_ship_surfaces() + paths
     if not paths:
-        parser.error('Provide paths, or pass --ship for the pre-ship set.')
+        parser.error('Provide paths, or pass --ship / --all-dives.')
 
     ok = True
     for p in paths:
