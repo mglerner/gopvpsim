@@ -134,7 +134,7 @@ def load_threshold_slug(species: str) -> tuple[Path, str]:
 def load_article_toml(slug: str) -> tuple[Path, dict]:
     """Load articles/<slug>.toml. Returns (path, parsed dict).
 
-    Unlike render_article.load_article this is permissive — the generator
+    Unlike render_article.load_article this is permissive - the generator
     can supply defaults for any missing field. But if the file does not
     exist at all we bail, because the front-matter (species, cd_date,
     author, description, framing) is still hand-curated.
@@ -661,7 +661,7 @@ def _render_move_pool_section(article: dict, species: str, league: str,
             tags.append('CD')
         if mid in default_ids:
             tags.append('default')
-        return ', '.join(tags) or '—'
+        return ', '.join(tags) or '-'
 
     # Build rows, sorted by DPT (fast) or Power (charged) descending
     # so the best-by-raw-stats sit at the top. Ties broken by name.
@@ -716,7 +716,7 @@ def _render_move_pool_section(article: dict, species: str, league: str,
                 str(stats['power']),
                 str(stats['energy']),
                 'yes' if stats['stab'] else 'no',
-                html.escape(stats['effect'] or '—'),
+                html.escape(stats['effect'] or '-'),
                 tag,
             ]
         body_rows.append(
@@ -1957,8 +1957,8 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
                f'{len(entries)} opponents): {summary_bits}.</p>')
 
     # F2: key-flips callout. Top-N opponents ranked by max(|delta|)
-    # across forms (not mean, so an asymmetric flip — one form swings
-    # hard, the other barely moves — still surfaces). Rendered as a
+    # across forms (not mean, so an asymmetric flip - one form swings
+    # hard, the other barely moves - still surfaces). Rendered as a
     # compact bulleted list between the moveset list and the full
     # sortable table, so a reader sees the high-leverage flips before
     # (optionally) drilling into the per-opponent detail below. Pure
@@ -1994,7 +1994,7 @@ def _render_key_flips_callout(entries: list, forms: list[dict],
     If either bucket is short, fill the remaining budget from the
     other. Rendered with positives first (wins the CD move creates),
     then negatives (losses the CD move creates), each group sorted by
-    magnitude — readers scan "what you gain / what you lose" without
+    magnitude - readers scan "what you gain / what you lose" without
     having to compute signs from the numbers.
     """
     if not entries or len(forms) < 2:
@@ -2051,7 +2051,7 @@ def _render_key_flips_callout(entries: list, forms: list[dict],
                 f'({delta_pp:+.1f} pp){flip_tag}'
             )
         items.append(
-            f'<li><strong>{html.escape(opp)}</strong> &mdash; '
+            f'<li><strong>{html.escape(opp)}</strong> - '
             + '; '.join(form_bits) + '</li>'
         )
 

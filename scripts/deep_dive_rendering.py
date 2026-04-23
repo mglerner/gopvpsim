@@ -399,7 +399,7 @@ DEEP_DIVE_CSS = """
  * with the same colour still read as distinct blocks.
  *
  * Adding a new zone class: add the class name to all three selector
- * lists (base, ::before, none for colour — use --sidebar-color
+ * lists (base, ::before, none for colour - use --sidebar-color
  * directly in the class's own rule), then set --sidebar-color in
  * that class's own definition. Optional: --sidebar-width override
  * (defaults to 4px) for narrower nested bars.
@@ -700,7 +700,7 @@ def composite_tradeoff_prose(member_idx, comp_cat, parent_categories, data_obj):
         identity += f" ({cutoffs})"
     identity += '.'
 
-    # Tradeoff sentence — compute against the slayer cohort's max wins.
+    # Tradeoff sentence - compute against the slayer cohort's max wins.
     tradeoff = ''
     if slayer_parent and slayer_parent.member_meta:
         all_wins = [
@@ -717,7 +717,7 @@ def composite_tradeoff_prose(member_idx, comp_cat, parent_categories, data_obj):
         elif max_wins > 0 and this_wins == max_wins:
             tradeoff = (f" Carries top {slayer_name} mirror wins "
                         f"({this_wins}/{max_wins}) AND clears the {tier_name} "
-                        f"cutoff — no tradeoff.")
+                        f"cutoff - no tradeoff.")
     return identity + tradeoff
 
 
@@ -821,7 +821,7 @@ def anchor_group_id(parent, opponent, target_stat, move_id):
     """Deterministic short id for an anchor bullet's (parent, opponent,
     target_stat, move_id) group. Used as a DOM attribute so JS can
     look up which of the user's canonical IVs pass this specific
-    bullet and fill in a "— yours: 0/15/15, 1/14/15" annotation.
+    bullet and fill in a "- yours: 0/15/15, 1/14/15" annotation.
     """
     import hashlib as _hl
     key = '|'.join(str(x) for x in (parent, opponent, target_stat, move_id or ''))
@@ -859,7 +859,7 @@ def render_species_narrative(narrative: dict) -> str:
 
     Render position is the top of the dive (above the interactive
     scatter/dashboard), matching RyanSwag's lead-with-why pattern.
-    Styled as ``dd-species-narrative`` — gold left border, same visual
+    Styled as ``dd-species-narrative`` - gold left border, same visual
     weight as the downstream gold ``dd-expert-zone`` so a reader
     recognizes the two as the same editorial register.
 
@@ -949,8 +949,8 @@ def _authored_by_class(block: dict) -> str:
     """Map the optional ``authored_by`` enum to a CSS modifier class.
 
     Values: ``"human"`` (default, gold), ``"ai"`` (orange),
-    ``"mixed"`` (gold — a human co-signed so treat as human register),
-    ``"auto"`` (blue — deterministically data-derived from dive data
+    ``"mixed"`` (gold - a human co-signed so treat as human register),
+    ``"auto"`` (blue - deterministically data-derived from dive data
     by ``scripts/auto_gen_narrative.py``; not human-reviewed and
     not LLM-drafted). Unknown or missing values fall back to
     ``"human"``. The returned string is always one of
@@ -982,7 +982,7 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
     sibling for matchup-flipping purposes (anything that crosses the
     high tier necessarily crosses the low one). The min threshold is
     "the smallest stat at which this move starts driving any flip
-    against this opponent" — the actionable number.
+    against this opponent" - the actionable number.
 
     Result: one bullet per (parent, opponent, move) triple, e.g.
         "96.62 Def for lickilicky bulk (Hyper Beam) vs Lickilicky (0v1, 1v2)"
@@ -1003,7 +1003,7 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
     group. The sink-provided path also injects a
     ``<span class="user-anchor-hits" data-anchor-id="…"></span>``
     placeholder into every bullet so the JS can fill it in with
-    "— yours: a/d/s, a/d/s" after a Poke Genie CSV is loaded.
+    "- yours: a/d/s, a/d/s" after a Poke Genie CSV is loaded.
     """
     # Group: (parent, opponent, target_stat, move_id) -> list of records.
     groups: dict = {}
@@ -1181,7 +1181,7 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
                                   recommendations_html=''):
     """Render the "Notable IVs" HTML section from a list of IVCategory.
 
-    Surfaces composite (slayer ∩ tier) and matchup categories — the
+    Surfaces composite (slayer ∩ tier) and matchup categories - the
     intersections that the SwagTips-style structured-IV-categories goal
     is about. Pure slayer and pure tier categories already have
     dedicated UI elsewhere on the page; this section is *additive*,
@@ -1193,7 +1193,7 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
             section stays focused on intersections.
         data_obj: the JS-bound data object (for IV labels, sp ranks).
         opp_iv_mode: 'pvpoke' or 'rank1' (used for the prose).
-        notable_max_pct: float — categories with member count <= this
+        notable_max_pct: float - categories with member count <= this
             fraction of nIvs are tagged dd-notable. The UI checkbox
             defaults to "show only notable" using this class.
         notable_max_count: hard cap on the notable bucket regardless
@@ -1259,7 +1259,7 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
         '<p class="dd-small">Cross-category IVs and notable matchup '
         'wins. Composite cards (slayer&nbsp;∩&nbsp;tier) surface IVs '
         'that satisfy a slayer anchor <em>and</em> a stat-cutoff '
-        'threshold tier — the rare intersections that trade some '
+        'threshold tier - the rare intersections that trade some '
         'slayer optimum for a broader-meta floor (or vice versa). '
         'Matchup cards surface non-trivial '
         '(opponent,&nbsp;scenario)&nbsp;partitions for selective '
@@ -1345,7 +1345,7 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
         # envelope_positions dict (i.e., anchor band and avg_scores were
         # available at compute time). Skipped on matchup cards because
         # those categories are typically huge (thousands of members) with
-        # tiny mean deltas — the envelope metric is designed for small,
+        # tiny mean deltas - the envelope metric is designed for small,
         # curated categories (composite, tier, structural) where the
         # distinction vs the anchor band is diagnostic.
         if envelope_positions and cat.kind != 'matchup':
@@ -1353,7 +1353,7 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
             if env_html:
                 parts.append(env_html)
 
-        # Member list — sort by total_wins desc when available, else
+        # Member list - sort by total_wins desc when available, else
         # by IV index. Render every member; rows past max_members_shown
         # get the dd-iv-hidden class and the expand button toggles
         # dd-iv-shown on them (matching the slayer-card pattern).
@@ -1388,7 +1388,7 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
                          f'dd-atk-weight-{_slug}"{tooltip_attr(_tip)}>'
                          f'{_weight}</span>')
             parts.append(
-                f'<p{row_cls}><b>{label}</b>{badge} &mdash; '
+                f'<p{row_cls}><b>{label}</b>{badge} - '
                 f'atk {atk:.2f}, def {def_:.2f}, hp {hp}, '
                 f'SP&nbsp;#{sp_rank}</p>\n'
             )
@@ -1485,13 +1485,13 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         '*.toml</code>, each grouped with the named anchors its spec '
         'clears and the IV spreads that meet it. Within each tier card, '
         'bullets are grouped by opponent and sorted by the required stat '
-        '(Def or Atk) ascending — read top-to-bottom in the order a '
+        '(Def or Atk) ascending - read top-to-bottom in the order a '
         'player would clear them as their stat grows. The flat list of '
         'every anchor (regardless of tier) lives in <em>Anchor-Driven '
         'Matchup Flips</em> below. A tier\'s anchors come from two '
         'passes over the anchor list:</p>\n'
         '<ul class="dd-small" style="margin-top:2px">\n'
-        '<li><b>Primary bullets</b> — the tier has a cutoff on the '
+        '<li><b>Primary bullets</b> - the tier has a cutoff on the '
         "anchor's target axis (atk or def) that meets or exceeds the "
         'anchor\'s threshold. Consequences:\n'
         '<ul>\n'
@@ -1499,7 +1499,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         'tier B on the anchor axis, A\'s bullet list is a superset of '
         'B\'s. Overlap is intentional.</li>\n'
         '<li><i>Crossed-cutoff case:</i> tier A has only an atk cutoff, '
-        'tier B has only a def cutoff — neither is a subset of the '
+        'tier B has only a def cutoff - neither is a subset of the '
         'other. Atk anchors appear only on A; def anchors only on B.</li>\n'
         '<li><i>Slayer-axis IV-count case:</i> two tiers can list the '
         'same atk anchor but have different member-IV counts because a '
@@ -1507,7 +1507,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         'that the looser tier keeps. Check the (−N vs parent) callout '
         'on the tier header to spot this at a glance.</li>\n'
         '</ul></li>\n'
-        '<li><b>Anchors we get for free</b> (collapsed) — the tier has '
+        '<li><b>Anchors we get for free</b> (collapsed) - the tier has '
         'no cutoff on the anchor\'s target axis, but every IV in the '
         'tier clears the anchor\'s threshold anyway. These would be '
         'silently dropped by the primary filter; we surface them in a '
@@ -1557,7 +1557,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         n_members = len(tier_ivs)
         tier_iv_set = tier_ivs_by_idx[ti]
 
-        # --- Filter 1: primary records — tier has a cutoff on the
+        # --- Filter 1: primary records - tier has a cutoff on the
         # anchor's axis that meets/exceeds the threshold.
         tier_records = []
         for rec in anchor_flip_records:
@@ -1571,7 +1571,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             elif stat == 'def' and def_cut > 0 and def_cut >= tv:
                 tier_records.append(rec)
 
-        # --- Filter 2: "anchors we get for free" — tier has no cutoff on
+        # --- Filter 2: "anchors we get for free" - tier has no cutoff on
         # the anchor's axis, but every IV in tier_ivs still clears the
         # threshold. Empty tiers skip this (vacuous-truth avoidance).
         free_records = []
@@ -1691,7 +1691,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         if tier_records:
             # Collect unique opponents whose anchors this tier clears
             tier_opps = sorted({r['opponent'] for r in tier_records})
-            # Count only — no sink here; the actual rendered bullets
+            # Count only - no sink here; the actual rendered bullets
             # below populate the sink.
             n_bullets = len(render_anchor_flip_bullets(
                 tier_records, has_bait_axis=has_bait_axis))
@@ -1759,7 +1759,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 "this tier's spec.</p>\n"
             )
 
-        # --- "Anchors we get for free" — anchors on axes this tier
+        # --- "Anchors we get for free" - anchors on axes this tier
         # doesn't cutoff, but every IV in tier clears anyway. Collapsed.
         if free_records:
             free_bullets = render_anchor_flip_bullets(
@@ -1864,7 +1864,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                         '<p class="dd-small" style="margin-top:6px">'
                         '<b style="color:#d29922">Additional matchup flips '
                         'at this tier\'s spec</b> (not explained by a single '
-                        'anchor — may involve HP or multi-stat interactions):'
+                        'anchor - may involve HP or multi-stat interactions):'
                         '</p>\n'
                     )
                     parts.append('<ul class="dd-threshold-list">\n')
@@ -1946,7 +1946,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 # Build hover text with matchup names when available.
                 # Full list (no truncation) so mirror-specific matchups
                 # like "Tinkaton 1v1" / "Tinkaton 2v2" land visibly
-                # instead of being hidden behind a "+N more" tail — the
+                # instead of being hidden behind a "+N more" tail - the
                 # person-deciding-which-IV-to-build needs every flip
                 # entry to distinguish lead-vs-closer builds.
                 fd = (flips_detail or {}).get(iv)
@@ -1969,7 +1969,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 if _have_per_shield:
                     for i, si in enumerate(_target_scen_idx):
                         if si is None or _per_scen_rank1[i] is None:
-                            _shield_cells += '<td class="dd-small">—</td>'
+                            _shield_cells += '<td class="dd-small">-</td>'
                             continue
                         base = iv * _n_scen * _n_opps + si * _n_opps
                         s = sum(_scores_flat[base + oi] for oi in range(_n_opps))
@@ -2113,7 +2113,7 @@ def generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode
 
         opp_c = _opp_color(opp)
         lines.append(
-            f'<li><b style="color:{opp_c}">{opp} {scene}</b> &mdash; '
+            f'<li><b style="color:{opp_c}">{opp} {scene}</b> - '
             f'{n} of top IVs gain this matchup vs {opp_label} opponent '
             f'(avg +{avg_delta:.0f} score){stat_note}{bait_badge}</li>'
         )
@@ -2321,19 +2321,19 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
                       'is binary per breakpoint: an IV is in this '
                       'category iff its effective attack reaches the '
                       'minimum needed to deal one extra damage with some '
-                      'move against some named opponent &mdash; not just '
+                      'move against some named opponent - not just '
                       '&ldquo;has higher attack than other survivors.&rdquo; '
                       'Each row&rsquo;s Tags column lists the specific '
                       'breakpoint(s) cleared (hover for the move&nbsp;+&nbsp;'
                       'tier detail). <strong>Hidden if no survivor '
-                      'clears any named breakpoint</strong> &mdash; an '
+                      'clears any named breakpoint</strong> - an '
                       'empty Atk Slayer box means no anchors fired '
                       'against the current opponent set.',
         'Bulk Slayer': 'IVs that either (a) have HP and defense both at '
                        'or above the survivor-pool median (structural '
                        'high-bulk pool, always shown) <strong>or</strong> '
                        '(b) clear at least one named <em>bulkpoint</em> '
-                       'anchor against a notable opponent &mdash; '
+                       'anchor against a notable opponent - '
                        'reaching a defense tier at which one of the '
                        'opponent&rsquo;s threat moves deals strictly '
                        'less damage to the focal. Each row&rsquo;s Tags '
@@ -2368,7 +2368,7 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
                 f'<p class="dd-small">Each survivor is tagged with the '
                 f'set of named anchors it passes. {n_parents} parent '
                 f'anchor(s) resolved to {n_subs} concrete threshold '
-                f'check(s) — Level&nbsp;3 discover-mode anchors expand '
+                f'check(s) - Level&nbsp;3 discover-mode anchors expand '
                 f'into a family of sub-anchors (one per discovered '
                 f'(move,&nbsp;tier) breakpoint). See the Tags column in '
                 f'each category for per-IV detail. IVs that fit '
@@ -2720,7 +2720,7 @@ function ddToggleTagsCompactCell(event) {
                     if kind in n_parents_by_kind:
                         n_parents_by_kind[kind] += 1
                     n_total_subs += n_subs
-                tags_cell = ' '.join(tag_bits) if tag_bits else '&mdash;'
+                tags_cell = ' '.join(tag_bits) if tag_bits else '-'
                 # Cell-level title is now a one-line summary instead of
                 # the previous per-parent dump (which was 2000+ chars
                 # and literally taller than a screen for rows with 40+
@@ -2823,7 +2823,7 @@ function ddToggleTagsCompactCell(event) {
                 'breakpoints (focal&nbsp;atk needed to deal more damage); '
                 'def-side rows are bulkpoints (focal&nbsp;def needed to '
                 'take less damage). Use this to identify which '
-                'sub-anchors actually matter for this species — '
+                'sub-anchors actually matter for this species - '
                 'high-count rows are the ones worth promoting '
                 'to Level&nbsp;1 in the TOML.</p>\n'
             )
@@ -2956,7 +2956,7 @@ def render_analysis_alpha_html(scores_flat, nIvs, nS, nO, scenarios,
                  f'Clusters are detected by sorting all {nIvs} IVs by their average score '
                  f'for a given scenario and scanning for score gaps that exceed 3&times; '
                  f'the median gap between consecutive IVs. Unlike k-means, this does not '
-                 f'assume a fixed number of clusters &mdash; it finds natural breakpoints '
+                 f'assume a fixed number of clusters - it finds natural breakpoints '
                  f'where performance drops sharply. '
                  f'The top-5 IVs listed below can be located on the graph above by hovering '
                  f'to find the matching stat product and score.</p>\n')
@@ -2984,10 +2984,10 @@ def render_analysis_alpha_html(scores_flat, nIvs, nS, nO, scenarios,
             tc_score_max = sc[scene_ranked[0]]
             parts.append(f'<p>{len(sig_gaps)} significant gap(s). '
                          f'Top cluster: {top_cluster_size} IVs, '
-                         f'scores {tc_score_min:.0f}&ndash;{tc_score_max:.0f} '
-                         f'(SP ranks {tc_sp_min}&ndash;{tc_sp_max}). '
+                         f'scores {tc_score_min:.0f}-{tc_score_max:.0f} '
+                         f'(SP ranks {tc_sp_min}-{tc_sp_max}). '
                          f'<b>On graph:</b> look for Y &ge; {tc_score_min:.0f} '
-                         f'with SP rank {tc_sp_min}&ndash;{tc_sp_max} on X axis.</p>\n')
+                         f'with SP rank {tc_sp_min}-{tc_sp_max} on X axis.</p>\n')
         else:
             parts.append('<p>Smooth gradient (no gaps &gt; 3&times; median).</p>\n')
         parts.append('<table class="dd-table dd-narrow"><tr><th>#</th><th>IVs</th><th>Atk</th><th>Def</th><th>HP</th><th>SP</th><th>Score</th><th>Tier</th></tr>\n')
@@ -3076,7 +3076,7 @@ def render_analysis_flips_html(data_obj, flip_summary, flips, avg_scores,
     for iv, g, l, net in notable[:8]:
         fd = flips[iv]
         prose = prose_flip_summary(fd, has_bait_axis=has_bait_axis)
-        parts.append(f'<details class="dd-flip-detail"><summary>{iv_label(data_obj, iv)} &mdash; <span class="dd-gain">+{g}</span>/<span class="dd-loss">-{l}</span> (net {net:+d}){tier_badge_html(data_obj, iv)}</summary>\n')
+        parts.append(f'<details class="dd-flip-detail"><summary>{iv_label(data_obj, iv)} - <span class="dd-gain">+{g}</span>/<span class="dd-loss">-{l}</span> (net {net:+d}){tier_badge_html(data_obj, iv)}</summary>\n')
         parts.append(f'<p class="dd-prose">{prose}</p>\n')
         focal_atk_iv = data_obj['ivAtk'][iv]
         focal_def_iv = data_obj['ivDef'][iv]
@@ -3128,7 +3128,7 @@ def render_analysis_methods_html(nIvs, nS, nO, data_obj, moveset_label,
 | <strong>Reference IV:</strong> {iv_label(data_obj, ref_iv)} (PvPoke default)</p>
 <dl class="dd-methods-dl">
   <dt>Rank volatility</dt>
-  <dd>Each IV is ranked 1&ndash;{nIvs} for each scenario independently. The range (best rank minus
+  <dd>Each IV is ranked 1-{nIvs} for each scenario independently. The range (best rank minus
   worst rank) shows how scenario-dependent performance is. Low range = generalist; high range = specialist.</dd>
   <dt>Matchup flip analysis</dt>
   <dd>For each IV, we check every (opponent, scenario) pair and compare to the reference IV
@@ -3144,13 +3144,13 @@ def render_analysis_methods_html(nIvs, nS, nO, data_obj, moveset_label,
 <dl class="dd-methods-dl">
   <dt>Banding detection</dt>
   <dd>IVs grouped by discrete stat value. F-ratio and &eta;&sup2; (fraction of total score
-  variance explained by stat grouping, 0&ndash;1 scale) measure how much each stat creates
+  variance explained by stat grouping, 0-1 scale) measure how much each stat creates
   visible bands. Pearson <em>r</em> shows correlation direction (positive = higher stat &rarr; higher score).</dd>
   <dt>Cluster detection (gap analysis)</dt>
   <dd>All {nIvs} IVs are sorted by their average score for a given scenario. We compute the
   score difference between each consecutive pair. The median of these differences is the
   &ldquo;typical&rdquo; gap. Gaps exceeding 3&times; the median indicate a natural break between
-  performance tiers. This is <em>not</em> k-means or similar &mdash; it assumes no fixed cluster
+  performance tiers. This is <em>not</em> k-means or similar - it assumes no fixed cluster
   count and finds breakpoints where performance drops sharply.</dd>
   <dt>Opponent importance</dt>
   <dd>For each scenario, the average score of the top 50 IVs against each opponent is compared
@@ -3273,15 +3273,15 @@ def render_results_section(data_obj, moveset_label, opp_label,
             '<details class="dd-glossary" style="margin:0 0 12px 0;font-size:0.9rem">\n'
             '<summary style="cursor:pointer;color:#d29922">What am I looking at? (glossary)</summary>\n'
             '<ul style="margin:8px 0 4px 18px;line-height:1.55;color:#c9d1d9">\n'
-            '<li><b>Tier</b> (a.k.a. <i>spread</i>) &mdash; a named stat-cutoff region, e.g. '
+            '<li><b>Tier</b> (a.k.a. <i>spread</i>) - a named stat-cutoff region, e.g. '
             '"GH Great = Def &ge; 143.03, HP &ge; 138." Any IV meeting all the cutoffs is in the tier.</li>\n'
-            '<li><b>Anchor</b> &mdash; a yes/no rule applied to one IV, e.g. "clears the Medicham '
+            '<li><b>Anchor</b> - a yes/no rule applied to one IV, e.g. "clears the Medicham '
             'Dynamic Punch bulkpoint." Each anchor reduces to a single numeric threshold.</li>\n'
-            '<li><b>Breakpoint</b> &mdash; an <i>attack</i> threshold at which one of your moves '
+            '<li><b>Breakpoint</b> - an <i>attack</i> threshold at which one of your moves '
             'deals +1 more integer damage to a specific opponent.</li>\n'
-            '<li><b>Bulkpoint</b> &mdash; a <i>defense</i> threshold at which one of an opponent\'s '
+            '<li><b>Bulkpoint</b> - a <i>defense</i> threshold at which one of an opponent\'s '
             'moves deals 1 less integer damage to you. The defensive mirror of a breakpoint.</li>\n'
-            '<li><b>Matchup-flipping boundary</b> &mdash; a full-battle stat target: the smallest '
+            '<li><b>Matchup-flipping boundary</b> - a full-battle stat target: the smallest '
             'stat increase that turns a simulated loss into a win against a specific opponent and '
             'shield scenario (not just a damage-tier change).</li>\n'
             '</ul>\n'
@@ -3523,7 +3523,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
             f'({summary_text})</span>'
             f'</summary>\n')
 
-        # Key Matchup Thresholds — the high-level overview, always visible on expand
+        # Key Matchup Thresholds - the high-level overview, always visible on expand
         if threshold_descs:
             parts.append('<h4 class="dd-h3">Key Matchup Thresholds</h4>\n')
             parts.append(f'<p>Matchups that flip vs {opp_label} opponents, '
@@ -3532,7 +3532,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
             parts.append('\n'.join(threshold_descs))
             parts.append('\n</ul>\n')
 
-        # Matchup-Flipping Boundaries — nested collapsible
+        # Matchup-Flipping Boundaries - nested collapsible
         if mb_bullets:
             parts.append(
                 f'<details class="dd-collapsible">'
@@ -3553,7 +3553,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
             parts.append('\n</ul>\n')
             parts.append('</details>\n')
 
-        # Anchor-Driven Matchup Flips — nested collapsible
+        # Anchor-Driven Matchup Flips - nested collapsible
         if anchor_bullets:
             parts.append(
                 f'<details class="dd-collapsible">'

@@ -5,10 +5,12 @@
 #   1. Regenerate userdata/website/index.html from per-dive meta.toml files
 #      (so a fresh dive dropped in userdata/website/<slug>/ with a meta.toml
 #      is picked up without a separate step).
-#   2. Run link verification (scripts/verify_article_links.py --ship).
-#      Any broken internal link aborts the publish before anything hits
-#      the server. Pass --skip-verify to bypass (e.g. publishing an
-#      in-progress page where you know a link will dangle temporarily).
+#   2. Run link verification (scripts/verify_article_links.py --ship)
+#      and em/en-dash verification (scripts/verify_no_unicode_dashes.py
+#      --ship). Any broken internal link or unicode-dash hit aborts the
+#      publish before anything hits the server. Pass --skip-verify to
+#      bypass (e.g. publishing an in-progress page where you know a
+#      link will dangle temporarily).
 #   3. rsync to mglerner.com:mglerner.com/pogo-dives/ with --delete
 #      --delete-excluded, so anything removed locally -- or matching an
 #      exclude pattern -- is also removed on the server.
@@ -50,12 +52,20 @@ python "${REPO_ROOT}/scripts/build_website_index.py"
 echo
 
 if [ "$SKIP_VERIFY" = true ]; then
-  echo "Skipping link verification (--skip-verify)."
+  echo "Skipping link + dash verification (--skip-verify)."
 else
   echo "Verifying article links..."
   if ! python "${REPO_ROOT}/scripts/verify_article_links.py" --ship; then
     echo
     echo "error: link verification failed -- fix broken links or re-run with --skip-verify" >&2
+    exit 1
+  fi
+  echo
+
+  echo "Verifying no em/en-dashes in user-facing text..."
+  if ! python "${REPO_ROOT}/scripts/verify_no_unicode_dashes.py" --ship -q; then
+    echo
+    echo "error: em/en-dash check failed -- replace with ASCII hyphens or re-run with --skip-verify" >&2
     exit 1
   fi
   echo

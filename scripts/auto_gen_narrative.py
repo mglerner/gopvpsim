@@ -190,7 +190,7 @@ def _gm_species_form_change_target(gm: Optional[dict], species_name: str) -> Opt
                 if target:
                     return (target, trigger)
             elif isinstance(fc, list) and fc and isinstance(fc[0], str):
-                # Legacy shape — list-of-strings fallback.
+                # Legacy shape - list-of-strings fallback.
                 return (fc[0], '')
             elif isinstance(fc, str) and fc:
                 return (fc, '')
@@ -518,7 +518,7 @@ def render_form_change(species: str, gm: Optional[dict]) -> str:
          transforms to A'/D'/HP' on the first charged move."
 
     When the attacker's default fast move has power 0 (pure energy
-    generation), appends a sentence describing that mechanic — it's
+    generation), appends a sentence describing that mechanic - it's
     the most reader-facing aspect of form-change species like
     Aegislash Shield.
     """
@@ -536,7 +536,7 @@ def render_form_change(species: str, gm: Optional[dict]) -> str:
     ta, td, th = tbs.get('atk'), tbs.get('def'), tbs.get('hp')
     if ta is None or td is None or th is None:
         return ''
-    # Trigger phrase — map the gamemaster's terse trigger id to reader prose.
+    # Trigger phrase - map the gamemaster's terse trigger id to reader prose.
     trigger_phrase = {
         'activate_charged': 'on the first charged move',
         'activate_shield': 'when the opponent shields a charged move',
@@ -567,7 +567,7 @@ def render_form_change(species: str, gm: Optional[dict]) -> str:
             ept = eg / turns if turns else 0.0
             fname = fm.get('name') or fid
             parts.append(
-                f'Default fast move {fname} has power 0 — 1 damage per '
+                f'Default fast move {fname} has power 0 - 1 damage per '
                 f'hit via PvP\'s minimum-damage floor, primarily energy '
                 f'generation at {ept:.1f} EPT.'
             )
@@ -1109,7 +1109,7 @@ def render_good_at(
 
     Two modes:
 
-    * **CD mode** (both moves supplied and different): flip list — only
+    * **CD mode** (both moves supplied and different): flip list - only
       opponents where ``cd_wr >= 0.5 AND base_wr < 0.5``, sorted by
       per-opp ppt delta desc.
     * **Standalone mode** (no CD swap): top ~10 matchups by absolute
@@ -1168,7 +1168,7 @@ def render_good_at(
         # F8: in CD mode, if the featured move is super-effective vs this
         # bucket's type, lead with a cause-and-effect sentence naming the
         # move + typing + multiplier. Reader learns the *why* of the flip
-        # bucket in the first phrase, not as a trailing ``— note``. For
+        # bucket in the first phrase, not as a trailing ``- note``. For
         # neutral buckets and for standalone mode, keep the
         # ``vs {Type}-type:`` frame plus optional trailing effectiveness
         # note (covers the resisted case).
@@ -1187,7 +1187,7 @@ def render_good_at(
                     featured_fast_display, featured_fast_type,
                     attacker_types, type_label.lower())
                 if eff_note:
-                    line = line[:-1] + f' — {eff_note}'
+                    line = line[:-1] + f' - {eff_note}'
         paras.append(line)
     return '\n\n'.join(paras)
 
@@ -1267,7 +1267,7 @@ def render_bad_at(
                 eff_note = _effectiveness_note_defense(
                     attacker_types, type_label.lower())
                 if eff_note:
-                    line = line[:-1] + f' — {eff_note}'
+                    line = line[:-1] + f' - {eff_note}'
         paras.append(line)
     return '\n\n'.join(paras)
 
