@@ -2673,20 +2673,24 @@ def _rank1_cp_capped(species: str, league: str) -> dict | None:
     filters for in their IV checker. Returns None on any failure so
     the caller can gracefully omit the section.
 
-    Known limitations (follow-ups, not blockers for current CDs):
+    Shadow focal species: when ``species`` ends with ``(Shadow)`` the
+    suffix is stripped before the gamemaster lookup and ``shadow=True``
+    is threaded to ``iv_rank`` so the ×1.2 atk / ×0.8333 def
+    multipliers land in the displayed rank-1 numbers.
 
-    * iv_rank defaults max_level=51 for every league, which INCLUDES
-      Best Buddy (level 51) in the search. PvPoke's UI typically
-      defaults to non-BB (level 50). For low-level species (e.g.
-      Oinkologne at level 22-23) this doesn't matter; for bulk-first
-      UL species like Cresselia, rank-1 differs between BB and non-
-      BB and we'd want a TOML knob to pick.
-    * shadow=False is hardcoded. A future CD article whose focal
-      species is a Shadow variant would need this plumbed through.
-      Tracked in TODO.md "P5. Stats at a Glance follow-ups".
+    Best Buddy: ``iv_rank`` defaults ``max_level`` to ``LEAGUE_MAX_LEVEL``
+    which is 50 for Great/Ultra (non-BB, matching PvPoke's UI) and 51
+    for Little/Master. Callers that want a Master-league non-BB view
+    or a GL/UL BB comparison would need a TOML knob; not wired yet
+    because no current CD article needs it.
     """
+    lookup_name = species
+    is_shadow = False
+    if lookup_name.endswith(' (Shadow)'):
+        is_shadow = True
+        lookup_name = lookup_name[:-len(' (Shadow)')]
     try:
-        entries = iv_rank(species, league=league)
+        entries = iv_rank(lookup_name, league=league, shadow=is_shadow)
     except Exception as exc:
         logger.warning('rank-1 lookup for %r in %s failed: %s',
                        species, league, exc)
