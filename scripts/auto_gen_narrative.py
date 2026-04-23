@@ -388,6 +388,123 @@ def _league_label(league: Optional[str]) -> str:
 
 
 # --------------------------------------------------------------------
+# JRE-shape BLUF verdict (role classifier + meta-coverage tier)
+# --------------------------------------------------------------------
+
+def _meta_coverage_tier(wins_of_9: int) -> str:
+    """Bucket scenario-win count into a meta-coverage tier label.
+
+    Thresholds: >=6 "strong", 3-5 "situational", <=2 "niche". Buckets
+    deliberately shallow -- BLUF is a header, the follow-up "Meta
+    coverage" paragraph carries the precise count and best/worst
+    scenario.
+    """
+    if wins_of_9 >= 6:
+        return 'strong'
+    if wins_of_9 >= 3:
+        return 'situational'
+    return 'niche'
+
+
+def _role_from_even_scenarios(rates, scenarios) -> str:
+    """Classify role by best-even-shield scenario: closer / switch / lead / flex.
+
+    Restricts to the three even-shield scenarios (0v0, 1v1, 2v2) because
+    asymmetric-shield best-cases ("I have 2 shields, opponent has 0") are
+    usually a tautology, not a role signal. The even-shield scenario with
+    the highest win rate is the one the reader should build around:
+
+    * 0v0 best -> ``closer`` (shields-down cleanup / finishing)
+    * 1v1 best -> ``switch`` (mid-shield trade engine)
+    * 2v2 best -> ``lead`` (lead-slot pressure with shields up)
+    * no even-shield data (or a tie no even scenario wins) -> ``flex``
+    """
+    best: Optional[tuple[int, int]] = None
+    best_rate = -1.0
+    for r, sc in zip(rates, scenarios):
+        try:
+            my_s, opp_s = sc[0], sc[1]
+        except (TypeError, IndexError):
+            continue
+        if my_s != opp_s:
+            continue
+        if r > best_rate:
+            best_rate = r
+            best = (int(my_s), int(opp_s))
+    if best == (0, 0):
+        return 'closer'
+    if best == (1, 1):
+        return 'switch'
+    if best == (2, 2):
+        return 'lead'
+    return 'flex'
+
+
+def render_bluf_verdict(
+    species: str,
+    dive: dict,
+    featured_ms: dict,
+    *,
+    cd_move_fast: Optional[str],
+    baseline_move_fast: Optional[str],
+    cd_ms: Optional[dict],
+    base_ms: Optional[dict],
+    league: Optional[str],
+    gm: Optional[dict],
+    include_stats: bool,
+) -> str:
+    """Render a one-sentence Bottom-Line-Up-Front verdict, or ''.
+
+    Shape::
+
+        {Species} [(A/D/H)] is a {role} {league} pick at {coverage}
+        meta coverage[, shifting from {base_wr}% ({base_move}) to
+        {cd_wr}% ({cd_move})].
+
+    Role = closer/switch/lead/flex by best even-shield scenario (see
+    ``_role_from_even_scenarios``). Coverage tier = strong/situational/
+    niche by scenario-win count. Pure data-derived per the
+    ``feedback_autogen_shape_not_voice`` register -- no editorial
+    judgement on whether the species "should" be invested in; the reader
+    gets the role + coverage + shift and decides.
+
+    Standalone mode (no CD swap, or same fast move both sides) drops the
+    ``shifting from ... to ...`` tail but keeps the role + coverage
+    classifier. ``include_stats=False`` suppresses the ``(A/D/H)`` tuple
+    (used when a form-change paragraph has already named the stats).
+    Returns '' when ``per_scenario_win_rate`` is missing or empty.
+    """
+    rates = featured_ms.get('per_scenario_win_rate') or []
+    scenarios = dive.get('scenarios') or []
+    if not rates or not scenarios or len(rates) != len(scenarios):
+        return ''
+    wins = sum(1 for r in rates if r >= 0.5)
+    coverage = _meta_coverage_tier(wins)
+    role = _role_from_even_scenarios(rates, scenarios)
+    lg_short = _league_label(league).replace(' aggregate', '')
+
+    stats_prefix = species
+    base_stats = _gm_species_base_stats(gm, species)
+    if include_stats and base_stats is not None:
+        a, d, h = base_stats
+        stats_prefix = f'{species} ({a}/{d}/{h})'
+
+    is_cd_mode = (cd_ms is not None and base_ms is not None
+                  and cd_move_fast and baseline_move_fast
+                  and cd_move_fast != baseline_move_fast)
+    tail = ''
+    if is_cd_mode:
+        cd_wr = cd_ms.get('win_rate', 0.0) * 100.0
+        base_wr = base_ms.get('win_rate', 0.0) * 100.0
+        cd_disp = _gm_move_display(gm, cd_move_fast)
+        base_disp = _gm_move_display(gm, baseline_move_fast)
+        tail = (f', shifting from {base_wr:.1f}% ({base_disp}) to '
+                f'{cd_wr:.1f}% ({cd_disp})')
+    return (f'{stats_prefix} is a {role} {lg_short} pick at {coverage} '
+            f'meta coverage{tail}.')
+
+
+# --------------------------------------------------------------------
 # B3b: form-change mechanical description
 # --------------------------------------------------------------------
 
@@ -512,22 +629,98 @@ def render_meta_coverage(
 # B3d: move pool narrative
 # --------------------------------------------------------------------
 
+def _fast_role_phrase(power: int, ept: float) -> str:
+    """One-phrase fast-move role label derived from power + EPT.
+
+    Four buckets (matches JRE-style move-pool prose where each move gets
+    a one-phrase role rather than a raw stat dump):
+
+    * ``the defining energy-only fast move`` -- power 0 (Psycho Cut on
+      Aegislash Shield et al.; the mechanic IS the move).
+    * ``a high-EPT pressure fast move`` -- EPT >= 4.0 (spam-bait feeders
+      like Counter, Mud-Slap-isn't-here).
+    * ``a balanced fast move`` -- EPT 3.0-3.9 (damage and energy both
+      fine; Mud Slap et al.).
+    * ``a damage-focused fast move`` -- EPT < 3.0 (Razor Leaf, Charm --
+      the fast move itself is the win condition).
+    """
+    if power == 0:
+        return 'the defining energy-only fast move'
+    if ept >= 4.0:
+        return 'a high-EPT pressure fast move'
+    if ept >= 3.0:
+        return 'a balanced fast move'
+    return 'a damage-focused fast move'
+
+
+def _charge_energy_tier(energy: int) -> str:
+    """One-word energy-tier label: low-energy / mid-energy / high-energy / nuke-cost.
+
+    PvP bait/closer taxonomy: <=35 cheap spammable bait, 40-50 mid,
+    55-65 high-energy commit, >=70 nuke-cost (often capped by a 1-bar).
+    """
+    if energy <= 35:
+        return 'low-energy'
+    if energy <= 50:
+        return 'mid-energy'
+    if energy <= 65:
+        return 'high-energy'
+    return 'nuke-cost'
+
+
+def _charge_effect_phrase(cm: dict) -> str:
+    """Short "with a {effect}" phrase for a charge move, or ''.
+
+    Returns ``self-buff`` / ``self-debuff`` / ``opponent-debuff`` /
+    ``opponent-buff`` (combined with ``/`` when a move has both signs).
+    Reads ``buffs`` + ``buffTarget`` directly from the gamemaster dict;
+    returns '' when no effect is present.
+    """
+    buffs = cm.get('buffs') or []
+    if not buffs:
+        return ''
+    target = cm.get('buffTarget') or ''
+    try:
+        any_pos = any(float(b) > 0 for b in buffs)
+        any_neg = any(float(b) < 0 for b in buffs)
+    except (TypeError, ValueError):
+        return ''
+    bits: list[str] = []
+    if target == 'self':
+        if any_pos:
+            bits.append('self-buff')
+        if any_neg:
+            bits.append('self-debuff')
+    elif target == 'opponent':
+        if any_neg:
+            bits.append('opponent-debuff')
+        if any_pos:
+            bits.append('opponent-buff')
+    if not bits:
+        return ''
+    return ' with a ' + '/'.join(bits)
+
+
 def render_move_pool_line(
     species: str,
     moveset: dict,
     gm: Optional[dict],
 ) -> str:
-    """Render a one-line move-pool summary for the dive narrative.
+    """Render a 2-3 sentence move-pool prose paragraph for the dive narrative.
 
-    Reads the fast + charge moves from the moveset's label, tags each
-    with its gamemaster type + STAB status + zero-power / self-debuff
-    flags. Format:
+    Reads fast + charge moves from the moveset's label and narrates role,
+    STAB / coverage, energy tier, and buff effect per move. Shape (JRE
+    move-pool-section register, auto-gen SHAPE not voice per
+    ``feedback_autogen_shape_not_voice``)::
 
-        "**Move pool.** Fast: Psycho Cut (Psychic, 0 pwr, 4.0 EPT, the
-         defining mechanic). Charged: Gyro Ball (Steel STAB, 80/50),
-         Shadow Ball (Ghost STAB, 100/50)."
+        **Move pool.** {Fast} is {fast-role} ({type/STAB}, {ept} EPT).
+        {Charge1} is a {energy-tier} {STAB option/Type coverage} move
+        ({power} damage, {energy} energy)[ with a {effect}]. {Charge2}
+        ...
 
-    Returns '' when the moveset has no parseable label.
+    Each charge move gets its own sentence so readers can scan role +
+    cost + effect without parsing a comma-dense list. Returns '' when the
+    moveset has no parseable label.
     """
     label = moveset.get('label') or ''
     if '/' not in label:
@@ -537,22 +730,33 @@ def render_move_pool_line(
     fast_id = fast_part.strip()
     charged_ids = [c.strip() for c in charged_part.split(',') if c.strip()]
 
+    sentences: list[str] = []
+
+    # ---- Fast move ----
     fm = _gm_fast_move(gm, fast_id)
-    fast_txt = ''
     if fm:
         fname = fm.get('name') or fast_id
         ftype = (fm.get('type') or '').capitalize()
         fpow = fm.get('power') or 0
         eg = fm.get('energyGain') or 0
-        cd = fm.get('cooldown') or 0
-        turns = max(1, int(cd / 500)) if cd else 1
+        cd_ms = fm.get('cooldown') or 0
+        turns = max(1, int(cd_ms / 500)) if cd_ms else 1
         ept = eg / turns if turns else 0.0
-        stab_tag = ' STAB' if fm.get('type', '').lower() in species_types else ''
-        zero_note = (', the defining mechanic'
-                     if fpow == 0 else '')
-        fast_txt = f'{fname} ({ftype}{stab_tag}, {fpow} pwr, {ept:.1f} EPT{zero_note})'
+        is_stab = (fm.get('type') or '').lower() in species_types
+        role_phrase = _fast_role_phrase(fpow, ept)
+        if fpow == 0:
+            sentences.append(f'{fname} is {role_phrase} at {ept:.1f} EPT.')
+        elif is_stab and ftype:
+            sentences.append(
+                f'{fname} is {role_phrase} ({ftype} STAB, {ept:.1f} EPT).')
+        elif ftype:
+            sentences.append(
+                f'{fname} is {role_phrase} ({ftype} coverage, '
+                f'{ept:.1f} EPT).')
+        else:
+            sentences.append(f'{fname} is {role_phrase} at {ept:.1f} EPT.')
 
-    charged_descs: list[str] = []
+    # ---- Charge moves (one sentence each) ----
     for cid in charged_ids:
         cm = _gm_fast_move(gm, cid)  # same lookup shape
         if not cm:
@@ -561,40 +765,23 @@ def render_move_pool_line(
         ctype = (cm.get('type') or '').capitalize()
         cpow = cm.get('power') or 0
         cenergy = cm.get('energy') or 0
-        stab_tag = ' STAB' if cm.get('type', '').lower() in species_types else ''
-        # buffs/debuffs flag from gamemaster (simple presence check).
-        effect_bits: list[str] = []
-        buffs = cm.get('buffs') or []
-        if buffs:
-            # Distinguish self-buff (positive, user target) vs self-debuff (negative, user)
-            # vs opponent debuff. The gamemaster stores [atk_delta, def_delta]; combined
-            # with buffTarget.
-            target = cm.get('buffTarget') or ''
-            try:
-                any_pos = any(float(b) > 0 for b in buffs)
-                any_neg = any(float(b) < 0 for b in buffs)
-            except (TypeError, ValueError):
-                any_pos = any_neg = False
-            if target == 'self':
-                if any_pos:
-                    effect_bits.append('self-buff')
-                if any_neg:
-                    effect_bits.append('self-debuff')
-            elif target == 'opponent':
-                if any_neg:
-                    effect_bits.append('opp-debuff')
-                if any_pos:
-                    effect_bits.append('opp-buff')
-        eff_txt = f', {"/".join(effect_bits)}' if effect_bits else ''
-        charged_descs.append(
-            f'{cname} ({ctype}{stab_tag}, {cpow}/{cenergy}{eff_txt})')
+        is_stab = (cm.get('type') or '').lower() in species_types
+        etier = _charge_energy_tier(cenergy)
+        if is_stab:
+            role_txt = 'STAB option'
+        elif ctype:
+            role_txt = f'{ctype} coverage option'
+        else:
+            role_txt = 'charged move'
+        effect_txt = _charge_effect_phrase(cm)
+        sentences.append(
+            f'{cname} is a {etier} {role_txt} '
+            f'({cpow} damage, {cenergy} energy){effect_txt}.'
+        )
 
-    parts = ['**Move pool.**']
-    if fast_txt:
-        parts.append(f'Fast: {fast_txt}.')
-    if charged_descs:
-        parts.append('Charged: ' + ', '.join(charged_descs) + '.')
-    return ' '.join(parts) if len(parts) > 1 else ''
+    if not sentences:
+        return ''
+    return '**Move pool.** ' + ' '.join(sentences)
 
 
 def _top_scoring_moveset(dive: dict) -> Optional[dict]:
@@ -686,40 +873,38 @@ def render_intro(
     if fc_note:
         paragraphs.append(fc_note)
 
-    # ---- Paragraph 1: the main intro sentence(s). ----
+    # ---- Paragraph 1: BLUF verdict + CD-specific follow-up sentences. ----
     sentences: list[str] = []
 
-    # Stat line.
-    stats_txt = species
-    base_stats = _gm_species_base_stats(gm, species)
-    if base_stats is not None:
-        a, d, h = base_stats
-        stats_txt = f'{species} ({a}/{d}/{h})'
+    # BLUF verdict leads the paragraph: "{Species} is a {role} {league}
+    # pick at {coverage} meta coverage[, shifting from X% to Y% with
+    # ...]." Role + coverage tier come from per_scenario_win_rate; the
+    # shift tail only fires in CD mode. When the form-change paragraph
+    # already names the stats (fc_note non-empty), suppress the
+    # ``(A/D/H)`` prefix so readers don't see the tuple twice.
+    bluf = render_bluf_verdict(
+        species, dive, featured_ms,
+        cd_move_fast=cd_move_fast,
+        baseline_move_fast=baseline_move_fast,
+        cd_ms=cd_ms, base_ms=base_ms,
+        league=league, gm=gm,
+        include_stats=(not fc_note),
+    )
+    if bluf:
+        sentences.append(bluf)
 
     if is_cd_mode:
+        # Still useful after the BLUF: name the TYPE of coverage the new
+        # fast move adds (BLUF names the move, not its type).
         cd_type = _gm_move_type(gm, cd_move_fast)
         cd_display = _gm_move_display(gm, cd_move_fast)
         if cd_type:
             sentences.append(
-                f'{stats_txt}. **{cd_display}** adds '
-                f'{cd_type.capitalize()}-type coverage.'
+                f'**{cd_display}** adds {cd_type.capitalize()}-type coverage.'
             )
-        else:
-            sentences.append(
-                f'{stats_txt}. **{cd_display}** is the new fast-move option.')
 
-        # Aggregate w/ baseline delta.
-        cd_wr_pct = cd_ms.get('win_rate', 0.0) * 100.0
-        base_wr_pct = base_ms.get('win_rate', 0.0) * 100.0
-        delta_pp = cd_wr_pct - base_wr_pct
-        base_display = _gm_move_display(gm, baseline_move_fast)
-        sentences.append(
-            f'{_league_label(league)} win rate: {cd_wr_pct:.1f}% '
-            f'({base_display} baseline: {base_wr_pct:.1f}%, '
-            f'{_fmt_delta_pp(delta_pp)}).'
-        )
-
-        # Biggest gains / drops (flip-filtered).
+        # Biggest gains / drops (flip-filtered). BLUF carries the
+        # aggregate shift; this sentence answers "where did it come from?"
         deltas = _per_opp_deltas(dive, cd_ms, base_ms)
         gains = sorted(
             [d for d in deltas if d['flipped_in']],
@@ -752,11 +937,15 @@ def render_intro(
 
         if cd_date:
             sentences.append(f'Community Day: {cd_date}.')
-    elif not fc_note:
-        # Standalone mode without a form-change paragraph. Emit a bare
-        # stats line as the opener so the Overview block has something
-        # before Meta coverage kicks in. When fc_note is present it
-        # already carries the stats; no redundant opener needed.
+    elif not sentences and not fc_note:
+        # Standalone mode with no BLUF (e.g. per_scenario_win_rate missing)
+        # and no form-change paragraph: fall back to a bare stats opener so
+        # the Overview block has something before Meta coverage kicks in.
+        stats_txt = species
+        base_stats = _gm_species_base_stats(gm, species)
+        if base_stats is not None:
+            a, d, h = base_stats
+            stats_txt = f'{species} ({a}/{d}/{h})'
         sentences.append(f'{stats_txt}.')
 
     if sentences:
