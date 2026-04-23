@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import html
+import re
 import shutil
 import sys
 import tomllib
@@ -55,9 +56,12 @@ GUIDES_SRC = REPO_ROOT / 'guides'
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
 GUIDES_OUT = WEBSITE_DIR / 'guides'
 
-# Verification-count scalars used by dev:* tokens. Source of truth;
-# DEVELOPER_NOTES.md cites the same numbers in prose form.
-VERIFICATION_COUNTS_PATH = REPO_ROOT / 'docs' / 'verification_counts.toml'
+# Verification-count scalars used by dev:* tokens. DEVELOPER_NOTES.md
+# is the source of truth; the numbers live in prose, each wrapped in
+# HTML-comment sentinels ``<!-- sync:KEY -->VALUE<!-- /sync -->`` that
+# the markdown renderer hides but we parse here. ``verify_dev_counts.py``
+# cross-checks derivable keys against live code on each commit.
+DEV_COUNTS_SOURCE_PATH = REPO_ROOT / 'DEVELOPER_NOTES.md'
 
 # Reference dive used for data-token resolution when a guide TOML
 # doesn't override. Oinkologne Male GL matches the shipping CD so
@@ -112,12 +116,35 @@ def _dive_data(dive_slug: str) -> dict | None:
 # Token resolution
 # --------------------------------------------------------------------
 
+_DEV_COUNTS_SENTINEL_RE = re.compile(
+    r'<!--\s*sync:([A-Za-z_][A-Za-z0-9_]*)\s*-->(.+?)<!--\s*/sync\s*-->',
+    flags=re.DOTALL,
+)
+
+
 def _load_verification_counts() -> dict:
-    """Read verification_counts.toml once; empty dict if absent."""
-    if not VERIFICATION_COUNTS_PATH.is_file():
+    """Extract dev-count scalars from DEVELOPER_NOTES.md sentinels.
+
+    Every sentinel pair ``<!-- sync:KEY -->VALUE<!-- /sync -->`` in
+    the file contributes one entry. VALUE is coerced to int when the
+    stripped text parses cleanly, otherwise left as a string.
+
+    Returns ``{}`` if the file is absent (keeps the guide build from
+    hard-failing in partial checkouts). Callers that need the strict
+    verifier should use ``scripts/verify_dev_counts.py`` instead.
+    """
+    if not DEV_COUNTS_SOURCE_PATH.is_file():
         return {}
-    with open(VERIFICATION_COUNTS_PATH, 'rb') as f:
-        return tomllib.load(f)
+    text = DEV_COUNTS_SOURCE_PATH.read_text()
+    out: dict = {}
+    for m in _DEV_COUNTS_SENTINEL_RE.finditer(text):
+        key = m.group(1)
+        raw = m.group(2).strip()
+        try:
+            out[key] = int(raw)
+        except ValueError:
+            out[key] = raw
+    return out
 
 
 def _resolve_tokens(
@@ -133,8 +160,8 @@ def _resolve_tokens(
     Resolution order:
       1. Literal scalar entries in ``[tokens]`` of the guide TOML.
       2. ``dive:`` prefixed tokens resolved via ``_resolve_dive_token``.
-      3. ``dev:`` prefixed tokens resolved via
-         ``docs/verification_counts.toml``.
+      3. ``dev:`` prefixed tokens resolved via sync sentinels in
+         ``DEVELOPER_NOTES.md``.
       4. Otherwise the placeholder is left intact and its name is
          appended to the unresolved list for the caller to warn on.
     """

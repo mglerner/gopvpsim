@@ -2,13 +2,16 @@
 
 ## Current status (2026-04-06)
 
-120 tests pass (102 original + 9 shadow + 9 Corviknight mirror). The simulator matches PvPoke's
-simulate-mode score table exactly (±0) for 8 matchups (72 cells). The 3
-remaining failures are all Mienfoo vs Medicham, root-caused to a
-`bestChargedMove` selection difference (see below).
+<!-- sync:test_count -->599<!-- /sync --> tests collected. The original PvPoke battle-correctness
+core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
+unit and integration tests added since. The simulator matches PvPoke's
+simulate-mode score table exactly (±0) for <!-- sync:pvpoke_matchups_verified -->8<!-- /sync --> matchups
+(<!-- sync:pvpoke_cells_verified -->72<!-- /sync --> cells). The 3 original failures were all Mienfoo vs
+Medicham, root-caused to a `bestChargedMove` selection difference and
+resolved 2026-04-06 (see below).
 
 ### Verified correct
-- **Type effectiveness**: All 324 matchups match PvPoke exactly
+- **Type effectiveness**: All <!-- sync:type_chart_cells_verified -->324<!-- /sync --> matchups match PvPoke exactly
 - **Damage formula**: Verified against manual calculation
 - **Buff/debuff mechanics**: Guaranteed buff (Beedrill 9/9), chance buff
   (Corviknight 9/9), self-debuff meter threshold
@@ -29,6 +32,10 @@ ordering and CMP cancellation fixes. Full root-cause writeup in
 `CHANGELOG.md` under `2026-04-04 to 2026-04-06`.
 
 ## PvPoke bugs found
+
+<!-- sync:pvpoke_bugs_documented -->4<!-- /sync --> bugs documented below (sections 1, 2, 3, 7 — numbering
+reflects discovery order; section 4 was retracted 2026-04-15 and is
+excluded from the count).
 
 ### 1. BattleState .hp/.oppHealth naming inconsistency
 
