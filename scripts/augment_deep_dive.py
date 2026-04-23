@@ -322,7 +322,7 @@ analysis of the {nIvs} IV spreads simulated across {nS} shield scenarios against
 {nO} opponents ({data['opponentLabel']}).</p>
 
 <h3 class="dd-h3">Moveset analyzed</h3>
-<p><code>{moveset_label}</code> &mdash; opponent IVs: {opp_iv_mode}</p>
+<p><code>{moveset_label}</code> - opponent IVs: {opp_iv_mode}</p>
 
 <h3 class="dd-h3">Techniques used</h3>
 <dl class="dd-methods-dl">
@@ -330,7 +330,7 @@ analysis of the {nIvs} IV spreads simulated across {nS} shield scenarios against
   <dd>For each stat (attack, defense, HP) and each scenario, IVs are grouped by their
   discrete stat value. We compute the F-ratio (between-group variance / within-group
   variance) and &eta;&sup2; (variance explained). High F-ratio or &eta;&sup2; indicates that
-  the stat creates visible horizontal or vertical bands in the scatter plot &mdash; meaning
+  the stat creates visible horizontal or vertical bands in the scatter plot - meaning
   IVs with the same stat value cluster at the same score level. We also report the
   Pearson correlation between each stat and the battle score.</dd>
 
@@ -368,7 +368,7 @@ analysis of the {nIvs} IV spreads simulated across {nS} shield scenarios against
 <div class="dd-section" id="dd-banding">
 <h2 class="dd-h2">Banding &amp; Stat Correlations</h2>
 <p>Which stats create visible structure (bands/gradients) in the scatter plot?
-A high &eta;&sup2; means the stat explains a large fraction of score variance &mdash;
+A high &eta;&sup2; means the stat explains a large fraction of score variance -
 you can &ldquo;see&rdquo; it as horizontal or colored bands.</p>
 """
 
@@ -429,7 +429,7 @@ you can &ldquo;see&rdquo; it as horizontal or colored bands.</p>
     banding_html += """
 <div class="dd-callout">
 <strong>Reading the table:</strong> <em>r</em> is Pearson correlation (positive = higher stat &rarr;
-higher score). &eta;&sup2; is variance explained by discrete stat grouping (0&ndash;1 scale).
+higher score). &eta;&sup2; is variance explained by discrete stat grouping (0-1 scale).
 <span class="dd-strong">Bold values</span> are noteworthy (&gt; 0.3).
 </div>
 
@@ -485,7 +485,7 @@ performance tiers.</p>
             cluster_html += f'{sig_gaps[0][2]:.1f} &rarr; {sig_gaps[0][3]:.1f} '
             cluster_html += f'(gap = {sig_gaps[0][1]:.1f})</p>\n'
         else:
-            cluster_html += '<p>No significant gaps detected &mdash; smooth score gradient.</p>\n'
+            cluster_html += '<p>No significant gaps detected - smooth score gradient.</p>\n'
 
         # Top 5 IVs for this scenario
         scene_ranked = sorted(range(nIvs), key=lambda i: scene_scores[i], reverse=True)
@@ -610,7 +610,7 @@ low range = generalist. The &ldquo;best&rdquo; IVs are those that rank well on a
     for iv, g, l, net in notable[:8]:
         fdata = flips[iv]
         flip_html += f'<details class="dd-flip-detail"><summary>{html_iv_label(data, iv)}'
-        flip_html += f' &mdash; <span class="dd-gain">+{g}</span>/<span class="dd-loss">-{l}</span>'
+        flip_html += f' - <span class="dd-gain">+{g}</span>/<span class="dd-loss">-{l}</span>'
         flip_html += f' (net {net:+d}){html_tier_badge(data, iv)}</summary>\n'
 
         if fdata['gains']:

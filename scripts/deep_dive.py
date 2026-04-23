@@ -13,7 +13,7 @@ Opponents can come from:
   - A PvPoke custom group (--group championshipseries)
 
 Two-phase approach:
-  Phase 1: Quick screen — sim rank-1 IVs in 1v1 shields against a few opponents
+  Phase 1: Quick screen - sim rank-1 IVs in 1v1 shields against a few opponents
            to prune hopeless movesets down to the top N.
   Phase 2: Full 4096-IV sweep for surviving movesets across all opponents.
 
@@ -219,7 +219,7 @@ def build_iv_categories(data_obj, slayer_categories=None,
     then tier categories, then composites, then matchups. Empty
     categories are dropped.
 
-    The function is intentionally pure — no I/O, no HTML, no globals.
+    The function is intentionally pure - no I/O, no HTML, no globals.
     Easy to unit-test with synthetic data_obj dicts.
     """
     n_ivs = data_obj.get('nIvs', 0)
@@ -287,7 +287,7 @@ def build_iv_categories(data_obj, slayer_categories=None,
 
     # ---- Threshold tier categories ----
     # data_obj['tiers'] is the ordered list of tier dicts; ivAllTiers[i]
-    # is the list of tier indices that IV i meets (inclusive — an IV
+    # is the list of tier indices that IV i meets (inclusive - an IV
     # that's "Top 5%" also lives in "Good"). We use ivAllTiers, not the
     # primary ivTiers, because we want category membership to be
     # inclusive across the tier ladder.
@@ -365,7 +365,7 @@ def build_iv_categories(data_obj, slayer_categories=None,
     # it without parsing the display name.
     #
     # Selectivity: skip pairs where every IV wins or no IV wins. Both
-    # are degenerate from a "named category" perspective — they'd just
+    # are degenerate from a "named category" perspective - they'd just
     # be "everyone" or "no one". The renderer applies a separate
     # "notable" filter (small categories only) on top of this baseline.
     if matchup_data:
@@ -399,7 +399,7 @@ def build_iv_categories(data_obj, slayer_categories=None,
                             }
                     n_win = len(members)
                     if n_win == 0 or n_win == n_ivs:
-                        continue  # degenerate partition — skip
+                        continue  # degenerate partition - skip
                     scen_label = f'{scen[0]}v{scen[1]}'
                     name = f'Beats {opp_iv_label} {opp_name} in the {scen_label}'
                     categories.append(IVCategory(
@@ -443,10 +443,10 @@ def auto_discover_thresholds(results, n_tiers=2):
 
     n = len(results)
 
-    # Tier 1: "Top 5%" — top 5% by avg score (renamed from "Premium" to
+    # Tier 1: "Top 5%" - top 5% by avg score (renamed from "Premium" to
     # avoid clashing with the community use of "premium" in IV deep dives,
     # which means something more specific than a top-percentile bucket).
-    # Tier 2: "Good" — top 20% by score
+    # Tier 2: "Good" - top 20% by score
     tier_cuts = [max(5, n // 20), max(20, n // 5)][:n_tiers]
     tier_names = ['Top 5%', 'Good'][:n_tiers]
 
@@ -581,7 +581,7 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None,
 
     # Determine charged move candidates
     if user_charged and len(user_charged) == 2:
-        # Full charged moveset specified — validate against gamemaster, not species
+        # Full charged moveset specified - validate against gamemaster, not species
         for cm in user_charged:
             if cm not in charged_moves_db:
                 sys.exit(f"Unknown charged move {cm!r} (not in gamemaster)")
@@ -590,7 +590,7 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None,
                                f"(CD/legacy move?)")
         charged_pairs = [tuple(sorted(user_charged))]
     elif user_charged and len(user_charged) == 1:
-        # One charged move specified — pair it with all legal partners
+        # One charged move specified - pair it with all legal partners
         fixed = user_charged[0]
         if fixed not in charged_moves_db:
             sys.exit(f"Unknown charged move {fixed!r} (not in gamemaster)")
@@ -607,7 +607,7 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None,
             if pair not in charged_pairs:
                 charged_pairs.append(pair)
     else:
-        # No charged moves specified — all pairs from legal list
+        # No charged moves specified - all pairs from legal list
         charged_pairs = list(itertools.combinations(sorted(legal_charged), 2))
         for cm in sorted(legal_charged):
             charged_pairs.append((cm,))
@@ -659,10 +659,10 @@ def resolve_opp_ivs(species_name, league, shadow, opp_iv_mode):
     """Return (atk_iv, def_iv, sta_iv) for an opponent based on the IV mode.
 
     opp_iv_mode:
-      'pvpoke'  — PvPoke's default IVs from the gamemaster (what pvpoke.com uses)
-      'rank1'   — stat-product rank 1 IVs
+      'pvpoke'  - PvPoke's default IVs from the gamemaster (what pvpoke.com uses)
+      'rank1'   - stat-product rank 1 IVs
 
-    Tolerates composite mode strings like ``'pvpoke:nobait'`` — the bait axis
+    Tolerates composite mode strings like ``'pvpoke:nobait'`` - the bait axis
     is focal-side and has no effect on opponent IV selection, so we strip it.
     """
     opp_iv_mode, _ = parse_mode(opp_iv_mode)
@@ -824,7 +824,7 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
     Return the top N movesets by average score.
     """
     if top_n == 0 or len(movesets) <= top_n:
-        logger.info(f"  {len(movesets)} moveset(s) — skipping screen phase.")
+        logger.info(f"  {len(movesets)} moveset(s) - skipping screen phase.")
         return movesets
 
     logger.info(f"  Phase 1: Screening {len(movesets)} movesets (rank-1 IVs, "
@@ -1018,14 +1018,14 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
-    multiprocessing — IVs with identical effective stats produce identical
+    multiprocessing - IVs with identical effective stats produce identical
     battles, so we sim each profile once and copy the result to all
     matching IVs (~1.7x speedup).
 
     opp_iv_mode may be a composite mode string encoding a bait-shields axis:
-      'pvpoke', 'rank1'        — bait-on (default pvpoke_dp behavior)
+      'pvpoke', 'rank1'        - bait-on (default pvpoke_dp behavior)
       'pvpoke:nobait', 'rank1:nobait'
-                                — bait-off (pvpoke_dp bait_shields=False)
+                                - bait-off (pvpoke_dp bait_shields=False)
     When the ``:nobait`` suffix is present, the focal uses a no-bait policy;
     the opponent still baits normally.
 
@@ -1074,7 +1074,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     profile_list = [(pk, dat[0], dat[1], dat[2]) for pk, dat in profile_data.items()]
 
     # Parallel sim: ~100 chunks across the worker pool. imap_unordered
-    # hands chunks out as workers free up — finer granularity gives more
+    # hands chunks out as workers free up - finer granularity gives more
     # frequent progress reports and better load balancing.
     n_workers = min(max(1, multiprocessing.cpu_count() - reserve_cpus), 16)
     n_chunks_target = 100
@@ -1158,11 +1158,11 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
 # HTML output with threshold highlighting
 # ---------------------------------------------------------------------------
 
-# Colors for threshold tiers — most restrictive first, then less restrictive.
+# Colors for threshold tiers - most restrictive first, then less restrictive.
 # "Other" (no threshold) uses the Viridis colorscale fallback.
 THRESHOLD_COLORS = [
-    '#00E676',  # bright green — most restrictive tier ("best")
-    '#FFD700',  # gold — next tier
+    '#00E676',  # bright green - most restrictive tier ("best")
+    '#FFD700',  # gold - next tier
     '#FF6D00',  # orange
     '#E040FB',  # purple
     '#00B0FF',  # blue
@@ -1229,7 +1229,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
     Generate an interactive HTML file with Plotly.js scatter plots.
 
     If thresholds are provided, points are colored by which threshold tier they
-    meet (most restrictive first). The legend is interactive — click to
+    meet (most restrictive first). The legend is interactive - click to
     isolate/hide groups, hover over legend entries to highlight those points.
     """
     # Build threshold tier names and assign colors
@@ -1352,7 +1352,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
 </style>
 </head>
 <body>
-<h1>{species} — {league.title()} League IV Deep Dive</h1>
+<h1>{species} - {league.title()} League IV Deep Dive</h1>
 <p class="meta">Opponents: {opp_desc}
 | Shield scenario(s): {', '.join(f'{s0}v{s1}' for s0, s1 in (shield_scenarios or [(1,1)]))}
 | Policy: pvpoke_dp</p>
@@ -1402,7 +1402,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
                                  f'style="background:{color};color:#000">'
                                  f'{tier}</span></td>')
                 else:
-                    tier_html = '<td>—</td>'
+                    tier_html = '<td>-</td>'
             html += (f'<tr><td>#{r["battle_rank"]}</td>'
                      f'<td>{r["atk_iv"]}/{r["def_iv"]}/{r["sta_iv"]}</td>'
                      f'<td>{r["level"]}</td><td>{r["cp"]}</td>'
@@ -1558,7 +1558,7 @@ Plotly.newPlot("plot{i}", {json.dumps(traces_js)}, {json.dumps(layout)},
 <hr style="border-color:#0f3460; margin-top:40px">
 <div style="color:#888; font-size:12px; max-width:800px; margin:10px 0 30px 0; line-height:1.6">
 <strong>Methodology</strong><br>
-Each of the 4096 possible IV spreads (0&ndash;15 for Atk/Def/Sta) is leveled to the
+Each of the 4096 possible IV spreads (0-15 for Atk/Def/Sta) is leveled to the
 highest level that stays under the {league.title()} League CP cap ({LEAGUE_CAPS[league]}).
 For each IV spread, a battle is simulated against each of the {n_opponents} opponents
 in the {opp_desc} pool in the {shield_desc} shield scenario(s), using the
@@ -1656,7 +1656,7 @@ def _rename_plotly_tiers(data_obj, flavors):
     match the same tier (same stat threshold within 0.1), the first flavor
     in iteration order wins; downstream flavors fall through to the next
     unclaimed tier. ``refine_flavor_names`` pre-sorts flavors most-specific-
-    first, so the first-match winner is the narrowest flavor — the one
+    first, so the first-match winner is the narrowest flavor - the one
     whose name best describes that tier's actual selectivity.
 
     Prior to 2026-04-21, this function produced compound names like
@@ -1665,7 +1665,7 @@ def _rename_plotly_tiers(data_obj, flavors):
     ``<br>``. Tier cards in the IV Recommendations grid convert ``<br>``
     to ``" - "`` for single-line display, so the compound leaked into
     the cards as "Steelix (Shadow) Slayer -   (Wigglytuff Slayer -
-    (Wigglytuff Atk))" — visibly wrong and misleading. The fix:
+    (Wigglytuff Atk))" - visibly wrong and misleading. The fix:
     narrative names already carry their own stat-signature
     disambiguation via ``refine_flavor_names`` (line 547-558), so the
     compound form adds no information and only noise. Plotly scatter
@@ -1909,7 +1909,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     ``{anchor_id: [passing_iv_idx, ...]}`` for every anchor-flip bullet
     rendered, so the interactive HTML can embed the map as DATA and
     light up "which of your IVs hit this breakpoint" annotations after
-    the user loads their CSV. Populated as a side effect — callers who
+    the user loads their CSV. Populated as a side effect - callers who
     just want HTML can leave it at None.
     """
     nIvs = data_obj['nIvs']
@@ -2040,7 +2040,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         pop_atk = sum(data_obj['ivAtk'][i] for i in ranked[:20]) / 20
         pop_def = sum(data_obj['ivDef'][i] for i in ranked[:20]) / 20
         pop_hp = sum(data_obj['ivHp'][i] for i in ranked[:20]) / 20
-        # "Bait Robust" — all flips fire in both bait modes and net is positive
+        # "Bait Robust" - all flips fire in both bait modes and net is positive
         if has_bait_axis and iv in flips and rc['net'] > 0:
             fd = flips[iv]
             all_entries = fd.get('gains', []) + fd.get('losses', [])
@@ -2143,7 +2143,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             logger.info(f"  Auto-derived {len(effective_tiers)} threshold tier(s) "
                         f"from anchor-flip records")
             # Inject auto-derived tiers into data_obj for scatter plot
-            # coloring. Exclude the "General" tier — it's too broad (catches
+            # coloring. Exclude the "General" tier - it's too broad (catches
             # ~all IVs) and kills the contrast that makes selective tiers
             # visible. General stays in effective_tiers for the tier cards.
             plot_tiers = [t for t in effective_tiers
@@ -2286,7 +2286,7 @@ def _filter_moveset_data_for_split(moveset_data, current_idx, reference_idx):
     """Return (filtered_moveset_data, new_reference_idx) for a split-mode file.
 
     Each split file embeds only the moveset being displayed. The "vs Ref"
-    hover diff is intentionally dropped in split mode — the ref moveset's
+    hover diff is intentionally dropped in split mode - the ref moveset's
     scores would need all opp-iv/bait modes embedded to cover mode
     switches, roughly doubling each non-reference file's size (~24 MB →
     ~47 MB for a GL 61-opponent dive). Since these files are for "pick
@@ -2320,7 +2320,7 @@ def _build_split_file_list(moveset_data, reference_idx, base_html_path):
     Landing is decoupled from ``reference_idx`` on purpose: for CD-prep
     dives the reference is typically the *pre-CD* moveset (the
     comparison baseline for "vs Ref" hovers), which is exactly what we
-    *don't* want as the landing page — the reader is here to see the
+    *don't* want as the landing page - the reader is here to see the
     CD move. moveset 0 is the top-scoring moveset by the same Phase 2
     ordering ``--top-movesets`` uses, which for CD dives is the
     CD-move variant and for non-CD dives is the meta-standard moveset
@@ -2342,7 +2342,7 @@ def _build_split_file_list(moveset_data, reference_idx, base_html_path):
         else:
             fname = f'{stem}_m{mi}_{_moveset_slug(md["label"])}{ext}'
         files.append({
-            'url': fname,                            # relative — same dir
+            'url': fname,                            # relative - same dir
             'path': _os.path.join(directory, fname),
             'label': md['label'],
             'pretty_label': f'{pretty}{ref_tag}',
@@ -2429,7 +2429,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         sp_ranks[idx] = rank + 1
 
     # Classify IVs by threshold tier
-    # iv_tiers: primary tier (most restrictive match, for coloring) — -1 = none
+    # iv_tiers: primary tier (most restrictive match, for coloring) - -1 = none
     # iv_all_tiers: list of ALL matching tier indices (for filtering and tables)
     iv_tiers = [-1] * n_ivs
     iv_all_tiers = [[] for _ in range(n_ivs)]
@@ -2546,7 +2546,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # a "slayer-quality" spread costs vs the avg-score-optimal cluster.
     # Slayer membership is fundamentally a different optimization target
     # than avg score (mirror-match wins under even-strict), so the two
-    # often don't coincide — visualizing the gap is the whole point.
+    # often don't coincide - visualizing the gap is the whole point.
     # The slayer iteration stores ``iv`` as a (a_iv, d_iv, s_iv) triple
     # (see line ~529 in iterative_slayer_discovery), but the JS plot
     # indexes IVs by their canonical position in iv_a/iv_d/iv_s. Build a
@@ -2587,7 +2587,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # Anchor-clear IV overlay: union the canonical IV indices that pass
     # any anchor for which _aggregate_flips_by_anchor emitted a record.
     # The aggregator runs again inside generate_analysis_sections for
-    # the bullet rendering — running it here too is cheap and avoids
+    # the bullet rendering - running it here too is cheap and avoids
     # plumbing its output through a side channel. Per-IV "which anchors
     # cleared" data populates the hover tooltip.
     #
@@ -2597,13 +2597,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # flip annotations" for the longer-term plan to surface anchors
     # without requiring a slayer iteration.
     # Selectivity gate: an anchor counts toward overlay membership only
-    # if it's "actually selective" — i.e., passed by less than half the
+    # if it's "actually selective" - i.e., passed by less than half the
     # IV pool. The bullets layer keeps all emitted anchors (an
     # easy-to-clear breakpoint is still informational about where the
     # damage tier lands), but for the overlay, "every IV clears
     # something" is degenerate noise. Without this filter, e.g. a
-    # Lickilicky Hyper Beam bulkpoint at def 96.62 — which essentially
-    # every spread satisfies — would mark every point on the scatter
+    # Lickilicky Hyper Beam bulkpoint at def 96.62 - which essentially
+    # every spread satisfies - would mark every point on the scatter
     # as anchor-cleared and defeat the highlighting purpose.
     SELECTIVITY_MAX_PASS_RATE = 0.5
     if _precomputed_analysis is not None and 'anchorClearIvs' in _precomputed_analysis:
@@ -2630,7 +2630,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                             continue
                         pass_rate = len(passing) / n_ivs if n_ivs else 0.0
                         if pass_rate > SELECTIVITY_MAX_PASS_RATE:
-                            continue  # too easy — skip for overlay purposes
+                            continue  # too easy - skip for overlay purposes
                         label = (rec['anchor'].parent_display_name
                                  or rec['anchor'].label
                                  or rec['anchor'].parent)
@@ -2649,7 +2649,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # users want alternative metrics that count *how many matchups
     # this IV wins* under different opponent assumptions. Slayer IVs in
     # particular don't appear at the top of the avg-score-ranked plot
-    # (they optimize a different target — mirror-match wins under
+    # (they optimize a different target - mirror-match wins under
     # even-strict), so a wins-based axis makes that cohort visible.
     #
     # Three wins modes are exposed in addition to avg score:
@@ -2658,7 +2658,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     #   * winsRank1: same but vs rank-1-stat-product opponents. Only
     #     available if --opp-ivs is rank1 or both.
     #   * winsMirror: total mirror-match wins from the slayer iteration's
-    #     final round. SPARSE — only the ~tens of slayer survivors have
+    #     final round. SPARSE - only the ~tens of slayer survivors have
     #     a value here; all other IVs are dropped from the plot when
     #     this mode is active.
     mirror_wins_by_idx: dict = {}
@@ -2723,13 +2723,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     #
     # Everything the browser-side JS port of user_collection.py needs to
     # parse the user's Poke Genie CSV and match it against this dive's
-    # auto-derived tiers — without any server round-trip and without
+    # auto-derived tiers - without any server round-trip and without
     # loading the full gamemaster on the client. The JS module lives at
     # scripts/deep_dive_user_collection.js and is injected into the HTML
     # alongside the engine JS. Keys mirror the Python API 1:1.
     #
     # The shadow flag controls three things:
-    #   * speciesKey: 'Tinkaton' vs 'Tinkaton (Shadow)' — this is the
+    #   * speciesKey: 'Tinkaton' vs 'Tinkaton (Shadow)' - this is the
     #     threshold-dict key the JS builds on CSV load. A user's shadow
     #     Tinkaton in the CSV resolves via get_species_name to
     #     'Tinkaton (Shadow)', which must match the speciesKey we picked
@@ -2753,7 +2753,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         # includes THIS dive's species. For a Tinkaton dive, that gives
         # {Tinkatink: [Tinkaton], Tinkatuff: [Tinkaton], Tinkaton: [Tinkaton]}.
         # Branching pre-evos (Eevee → 8 eeveelutions) contribute only if
-        # the dive is one of the branches — e.g. an Umbreon dive gets
+        # the dive is one of the branches - e.g. an Umbreon dive gets
         # {Eevee: [Umbreon], Umbreon: [Umbreon]} rather than the full 8.
         _pre_to_finals_full = _load_pre_to_finals()
         _pre_to_finals_subset = {}
@@ -2908,7 +2908,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 </style>
 </head>
 <body>
-<h1>{species} — {league.title()} League IV Deep Dive</h1>
+<h1>{species} - {league.title()} League IV Deep Dive</h1>
 <p class="meta">Opponents: {opp_desc}
 | Shield scenario(s): {shield_desc} | Policy: pvpoke_dp{_bait_meta}</p>
 """
@@ -2956,20 +2956,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # [Species.intro] / [Species.meta_role] / [Species.verdict] blocks.
     # Renders above the dashboard so a reader gets the "why should I
     # care" before the interactive scatter (RyanSwag-style). Silent
-    # no-op when no blocks are populated — most species today.
+    # no-op when no blocks are populated - most species today.
     if species_narrative:
         html += rendering.render_species_narrative(species_narrative)
 
     # Threshold info folded into controls (legend shows tier name + desc)
-    # No separate threshold-info box needed — graph legend has full detail
+    # No separate threshold-info box needed - graph legend has full detail
 
     # Controls
     html += '<div class="controls">\n'
     if split_info is not None:
         # URL-navigating dropdown: onchange jumps to a sibling HTML file
         # for the selected moveset. Uses a distinct id ('moveset-nav-sel')
-        # so the engine's updateView() — which looks up 'moveset-sel' and
-        # parseInt()'s its value — stays quiet and leaves state.movesetIdx
+        # so the engine's updateView() - which looks up 'moveset-sel' and
+        # parseInt()'s its value - stays quiet and leaves state.movesetIdx
         # at its default (0, the current-file moveset). The CSV paste-box
         # state lives in this page's DOM and is lost on navigation; we
         # flag that inline next to the selector rather than trying to
@@ -3043,10 +3043,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # (Highlight IVs input lives directly below the plot, right-aligned
     # under the legend, so the user's eye doesn't jump from the plot
     # back up to the control strip to pin a specific IV.)
-    # (Top-IVs table controls live next to the table itself — see the
+    # (Top-IVs table controls live next to the table itself - see the
     # control strip rendered just before <div id="summary"> below.)
     # "Show clusters" is gated behind the experimental-analysis toggle
-    # in the Deep Dive Analysis section — hidden by default, revealed
+    # in the Deep Dive Analysis section - hidden by default, revealed
     # when the user opts into experimental output. The wrapper span is
     # toggled by the alpha-chk onchange handler below (in the analysis
     # sections block).
@@ -3056,7 +3056,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += '</div>\n'
 
     # "Your collection" paste-box. Hidden (display:none) until DOMContentLoaded
-    # — the engine JS reveals it only if DATA.collection was populated
+    # - the engine JS reveals it only if DATA.collection was populated
     # (i.e. the dive species was found in the gamemaster). Privacy note
     # reinforces that no upload happens; the textarea + FileReader both
     # run fully client-side.
@@ -3065,7 +3065,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             '<details id="collection-panel" class="collection-panel" open>\n'
             '  <summary><b>Check my collection</b> '
             '<span style="font-size:11px;color:#888">'
-            '— Your collection stays in your browser; nothing is uploaded.'
+            '- Your collection stays in your browser; nothing is uploaded.'
             '</span></summary>\n'
             '  <div class="collection-body">\n'
             '    <div class="collection-instructions">\n'
@@ -3128,7 +3128,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # fallbacks. Accepts a comma-separated list of triples in "a/d/s"
     # form (also "-" or whitespace separated). Matching IVs render as
     # red diamonds on top and the rest of the plot dims to ~30% opacity.
-    # Orthogonal to the collection paste-box — this is an ad-hoc "pin
+    # Orthogonal to the collection paste-box - this is an ad-hoc "pin
     # these to the plot" tool, not a persistent user collection.
     html += (
         '<div class="highlight-strip" '
@@ -3193,7 +3193,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         _pretty = _pretty_moveset(_md['label'])
         _vis = 'block' if _mi == 0 else 'none'
         # max-width keeps the plot from stretching across the full page
-        # on wide monitors — narrower histograms read better and match
+        # on wide monitors - narrower histograms read better and match
         # PvPoke's visual density.
         html += (
             f'<div id="histogram-{_slug}" class="dd-histogram-moveset" '
@@ -3416,7 +3416,7 @@ var _scoresReady = (async function() {
 
     # User-collection JS module (POGOCollection global). Injected BEFORE
     # the engine so the engine can reference POGOCollection.parseCsvText
-    # etc. on init. Kept as a separate <script> block — if the module
+    # etc. on init. Kept as a separate <script> block - if the module
     # file is missing (dev moved it, etc.) the engine still loads and
     # the paste-box simply stays hidden via the DATA.collection null
     # guard in the engine init.
@@ -3428,7 +3428,7 @@ var _scoresReady = (async function() {
     except FileNotFoundError:
         pass
 
-    # JS engine — wrapped in an async IIFE that waits for gzip
+    # JS engine - wrapped in an async IIFE that waits for gzip
     # decompression of score arrays to finish before initializing.
     html += '<script>\n'
     html += '(async function() {\nawait _scoresReady;\n'
@@ -3504,7 +3504,7 @@ var _scoresReady = (async function() {
             html += f'top 5 species: {top5}'
             html += '</pre></details>\n'
     except Exception as _e:
-        # Fingerprint is best-effort — don't break HTML generation
+        # Fingerprint is best-effort - don't break HTML generation
         # if the cache file is missing or unreadable.
         pass
 
@@ -3564,19 +3564,19 @@ def format_cli_args(args, parser) -> str:
     with its actual value, including flags whose value happens to equal the
     current parser default. This is intentional: defaults can change between
     runs, so a string that omits "default" flags becomes ambiguous when read
-    later — you can't tell whether `--mirror-slayer-pool` was unset (and got
+    later - you can't tell whether `--mirror-slayer-pool` was unset (and got
     today's default) or set to today's default explicitly.
 
     The fully-resolved form is verbose but unambiguous: re-reading the HTML
     next month after a default has changed still tells you exactly what value
     was used. This output is the forensic record, not necessarily a
-    convenient copy-paste — though it IS pasteable and will reproduce the
+    convenient copy-paste - though it IS pasteable and will reproduce the
     same run.
 
     Boolean flags are emitted only when True (False is the implicit absence),
     since there's no `--no-X` form for store_true / store_false flags here.
     ``BooleanOptionalAction`` flags (which DO have a `--no-X` form) always
-    emit explicitly — `--flag` for True, `--no-flag` for False — so the
+    emit explicitly - `--flag` for True, `--no-flag` for False - so the
     record round-trips through argparse on paste-back. Flags whose value
     is None are skipped because there's no syntax for "explicitly set to
     None" on the command line.
@@ -3621,13 +3621,13 @@ def format_cli_args(args, parser) -> str:
             continue
         if action.nargs in (None, '?', 0) or action.nargs == argparse.OPTIONAL:
             if isinstance(val, list):
-                # action='append' — emit one occurrence per value
+                # action='append' - emit one occurrence per value
                 for item in val:
                     flags.append(f'{flag} {_shell_quote(str(item))}')
             else:
                 flags.append(f'{flag} {_shell_quote(str(val))}')
         else:
-            # nargs='+', '*', or numeric — join with spaces
+            # nargs='+', '*', or numeric - join with spaces
             if isinstance(val, (list, tuple)):
                 joined = ' '.join(_shell_quote(str(v)) for v in val)
             else:
@@ -3713,7 +3713,7 @@ def main():
     parser.add_argument('--species-iv-floor', default=None, metavar='ATK,DEF,STA',
                         help='Prune focal species IVs below this floor at '
                              'enumeration time. Comma-separated (e.g. "13,13,13" '
-                             'for UL tight-spread dives — trims 4096 IVs to 27). '
+                             'for UL tight-spread dives - trims 4096 IVs to 27). '
                              'Applies ONLY to the focal species; opponents still '
                              'use their default / rank1 / cohort selection. The '
                              'scatter plot, tier derivation, and anchor analysis '
@@ -3944,8 +3944,8 @@ def main():
         # Explicit opt-out: no TOML registry load. Falls through to the
         # auto-derive path which reads anchor records from opponent
         # analysis only. The species-narrative blocks (Shape 2 migration)
-        # are orthogonal to the threshold-registry payload — they're raw
-        # TOML prose extracted alongside, not threshold data — so the
+        # are orthogonal to the threshold-registry payload - they're raw
+        # TOML prose extracted alongside, not threshold data - so the
         # --no-thresholds opt-out should NOT suppress them. Read the
         # same file the auto-discover path would find, extract just
         # narrative, leave threshold_registry None.
@@ -3993,7 +3993,7 @@ def main():
             except Exception:
                 _article_slug = ''
             # Extract optional species narrative blocks (Shape 2 migration).
-            # Same raw-TOML re-read pattern as cd_prep / article — the
+            # Same raw-TOML re-read pattern as cd_prep / article - the
             # ThresholdRegistry parser silently ignores species-level
             # sub-tables that aren't leagues, so these live outside the
             # registry and are threaded through to the renderer directly.
@@ -4115,7 +4115,7 @@ def main():
 
     logger.result('')
     logger.result('=' * 60)
-    logger.result(f"  {args.species}{'  (Shadow)' if args.shadow else ''} — "
+    logger.result(f"  {args.species}{'  (Shadow)' if args.shadow else ''} - "
                   f"{args.league.title()} League IV Deep Dive")
     logger.result('=' * 60)
     logger.result('')
@@ -4129,7 +4129,7 @@ def main():
                                   cd_prep_charged=_cd_prep_charged)
     logger.info(f"  {len(movesets)} moveset combination(s) to evaluate")
 
-    # Get opponents — from group or rankings
+    # Get opponents - from group or rankings
     # Always include the focal species so we can do mirror slayer analysis.
     opponent_label = None
     if args.group and args.opponents_file:
@@ -4256,7 +4256,7 @@ def main():
     logger.info(f"  Opponent IVs: {opp_iv_label}")
     if thresholds:
         for name, thresh in thresholds.items():
-            logger.info(f"  Threshold: {name} — {_threshold_desc(thresh)}")
+            logger.info(f"  Threshold: {name} - {_threshold_desc(thresh)}")
 
     # Determine screen opponents
     if args.group:
@@ -4353,7 +4353,7 @@ def main():
                             new_thresholds.update(thresholds)
                             thresholds = new_thresholds
                     elif max_wins == n_scen:
-                        logger.info(f"    {slayer_name}: all IVs win the mirror — no slayer threshold needed")
+                        logger.info(f"    {slayer_name}: all IVs win the mirror - no slayer threshold needed")
                     elif max_wins == 0:
                         logger.info(f"    {slayer_name}: no IV beats the mirror")
                     else:
@@ -4464,7 +4464,7 @@ def main():
                         # focal atk space for this species, not the cohort
                         # range. With a converged cohort atk range collapses
                         # to almost a single point and Level 3 enumeration
-                        # finds nothing — the interesting BPs lie BELOW the
+                        # finds nothing - the interesting BPs lie BELOW the
                         # cohort (already cleared by every survivor), and we
                         # want to tag each survivor with which ones it passes.
                         all_ivs = iv_rank(
@@ -4673,7 +4673,7 @@ def main():
                     all_moveset_results.append((fast_id, charged_ids, results,
                                                 scores_by_mode, meta))
             else:
-                # Already ran with the right scenarios — repack Phase 2
+                # Already ran with the right scenarios - repack Phase 2
                 # results and fill in any additional composite modes
                 # (extra opp-IV mode and/or bait mode) that weren't run
                 # originally. The cached Phase 2 result corresponds to
@@ -4764,7 +4764,7 @@ def main():
                     moveset_data, reference_idx, args.html,
                 )
                 logger.info(f"  Split mode: emitting {len(split_files)} per-moveset HTML files")
-                # Precompute analysis on the first file — it always uses
+                # Precompute analysis on the first file - it always uses
                 # moveset_idx=0 scores so the result is identical across
                 # all split files. Avoids re-running the expensive anchor
                 # aggregator + matchup boundary sweeps N times. The empty
@@ -4798,7 +4798,7 @@ def main():
                     )
             else:
                 if args.split_movesets:
-                    logger.warning("--split-movesets: only one moveset surviving — "
+                    logger.warning("--split-movesets: only one moveset surviving - "
                                    "writing a single file")
                 generate_interactive_html(
                     args.species, args.league, moveset_data, args.html,

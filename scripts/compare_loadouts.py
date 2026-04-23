@@ -424,7 +424,7 @@ def _loadout_abbrev(label: str) -> str:
     Strategy: strip a leading ``Shadow `` modifier into an ``S`` prefix,
     then reduce the remaining content to word-initials (or the first
     letter if it's a single word). Used only by the all-in-row matchup
-    table — the Base Stats / Moveset tables at the top of a comparison
+    table - the Base Stats / Moveset tables at the top of a comparison
     keep the full labels since they have fewer columns.
 
     Examples:
@@ -552,7 +552,7 @@ def _render_all_in_row_matchup_table(
                         f'<a class="flip-badge {badge_cls}" '
                         f'href="{html.escape(href)}" '
                         f'title="{html.escape(spec.label)} {wl} vs '
-                        f'{html.escape(name)} &mdash; jump to this '
+                        f'{html.escape(name)} - jump to this '
                         f'matchup in the {html.escape(spec.label)} '
                         f'dive">'
                         f'{html.escape(abbr)} {wl}</a>'
