@@ -246,18 +246,14 @@ def _resolve_dive_token(suffix: str, dive: dict | None) -> str | None:
         return None
     t0 = tiers[0]
     if suffix == 'top_tier_name':
-        # The tier CARD header on the dive uses the name at the moment
-        # render_threshold_tier_cards() ran - i.e. the original_name,
-        # since _rename_plotly_tiers() mutates `name` afterward for the
-        # Plotly legend. Point readers at what their eyes actually see
-        # on the card header.
-        name = (t0.get('original_name') or t0.get('name') or '').strip()
+        # Post-2026-04-23 tier-name unify: the tier-card badge and the
+        # Plotly legend both display ``t['name']`` (the flavor-matched
+        # name), so a single resolver covers both surfaces. Prior
+        # implementations needed an ``original_name`` fallback because
+        # the card rendered the pre-rename label; that's no longer
+        # true.
+        name = (t0.get('name') or '').strip()
         return name or None
-    if suffix == 'top_tier_plot_name':
-        # The Plotly-legend name (post-rename), when different from
-        # the card header. Useful if a guide wants to mention the
-        # legend and the card separately.
-        return str(t0.get('name') or '').strip() or None
     if suffix in ('top_tier_atk_cutoff',
                   'top_tier_def_cutoff',
                   'top_tier_sta_cutoff'):
