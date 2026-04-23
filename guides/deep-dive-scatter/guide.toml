@@ -2,4 +2,4 @@ title = "Reading the Deep-Dive Scatter Plot"
 slug = "deep-dive-scatter"
 description = "Color modes, hover cards, the Shields / Opponent-IVs / Bait dropdowns, and what the anchor-clear overlay shows."
 order = 4
-coming_soon = true
+coming_soon = false
