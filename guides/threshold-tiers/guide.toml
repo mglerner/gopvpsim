@@ -2,7 +2,8 @@ title = "Threshold Tiers"
 slug = "threshold-tiers"
 description = "Tier vs category vs anchor. What the stat-cutoff bullets mean and why overlapping tiers are intentional."
 order = 1
-coming_soon = true
+coming_soon = false
 
-# When this guide's body.md lands, set coming_soon=false and add any
-# data tokens this guide consumes under [tokens] / [data_tokens].
+# Reference dive defaults to Oinkologne Male GL (inherited from
+# build_guides.DEFAULT_REFERENCE). Numeric citations resolve via
+# dive:* tokens so the worked example auto-updates on every publish.
