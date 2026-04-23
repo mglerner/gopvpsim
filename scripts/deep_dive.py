@@ -1898,7 +1898,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                slayer_iter_result=None,
                                has_toml_tiers=False,
                                anchor_passing_sink=None,
-                               threshold_registry=None):
+                               threshold_registry=None,
+                               moveset0_flavors_for_rename=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
@@ -2170,6 +2171,24 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                             _iv_tiers[_iv] = _ti
             data_obj['ivTiers'] = _iv_tiers
             data_obj['ivAllTiers'] = _iv_all_tiers
+
+    # Tier-name unify (2026-04-23): rename data_obj['tiers'] to match
+    # narrative flavor names so the tier-card badges and the Plotly
+    # legend both display the flavor-matched name. The rename is
+    # idempotent on the TOML-tier path (caller already pre-renamed in
+    # generate_interactive_html); on the auto-derive path above, this
+    # is the *first* chance to rename, because the block at line
+    # ``data_obj['tiers'] = plot_tiers`` replaced the dicts the caller
+    # would have touched.
+    if moveset0_flavors_for_rename and (data_obj.get('tiers') or []):
+        _rename_plotly_tiers(data_obj, moveset0_flavors_for_rename)
+        # effective_tiers may be a distinct list from data_obj['tiers']
+        # (auto-derive keeps 'General' locally but drops it for plotting),
+        # so sync the rename into any shared-name entries too. Matching
+        # is by object identity: plot_tiers is filtered from
+        # effective_tiers, so the renamed dicts *are* the same objects,
+        # and iterating effective_tiers picks up the mutation automatically.
+
     # ======== RESULTS section (always visible) ========
     import time as _time
     _rr_start = _time.time()
@@ -3211,6 +3230,30 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         )
     html += '</section>\n'
 
+    # Pre-compute moveset 0's narrative so we know its flavor names
+    # before render_threshold_tier_cards emits the tier-card badges.
+    # Historically the rename ran *after* the analysis render, so the
+    # tier cards showed the auto-derived name ("Lapras Atk") while the
+    # Plotly legend showed the flavor name ("Lapras Slayer"); this
+    # pre-compute unifies both surfaces on the flavor name. The output
+    # is cached for reuse in the per-moveset narrative loop below so we
+    # don't double-render moveset 0.
+    scenarios_list = [tuple(s) for s in data_obj['scenarios']]
+    _resolved_anchors = None
+    if slayer_iter_result:
+        _resolved_anchors = slayer_iter_result.get('resolved_anchors') or None
+    import time as _time
+    _nar0_start = _time.time()
+    moveset0_nar_html, moveset0_flavors = _generate_narrative_for_moveset(
+        data_obj, score_arrays, 0,
+        scenarios_list, opponent_names or [],
+        opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
+        has_toml_tiers,
+        resolved_anchors=_resolved_anchors,
+    )
+    logger.info(f"  Moveset 0 narrative (pre-render for rename) in "
+                f"{_time.time() - _nar0_start:.1f}s")
+
     # Deep dive analysis sections (banding, clusters, flips, etc.)
     # The anchor_passing_sink accumulates {anchor_id: [passing_iv_idx]}
     # for every anchor-flip bullet rendered inside the analysis layer.
@@ -3221,6 +3264,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # (always uses moveset_idx=0), so the caller can pass a shared dict
     # via _precomputed_analysis. On the first call (dict is empty), we
     # compute and populate it; subsequent calls read from the cache.
+    # ``moveset0_flavors`` is plumbed through so the analysis can rename
+    # tier cards to the flavor-matched name before rendering them.
     if _precomputed_analysis is not None and 'css' in _precomputed_analysis:
         analysis_css = _precomputed_analysis['css']
         results_html = _precomputed_analysis['results_html']
@@ -3234,7 +3279,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             slayer_iter_result=slayer_iter_result,
             has_toml_tiers=has_toml_tiers,
             anchor_passing_sink=anchor_passing_sink,
-            threshold_registry=threshold_registry)
+            threshold_registry=threshold_registry,
+            moveset0_flavors_for_rename=moveset0_flavors)
         if _precomputed_analysis is not None:
             _precomputed_analysis.update({
                 'css': analysis_css,
@@ -3245,30 +3291,28 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     data_obj['anchorFlipSets'] = anchor_passing_sink
     # Inject analysis CSS into the style block (replace closing tag we already emitted)
     html = html.replace('</style>\n</head>', analysis_css + '\n</style>\n</head>', 1)
-    # Generate per-moveset narrative zones
-    scenarios_list = [tuple(s) for s in data_obj['scenarios']]
-    _resolved_anchors = None
-    if slayer_iter_result:
-        _resolved_anchors = slayer_iter_result.get('resolved_anchors') or None
+    # Generate per-moveset narrative zones. Moveset 0 was pre-rendered
+    # above for the rename; reuse its cached output here.
     narrative_blocks = []
-    moveset0_flavors = []
     n_movesets = len(data_obj.get('movesets', [{}]))
-    import time as _time
     _nar_start = _time.time()
     logger.info(f"  Generating narrative for {n_movesets} moveset(s)...")
     for mi in range(n_movesets):
         _mi_start = _time.time()
-        nar_html, flavors = _generate_narrative_for_moveset(
-            data_obj, score_arrays, mi,
-            scenarios_list, opponent_names or [],
-            opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
-            has_toml_tiers,
-            resolved_anchors=_resolved_anchors if mi == 0 else None,
-        )
-        logger.info(f"    Narrative moveset {mi+1}/{n_movesets} rendered in "
-                    f"{_time.time() - _mi_start:.1f}s")
         if mi == 0:
-            moveset0_flavors = flavors
+            nar_html, flavors = moveset0_nar_html, moveset0_flavors
+            logger.info(f"    Narrative moveset 1/{n_movesets} reused "
+                        f"(pre-rendered)")
+        else:
+            nar_html, flavors = _generate_narrative_for_moveset(
+                data_obj, score_arrays, mi,
+                scenarios_list, opponent_names or [],
+                opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
+                has_toml_tiers,
+                resolved_anchors=None,
+            )
+            logger.info(f"    Narrative moveset {mi+1}/{n_movesets} "
+                        f"rendered in {_time.time() - _mi_start:.1f}s")
         if nar_html:
             vis = 'block' if mi == 0 else 'none'
             narrative_blocks.append(
@@ -3279,9 +3323,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                 f"{_time.time() - _nar_start:.1f}s "
                 f"({len(narrative_blocks)} non-empty block(s))")
 
-    # Rename Plotly tier entries to match narrative flavor names and
-    # sync HP cutoffs.  The legend shows two lines: narrative name on
-    # top, original tier-card name below.
+    # Tier rename is now done inside generate_analysis_sections (via the
+    # ``moveset0_flavors_for_rename`` param) so both tier cards and the
+    # Plotly legend see the flavor name. Kept here as a safety net for
+    # the cached-analysis path in split-moveset mode: each per-file call
+    # has its own data_obj['tiers'], and the cache stores only rendered
+    # HTML — so we still need to rename data_obj's in-memory tier names
+    # on subsequent calls for the scatter plot's JS legend.
     if moveset0_flavors and 'tiers' in data_obj:
         _rename_plotly_tiers(data_obj, moveset0_flavors)
 
