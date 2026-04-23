@@ -1260,9 +1260,11 @@ function setCollectionStatus(text, color) {
 
 // Fill in "N of yours qualify" annotations on tier cards. Tier cards
 // emit empty spans with ids `tier-card-yours-<slug>` where slug is
-// the tier name lowercased with non-alphanumerics replaced with '-'.
-// If a card's span is missing (older template or filtered out), this
-// is a silent no-op.
+// derived from `original_name` when present (falls back to `name`)
+// so the id stays stable across the 2026-04-23 tier-name unify, which
+// overwrites `name` with the narrative flavor name but preserves the
+// pre-rename label on `original_name`. If a card's span is missing
+// (older template or filtered out), this is a silent no-op.
 function updateTierCardCounts(tierCounts) {
   // Read from the live tiers array (post-analysis) rather than the
   // stale pre-analysis DATA.collection.tierNames snapshot — same
@@ -1274,7 +1276,8 @@ function updateTierCardCounts(tierCounts) {
     var t = liveTiers[i];
     if (!t || !t.name) continue;
     var n = t.name;
-    var slug = n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    var slugSource = t.original_name || t.name;
+    var slug = slugSource.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     var el = document.getElementById('tier-card-yours-' + slug);
     if (!el) continue;
     var c = tierCounts[n];
