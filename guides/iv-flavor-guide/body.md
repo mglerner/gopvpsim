@@ -214,6 +214,9 @@ the right direction on average.
   carries an envelope tag (rider-top, straddles band, etc.). The
   tag tells you whether the flavor's win-rate lift is consistent
   across members or only shows up on a specific sub-cluster.
+- **[Reading a CD Article](../cd-article/)** - the CD article's IV
+  Recommendations card grid is a compact distillation of the flavor
+  cuts, one card per form.
 - **[How This Works](../how-this-works/)** - if you want the short
   version of how the simulation sweep that powers all of this is
   built.

@@ -134,10 +134,15 @@ whole surface.
   Flavor Guide zone that sits next to Threshold Tiers on the dive
   page and explains how the Plotly legend's names (like "Lapras
   Slayer") relate to the tier cards' auto-derived names (like
-  "{{dive:top_tier_name}}"). _(Coming soon.)_
+  "{{dive:top_tier_name}}").
 - **[Envelope Position](../envelope-position/)** - covers how a
   tier's bullets classify as "rider" or "band-crosser" shapes and
-  what that says about how robust the tier's advantage is. _(Coming
-  soon.)_
+  what that says about how robust the tier's advantage is.
+- **[Deep-Dive Scatter](../deep-dive-scatter/)** - the scatter plot
+  at the top of every dive colours points by tier membership. The
+  scatter is where you see which specific IVs land in each tier.
+- **[Reading a CD Article](../cd-article/)** - the CD article's IV
+  Recommendations card grid points into tier cards from each form's
+  paired dive.
 - **[How This Works](../how-this-works/)** - if you want the short
   version of how the underlying simulation is built.
