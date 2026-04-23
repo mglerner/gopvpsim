@@ -26,9 +26,10 @@ pre-ship surface.
    `f9a1fc4`. Post-ship residual: F-tier-name-cleanup, F-shadow-
    narrative, F5 cross-article footer (gated ≥3-5 articles).
 4. **P1-P4 polish** (see "Post-ship (article + dive polish)" section
-   below). **P1, P2, P4 shipped; P3 (envelope-position annotations)
-   and P5 (Stats at a Glance) remain.** Pull forward opportunistically
-   if capacity allows before CD day.
+   below). **P1, P2, P4 shipped; P3 shipped as §12.4 F6 retrofit;
+   P5 resolved 2026-04-23** (P5.1 was a false limitation — GL/UL
+   already default to L50 non-BB via `LEAGUE_MAX_LEVEL`; P5.2 Shadow
+   focal species plumbed through `_rank1_cp_capped`).
 5. ~~**XL-candy-decision tool**~~ — **SHIPPED 2026-04-22** as the
    Mirror CMP semantic reframe arc (11 commits `6dcc571`..`939162e` +
    Slayer IVs tooltip retrofit `c3edb14` 2026-04-23). Three columns
@@ -520,34 +521,26 @@ handlers in each dive — those construct PvPoke URLs at runtime
 and can't be statically verified. Add a targeted onclick scan if
 a regression ever surfaces; not worth building until then.
 
-### P5. Stats at a Glance follow-ups
+### P5. Stats at a Glance follow-ups — RESOLVED 2026-04-23
 
 The CP-capped rank-1 stats section shipped 2026-04-18 (part of
-F-stats-block enhancement). Two known limitations in the
-`_rank1_cp_capped` helper in `scripts/generate_article.py`:
+F-stats-block enhancement). Revisited 2026-04-23:
 
-1. **Best Buddy (level 51) is included in the rank-1 search.** The
-   underlying `gopvpsim.pokemon.iv_rank` defaults `max_level=51`
-   for every league, so rank-1 computation implicitly picks the
-   Best Buddy-option IV spread when that produces a better stat
-   product. PvPoke's UI defaults to non-BB (level 50). For low-
-   level species (Oinkologne rank-1 lands at level 22-23) this is
-   a non-issue. For UL bulk-first species (Cresselia, Registeel,
-   Guzzlord, etc.) rank-1 IVs differ between BB and non-BB and
-   our displayed numbers may not match a reader's PvPoke-defaults
-   view. Fix: add a TOML knob (`stats_at_a_glance.best_buddy =
-   true|false`, default false to match PvPoke) and thread through
-   to `iv_rank(..., max_level=50 or 51)`.
+1. **Best Buddy (level 51) is NOT included in GL/UL rank-1** —
+   original note was wrong. `iv_rank`'s `max_level` defaults to
+   `LEAGUE_MAX_LEVEL`, which is 50.0 for Great and Ultra (non-BB,
+   matching PvPoke UI) and 51.0 only for Little and Master.
+   Verified 2026-04-23 with Cresselia UL + Registeel UL: default
+   rank-1 and `max_level=51.0` rank-1 return identical IVs. No fix
+   needed. A TOML knob for Master-league non-BB or GL/UL BB
+   comparisons could be wired later if a ML article ever lands.
 
-2. **Shadow focal species aren't supported.** `_rank1_cp_capped`
-   hardcodes `shadow=False` in the `iv_rank` call. Any future CD
-   article whose focal Pokemon is a Shadow variant (e.g. a
-   hypothetical Shadow Oinkologne CD) would display non-Shadow
-   rank-1 stats. Fix: detect shadow from the article's species
-   name or a TOML flag; pass `shadow=True` to `iv_rank`.
-
-Neither blocks current CD-article generation. Pull into a session
-when a species that actually needs either hits the queue.
+2. **Shadow focal species** — fixed 2026-04-23 in
+   `_rank1_cp_capped`. Species names ending with ` (Shadow)` strip
+   the suffix for the gamemaster lookup and pass `shadow=True` to
+   `iv_rank`, so the displayed rank-1 stats carry the ×1.2 atk /
+   ×0.8333 def multipliers. Regression-checked on non-shadow
+   species: Oinkologne GL unchanged.
 
 ## Status-box generalization — shipped as chain_status.py (2026-04-21)
 
