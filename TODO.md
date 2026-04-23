@@ -472,6 +472,28 @@ not threshold tier, so the article would need either a
 category-card surface or a tier-name to category-name mapping.
 Design question before implementation.
 
+**Dive-side retrofit SHIPPED 2026-04-23.** Michael's call on the
+F6 ship-blocker candidate: build the patcher now.
+`scripts/patch_dive_envelope_tags.py` (~195 lines) injects the
+envelope tag HTML into each Notable-IVs composite card in shipped
+dive main `index.html`s using the `envelopePositions` data
+already embedded in their `DATA` object. Idempotent via
+fingerprint `/* ENVELOPE_TAGS_v1 */`; imports `_render_envelope_tag`
+from `deep_dive_rendering.py` so the patched markup stays
+byte-identical to fresh renders. Applied to Oinkologne Male (2 of
+2 composites tagged). Oinkologne Female reports `12 composite
+cards found, all sparse` — correct renderer behaviour for
+1-IV-member composites (sparse metric is unreliable, so the tag
+is deliberately suppressed). Forretress Volt-Switch /
+Shadow-VS / Tinkaton UL main HTMLs have 9 / 8 / 12 eligible
+cards in dry-run — broader apply gated on Michael.
+
+**Article-surface design question still open.** The retrofit
+covers the dive side (Notable-IVs composite cards on the dive
+page). A category-card surface on the CD article itself (linking
+envelope-shape to a specific "Cost to XL" judgment) remains the
+original P3 question and has not been addressed.
+
 ### P4. Pre-ship link verification pass — TOOL SHIPPED 2026-04-18
 
 Tool: `scripts/verify_article_links.py`. Usage:
