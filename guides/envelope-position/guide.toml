@@ -2,4 +2,8 @@ title = "Envelope Position"
 slug = "envelope-position"
 description = "What 'rider' and 'band-crosser' shapes mean for a category, why mean_delta matters when you're picking an IV to chase."
 order = 2
-coming_soon = true
+coming_soon = false
+
+# Reference dive defaults to Oinkologne Male GL (inherited from
+# build_guides.DEFAULT_REFERENCE). Envelope-count tokens resolve via
+# dive:envelope_* against that dive's envelopePositions map.
