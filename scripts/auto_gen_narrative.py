@@ -774,6 +774,17 @@ def render_intro(
         if mp_note:
             paragraphs.append(mp_note)
 
+        # ---- Paragraph 4: envelope-shape text-gestalt (F8). ----
+        # Only fires when the dive carries S4/P3 envelope-positions data
+        # (older dives predating commit 2b15357 return ''). Substitutes
+        # for a static scatter image on the article side per §11.4
+        # path (e); see ``docs/jre_ryanswag_comparison.md``.
+        featured_idx = _featured_moveset_index(dive, featured_ms)
+        if featured_idx is not None:
+            env_note = render_envelope_summary(dive, featured_idx)
+            if env_note:
+                paragraphs.append(env_note)
+
     return '\n\n'.join(paragraphs)
 
 
@@ -835,6 +846,68 @@ def _standalone_entries(dive: dict, ms: dict,
 def _fmt_wr_pct(wr: float) -> str:
     """Format an absolute win rate as '82%' for standalone-mode lists."""
     return f'{wr * 100.0:.0f}%'
+
+
+def _opp_str_flip_range(e: dict) -> str:
+    """Format a CD-mode opponent entry as ``Display base%→cd%``.
+
+    Used by ``render_good_at`` / ``render_bad_at`` in CD mode to show the
+    raw before/after win rates instead of just the signed delta. The
+    range carries the delta implicitly and is more concrete -- a reader
+    sees 17%→66% and knows the matchup was losing by a wide margin
+    and now wins convincingly, information the ``+49pp`` delta hides.
+    RyanSwag-register cause-and-effect prose (F8 per §11.3 of
+    ``docs/jre_ryanswag_comparison.md``).
+    """
+    base_pct = int(round(e.get('base_wr', 0.0) * 100))
+    cd_pct = int(round(e.get('cd_wr', 0.0) * 100))
+    return f'{e["display"]} {base_pct}%→{cd_pct}%'
+
+
+def _cause_effect_offense_lead(move_display: str, move_type: Optional[str],
+                               attacker_types: list[str], bucket_type: str,
+                               opp_strs: str) -> Optional[str]:
+    """Cause-and-effect lead sentence for a super-effective bucket in CD mode.
+
+    Returns e.g. ``"Mud Slap (Ground STAB) flips the Steel bucket ×1.6:
+    {opp_strs}."`` when the move type hits the bucket super-effectively
+    (multiplier > 1). Returns None for neutral or resisted buckets
+    (callers fall back to the existing ``vs {Type}-type:`` frame with
+    the optional suffix effectiveness note).
+    """
+    if not move_type or not bucket_type:
+        return None
+    mult = _type_effectiveness_mult(move_type, [bucket_type])
+    if mult is None or mult <= 1.05:
+        return None
+    suffix = _fmt_eff_multiplier(mult)
+    if suffix is None:
+        return None
+    stab_tag = ' STAB' if (move_type.lower() in
+                           [t.lower() for t in attacker_types]) else ''
+    return (f'{move_display} ({move_type.capitalize()}{stab_tag}) flips the '
+            f'{bucket_type.capitalize()} bucket {suffix}: {opp_strs}.')
+
+
+def _cause_effect_defense_lead(attacker_types: list[str], bucket_type: str,
+                               opp_strs: str) -> Optional[str]:
+    """Cause-and-effect lead for a bucket that hits the attacker super-effectively.
+
+    Used by ``render_bad_at`` in CD mode. Returns None when the bucket's
+    type is neutral or resisted vs the attacker's defensive typing
+    (callers fall back to the existing ``vs {Type}-type:`` frame).
+    """
+    if not attacker_types or not bucket_type:
+        return None
+    mult = _type_effectiveness_mult(bucket_type, attacker_types)
+    if mult is None or mult <= 1.05:
+        return None
+    suffix = _fmt_eff_multiplier(mult)
+    if suffix is None:
+        return None
+    type_disp = '/'.join(t.capitalize() for t in attacker_types)
+    return (f'{bucket_type.capitalize()} damage hits {type_disp} {suffix}: '
+            f'{opp_strs}.')
 
 
 def render_good_at(
@@ -899,25 +972,35 @@ def render_good_at(
     paras = [header]
     for type_label, bucket_entries in _group_by_primary_type(entries, gm):
         if use_delta:
-            opp_strs = ', '.join(
-                f'{e["display"]} ({_fmt_delta_pp(e["delta_pp"])})'
-                for e in bucket_entries
-            )
+            opp_strs = ', '.join(_opp_str_flip_range(e) for e in bucket_entries)
         else:
             opp_strs = ', '.join(
                 f'{e["display"]} ({_fmt_wr_pct(e["cd_wr"])})'
                 for e in bucket_entries
             )
-        line = (f'{opp_strs}.' if type_label == 'Other'
-                else f'vs {type_label}-type: {opp_strs}.')
-        # B3a: append effectiveness suffix when the featured move is
-        # super-effective (or resisted) against this bucket's type.
-        if type_label != 'Other':
-            eff_note = _effectiveness_note_offense(
+        # F8: in CD mode, if the featured move is super-effective vs this
+        # bucket's type, lead with a cause-and-effect sentence naming the
+        # move + typing + multiplier. Reader learns the *why* of the flip
+        # bucket in the first phrase, not as a trailing ``— note``. For
+        # neutral buckets and for standalone mode, keep the
+        # ``vs {Type}-type:`` frame plus optional trailing effectiveness
+        # note (covers the resisted case).
+        ce_lead = None
+        if use_delta and type_label != 'Other':
+            ce_lead = _cause_effect_offense_lead(
                 featured_fast_display, featured_fast_type,
-                attacker_types, type_label.lower())
-            if eff_note:
-                line = line[:-1] + f' — {eff_note}'
+                attacker_types, type_label.lower(), opp_strs)
+        if ce_lead is not None:
+            line = ce_lead
+        else:
+            line = (f'{opp_strs}.' if type_label == 'Other'
+                    else f'vs {type_label}-type: {opp_strs}.')
+            if type_label != 'Other':
+                eff_note = _effectiveness_note_offense(
+                    featured_fast_display, featured_fast_type,
+                    attacker_types, type_label.lower())
+                if eff_note:
+                    line = line[:-1] + f' — {eff_note}'
         paras.append(line)
     return '\n\n'.join(paras)
 
@@ -973,24 +1056,194 @@ def render_bad_at(
     paras = [header]
     for type_label, bucket_entries in _group_by_primary_type(entries, gm):
         if use_delta:
-            opp_strs = ', '.join(
-                f'{e["display"]} ({_fmt_delta_pp(e["delta_pp"])})'
-                for e in bucket_entries
-            )
+            opp_strs = ', '.join(_opp_str_flip_range(e) for e in bucket_entries)
         else:
             opp_strs = ', '.join(
                 f'{e["display"]} ({_fmt_wr_pct(e["cd_wr"])})'
                 for e in bucket_entries
             )
-        line = (f'{opp_strs}.' if type_label == 'Other'
-                else f'vs {type_label}-type: {opp_strs}.')
-        if type_label != 'Other':
-            eff_note = _effectiveness_note_defense(
-                attacker_types, type_label.lower())
-            if eff_note:
-                line = line[:-1] + f' — {eff_note}'
+        # F8: defensive cause-and-effect -- when the bucket's type hits
+        # our attacker's defensive typing super-effectively, lead with the
+        # damage-effectiveness sentence. Mirror of the offensive path in
+        # ``render_good_at``. Neutral/resisted buckets fall back to the
+        # ``vs {Type}-type:`` frame with the existing trailing suffix.
+        ce_lead = None
+        if use_delta and type_label != 'Other':
+            ce_lead = _cause_effect_defense_lead(
+                attacker_types, type_label.lower(), opp_strs)
+        if ce_lead is not None:
+            line = ce_lead
+        else:
+            line = (f'{opp_strs}.' if type_label == 'Other'
+                    else f'vs {type_label}-type: {opp_strs}.')
+            if type_label != 'Other':
+                eff_note = _effectiveness_note_defense(
+                    attacker_types, type_label.lower())
+                if eff_note:
+                    line = line[:-1] + f' — {eff_note}'
         paras.append(line)
     return '\n\n'.join(paras)
+
+
+# --------------------------------------------------------------------
+# F8: Meta Role wrap paragraph (STYLE_CONFORMANCE C11)
+# --------------------------------------------------------------------
+
+def render_wrap(
+    species: str,
+    dive: dict,
+    *,
+    cd_move_fast: Optional[str] = None,
+    baseline_move_fast: Optional[str] = None,
+    league: Optional[str] = None,
+    gm: Optional[dict] = None,
+) -> str:
+    """Render a 1-2 sentence Meta Role closing paragraph, or ''.
+
+    CD mode only: synthesises the headline aggregate-score shift plus the
+    gain/drop counts and top-named opponents as a pure-data summary. Used
+    to end the Meta Role block with a "landing" sentence in RyanSwag's
+    mature format (STYLE_CONFORMANCE C11 wrap-up).
+
+    Shape::
+
+        **{Move}** shifts {species} from {base}% baseline to {cd}%
+        {League} aggregate. Gains {N_in} matchups (top: {top_3_in});
+        drops {N_out} (top: {top_3_out}).
+
+    No editorial judgment ('you should', 'the meta will', etc.) per the
+    ship-mode narrative policy in CLAUDE.md. Standalone mode returns ''
+    because there is no baseline to shift from.
+    """
+    if not (cd_move_fast and baseline_move_fast
+            and cd_move_fast != baseline_move_fast):
+        return ''
+    cd_ms = _pick_moveset(dive, cd_move_fast)
+    base_ms = _pick_moveset(dive, baseline_move_fast)
+    if cd_ms is None or base_ms is None:
+        return ''
+
+    cd_pct = cd_ms.get('win_rate', 0.0) * 100.0
+    base_pct = base_ms.get('win_rate', 0.0) * 100.0
+    cd_disp = _gm_move_display(gm, cd_move_fast)
+    lg_short = _league_label(league).replace(' aggregate', '')
+
+    deltas = _per_opp_deltas(dive, cd_ms, base_ms)
+    gains = sorted([d for d in deltas if d['flipped_in']],
+                   key=lambda d: d['delta_pp'], reverse=True)
+    drops = sorted([d for d in deltas if d['flipped_out']],
+                   key=lambda d: d['delta_pp'])
+
+    sentences = [
+        f'**{cd_disp}** shifts {species} from {base_pct:.1f}% baseline '
+        f'to {cd_pct:.1f}% {lg_short} aggregate.'
+    ]
+    tail_bits: list[str] = []
+    if gains:
+        top_g = ', '.join(g['display'] for g in gains[:3])
+        tail_bits.append(
+            f'Gains {len(gains)} matchup{"s" if len(gains) != 1 else ""} '
+            f'(top: {top_g})'
+        )
+    if drops:
+        top_d = ', '.join(d['display'] for d in drops[:3])
+        tail_bits.append(
+            f'drops {len(drops)} (top: {top_d})'
+        )
+    if tail_bits:
+        sentences.append('; '.join(tail_bits) + '.')
+    return ' '.join(sentences)
+
+
+# --------------------------------------------------------------------
+# F8: Envelope-shape prose (text-gestalt substitute for static scatter)
+# --------------------------------------------------------------------
+
+def render_envelope_summary(
+    dive: dict,
+    moveset_idx: int,
+) -> str:
+    """Render a 1-2 sentence IV envelope-shape summary, or ''.
+
+    Consumes ``dive['envelopePositions'][str(moveset_idx)]`` (produced by
+    ``deep_dive_analysis.compute_envelope_positions`` -- see S4/P3 in
+    ``scripts/deep_dive_rendering.py`` commit 2b15357). Each entry carries
+    a ``shape`` classifier ('envelope-rider-top', 'envelope-rider-bottom',
+    'elevated-band-crosser', 'depressed-band-crosser', 'sparse') and a
+    ``mean_delta`` signed distance from the Anchor IVs band.
+
+    Output describes how many named categories ride above the band vs
+    below, with the standout in each direction named. This is the
+    text-gestalt substitute for the static scatter we declined in
+    §11.4 path (e) -- it lands the envelope shape through words for
+    readers who don't click through to the interactive plot.
+
+    Returns '' when envelope data is absent (older dives predating P3),
+    when every category is sparse, or when moveset_idx isn't keyed.
+    """
+    env_map = (dive.get('envelopePositions') or {}).get(str(moveset_idx))
+    if not env_map or not isinstance(env_map, dict):
+        return ''
+    riders_top: list[tuple[str, float]] = []
+    riders_bottom: list[tuple[str, float]] = []
+    n_cross = 0
+    for name, entry in env_map.items():
+        if not isinstance(entry, dict):
+            continue
+        shape = entry.get('shape')
+        if shape == 'envelope-rider-top':
+            riders_top.append((name, float(entry.get('mean_delta', 0.0))))
+        elif shape == 'envelope-rider-bottom':
+            riders_bottom.append((name, float(entry.get('mean_delta', 0.0))))
+        elif shape in ('elevated-band-crosser', 'depressed-band-crosser'):
+            n_cross += 1
+        # 'sparse' and unknown shapes are skipped: the tag renderer
+        # skips them too, and their delta isn't diagnostic.
+
+    total_classified = len(riders_top) + len(riders_bottom) + n_cross
+    if total_classified == 0:
+        return ''
+
+    riders_top.sort(key=lambda x: -x[1])
+    riders_bottom.sort(key=lambda x: x[1])
+
+    bits: list[str] = []
+    if riders_top:
+        top_name, top_d = riders_top[0]
+        bits.append(
+            f'{len(riders_top)} of {total_classified} named categor'
+            f'{"ies" if total_classified != 1 else "y"} ride above the '
+            f'anchor band (led by **{top_name}** at +{top_d:.1f} avg)'
+        )
+    if riders_bottom:
+        bot_name, bot_d = riders_bottom[0]
+        bits.append(
+            f'{len(riders_bottom)} ride below (led by **{bot_name}** at '
+            f'{bot_d:.1f} avg)'
+        )
+    if n_cross:
+        bits.append(
+            f'{n_cross} straddle'
+        )
+    if not bits:
+        return ''
+    return f'**Envelope shape.** {"; ".join(bits)}.'
+
+
+def _featured_moveset_index(dive: dict, featured_ms: Optional[dict]) -> Optional[int]:
+    """Return the canonical index of ``featured_ms`` in ``dive.movesets``.
+
+    ``envelopePositions`` is keyed by stringified moveset index; the
+    caller needs it to look up the envelope map for the featured
+    moveset. Returns None when the moveset isn't in the list.
+    """
+    if featured_ms is None:
+        return None
+    movesets = dive.get('movesets') or []
+    for i, m in enumerate(movesets):
+        if m is featured_ms:
+            return i
+    return None
 
 
 # --------------------------------------------------------------------
@@ -1070,6 +1323,17 @@ def fill_narrative_a_fields(
         species, dive,
         cd_move_fast=cd_move_fast,
         baseline_move_fast=baseline_move_fast,
+        gm=gm,
+    ))
+    # F8 wrap paragraph (STYLE_CONFORMANCE C11): ends the Meta Role block
+    # with a 1-2 sentence synthesis of the aggregate shift + gain/drop
+    # counts. Standalone mode (no CD swap) returns '' so the field stays
+    # empty and the renderer skips the extra paragraph.
+    _auto_fill(meta_role, 'wrap', render_wrap(
+        species, dive,
+        cd_move_fast=cd_move_fast,
+        baseline_move_fast=baseline_move_fast,
+        league=league,
         gm=gm,
     ))
 

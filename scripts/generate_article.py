@@ -2851,7 +2851,9 @@ def _render_meta_role_section(article: dict) -> str:
         )
 
     parts = []
-    for field in ('good_at', 'bad_at', 'team_role'):
+    # ``wrap`` appended last so the Meta Role block ends with the F8
+    # closing-sentence synthesis (STYLE_CONFORMANCE C11).
+    for field in ('good_at', 'bad_at', 'team_role', 'wrap'):
         txt = (block.get(field) or '').strip()
         if txt:
             parts.append(txt)

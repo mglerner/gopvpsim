@@ -877,7 +877,9 @@ def render_species_narrative(narrative: dict) -> str:
     intro_body = (intro_block.get('body') or '').strip()
     mr_body_override = (meta_role_block.get('body') or '').strip()
     mr_field_parts = []
-    for field in ('good_at', 'bad_at', 'team_role'):
+    # ``wrap`` appended last so the Meta Role block ends with the F8
+    # closing-sentence synthesis (STYLE_CONFORMANCE C11).
+    for field in ('good_at', 'bad_at', 'team_role', 'wrap'):
         txt = (meta_role_block.get(field) or '').strip()
         if txt:
             mr_field_parts.append(txt)
