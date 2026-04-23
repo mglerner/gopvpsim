@@ -41,6 +41,7 @@ Usage:
 """
 from __future__ import annotations
 
+import datetime as _dt
 import html
 import shutil
 import sys
@@ -53,6 +54,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 GUIDES_SRC = REPO_ROOT / 'guides'
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
 GUIDES_OUT = WEBSITE_DIR / 'guides'
+
+# Verification-count scalars used by dev:* tokens. Source of truth;
+# DEVELOPER_NOTES.md cites the same numbers in prose form.
+VERIFICATION_COUNTS_PATH = REPO_ROOT / 'docs' / 'verification_counts.toml'
 
 # Reference dive used for data-token resolution when a guide TOML
 # doesn't override. Oinkologne Male GL matches the shipping CD so
@@ -73,29 +78,54 @@ def _dive_data(dive_slug: str) -> dict | None:
 
     Uses generate_article's _load_dive_data helper so the dict shape
     matches what auto_gen_narrative consumes - makes future data-token
-    resolvers drop-in without re-parsing.
+    resolvers drop-in without re-parsing. Also hoists a couple of
+    top-level dive fields (species, league) that the loader doesn't
+    surface but that token resolvers need for display strings.
     """
     sys.path.insert(0, str(REPO_ROOT / 'scripts'))
     sys.path.insert(0, str(REPO_ROOT / 'src'))
-    from generate_article import _load_dive_data  # type: ignore[import-not-found]
+    from generate_article import _load_dive_data, _extract_js_assignment  # type: ignore[import-not-found]
+    import json as _json
     dive_dir = WEBSITE_DIR / dive_slug
     if not dive_dir.is_dir():
         return None
     try:
-        return _load_dive_data(dive_dir)
+        parsed = _load_dive_data(dive_dir)
     except SystemExit:
         return None
+    # _load_dive_data intentionally returns only the moveset-shaped
+    # fields. Re-open index.html to pull species/league off the
+    # top-level DATA; avoids touching generate_article.py just to add a
+    # field the CD-article flow doesn't need.
+    idx = dive_dir / 'index.html'
+    try:
+        content = idx.read_text()
+        top = _json.loads(_extract_js_assignment(content, 'DATA'))
+        parsed['species'] = top.get('species') or ''
+        parsed['league'] = top.get('league') or ''
+    except Exception:
+        pass
+    return parsed
 
 
 # --------------------------------------------------------------------
 # Token resolution
 # --------------------------------------------------------------------
 
+def _load_verification_counts() -> dict:
+    """Read verification_counts.toml once; empty dict if absent."""
+    if not VERIFICATION_COUNTS_PATH.is_file():
+        return {}
+    with open(VERIFICATION_COUNTS_PATH, 'rb') as f:
+        return tomllib.load(f)
+
+
 def _resolve_tokens(
     body: str,
     guide_tokens: dict,
     *,
     dive: dict | None,
+    dev_counts: dict,
     guide_slug: str,
 ) -> tuple[str, list[str]]:
     """Replace ``{{token}}`` placeholders. Returns (resolved, unresolved).
@@ -103,7 +133,9 @@ def _resolve_tokens(
     Resolution order:
       1. Literal scalar entries in ``[tokens]`` of the guide TOML.
       2. ``dive:`` prefixed tokens resolved via ``_resolve_dive_token``.
-      3. Otherwise the placeholder is left intact and its name is
+      3. ``dev:`` prefixed tokens resolved via
+         ``docs/verification_counts.toml``.
+      4. Otherwise the placeholder is left intact and its name is
          appended to the unresolved list for the caller to warn on.
     """
     import re as _re
@@ -117,6 +149,10 @@ def _resolve_tokens(
             val = _resolve_dive_token(name[len('dive:'):], dive)
             if val is not None:
                 return val
+        if name.startswith('dev:'):
+            key = name[len('dev:'):]
+            if key in dev_counts:
+                return str(dev_counts[key])
         unresolved.append(f'{guide_slug}:{name}')
         return match.group(0)
 
@@ -127,26 +163,83 @@ def _resolve_tokens(
 def _resolve_dive_token(suffix: str, dive: dict | None) -> str | None:
     """Resolve a ``dive:<suffix>`` token against the reference dive.
 
-    v1 vocabulary (extend as guides land):
+    Vocabulary (extend as guides land):
       - ``species_display``: pretty species label from the first moveset.
       - ``moveset_count``: count of movesets in the dive.
       - ``opponent_count``: count of opponents scored.
+      - ``scenario_count``: count of shield scenarios simulated.
+      - ``iv_space_size``: number of IV spreads swept (always 4096 for
+        a full dive; pulled from the data so we never hardcode).
+      - ``tier_count``: number of threshold-tier cards on the featured
+        moveset (= the moveset analyzed in ``index.html``).
+      - ``top_tier_name``: display name of the first threshold tier.
+      - ``top_tier_atk_cutoff`` / ``top_tier_def_cutoff`` /
+        ``top_tier_sta_cutoff``: the first tier's three stat cutoffs,
+        rounded to 2 decimals. A cutoff of exactly 0 renders as ``0``
+        (meaning "no cutoff on that stat"), otherwise rendered with
+        two digits.
+      - ``top_tier_clear_count``: how many of the 4096 IVs clear the
+        first tier's cutoffs.
 
     Returns None when the dive is missing or the token isn't known.
     """
     if dive is None:
         return None
+    movesets = dive.get('movesets') or []
+    featured = movesets[0] if movesets else None
     if suffix == 'species_display':
-        movesets = dive.get('movesets') or []
+        # Prefer the hoisted top-level species; fall back to the first
+        # moveset's pretty label only if the species field is missing.
+        sp = (dive.get('species') or '').strip()
+        if sp:
+            return sp
         for m in movesets:
             label = (m.get('pretty_label') or m.get('label') or '').strip()
             if label:
                 return label.split('/', 1)[0].strip().title()
         return None
+    if suffix == 'league_display':
+        league = (dive.get('league') or '').strip()
+        return league.title() + ' League' if league else None
     if suffix == 'moveset_count':
-        return str(len(dive.get('movesets') or []))
+        return str(len(movesets))
     if suffix == 'opponent_count':
         return str(len(dive.get('opponents') or []))
+    if suffix == 'scenario_count':
+        return str(len(dive.get('scenarios') or []))
+    if featured is None:
+        return None
+    if suffix == 'iv_space_size':
+        return str(featured.get('n_ivs', 0) or 0)
+    tiers = featured.get('tiers') or []
+    iv_all = featured.get('iv_all_tiers') or []
+    if suffix == 'tier_count':
+        return str(len(tiers))
+    if not tiers:
+        return None
+    t0 = tiers[0]
+    if suffix == 'top_tier_name':
+        return str(t0.get('name') or '').strip() or None
+    if suffix in ('top_tier_atk_cutoff',
+                  'top_tier_def_cutoff',
+                  'top_tier_sta_cutoff'):
+        key = {'top_tier_atk_cutoff': 'attack',
+               'top_tier_def_cutoff': 'defense',
+               'top_tier_sta_cutoff': 'stamina'}[suffix]
+        raw = t0.get(key)
+        if raw is None:
+            return None
+        # An unused axis stores 0 exactly; preserve that rendering so
+        # guide prose can say "def 0 / sta 0" and read naturally.
+        if raw == 0:
+            return '0'
+        return f'{float(raw):.2f}'
+    if suffix == 'top_tier_clear_count':
+        count = 0
+        for iv_tier_list in iv_all:
+            if 0 in iv_tier_list:
+                count += 1
+        return str(count)
     return None
 
 
@@ -200,7 +293,13 @@ figcaption { color: #aaa; font-size: 14px; margin-top: 8px;
 
 
 def _render_page(*, title: str, body_html: str,
-                 breadcrumb_html: str = '') -> str:
+                 breadcrumb_html: str = '',
+                 regenerated_stamp: str = '',
+                 site_root: str = '../../') -> str:
+    stamp_html = (
+        f' Last regenerated {html.escape(regenerated_stamp)}.'
+        if regenerated_stamp else ''
+    )
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -211,9 +310,9 @@ def _render_page(*, title: str, body_html: str,
 <body>
 {breadcrumb_html}
 {body_html}
-<p class="about">Part of <a href="../../">the PvP deep dive site</a>.
+<p class="about">Part of <a href="{html.escape(site_root)}">the PvP deep dive site</a>.
 Explainers regenerate from current dive data every publish, so numbers
-stay in sync with the methodology.</p>
+stay in sync with the methodology.{stamp_html}</p>
 </body>
 </html>
 """
@@ -234,7 +333,9 @@ def _load_guide(sub: Path) -> dict | None:
 
 
 def _build_guide(guide: dict,
-                 *, total_unresolved: list[str]) -> dict:
+                 *, total_unresolved: list[str],
+                 dev_counts: dict,
+                 regenerated_stamp: str) -> dict:
     src_dir: Path = guide['_src_dir']
     slug = guide.get('slug') or src_dir.name
     title = guide.get('title') or slug.replace('-', ' ').title()
@@ -265,7 +366,8 @@ def _build_guide(guide: dict,
         }
         dive = _dive_data(ref['dive_slug'])
         resolved_body, unresolved = _resolve_tokens(
-            body_md, tokens, dive=dive, guide_slug=slug)
+            body_md, tokens, dive=dive, dev_counts=dev_counts,
+            guide_slug=slug)
         total_unresolved.extend(unresolved)
         body_html = _render_markdown(resolved_body)
 
@@ -288,6 +390,8 @@ def _build_guide(guide: dict,
         title=f'{title} - Reader\'s Guide',
         body_html=f'<h1>{html.escape(title)}</h1>\n{body_html}',
         breadcrumb_html=breadcrumb,
+        regenerated_stamp=regenerated_stamp,
+        site_root='../../',
     )
     (out_dir / 'index.html').write_text(page_html)
 
@@ -320,7 +424,8 @@ def _toml_escape(s: str) -> str:
 # Landing page
 # --------------------------------------------------------------------
 
-def _build_landing(index_meta: dict, guides: list[dict]) -> None:
+def _build_landing(index_meta: dict, guides: list[dict],
+                   *, regenerated_stamp: str) -> None:
     title = index_meta.get('title') or 'Reader\'s Guide'
     description = index_meta.get('description') or ''
     intro_md = index_meta.get('body') or ''
@@ -355,6 +460,8 @@ def _build_landing(index_meta: dict, guides: list[dict]) -> None:
         title='Reader\'s Guide',
         body_html=body_html,
         breadcrumb_html=breadcrumb,
+        regenerated_stamp=regenerated_stamp,
+        site_root='../',
     )
     GUIDES_OUT.mkdir(parents=True, exist_ok=True)
     (GUIDES_OUT / 'index.html').write_text(page)
@@ -383,16 +490,24 @@ def main() -> int:
     else:
         index_meta = {}
 
+    dev_counts = _load_verification_counts()
+    regenerated_stamp = _dt.date.today().isoformat()
+
     guides_built: list[dict] = []
     total_unresolved: list[str] = []
     for sub in sorted(p for p in GUIDES_SRC.iterdir() if p.is_dir()):
         g = _load_guide(sub)
         if g is None:
             continue
-        built = _build_guide(g, total_unresolved=total_unresolved)
+        built = _build_guide(
+            g, total_unresolved=total_unresolved,
+            dev_counts=dev_counts,
+            regenerated_stamp=regenerated_stamp,
+        )
         guides_built.append(built)
 
-    _build_landing(index_meta, guides_built)
+    _build_landing(index_meta, guides_built,
+                   regenerated_stamp=regenerated_stamp)
 
     if total_unresolved:
         print('warning: unresolved tokens:', file=sys.stderr)
