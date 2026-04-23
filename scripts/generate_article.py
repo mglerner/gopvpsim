@@ -2489,7 +2489,10 @@ def _render_iv_recommendations_per_form_section(cd_move: str,
     intro = (
         f'<p class="iv-rec-intro">Follow through to each deep dive\'s '
         f'Threshold Tiers section for the per-anchor matchup bullets '
-        f'backing each tier: {link_items}.</p>'
+        f'backing each tier: {link_items}. New to tier cards? '
+        f'The <a href="../../guides/threshold-tiers/">Threshold Tiers '
+        f'guide</a> walks through what the stat cutoffs and member '
+        f'counts mean.</p>'
         f'<details class="methodology-details">'
         f'<summary>About these tiers</summary>'
         f'<p>Tier cutoffs are taken from each form\'s best CD moveset. '
@@ -2567,9 +2570,13 @@ def _render_iv_recommendations_section(cd_move: str, species: str,
     )
     if dive_href:
         intro += (f'<a href="{html.escape(dive_href)}">Threshold Tiers '
-                  f'section</a>.</p>')
+                  f'section</a>.')
     else:
-        intro += 'Threshold Tiers section.</p>'
+        intro += 'Threshold Tiers section.'
+    intro += (' New to tier cards? The '
+              '<a href="../../guides/threshold-tiers/">Threshold Tiers '
+              'guide</a> walks through what the stat cutoffs and member '
+              'counts mean.</p>')
 
     return intro + '\n<div class="iv-rec-grid">' + '\n'.join(cards) + '</div>'
 
@@ -3408,7 +3415,8 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
 <footer>
   By {author} | Generated from simulation data by
   <code>scripts/generate_article.py</code>. Built with
-  <a href="https://github.com/pvpoke/pvpoke">PvPoke</a> game data.
+  <a href="https://github.com/pvpoke/pvpoke">PvPoke</a> game data. |
+  <a href="../../guides/">Reader's Guide</a>
 </footer>
 <script>
 (function() {{

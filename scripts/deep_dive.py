@@ -3441,8 +3441,18 @@ var _scoresReady = (async function() {
     html += '\n})();\n'
     html += '</script>\n'
 
+    # One-line pointer to the Reader's Guide, above the About / Credits
+    # details block so a first-time reader sees it before the
+    # methodology deep-dive. Relative path reaches the guides landing
+    # from both a dive landing (oinkologne-great-league/) and a
+    # split-moveset sibling (same directory).
+    html += ('<p style="margin-top:30px;color:#888;font-size:12px">'
+             'New here? The <a href="../guides/">Reader\'s Guide</a> '
+             'explains tier cards, envelope shapes, and the IV flavor '
+             'guide in plain language.</p>\n')
+
     # About / Credits section
-    html += '<details class="meta" style="margin-top:30px;border-top:1px solid #0f3460;padding-top:10px">'
+    html += '<details class="meta" style="margin-top:10px;border-top:1px solid #0f3460;padding-top:10px">'
     html += '<summary>About &amp; Credits</summary>'
     html += '<div style="margin:8px 0;font-size:0.85rem;color:#b0b8c4;line-height:1.6">'
     html += '<p><b>PoGo PvP IV Deep Dive</b> - a stat-threshold analysis tool '

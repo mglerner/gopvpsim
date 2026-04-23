@@ -1488,8 +1488,10 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         '(Def or Atk) ascending - read top-to-bottom in the order a '
         'player would clear them as their stat grows. The flat list of '
         'every anchor (regardless of tier) lives in <em>Anchor-Driven '
-        'Matchup Flips</em> below. A tier\'s anchors come from two '
-        'passes over the anchor list:</p>\n'
+        'Matchup Flips</em> below. New to tier cards? The '
+        '<a href="../guides/threshold-tiers/">Threshold Tiers guide</a> '
+        'walks through what the stat cutoffs and member counts mean. '
+        'A tier\'s anchors come from two passes over the anchor list:</p>\n'
         '<ul class="dd-small" style="margin-top:2px">\n'
         '<li><b>Primary bullets</b> - the tier has a cutoff on the '
         "anchor's target axis (atk or def) that meets or exceeds the "
