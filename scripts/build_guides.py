@@ -574,16 +574,25 @@ def main() -> int:
     _build_landing(index_meta, guides_built,
                    regenerated_stamp=regenerated_stamp)
 
-    if total_unresolved:
-        print('warning: unresolved tokens:', file=sys.stderr)
-        for t in total_unresolved:
-            print(f'  {t}', file=sys.stderr)
-
     print(f'Wrote {GUIDES_OUT}/index.html '
           f'({len(guides_built)} guide(s))')
     for g in guides_built:
         tag = '  [coming-soon]' if g['coming_soon'] else ''
         print(f"  - {g['title']} -> {g['slug']}/{tag}")
+
+    # Hard-fail on unresolved tokens. Warning-only is too quiet: a
+    # typo like ``{{dive:envelop_straddler_count}}`` would otherwise
+    # ship with literal braces visible to readers, and publish_website.sh
+    # wouldn't notice because `set -e` triggers on exit code, not stderr.
+    if total_unresolved:
+        print('error: unresolved tokens:', file=sys.stderr)
+        for t in total_unresolved:
+            print(f'  {t}', file=sys.stderr)
+        print('Fix the token (check `_resolve_dive_token` vocabulary, '
+              'DEVELOPER_NOTES.md sentinels, or guide [tokens] TOML '
+              'entries) and rebuild.', file=sys.stderr)
+        return 1
+
     return 0
 
 
