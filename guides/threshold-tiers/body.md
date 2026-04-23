@@ -32,11 +32,11 @@ Three things to read off the header:
 
 Below the header, each card carries a list of anchor bullets - the
 specific matchup flips this tier buys you. A tier with a name like
-"Lapras Atk" will typically list Lapras as its primary bullet plus any
-other opponents whose damage breakpoint sits below Lapras's. That's why
-{{dive:species_display}}'s {{dive:top_tier_name}} card lists more than
-just Lapras in its bullet list; clearing a stricter atk cutoff clears
-every looser atk cutoff at the same time.
+"Lapras Slayer" will typically list Lapras as its primary bullet plus
+any other opponents whose damage breakpoint sits below Lapras's. That's
+why {{dive:species_display}}'s {{dive:top_tier_name}} card lists more
+than just Lapras in its bullet list; clearing a stricter atk cutoff
+clears every looser atk cutoff at the same time.
 
 ## Tier vs anchor vs category
 
@@ -74,7 +74,7 @@ Altaria AND Lapras" is more informative than one that only says
 "Lapras."
 
 **Crossed-axis tiers don't contain each other.** A tier that only
-cares about attack (say, "Lapras Atk") and a tier that only cares
+cares about attack (say, "Lapras Slayer") and a tier that only cares
 about defense (say, "Fortified Greedent") don't sit on the same axis
 at all. Atk anchors show up on one card, def anchors on the other,
 and the IVs that clear both are a separate rare intersection that the
