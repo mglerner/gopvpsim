@@ -115,16 +115,26 @@ def _extract_envelope_positions(html: str) -> dict | None:
 
 
 def _inject_css(html: str) -> tuple[str, bool]:
-    """Append the envelope-tag CSS to the first ``<style>`` block.
+    """Append the envelope-tag CSS to the dive's real ``<style>`` block.
+
+    Uses the LAST ``<style>...</style>`` match, not the first. Plotly's
+    inlined library contains JS string arrays with ``"<style>"`` /
+    ``"</style>"`` fragments (part of the ``plotlylogo`` SVG
+    definition); the legacy "first match" regex landed inside Plotly's
+    JS and truncated a string literal, breaking the whole script. The
+    dive's hand-authored CSS is always the last ``<style>`` block in
+    the HTML, so anchoring on the final match skips the Plotly false
+    positives reliably.
 
     No-op if the fingerprint is already present. Returns
     ``(patched, changed)``.
     """
     if FINGERPRINT in html:
         return html, False
-    m = re.search(r'<style>(.*?)</style>', html, re.DOTALL)
-    if not m:
+    matches = list(re.finditer(r'<style>(.*?)</style>', html, re.DOTALL))
+    if not matches:
         return html, False
+    m = matches[-1]
     patched = html[:m.end(1)] + _CSS_BLOCK + html[m.end(1):]
     return patched, True
 
