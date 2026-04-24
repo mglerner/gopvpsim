@@ -313,9 +313,14 @@ def _resolve_dive_token(suffix: str, dive: dict | None) -> str | None:
 # --------------------------------------------------------------------
 
 def _render_markdown(body: str) -> str:
+    # toc extension auto-slugifies every heading into an id attribute so
+    # article / dive pointers can target specific subsections via
+    # `guides/<slug>/#heading-slug`. permalink=False keeps the rendered
+    # heading clean (no anchor icon).
     return markdown.markdown(
         body,
-        extensions=['extra', 'sane_lists', 'smarty'],
+        extensions=['extra', 'sane_lists', 'smarty', 'toc'],
+        extension_configs={'toc': {'permalink': False}},
         output_format='html5',
     )
 
