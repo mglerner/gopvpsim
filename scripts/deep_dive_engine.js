@@ -64,6 +64,7 @@ var nIvs = DATA.nIvs, nS = DATA.nScenarios, nO = DATA.nOpponents;
 var HELP_MIRROR_SLAYER_CMP = '% of the Nash-converged slayer cohort whose attack you at least tie. Niche; often collapses to all-0 or all-100.';
 var HELP_TOP_MIRROR_CMP = '% of the top-50 same-species IVs in this dive whose attack you at least tie. Ladder-realistic mirror cohort.';
 var HELP_MATCHUPS_KEPT = 'Expected non-mirror matchups won, sampling scenarios uniformly: per opponent, (scenarios won / nSel) summed over opponents. Integer when a single scenario is selected; fractional when averaging. Denominator excludes the mirror entry.';
+var HELP_PER_SHIELD_DELTA = 'Signed avg-score delta vs the best IV in this scenario: +ve beats the best IV here, 0 is the best IV, -ve trades score for something else (atk / HP / bulk). Frozen on the Shields axis so all three show regardless of dropdown; reacts to Opp-IVs + Bait.';
 
 // ---- Helpers ----
 function getScoreKey(mi, mode) { return mi + '_' + mode; }
@@ -324,14 +325,19 @@ function buildHoverText(iv) {
   if (DATA.slayerCatsByIv && DATA.slayerCatsByIv[iv]) {
     lines.push('Slayer: '+DATA.slayerCatsByIv[iv].join(', '));
   }
-  // XL-candy-decision helpers. Score Δ reacts to dropdowns; Mirror
-  // CMP % is dropdown-independent (atk-based). Only surface when the
-  // numbers are meaningful: Score Δ on rank-1 is 0 (skip; not new
-  // info), Mirror CMP % needs a cohort to exist.
-  var sd = _computeScoreDelta(iv);
-  if (isFinite(sd) && yRanks[iv] !== 1) {
-    lines.push('Δ vs #1: ' + (sd > 0 ? '+' : '') + sd.toFixed(1));
-  }
+  // XL-candy-decision helpers. Per-shield Δ columns are frozen on
+  // the Shields axis so hover always shows the full lead/mid/closer
+  // split regardless of dropdown state. Mirror CMP % is
+  // dropdown-independent (atk-based) and cohort-gated.
+  var _d0 = _computePerShieldScoreDelta(iv, 0);
+  var _d1 = _computePerShieldScoreDelta(iv, 1);
+  var _d2 = _computePerShieldScoreDelta(iv, 2);
+  function _fmtD(d) { return (d > 0 ? '+' : '') + d.toFixed(1); }
+  var _parts = [];
+  if (isFinite(_d0)) _parts.push('0v0 ' + _fmtD(_d0));
+  if (isFinite(_d1)) _parts.push('1v1 ' + _fmtD(_d1));
+  if (isFinite(_d2)) _parts.push('2v2 ' + _fmtD(_d2));
+  if (_parts.length > 0) lines.push('Δ vs best: ' + _parts.join(' | '));
   var cmp = _computeMirrorCmpPct(iv);
   if (isFinite(cmp)) {
     lines.push('Mirror CMP: beats ' + cmp.toFixed(0) + '% of cohort');
@@ -1919,11 +1925,13 @@ var summarySort = { col: 'yrank', dir: 'asc' };
 // numeric sort key. label is the column header text (yval column uses
 // currentYLabel at render time since the Y-axis metric is dynamic).
 //
-// 'mirrorCmp' and 'scoreDelta' are the XL-candy-decision helpers
-// (docs/todo.md "XL-candy-decision tool"). Both are optional:
-// mirrorCmp is present only when --mirror-slayer produced a cohort
-// (DATA.mirrorCohortAtk non-empty), scoreDelta is always available
-// as long as yValues is populated.
+// 'mirrorCmp' and the three per-shield Δ columns are the
+// XL-candy-decision helpers (docs/todo.md "XL-candy-decision tool" +
+// "Personal-collection decision tool follow-ups"). mirrorCmp is
+// optional (cohort-gated); the three Δ columns are always present
+// when score arrays exist and always surface per-scenario splits
+// regardless of the Shields dropdown, so lead/mid/closer role
+// picking doesn't collapse into one number.
 function _summaryColumns() {
   var hasCohort = !!(DATA.mirrorCohortAtk && DATA.mirrorCohortAtk.length > 0);
   var cols = [
@@ -1936,7 +1944,12 @@ function _summaryColumns() {
     { id: 'hp',    label: 'HP',      defaultDir: 'desc', value: function(iv){ return DATA.ivHp[iv]; } },
     { id: 'sp',    label: 'SP Rank', defaultDir: 'asc',  value: function(iv){ return DATA.spRanks[iv]; } },
     { id: 'yval',  label: null,      defaultDir: 'desc', value: function(iv){ return yValues[iv]; } },
-    { id: 'scoreDelta',    label: 'Δ vs #1',        defaultDir: 'desc', value: function(iv){ return _computeScoreDelta(iv); } },
+    { id: 'd0',    label: '0v0 Δ',   defaultDir: 'desc', value: function(iv){ return _computePerShieldScoreDelta(iv, 0); },
+      help: HELP_PER_SHIELD_DELTA },
+    { id: 'd1',    label: '1v1 Δ',   defaultDir: 'desc', value: function(iv){ return _computePerShieldScoreDelta(iv, 1); },
+      help: HELP_PER_SHIELD_DELTA },
+    { id: 'd2',    label: '2v2 Δ',   defaultDir: 'desc', value: function(iv){ return _computePerShieldScoreDelta(iv, 2); },
+      help: HELP_PER_SHIELD_DELTA },
     { id: 'topMirrorCmp',  label: 'Top-Mirror CMP %', defaultDir: 'desc', value: function(iv){ return _computeTopMirrorCmpPct(iv); },
       help: HELP_TOP_MIRROR_CMP },
     { id: 'matchupsKept',  label: 'Matchups Kept',    defaultDir: 'desc', value: function(iv){ return _computeMatchupsKept(iv); },
@@ -2077,22 +2090,81 @@ function _matchupsKeptDenom() {
   return nO - n;
 }
 
-// Difference in avg battle score vs the current rank-1 (lowest yRank)
-// IV, under the ACTIVE Shields/Opp-IVs/Bait combo. Positive = this IV
-// scores better than rank-1; negative = worse. Rank-1 itself returns 0.
-// Uses yValues so the delta reacts to dropdown changes automatically.
-function _computeScoreDelta(iv) {
-  var myScore = yValues[iv];
-  if (!isFinite(myScore)) return NaN;
-  // Find the rank-1 IV for the current Y-axis mode.
-  var rank1Iv = -1;
-  for (var k = 0; k < yRanks.length; k++) {
-    if (yRanks[k] === 1) { rank1Iv = k; break; }
+// Per-shield Score Δ helpers. Each IV gets one Δ per even-shield
+// scenario (0v0 / 1v1 / 2v2); values are avg battle score across
+// opponents at that specific scenario minus the rank-1 IV's avg at
+// the same scenario. Unlike the former dropdown-reactive single Δ,
+// these three columns always surface the per-scenario split so a
+// reader can pick an IV for lead (~2v2-weighted), mid (~1v1) or
+// closer (~0v0) role regardless of what the Shields dropdown is
+// set to. Reacts to Opp-IVs + Bait (via scoreMode); frozen on the
+// Shields axis.
+//
+// Cached per (movesetIdx, scoreMode) so dropdown shuffles don't
+// rebuild the nIvs-length avg arrays on every sort.
+var _perShieldCacheKey = null;
+var _perShieldCache = {};  // shieldCount -> { avgByIv, rank1Score }
+var _perShieldScenarioIdxCache = null;
+
+function _perShieldScenarioIdx(shields) {
+  // Find the scenarios index where scenarios[si] === [shields, shields].
+  // Cache the full (0v0, 1v1, 2v2) mapping on first call.
+  if (_perShieldScenarioIdxCache === null) {
+    _perShieldScenarioIdxCache = { 0: -1, 1: -1, 2: -1 };
+    var scs = DATA.scenarios || [];
+    for (var si = 0; si < scs.length; si++) {
+      var sc = scs[si];
+      if (sc[0] === sc[1] && sc[0] >= 0 && sc[0] <= 2) {
+        _perShieldScenarioIdxCache[sc[0]] = si;
+      }
+    }
   }
-  if (rank1Iv < 0) return NaN;
-  var rank1Score = yValues[rank1Iv];
-  if (!isFinite(rank1Score)) return NaN;
-  return myScore - rank1Score;
+  var idx = _perShieldScenarioIdxCache[shields];
+  return (idx === undefined) ? -1 : idx;
+}
+
+function _ensurePerShieldBaselines(mi) {
+  // scoreMode tracks the y-axis mode / oppIvMode the same way
+  // computeYValues does, so the Δ numbers match the "Score" column
+  // semantically (avgScore vs winsPvpoke vs winsRank1 all key off
+  // different score arrays).
+  var mode = state.yAxisMode || 'avgScore';
+  var scoreMode;
+  if (mode === 'winsPvpoke') scoreMode = 'pvpoke';
+  else if (mode === 'winsRank1') scoreMode = 'rank1';
+  else scoreMode = state.oppIvMode;  // 'avgScore' follows the Opp-IV/Bait dropdown
+  var key = mi + '|' + scoreMode;
+  if (key === _perShieldCacheKey) return;
+  _perShieldCacheKey = key;
+  _perShieldCache = {};
+  var scores = getScores(mi, scoreMode);
+  if (!scores) return;
+  var targets = [0, 1, 2];
+  for (var t = 0; t < targets.length; t++) {
+    var shields = targets[t];
+    var si = _perShieldScenarioIdx(shields);
+    if (si < 0) continue;
+    var avgByIv = new Float64Array(nIvs);
+    var bestScore = -Infinity;
+    for (var iv = 0; iv < nIvs; iv++) {
+      var base = iv * nS * nO + si * nO;
+      var sum = 0;
+      for (var oi = 0; oi < nO; oi++) sum += scores[base + oi];
+      var a = sum / nO;
+      avgByIv[iv] = a;
+      if (a > bestScore) bestScore = a;
+    }
+    _perShieldCache[shields] = { avgByIv: avgByIv, rank1Score: bestScore };
+  }
+}
+
+function _computePerShieldScoreDelta(iv, shields) {
+  _ensurePerShieldBaselines(state.movesetIdx);
+  var b = _perShieldCache[shields];
+  if (!b) return NaN;
+  var my = b.avgByIv[iv];
+  if (!isFinite(my)) return NaN;
+  return my - b.rank1Score;
 }
 
 function _summarySortClick(colId) {
@@ -2204,14 +2276,16 @@ function updateSummaryTable() {
 
   var arrow = (summarySort.dir === 'asc') ? ' \u25B2' : ' \u25BC';
 
-  // About-these-metrics box: explains the three mirror-adjacent columns
-  // (Top-Mirror CMP %, Matchups Kept, Mirror Slayer CMP %). Collapsed
-  // by default so regulars are not slowed down; sits above the table so
-  // new readers see it adjacent to the headers.
+  // About-these-metrics box: explains the per-shield Δ trio plus the
+  // mirror-adjacent columns (Top-Mirror CMP %, Matchups Kept, Mirror
+  // Slayer CMP %). Collapsed by default so regulars are not slowed
+  // down; sits above the table so new readers see it adjacent to the
+  // headers.
   var h = '<details style="margin:0 0 8px 0;background:#1a1f2a;border:1px solid #2a3040;border-radius:4px;padding:6px 10px">'
-    + '<summary style="cursor:pointer;color:#c9d1d9;font-weight:600">About these metrics (Top-Mirror CMP %, Matchups Kept, Mirror Slayer CMP %)</summary>'
+    + '<summary style="cursor:pointer;color:#c9d1d9;font-weight:600">About these metrics (0v0 / 1v1 / 2v2 Δ, Top-Mirror CMP %, Matchups Kept, Mirror Slayer CMP %)</summary>'
     + '<div style="margin-top:8px;font-size:12px;line-height:1.5;color:#c9d1d9">'
-    + '<p>These three columns all ask "how well does this IV compete in the mirror (same-species) matchup," but they answer it from different angles. Read them together, not individually.</p>'
+    + '<p><b>0v0 Δ / 1v1 Δ / 2v2 Δ.</b> Per-even-shield signed avg-score delta vs the best IV in that specific scenario. These three columns are <em>frozen on the Shields axis</em> so all three show regardless of what the Shields dropdown is set to; they do react to Opp-IVs + Bait. Useful for role-specific IV picking: leads weight 2v2 Δ, closers weight 0v0 Δ, mid picks weight 1v1 Δ. Positive = beats the best IV in that scenario (rare; the best IV has 0), negative = trades score for something else (usually atk or bulk).</p>'
+    + '<p>The next three columns all ask "how well does this IV compete in the mirror (same-species) matchup," but they answer it from different angles. Read them together, not individually.</p>'
     + '<p><b>Top-Mirror CMP %.</b> Of the top 50 IVs of this species in THIS dive (ranked by the active battle-score column), what fraction does this IV at least tie on attack? This is the "realistic ladder mirror" metric: your cohort is the IVs actually likely to appear on ladder, spanning a range of attack values, so the result spreads meaningfully from 0 to 100. The focal IV is counted in its own cohort, so the denominator stays at 50.</p>'
     + '<p><b>Matchups Kept.</b> Expected number of non-mirror opponents this IV beats, sampling shield scenarios uniformly. Per opponent, credit = (scenarios won / total scenarios), summed across all non-mirror opponents; the denominator is M = nOpponents minus the mirror. When you\'ve picked a single shield scenario, the number is an integer (you win each matchup or you don\'t). When averaging across all shield combinations, it is fractional (e.g. 34.2 / 59): two IVs that beat the same 30 opponents but under different shield-combination profiles rank differently, so the column discriminates even among top candidates. The mirror opponent is excluded because Top-Mirror CMP % and Mirror Slayer CMP % already cover the mirror axis.</p>'
     + '<p><b>Mirror Slayer CMP %.</b> Same atk-comparison idea as Top-Mirror, but against the Nash-converged mirror slayer cohort produced by <code>--mirror-slayer</code>. This cohort often collapses to a single attack value when one corner of the IV grid dominates mirror wins, so the column tends to read 0 or 100 for most rows. It is the niche "build expressly to beat other slayer-optimal builds" metric, not a general-purpose mirror target, and only appears when slayer iteration was requested on this dive.</p>'
@@ -2255,17 +2329,21 @@ function updateSummaryTable() {
     h += '<td>' + DATA.ivAtk[iv].toFixed(2) + '</td><td>' + DATA.ivDef[iv].toFixed(2) + '</td>';
     h += '<td>' + DATA.ivHp[iv] + '</td><td>#' + DATA.spRanks[iv] + '</td>';
     h += '<td>' + (isFinite(yValues[iv]) ? yValues[iv].toFixed(1) : '-') + '</td>';
-    // Score Δ: show signed delta vs rank-1 under the active Y-axis mode.
-    // Green when positive (beats rank-1), red when negative (trades
-    // score for something else — typically atk or HP), zero for the
-    // rank-1 IV itself.
-    var sd = _computeScoreDelta(iv);
-    if (isFinite(sd)) {
-      var sdStr = (sd > 0 ? '+' : '') + sd.toFixed(1);
-      var sdColor = (sd > 0) ? '#9be89b' : (sd < 0 ? '#e89b9b' : '#c9d1d9');
-      h += '<td style="color:' + sdColor + '">' + sdStr + '</td>';
-    } else {
-      h += '<td>-</td>';
+    // Per-shield Score Δ: one cell each for 0v0 / 1v1 / 2v2, value is
+    // avg score across opponents at that scenario minus the best-IV's
+    // avg at the same scenario. Frozen on the Shields axis so the
+    // three cells show the full lead/mid/closer split regardless of
+    // the Shields dropdown selection. Green positive / red negative /
+    // neutral for exact zero (best IV at that shield).
+    for (var _sh = 0; _sh < 3; _sh++) {
+      var _d = _computePerShieldScoreDelta(iv, _sh);
+      if (isFinite(_d)) {
+        var _dStr = (_d > 0 ? '+' : '') + _d.toFixed(1);
+        var _dColor = (_d > 0) ? '#9be89b' : (_d < 0 ? '#e89b9b' : '#c9d1d9');
+        h += '<td style="color:' + _dColor + '">' + _dStr + '</td>';
+      } else {
+        h += '<td>-</td>';
+      }
     }
     // Top-Mirror CMP %: same colour buckets as Mirror Slayer CMP %.
     var tmc = _computeTopMirrorCmpPct(iv);
