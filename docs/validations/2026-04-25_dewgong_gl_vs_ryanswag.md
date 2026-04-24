@@ -25,13 +25,46 @@ deciding which Dewgong to build today":
    which all sit at atk ≥ 108.43. Modern atk targets are 6+ points
    higher because the modern bulky opponents (Steelix Shadow,
    Swampert, Sealeo Shadow) require harder hits.
-2. **The mirror axis has flipped from def-dominant to atk-dominant.**
-   The article said `138.28 Def dominates 12 of the Top 20 Stat
-   Product Dewgong in every single shield scenario` — i.e. the
-   mirror was decided by *defense*. Our 2026 mirror-slayer Nash
-   convergence settled at an attack range of 100.86 - 105.55,
-   *higher than* the rank-1 Dewgong's atk of 100.86. The cohort
-   wins the modern mirror by being more attacky, not bulkier.
+2. **The article's def-dominance claim reproduces in our sim;
+   separately, the Nash-slayer cohort converges on a different
+   equilibrium.** These two findings answer different questions
+   and are both correct.
+
+   *The article's claim holds.* The regenerated mirror-dominant
+   IV table has 4 cohort members (SP ranks #46, #49, #57, #58:
+   0/12/4, 2/14/7, 1/12/5, 0/13/3; all in def range 138.29-139.60,
+   atk 102.13-102.44, HP 154-155). Tested each against rank-1 SP
+   Dewgong (0/12/15, atk 100.86 def 137.13 hp 161) at the article's
+   recommended moveset (Ice Shard / Icy Wind / Drill Run) across
+   all 9 shield scenarios. All four cohort IVs beat rank-1 SP
+   **7-2-0** with score Δ in the +1363 to +1417 range. That
+   reproduces the article's "138.28 Def dominates Top-20 SP
+   Dewgong" finding unchanged.
+
+   *The Nash cohort finds a different equilibrium.* Our
+   mirror-slayer iteration converges on attack 100.86-105.55
+   because atk-weighted Dewgong beats the article's def-weighted
+   spread head-to-head. Tested 15/0/0 (109.83 atk, 126.23 def,
+   147 hp) vs 0/13/3 (the max-def cohort member): 15/0/0 wins
+   5-4-0 with score Δ +467. Rock-paper-scissors: article's
+   def-spread beats rank-1 SP cleanly; max-atk beats article's
+   def-spread narrowly; rank-1 SP beats max-atk in some
+   scenarios (6-3 in favor of atk overall, so atk is the
+   stable winner). Nash iteration converges on the
+   moderately-atk-weighted balance that dominates all three
+   reference builds.
+
+   *So the two recommendations answer different questions:*
+   - "What beats a casual rank-1-by-stat-product Dewgong?" →
+     article's 138.28+ Def target is the right answer.
+   - "What wins the mirror against a mirror-aware competitive
+     cohort?" → our atk-weighted Nash cohort is the right
+     answer.
+
+   The article's recommendation was calibrated for a Go Battle Day
+   GBL flood of casually-built Dewgong — that framing is still
+   valid and its numeric target is still correct for its intended
+   opponent.
 3. **The article's recommended moveset (Ice Shard / Icy Wind /
    Drill Run, the Go Battle Day Seel legacy combo) is no longer
    the top-scoring moveset in our pool.** Our dive ranks
@@ -41,15 +74,16 @@ deciding which Dewgong to build today":
 
 ## Side-by-side context
 
-| dimension              | RyanSwag (Mar 2022)                                           | Our dive (Apr 2026)                                           |
-| ---------------------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
-| Article event hook     | Go Battle Day: Seel — legacy Ice Shard + Icy Wind unlock      | none — niche GL pick added alongside Oinkologne CD batch      |
-| Recommended moveset    | Ice Shard / Icy Wind / Drill Run                              | Ice Shard / Blizzard, Icy Wind (top-scoring, index.html)      |
-| Opponent pool          | Implicit 2022 GL meta (Umbreon, Trevenant, Mew, etc.)         | `opponent_pools/gl_top50_plus_cs.txt` (66 mons, 2026 meta)    |
-| Max level              | Best Buddy (51) per pvpivs.com URLs                           | Default L50 non-BB per `LEAGUE_MAX_LEVEL` (matches PvPoke UI) |
-| Atk targets cited      | 101.79, 102.03, 102.52, 102.89, 102.94, 103.7, 104.35, 104.87 | 108.43 (Sealeo S), 108.86 (Swampert), 109.09 (Steelix S)      |
-| Def targets cited      | 131.7 (bare min), 136.81, 137.53, 138.28, 139.45, 141         | 138.70 (Corviknight), 141.05 (Sableye S)                      |
-| Mirror dominance basis | Defense (138.28 Def beats most Top-20 SP Dewgong)             | Attack (mirror-slayer cohort atk 100.86 - 105.55)             |
+| dimension                                     | RyanSwag (Mar 2022)                                           | Our dive (Apr 2026)                                                   |
+| --------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Article event hook                            | Go Battle Day: Seel — legacy Ice Shard + Icy Wind unlock      | none — niche GL pick added alongside Oinkologne CD batch              |
+| Recommended moveset                           | Ice Shard / Icy Wind / Drill Run                              | Ice Shard / Blizzard, Icy Wind (top-scoring, index.html)              |
+| Opponent pool                                 | Implicit 2022 GL meta (Umbreon, Trevenant, Mew, etc.)         | `opponent_pools/gl_top50_plus_cs.txt` (66 mons, 2026 meta)            |
+| Max level                                     | Best Buddy (51) per pvpivs.com URLs                           | Default L50 non-BB per `LEAGUE_MAX_LEVEL` (matches PvPoke UI)         |
+| Atk targets cited                             | 101.79, 102.03, 102.52, 102.89, 102.94, 103.7, 104.35, 104.87 | 108.43 (Sealeo S), 108.86 (Swampert), 109.09 (Steelix S)              |
+| Def targets cited                             | 131.7 (bare min), 136.81, 137.53, 138.28, 139.45, 141         | 138.70 (Corviknight), 141.05 (Sableye S)                              |
+| Mirror target (beat rank-1 SP)                | 138.28+ Def (reproduces in our sim: 7-2-0 vs rank-1)          | same — article target still works; just not surfaced as a dive flavor |
+| Mirror equilibrium (beat mirror-aware cohort) | not addressed in article                                      | atk 100.86-105.55 moderately-weighted cohort                          |
 
 ## Opponent overlap audit
 
@@ -116,27 +150,44 @@ matches; specific opponent doesn't.
 `0/13/3`. All sit at level 29.5 - 30.5 (Best Buddy region), atk
 102.13 - 102.44, def 138.29 - 139.60, hp 154 - 155.
 
-**Our dive's analog: NONE; the axis has flipped.** The article's
-premise was that 138.28+ Def beats the bulk of the high-stat-product
-Dewgong in the mirror. Our 2026 dive's mirror-slayer iteration
-converges to a cohort with atk 100.86 - 105.55 — *higher* atk than
-the rank-1 Dewgong (100.86). That means today's mirror-winning IV
-spreads are gaining on attack, not on bulk.
+**The article's claim still holds in our sim.** Tested each of the 4
+cohort IVs against rank-1 SP Dewgong (0/12/15, 100.86 atk, 137.13
+def, 161 hp) at the article's recommended moveset (Ice Shard / Icy
+Wind / Drill Run) across all 9 shield scenarios: all four cohort
+IVs beat rank-1 SP **7-2-0** with score Δ +1363 to +1417. The
+article's "138.28 Def dominates Top-20 SP Dewgong" claim reproduces
+unchanged.
 
-Two plausible explanations:
+**Our dive doesn't surface this as a flavor today.** The 5 named
+tiers on our Dewgong GL landing page (Sableye Shadow Bulk, Steelix
+Shadow Atk, Swampert Atk, Sealeo Shadow Slayer, Fortified
+Corviknight) are all driven by non-mirror matchups; there's no
+"Dewgong Mirror Bulk" / "Fortified Dewgong" tier. That's a
+visibility gap, not a correctness bug — our sim would produce the
+same 7-2 result the article claims, but the auto-derive pipeline
+doesn't synthesize mirror bulkpoint anchors without a TOML-authored
+one telling it to. Adding `thresholds/dewgong.toml` with a
+`dewgong_blkp_any` bulkpoint anchor vs Dewgong would surface this
+cohort as a named tier in the next re-dive.
 
-1. **Move re-balance:** Icy Wind cost / damage tweaks since 2022
-   could have changed the relative value of an extra fast-move-tick
-   per cycle vs the def floor. Worth a check on PvPoke's move
-   gamemaster history.
-2. **Sim methodology divergence:** RyanSwag was reasoning from
-   per-matchup damage breakpoints + intuition. Our converged Nash
-   cohort is pure simulation across the whole matchup space. The
-   two methods can disagree when the prevailing best move-pattern
-   differs from individual-breakpoint optimization.
+**But the Nash cohort converges on a different equilibrium.** Our
+mirror-slayer iteration finds the atk-weighted balance that
+dominates the rock-paper-scissors game: article's def-spread beats
+rank-1 SP 7-2; max-atk 15/0/0 beats article's def-spread 5-4; the
+Nash cohort at atk 100.86-105.55 dominates both reference points.
+So both recommendations are correct for different questions:
 
-Either way, the article's **specific** advice to chase 138.28 Def
-for the mirror is no longer the right move in 2026.
+- **"What beats a casual rank-1-by-stat-product Dewgong?"** →
+  article's 138.28+ Def target wins 7 of 9 shield scenarios
+  cleanly.
+- **"What wins the mirror against a mirror-aware competitive
+  cohort?"** → Nash-converged atk-weighted cohort; the article's
+  def-spread loses this sub-game to max-atk 5-4.
+
+The article's original framing was a Go Battle Day GBL flood of
+casually-built Dewgong, where casual-build = rank-1-by-SP — which
+is exactly who the article's def-spread beats cleanly. So the
+article's numeric target is still correct for its intended context.
 
 ## Where the article is still useful
 
@@ -200,12 +251,15 @@ level surfaces a violation.
    don't try to apply the article's 102.89-Atk recommendation
    directly to a modern Dewgong build. Adding that as a header
    block in the archive would be appropriate.
-2. **The mirror axis flip** (def-rules → atk-rules) is the most
-   analytically interesting finding and merits a quick PvPoke
-   move-gamemaster history check. If Icy Wind's cost or energy gain
-   changed between 2022 and 2026, that's the smoking gun. If the
-   moves are unchanged, the divergence is methodology (RyanSwag's
-   per-breakpoint reasoning vs our converged Nash sim).
+2. **Surface the mirror bulkpoint as a named flavor.** The 138.28+
+   Def mirror-dominant cohort isn't currently represented in our
+   Dewgong dive's tier list even though our sim confirms the 7-2
+   advantage vs rank-1 SP. Adding a `thresholds/dewgong.toml` with
+   a `dewgong_blkp_any` bulkpoint anchor would let the auto-derive
+   pipeline synthesize a "Dewgong Mirror Bulk" / "Fortified
+   Dewgong" tier in the next re-dive. That gives casual-meta
+   players the def-weighted recommendation (beat rank-1 SP) as a
+   named flavor alongside the Nash cohort's atk-weighted flavor.
 3. **No reason to update our shipped Dewgong dive based on this
    diff.** The article's frame doesn't transfer; our dive correctly
    reflects the 2026 meta.
