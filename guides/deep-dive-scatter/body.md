@@ -8,6 +8,26 @@ It's where you go when the tier cards and the IV Flavor Guide have
 narrowed things down and you want to see **which specific IVs** land
 where.
 
+<figure>
+<img src="screenshots/scatter-example.png"
+     alt="Tinkaton UL scatter plot with the control strip above and
+          named-category traces in the legend.">
+<figcaption>
+Scatter plot from the Tinkaton UL dive. The control strip across the
+top (Moveset / Shields / Opp-IVs / Bait / Y-axis / Color / Anchors)
+re-renders the plot instantly without re-simulating. On the plot
+itself, each dot is one of 4,096 IV spreads. The grey triangle band
+is the Anchor IVs reference cohort; the coloured overlays
+(<span style="color:#3fb950;font-weight:600">Ampharos Atk</span>,
+<span style="color:#f85149;font-weight:600">Annihilape Bulk</span>,
+<span style="color:#58a6ff;font-weight:600">Dusknoir Slayer</span>,
+<span style="color:#f0883e;font-weight:600">Steelix (Shadow) Slayer</span>,
+<span style="color:#bc8cff;font-weight:600">Fortified Walrein</span>)
+are the named categories the IV Flavor Guide and Threshold Tiers
+reference by name. Click any legend entry to toggle its visibility.
+</figcaption>
+</figure>
+
 ## Axes, at a glance
 
 - **x-axis: stat-product rank.** Lower rank is to the left (rank 1 at

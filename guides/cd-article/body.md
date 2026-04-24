@@ -113,6 +113,29 @@ scenario (0v0, 0v1, 0v2, 1v0, 1v1, 1v2, 2v0, 2v1, 2v2). Cell value is
 the form's win rate on the CD moveset at that shield count, coloured
 green above 50% and red below.
 
+<figure>
+<img src="screenshots/meta-coverage-example.png"
+     alt="Meta Coverage grid from the Oinkologne CD article showing
+          Female and Male forms' win rates across all 9 shield
+          scenarios, with collapsible methodology details above.">
+<figcaption>
+The Meta Coverage section of the Oinkologne CD article. The dropdown
+control row (<strong>Opponent IVs</strong> / <strong>Bait</strong>)
+re-writes every cell instantly without re-simulating; the two
+collapsed <code>&lt;details&gt;</code> lines point at the prose
+explaining how to read the grid and how the numbers are computed.
+Below that, the 2-row grid: <span style="color:#f85a9e;font-weight:600">♀ Female</span>
+is the pink row, <span style="color:#58a6ff;font-weight:600">♂ Male</span>
+is the blue row. Green cells are win rates above 50% (form wins
+that shield scenario outright), red cells are below 50% (form
+loses). Shield asymmetry dominates the extremes: 2v0 / 2v1 cells
+read green near 100% for both forms, 0v1 / 0v2 cells read red near
+zero — per the prose below, the interesting reading is
+<em>within a column</em> (does form choice swing the outcome
+at a given shield count?).
+</figcaption>
+</figure>
+
 #### How to read the shield-scenario grid
 
 Shield asymmetry dominates the extremes: **2v0** (you have two, they

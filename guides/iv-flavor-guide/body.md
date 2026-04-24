@@ -26,12 +26,16 @@ opponent-by-opponent matchups that flavor's stat cutoffs buy you.
 
 A flavor is a **named cluster of IVs with a shared stat signature and
 a shared strategic intent**. The screenshot above shows the Tinkaton
-UL dive's four flavors: **General Good** is a broad "safe baseline"
-cut covering 82.4% of the IV space; **Fortified Walrein** is a much
-narrower cut that trades attack range for a defensive threshold
-against Walrein; **Dusknoir Slayer** and **Steelix (Shadow) Slayer**
-each give up bulk to clear a specific damage breakpoint against their
-namesake opponent.
+UL dive's four flavors:
+<span style="color:#3fb950;font-weight:600">General Good</span> is a
+broad "safe baseline" cut covering 82.4% of the IV space;
+<span style="color:#bc8cff;font-weight:600">Fortified Walrein</span>
+is a much narrower cut that trades attack range for a defensive
+threshold against Walrein;
+<span style="color:#58a6ff;font-weight:600">Dusknoir Slayer</span>
+and <span style="color:#f0883e;font-weight:600">Steelix (Shadow) Slayer</span>
+each give up bulk to clear a specific damage breakpoint against
+their namesake opponent.
 
 A flavor is **not** an arbitrary PvPoke preset. It's derived by:
 
