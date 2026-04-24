@@ -2,23 +2,24 @@
 
 Current thread: pre-ship polish between S10 ship day (2026-04-18) and
 Oinkologne CD (2026-05-09). Canonical ordering, read this first when
-resuming. **2026-04-23 refresh:** items 1, 3, 5 have shipped or are
-largely shipped since this list was written; item 2 is legitimately
-open (Michael wants another pass); items 4, 6 are the main remaining
-pre-ship surface.
+resuming. **2026-04-24 refresh:** items 1-5 shipped. Item 6 is the
+ship itself; link-verify is now integrated into `publish_website.sh`.
+Two optional pre-ship polish items remain below (G16 guide pointer +
+Top IVs per-shield Score Δ split).
 
 1. ~~**Cross-form re-dive**~~ — **SHIPPED** via `scripts/overnight_redive.sh`
    (2026-04-19/20 chain, ~8h). Both Oinkologne forms in
    `opponent_pools/gl_top50_plus_cs.txt`, article + standalone
    comparison page regenerated, `cd_prep` auto-injection path
    validated. See CHANGELOG 2026-04-19.
-2. **JRE / RyanSwag / ours comparison** (`~/.claude/plans/
-   jre-ryanswag-comparison.md`). **Status: re-run requested
-   2026-04-23.** First pass shipped `docs/jre_ryanswag_comparison.md`
-   (2026-04-18) against the pre-re-dive article; 2026-04-21 refresh
-   surfaced G-series follow-ups (see §10.4). Michael wants another
-   pass now that the article + dives have iterated further — "we
-   always learn more each time."
+2. ~~**JRE / RyanSwag / ours comparison**~~ — **RE-RUN SHIPPED** across
+   §11-§14 of `docs/jre_ryanswag_comparison.md` (2026-04-21 through
+   2026-04-24). §14 is the most recent (overnight 2026-04-23 →
+   2026-04-24, post Reader's Guide arc); §14.5 declares all automated
+   pre-ship gates clean (link integrity / em-dashes / dev-count
+   sentinels / ship-mode narrative / Reader's Guide tokens). Residual:
+   G16 methodology-details → guide pointer (~30 min, optional pre-ship
+   pull-in, see §14.4).
 3. **F1-F5 follow-ups** surfaced by the comparison output. **Mostly
    SHIPPED.** F1 Meta Role `ddf9d19`, F2 key-flips callout `923f985`,
    F4+F-wrap+F-intro `cbc9b28`+`259c493`, F-stats-block `c59a701`+
@@ -38,8 +39,12 @@ pre-ship surface.
    IVs "of yours" table gets the same columns + column-header
    tooltips. All shipped via direct source change; retrofit patchers
    cover previously-shipped dives.
-6. **Link-verification pass** (P4 tool shipped; run it pre-publish)
-   and **ship**.
+6. **Ship** via `scripts/publish_website.sh --push`. Link-verification
+   (`verify_article_links.py --ship`) and em/en-dash verification
+   (`verify_no_unicode_dashes.py --ship`) are integrated into the
+   publish script as step 2; they run automatically before rsync and
+   abort the publish on any hit. No separate pre-ship verify step
+   needed — running the publish IS running the checks.
 
 Post-ship, the post-S5 arc resumes at S13-S17 in
 `~/.claude/plans/post-s5-oinkologne-arc.md` (matchup-flip
@@ -141,24 +146,19 @@ above answers the headline question once shipped; these three items
 are orthogonal polish that became load-bearing when the session tried
 to cross-reference the shipped dive against his collection.
 
-- **Matchup Flip tooltip un-truncation.** The Top IVs table's
-  `Gained` / `Lost` tooltips cap at 6 entries each with a `+N more`
-  tail. For 15/11/11 vs 13/15/15 UL Tinkaton, the hidden "+5 more"
-  losses almost certainly contain `Tinkaton 1v1` and `Tinkaton 2v2` —
-  which is exactly what decides whether the slayer is a lead or a
-  closer choice. Fix options: expand the tooltip cap, or append a
-  click-to-expand `<details>` with the full list below the row. Low
-  effort, directly unblocks the personal-collection decision without
-  needing the bigger XL-candy tool.
+- ~~**Matchup Flip tooltip un-truncation.**~~ **SHIPPED 2026-04-22** in
+  `20e7bd1` (dropped the hardcoded `[:6]` cap; tooltip now shows the
+  full Gained / Lost list with no `+N more` tail). Retrofit patcher
+  `9ca8f5a` applied to shipped HTMLs.
 
-- **Per-shield Score Δ column(s) on the Top IVs table.** The SP # and
-  avg-score columns collapse 0v0 / 1v1 / 2v2 into one number. For
-  role-specific builds (lead ≈ 2v2-weighted, closer ≈ 0v0-weighted,
-  mid ≈ 1v1-weighted) the three splits are separate decisions. Data
-  already exists in the dive (the Matchup Delta table has per-shield
-  deltas); this is a rendering add, not a simulation change. Pairs
-  well with the XL-candy tool's `Score Δ` column — extend that to
-  three columns instead of one.
+- **Per-shield Score Δ column(s) on the Top IVs table.** Partially
+  shipped. Single-number Score Δ vs rank-1 landed on the outer Top
+  IVs table in `fdbf6ce` (XL-candy tool). Three-way per-shield split
+  (0v0 Δ / 1v1 Δ / 2v2 Δ) shipped on the **Member IVs inner table**
+  inside tier cards in `20e7bd1`, but NOT yet on the outer Top IVs
+  table. Open: extend `20e7bd1`'s three-column pattern to Top IVs +
+  retrofit patcher for shipped dives. Estimated ~1 hr. Flagged for
+  pre-ship pull-in 2026-04-24.
 
 - **`scripts/suggest_builds.py`.** CLI helper: takes `--species`,
   `--league`, `--roles lead,closer`, path to a PokeGenie CSV export,
@@ -213,12 +213,15 @@ now click-gated:
 The existing `<details>` on the &Delta; column was already default-
 closed pre-pass.
 
-**Broader pass (after the JRE / RyanSwag comparison, pre-ship):**
-once the density gap is quantified, do a structural edit pass. The
-question isn't "wrap this paragraph in `<details>`" but "which three
-of these six paragraphs can go entirely?" - that requires the
-benchmark to answer. Comparison tracked under "Pre-ship: JRE /
-RyanSwag / ours comparison" below.
+**Broader pass — effectively SHIPPED.** The Reader's Guide arc moved
+methodology prose into its own dedicated surface (`bd8be63` How This
+Works guide content, `91f2430` G16 methodology-details routing),
+doing the structural work the original broader pass anticipated.
+Residual: **G16 — replace the in-article hidden-but-present
+methodology prose with a one-line guide pointer** (the hide layer is
+already in place; G16 is the last-mile substitution). Logged as
+post-ship polish in `docs/jre_ryanswag_comparison.md` §14.4, ~30 min,
+optional pre-ship pull-in — Michael's call.
 
 ## Pre-ship: JRE / RyanSwag / ours comparison (2026-04-18) — EXECUTED (against pre-re-dive article)
 
