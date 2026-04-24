@@ -2865,8 +2865,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
               margin-bottom: 20px; font-size: 13px; overflow-x: auto; }}
   .summary table {{ border-collapse: collapse; width: 100%; }}
   .summary th, .summary td {{ text-align: left; padding: 3px 8px;
-                               border-bottom: 1px solid #0f3460; white-space: nowrap; }}
-  .summary th {{ color: #e94560; }}
+                               border-bottom: 1px solid #0f3460; }}
+  .summary td {{ white-space: nowrap; }}
+  .summary th {{ color: #e94560; white-space: normal; vertical-align: bottom; }}
   .tier-badge {{ display: inline-block; padding: 2px 8px; border-radius: 3px;
                  font-size: 11px; font-weight: bold; }}
   .threshold-info {{ background: #16213e; padding: 10px; border-radius: 6px;
