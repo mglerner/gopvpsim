@@ -350,6 +350,8 @@ pre code { background: transparent; padding: 0; font-size: inherit;
 ul, ol { padding-left: 22px; }
 li { margin: 4px 0; }
 figure { margin: 20px 0; }
+figure img { max-width: 100%; height: auto; display: block;
+             border-radius: 6px; }
 figcaption { color: #aaa; font-size: 14px; margin-top: 8px;
              font-style: italic; }
 .coming-soon { background: #16213e; padding: 20px; border-radius: 6px;

@@ -7,16 +7,31 @@ buys you and the specific matchups it costs.
 It's the fastest section to read on the whole page, and it's the
 right place to start if you're deciding which IV to chase.
 
+<figure>
+<img src="screenshots/flavor-example.png"
+     alt="The purple-bordered IV Flavor Guide zone on a deep dive
+          page, showing four flavors with a summary table and an
+          expanded 'General Good' flavor below.">
+<figcaption>
+The IV Flavor Guide zone on the Tinkaton UL dive. The summary table
+lists the four flavors the simulation derived, each with how many
+IVs qualify and how many catches it takes to land one. Below the
+table, each flavor expands (the "General Good" one is open here)
+with its stat signature, a safe-baseline description, and the
+opponent-by-opponent matchups that flavor's stat cutoffs buy you.
+</figcaption>
+</figure>
+
 ## What a flavor is
 
 A flavor is a **named cluster of IVs with a shared stat signature and
-a shared strategic intent**. Example on the reference
-{{dive:species_display}} {{dive:league_display}} dive: one flavor is
-**General Good** (a broad "safe baseline" cut covering almost the
-entire IV space); another is **Lapras Slayer** (a much narrower cut
-that gives up bulk to clear a specific damage breakpoint against
-Lapras); a third is **Fortified Greedent** (gives up attack range in
-exchange for a defensive threshold against Greedent).
+a shared strategic intent**. The screenshot above shows the Tinkaton
+UL dive's four flavors: **General Good** is a broad "safe baseline"
+cut covering 82.4% of the IV space; **Fortified Walrein** is a much
+narrower cut that trades attack range for a defensive threshold
+against Walrein; **Dusknoir Slayer** and **Steelix (Shadow) Slayer**
+each give up bulk to clear a specific damage breakpoint against their
+namesake opponent.
 
 A flavor is **not** an arbitrary PvPoke preset. It's derived by:
 
