@@ -1,0 +1,8 @@
+title = "Under the Hood"
+slug = "under-the-hood"
+description = "How the deep dives auto-generate: the anchor / category / tier / flavor pipeline, why certain narrative blocks are gold vs blue vs orange, and where to push back when the output gets something wrong."
+order = 6
+coming_soon = false
+authorship = "both"
+
+# No dive: tokens needed — the examples are illustrative, not live.
