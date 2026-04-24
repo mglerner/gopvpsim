@@ -354,7 +354,51 @@ figcaption { color: #aaa; font-size: 14px; margin-top: 8px;
     font-size: 12px; color: #d29922; margin-left: 8px; }
 .about { color: #888; font-size: 13px; margin-top: 40px;
          border-top: 1px solid #0f3460; padding-top: 12px; }
+.authorship-banner { padding: 10px 14px 10px 18px; border-radius: 6px;
+                     margin: 0 0 18px 0; font-size: 14px;
+                     border-left: 3px solid var(--sidebar-color, #8b949e); }
+.authorship-banner.ai     { --sidebar-color: #d29922;
+                            background: #2a1f00; color: #e8c87b; }
+.authorship-banner.auto   { --sidebar-color: #5b8dd9;
+                            background: #1a2333; color: #8ab4f8; }
+.authorship-banner.both   { --sidebar-color: #7db87d;
+                            background: #1f2a1a; color: #a8d8a8; }
+.authorship-banner.expert { --sidebar-color: #d4a017;
+                            background: #2a2000; color: #e8d48b; }
 """
+
+
+# Authorship banner vocabulary for guides. Parallels the CD-article
+# variants (see ``render_article.render_authorship_banner``) but adds
+# an ``ai`` tier to distinguish LLM-drafted prose from template-filled
+# ``auto`` output. When a guide's TOML omits ``authorship``, we default
+# to ``ai`` because every guide currently in the tree was LLM-drafted;
+# a human rewrite should set the field explicitly to promote the
+# banner colour.
+_AUTHORSHIP_BANNERS = {
+    'ai': ("This guide was drafted by an LLM from the site's "
+           'methodology; it has not been reviewed by a human expert.'),
+    'auto': 'Auto-generated from simulation data.',
+    'both': 'Drafted by an LLM, reviewed and edited by a human expert.',
+    'expert': 'Written by a human analyst.',
+}
+
+
+def _render_authorship_banner(kind: str | None) -> str:
+    """Return the HTML banner for a guide's authorship tier, or ''.
+
+    ``kind`` of ``None`` falls back to ``ai`` (see rationale above).
+    An unknown value warns to stderr and is treated as ``ai`` so a
+    typo doesn't silently strip attribution.
+    """
+    resolved = (kind or 'ai').strip().lower()
+    if resolved not in _AUTHORSHIP_BANNERS:
+        print(f'warning: unknown authorship={kind!r}; treating as ai',
+              file=sys.stderr)
+        resolved = 'ai'
+    text = _AUTHORSHIP_BANNERS[resolved]
+    return (f'<div class="authorship-banner {resolved}">'
+            f'{html.escape(text)}</div>\n')
 
 
 def _render_page(*, title: str, body_html: str,
@@ -406,11 +450,14 @@ def _build_guide(guide: dict,
     title = guide.get('title') or slug.replace('-', ' ').title()
     description = guide.get('description') or ''
     coming_soon = bool(guide.get('coming_soon'))
+    authorship = guide.get('authorship')
 
     out_dir = GUIDES_OUT / slug
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Body: markdown file, or "coming soon" placeholder.
+    # Body: markdown file, or "coming soon" placeholder. A stub guide
+    # doesn't get an authorship banner - there's no prose to attribute
+    # yet - so we suppress it below by leaving ``banner_html`` empty.
     body_md_path = src_dir / 'body.md'
     if coming_soon or not body_md_path.is_file():
         body_html = (
@@ -418,6 +465,7 @@ def _build_guide(guide: dict,
             f'<strong>Coming soon:</strong> {html.escape(description)}'
             '</div>'
         )
+        banner_html = ''
     else:
         body_md = body_md_path.read_text()
         tokens = guide.get('tokens') or {}
@@ -435,6 +483,7 @@ def _build_guide(guide: dict,
             guide_slug=slug)
         total_unresolved.extend(unresolved)
         body_html = _render_markdown(resolved_body)
+        banner_html = _render_authorship_banner(authorship)
 
     # Copy any source-tracked screenshots so the rendered guide can
     # reference them as "screenshots/<name>".
@@ -453,7 +502,8 @@ def _build_guide(guide: dict,
     )
     page_html = _render_page(
         title=f'{title} - Reader\'s Guide',
-        body_html=f'<h1>{html.escape(title)}</h1>\n{body_html}',
+        body_html=(f'<h1>{html.escape(title)}</h1>\n'
+                   f'{banner_html}{body_html}'),
         breadcrumb_html=breadcrumb,
         regenerated_stamp=regenerated_stamp,
         site_root='../../',
