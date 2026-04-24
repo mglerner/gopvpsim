@@ -197,6 +197,30 @@ DIVES = [
                        '--charged', 'SAND_TOMB,ROCK_TOMB'],
         'reference': 'BUG_BITE,SAND_TOMB,ROCK_TOMB',
     },
+    # Dewgong + Stunfisk — GL niche picks Michael wanted to ship
+    # alongside the main 2026-04-24 batch. Both have one meta moveset
+    # per PvPoke's default (Dewgong: Ice Shard / Icy Wind / Drill Run;
+    # Stunfisk: Thunder Shock / Mud Bomb / Discharge), so
+    # top_movesets=1 runs fast (~20 min per dive) -- niche species
+    # don't warrant the 3× interactive-sweep cost of the default
+    # top_movesets=5. `reference` omitted so the loader uses PvPoke's
+    # default (get_default_moveset) per feedback_use_pvpoke_default_moveset.
+    {
+        'species': 'Dewgong',
+        'league': 'great',
+        'slug': 'dewgong-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+    },
+    {
+        'species': 'Stunfisk',
+        'league': 'great',
+        'slug': 'stunfisk-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+    },
 ]
 
 
