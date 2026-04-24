@@ -32,8 +32,10 @@ Three things to read off the tier card header in the screenshot:
 1. **The tier name.** It's always "(opponent) Atk" or "(opponent) Def"
    or "Fortified (opponent)" - a shorthand for "this tier is defined
    by a specific breakpoint or bulkpoint against that opponent." In
-   the screenshot, **Dusknoir Atk** means this cutoff was derived
-   from a damage breakpoint against Dusknoir.
+   the screenshot, the
+   <span style="color:#58a6ff;font-weight:600">Dusknoir Atk</span>
+   badge means this cutoff was derived from a damage breakpoint
+   against Dusknoir.
 2. **The stat cutoff.** The part after the middle dot is what an IV
    has to clear to be a member of the tier. `atk ≥ 142.54` means the
    IV's effective attack stat (base + IV, at the level the CP cap
