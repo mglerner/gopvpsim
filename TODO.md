@@ -2,10 +2,21 @@
 
 Current thread: pre-ship polish between S10 ship day (2026-04-18) and
 Oinkologne CD (2026-05-09). Canonical ordering, read this first when
-resuming. **2026-04-24 refresh:** items 1-5 shipped. Item 6 is the
-ship itself; link-verify is now integrated into `publish_website.sh`.
-Two optional pre-ship polish items remain below (G16 guide pointer +
-Top IVs per-shield Score Δ split).
+resuming. **2026-04-25 refresh:** items 1-5 shipped; today adds 2
+niche GL dives (Dewgong, Stunfisk) + 1 ship-blocker bug.
+
+**Ship-blocker surfaced 2026-04-25:** the IV Flavor Guide's
+`_flavor_name_for_tier` logic picks an opponent name from a nearby
+anchor instead of the dominant-flip opponent in at least one case.
+Dewgong GL m1 (Ice Shard / Aqua Jet, Drill Run) has a Def+HP tier
+labeled "Fortified Corviknight" whose `desc` attributes the matchup
+flip to **Quagsire** (1 scenario, 23 IVs), not Corviknight. The
+name and the actual flip disagree. Must be fixed (or at minimum
+diagnosed and explicit-override-patched on the Dewgong dive) before
+the Oinkologne CD ship. Lives in
+`scripts/deep_dive_narrative.py::_flavor_name_for_tier` + adjacent
+matchup-boundary/anchor-flip attribution; diagnosis should start by
+tracing what opponent the resolver picked for m1's tier and why.
 
 1. ~~**Cross-form re-dive**~~ — **SHIPPED** via `scripts/overnight_redive.sh`
    (2026-04-19/20 chain, ~8h). Both Oinkologne forms in
