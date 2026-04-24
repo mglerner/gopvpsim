@@ -339,8 +339,14 @@ h2 { color: #c8a2d0; border-bottom: 1px solid #0f3460;
 h3 { color: #c8a2d0; margin-top: 24px; }
 a { color: #9be89b; text-decoration: none; }
 a:hover { text-decoration: underline; }
-code { background: #16213e; padding: 2px 6px; border-radius: 3px;
-       font-size: 0.92em; }
+code { background: #16213e; padding: 2px 6px; border-radius: 4px;
+       border: 1px solid #0f3460; font-size: 0.92em; }
+pre { background: #16213e; padding: 12px 16px; border-radius: 6px;
+      border: 1px solid #0f3460; overflow-x: auto; margin: 16px 0;
+      font-size: 0.9em; line-height: 1.5;
+      width: fit-content; max-width: 100%; }
+pre code { background: transparent; padding: 0; font-size: inherit;
+           border: 0; }
 ul, ol { padding-left: 22px; }
 li { margin: 4px 0; }
 figure { margin: 20px 0; }
@@ -370,6 +376,17 @@ figcaption { color: #aaa; font-size: 14px; margin-top: 8px;
                             background: #1f2a1a; color: #a8d8a8; }
 .authorship-banner.expert { --sidebar-color: #d4a017;
                             background: #2a2000; color: #e8d48b; }
+.auth-chip { display: inline-block; padding: 1px 8px 1px 10px;
+             border-radius: 4px; font-weight: 600;
+             border-left: 3px solid var(--sidebar-color, #8b949e); }
+.auth-chip.ai     { --sidebar-color: #d29922;
+                    background: #2a1f00; color: #e8c87b; }
+.auth-chip.auto   { --sidebar-color: #5b8dd9;
+                    background: #1a2333; color: #8ab4f8; }
+.auth-chip.both   { --sidebar-color: #7db87d;
+                    background: #1f2a1a; color: #a8d8a8; }
+.auth-chip.expert { --sidebar-color: #d4a017;
+                    background: #2a2000; color: #e8d48b; }
 """
 
 
@@ -384,7 +401,7 @@ _AUTHORSHIP_BANNERS = {
     'ai': ("This guide was drafted by an LLM from the site's "
            'methodology; it has not been reviewed by a human expert.'),
     'auto': 'Auto-generated from simulation data.',
-    'both': 'Drafted by an LLM, reviewed and edited by a human expert.',
+    'both': 'Drafted by an LLM, reviewed and edited by Michael G. Lerner.',
     'expert': 'Written by a human analyst.',
 }
 
