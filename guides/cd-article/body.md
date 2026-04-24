@@ -113,6 +113,22 @@ scenario (0v0, 0v1, 0v2, 1v0, 1v1, 1v2, 2v0, 2v1, 2v2). Cell value is
 the form's win rate on the CD moveset at that shield count, coloured
 green above 50% and red below.
 
+#### How to read the shield-scenario grid
+
+Shield asymmetry dominates the extremes: **2v0** (you have two, they
+have none) is essentially a free win, and **0v2** is essentially a
+free loss, regardless of species or form. So the interesting reading
+isn't the absolute numbers in the corners - it's **within a column**:
+does form choice swing the outcome at a given shield count?
+
+Most players give the **even-shield scenarios** (0v0, 1v1, 2v2) more
+weight when team-building, because those are the states opponents
+most often end up in after mutual shield trades. Playstyle matters
+too - an aggressive shielder weights 0v0 / 0v1 / 0v2 more; a
+shield-hoarder weights 2v0 / 2v1 / 2v2 more.
+
+#### Dropdown control
+
 The Meta Coverage section carries a small **dropdown control** that
 rewrites the numbers in both this grid and the Matchup Delta table
 below:
