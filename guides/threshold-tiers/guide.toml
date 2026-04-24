@@ -3,7 +3,7 @@ slug = "threshold-tiers"
 description = "Tier vs category vs anchor. What the stat-cutoff bullets mean and why overlapping tiers are intentional."
 order = 1
 coming_soon = false
-authorship = "ai"
+authorship = "both"
 
 # Reference dive defaults to Oinkologne Male GL (inherited from
 # build_guides.DEFAULT_REFERENCE). Numeric citations resolve via
