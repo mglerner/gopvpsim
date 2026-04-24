@@ -6,37 +6,52 @@ picking which IV to invest in.
 
 ## What a tier card actually shows
 
-On the reference dive for {{dive:species_display}} in {{dive:league_display}},
-the top tier card looks like this:
+<figure>
+<img src="screenshots/tier-card-example.png"
+     alt="A threshold tier card for 'Dusknoir Atk' showing the badge,
+          stat cutoff, IV count, a list of anchor bullets, and a
+          list of matchup-flipping boundaries.">
+<figcaption>
+The <strong>Dusknoir Atk</strong> tier card from the Tinkaton UL
+dive. Header: the tier-name badge, the stat cutoff
+(<code>atk&ge;142.54</code>), the member count (220 IVs), and a
+parent-tier diff callout explaining what this stricter tier trades
+vs. the next looser one. Below the header: two lists. The
+<strong>anchor bullets</strong> (top) are pure damage breakpoints
+("X Atk flips Y against Z"). The <strong>Matchup-flipping
+boundaries</strong> (bottom) are full-battle boundaries that
+usually include an HP co-floor - the full 1v1 outcome flips at
+<code>131.09 Atk + 176 HP</code>, not just the damage tier. The
+distinction matters: anchors tell you what a move does, boundaries
+tell you what a whole fight does.
+</figcaption>
+</figure>
 
-> **{{dive:top_tier_name}}** &middot; atk &ge; {{dive:top_tier_atk_cutoff}}
-> ({{dive:top_tier_clear_count}} IVs)
-
-Three things to read off the header:
+Three things to read off the tier card header in the screenshot:
 
 1. **The tier name.** It's always "(opponent) Atk" or "(opponent) Def"
    or "Fortified (opponent)" - a shorthand for "this tier is defined
    by a specific breakpoint or bulkpoint against that opponent." In
-   the example above, "{{dive:top_tier_name}}" means this cutoff was
-   derived from a damage breakpoint against that opponent.
+   the screenshot, **Dusknoir Atk** means this cutoff was derived
+   from a damage breakpoint against Dusknoir.
 2. **The stat cutoff.** The part after the middle dot is what an IV
-   has to clear to be a member of the tier. `atk >= 123.74` means the
+   has to clear to be a member of the tier. `atk ≥ 142.54` means the
    IV's effective attack stat (base + IV, at the level the CP cap
-   allows) has to be at least 123.74. A tier can have any combination
-   of `atk >=`, `def >=`, and `hp >=` cutoffs; stats without a cutoff
+   allows) has to be at least 142.54. A tier can have any combination
+   of `atk ≥`, `def ≥`, and `hp ≥` cutoffs; stats without a cutoff
    aren't restricted.
-3. **The member count in parentheses.** `{{dive:top_tier_clear_count}}
-   IVs` means that many of the 4096 possible IV spreads clear this
-   tier's cutoffs. The higher the number, the easier the tier is to
-   hit with a catchable IV; the lower, the rarer.
+3. **The member count in parentheses.** `220 IVs` means that many of
+   the 4096 possible IV spreads clear this tier's cutoffs. The higher
+   the number, the easier the tier is to hit with a catchable IV; the
+   lower, the rarer.
 
 Below the header, each card carries a list of anchor bullets - the
-specific matchup flips this tier buys you. A tier with a name like
-"Lapras Slayer" will typically list Lapras as its primary bullet plus
-any other opponents whose damage breakpoint sits below Lapras's. That's
-why {{dive:species_display}}'s {{dive:top_tier_name}} card lists more
-than just Lapras in its bullet list; clearing a stricter atk cutoff
-clears every looser atk cutoff at the same time.
+specific matchup flips this tier buys you. The Dusknoir Atk card in
+the screenshot lists Lapras, Corviknight, and Tinkaton bullets
+alongside the namesake Dusknoir bullet - because clearing a stricter
+atk cutoff like `142.54` automatically clears every looser atk cutoff
+(131.52 Atk for Lapras, 134.13 Atk for Corviknight, etc.) at the
+same time.
 
 ## Tier vs anchor vs category
 

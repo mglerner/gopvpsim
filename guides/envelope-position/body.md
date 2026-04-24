@@ -25,6 +25,21 @@ Flavor Guide, each card in Notable IVs, each tier in Threshold Tiers):
 **at matching stat-product rank, does this category's score sit above,
 below, or on the band?**
 
+<figure>
+<img src="screenshots/envelope-example.png"
+     alt="Tinkaton UL scatter plot showing named categories riding or
+          spreading across the Anchor IVs band.">
+<figcaption>
+Scatter plot from the Tinkaton UL dive. The grey triangle band is the
+Anchor IVs overlay. Orange <strong>Steelix (Shadow) Slayer</strong>
+tightly rides the top edge (envelope-rider-top). Red
+<strong>Annihilape Bulk</strong> tightly rides the bottom
+(envelope-rider-bottom). Green <strong>Ampharos Atk</strong> sits
+elevated above the band but spreads across it (elevated-band-crosser).
+Three of the four shape classes in one frame.
+</figcaption>
+</figure>
+
 ## The four shapes
 
 Each category carries a shape label, derived from two numbers:
@@ -43,20 +58,32 @@ consistently on one side of the band). Otherwise it's a
 **band-crosser** (members scatter across the band; the sign of the
 mean tells you which way the scatter tilts).
 
-That gives four named shapes:
+That gives four named shapes. The first, second, and fourth each
+have a labeled trace on the screenshot above; the third
+(depressed-band-crosser) appears in Tinkaton UL only as
+single-matchup cohorts that don't get dedicated traces.
 
 - **Rides top of anchor band** (`rider-top`) - members consistently
-  above the band. These are the categories that earn their spot on
-  top of the score distribution, not by rank alone but by some
-  property of the IV cut itself. Green tag on the dive.
+  above the band. These earn their spot on top of the score
+  distribution not by rank alone but by some property of the IV
+  cut itself. For example, see the
+  <span style="color:#f0883e;font-weight:600">Steelix (Shadow) Slayer</span>
+  trace in the screenshot above - a tight cluster hugging the upper
+  edge of the grey Anchor IVs band.
 - **Straddles band (net +)** (`elevated-band-crosser`) - mixed, but
   averages above the band. The cut helps on average; chasing a
-  specific member IV isn't strictly required. Muted green.
+  specific member IV isn't strictly required. For example, the
+  <span style="color:#3fb950;font-weight:600">Ampharos Atk</span>
+  trace above - clearly elevated overall, but visibly spread across
+  the band rather than hugging the edge.
 - **Straddles band (net -)** (`depressed-band-crosser`) - mixed,
   averages below. The cut hurts on average; clearing the tier in
-  question may not be worth the trade. Muted orange.
+  question may not be worth the trade.
 - **Rides bottom of anchor band** (`rider-bottom`) - members
-  consistently below. Category to avoid. Red tag.
+  consistently below. Category to avoid. For example, the
+  <span style="color:#f85149;font-weight:600">Annihilape Bulk</span>
+  trace above - a tight cluster hugging the bottom edge of the
+  anchor band.
 
 A fifth label, `sparse`, fires when the category has too few members
 or too few anchors for the metric to be informative. The dive renderer
