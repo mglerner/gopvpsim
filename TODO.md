@@ -1,3 +1,27 @@
+## Mirror-tier synth backfill — SHIPPED 2026-04-26 via overnight chain
+
+Synth-tier work (commits `ee8b026`, `dede396`, `fe75e08`) added a
+`<species> Mirror Bulk/Atk` tier whenever the focal species has a
+mirror-axis cohort that wins majority-of-scenarios. Backfilled
+across all 14 shipped dives via `scripts/overnight_redive.sh`
+(2026-04-25 23:08 → 2026-04-26 08:53). Results:
+
+* **Synth tier fired (5 dives):** Dewgong Mirror Bulk (def, 10 IVs),
+  Forretress Volt Switch GL Mirror Atk (842 IVs), Forretress Shadow
+  Volt Switch GL Mirror Bulk (78 IVs), Stunfisk Mirror Atk (3495
+  IVs), Tinkaton UL Mirror Atk (491 IVs).
+* **No synth tier (9 dives):** Oinkologne (M/F GL), Aegislash
+  (Blade/Shield × GL/UL), Tinkaton GL, Forretress Bug Bite (both
+  forms). The synth function correctly returned `None` when no
+  cohort cleared the gate.
+
+Open follow-up: synth tier is silently dropped from the IV Flavor
+Guide section by `refine_flavor_names`'s dedup pass (pain point #9
+in `project_post_ship_cleanup_pain_points.md`,
+`feedback_synth_mirror_tier_in_iv_flavor_guide.md`). Add to IV
+Flavor Guide without removing existing flavors when the synth tier
+is mirror-axis-specific.
+
 ## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
 
 Current thread: pre-ship polish between S10 ship day (2026-04-18) and
