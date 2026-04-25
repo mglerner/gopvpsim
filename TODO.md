@@ -1490,6 +1490,16 @@ bottleneck.
 
 ## Refactoring
 
+* **Pain points captured during real debugging** — see memory file
+  `project_post_ship_cleanup_pain_points.md` (silent early-returns
+  with no logging, no replay-from-saved-state mode, hardcoded magic
+  numbers assuming `nS=9`, parallel call-site duplication,
+  free-form-string opponent identity, `data_obj`-as-mutable-bag,
+  `id()`-keyed caches). Specific friction encountered while
+  diagnosing the 2026-04-25 mirror-tier-synthesis no-fire bug;
+  read this *before* starting the deep_dive.py split below so the
+  cuts address actual pain rather than aesthetic ones.
+
 * **Split `scripts/deep_dive.py`** *(deferred from 2026-04-09; not
   blocking, but file is now ~6100 lines as of 2026-04-10)* — After the structured IV
   categories shipped, the file is approaching the size where edits

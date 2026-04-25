@@ -1639,6 +1639,7 @@ _pretty_name = analysis.pretty_name
 _pretty_moveset = analysis.pretty_moveset
 _stat_cutoffs_from_anchors = analysis.stat_cutoffs_from_anchors
 _aggregate_flips_by_anchor = analysis.aggregate_flips_by_anchor
+_synthesize_mirror_tier = analysis.synthesize_mirror_tier
 _find_matchup_boundaries = analysis.find_matchup_boundaries
 _auto_derive_tiers = analysis.auto_derive_tiers
 
@@ -1785,7 +1786,8 @@ def _recompute_tier_assignments(data_obj, plot_tiers):
 
 def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
                                     scenarios, opponents, opp_iv_modes,
-                                    has_toml_tiers, resolved_anchors=None):
+                                    has_toml_tiers, resolved_anchors=None,
+                                    *, species=None):
     """Generate narrative HTML for one moveset.
 
     Computes matchup boundaries (and optionally anchor-flip records if
@@ -1867,6 +1869,27 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
         effective_tiers = _auto_derive_tiers(
             anchor_flip_records, data_obj,
             matchup_boundaries=all_matchup_boundaries) or []
+        # Mirror-tier synthesis (mirror to the line ~2140 code path):
+        # ensure the per-moveset IV Flavor Guide also surfaces a
+        # "<species> Mirror Bulk" tier if no existing tier covers it.
+        # See synthesize_mirror_tier docstring for the relaxed-gate
+        # rationale. Append-only. Skipped when species was not
+        # threaded through (older callers).
+        if species:
+            _mirror_scores = score_arrays.get(f'{moveset_idx}_pvpoke')
+            if _mirror_scores:
+                _mirror_tier = _synthesize_mirror_tier(
+                    species=species,
+                    scores_flat=_mirror_scores,
+                    nIvs=nIvs, nS=nS, nO=nO,
+                    data_obj=data_obj,
+                    scenarios=scenarios,
+                    opponents=opponents,
+                    resolved_anchors=resolved_anchors or [],
+                    existing_tiers=effective_tiers,
+                )
+                if _mirror_tier:
+                    effective_tiers = list(effective_tiers) + [_mirror_tier]
 
     if not effective_tiers:
         return '', []
@@ -2140,6 +2163,61 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         effective_tiers = _auto_derive_tiers(
             anchor_flip_records, data_obj,
             matchup_boundaries=all_matchup_boundaries)
+        # Mirror-tier synthesis: when the focal species is in the
+        # opponent pool, synthesize a "<species> Mirror Bulk" / "Mirror
+        # Atk" tier from the auto-anchor's mirror data using a mean-
+        # score gate (passing-cohort mean >= 500 AND > failing-cohort
+        # mean, in majority of scenarios). Article-era "Species Mirror
+        # Bulk" framing — the standard 75/25 anchor-flip partition gate
+        # filters mirror anchors out because the cohort can win on
+        # average without 75%+ per-IV win rates. See
+        # `synthesize_mirror_tier` docstring for the gate rationale.
+        # Append-only; no existing tier is removed or replaced.
+        _focal_species = data_obj.get('species') or ''
+        _mirror_scores = score_arrays.get(f'{moveset_idx}_pvpoke') if _focal_species else None
+        if _mirror_scores:
+            # Optional state pickle for offline iteration on the synth
+            # gate. Set DUMP_SYNTH_STATE=/path/to/file.pkl on the dive
+            # invocation; the dump fires once per (moveset, focal-
+            # species) pair. See cleanup pain point #2 in
+            # `project_post_ship_cleanup_pain_points.md` — this is the
+            # smallest-possible replay-from-saved-state mode for the
+            # mirror-tier synthesis pass; a generalized version could
+            # cover other analytical passes too.
+            try:
+                import os as _os
+                if _os.environ.get('DUMP_SYNTH_STATE'):
+                    import pickle as _pkl
+                    _dump_path = _os.environ.get('DUMP_SYNTH_STATE')
+                    with open(_dump_path, 'wb') as _f:
+                        _pkl.dump({
+                            'species': _focal_species,
+                            'scores_flat': _mirror_scores,
+                            'nIvs': nIvs, 'nS': nS, 'nO': nO,
+                            'data_obj': data_obj,
+                            'scenarios': scenarios,
+                            'opponents': opponents,
+                            'resolved_anchors': resolved_anchors_top,
+                            'existing_tiers': effective_tiers,
+                        }, _f)
+                    logger.info(f"  [mirror-synth] state dumped to {_dump_path}")
+            except Exception as _e:
+                logger.warning(f"  [mirror-synth] state dump failed: {_e}")
+            _mirror_tier = _synthesize_mirror_tier(
+                species=_focal_species,
+                scores_flat=_mirror_scores,
+                nIvs=nIvs, nS=nS, nO=nO,
+                data_obj=data_obj,
+                scenarios=scenarios,
+                opponents=opponents,
+                resolved_anchors=resolved_anchors_top,
+                existing_tiers=effective_tiers,
+            )
+            if _mirror_tier:
+                effective_tiers = list(effective_tiers) + [_mirror_tier]
+                logger.info(f"  Synthesized mirror tier: "
+                            f"{_mirror_tier['name']} "
+                            f"({_mirror_tier['desc']})")
         if effective_tiers:
             logger.info(f"  Auto-derived {len(effective_tiers)} threshold tier(s) "
                         f"from anchor-flip records")
@@ -3251,6 +3329,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
         has_toml_tiers,
         resolved_anchors=_resolved_anchors,
+        species=species,
     )
     logger.info(f"  Moveset 0 narrative (pre-render for rename) in "
                 f"{_time.time() - _nar0_start:.1f}s")
@@ -3311,6 +3390,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                 opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
                 has_toml_tiers,
                 resolved_anchors=None,
+                species=species,
             )
             logger.info(f"    Narrative moveset {mi+1}/{n_movesets} "
                         f"rendered in {_time.time() - _mi_start:.1f}s")
