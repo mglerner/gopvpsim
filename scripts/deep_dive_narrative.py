@@ -492,6 +492,32 @@ def refine_flavor_names(flavors, tradeoffs):
                 rest = [g for g in gains
                         if _base_species(g['opponent']) != naming_opp]
                 td['gains'] = front + rest
+            # Rewrite tier_desc to match the renamed opponent. The
+            # desc was copied from auto_derive_tiers' matchup-boundary
+            # path, which attributes flips by stat-sweep (a different
+            # computation than the anchor-flip-driven gain consolidation
+            # used to pick naming_opp). Without this rewrite, the tier
+            # name says "Fortified Corviknight" while the desc says
+            # "vs Quagsire (1 scenario, 23 IVs)" — name and desc point
+            # to different opponents.
+            if naming_opp and gains:
+                primary_scens = sum(
+                    len(g['scenarios']) for g in gains
+                    if _base_species(g['opponent']) == naming_opp)
+                other_opps = sorted({_base_species(g['opponent'])
+                                      for g in gains
+                                      if _base_species(g['opponent']) != naming_opp})
+                desc_parts = [
+                    f'{"Bulkpoint(s)" if new_name.startswith("Fortified ") else "Atk gain(s)"} '
+                    f'vs {naming_opp} '
+                    f'({primary_scens} scenario'
+                    f'{"s" if primary_scens != 1 else ""})'
+                ]
+                if other_opps:
+                    desc_parts.append(
+                        f'+ {len(other_opps)} secondary '
+                        f'opponent{"s" if len(other_opps) != 1 else ""}')
+                flavor['tier_desc'] = ' '.join(desc_parts) + '.'
 
     # Drop wash specialists: if the naming opponent appears in losses at
     # >= the gain-scenario count, the "slayer/fortified" label is
