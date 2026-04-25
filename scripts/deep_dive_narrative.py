@@ -140,8 +140,19 @@ def _flavor_name_for_tier(name, atk, def_, hp):
 
     TOML-defined names (GL-General Good, Slight Atk Weight, etc.) pass
     through as-is since the user chose them deliberately.
+
+    Synth-tier names ("<Species> Mirror Bulk" / "<Species> Mirror Atk")
+    also pass through. They look like "<Opp> Bulk" / "<Opp> Atk" to the
+    naive opponent stripper, which would rewrite "Dewgong Mirror Bulk"
+    to "Fortified Dewgong Mirror" — replacing a clean synth name with
+    a phrase that reads like Dewgong Mirror is an opponent. Detect
+    "<word> Mirror Bulk|Atk" up front and skip flavoring.
     """
     shape = _axis_shape(atk, def_, hp)
+
+    # Synth mirror-tier names pass through unchanged.
+    if name.endswith(' Mirror Bulk') or name.endswith(' Mirror Atk'):
+        return name
 
     if name == 'General':
         # Bulk family requires DH / D / H. Anything with Atk becomes
