@@ -10,6 +10,7 @@ requires-python = ">=3.13"
 dependencies = [
     "certifi",
     "markdown",  # scripts/build_guides.py renders the Reader's Guide pages
+    "numpy",     # vectorised aggregator hot paths in scripts/deep_dive_analysis.py
 ]
 
 [project.optional-dependencies]

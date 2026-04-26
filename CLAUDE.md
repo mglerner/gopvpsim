@@ -102,12 +102,20 @@ Pluggable policy. Simulate all three shield scenarios (0-0, 1-1, 2-2).
 
 ## Running Python
 This project requires Python **3.13+** (`pyproject.toml` `requires-python =
-">=3.13"`). On Michael's machine, bare `python` resolves to the anaconda
-3.13 install and is the correct interpreter. Bare `python3` resolves to
-the macOS-default `/usr/bin/python3` (3.9.6) and will fail on stdlib
-imports like `tomllib`. **Always invoke `python`, never `python3`**, for
-any project script, `-c` one-liner, or test runner. Script shebangs all
-use `#!/usr/bin/env python` to reinforce this.
+">=3.13"`). On Michael's machine the interpreter is selected by **pyenv**
+via `~/coding/MGLPoGo/.python-version` (currently `3.13` → resolves to the
+installed 3.13.x). Bare `python` is the correct invocation; it picks up the
+pyenv shim and lands on the right interpreter. Bare `python3` resolves to
+the macOS-default `/usr/bin/python3` (3.9.6) and will fail on stdlib imports
+like `tomllib`. **Always invoke `python`, never `python3`**, for any project
+script, `-c` one-liner, or test runner. Script shebangs all use
+`#!/usr/bin/env python` to reinforce this.
+
+The pyenv environment is barebones — install runtime + dev + perf deps with
+`python -m pip install -e ".[dev,perf]"`. Runtime deps are declared in
+`pyproject.toml` (currently `certifi`, `markdown`, `numpy`); `[dev]` adds
+`pytest`; `[perf]` adds `numba` (optional — `_dp_jit.py` falls back to pure
+Python if not importable).
 
 ## Testing
 - `python -m pytest tests/test_battle.py -q` — run all battle tests (99/102 passing)
