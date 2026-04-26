@@ -49,6 +49,7 @@ import os
 from pathlib import Path
 import sys
 import time
+import tomllib
 from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -804,6 +805,97 @@ def _parse_opponent_pool_line(line):
             analysis.pretty_name(c) for c in charged_override))
     display = f"{species_with_form} ({' / '.join(suffix_parts)})"
     return display, base_species, is_shadow, fast_override, charged_override
+
+
+# ---- Active alt-moveset opponent variants (TOML, project-wide) ----
+
+ACTIVE_VARIANTS_PATH = Path(__file__).resolve().parents[1] / (
+    'opponent_pools/active_variants.toml')
+
+
+def _apply_active_variants(opponents, opp_movesets_full, league, toml_path=None,
+                           skip=False):
+    """Append project-wide alt-moveset opponent variants from a TOML file.
+
+    Skipping rules:
+    - ``skip=True`` → no-op (returns []).
+    - File missing → no-op (returns []).
+    - Variant whose ``(base_species, is_shadow)`` doesn't match any opponent
+      already in the pool → skipped silently. Lets a single TOML cover
+      multiple leagues without manual scoping (a Forretress (BB) entry
+      auto-skips on a UL pool that doesn't include Forretress).
+    - Variant display name already in ``opponents`` (e.g. from inline
+      pipe-syntax) → skipped.
+
+    Mutates ``opponents`` and ``opp_movesets_full`` in place. Registers each
+    appended variant via ``register_opponent_variant`` so
+    ``parse_opponent_spec`` can recover the base species downstream.
+
+    Returns: list of display names actually appended.
+    """
+    if skip:
+        return []
+    if toml_path is None:
+        toml_path = ACTIVE_VARIANTS_PATH
+    toml_path = Path(toml_path)
+    if not toml_path.exists():
+        return []
+
+    with open(toml_path, 'rb') as f:
+        data = tomllib.load(f)
+
+    # Index existing pool by (base_species, is_shadow) so a variant only
+    # appends when its base form is already a meta opponent.
+    base_present = set()
+    for opp_name in opponents:
+        base, _, is_shadow = parse_opponent_spec(opp_name)
+        base_present.add((base, is_shadow))
+
+    applied = []
+    for v in data.get('variants', []):
+        species = v.get('species')
+        if not species:
+            logger.warning(f"active_variants.toml: skipping entry without 'species'")
+            continue
+        is_shadow = bool(v.get('shadow', False))
+        fast_ov = v.get('fast')
+        charged_ov = v.get('charged')
+        if fast_ov is None and charged_ov is None:
+            logger.warning(f"active_variants.toml: {species} entry has no "
+                           f"'fast' or 'charged' override, skipping")
+            continue
+        if (species, is_shadow) not in base_present:
+            continue  # base form not in this pool; quietly skip
+
+        try:
+            d_fast, d_charged = get_default_moveset(
+                species, league=league, shadow=is_shadow)
+        except (KeyError, ValueError) as _e:
+            logger.warning(f"active_variants.toml: {species} not in "
+                           f"{league} rankings, skipping ({_e})")
+            continue
+        fast_id = fast_ov if fast_ov is not None else d_fast
+        charged_ids = (
+            list(charged_ov) if charged_ov is not None else list(d_charged))
+
+        species_with_form = f"{species} (Shadow)" if is_shadow else species
+        suffix_parts = []
+        if fast_ov is not None:
+            suffix_parts.append(analysis.pretty_name(fast_ov))
+        if charged_ov is not None:
+            suffix_parts.append('+'.join(
+                analysis.pretty_name(c) for c in charged_ov))
+        display = f"{species_with_form} ({' / '.join(suffix_parts)})"
+
+        if display in opponents:
+            continue  # already there from inline pipe-syntax
+
+        opponents.append(display)
+        opp_movesets_full.append((fast_id, charged_ids))
+        register_opponent_variant(display, species, is_shadow)
+        applied.append(display)
+
+    return applied
 
 
 def _atk_weighted_spread_name(species):
@@ -3913,9 +4005,20 @@ def main():
                              'need a custom opponent pool (e.g. top-50 rankings '
                              'union championshipseries). Species must match '
                              'the PvPoke speciesName exactly, e.g. '
-                             '"Tinkaton" or "Altaria (Shadow)". Movesets are '
-                             'resolved the same way as the --opponents path '
-                             '(PvPoke default moveset per species).')
+                             '"Tinkaton" or "Altaria (Shadow)". Per-line '
+                             'moveset overrides are also supported via '
+                             '`Forretress | fast=BUG_BITE` syntax — see '
+                             '_parse_opponent_pool_line. Movesets without '
+                             'overrides are resolved via PvPoke default.')
+    parser.add_argument('--no-active-variants', action='store_true',
+                        help='Skip the opponent_pools/active_variants.toml '
+                             'auto-merge. Default behavior reads that file '
+                             '(if present) and appends each variant whose '
+                             'base species is already in the loaded opponent '
+                             'pool, so e.g. Forretress (Bug Bite) appears '
+                             'alongside the default Forretress without '
+                             'editing every dive\'s pool file. Use this flag '
+                             'to reproduce a clean baseline pool.')
     parser.add_argument('--top-movesets', type=int, default=5, metavar='N',
                         help='Keep top N movesets after Phase 1 screening (default: 5). '
                              'Screening sims the stat-product rank 1 IV against '
@@ -4515,6 +4618,19 @@ def main():
     if _atk_added:
         logger.info(f"  (added {len(_atk_added)} atk-weighted variant(s): "
                     f"{', '.join(_atk_added)})")
+
+    # Apply project-wide alt-moveset opponent variants from
+    # opponent_pools/active_variants.toml (e.g. Forretress (Bug Bite) so
+    # every dive sees both fast-move forms without per-pool edits). Skipped
+    # via --no-active-variants for clean-baseline reproductions.
+    _active_added = _apply_active_variants(
+        opponents, opp_movesets_full, args.league,
+        skip=args.no_active_variants,
+    )
+    if _active_added:
+        logger.info(f"  (added {len(_active_added)} active alt-moveset "
+                    f"variant(s) from active_variants.toml: "
+                    f"{', '.join(_active_added)})")
 
     opp_iv_labels = {'pvpoke': 'PvPoke defaults', 'rank1': 'rank 1 (stat product)', 'both': 'both (PvPoke + rank 1)'}
     opp_iv_label = opp_iv_labels.get(args.opp_ivs, args.opp_ivs)

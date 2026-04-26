@@ -1,0 +1,33 @@
+# Project-wide active alt-moveset opponent variants.
+#
+# Auto-merged onto every opponent pool by deep_dive.py unless the dive
+# is invoked with --no-active-variants. Each [[variants]] entry adds a
+# new opponent only if its base species is already in the loaded pool,
+# so a GL-only variant skips silently on UL pools.
+#
+# Schema (per entry):
+#   species   = "Forretress"   # PvPoke speciesName, base form (no shadow suffix)
+#   shadow    = true           # optional, default false
+#   fast      = "BUG_BITE"     # optional fast-move ID override
+#   charged   = ["A", "B"]     # optional charged-move ID list override
+#   note      = "..."          # free-form, ignored by the loader
+#
+# At least one of fast / charged is required; defaults come from PvPoke
+# rankings for the (species, shadow) combo. Display name is auto-generated:
+#
+#   Forretress | fast=BUG_BITE             -> 'Forretress (Bug Bite)'
+#   Forretress (Shadow) | fast=BUG_BITE    -> 'Forretress (Shadow) (Bug Bite)'
+#
+# To toggle a variant off without losing the entry, comment its block.
+# To toggle the whole file off for a single dive: --no-active-variants.
+
+[[variants]]
+species = "Forretress"
+fast = "BUG_BITE"
+note = "Bug Bite is a CS-meta fast-move alternative to Volt Switch (e.g. for the Galarian Corsola GL dive 2026-04-26)."
+
+[[variants]]
+species = "Forretress"
+shadow = true
+fast = "BUG_BITE"
+note = "Shadow Forretress also has a meta-relevant Bug Bite variant; see the four shipped Forretress dive HTMLs."
