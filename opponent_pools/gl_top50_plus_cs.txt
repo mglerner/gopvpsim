@@ -1,6 +1,6 @@
-# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 65 unique species.
-# Generated 2026-04-12 by scripts/build_opponent_pool.py
-# Hand-extended 2026-04-18 with the four dive focal species so each dive's
+# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 56 unique species.
+# Generated 2026-04-26 by scripts/build_opponent_pool.py
+# Hand-extended 2026-04-26 with the four dive focal species so each dive's
 # opponent pool includes the cross-form / alt-form partner (Oinkologne M/F,
 # Aegislash Blade/Shield). deep_dive.py auto-appends the focal species for
 # mirror analysis, so having them explicit here just makes the cross-form
@@ -12,14 +12,14 @@ Quagsire (Shadow)
 Tinkaton
 Corviknight
 Jellicent
-Empoleon
 Wigglytuff
+Empoleon
 Forretress
 Altaria
 Altaria (Shadow)
 Azumarill
-Empoleon (Shadow)
 Forretress (Shadow)
+Empoleon (Shadow)
 Feraligatr
 Lickilicky
 Medicham
@@ -27,47 +27,42 @@ Corsola (Galarian)
 Talonflame
 Lapras
 Sealeo
+Malamar
 Clodsire
 Dusclops
-Malamar
 Sealeo (Shadow)
-Stunfisk
 Clefable
 Drapion (Shadow)
+Stunfisk
+Annihilape
 Blastoise
 Dusclops (Shadow)
-Annihilape
 Florges
+Cradily
 Politoed (Shadow)
 Talonflame (Shadow)
 Charjabug
-Cradily
 Greedent
 Lapras (Shadow)
 Dusknoir (Shadow)
+Furret
 Sableye
 Steelix (Shadow)
-Feraligatr (Shadow)
-Furret
-Gastrodon
 Sableye (Shadow)
+Feraligatr (Shadow)
+Gastrodon
 Dondozo
+Guzzlord
 Seaking
-Stunfisk (Galarian)
+Shelgon
 Swampert
 Swampert (Shadow)
-Guzzlord
+Diggersby
 Gourgeist (Super)
-Moltres (Galarian)
-Ninetales (Alolan)
-Piloswine
-Piloswine (Shadow)
-Politoed
-Shelgon
 Steelix
 Togekiss
 Weezing (Galarian) (Shadow)
-Diggersby
+Malamar (Shadow)
 Oinkologne
 Oinkologne (Female)
 Aegislash (Blade)
