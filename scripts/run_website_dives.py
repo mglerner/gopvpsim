@@ -223,6 +223,23 @@ DIVES = [
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'top_movesets': 3,
     },
+    # Galarian Corsola GL — niche pick added 2026-04-26. PvPoke top
+    # moveset is fine (no `reference` override, so the loader pulls
+    # get_default_moveset). top_movesets=1 keeps the surface to a single
+    # screened-winner page; bump later if alt-moveset comparison becomes
+    # interesting. No thresholds TOML yet — clean dive; we'll author
+    # anchors after seeing what flips. opponent_pools/active_variants.toml
+    # will auto-merge Forretress (Bug Bite) ± shadow into the matchup
+    # matrix unless --no-active-variants is set.
+    {
+        'species': 'Corsola (Galarian)',
+        'league': 'great',
+        'slug': 'galarian-corsola-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+    },
 ]
 
 
