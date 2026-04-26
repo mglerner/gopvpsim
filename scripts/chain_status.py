@@ -244,6 +244,28 @@ _ETA_LINE_RE = re.compile(
     r'elapsed\s+(\d+)s,\s*eta\s+(\d+)s'
 )
 
+# Anchors used to project a rough dive-level ETA: one of these phrases
+# appears in the active log → we look for the SAME phrase in a recent
+# completed dive log and use its (anchor_ts → 'Done.' last-line ts) gap
+# as the projected remaining-after-anchor time. Listed latest-anchor
+# first so the most-specific match wins.
+_DIVE_ETA_ANCHORS = [
+    'Mirror slayer iteration',
+    'Phase 2',
+    'Phase 1: Screening',
+]
+
+_LOG_TS_RE = re.compile(r'^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)\]')
+
+_PHASE2_TOTAL_RE = re.compile(r'Phase 2 \[\d+/(\d+)\]')
+
+
+def _phase2_total(text: str):
+    """Return the total moveset count from the first 'Phase 2 [N/M]' line,
+    or None if no Phase 2 marker is present yet."""
+    m = _PHASE2_TOTAL_RE.search(text)
+    return int(m.group(1)) if m else None
+
 
 def _format_eta_seconds(secs: int) -> str:
     if secs < 60:
@@ -253,6 +275,131 @@ def _format_eta_seconds(secs: int) -> str:
         return f'{m}m {s:02d}s'
     h, m = divmod(m, 60)
     return f'{h}h {m:02d}m'
+
+
+def _parse_log_ts(line: str):
+    """Parse the leading '[YYYY-MM-DD HH:MM:SS.mmm]' timestamp; None if absent."""
+    m = _LOG_TS_RE.match(line)
+    if m is None:
+        return None
+    try:
+        return datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S.%f')
+    except ValueError:
+        return None
+
+
+def _find_anchor_ts(log_path: Path, anchor: str):
+    """Earliest timestamp of a log line containing ``anchor``, or None."""
+    try:
+        with open(log_path) as f:
+            for line in f:
+                if anchor in line:
+                    ts = _parse_log_ts(line)
+                    if ts is not None:
+                        return ts
+    except OSError:
+        pass
+    return None
+
+
+def _find_completed_reference_log(active_log: Path, anchor: str,
+                                   active_phase2_total: int | None,
+                                   max_age_days: int = 14):
+    """Most recent finished dive log (containing 'Done.' as a deep_dive line)
+    that also contains ``anchor`` and isn't the active log itself.
+
+    When ``active_phase2_total`` is known (active dive has hit Phase 2), only
+    references with the same Phase 2 moveset count match — a top_movesets=3
+    reference would over-estimate a top_movesets=1 active dive's remaining
+    work by ~3x.
+
+    Bounded to logs younger than ``max_age_days``."""
+    log_dir = active_log.parent.parent  # userdata/logs/
+    cutoff = datetime.now().timestamp() - max_age_days * 86400
+    candidates = []
+    for month_dir in sorted(log_dir.glob('20*'), reverse=True):
+        for log in month_dir.glob('20*_*.log'):
+            if log == active_log:
+                continue
+            if log.stat().st_mtime < cutoff:
+                continue
+            candidates.append(log)
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    for log in candidates:
+        try:
+            with open(log) as f:
+                text = f.read()
+        except OSError:
+            continue
+        # Quick sniff: does it have BOTH the anchor AND 'Done.' as a
+        # deep_dive log line (rather than the literal token in some other
+        # context)? Match the structured logger's format prefix.
+        if anchor not in text:
+            continue
+        if not re.search(r'INFO\s+deep_dive: Done\.', text):
+            continue
+        if active_phase2_total is not None:
+            ref_total = _phase2_total(text)
+            if ref_total != active_phase2_total:
+                continue  # different dive shape; would mis-estimate
+        return log
+    return None
+
+
+def _last_log_ts(log_path: Path):
+    """Last timestamped log line's parsed datetime, or None."""
+    try:
+        with open(log_path) as f:
+            last = None
+            for line in f:
+                ts = _parse_log_ts(line)
+                if ts is not None:
+                    last = ts
+            return last
+    except OSError:
+        return None
+
+
+def _project_dive_eta(active_log: Path):
+    """Project a rough dive ETA by replaying a recent completed dive's
+    elapsed-from-anchor-to-'Done.' against the active dive's anchor.
+
+    Returns (eta_seconds, anchor, reference_log_name) or (None, None, None)
+    when no usable reference exists.
+    """
+    if not active_log.exists():
+        return None, None, None
+    # Pick the latest anchor present in the active log.
+    try:
+        active_text = active_log.read_text()
+    except OSError:
+        return None, None, None
+    chosen_anchor = None
+    for a in _DIVE_ETA_ANCHORS:
+        if a in active_text:
+            chosen_anchor = a
+            break
+    if chosen_anchor is None:
+        return None, None, None
+    active_anchor_ts = _find_anchor_ts(active_log, chosen_anchor)
+    if active_anchor_ts is None:
+        return None, None, None
+    active_phase2_total = _phase2_total(active_text)
+    ref = _find_completed_reference_log(
+        active_log, chosen_anchor, active_phase2_total)
+    if ref is None:
+        return None, None, None
+    ref_anchor_ts = _find_anchor_ts(ref, chosen_anchor)
+    ref_done_ts = _last_log_ts(ref)
+    if ref_anchor_ts is None or ref_done_ts is None:
+        return None, None, None
+    ref_delta = (ref_done_ts - ref_anchor_ts).total_seconds()
+    active_elapsed_since_anchor = (
+        datetime.now() - active_anchor_ts).total_seconds()
+    remaining = int(ref_delta - active_elapsed_since_anchor)
+    if remaining < 0:
+        remaining = 0
+    return remaining, chosen_anchor, ref.name
 
 
 def print_eta(wrapper_log: Path | None,
@@ -309,14 +456,23 @@ def print_eta(wrapper_log: Path | None,
                     last_match = m
     except OSError:
         return
-    if last_match is None:
-        return
-    chunks_done, chunks_total, elapsed_s, eta_s = (
-        int(last_match.group(i)) for i in (1, 2, 3, 4))
-    pct = 100 * chunks_done // chunks_total if chunks_total else 0
-    print(f'  {eta_accent("► CURRENT-PHASE ETA: " + _format_eta_seconds(eta_s))}'
-          f'  {dim(f"({chunks_done}/{chunks_total} chunks, {pct}%, "
-                   f"elapsed {_format_eta_seconds(elapsed_s)})")}')
+    if last_match is not None:
+        chunks_done, chunks_total, elapsed_s, eta_s = (
+            int(last_match.group(i)) for i in (1, 2, 3, 4))
+        pct = 100 * chunks_done // chunks_total if chunks_total else 0
+        print(f'  {eta_accent("► CURRENT-PHASE ETA: " + _format_eta_seconds(eta_s))}'
+              f'  {dim(f"({chunks_done}/{chunks_total} chunks, {pct}%, "
+                       f"elapsed {_format_eta_seconds(elapsed_s)})")}')
+
+    # Dive-level rough ETA: replay a recent completed dive's elapsed-from-
+    # anchor-to-'Done.' against the active dive's matching anchor. Rough
+    # because dive shape (top_movesets, opponent count, mirror-slayer-cold)
+    # varies; calibrate against actual completion rather than treating as
+    # ground truth.
+    dive_eta_s, anchor, ref_name = _project_dive_eta(per_dive_log)
+    if dive_eta_s is not None:
+        print(f'  {eta_accent("► DIVE ETA (rough): " + _format_eta_seconds(dive_eta_s))}'
+              f'  {dim(f"(anchor: {anchor!r}, ref: {ref_name})")}')
 
 
 def print_latest_log(per_dive_log: Path | None, width: int) -> None:
