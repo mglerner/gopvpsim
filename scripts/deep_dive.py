@@ -686,18 +686,50 @@ def resolve_opp_ivs(species_name, league, shadow, opp_iv_mode):
 # resolve_opp_ivs().
 ATK_WEIGHTED_SUFFIX = ' (atk-weighted)'
 
+# Moveset-variant opponents (e.g. 'Forretress (Bug Bite)' for a fast-move
+# override) get a registry entry at pool-load time so parse_opponent_spec
+# can recover the base species. Keyed by display name -> (base, is_shadow).
+# Populated by _parse_opponent_pool_line / _apply_active_variants in the main
+# process before workers spawn; workers consume opp_cache (pre-resolved) and
+# never call parse_opponent_spec directly.
+_OPPONENT_VARIANT_REGISTRY = {}
+
+
+def register_opponent_variant(display_name, base_species, is_shadow):
+    """Register a moveset-variant opponent so parse_opponent_spec resolves
+    the display name back to its base species + shadow flag.
+
+    Idempotent: re-registering with identical fields is a no-op; conflicts
+    raise ValueError so a typo can't silently shadow an earlier entry.
+    """
+    existing = _OPPONENT_VARIANT_REGISTRY.get(display_name)
+    payload = (base_species, is_shadow)
+    if existing is not None and existing != payload:
+        raise ValueError(
+            f"opponent variant {display_name!r} already registered as "
+            f"{existing}, cannot reregister as {payload}"
+        )
+    _OPPONENT_VARIANT_REGISTRY[display_name] = payload
+
 
 def parse_opponent_spec(opp_name):
     """Split an opponents-list entry into (species, variant, is_shadow).
 
-    Handles three forms:
-      'Medicham'                 -> ('Medicham', None,           False)
-      'Medicham (Shadow)'        -> ('Medicham', None,           True)
-      'Medicham (atk-weighted)'  -> ('Medicham', 'atk_weighted', False)
+    Handles four forms:
+      'Medicham'                       -> ('Medicham', None,             False)
+      'Medicham (Shadow)'              -> ('Medicham', None,             True)
+      'Medicham (atk-weighted)'        -> ('Medicham', 'atk_weighted',   False)
+      'Forretress (Bug Bite)'          -> ('Forretress','moveset_variant',False)
+        (only when registered via register_opponent_variant; otherwise the
+        parenthetical falls through and the whole string is treated as a
+        speciesName so genuine PvPoke forms like '(Galarian)' still work)
 
     Shadow + atk-weighted in the same entry is not supported (no meta-relevant
     opponent today is both).
     """
+    if opp_name in _OPPONENT_VARIANT_REGISTRY:
+        base, is_shadow = _OPPONENT_VARIANT_REGISTRY[opp_name]
+        return base, 'moveset_variant', is_shadow
     variant = None
     name = opp_name
     if name.endswith(ATK_WEIGHTED_SUFFIX):
@@ -707,6 +739,71 @@ def parse_opponent_spec(opp_name):
     if is_shadow:
         name = name[:-len(' (Shadow)')]
     return name, variant, is_shadow
+
+
+def _parse_opponent_pool_line(line):
+    """Parse one non-comment, non-blank line from an opponents-file.
+
+    Format:
+        SPECIES                              # default moveset (PvPoke)
+        SPECIES | fast=ID                    # fast-move override
+        SPECIES | charged=A,B                # charged-only override
+        SPECIES | fast=ID | charged=A,B      # full moveset override
+
+    SPECIES is the PvPoke speciesName, optionally with a trailing ' (Shadow)'.
+    Override keys are case-sensitive ('fast', 'charged'); unknown keys raise.
+    Whitespace around the '|' separator and around 'key=value' is tolerated.
+
+    Returns:
+        (display_name, base_species, is_shadow, fast_override, charged_override)
+        where fast_override / charged_override are None when not present.
+        Display name auto-generated for entries with overrides:
+            'Forretress | fast=BUG_BITE'           -> 'Forretress (Bug Bite)'
+            'Forretress (Shadow) | fast=BUG_BITE'  -> 'Forretress (Shadow) (Bug Bite)'
+
+    Raises ValueError on malformed input.
+    """
+    parts = [p.strip() for p in line.split('|')]
+    species_with_form = parts[0]
+    if not species_with_form:
+        raise ValueError(f"empty species name in pool line: {line!r}")
+
+    overrides = {}
+    for kv in parts[1:]:
+        if '=' not in kv:
+            raise ValueError(f"override {kv!r} missing '=' (expected key=value)")
+        k, v = kv.split('=', 1)
+        k, v = k.strip(), v.strip()
+        if not k or not v:
+            raise ValueError(f"empty key or value in override {kv!r}")
+        if k in overrides:
+            raise ValueError(f"duplicate override key {k!r} in {line!r}")
+        overrides[k] = v
+
+    fast_override = overrides.pop('fast', None)
+    charged_str = overrides.pop('charged', None)
+    charged_override = (
+        [c.strip() for c in charged_str.split(',') if c.strip()]
+        if charged_str else None
+    )
+    if overrides:
+        raise ValueError(f"unknown override key(s) {sorted(overrides)} in {line!r}")
+
+    is_shadow = species_with_form.endswith(' (Shadow)')
+    base_species = (species_with_form[:-len(' (Shadow)')]
+                    if is_shadow else species_with_form)
+
+    if fast_override is None and charged_override is None:
+        return species_with_form, base_species, is_shadow, None, None
+
+    suffix_parts = []
+    if fast_override is not None:
+        suffix_parts.append(analysis.pretty_name(fast_override))
+    if charged_override is not None:
+        suffix_parts.append('+'.join(
+            analysis.pretty_name(c) for c in charged_override))
+    display = f"{species_with_form} ({' / '.join(suffix_parts)})"
+    return display, base_species, is_shadow, fast_override, charged_override
 
 
 def _atk_weighted_spread_name(species):
@@ -4297,34 +4394,64 @@ def main():
         opponent_label = f"PvPoke group: {args.group} ({len(opponents)} mons)"
         logger.info(f"  Opponents: {opponent_label}")
     elif args.opponents_file:
-        # Read a custom opponent list from a text file (one species per
-        # line, # comments / blank lines ignored). Same downstream
-        # handling as --opponents: moveset per species resolved via
-        # get_default_moveset, focal species appended if missing.
+        # Read a custom opponent list from a text file. One opponent per
+        # non-blank, non-comment line. See `_parse_opponent_pool_line` for
+        # the per-line format (bare speciesName, or pipe-delimited overrides
+        # like 'Forretress | fast=BUG_BITE'). Focal species appended for
+        # mirror analysis if not already present.
         path = args.opponents_file
+        opponents = []
+        opp_movesets_full = []
+        n_variants = 0
         with open(path) as f:
-            opponents = [
-                line.strip() for line in f
-                if line.strip() and not line.lstrip().startswith('#')
-            ]
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                try:
+                    display, base, is_shadow, fast_ov, charged_ov = (
+                        _parse_opponent_pool_line(line))
+                except ValueError as _e:
+                    logger.warning(f"skipping malformed pool line: {_e}")
+                    continue
+
+                # Resolve missing pieces from the PvPoke default moveset.
+                if fast_ov is None or charged_ov is None:
+                    try:
+                        d_fast, d_charged = get_default_moveset(
+                            base, league=args.league, shadow=is_shadow)
+                    except (KeyError, ValueError) as _e:
+                        logger.warning(f"skipping {display}: {_e}")
+                        continue
+                else:
+                    d_fast, d_charged = None, None
+                fast_id = fast_ov if fast_ov is not None else d_fast
+                charged_ids = (
+                    list(charged_ov) if charged_ov is not None else list(d_charged))
+
+                opponents.append(display)
+                opp_movesets_full.append((fast_id, charged_ids))
+                if fast_ov is not None or charged_ov is not None:
+                    register_opponent_variant(display, base, is_shadow)
+                    n_variants += 1
+
         if args.species not in opponents:
-            opponents.append(args.species)
-            logger.info(f"  (added {args.species} to opponents for mirror analysis)")
+            try:
+                focal_fast, focal_charged = get_default_moveset(
+                    args.species, league=args.league, shadow=args.shadow)
+                opponents.append(args.species)
+                opp_movesets_full.append((focal_fast, focal_charged))
+                logger.info(f"  (added {args.species} to opponents for mirror analysis)")
+            except (KeyError, ValueError) as _e:
+                logger.warning(f"could not append focal species for mirror: {_e}")
         focal_in_opponents = True
         opponent_label = (f"Custom pool from {os.path.basename(path)} "
                           f"({len(opponents)} mons)")
-        logger.info(f"  {len(opponents)} opponents from {path}")
-        opp_movesets_full = []
-        to_remove = []
-        for opp in opponents:
-            try:
-                opp_fast, opp_charged = get_default_moveset(opp, league=args.league)
-                opp_movesets_full.append((opp_fast, opp_charged))
-            except (KeyError, ValueError) as _e:
-                logger.warning(f"skipping {opp}: {_e}")
-                to_remove.append(opp)
-        for opp in to_remove:
-            opponents.remove(opp)
+        if n_variants:
+            opponent_label += f", incl. {n_variants} moveset variant(s)"
+        logger.info(f"  {len(opponents)} opponents from {path}"
+                    + (f" (+{n_variants} moveset variant(s))"
+                       if n_variants else ""))
     else:
         screen_n = args.screen_opponents or args.opponents
         opponents = get_top_opponents(args.league, args.opponents)
