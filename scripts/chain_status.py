@@ -250,6 +250,7 @@ _ETA_LINE_RE = re.compile(
 # as the projected remaining-after-anchor time. Listed latest-anchor
 # first so the most-specific match wins.
 _DIVE_ETA_ANCHORS = [
+    'Interactive sweep',     # most precise: post-mirror, the long sweep block
     'Mirror slayer iteration',
     'Phase 2',
     'Phase 1: Screening',
