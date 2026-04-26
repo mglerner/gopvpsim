@@ -239,32 +239,84 @@ def print_dive_info(wrapper_log: Path | None,
           f'elapsed {green(elapsed_str)}')
 
 
-def print_eta(wrapper_log: Path | None) -> None:
-    """Shell out to overnight_eta.py for SCRIPT/DIVE/BUCKETS lines."""
-    if wrapper_log is None:
+_ETA_LINE_RE = re.compile(
+    r'sim progress:\s*(\d+)/(\d+)\s+chunks\s*\(\d+%\),\s*'
+    r'elapsed\s+(\d+)s,\s*eta\s+(\d+)s'
+)
+
+
+def _format_eta_seconds(secs: int) -> str:
+    if secs < 60:
+        return f'{secs}s'
+    m, s = divmod(secs, 60)
+    if m < 60:
+        return f'{m}m {s:02d}s'
+    h, m = divmod(m, 60)
+    return f'{h}h {m:02d}m'
+
+
+def print_eta(wrapper_log: Path | None,
+              per_dive_log: Path | None = None) -> None:
+    """Surface a runtime ETA.
+
+    Wrapper-driven chains (overnight, retrofit) shell out to
+    overnight_eta.py for SCRIPT/DIVE/BUCKETS lines (bucket-mean
+    averaging across past runs needs the wrapper log's per-dive
+    START/DONE banners).
+
+    Ad-hoc single-dive runs (--chain single) have no wrapper log;
+    fall back to scanning the latest per-dive log for the most
+    recent `sim progress: ... eta <N>s` line that deep_dive.py emits
+    during chunk processing. Surfaced verbatim — covers Phase 2 sweep
+    AND mirror slayer rounds since both share the format. No attempt
+    to roll up post-current-phase work; that estimate is the user's
+    job.
+    """
+    if wrapper_log is not None:
+        try:
+            r = subprocess.run(
+                ['python', str(REPO_ROOT / 'scripts' / 'overnight_eta.py'),
+                 str(wrapper_log)],
+                capture_output=True, text=True, check=False,
+            )
+        except FileNotFoundError:
+            return
+        script_line = dive_line = buckets_line = None
+        for line in r.stdout.splitlines():
+            if line.startswith('SCRIPT:'):
+                script_line = line[len('SCRIPT: '):]
+            elif line.startswith('DIVE:'):
+                dive_line = line[len('DIVE: '):]
+            elif line.startswith('BUCKETS:'):
+                buckets_line = line[len('BUCKETS: '):]
+        if script_line:
+            print(f'  {eta_accent("► SCRIPT ETA: " + script_line)}')
+        if dive_line:
+            print(f'  {cyan("  dive ETA: " + dive_line)}')
+        if buckets_line:
+            print(f'    {dim(buckets_line)}')
         return
+
+    # Single-dive fallback: scan the per-dive log for the latest progress line.
+    if per_dive_log is None or not per_dive_log.exists():
+        return
+    last_match = None
     try:
-        r = subprocess.run(
-            ['python', str(REPO_ROOT / 'scripts' / 'overnight_eta.py'),
-             str(wrapper_log)],
-            capture_output=True, text=True, check=False,
-        )
-    except FileNotFoundError:
+        with open(per_dive_log) as f:
+            for line in f:
+                m = _ETA_LINE_RE.search(line)
+                if m:
+                    last_match = m
+    except OSError:
         return
-    script_line = dive_line = buckets_line = None
-    for line in r.stdout.splitlines():
-        if line.startswith('SCRIPT:'):
-            script_line = line[len('SCRIPT: '):]
-        elif line.startswith('DIVE:'):
-            dive_line = line[len('DIVE: '):]
-        elif line.startswith('BUCKETS:'):
-            buckets_line = line[len('BUCKETS: '):]
-    if script_line:
-        print(f'  {eta_accent("► SCRIPT ETA: " + script_line)}')
-    if dive_line:
-        print(f'  {cyan("  dive ETA: " + dive_line)}')
-    if buckets_line:
-        print(f'    {dim(buckets_line)}')
+    if last_match is None:
+        return
+    chunks_done, chunks_total, elapsed_s, eta_s = (
+        int(last_match.group(i)) for i in (1, 2, 3, 4))
+    pct = 100 * chunks_done // chunks_total if chunks_total else 0
+    print(f'  {eta_accent("► CURRENT-PHASE ETA: " + _format_eta_seconds(eta_s))}'
+          f'  {dim(f"({chunks_done}/{chunks_total} chunks, {pct}%, "
+                   f"elapsed {_format_eta_seconds(elapsed_s)})")}')
 
 
 def print_latest_log(per_dive_log: Path | None, width: int) -> None:
@@ -488,7 +540,7 @@ def main() -> int:
     per_dive_log = per_dive_candidates[0] if per_dive_candidates else None
 
     print_dive_info(wrapper_log, per_dive_log, width)
-    print_eta(wrapper_log)
+    print_eta(wrapper_log, per_dive_log)
     rule(width)
     print_latest_log(per_dive_log, width)
     rule(width)
