@@ -1,628 +1,126 @@
-## Mirror-tier synth backfill — SHIPPED 2026-04-26 via overnight chain
-
-Synth-tier work (commits `ee8b026`, `dede396`, `fe75e08`) added a
-`<species> Mirror Bulk/Atk` tier whenever the focal species has a
-mirror-axis cohort that wins majority-of-scenarios. Backfilled
-across all 14 shipped dives via `scripts/overnight_redive.sh`
-(2026-04-25 23:08 → 2026-04-26 08:53). Results:
-
-* **Synth tier fired (5 dives):** Dewgong Mirror Bulk (def, 10 IVs),
-  Forretress Volt Switch GL Mirror Atk (842 IVs), Forretress Shadow
-  Volt Switch GL Mirror Bulk (78 IVs), Stunfisk Mirror Atk (3495
-  IVs), Tinkaton UL Mirror Atk (491 IVs).
-* **No synth tier (9 dives):** Oinkologne (M/F GL), Aegislash
-  (Blade/Shield × GL/UL), Tinkaton GL, Forretress Bug Bite (both
-  forms). The synth function correctly returned `None` when no
-  cohort cleared the gate.
-
-Open follow-up: synth tier is silently dropped from the IV Flavor
-Guide section by `refine_flavor_names`'s dedup pass (pain point #9
-in `project_post_ship_cleanup_pain_points.md`,
-`feedback_synth_mirror_tier_in_iv_flavor_guide.md`). Add to IV
-Flavor Guide without removing existing flavors when the synth tier
-is mirror-axis-specific.
-
 ## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
 
-Current thread: pre-ship polish between S10 ship day (2026-04-18) and
-Oinkologne CD (2026-05-09). Canonical ordering, read this first when
-resuming. **2026-04-25 refresh:** items 1-5 shipped; today adds 2
-niche GL dives (Dewgong, Stunfisk) + 1 ship-blocker bug.
+Original pre-ship items 1-5 all shipped (cross-form re-dive,
+JRE/RyanSwag comparison, F1-F5 follow-ups, P1-P5 polish, XL-candy
+decision tool / Mirror CMP reframe). Mirror-tier synth backfill
+shipped 2026-04-26 across all 14 dives via overnight chain. The
+Dewgong flavor-name ship-blocker (commit `0b91fec`) was resolved
+2026-04-25 via `dede396` (`refine_flavor_names: rewrite tier_desc
+to match renamed opponent`).
 
-**Ship-blocker surfaced 2026-04-25:** the IV Flavor Guide's
-`_flavor_name_for_tier` logic picks an opponent name from a nearby
-anchor instead of the dominant-flip opponent in at least one case.
-Dewgong GL m1 (Ice Shard / Aqua Jet, Drill Run) has a Def+HP tier
-labeled "Fortified Corviknight" whose `desc` attributes the matchup
-flip to **Quagsire** (1 scenario, 23 IVs), not Corviknight. The
-name and the actual flip disagree. Must be fixed (or at minimum
-diagnosed and explicit-override-patched on the Dewgong dive) before
-the Oinkologne CD ship. Lives in
-`scripts/deep_dive_narrative.py::_flavor_name_for_tier` + adjacent
-matchup-boundary/anchor-flip attribution; diagnosis should start by
-tracing what opponent the resolver picked for m1's tier and why.
-
-1. ~~**Cross-form re-dive**~~ — **SHIPPED** via `scripts/overnight_redive.sh`
-   (2026-04-19/20 chain, ~8h). Both Oinkologne forms in
-   `opponent_pools/gl_top50_plus_cs.txt`, article + standalone
-   comparison page regenerated, `cd_prep` auto-injection path
-   validated. See CHANGELOG 2026-04-19.
-2. ~~**JRE / RyanSwag / ours comparison**~~ — **RE-RUN SHIPPED** across
-   §11-§14 of `docs/jre_ryanswag_comparison.md` (2026-04-21 through
-   2026-04-24). §14 is the most recent (overnight 2026-04-23 →
-   2026-04-24, post Reader's Guide arc); §14.5 declares all automated
-   pre-ship gates clean (link integrity / em-dashes / dev-count
-   sentinels / ship-mode narrative / Reader's Guide tokens). Residual:
-   G16 methodology-details → guide pointer (~30 min, optional pre-ship
-   pull-in, see §14.4).
-3. **F1-F5 follow-ups** surfaced by the comparison output. **Mostly
-   SHIPPED.** F1 Meta Role `ddf9d19`, F2 key-flips callout `923f985`,
-   F4+F-wrap+F-intro `cbc9b28`+`259c493`, F-stats-block `c59a701`+
-   `f6ef6a0`, F-fast/charge-moves `8397fa9`, F-hide-methodology
-   `f9a1fc4`. Post-ship residual: F-tier-name-cleanup, F-shadow-
-   narrative, F5 cross-article footer (gated ≥3-5 articles).
-4. **P1-P4 polish** (see "Post-ship (article + dive polish)" section
-   below). **P1, P2, P4 shipped; P3 shipped as §12.4 F6 retrofit;
-   P5 resolved 2026-04-23** (P5.1 was a false limitation — GL/UL
-   already default to L50 non-BB via `LEAGUE_MAX_LEVEL`; P5.2 Shadow
-   focal species plumbed through `_rank1_cp_capped`).
-5. ~~**XL-candy-decision tool**~~ — **SHIPPED 2026-04-22** as the
-   Mirror CMP semantic reframe arc (11 commits `6dcc571`..`939162e` +
-   Slayer IVs tooltip retrofit `c3edb14` 2026-04-23). Three columns
-   on Top IVs table (Mirror Slayer CMP %, Top-Mirror CMP %, Matchups
-   Kept) + About-these-metrics box + Highlight IVs feature + Slayer
-   IVs "of yours" table gets the same columns + column-header
-   tooltips. All shipped via direct source change; retrofit patchers
-   cover previously-shipped dives.
-6. **Ship** via `scripts/publish_website.sh --push`. Link-verification
-   (`verify_article_links.py --ship`) and em/en-dash verification
-   (`verify_no_unicode_dashes.py --ship`) are integrated into the
-   publish script as step 2; they run automatically before rsync and
-   abort the publish on any hit. No separate pre-ship verify step
-   needed — running the publish IS running the checks.
+Item 6 — **ship via `scripts/publish_website.sh --push`**. The
+publish script integrates link-verification + em/en-dash
+verification as step 2 (auto-aborts on hits). Re-run before ship
+after any further re-dive.
 
 Post-ship, the post-S5 arc resumes at S13-S17 in
 `~/.claude/plans/post-s5-oinkologne-arc.md` (matchup-flip
 attribution, post-debuff breakpoints, bait policy). S11-S12 (HTML
-file-size) already shipped 2026-04-21, earlier than scoped. The
-remaining S13-S17 are **not pre-ship items** - do not pull forward.
+file-size) shipped 2026-04-21. The remaining S13-S17 are **not
+pre-ship items** — do not pull forward.
 
-## Pre-ship: XL-candy-decision tool (Mirror CMP % + Score Δ vs rank-1)
+### Open follow-ups from the pre-ship arc
 
-**Motivation:** deciding which IV to pour stardust and XL candy into
-for a meta-staple species (Tinkaton UL, Medicham GL, Corviknight GL,
-Cresselia UL, Clefable GL, Annihilape GL) requires answering two
-questions simultaneously:
+- **Mirror-tier synth dropped from IV Flavor Guide.** Synth-tier
+  (commits `ee8b026`, `dede396`, `fe75e08`) is silently dropped
+  from the IV Flavor Guide section by `refine_flavor_names`'s
+  dedup pass when broader than another flavor (pain point #9 in
+  `project_post_ship_cleanup_pain_points.md`,
+  `feedback_synth_mirror_tier_in_iv_flavor_guide.md`). Add to IV
+  Flavor Guide without removing existing flavors when the synth
+  tier is mirror-axis-specific.
 
-1. Does this IV score near the top of the overall battle ranking?
-2. Does this IV beat the CMP tie-break against the IVs real opponents
-   actually run?
+- **G16 — methodology-details guide pointer.** Replace the
+  in-article hidden-but-present methodology prose with a one-line
+  guide pointer (the hide layer is already in place; G16 is the
+  last-mile substitution). Logged in
+  `docs/jre_ryanswag_comparison.md` §14.4, ~30 min.
 
-Rank-1-by-stat-product answers (1) trivially but often loses CMP
-(confirmed 2026-04-19 on Tinkaton UL dive 4: rank-1 13/15/15 at
-atk=140.75 is beaten on atk by rows 3, 5, 8, 9, 10 of the Top IVs
-table — atk 141.17 through 142.85 — with battle-score deltas of
-only 0.9-1.6 points vs rank-1). No single IV maximizes both. The
-XL-candy commitment is large enough that eyeballing the table for
-the right trade-off is an honest ~20-minute task per species.
+- **G3 — Oinkologne verdict editorial + outlook prose not
+  populated.** `cbc9b28` shipped the F4 schema + renderer hook;
+  article ships with just the mechanical one-liner because verdict
+  editorial is expert-only (no auto-gen template, per
+  `feedback_expert_narrative_not_autogen`). Either 15-30 min of
+  Michael-authored prose pre-ship OR accept the mechanical line.
 
-**Two new computed values** (native in the dive HTML, retrofittable
-to existing dives via an HTML patcher — no re-dive required; both
-are pure arithmetic on data already embedded in the dive's `DATA`
-object):
+- **G1 + G2 + G7 — richer auto-gen prose template** [post-ship,
+  recommended]. F1 Meta Role, F2 key-flips callout, and
+  F-fast/charge-moves shipped as deterministic rollups; JRE-style
+  prose ("Mud Slap takes Male Oinkologne from 0% to 76.6% vs
+  Steelix — the signature upgrade") would close the register
+  gap. Template change, not Claude-drafted prose, so
+  ship-policy-clean. 0.5-1 session. Benefits every future dive.
+  Bundles with **Row D** — bulk-vs-peers paragraph (micro-gap from
+  original §3.D, never made it through F1's auto-gen template).
 
-1. **`Mirror CMP %`** — per IV, fraction of the `--mirror-slayer`
-   converged cohort that this IV beats at CMP (higher atk than).
-   The mirror-slayer cohort is already computed for every
-   full-sweep dive in `run_website_dives.py`, and its members'
-   IV/atk values are already in the dive HTML. Compute =
-   `count(cohort[i].atk < this_iv.atk) / len(cohort)`. Uses the
-   Nash-converged cohort (not uniform-random 4096 IVs) so the
-   number reflects what opponents realistically build, not what
-   theoretically exists.
-2. **`Score Δ vs rank-1`** — per IV, `my_score - rank1_score`
-   under the currently-selected Shields / Opp-IV / Bait combo.
-   Negative values = what you give up for the bulk or atk trade.
-   Reacts to the dropdowns, so hovering in 1v1 mode shows the
-   1v1-specific delta.
-
-**Surface these in two places** (both cheap):
-
-- **New sortable columns in the Top IVs table:** `Mirror CMP %`
-  and `Score Δ`. User sorts by `Mirror CMP %` desc, scans down for
-  IVs with `Score Δ` close to 0 (small score sacrifice, high CMP
-  coverage). That row answers "which of my catchable IVs is the
-  right XL target."
-- **Hover tooltip on the scatter plot:** two extra lines per
-  hover showing the same values. Combined with the existing
-  paste-box-CSV-overlay (your collection circled), you can paste
-  your Tinkaton collection, hover each one, and see instantly which
-  meets the "good battle rank + wins mirror CMP" criteria.
-
-**Implementation path:**
-
-- **Client-side JS** (not server-side Python patching) — the
-  computations depend on the currently-selected Shields / Opp-IV /
-  Bait dropdowns, which drive the avg score. Doing it in Python
-  would require re-running the patcher every time those change.
-  ~30 lines of JS in the dive's existing inline script: compute
-  both values at page load and after each dropdown change, inject
-  into the Top IVs table rows + hover tooltips.
-- **Renderer update** (`scripts/deep_dive_rendering.py`): emit
-  the new columns + JS block for every future dive.
-- **Retrofit patcher** (`scripts/patch_dive_mirror_cmp.py`,
-  new): regex-inject the JS into existing dive HTMLs. Idempotent
-  via a comment-fingerprint header. Parallels the existing
-  `patch_dive_species_narrative.py` pattern. Run against the 4
-  existing dive dirs + anything else with an `index_m*.html`.
-
-**Estimated effort:** 3-4 hours (JS computation + table/tooltip
-wiring + renderer change + patcher).
-
-**Generalization note:** this is the "which IV do I XL?" decision
-tool. Applies to every meta-staple species whose candy XL cost is
-nontrivial — Tinkaton UL, Medicham GL, Corviknight GL, Clefable
-GL, Annihilape GL, Cresselia UL, Guzzlord UL, Registeel UL, and
-on. Once built, zero per-species config — every full-sweep dive
-with `--mirror-slayer` gets it for free.
-
-**Optional stretch:** dedicated Pareto-frontier sub-plot — atk
-stat on X-axis, avg score on Y-axis, frontier line highlighted,
-CMP-% contours at 50/75/90%, user collection circled. Pretty and
-information-dense, but the two-column add alone answers the
-question at the cost of less visual polish. Pull in if the
-core add leaves time; skip otherwise.
-
-## Personal-collection decision tool follow-ups (2026-04-21)
-
-Gaps surfaced during a session helping Michael pick which Tinkaton UL
-to build from his PokeGenie CSV. The XL-candy-decision tool section
-above answers the headline question once shipped; these three items
-are orthogonal polish that became load-bearing when the session tried
-to cross-reference the shipped dive against his collection.
-
-- ~~**Matchup Flip tooltip un-truncation.**~~ **SHIPPED 2026-04-22** in
-  `20e7bd1` (dropped the hardcoded `[:6]` cap; tooltip now shows the
-  full Gained / Lost list with no `+N more` tail). Retrofit patcher
-  `9ca8f5a` applied to shipped HTMLs.
-
-- **Per-shield Score Δ column(s) on the Top IVs table.** Partially
-  shipped. Single-number Score Δ vs rank-1 landed on the outer Top
-  IVs table in `fdbf6ce` (XL-candy tool). Three-way per-shield split
-  (0v0 Δ / 1v1 Δ / 2v2 Δ) shipped on the **Member IVs inner table**
-  inside tier cards in `20e7bd1`, but NOT yet on the outer Top IVs
-  table. Open: extend `20e7bd1`'s three-column pattern to Top IVs +
-  retrofit patcher for shipped dives. Estimated ~1 hr. Flagged for
-  pre-ship pull-in 2026-04-24.
-
-- **`scripts/suggest_builds.py`.** CLI helper: takes `--species`,
-  `--league`, `--roles lead,closer`, path to a PokeGenie CSV export,
-  and the shipped dive HTML. Parses the Top IVs + Anchors + Matchup
-  Flip tables, intersects with the collection, prints a ranked
-  shortlist per role with the key tradeoffs (atk/HP/def, anchor
-  flips, score Δ, XL/dust cost to finish). Essentially automates the
-  manual grep+cross-reference dance. Maybe 2-3 hours; deprioritize if
-  the XL-candy tool lands first and the scatter paste-box overlay
-  turns out to be enough.
-
-## CD-prep tracking (2026-04-17, fix shipped 2026-04-18)
-
-**SHIPPED.** Per-species `[cd_prep]` TOML block is now read by
-`deep_dive.py`: any listed `fast_moves` / `charged_moves` are injected
-into `enumerate_movesets`' legal lists with a loud log line per
-injected move, so pre-CD dives include the incoming move even when
-PvPoke's gamemaster lags. Implementation in the
-``enumerate_movesets(..., cd_prep_fast=, cd_prep_charged=)`` signature
-plus the auto-discover block that reads the focal species' TOML.
-
-Original problem (kept here until the Oinkologne CD ships and we
-delete the cd_prep blocks): pre-CD dives silently dropped the
-incoming CD move when the gamemaster cache refresh flipped between
-runs. Observed on 2026-04-17 for the Male/Female Oinkologne pair.
-Manual workaround was `--fast MUD_SLAP`; the permanent fix removes
-the need to remember that flag.
-
-Delete the TOML `cd_prep` section after the CD ships, or after
-PvPoke stably lists the move for 2+ gamemaster refreshes.
-
-## Pre-ship: article text-density pass (2026-04-18)
-
-Surfaced during S10 UI polish: our article has noticeably more
-explanatory / clarifying prose than JRE's GamePress CD articles or
-RyanSwag's GamePress deep dives. Much of it answers first-time-reader
-questions but repeats on every visit; a second-time reader or
-multi-article reader wants to skim faster.
-
-**First-pass fix — SHIPPED.** The three paragraph targets are all
-now click-gated:
-
-- Meta Coverage "Each cell averages 4,096 focal IVs x N opponents"
-  methodology paragraph — wrapped by `f9a1fc4` (F-hide-methodology).
-- Matchup Delta legend "What the columns mean" — SHIPPED `a6db157`
-  (removed the default-open `open` attribute so it now collapses
-  like the sibling legends).
-- Opp-IV / Bait toggle caption — SHIPPED `a6db157` (collapsed the
-  visible caption sentence into the adjacent "What these dropdowns
-  change" `<details>` block; dropdowns themselves stay visible).
-
-The existing `<details>` on the &Delta; column was already default-
-closed pre-pass.
-
-**Broader pass — effectively SHIPPED.** The Reader's Guide arc moved
-methodology prose into its own dedicated surface (`bd8be63` How This
-Works guide content, `91f2430` G16 methodology-details routing),
-doing the structural work the original broader pass anticipated.
-Residual: **G16 — replace the in-article hidden-but-present
-methodology prose with a one-line guide pointer** (the hide layer is
-already in place; G16 is the last-mile substitution). Logged as
-post-ship polish in `docs/jre_ryanswag_comparison.md` §14.4, ~30 min,
-optional pre-ship pull-in — Michael's call.
-
-## Pre-ship: JRE / RyanSwag / ours comparison (2026-04-18) — EXECUTED (against pre-re-dive article)
-
-Plan: `~/.claude/plans/jre-ryanswag-comparison.md`.
-**Output:** `docs/jre_ryanswag_comparison.md` (written 2026-04-18).
-**Reference archive:** `docs/reference_deep_dives/jre/` — five JRE
-articles archived locally (Tinkaton, Ninetales, Rillaboom,
-Empoleon, Toucannon) so future comparison sessions can skip the
-re-fetch. RyanSwag archive at `docs/reference_deep_dives/ryanswag/`
-(pre-existing).
-
-**Note on re-dive ordering:** The comparison was run *before* the
-cross-form re-dive (opposite to the original sequencing plan)
-because the JRE/RyanSwag structural findings don't depend on dive
-data — section layout, prose-vs-data ratio, and meta-role framing
-are all article-level. Numbers quoted in §3.Q of the output doc
-(43.1% win rate, specific IV counts) will shift slightly after the
-re-dive regenerates the article; the F1-F5 follow-up list below is
-unaffected.
-
-### Follow-ups to execute (from comparison §4)
-
-Listed priority-ordered for the pre-ship window (2026-04-18 to
-2026-05-09). Hide-vs-remove discipline: default action for "content
-we have they don't" is hide-behind-`<details>`, not delete.
-Removal candidates (R1-R3 in comparison §5) require per-item
-Michael approval; **do not auto-execute**.
-
-**2026-04-19 status audit:** Most of the pre-ship F-list is already
-shipped. See each item's **SHIPPED** annotation for the commit. Also:
-2026-04-19 decision to move to **Shape 2** (narrative at top of the
-dive, not in the article) — see "Shape 2 migration" block at the
-bottom of this section. The shipped F-list entries below remain
-useful for article-side polish but the primary narrative home is
-shifting to the dive via a new renderer path.
-
-- **F1 + F-typing + F-stats-block** — SHIPPED. F1 Meta Role `ddf9d19`,
-  F-stats-block `c59a701` + `f6ef6a0`. F-typing is woven into F1's
-  Meta Role `good_at` paragraph for Oinkologne (not a separate
-  block); could split later if another species needs a distinct
-  typing discussion.
-
-- **F2** — SHIPPED `923f985` (key-flips callout above Matchup Delta,
-  3/3 knob).
-
-- **F4 + F-wrap + F-intro** — SHIPPED. F4 + F-wrap `cbc9b28` (verdict
-  editorial + outlook fields, both expert mode). F-intro `259c493`
-  (BLUF intro override with hooked matchup).
-
-- **F-fast-moves + F-charge-moves** — SHIPPED `8397fa9` (full move-
-  pool tables between Move Comparison and Meta Coverage).
-
-- **F-hide-methodology** — SHIPPED `f9a1fc4` (four `<details>` wraps:
-  Meta Coverage caption split, compare-lead, IV Recommendations
-  intro, Matchup Delta pool annotation).
-
-- **P2 article -> dive per-opponent deep links** — SHIPPED `081cd2a`
-  (see P2 section below).
-
-### Shape 2 migration — narrative moves from article to dive (2026-04-19)
-
-Decision 2026-04-19: primary narrative home for a species is the
-**dive** (RyanSwag-style), not the CD article. Articles continue to
-exist when they do something the dive can't — disambiguating multiple
-forms (Oinkologne M/F, Aegislash Blade/Shield), shadow variants, or
-alt-moveset meta forks (Forretress Volt Switch vs Bug Bite). For
-Oinkologne the CD article stays because M/F comparison is its
-justification; the existing `[intro] / [meta_role] / [verdict]`
-prose will migrate (or be duplicated) into per-form threshold-TOML
-expert-zone fields that a new dive renderer surfaces at the top of
-each dive.
-
-**Session 1 SHIPPED 2026-04-19 as commit `41bbe6f`** — renderer
-plumbing + per-block `author` attribution schema. Pure code, zero
-content migration. Design decisions resolved in that session:
-
-- Render position: **above the interactive dashboard** (after the
-  Related Article link, before the controls bar).
-- TOML schema: **new top-level `[Species.intro] / [Species.meta_role]
-  / [Species.verdict]` blocks** in `thresholds/<species>.toml` —
-  field-for-field mirrors of `articles/*.toml`'s same-named blocks
-  so prose migrates by copy-paste.
-- Renderer location: **`deep_dive_rendering.render_species_narrative()`**
-  alongside the existing gold-zone code, not the Flavor Guide module.
-- Migration scope: **split** — species-scoped prose moves to per-form
-  threshold TOMLs; CD-event-scoped framing (move comparison, form
-  comparison, verdict-on-the-CD-move) stays article-side.
-- Author attribution: **new optional `author = "..."` field** on each
-  narrative block, rendered verbatim as a muted italic line. Reader-
-  visible distinction between AI-drafted and human-written prose.
-  See `docs/article_schema.md` "Per-block author attribution" and
-  `docs/threshold_schema.md` "Species narrative" for full schema.
-
-**Pre-ship blocker reminder:** the existing Oinkologne article ships
-today with unlabeled Claude-drafted `[intro]` / `[meta_role]` /
-`[verdict]` blocks. Session 2 below unblocks ship — Session 1's
-renderer alone does not (it just made the `author` field possible).
-
-**Session 2 — SHIPPED `bf05538`.** Per-form Oinkologne M/F narrative
-authored in the threshold TOMLs; article `[intro]` / `[meta_role]` /
-`[verdict]` slimmed to CD-event scope; every Claude-drafted block
-carries `author = "Drafted by Claude (Opus 4.7), not yet
-human-reviewed"`. Tonight's overnight re-dive bakes the narrative
-into the regenerated Oinkologne dive HTMLs.
-
-**Session 3 (Aegislash) — SHIPPED `bb021fa`.** Blade and Shield
-narrative authored in the threshold TOMLs (Shield = canonical
-realistic play pattern; Blade = always-Blade diagnostic
-hypothetical). Out-of-band Aegislash GL dives against the Orlando
-top-32 pool landed the same day (Blade `14:37`, Shield `15:41`);
-HTMLs were force-patched with the narrative injection. Aegislash UL
-pair runs in tonight's overnight chain and picks up the narrative
-natively.
-
-- **[Post-ship] F-tier-name-cleanup** — simplify IV-rec tier card
+- **F-tier-name-cleanup** [post-ship] — simplify IV-rec tier card
   names (current: `Steelix (Shadow) Slayer -   (Wigglytuff Slayer
   -   (Wigglytuff Atk))`) to RyanSwag's name/signature convention
   per `docs/reference_deep_dives/ryanswag/STYLE_ANALYSIS.md`.
   Bundles with S5a rename work in post-S5 arc.
-- **[Post-ship] F-shadow-narrative** — Shadow-variant comparison
+
+- **F-shadow-narrative** [post-ship] — Shadow-variant comparison
   prose block for species that have shadow forms (not applicable
   to Oinkologne ship).
-- **[Post-ship, gated ≥3-5 shipped articles] F5** —
+
+- **F5** [post-ship, gated ≥3-5 shipped articles] —
   multi-article-reader cross-linking footer. Not worth building
   until cross-reference surface is large enough.
 
-### Removal candidates (MICHAEL APPROVAL REQUIRED)
+- **R3 removal candidate.** Meta Coverage "Shield asymmetry
+  dominates the extremes" explanatory paragraph — currently
+  hidden; re-evaluate for removal post-ship if hide reads as
+  bloat.
 
-Comparison doc §5 (R1-R3) lists three items proposed for deletion
-rather than hiding. Each has per-item justification + JRE/RyanSwag
-precedent for absence. Nothing ships without explicit sign-off.
+- **Personal-collection: `scripts/suggest_builds.py`.** CLI
+  helper: takes `--species`, `--league`, `--roles lead,closer`,
+  path to a PokeGenie CSV export, and the shipped dive HTML.
+  Parses Top IVs + Anchors + Matchup Flip tables, intersects with
+  the collection, prints a ranked shortlist per role with the key
+  tradeoffs (atk/HP/def, anchor flips, score Δ, XL/dust cost).
+  Maybe 2-3 hours; deprioritize if scatter paste-box overlay +
+  Mirror CMP columns are enough.
 
-- **R1 — SHIPPED `934a8a1`.** "(N dropped, missing from at least one
-  dive)" parenthetical removed from `scripts/compare_loadouts.py`
-  along with the unused skipped-opponents loop.
-- **R2 — SHIPPED `934a8a1`.** "Cards are colored by form (♂ blue /
-  ♀ pink)..." self-reference removed from the IV Recommendations
-  tier intro in `scripts/generate_article.py`.
-- **R3:** Meta Coverage "Shield asymmetry dominates the extremes"
-  explanatory paragraph — start with hide (F-hide-methodology
-  above), escalate to removal only if hide reads as bloat at
-  review time. **Status: still hidden, not removed.** Re-evaluate
-  post-ship.
+- **CD-prep tracking — delete `[cd_prep]` blocks** after the
+  Oinkologne CD ships, or after PvPoke stably lists Mud Slap for
+  2+ gamemaster refreshes. The auto-injection plumbing
+  (`enumerate_movesets(..., cd_prep_fast=, cd_prep_charged=)`,
+  commit `e61c14e`) stays.
 
-### Aegislash test case — SHIPPED
+- **P2 single-form opponent links.** `_render_matchup_delta_section`
+  (line 1954) doesn't yet link opponent cells — applies to
+  non-CD articles that aren't per-form. Extend when the first
+  such article actually ships.
 
-F1 shipped on Oinkologne first. Aegislash Blade + Shield narrative
-shipped 2026-04-19 (commit `bb021fa`) as Shape 2 Session 3, serving
-as the second test case for the Meta Role section type. Out-of-band
-GL dives landed same day; UL pair came through the overnight chain.
-See `project_shape2_session1_shipped.md` for the canonical record.
+- **P3 article-surface design question.** Dive-side envelope-tag
+  retrofit shipped 2026-04-23 (`patch_dive_envelope_tags.py`);
+  a category-card surface on the CD article itself (linking
+  envelope-shape to a specific "Cost to XL" judgment) remains
+  the original P3 question and has not been addressed.
 
-### 2026-04-21 refresh follow-ups (comparison doc §10)
+- **Aegislash UL apply.** `patch_dive_envelope_tags.py` dry-run
+  reports 12 eligible cards; broader apply gated on Michael.
+  Same gate applies for Forretress Volt-Switch (9) and
+  Shadow-VS (8).
 
-Refresh pass 2026-04-21 against shipped F1-F5 state surfaced five
-new gaps the original 2026-04-18 cut did not anticipate. Full
-writeup in `docs/jre_ryanswag_comparison.md` §10.4; short form:
+- **Cross-form opponent expansion (parked).** Item 4 (auto-
+  form-sibling expansion in `build_opponent_pool.py`) — design
+  done but parked pending review of rendered Oinkologne article;
+  decide pool-level vs render-level filter for hypothetical-form
+  rows. See memory `project_form_change_pool_expansion_parked.md`.
 
-- ~~**G4 — `authored-auto` label for auto-gen narrative blocks**~~
-  **SHIPPED 2026-04-21 as commit `284c95b`.** Fourth enum value
-  `auto` added alongside `human` / `ai` / `mixed`; `_auto_fill` sets
-  `authored_by="auto"` when filling; both `authored_by_class`
-  (article) and `_authored_by_class` (dive) map it to the
-  `authored-auto` class (blue sidebar). Verified on the shipped
-  Oinkologne article (4 blocks tagged `authored-auto` correctly).
+- **Status-box paste-watch hint.** `run_website_dives.py` and
+  `deep_dive.py` could print a `watch -n 5 'scripts/chain_status.py
+  --chain ...'` recipe at startup when the matching status preset
+  exists. Small.
 
-- ~~**G5 — Aegislash narrative is orphan ship content**~~
-  **NOT NEEDED.** Audit 2026-04-23: the shipped Aegislash narrative
-  is `authored-auto` (deterministic rollup from dive data via
-  `auto_gen_narrative.py` standalone mode), not LLM-drafted prose.
-  Every re-render regenerates it from `data_obj` — no orphan risk.
-  The empty `thresholds/aegislash_shield.toml` bodies are correct
-  and expected: the TOML comment on line 23-27 explicitly documents
-  that auto-gen fills them at render time and they stay empty until
-  a human writes species-specific prose.
-
-- **[Pre-ship, Michael-decides] G3 — Oinkologne verdict editorial
-  + outlook prose not populated.** `cbc9b28` shipped the F4 schema
-  + renderer hook; article ships with just the mechanical one-liner
-  because verdict editorial is expert-only (no auto-gen template,
-  per `feedback_expert_narrative_not_autogen`). Either 15-30 min
-  of Michael-authored prose pre-ship OR accept the mechanical line
-  as the ship form. Both defensible.
-
-- **[Post-ship, recommended] G1 + G2 + G7 — richer auto-gen prose
-  template.** F1 Meta Role, F2 key-flips callout, and F-fast/charge-
-  moves all shipped as deterministic rollups ("vs Steel-type:
-  Steelix +77pp..." / "Steelix — Male: 0.0% → 76.6% (+76.6 pp)
-  +Flip"). JRE-style prose ("Mud Slap takes Male Oinkologne from
-  0% to 76.6% vs Steelix — the signature upgrade") would close
-  the register gap. Template change, not Claude-drafted prose, so
-  ship-policy-clean. 0.5-1 session. Benefits every future dive.
-
-- **[Post-ship, bundles with G1] Row D — bulk-vs-peers paragraph.**
-  Micro-gap from original §3.D; never made it through F1's auto-
-  gen template. Fold into the G1 template upgrade.
-
-## Post-ship (article + dive polish, 2026-04-18)
-
-Items queued from the post-S10 UI polish round that are nice-to-
-have but not required for the Oinkologne CD ship. Pulled-forward
-candidates: after each pre-ship item lands, check whether there's
-capacity to pull one of these in without risking the ship window.
-
-### P1. Tier-card anchors for Notable IVs + Mirror Slayer cards — SHIPPED `40d19e9`
-
-Notable IVs cards now emit `id="notable-<slug>"` (name-slug stable
-across re-dives) and Mirror Slayer cards emit `id="mirror-<slug>"`.
-`scripts/patch_dive_tier_anchors.py` extended with regex-backfill
-variants for both card types (verified: 125 notable + 3 mirror
-per Oinkologne GL dive file). External pages — CD article IV
-Recommendations, cross-species comparisons — can now deep-link
-into the per-card anchor. Article-side wiring is still open; see
-TODO §"S8 envelope-annotation" / the parked form-change-pool
-decision for the design question around which article surface
-should consume these anchors.
-
-### P2. Article -> dive per-opponent deep links — SHIPPED 2026-04-18
-
-Each opponent name in the per-form Matchup Delta table is now a
-link to the primary form's dive, landing on that opponent's first
-`#opp-<slug>` anchor inside the Matchup-Flipping Boundaries
-section. Secondary forms get a small trailing symbol link (♂ / ♀)
-in the form's column color. Opponents with no flipping boundary in
-any form's dive (clean sweeps in either direction) stay as plain
-text so clicks never scroll to nowhere.
-
-**Implementation:**
-- `scripts/deep_dive_rendering.py`: `opp_slug()` helper;
-  `render_matchup_boundary_bullets` + `render_anchor_flip_bullets`
-  emit `id="opp-<slug>"` on the first `<li>` per opponent when
-  `emit_opponent_ids=True` (wired only at the standalone call
-  sites to avoid duplicate ids with the tier-card-nested callers).
-- `scripts/patch_dive_opp_anchors.py`: in-place regex backfiller
-  parallel to `patch_dive_tier_anchors.py`; idempotent.
-- `scripts/generate_article.py`: `_load_one_dive_file` extracts
-  `anchored_opps` from each dive file's HTML;
-  `_render_matchup_delta_per_form_section` gates link emission on
-  whether the slug exists in the best-CD moveset's anchor set.
-
-**Follow-up (out of scope this session):** single-form
-`_render_matchup_delta_section` (line 1954) doesn't yet link
-opponent cells — applies to non-CD articles that aren't per-form.
-Extend when the first such article actually ships.
-
-### P3. Envelope-position annotations in IV Recommendations cards
-
-Previously deferred in the post-S5 arc (see the "S8 envelope-
-annotation wiring skipped" note in the old TODO flow). The S4
-`envelopePositions` dict is keyed by Notable-IVs category name,
-not threshold tier, so the article would need either a
-category-card surface or a tier-name to category-name mapping.
-Design question before implementation.
-
-**Dive-side retrofit SHIPPED 2026-04-23.** Michael's call on the
-F6 ship-blocker candidate: build the patcher now.
-`scripts/patch_dive_envelope_tags.py` (~195 lines) injects the
-envelope tag HTML into each Notable-IVs composite card in shipped
-dive main `index.html`s using the `envelopePositions` data
-already embedded in their `DATA` object. Idempotent via
-fingerprint `/* ENVELOPE_TAGS_v1 */`; imports `_render_envelope_tag`
-from `deep_dive_rendering.py` so the patched markup stays
-byte-identical to fresh renders. Applied to Oinkologne Male (2 of
-2 composites tagged). Oinkologne Female reports `12 composite
-cards found, all sparse` — correct renderer behaviour for
-1-IV-member composites (sparse metric is unreliable, so the tag
-is deliberately suppressed). Forretress Volt-Switch /
-Shadow-VS / Tinkaton UL main HTMLs have 9 / 8 / 12 eligible
-cards in dry-run — broader apply gated on Michael.
-
-**Article-surface design question still open.** The retrofit
-covers the dive side (Notable-IVs composite cards on the dive
-page). A category-card surface on the CD article itself (linking
-envelope-shape to a specific "Cost to XL" judgment) remains the
-original P3 question and has not been addressed.
-
-### P4. Pre-ship link verification pass — TOOL SHIPPED 2026-04-18
-
-Tool: `scripts/verify_article_links.py`. Usage:
-
-    python scripts/verify_article_links.py --ship
-    # or against specific files:
-    python scripts/verify_article_links.py path/to/index.html [...]
-
-The `--ship` flag scans the Oinkologne pre-ship surface set
-automatically (site index, CD article, both dive landings, all
-moveset split files under each, the standalone compare page).
-Exit code 0 = no broken internal refs; 1 = errors found.
-
-First run 2026-04-18: 18 files, 252 hrefs (36 internal, 24 anchor,
-192 external, 0 other). No broken refs. Article had zero stale
-`tackle_*` references — all dive-split links land on Mud Slap
-movesets. The `tackle_*` files only cross-reference each other in
-the moveset dropdown nav, which is self-consistent.
-
-**Re-run before ship** (after the cross-form re-dive lands, since
-any regeneration can introduce new link shapes). The script uses
-stdlib `html.parser` so it correctly skips the ~1000 `onclick`
-handlers in each dive — those construct PvPoke URLs at runtime
-and can't be statically verified. Add a targeted onclick scan if
-a regression ever surfaces; not worth building until then.
-
-### P5. Stats at a Glance follow-ups — RESOLVED 2026-04-23
-
-The CP-capped rank-1 stats section shipped 2026-04-18 (part of
-F-stats-block enhancement). Revisited 2026-04-23:
-
-1. **Best Buddy (level 51) is NOT included in GL/UL rank-1** —
-   original note was wrong. `iv_rank`'s `max_level` defaults to
-   `LEAGUE_MAX_LEVEL`, which is 50.0 for Great and Ultra (non-BB,
-   matching PvPoke UI) and 51.0 only for Little and Master.
-   Verified 2026-04-23 with Cresselia UL + Registeel UL: default
-   rank-1 and `max_level=51.0` rank-1 return identical IVs. No fix
-   needed. A TOML knob for Master-league non-BB or GL/UL BB
-   comparisons could be wired later if a ML article ever lands.
-
-2. **Shadow focal species** — fixed 2026-04-23 in
-   `_rank1_cp_capped`. Species names ending with ` (Shadow)` strip
-   the suffix for the gamemaster lookup and pass `shadow=True` to
-   `iv_rank`, so the displayed rank-1 stats carry the ×1.2 atk /
-   ×0.8333 def multipliers. Regression-checked on non-shadow
-   species: Oinkologne GL unchanged.
-
-## Status-box generalization — shipped as chain_status.py (2026-04-21)
-
-`scripts/chain_status.py` replaces `scripts/overnight_status.sh`
-with a `--chain {overnight,retrofit}` preset flag + `--status-file`
-/ `--pgrep` / `--wrapper-log-glob` escape-hatch overrides. ETA still
-delegates to `scripts/overnight_eta.py` for bucket averages and
-cross-midnight / overshoot handling. Backward-compat: both presets
-render correctly; overnight's display uses the wrapper-log mtime as
-an upper bound so a later chain's per-dive logs don't leak in.
-
-Follow-up #2 from the 2026-04-19 plan (paste-this-watch-command
-hint in other wrappers) still stands — `run_website_dives.py` and
-`deep_dive.py` could print a `watch -n 5 'scripts/chain_status.py
---chain ...'` recipe at startup when the matching status preset
-exists. Small.
-
-## Pre-ship: cross-form opponent coverage for Oinkologne (2026-04-18) — SHIPPED
-
-Items 1-3 (add both forms to `opponent_pools/gl_top50_plus_cs.txt`,
-re-dive serially, regenerate article + comparison page) shipped via
-the 2026-04-19/20 overnight chain. `cd_prep` TOML auto-injection
-(commit `e61c14e`) replaced the old `--fast MUD_SLAP` workaround;
-re-dive validated that code path.
-
-**Open tail:** item 4 (auto-form-sibling expansion in
-`build_opponent_pool.py`) — design done but parked pending review of
-rendered Oinkologne article; decide pool-level vs render-level filter
-for hypothetical-form rows. See memory
-`project_form_change_pool_expansion_parked.md`.
-
-## S9a checkpoint observations (2026-04-17)
-
-- **CLI-comment logger reconstructs `--mirror-slayer` incorrectly.** In
-  the log header and the top-of-HTML `<!-- CLI: ... -->` comment,
-  `deep_dive_logging.py`'s argv reconstruction emits `--mirror-slayer
-  True` even when the actual invocation used only `--mirror-slayer` (a
-  `BooleanOptionalAction` flag, which argparse rejects with a literal
-  `True` argument — reproducibly verified: pasting the logged CLI back
-  into a shell errors with `unrecognized arguments: True`). Effect:
-  cosmetic but breaks copy-paste reproducibility of past dives.
-  Likely cause: the reconstruction formats bool flags as
-  `--flag <value>` instead of `--flag` / `--no-flag`. Low-risk fix in
-  the logger.
+- **CLI-comment logger reconstructs `--mirror-slayer` incorrectly.**
+  In the log header and the top-of-HTML `<!-- CLI: ... -->`
+  comment, `deep_dive_logging.py` emits `--mirror-slayer True`
+  for a `BooleanOptionalAction` flag (argparse rejects the
+  literal `True`). Effect: cosmetic but breaks copy-paste
+  reproducibility. Format bool flags as `--flag` / `--no-flag`
+  instead.
 
 ## Deferred cleanup: backwards-compatibility removal pass
 
@@ -685,15 +183,10 @@ break invariants that weren't yet nailed down by tests.
      charged move (Tinkaton, Corviknight, Clefable, Drapion).
      Discovered 2026-04-15; writeup in DEVELOPER_NOTES.md §7.
 
-* **Resolve known PvPoke divergences** — ~~Three~~ One remaining intentional
-  implementation difference tracked in DEVELOPER_NOTES.md "Known divergences."
-  1. ~~selfBuffing flag scope~~ RESOLVED 2026-04-14: broadened to match PvPoke
-  2. ~~Bait-wait DPE ratio~~ RESOLVED 2026-04-14: was misdiagnosed; PvPoke
-     also uses raw DPE in the 1.5 ratio check (selectBestChargedMove
-     overwrites buff-adjusted values). Real gap was the priority-shuffle
-     (Pokemon.js:711-787), now ported.
-  3. bestChargedMove recomputed per-turn vs PvPoke's init-time cache --
-     keeping ours (intentional, more correct; see DEVELOPER_NOTES.md)
+* **Resolve known PvPoke divergences** — one intentional implementation
+  difference remains: bestChargedMove recomputed per-turn vs PvPoke's
+  init-time cache. Keeping ours (intentional, more correct; see
+  DEVELOPER_NOTES.md "Known divergences").
 
 * **Audit existing oracle tests against the PvPoke harness** — Now
   that `scripts/pvpoke_trace.js` + `scripts/verify_pvpoke_harness.py`
@@ -709,34 +202,6 @@ break invariants that weren't yet nailed down by tests.
 
 * **Speed test** -- compare our speed vs the PvPoke JS code, look for
   ways we can speed ours up.
-
-* ~~**Forretress/Azu 0-shield score divergence**~~ — **RESOLVED 2026-04-15.**
-  Not a DP plan-selection bug after all. Root cause: our OMT
-  (`_optimize_move_timing`) had a `defender.hp > _fast_dmg` gate that
-  preferred fast-KO over charged-KO "because scores identical." That
-  assumption held only for instant-fast; under mid-cooldown timing a
-  delayed fast cost 3 turns of Azu damage on Forr (T37 fires charged
-  immediately in PvPoke; ours waits for fast that lands at T40). Gate
-  removed. GL grid max |Δ| 15→0 across all 405 pairs.
-  Investigation landmark: decideLog entry/return tracing added to
-  scripts/pvpoke_trace.js (PvPoke's decideAction-level entry/exit log)
-  was the tool that localized this — earlier dpPlan-level traces missed
-  it because the divergence was upstream of the DP. Full writeup in
-  DEVELOPER_NOTES.md "Resolved divergences" 2026-04-15 OMT entry.
-
-* ~~**Near-KO DP non-debuf swap (Lapras [1,2] flip)**~~ — **Closed
-  2026-04-15 followup, not fixing.** Original hypothesis ("near-KO
-  branch needs a symmetric non-debuf swap") was wrong. The actual
-  mechanism is PvPoke's post-DP bandaid[885] (our port: bandaid[866]
-  at battle.py:1541), which relies on a `.damage` side effect from
-  OMT line 320. Faithfully mirroring PvPoke fires the swap in ALL 6
-  MG cluster cases — the `damage/opp.hp < 0.8` test doesn't separate
-  Lapras (0.70) from Jellicent (0.62) / Corv (~0.6). Net: matching
-  PvPoke inverts the 6:1 ratio (resolves Lapras, regresses 6 cluster
-  clear-wins). Per CLAUDE.md divergence policy, ours is defensibly
-  better overall. Keeping the `_cached_damage` subgate at
-  battle.py:652 as the intentional deviation; xfails stay. Full
-  writeup in DEVELOPER_NOTES.md "Near-KO DP plan choice".
 
 ## Policies to add
 
@@ -754,116 +219,41 @@ break invariants that weren't yet nailed down by tests.
   an estimated P(opponent shields). P~0 → fire best-DPE move; P~1 → bait with
   cheapest.
 
-* ~~**Baiting policy as a deep-dive sim axis**~~ — **SHIPPED.** `--bait
-  {on,off,both}` sweeps the selected modes; with `--bait both` the HTML
-  renders a Bait dropdown (`deep_dive.py:2678-2683`) alongside Shields
-  and Opponent-IVs. Scatter, threshold/flip aggregator, anchor-clear
-  overlay, and bait-differential matchup cards
-  (`deep_dive_rendering.py:2840-2910`) all consume `state.oppIvMode`
-  with the `:nobait` suffix so they react to the dropdown. Confirmed
-  2026-04-16 while scoping S3 histogram. Remaining open items are
-  policy-enumeration (Selective, EV-based) under "Policies to add"
-  above — distinct from the axis plumbing. S16/S17 in the post-S5 arc
-  still tracks post-ship design polish (named bait modes in bullets),
-  but nothing is blocking.
-
 ## Features to add
 
-* **Form Change** — ✅ **Done 2026-04-14.** Morpeko (toggle Aura Wheel
-  Electric/Dark), Aegislash (Shield<->Blade stat/move/level swap),
-  Mimikyu (disguise absorbs first unshielded hit, -1 def stage).
-  Data-driven via gamemaster formChange field. Oracle tests: Morpeko
-  6/9, Aegislash 1/9, Mimikyu 6/9 match PvPoke exactly; remaining
-  mismatches are the GB/SB cascade (PvPoke bug #3) and Mimikyu SS
-  timing (PvPoke bug #5), pinned as xfails. Next: Mimikyu deep dive
-  with form change narrative.
-
-* ~~**DP cycle-timing move selection**~~ — **CLOSED 2026-04-15,
-  not an actual issue.** Original claim: our DP picks PR over IB in
-  Azu vs Aegislash 0v0 where IB yields more total damage via an extra
-  throw. Verified independently in two sessions (2026-04-15): current
-  sim throws Ice Beam twice in Azu vs Aegislash 0v0 and lands on the
-  same score PvPoke does (773). The concrete example was resolved
-  incidentally by one or more of: the bestChargedMove DPE threshold
-  port (fca1b7c), the activeChargedMoves priority-shuffle port
-  (68a306d), and the raw-DPE / atk_stage fixes around 2026-04-15. The
-  full oracle audit (115/115 matches PvPoke harness) shows no
-  remaining cycle-timing symptoms in any form-change or basic 0v0
-  fixture. Do NOT re-queue without a new concrete failing case.
+(Form Change shipped 2026-04-14 for Morpeko/Aegislash/Mimikyu;
+bait-axis as a deep-dive sim dimension shipped; DP cycle-timing
+move selection closed 2026-04-15 as not-a-real-issue.)
 
 ## Tests to add
 
-* **No-bait oracle tests from iv-tech deep dives** — `pvpoke_dp` now
-  accepts `bait_shields=False`. Sanity tests for the farm-down gate
-  landed in `test_battle.py` (see `test_pvpoke_dp_no_bait_*`), but we
-  should add real-world oracle cases from the HSH #iv-tech deep dives
-  in `docs/*.md`. Candidates (each asserts that `bait_shields=False`
-  still wins the cited matchup):
+* **No-bait oracle tests from iv-tech deep dives** — `pvpoke_dp`
+  accepts `bait_shields=False`; sanity tests for the farm-down gate
+  landed in `test_battle.py` (see `test_pvpoke_dp_no_bait_*`).
+  Real-world oracle cases from the HSH #iv-tech deep dives still
+  open:
 
-  1. **Tinkaton vs Medicham 1-1** — ✅ **Done 2026-04-12**
-     `docs/tinkaton_deep_dive_reference.md:25`. "141.66 defense with
-     138 hp lets you … win the 1s *without baiting*." Covered by
-     `test_tinkaton_wins_1v1_vs_medicham_no_bait` parametrized over
-     both rank #1 (5/15/15 NBB) and default (7/15/14) Medicham and
-     both bait modes. Tinkaton 1/14/14 (def=141.66 exactly, hp=143)
-     wins all 4 cases at score 520. Note: `bait_shields` has no
-     observable effect here (near-KO DP phase bypasses farm-down bait
-     branches); the test confirms bait-off doesn't break the matchup.
-     **Open followup**: our sim has a more forgiving win threshold
-     than the reference — many Tinkaton spreads below def=141.66 also
-     win the 1v1 (e.g. 0/10/15 at def=138.96 wins). The reference's
-     141.66 threshold may be overly conservative, or our sim is
-     missing a nuance. Worth round-tripping at pvpoke.com/battle.
-
-  2. **Tinkaton vs rank #1 Azumarill 1-2** — ✅ **Done 2026-04-12**
-     `docs/tinkaton_deep_dive_reference.md:27`. "143.03 defense gives
-     a bulkpoint vs rank #1 azu which flips the 1-2s (*no baiting
-     required*)." Covered by
-     `test_tinkaton_def_143_flips_1v2_vs_rank1_azumarill` which
-     asserts the directional def-bulkpoint flip: Tink 1/14/14
-     (def=141.66) LOSES 1v2 at score 397; Tink 0/14/9 (def=143.04)
-     WINS 1v2 at score 535. Crossing def=143.03 flips the matchup as
-     predicted. The "no baiting required" qualifier is verified by
-     parametrizing over both bait modes (bait_shields irrelevant in
-     this matchup, same scores either way).
-
-  3. **Tinkaton vs rank #1 shadow Altaria 0-1** —
+  1. **Tinkaton vs rank #1 shadow Altaria 0-1** —
      `docs/tinkaton_deep_dive_reference.md:31`. "143.04 defense with
-     141 hp … win the 0-1s *without baiting*." Note: reference also
-     flags inconsistency due to shadow IV variance.
-
-  4. **Spidops vs rank #1 Altaria 1s** —
+     141 hp … win the 0-1s *without baiting*." Reference also flags
+     inconsistency due to shadow IV variance.
+  2. **Spidops vs rank #1 Altaria 1s** —
      `docs/spidops_deep_dive_reference.md:35`. "140.67 defense with
      132+ hp flips the 1s vs the rank #1 altaria *without baits* by
      reducing sky attack damage."
 
-  5. **Corviknight vs default-IV Shadow Sableye** — ✅ **Done 2026-04-12**
-     `docs/corviknight_deep_dive_reference.md:58`. Both halves of the
-     reference claim verified by:
-     - `test_corviknight_max_def_wins_1v1_vs_default_shadow_sableye`
-       (parametrized over bait modes — 1v1 "flips without baiting")
-     - `test_corviknight_2v2_vs_default_shadow_sableye_flips_with_bait`
-       (2v2 "flips with bait twice" — directional A/B: bait-on wins
-       531, bait-off loses 288). This is the strongest oracle we have
-       for the `bait_shields` gate: if farm-down baiting regresses, the
-       2v2 test flips and catches it.
+  (Tinkaton vs Medicham 1-1, Tinkaton vs rank #1 Azumarill 1-2, and
+  Corviknight vs default-IV Shadow Sableye all shipped 2026-04-12.)
 
-  Each test should parametrize over `bait_shields=[True, False]`
-  when the reference makes a directional claim (cases 1, 5
-  especially). For cases where the reference only asserts the
-  no-bait result, test only `bait_shields=False`.
+  Open followup from case 1: our sim has a more forgiving win
+  threshold than the reference (many Tinkaton spreads below
+  def=141.66 win the 1v1, e.g. 0/10/15 at def=138.96). Reference may
+  be overly conservative, or our sim is missing a nuance. Worth
+  round-tripping at pvpoke.com/battle.
 
-  Priority: low-to-medium. These are integration oracles, not
-  correctness-blocking — the simple unit tests in `test_battle.py`
-  already prove the gate works. Pick these up in a session where you
-  can verify exact movesets/IVs at pvpoke.com/battle.
-
-* **Form Change** — ✅ **Done 2026-04-14.** Oracle tests shipped:
-  Morpeko 9/9, Aegislash 5/9 + 4 xfails (PvPoke bug #3 GB/SB cascade),
-  Mimikyu 9/9 match PvPoke harness.
-  Form changes DO affect opponent shielding (Aegislash Shield form
-  suppresses shields if damage < half HP) and baiting (Mimikyu
-  opponents break disguise ASAP with cheapest charged move).
+  Each remaining test should parametrize over `bait_shields=[True,
+  False]` when the reference makes a directional claim. Priority:
+  low-to-medium — integration oracles, not correctness-blocking.
 
 * **Auto-anchor fallback gating tests** — `build_auto_anchors()` and
   the per-kind gating logic are currently only verified by smoke runs
@@ -1107,134 +497,45 @@ break invariants that weren't yet nailed down by tests.
   to mistakenly run a smoke test without `--interactive` and conclude
   nothing rendered.
 
-## CD article generator (2026-04-16; SHIPPED Post-S5 S6-S10)
+## CD article generator — open follow-ups
 
-* ~~**Python article generator**~~ — **SHIPPED** across Post-S5
-  Sessions S6-S10 (2026-04-17 to 2026-04-18). Default path is live at
-  `scripts/generate_article.py`; the Oinkologne CD article ships from
-  `articles/oinkologne-cd-2026-05.toml` to `userdata/website/articles/
-  oinkologne-cd-2026-05/index.html`. Move-comparison table, meta-
-  coverage summary, matchup-delta, IV recommendations, verdict,
-  PvPoke-link helper, per-form rendering, and opponent-IV / bait
-  toggle are all implemented. The authorship-gated override layer
-  (`expert` / `both` / `auto`) also shipped — F1 Meta Role, F2 key-
-  flips callout, F4 Verdict augment, and F-intro are the currently
-  authored surfaces.
+The Python article generator (`scripts/generate_article.py`) shipped
+across Post-S5 Sessions S6-S10 (2026-04-17/18). Open polish:
 
-  **Related work now resolved:**
-  - ~~Battle-rating histogram~~ — SHIPPED `af56cb6`.
-  - ~~Slug convention fix~~ — resolved; article TOML
-    (`articles/oinkologne-cd-2026-05.toml`) and threshold slug
-    (`thresholds/oinkologne.toml:13` `slug = "oinkologne-cd-2026-05"`)
-    both use hyphens. Dive "Related Article" link renders at
-    `scripts/deep_dive.py:2783` — re-verify during ship if a 404 is
-    observed in the field.
-  - ~~Female Oinkologne dive~~ — SHIPPED 2026-04-18 (S10);
-    `userdata/website/oinkologne-female-great-league/` live with 10
-    split-moveset HTMLs.
-
-  **Still open on top of the shipped generator:**
-  - Envelope-position annotation wiring into IV Recommendations
-    cards — see S8 envelope-annotation follow-up below (unchanged).
-
-  **Also shipped on top of the generator:**
-  - Shape 2 migration of narrative from article to dive — SHIPPED
-    2026-04-19 across three sessions (commits `41bbe6f`, `bf05538`,
-    `bb021fa`). Per-species narrative now lives in
-    `thresholds/<species>.toml` and renders at the top of each dive
-    via `deep_dive_rendering.render_species_narrative()`. Article
-    `[intro] / [meta_role] / [verdict]` slimmed to CD-event scope.
-
-  **Watch item for S8 (envelope-position annotation surfacing):** when
-  the per-category envelope-position metric (S4) gets surfaced as
-  in-card annotations in the IV recommendations section, audit whether
-  `render_notable_ivs_section`'s existing UX caps
-  (`notable_max_count=5`, `max_members_shown=5`) still feel right with
-  an extra shape-tag line per card. Not an action item yet — S4's
-  metric doesn't add new category *types*, only a classification, so
-  the cap isn't currently under pressure. Flagging so the audit
-  doesn't get discovered at render-time in S8.
-
-  **S8 envelope-annotation wiring skipped (2026-04-17), follow-up
-  logged:** S4's `envelopePositions` dict is embedded in the dive DATA
-  blob keyed by Notable-IVs category name (`Atk Slayer`, `Lapras Atk`,
-  etc.). The article's IV Recommendations section currently renders
-  `tier` cards (stat-cutoff-based, from `data_obj['tiers']`) not
-  category cards, so the annotations don't have a natural slot. Two
-  paths for a future session: (a) add a Notable-IVs card block to the
-  article IV-recs section and annotate those directly, or (b) build a
+- **S8 envelope-annotation wiring on the article surface** — S4's
+  `envelopePositions` dict is keyed by Notable-IVs category name
+  (`Atk Slayer`, `Lapras Atk`, etc.); the article's IV
+  Recommendations section renders `tier` cards (stat-cutoff-based,
+  from `data_obj['tiers']`), so the annotations don't have a natural
+  slot. Two paths: (a) add a Notable-IVs card block to the article
+  IV-recs section and annotate those directly, or (b) build a
   tier-name → category-name mapping and attach the envelope annotation
-  to whichever tier exposes the anchor that backs the category. (a) is
-  simpler but duplicates dive content; (b) reuses the existing
-  presentation but needs a naming bridge. Defer until someone has an
-  opinion about which surface to annotate.
+  to whichever tier exposes the anchor that backs the category. (a)
+  is simpler but duplicates dive content; (b) reuses presentation
+  but needs a naming bridge. Defer until someone has an opinion.
+  Watch item: when S8 lands, audit `render_notable_ivs_section`'s
+  UX caps (`notable_max_count=5`, `max_members_shown=5`) under the
+  extra shape-tag line.
 
-## Deep-dive narrative
+## Deep-dive narrative — open polish
 
-* **SwagTips narrative 3-session arc — SHIPPED 2026-04-19.** The
-  renderer module `scripts/deep_dive_narrative.py` (1016 lines, purple
-  "IV Flavor Guide" zone between Expert Analysis gold and Simulation
-  Deep Dive blue) is in place. All three sessions per
-  `~/.claude/plans/flickering-swinging-micali.md` are done:
-  (1) renderer shipped as Shape 2 Session 1 (commit `41bbe6f`),
-  (2) ~~Goodra test-drive dive~~ done 2026-04-16, and
-  (3) ~~Aegislash form-change dive~~ done 2026-04-19 (commit `bb021fa`,
-  Shape 2 Session 3); narrative generation handles mid-battle form/
-  moveset swaps. See "Narrative renderer polish gated on Oinkologne"
-  below for cosmetic items logged during the Goodra session.
+* **22-IV catch-phrase edge case** — `_catch_phrase` caps at 500
+  catches as "very rare". The 22-IV Altaria Slayer on Goodra moveset
+  4 shows `~129-258 for a 50-75% chance` — under the cap but still
+  a large number; arguably should have a middle "rare" tier. Wait
+  for more species in the 50-300 range before adding a tier.
 
-* **Narrative renderer polish gated on Oinkologne** — surfaced during
-  the Goodra test-drive (2026-04-16, Lechonk CD prep Session 2). Items
-  are cosmetic; holding until Session 4 (Oinkologne deep dive) reveals
-  which actually bite on a different species before fixing
-  speculatively.
-  1. ~~**General-tier 3-stat signature**~~ — **FIXED 2026-04-17 (S5a
-     items 6+7).** Resolution was structural, not cosmetic: the name
-     and signature are now coupled via `_flavor_name_for_tier(name, atk,
-     def_, hp)`, which picks from axis shape per STYLE_ANALYSIS.md
-     "Stat Signature Rule". A General tier with ADH signature renames
-     to `General Good`; DH stays `Premium Bulk`; A-only becomes
-     `Attack Weight`. `_stat_signature` no longer suppresses axes at
-     all — it shows the real constraint set, which is correct because
-     name family now matches shape. Also fixes item 7 of S5a (any
-     2-axis pair supported, e.g. GFisk `Pure Mirror Slayer (Atk/Def)`
-     without HP).
-  2. **22-IV catch-phrase edge case** — `_catch_phrase` caps at 500
-     catches as "very rare". The 22-IV Altaria Slayer on Goodra
-     moveset 4 shows `~129-258 for a 50-75% chance`, which is under
-     the cap but still a large number; arguably should have a middle
-     "rare" tier. Wait for Oinkologne to see what catch counts
-     actually land in the 50-300 range before adding a tier.
-  3. **Session 2 validation note** — most Goodra narrative thresholds
-     that diverge from RyanSwag's June 2024 reference are explained
-     by opponent-pool shift (Lickitung/Gligar/Mantine/Pelipper no
-     longer in PvPoke GL top-21), not renderer bugs. Session 4 /
-     Oinkologne should not re-litigate these; they are expected data
-     differences per the existing "format and reasoning style, not
-     exact stats" principle.
-  4. ~~**Identical-stat flavors not merged**~~ — **FIXED 2026-04-17
-     (S5a item 2).** `merge_identical_stat_flavors()` groups flavors
-     by `(stat_sig, gains_sig)` exact equality, renames the primary
-     to `"{Opp} / Shadow {Opp} Slayer"` (or `Fortified …`), and
-     absorbs the others. Live Oinkologne m0 case after the renderer
-     fix is Lapras / Shadow Lapras Slayer (the Quagsire case no longer
-     renders because commit 759edb8 dropped 0-IV narrative flavors).
-     Negative-test `Fortified Lapras (105.19 Def, 153 HP)` has a
-     different stat signature and correctly stays standalone.
-     Also fixed: S5a item 1 namesake guarantee — Slayer tiers whose
-     gains didn't mention their namesake opponent now get a synthetic
-     entry prepended from the closest matchup boundary.
-  5. **Narrative flavors not reflected in Plotly scatter tiers** —
-     surfaced on Oinkologne Tackle moveset (Session 4): the IV Flavor
-     Guide derives 4 flavors (Premium Bulk, Quag Slayer, Shadow Quag
-     Slayer, G-Corsola Slayer) but the Plotly scatter only shows
-     "Top 5%" because the anchor-flip aggregation system found too
-     few records to derive named tiers. The two tier systems (anchor-
-     flip-derived plot tiers and narrative-derived flavors) are
-     independent; when the anchor system falls back to "Top 5%" only,
-     the plot loses all the structure the narrative found. Consider
-     feeding narrative flavors back as plot tier annotations, at least
-     as a fallback when anchor-derived tiers are sparse.
+* **Narrative flavors not reflected in Plotly scatter tiers** —
+  surfaced on Oinkologne Tackle moveset (Session 4): the IV Flavor
+  Guide derives 4 flavors (Premium Bulk, Quag Slayer, Shadow Quag
+  Slayer, G-Corsola Slayer) but the Plotly scatter only shows
+  "Top 5%" because the anchor-flip aggregation system found too
+  few records to derive named tiers. The two tier systems (anchor-
+  flip-derived plot tiers and narrative-derived flavors) are
+  independent; when the anchor system falls back to "Top 5%" only,
+  the plot loses all the structure the narrative found. Consider
+  feeding narrative flavors back as plot tier annotations, at least
+  as a fallback when anchor-derived tiers are sparse.
 
 * **Export Notable IVs cards to external scanner tool** — The user has a
   separate tool that scans their existing pokemon collection against
@@ -1264,17 +565,6 @@ break invariants that weren't yet nailed down by tests.
   `display_priority = N`. Defer until the auto-derived path proves
   useful on Tinkaton + 1-2 more species — single point of data
   doesn't yet justify the schema work.
-
-* ~~**Bait-axis matchup categories**~~ — **SHIPPED.** Confirmed
-  2026-04-16 while scoping S3 histogram. Non-bait matchup cards
-  populate `bait` from `parse_mode(opp_iv_mode)[1]`
-  (`deep_dive.py:415-423`); the bait-differential builder in
-  `deep_dive_rendering.py:2840-2910` emits "Beats … with bait only" /
-  "… no bait only" cards keyed on `(opponent, scenario, bait)`; and
-  `matchup_subtitle()` at `deep_dive_rendering.py:517-538` renders the
-  ``· no bait`` / ``· with bait`` suffix. Follow-up UX polish (richer
-  narrative phrasing, merging adjacent bait cards) lives in S17 of the
-  post-S5 arc, not here.
 
 * **RyanSwag-style autogenerated deep-dive section** *(own arc, scope
   after post-S5 arc ships)* — With the narrative renderer,
@@ -1355,31 +645,6 @@ break invariants that weren't yet nailed down by tests.
   changes direction, you click on another column to sort by that
   column and the arrow from the first column goes away, etc).
 
-* ~~**Threshold Tiers intro: document multi-axis anchor filtering**~~ —
-  **Done 2026-04-16** (Lechonk CD prep Session 1). Intro rewritten as
-  short lead + nested `<ul>` covering subset, crossed-cutoff, and
-  slayer-axis IV-count cases. Rendering gained (a) an "Anchors we get
-  for free" collapsed `<details>` per tier, surfacing anchors on axes
-  the tier doesn't cut off but every IV still clears, and (b) a
-  parent-tier diff callout in the header (e.g. `(−73 vs Balanced,
-  def-sacrificing / hp-low spreads excluded)`) when a tier's IVs are
-  a strict subset of a looser tier's. Verified against Annihilape m0
-  (`High Bulk` tier: 5 primary def-bulk bullets, 1 free atk-mirror
-  anchor, −73 vs Balanced callout).
-
-## Diagnostics / observability
-
-* ~~**Switch deep_dive.py from print statements to a structured
-  logger**~~ — **SHIPPED Post-S5 S2a-S2d** (2026-04-15/16). Helper
-  module at `scripts/deep_dive_logging.py` (commit `e300862`);
-  `deep_dive.py` + `deep_dive_slayer.py` ported (`1261d33`); log-
-  cleanup utility at `scripts/clean_logs.py` (`ca089bb`); docs
-  reference in `CLAUDE.md` "Debugging conventions" and
-  `DEVELOPER_NOTES.md` "Log file layout" (`6510c69`). Per-run log
-  files land under `userdata/logs/YYYY-MM/`, canonical live-monitor
-  command is `tail -f userdata/logs/latest.log`, workers route
-  through `worker_log_setup` instead of bare prints.
-
 ## Performance
 
 **Architecture note (2026-04-07)**: The BeeWare/iOS-pure-Python constraint
@@ -1394,25 +659,6 @@ section). Real-world impact: 9hr → 6 min on the actual deep-dive workload.
 Round 3 (numba JIT for the inner sim loop) was deprioritized because
 fastmath was confirmed a dead-end and the workload is no longer the
 bottleneck.
-
-* ~~**Deep-dive analysis+narrative phase is 20+ min single-threaded**~~
-  *(pulled into current plan as S8a on 2026-04-17)* — profile numbers
-  and candidate targets live in `~/.claude/plans/post-s5-oinkologne-arc.md`
-  §S8a. Pulled forward because S9+S10 full dives both benefit from the
-  speedup; scope is contained (two vectorisation targets). Not post-ship
-  anymore.
-
-* ~~**HTML file size**~~ — *S11+S12 shipped 2026-04-21 (commits
-  f839e65 S11 audit, 1fe232a R1 tooltip dedup, 5ad2d4b R2
-  --shared-plotly).* A/B on a small Oinkologne dive:
-  baseline 38.12 MB, R1+R2 21.72 MB (**-43.0%** file size,
-  **-40.5%** gzipped). Byte budget + ranked approach list in
-  `docs/s11_html_size_audit.md`. Deferred follow-ups (not currently
-  painful enough to pursue): lazy per-scenario SCORES_GZ blobs
-  (Rank 3 — regresses `file://` portability), class= dedup
-  (Rank 4 — gzip already captures most), defer-DOM collapsibles
-  (Rank 5 — wrong bottleneck). Reopen only if the post-R1+R2 file
-  size becomes painful again.
 
 * **Better slayer iteration progress reporting** — The current progress
   prints fire only when a `pool.imap_unordered` chunk completes. With
@@ -1567,100 +813,43 @@ bottleneck.
 
 ## Moveset / variant comparison tool
 
-* **Generalise the article generator into a loadout comparator**
-  *(follow-up from the Oinkologne CD article arc)* — most of the
-  infrastructure built for `scripts/generate_article.py` is really a
-  "compare loadout A vs loadout B" pipeline with a CD framing bolted
-  on. Concrete user questions this should answer:
-  - "I'm playing in a Championship Series event and want to know if
-    I should run Forretress with Volt Switch or Bug Bite." (Two fast
-    moves on the same species.)
-  - "I want to see the difference between Shadow Forretress and
-    normal Forretress." (Same moveset, different base form /
-    stat-multiplier pair.)
-  - "Which Forretress do I want on my team — Volt Switch Shadow, Volt
-    Switch normal, Bug Bite Shadow, or Bug Bite normal?" (2 fast-move
-    options × 2 form options = 4 loadouts.)
-  - CD catches that weren't tied to a new move announcement — just
-    "is the shadow worth chasing for this slot."
+* **N=3 / N=4 renderer support for `compare_loadouts.py`** — MVP
+  (N=2) shipped 2026-04-18. N=4 ceiling covers the canonical
+  (moveset × form) cross (e.g. Forretress: Volt Switch / Bug Bite ×
+  Shadow / normal). Remaining work: N=3 and N=4 renderer support,
+  plus verdict templating for N-way ranking (MVP keeps verdict
+  simple, just for Male-vs-Female).
 
-  **MVP (N=2) SHIPPED 2026-04-18 (S10)** at
-  `scripts/compare_loadouts.py`; commits `ebba13f` (MVP),
-  `8530f19` (wired into CD article), `21d3393` (source-dive
-  listing), `69bdf64` (spec `order` field), `53d7050` (Oinkologne
-  spec puts Female first). Output lands at
-  `userdata/website/comparisons/<slug>/index.html`; the Oinkologne
-  M-vs-F comparison is live at `.../oinkologne-male-vs-female/`.
-
-  **Design constraint:** stay loadout-list-keyed, not A/B-keyed. Use
-  `loadouts: list[LoadoutSpec]` in the data model even at N=2; use
-  pairwise-delta iteration (`itertools.combinations`) rather than
-  `a - b` shortcuts. Upgrade to N=4 is then a renderer extension, not
-  a data-model rewrite.
-
-  **N=4 ceiling:** 4 covers the canonical (moveset × form) cross
-  (Forretress case above). More than 4 makes the matchup-delta table
-  unreadable and the verdict ambiguous. Don't design past this.
-
-  **Remaining post-S10 work:** N=3 and N=4 renderer support, verdict
-  templating for N-way ranking (MVP keeps verdict simple, just for
-  Male-vs-Female).
-
-  Reuse of the S8 work: matchup-delta table, per-opponent win-rate
-  diff, +Flip/No-flip/-Flip pills, PvPoke single-battle drill-through
-  links, move-stat side-by-side table. What changes vs CD article: no
-  "old default" vs "new CD move" framing; instead a generic loadout
-  comparison with the user picking all sides. Flagged 2026-04-17 by
-  Michael after seeing the Oinkologne article render.
+  Design constraint: stay loadout-list-keyed, not A/B-keyed
+  (`loadouts: list[LoadoutSpec]`, pairwise-delta iteration via
+  `itertools.combinations`). N=4 ceiling: more than 4 makes the
+  matchup-delta table unreadable. Don't design past this.
 
 ## User-facing documentation (post-arc)
 
-* **Explainer docs for expert-but-non-programmer readers** *(queue
-  after the post-S5 Oinkologne arc ships)* — audience is roughly
-  RyanSwag's level of PvP game understanding, but with no programming
-  background or interest. Separate audience from everything in
-  `docs/` today (which assumes the reader is reading source).
-  **The full topic list is a conversation Michael wants to have at the
-  start of the task, not a fixed scope** — the five topics below are a
-  starting draft captured during S8 (2026-04-17) so the idea doesn't
-  get lost, and Michael explicitly asked that they not be removed, but
-  a first-pass planning session should (a) add topics we haven't
-  thought of yet, (b) reorder by what's causing the most reader
-  confusion at the time the task starts, (c) decide screenshot
-  authoring cadence, and (d) decide whether each topic gets its own
-  page or whether related topics merge into a single guide. Starting
-  draft, in current priority order:
-  1. **Envelope-position metric** (S4) — what "elevated-band-crosser"
-     means for a category, why it matters when you're deciding which
-     IV to chase, what the `mean_delta` / `spread` / `shape` tuple
-     says about the category in plain language. Needs **annotated
-     screenshots** of the Notable IVs section with the envelope
-     annotation visible, plus a contrasting screenshot of a category
-     with a very different shape.
-  2. **Threshold Tiers** — tier vs category vs anchor, what the stat
-     cutoff bullets mean, why overlapping tiers are intentional. The
-     current in-page intro (rewritten 2026-04-16, Session 1) is good
-     enough for an expert scanning the page but lacks the worked
-     example a non-programmer needs. Screenshots of a tier card with
-     each part labeled.
-  3. **IV Flavor Guide** — what the purple "IV Flavor Guide" zone
-     does, how to read a flavor, what a "namesake" is, why two flavors
-     with the same stat signature merge. Owe this to acidicArisen per
-     `project_acidic_arisen_writeup_commitment.md`.
-  4. **CD article page** — how to read the matchup-delta table,
-     what the PvPoke multi-battle link does when you click it, what
-     "flip" means here. Short; mostly a figure tour.
-  5. **Deep-dive scatter plot** — color modes, hover cards, the
-     Shields / Opponent-IVs / Bait dropdowns, what "anchor-clear
-     overlay" shows.
-  Shape: `docs/guides/*.md` (new subdir) or a landing page at
-  `userdata/website/guides/`. Decide placement when the first guide
-  lands. Screenshots authored manually; keep them under
-  `docs/guides/screenshots/` (or `userdata/website/guides/images/`)
-  and compress before committing — the existing policy against
-  embedding large binaries still applies.
-  Not urgent until a second user starts engaging with the tool; until
-  then the primary reader is Michael, who can read source.
+The Reader's Guide arc shipped 2026-04-23/24 — infrastructure
+(`build_guides.py`, landing page, dev-count sentinels), plus five
+guide bodies: How This Works / Under the Hood, Envelope Position,
+Threshold Tiers, IV Flavor Guide, CD Article, Deep-Dive Scatter.
+Envelope Position + Threshold Tiers are at `authorship=both`; the
+others are still `authorship=ai` pending Michael review.
+
+Open follow-ups:
+
+- **Promote remaining guides from `ai` to `both` / `expert`** as
+  Michael reviews and edits each one.
+- **Round-3 screenshots** if/when reader confusion surfaces a
+  specific gap (round-1 + round-2 screenshots shipped via `32fae84`
+  and `e449b38`).
+- **Add topics** beyond the five shipped — Michael asked that the
+  topic list be a conversation at the start of the task, not a
+  fixed scope. Plan a session to (a) add topics surfaced by
+  acidicArisen / new readers, (b) reorder by current reader
+  confusion, (c) decide whether related topics merge.
+
+The IV Flavor Guide write-up is owed to acidicArisen per
+`project_acidic_arisen_writeup_commitment.md` — promoting that
+guide from `ai` to `expert` is the closing of that commitment.
 
 ## Low priority
 
