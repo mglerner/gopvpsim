@@ -8,20 +8,24 @@ this generated," the other six guides are a great starting point.
 
 ## What the tool actually does
 
-For each dive, we sim each of the 4,096 possible IVs of the focal
-species (0/0/0, 0/0/1, ..., 15/15/14, 15/15/15) at their best
+For each dive, we sim each of the 4,096 possible IV spreads of the
+focal species (0/0/0, 0/0/1, ..., 15/15/14, 15/15/15) at their best
 under-cap level against a pool of opponents (currently GL top-50 plus
 Championship Series additions, ~65 species), across all nine shield
 scenarios (0v0 / 0v1 / ... / 2v2), under two opponent-IV variants
 ([PvPoke](https://pvpoke.com/) default vs stat-product rank 1) and
 two bait policies (selective vs never-bait). One "score" per focal
-IV x opponent x scenario x opp-IV x bait cell. That's the raw input
+IV spread × opponent × scenario × opp-IV × bait cell. That's the raw input
 to every narrative and category decision on the page.
 
 The sim itself is a pure-Python port of PvPoke's JavaScript
 ActionLogic and Battle engine; we verify exact score parity against
-PvPoke on a fixed oracle set. When we diverge, we document and xfail
-rather than quietly differ. (There are a handful of known PvPoke bugs
+PvPoke on a fixed oracle set. When we diverge, we document the
+divergence and pin the case as an **expected-failure** test (`xfail`
+in [pytest](https://docs.pytest.org/en/stable/how-to/skipping.html#xfail-mark-test-functions-as-expected-to-fail);
+Paul Ganssle's [post on xfail-vs-skip](https://blog.ganssle.io/articles/2021/11/pytest-xfail.html)
+is the short read if you've never used it) rather than quietly
+differ. (There are a handful of known PvPoke bugs
 we intentionally don't reproduce; the [How This Works](../how-this-works/)
 guide walks through the parity check at a higher level.)
 
@@ -108,24 +112,26 @@ if there's nothing against Sealeo, it adds `auto_sealeo_brkp_any`.
 
 ### 3. Notable IVs (the category layer)
 
-Every focal IV gets tagged with the set of anchors it passes. A
-"category" is a named group of IVs sharing some structural property:
+Every focal IV spread gets tagged with the set of anchors it passes.
+A "category" is a named group of IV spreads sharing some structural
+property:
 
 - **Slayer categories** are the Nash-convergence output of iterative
-  mirror slayer discovery. Round 0 starts from every IV that wins
-  against a default opponent; each round tests the survivors against
-  *each other* in the mirror; the set usually collapses to 30-150 IVs
-  over 3-4 rounds. Those are the "survivors of the mirror."
+  mirror slayer discovery. Round 0 starts from every IV spread that
+  wins against a default opponent; each round tests the survivors
+  against *each other* in the mirror; the set usually collapses to
+  30-150 IV spreads over 3-4 rounds. Those are the "survivors of the
+  mirror."
 - **Composite categories** are intersections of anchor sets: "Atk
   Slayer & Top 5% by stat product" becomes one composite card on the
   Notable IVs list.
 - **Matchup categories** are synthesized per (opponent, scenario,
-  bait mode) where an IV cohort wins that exact cell. They're the
-  most granular and usually have the fewest members.
+  bait mode) where an IV-spread cohort wins that exact cell. They're
+  the most granular and usually have the fewest members.
 
-Categories are ranked on a selectivity metric (how many IVs pass vs
-the dive baseline) so the ones that actually differentiate IVs float
-to the top.
+Categories are ranked on a selectivity metric (how many IV spreads
+pass vs the dive baseline) so the ones that actually differentiate IV
+spreads float to the top.
 
 ### 4. Threshold tier cards
 
@@ -171,9 +177,9 @@ This is the purple "IV Flavor Guide" zone on every dive. Derivation:
   "Lapras / Shadow Lapras Slayer" card.
 - **Catch-phrase tier**: each flavor gets a geometric-distribution
   rarity label. "~14-28 catches for a 50-75% chance" means in 14
-  catches you have a 50% shot at seeing a qualifying IV, in 28
+  catches you have a 50% shot at seeing a qualifying IV spread, in 28
   catches a 75% shot. "Very rare" over 500 catches, "almost any will
-  do" when most IVs qualify.
+  do" when most IV spreads qualify.
 
 The [IV Flavor Guide](../iv-flavor-guide/) guide is the
 reader-facing companion for this section; this one describes how the
@@ -220,9 +226,15 @@ narrative blocks on dives default to "auto" now, replacing earlier
 ai-drafted prose, so there's no unreviewed LLM prose on the main
 deep dives.
 
-## Overriding any of this
+## Overriding any of this — for project contributors
 
 The tool is designed so expert authoring always wins over automation.
+The overrides below all live in `thresholds/<species>.toml` and apply
+on the next dive run. **There is no client-side UI for this today** -
+adding or removing anchors / thresholds requires editing the TOML in
+a local clone and re-running the dive. A per-Pokemon custom-anchor
+surface in your browser is a future feature on the TODO; for now,
+contributions flow through the project repo.
 
 - Adding a TOML anchor replaces whatever the auto-fallback would have
   produced on that axis.
@@ -231,6 +243,14 @@ The tool is designed so expert authoring always wins over automation.
   species.
 - Adding a named spread with `source = "..."` routes the anchor into
   the gold Expert zone so readers can tell it's your judgment call.
+
+For removal: the auto-fallback layer is gated, so a TOML that hand-
+authors anchors against (say) Annihilape will not get auto-fallback
+Annihilape additions stacked on top — only auto-anchors against
+opponents the TOML doesn't already cover. If a tier card has too
+many bullets, the right move is usually adding a hand-authored
+narrower anchor against that opponent rather than trying to remove
+the auto one.
 
 If you see something on a shipped dive that you disagree with,
 there's a TOML knob for it. The auto-fallback is specifically
