@@ -1,13 +1,15 @@
-The **envelope position** of a named IV category answers one question:
-when IVs in this category win, are they winning because the IVs
-themselves are special, or because almost any IV at the same stat-
-product rank would be winning those matchups?
+The **envelope position** of a named IV-spread category answers one
+question: when IV spreads in this category win, are they winning
+because the IV spreads themselves are special, or because almost any
+IV spread at the same stat-product rank would be winning those
+matchups?
 
-That distinction matters when you're deciding which IV to chase. A
-category that "rides above" the Anchor IVs band at its rank is doing
-something that the rank alone doesn't buy you. A category that
-"straddles" the band is doing roughly what rank already predicts, and
-chasing a specific IV inside it isn't worth extra effort.
+That distinction matters when you're deciding which IV spread to
+chase. A category that "rides above" the Anchor IVs band at its rank
+is doing something that the rank alone doesn't buy you. A category
+that "straddles" the band is doing roughly what rank already
+predicts, and chasing a specific IV spread inside it isn't worth
+extra effort.
 
 ## What the Anchor IVs band is
 
@@ -30,8 +32,9 @@ below, or on the band?**
      alt="Tinkaton UL scatter plot showing named categories riding or
           spreading across the Anchor IVs band.">
 <figcaption>
-Scatter plot from the Tinkaton UL dive. The grey triangle band is the
-Anchor IVs overlay. Orange <strong>Steelix (Shadow) Slayer</strong>
+Scatter plot from the Tinkaton UL dive. The triangle markers labelled
+<strong>Anchor IVs</strong> in the legend trace the reference band.
+Orange <strong>Steelix (Shadow) Slayer</strong>
 tightly rides the top edge (envelope-rider-top). Red
 <strong>Annihilape Bulk</strong> tightly rides the bottom
 (envelope-rider-bottom). Green <strong>Ampharos Atk</strong> sits
@@ -39,6 +42,17 @@ elevated above the band but spreads across it (elevated-band-crosser).
 Three of the four shape classes in one frame.
 </figcaption>
 </figure>
+
+**Why the Anchor IVs markers change color across the rank axis.** Each
+triangle carries a cyan border ring (the "I'm in the Anchor IVs
+cohort" signal) and an inner fill that matches what that IV spread
+would look like in the base scatter underneath. So in the default
+**Color: Threshold tiers** mode, anchor IVs that clear a named tier
+take that tier's color; untiered anchor IVs take a Viridis-by-score
+gradient. Switch the **Color** dropdown to a stat axis like "HP" or
+"Attack" and every anchor fill flips to a fixed gold — the per-tier
+mapping doesn't apply outside threshold mode. The cyan border stays
+constant; only the fill responds to the Color setting.
 
 ## The four shapes
 
@@ -119,7 +133,7 @@ looking at:
 
 - **avg close to 0** means the category is sitting roughly on the
   band. Score-wise, members are interchangeable with what a typical
-  rank-matched anchor IV would produce. Skip.
+  rank-matched anchor IV spread would produce. Skip.
 - **avg large (positive or negative), spread small** means everyone in
   the category is reliably off the band in the same direction. A
   `+2.8 avg, 0.4 spread` rider tag is saying: "every member beats the
@@ -159,23 +173,23 @@ trading def-sacrifice for atk gains is a wash on average.
 ## How to use this when picking an IV
 
 Work the envelope tag together with the category's **member count**
-(how many IVs qualify) and the cutoffs themselves:
+(how many IV spreads qualify) and the cutoffs themselves:
 
 - **Rider-top + small member count** = the combination to chase. Few
-  IVs qualify, but every one that does beats the band. This is the
-  "rare but worth the trade" IV.
-- **Rider-top + large member count** = free lunch. Most IVs already
-  sit here; you don't need to chase anything specific.
+  IV spreads qualify, but every one that does beats the band. This is
+  the "rare but worth the trade" IV spread.
+- **Rider-top + large member count** = free lunch. Most IV spreads
+  already sit here; you don't need to chase anything specific.
 - **Straddles band + small member count** = low confidence. The
   category narrows the IV space but the mean effect is flat. Either
   rank or a specific-IV chase is better than chasing this category.
 - **Rider-bottom** at any member count = avoid. Members are
   persistently below band.
 
-The **Paste-box CSV overlay** on the scatter plot makes this concrete:
-paste your own IVs into the plot, switch to the category whose tag you
-like, and see instantly which of your catchable IVs land inside a
-rider-top band vs a straddle.
+The **Paste-box CSV overlay** on the scatter plot makes this
+concrete: paste your own IV spreads into the plot, switch to the
+category whose tag you like, and see instantly which of your
+catchable IV spreads land inside a rider-top band vs a straddle.
 
 ## Where to go next
 
