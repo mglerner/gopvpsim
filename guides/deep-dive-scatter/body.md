@@ -5,8 +5,8 @@ outcome on the y-axis. The plot is a Plotly figure, so every point is
 hoverable and the legend is clickable.
 
 It's where you go when the tier cards and the IV Flavor Guide have
-narrowed things down and you want to see **which specific IVs** land
-where.
+narrowed things down and you want to see **which specific IV spreads**
+land where.
 
 <figure>
 <img src="screenshots/scatter-example.png"
@@ -14,10 +14,11 @@ where.
           named-category traces in the legend.">
 <figcaption>
 Scatter plot from the Tinkaton UL dive. The control strip across the
-top (Moveset / Shields / Opp-IVs / Bait / Y-axis / Color / Anchors)
+top (Moveset / Shields / Opponent IVs / Bait / Y-axis / Color / Anchors)
 re-renders the plot instantly without re-simulating. On the plot
-itself, each dot is one of 4,096 IV spreads. The grey triangle band
-is the Anchor IVs reference cohort; the coloured overlays
+itself, each dot is one of 4,096 IV spreads. The triangle markers
+labelled <strong>Anchor IVs</strong> in the legend trace the reference
+cohort's score band; the coloured overlays
 (<span style="color:#3fb950;font-weight:600">Ampharos Atk</span>,
 <span style="color:#f85149;font-weight:600">Annihilape Bulk</span>,
 <span style="color:#58a6ff;font-weight:600">Dusknoir Slayer</span>,
@@ -32,8 +33,8 @@ reference by name. Click any legend entry to toggle its visibility.
 
 - **x-axis: stat-product rank.** Lower rank is to the left (rank 1 at
   the leftmost edge, rank {{dive:iv_space_size}} at the rightmost).
-  Two IVs with identical stat products get tied ranks, which is why
-  the x-axis can look slightly discrete in places.
+  Two IV spreads with identical stat products get tied ranks, which
+  is why the x-axis can look slightly discrete in places.
 - **y-axis: the selected outcome mode.** Defaults to average battle
   score across the dive's opponent pool and shield scenarios. Higher
   is better.
@@ -60,8 +61,9 @@ flipping between views is instant.
   the score down to one shield configuration; `All (avg)` is the
   default and shows the pool-wide average.
 - **Opponent IVs** (when the dive ran with `--opp-ivs both`) -
-  switches opponents between PvPoke's default IVs and each opponent's
-  rank-1-by-stat-product IVs. Rank-1 opponents are marginally bulkier;
+  switches opponents between PvPoke's default IV spreads and each
+  opponent's rank-1-by-stat-product IV spread. Rank-1 opponents are
+  marginally bulkier;
   matchups on a breakpoint edge can flip across the switch.
 - **Bait** (when the dive ran with `--bait both`) - disables
   bait-first shielding so the opponent never concedes a bait-move
@@ -74,10 +76,18 @@ flipping between views is instant.
   shows. The other four modes turn the plot into a raw heatmap across
   that stat axis, useful for spotting a stat band you couldn't see
   with the tier colouring on.
-- **Anchors** - switches the Anchor IVs overlay between `Filled` (a
-  subdued cyan blob) and `Outline` (ring markers). Outline mode is
-  useful when a rider-top category sits inside the anchor band and
-  you want its trace to read clearly instead of fighting the fill.
+- **Anchors** - switches the Anchor IVs overlay between two display
+  modes:
+    - **Filled** (default) - the Anchor IVs cohort renders as a soft
+      colour band across the rank axis. Easier to read at a glance:
+      "is my IV spread above or below the band?" answers the
+      envelope-position question directly.
+    - **Outline** - the Anchor IVs cohort renders as ring markers
+      (one per anchor IV spread). Use this when a rider-top category
+      sits inside the Filled band and you want its trace to read
+      clearly without the fill behind it.
+  Pick **Filled** when reading the band as a baseline; pick **Outline**
+  when comparing a specific category trace against the band.
 
 Changing any of these **rebinds every other surface on the page** -
 the Top IVs table, the per-IV hover card, the anchor-clear bullet
@@ -135,8 +145,8 @@ Hover any point and you get a compact summary:
 
 Below the control strip is a collapsible **"Check my collection"**
 panel. Paste your Poke Genie CSV export into the textarea (or click
-"Choose file..." to upload one), and every matching IV on the plot
-gets circled. Everything runs client-side - nothing is uploaded.
+"Choose file..." to upload one), and every matching IV spread on the
+plot gets circled. Everything runs client-side - nothing is uploaded.
 
 Two useful follow-ups once your collection is on the plot:
 
@@ -168,10 +178,10 @@ point to it on the scatter without loading a whole CSV.
 
 A few things the scatter is especially good at:
 
-**Find my IVs on the plot.** Paste your collection, switch the color
-mode to Threshold tiers, and scan for green dots in a tier card you
-care about. If none of your mons sit in that card's colour, you know
-you need to catch or trade for a qualifying IV.
+**Find my IV spreads on the plot.** Paste your collection, switch the
+color mode to Threshold tiers, and scan for green dots in a tier card
+you care about. If none of your mons sit in that card's colour, you
+know you need to catch or trade for a qualifying IV spread.
 
 **Compare two colour modes.** Flip the color dropdown between
 `Threshold tiers` and `Attack`. Tier colour shows you which
@@ -180,16 +190,17 @@ underlying stat the cut is derived from. Shifts in where the warm
 colours concentrate tell you whether a tier is atk-driven or def/hp-
 driven.
 
-**See if a rare IV is worth chasing.** Sort the Top IVs table by
-`Top-Mirror CMP %` descending and cross-reference with the scatter:
-high-CMP IVs with low battle-rank penalty are the XL-candy picks. The
+**See if a rare IV spread is worth chasing.** Sort the Top IVs table
+by `Top-Mirror CMP %` descending and cross-reference with the scatter:
+high-CMP IV spreads with low battle-rank penalty are the XL-candy
+picks. The
 hover card's `&Delta; vs #1` line is the direct readout of "how much
 score do I give up for this trade."
 
 **Check a breakpoint edge.** Switch the Shields dropdown from `All
 (avg)` to a specific scenario like `1v1`. Points that were bunched on
-the average view spread out, and IVs sitting on an atk breakpoint
-become visible as a discontinuity.
+the average view spread out, and IV spreads sitting on an atk
+breakpoint become visible as a discontinuity.
 
 ## What the scatter does NOT show
 
@@ -201,8 +212,8 @@ become visible as a discontinuity.
   averaged over the pool. The scatter doesn't know about switch
   order or lingering charge-move energy.
 - **Fast-move floor.** Points are battle-score output, not timing.
-  Two IVs with the same score but different charge-move timings look
-  identical on the plot.
+  Two IV spreads with the same score but different charge-move
+  timings look identical on the plot.
 - **Absolute tier-card cuts.** The Plotly legend shows tier membership
   but not the stat cutoff itself - for that, scroll down to the
   Threshold Tiers cards. The scatter is the "where they sit" view;
