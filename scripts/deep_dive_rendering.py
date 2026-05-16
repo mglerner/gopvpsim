@@ -170,20 +170,40 @@ _OPP_COLORS = [
 
 
 def _opp_color(name):
-    """Deterministic color for an opponent name (case-insensitive)."""
+    """Deterministic color for an opponent name (case-insensitive).
+
+    Hashes the *gamemaster* name (not the prettified display name) so
+    the colour stays stable across the 2026-05-17 shadow/regional
+    renaming convention. ``Forretress (Shadow)`` and
+    ``Shadow Forretress`` always read the same colour because both
+    map to the same gamemaster ``speciesName`` upstream.
+    """
     h = int(hashlib.md5(name.lower().encode()).hexdigest(), 16)
     return _OPP_COLORS[h % len(_OPP_COLORS)]
 
 
 def _opp_b(name):
-    """Wrap an opponent name in a colored <b> tag."""
-    return f'<b style="color:{_opp_color(name)}">{name}</b>'
+    """Wrap an opponent name in a colored <b> tag.
+
+    Display text is run through ``pretty_species`` so the rendered
+    name follows the modifier-first convention (`Shadow Forretress`,
+    `Galarian Corsola`, etc.). The color hash still uses the
+    gamemaster name for stability across the rename.
+    """
+    from gopvpsim.display import pretty_species
+    return f'<b style="color:{_opp_color(name)}">{pretty_species(name)}</b>'
 
 
 def _opp_strong(color_key, display_text=None):
-    """Wrap text in a colored <strong> tag using the opponent's color."""
+    """Wrap text in a colored <strong> tag using the opponent's color.
+
+    If ``display_text`` isn't supplied, the prettified form of
+    ``color_key`` is used as the visible text. The color hash always
+    uses the raw ``color_key`` for stability.
+    """
+    from gopvpsim.display import pretty_species
     if display_text is None:
-        display_text = color_key
+        display_text = pretty_species(color_key)
     return f'<strong style="color:{_opp_color(color_key)}">{display_text}</strong>'
 
 
