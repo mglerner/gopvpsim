@@ -226,6 +226,14 @@ class Pokemon:
                 f"{species_name} with IVs {atk_iv}/{def_iv}/{sta_iv} "
                 f"exceeds {max_cp} CP even at level 1"
             )
+        # Aegislash (Blade) powers up in whole-level increments only,
+        # not half-levels — see PvPoke's getFormStats() (newLevel--)
+        # and the in-game form-change rule discovered by cascade1185.
+        # The standard half-level grid is wrong for Blade as the focal
+        # species; round down so the listed CP/stats match what real
+        # PvP players actually build.
+        if species_name == 'Aegislash (Blade)' and level % 1.0 != 0:
+            level -= 0.5
         return cls(species_name, base_atk, base_def, base_sta,
                    atk_iv, def_iv, sta_iv, level, shadow=shadow)
 
@@ -257,6 +265,10 @@ def iv_rank(species_name: str, *, league: str = 'great', max_level: float = None
     shadow_atk_mult = SHADOW_ATK_BONUS if shadow else 1.0
     shadow_def_mult = SHADOW_DEF_MULT  if shadow else 1.0
 
+    # Aegislash (Blade) powers up in whole-level increments only;
+    # mirror the rounding from Pokemon.at_best_level.
+    _blade_round_down = (species_name == 'Aegislash (Blade)')
+
     entries = []
     for a in range(16):
         for d in range(16):
@@ -265,6 +277,8 @@ def iv_rank(species_name: str, *, league: str = 'great', max_level: float = None
                                 max_cp=max_cp, max_level=max_level)
                 if lv is None:
                     continue
+                if _blade_round_down and lv % 1.0 != 0:
+                    lv -= 0.5
                 cpm = CPM[lv]
                 atk  = (base_atk + a) * cpm * shadow_atk_mult
                 def_ = (base_def + d) * cpm * shadow_def_mult
