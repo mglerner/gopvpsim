@@ -316,6 +316,11 @@ def _load_one_dive_file(path: Path) -> dict:
         'tiers': data.get('tiers') or [],
         'iv_tiers': data.get('ivTiers') or [],
         'iv_all_tiers': data.get('ivAllTiers') or [],
+        'effective_tier_count': (
+            data.get('effectiveTierCount')
+            if data.get('effectiveTierCount') is not None
+            else len(data.get('tiers') or [])
+        ),
         'n_ivs': n_ivs,
         'anchored_opps': anchored_opps,
         'envelope_positions': env_for_moveset,
