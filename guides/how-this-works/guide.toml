@@ -3,7 +3,7 @@ slug = "how-this-works"
 description = "How these dives get built: PvPoke's simulator, reimplemented in Python, swept across every IV, then rendered with Plotly. The short version of what you can and can't trust."
 order = 0
 coming_soon = false
-authorship = "ai"
+authorship = "both"
 
 # Tokens come from DEVELOPER_NOTES.md sync sentinels (dev:*) and the
 # default reference dive (dive:*, Oinkologne Male GL).

@@ -41,19 +41,19 @@ developer notes ({{dev:pvpoke_bugs_documented}} so far) so readers know
 when we're intentionally running a fixed version of the reference
 logic.
 
-## We sweep every IV, not just the top ones
+## We sweep every IV spread, not just the top ones
 
-PvPoke's UI shows you one IV matchup at a time, usually the stat-product
-rank-1 IVs on both sides. We run the simulation against every legal IV
-spread on your side - all {{dive:iv_space_size}} of them (Atk 0-15, Def
-0-15, Sta 0-15) - at every level that keeps the CP under the league
-cap.
+PvPoke's UI shows you one IV-spread matchup at a time, usually the
+stat-product rank-1 IV spread on both sides. We run the simulation
+against every legal IV spread on your side - all {{dive:iv_space_size}}
+of them (Atk 0-15, Def 0-15, Sta 0-15) - at every level that keeps the
+CP under the league cap.
 
-Why the full sweep: IVs matter to PvP teambuilding in a way that
-rank-1 doesn't capture. Two IV spreads with similar stat products can
-sit on opposite sides of an important damage breakpoint or a CMP tie,
-and the only way to see which IVs fall on which side is to simulate
-them all. The **Threshold Tiers** on every dive page are the output of
+Why the full sweep: IV spreads matter to PvP teambuilding in a way
+that the rank-1 stat-product spread doesn't capture. Two IV spreads
+with similar stat products can sit on opposite sides of an important
+damage breakpoint or a CMP tie, and the only way to see which IV
+spreads fall on which side is to simulate them all. The **Threshold Tiers** on every dive page are the output of
 that sweep: they name the specific cutoff an IV has to clear to reach
 the next meaningful tier against each notable opponent. See the
 [Threshold Tiers guide](../threshold-tiers/) for how to read those
@@ -65,19 +65,22 @@ pool (currently {{dive:opponent_count}} opponents on the reference
 nine shield scenarios (0-0, 0-1, 0-2, 1-0, 1-1, 1-2, 2-0, 2-1, 2-2).
 That's one dive, fully scored.
 
-## We render with Plotly so every IV is inspectable
+## We render with Plotly so every IV spread is inspectable
 
 The scatter plot on every dive page is a Plotly figure with one point
-per IV. Hovering a point shows you its stat-product rank, its battle
+per IV spread. Hovering a point shows you its stat-product rank, its battle
 rank, its avg battle score, its per-opponent win/loss list, and which
 threshold tiers it clears. The dropdowns at the top of the plot
-(Shields / Opponent-IVs / Bait) re-color the plot live - same data,
+(Shields / Opponent IVs / Bait) re-color the plot live - same data,
 different lens.
 
 This is the part we built that PvPoke doesn't have. Instead of asking
-"what's the best IV," it lets you ask "which of the IVs I could realistically
-catch or trade for is the right one to invest in," which is usually the
-question that matters in a teambuilding session.
+"what's the best IV spread," the scatter lets you ask "how does each IV
+spread compare to every other one at once" - the cluster shapes,
+breakpoint banding, and outlier IV spreads are all visible on the same
+canvas. The catch- and trade-probability question is answered separately
+in the IV Flavor Guide and Threshold Tier sections; the scatter is the
+"see them all together" view.
 
 ## What you should trust, and what you shouldn't
 
@@ -96,9 +99,10 @@ question that matters in a teambuilding session.
   around the numbers is there to highlight what we think matters, not
   to replace your own read of the matchup list.
 - Rankings across opponent pools that use different rules than
-  pvpoke.com (we sometimes cap CP on opponents or include sibling
-  forms; each dive's methodology footer spells out what pool was
-  used).
+  pvpoke.com (we sometimes cap CP on opponents or include both forms
+  of multi-form species like Oinkologne Male/Female or Aegislash
+  Shield/Blade; each dive's methodology footer spells out what pool
+  was used).
 
 **Known limits:**
 
