@@ -1,5 +1,5 @@
-A threshold tier is a named stat cutoff that an IV has to clear to reach
-the next meaningful battle outcome against a notable opponent. This
+A threshold tier is a named stat cutoff that an IV spread has to clear
+to reach the next meaningful battle outcome against a notable opponent. This
 page is about the **Threshold Tiers** section of a deep dive - what the
 cards show you, what the numbers mean, and how to use them when you're
 picking which IV to invest in.
@@ -37,15 +37,15 @@ Three things to read off the tier card header in the screenshot:
    badge means this cutoff was derived from a damage breakpoint
    against Dusknoir.
 2. **The stat cutoff.** The part after the middle dot is what an IV
-   has to clear to be a member of the tier. `atk ≥ 142.54` means the
-   IV's effective attack stat (base + IV, at the level the CP cap
-   allows) has to be at least 142.54. A tier can have any combination
+   spread has to clear to be a member of the tier. `atk ≥ 142.54`
+   means the IV spread's effective attack stat (base + IV, at the
+   level the CP cap allows) has to be at least 142.54. A tier can have any combination
    of `atk ≥`, `def ≥`, and `hp ≥` cutoffs; stats without a cutoff
    aren't restricted.
-3. **The member count in parentheses.** `220 IVs` means that many of
-   the 4096 possible IV spreads clear this tier's cutoffs. The higher
-   the number, the easier the tier is to hit with a catchable IV; the
-   lower, the rarer.
+3. **The member count in parentheses.** `220 IV spreads` means that
+   many of the 4096 possible IV spreads clear this tier's cutoffs. The
+   higher the number, the easier the tier is to hit with a catchable
+   IV spread; the lower, the rarer.
 
 Below the header, each card carries a list of anchor bullets - the
 specific matchup flips this tier buys you. The Dusknoir Atk card in
@@ -82,8 +82,9 @@ Two things make tiers overlap, and both are intentional.
 
 **Stricter cutoffs contain looser ones.** If {{dive:top_tier_name}}
 requires `atk >= {{dive:top_tier_atk_cutoff}}` and a second tier
-requires `atk >= 123.19` (the Tinkaton breakpoint, lower), any IV that
-meets the stricter cutoff automatically meets the looser one. So the
+requires `atk >= 123.19` (the Tinkaton breakpoint, lower), any IV
+spread that meets the stricter cutoff automatically meets the looser
+one. So the
 stricter tier's bullet list is a **superset** of the looser tier's
 bullets. The dive surfaces this deliberately rather than de-duplicating:
 a card telling you "this tier buys you Tinkaton AND Wigglytuff AND
@@ -101,21 +102,21 @@ When two tiers share the same primary anchor but different member
 counts - one says `atk >= 123.74, def >= 100` and the other just
 `atk >= 123.74` - the dive puts a small `(-N vs parent)` note on
 the stricter tier's header so you can see at a glance that the
-stricter one trades off def-sacrificing (or hp-low) IVs the looser
-one keeps.
+stricter one trades off def-sacrificing (or hp-low) IV spreads the
+looser one keeps.
 
 ## How to use the clear count
 
-The `{{dive:top_tier_clear_count}} IVs` style member count is the
-single most actionable number on a tier card.
+The `{{dive:top_tier_clear_count}} IV spreads` style member count is
+the single most actionable number on a tier card.
 
 - **Above ~500** (roughly 1/8 of the 4096 IV space): common tier. A
   typical catch will already clear it, or will clear it with minor
-  XL investment. You shouldn't have to chase a specific IV for this
-  tier unless the cutoff is on the edge of something you catch.
+  XL investment. You shouldn't have to chase a specific IV spread for
+  this tier unless the cutoff is on the edge of something you catch.
 - **~100-500**: selective but attainable. Worth checking your paste-box
-  highlights on the scatter plot to see which of your catchable IVs
-  already qualify.
+  highlights on the scatter plot to see which of your catchable IV
+  spreads already qualify.
 - **Under ~100**: genuinely rare. If a named matchup requires this
   tier, the IV recommendation on the card is telling you to
   deliberately target that spread (trade, egg-hatch filter, or
@@ -124,7 +125,7 @@ single most actionable number on a tier card.
 Those ranges are rules of thumb, not hard lines. What matters is the
 **relative ordering**: a tier with 46 members is an order of magnitude
 rarer than one with 460, and the dive's Notable IVs section will flag
-which of your catchable IVs fall inside each.
+which of your catchable IV spreads fall inside each.
 
 ## One worked example, quickly
 
@@ -132,11 +133,12 @@ which of your catchable IVs fall inside each.
 {{dive:tier_count}} threshold-tier cards on its featured moveset.
 The top card - {{dive:top_tier_name}} - has `atk &ge;
 {{dive:top_tier_atk_cutoff}}` and {{dive:top_tier_clear_count}} of the
-{{dive:iv_space_size}} IVs meet it. That means clearing that tier
-isn't free; it rules out most low-attack IVs. But every IV that does
-meet it also flips the matchups listed as primary bullets below (the
-Lapras scenario flip plus everything below the same atk cutoff -
-Tinkaton, Wigglytuff, Altaria, and so on for this moveset).
+{{dive:iv_space_size}} IV spreads meet it. That means clearing that
+tier isn't free; it rules out most low-attack IV spreads. But every
+IV spread that does meet it also flips the matchups listed as primary
+bullets below (the Lapras scenario flip plus everything below the
+same atk cutoff - Tinkaton, Wigglytuff, Altaria, and so on for this
+moveset).
 
 Read the card top-down: tier name tells you what opponent drives the
 cutoff; the cutoff tells you what stat you need; the member count
