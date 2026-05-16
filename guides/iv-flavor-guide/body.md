@@ -5,7 +5,7 @@ IV space into a short list of named play-style archetypes - a
 buys you and the specific matchups it costs.
 
 It's the fastest section to read on the whole page, and it's the
-right place to start if you're deciding which IV to chase.
+right place to start if you're deciding which IV spread to chase.
 
 <figure>
 <img src="screenshots/flavor-example.png"
@@ -24,8 +24,8 @@ opponent-by-opponent matchups that flavor's stat cutoffs buy you.
 
 ## What a flavor is
 
-A flavor is a **named cluster of IVs with a shared stat signature and
-a shared strategic intent**. The screenshot above shows the Tinkaton
+A flavor is a **named cluster of IV spreads with a shared stat
+signature and a shared strategic intent**. The screenshot above shows the Tinkaton
 UL dive's four flavors:
 <span style="color:#3fb950;font-weight:600">General Good</span> is a
 broad "safe baseline" cut covering 82.4% of the IV space;
@@ -40,15 +40,15 @@ their namesake opponent.
 A flavor is **not** an arbitrary PvPoke preset. It's derived by:
 
 1. Taking the mechanical tier cutoffs from the simulation sweep
-   (every atk/def/hp threshold that changes the matchup list).
-2. Mapping each cutoff's shape - does it bound attack, defense, HP,
-   or a combination - onto a SwagTips-style name family. Pure-def
-   cuts become `Fortified {Opp}` or `Premium Bulk`. Pure-atk cuts
+   (every Atk/Def/HP threshold that changes the matchup list).
+2. Mapping each cutoff's shape - does it bound Atk, Def, HP,
+   or a combination - onto a SwagTips-style name family. Pure-Def
+   cuts become `Fortified {Opp}` or `Premium Bulk`. Pure-Atk cuts
    tied to a specific opponent become `{Opp} Slayer`. Broad cuts
    with no single anchor become `General Good`.
 3. Attaching the per-flavor trade-off list by partitioning the IV
    space at the flavor's cut and comparing the flavor cohort's
-   win rate against the General cohort's win rate across every
+   win rate against the General Good flavor's win rate across every
    opponent in the dive's pool.
 
 The code that does this is `refine_flavor_names` in
@@ -58,28 +58,28 @@ the cluster is the mechanical output.
 ## The six name families
 
 Every flavor you see on a dive comes out of one of six families. The
-family is chosen from the shape of the cut (atk, def, hp, or a
+family is chosen from the shape of the cut (Atk, Def, HP, or a
 combination) plus whether the cut is tied to a specific opponent:
 
-- **General Good** - a broad cut with atk, def, and hp floors, no
+- **General Good** - a broad cut with Atk, Def, and HP floors, no
   single opponent anchor. This is the "recommended" flavor on most
   dives; clearing it gets you the bulk of the species' meta coverage
   without chasing anything specific.
-- **Premium Bulk** - a def + hp cut with no atk floor. The defensive
-  counterpart to General Good: the cut narrows to bulkier IVs, but
-  isn't tied to a named opponent.
-- **Attack Weight** - a pure atk cut with no def or hp floor. Narrows
-  to the high-atk tail of the IV space; usually surfaces on species
+- **Premium Bulk** - a Def + HP cut with no Atk floor. The defensive
+  counterpart to General Good: the cut narrows to bulkier IV spreads,
+  but isn't tied to a named opponent.
+- **Attack Weight** - a pure Atk cut with no Def or HP floor. Narrows
+  to the high-Atk tail of the IV space; usually surfaces on species
   whose role is "open with a charged move, win by damage race."
-- **High Bulk** - a pure def cut, no atk or hp floor. Rarer; usually
-  a species-specific pattern where the hp dimension doesn't carry
+- **High Bulk** - a pure Def cut, no Atk or HP floor. Rarer; usually
+  a species-specific pattern where the HP dimension doesn't carry
   a bulkpoint.
-- **{Opponent} Slayer** - a cut (atk, or atk + hp) tied to a
+- **{Opponent} Slayer** - a cut (Atk, or Atk + HP) tied to a
   specific opponent's damage breakpoint. Lapras Slayer, Tinkaton
   Slayer, etc. The cutoff is the attack threshold at which one of
   the focal's moves steps up a damage tier against that opponent,
   plus any HP requirement from the neighboring matchup boundary.
-- **Fortified {Opponent}** - a cut (def, or def + hp) tied to a
+- **Fortified {Opponent}** - a cut (Def, or Def + HP) tied to a
   specific opponent's bulkpoint. Fortified Greedent, Fortified
   Clodsire, etc. The cutoff is the defense threshold at which one
   of the opponent's moves steps **down** a damage tier against the
@@ -107,11 +107,24 @@ overview table with one row per flavor:
 its own values.)
 
 The **IVs** column is the count of IV spreads out of
-{{dive:iv_space_size}} that meet this flavor's stat cuts. The
-**Catches needed** column is the expected number of catches to hit
-at least one qualifying IV with 50-75% probability, assuming
-uniformly random IVs (accurate for wild catches; less accurate for
-traded or raid Pokemon with their own IV floors).
+{{dive:iv_space_size}} that meet this flavor's stat cuts. The **%**
+column is that count expressed as a fraction of the IV space - the
+same number as the IVs column, just in percent form for quick
+scanning. In the example table above, General Good covers ~98% of
+the IV space (almost any wild catch clears its cutoffs), while
+Fortified Greedent and Lapras Slayer each cover ~1% of the IV space
+(most catches miss them). Use **%** for "how often does this flavor
+come up at random"; use **Catches needed** (described next) to turn
+the same information into a tangible catch count.
+
+The **Catches needed** column is the expected number of catches to
+hit at least one qualifying IV spread, with 50-75% probability. The
+column assumes an IV floor of 0/0/0 unless stated otherwise; that
+matches plain wild spawns. Weather-boosted, raid, hatched, traded,
+research-reward, and Shadow-rescue catches use higher IV floors and
+need correspondingly fewer catches — see the
+[Pokemon Go Wiki's IV floor reference](https://pokemongo.fandom.com/wiki/Individual_Values)
+for the per-source floor table.
 
 Below the table, each flavor has its own collapsible card:
 
@@ -119,16 +132,15 @@ Below the table, each flavor has its own collapsible card:
   The stat signature is the minimum each constrained axis has to
   clear.
 - **Body - gains paragraph**: a short sentence naming the opponents
-  and shield scenarios this flavor wins relative to the General
-  cohort.
+  and shield scenarios this flavor wins relative to General Good.
 - **Body - losses paragraph** (only shown for non-General flavors):
-  the matchups the flavor gives up relative to General. This is the
-  trade.
-- **Body - threshold ladder** (on General): a bulleted list of the
-  exact def / atk / hp combinations that clear specific opponents.
+  the matchups the flavor gives up relative to General Good. This is
+  the tradeoff.
+- **Body - threshold ladder** (on General Good): a bulleted list of
+  the exact Def / Atk / HP combinations that clear specific opponents.
   This is the "what is each part of the cut buying me" detail.
 
-The cards default to the General flavor open and the rest collapsed.
+The cards default to the General Good flavor open and the rest collapsed.
 Click any header to expand.
 
 ## The namesake guarantee
@@ -157,16 +169,16 @@ about the same data**. They overlap, sometimes confusingly, and the
 distinction is worth getting straight:
 
 - **Threshold Tiers** tell you *"what cutoff do I need to clear to
-  hit this tier, and which IVs qualify?"* Tier cards are named
-  after their mechanical anchor (e.g. "Lapras Slayer" because the
-  cut comes from Lapras's breakpoint), list every IV spread that
+  hit this tier, and which IV spreads qualify?"* Tier cards are
+  named after their mechanical anchor (e.g. "Lapras Slayer" because
+  the cut comes from Lapras's breakpoint), list every IV spread that
   meets the cut, and show you the full list of per-opponent anchors
   the tier clears. Tier cards are **mechanical**.
 - **IV Flavor Guide** tells you *"what archetype does this cluster
-  of IVs represent, and what trade does picking it make?"* Flavor
-  cards name the play-style, name one or two load-bearing gains,
-  name one or two load-bearing losses, and skip the exhaustive
-  anchor list. Flavor cards are **editorial**.
+  of IV spreads represent, and what tradeoff does picking it make?"*
+  Flavor cards name the play-style, name one or two load-bearing
+  gains, name one or two load-bearing losses, and skip the
+  exhaustive anchor list. Flavor cards are **editorial**.
 
 The tier-name unify (shipped 2026-04-23) means the two surfaces now
 share the same flavor name: a Threshold Tier card named "Lapras
@@ -196,27 +208,27 @@ Three flavors on the reference dive, in the order they're presented:
 and 148 HP as a bulk baseline, 115.50 Atk as a coverage floor.
 Doesn't chase a specific opponent; sits above most of the meta. The
 threshold-ladder in its card names every opponent and scenario the
-General floor unlocks (Azumarill 1-1, Clodsire 1-1, Empoleon incl.
-Shadow, and so on). Recommended for most players.
+General Good floor unlocks (Azumarill 1-1, Clodsire 1-1, Empoleon
+incl. Shadow, and so on). Recommended for most players.
 
-**Fortified Greedent** (~38 IVs) - defensive namesake. Trades
-attack range (no atk floor) for a 104.18 Def cut with 153 HP.
+**Fortified Greedent** (~38 IV spreads) - defensive namesake. Trades
+attack range (no Atk floor) for a 104.18 Def cut with 153 HP.
 Gain: Greedent 0-0, Charjabug 1-1, Cradily 1-0 flip into wins.
 Loss: Forretress 2-0, Furret 2-1, Lickilicky 2-2 drop out (the
-higher def cut excludes def-sacrificing IVs that clear other
+higher Def cut excludes Def-sacrificing IV spreads that clear other
 matchups via the attack side). Genuinely rare cut - the catch
 count needed for a 50% chance of hitting one is in the 70s.
 
-**Lapras Slayer** ({{dive:top_tier_clear_count}} IVs) - offensive
-namesake. Trades bulk (no def floor) for a
+**Lapras Slayer** ({{dive:top_tier_clear_count}} IV spreads) -
+offensive namesake. Trades bulk (no Def floor) for a
 {{dive:top_tier_atk_cutoff}} Atk cut, the smallest attack that flips
 Lapras's breakpoint with the featured moveset. Gain: Lapras 2-1,
 Altaria 2-0, Charjabug 0-0. Loss: Azumarill 1-1, Clodsire 1-1,
-Corsola (Galarian) 0-0 drop out (low-def IVs lose the defensive
+Corsola (Galarian) 0-0 drop out (low-Def IV spreads lose the defensive
 matchups). Similar rarity to Fortified Greedent.
 
-Reading the three together: General is the default pick; the two
-namesakes are the trades to consider if you care about the
+Reading the three together: General Good is the default pick; the
+two namesakes are the tradeoffs to consider if you care about the
 Greedent-family defensive matchup or the Lapras 2-1 flip
 specifically. The envelope tag next to each (see the
 [Envelope Position](../envelope-position/) guide) tells you whether
