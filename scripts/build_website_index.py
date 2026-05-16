@@ -58,29 +58,61 @@ def _slug_to_pretty_title(slug: str) -> str:
     Returns empty string when the slug doesn't match the pattern (no
     league suffix) — caller falls back to the HTML title.
     """
+    # Lazy import — display module needs gamemaster data; calling at
+    # module-import time bloats fast paths that don't need this.
+    import sys as _sys
+    _sys.path.insert(0, str(REPO_ROOT / 'src'))
+    from gopvpsim.display import pretty_species_from_slug  # type: ignore[import-not-found]
+
     for suffix, pretty in _LEAGUE_SUFFIXES.items():
         if slug.endswith('-' + suffix):
             core = slug[:-(len(suffix) + 1)]  # strip "-great-league" etc.
-            # Special-case the (form) parenthetical: species names
-            # containing a form suffix (Oinkologne female, Aegislash
-            # blade/shield) were slugified with dashes; recompose with
-            # the form token parenthesised.
-            tokens = [t.capitalize() for t in core.split('-')]
-            # Heuristic: common form-suffix tokens get parenthesised
-            # right after the species name. Matches the dive HTML
-            # `<title>` convention (e.g. "Oinkologne (Female)").
-            form_tokens = {'Female', 'Blade', 'Shield', 'Alolan',
-                           'Galarian', 'Hisuian'}
-            parts = [tokens[0]] if tokens else []
+            tokens = core.split('-')
+            # Identify the boundary between the species-name slug
+            # tokens (which feed pretty_species_from_slug) and any
+            # variant-descriptor tokens (moveset names, etc.) that
+            # follow. We consume tokens greedily into the species
+            # portion as long as each consumed token is either part
+            # of the bare species name or one of the known
+            # regional/shadow/form tags. Once we hit a token that
+            # isn't, the rest are variant descriptors.
+            #
+            # Tokens we consume into the species slug:
+            #   * Regional / shadow tags: shadow, galarian, alolan,
+            #     hisuian, paldean
+            #   * Form tags: female, male, blade, shield, busted,
+            #     disguised, super, large, small, average, hangry
+            #
+            # pretty_species_from_slug handles regional + female
+            # promotion; other form tags get re-parenthesised inline.
+            REGIONAL = {'shadow', 'galarian', 'alolan', 'hisuian',
+                        'paldean'}
+            FORM_PAREN = {'blade', 'shield', 'busted', 'disguised',
+                          'super', 'large', 'small', 'average',
+                          'hangry'}
+            # Always take the first token (it's the bare species).
+            species_tokens = [tokens[0]] if tokens else []
+            extra_form_parens: list[str] = []
             i = 1
-            while i < len(tokens) and tokens[i] in form_tokens:
-                parts.append(f'({tokens[i]})')
-                i += 1
-            # Rest of the tokens are variant descriptors (shadow flag,
-            # moveset words). Capitalise and join.
-            if i < len(tokens):
-                parts.append(' '.join(tokens[i:]))
-            species_plus_variant = ' '.join(parts).strip()
+            while i < len(tokens):
+                t = tokens[i]
+                if t in REGIONAL or t == 'female':
+                    species_tokens.append(t)
+                    i += 1
+                elif t in FORM_PAREN:
+                    extra_form_parens.append(t.capitalize())
+                    i += 1
+                else:
+                    break
+            species_slug = '_'.join(species_tokens)
+            species_display = pretty_species_from_slug(species_slug)
+            for fp in extra_form_parens:
+                species_display = f'{species_display} ({fp})'
+            # Remaining tokens are variant descriptors (moveset names,
+            # etc.). Capitalize each.
+            variant_parts = [t.capitalize() for t in tokens[i:]]
+            species_plus_variant = ' '.join(
+                [species_display] + variant_parts).strip()
             return f'{species_plus_variant} ({pretty})'
     return ''
 

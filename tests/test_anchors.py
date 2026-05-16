@@ -20,26 +20,34 @@ class TestDeriveDisplayName:
 
     @pytest.mark.parametrize("raw,expected", [
         # _brkp_any → root
-        ("cresselia_brkp_any", "cresselia"),
-        ("lickitung_brkp_any", "lickitung"),
-        ("umbreon_brkp_any", "umbreon"),
-        ("mirror_brkp_any", "mirror"),
+        ("cresselia_brkp_any", "Cresselia"),
+        ("lickitung_brkp_any", "Lickitung"),
+        ("umbreon_brkp_any", "Umbreon"),
+        ("mirror_brkp_any", "Mirror"),
         # _brkp_above_X → root↑X
-        ("lickitung_brkp_above_lurgan", "lickitung\u2191lurgan"),
+        ("lickitung_brkp_above_lurgan", "Lickitung\u2191lurgan"),
         # cmp_vs_X → cmp:X
         ("cmp_vs_lurgan", "cmp:lurgan"),
         ("cmp_vs_cohort", "cmp:cohort"),
         # _brkp_<other> → root:<other>  (Level 1 explicit fallback)
-        ("lickitung_brkp_counter_5", "lickitung:counter_5"),
+        ("lickitung_brkp_counter_5", "Lickitung:counter_5"),
         # auto_ prefix is stripped first, then rules re-applied
-        ("auto_corviknight_brkp_any", "corviknight"),
+        ("auto_corviknight_brkp_any", "Corviknight"),
         ("auto_cmp_vs_cohort", "cmp:cohort"),
-        ("auto_quagsire_shadow_brkp_any", "quagsire_shadow"),
+        # Shadow / regional tokens hoist to a leading prefix per the
+        # 2026-05-17 naming convention.
+        ("auto_quagsire_shadow_brkp_any", "Shadow Quagsire"),
+        ("corsola_galarian_brkp_any", "Galarian Corsola"),
+        ("weezing_galarian_shadow_brkp_any", "Shadow Galarian Weezing"),
         # Bulkpoint patterns get a trailing " bulk" so they're distinct from BP
-        ("mirror_blkp_any", "mirror bulk"),
-        ("auto_lickitung_blkp_any", "lickitung bulk"),
-        ("mirror_blkp_above_lurgan", "mirror bulk\u2191lurgan"),
-        ("lickitung_blkp_body_slam_3", "lickitung bulk:body_slam_3"),
+        ("mirror_blkp_any", "Mirror bulk"),
+        ("auto_lickitung_blkp_any", "Lickitung bulk"),
+        ("mirror_blkp_above_lurgan", "Mirror bulk\u2191lurgan"),
+        ("lickitung_blkp_body_slam_3", "Lickitung bulk:body_slam_3"),
+        # Gender disambiguation: bare male form gains "(Male)" when
+        # the gamemaster has a Female sibling.
+        ("oinkologne_brkp_any", "Oinkologne (Male)"),
+        ("oinkologne_female_brkp_any", "Oinkologne (Female)"),
         # No matching pattern → unchanged
         ("custom_anchor", "custom_anchor"),
     ])
@@ -486,7 +494,7 @@ class TestResolveAnchorsAnnihilape:
         # All share the parent name
         assert all(r.parent == "lickitung_brkp_any" for r in ltung_subs)
         # All share the parent display name (derived from auto_-stripped name)
-        assert all(r.parent_display_name == "lickitung" for r in ltung_subs)
+        assert all(r.parent_display_name == "Lickitung" for r in ltung_subs)
 
     def test_resolved_anchors_have_display_names(
         self, annihilape_registry, annihilape_focal_context,
@@ -587,7 +595,7 @@ class TestResolveAnchorsAnnihilape:
         for s in subs:
             assert s.kind == "bulkpoint"
             assert s.target_stat == "def"
-            assert s.parent_display_name == "lickitung bulk"
+            assert s.parent_display_name == "Lickitung bulk"
 
     def test_bulkpoint_anchor_resolves_via_auto_fallback(
         self, annihilape_focal_context,

@@ -110,27 +110,36 @@ def derive_display_name(parent_name: str) -> str:
       auto_lickitung_blkp_any       → lickitung bulk
       mirror_blkp_above_lurgan      → mirror bulk↑lurgan
     """
+    from .display import pretty_species_from_slug
+
     name = parent_name
     if name.startswith("auto_"):
         name = name[len("auto_"):]
     if name.startswith("cmp_vs_"):
         return "cmp:" + name[len("cmp_vs_"):]
+    # Head is always an opponent species slug; tail (after ``_brkp_`` /
+    # ``_blkp_``) is usually a non-species identifier (spread name, move
+    # token, "any") and stays as-is. The head goes through
+    # ``pretty_species_from_slug`` so the anchor badge follows the same
+    # "Shadow X" / "Galarian X" / "Oinkologne (Male)" convention used
+    # everywhere else on the dive page.
     if name.endswith("_blkp_any"):
-        return name[: -len("_blkp_any")] + " bulk"
+        head = name[: -len("_blkp_any")]
+        return f"{pretty_species_from_slug(head)} bulk"
     if "_blkp_above_" in name:
         head, tail = name.split("_blkp_above_", 1)
-        return f"{head} bulk\u2191{tail}"
+        return f"{pretty_species_from_slug(head)} bulk\u2191{tail}"
     if "_blkp_" in name:
         head, tail = name.split("_blkp_", 1)
-        return f"{head} bulk:{tail}"
+        return f"{pretty_species_from_slug(head)} bulk:{tail}"
     if name.endswith("_brkp_any"):
-        return name[: -len("_brkp_any")]
+        return pretty_species_from_slug(name[: -len("_brkp_any")])
     if "_brkp_above_" in name:
         head, tail = name.split("_brkp_above_", 1)
-        return f"{head}\u2191{tail}"
+        return f"{pretty_species_from_slug(head)}\u2191{tail}"
     if "_brkp_" in name:
         head, tail = name.split("_brkp_", 1)
-        return f"{head}:{tail}"
+        return f"{pretty_species_from_slug(head)}:{tail}"
     return name
 
 

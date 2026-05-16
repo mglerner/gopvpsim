@@ -74,6 +74,7 @@ from gopvpsim.anchors import (
     resolve_anchors, tag_iv, ResolvedAnchor, build_auto_anchors,
     derive_short_name,
 )
+from gopvpsim.display import pretty_species
 sys.path.insert(0, os.path.dirname(__file__))
 import deep_dive_analysis as analysis
 import deep_dive_rendering as rendering
@@ -1085,6 +1086,11 @@ def compute_iv_metadata(species, league, shadow=False, iv_floor=None):
     if iv_floor is not None:
         a_floor, d_floor, s_floor = iv_floor
 
+    # Aegislash (Blade) powers up in whole levels only; mirror the
+    # rounding from Pokemon.at_best_level / iv_rank. See
+    # DEVELOPER_NOTES "Form change gotchas" + S1 commit 1b6c075.
+    _blade_round_down = (species == 'Aegislash (Blade)')
+
     iv_meta = []
     for a in range(a_floor, 16):
         for d in range(d_floor, 16):
@@ -1094,6 +1100,8 @@ def compute_iv_metadata(species, league, shadow=False, iv_floor=None):
                                 max_level=LEAGUE_MAX_LEVEL.get(league, 51.0))
                 if lv is None:
                     continue
+                if _blade_round_down and lv % 1.0 != 0:
+                    lv -= 0.5
                 cpm = CPM[lv]
                 atk_stat = (base_atk + a) * cpm
                 def_stat = (base_def + d) * cpm
@@ -1511,11 +1519,15 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
         from html import escape as _esc_cmt
         cli_comment = f'<!-- CLI: {_esc_cmt(cli_args_str)} -->\n'
 
+    # Display-rename for non-interactive output; same convention as
+    # generate_interactive_html below.
+    species_pretty = pretty_species(species)
+
     html = f"""<!DOCTYPE html>
 {cli_comment}<html>
 <head>
 <meta charset="utf-8">
-<title>{species} {league.title()} League IV Deep Dive</title>
+<title>{species_pretty} {league.title()} League IV Deep Dive</title>
 {_plotly_script_tag(standalone, shared_plotly_dir, html_path)}
 <style>
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -1541,7 +1553,7 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
 </style>
 </head>
 <body>
-<h1>{species} - {league.title()} League IV Deep Dive</h1>
+<h1>{species_pretty} - {league.title()} League IV Deep Dive</h1>
 <p class="meta">Opponents: {opp_desc}
 | Shield scenario(s): {', '.join(f'{s0}v{s1}' for s0, s1 in (shield_scenarios or [(1,1)]))}
 | Policy: pvpoke_dp</p>
@@ -2766,6 +2778,18 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'nOpponents': n_opponents,
         'scenarios': [[s0, s1] for s0, s1 in shield_scenarios],
         'opponents': opponent_names,
+        # Parallel-aligned display strings: same order as `opponents`,
+        # each name rewritten via `pretty_species` so shadow/regional
+        # tags read as a leading prefix ("Shadow Forretress" instead
+        # of "Forretress (Shadow)") and the bare male form picks up
+        # a "(Male)" qualifier when a Female sibling exists. JS code
+        # uses this for display; `opponents` stays in gamemaster
+        # format for any lookup-by-name path. Tag suffixes that
+        # `pretty_species` doesn't recognize (e.g. "(atk-weighted)")
+        # pass through unchanged.
+        'opponentsDisplay': [
+            pretty_species(_n) for _n in opponent_names
+        ],
         # Indices into opponent_names whose species matches the focal
         # species (i.e., the mirror entry, or both forms when a pool
         # carries both normal + shadow of self). Used client-side by
@@ -3115,11 +3139,18 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         from html import escape as _esc_cmt
         cli_comment = f'<!-- CLI: {_esc_cmt(cli_args_str)} -->\n'
 
+    # Display-rename: focal species name in the title and H1 banner
+    # goes through pretty_species so "Forretress (Shadow)" reads as
+    # "Shadow Forretress", "Oinkologne" gets a "(Male)" suffix when
+    # there's a Female sibling, etc. The internal `species` variable
+    # stays in gamemaster format for any lookup.
+    species_pretty = pretty_species(species)
+
     html = f"""<!DOCTYPE html>
 {cli_comment}<html>
 <head>
 <meta charset="utf-8">
-<title>{species} {league.title()} League IV Deep Dive</title>
+<title>{species_pretty} {league.title()} League IV Deep Dive</title>
 {plotly_tag}
 <style>
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -3202,7 +3233,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 </style>
 </head>
 <body>
-<h1>{species} - {league.title()} League IV Deep Dive</h1>
+<h1>{species_pretty} - {league.title()} League IV Deep Dive</h1>
 <p class="meta">Opponents: {opp_desc}
 | Shield scenario(s): {shield_desc} | Policy: pvpoke_dp{_bait_meta}</p>
 """

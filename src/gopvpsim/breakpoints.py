@@ -215,6 +215,10 @@ def iv_breakpoints(
     )
     if d_level is None:
         raise ValueError(f"{defender_species} can't fit in {league} league at those IVs")
+    # Aegislash (Blade) powers up in whole levels only; round down.
+    # Mirrors Pokemon.at_best_level + iv_rank (commit 1b6c075).
+    if defender_species == 'Aegislash (Blade)' and d_level % 1.0 != 0:
+        d_level -= 0.5
     d_stats     = battle_stats(d_base['atk'], d_base['def'], d_base['hp'],
                                defender_atk_iv, defender_def_iv, defender_sta_iv,
                                d_level)
