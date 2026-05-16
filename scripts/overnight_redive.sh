@@ -95,26 +95,22 @@ step "Regenerating Oinkologne CD article" \
 step "Rendering Oinkologne M-vs-F comparison" \
     python scripts/compare_loadouts.py comparisons/oinkologne-male-vs-female.toml
 
-# 4. Aegislash Blade-vs-Shield comparison pages (GL + UL).
+# 4. Aegislash Blade-vs-Shield comparison page (GL only).
+# UL dropped 2026-05-17 per mercuryish review (S2): not competitively
+# viable, dropped from the site.
 step "Rendering Aegislash Blade-vs-Shield GL comparison" \
     python scripts/compare_loadouts.py comparisons/aegislash-blade-vs-shield.toml
-
-step "Rendering Aegislash Blade-vs-Shield UL comparison" \
-    python scripts/compare_loadouts.py comparisons/aegislash-blade-vs-shield-ul.toml
 
 # 5. Forretress 4-way comparison: fast-move x shadow. Reads data from
 #    the 4 Forretress dive dirs the chain produced in step 1.
 step "Rendering Forretress fast-move x shadow comparison" \
     python scripts/compare_loadouts.py comparisons/forretress-fast-move-shadow.toml
 
-# 6. Aegislash first-draft narrative articles (one per league). Auto-
-#    generated prose; morning report should flag every authored section
-#    before anything ships.
+# 6. Aegislash first-draft narrative article (GL only). Auto-generated
+#    prose; morning report should flag every authored section before
+#    anything ships. UL dropped 2026-05-17 per mercuryish review (S2).
 step "Generating Aegislash GL first-draft article" \
     python scripts/write_aegislash_narrative.py great
-
-step "Generating Aegislash UL first-draft article" \
-    python scripts/write_aegislash_narrative.py ultra
 
 # 7. Rebuild site index so the new pages show up in the top-level link
 #    page.

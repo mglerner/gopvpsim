@@ -6,6 +6,39 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-05-17 — Dropped UL Aegislash dives (mercuryish review, S2)
+
+**What:** Removed every UL-Aegislash surface from the site:
+
+- `userdata/website/aegislash-blade-ultra-league/`
+- `userdata/website/aegislash-shield-ultra-league/`
+- `userdata/website/comparisons/aegislash-blade-vs-shield-ul/`
+- `userdata/website/articles/aegislash-form-change-guide-ul/`
+- `comparisons/aegislash-blade-vs-shield-ul.toml` (source TOML)
+- UL entries in `scripts/run_website_dives.py`,
+  `scripts/write_aegislash_narrative.py`'s `LEAGUE_INFO`, and
+  `scripts/overnight_redive.sh`'s UL render steps
+- UL deep-dive / article comment references in
+  `thresholds/aegislash_{shield,blade}.toml`
+
+**Why:** Mercuryish flagged UL Aegislash as non-competitive in his
+2026-04-26 review, with confirmation from his UL-player contacts.
+Per the review: "I asked for second opinions from people who play
+UL, and they agree that UL Aegislash is not real." We agreed —
+keeping a stale-data UL surface live (where the simulation
+produces numbers but the species itself isn't a live PvP option)
+risks misleading readers who land on the page without context.
+
+**Reversal cost if UL Aegislash becomes viable later:** small.
+The deletion is purely site-state + scripted-config; the sim's
+form-change mechanics (`src/gopvpsim/formchange.py`) still handle
+Aegislash transformations in both leagues and there are no
+correctness tests gated on UL Aegislash. To re-add: restore the
+two `run_website_dives.py` entries, the `LEAGUE_INFO['ultra']`
+block in `write_aegislash_narrative.py`, the two `overnight_redive.sh`
+UL steps, and the `comparisons/aegislash-blade-vs-shield-ul.toml`
+file from git history.
+
 ## 2026-04-23 — Slayer IVs "of yours" table: column-header tooltips
 
 **Retrofit follow-up on the Mirror CMP reframe (2026-04-22).** The

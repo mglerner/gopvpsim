@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Emit a first-draft Aegislash form-change guide article (GL or UL).
+"""Emit a first-draft Aegislash form-change guide article (GL only).
 
 Usage:
-    python scripts/write_aegislash_narrative.py {great,ultra}
+    python scripts/write_aegislash_narrative.py great
 
 Writes:
-    userdata/website/articles/aegislash-form-change-guide-{gl,ul}/index.html
-    userdata/website/articles/aegislash-form-change-guide-{gl,ul}/meta.toml
+    userdata/website/articles/aegislash-form-change-guide-gl/index.html
+    userdata/website/articles/aegislash-form-change-guide-gl/meta.toml
+
+UL was dropped 2026-05-17 per mercuryish review (S2); the ``ultra``
+argument no longer resolves.
 
 This is a **first-draft** generator. Unlike the Oinkologne CD article
 (which goes through scripts/generate_article.py with an expert-authored
@@ -43,16 +46,9 @@ LEAGUE_INFO = {
         'shield_fast': 'Psycho Cut (charge-only fast move, 0 power)',
         'shield_charged': 'Shadow Ball, Gyro Ball',
     },
-    'ultra': {
-        'suffix': 'ul',
-        'display': 'Ultra League',
-        'cp_cap': 2500,
-        'blade_slug': 'aegislash-blade-ultra-league',
-        'shield_slug': 'aegislash-shield-ultra-league',
-        'comparison_slug': 'aegislash-blade-vs-shield-ul',
-        'shield_fast': 'Psycho Cut (charge-only fast move, 0 power)',
-        'shield_charged': 'Shadow Ball, Flash Cannon',
-    },
+    # 'ultra' entry dropped 2026-05-17 per mercuryish review (S2):
+    # UL Aegislash is not competitively viable; mercuryish + UL-player
+    # contacts confirmed. Re-add here if that changes.
 }
 
 

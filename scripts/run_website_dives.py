@@ -117,30 +117,9 @@ DIVES = [
                        '--charged', 'SHADOW_BALL,GYRO_BALL'],
         'reference': 'AEGISLASH_CHARGE_PSYCHO_CUT,SHADOW_BALL,GYRO_BALL',
     },
-    {
-        'species': 'Aegislash (Blade)',
-        'league': 'ultra',
-        'slug': 'aegislash-blade-ultra-league',
-        'html_base': 'index.html',
-        # UL top-60 + both Aegislash forms so Blade sees Shield as an
-        # opponent (cross-form matchup for the Blade-vs-Shield article).
-        'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
-        'no_thresholds': True,
-        'extra_args': ['--fast', 'PSYCHO_CUT',
-                       '--charged', 'SHADOW_BALL,FLASH_CANNON'],
-        'reference': 'PSYCHO_CUT,SHADOW_BALL,FLASH_CANNON',
-    },
-    {
-        'species': 'Aegislash (Shield)',
-        'league': 'ultra',
-        'slug': 'aegislash-shield-ultra-league',
-        'html_base': 'index.html',
-        # UL top-60 + both Aegislash forms so Shield sees Blade as an
-        # opponent.
-        'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
-        'no_thresholds': True,
-        'reference': 'AEGISLASH_CHARGE_PSYCHO_CUT,SHADOW_BALL,FLASH_CANNON',
-    },
+    # UL Aegislash entries were dropped 2026-05-17 per mercuryish
+    # review (S2): UL Aegislash is not competitively viable; mercuryish
+    # + UL-player contacts confirmed. GL stays.
     # Forretress 4-way: normal vs shadow × Bug Bite vs Volt Switch, same
     # charged moves (Sand Tomb + Rock Tomb — PvPoke default, also the CS
     # meta standard for both fast-move variants). Against the Orlando

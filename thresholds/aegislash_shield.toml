@@ -7,10 +7,11 @@
 # models this via src/gopvpsim/formchange.py using the gamemaster's
 # formChange field.
 #
-# Deep dive: userdata/website/aegislash-shield-great-league/ (GL),
-#            userdata/website/aegislash-shield-ultra-league/ (UL).
-# Articles:  articles/aegislash-form-change-guide-gl.toml (GL),
-#            articles/aegislash-form-change-guide-ul.toml (UL).
+# Deep dive: userdata/website/aegislash-shield-great-league/ (GL).
+# Articles:  articles/aegislash-form-change-guide-gl.toml (GL).
+#
+# UL coverage was dropped 2026-05-17 per mercuryish review: UL
+# Aegislash is not competitively viable.
 #
 # deep_dive.py is invoked with `--no-thresholds` so this file isn't
 # auto-loaded into the threshold registry; no attack/defense/stamina

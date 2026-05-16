@@ -6,10 +6,11 @@
 # Shield and transforms mid-battle. This stub exists so downstream
 # article/comparison tooling can find an article slug for the form.
 #
-# Deep dive: userdata/website/aegislash-blade-great-league/ (GL),
-#            userdata/website/aegislash-blade-ultra-league/ (UL).
-# Articles:  articles/aegislash-form-change-guide-gl.toml (GL),
-#            articles/aegislash-form-change-guide-ul.toml (UL).
+# Deep dive: userdata/website/aegislash-blade-great-league/ (GL).
+# Articles:  articles/aegislash-form-change-guide-gl.toml (GL).
+#
+# UL coverage was dropped 2026-05-17 per mercuryish review: UL
+# Aegislash is not competitively viable.
 #
 # deep_dive.py is invoked with `--no-thresholds` for Aegislash so this
 # file isn't auto-loaded into the threshold registry; no attack/defense/
