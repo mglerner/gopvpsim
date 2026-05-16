@@ -5,7 +5,7 @@ species's forms benefits most, and which IVs inside each form get the
 biggest lift. It's the page you should open first when Niantic
 announces the next CD; the per-species deep dives are the page you
 open when you've decided the species is worth a dust commit and you
-want to pick a specific IV.
+want to pick a specific IV spread.
 
 This guide walks through what each section of a CD article shows, how
 to read the tables and cards, and where the article intentionally
@@ -43,6 +43,12 @@ or purely auto-generated.
   numbers are mechanical; any editorial framing ("switch GL pick,"
   "clear upgrade") comes from a small vocabulary of auto-gen patterns,
   not from a human taking a stance.
+- **Orange banner ("LLM-drafted, not yet human-reviewed")**: the
+  prose was drafted by an LLM and is awaiting human review. Distinct
+  from blue because LLMs make register choices a template can't, so
+  the orange border flags the section for extra scrutiny. CD articles
+  rarely ship with this banner; it's mostly used in the Reader's
+  Guides while they're being polished.
 
 The reference Oinkologne article is currently auto-generated (blue
 banner) - readable, numerically accurate, and deliberately low-opinion.
@@ -52,12 +58,26 @@ match.
 
 ## The obsolescence banner
 
-When an article ages past the event it was written for, or when a
-simulator change reshuffles its conclusions, we add a **red "This
-article is outdated" banner** at the top and a dated note explaining
-what changed. The article stays live - its numbers at time of writing
-are sometimes still useful for historical comparison - but the banner
-is an explicit "don't treat this as current advice."
+The banner is editorial: when one of us decides an article's framing
+no longer applies, we flip an `[obsolescence]` field in the article
+TOML and the banner appears on the next publish. Triggers we've used
+or expect to use:
+
+- **The CD move turned out to be strictly better or worse** than the
+  article's "sidegrade" / "upgrade" framing claimed. (Article was
+  written before launch; live data showed something different.)
+- **The opponent meta has shifted** enough that the article's per-
+  matchup deltas read against an opponent pool nobody plays anymore
+  (e.g. a new species drops the old #1 out of the top 50).
+- **A simulator fix changed the underlying numbers** (a damage formula
+  bugfix, a new shield-policy gate) and the article's headline
+  conclusion no longer matches what the dives now say.
+
+A red **"This article is outdated"** banner appears at the top with a
+dated note explaining what changed. The article stays live - its
+numbers at time of writing are sometimes still useful for historical
+comparison - but the banner is an explicit "don't treat this as
+current advice."
 
 No banner visible means the article is current.
 
@@ -73,7 +93,7 @@ to decide whether the CD is worth powering a new one.
 
 ### Stats at a Glance
 
-A small table showing each form's rank-1-IV stats (Attack, Defense,
+A small table showing each form's rank-1 IV-spread stats (Attack, Defense,
 HP) alongside the form's rank-1 IV triple and the level-at-cap. For
 {{dive:species_display}} it's the two-column Female/Male readout; for
 a single-form species it collapses to one column.
@@ -158,7 +178,7 @@ below:
 
 - **Opponent IVs: PvPoke default vs Rank 1** - switches every
   opponent's IV spread between PvPoke's current default and the
-  opponent's highest-stat-product IVs. Rank-1 opponents are marginally
+  opponent's highest-stat-product IV spreads. Rank-1 opponents are marginally
   bulkier; matchups sitting on a breakpoint edge can flip with the
   switch.
 - **Bait: Selective vs Never** - disables bait-first shielding so the
@@ -212,7 +232,7 @@ A card grid, one card per tier cut-off per form. Each card shows:
 - The tier name (`Lapras Slayer`, `Fortified Greedent`, `Wigglytuff
   Slayer`, etc.).
 - The stat cutoffs to hit it.
-- The member count out of {{dive:iv_space_size}} IVs.
+- The member count out of {{dive:iv_space_size}} IV spreads.
 - A one-line description of what matchups the cut buys you.
 
 Cards link directly into the corresponding tier card on the paired
