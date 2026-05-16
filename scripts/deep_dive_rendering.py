@@ -972,7 +972,8 @@ def _authored_by_class(block: dict) -> str:
 
 def render_anchor_flip_bullets(records, anchor_passing_sink=None,
                                has_bait_axis=False,
-                               emit_opponent_ids=False):
+                               emit_opponent_ids=False,
+                               strip_bulk_suffix=False):
     """Render anchor-flip records as RyanSwag-style HTML <li> bullets.
 
     Grouping grain is ``(parent, opponent, target_stat, move_id)``.
@@ -1048,6 +1049,13 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
             first = recs[0]['anchor']
             stat_label = 'Atk' if first.target_stat == 'atk' else 'Def'
             anchor_label = first.parent_display_name or first.label or first.parent
+            # B2: drop the trailing " bulk" disambiguator when rendered
+            # inside a tier card whose only target axis is def. The
+            # suffix exists to distinguish brkp from blkp inside the
+            # Bulk Slayer card (where both can appear); a def-only tier
+            # card has no breakpoint risk to disambiguate against.
+            if strip_bulk_suffix and anchor_label.endswith(' bulk'):
+                anchor_label = anchor_label[: -len(' bulk')]
 
             min_thresh = min(r['anchor'].threshold_value for r in recs)
 
@@ -1325,7 +1333,7 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
         parts.append(
             f'<h4>{cat.name} '
             f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
-            f'({n_members} IV{"s" if n_members != 1 else ""})'
+            f'({n_members} IV spread{"s" if n_members != 1 else ""})'
             f'</span></h4>\n'
         )
         # Description and provenance subtitle
@@ -1675,7 +1683,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             f'<span class="dd-small" style="font-weight:400;color:#b0b8c4">'
             f'· {cutoffs_str}</span> '
             f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
-            f'({n_members} IV{"s" if n_members != 1 else ""})'
+            f'({n_members} IV spread{"s" if n_members != 1 else ""})'
             f'</span>'
             f'{parent_diff_html} '
             f'<span id="tier-card-yours-{_tier_slug}" '
@@ -1731,9 +1739,17 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         # --- Anchor-flip bullets (collapsed past 5) ---
         max_bullets_visible = 5
         if tier_records:
+            # B2: in a def-only tier card (no atk cutoff), every bullet
+            # is a bulkpoint by construction, so the " bulk" suffix on
+            # each anchor label is redundant noise. Strip it. Bulk
+            # Slayer card (render_notable_ivs_section) and the flat
+            # Anchor-Driven Matchup Flips section keep the suffix
+            # because they can mix brkp + blkp anchors.
+            _strip_bulk = (def_cut > 0 and atk_cut == 0)
             bullets = render_anchor_flip_bullets(
                 tier_records, anchor_passing_sink=anchor_passing_sink,
-                has_bait_axis=has_bait_axis)
+                has_bait_axis=has_bait_axis,
+                strip_bulk_suffix=_strip_bulk)
             if bullets:
                 tier_card_uid = f'dd-tier-{ti}'
                 n_vis = min(len(bullets), max_bullets_visible)

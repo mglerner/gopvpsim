@@ -2417,6 +2417,13 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             plot_tiers = [t for t in effective_tiers
                           if t['name'] != 'General']
             data_obj['tiers'] = plot_tiers
+            # B4 (mercuryish review): the guide's "{{dive:tier_count}}"
+            # token resolver and any other consumer that wants to count
+            # *rendered tier cards* (rather than plot-traced tiers)
+            # should use effectiveTierCount, which keeps the General
+            # fallback. Visible cards = len(effective_tiers); plot
+            # legend entries = len(data['tiers']).
+            data_obj['effectiveTierCount'] = len(effective_tiers)
             _n = data_obj['nIvs']
             _iv_tiers = [-1] * _n
             _iv_all_tiers = [[] for _ in range(_n)]

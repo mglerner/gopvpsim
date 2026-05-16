@@ -272,7 +272,15 @@ def _resolve_dive_token(suffix: str, dive: dict | None) -> str | None:
     tiers = featured.get('tiers') or []
     iv_all = featured.get('iv_all_tiers') or []
     if suffix == 'tier_count':
-        return str(len(tiers))
+        # B4 (mercuryish review): count of *rendered tier cards* on the
+        # featured moveset. The dive's auto-derive path filters the
+        # broad "General" tier out of data['tiers'] (it would dominate
+        # the plot legend) but still renders it as a tier card. So
+        # tier_count needs the pre-filter count; effectiveTierCount
+        # carries it when present, falling back to len(tiers) for the
+        # TOML-tiers path (no General fallback there).
+        eff = featured.get('effective_tier_count')
+        return str(eff if eff is not None else len(tiers))
     if not tiers:
         return None
     t0 = tiers[0]
