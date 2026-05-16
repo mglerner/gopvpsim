@@ -82,6 +82,28 @@ def build_html(league: str) -> str:
         <code>src/gopvpsim/formchange.py</code> using the gamemaster
         <code>formChange</code> field; no policy toggle is required.</p>
 
+        <h2>Blade form only powers up in whole levels</h2>
+        <p>One non-obvious build constraint: <strong>Blade form rounds
+        the Pokemon's level <em>down</em> to the nearest whole number</strong>.
+        If your Shield form lands on a half level (say L22.5 at the
+        {html.escape(info["display"])} CP cap), then once the
+        form-change triggers in battle, Blade form recomputes its
+        stats at the whole level below (L22), losing half a level
+        worth of attack/defense/HP. This is a real in-game rule, not
+        a sim quirk — it's PvPoke's <code>getFormStats()</code>
+        behavior, matches the
+        <a href="https://x.com/cascade1185/status/2037456058265075782">
+        cascade1185 / Caleb&nbsp;Peng discovery</a>, and our sim mirrors
+        it.</p>
+        <p><strong>Practical implication when picking IVs to power up:</strong>
+        verify the Shield form's CP-capped level lands on a whole
+        number. A 1/14/11 Aegislash in {html.escape(info["display"])}
+        will sit at Blade L22 / 1454&nbsp;CP, even though Blade's
+        unrounded position would be L22.5 / 1487&nbsp;CP. Spreads
+        whose Shield form lands on a half level are paying a hidden
+        Blade-form stat tax; spreads whose Shield form is already at
+        a whole level have zero rounding loss.</p>
+
         <h2>Per-form deep dives</h2>
         <ul>
           <li><a href="{html.escape(shield_href)}">
