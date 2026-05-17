@@ -143,6 +143,12 @@
     var iLevel   = required('Level Min');
     var iShadow  = required('Shadow/Purified');
     var iLucky   = required('Lucky');
+    // Gender is optional (older Poke Genie exports may not include it,
+    // and not every CSV row populates it). The match-time gender filter
+    // on gender-differentiated species (Oinkologne, Meowstic, Indeedee)
+    // only fires when both the CSV row carries a gender AND the dive's
+    // focal species is gender-specific; missing-gender rows pass through.
+    var iGender  = ('Gender' in col) ? col['Gender'] : -1;
 
     var mons = [];
     for (var r = 1; r < lines.length; r++) {
@@ -157,9 +163,15 @@
         // ValueError which we catch-and-skip; mirror that here.
         if (!isFinite(cp) || !isFinite(atkIv) || !isFinite(defIv) ||
             !isFinite(staIv) || !isFinite(level)) continue;
+        // Gender normalization: Poke Genie writes '♂' / '♀' / ''.
+        var genderRaw = (iGender >= 0 && row[iGender]) ? row[iGender].trim() : '';
+        var gender = '';
+        if (genderRaw === '♂') gender = 'male';
+        else if (genderRaw === '♀') gender = 'female';
         mons.push({
           name:      (row[iName]   || '').trim(),
           form:      (row[iForm]   || '').trim(),
+          gender:    gender,
           cp:        cp,
           atk_iv:    atkIv,
           def_iv:    defIv,
@@ -313,7 +325,8 @@
   function capitalize(s) { return s.charAt(0).toUpperCase() + s.substring(1); }
 
   function matchMons(mons, thresholds, opts) {
-    // opts: {league, maxLevel, includeEmpty, pokemonIndex, preToFinals, rankLookup}
+    // opts: {league, maxLevel, includeEmpty, pokemonIndex, preToFinals,
+    //        rankLookup, requireGender}
     opts = opts || {};
     var league = opts.league || 'great';
     var maxLevel = (opts.maxLevel != null) ? opts.maxLevel : 51.0;
@@ -323,6 +336,12 @@
     var rankLookup = opts.rankLookup || null;
     var leagueCaps = opts.leagueCaps || { great: 1500, ultra: 2500, master: 10000 };
     var maxCp = leagueCaps[league];
+    // Gender filter for gender-differentiated species (Oinkologne /
+    // Meowstic / Indeedee). When set to 'female' or 'male', CSV mons
+    // whose gender doesn't match are skipped. Unknown / blank
+    // gender is permissive (older Poke Genie exports may not have
+    // a Gender column).
+    var requireGender = opts.requireGender || null;
     // NOTE: thresholds keys are the *capitalized* league label
     // ('Great'/'Ultra'/'Master') for compat with gobattlekit's historical
     // schema, while the rest of the API uses lowercase `league`. This
@@ -344,6 +363,13 @@
 
     for (var mi = 0; mi < mons.length; mi++) {
       var mon = mons[mi];
+      // Gender filter: if the focal species is gender-specific and
+      // this CSV row carries a gender, skip on mismatch. Blank
+      // gender on the row passes through (Poke Genie versions
+      // without a Gender column).
+      if (requireGender && mon.gender && mon.gender !== requireGender) {
+        continue;
+      }
       var csvSpecies = getSpeciesName(mon.name, mon.form, mon.is_shadow);
 
       var targetsToTry = [];

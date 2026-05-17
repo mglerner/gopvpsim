@@ -532,6 +532,13 @@ function loadCollection(csvText) {
   var rankLookup = coll.rankLookup;
   var leagueCap = coll.leagueCap;
   var maxLevel = coll.maxLevel;
+  // Gender filter for gender-differentiated species (Oinkologne /
+  // Meowstic / Indeedee). When the focal species is "X (Female)",
+  // we set requireGender='female'; when bare "X" with a Female
+  // sibling, requireGender='male'. Otherwise null = no filter.
+  // CSV rows without a gender (older Poke Genie exports) pass
+  // through unfiltered.
+  var requireGender = coll.requireGender || null;
 
   // Build the species thresholds dict from the LIVE tiers array
   // (populated after generate_analysis_sections ran). Prefer
@@ -574,6 +581,13 @@ function loadCollection(csvText) {
 
   for (var mi = 0; mi < mons.length; mi++) {
     var mon = mons[mi];
+    // Gender filter: skip mons whose CSV-recorded gender doesn't
+    // match a gender-specific focal species. Blank-gender rows
+    // pass through (older Poke Genie exports may not populate the
+    // Gender column).
+    if (requireGender && mon.gender && mon.gender !== requireGender) {
+      continue;
+    }
     var csvSpecies = POGOCollection.getSpeciesName(mon.name, mon.form, mon.is_shadow);
     // Does this mon pertain to the dive's species? Direct match or
     // walkup via preToFinals.

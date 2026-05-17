@@ -86,6 +86,44 @@ def _build_evolution_lines() -> dict:
         for line in build_family_lines(members):
             if line:
                 result[line[-1]] = line
+
+    # Post-process: catch sibling final-form species that the
+    # forward walk missed. PvPoke's gamemaster lists Lechonk's
+    # ``evolutions`` field as ``['oinkologne', 'oinkologne']`` (two
+    # references to the Male form), so the Female form orphans —
+    # it has ``parent='lechonk'`` but isn't reachable from
+    # Lechonk's evolutions list. Mirror species (gender-
+    # differentiated species like Oinkologne / Meowstic / Indeedee,
+    # plus any sibling form Niantic ships in the future) need to
+    # be added explicitly by walking up from the orphan's parent.
+    id_to_entry = {m['speciesId']: m for m in gm['pokemon']}
+    for mon in gm['pokemon']:
+        name = mon.get('speciesName', '')
+        if not name or name in result:
+            continue
+        fam = mon.get('family') or {}
+        parent_id = fam.get('parent')
+        if not parent_id:
+            continue
+        # If this species has outgoing evolutions, it's a mid-evo
+        # and shouldn't be a result key.
+        if fam.get('evolutions'):
+            continue
+        # No outgoing evolutions + has a parent = final form that
+        # the forward walk missed. Build its chain by climbing up
+        # the parent links.
+        chain: list = [name]
+        cur_id: str | None = parent_id
+        seen: set = set()
+        while cur_id and cur_id not in seen:
+            seen.add(cur_id)
+            pmon = id_to_entry.get(cur_id)
+            if not pmon:
+                break
+            chain.insert(0, pmon.get('speciesName', cur_id))
+            pfam = pmon.get('family') or {}
+            cur_id = pfam.get('parent')
+        result[name] = chain
     return result
 
 
