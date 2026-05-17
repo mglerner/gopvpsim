@@ -645,7 +645,29 @@ across Post-S5 Sessions S6-S10 (2026-04-17/18). Open polish:
   changes direction, you click on another column to sort by that
   column and the arrow from the first column goes away, etc).
 
-## Performance
+* **Client-side add / remove anchors + thresholds** *(mercuryish
+  request, 2026-04-26)* — Today's TOML-edit flow requires a local
+  clone, a re-dive, and a PR. Mercuryish asked whether a per-species
+  in-browser surface could let readers add their own custom anchors
+  (or hide existing ones) on a single dive without affecting the
+  rest of the site. Use case: cut visual noise by hiding anchors
+  the reader doesn't care about, or pin a custom matchup the dive
+  doesn't already surface. Scope:
+
+  1. **Hide**: a per-tier-card "hide this anchor" toggle that
+     adds/removes the anchor from the rendered bullet list and the
+     scatter-plot tier coloring. Pure client-side; saved to
+     `localStorage` keyed by dive slug. Should be the easier of
+     the two paths.
+  2. **Add**: a "create custom anchor" surface that lets the reader
+     pick an opponent + threshold and have it render on the current
+     dive's tier cards / bullets / scatter. Harder — the threshold
+     would need to be evaluated against the dive's cached score
+     data without re-simulating. Possibly limited to "stat cutoff
+     only, no per-move sub-anchors."
+
+  Until this lands, the Under the Hood guide notes the TOML-edit-
+  via-PR flow as the only option.
 
 **Architecture note (2026-04-07)**: The BeeWare/iOS-pure-Python constraint
 has been DROPPED. Mobile is no longer a meaningful use case for the deep
