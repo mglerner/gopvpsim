@@ -158,9 +158,22 @@ def parse_csv_text(text: str) -> list:
     reader = csv.DictReader(io.StringIO(text))
     for row in reader:
         try:
+            # Gender column is '♂' / '♀' / '' (empty for genderless
+            # species). Normalize to 'male' / 'female' / '' for the
+            # match-time gender filter on species like Oinkologne /
+            # Meowstic / Indeedee where Niantic ships two final forms
+            # disambiguated only by gender.
+            _gender_raw = (row.get('Gender') or '').strip()
+            if _gender_raw == '♂':
+                _gender = 'male'
+            elif _gender_raw == '♀':
+                _gender = 'female'
+            else:
+                _gender = ''
             mons.append({
                 'name':      row['Name'].strip(),
                 'form':      row['Form'].strip(),
+                'gender':    _gender,
                 'cp':        int(row['CP']),
                 'atk_iv':    int(row['Atk IV']),
                 'def_iv':    int(row['Def IV']),
@@ -334,6 +347,22 @@ def match_mons(
                 continue
             if final_species not in pokemon_index:
                 continue
+
+            # Gender filter for gender-differentiated species
+            # (Oinkologne / Meowstic / Indeedee). When the target
+            # species is "X (Female)", only female-gendered mons
+            # match. When target is the bare "X" AND a "X (Female)"
+            # sibling exists in the gamemaster, only male-gendered
+            # mons match. Unknown / blank gender is permissive (older
+            # Poke Genie exports may not populate the Gender column).
+            mon_gender = mon.get('gender', '')
+            if mon_gender:
+                if final_species.endswith(' (Female)'):
+                    if mon_gender != 'female':
+                        continue
+                elif f'{final_species} (Female)' in pokemon_index:
+                    if mon_gender != 'male':
+                        continue
 
             base = pokemon_index[final_species]
             stats = ivs_to_stats_at_cap(

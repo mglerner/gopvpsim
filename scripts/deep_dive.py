@@ -3064,6 +3064,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     _collection_species_key = f'{species} (Shadow)' if shadow else species
     _collection_data = None
     _pkidx = _get_pkidx()
+    # Gender filter: when the focal species is gender-differentiated
+    # (Oinkologne / Meowstic / Indeedee), CSV mons that resolve to a
+    # final form via evolution walkup (e.g. Lechonk → Oinkologne or
+    # Oinkologne (Female)) need to be filtered by their CSV-recorded
+    # gender so the wrong-gender form doesn't false-positive on the
+    # focal dive. PvPoke's gamemaster ships Lechonk's evolutions list
+    # as ['oinkologne', 'oinkologne'] (both Male) so the female form
+    # only reaches the matcher via the sibling-form pass in
+    # evolution_lines._build_evolution_lines.
+    _require_gender = None
+    if _collection_species_key.endswith(' (Female)'):
+        _require_gender = 'female'
+    elif f'{_collection_species_key} (Female)' in _pkidx:
+        _require_gender = 'male'
     if _collection_species_key in _pkidx:
         _base = _pkidx[_collection_species_key]
         # Pre-evo subset: only keys whose list of possible final forms
@@ -3126,6 +3140,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             'rankLookup':      {_collection_species_key: {_rank_shadow_key: _rank_table}},
             'thresholds':      _collection_thresholds,
             'tierNames':       [t['name'] for t in tier_info],
+            'requireGender':   _require_gender,
         }
     data_obj['collection'] = _collection_data
 
