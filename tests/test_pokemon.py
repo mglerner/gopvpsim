@@ -6,7 +6,11 @@ Integration tests (marked 'integration') hit the real gamemaster and validate
 against known PvPoke values — run with: pytest -m integration
 """
 import math
+from pathlib import Path
+
 import pytest
+
+REPO_ROOT_FOR_SCRIPTS = Path(__file__).resolve().parent.parent / 'scripts'
 
 from gopvpsim.pokemon import (
     CPM, LEAGUE_CAPS, _LEVELS,
@@ -539,3 +543,114 @@ def test_compute_default_ivs_matches_gamemaster_broadly():
 
     # This assertion will fail — that's expected and documented via xfail
     assert mismatches == 0, f"{mismatches}/{total} entries differ from gamemaster"
+
+
+# ===========================================================================
+# Aegislash (Blade) whole-level rounding (regression guard for S1)
+#
+# Aegislash (Blade) powers up in whole-level increments only — not the
+# standard half-level grid — because Pokemon Go's form-change rule
+# rounds DOWN to whole levels when transforming from Shield to Blade
+# (cascade1185 / Caleb Peng discovery; PvPoke's getFormStats() mirrors
+# this via newLevel--).
+#
+# Our sim was correctly enforcing this in the in-battle transform path
+# (gopvpsim.formchange._aegislash_alt_level) but NOT in the focal-
+# species path. So Aegislash (Blade) as a dive's focal species was
+# computing stats at half levels. Mercuryish caught it in the
+# 2026-04-26 review. Patched in commit 1b6c075. These tests ensure
+# the patch sticks.
+# ===========================================================================
+
+class TestAegislashBladeWholeLevels:
+    """Lock in whole-level rounding for Aegislash (Blade) as the focal
+    species. The ground-truth values are the ones the Prague Regional
+    winner's IVs produce (1/14/11 = L22 / 1454 CP per mercuryish; PvPoke
+    confirms)."""
+
+    @pytest.mark.integration
+    @pytest.mark.parametrize("ivs,expected_level,expected_cp", [
+        # mercuryish's reference: tournament winner's 1/14/11 build.
+        # Without the whole-level patch, this would land at L22.5 / 1487.
+        ((1, 14, 11), 22.0, 1454),
+        # Hundo: already whole-level by chance (the unpatched grid
+        # also picks L21.0 here). Patch is a no-op but the test
+        # documents that the result is stable.
+        ((15, 15, 15), 21.0, 1484),
+        # 15/14/15: same — pre-patch and post-patch both land on L21.
+        ((15, 14, 15), 21.0, 1477),
+        # 15/15/14: same.
+        ((15, 15, 14), 21.0, 1479),
+    ])
+    def test_at_best_level_rounds_down_to_whole(
+            self, ivs, expected_level, expected_cp):
+        a, d, s = ivs
+        mon = Pokemon.at_best_level(
+            'Aegislash (Blade)', a, d, s, league='great', shadow=False)
+        assert mon.level == expected_level, (
+            f'Aegislash (Blade) {a}/{d}/{s} GL: expected L{expected_level} '
+            f'(whole-level rule), got L{mon.level}')
+        assert mon.cp == expected_cp, (
+            f'Aegislash (Blade) {a}/{d}/{s} GL: expected CP {expected_cp}, '
+            f'got CP {mon.cp}')
+        # Defensive: every Blade-form-as-focal level must be a whole
+        # number, no matter the IVs. Test on a wider sweep would be
+        # better but is too slow for unit scope; spot-check here.
+        assert mon.level % 1.0 == 0, (
+            f'Aegislash (Blade) landed on a half level: L{mon.level}')
+
+    @pytest.mark.integration
+    def test_at_best_level_does_not_affect_shield_form(self):
+        """Aegislash (Shield), Aegislash (Blade)'s in-battle counterpart,
+        keeps the standard half-level grid since Shield form does power
+        up in half-levels in-game."""
+        mon = Pokemon.at_best_level(
+            'Aegislash (Shield)', 1, 14, 11, league='great', shadow=False)
+        # Pre-existing behavior: Shield form's high def means it caps
+        # high on the level grid; expecting a half-level result here is
+        # how we know the patch is Blade-specific.
+        assert mon.level == 49.5
+        assert mon.cp == 1498
+
+    @pytest.mark.integration
+    def test_iv_rank_rounds_aegislash_blade_levels(self):
+        """iv_rank goes through the same best_level call as
+        at_best_level — verify it gets the same whole-level rounding
+        applied. Without the patch, half-level entries would slip
+        through and break stat-product rankings against PvPoke."""
+        ranked = iv_rank('Aegislash (Blade)', league='great')
+        half_levels = [e for e in ranked if e['level'] % 1.0 != 0]
+        assert half_levels == [], (
+            f'iv_rank emitted {len(half_levels)} Aegislash (Blade) entries '
+            f'with half-level levels; first offender: {half_levels[0]}')
+
+    @pytest.mark.integration
+    def test_iv_rank_does_not_affect_shield_form(self):
+        """iv_rank for Aegislash (Shield) keeps half-levels (no patch
+        applied) so we know the patch is Blade-specific."""
+        ranked = iv_rank('Aegislash (Shield)', league='great')
+        half_levels = [e for e in ranked if e['level'] % 1.0 != 0]
+        # Should be plenty of half-levels on Shield form — many IV
+        # combos land on .5 levels under the CP cap.
+        assert len(half_levels) > 100, (
+            f'Aegislash (Shield) iv_rank produced only {len(half_levels)} '
+            f'half-level entries; either the dataset shrank or the '
+            f'Blade-form patch is leaking into Shield form')
+
+    @pytest.mark.integration
+    def test_compute_iv_metadata_rounds_aegislash_blade_levels(self):
+        """deep_dive.compute_iv_metadata is the third best_level
+        call site that needed the same whole-level rounding. The
+        first attempt at S1 missed this path; the patch was extended
+        in commit 1b6c075's follow-up. Test guards against that
+        path silently regressing if a future refactor moves the
+        Aegislash check elsewhere."""
+        import sys as _sys
+        _sys.path.insert(0, str(REPO_ROOT_FOR_SCRIPTS))
+        import deep_dive  # noqa: E402
+        meta = deep_dive.compute_iv_metadata('Aegislash (Blade)', 'great')
+        half_levels = [m for m in meta if m['level'] % 1.0 != 0]
+        assert half_levels == [], (
+            f'compute_iv_metadata emitted {len(half_levels)} Aegislash '
+            f'(Blade) entries with half-level levels; the focal-species '
+            f'whole-level rounding regressed.')

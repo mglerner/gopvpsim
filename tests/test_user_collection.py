@@ -404,3 +404,146 @@ def test_check_thresholds_include_empty_returns_unmatched_species():
         str(path), thresholds, league='great', include_empty=True)
     assert 'Tinkaton' in results
     assert results['Tinkaton'] == []
+
+
+# ===========================================================================
+# Gender column parsing + match-time gender filter
+#
+# Mercuryish review 2026-04-26 surfaced a silent bug: the Female
+# Oinkologne dive's paste-box failed to detect female Oinkologne in a
+# Poke Genie CSV. Two root causes, both fixed in commit 1b59c83:
+#
+#   1. PvPoke gamemaster lists Lechonk's evolutions as
+#      ['oinkologne', 'oinkologne'] — both pointing to the Male form's
+#      speciesId — so Oinkologne (Female) orphaned. Fixed by extending
+#      evolution_lines._build_evolution_lines to catch sibling
+#      final-forms via parent-link walkup.
+#
+#   2. Even with (1) fixed, every Lechonk would match BOTH Male and
+#      Female dives because the parser ignored the Gender column.
+#      Fixed by parsing ♂/♀ from the Gender column and filtering
+#      match_mons by mon.gender when the target species is
+#      gender-differentiated.
+#
+# These tests guard both halves so a future refactor can't silently
+# regress paste-box behavior on gender-differentiated species.
+# ===========================================================================
+
+_GENDER_CSV = (
+    "Name,Form,Gender,CP,Atk IV,Def IV,Sta IV,Level Min,Shadow/Purified,Lucky\n"
+    "Lechonk,,♂,500,5,11,15,20.0,0,0\n"
+    "Lechonk,,♀,500,4,13,8,20.0,0,0\n"
+    "Lechonk,,,500,7,7,7,20.0,0,0\n"   # genderless / blank — should pass both filters
+)
+
+
+def test_parse_csv_text_reads_gender_column():
+    """Poke Genie's Gender column is ♂/♀/blank; parse_csv_text should
+    normalize to 'male'/'female'/'' on the parsed row dict."""
+    mons = parse_csv_text(_GENDER_CSV)
+    assert len(mons) == 3
+    assert mons[0]['gender'] == 'male'
+    assert mons[1]['gender'] == 'female'
+    assert mons[2]['gender'] == ''
+
+
+def test_parse_csv_text_gender_optional():
+    """Older Poke Genie exports may not have a Gender column at all.
+    parse_csv_text should not raise; the field defaults to ''.
+    Mirrors the JS parser's optional-column behavior."""
+    # Note the lack of "Gender" header.
+    legacy_csv = (
+        "Name,Form,CP,Atk IV,Def IV,Sta IV,Level Min,Shadow/Purified,Lucky\n"
+        "Lechonk,,500,5,11,15,20.0,0,0\n"
+    )
+    mons = parse_csv_text(legacy_csv)
+    assert len(mons) == 1
+    assert mons[0].get('gender', '') == ''
+
+
+@pytest.mark.integration
+def test_match_mons_gender_filter_female_dive():
+    """On an Oinkologne (Female) dive, match_mons should accept the
+    female Lechonk and the genderless Lechonk, but reject the male."""
+    from gopvpsim.evolution_lines import invalidate_cache
+    invalidate_cache()  # ensure the sibling-form fix is loaded fresh
+
+    mons = parse_csv_text(_GENDER_CSV)
+    thresholds = {
+        'Oinkologne (Female)': {
+            'Great': {
+                'permissive': {'attack': 0, 'defense': 0, 'stamina': 0},
+            },
+        },
+    }
+    results = match_mons(mons, thresholds, league='great')
+    matched = results.get('Oinkologne (Female)', [])
+    # 2 expected: the female Lechonk (gender match) and the genderless
+    # Lechonk (blank gender passes through).
+    assert len(matched) == 2
+    # All matched rows are Lechonks (pre-evo); none are direct
+    # Oinkologne (Female) entries (none in the CSV).
+    assert all(r['is_pre_evo'] for r in matched)
+    # The male Lechonk must be excluded.
+    iv_triples_matched = {
+        (r['mon']['atk_iv'], r['mon']['def_iv'], r['mon']['sta_iv'])
+        for r in matched
+    }
+    assert (5, 11, 15) not in iv_triples_matched   # male was 5/11/15
+    assert (4, 13, 8) in iv_triples_matched         # female 4/13/8
+    assert (7, 7, 7) in iv_triples_matched          # blank-gender 7/7/7
+
+
+@pytest.mark.integration
+def test_match_mons_gender_filter_male_dive():
+    """On the bare Oinkologne (Male) dive, match_mons should accept
+    the male Lechonk and the genderless Lechonk, but reject the
+    female. Symmetric to the female-dive case."""
+    from gopvpsim.evolution_lines import invalidate_cache
+    invalidate_cache()
+
+    mons = parse_csv_text(_GENDER_CSV)
+    thresholds = {
+        'Oinkologne': {
+            'Great': {
+                'permissive': {'attack': 0, 'defense': 0, 'stamina': 0},
+            },
+        },
+    }
+    results = match_mons(mons, thresholds, league='great')
+    matched = results.get('Oinkologne', [])
+    assert len(matched) == 2
+    iv_triples_matched = {
+        (r['mon']['atk_iv'], r['mon']['def_iv'], r['mon']['sta_iv'])
+        for r in matched
+    }
+    assert (5, 11, 15) in iv_triples_matched        # male passes
+    assert (4, 13, 8) not in iv_triples_matched     # female rejected
+    assert (7, 7, 7) in iv_triples_matched          # blank passes
+
+
+@pytest.mark.integration
+def test_match_mons_gender_filter_inert_for_non_gendered_species():
+    """The gender filter must not affect species without a Female
+    sibling. Tinkaton (gender-symmetric in the game) should match
+    male, female, AND blank-gender mons identically."""
+    from gopvpsim.evolution_lines import invalidate_cache
+    invalidate_cache()
+
+    tink_csv = (
+        "Name,Form,Gender,CP,Atk IV,Def IV,Sta IV,Level Min,Shadow/Purified,Lucky\n"
+        "Tinkaton,,♂,1490,0,14,14,26.5,0,0\n"
+        "Tinkaton,,♀,1490,0,14,14,26.5,0,0\n"
+        "Tinkaton,,,1490,0,14,14,26.5,0,0\n"
+    )
+    mons = parse_csv_text(tink_csv)
+    thresholds = {
+        'Tinkaton': {
+            'Great': {
+                'permissive': {'attack': 0, 'defense': 0, 'stamina': 0},
+            },
+        },
+    }
+    results = match_mons(mons, thresholds, league='great')
+    # All 3 should match — gender filter is inert on Tinkaton.
+    assert len(results.get('Tinkaton', [])) == 3
