@@ -1,3 +1,24 @@
+## NAIC re-dive for Oinkologne (2026-05-18, near-future)
+
+Oinkologne is expected to be NAIC-meta-relevant. Once PvPoke's
+rankings include the NAIC cohort:
+
+1. `git pull` Michael's local PvPoke clone (path in memory
+   `reference_pvpoke_source.md`).
+2. Invalidate the rankings cache at `~/Documents/gopvpsim_cache/`
+   so the fresh data is picked up.
+3. Build a NAIC-aware opponent pool (new file or merge into
+   `opponent_pools/gl_top50_plus_cs.txt` depending on scope).
+4. Re-dive Oinkologne Male + Female GL via
+   `python scripts/run_website_dives.py 'oinkologne'`.
+5. Check if `articles/oinkologne-cd-2026-05.toml` needs a
+   data refresh.
+6. Publish via `scripts/publish_website.sh --push`.
+
+Open: confirm NAIC uses standard GL ruleset (CP cap, etc.) or
+needs adjusted flags. Full plan in memory file
+`project_oinkologne_naic_redive.md`.
+
 ## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
 
 Original pre-ship items 1-5 all shipped (cross-form re-dive,
