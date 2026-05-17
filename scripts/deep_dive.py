@@ -1520,8 +1520,10 @@ def generate_html(species, league, moveset_results, html_path, thresholds=None,
         cli_comment = f'<!-- CLI: {_esc_cmt(cli_args_str)} -->\n'
 
     # Display-rename for non-interactive output; same convention as
-    # generate_interactive_html below.
-    species_pretty = pretty_species(species)
+    # generate_interactive_html below. Shadow flag is separate from
+    # species; reconstruct the gamemaster-format name first.
+    _species_for_display = f'{species} (Shadow)' if shadow else species
+    species_pretty = pretty_species(_species_for_display)
 
     html = f"""<!DOCTYPE html>
 {cli_comment}<html>
@@ -3158,8 +3160,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # goes through pretty_species so "Forretress (Shadow)" reads as
     # "Shadow Forretress", "Oinkologne" gets a "(Male)" suffix when
     # there's a Female sibling, etc. The internal `species` variable
-    # stays in gamemaster format for any lookup.
-    species_pretty = pretty_species(species)
+    # stays in gamemaster format for any lookup. Shadow is tracked
+    # via a separate flag; reconstruct the gamemaster-format name
+    # before pretty_species so shadow-form dives render correctly.
+    _species_for_display = f'{species} (Shadow)' if shadow else species
+    species_pretty = pretty_species(_species_for_display)
 
     html = f"""<!DOCTYPE html>
 {cli_comment}<html>
