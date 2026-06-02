@@ -37,12 +37,26 @@ DEEP_DIVE = os.path.join(SCRIPT_DIR, 'deep_dive.py')
 #   extra_args: []           (escape hatch for unusual flags)
 
 DIVES = [
-    # Order is deliberate: Oinkologne pair first so the CD article can
-    # regenerate earliest if the later dives slip. Tinkaton next (GL then
-    # UL). Aegislash pair last, GL before UL per the D2 decision on
-    # 2026-04-18. `--reserve-cpus 1` on every entry per the
+    # Order is deliberate: Shadow Sableye pulled to position 1
+    # (2026-06-02 — Michael's stated interest after the new-season pull).
+    # Then Oinkologne pair so the CD article can regenerate earliest if
+    # the later dives slip. Tinkaton next (GL then UL). Aegislash pair
+    # follows, GL before UL per the D2 decision on 2026-04-18. The other
+    # new-season focals (Seismitoad, Jumpluff, Ninetales) bring up the
+    # rear next to the existing niche group (Dewgong, Stunfisk, Galarian
+    # Corsola). `--reserve-cpus 1` on every entry per the
     # `feedback_reserve_cpu_for_dives` discipline so local work stays
     # responsive if someone else lands on the box mid-run.
+    {
+        'species': 'Sableye',
+        'league': 'great',
+        'slug': 'shadow-sableye-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'shadow': True,
+    },
     {
         'species': 'Oinkologne',
         'league': 'great',
@@ -98,7 +112,7 @@ DIVES = [
         'league': 'great',
         'slug': 'aegislash-blade-great-league',
         'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'top_movesets': 5,
         'no_thresholds': True,
         'extra_args': ['--fast', 'PSYCHO_CUT',
@@ -110,7 +124,7 @@ DIVES = [
         'league': 'great',
         'slug': 'aegislash-shield-great-league',
         'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'top_movesets': 1,
         'no_thresholds': True,
         'extra_args': ['--fast', 'AEGISLASH_CHARGE_PSYCHO_CUT',
@@ -131,7 +145,7 @@ DIVES = [
         'league': 'great',
         'slug': 'forretress-volt-switch-great-league',
         'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'top_movesets': 1,
         'no_thresholds': True,
         'extra_args': ['--fast', 'VOLT_SWITCH',
@@ -143,7 +157,7 @@ DIVES = [
         'league': 'great',
         'slug': 'forretress-bug-bite-great-league',
         'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'top_movesets': 1,
         'no_thresholds': True,
         'extra_args': ['--fast', 'BUG_BITE',
@@ -155,7 +169,7 @@ DIVES = [
         'league': 'great',
         'slug': 'forretress-shadow-volt-switch-great-league',
         'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'top_movesets': 1,
         'no_thresholds': True,
         'shadow': True,
@@ -168,7 +182,7 @@ DIVES = [
         'league': 'great',
         'slug': 'forretress-shadow-bug-bite-great-league',
         'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/cs_2026_orlando_top32.txt',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'top_movesets': 1,
         'no_thresholds': True,
         'shadow': True,
@@ -214,6 +228,43 @@ DIVES = [
         'species': 'Corsola (Galarian)',
         'league': 'great',
         'slug': 'galarian-corsola-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+    },
+    # New-season additions (2026-06-02 PvPoke pull afa3ad740). All four
+    # follow the Galarian Corsola pattern: top_movesets=1 (single screened
+    # winner page), no_thresholds (clean dive; author anchors after
+    # eyeballing the result), PvPoke get_default_moveset via no explicit
+    # reference. Bump movesets / add thresholds once the meta picture
+    # settles. Each species is also in the refreshed opponent pool
+    # (`opponent_pools/gl_top50_plus_cs.txt`) so it appears as an
+    # opponent in everyone else's dives, not just as a focal here.
+    # Note: Shadow Sableye is pulled to position 1 above (Michael's
+    # stated interest); the other three new-season focals stay here.
+    {
+        'species': 'Seismitoad',
+        'league': 'great',
+        'slug': 'seismitoad-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+    },
+    {
+        'species': 'Jumpluff',
+        'league': 'great',
+        'slug': 'jumpluff-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+    },
+    {
+        'species': 'Ninetales',
+        'league': 'great',
+        'slug': 'ninetales-great-league',
         'html_base': 'index.html',
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'top_movesets': 1,

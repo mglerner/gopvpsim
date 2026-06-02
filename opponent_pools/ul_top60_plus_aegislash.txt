@@ -1,6 +1,6 @@
 # PvPoke Ultra League top-60 opponents + Aegislash Shield + Blade.
 #
-# Hand-extended 2026-04-21 so the Tinkaton UL + Aegislash UL pair can
+# Hand-extended 2026-04-21 (refreshed top-60 2026-06-02) so the Tinkaton UL + Aegislash UL pair can
 # see each other as opponents during dives (Aegislash Shield/Blade
 # are not in PvPoke UL top-60, so --opponents 60 would omit them).
 # Without this file, the Aegislash Blade-vs-Shield UL comparison has
@@ -16,66 +16,67 @@
 #     from deep_dive import get_top_opponents; \
 #     print('\n'.join(get_top_opponents('ultra', 60)))"
 
-Jellicent
-Lapras
-Corviknight
-Lapras (Shadow)
 Tinkaton
+Lickilicky
+Zygarde (Complete Forme)
+Jellicent
+Corviknight
+Florges
+Feraligatr (Shadow)
+Virizion
+Empoleon (Shadow)
 Empoleon
 Moltres (Galarian)
-Empoleon (Shadow)
-Feraligatr (Shadow)
-Malamar (Shadow)
-Feraligatr
-Florges
-Dondozo
-Regidrago
-Virizion
-Lickilicky
-Ludicolo
-Clefable
-Blastoise
-Oranguru
-Malamar
-Zygarde (Complete Forme)
-Walrein
-Walrein (Shadow)
-Dusknoir (Shadow)
-Ninetales (Alolan)
-Dusknoir
-Drapion
-Turtonator
 Kingdra
-Ninetales (Alolan) (Shadow)
-Annihilape (Shadow)
-Bellibolt
-Giratina (Altered)
-Annihilape
-Cresselia
+Blastoise
 Forretress
-Steelix
-Togekiss
+Malamar
+Malamar (Shadow)
+Annihilape
+Annihilape (Shadow)
 Cradily
-Cresselia (Shadow)
 Forretress (Shadow)
-Kingdra (Shadow)
-Runerigus
-Giratina (Altered) (Shadow)
-Blastoise (Shadow)
-Samurott
-Golisopod
-Guzzlord
-Ninetales (Shadow)
-Steelix (Shadow)
-Toucannon (Shadow)
-Jirachi
-Seaking
-Skeledirge
-Ampharos
-Aurorus
-Hydreigon (Shadow)
+Ninetales (Alolan)
+Clefable
+Feraligatr
 Ninetales
-Weezing (Galarian)
+Oranguru
+Registeel
+Kingdra (Shadow)
+Lapras
+Dusknoir
+Ninetales (Alolan) (Shadow)
+Seaking
+Dusknoir (Shadow)
+Turtonator
+Dondozo
+Giratina (Altered)
+Lapras (Shadow)
+Milotic
+Regidrago
+Swampert
+Talonflame
+Walrein (Shadow)
+Walrein
+Bellibolt
+Ninetales (Shadow)
+Cresselia
+Raikou (Shadow)
+Golisopod
+Milotic (Shadow)
+Talonflame (Shadow)
+Togekiss
+Gyarados
+Toucannon (Shadow)
+Giratina (Altered) (Shadow)
+Hippowdon
+Hydreigon (Shadow)
+Orthworm
+Toucannon
+Guzzlord
+Seismitoad
+Aromatisse
 
+# --- Aegislash hand-extension (see above) ---
 Aegislash (Shield)
 Aegislash (Blade)

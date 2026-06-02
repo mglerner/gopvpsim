@@ -1,69 +1,83 @@
-# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 56 unique species.
-# Generated 2026-04-26 by scripts/build_opponent_pool.py
-# Hand-extended 2026-04-26 with the four dive focal species so each dive's
-# opponent pool includes the cross-form / alt-form partner (Oinkologne M/F,
-# Aegislash Blade/Shield). deep_dive.py auto-appends the focal species for
-# mirror analysis, so having them explicit here just makes the cross-form
-# matchups symmetric across focals.
+# Top 50 GL overall rankings (PvPoke) union the championshipseries group.
+# Generated 2026-06-02 by scripts/build_opponent_pool.py against the
+# afa3ad740 PvPoke pull. 63 species from the auto recipe + 3 hand-
+# extended focals = 66 total.
+#
+# Hand-extended 2026-06-02 with the three focal species that dropped
+# out of the rebuilt top-50 so each dive's opponent pool includes the
+# cross-form / alt-form partner (Oinkologne Male/Female) and the new
+# focal species (Seismitoad). deep_dive.py auto-appends the focal
+# species for mirror analysis, so having them explicit here makes the
+# cross-form matchups symmetric across focals.
+#
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
+# --- hand-extended focals (2026-06-02) ---
+Oinkologne
+Oinkologne (Female)
+Seismitoad
+
+# --- auto recipe (top 50 GL ∪ championshipseries) ---
+Lickilicky
+Feraligatr
+Feraligatr (Shadow)
+Altaria
+Corsola (Galarian)
+Jellicent
 Quagsire
 Quagsire (Shadow)
 Tinkaton
-Corviknight
-Jellicent
-Wigglytuff
-Empoleon
 Forretress
-Altaria
 Altaria (Shadow)
+Empoleon
 Azumarill
 Forretress (Shadow)
+Kingdra
+Corviknight
 Empoleon (Shadow)
-Feraligatr
-Lickilicky
+Kingdra (Shadow)
+Aegislash (Blade)
+Mantine
 Medicham
-Corsola (Galarian)
-Talonflame
-Lapras
-Sealeo
+Ninetales
+Jumpluff
+Sableye (Shadow)
+Seaking
+Guzzlord
 Malamar
-Clodsire
-Dusclops
-Sealeo (Shadow)
-Clefable
-Drapion (Shadow)
 Stunfisk
+Talonflame
+Clodsire
+Sliggoo
+Lapras
+Dragonair (Shadow)
+Dusclops
+Sealeo
+Greedent
+Grumpig
+Pelipper
+Sealeo (Shadow)
 Annihilape
+Sableye
+Charjabug
+Cradily
+Drapion (Shadow)
+Stunfisk (Galarian)
 Blastoise
+Clefable
 Dusclops (Shadow)
 Florges
-Cradily
-Politoed (Shadow)
-Talonflame (Shadow)
-Charjabug
-Greedent
-Lapras (Shadow)
-Dusknoir (Shadow)
-Furret
-Sableye
-Steelix (Shadow)
-Sableye (Shadow)
-Feraligatr (Shadow)
-Gastrodon
-Dondozo
-Guzzlord
-Seaking
-Shelgon
-Swampert
-Swampert (Shadow)
-Diggersby
-Gourgeist (Super)
-Steelix
-Togekiss
-Weezing (Galarian) (Shadow)
-Malamar (Shadow)
-Oinkologne
-Oinkologne (Female)
-Aegislash (Blade)
+Jumpluff (Shadow)
 Aegislash (Shield)
+Dartrix
+Dewgong
+Diggersby
+Dusknoir (Shadow)
+Gourgeist (Super)
+Ninetales (Shadow)
+Steelix
+Talonflame (Shadow)
+Togekiss
+Togetic
+Weezing (Galarian) (Shadow)
+Wigglytuff
