@@ -37,10 +37,16 @@ DEEP_DIVE = os.path.join(SCRIPT_DIR, 'deep_dive.py')
 #   extra_args: []           (escape hatch for unusual flags)
 
 DIVES = [
-    # Order is deliberate: Shadow Sableye trio at positions 1-3
-    # (2026-06-02 — Michael's stated interest after the new-season pull;
-    # Foul Play is locked as 1st charged, varying 2nd charged across
-    # Power Gem / Drain Punch / Dazzling Gleam to compare coverage).
+    # Order is deliberate: Shadow Sableye pulled to position 1
+    # (2026-06-02 — Michael's stated interest after the new-season pull).
+    # Foul Play is locked as 1st charged, varying 2nd charged across all
+    # 4 legal partners (Power Gem, Drain Punch, Dazzling Gleam, Shadow
+    # Sneak) in a single shared-dir dive: `--charged FOUL_PLAY` triggers
+    # enumerate_movesets's "pair with all legal partners" branch (line
+    # 594), and top_movesets=4 renders every FP-pair via --split-movesets.
+    # Sableye has exactly 5 legal charged moves (FP + the 4 partners), so
+    # this guarantees the 3 partners Michael specifically asked about
+    # (PG / DP / DG) render, plus Shadow Sneak as a 4th option for free.
     # Then Oinkologne pair so the CD article can regenerate earliest if
     # the later dives slip. Tinkaton next (GL then UL). Aegislash pair
     # follows, GL before UL per the D2 decision on 2026-04-18. The other
@@ -52,41 +58,14 @@ DIVES = [
     {
         'species': 'Sableye',
         'league': 'great',
-        'slug': 'shadow-sableye-power-gem-great-league',
+        'slug': 'shadow-sableye-great-league',
         'html_base': 'index.html',
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
-        'top_movesets': 1,
+        'top_movesets': 4,
         'no_thresholds': True,
         'shadow': True,
-        'extra_args': ['--fast', 'SHADOW_CLAW',
-                       '--charged', 'FOUL_PLAY,POWER_GEM'],
-        'reference': 'SHADOW_CLAW,FOUL_PLAY,POWER_GEM',
-    },
-    {
-        'species': 'Sableye',
-        'league': 'great',
-        'slug': 'shadow-sableye-drain-punch-great-league',
-        'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
-        'top_movesets': 1,
-        'no_thresholds': True,
-        'shadow': True,
-        'extra_args': ['--fast', 'SHADOW_CLAW',
-                       '--charged', 'FOUL_PLAY,DRAIN_PUNCH'],
+        'extra_args': ['--fast', 'SHADOW_CLAW', '--charged', 'FOUL_PLAY'],
         'reference': 'SHADOW_CLAW,FOUL_PLAY,DRAIN_PUNCH',
-    },
-    {
-        'species': 'Sableye',
-        'league': 'great',
-        'slug': 'shadow-sableye-dazzling-gleam-great-league',
-        'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
-        'top_movesets': 1,
-        'no_thresholds': True,
-        'shadow': True,
-        'extra_args': ['--fast', 'SHADOW_CLAW',
-                       '--charged', 'FOUL_PLAY,DAZZLING_GLEAM'],
-        'reference': 'SHADOW_CLAW,FOUL_PLAY,DAZZLING_GLEAM',
     },
     {
         'species': 'Oinkologne',
