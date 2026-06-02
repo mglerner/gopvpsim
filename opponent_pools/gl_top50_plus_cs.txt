@@ -10,6 +10,13 @@
 # species for mirror analysis, so having them explicit here makes the
 # cross-form matchups symmetric across focals.
 #
+# Aegislash (Blade) is present as a bare entry but PvPoke's GL
+# rankings only list Aegislash (Shield) (Blade is the in-battle
+# transform state, not separately ranked). The default-moveset
+# rejection is handled in src/gopvpsim/data.py via the
+# _DEFAULT_MOVESET_FALLBACK dict (pins PSYCHO_CUT/SHADOW_BALL/
+# GYRO_BALL for aegislash_blade), so this pool can stay clean.
+#
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
 # --- hand-extended focals (2026-06-02) ---

@@ -37,8 +37,10 @@ DEEP_DIVE = os.path.join(SCRIPT_DIR, 'deep_dive.py')
 #   extra_args: []           (escape hatch for unusual flags)
 
 DIVES = [
-    # Order is deliberate: Shadow Sableye pulled to position 1
-    # (2026-06-02 — Michael's stated interest after the new-season pull).
+    # Order is deliberate: Shadow Sableye trio at positions 1-3
+    # (2026-06-02 — Michael's stated interest after the new-season pull;
+    # Foul Play is locked as 1st charged, varying 2nd charged across
+    # Power Gem / Drain Punch / Dazzling Gleam to compare coverage).
     # Then Oinkologne pair so the CD article can regenerate earliest if
     # the later dives slip. Tinkaton next (GL then UL). Aegislash pair
     # follows, GL before UL per the D2 decision on 2026-04-18. The other
@@ -50,12 +52,41 @@ DIVES = [
     {
         'species': 'Sableye',
         'league': 'great',
-        'slug': 'shadow-sableye-great-league',
+        'slug': 'shadow-sableye-power-gem-great-league',
         'html_base': 'index.html',
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'top_movesets': 1,
         'no_thresholds': True,
         'shadow': True,
+        'extra_args': ['--fast', 'SHADOW_CLAW',
+                       '--charged', 'FOUL_PLAY,POWER_GEM'],
+        'reference': 'SHADOW_CLAW,FOUL_PLAY,POWER_GEM',
+    },
+    {
+        'species': 'Sableye',
+        'league': 'great',
+        'slug': 'shadow-sableye-drain-punch-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'shadow': True,
+        'extra_args': ['--fast', 'SHADOW_CLAW',
+                       '--charged', 'FOUL_PLAY,DRAIN_PUNCH'],
+        'reference': 'SHADOW_CLAW,FOUL_PLAY,DRAIN_PUNCH',
+    },
+    {
+        'species': 'Sableye',
+        'league': 'great',
+        'slug': 'shadow-sableye-dazzling-gleam-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'shadow': True,
+        'extra_args': ['--fast', 'SHADOW_CLAW',
+                       '--charged', 'FOUL_PLAY,DAZZLING_GLEAM'],
+        'reference': 'SHADOW_CLAW,FOUL_PLAY,DAZZLING_GLEAM',
     },
     {
         'species': 'Oinkologne',
