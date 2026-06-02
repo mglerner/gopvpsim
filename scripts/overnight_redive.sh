@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Overnight re-dive + article regen + comparison + verify pipeline.
 #
-# Runs all 17 website dives serially (per run_website_dives.py;
+# Runs all 19 website dives serially (per run_website_dives.py;
 # Oinkologne M/F GL, Tinkaton GL/UL, Aegislash Blade/Shield GL,
 # Forretress normal/shadow x Volt-Switch/Bug-Bite GL, Dewgong GL,
 # Stunfisk GL, Galarian Corsola GL, plus 2026-06-02 new-season
-# additions: Shadow Sableye GL, Seismitoad GL, Jumpluff GL,
+# additions: Shadow Sableye GL trio (Foul Play + Power Gem /
+# Drain Punch / Dazzling Gleam), Seismitoad GL, Jumpluff GL,
 # Kanto Ninetales GL),
 # patches per-opponent anchors, regenerates the Oinkologne CD article,
 # renders the two Aegislash form-change comparison pages and the two
@@ -76,7 +77,7 @@ log ""
 #    rejoined the chain 2026-04-21 so the 2026-04-21 rename refactor
 #    (drop compound <br> tier names, auto-gen standalone-mode narrative
 #    for non-CD species) reaches every shipped dive.
-step "Running 17 dives via run_website_dives.py" \
+step "Running 19 dives via run_website_dives.py" \
     python scripts/run_website_dives.py
 
 # The scripts/patch_dive_*.py patchers are retrofit-only tools: they

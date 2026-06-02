@@ -133,6 +133,29 @@ def load_group(group_name):
         )
 
 
+# Explicit per-species fallback movesets for species absent from PvPoke's
+# rankings JSON. PvPoke ranks certain form-change Pokemon under only one
+# form even though both forms are battle-legal as opponents (e.g. it ranks
+# Aegislash (Shield) but not Aegislash (Blade) — Blade is the in-battle
+# transform state). Without a fallback, the opponent loader in
+# scripts/deep_dive.py rejects such opponents as "not found in <league>
+# league rankings" and silently skips them, leaving holes in matchup
+# matrices. Each entry pins the canonical PvPoke moveset for the missing
+# form. Add entries here when a new "rankings-orphan" focal surfaces;
+# blast radius is intentionally narrow (only get_default_moveset() reads
+# this dict, and only when the primary lookup misses).
+#
+# Keyed by ``(speciesId, league)`` (lowercase, underscored speciesId,
+# string league) and valued by ``(fast_move_id, [charged_move_id, ...])``.
+_DEFAULT_MOVESET_FALLBACK = {
+    # Aegislash (Blade) GL — canonical PvPoke moveset for the Blade form,
+    # matches the --reference used by the Aegislash (Blade) GL focal dive
+    # in scripts/run_website_dives.py. Falls back here when Shadow Sableye
+    # / Forretress / etc. dives need to sim against Blade as an opponent.
+    ('aegislash_blade', 'great'): ('PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL']),
+}
+
+
 def get_default_moveset(species_name, league='great', shadow=False):
     """Return (fast_move_id, [charged_move_ids]) from PvPoke's rankings.
 
@@ -149,7 +172,8 @@ def get_default_moveset(species_name, league='great', shadow=False):
         (fast_move_id, [charged_move_id, ...])
 
     Raises:
-        KeyError: if species not found in rankings for this league
+        KeyError: if species not found in rankings for this league and
+            not present in the _DEFAULT_MOVESET_FALLBACK escape hatch.
     """
     index = _get_rankings_index(league)
 
@@ -158,12 +182,17 @@ def get_default_moveset(species_name, league='great', shadow=False):
     if shadow:
         species_id = species_id + '_shadow'
 
-    if species_id not in index:
-        raise KeyError(
-            f"{species_name!r} {'(Shadow) ' if shadow else ''}"
-            f"not found in {league} league rankings. "
-            f"Available species can be listed with load_rankings({league!r})."
-        )
+    if species_id in index:
+        moveset = index[species_id]['moveset']
+        return moveset[0], moveset[1:]
 
-    moveset = index[species_id]['moveset']
-    return moveset[0], moveset[1:]
+    # Primary lookup missed — try the explicit-fallback dict before raising.
+    fallback = _DEFAULT_MOVESET_FALLBACK.get((species_id, league))
+    if fallback is not None:
+        return fallback[0], list(fallback[1])
+
+    raise KeyError(
+        f"{species_name!r} {'(Shadow) ' if shadow else ''}"
+        f"not found in {league} league rankings. "
+        f"Available species can be listed with load_rankings({league!r})."
+    )
