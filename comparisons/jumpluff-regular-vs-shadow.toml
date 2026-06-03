@@ -1,0 +1,40 @@
+# Jumpluff: regular vs Shadow comparison (GL).
+#
+# Both forms use the same PvPoke default moveset (Fairy Wind / Energy
+# Ball, Acrobatics) so the delta isolates the shadow stat multipliers
+# (x1.2 attack, x5/6 defense, x1 stamina) rather than a moveset choice.
+#
+# Output: userdata/website/comparisons/jumpluff-regular-vs-shadow/
+# Schema: scripts/compare_loadouts.py docstring.
+
+slug   = "jumpluff-regular-vs-shadow"
+title  = "Jumpluff: regular vs Shadow"
+league = "great"
+author = "mglerner"
+
+order = ["Regular", "Shadow"]
+
+summary = """
+Jumpluff (Grass/Flying) is a niche Great League pick relying on Fairy \
+Wind energy generation paired with Energy Ball plus Acrobatics for \
+coverage. The shadow form adds the standard x1.2 attack / x5/6 defense \
+multipliers, shifting Jumpluff toward a more aggressive role at the \
+cost of survivability. Both loadouts use the same fast and charged \
+moves so the matchup delta isolates the shadow stat tradeoff.
+"""
+
+[[loadouts]]
+label         = "Regular"
+species       = "Jumpluff"
+dive_slug     = "jumpluff-great-league"
+fast_move     = "FAIRY_WIND"
+charged_moves = ["ENERGY_BALL", "ACROBATICS"]
+shadow        = false
+
+[[loadouts]]
+label         = "Shadow"
+species       = "Jumpluff"
+dive_slug     = "shadow-jumpluff-great-league"
+fast_move     = "FAIRY_WIND"
+charged_moves = ["ENERGY_BALL", "ACROBATICS"]
+shadow        = true

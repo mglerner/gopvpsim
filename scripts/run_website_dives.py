@@ -278,6 +278,16 @@ DIVES = [
         'no_thresholds': True,
     },
     {
+        'species': 'Jumpluff',
+        'league': 'great',
+        'slug': 'shadow-jumpluff-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'shadow': True,
+    },
+    {
         'species': 'Ninetales',
         'league': 'great',
         'slug': 'ninetales-great-league',
@@ -285,6 +295,16 @@ DIVES = [
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'top_movesets': 1,
         'no_thresholds': True,
+    },
+    {
+        'species': 'Ninetales',
+        'league': 'great',
+        'slug': 'shadow-ninetales-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'shadow': True,
     },
 ]
 
