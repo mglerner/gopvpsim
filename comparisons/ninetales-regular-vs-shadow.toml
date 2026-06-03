@@ -1,0 +1,40 @@
+# Kanto Ninetales: regular vs Shadow comparison (GL).
+#
+# Both forms use the same PvPoke default moveset (Ember / Weather Ball
+# Fire, Energy Ball) so the delta isolates the shadow stat multipliers
+# (x1.2 attack, x5/6 defense, x1 stamina) rather than a moveset choice.
+#
+# Output: userdata/website/comparisons/ninetales-regular-vs-shadow/
+# Schema: scripts/compare_loadouts.py docstring.
+
+slug   = "ninetales-regular-vs-shadow"
+title  = "Kanto Ninetales: regular vs Shadow"
+league = "great"
+author = "mglerner"
+
+order = ["Regular", "Shadow"]
+
+summary = """
+Kanto Ninetales (Fire) is a niche Great League pick built around \
+Ember chip damage plus Weather Ball (Fire) and Energy Ball for \
+coverage against Steel, Grass, Ice, and Bug targets. The shadow form \
+trades x5/6 defense for x1.2 attack, sharpening the offensive \
+profile. Both loadouts use the same fast and charged moves so the \
+matchup delta isolates the shadow stat tradeoff.
+"""
+
+[[loadouts]]
+label         = "Regular"
+species       = "Ninetales"
+dive_slug     = "ninetales-great-league"
+fast_move     = "EMBER"
+charged_moves = ["WEATHER_BALL_FIRE", "ENERGY_BALL"]
+shadow        = false
+
+[[loadouts]]
+label         = "Shadow"
+species       = "Ninetales"
+dive_slug     = "shadow-ninetales-great-league"
+fast_move     = "EMBER"
+charged_moves = ["WEATHER_BALL_FIRE", "ENERGY_BALL"]
+shadow        = true
