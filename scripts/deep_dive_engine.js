@@ -1528,9 +1528,36 @@ function buildTraces() {
     // Tier traces are collected separately and appended AFTER the
     // slayer/anchor overlays so they render on top (Plotly z-order =
     // trace insertion order).
+    //
+    // Density-aware styling (added 2026-06-03): when one tier dominates
+    // the IV pool (e.g. "Sableye Mirror Bulk" covers 100% of 4096 IVs
+    // in the Shadow Sableye / Dazzling Gleam dive), a uniform size-7
+    // opacity-0.9 wash drowns out the rare per-opponent Atk/Slayer
+    // categories drawn on top — the z-order is correct but the visual
+    // wash overwhelms the eye. Two compensations:
+    //   1. Dominant tiers (>50% of IVs) fade to opacity 0.35 so the
+    //      rare-tier markers on top can punch through visually.
+    //   2. Tiny tiers (<5% of IVs) get marker size 9 instead of 7 so
+    //      they're physically larger relative to the wash even when
+    //      their color collides with the dominant tier.
+    // Both gates use nIvs (full IV pool) as the denominator so the
+    // styling is stable across opp-IV / bait / scenario toggles that
+    // change yValues but not the underlying tier membership counts.
     var _tierTraces = [];
+    var _tierDomThreshold = nIvs * 0.5;
+    var _tierTinyThreshold = nIvs * 0.05;
     for (var ti=0; ti<tierNames.length; ti++) {
       var tx=[], ty=[], tt=[];
+      // Tier membership count is independent of y-axis filtering — count
+      // by ivAllTiers directly so the dominant/tiny gates don't flicker
+      // when the user toggles a sparse y-axis mode (sparse drops some
+      // IVs from tx, but tier identity hasn't changed).
+      var _tierTotal = 0;
+      for (var iv=0; iv<nIvs; iv++) {
+        if (DATA.ivAllTiers[iv] && DATA.ivAllTiers[iv].indexOf(ti) >= 0) {
+          _tierTotal++;
+        }
+      }
       for (var iv=0; iv<nIvs; iv++) {
         if (currentYIsSparse && !isFinite(yValues[iv])) continue;
         if (!isOwnedFilter(iv)) continue;
@@ -1541,11 +1568,16 @@ function buildTraces() {
         }
       }
       if (tx.length) {
+        var _isDom = _tierTotal > _tierDomThreshold;
+        var _isTiny = _tierTotal < _tierTinyThreshold;
+        var _markerSize = _isTiny ? 9 : 7;
+        var _markerOpacity = _isDom ? 0.35 : 0.9;
         _tierTraces.push({
           name:tierNames[ti],
           x:tx, y:ty, text:tt,
           mode:'markers', type:'scattergl', hoverinfo:'text',
-          marker:{size:7, color:tierColors[ti], opacity:0.9,
+          marker:{size:_markerSize, color:tierColors[ti],
+                   opacity:_markerOpacity,
                    line:{width:1, color:'#000'}},
           hoverlabel:{bordercolor:tierColors[ti]}
         });
