@@ -331,6 +331,27 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   here for the precedent + the mutation-hack pattern that proved
   the engine-side feasibility.
 
+  **Counter-intuitive cross-check (2026-06-03) — keep as a
+  regression test when the feature ships:** the same one-off
+  script run on 0/15/15 (rank-1 stat product) vs 2/11/13 (the
+  pick that won via stat product alone) across the same energy
+  axis showed 0/15/15 *gains more wins from energy lead than
+  2/11/13 does* (+92 / +231 wins at 1-fast / 2-fast lead vs
+  +80 / +217 for 2/11/13). This contradicts the natural intuition
+  that "energy lead favors high-atk IVs because the first charged
+  move hits harder" — for high-power moves that opponents shield
+  with high probability (Foul Play 65-power in this case), the
+  post-shield chip war is what the fight comes down to, and bulk
+  wins chip wars regardless of the swing-throw dynamics. When the
+  feature lands, Shadow Sableye should be a calibration-test
+  species: if the aggregator surfaces atk-favored IVs as bigger
+  energy-lead gainers for Sableye-class species (high-power
+  shield-bait charged moves + Foul-Play-like primaries), that's a
+  feature bug, not the genuine matchup math. The shape to look
+  for: bulk-leaning IVs should gain MORE matchups as energy lead
+  rises, against opponents whose damage profile rewards
+  longevity over burst.
+
 ## Tests to add
 
 * **No-bait oracle tests from iv-tech deep dives** — `pvpoke_dp`
