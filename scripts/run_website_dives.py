@@ -65,7 +65,13 @@ DIVES = [
         'no_thresholds': True,
         'shadow': True,
         'extra_args': ['--fast', 'SHADOW_CLAW', '--charged', 'FOUL_PLAY'],
-        'reference': 'SHADOW_CLAW,FOUL_PLAY,DRAIN_PUNCH',
+        # Reference charged moves listed alphabetically (DRAIN_PUNCH <
+        # FOUL_PLAY) to match enumerate_movesets' canonical sorted-tuple
+        # pair form. Mismatched order (FP first) caused a duplicate
+        # m4 HTML in the 2026-06-02 run because the dedup compared
+        # (DRAIN_PUNCH, FOUL_PLAY) vs (FOUL_PLAY, DRAIN_PUNCH) as
+        # different tuples. Alphabetical here keeps them in sync.
+        'reference': 'SHADOW_CLAW,DRAIN_PUNCH,FOUL_PLAY',
     },
     {
         'species': 'Oinkologne',
