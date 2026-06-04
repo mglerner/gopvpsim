@@ -612,6 +612,44 @@ move selection closed 2026-04-15 as not-a-real-issue.)
 
 ## HTML output paths
 
+* **Plotly.js CDN download has no timeout (and no retry)** *(real
+  failure mode, surfaced 2026-06-03)* — `scripts/deep_dive.py` lines
+  1399 and 1416 both call
+  `urllib.request.urlopen(PLOTLY_CDN, context=ctx)` to fetch
+  plotly.min.js (~4.35 MB) for `--standalone` and shared-dir output
+  modes. **No `timeout=` argument** means urllib defaults to no
+  timeout — if the connection or read hangs (transient network
+  issue, slow server, dropped TCP keep-alive), the dive blocks
+  indefinitely. There is also no retry-on-fail.
+
+  This bit the 2026-06-03 overnight chain: dive 16 (Jumpluff GL
+  regular) finished all sims, logged "Downloading Plotly.js for
+  standalone HTML...", then hung forever. Eventually the python
+  process was killed (probably by macOS during a power/sleep
+  event), the bash chain wrapper died with it, and no
+  SUCCESS/FAIL marker was written to overnight_status.txt — the
+  chain silently disappeared in step 1 with 15 of 19 dives done
+  and ~6 hours of recovery work needed.
+
+  Fix sketch (~30 min):
+
+  1. Add `timeout=60` to both urlopen calls. Bounded fail instead
+     of unbounded hang.
+  2. Wrap each call in a retry loop (3 attempts with exponential
+     backoff: 1s, 5s, 15s) — Plotly CDN flakes once or twice a
+     year; a handful of retries is sufficient.
+  3. On final failure, fall back to the CDN `<script src=...>`
+     reference mode (already implemented at line 1410). The dive
+     HTML becomes online-only instead of offline-portable, but it
+     still ships. Log a clear warning so the operator knows
+     standalone fallback fired.
+  4. Add a one-line test: mock urllib to raise socket.timeout and
+     confirm the fallback path emits the CDN reference + a warning.
+
+  Bundles naturally with any future dive-engine robustness pass.
+  Until this lands, the watchdog in `/tmp/shadow-chain-recovery.sh`
+  (kill-batch-if-latest.log-idle-30min) is the band-aid.
+
 * **Non-interactive `generate_html` is now strictly worse than interactive**
   — `generate_analysis_sections` (line 2046, which produces the slayer
   iteration display, breakpoint narration, banding analysis, clusters,
