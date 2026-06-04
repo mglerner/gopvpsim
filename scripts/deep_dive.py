@@ -1371,6 +1371,60 @@ THRESHOLD_COLORS = [
 
 PLOTLY_CDN = "https://cdn.plot.ly/plotly-2.35.2.min.js"
 PLOTLY_FILENAME = "plotly-2.35.2.min.js"
+PLOTLY_DOWNLOAD_TIMEOUT = 60        # seconds per attempt
+PLOTLY_DOWNLOAD_BACKOFF = (1, 5, 15)  # retry sleep schedule (3 attempts total)
+
+
+def _download_plotly_with_retry():
+    """Fetch plotly.min.js bytes with timeout + retry-with-backoff.
+
+    Returns:
+        bytes on success; ``None`` on persistent failure (callers
+        should fall back to the CDN ``<script src>`` reference).
+
+    Bounded-time semantics: each attempt has a 60s socket timeout, so
+    a slow CDN can't block the dive indefinitely. The three attempts
+    are spaced 1s / 5s / 15s apart, total worst-case ~3 minutes before
+    giving up — enough to ride out brief network hiccups (DNS flake,
+    transient TCP reset, CDN edge-node issue) without committing to
+    an indefinite wait.
+
+    Surfaced 2026-06-03 / 2026-06-04 overnight chain: an internet
+    outage during the Jumpluff GL render killed the dive with
+    ``socket.gaierror`` ("nodename nor servname provided"). Original
+    code had no timeout, no retry, no fallback — single transient
+    network event lost the entire dive run.
+    """
+    import urllib.request
+    import urllib.error
+    import ssl
+    import socket
+    import time
+    import certifi
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    last_err = None
+    for attempt, backoff in enumerate(PLOTLY_DOWNLOAD_BACKOFF, start=1):
+        try:
+            with urllib.request.urlopen(
+                    PLOTLY_CDN, context=ctx,
+                    timeout=PLOTLY_DOWNLOAD_TIMEOUT) as r:
+                return r.read()
+        except (urllib.error.URLError, socket.timeout, ConnectionError) as e:
+            last_err = e
+            if attempt < len(PLOTLY_DOWNLOAD_BACKOFF):
+                logger.warning(
+                    f"  Plotly.js download attempt {attempt} failed: {e}; "
+                    f"retrying in {backoff}s")
+                time.sleep(backoff)
+            else:
+                logger.warning(
+                    f"  Plotly.js download attempt {attempt} failed: {e}; "
+                    f"giving up after {len(PLOTLY_DOWNLOAD_BACKOFF)} attempts")
+    logger.warning(
+        f"  Plotly.js fetch failed persistently ({last_err}); the dive HTML "
+        f"will fall back to the CDN <script src> reference (online-only). "
+        f"Re-render later from the cached scores if you need standalone.")
+    return None
 
 
 def _plotly_script_tag(standalone, shared_plotly_dir=None, html_path=None):
@@ -1385,19 +1439,24 @@ def _plotly_script_tag(standalone, shared_plotly_dir=None, html_path=None):
       standalone=True: download and inline plotly.min.js (~4.35 MB
         inline blob; file works in isolation).
       otherwise: emit a CDN <script src=...> reference.
+
+    Robustness: both download paths use ``_download_plotly_with_retry``,
+    which times out (60s/attempt), retries with backoff (1s/5s/15s),
+    and on persistent failure returns None — callers then fall back
+    to the plain CDN ``<script src>`` reference so the dive still
+    ships (just online-only instead of offline-portable). See that
+    function's docstring for context.
     """
     if shared_plotly_dir is not None:
         shared = Path(shared_plotly_dir)
         shared.mkdir(parents=True, exist_ok=True)
         plotly_path = shared / PLOTLY_FILENAME
         if not plotly_path.exists():
-            import urllib.request
-            import ssl
-            import certifi
             logger.info(f"  Downloading Plotly.js to shared dir: {plotly_path}")
-            ctx = ssl.create_default_context(cafile=certifi.where())
-            with urllib.request.urlopen(PLOTLY_CDN, context=ctx) as r:
-                plotly_path.write_bytes(r.read())
+            plotly_bytes = _download_plotly_with_retry()
+            if plotly_bytes is None:
+                return f'<script src="{PLOTLY_CDN}"></script>'
+            plotly_path.write_bytes(plotly_bytes)
         if html_path:
             rel = os.path.relpath(
                 str(plotly_path),
@@ -1408,14 +1467,11 @@ def _plotly_script_tag(standalone, shared_plotly_dir=None, html_path=None):
         return f'<script src="{rel}"></script>'
     if not standalone:
         return f'<script src="{PLOTLY_CDN}"></script>'
-    import urllib.request
-    import ssl
-    import certifi
     logger.info("  Downloading Plotly.js for standalone HTML...")
-    ctx = ssl.create_default_context(cafile=certifi.where())
-    with urllib.request.urlopen(PLOTLY_CDN, context=ctx) as r:
-        plotly_src = r.read().decode()
-    return f'<script>{plotly_src}</script>'
+    plotly_bytes = _download_plotly_with_retry()
+    if plotly_bytes is None:
+        return f'<script src="{PLOTLY_CDN}"></script>'
+    return f'<script>{plotly_bytes.decode()}</script>'
 
 
 def generate_html(species, league, moveset_results, html_path, thresholds=None,

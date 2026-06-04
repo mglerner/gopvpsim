@@ -612,43 +612,42 @@ move selection closed 2026-04-15 as not-a-real-issue.)
 
 ## HTML output paths
 
-* **Plotly.js CDN download has no timeout (and no retry)** *(real
-  failure mode, surfaced 2026-06-03)* — `scripts/deep_dive.py` lines
-  1399 and 1416 both call
-  `urllib.request.urlopen(PLOTLY_CDN, context=ctx)` to fetch
-  plotly.min.js (~4.35 MB) for `--standalone` and shared-dir output
-  modes. **No `timeout=` argument** means urllib defaults to no
-  timeout — if the connection or read hangs (transient network
-  issue, slow server, dropped TCP keep-alive), the dive blocks
-  indefinitely. There is also no retry-on-fail.
+* **Plotly.js CDN download: write the missing test** *(robustness
+  fix landed 2026-06-04, test still owed)* — `scripts/deep_dive.py`
+  used to call `urllib.request.urlopen(PLOTLY_CDN, context=ctx)`
+  with no timeout, no retry, and no fallback at both download sites
+  (standalone-inline mode and shared-dir mode). Both failure modes
+  bit the 2026-06-03 → 06-04 overnight chain via Michael's internet
+  outage during the Jumpluff GL render:
 
-  This bit the 2026-06-03 overnight chain: dive 16 (Jumpluff GL
-  regular) finished all sims, logged "Downloading Plotly.js for
-  standalone HTML...", then hung forever. Eventually the python
-  process was killed (probably by macOS during a power/sleep
-  event), the bash chain wrapper died with it, and no
-  SUCCESS/FAIL marker was written to overnight_status.txt — the
-  chain silently disappeared in step 1 with 15 of 19 dives done
-  and ~6 hours of recovery work needed.
+  - **Fast-fail (what actually happened):** `socket.gaierror:
+    nodename nor servname provided` raised immediately when DNS for
+    `cdn.plot.ly` couldn't resolve. The dive crashed with an
+    unhandled exception and run_website_dives.py exited rc=1. The
+    overnight-chain bash wrapper had already died at that point
+    (likely killed when python's parent terminal lost network /
+    macOS event), so no SUCCESS/FAIL marker reached
+    `overnight_status.txt`.
+  - **Hang (hypothetical but also possible):** if the connection
+    completes but the body read stalls (slow CDN, dropped
+    keep-alive), without a timeout urllib would block indefinitely.
+    The original TODO entry described this mode; in our actual
+    incident the failure was the fast-fail above, but both modes
+    were latent.
 
-  Fix sketch (~30 min):
+  Fix landed in commit (this commit, 2026-06-04):
+  `_download_plotly_with_retry()` helper does timeout 60s/attempt +
+  3 attempts with 1s/5s/15s backoff. On persistent failure it
+  returns None and the call sites fall back to the plain
+  `<script src=PLOTLY_CDN>` reference (online-only HTML, ships
+  with a logged warning). Smoke-tested live; module reloads
+  cleanly; healthy-network case returns 4.35 MB as expected.
 
-  1. Add `timeout=60` to both urlopen calls. Bounded fail instead
-     of unbounded hang.
-  2. Wrap each call in a retry loop (3 attempts with exponential
-     backoff: 1s, 5s, 15s) — Plotly CDN flakes once or twice a
-     year; a handful of retries is sufficient.
-  3. On final failure, fall back to the CDN `<script src=...>`
-     reference mode (already implemented at line 1410). The dive
-     HTML becomes online-only instead of offline-portable, but it
-     still ships. Log a clear warning so the operator knows
-     standalone fallback fired.
-  4. Add a one-line test: mock urllib to raise socket.timeout and
-     confirm the fallback path emits the CDN reference + a warning.
-
-  Bundles naturally with any future dive-engine robustness pass.
-  Until this lands, the watchdog in `/tmp/shadow-chain-recovery.sh`
-  (kill-batch-if-latest.log-idle-30min) is the band-aid.
+  **Still owed**: a mock-based unit test that patches
+  `urllib.request.urlopen` to raise `socket.gaierror`/`socket.
+  timeout`/`URLError` and confirms `_plotly_script_tag` emits the
+  CDN-reference fallback + the expected warning. Lives naturally
+  in `tests/test_deep_dive_plotly.py` or similar. ~15 min.
 
 * **Non-interactive `generate_html` is now strictly worse than interactive**
   — `generate_analysis_sections` (line 2046, which produces the slayer
