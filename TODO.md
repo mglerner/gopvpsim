@@ -649,6 +649,74 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   CDN-reference fallback + the expected warning. Lives naturally
   in `tests/test_deep_dive_plotly.py` or similar. ~15 min.
 
+* **Mirror-slayer iteration tables blow up HTML size for high-anchor
+  species** *(real instance, surfaced 2026-06-05 on Jumpluff GL)* —
+  Jumpluff regular GL dive HTML is 60.7 MB (vs Ninetales 15.2 MB,
+  Shadow Sableye 17.6 MB, etc.). 47 MB of the 60 MB lives in the
+  analysis-sections body, almost entirely in two tables:
+
+      ms0-slayer-1-table   12.0 MB  (vs Ninetales 0.31 MB)  37x
+      ms0-slayer-2-table   33.6 MB  (vs Ninetales 0.72 MB)  44x
+
+  Mechanism: each row enumerates its anchor membership inline via two
+  bloated paths. Per-row HTML is ~9,696 bytes, and slayer-1 alone has
+  1,608 rows.
+
+  1. `<tr ... data-anchors="0 1 2 3 4 ... 1607">` — space-separated
+     list of every anchor-index the IV passes. For Jumpluff (3,161
+     resolved anchors, 133 parents, 1,607 IVs in round-3 mirror-
+     slayer pool) the cross-product is ~1607 rows × ~1000+ anchor
+     refs per row, all serialized into HTML attributes.
+  2. Inline `<span class="dd-anchor-tag" data-t="...">opp_abbrev<span
+     class="dd-anchor-tag-count">xN</span></span>` per opponent that
+     the IV passes, repeated per row. For Jumpluff this is dozens of
+     spans per row times 1,608 rows.
+
+  Ninetales has the same renderer path but ~280 anchors and a much
+  smaller pool, so the cross-product stays under 1 MB per table.
+  Bug is pre-existing (not introduced by recent renderer work);
+  Jumpluff just happens to be the first species where the anchor
+  count + pool size hit the pathological corner.
+
+  **Open meta-question before optimizing — do we even need this so
+  accessible?** Michael's framing 2026-06-05: "the mirror slayer
+  code isn't perfect yet." If the underlying mirror-slayer logic is
+  still likely to change substantively (anchor enumeration heuristics,
+  pool-shrink criteria, score-margin tiebreaks, etc.), heavy renderer
+  optimization is premature investment in a moving target. The
+  cheaper path is to *demote* the mirror-slayer iteration tables —
+  put them behind a collapsed-by-default `<details>` (or behind the
+  experimental-analysis toggle that already gates clusters/banding)
+  — until we have higher confidence that the displayed numbers are
+  worth surfacing prominently. That's near-zero renderer work and
+  immediately reduces user-facing surface area for code we're not
+  yet ready to ship-quality-promote. Decide demote-vs-optimize
+  before picking from the optimization options below.
+
+  **Optimization options** *(only relevant if mirror-slayer is
+  promoted from "experimental" to ship-quality output)*:
+
+  1. **Compress data-anchors to a per-IV bitmap** in the DATA blob.
+     1,607 IVs × 3,161 anchors = 5M bits = ~640 KB compressed via
+     base64. Each `<tr>` gets `data-iv-idx="N"` and the JS resolves
+     the anchor set from the DATA bitmap at hover time. ~10x size
+     reduction; cleanest fix.
+  2. **Cap displayed rows to `--mirror-slayer-show`**. The chain
+     passes `--mirror-slayer-show 20` but the rendered table emits
+     all 1,608 rows. Likely the flag only affects log/summary output,
+     not the HTML rows. Wire it through. Simple win.
+  3. **Truncate anchor-tag spans per row** to top-N opponents
+     (`tin×5 tog×11 ... +24 more`). Cosmetic; doesn't help if data-
+     anchors stays inline.
+  4. **Move per-row enumeration into a collapsed `<details>`**.
+     Same total bytes; lazy-loaded in the browser. Doesn't fix file
+     size; only helps initial render latency.
+
+  The right combo when ship-quality time comes is probably (1) + (2):
+  cap rows to the flagged N, then bitmap-compress what remains.
+  Until then, demoting the section gives most of the operational win
+  for none of the engineering cost.
+
 * **Non-interactive `generate_html` is now strictly worse than interactive**
   — `generate_analysis_sections` (line 2046, which produces the slayer
   iteration display, breakpoint narration, banding analysis, clusters,
