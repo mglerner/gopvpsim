@@ -306,6 +306,19 @@ DIVES = [
         'no_thresholds': True,
         'shadow': True,
     },
+    # NAIC GL focal. thresholds/sylveon.toml auto-loads (no no_thresholds)
+    # so the four card tiers (Gatr Slayer / Max Defense / S. Quagsire Focus
+    # / Full Attack) render. reference + top_movesets=3 keep the Psyshock /
+    # Moonblast / Last Resort moveset debate visible in the dropdown.
+    {
+        'species': 'Sylveon',
+        'league': 'great',
+        'slug': 'sylveon-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'reference': 'FAIRY_WIND,PSYSHOCK,SHADOW_BALL',
+        'top_movesets': 3,
+    },
 ]
 
 
