@@ -1,3 +1,24 @@
+## HIGH PRIORITY: enable HTTPS on the website (2026-06-06)
+
+The site (`mglerner.com/pogo-dives/`) is currently HTTP-only. DreamHost
+offers free, auto-renewing HTTPS via Let's Encrypt. Two halves:
+
+1. **Flip the cert (Michael's action, DreamHost panel).** Panel →
+   Websites → Secure Certificates (older UI: Manage Domains → SSL/TLS)
+   → add a free Let's Encrypt certificate for `mglerner.com`. Wait for
+   issuance/propagation (minutes, up to a couple hours), then enable
+   "force HTTPS / redirect HTTP to HTTPS". Cert is per-domain, so it
+   covers the `/pogo-dives/` subdirectory automatically. Free; no paid
+   cert needed for the static site.
+2. **Mixed-content scan + generator fix (our action, after the cert is
+   live).** Once pages are served over HTTPS, any `http://` asset is
+   blocked by the browser. Grep `userdata/website/` for hardcoded
+   `http://` resource/link references and fix the *generators* that emit
+   them (candidates: `deep_dive.py` Plotly CDN tag, `build_website_index.py`
+   footer link, `render_article.py`, `build_guides.py`). Then republish.
+
+`publish_website.sh` itself is unaffected (rsync over SSH, not HTTP).
+
 ## NAIC re-dive for Oinkologne (2026-05-18, near-future)
 
 Oinkologne is expected to be NAIC-meta-relevant. Once PvPoke's
