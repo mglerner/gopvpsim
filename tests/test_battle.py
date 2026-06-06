@@ -815,17 +815,24 @@ def test_corviknight_vs_azumarill_air_cutter_buff(shields_cor, shields_azu,
     #
     # Tests shadow multipliers: Shadow Swampert deals ×1.2 damage, takes ×1.2 damage.
     #
-    # PvPoke verified scores (pvpoke.com/battle/, Swampert's perspective):
+    # PvPoke verified scores (Swampert's perspective):
     #              Regi 0s  Regi 1s  Regi 2s
-    #   Swam 0s:    541      507      216
-    #   Swam 1s:    936      902      436
+    #   Swam 0s:    720      686      216
+    #   Swam 1s:    936      902      232
     #   Swam 2s:    936      902      861
-    (0, 0, 0, 541, ['Registeel: Focus Blast', 'Swampert: Earthquake']),
-    (0, 1, 0, 507, ['Registeel: Focus Blast', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Earthquake']),
-    (0, 2, 1, 216, ['Registeel: Focus Blast', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)']),
+    #
+    # Re-vetted 2026-06-06 via scripts/pvpoke_trace.js against pvpoke
+    # bc532fbda after the June-2026 move rebalance (Flash Cannon 70->65
+    # energy, Earthquake 110->120 power). The 0v0/0v1/0v2/1v2 cells shifted
+    # vs the pre-rebalance fixture (Registeel now throws Flash Cannon first
+    # at the cheaper cost); our sim matches PvPoke exactly on all 9 cells
+    # (score, winner, chargedLog).
+    (0, 0, 0, 720, ['Registeel: Flash Cannon', 'Swampert: Earthquake']),
+    (0, 1, 0, 686, ['Registeel: Flash Cannon', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Earthquake']),
+    (0, 2, 1, 216, ['Registeel: Flash Cannon', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon']),
     (1, 0, 0, 936, ['Registeel: Focus Blast (shielded)', 'Swampert: Earthquake']),
     (1, 1, 0, 902, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Earthquake']),
-    (1, 2, 1, 436, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon', 'Registeel: Focus Blast']),
+    (1, 2, 1, 232, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Registeel: Focus Blast']),
     (2, 0, 0, 936, ['Registeel: Focus Blast (shielded)', 'Swampert: Earthquake']),
     (2, 1, 0, 902, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Earthquake']),
     (2, 2, 0, 861, ['Registeel: Flash Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Swampert: Hydro Cannon (shielded)', 'Registeel: Flash Cannon (shielded)', 'Swampert: Earthquake']),

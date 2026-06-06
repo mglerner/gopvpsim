@@ -1,5 +1,72 @@
 # Developer Notes
 
+## PvPoke re-vetting log
+
+**2026-06-06 — re-vetted against pvpoke `bc532fbda`** (Michael's
+2026-06-05 `git pull`; range `8ed523811..bc532fbda` covers the
+04-26 / 06-02 / 06-05 pulls). Findings:
+
+- **Battle engine unchanged.** `Battle.js`, `ActionLogic.js`, and
+  `DamageCalculator.js` are byte-identical to the 2026-04-16 vetting.
+  The only `src/js` changes were non-sim: a `dex` multi-range filter
+  in `GameMaster.js` (before line 873, so the `selfBuffing` citation
+  is unaffected), a whitespace + `&& self.fastMove` null-guard in
+  `Pokemon.js` `replaceMove`, a `startStatBuffs` comparison fix in
+  `TeamRanker.js`, and pure-UI files. **Every divergence cited in
+  this doc and CLAUDE.md still resolves to the correct line and is
+  still valid.**
+- **Move data rebalanced** (real June-2026 game patch PvPoke tracked,
+  in `src/data/gamemaster/moves.json`): Charm 13->12, Dragon Ascent
+  150/70->110/45, Drill Run 80/45->70/40, Earthquake 110->120, Earth
+  Power ->50e, Energy Ball 90/55->80/45, Flash Cannon ->65e, Hurricane
+  ->60e, Silver Wind 60->75, Wrap 60->70, Gust energyGain 12->14,
+  Plasma Fists added. `buffApplyChance` untouched (buff flags
+  unaffected). This is data, not logic — it shifts both sims
+  identically, so it is **not a divergence**. Our sim already runs on
+  it (`data.py` fetches gamemaster from GitHub master, 24h cache).
+- **Fixture fallout:** `test_shadow_swampert_vs_registeel` (uses
+  Earthquake + Flash Cannon) went stale on 4 of 9 cells. Re-vetted all
+  9 via `scripts/pvpoke_trace.js`; our engine matches current PvPoke
+  exactly on score, winner, and chargedLog. Fixtures refreshed
+  (0v0 541->720, 0v1 507->686, 1v2 436->232; 0v2 score held at 216 but
+  log changed). No other battle test affected.
+
+**2026-06-06 — full oracle harness audit.** Ran the new
+`scripts/audit_oracle_harness.py`, which drives **every** hand-typed
+PvPoke-oracle matchup in `tests/test_battle.py` (12 matchups × 9 shield
+combos = 108 cells) through both our sim and `scripts/pvpoke_trace.js`
+and compares score / winner / chargedLog directly. (We compare sim-vs-
+harness rather than re-typing PvPoke's score matrices, since the passing
+test suite already proves sim == fixture; this avoids re-introducing the
+typo class we're auditing for.) Results:
+
+- **98 of 108 cells: exact match** (score + winner + chargedLog) against
+  current PvPoke. Confirms no hand-entry typo ever crept into the
+  Medicham/Azu, Azu/Forr (full + RT), Beedrill/Med, Corv/Med,
+  Mienfoo/Med, Corv/Azu, Shadow Swampert/Registeel, Corviknight-mirror,
+  Aegislash, and Mimikyu fixtures.
+- **6 cells: documented Aegislash bug #3 divergence, all still present**
+  (the `_AEGI_XFAIL_GB_*` cells: 0v1, 0v2, 1v1, 1v2, 2v1, 2v2). Includes
+  the 1v2/2v2 score+winner flip (ours 510/w0 vs PvPoke 376/w1) — intact.
+- **4 cells: NEW finding — Morpeko form-label timing divergence**
+  (`morpeko_vs_azumarill_form_change` 1v1, 1v2, 2v1, 2v2). Score,
+  winner, and move sequence all match PvPoke exactly; only the form
+  prefix on a Morpeko chargedLog entry differs (we tag "Morpeko (Full
+  Belly)" where PvPoke tags "Morpeko (Hangry)", or vice-versa). The
+  divergence is **score-neutral across the entire oracle**: every cell
+  where the label differs, the affected throw is either a
+  form-independent move (Psychic Fangs) or a shielded Aura Wheel (1 dmg
+  regardless of type), so no damage/type/score consequence. All 5
+  zero-shield cells agree on labels; the divergence only appears after a
+  shield interaction, pointing to a form-toggle-on-shielded-charged-move
+  timing difference between our sim and PvPoke. The Morpeko oracle test
+  asserts score only (no chargedLog), so this was invisible until the
+  harness audit. **Not yet root-caused (ours vs PvPoke); not fixed** —
+  flagged in TODO.md "Battle simulator". Per the CLAUDE.md divergence
+  policy, do not change form-label timing to match PvPoke without first
+  confirming which is correct and whether any unshielded-Aura-Wheel
+  matchup makes it score-relevant.
+
 ## Current status (2026-04-06)
 
 <!-- sync:test_count -->699<!-- /sync --> tests collected. The original PvPoke battle-correctness
@@ -502,8 +569,8 @@ nearest whole level (not half level). In Pokemon Go you power up in
 0.5-level increments, so a Blade form could theoretically be level 22.5
 (1476 CP, under the 1500 cap), but the game puts it at level 22 (1443
 CP) instead -- losing a half level of stats. PvPoke's `getFormStats()`
-(Pokemon.js line ~2391) implements this via `newLevel--` (decrementing by
-1, not 0.5). This was discovered by cascade1185
+(Pokemon.js line ~2455 as of pvpoke bc532fbda) implements this via
+`newLevel--` (decrementing by 1, not 0.5). This was discovered by cascade1185
 (https://x.com/cascade1185/status/2037456058265075782) and explained by
 Caleb Peng (https://www.youtube.com/watch?v=OdHxOD6FZcg&t=167s). When
 choosing which Aegislash to power up, players need to check that the

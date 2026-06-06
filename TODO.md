@@ -209,17 +209,33 @@ break invariants that weren't yet nailed down by tests.
   init-time cache. Keeping ours (intentional, more correct; see
   DEVELOPER_NOTES.md "Known divergences").
 
-* **Audit existing oracle tests against the PvPoke harness** — Now
-  that `scripts/pvpoke_trace.js` + `scripts/verify_pvpoke_harness.py`
-  exist and 27/27 pass, extend the verify script to cover ALL
-  PvPoke-oracle test cases currently in `tests/test_battle.py` (and
-  anywhere else we've hand-typed a PvPoke score or move sequence into
-  a test/docstring/comment). Typos and user-entry errors may have
-  silently crept in over time; the harness is cheap to run and gives
-  a definitive check against PvPoke. Scope: enumerate all existing
-  fixtures, feed each to the harness, flag any where the harness
-  disagrees with the recorded PvPoke numbers. Fix typos; separately
-  flag genuine PvPoke divergences for follow-up.
+* **Audit existing oracle tests against the PvPoke harness** — DONE
+  2026-06-06. `scripts/audit_oracle_harness.py` drives all 12 hand-typed
+  oracle matchups in `tests/test_battle.py` × 9 shield combos (108 cells)
+  through both our sim and `scripts/pvpoke_trace.js`. Result: 98 exact
+  matches (no hand-entry typo ever crept in), 6 confirmed Aegislash
+  bug #3 divergence cells (intact), and 1 new finding — the Morpeko
+  form-label timing divergence below. Full writeup in DEVELOPER_NOTES
+  "2026-06-06 — full oracle harness audit". Re-run anytime:
+  `python scripts/audit_oracle_harness.py`.
+
+* **Morpeko form-label timing divergence** *(surfaced by the 2026-06-06
+  harness audit)* — On `morpeko_vs_azumarill_form_change` cells 1v1, 1v2,
+  2v1, 2v2 our chargedLog tags a Morpeko throw with a different form
+  ("Full Belly" vs "Hangry") than PvPoke does. Score, winner, and move
+  sequence all match PvPoke exactly; the divergence is score-neutral
+  across the whole oracle because every label-differing throw is a
+  form-independent move (Psychic Fangs) or a shielded Aura Wheel (1 dmg).
+  The divergence only appears after a shield interaction, suggesting a
+  form-toggle-on-shielded-charged-move timing difference. Open work:
+  (1) root-cause whether ours or PvPoke is right about when the toggle
+  fires relative to a shielded charged move; (2) check whether any
+  *unshielded* Aura Wheel matchup makes the label score-relevant (would
+  promote this from cosmetic to a real divergence); (3) if cosmetic-only,
+  consider adding a chargedLog assertion to the Morpeko oracle test
+  (currently score-only) as an xfail with the documented reason. Do NOT
+  change form-label timing to match PvPoke before (1)/(2) per the
+  CLAUDE.md divergence policy.
 
 * **Speed test** -- compare our speed vs the PvPoke JS code, look for
   ways we can speed ours up.
