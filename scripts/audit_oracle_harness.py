@@ -75,9 +75,15 @@ MATCHUPS = [
     dict(label='corviknight_mirror_both_buff',
          p1=P('Corviknight', 'AIR_SLASH', ['AIR_CUTTER'], (4, 12, 14), 'corviknight'),
          p2=P('Corviknight', 'AIR_SLASH', ['AIR_CUTTER'], (4, 12, 14), 'corviknight')),
+    # Morpeko cells 1v1/1v2/2v1/2v2 differ on chargedLog only (score+winner
+    # match). PvPoke bug #8: its Battle.js:1536 form-toggle guard makes
+    # Morpeko stick in Hangry after the first charged move instead of
+    # toggling back. OUR two-way toggle is correct (verified in-game
+    # 2026-06-06). See DEVELOPER_NOTES "PvPoke bugs found" #8.
     dict(label='morpeko_vs_azumarill_form_change',
          p1=P('Morpeko (Full Belly)', 'THUNDER_SHOCK', ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS'], (5, 14, 15), 'morpeko_full_belly'),
-         p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill')),
+         p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
+         xfail_cells={(1, 1), (1, 2), (2, 1), (2, 2)}),
     dict(label='aegislash_vs_azumarill_form_change',
          p1=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_shield'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),

@@ -178,7 +178,7 @@ break invariants that weren't yet nailed down by tests.
 
 ## Battle simulator
 
-* **File PvPoke bug reports** — Seven bugs found in PvPoke's JS:
+* **File PvPoke bug reports** — Eight bugs found in PvPoke's JS:
   1. BattleState `.hp`/`.oppHealth` naming inconsistency (dead-code dominance checks)
   2. bestChargedMove using `move.damage` (undefined at init) instead of `move.power`
   3. bestChargedMove not recomputed on opponent form change (stale DPE cache)
@@ -203,6 +203,16 @@ break invariants that weren't yet nailed down by tests.
      the 4 GL meta species whose default moveset has a chance-<1
      charged move (Tinkaton, Corviknight, Clefable, Drapion).
      Discovered 2026-04-15; writeup in DEVELOPER_NOTES.md §7.
+  8. Morpeko form change is one-way instead of a true toggle.
+     Battle.js:1536 guard `activeFormId != alternativeFormId` (plus
+     `morpeko_hangry` carrying no `formChange`) makes Morpeko stick in
+     Hangry after the first charged move instead of toggling back, even
+     though the gamemaster says `type: "toggle"`. Real game toggles each
+     charged move (Michael verified in-game 2026-06-06; resets to Full
+     Belly on switch-in). Ours is correct. Score-relevant whenever
+     Morpeko throws an unshielded 2nd+ Aura Wheel against an opponent
+     where Electric/Dark effectiveness differs. Discovered 2026-06-06 by
+     `scripts/audit_oracle_harness.py`; writeup in DEVELOPER_NOTES.md §8.
 
 * **Resolve known PvPoke divergences** — one intentional implementation
   difference remains: bestChargedMove recomputed per-turn vs PvPoke's
@@ -219,23 +229,16 @@ break invariants that weren't yet nailed down by tests.
   "2026-06-06 — full oracle harness audit". Re-run anytime:
   `python scripts/audit_oracle_harness.py`.
 
-* **Morpeko form-label timing divergence** *(surfaced by the 2026-06-06
-  harness audit)* — On `morpeko_vs_azumarill_form_change` cells 1v1, 1v2,
-  2v1, 2v2 our chargedLog tags a Morpeko throw with a different form
-  ("Full Belly" vs "Hangry") than PvPoke does. Score, winner, and move
-  sequence all match PvPoke exactly; the divergence is score-neutral
-  across the whole oracle because every label-differing throw is a
-  form-independent move (Psychic Fangs) or a shielded Aura Wheel (1 dmg).
-  The divergence only appears after a shield interaction, suggesting a
-  form-toggle-on-shielded-charged-move timing difference. Open work:
-  (1) root-cause whether ours or PvPoke is right about when the toggle
-  fires relative to a shielded charged move; (2) check whether any
-  *unshielded* Aura Wheel matchup makes the label score-relevant (would
-  promote this from cosmetic to a real divergence); (3) if cosmetic-only,
-  consider adding a chargedLog assertion to the Morpeko oracle test
-  (currently score-only) as an xfail with the documented reason. Do NOT
-  change form-label timing to match PvPoke before (1)/(2) per the
-  CLAUDE.md divergence policy.
+* **Morpeko form-toggle divergence — RESOLVED 2026-06-06.** The
+  2026-06-06 harness audit flagged 4 Morpeko cells whose chargedLog
+  tagged a throw "Full Belly" where PvPoke said "Hangry". Root-caused to
+  PvPoke bug #8 (one-way form change; ours is the correct two-way
+  toggle, Michael verified in-game). Pinned by a chargedLog regression
+  assertion on `test_morpeko_vs_azumarill_form_change` and a
+  known-divergence marker in `scripts/audit_oracle_harness.py`. Writeup
+  in DEVELOPER_NOTES.md §8. Forward note: when multi-mon/switching lands
+  (see "Energy-lead axis"), honor `reset_on_switch` — Morpeko must
+  re-enter in Full Belly on every switch-in, confirmed in-game.
 
 * **Speed test** -- compare our speed vs the PvPoke JS code, look for
   ways we can speed ours up.
