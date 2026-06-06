@@ -39,6 +39,15 @@ _LEAGUE_SUFFIXES = {
     'master-league': 'Master League',
 }
 
+# Slug tokens that classify as variant axes (not part of the base-species
+# group key). Regional tags stay in the group key (a Galarian form is a
+# different dex entry); shadow / gender / alternate-form tokens are
+# variants of the same species and collapse under one group.
+_REGIONAL = {'galarian', 'alolan', 'hisuian', 'paldean'}
+_FORM_PAREN = {'blade', 'shield', 'busted', 'disguised',
+               'super', 'large', 'small', 'average', 'hangry'}
+_LEAGUE_ORDER = {'great': 0, 'ultra': 1, 'master': 2}
+
 
 def _slug_to_pretty_title(slug: str) -> str:
     """Convert a dive dir slug to a human-readable title.
@@ -222,6 +231,10 @@ def load_entries(base_dir: Path, *, href_prefix: str = '',
             'description': meta['description'].strip(),
             'landing': meta['landing'],
             'href': f"{href_prefix}{sub.name}/{meta['landing']}",
+            # Curated = an authored meta.toml exists (vs HTML-derived
+            # fallback). Drives whether the grouped dives list surfaces
+            # the description as a hover tooltip.
+            'curated': meta_path.exists(),
         })
     entries.sort(key=lambda d: d['title'].lower())
     return entries
@@ -242,12 +255,194 @@ def _render_entry_list(entries: list[dict], empty_msg: str) -> str:
     return '\n'.join(items)
 
 
+def _parse_dive_slug(slug: str) -> dict | None:
+    """Split a dive slug into base species (group key) + variant axes.
+
+    Returns None when the slug has no recognised league suffix or no
+    species token (caller falls back to rendering it ungrouped).
+
+    Group key = bare species + regional tags (Galarian etc.) — same dex
+    entry. Variant axes = shadow flag, gender, alternate form (Blade/
+    Shield/...), moveset tokens, and league. Examples:
+
+      forretress-shadow-bug-bite-great-league
+        → species "Forretress", variant ["Shadow", "Bug", "Bite"], great
+      tinkaton-ultra-league
+        → species "Tinkaton", variant [], ultra
+      galarian-corsola-great-league
+        → species "Galarian Corsola", variant [], great
+      oinkologne-female-great-league
+        → species "Oinkologne", gender "female", great
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(REPO_ROOT / 'src'))
+    from gopvpsim.display import pretty_species_from_slug  # type: ignore[import-not-found]
+
+    core = league_key = league_pretty = None
+    for suffix, pretty in _LEAGUE_SUFFIXES.items():
+        if slug.endswith('-' + suffix):
+            core = slug[:-(len(suffix) + 1)]
+            league_key = suffix.split('-')[0]
+            league_pretty = pretty
+            break
+    if core is None:
+        return None
+
+    shadow = False
+    gender = None
+    regional: list[str] = []
+    forms: list[str] = []
+    name_tokens: list[str] = []
+    for t in core.split('-'):
+        if t == 'shadow':
+            shadow = True
+        elif t in _REGIONAL:
+            regional.append(t)
+        elif t in ('female', 'male'):
+            gender = t
+        elif t in _FORM_PAREN:
+            forms.append(t)
+        else:
+            name_tokens.append(t)
+    if not name_tokens:
+        return None
+
+    bare = name_tokens[0]
+    moveset_tokens = name_tokens[1:]
+    group_slug = '_'.join([bare] + regional)
+    species_display = pretty_species_from_slug(group_slug)
+    # Drop the gender parenthetical for the group heading — the group
+    # spans both genders; the per-variant chip carries Male/Female.
+    for g in (' (Male)', ' (Female)'):
+        if species_display.endswith(g):
+            species_display = species_display[: -len(g)]
+            break
+
+    variant_tokens: list[str] = []
+    if shadow:
+        variant_tokens.append('Shadow')
+    variant_tokens += [f.capitalize() for f in forms]
+    if gender:
+        variant_tokens.append(gender.capitalize())
+    variant_tokens += [t.capitalize() for t in moveset_tokens]
+
+    return {
+        'group_key': group_slug,
+        'species_display': species_display,
+        'shadow': shadow,
+        'gender': gender,
+        'variant_tokens': variant_tokens,
+        'league_key': league_key,
+        'league_pretty': league_pretty,
+    }
+
+
+def _group_dives(dives: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Collapse per-variant dive entries under one base-species group.
+
+    Returns (groups, leftovers). Each group is
+    ``{'species': str, 'entries': [{'entry', 'label'}, ...]}`` sorted by
+    species; leftovers are entries whose slug didn't parse (rendered
+    ungrouped with their full title).
+    """
+    groups: dict[str, dict] = {}
+    leftovers: list[dict] = []
+    for d in dives:
+        p = _parse_dive_slug(d['slug'])
+        if p is None:
+            leftovers.append(d)
+            continue
+        g = groups.setdefault(
+            p['group_key'],
+            {'species': p['species_display'], 'rows': []})
+        g['rows'].append({'entry': d, 'parse': p})
+
+    result: list[dict] = []
+    for g in groups.values():
+        rows = g['rows']
+        multi_league = len({r['parse']['league_key'] for r in rows}) > 1
+        has_female = any(r['parse']['gender'] == 'female' for r in rows)
+        for r in rows:
+            p = r['parse']
+            toks = list(p['variant_tokens'])
+            # A genderless sibling in a group that also has a Female form
+            # is the Male form (Oinkologne etc.).
+            if has_female and p['gender'] is None and not toks:
+                toks = ['Male']
+            label = ' '.join(toks)
+            if multi_league:
+                label = (f'{label} ({p["league_pretty"]})'.strip()
+                         if label else p['league_pretty'])
+            r['label'] = label or 'Regular'
+        rows.sort(key=lambda r: (
+            _LEAGUE_ORDER.get(r['parse']['league_key'], 9),
+            r['parse']['shadow'],
+            1 if r['parse']['gender'] == 'female' else 0,  # Male before Female
+            r['label'].lower()))
+        result.append({'species': g['species'], 'entries': rows})
+    result.sort(key=lambda g: g['species'].lower())
+    leftovers.sort(key=lambda d: d['title'].lower())
+    return result, leftovers
+
+
+def _render_dives_grouped(dives: list[dict], empty_msg: str) -> str:
+    if not dives:
+        return f'  <li><i>{html.escape(empty_msg)}</i></li>'
+    groups, leftovers = _group_dives(dives)
+    items: list[str] = []
+    for g in groups:
+        species = html.escape(g['species'])
+        rows = g['entries']
+        if len(rows) == 1:
+            d = rows[0]['entry']
+            p = rows[0]['parse']
+            # No sibling chips to carry the variant axes, so fold them
+            # into the display name (Shadow hoisted to a prefix, the rest
+            # appended): shadow-sableye -> "Shadow Sableye", not "Sableye".
+            non_shadow = [t for t in p['variant_tokens'] if t != 'Shadow']
+            name = g['species']
+            if p['shadow']:
+                name = f'Shadow {name}'
+            if non_shadow:
+                name = f'{name} ' + ' '.join(non_shadow)
+            suffix = ('' if p['league_key'] == 'great'
+                      else f' ({html.escape(p["league_pretty"])})')
+            title_attr = (f' title="{html.escape(d["description"])}"'
+                          if d.get('curated') else '')
+            items.append(
+                '  <li class="dive">'
+                f'<b><a href="{html.escape(d["href"])}"{title_attr}>'
+                f'{html.escape(name)}</a></b>{suffix}'
+                '</li>')
+        else:
+            chips = []
+            for r in rows:
+                d = r['entry']
+                title_attr = (f' title="{html.escape(d["description"])}"'
+                              if d.get('curated') else '')
+                chips.append(
+                    f'<a class="chip" href="{html.escape(d["href"])}"'
+                    f'{title_attr}>{html.escape(r["label"])}</a>')
+            items.append(
+                '  <li class="dive">'
+                f'<span class="species">{species}</span>'
+                f'<span class="variants">{"".join(chips)}</span>'
+                '</li>')
+    for d in leftovers:
+        items.append(
+            '  <li class="dive">'
+            f'<b><a href="{html.escape(d["href"])}">'
+            f'{html.escape(d["title"])}</a></b>'
+            '</li>')
+    return '\n'.join(items)
+
+
 def render_index(dives: list[dict],
                  articles: list[dict],
                  comparisons: list[dict],
                  *,
                  guides_landing: dict | None = None) -> str:
-    dives_html = _render_entry_list(dives, 'No dives published yet.')
+    dives_html = _render_dives_grouped(dives, 'No dives published yet.')
     articles_html = _render_entry_list(articles, 'No articles published yet.')
     comparisons_html = _render_entry_list(comparisons, 'No comparisons published yet.')
 
@@ -302,6 +497,12 @@ def render_index(dives: list[dict],
   li.dive {{ background: #16213e; padding: 14px 18px; border-radius: 6px;
              margin-bottom: 14px; }}
   li.dive p {{ margin: 6px 0 0 0; color: #aaa; font-size: 14px; }}
+  .section-intro {{ color: #aaa; font-size: 14px; margin: 0 0 14px 0; }}
+  .species {{ font-weight: bold; color: #e0e0e0; margin-right: 10px; }}
+  a.chip {{ display: inline-block; background: #0f3460; color: #9be89b;
+            padding: 2px 10px; border-radius: 11px; margin: 3px 6px 3px 0;
+            font-size: 13px; }}
+  a.chip:hover {{ background: #1b4b80; text-decoration: none; }}
   .about {{ color: #888; font-size: 13px; margin-top: 30px;
             border-top: 1px solid #0f3460; padding-top: 12px; }}
 </style>
@@ -312,6 +513,10 @@ def render_index(dives: list[dict],
 simulator that matches PvPoke's simulate-mode scores. Click a title to
 open the dive. Each page is self-contained and runs in your browser.</p>
 <h2>Deep Dives</h2>
+<p class="section-intro">Each dive simulates all 4,096 IVs against the meta
+across all 9 shield scenarios, with per-opponent matchup data, IV-tier
+recommendations, and an interactive stat-product scatter. Pick a variant to
+open it.</p>
 <ul>
 {dives_html}
 </ul>
