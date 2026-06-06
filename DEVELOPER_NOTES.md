@@ -48,24 +48,21 @@ typo class we're auditing for.) Results:
 - **6 cells: documented Aegislash bug #3 divergence, all still present**
   (the `_AEGI_XFAIL_GB_*` cells: 0v1, 0v2, 1v1, 1v2, 2v1, 2v2). Includes
   the 1v2/2v2 score+winner flip (ours 510/w0 vs PvPoke 376/w1) — intact.
-- **4 cells: NEW finding — Morpeko form-label timing divergence**
-  (`morpeko_vs_azumarill_form_change` 1v1, 1v2, 2v1, 2v2). Score,
-  winner, and move sequence all match PvPoke exactly; only the form
-  prefix on a Morpeko chargedLog entry differs (we tag "Morpeko (Full
-  Belly)" where PvPoke tags "Morpeko (Hangry)", or vice-versa). The
-  divergence is **score-neutral across the entire oracle**: every cell
-  where the label differs, the affected throw is either a
-  form-independent move (Psychic Fangs) or a shielded Aura Wheel (1 dmg
-  regardless of type), so no damage/type/score consequence. All 5
-  zero-shield cells agree on labels; the divergence only appears after a
-  shield interaction, pointing to a form-toggle-on-shielded-charged-move
-  timing difference between our sim and PvPoke. The Morpeko oracle test
-  asserts score only (no chargedLog), so this was invisible until the
-  harness audit. **Not yet root-caused (ours vs PvPoke); not fixed** —
-  flagged in TODO.md "Battle simulator". Per the CLAUDE.md divergence
-  policy, do not change form-label timing to match PvPoke without first
-  confirming which is correct and whether any unshielded-Aura-Wheel
-  matchup makes it score-relevant.
+- **4 cells: NEW PvPoke bug found — Morpeko form-toggle**
+  (`morpeko_vs_azumarill_form_change` 1v1, 1v2, 2v1, 2v2). Score and
+  winner match PvPoke exactly; the chargedLog form prefix on a Morpeko
+  throw differs (we tag "Morpeko (Full Belly)" where PvPoke tags
+  "Morpeko (Hangry)"). Root-caused and resolved 2026-06-06: **our
+  two-way toggle is correct; PvPoke's is a bug** (now documented as
+  PvPoke bug #8 below). Michael verified in-game 2026-06-06 that Morpeko
+  enters every battle in Full Belly (start AND switch-in) and toggles
+  Full Belly <-> Hangry after each charged move. The divergence is
+  score-neutral across this oracle (every label-differing throw is
+  form-independent Psychic Fangs or a shielded Aura Wheel), which is why
+  the score-only Morpeko test never caught it. Now pinned by a chargedLog
+  regression assertion on the Morpeko test (asserts OUR correct log) and
+  marked as a known-divergence cell in `scripts/audit_oracle_harness.py`.
+  Keeping our behavior per the CLAUDE.md divergence policy.
 
 ## Current status (2026-04-06)
 
@@ -100,9 +97,9 @@ ordering and CMP cancellation fixes. Full root-cause writeup in
 
 ## PvPoke bugs found
 
-<!-- sync:pvpoke_bugs_documented -->4<!-- /sync --> bugs documented below (sections 1, 2, 3, 7 — numbering
-reflects discovery order; section 4 was retracted 2026-04-15 and is
-excluded from the count).
+<!-- sync:pvpoke_bugs_documented -->5<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8 —
+numbering reflects discovery order; section 4 was retracted 2026-04-15
+and is excluded from the count).
 
 ### 1. BattleState .hp/.oppHealth naming inconsistency
 
@@ -193,6 +190,52 @@ effective single-plan behavior.
 If PvPoke ever removes line 539 or fixes the `needsBoost = true`
 assignment, revisit — the enumeration of affected meta species above
 still applies.
+
+### 8. Morpeko form change is one-way instead of a true toggle
+
+**File**: `Battle.js:1536-1537` (post-attack `charged_move` form trigger)
+and `src/data/gamemaster/pokemon.json` (`morpeko_hangry` has
+`formChange: null`).
+
+Morpeko's gamemaster `formChange` is `type: "toggle", trigger:
+"charged_move", moveId: "ANY"`, and the real game toggles Full Belly
+<-> Hangry after **every** charged move (Aura Wheel swaps
+Electric/Dark accordingly). Michael verified in-game 2026-06-06: Morpeko
+enters every battle in Full Belly (battle start AND switch-in), fires a
+charged move in its current form, then changes form.
+
+PvPoke implements this one-way. The line 1536 trigger is gated on
+`attacker.activeFormId != attacker.formChange.alternativeFormId`. The
+first charged move changes Full Belly -> Hangry (guard passes); but once
+in Hangry, `activeFormId == alternativeFormId` ("morpeko_hangry") so the
+guard fails, AND the `morpeko_hangry` entry carries no `formChange` of
+its own — so PvPoke never toggles back. Morpeko sticks in Hangry for the
+rest of the battle (it does correctly reset to Full Belly on switch via
+`resetOnSwitch: true`). The guard was evidently written for genuinely
+one-way changers (Aegislash/Mimikyu) and wrongly catches Morpeko's
+toggle, contradicting the gamemaster's own `type: "toggle"`.
+
+**Our code**: `formchange.py:240-241` makes the Hangry form inherit the
+`charged_move` trigger so it toggles back, matching the real game. So
+our chargedLog disagrees with PvPoke's on any battle where Morpeko
+throws a second-or-later charged move: we correctly fire the
+post-second-toggle move from Full Belly (Aura Wheel Electric), PvPoke
+fires it from a stuck Hangry (Aura Wheel Dark).
+
+**Impact**: in `morpeko_vs_azumarill_form_change` the divergence is
+score-neutral (every label-differing throw is form-independent Psychic
+Fangs or a shielded Aura Wheel), so the score-only oracle never caught
+it — the 2026-06-06 harness audit did. It IS score-relevant in any
+matchup where Morpeko throws an unshielded Aura Wheel as its 2nd+ charged
+move and Electric-vs-Dark effectiveness differs against the opponent
+(e.g. Aura Wheel Electric is super-effective on Water, Dark is not).
+There PvPoke's published Morpeko numbers are wrong; ours are right.
+
+**Our stance**: keep our two-way toggle. PvPoke isn't demonstrably
+better here — it's wrong about the mechanic — and our deviation matches
+the verified game behavior. Pinned by a chargedLog regression assertion
+on `test_morpeko_vs_azumarill_form_change` and marked as a known
+divergence in `scripts/audit_oracle_harness.py`.
 
 ### 4. Mimikyu SS timing — RETRACTED 2026-04-15
 

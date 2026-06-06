@@ -1208,24 +1208,38 @@ def test_corviknight_2v2_vs_default_shadow_sableye_flips_with_bait():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.integration
-@pytest.mark.parametrize("shields_m,shields_a,expected_morpeko_score", [
+@pytest.mark.parametrize("shields_m,shields_a,expected_morpeko_score,expected_log", [
     # Morpeko (Full Belly) 5/14/15 vs Azumarill 4/15/13, Great League
     # THUNDER_SHOCK / AURA_WHEEL_ELECTRIC / PSYCHIC_FANGS
     # vs BUBBLE / ICE_BEAM / PLAY_ROUGH
-    # Verified at pvpoke.com/battle/ 2026-04-14
-    # Form change: Morpeko toggles Full Belly <-> Hangry after each
+    # Scores verified at pvpoke.com/battle/ 2026-04-14.
+    # Form change: Morpeko enters in Full Belly (always, at battle start
+    # and on switch-in) and toggles Full Belly <-> Hangry after EACH
     # charged move, swapping AURA_WHEEL_ELECTRIC <-> AURA_WHEEL_DARK.
-    (0, 0, 489),
-    (0, 1, 219),
-    (0, 2, 219),
-    (1, 0, 817),
-    (1, 1, 728),
-    (1, 2, 348),
-    (2, 0, 817),
-    (2, 1, 728),
-    (2, 2, 665),
+    # The two-way toggle + Full-Belly-on-entry were verified in-game by
+    # Michael 2026-06-06.
+    #
+    # expected_log is OUR (correct) chargedLog, NOT PvPoke's. PvPoke has a
+    # form-toggle bug (DEVELOPER_NOTES "PvPoke bugs found" #8): its
+    # Battle.js:1536 guard `activeFormId != alternativeFormId` makes
+    # Morpeko stick in Hangry after the FIRST charged move instead of
+    # toggling back, so PvPoke's chargedLog disagrees with ours on cells
+    # 1v1/1v2/2v1/2v2 (a Morpeko throw tagged Hangry where it should be
+    # Full Belly). Scores still match because every label-differing throw
+    # is form-independent (Psychic Fangs) or a shielded Aura Wheel (1 dmg).
+    # This assertion pins our correct two-way behavior so a regression
+    # toward PvPoke's one-way bug fails here.
+    (0, 0, 489, ['Morpeko (Full Belly): Aura Wheel', 'Azumarill: Play Rough']),
+    (0, 1, 219, ['Morpeko (Full Belly): Psychic Fangs (shielded)', 'Morpeko (Hangry): Psychic Fangs', 'Azumarill: Play Rough']),
+    (0, 2, 219, ['Morpeko (Full Belly): Psychic Fangs (shielded)', 'Morpeko (Hangry): Psychic Fangs', 'Azumarill: Play Rough']),
+    (1, 0, 817, ['Morpeko (Full Belly): Aura Wheel', 'Azumarill: Play Rough (shielded)', 'Morpeko (Hangry): Psychic Fangs']),
+    (1, 1, 728, ['Morpeko (Full Belly): Psychic Fangs (shielded)', 'Azumarill: Ice Beam (shielded)', 'Morpeko (Hangry): Aura Wheel', 'Morpeko (Full Belly): Psychic Fangs']),
+    (1, 2, 348, ['Morpeko (Full Belly): Psychic Fangs (shielded)', 'Morpeko (Hangry): Psychic Fangs', 'Azumarill: Ice Beam (shielded)', 'Morpeko (Full Belly): Aura Wheel (shielded)', 'Azumarill: Ice Beam']),
+    (2, 0, 817, ['Morpeko (Full Belly): Aura Wheel', 'Azumarill: Play Rough (shielded)', 'Morpeko (Hangry): Psychic Fangs']),
+    (2, 1, 728, ['Morpeko (Full Belly): Psychic Fangs (shielded)', 'Azumarill: Ice Beam (shielded)', 'Morpeko (Hangry): Aura Wheel', 'Morpeko (Full Belly): Psychic Fangs']),
+    (2, 2, 665, ['Morpeko (Full Belly): Psychic Fangs (shielded)', 'Morpeko (Hangry): Psychic Fangs', 'Azumarill: Ice Beam (shielded)', 'Morpeko (Full Belly): Psychic Fangs (shielded)', 'Azumarill: Play Rough (shielded)', 'Morpeko (Hangry): Psychic Fangs']),
 ])
-def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko_score):
+def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko_score, expected_log):
     """Morpeko form change: Aura Wheel toggles Electric/Dark type each charged move."""
     bp_m = _make_battle_pokemon(
         'Morpeko (Full Belly)', 'THUNDER_SHOCK',
@@ -1244,6 +1258,10 @@ def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko
     assert score == expected_morpeko_score, (
         f"{shields_m}v{shields_a}: expected Morpeko score={expected_morpeko_score}, "
         f"got {score} (delta={score - expected_morpeko_score:+d})"
+    )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_m}v{shields_a}: chargedLog mismatch (pins our correct "
+        f"two-way toggle; see PvPoke bug #8)"
     )
 
 
