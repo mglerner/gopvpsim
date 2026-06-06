@@ -1,0 +1,122 @@
+# thresholds/sylveon.toml
+#
+# DRAFT (2026-06-05) — names the four IV spreads from the Lundberger /
+# Dragapult Simulator NAIC Great League Sylveon card (Twitter, 2026-06-02,
+# with the author's two corrections applied: Full Attack = 11/2/2 not
+# 12/2/2; S. Quag Focus = 12/4/10 not 12/14/10) as first-class anchors.
+#
+# Every numeric claim below was reproduced by our own sim before being
+# written here (see memory project_sylveon_naic_verification + the dive at
+# userdata/dives/sylveon-naic-verify/). The card's three mechanics map to
+# three anchor families:
+#   1. "Slays Feraligatr"      -> bulkpoint vs Feraligatr (def axis)
+#   2. "Breaks S. Quagsire"    -> Fairy Wind 4->5 breakpoint (atk axis)
+#   3. "CMPs all top Sylveon"  -> cmp vs the max-atk top-512 mirror spread
+#
+# NOTE (ship-mode narrative policy, CLAUDE.md): the [Species.intro] /
+# [Species.meta_role] editorial voice (the card's "Cute, but Defensive"
+# framing) is intentionally left for Michael to author — it must not be
+# Claude-drafted. This file carries only the mechanical anchor data.
+
+[Sylveon]
+sources = """
+Lundberger / Dragapult Simulator NAIC Great League Sylveon IV card
+(Twitter @lundberger, 2026-06-02), with the @DragapultSim corrections
+(Full Attack 11/2/2; Shadow Quagsire break 12/4/10). All thresholds
+independently reproduced by gopvpsim (moveset Fairy Wind / Psyshock /
+Shadow Ball; opponent cohorts = top-512 ranks, matching the card's
+stated methodology).
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — the four card IVs as concrete named reference points.
+# (Single-IV lists: each renders as a named tier headline with the exact
+#  recommended spread, alongside the anchors it clears.)
+# ─────────────────────────────────────────────────────────────────────
+
+# Stat-cutoff form so each headlines the Threshold Tiers section. The
+# cutoff is the *mechanic* (Feraligatr bulkpoint / Quagsire Fairy Wind
+# break); the card's exact recommended IV is named in the description.
+
+[Sylveon.Great.spreads."Gatr Slayer"]
+description = "Card 'Gatr Slayer' (recommended IV 2/12/10 -> 117.79 atk / 124.68 def). def >= 124.61 clears the Feraligatr 2-2 (bait) bulkpoint = 'Slays ALL TOP Feraligatr'."
+source = "Lundberger / Dragapult Simulator NAIC card"
+attack = 0
+defense = 124.61
+stamina = 0
+
+[Sylveon.Great.spreads."Max Defense"]
+description = "Card 'Max Defense' (recommended IV 0/14/1 -> 118.20 atk / 127.52 def). Maximum bulk; clears every Feraligatr bulkpoint with margin. NOTE: its 'CMPs ALL TOP Sylveon' claim holds only vs the bulk-built mirror, not the full top-512 (atk 118.20 < top-512 max atk 120.34)."
+source = "Lundberger / Dragapult Simulator NAIC card"
+attack = 0
+defense = 127.52
+stamina = 0
+
+[Sylveon.Great.spreads."S. Quagsire Focus"]
+description = "Card 'S. Quagsire Focus' (recommended IV 12/4/10 -> 121.85 atk / 118.45 def). atk >= 121.70: Fairy Wind reaches 5 dmg vs rank-1 Shadow Quagsire (499/512 of the cohort, incl. rank #1); also out-CMPs all top-512 Sylveon."
+source = "Lundberger / Dragapult Simulator NAIC card"
+attack = 121.70
+defense = 0
+stamina = 0
+
+[Sylveon.Great.spreads."Full Attack"]
+description = "Card 'Full Attack' (recommended IV 11/2/2 -> 122.96 atk / 118.94 def). atk >= 122.96: Fairy Wind reaches 5 dmg vs ALL 512 top Shadow Quagsire (incl. the bulkiest); out-CMPs all top-512 Sylveon. Highest realistic attack."
+source = "Lundberger / Dragapult Simulator NAIC card"
+attack = 122.96
+defense = 0
+stamina = 0
+
+# Max-attack member of the top-512 (by stat product) Sylveon cohort.
+# Its effective atk (120.34) is the CMP target: any focal atk strictly
+# above this out-prioritizes every top-512 mirror Sylveon.
+[Sylveon.Great.spreads.top_mirror_atk]
+description = "Highest-attack Sylveon inside the top-512-by-stat-product cohort (1/1/1, atk 120.34). Used as the CMP target for 'beats all top Sylveon'."
+source = "Derived from PvPoke top-512 rankings"
+ivs = [[1, 1, 1]]
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors
+# ─────────────────────────────────────────────────────────────────────
+
+# CMP: out-prioritize every top-512 mirror Sylveon. Threshold T = atk of
+# the punchiest top-512 member (120.34). squag_focus (121.85) and
+# full_attack (122.96) clear it; gatr_slayer (117.79) and max_defense
+# (118.20) do not — they only win CMP vs the bulk-built mirror.
+[Sylveon.Great.anchors.cmp_vs_top_sylveon]
+kind = "cmp"
+spread = "top_mirror_atk"
+description = "Win CMP vs the highest-attack top-512 mirror Sylveon (atk > 120.34)."
+source = "Lundberger / Dragapult Simulator NAIC card"
+
+# Breakpoint: Fairy Wind does 5 (instead of 4) to rank-1 Shadow Quagsire.
+# Resolves to atk >= 121.70, which gates squag_focus / full_attack in and
+# the two defensive spreads out — the card's "Breaks ... including rank #1".
+# full_attack additionally clears the bulkiest top-512 Quagsire (atk 122.96
+# = "hits ALL"); see the cohort counts in the verification memory.
+[Sylveon.Great.anchors.squag_fairy_wind_5]
+kind = "damage_breakpoint"
+opponent = "Quagsire (Shadow)"
+opponent_ivs = [0, 15, 14]
+move = "FAIRY_WIND"
+deals_at_least = 5
+description = "Fairy Wind deals >= 5 to rank-1 Shadow Quagsire (atk >= 121.70). Card: 'Breaks 499 S. Quagsire including rank #1'."
+source = "Lundberger / Dragapult Simulator NAIC card"
+
+# Bulkpoint family: discover every Feraligatr bulkpoint in the survivor
+# def range. The card's two defensive spreads sit on this axis — our dive
+# surfaced battle-win boundaries at def 122.11 (Feraligatr 1-1) and 124.61
+# (Feraligatr 2-2 w/ bait); gatr_slayer (124.68 def) sits right at the
+# upper one, max_defense (127.52) clears both. Card: 'Slays ALL Feraligatr'.
+[Sylveon.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. def 124.61 picks up the Feraligatr 2-2 (bait); 122.11 the 1-1. Card 'Gatr Slayer' / 'Max Defense' bulk axis."
+source = "Lundberger / Dragapult Simulator NAIC card"
+
+# Bulkpoint family: the mirror. Surfaces the Sylveon-vs-Sylveon def tiers
+# the defensive spreads pick up (our dive flagged a 121.04 def mirror
+# Shadow Ball bulkpoint, among others).
+[Sylveon.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Sylveon"
+description = "Discover all mirror (Sylveon) bulkpoints in the survivor def range."

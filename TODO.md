@@ -612,6 +612,28 @@ move selection closed 2026-04-15 as not-a-real-issue.)
 
 ## HTML output paths
 
+* **`--split-movesets` "Deep Dive Results" subheader shows the wrong
+  moveset** *(surfaced 2026-06-05 on the Sylveon NAIC verification dive)*
+  — In a split-moveset file, the per-file "Deep Dive Results" section
+  subheader renders `Moveset: <top-ranked moveset>` instead of *this
+  file's* moveset. Concrete repro: the Fairy Wind / Psyshock / Shadow
+  Ball file (`index_m5_fairy_wind_psyshock_shadow_ball.html`) renders
+  `Moveset: Quick Attack / Moonblast, Psyshock` (that's moveset #1's
+  fast move + a different charged pair). The page `<title>` and `<h1>`
+  are correct (`Sylveon - Great League IV Deep Dive`), and the analysis
+  data itself is for the right moveset — only the subheader label leaks
+  moveset #1's name. DEVELOPER_NOTES "All-in-one vs split-moveset HTML"
+  says each split file gets its own full `generate_analysis_sections`
+  call with that file's moveset, so the label is being pulled from the
+  wrong place (likely the top-ranked moveset used for the all-in-one
+  Deep Dive Results header, not threaded through to the split render).
+  Effect: cosmetic but actively misleading — a reader on the correct
+  moveset's page sees a header naming a different moveset and reasonably
+  doubts they're on the right page. Find where the "Deep Dive Results"
+  subheader string is built and pass the split file's actual moveset.
+  ~15-30 min; add a render assertion that the subheader moveset matches
+  the file's moveset in split mode.
+
 * **Plotly.js CDN download: write the missing test** *(robustness
   fix landed 2026-06-04, test still owed)* — `scripts/deep_dive.py`
   used to call `urllib.request.urlopen(PLOTLY_CDN, context=ctx)`
