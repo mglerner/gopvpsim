@@ -6,6 +6,50 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-07 — HTTPS on the website + Oinkologne NAIC re-dive
+
+**HTTPS.** `mglerner.com/pogo-dives/` now serves over HTTPS via a free,
+auto-renewing DreamHost Let's Encrypt cert (per-domain, so it covers
+`/pogo-dives/` automatically) plus force-HTTPS. Confirmed in-browser: a
+dive page loads over HTTPS with no mixed-content warnings and the Plotly
+scatter renders. Mixed-content scan of the built `userdata/website/` tree
+came back clean and required no generator change or republish: all 77
+files containing `http://` are false positives (~5400 XML namespace
+identifiers like `http://www.w3.org/2000/svg`, an ESRI attribution `<a>`
+inside Plotly's unused basemap config, and a Plotly WebGL error string).
+Grepping for real loads/links (`src="http://"` / `href="http://"`)
+returns zero hits; Plotly is inlined at build time, not pulled from a CDN
+at runtime. `publish_website.sh` is unaffected (rsync over SSH, not HTTP).
+
+**Oinkologne NAIC re-dive.** Re-dived Oinkologne (Male + Female) GL
+against the NAIC-meta cohort once PvPoke's rankings included it, and
+published. Full reproducible procedure (cache invalidation, pool build,
+re-dive, article refresh) is preserved in memory file
+`project_oinkologne_naic_redive.md` for the next NAIC-style cycle.
+
+## 2026-06-06 — Full oracle harness audit + Morpeko form-toggle (PvPoke bug #8)
+
+**Oracle harness audit.** New `scripts/audit_oracle_harness.py` drives
+all 12 hand-typed PvPoke-oracle matchups in `tests/test_battle.py` x 9
+shield combos (108 cells) through both our sim and
+`scripts/pvpoke_trace.js`, comparing score / winner / chargedLog. Result:
+98 exact matches (confirming no hand-entry typo ever crept in), 6
+documented Aegislash bug #3 divergence cells (intact), and 1 new finding
+(Morpeko, below). Re-run anytime: `python scripts/audit_oracle_harness.py`.
+
+**Morpeko form-toggle (PvPoke bug #8).** The audit flagged 4 Morpeko
+cells whose chargedLog tagged a throw "Full Belly" where PvPoke said
+"Hangry". Root cause: PvPoke implements Morpeko's `type: "toggle"` form
+change as one-way (it sticks in Hangry after the first charged move),
+whereas the real game toggles Full Belly <-> Hangry after every charged
+move (Michael verified in-game: enters every battle in Full Belly at
+start AND switch-in). Ours is the correct two-way toggle. Score-neutral
+across this oracle, which is why the score-only test never caught it.
+Kept per the CLAUDE.md divergence policy; pinned by a chargedLog
+regression assertion on `test_morpeko_vs_azumarill_form_change` and a
+known-divergence marker in the audit script. Full writeup in
+DEVELOPER_NOTES.md §8.
+
 ## 2026-05-17 — Dropped UL Aegislash dives (mercuryish review, S2)
 
 **What:** Removed every UL-Aegislash surface from the site:
