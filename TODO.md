@@ -1,65 +1,17 @@
-## HIGH PRIORITY: enable HTTPS on the website (2026-06-06)
-
-The site (`mglerner.com/pogo-dives/`) is currently HTTP-only. DreamHost
-offers free, auto-renewing HTTPS via Let's Encrypt. Two halves:
-
-1. **Flip the cert (Michael's action, DreamHost panel).** Panel →
-   Websites → Secure Certificates (older UI: Manage Domains → SSL/TLS)
-   → add a free Let's Encrypt certificate for `mglerner.com`. Wait for
-   issuance/propagation (minutes, up to a couple hours), then enable
-   "force HTTPS / redirect HTTP to HTTPS". Cert is per-domain, so it
-   covers the `/pogo-dives/` subdirectory automatically. Free; no paid
-   cert needed for the static site.
-2. **Mixed-content scan + generator fix (our action, after the cert is
-   live).** Once pages are served over HTTPS, any `http://` asset is
-   blocked by the browser. Grep `userdata/website/` for hardcoded
-   `http://` resource/link references and fix the *generators* that emit
-   them (candidates: `deep_dive.py` Plotly CDN tag, `build_website_index.py`
-   footer link, `render_article.py`, `build_guides.py`). Then republish.
-
-`publish_website.sh` itself is unaffected (rsync over SSH, not HTTP).
-
-## NAIC re-dive for Oinkologne (2026-05-18, near-future)
-
-Oinkologne is expected to be NAIC-meta-relevant. Once PvPoke's
-rankings include the NAIC cohort:
-
-1. `git pull` Michael's local PvPoke clone (path in memory
-   `reference_pvpoke_source.md`).
-2. Invalidate the rankings cache at `~/Documents/gopvpsim_cache/`
-   so the fresh data is picked up.
-3. Build a NAIC-aware opponent pool (new file or merge into
-   `opponent_pools/gl_top50_plus_cs.txt` depending on scope).
-4. Re-dive Oinkologne Male + Female GL via
-   `python scripts/run_website_dives.py 'oinkologne'`.
-5. Check if `articles/oinkologne-cd-2026-05.toml` needs a
-   data refresh.
-6. Publish via `scripts/publish_website.sh --push`.
-
-Open: confirm NAIC uses standard GL ruleset (CP cap, etc.) or
-needs adjusted flags. Full plan in memory file
-`project_oinkologne_naic_redive.md`.
-
 ## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
 
-Original pre-ship items 1-5 all shipped (cross-form re-dive,
-JRE/RyanSwag comparison, F1-F5 follow-ups, P1-P5 polish, XL-candy
-decision tool / Mirror CMP reframe). Mirror-tier synth backfill
-shipped 2026-04-26 across all 14 dives via overnight chain. The
-Dewgong flavor-name ship-blocker (commit `0b91fec`) was resolved
-2026-04-25 via `dede396` (`refine_flavor_names: rewrite tier_desc
-to match renamed opponent`).
-
-Item 6 — **ship via `scripts/publish_website.sh --push`**. The
-publish script integrates link-verification + em/en-dash
-verification as step 2 (auto-aborts on hits). Re-run before ship
-after any further re-dive.
-
+Pre-ship arc shipped: items 1-6 all done (cross-form re-dive,
+JRE/RyanSwag comparison, F1-F5, P1-P5 polish, Mirror CMP reframe,
+mirror-tier synth backfill, Dewgong flavor-name fix `dede396`), and the
+site was published via `scripts/publish_website.sh --push` (2026-06-07).
 Post-ship, the post-S5 arc resumes at S13-S17 in
-`~/.claude/plans/post-s5-oinkologne-arc.md` (matchup-flip
-attribution, post-debuff breakpoints, bait policy). S11-S12 (HTML
-file-size) shipped 2026-04-21. The remaining S13-S17 are **not
-pre-ship items** — do not pull forward.
+`~/.claude/plans/post-s5-oinkologne-arc.md` (matchup-flip attribution,
+post-debuff breakpoints, bait policy) — **not pre-ship items, do not
+pull forward**. The open follow-ups below are the residue.
+
+(HTTPS on the website, the Oinkologne NAIC re-dive, the full oracle
+harness audit, and the Morpeko form-toggle resolution all shipped
+2026-06-06/07 — see CHANGELOG.md.)
 
 ### Open follow-ups from the pre-ship arc
 
@@ -240,26 +192,10 @@ break invariants that weren't yet nailed down by tests.
   init-time cache. Keeping ours (intentional, more correct; see
   DEVELOPER_NOTES.md "Known divergences").
 
-* **Audit existing oracle tests against the PvPoke harness** — DONE
-  2026-06-06. `scripts/audit_oracle_harness.py` drives all 12 hand-typed
-  oracle matchups in `tests/test_battle.py` × 9 shield combos (108 cells)
-  through both our sim and `scripts/pvpoke_trace.js`. Result: 98 exact
-  matches (no hand-entry typo ever crept in), 6 confirmed Aegislash
-  bug #3 divergence cells (intact), and 1 new finding — the Morpeko
-  form-label timing divergence below. Full writeup in DEVELOPER_NOTES
-  "2026-06-06 — full oracle harness audit". Re-run anytime:
-  `python scripts/audit_oracle_harness.py`.
-
-* **Morpeko form-toggle divergence — RESOLVED 2026-06-06.** The
-  2026-06-06 harness audit flagged 4 Morpeko cells whose chargedLog
-  tagged a throw "Full Belly" where PvPoke said "Hangry". Root-caused to
-  PvPoke bug #8 (one-way form change; ours is the correct two-way
-  toggle, Michael verified in-game). Pinned by a chargedLog regression
-  assertion on `test_morpeko_vs_azumarill_form_change` and a
-  known-divergence marker in `scripts/audit_oracle_harness.py`. Writeup
-  in DEVELOPER_NOTES.md §8. Forward note: when multi-mon/switching lands
-  (see "Energy-lead axis"), honor `reset_on_switch` — Morpeko must
-  re-enter in Full Belly on every switch-in, confirmed in-game.
+  (The full oracle harness audit and the Morpeko form-toggle divergence
+  resolution both completed 2026-06-06 — see CHANGELOG.md and
+  DEVELOPER_NOTES.md §8. Re-run the audit anytime:
+  `python scripts/audit_oracle_harness.py`.)
 
 * **Speed test** -- compare our speed vs the PvPoke JS code, look for
   ways we can speed ours up.
@@ -1170,7 +1106,9 @@ guide from `ai` to `expert` is the closing of that commitment.
 ## Low priority
 
 * **Team/multi-mon simulation** — currently only 1v1; real PvP is 3v3 with
-  switching. Add team composition and switch-timing support.
+  switching. Add team composition and switch-timing support. When this
+  lands, honor `reset_on_switch`: Morpeko must re-enter in Full Belly on
+  every switch-in (confirmed in-game 2026-06-06; see DEVELOPER_NOTES §8).
 
 ---
 
