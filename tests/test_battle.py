@@ -1545,3 +1545,73 @@ def test_moltres_g_nearKO_plan_divergence_pinned(
         f"expected MG score={expected_mg_score}, got {mg_score} "
         f"(delta={mg_score - expected_mg_score:+d})"
     )
+
+
+# ---------------------------------------------------------------------------
+# reset_for_battle: reuse across shield scenarios must match fresh objects
+# ---------------------------------------------------------------------------
+
+_REUSE_MATCHUPS = [
+    # Buff/debuff-heavy mirror (Close Combat self-debuff -> stage changes,
+    # so the damage/DP caches go through invalidation cycles mid-battle)
+    pytest.param(
+        ('Annihilape', 'COUNTER', ['RAGE_FIST', 'CLOSE_COMBAT'],
+         'great', 0, 15, 15, False),
+        ('Annihilape', 'COUNTER', ['RAGE_FIST', 'CLOSE_COMBAT'],
+         'great', 15, 1, 5, False),
+        id='annihilape-mirror'),
+    # Zap Cannon priority-shuffle clause (mutates move dicts) + the
+    # bandaid[866] _cached_damage path that reset must clear
+    pytest.param(
+        ('Swampert', 'MUD_SHOT', ['HYDRO_CANNON', 'EARTHQUAKE'],
+         'great', 15, 15, 15, True),
+        ('Registeel', 'LOCK_ON', ['FLASH_CANNON', 'FOCUS_BLAST'],
+         'great', 15, 15, 15, False),
+        id='swampert-registeel'),
+    # Form change: reset must restore Shield form and invalidate the
+    # opponent's caches too
+    pytest.param(
+        ('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT',
+         ['SHADOW_BALL', 'GYRO_BALL'], 'great', 4, 14, 15, False),
+        ('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+         'great', 4, 15, 13, False),
+        id='aegislash-azumarill'),
+]
+
+
+@pytest.mark.parametrize("p0_spec, p1_spec", _REUSE_MATCHUPS)
+def test_reset_for_battle_reuse_matches_fresh(p0_spec, p1_spec):
+    """Reusing one BattlePokemon pair across all 9 shield scenarios via
+    reset_for_battle must be battle-for-battle identical to constructing
+    fresh objects per scenario (the sweep/slayer workers rely on this).
+    Timelines are compared too, so any state leak that changes a single
+    move or damage value fails loudly.
+    """
+    all_nine = [(a, b) for a in range(3) for b in range(3)]
+
+    def build(spec, shields):
+        sp, fast, charged, league, a, d, s, shadow = spec
+        return _make_battle_pokemon(sp, fast, charged, league, shields,
+                                    a, d, s, shadow=shadow)
+
+    fresh = []
+    for s0, s1 in all_nine:
+        r = simulate(build(p0_spec, s0), build(p1_spec, s1),
+                     charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp,
+                     log=True)
+        fresh.append(r)
+
+    bp0 = build(p0_spec, 0)
+    bp1 = build(p1_spec, 0)
+    for (s0, s1), expected in zip(all_nine, fresh):
+        bp0.reset_for_battle(s0, opponent=bp1)
+        bp1.reset_for_battle(s1, opponent=bp0)
+        got = simulate(bp0, bp1,
+                       charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp,
+                       log=True)
+        assert (got.winner, got.turns, got.hp_remaining,
+                got.energy_remaining, got.shields_remaining,
+                got.timeline) == (
+            expected.winner, expected.turns, expected.hp_remaining,
+            expected.energy_remaining, expected.shields_remaining,
+            expected.timeline), f"{s0}v{s1}: reuse diverged from fresh"

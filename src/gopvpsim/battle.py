@@ -1843,6 +1843,51 @@ class BattlePokemon:
                 bp._form_disguise_active = True
         return bp
 
+    def reset_for_battle(self, shields: int,
+                         opponent: "BattlePokemon | None" = None) -> None:
+        """Reset mutable battle state so this object can be reused for
+        another simulate() call, keeping the damage and DP setup caches
+        warm (their keys cover opponent identity and stat stages, so
+        entries stay valid as long as base stats and moves are unchanged).
+
+        Used by the sweep/slayer workers to share one BattlePokemon pair
+        across the shield-scenario axis instead of reconstructing (and
+        re-deriving every damage table) once per scenario.
+
+        For form-changing Pokemon the base form is restored first, which
+        changes this object's stats/moves — that staleness reaches the
+        OPPONENT's caches too, so `opponent` is required in that case
+        (mirrors apply_form_change's both-sides invalidation).
+        """
+        if self._form_change is not None:
+            if self._form_is_alt:
+                if opponent is None:
+                    raise ValueError(
+                        "reset_for_battle on a form-changed Pokemon needs "
+                        "the opponent for cache invalidation")
+                from .formchange import apply_form_change
+                apply_form_change(self, opponent)   # swap back to base form
+            self._form_disguise_active = (self._form_change.effect == 'protect')
+            # The alt form's move dicts may also carry the per-battle
+            # damage memo cleared below — clear both forms' lists.
+            for form in self._form_change.forms:
+                for cm in form.charged_moves:
+                    cm.pop('_cached_damage', None)
+        # Per-battle damage memo on the move dicts (set by
+        # _optimize_move_timing, read by the bandaid[866] gate) — must not
+        # leak into the next battle.
+        for cm in self.charged_moves:
+            cm.pop('_cached_damage', None)
+        self.hp = self.max_hp
+        self.energy = min(ENERGY_CAP, max(0, self.initial_energy))
+        self.shields = shields
+        self.cooldown = 0
+        self._fm_since_charge = 0
+        self._queued_fast = None
+        self.atk_stage = 0
+        self.def_stage = 0
+        self._buff_apply_meters = {}
+
     @property
     def current_form_trigger(self) -> str | None:
         """Return the trigger for changing FROM the current form, or None."""
