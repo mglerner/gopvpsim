@@ -824,6 +824,18 @@ reflects the correct moveset. This is the intended experience for the
 website — all-in-one is primarily for quick interactive score-distribution
 comparison during development.
 
+**History note (2026-06-10):** the paragraph above was false from
+2026-04-12 to 2026-06-10. A cross-file analysis cache (`fa34f39`)
+assumed split files shared identical analysis and served **moveset 0's
+analysis sections in every split file** (surfaced as the "wrong
+moveset in the Deep Dive Results subheader" symptom on the Sylveon
+NAIC dive — the label was the visible tip; the whole section was
+moveset-0's). The cache is removed; a tripwire assertion in
+`generate_interactive_html` now verifies each split file's results
+subheader names that file's moveset. Split dives published before the
+fix carry moveset-0 analysis on their non-landing pages and need a
+re-render to correct.
+
 ## Article lifecycle
 
 Articles live in `articles/*.toml` (source TOML, checked in) and render

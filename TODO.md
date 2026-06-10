@@ -108,14 +108,6 @@ harness audit, and the Morpeko form-toggle resolution all shipped
   --chain ...'` recipe at startup when the matching status preset
   exists. Small.
 
-- **CLI-comment logger reconstructs `--mirror-slayer` incorrectly.**
-  In the log header and the top-of-HTML `<!-- CLI: ... -->`
-  comment, `deep_dive_logging.py` emits `--mirror-slayer True`
-  for a `BooleanOptionalAction` flag (argparse rejects the
-  literal `True`). Effect: cosmetic but breaks copy-paste
-  reproducibility. Format bool flags as `--flag` / `--no-flag`
-  instead.
-
 ## Deferred cleanup: backwards-compatibility removal pass
 
 Once we've verified all the oracle/sim tests (including direct human
@@ -638,64 +630,17 @@ move selection closed 2026-04-15 as not-a-real-issue.)
 
 ## HTML output paths
 
-* **`--split-movesets` "Deep Dive Results" subheader shows the wrong
-  moveset** *(surfaced 2026-06-05 on the Sylveon NAIC verification dive)*
-  — In a split-moveset file, the per-file "Deep Dive Results" section
-  subheader renders `Moveset: <top-ranked moveset>` instead of *this
-  file's* moveset. Concrete repro: the Fairy Wind / Psyshock / Shadow
-  Ball file (`index_m5_fairy_wind_psyshock_shadow_ball.html`) renders
-  `Moveset: Quick Attack / Moonblast, Psyshock` (that's moveset #1's
-  fast move + a different charged pair). The page `<title>` and `<h1>`
-  are correct (`Sylveon - Great League IV Deep Dive`), and the analysis
-  data itself is for the right moveset — only the subheader label leaks
-  moveset #1's name. DEVELOPER_NOTES "All-in-one vs split-moveset HTML"
-  says each split file gets its own full `generate_analysis_sections`
-  call with that file's moveset, so the label is being pulled from the
-  wrong place (likely the top-ranked moveset used for the all-in-one
-  Deep Dive Results header, not threaded through to the split render).
-  Effect: cosmetic but actively misleading — a reader on the correct
-  moveset's page sees a header naming a different moveset and reasonably
-  doubts they're on the right page. Find where the "Deep Dive Results"
-  subheader string is built and pass the split file's actual moveset.
-  ~15-30 min; add a render assertion that the subheader moveset matches
-  the file's moveset in split mode.
-
-* **Plotly.js CDN download: write the missing test** *(robustness
-  fix landed 2026-06-04, test still owed)* — `scripts/deep_dive.py`
-  used to call `urllib.request.urlopen(PLOTLY_CDN, context=ctx)`
-  with no timeout, no retry, and no fallback at both download sites
-  (standalone-inline mode and shared-dir mode). Both failure modes
-  bit the 2026-06-03 → 06-04 overnight chain via Michael's internet
-  outage during the Jumpluff GL render:
-
-  - **Fast-fail (what actually happened):** `socket.gaierror:
-    nodename nor servname provided` raised immediately when DNS for
-    `cdn.plot.ly` couldn't resolve. The dive crashed with an
-    unhandled exception and run_website_dives.py exited rc=1. The
-    overnight-chain bash wrapper had already died at that point
-    (likely killed when python's parent terminal lost network /
-    macOS event), so no SUCCESS/FAIL marker reached
-    `overnight_status.txt`.
-  - **Hang (hypothetical but also possible):** if the connection
-    completes but the body read stalls (slow CDN, dropped
-    keep-alive), without a timeout urllib would block indefinitely.
-    The original TODO entry described this mode; in our actual
-    incident the failure was the fast-fail above, but both modes
-    were latent.
-
-  Fix landed in commit (this commit, 2026-06-04):
-  `_download_plotly_with_retry()` helper does timeout 60s/attempt +
-  3 attempts with 1s/5s/15s backoff. On persistent failure it
-  returns None and the call sites fall back to the plain
-  `<script src=PLOTLY_CDN>` reference (online-only HTML, ships
-  with a logged warning). Smoke-tested live; module reloads
-  cleanly; healthy-network case returns 4.35 MB as expected.
-
-  **Still owed**: a mock-based unit test that patches
-  `urllib.request.urlopen` to raise `socket.gaierror`/`socket.
-  timeout`/`URLError` and confirms `_plotly_script_tag` emits the
-  CDN-reference fallback + the expected warning. Lives naturally
-  in `tests/test_deep_dive_plotly.py` or similar. ~15 min.
+* **Re-render published split-moveset dives** *(follow-up to the
+  2026-06-10 split-analysis-cache fix)* — The fixed bug was worse than
+  the original "wrong subheader" report: from 2026-04-12 to 2026-06-10
+  every NON-LANDING split file shipped **moveset 0's entire analysis
+  sections** (Deep Dive Results, tier cards, anchor bullets, matchup
+  boundaries), not just its label. The landing page (moveset 0) of
+  each dive was always correct. Any split dive published in that
+  window needs a re-render (`scripts/run_website_dives.py` →
+  `publish_website.sh`) for its secondary moveset pages to show their
+  own analysis. See DEVELOPER_NOTES "All-in-one vs split-moveset
+  HTML" history note.
 
 * **Mirror-slayer iteration tables blow up HTML size for high-anchor
   species** *(real instance, surfaced 2026-06-05 on Jumpluff GL)* —
