@@ -446,6 +446,19 @@ def find_matchup_boundaries(scores_flat, nIvs, nS, nO,
     Only emits for (opponent, scenario_group) combinations where the
     partition is clean. Scenarios that flip at the same threshold+HP
     are grouped.
+
+    Implementation note (2026-06-10): vectorized. "stat >= threshold"
+    partitions are suffixes of the stat-sorted IV order, so every
+    threshold's pass/fail win counts come from one reversed cumulative
+    sum instead of an O(nIvs) scan per threshold; the HP co-condition
+    sweep is the same trick over the HP-sorted order. Threshold and
+    hp_threshold values are returned as the ORIGINAL Python objects
+    from data_obj (via value maps), so records — and the HTML rendered
+    from them — are identical to the pre-vectorization scan loops
+    (verified byte-identical via replay_analysis.py on a real dive
+    blob, plus the reference-implementation test in
+    tests/test_matchup_boundaries.py). This was 95% of dive render
+    time once arc S3-S5 made the sims cheap.
     """
     if nIvs == 0 or nO == 0:
         return []
@@ -456,7 +469,33 @@ def find_matchup_boundaries(scores_flat, nIvs, nS, nO,
     else:
         stat_vals = data_obj['ivDef']
     hp_vals = data_obj.get('ivHp', [])
-    unique_stats = sorted({stat_vals[iv] for iv in range(nIvs)})
+
+    stat_np  = np.asarray(stat_vals, dtype=np.float64)
+    scores3d = np.asarray(scores_flat, dtype=np.float64).reshape(nIvs, nS, nO)
+    wins_all = scores3d >= win_threshold
+
+    # Stat-sorted order: "stat >= uniq[k]" is the suffix starting at
+    # first_idx[k]. Map float64 values back to the original Python
+    # objects so emitted records match the old implementation exactly.
+    order        = np.argsort(stat_np, kind='stable')
+    sorted_stats = stat_np[order]
+    uniq, first_idx = np.unique(sorted_stats, return_index=True)
+    pass_cnt = nIvs - first_idx
+    fail_cnt = first_idx.astype(np.int64)
+    size_ok  = (pass_cnt >= min_passing) & (fail_cnt > 0)
+    stat_value_map = {}
+    for v in stat_vals:
+        stat_value_map.setdefault(float(v), v)
+
+    have_hp = bool(hp_vals)
+    if have_hp:
+        hp_np       = np.asarray(hp_vals, dtype=np.float64)
+        hp_order    = np.argsort(hp_np, kind='stable')
+        hp_sorted   = hp_np[hp_order]
+        stat_by_hp  = stat_np[hp_order]
+        hp_value_map = {}
+        for v in hp_vals:
+            hp_value_map.setdefault(float(v), v)
 
     results = []
 
@@ -464,95 +503,79 @@ def find_matchup_boundaries(scores_flat, nIvs, nS, nO,
         opp = opponents[oi]
 
         for si in range(nS):
-            # Precompute win/loss for each IV in this (opp, scenario)
-            wins = [scores_flat[iv * nS * nO + si * nO + oi] >= win_threshold
-                    for iv in range(nIvs)]
-
-            # Sweep def thresholds ascending. For each threshold, count
-            # pass/fail wins efficiently using running totals.
-            # total_wins = sum of wins across all IVs
-            total_wins = sum(1 for w in wins if w)
+            wins = wins_all[:, si, oi]
+            total_wins = int(wins.sum())
             if total_wins == 0 or total_wins == nIvs:
                 continue  # everyone wins or everyone loses — no flip
 
             best_stat = None
             best_hp = None
 
-            # Walk unique_stats ascending. At each threshold, passing =
-            # IVs with stat >= threshold. We want the LOWEST value where
-            # the partition is clean.
-            for stat_thresh in unique_stats:
-                passing = [iv for iv in range(nIvs)
-                           if stat_vals[iv] >= stat_thresh]
-                failing = [iv for iv in range(nIvs)
-                           if stat_vals[iv] < stat_thresh]
-                if len(passing) < min_passing or not failing:
-                    continue
+            # Phase 1: lowest threshold where the single-stat partition
+            # is clean. pass_wins[k] = wins among {stat >= uniq[k]}.
+            wins_sorted = wins[order].astype(np.int64)
+            suffix_wins = np.concatenate(
+                (np.cumsum(wins_sorted[::-1])[::-1], [0]))
+            pass_wins = suffix_wins[first_idx]
+            pw = pass_wins / pass_cnt
+            fw = (total_wins - pass_wins) / np.maximum(fail_cnt, 1)
+            clean = size_ok & (pw >= pass_winrate_min) & (fw <= fail_winrate_max)
+            ci = np.flatnonzero(clean)
+            if ci.size:
+                best_stat = stat_value_map[float(uniq[ci[0]])]
+                best_hp = None
 
-                pw = sum(1 for iv in passing if wins[iv]) / len(passing)
-                fw = sum(1 for iv in failing if wins[iv]) / len(failing)
-
-                if pw >= pass_winrate_min and fw <= fail_winrate_max:
-                    best_stat = stat_thresh
-                    best_hp = None
-                    break  # found minimum — done
-
-            # If no single-stat threshold works, try stat + HP
-            if best_stat is None and hp_vals:
-                for stat_thresh in unique_stats:
-                    s_passing = [iv for iv in range(nIvs)
-                                 if stat_vals[iv] >= stat_thresh]
-                    s_failing = [iv for iv in range(nIvs)
-                                 if stat_vals[iv] < stat_thresh]
-                    if len(s_passing) < min_passing or not s_failing:
-                        continue
-                    # Check if there's ANY signal — do the passing IVs
-                    # win more often than failing ones?
-                    pw_raw = sum(1 for iv in s_passing if wins[iv])
-                    if pw_raw == 0:
-                        continue  # no wins in passing set at all
-                    if pw_raw / len(s_passing) < 0.3:
-                        continue  # too low to be tightenable
-
-                    # Try HP thresholds within the stat-passing set
-                    pass_hps = sorted({hp_vals[iv] for iv in s_passing})
+            # Phase 2: if no single-stat threshold works, try stat + HP.
+            # Walk thresholds ascending; first one with a workable HP
+            # floor wins, mirroring the original loop's break.
+            if best_stat is None and have_hp:
+                # Pre-gates per threshold (identical to the originals):
+                # partition sizes, any wins at all, winrate >= 0.3.
+                gate = size_ok & (pass_wins > 0) & (pw >= 0.3)
+                wins_by_hp = wins[hp_order].astype(np.int64)
+                for ui in np.flatnonzero(gate):
+                    thresh = uniq[ui]
+                    m = stat_by_hp >= thresh
+                    # Suffix sums over the HP-sorted order: for a floor
+                    # starting at row j, sub_pass = passing IVs with
+                    # hp >= floor; sub_fail is its complement.
+                    cnt_suf = np.concatenate(
+                        (np.cumsum(m[::-1].astype(np.int64))[::-1], [0]))
+                    win_suf = np.concatenate(
+                        (np.cumsum((wins_by_hp * m)[::-1])[::-1], [0]))
+                    pass_hps = np.unique(hp_sorted[m])
+                    js = np.searchsorted(hp_sorted, pass_hps, side='left')
                     found_hp = None
-                    for hp_floor in reversed(pass_hps):
-                        sub_pass = [iv for iv in s_passing
-                                    if hp_vals[iv] >= hp_floor]
-                        sub_fail = s_failing + [
-                            iv for iv in s_passing
-                            if hp_vals[iv] < hp_floor]
-                        if len(sub_pass) < min_passing or not sub_fail:
+                    for k in range(len(pass_hps) - 1, -1, -1):
+                        j = js[k]
+                        n_sub  = int(cnt_suf[j])
+                        n_rest = nIvs - n_sub
+                        if n_sub < min_passing or n_rest == 0:
                             continue
-                        spw = sum(1 for iv in sub_pass
-                                  if wins[iv]) / len(sub_pass)
-                        sfw = sum(1 for iv in sub_fail
-                                  if wins[iv]) / len(sub_fail)
+                        spw = win_suf[j] / n_sub
+                        sfw = (total_wins - win_suf[j]) / n_rest
                         if (spw >= pass_winrate_min
                                 and sfw <= fail_winrate_max):
-                            found_hp = hp_floor
+                            found_hp = pass_hps[k]
                         else:
                             if found_hp is not None:
                                 break
                     if found_hp is not None:
-                        best_stat = stat_thresh
-                        best_hp = found_hp
+                        best_stat = stat_value_map[float(thresh)]
+                        best_hp = hp_value_map[float(found_hp)]
                         break  # found minimum stat+HP — done
 
             if best_stat is not None:
-                n_pass = sum(
-                    1 for iv in range(nIvs)
-                    if stat_vals[iv] >= best_stat
-                    and (best_hp is None or hp_vals[iv] >= best_hp)
-                )
+                pass_mask = stat_np >= best_stat
+                if best_hp is not None:
+                    pass_mask &= hp_np >= best_hp
                 results.append({
                     'opponent': opp,
                     'scenario': scenarios[si],
                     'threshold': best_stat,
                     'stat': sweep_stat,
                     'hp_threshold': best_hp,
-                    'n_passing': n_pass,
+                    'n_passing': int(pass_mask.sum()),
                 })
 
     # Group scenarios that flip at the same (opponent, threshold, hp) spec
