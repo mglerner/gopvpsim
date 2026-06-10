@@ -71,25 +71,34 @@ _MORPEKO_CHARGED_MOVE_MAP = {
 # ---------------------------------------------------------------------------
 
 def _swap_charged_move(charged_moves, move_map):
-    """Return a new tuple of charged move dicts with any mapped moves swapped."""
+    """Return a new tuple of charged move dicts with any mapped moves swapped.
+
+    Swapped-in moves are copied: the gamemaster's move dicts are global,
+    and battle code mutates move dicts in place (`_cached_damage`,
+    `_turns`). Without the copy, two BattlePokemon whose form changes
+    swap in the same move (e.g. a Morpeko mirror) would share one dict
+    and cross-contaminate each other's per-battle damage memo.
+    """
     _, all_charged = get_moves()
     result = []
     for cm in charged_moves:
         mid = cm['moveId']
         if mid in move_map:
             alt_id = move_map[mid]
-            result.append(all_charged[alt_id])
+            result.append(dict(all_charged[alt_id]))
         else:
             result.append(cm)
     return tuple(result)
 
 
 def _swap_fast_move(fast_move, move_map):
-    """Return the alternate fast move dict if mapped, else the same move."""
+    """Return a copy of the alternate fast move dict if mapped, else the
+    same move (copied for the same shared-global-dict reason as
+    _swap_charged_move)."""
     mid = fast_move['moveId']
     if mid in move_map:
         all_fast, _ = get_moves()
-        return all_fast[move_map[mid]]
+        return dict(all_fast[move_map[mid]])
     return fast_move
 
 
@@ -260,6 +269,29 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         reset_on_switch=reset_on_switch,
         effect=effect,
     )
+
+
+def attach_form_change(bp, mon_entry, atk_iv, def_iv, sta_iv,
+                       level, league_cp, shadow):
+    """Build and attach form-change state to a BattlePokemon.
+
+    No-op (returns None) for species without a form change. The single
+    canonical attach path — used by BattlePokemon.from_pokemon and by
+    the deep-dive workers that construct BattlePokemon from raw stats.
+
+    Must be called with bp's own fast_move/charged_moves already in
+    place (the FormData for the default form references those dicts).
+    """
+    fc = build_form_change_state(
+        mon_entry, atk_iv, def_iv, sta_iv,
+        level, league_cp, shadow,
+        bp.fast_move, bp.charged_moves,
+    )
+    if fc is not None:
+        bp._form_change = fc
+        if fc.effect == 'protect':
+            bp._form_disguise_active = True
+    return fc
 
 
 # ---------------------------------------------------------------------------

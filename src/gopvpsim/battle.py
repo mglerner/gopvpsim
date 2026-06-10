@@ -1814,7 +1814,7 @@ class BattlePokemon:
                      league_cp: int | None = None) -> "BattlePokemon":
         """Build a BattlePokemon from a Pokemon dataclass + move dicts."""
         from .data import load_gamemaster
-        from .formchange import build_form_change_state
+        from .formchange import attach_form_change
         gm  = load_gamemaster()
         mon = next(m for m in gm['pokemon'] if m['speciesName'] == pokemon.species)
         types = parse_types(mon)
@@ -1832,15 +1832,10 @@ class BattlePokemon:
         # Set up form change if applicable
         if league_cp is None:
             league_cp = 1500  # default to GL
-        fc = build_form_change_state(
-            mon, pokemon.atk_iv, pokemon.def_iv, pokemon.sta_iv,
+        attach_form_change(
+            bp, mon, pokemon.atk_iv, pokemon.def_iv, pokemon.sta_iv,
             pokemon.level, league_cp, pokemon.shadow,
-            fast_move, charged_moves,
         )
-        if fc is not None:
-            bp._form_change = fc
-            if fc.effect == 'protect':
-                bp._form_disguise_active = True
         return bp
 
     def reset_for_battle(self, shields: int,

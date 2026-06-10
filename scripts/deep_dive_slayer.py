@@ -17,6 +17,7 @@ from gopvpsim.pokemon import (
 from gopvpsim.moves import get_moves, type_effectiveness
 from gopvpsim.data import load_gamemaster, load_rankings, get_default_moveset, parse_types
 from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp, pvpoke_simulate_shield
+from gopvpsim.formchange import attach_form_change
 from gopvpsim.anchors import resolve_anchors, tag_iv, ResolvedAnchor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -121,7 +122,8 @@ _slayer_state = {}
 
 def slayer_worker_init(species, focal_types, base_atk, base_def, base_sta,
                          max_cp, shadow, fm_template, cms_template,
-                         shield_scenarios, log_path=None, verbose=False):
+                         shield_scenarios, log_path=None, verbose=False,
+                         focal_mon=None):
     worker_log_setup(log_path, verbose=verbose)
     _slayer_state['species'] = species
     _slayer_state['focal_types'] = focal_types
@@ -133,6 +135,7 @@ def slayer_worker_init(species, focal_types, base_atk, base_def, base_sta,
     _slayer_state['fm_template'] = fm_template
     _slayer_state['cms_template'] = cms_template
     _slayer_state['shield_scenarios'] = shield_scenarios
+    _slayer_state['focal_mon'] = focal_mon
 
 
 def slayer_iter_worker(args):
@@ -143,19 +146,22 @@ def slayer_iter_worker(args):
     all matching focal_idx values.
     """
     focal_profile_chunk, opponents = args
-    # focal_profile_chunk: list of (profile_key, atk, def_, hp)
-    # opponents: list of (opp_iv_idx, (opp_atk, opp_def, opp_hp))
+    # focal_profile_chunk: list of (profile_key, atk, def_, hp, a, d, s, lv)
+    # opponents: list of (opp_iv_idx, (opp_atk, opp_def, opp_hp, a, d, s, lv))
     ws = _slayer_state
     species = ws['species']
     focal_types = ws['focal_types']
     fm_template = ws['fm_template']
     cms_template = ws['cms_template']
     shield_scenarios = ws['shield_scenarios']
+    focal_mon = ws['focal_mon']
+    league_cp = ws['max_cp']
+    shadow = ws['shadow']
 
     results = {}
-    for profile_key, atk_stat, def_stat, hp_stat in focal_profile_chunk:
+    for profile_key, atk_stat, def_stat, hp_stat, a_iv, d_iv, s_iv, lv in focal_profile_chunk:
         for opp_iv_idx, opp_data in opponents:
-            opp_atk, opp_def, opp_hp = opp_data
+            opp_atk, opp_def, opp_hp, opp_a, opp_d, opp_s, opp_lv = opp_data
             scores = []
             # One BattlePokemon pair per (profile, opponent), reset between
             # scenarios — keeps the damage/DP caches warm across the
@@ -166,12 +172,16 @@ def slayer_iter_worker(args):
                 fast_move=dict(fm_template),
                 charged_moves=[dict(cm) for cm in cms_template],
             )
+            attach_form_change(bp0, focal_mon, a_iv, d_iv, s_iv, lv,
+                               league_cp, shadow)
             bp1 = BattlePokemon(
                 species=species, types=focal_types,
                 atk=opp_atk, def_=opp_def, max_hp=opp_hp,
                 fast_move=dict(fm_template),
                 charged_moves=[dict(cm) for cm in cms_template],
             )
+            attach_form_change(bp1, focal_mon, opp_a, opp_d, opp_s, opp_lv,
+                               league_cp, shadow)
             for s_focal, s_opp in shield_scenarios:
                 bp0.reset_for_battle(s_focal, opponent=bp1)
                 bp1.reset_for_battle(s_opp, opponent=bp0)
@@ -187,8 +197,8 @@ def build_focal_meta(species, league, shadow, iv_floor=None):
     """Compute (atk, def, hp, iv_idx) for all valid focal IVs.
 
     Returns (iv_to_idx, iv_meta_tuples) where iv_meta_tuples is a list of
-    (a, d, s, atk, def, hp). Thin wrapper around compute_iv_metadata for
-    backwards compatibility with the slayer iteration code. ``iv_floor``
+    (a, d, s, atk, def, hp, level). Thin wrapper around compute_iv_metadata
+    for backwards compatibility with the slayer iteration code. ``iv_floor``
     is passed through to prune the focal IV space.
     """
     iv_meta_dicts = compute_iv_metadata(species, league, shadow=shadow,
@@ -198,7 +208,7 @@ def build_focal_meta(species, league, shadow, iv_floor=None):
     for idx, m in enumerate(iv_meta_dicts):
         iv_to_idx[(m['atk_iv'], m['def_iv'], m['sta_iv'])] = idx
         iv_meta.append((m['atk_iv'], m['def_iv'], m['sta_iv'],
-                        m['atk'], m['def_'], m['hp']))
+                        m['atk'], m['def_'], m['hp'], m['level']))
     return iv_to_idx, iv_meta
 
 
@@ -252,18 +262,26 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     # Pre-compute focal profile groups: profile_key -> list of focal_idx values
     # IVs with identical (atk, def, hp) produce identical battles, so we only
     # need to sim one representative per profile and copy the result to the rest.
+    # EXCEPT for form-change species: the alt form's stats depend on the raw
+    # IVs + level (Blade-side whole-level rounding), so every IV spread sims
+    # separately (measured cost 1.1-1.35x more profiles).
+    form_per_iv = focal_mon.get('formChange') is not None
+
     def _profile_key(focal_idx):
-        a_, d_, s_, at, df, hp = iv_meta[focal_idx]
-        return (round(at, 4), round(df, 4), int(hp))
+        a_, d_, s_, at, df, hp, lv = iv_meta[focal_idx]
+        pk = (round(at, 4), round(df, 4), int(hp))
+        if form_per_iv:
+            pk += (a_, d_, s_, lv)
+        return pk
 
     focal_profile_to_ivs = {}  # profile_key -> [focal_idx, ...]
-    focal_profile_data = {}    # profile_key -> (atk, def, hp) for sim
+    focal_profile_data = {}    # profile_key -> (atk, def, hp, a, d, s, lv)
     for focal_idx in range(n_focal):
-        a_, d_, s_, at, df, hp = iv_meta[focal_idx]
-        pk = (round(at, 4), round(df, 4), int(hp))
+        a_, d_, s_, at, df, hp, lv = iv_meta[focal_idx]
+        pk = _profile_key(focal_idx)
         focal_profile_to_ivs.setdefault(pk, []).append(focal_idx)
         if pk not in focal_profile_data:
-            focal_profile_data[pk] = (at, df, hp)
+            focal_profile_data[pk] = (at, df, hp, a_, d_, s_, lv)
     n_unique_profiles = len(focal_profile_data)
 
     # Round 0: initial opponent IV
@@ -282,11 +300,13 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
 
     for round_idx in range(max_rounds):
         round_start = _time.time()
-        # Build opponent meta (atk, def, hp) for current round's opponents
+        # Build opponent meta (atk, def, hp, a, d, s, lv) for current
+        # round's opponents (IVs + level feed attach_form_change in the
+        # worker; no-op for species without form changes)
         opp_data_list = []
         for opp_idx in current_opponent_indices:
-            a, d, s, atk_, def_, hp_ = iv_meta[opp_idx]
-            opp_data_list.append((opp_idx, (atk_, def_, hp_)))
+            a, d, s, atk_, def_, hp_, lv = iv_meta[opp_idx]
+            opp_data_list.append((opp_idx, (atk_, def_, hp_, a, d, s, lv)))
 
         # Determine which (focal, opp) pairs need sim (cache miss).
         # We dedup BOTH sides:
@@ -320,7 +340,7 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
             # Build the focal profile chunks. We sim each unique (atk, def, hp)
             # exactly once per opponent. After workers return, we expand the
             # results to all focal IVs that share that profile.
-            profile_list = [(pk, dat[0], dat[1], dat[2])
+            profile_list = [(pk, *dat)
                             for pk, dat in focal_profile_data.items()]
             # Split into ~100 chunks (capped by len(profile_list)). With
             # imap_unordered the pool grabs the next chunk as workers free
@@ -332,7 +352,7 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
 
             init_args = (species, focal_types, base_atk, base_def, base_sta,
                          max_cp, shadow, fm_template, cms_template,
-                         shield_scenarios, log_path, verbose)
+                         shield_scenarios, log_path, verbose, focal_mon)
             sim_start = _time.time()
             with multiprocessing.Pool(
                 processes=n_workers,
@@ -409,7 +429,7 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
             if n_pairs == 0:
                 continue
             avg_score = total_score / n_pairs
-            a, d, s, atk_, def_, hp_ = iv_meta[focal_idx]
+            a, d, s, atk_, def_, hp_, _lv = iv_meta[focal_idx]
             focal_scores.append({
                 'focal_idx': focal_idx,
                 'iv': (a, d, s),
@@ -448,9 +468,11 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
         # literally identical battles, so we only need ONE per unique profile
         # as an opponent. The full survivor list is preserved in history[]
         # so users still see all the equivalent IVs in the final categories.
+        # (Form-change species use the per-IV _profile_key, so no two
+        # distinct IV spreads collapse there.)
         seen_profiles = {}
         for r in top:
-            profile = (round(r['atk'], 4), round(r['def_'], 4), int(r['hp']))
+            profile = _profile_key(r['focal_idx'])
             if profile not in seen_profiles:
                 seen_profiles[profile] = r['focal_idx']
         current_opponent_indices = list(seen_profiles.values())

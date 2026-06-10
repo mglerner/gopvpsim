@@ -67,6 +67,7 @@ from gopvpsim.battle import (
     BattlePokemon, simulate,
     pvpoke_dp, pvpoke_simulate_shield,
 )
+from gopvpsim.formchange import attach_form_change
 from gopvpsim.thresholds import (
     ThresholdRegistry, load_file as load_threshold_file, as_legacy_dict,
 )
@@ -627,19 +628,20 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None,
 
 def make_battle_pokemon(species, fast_id, charged_ids, league, shields,
                         atk_iv, def_iv, sta_iv, shadow=False):
-    """Build a BattlePokemon from species + IVs + move IDs."""
+    """Build a BattlePokemon from species + IVs + move IDs.
+
+    Routes through BattlePokemon.from_pokemon so form-change state
+    (Aegislash, Morpeko, Mimikyu) is wired up like the oracle tests
+    and the scripts/battle.py CLI.
+    """
     pokemon = Pokemon.at_best_level(species, atk_iv, def_iv, sta_iv,
                                     league=league, shadow=shadow)
     fast_moves, charged_moves = get_moves()
     fm = dict(fast_moves[fast_id])
     cms = [dict(charged_moves[cid]) for cid in charged_ids]
-    gm = load_gamemaster()
-    mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
-    types = parse_types(mon)
-    return BattlePokemon(
-        species=species, types=types,
-        atk=pokemon.atk, def_=pokemon.def_, max_hp=pokemon.hp,
-        fast_move=fm, charged_moves=cms, shields=shields,
+    return BattlePokemon.from_pokemon(
+        pokemon, fm, cms, shields=shields,
+        league_cp=LEAGUE_CAPS[league],
     )
 
 
@@ -1121,28 +1123,48 @@ def compute_iv_metadata(species, league, shadow=False, iv_floor=None):
 slayer.compute_iv_metadata = compute_iv_metadata
 
 
-def group_ivs_by_stat_profile(iv_meta_list):
+def _stat_profile_key(meta, per_iv=False):
+    """Profile key for sweep dedup. With per_iv, the key also carries
+    (IVs, level) so every IV spread sims separately — required for
+    form-change species, where the alt form's stats depend on the raw
+    IVs and level (Blade-side whole-level rounding), not just the
+    default form's effective stats."""
+    key = (round(meta['atk'], 4), round(meta['def_'], 4), int(meta['hp']))
+    if per_iv:
+        key += (meta['atk_iv'], meta['def_iv'], meta['sta_iv'], meta['level'])
+    return key
+
+
+def group_ivs_by_stat_profile(iv_meta_list, per_iv=False):
     """
     Group IVs by effective (atk, def, hp) so we sim each profile once.
+    With per_iv=True (form-change focal species), group per IV spread
+    instead — measured cost 1.1-1.35x more sims (see _stat_profile_key).
 
     Returns:
-        profile_to_indices: dict of (atk, def, hp) -> [iv_idx, ...]
-        profile_data: dict of (atk, def, hp) -> (atk, def, hp) for sim
-                      (these are the high-precision values; the key uses rounded)
+        profile_to_indices: dict of profile_key -> [iv_idx, ...]
+        profile_data: dict of profile_key ->
+                      (atk, def, hp, atk_iv, def_iv, sta_iv, level)
+                      (high-precision stats of the representative IV,
+                      plus the IVs/level the worker needs to build
+                      form-change state)
     """
     profile_to_indices = {}
     profile_data = {}
     for idx, meta in enumerate(iv_meta_list):
-        key = (round(meta['atk'], 4), round(meta['def_'], 4), int(meta['hp']))
+        key = _stat_profile_key(meta, per_iv)
         profile_to_indices.setdefault(key, []).append(idx)
         if key not in profile_data:
-            profile_data[key] = (meta['atk'], meta['def_'], meta['hp'])
+            profile_data[key] = (meta['atk'], meta['def_'], meta['hp'],
+                                 meta['atk_iv'], meta['def_iv'],
+                                 meta['sta_iv'], meta['level'])
     return profile_to_indices, profile_data
 
 
 def _sweep_worker_init(species, focal_types, fm_template, cms_template,
                        opp_cache, shield_scenarios, focal_bait=True,
-                       log_path=None, verbose=False):
+                       log_path=None, verbose=False,
+                       focal_mon=None, league_cp=1500, focal_shadow=False):
     """Initialize shared state in each sweep worker process."""
     # Spawn-mode workers (default on macOS) do not inherit the parent
     # logger's handlers; re-attach a FileHandler so any worker-side
@@ -1155,6 +1177,9 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
     _worker_state['opp_cache'] = opp_cache
     _worker_state['shield_scenarios'] = shield_scenarios
     _worker_state['focal_bait'] = focal_bait
+    _worker_state['focal_mon'] = focal_mon
+    _worker_state['league_cp'] = league_cp
+    _worker_state['focal_shadow'] = focal_shadow
     if focal_bait:
         _worker_state['focal_policy'] = pvpoke_dp
     else:
@@ -1167,7 +1192,8 @@ def _sweep_worker(profile_chunk):
     """
     Sim a chunk of focal stat profiles against the cached opponent list.
 
-    profile_chunk: list of (profile_key, atk, def, hp) tuples.
+    profile_chunk: list of (profile_key, atk, def, hp,
+                            atk_iv, def_iv, sta_iv, level) tuples.
     Returns dict of profile_key -> per_opp (which is dict of (scenario_idx, opp_idx) -> score).
     """
     ws = _worker_state
@@ -1178,10 +1204,13 @@ def _sweep_worker(profile_chunk):
     opp_cache = ws['opp_cache']
     shield_scenarios = ws['shield_scenarios']
     focal_policy = ws.get('focal_policy', pvpoke_dp)
+    focal_mon = ws['focal_mon']
+    league_cp = ws['league_cp']
+    focal_shadow = ws['focal_shadow']
 
     results = {}
     n_sims = 0
-    for profile_key, atk_stat, def_stat, hp_stat in profile_chunk:
+    for profile_key, atk_stat, def_stat, hp_stat, a_iv, d_iv, s_iv, lv in profile_chunk:
         per_opp = {}
         for oi, opp in enumerate(opp_cache):
             # One BattlePokemon pair per (profile, opponent), reset between
@@ -1193,12 +1222,16 @@ def _sweep_worker(profile_chunk):
                 fast_move=dict(fm_template),
                 charged_moves=[dict(cm) for cm in cms_template],
             )
+            attach_form_change(bp0, focal_mon, a_iv, d_iv, s_iv, lv,
+                               league_cp, focal_shadow)
             bp1 = BattlePokemon(
                 species=opp['species'], types=opp['types'],
                 atk=opp['atk'], def_=opp['def_'], max_hp=opp['hp'],
                 fast_move=dict(opp['fm']),
                 charged_moves=[dict(cm) for cm in opp['cms']],
             )
+            attach_form_change(bp1, opp['mon'], *opp['ivs'], opp['level'],
+                               league_cp, opp['shadow'])
             for si, (s_focal, s_opp) in enumerate(shield_scenarios):
                 bp0.reset_for_battle(s_focal, opponent=bp1)
                 bp1.reset_for_battle(s_opp, opponent=bp0)
@@ -1265,13 +1298,22 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
             'atk': opp_pokemon.atk, 'def_': opp_pokemon.def_,
             'hp': opp_pokemon.hp, 'fm': opp_fm, 'cms': opp_cms,
             'shadow': opp_is_shadow,
+            # Form-change ingredients (worker calls attach_form_change;
+            # no-op for species without a formChange entry).
+            'mon': opp_mon, 'ivs': (oa, od, os_),
+            'level': opp_pokemon.level,
         })
 
-    # Pre-compute IV metadata and group by stat profile (focal-side dedup)
+    # Pre-compute IV metadata and group by stat profile (focal-side dedup).
+    # Form-change species group per IV spread instead: the alt form's
+    # stats depend on raw IVs + level, so identical default-form stats
+    # do NOT imply identical battles (see _stat_profile_key).
+    focal_per_iv = focal_mon.get('formChange') is not None
     iv_meta = compute_iv_metadata(species, league, shadow=shadow,
                                   iv_floor=iv_floor)
-    profile_to_indices, profile_data = group_ivs_by_stat_profile(iv_meta)
-    profile_list = [(pk, dat[0], dat[1], dat[2]) for pk, dat in profile_data.items()]
+    profile_to_indices, profile_data = group_ivs_by_stat_profile(
+        iv_meta, per_iv=focal_per_iv)
+    profile_list = [(pk, *dat) for pk, dat in profile_data.items()]
 
     # Parallel sim: ~100 chunks across the worker pool. imap_unordered
     # hands chunks out as workers free up - finer granularity gives more
@@ -1289,7 +1331,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         initializer=_sweep_worker_init,
         initargs=(species, focal_types, fm_template, cms_template,
                   opp_cache, shield_scenarios, focal_bait,
-                  log_path, verbose),
+                  log_path, verbose,
+                  focal_mon, LEAGUE_CAPS[league], shadow),
     ) as pool:
         last_print = sim_start
         completed = 0
@@ -1318,7 +1361,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     n_opponents = len(opp_cache)
     results = []
     for idx, meta in enumerate(iv_meta):
-        pk = (round(meta['atk'], 4), round(meta['def_'], 4), int(meta['hp']))
+        pk = _stat_profile_key(meta, per_iv=focal_per_iv)
         per_opp = profile_per_opp[pk]
         # Compute avg_score for this IV (same for all IVs sharing the profile)
         total_score = sum(per_opp.values())
