@@ -39,6 +39,7 @@ import numpy as np
 
 QUEUE_CAP = 1024
 MAX_ITERS = 500
+TTL_STACK_CAP = 2048
 
 try:
     from numba import njit
@@ -363,4 +364,134 @@ def _make_jit():
     return _near_ko_dp_jit
 
 
+def _make_ttl_jit():
+    """Build the JIT'd turnsToLive kernel. Returns None if numba is
+    unavailable.
+
+    Faithful port of the pure-Python stack loop in
+    `battle._calc_turns_to_live` (itself a port of PvPoke's
+    ActionLogic.js lines 38-138). The defender-side charged-move damage
+    and energy arrays are prebuilt int64 buffers cached on BattlePokemon
+    (`_cached_charged_dmgs_np` / `_cm_energy_np`, rebuilt alongside the
+    damage cache) — this is what makes the JIT a win; the 2026-04-07
+    "round 3 false start" showed per-call np.asarray conversions eat
+    the entire savings.
+
+    Returns (ok, ttl). ok=False means the preallocated stack overflowed
+    (never observed in practice; capacity is generous) and the caller
+    must fall back to the pure-Python loop. ttl is float64 (np.inf when
+    no KO is found).
+    """
+    if njit is None:
+        return None
+
+    @njit(cache=True)
+    def _calc_ttl_jit(
+        start_hp,           # int — attacker hp in the initial state
+        start_op_e,         # int — defender energy in the initial state
+        start_turn,         # int — initial turn offset
+        start_shields,      # int — attacker shields
+        opp_fast_damage,    # int
+        opp_fast_energy,    # int
+        opp_fast_turns,     # int
+        atk_fast_turns,     # int
+        wins_cmp,           # bool — attacker.atk >= defender.atk
+        cmp_bonus,          # bool — attacker.atk > defender.atk and
+                            #        opp_fast_cd % atk_fast_cd == 0
+        d_cm_dmgs,          # int64[:] — defender charged damage (natural order)
+        d_cm_energy,        # int64[:]
+        energy_cap,         # int
+    ):
+        n_d_cms = d_cm_energy.shape[0]
+        fastest_cm_energy = 0
+        if n_d_cms > 0:
+            fastest_cm_energy = d_cm_energy[0]
+            for n in range(1, n_d_cms):
+                if d_cm_energy[n] < fastest_cm_energy:
+                    fastest_cm_energy = d_cm_energy[n]
+
+        # Preallocated LIFO stack (struct of arrays).
+        s_hp = np.empty(TTL_STACK_CAP, dtype=np.int64)
+        s_e  = np.empty(TTL_STACK_CAP, dtype=np.int64)
+        s_t  = np.empty(TTL_STACK_CAP, dtype=np.int64)
+        s_sh = np.empty(TTL_STACK_CAP, dtype=np.int64)
+        s_hp[0] = start_hp
+        s_e[0]  = start_op_e
+        s_t[0]  = start_turn
+        s_sh[0] = start_shields
+        sp = 1
+
+        turns_to_live = np.inf
+
+        while sp > 0:
+            sp -= 1
+            c_hp      = s_hp[sp]
+            c_op_e    = s_e[sp]
+            c_turn    = s_t[sp]
+            c_shields = s_sh[sp]
+
+            # Prune far-future states when the attacker can still
+            # survive another hit
+            if c_hp > opp_fast_damage:
+                if wins_cmp:
+                    if c_turn > atk_fast_turns:
+                        continue
+                else:
+                    if c_turn > atk_fast_turns + 1:
+                        continue
+
+            # Shields up → model opponent baiting with cheapest charged move
+            if c_shields != 0:
+                if c_op_e >= fastest_cm_energy:
+                    if sp >= TTL_STACK_CAP:
+                        return False, 0.0
+                    s_hp[sp] = c_hp - 1          # shielded: 1 dmg
+                    s_e[sp]  = c_op_e - fastest_cm_energy
+                    s_t[sp]  = c_turn + 1
+                    s_sh[sp] = c_shields - 1
+                    sp += 1
+            else:
+                # No shields: check whether any charged move would KO
+                for n in range(n_d_cms):
+                    e = d_cm_energy[n]
+                    if c_op_e >= e:
+                        cm_dmg = d_cm_dmgs[n]
+                        if cm_dmg >= c_hp:
+                            if c_turn < turns_to_live:
+                                turns_to_live = c_turn
+                            if cmp_bonus:
+                                turns_to_live += 1
+                            break
+                        if sp >= TTL_STACK_CAP:
+                            return False, 0.0
+                        s_hp[sp] = c_hp - cm_dmg
+                        s_e[sp]  = c_op_e - e
+                        s_t[sp]  = c_turn + 1
+                        s_sh[sp] = c_shields
+                        sp += 1
+
+            # Would a fast move KO?
+            if c_hp - opp_fast_damage <= 0:
+                tt = c_turn + opp_fast_turns
+                if tt < turns_to_live:
+                    turns_to_live = tt
+                break
+            else:
+                if sp >= TTL_STACK_CAP:
+                    return False, 0.0
+                new_e = c_op_e + opp_fast_energy
+                if new_e > energy_cap:
+                    new_e = energy_cap
+                s_hp[sp] = c_hp - opp_fast_damage
+                s_e[sp]  = new_e
+                s_t[sp]  = c_turn + opp_fast_turns
+                s_sh[sp] = c_shields
+                sp += 1
+
+        return True, turns_to_live
+
+    return _calc_ttl_jit
+
+
 _near_ko_dp_jit = _make_jit()
+_calc_ttl_jit = _make_ttl_jit()

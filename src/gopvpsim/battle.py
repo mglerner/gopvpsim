@@ -27,15 +27,17 @@ from typing import Callable
 from .moves import damage as calc_damage, type_effectiveness, stab
 from .data import parse_types
 
-# Optional numba JIT for the near-KO DP loop. If unavailable (numba not
-# installed, LLVM mismatch, etc.), pvpoke_dp falls back to the pure-Python
-# loop further down.
+# Optional numba JIT for the near-KO DP loop and the turnsToLive sub-DP.
+# If unavailable (numba not installed, LLVM mismatch, etc.), pvpoke_dp and
+# _calc_turns_to_live fall back to the pure-Python loops further down.
 try:
     import numpy as _np
     from ._dp_jit import _near_ko_dp_jit as _NEAR_KO_DP_JIT
+    from ._dp_jit import _calc_ttl_jit as _CALC_TTL_JIT
 except Exception:                       # pragma: no cover - jit optional
     _np = None
     _NEAR_KO_DP_JIT = None
+    _CALC_TTL_JIT = None
 
 ENERGY_CAP = 100
 MAX_TURNS  = 500   # ~4 minutes; prevents infinite loops
@@ -357,16 +359,6 @@ def _calc_turns_to_live(
     atk_fast_turns    = attacker.fast_move.get('_turns', 1)
     wins_cmp          = attacker.atk >= defender.atk
 
-    # Hoist defender's charged-move energy + damage into parallel arrays so
-    # the inner loop avoids method/dict lookups. The damage cache was
-    # populated by defender.fast_move_damage(attacker) above.
-    d_cm_dmgs   = defender._cached_charged_dmgs
-    d_cm_energy = [cm['energy'] for cm in defender.charged_moves]
-    n_d_cms     = len(d_cm_energy)
-    fastest_cm_energy = min(d_cm_energy) if d_cm_energy else 0
-
-    turns_to_live: float = math.inf
-
     # Build initial state.
     # In our timing model, fast moves with D ≤ 2 always land before the action-
     # decision phase, so _queued_fast is None.  For D ≥ 3 moves, compute the
@@ -384,6 +376,39 @@ def _calc_turns_to_live(
                    defender.energy,
                    0,
                    attacker.shields)
+
+    if _CALC_TTL_JIT is not None:
+        # Numba-JIT'd kernel (same loop as the pure-Python below).
+        # Defender-side damage/energy buffers were rebuilt alongside the
+        # damage cache by fast_move_damage() above — no per-call asarray.
+        # The CMP turn bonus is loop-invariant, so it's hoisted here.
+        cmp_bonus = (attacker.atk > defender.atk
+                     and defender.fast_move.get('cooldown', 500)
+                         % attacker.fast_move.get('cooldown', 500) == 0)
+        ok, ttl = _CALC_TTL_JIT(
+            initial[0], initial[1], initial[2], initial[3],
+            opp_fast_damage, opp_fast_energy, opp_fast_turns,
+            atk_fast_turns, wins_cmp, cmp_bonus,
+            defender._cached_charged_dmgs_np, defender._cm_energy_np,
+            ENERGY_CAP,
+        )
+        if ok:
+            # Keep the historical return types: int for finite, math.inf
+            # otherwise (turn counts are small, exact in float64).
+            return math.inf if ttl == math.inf else int(ttl)
+        # stack overflow (never expected) → fall through to Python loop
+
+    # Pure-Python fallback (numba unavailable). Same algorithm as the JIT
+    # in _dp_jit.py — kept so the project still runs without numba.
+    # Hoist defender's charged-move energy + damage into parallel arrays so
+    # the inner loop avoids method/dict lookups. The damage cache was
+    # populated by defender.fast_move_damage(attacker) above.
+    d_cm_dmgs   = defender._cached_charged_dmgs
+    d_cm_energy = [cm['energy'] for cm in defender.charged_moves]
+    n_d_cms     = len(d_cm_energy)
+    fastest_cm_energy = min(d_cm_energy) if d_cm_energy else 0
+
+    turns_to_live: float = math.inf
 
     stack = [initial]
 
@@ -1767,6 +1792,12 @@ class BattlePokemon:
     _cached_fast_dmg:     int       = field(init=False, repr=False)
     _cached_charged_dmgs: list      = field(init=False, repr=False)
     _cm_id_to_idx:        dict      = field(init=False, repr=False)
+    # int64 numpy views of the charged-move damages/energies (natural
+    # order), consumed by the turnsToLive JIT. Rebuilt with the damage
+    # cache so per-call np.asarray conversion is never needed (the
+    # 2026-04-07 round-3 false-start lesson). None when numba is absent.
+    _cached_charged_dmgs_np: "object" = field(init=False, repr=False)
+    _cm_energy_np:           "object" = field(init=False, repr=False)
 
     # pvpoke_dp setup cache (vs current opponent at current stat stages).
     # Holds the priority-shuffled move order, per-move scalar arrays, the
@@ -1798,6 +1829,8 @@ class BattlePokemon:
         self._dmg_cache_def_stage = 0
         self._cached_fast_dmg     = 0
         self._cached_charged_dmgs = []
+        self._cached_charged_dmgs_np = None
+        self._cm_energy_np           = None
         # Identity-keyed lookup so charged_move_damage(move, ...) can find
         # its precomputed entry even when the policy passes a sorted copy
         # of self.charged_moves (same dict objects, different order).
@@ -1916,6 +1949,14 @@ class BattlePokemon:
                         cm['type'], my_types, opp_types)
             for cm in self.charged_moves
         ]
+        if _CALC_TTL_JIT is not None:
+            # Prebuilt buffers for the turnsToLive JIT. Energies are
+            # re-derived here (not __post_init__) so form changes — which
+            # swap the move dicts and invalidate this cache — are covered.
+            self._cached_charged_dmgs_np = _np.asarray(
+                self._cached_charged_dmgs, dtype=_np.int64)
+            self._cm_energy_np = _np.asarray(
+                [cm['energy'] for cm in self.charged_moves], dtype=_np.int64)
         self._dmg_cache_opp_id    = id(defender)
         self._dmg_cache_atk_stage = self.atk_stage
         self._dmg_cache_def_stage = defender.def_stage
