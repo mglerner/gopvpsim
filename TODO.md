@@ -189,6 +189,20 @@ break invariants that weren't yet nailed down by tests.
   DEVELOPER_NOTES.md §8. Re-run the audit anytime:
   `python scripts/audit_oracle_harness.py`.)
 
+* **Deep-dive workers never wire up form changes** *(discovered
+  2026-06-10 while implementing scenario reuse)* — `_sweep_worker` /
+  `slayer_iter_worker` construct `BattlePokemon` directly, so
+  `_form_change` is always None; only `BattlePokemon.from_pokemon`
+  callers (oracle tests, scripts/battle.py CLI) get form mechanics.
+  Consequence: every published Aegislash / Mimikyu / Morpeko dive
+  simmed those species (focal AND opponent side) WITHOUT form change,
+  disguise, or the Hangry toggle. The battle engine is verified
+  correct (oracle suite); the dive pipeline just never opts in. Needs
+  a decision on scope (focal-side only vs opponent-side too — Morpeko
+  appears in GL opponent pools) and then plumbing IVs/level through
+  the worker templates so `build_form_change_state` can run. Sizeable
+  correctness item for those species' dives; orthogonal to perf.
+
 * **Speed test** -- compare our speed vs the PvPoke JS code, look for
   ways we can speed ours up. *(Partly addressed 2026-06-10: holistic
   perf review found and fixed a 2.0x engine regression dating to the
