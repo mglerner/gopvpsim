@@ -198,7 +198,11 @@ break invariants that weren't yet nailed down by tests.
   `python scripts/audit_oracle_harness.py`.)
 
 * **Speed test** -- compare our speed vs the PvPoke JS code, look for
-  ways we can speed ours up.
+  ways we can speed ours up. *(Partly addressed 2026-06-10: holistic
+  perf review found and fixed a 2.0x engine regression dating to the
+  2026-04-15 correctness arc — see DEVELOPER_NOTES "Performance
+  baseline" for the regression gate and `docs/perf/` for the writeup.
+  The vs-PvPoke-JS throughput comparison itself remains open.)*
 
 ## Policies to add
 
@@ -549,6 +553,52 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   2026-04-08.
 
 ## Slayer iteration cleanup
+
+* **Mirror-slayer re-look: objective semantics + tie explosion**
+  *(scoped 2026-06-10 during the perf-review session; needs its own
+  design session — do NOT bundle with engine perf work)*
+
+  **Semantics question (Michael's framing).** There are two distinct
+  mirror-slayer archetypes, and the current code computes neither
+  directly:
+
+  1. **Anchors-first**: "hit the important break/bulkpoints; after
+     that, win CMP as much as possible." Lexicographic: filter the
+     4096 IVs by chosen anchors, THEN maximize atk / mirror-CMP%
+     among survivors.
+  2. **CMP-first ("lab mon")**: "win CMP as first priority, pick up
+     break/bulkpoints as a secondary goal." Lexicographic the other
+     way: take max-atk viable spreads, then report which anchors
+     they clear vs miss.
+
+  Both are nearly sim-free given the anchor resolver (anchor
+  membership is closed-form; CMP% is an atk comparison against an
+  opponent population). What today's `iterative_slayer_discovery`
+  actually optimizes is a third thing: integer scenario-win count
+  vs an endogenous self-play cohort, with anchors applied only as
+  post-hoc labels in `categorize_slayers` and CMP nowhere in the
+  objective. The Nash cohort is still useful — but as the *opponent
+  population* against which CMP% and wins are evaluated, not as the
+  optimization target itself. (The dracoviz tournament-CP item under
+  "Analysis goals" could eventually supply an *empirical* mirror
+  population for the same role.)
+
+  **Efficiency finding (observed live 2026-06-10).** The
+  keep-all-tied rule (`eb145a2`) defeats the `--mirror-slayer-pool`
+  cap: Round 0 scores IVs vs ONE opponent over ≤9 scenarios, so win
+  counts are 0-9 and thousands of IVs tie at the top. Concrete
+  Tinkaton GL run: pool cap 30, but Round 1 ran 2,756 opponents ×
+  2,978 profiles × 9 scenarios = **8.2M sims, ~80% of the whole
+  dive's sim budget**. The same tied-pool explosion is the root
+  cause of three documented pains: slayer rounds dominating dive
+  wall time, the Jumpluff 60.7 MB HTML tables (1,608 tied rows),
+  and the "Slayer-card signal-loss audit" below (everyone ties →
+  no signal). Fix shapes: a graded round metric (score margins or
+  per-opponent win vectors) so exact ties are rare, and/or sample
+  representative opponents from a tied pool instead of taking all
+  of them. Any fix here shrinks the HTML and signal-loss problems
+  for free — decide this BEFORE investing in either of those
+  separately.
 
 * **Investigate inconsistent slayer Max Wins column** *(cosmetic, not
   blocking — ranking is correct)* — Yesterday's
@@ -928,8 +978,19 @@ bottleneck.
   of mind.
 
 * **Form-change path speedup (Aegislash Shield, Mimikyu, Morpeko)**
-  — *Discovered 2026-04-19 during the out-of-band Aegislash GL dive
-  against Orlando top-32.* Mirror-slayer Round 1 on Aegislash (Shield)
+  — **MOSTLY RESOLVED 2026-06-10 as a misattribution.** The ~10×
+  Shield-vs-Blade gap was dominated by the engine-wide pvpoke_dp
+  regression (per-call stage-table rebuild, fixed in `5e25e28` — see
+  DEVELOPER_NOTES "Performance baseline"), which Shield's battle shape
+  (charge-farm → near-KO DP every turn) amplified. Post-fix smoke
+  measurement (Phase 2, 3 opponents, 1v1): Shield 4,800-6,900 sims/s
+  vs Blade 5,200-5,700 — parity. The hypotheses below were never the
+  dominant cost. Keep this entry only as a pointer: if a future
+  mirror-slayer-scale Aegislash (Shield) run still looks slow
+  relative to Blade, re-measure before reaching for the plan below.
+
+  *Original 2026-04-19 observation (pre-fix):* Mirror-slayer Round 1
+  on Aegislash (Shield)
   projected ~25-30 min per moveset (~10× the Blade-side baseline) at
   ~700 sims/s vs the 7,000 sims/s Phase 2 baseline. Correctness is fine
   (validated by `tests/test_aegislash_vs_azumarill_form_change`); the
