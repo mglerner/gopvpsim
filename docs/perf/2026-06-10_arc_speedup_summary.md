@@ -36,6 +36,10 @@ figures are multiprocess wall-clock from
 | S5 engine round 3 (TTL JIT,       | engine sims/s (single core)    | ~2,295   | ~3,160      | **1.38x**     |
 | stage-row reachability, DP-cache  | interactive sweep sims/s       | 16,073-  | 21,157-     | **~1.33x**    |
 | precompute, JIT signatures)       | (Tinkaton GL smoke, 9 workers) | 16,947   | 23,792      |               |
+| S5e find_matchup_boundaries       | render wall (replay, Tinkaton  | 73.0s    | 5.8s        | **12.6x**     |
+| vectorization (byte-identical)    | GL blob)                       |          |             |               |
+|                                   | warm-cache full-dive re-run    | 53s      | 10.8s       | **4.9x**      |
+|                                   | (S4 all-hits + this)           |          |             |               |
 
 Correctness shipped alongside (not speed, but why the arc exists):
 S1 wired real form mechanics into every dive worker (Aegislash
