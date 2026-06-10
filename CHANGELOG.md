@@ -6,6 +6,38 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-10 — Form-change plumbing in dive workers (perf+correctness arc S1)
+
+The deep-dive sweep/slayer workers (and the phase-1 moveset screen)
+constructed `BattlePokemon` directly from effective stats, so
+`_form_change` was always None — every published Aegislash / Mimikyu /
+Morpeko dive simmed those species without form mechanics, on both the
+focal and opponent side. The engine itself was always correct (oracle
+suite); the dive pipeline never opted in.
+
+Fix: IVs + level are threaded through the sweep profile tuples,
+`opp_cache` entries, and slayer opponent tuples; workers call the new
+`gopvpsim.formchange.attach_form_change` (also the canonical path
+inside `BattlePokemon.from_pokemon` now). Form-change species sweep
+per-IV instead of per-stat-profile because alt-form stats depend on
+raw IVs + level (Blade whole-level rounding) — measured cost 1.1-1.35x
+more sims, confined to those species. Form-swapped move dicts are
+copied rather than shared from the global gamemaster tables (a mirror
+battle would otherwise cross-contaminate `_cached_damage` between the
+two sides). Slayer disk-cache `CACHE_VERSION` bumped 1→2.
+
+Verification: `tests/test_dive_worker_form_change.py` pins worker ==
+`from_pokemon` equivalence (focal side, opponent side, slayer mirror)
+and the PvPoke-harness-verified 773 cell. Smoke dive (Aegislash
+(Shield) UL, 10 opponents): top-IV avg score 237.9 → 390.7, with
+def-IV differentiation the no-form-change baseline couldn't see.
+Gates: 708 passed + 14 xfailed; benchmark 2,254 sims/s (baseline
+2,278, −1.1%); oracle harness 98 exact + 10 documented divergences.
+
+Side finding: non-interactive `generate_html` crashes with a
+`NameError` (pre-existing, unrelated) — logged in TODO under the
+existing "non-interactive is strictly worse" item.
+
 ## 2026-06-07 — HTTPS on the website + Oinkologne NAIC re-dive
 
 **HTTPS.** `mglerner.com/pogo-dives/` now serves over HTTPS via a free,

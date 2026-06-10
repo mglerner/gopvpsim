@@ -189,19 +189,32 @@ break invariants that weren't yet nailed down by tests.
   DEVELOPER_NOTES.md §8. Re-run the audit anytime:
   `python scripts/audit_oracle_harness.py`.)
 
-* **Deep-dive workers never wire up form changes** *(discovered
-  2026-06-10 while implementing scenario reuse)* — `_sweep_worker` /
-  `slayer_iter_worker` construct `BattlePokemon` directly, so
-  `_form_change` is always None; only `BattlePokemon.from_pokemon`
-  callers (oracle tests, scripts/battle.py CLI) get form mechanics.
-  Consequence: every published Aegislash / Mimikyu / Morpeko dive
-  simmed those species (focal AND opponent side) WITHOUT form change,
-  disguise, or the Hangry toggle. The battle engine is verified
-  correct (oracle suite); the dive pipeline just never opts in. Needs
-  a decision on scope (focal-side only vs opponent-side too — Morpeko
-  appears in GL opponent pools) and then plumbing IVs/level through
-  the worker templates so `build_form_change_state` can run. Sizeable
-  correctness item for those species' dives; orthogonal to perf.
+* **Deep-dive workers never wire up form changes — FIXED 2026-06-10
+  (arc S1)** — `_sweep_worker` / `slayer_iter_worker` (and the phase-1
+  screen via `make_battle_pokemon`) now thread IVs + level through the
+  profile tuples / `opp_cache` and call `attach_form_change`, on BOTH
+  the focal and opponent side. Form-change species sweep per-IV
+  instead of per-stat-profile (alt-form stats depend on raw IVs +
+  level; measured cost only 1.1-1.35x more sims, those species only).
+  Equivalence pinned by `tests/test_dive_worker_form_change.py`
+  (worker == `from_pokemon` == PvPoke oracle 773 cell). Smoke dive
+  delta: Aegislash (Shield) UL top-IV avg score 237.9 → 390.7.
+
+  **S6 targeted re-dive list (consequence of the old bug):**
+  1. **Aegislash (Shield) GL + Aegislash (Blade) GL** — focal-side;
+     biggest deltas (published dives simmed Shield with no Blade
+     transform at all).
+  2. **Every dive using `gl_top50_plus_cs.txt` or
+     `ul_top60_plus_aegislash.txt`** — i.e. the whole website chain:
+     those pools carry Aegislash (Shield)+(Blade), so every dive's
+     Aegislash opponent rows were simmed form-change-less. S6's full
+     re-dive covers this; do NOT trim S6 to "just the form species."
+  3. **Blade-vs-Shield GL comparison page** (and the form-change
+     guide screenshots if numbers moved visibly) — regenerate after
+     the Aegislash re-dives.
+  4. Mimikyu (no published dive — applies if/when dived) and Morpeko
+     (in no current pool — applies when a pool adds it) need nothing
+     now; the plumbing already covers them.
 
 * **Speed test** -- compare our speed vs the PvPoke JS code, look for
   ways we can speed ours up. *(Partly addressed 2026-06-10: holistic
@@ -734,7 +747,12 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   path entirely, or refactor so both paths render the analysis sections.
   Discovered 2026-04-08 during anchor-system smoke testing — it's easy
   to mistakenly run a smoke test without `--interactive` and conclude
-  nothing rendered.
+  nothing rendered. *Update 2026-06-10 (arc S1):* the non-interactive
+  path now **crashes outright** — `generate_html` line ~1627
+  references a `shadow` variable that isn't in its signature
+  (`NameError`), evidently since the display-rename line was added.
+  Nobody noticed, which settles how unused the path is; points toward
+  the "deprecate it" option.
 
 ## CD article generator — open follow-ups
 
