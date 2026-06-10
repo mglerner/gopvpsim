@@ -687,7 +687,7 @@ def _cm_debuf_delta(m: dict) -> int:
     """Per-move delta for the dedup tie-break debuff count.
 
     +1 for self-debuffing, −1 for guaranteed self-buffing. Precomputed once
-    per cms-list at the top of pvpoke_dp so the inner loop only carries an
+    per cms-list in _ensure_dp_cache so the inner loop only carries an
     integer running sum.
     """
     delta = 0
@@ -698,6 +698,112 @@ def _cm_debuf_delta(m: dict) -> int:
             and sum(m.get('buffs', [0, 0])) > 0):
         delta -= 1
     return delta
+
+
+def _cm_buff_delta(m: dict) -> int:
+    """Per-cm atk-stage delta applied to the ATTACKER on throw.
+
+    Mirrors PvPoke ActionLogic.js lines 519-535: chance-1 self-atk-buff
+    increases attackMult, chance-1 opp-def-debuff also increases
+    attackMult (scaling atk/def). Only chance-1 effects contribute —
+    PvPoke zeros changeTTKChance unconditionally before the DP.
+    """
+    buffs = m.get('buffs')
+    if not buffs:
+        return 0
+    # buffApplyChance may be a string in raw gamemaster data.
+    if float(m.get('buffApplyChance', 0) or 0) != 1.0:
+        return 0
+    bt = m.get('buffTarget', '')
+    if bt == 'self' and buffs[0] > 0:
+        return buffs[0]
+    if bt == 'opponent' and buffs[1] < 0:
+        return -buffs[1]
+    return 0
+
+
+def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict) -> None:
+    """PvPoke's activeChargedMoves priority-shuffle (Pokemon.js lines 711-787).
+
+    Reorders the energy-sorted ``cms`` list in place based on buff/debuff
+    properties. PvPoke runs this once at init; we re-run it whenever the
+    cached damage values change (see _ensure_dp_cache). Uses buff-adjusted
+    DPE for the selfBuffing-promotion clause (line 758). Verified
+    2026-04-15 to affect 153/378 matchups in a 7x6x9 differential grid.
+
+    ``cm_dmgs`` is indexed by original charged_moves position via
+    ``idx_map`` (id(move) -> original index).
+    """
+    def _get_dmg(m):
+        return cm_dmgs[idx_map[id(m)]]
+
+    # Buff-adjusted DPE per PvPoke initializeMove (Pokemon.js:849-864).
+    # Only self-atk-buff and opp-def-debuff get the multiplier.
+    def _buff_adj_dpe(m):
+        raw = _get_dmg(m) / m['energy']
+        buffs = m.get('buffs')
+        if not buffs:
+            return raw
+        bt = m.get('buffTarget', '')
+        chance = float(m.get('buffApplyChance', 0) or 0)
+        eff = 0.0
+        if bt == 'self' and buffs[0] > 0:
+            eff = buffs[0] * (80 / m['energy'])
+        elif bt == 'opponent' and buffs[1] < 0:
+            eff = abs(buffs[1]) * (80 / m['energy'])
+        if eff > 0:
+            return raw * (4 + eff * chance) / 4
+        return raw
+
+    # Line 715-722: same energy — prefer buff or higher damage
+    if (cms[1]['energy'] == cms[0]['energy']
+            and not cms[1].get('selfDebuffing', False)):
+        if cms[1].get('buffs') or _get_dmg(cms[1]) > _get_dmg(cms[0]):
+            cms[0], cms[1] = cms[1], cms[0]
+
+    # Line 726-730: same energy — prefer higher buffApplyChance
+    if (cms[1]['energy'] == cms[0]['energy']
+            and cms[0].get('buffs') and cms[1].get('buffs')
+            and not cms[1].get('selfDebuffing', False)
+            and (cms[1].get('buffApplyChance', 0) or 0) > (cms[0].get('buffApplyChance', 0) or 0)):
+        cms[0], cms[1] = cms[1], cms[0]
+
+    # Line 734-744: Zap Cannon / Registeel clause
+    if (cms[0].get('moveId') == 'FOCUS_BLAST'
+            and cms[1].get('moveId') == 'ZAP_CANNON'):
+        if _buff_adj_dpe(cms[1]) - _buff_adj_dpe(cms[0]) > -0.3:
+            cms[0]['buffs'] = [0, 0]
+            cms[0]['buffTarget'] = 'self'
+            cms[0]['selfDebuffing'] = True
+        else:
+            cms[0].pop('buffs', None)
+            cms[0].pop('buffTarget', None)
+            cms[0].pop('selfDebuffing', None)
+
+    # Line 756-762: similar energy — promote selfBuffing move
+    if (cms[1]['energy'] - cms[0]['energy'] <= 10
+            and not cms[1].get('selfDebuffing', False)
+            and cms[1].get('selfBuffing', False)
+            and _buff_adj_dpe(cms[0]) - _buff_adj_dpe(cms[1]) < 0.3):
+        cms[0], cms[1] = cms[1], cms[0]
+
+    # Line 767-771: demote selfAttackDebuffing
+    if (cms[1]['energy'] - cms[0]['energy'] <= 10
+            and cms[0].get('selfAttackDebuffing', False)
+            and not cms[1].get('selfDebuffing', False)):
+        cms[0], cms[1] = cms[1], cms[0]
+
+    # Line 775-779: demote expensive (>50 energy) selfDebuffing
+    if (cms[1]['energy'] - cms[0]['energy'] <= 10
+            and cms[0].get('selfDebuffing', False)
+            and cms[0]['energy'] > 50
+            and not cms[1].get('selfDebuffing', False)):
+        cms[0], cms[1] = cms[1], cms[0]
+
+    # Line 783-787: promote close-energy selfBuffing as bait
+    if (cms[1]['energy'] - cms[0]['energy'] <= 5
+            and cms[1].get('selfBuffing', False)):
+        cms[0], cms[1] = cms[1], cms[0]
 
 
 # ---------------------------------------------------------------------------
@@ -896,121 +1002,25 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     opp_fast_damage  = defender.fast_move_damage(attacker)
     wins_cmp         = attacker.atk >= defender.atk
 
-    # PvPoke's activeChargedMoves is sorted by energy (cheapest first),
-    # then reordered by a priority-shuffle (Pokemon.js lines 711-787).
-    cms = sorted(attacker.charged_moves, key=lambda m: m['energy'])
-    n_cms = len(cms)
-
-    # Damage cache was populated by fast_move_damage() above.
+    # Energy-sorted, priority-shuffled move order plus the per-move scalar
+    # arrays and per-atk-stage damage tables, cached per (opponent, stat
+    # stages) — see BattlePokemon._ensure_dp_cache. The damage cache itself
+    # was populated by fast_move_damage() above.
+    dp_cache  = attacker._ensure_dp_cache(defender)
     a_charged = attacker.charged_moves
     a_cm_dmgs = attacker._cached_charged_dmgs
     a_idx_map = attacker._cm_id_to_idx
 
-    # --- Priority-shuffle (PvPoke Pokemon.js lines 711-787) ---
-    # Reorder cms based on buff/debuff properties.  PvPoke runs this once
-    # at init; we apply it after energy sort each call.  Uses buff-adjusted
-    # DPE for the selfBuffing-promotion clause (line 758).  Verified
-    # 2026-04-15 to affect 153/378 matchups in a 7x6x9 differential grid.
-    if n_cms > 1:
-        def _get_dmg(m):
-            return a_cm_dmgs[a_idx_map[id(m)]]
-
-        # Buff-adjusted DPE per PvPoke initializeMove (Pokemon.js:849-864).
-        # Only self-atk-buff and opp-def-debuff get the multiplier.
-        def _buff_adj_dpe(m):
-            raw = _get_dmg(m) / m['energy']
-            buffs = m.get('buffs')
-            if not buffs:
-                return raw
-            bt = m.get('buffTarget', '')
-            chance = float(m.get('buffApplyChance', 0) or 0)
-            eff = 0.0
-            if bt == 'self' and buffs[0] > 0:
-                eff = buffs[0] * (80 / m['energy'])
-            elif bt == 'opponent' and buffs[1] < 0:
-                eff = abs(buffs[1]) * (80 / m['energy'])
-            if eff > 0:
-                return raw * (4 + eff * chance) / 4
-            return raw
-
-        # Line 715-722: same energy — prefer buff or higher damage
-        if (cms[1]['energy'] == cms[0]['energy']
-                and not cms[1].get('selfDebuffing', False)):
-            if cms[1].get('buffs') or _get_dmg(cms[1]) > _get_dmg(cms[0]):
-                cms[0], cms[1] = cms[1], cms[0]
-
-        # Line 726-730: same energy — prefer higher buffApplyChance
-        if (cms[1]['energy'] == cms[0]['energy']
-                and cms[0].get('buffs') and cms[1].get('buffs')
-                and not cms[1].get('selfDebuffing', False)
-                and (cms[1].get('buffApplyChance', 0) or 0) > (cms[0].get('buffApplyChance', 0) or 0)):
-            cms[0], cms[1] = cms[1], cms[0]
-
-        # Line 734-744: Zap Cannon / Registeel clause
-        if (cms[0].get('moveId') == 'FOCUS_BLAST'
-                and cms[1].get('moveId') == 'ZAP_CANNON'):
-            if _buff_adj_dpe(cms[1]) - _buff_adj_dpe(cms[0]) > -0.3:
-                cms[0]['buffs'] = [0, 0]
-                cms[0]['buffTarget'] = 'self'
-                cms[0]['selfDebuffing'] = True
-            else:
-                cms[0].pop('buffs', None)
-                cms[0].pop('buffTarget', None)
-                cms[0].pop('selfDebuffing', None)
-
-        # Line 756-762: similar energy — promote selfBuffing move
-        if (cms[1]['energy'] - cms[0]['energy'] <= 10
-                and not cms[1].get('selfDebuffing', False)
-                and cms[1].get('selfBuffing', False)
-                and _buff_adj_dpe(cms[0]) - _buff_adj_dpe(cms[1]) < 0.3):
-            cms[0], cms[1] = cms[1], cms[0]
-
-        # Line 767-771: demote selfAttackDebuffing
-        if (cms[1]['energy'] - cms[0]['energy'] <= 10
-                and cms[0].get('selfAttackDebuffing', False)
-                and not cms[1].get('selfDebuffing', False)):
-            cms[0], cms[1] = cms[1], cms[0]
-
-        # Line 775-779: demote expensive (>50 energy) selfDebuffing
-        if (cms[1]['energy'] - cms[0]['energy'] <= 10
-                and cms[0].get('selfDebuffing', False)
-                and cms[0]['energy'] > 50
-                and not cms[1].get('selfDebuffing', False)):
-            cms[0], cms[1] = cms[1], cms[0]
-
-        # Line 783-787: promote close-energy selfBuffing as bait
-        if (cms[1]['energy'] - cms[0]['energy'] <= 5
-                and cms[1].get('selfBuffing', False)):
-            cms[0], cms[1] = cms[1], cms[0]
-    cm_dmgs    = [a_cm_dmgs[a_idx_map[id(m)]] for m in cms]
-    cm_energy  = [m['energy'] for m in cms]
     # original-charged-moves index for each sorted entry — used by callers
     # that need to return an index into attacker.charged_moves
-    cm_orig_idx = [a_idx_map[id(m)] for m in cms]
-    # Per-cm self-debuff flag and net debuff delta — precomputed once so the
-    # near-KO DP body can update its scalar plan summary in O(1) without dict
-    # lookups on each move dispatch.
-    cm_self_debuf = [1 if m.get('selfDebuffing', False) else 0 for m in cms]
-    cm_debuf_delta = [_cm_debuf_delta(m) for m in cms]
-    # Per-cm atk-stage delta applied to the ATTACKER on throw.
-    # Mirrors PvPoke ActionLogic.js lines 519-535: chance-1 self-atk-buff
-    # increases attackMult, chance-1 opp-def-debuff also increases
-    # attackMult (scaling atk/def). Only chance-1 effects contribute —
-    # PvPoke zeros changeTTKChance unconditionally before the DP.
-    def _cm_buff_delta(m: dict) -> int:
-        buffs = m.get('buffs')
-        if not buffs:
-            return 0
-        # buffApplyChance may be a string in raw gamemaster data.
-        if float(m.get('buffApplyChance', 0) or 0) != 1.0:
-            return 0
-        bt = m.get('buffTarget', '')
-        if bt == 'self' and buffs[0] > 0:
-            return buffs[0]
-        if bt == 'opponent' and buffs[1] < 0:
-            return -buffs[1]
-        return 0
-    cm_buff_delta = [_cm_buff_delta(m) for m in cms]
+    cm_orig_idx = dp_cache['order']
+    cms     = [a_charged[i] for i in cm_orig_idx]
+    n_cms   = len(cms)
+    cm_dmgs = [a_cm_dmgs[i] for i in cm_orig_idx]
+    cm_energy      = dp_cache['cm_energy']
+    cm_self_debuf  = dp_cache['cm_self_debuf']
+    cm_debuf_delta = dp_cache['cm_debuf_delta']
+    cm_buff_delta  = dp_cache['cm_buff_delta']
 
     def _orig_idx(move: dict) -> int:
         """Map a move back to its index in attacker.charged_moves."""
@@ -1263,47 +1273,29 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     final_state: "_DPState | None" = None
     iters = 0
 
-    # Per-atk-stage damage tables for the DP.
+    # Per-atk-stage damage tables for the DP (cached — see _ensure_dp_cache).
     # atk_stage runs over [-4, +4]; index as stage + 4 → [0..8].
     # Each entry recomputes damage from raw power/atk/def via calc_damage
     # (floor semantics) rather than multiplicatively scaling the root-stage
     # damage — keeps KO thresholds exact at the 1-HP margin.
     root_atk_stage = attacker.atk_stage
-    def_eff_val = defender.def_ * _stat_stage_mult(defender.def_stage)
-    atk_base = attacker.atk
-    atk_types = attacker.types
-    def_types = defender.types
-    fm_power = attacker.fast_move['power']
-    fm_type  = attacker.fast_move['type']
-    cm_dmgs_by_stage: list[list[int]] = []
-    fast_dmg_by_stage: list[int] = []
-    for _s_off in range(9):         # stage -4 .. +4
-        _s = _s_off - 4
-        _atk_eff = atk_base * _stat_stage_mult(_s)
-        cm_dmgs_by_stage.append([
-            calc_damage(cm['power'], _atk_eff, def_eff_val,
-                        cm['type'], atk_types, def_types)
-            for cm in cms
-        ])
-        fast_dmg_by_stage.append(
-            calc_damage(fm_power, _atk_eff, def_eff_val,
-                        fm_type, atk_types, def_types)
-        )
+    cm_dmgs_by_stage  = dp_cache['cm_dmgs_by_stage']
+    fast_dmg_by_stage = dp_cache['fast_dmg_by_stage']
 
     if _NEAR_KO_DP_JIT is not None:
         # Numba-JIT'd inner DP. Same algorithm as the Python loop below;
         # operates on numpy scalar arrays for ~5-10x inner-loop speedup.
-        cm_dmgs_np    = _np.asarray(cm_dmgs, dtype=_np.float64)
-        cm_energy_np  = _np.asarray(cm_energy, dtype=_np.int64)
-        cm_self_db_np = _np.asarray(cm_self_debuf, dtype=_np.int8)
-        cm_db_dlt_np  = _np.asarray(cm_debuf_delta, dtype=_np.int8)
-        cm_buff_dlt_np = _np.asarray(cm_buff_delta, dtype=_np.int8)
-        cm_dmgs_stage_np = _np.asarray(cm_dmgs_by_stage, dtype=_np.float64)
-        fast_dmg_stage_np = _np.asarray(fast_dmg_by_stage, dtype=_np.int64)
+        # The root-stage damage row of the stage table is computed by the
+        # same calc_damage inputs as _cached_charged_dmgs, so it doubles
+        # as the cm_dmgs argument (root-stage ordering tiebreak).
+        cm_dmgs_stage_np = dp_cache['cm_dmgs_stage_np']
         (found, _first, _max_idx, _has_deb, _deb_cnt,
          _f_turn, _f_hp, _f_sh, iters) = _NEAR_KO_DP_JIT(
-            cm_dmgs_np, cm_energy_np, cm_self_db_np, cm_db_dlt_np,
-            cm_buff_dlt_np, cm_dmgs_stage_np, fast_dmg_stage_np,
+            cm_dmgs_stage_np[root_atk_stage + 4],
+            dp_cache['cm_energy_np'], dp_cache['cm_self_db_np'],
+            dp_cache['cm_db_dlt_np'],
+            dp_cache['cm_buff_dlt_np'], cm_dmgs_stage_np,
+            dp_cache['fast_dmg_stage_np'],
             int(root_atk_stage),
             n_cms,
             int(attacker.energy),
@@ -1774,6 +1766,16 @@ class BattlePokemon:
     _cached_charged_dmgs: list      = field(init=False, repr=False)
     _cm_id_to_idx:        dict      = field(init=False, repr=False)
 
+    # pvpoke_dp setup cache (vs current opponent at current stat stages).
+    # Holds the priority-shuffled move order, per-move scalar arrays, the
+    # per-atk-stage damage tables for the near-KO DP, and (when numba is
+    # available) the numpy buffers passed to the JIT. Rebuilt by key
+    # comparison like the damage cache above; without it, pvpoke_dp
+    # re-sorted the moves and recomputed 9 stage rows of calc_damage on
+    # every call (~27 damage computations x ~32 calls per sim), which was
+    # the dominant cost of the 2026-04-15 stage-aware DP fix.
+    _dp_cache: "dict | None" = field(init=False, repr=False)
+
     # Form change state (None for Pokemon without form changes)
     _form_change:          "FormChangeConfig | None" = field(init=False, repr=False)
     _form_is_alt:          bool = field(init=False, repr=False)
@@ -1798,6 +1800,7 @@ class BattlePokemon:
         # its precomputed entry even when the policy passes a sorted copy
         # of self.charged_moves (same dict objects, different order).
         self._cm_id_to_idx = {id(cm): i for i, cm in enumerate(self.charged_moves)}
+        self._dp_cache = None
         # Form change state
         self._form_change = None
         self._form_is_alt = False
@@ -1874,6 +1877,91 @@ class BattlePokemon:
         self._dmg_cache_opp_id    = id(defender)
         self._dmg_cache_atk_stage = self.atk_stage
         self._dmg_cache_def_stage = defender.def_stage
+
+    def _ensure_dp_cache(self, defender: "BattlePokemon") -> dict:
+        """Return the pvpoke_dp setup cache vs `defender` at the current
+        stat stages, rebuilding it if the key no longer matches.
+
+        Contents (all in priority-shuffled order, cheapest-energy-first
+        before the shuffle):
+          order              original charged_moves index per sorted slot
+          cm_energy          energy cost per slot
+          cm_self_debuf      1/0 selfDebuffing flag per slot
+          cm_debuf_delta     dedup tie-break delta per slot
+          cm_buff_delta      chance-1 attacker atk-stage delta per slot
+          cm_dmgs_by_stage   9 rows (atk stage -4..+4) of charged damage
+          fast_dmg_by_stage  9 entries of fast-move damage
+          *_np               numpy views of the above for the JIT
+                             (present only when numba is available)
+
+        Same staleness caveats as the damage cache: keyed on id(defender)
+        plus both stat stages, explicitly invalidated on form change.
+        """
+        dp = self._dp_cache
+        if (dp is not None
+                and dp['opp_id'] == id(defender)
+                and dp['atk_stage'] == self.atk_stage
+                and dp['def_stage'] == defender.def_stage):
+            return dp
+        self._ensure_dmg_cache(defender)
+        idx_map = self._cm_id_to_idx
+        cm_dmgs_root = self._cached_charged_dmgs
+
+        # PvPoke's activeChargedMoves is sorted by energy (cheapest first),
+        # then reordered by the priority-shuffle (Pokemon.js lines 711-787).
+        cms = sorted(self.charged_moves, key=lambda m: m['energy'])
+        if len(cms) > 1:
+            _priority_shuffle(cms, cm_dmgs_root, idx_map)
+
+        # Per-atk-stage damage tables for the near-KO DP.
+        # atk_stage runs over [-4, +4]; index as stage + 4 → [0..8].
+        # Each entry recomputes damage from raw power/atk/def via
+        # calc_damage (floor semantics) rather than multiplicatively
+        # scaling the root-stage damage — keeps KO thresholds exact at
+        # the 1-HP margin.
+        def_eff_val = defender.def_ * _stat_stage_mult(defender.def_stage)
+        atk_base = self.atk
+        atk_types = self.types
+        def_types = defender.types
+        fm_power = self.fast_move['power']
+        fm_type  = self.fast_move['type']
+        cm_dmgs_by_stage: list[list[int]] = []
+        fast_dmg_by_stage: list[int] = []
+        for _s_off in range(9):         # stage -4 .. +4
+            _s = _s_off - 4
+            _atk_eff = atk_base * _stat_stage_mult(_s)
+            cm_dmgs_by_stage.append([
+                calc_damage(cm['power'], _atk_eff, def_eff_val,
+                            cm['type'], atk_types, def_types)
+                for cm in cms
+            ])
+            fast_dmg_by_stage.append(
+                calc_damage(fm_power, _atk_eff, def_eff_val,
+                            fm_type, atk_types, def_types)
+            )
+
+        dp = {
+            'opp_id':    id(defender),
+            'atk_stage': self.atk_stage,
+            'def_stage': defender.def_stage,
+            'order':          [idx_map[id(m)] for m in cms],
+            'cm_energy':      [m['energy'] for m in cms],
+            'cm_self_debuf':  [1 if m.get('selfDebuffing', False) else 0
+                               for m in cms],
+            'cm_debuf_delta': [_cm_debuf_delta(m) for m in cms],
+            'cm_buff_delta':  [_cm_buff_delta(m) for m in cms],
+            'cm_dmgs_by_stage':  cm_dmgs_by_stage,
+            'fast_dmg_by_stage': fast_dmg_by_stage,
+        }
+        if _NEAR_KO_DP_JIT is not None:
+            dp['cm_energy_np']      = _np.asarray(dp['cm_energy'], dtype=_np.int64)
+            dp['cm_self_db_np']     = _np.asarray(dp['cm_self_debuf'], dtype=_np.int8)
+            dp['cm_db_dlt_np']      = _np.asarray(dp['cm_debuf_delta'], dtype=_np.int8)
+            dp['cm_buff_dlt_np']    = _np.asarray(dp['cm_buff_delta'], dtype=_np.int8)
+            dp['cm_dmgs_stage_np']  = _np.asarray(cm_dmgs_by_stage, dtype=_np.float64)
+            dp['fast_dmg_stage_np'] = _np.asarray(fast_dmg_by_stage, dtype=_np.int64)
+        self._dp_cache = dp
+        return dp
 
     def fast_move_damage(self, defender: "BattlePokemon") -> int:
         if (self._dmg_cache_opp_id != id(defender)
