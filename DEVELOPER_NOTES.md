@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (2026-04-06)
 
-<!-- sync:test_count -->729<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->735<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The simulator matches PvPoke's
 simulate-mode score table exactly (±0) for <!-- sync:pvpoke_matchups_verified -->8<!-- /sync --> matchups
@@ -125,6 +125,53 @@ rankings/gamemaster cache refreshes, expect drift — re-baseline by
 re-running on a commit with a known-good number rather than comparing
 across data vintages. cProfile runs (`--profile`) are ~2-5x slower
 than wall-time runs; only compare like with like.
+
+**Caveat when benchmarking dives (not the canonical benchmark above):**
+since arc S4, `deep_dive.py` serves IV sweeps from the per-opponent-
+column disk cache by default, so a repeated dive command reports 0
+sims. Pass `--no-sweep-cache` for timing runs.
+
+## Sweep disk cache + replay-from-saved-state (arc S4)
+
+Two iteration-speed layers shipped 2026-06-10; full design rationale
+in CHANGELOG ("Sweep disk cache + replay-from-saved-state").
+
+**Sweep cache** (`scripts/sweep_cache.py`): `iv_sweep` persists each
+opponent's score column to `~/.cache/gopvpsim/sweep/` and skips
+cache-hit opponents entirely. Keys include the moveset, scenarios,
+bait mode, an engine-source hash (battle.py, _dp_jit.py, moves.py,
+formchange.py, pokemon.py — any edit invalidates automatically), and
+a gamemaster content hash; opponent-side keys carry resolved IVs +
+moveset, so rankings drift produces clean misses rather than stale
+hits. Columns are raw float64 in canonical iv_meta order — hits are
+bit-identical to fresh sims (pinned by tests/test_sweep_cache.py).
+Operational notes:
+
+- `--no-sweep-cache` forces fresh sims (timing runs, debugging).
+- Hit log line per sweep: `sweep cache: N/M opponent columns hit`
+  (nothing printed on an all-miss sweep).
+- Stale key-dirs accumulate as engine/gamemaster evolve; the cache
+  has no auto-purge. `rm -r ~/.cache/gopvpsim/sweep` is always safe.
+- Library callers (tests, verify scripts) default to OFF; only the
+  CLI turns it on.
+
+**Replay** (`scripts/replay_analysis.py`): every interactive dive
+dumps its render-input state to `userdata/replay/*.replay.pkl.gz`
+right after sims complete (skip with `--no-replay-dump`). To iterate
+on renderer/analysis-section code without re-simming:
+
+```
+python scripts/replay_analysis.py userdata/replay/<blob> [--html OUT]
+```
+
+This re-runs `deep_dive.render_dive_html` — the same code path the
+live dive uses, split-moveset mode included — and produces HTML
+byte-identical to the original dive's. Prefer this over the old
+inline-HTML-editing workaround when the change is in Python renderer
+code (inline edits remain fine for pure JS/CSS tweaks in built
+files). Blobs are ~1MB for smokes, ~10MB for website-scale dives,
+and accumulate in userdata/replay/ (gitignored, never published);
+delete old ones freely.
 
 ## PvPoke bugs found
 

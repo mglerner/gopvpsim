@@ -883,10 +883,14 @@ def _scenario_str(scenarios):
 
 def _opp_colored(name):
     """Wrap opponent name in a colored span."""
-    # Use a simple hash for consistent coloring
+    # md5, not builtin hash(): str hashing is PYTHONHASHSEED-randomized
+    # per process, which made these colors differ run-to-run (and broke
+    # replay-vs-original HTML equality, which is how it was caught —
+    # arc S4). Same approach as deep_dive_rendering._opp_color.
+    import hashlib
     colors = ['#58a6ff', '#f85149', '#3fb950', '#d29922', '#bc8cff',
               '#f0883e', '#e8e6e3', '#79c0ff', '#7ee787', '#d2a8ff']
-    idx = hash(name) % len(colors)
+    idx = int(hashlib.md5(name.encode()).hexdigest(), 16) % len(colors)
     return f'<span style="color:{colors[idx]};font-weight:600">{name}</span>'
 
 
