@@ -2725,7 +2725,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               standalone=False, slayer_iter_result=None,
                               cli_args_str=None, has_toml_tiers=False,
                               shadow=False, split_info=None,
-                              _precomputed_analysis=None,
                               article_slug='',
                               threshold_registry=None,
                               species_narrative=None,
@@ -2984,43 +2983,36 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # every spread satisfies - would mark every point on the scatter
     # as anchor-cleared and defeat the highlighting purpose.
     SELECTIVITY_MAX_PASS_RATE = 0.5
-    if _precomputed_analysis is not None and 'anchorClearIvs' in _precomputed_analysis:
-        data_obj['anchorClearIvs'] = _precomputed_analysis['anchorClearIvs']
-        data_obj['anchorClearByIv'] = _precomputed_analysis['anchorClearByIv']
-    else:
-        anchor_cleared_by_idx: dict = {}
-        if slayer_iter_result:
-            ra = slayer_iter_result.get('resolved_anchors', []) or []
-            if ra:
-                mset_key = f'0_{opp_iv_modes[0]}'
-                sf = score_arrays.get(mset_key, [])
-                if sf:
-                    # Build a stub data_obj-shaped dict the aggregator can read.
-                    # It only needs ivAtk/ivDef.
-                    stub = {'ivAtk': iv_atk, 'ivDef': iv_def}
-                    records = _aggregate_flips_by_anchor(
-                        sf, n_ivs, n_scenarios, n_opponents,
-                        ra, stub, shield_scenarios, opponent_names,
-                    )
-                    for rec in records:
-                        passing = rec.get('passing_ivs', [])
-                        if not passing:
-                            continue
-                        pass_rate = len(passing) / n_ivs if n_ivs else 0.0
-                        if pass_rate > SELECTIVITY_MAX_PASS_RATE:
-                            continue  # too easy - skip for overlay purposes
-                        label = (rec['anchor'].parent_display_name
-                                 or rec['anchor'].label
-                                 or rec['anchor'].parent)
-                        for iv in passing:
-                            anchor_cleared_by_idx.setdefault(iv, set()).add(label)
-        data_obj['anchorClearIvs'] = sorted(anchor_cleared_by_idx.keys())
-        data_obj['anchorClearByIv'] = {
-            str(idx): sorted(labels) for idx, labels in anchor_cleared_by_idx.items()
-        }
-        if _precomputed_analysis is not None:
-            _precomputed_analysis['anchorClearIvs'] = data_obj['anchorClearIvs']
-            _precomputed_analysis['anchorClearByIv'] = data_obj['anchorClearByIv']
+    anchor_cleared_by_idx: dict = {}
+    if slayer_iter_result:
+        ra = slayer_iter_result.get('resolved_anchors', []) or []
+        if ra:
+            mset_key = f'0_{opp_iv_modes[0]}'
+            sf = score_arrays.get(mset_key, [])
+            if sf:
+                # Build a stub data_obj-shaped dict the aggregator can read.
+                # It only needs ivAtk/ivDef.
+                stub = {'ivAtk': iv_atk, 'ivDef': iv_def}
+                records = _aggregate_flips_by_anchor(
+                    sf, n_ivs, n_scenarios, n_opponents,
+                    ra, stub, shield_scenarios, opponent_names,
+                )
+                for rec in records:
+                    passing = rec.get('passing_ivs', [])
+                    if not passing:
+                        continue
+                    pass_rate = len(passing) / n_ivs if n_ivs else 0.0
+                    if pass_rate > SELECTIVITY_MAX_PASS_RATE:
+                        continue  # too easy - skip for overlay purposes
+                    label = (rec['anchor'].parent_display_name
+                             or rec['anchor'].label
+                             or rec['anchor'].parent)
+                    for iv in passing:
+                        anchor_cleared_by_idx.setdefault(iv, set()).add(label)
+    data_obj['anchorClearIvs'] = sorted(anchor_cleared_by_idx.keys())
+    data_obj['anchorClearByIv'] = {
+        str(idx): sorted(labels) for idx, labels in anchor_cleared_by_idx.items()
+    }
 
     # ---- Wins-based y-axis data ----
     # The interactive scatter's y-axis defaults to avg battle score, but
@@ -3646,34 +3638,30 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # We embed it into DATA below so JS can light up "which of your
     # IVs hit this breakpoint" annotations when a CSV is loaded.
     #
-    # In split-movesets mode the analysis is identical across files
-    # (always uses moveset_idx=0), so the caller can pass a shared dict
-    # via _precomputed_analysis. On the first call (dict is empty), we
-    # compute and populate it; subsequent calls read from the cache.
-    # ``moveset0_flavors`` is plumbed through so the analysis can rename
-    # tier cards to the flavor-matched name before rendering them.
-    if _precomputed_analysis is not None and 'css' in _precomputed_analysis:
-        analysis_css = _precomputed_analysis['css']
-        results_html = _precomputed_analysis['results_html']
-        analysis_html = _precomputed_analysis['analysis_html']
-        anchor_passing_sink = _precomputed_analysis['anchor_passing_sink']
-    else:
-        anchor_passing_sink = {}
-        analysis_css, results_html, analysis_html = generate_analysis_sections(
-            data_obj, score_arrays, 0, opp_iv_modes[0],
-            shield_scenarios, opponent_names,
-            slayer_iter_result=slayer_iter_result,
-            has_toml_tiers=has_toml_tiers,
-            anchor_passing_sink=anchor_passing_sink,
-            threshold_registry=threshold_registry,
-            moveset0_flavors_for_rename=moveset0_flavors)
-        if _precomputed_analysis is not None:
-            _precomputed_analysis.update({
-                'css': analysis_css,
-                'results_html': results_html,
-                'analysis_html': analysis_html,
-                'anchor_passing_sink': anchor_passing_sink,
-            })
+    # NOTE: always computed per call. In split-movesets mode each file's
+    # moveset_data is filtered so index 0 is THAT FILE's moveset — the
+    # analysis genuinely differs per file. A cross-file cache here
+    # (fa34f39, removed 2026-06-10) silently served moveset-0's analysis
+    # sections in every split file for eight weeks; see the tripwire
+    # assertion below. ``moveset0_flavors`` is plumbed through so the
+    # analysis can rename tier cards to the flavor-matched name before
+    # rendering them.
+    anchor_passing_sink = {}
+    analysis_css, results_html, analysis_html = generate_analysis_sections(
+        data_obj, score_arrays, 0, opp_iv_modes[0],
+        shield_scenarios, opponent_names,
+        slayer_iter_result=slayer_iter_result,
+        has_toml_tiers=has_toml_tiers,
+        anchor_passing_sink=anchor_passing_sink,
+        threshold_registry=threshold_registry,
+        moveset0_flavors_for_rename=moveset0_flavors)
+    # Tripwire: a split-mode file must carry its OWN moveset's analysis.
+    # This is what would have caught the fa34f39 cache immediately.
+    if split_info is not None:
+        _expected = f"Moveset: {_pretty_moveset(data_obj['movesets'][0]['label'])}"
+        assert _expected in results_html, (
+            f"split-mode analysis subheader mismatch: expected '{_expected}' "
+            f"in the Deep Dive Results section of {html_path}")
     data_obj['anchorFlipSets'] = anchor_passing_sink
     # Inject analysis CSS into the style block (replace closing tag we already emitted)
     html = html.replace('</style>\n</head>', analysis_css + '\n</style>\n</head>', 1)
@@ -5263,13 +5251,16 @@ def main():
                     moveset_data, reference_idx, args.html,
                 )
                 logger.info(f"  Split mode: emitting {len(split_files)} per-moveset HTML files")
-                # Precompute analysis on the first file - it always uses
-                # moveset_idx=0 scores so the result is identical across
-                # all split files. Avoids re-running the expensive anchor
-                # aggregator + matchup boundary sweeps N times. The empty
-                # dict gets populated by the first call; subsequent calls
-                # see it non-empty and skip recomputation.
-                _cached_analysis = {}
+                # Each file computes its own analysis sections: the
+                # filtered moveset_data puts THIS file's moveset at index
+                # 0, so the anchor aggregator + boundary sweeps genuinely
+                # differ per file. (A cross-file analysis cache lived here
+                # 2026-04-12..06-10 on the wrong premise that the results
+                # were identical — every non-landing split file shipped
+                # moveset-0's analysis. If split render time ever hurts,
+                # re-optimize INSIDE generate_analysis_sections with
+                # moveset-keyed caching, never by sharing rendered HTML
+                # across files.)
                 for finfo in split_files:
                     mi = finfo['moveset_idx']
                     filtered_md, filtered_ref_idx = _filter_moveset_data_for_split(
@@ -5289,7 +5280,6 @@ def main():
                         has_toml_tiers=_toml_tiers_loaded,
                         shadow=args.shadow,
                         split_info=split_info,
-                        _precomputed_analysis=_cached_analysis,
                         article_slug=_article_slug,
                         threshold_registry=threshold_registry,
                         species_narrative=_species_narrative,
