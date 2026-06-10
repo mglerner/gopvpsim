@@ -499,10 +499,12 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
         cm_dmg = attacker.charged_move_damage(cm, defender)
         if cm_dmg >= defender.hp / 1.4 and fast_dpt > 1.5:
             use_shield = True
-            cm_reasons.append(f"{cm.get('moveId')}({cm_dmg})≥hp/1.4({defender.hp/1.4:.0f})&dpt({fast_dpt:.1f})>1.5")
+            if _shield_trace:
+                cm_reasons.append(f"{cm.get('moveId')}({cm_dmg})≥hp/1.4({defender.hp/1.4:.0f})&dpt({fast_dpt:.1f})>1.5")
         if cm_dmg >= defender.hp - cycle_damage:
             use_shield = True
-            cm_reasons.append(f"{cm.get('moveId')}({cm_dmg})≥hp-cycle({defender.hp}-{cycle_damage}={defender.hp-cycle_damage})")
+            if _shield_trace:
+                cm_reasons.append(f"{cm.get('moveId')}({cm_dmg})≥hp-cycle({defender.hp}-{cycle_damage}={defender.hp-cycle_damage})")
 
     if _shield_trace:
         buff_note = ""
@@ -2111,6 +2113,10 @@ def simulate(
     use_priority = (p0.atk != p1.atk)
 
     def log_event(msg: str):
+        # Call sites must gate on `if log:` themselves — the f-string
+        # argument is evaluated before the call, and at millions of sims
+        # the discarded formatting is measurable. The check here is a
+        # backstop only.
         if log:
             timeline.append(f"T{turn:>3}: {msg}")
 
@@ -2162,7 +2168,8 @@ def simulate(
                     _pending.append((i, 'charged', move_idx))
                 else:
                     fm = p.fast_move
-                    log_event(f"{p.species} uses {fm.get('name', fm['moveId'])}")
+                    if log:
+                        log_event(f"{p.species} uses {fm.get('name', fm['moveId'])}")
                     if fm['_turns'] == 1:
                         # PvPoke: requiredTimeToPass = 0 → fires same step.
                         _pending.append((i, 'fast_1', fm))
@@ -2214,10 +2221,11 @@ def simulate(
             attacker.cooldown = 0
             attacker._fm_since_charge += 1
 
-            log_event(
-                f"{attacker.species} fast → {dmg} dmg, "
-                f"energy {attacker.energy}"
-            )
+            if log:
+                log_event(
+                    f"{attacker.species} fast → {dmg} dmg, "
+                    f"energy {attacker.energy}"
+                )
 
         # --- 4. Resolve charged moves (higher priority first) ---
         # Skip if defender was already killed by the fast move this turn.
@@ -2261,7 +2269,8 @@ def simulate(
                 _fc_mid = attacker._form_change.forms[int(attacker._form_is_alt)].move_id
                 if _fc_mid == 'ANY' or _fc_mid == move['moveId']:
                     attacker.change_form(defender)
-                    log_event(f"{attacker.species} changed form")
+                    if log:
+                        log_event(f"{attacker.species} changed form")
 
             _, shield_pol = policies[1 - actor_idx]
             use_shield    = shield_pol(attacker, defender, move)
@@ -2273,9 +2282,11 @@ def simulate(
                 # Form change: activate_shield (Aegislash Blade -> Shield)
                 if defender.current_form_trigger == 'activate_shield':
                     defender.change_form(attacker)
-                    log_event(f"{defender.species} changed form (shielded)")
+                    if log:
+                        log_event(f"{defender.species} changed form (shielded)")
 
-                log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → SHIELDED (1 dmg)")
+                if log:
+                    log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → SHIELDED (1 dmg)")
             else:
                 dmg = attacker.charged_move_damage(move, defender)
 
@@ -2287,9 +2298,10 @@ def simulate(
                     dmg = 1
                     defender._form_disguise_active = False
                     defender.change_form(attacker)
-                    log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → {dmg} dmg")
-                    log_event(f"{defender.species} disguise busted (1 dmg)")
-                else:
+                    if log:
+                        log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → {dmg} dmg")
+                        log_event(f"{defender.species} disguise busted (1 dmg)")
+                elif log:
                     log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → {dmg} dmg")
 
             defender.hp = max(0, defender.hp - dmg)
@@ -2305,7 +2317,8 @@ def simulate(
                 _fc_mid = attacker._form_change.forms[int(attacker._form_is_alt)].move_id
                 if _fc_mid == 'ANY' or _fc_mid == move['moveId']:
                     attacker.change_form(defender)
-                    log_event(f"{attacker.species} changed form")
+                    if log:
+                        log_event(f"{attacker.species} changed form")
 
         # After any charged move this turn, fire "floating" fast moves then reset.
         # PvPoke Battle.js: a fast move queued in the same turn as a charged move
@@ -2325,10 +2338,11 @@ def simulate(
                             p.energy = min(ENERGY_CAP, p.energy + qmove['energyGain'])
                             defender.hp = max(0, defender.hp - dmg)
                             p._fm_since_charge += 1
-                            log_event(
-                                f"{p.species} floating fast → {dmg} dmg, "
-                                f"energy {p.energy}"
-                            )
+                            if log:
+                                log_event(
+                                    f"{p.species} floating fast → {dmg} dmg, "
+                                    f"energy {p.energy}"
+                                )
             for p in pokemon:
                 p.cooldown = 0
                 p._queued_fast = None
