@@ -6,6 +6,57 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-10 — Sweep disk cache + replay-from-saved-state (perf+correctness arc S4)
+
+Two iteration-speed features, both exact-by-construction:
+
+**Per-opponent-column sweep disk cache** (`scripts/sweep_cache.py`,
+`iv_sweep(use_sweep_cache=...)`, on by default in the CLI,
+`--no-sweep-cache` to disable). A sweep decomposes into independent
+per-opponent score columns, so the cache keys each column by
+(focal species/league/shadow/moveset/iv_floor/scenarios/bait mode +
+engine-source hash + gamemaster content hash) × (opponent species/
+shadow/resolved IVs/level/moveset). Columns store raw float64 per-IV
+scores (canonical iv_meta order) under `~/.cache/gopvpsim/sweep/`, so
+hits are bit-identical to fresh sims. An unchanged dive command re-runs
+all-hits (smoke: 16/16 columns, 0 sims, 113s → 53s wall — remainder is
+slayer iteration + render); a pool edit sims only the new/changed
+columns. Engine edits auto-invalidate via the source hash (battle.py,
+_dp_jit.py, moves.py, formchange.py, pokemon.py) — no manual version
+bump to forget. Old key-dirs accumulate; clear with
+`rm -r ~/.cache/gopvpsim/sweep` when disk matters. avg_score now sums
+per_opp in canonical (si, oi) order so float accumulation is identical
+regardless of cache-hit pattern.
+
+**Replay-from-saved-state** (`scripts/replay_analysis.py`). The HTML
+render tail of `main()` is factored into `render_dive_html(state)`;
+the dive dumps the full render-input state (moveset data + scores,
+thresholds, slayer result, narrative, registry) to
+`userdata/replay/*.replay.pkl.gz` right after sims complete
+(`--no-replay-dump` to skip; ~1MB smoke / ~10MB website-scale blob).
+`replay_analysis.py BLOB [--html OUT]` re-renders the dive through the
+exact same code path in seconds-to-a-minute instead of a full re-sim —
+the renderer/analysis iteration loop the inline-HTML-editing workflow
+was approximating. Verified: replayed HTML is byte-identical to the
+original dive's, single-file and split-moveset modes both.
+
+Byte-identical verification flushed out two pre-existing run-to-run
+nondeterminisms, both fixed: `_opp_colored` (deep_dive_narrative.py)
+keyed colors off builtin `hash()` (PYTHONHASHSEED-randomized per
+process) → md5; SCORES_GZ embedded the gzip mtime header → `mtime=0`.
+
+Also fixed pain point #7 (project_post_ship_cleanup_pain_points):
+`_STAT_NP_CACHE`/`_SCORE_NP_CACHE` in deep_dive_analysis.py keyed by
+`id()` of host dicts with no liveness guarantee; entries now pin the
+host dict (strong ref) and identity-check on read, so id reuse is
+impossible and a future dive-A-vs-dive-B path stays correct.
+
+Tests: +6 (tests/test_sweep_cache.py — column roundtrip/shape/key
+separation, iv_sweep end-to-end second-run-0-sims + bit-equality +
+incremental pool edit vs no-cache ground truth, replay dump/load
+roundtrip; sentinel 729→735). Engine files untouched — no bench/oracle
+rerun required.
+
 ## 2026-06-10 — Damage-signature dedup in IV sweeps (perf+correctness arc S3)
 
 Sweep sims now dedup per-opponent by **damage signature**: the audit

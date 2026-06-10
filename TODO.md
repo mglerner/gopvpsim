@@ -867,6 +867,12 @@ across Post-S5 Sessions S6-S10 (2026-04-17/18). Open polish:
        start so users notice when their dive's opponent set is unusual.
   Option 1 + option 3 together is probably the right starting point —
   cheap, doesn't require any new infra.
+  *Update 2026-06-10 (arc S4):* the sweep disk cache key now hashes
+  gamemaster content and keys opponents by their *resolved* IVs +
+  movesets (see DEVELOPER_NOTES "Sweep disk cache"), so cached scores
+  can never silently mix data vintages — but the HTML fingerprint /
+  run-start logging for human-visible drift detection (options 1+3)
+  remains open.
 
 ## UI / Display
 

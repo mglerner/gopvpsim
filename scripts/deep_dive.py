@@ -1250,7 +1250,8 @@ def _sweep_worker(pair_chunk):
 def iv_sweep(species, fast_id, charged_ids, league, shadow,
              opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke',
              iv_floor=None, log_path=None, verbose=False,
-             threshold_registry=None, reserve_cpus=0, signature_dedup=True):
+             threshold_registry=None, reserve_cpus=0, signature_dedup=True,
+             use_sweep_cache=False):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
@@ -1265,6 +1266,13 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     (signature, opponent) covers the whole group. Provably exact;
     ``--no-signature-dedup`` / signature_dedup=False restores the
     per-profile path (used by the verification script and tests).
+
+    With ``use_sweep_cache``, per-opponent score columns are persisted
+    to disk (see scripts/sweep_cache.py) and opponents whose column key
+    hits are skipped entirely — an unchanged dive command re-runs
+    all-hits, a pool edit sims only the new/changed columns. Off by
+    default so library callers and tests always sim; the deep_dive CLI
+    turns it on unless --no-sweep-cache is passed.
 
     opp_iv_mode may be a composite mode string encoding a bait-shields axis:
       'pvpoke', 'rank1'        - bait-on (default pvpoke_dp behavior)
@@ -1313,6 +1321,10 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
             # no-op for species without a formChange entry).
             'mon': opp_mon, 'ivs': (oa, od, os_),
             'level': opp_pokemon.level,
+            # Sweep-cache column key ingredients (resolved move IDs;
+            # display-name differences with identical resolution
+            # correctly share a column).
+            'fast_id': opp_fast, 'charged_ids': list(opp_charged),
         })
 
     # Pre-compute IV metadata and group by stat profile (focal-side dedup).
@@ -1326,32 +1338,59 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         iv_meta, per_iv=focal_per_iv)
     profile_list = [(pk, *dat) for pk, dat in profile_data.items()]
 
+    # Sweep disk cache: load per-opponent score columns from previous
+    # runs (see scripts/sweep_cache.py); only cache-miss opponents get
+    # simmed below. Columns store post-fan-out per-IV float64 scores in
+    # canonical iv_meta order, so hits are bit-identical to a fresh sim.
+    n_ivs_total = len(iv_meta)
+    sweep_cache = None
+    cached_cols = {}  # oi -> ndarray (n_ivs, n_scenarios)
+    if use_sweep_cache:
+        import sweep_cache as swc
+        sweep_cache = swc.SweepCache(swc.focal_key_fields(
+            species, league, shadow, fast_id, charged_ids,
+            iv_floor, shield_scenarios, bait_mode))
+        for oi, opp in enumerate(opp_cache):
+            col = sweep_cache.get_column(
+                swc.column_key_fields(opp['species'], opp['shadow'],
+                                      opp['ivs'], opp['level'],
+                                      opp['fast_id'], opp['charged_ids']),
+                n_ivs_total, len(shield_scenarios))
+            if col is not None:
+                cached_cols[oi] = col
+        if cached_cols:
+            logger.info(f"      sweep cache: {len(cached_cols)}/"
+                        f"{len(opp_cache)} opponent columns hit")
+    missing_ois = [oi for oi in range(len(opp_cache))
+                   if oi not in cached_cols]
+
     # Signature dedup: per opponent, group profiles whose battles are
     # provably bit-identical (same damage tables both ways, same CMP
     # sign, same HP — see deep_dive_signature.py) and sim one
     # representative per group.
     n_profiles = len(profile_list)
-    if signature_dedup:
+    if signature_dedup and missing_ois:
         import deep_dive_signature as sig
         focal_side = sig.build_focal_side(
             focal_mon, focal_types, fm_template, cms_template,
             profile_list, LEAGUE_CAPS[league], shadow)
-        groups_by_opp = [
-            sig.signature_groups(focal_side,
-                                 sig.build_opp_side(opp, LEAGUE_CAPS[league]))
-            for opp in opp_cache
-        ]
+        groups_by_opp = {
+            oi: sig.signature_groups(
+                focal_side,
+                sig.build_opp_side(opp_cache[oi], LEAGUE_CAPS[league]))
+            for oi in missing_ois
+        }
     else:
         trivial = [(pos, [pos]) for pos in range(n_profiles)]
-        groups_by_opp = [trivial for _ in opp_cache]
+        groups_by_opp = {oi: trivial for oi in missing_ois}
 
     pair_list = [(profile_list[rep_pos], oi)
-                 for oi, groups in enumerate(groups_by_opp)
+                 for oi, groups in groups_by_opp.items()
                  for rep_pos, _members in groups]
-    total_pairs = n_profiles * len(opp_cache)
+    total_pairs = n_profiles * len(missing_ois)
     if signature_dedup and pair_list:
         logger.info(f"      signature dedup: {n_profiles} profiles x "
-                    f"{len(opp_cache)} opponents -> {len(pair_list)} "
+                    f"{len(missing_ois)} opponents -> {len(pair_list)} "
                     f"representative pairs "
                     f"({total_pairs / len(pair_list):.2f}x)")
 
@@ -1366,27 +1405,28 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     import time as _time
     sim_start = _time.time()
     chunk_results = []
-    with multiprocessing.Pool(
-        processes=n_workers,
-        initializer=_sweep_worker_init,
-        initargs=(species, focal_types, fm_template, cms_template,
-                  opp_cache, shield_scenarios, focal_bait,
-                  log_path, verbose,
-                  focal_mon, LEAGUE_CAPS[league], shadow),
-    ) as pool:
-        last_print = sim_start
-        completed = 0
-        for result in pool.imap_unordered(_sweep_worker, chunks):
-            chunk_results.append(result)
-            completed += 1
-            now = _time.time()
-            if now - last_print >= 10 and completed < len(chunks):
-                elapsed = now - sim_start
-                frac = completed / len(chunks)
-                eta = (elapsed / frac) * (1 - frac)
-                logger.info(f"      progress: {completed}/{len(chunks)} chunks "
-                            f"({frac*100:.0f}%), eta {eta:.0f}s")
-                last_print = now
+    if chunks:  # all-columns-hit sweeps skip the pool entirely
+        with multiprocessing.Pool(
+            processes=n_workers,
+            initializer=_sweep_worker_init,
+            initargs=(species, focal_types, fm_template, cms_template,
+                      opp_cache, shield_scenarios, focal_bait,
+                      log_path, verbose,
+                      focal_mon, LEAGUE_CAPS[league], shadow),
+        ) as pool:
+            last_print = sim_start
+            completed = 0
+            for result in pool.imap_unordered(_sweep_worker, chunks):
+                chunk_results.append(result)
+                completed += 1
+                now = _time.time()
+                if now - last_print >= 10 and completed < len(chunks):
+                    elapsed = now - sim_start
+                    frac = completed / len(chunks)
+                    eta = (elapsed / frac) * (1 - frac)
+                    logger.info(f"      progress: {completed}/{len(chunks)} chunks "
+                                f"({frac*100:.0f}%), eta {eta:.0f}s")
+                    last_print = now
 
     # Merge pair results, then fan each representative's scores out to
     # every profile in its signature group.
@@ -1397,13 +1437,44 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         n_sims += chunk_sims
 
     profile_per_opp = {}
-    for oi, groups in enumerate(groups_by_opp):
+    for oi, groups in groups_by_opp.items():
         for rep_pos, members in groups:
             scores = pair_scores[(profile_list[rep_pos][0], oi)]
             for pos in members:
                 per_opp = profile_per_opp.setdefault(profile_list[pos][0], {})
                 for si, sc in enumerate(scores):
                     per_opp[(si, oi)] = sc
+
+    # Fill cache-hit columns: all IVs in a profile share effective
+    # stats, hence identical battles, so the profile's first IV index
+    # reads the stored per-IV column exactly.
+    iv_idx_by_profile = None
+    if cached_cols:
+        iv_idx_by_profile = {pk: idxs[0]
+                             for pk, idxs in profile_to_indices.items()}
+        for oi, col in cached_cols.items():
+            for pk, rep_idx in iv_idx_by_profile.items():
+                per_opp = profile_per_opp.setdefault(pk, {})
+                for si in range(len(shield_scenarios)):
+                    per_opp[(si, oi)] = float(col[rep_idx, si])
+
+    # Persist freshly simmed columns (expanded to per-IV order).
+    if sweep_cache is not None and missing_ois:
+        import numpy as _np
+        import sweep_cache as swc
+        for oi in missing_ois:
+            opp = opp_cache[oi]
+            col = _np.empty((n_ivs_total, len(shield_scenarios)),
+                            dtype=_np.float64)
+            for pk, idxs in profile_to_indices.items():
+                scores = [profile_per_opp[pk][(si, oi)]
+                          for si in range(len(shield_scenarios))]
+                col[idxs, :] = scores
+            sweep_cache.put_column(
+                swc.column_key_fields(opp['species'], opp['shadow'],
+                                      opp['ivs'], opp['level'],
+                                      opp['fast_id'], opp['charged_ids']),
+                col)
 
     # Build per-IV results by expanding profile sims to all matching IVs.
     # The list is built in canonical iteration order (matches iv_meta order).
@@ -1413,8 +1484,13 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     for idx, meta in enumerate(iv_meta):
         pk = _stat_profile_key(meta, per_iv=focal_per_iv)
         per_opp = profile_per_opp[pk]
-        # Compute avg_score for this IV (same for all IVs sharing the profile)
-        total_score = sum(per_opp.values())
+        # Compute avg_score for this IV (same for all IVs sharing the
+        # profile). Sum in canonical (si, oi) order, not dict insertion
+        # order: with the sweep cache, insertion order depends on which
+        # columns were hits, and float accumulation order must not.
+        total_score = sum(per_opp[(si, oi)]
+                          for si in range(n_scenarios)
+                          for oi in range(n_opponents))
         count = len(per_opp)
         avg_score = total_score / count if count else 0
         result = dict(meta)  # copy a, d, s, level, cp, atk, def_, hp, stat_product
@@ -3850,7 +3926,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     for key, arr in score_arrays.items():
         clamped = [max(0, min(65535, int(v))) for v in arr]
         raw = struct.pack(f'<{len(clamped)}H', *clamped)
-        gz = gzip.compress(raw, compresslevel=9)
+        # mtime=0: the gzip header embeds a timestamp by default, which
+        # made byte-identical data produce different HTML run-to-run
+        # (caught by replay-vs-original diffing, arc S4).
+        gz = gzip.compress(raw, compresslevel=9, mtime=0)
         packed_scores[key] = base64.b64encode(gz).decode('ascii')
     # Dedup'd tooltip table: renderers register tooltip text as they
     # emit data-t="<sid>" attrs; we dump {sid: text} here and a
@@ -4185,6 +4264,125 @@ def _shell_quote(s: str) -> str:
     return "'" + s.replace("'", "'\"'\"'") + "'"
 
 
+# ---------------------------------------------------------------------------
+# Replay-from-saved-state (arc S4)
+# ---------------------------------------------------------------------------
+# The HTML render tail is factored out of main() and driven by a plain
+# state dict so the exact same code path serves two callers: the live
+# dive (which dumps the state right after sims complete) and
+# scripts/replay_analysis.py (which loads the dump and re-renders after
+# renderer/analysis code changes, without re-simming).
+
+def dump_replay_state(state, path=None):
+    """Pickle+gzip the render-input state; return the path (or None).
+
+    Best-effort: a dump failure must never kill a completed dive, so
+    errors degrade to a warning. Default path is under userdata/replay/
+    (gitignored, never published by publish_website.sh).
+    """
+    import gzip
+    import pickle
+    from datetime import datetime
+    try:
+        if path is None:
+            ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+            slug = (state['species'].replace(' ', '_')
+                    .replace('(', '').replace(')', ''))
+            shadow_tag = '_shadow' if state.get('shadow') else ''
+            path = os.path.join(
+                'userdata', 'replay',
+                f"{ts}_{slug}_{state['league']}{shadow_tag}.replay.pkl.gz")
+        os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+        with gzip.open(path, 'wb', compresslevel=4) as f:
+            pickle.dump(state, f, protocol=pickle.HIGHEST_PROTOCOL)
+        return path
+    except Exception as e:
+        logger.warning(f"replay state dump failed ({e}); dive output is "
+                       f"unaffected, but this run can't be replayed")
+        return None
+
+
+def load_replay_state(path):
+    """Load a replay state blob written by dump_replay_state."""
+    import gzip
+    import pickle
+    with gzip.open(path, 'rb') as f:
+        return pickle.load(f)
+
+
+def render_dive_html(state):
+    """Render the interactive HTML output (split or single) from a
+    replayable state dict. Keys mirror generate_interactive_html's
+    kwargs plus the few main()/CLI fields the tail needs."""
+    moveset_data = state['moveset_data']
+    reference_idx = state['reference_idx']
+    if state['split_movesets'] and len(moveset_data) > 1:
+        # Per-moveset split: emit N files, one per moveset. The
+        # filesystem plan is computed up-front so every file
+        # knows every sibling's URL for its navigation dropdown.
+        split_files = _build_split_file_list(
+            moveset_data, reference_idx, state['html_path'],
+        )
+        logger.info(f"  Split mode: emitting {len(split_files)} per-moveset HTML files")
+        # Each file computes its own analysis sections: the
+        # filtered moveset_data puts THIS file's moveset at index
+        # 0, so the anchor aggregator + boundary sweeps genuinely
+        # differ per file. (A cross-file analysis cache lived here
+        # 2026-04-12..06-10 on the wrong premise that the results
+        # were identical — every non-landing split file shipped
+        # moveset-0's analysis. If split render time ever hurts,
+        # re-optimize INSIDE generate_analysis_sections with
+        # moveset-keyed caching, never by sharing rendered HTML
+        # across files.)
+        for finfo in split_files:
+            mi = finfo['moveset_idx']
+            filtered_md, filtered_ref_idx = _filter_moveset_data_for_split(
+                moveset_data, mi, reference_idx,
+            )
+            split_info = {'files': split_files, 'current': mi}
+            generate_interactive_html(
+                state['species'], state['league'], filtered_md, finfo['path'],
+                thresholds=state['thresholds'],
+                opponent_label=state['opponent_label'],
+                shield_scenarios=state['shield_scenarios'],
+                opponent_names=state['opponent_names'],
+                opp_iv_modes=state['opp_iv_modes'],
+                reference_idx=filtered_ref_idx,
+                standalone=state['standalone'],
+                slayer_iter_result=state['slayer_iter_result'],
+                cli_args_str=state['cli_args_str'],
+                has_toml_tiers=state['has_toml_tiers'],
+                shadow=state['shadow'],
+                split_info=split_info,
+                article_slug=state['article_slug'],
+                threshold_registry=state['threshold_registry'],
+                species_narrative=state['species_narrative'],
+                shared_plotly_dir=state['shared_plotly_dir'],
+            )
+    else:
+        if state['split_movesets']:
+            logger.warning("--split-movesets: only one moveset surviving - "
+                           "writing a single file")
+        generate_interactive_html(
+            state['species'], state['league'], moveset_data, state['html_path'],
+            thresholds=state['thresholds'],
+            opponent_label=state['opponent_label'],
+            shield_scenarios=state['shield_scenarios'],
+            opponent_names=state['opponent_names'],
+            opp_iv_modes=state['opp_iv_modes'],
+            reference_idx=reference_idx,
+            standalone=state['standalone'],
+            slayer_iter_result=state['slayer_iter_result'],
+            cli_args_str=state['cli_args_str'],
+            has_toml_tiers=state['has_toml_tiers'],
+            shadow=state['shadow'],
+            article_slug=state['article_slug'],
+            threshold_registry=state['threshold_registry'],
+            species_narrative=state['species_narrative'],
+            shared_plotly_dir=state['shared_plotly_dir'],
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='IV deep dive: sim all 4096 IV spreads against meta opponents.',
@@ -4387,6 +4585,17 @@ def main():
                              'opponent). The dedup is provably exact; this '
                              'flag exists for verification runs '
                              '(scripts/verify_signature_dedup.py) and debugging.')
+    parser.add_argument('--no-sweep-cache', action='store_true',
+                        help='Disable the per-opponent-column sweep disk '
+                             'cache (~/.cache/gopvpsim/sweep/). The key '
+                             'includes engine source + gamemaster hashes, '
+                             'so hits are bit-identical; this flag forces '
+                             'a fresh sim for timing runs and debugging.')
+    parser.add_argument('--no-replay-dump', action='store_true',
+                        help='Skip writing the replay state blob '
+                             '(userdata/replay/) that lets '
+                             'scripts/replay_analysis.py re-render this '
+                             'dive\'s HTML without re-simming.')
 
     args = parser.parse_args()
 
@@ -4898,6 +5107,7 @@ def main():
             threshold_registry=threshold_registry,
             reserve_cpus=args.reserve_cpus,
             signature_dedup=not args.no_signature_dedup,
+            use_sweep_cache=not args.no_sweep_cache,
         )
 
         elapsed = time.time() - t0
@@ -5274,6 +5484,7 @@ def main():
                             threshold_registry=threshold_registry,
                             reserve_cpus=args.reserve_cpus,
                             signature_dedup=not args.no_signature_dedup,
+                            use_sweep_cache=not args.no_sweep_cache,
                         )
                         elapsed = time.time() - t0
                         rate = n_sims / elapsed if elapsed > 0 else 0
@@ -5309,6 +5520,7 @@ def main():
                             threshold_registry=threshold_registry,
                             reserve_cpus=args.reserve_cpus,
                             signature_dedup=not args.no_signature_dedup,
+                            use_sweep_cache=not args.no_sweep_cache,
                         )
                         elapsed = time.time() - t0
                         logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
@@ -5346,6 +5558,7 @@ def main():
                             threshold_registry=threshold_registry,
                             reserve_cpus=args.reserve_cpus,
                             signature_dedup=not args.no_signature_dedup,
+                            use_sweep_cache=not args.no_sweep_cache,
                         )
                         elapsed = time.time() - t0
                         rate = ref_n / elapsed if elapsed > 0 else 0
@@ -5369,69 +5582,39 @@ def main():
                     'meta': meta,
                 })
 
-            if args.split_movesets and len(moveset_data) > 1:
-                # Per-moveset split: emit N files, one per moveset. The
-                # filesystem plan is computed up-front so every file
-                # knows every sibling's URL for its navigation dropdown.
-                split_files = _build_split_file_list(
-                    moveset_data, reference_idx, args.html,
-                )
-                logger.info(f"  Split mode: emitting {len(split_files)} per-moveset HTML files")
-                # Each file computes its own analysis sections: the
-                # filtered moveset_data puts THIS file's moveset at index
-                # 0, so the anchor aggregator + boundary sweeps genuinely
-                # differ per file. (A cross-file analysis cache lived here
-                # 2026-04-12..06-10 on the wrong premise that the results
-                # were identical — every non-landing split file shipped
-                # moveset-0's analysis. If split render time ever hurts,
-                # re-optimize INSIDE generate_analysis_sections with
-                # moveset-keyed caching, never by sharing rendered HTML
-                # across files.)
-                for finfo in split_files:
-                    mi = finfo['moveset_idx']
-                    filtered_md, filtered_ref_idx = _filter_moveset_data_for_split(
-                        moveset_data, mi, reference_idx,
-                    )
-                    split_info = {'files': split_files, 'current': mi}
-                    generate_interactive_html(
-                        args.species, args.league, filtered_md, finfo['path'],
-                        thresholds=thresholds, opponent_label=opponent_label,
-                        shield_scenarios=shield_scenarios,
-                        opponent_names=opponents,
-                        opp_iv_modes=opp_iv_modes_to_run,
-                        reference_idx=filtered_ref_idx,
-                        standalone=args.standalone,
-                        slayer_iter_result=main_slayer_iter_result,
-                        cli_args_str=cli_args_str,
-                        has_toml_tiers=_toml_tiers_loaded,
-                        shadow=args.shadow,
-                        split_info=split_info,
-                        article_slug=_article_slug,
-                        threshold_registry=threshold_registry,
-                        species_narrative=_species_narrative,
-                        shared_plotly_dir=args.shared_plotly,
-                    )
-            else:
-                if args.split_movesets:
-                    logger.warning("--split-movesets: only one moveset surviving - "
-                                   "writing a single file")
-                generate_interactive_html(
-                    args.species, args.league, moveset_data, args.html,
-                    thresholds=thresholds, opponent_label=opponent_label,
-                    shield_scenarios=shield_scenarios,
-                    opponent_names=opponents,
-                    opp_iv_modes=opp_iv_modes_to_run,
-                    reference_idx=reference_idx,
-                    standalone=args.standalone,
-                    slayer_iter_result=main_slayer_iter_result,
-                    cli_args_str=cli_args_str,
-                    has_toml_tiers=_toml_tiers_loaded,
-                    shadow=args.shadow,
-                    article_slug=_article_slug,
-                    threshold_registry=threshold_registry,
-                    species_narrative=_species_narrative,
-                    shared_plotly_dir=args.shared_plotly,
-                )
+            # All render inputs are now in hand: snapshot them so
+            # scripts/replay_analysis.py can re-render this dive after
+            # renderer/analysis code changes without re-simming.
+            state = {
+                'species': args.species,
+                'league': args.league,
+                'shadow': args.shadow,
+                'html_path': args.html,
+                'split_movesets': args.split_movesets,
+                'standalone': args.standalone,
+                'shared_plotly_dir': args.shared_plotly,
+                'moveset_data': moveset_data,
+                'thresholds': thresholds,
+                'opponent_label': opponent_label,
+                'shield_scenarios': shield_scenarios,
+                'opponent_names': opponents,
+                'opp_iv_modes': opp_iv_modes_to_run,
+                'reference_idx': reference_idx,
+                'slayer_iter_result': main_slayer_iter_result,
+                'cli_args_str': cli_args_str,
+                'has_toml_tiers': _toml_tiers_loaded,
+                'article_slug': _article_slug,
+                'threshold_registry': threshold_registry,
+                'species_narrative': _species_narrative,
+            }
+            if not args.no_replay_dump:
+                _replay_path = dump_replay_state(state)
+                if _replay_path:
+                    logger.info(f"  Replay state: {_replay_path}")
+                    logger.info(f"    (re-render without re-simming: "
+                                f"python scripts/replay_analysis.py "
+                                f"{_replay_path})")
+            render_dive_html(state)
         else:
             # Static mode (original behavior)
             generate_html(args.species, args.league, all_moveset_results, args.html,

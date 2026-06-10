@@ -15,9 +15,15 @@ from gopvpsim.moves import type_effectiveness
 # The narrative + tier-cutoff probes are called repeatedly with the same
 # data_obj / score_arrays dicts within a dive; converting once amortises
 # the ~25ms-per-score-array asarray+reshape over all calls. Keyed by
-# id() of the host dict: dive processes are one-shot so a stale id after
-# gc would only matter if another dict of the same shape reused the id,
-# which is fine here because the cache value is correct for that shape.
+# id() of the host dict, with each entry ALSO holding a strong reference
+# to that dict: the reference pins the object alive, so its id() can
+# never be reused by a different dict, and the identity check on read
+# makes a collision impossible even if a future "compare dive A vs B"
+# path keeps several host dicts live at once (arc S4 fix for the
+# id-reuse fragility flagged in project_post_ship_cleanup_pain_points
+# #7). Entries persist until _invalidate_np_caches(); dive processes
+# host a handful of dicts so the pinning cost is negligible, and tests
+# clear between fixtures.
 _STAT_NP_CACHE: dict = {}
 _SCORE_NP_CACHE: dict = {}
 
@@ -26,29 +32,30 @@ def _np_stats(data_obj):
     """Return (ivAtk, ivDef, ivHp) as numpy arrays, cached per data_obj."""
     key = id(data_obj)
     cached = _STAT_NP_CACHE.get(key)
-    if cached is not None:
-        return cached
+    if cached is not None and cached[0] is data_obj:
+        return cached[1]
     atk = np.asarray(data_obj['ivAtk'])
     def_ = np.asarray(data_obj['ivDef'])
     hp = np.asarray(data_obj['ivHp'])
-    _STAT_NP_CACHE[key] = (atk, def_, hp)
+    _STAT_NP_CACHE[key] = (data_obj, (atk, def_, hp))
     return (atk, def_, hp)
 
 
 def _np_scores(score_arrays_all, moveset_idx, mode, nIvs, nS, nO):
     """Return reshaped (nIvs, nS, nO) score array, or None if missing.
 
-    Caches per (id(score_arrays_all), moveset_idx, mode).
+    Caches per (id(score_arrays_all), moveset_idx, mode); the host dict
+    is pinned by the entry (see cache comment above).
     """
     key = (id(score_arrays_all), moveset_idx, mode)
     cached = _SCORE_NP_CACHE.get(key)
-    if cached is not None:
-        return cached
+    if cached is not None and cached[0] is score_arrays_all:
+        return cached[1]
     raw = score_arrays_all.get(f'{moveset_idx}_{mode}')
     if raw is None or len(raw) == 0:
         return None
     arr = np.asarray(raw).reshape(nIvs, nS, nO)
-    _SCORE_NP_CACHE[key] = arr
+    _SCORE_NP_CACHE[key] = (score_arrays_all, arr)
     return arr
 
 
