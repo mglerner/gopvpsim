@@ -63,11 +63,11 @@ def _make_data_obj():
 
 
 def _make_slayer_categories(data_obj):
-    """Synthesize a categorize_slayers-style dict.
+    """Synthesize a build_slayer_archetypes-style dict.
 
-    Atk Slayer = IVs 0 and 1 (high atk).
-    Bulk Slayer = IVs 2 and 3 (mid/high def + hp).
-    CMP Slayer empty.
+    Anchors-First Slayer = IVs 0 and 1 (high atk).
+    CMP-First Slayer = IVs 2 and 3.
+    Empty Archetype = empty (drop-empty-buckets case).
     """
     def _row(idx, total_wins):
         return {
@@ -82,9 +82,9 @@ def _make_slayer_categories(data_obj):
         }
 
     return {
-        'Atk Slayer': [_row(1, 132), _row(0, 45)],  # 1 first (more wins)
-        'Bulk Slayer': [_row(3, 90), _row(2, 80)],
-        'CMP Slayer': [],
+        'Anchors-First Slayer': [_row(1, 132), _row(0, 45)],  # 1 first (more wins)
+        'CMP-First Slayer': [_row(3, 90), _row(2, 80)],
+        'Empty Archetype': [],
     }
 
 
@@ -94,12 +94,12 @@ def test_build_categories_slayer_kinds_only():
     cats = build_iv_categories(data_obj, slayer)
 
     by_name = {c.name: c for c in cats}
-    # Three slayer + two tier + composites
-    assert 'Atk Slayer' in by_name
-    assert 'Bulk Slayer' in by_name
-    assert 'CMP Slayer' not in by_name  # empty buckets dropped
+    # Two archetypes + two tier + composites
+    assert 'Anchors-First Slayer' in by_name
+    assert 'CMP-First Slayer' in by_name
+    assert 'Empty Archetype' not in by_name  # empty buckets dropped
 
-    atk = by_name['Atk Slayer']
+    atk = by_name['Anchors-First Slayer']
     assert atk.kind == 'slayer'
     assert atk.members == [0, 1]  # sorted ascending
     assert 1 in atk.member_meta
@@ -125,20 +125,20 @@ def test_build_categories_tier_kinds():
 
 
 def test_composite_categories_intersection():
-    """The Annihilape 13/0/11-style case: an IV in BOTH Atk Slayer and
+    """The Annihilape 13/0/11-style case: an IV in BOTH an archetype and
     a stat-cutoff tier should surface as a composite category."""
     data_obj = _make_data_obj()
     slayer = _make_slayer_categories(data_obj)
     cats = build_iv_categories(data_obj, slayer)
     by_name = {c.name: c for c in cats}
 
-    # IV 1 is the only one in BOTH Atk Slayer and Top 5%.
-    comp_name = 'Atk Slayer ∩ Top 5%'
+    # IV 1 is the only one in BOTH Anchors-First Slayer and Top 5%.
+    comp_name = 'Anchors-First Slayer ∩ Top 5%'
     assert comp_name in by_name, f"missing composite; got {sorted(by_name)}"
     comp = by_name[comp_name]
     assert comp.kind == 'composite'
     assert comp.members == [1]
-    assert comp.source_categories == ['Atk Slayer', 'Top 5%']
+    assert comp.source_categories == ['Anchors-First Slayer', 'Top 5%']
     assert comp.source_tier == 'Top 5%'
     assert comp.stat_cutoffs == {'atk': 128, 'def': None, 'hp': 139}
     # member_meta merged from both parents
@@ -150,9 +150,9 @@ def test_no_composite_when_no_intersection():
     """If no IV lives in both a slayer and a tier category, no composite
     is emitted (we don't manufacture empty intersections)."""
     data_obj = _make_data_obj()
-    # Custom slayer dict where Atk Slayer covers IVs that AREN'T in any tier.
+    # Custom dict where the archetype covers IVs that AREN'T in any tier.
     slayer = {
-        'Atk Slayer': [{
+        'Anchors-First Slayer': [{
             'iv': (data_obj['ivA'][0], data_obj['ivD'][0], data_obj['ivS'][0]),
             'atk': data_obj['ivAtk'][0],
             'def_': data_obj['ivDef'][0],
@@ -161,8 +161,7 @@ def test_no_composite_when_no_intersection():
             'avg_score': 500.0,
             '_anchor_tags': {},
         }],
-        'Bulk Slayer': [],
-        'CMP Slayer': [],
+        'CMP-First Slayer': [],
     }
     cats = build_iv_categories(data_obj, slayer)
     composites = [c for c in cats if c.kind == 'composite']
@@ -260,7 +259,7 @@ def test_render_notable_ivs_emits_composite_card():
 
     assert html  # non-empty
     # Composite card title is present
-    assert 'Atk Slayer ∩ Top 5%' in html
+    assert 'Anchors-First Slayer ∩ Top 5%' in html
     # Notability filter checkbox is present
     assert 'dd-notable-only-cb' in html
     assert 'Show only notable categories' in html

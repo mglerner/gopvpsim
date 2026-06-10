@@ -573,51 +573,38 @@ move selection closed 2026-04-15 as not-a-real-issue.)
 
 ## Slayer iteration cleanup
 
-* **Mirror-slayer re-look: objective semantics + tie explosion**
-  *(scoped 2026-06-10 during the perf-review session; needs its own
-  design session — do NOT bundle with engine perf work)*
+* **Mirror-slayer re-look: objective semantics + tie explosion —
+  RESOLVED 2026-06-10 (arc S2)** — Both halves shipped per Michael's
+  four design decisions (output surface: replace section; metric:
+  fractional wins + score tiebreak; CMP population: top-mirror ranks,
+  Nash secondary; old labels: retired).
 
-  **Semantics question (Michael's framing).** There are two distinct
-  mirror-slayer archetypes, and the current code computes neither
-  directly:
-
-  1. **Anchors-first**: "hit the important break/bulkpoints; after
-     that, win CMP as much as possible." Lexicographic: filter the
-     4096 IVs by chosen anchors, THEN maximize atk / mirror-CMP%
-     among survivors.
-  2. **CMP-first ("lab mon")**: "win CMP as first priority, pick up
-     break/bulkpoints as a secondary goal." Lexicographic the other
-     way: take max-atk viable spreads, then report which anchors
-     they clear vs miss.
-
-  Both are nearly sim-free given the anchor resolver (anchor
-  membership is closed-form; CMP% is an atk comparison against an
-  opponent population). What today's `iterative_slayer_discovery`
-  actually optimizes is a third thing: integer scenario-win count
-  vs an endogenous self-play cohort, with anchors applied only as
-  post-hoc labels in `categorize_slayers` and CMP nowhere in the
-  objective. The Nash cohort is still useful — but as the *opponent
-  population* against which CMP% and wins are evaluated, not as the
-  optimization target itself. (The dracoviz tournament-CP item under
-  "Analysis goals" could eventually supply an *empirical* mirror
-  population for the same role.)
-
-  **Efficiency finding (observed live 2026-06-10).** The
-  keep-all-tied rule (`eb145a2`) defeats the `--mirror-slayer-pool`
-  cap: Round 0 scores IVs vs ONE opponent over ≤9 scenarios, so win
-  counts are 0-9 and thousands of IVs tie at the top. Concrete
-  Tinkaton GL run: pool cap 30, but Round 1 ran 2,756 opponents ×
-  2,978 profiles × 9 scenarios = **8.2M sims, ~80% of the whole
-  dive's sim budget**. The same tied-pool explosion is the root
-  cause of three documented pains: slayer rounds dominating dive
-  wall time, the Jumpluff 60.7 MB HTML tables (1,608 tied rows),
-  and the "Slayer-card signal-loss audit" below (everyone ties →
-  no signal). Fix shapes: a graded round metric (score margins or
-  per-opponent win vectors) so exact ties are rare, and/or sample
-  representative opponents from a tied pool instead of taking all
-  of them. Any fix here shrinks the HTML and signal-loss problems
-  for free — decide this BEFORE investing in either of those
-  separately.
+  - **Semantics**: `build_slayer_archetypes` (deep_dive_slayer.py)
+    makes the two archetypes first-class, sim-free outputs:
+    **Anchors-First Slayer** (clear the max achievable number of
+    counted anchor parents, then rank by Top-Mirror CMP% / atk;
+    explicit TOML parents always count, auto parents only when
+    cleared by <50% of the IV space) and **CMP-First Slayer**
+    (max-atk "lab mon" rows with a clears-vs-sacrifices anchor
+    checklist). The Nash iteration is demoted to producing the
+    mirror opponent population: `all_scores` (dense per-IV mirror
+    wins vs the converged pool) feeds the archetype rows and the
+    winsMirror y-axis; the Nash cohort remains only as the secondary
+    "Nash CMP %" column. Atk/Bulk/CMP Slayer labels retired
+    (vocabulary updated in docs/concepts.md); Notable IVs composites
+    and the scatter star-diamond overlay now key off the two
+    archetypes. The old "Mirror Slayer Iteration" HTML section is
+    replaced by compact "Slayer Builds" tables (top-100 row cap,
+    no per-row data-anchors attribute, filter-panel JS deleted) —
+    this also de-fangs the Jumpluff 60.7MB-table mechanism for
+    future dives.
+  - **Tie explosion**: round metric is now graded (per-opponent
+    fractional scenario credit, same formulation as Matchups Kept
+    `bb6f63e`, avg-score tiebreak); `_cut_pool` honors
+    `--mirror-slayer-pool` exactly except on exact metric ties.
+    (The dracoviz tournament-CP item under "Analysis goals" could
+    eventually supply an *empirical* mirror population to replace
+    the Nash pool entirely.)
 
 * **Investigate inconsistent slayer Max Wins column** *(cosmetic, not
   blocking — ranking is correct)* — Yesterday's
@@ -670,7 +657,14 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   HTML" history note.
 
 * **Mirror-slayer iteration tables blow up HTML size for high-anchor
-  species** *(real instance, surfaced 2026-06-05 on Jumpluff GL)* —
+  species — MECHANISM REMOVED 2026-06-10 (arc S2)** — the redesigned
+  Slayer Builds renderer emits at most 100 rows per archetype table,
+  drops the per-row `data-anchors` attribute entirely (the filter-panel
+  JS that consumed it is deleted), and the tie-explosion fix caps the
+  survivor pool at `--mirror-slayer-pool`. The 60.7MB pathology can't
+  recur on future renders; re-dive Jumpluff (S6) to shrink the
+  published file. Historical detail below kept for the record.
+  *(original entry, 2026-06-05)* —
   Jumpluff regular GL dive HTML is 60.7 MB (vs Ninetales 15.2 MB,
   Shadow Sableye 17.6 MB, etc.). 47 MB of the 60 MB lives in the
   analysis-sections body, almost entirely in two tables:

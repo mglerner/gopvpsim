@@ -6,6 +6,61 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-10 — Mirror-slayer redesign: archetypes + tie-explosion fix (perf+correctness arc S2)
+
+Interactive design session with Michael; his four decisions: replace
+the HTML section, fractional-wins + score-tiebreak round metric,
+top-mirror cohort as the primary CMP denominator (Nash secondary),
+retire the Atk/Bulk/CMP Slayer labels.
+
+**Archetypes are now the first-class output.**
+`build_slayer_archetypes` (deep_dive_slayer.py, replaces
+`categorize_slayers`) classifies the FULL IV space, sim-free:
+
+- **Anchors-First Slayer** — clear the max achievable number of
+  counted anchor parents, then rank by Top-Mirror CMP% / atk.
+  Explicit TOML parents always count; auto parents only when
+  selective (<50% pass rate) — the slayer-card signal-loss fix.
+- **CMP-First Slayer ("lab mon")** — top-N max-atk spreads with a
+  clears-vs-sacrifices anchor checklist; no anchor required.
+
+The Nash iteration is demoted to producing the mirror opponent
+population: new `all_scores` export (dense per-IV mirror wins vs the
+converged pool) feeds the archetype rows and makes the winsMirror
+y-axis dense (4096 values vs ~30); the Nash cohort survives only as
+the secondary "Nash CMP %" column (JS "Mirror Slayer CMP %"
+unchanged). Top-Mirror CMP% computed Python-side with the same
+semantics as the JS (2dp rounding, ties-as-beats, top-50 by avg
+score, self included).
+
+**Tie explosion fixed.** Round metric is graded — per-opponent credit
+= scenarios won / scenarios counted (the Matchups Kept formulation,
+`bb6f63e`), avg-score tiebreak; `_cut_pool` honors
+`--mirror-slayer-pool` exactly except on exact metric ties. Smoke
+measurement (Tinkaton GL, pool 30): Round 1 = 29 opponents × 2,978
+profiles ≈ 86k sims vs the old 2,756 × 2,978 × 9 = 8.2M (~95× cut);
+slayer phase 20.7s and no longer dominates the dive budget.
+
+**HTML.** "Mirror Slayer Iteration" section replaced by "Slayer
+Builds": two compact archetype tables (Anchors/CMP% columns, badge
+walls with per-anchor tooltips, 100-row hard cap with an explicit
+dropped-count note), iteration diagnostics collapsed, Level-3
+sub-anchor distribution kept. Per-row `data-anchors` attributes and
+the filter-panel JS/CSS deleted — the Jumpluff 60.7MB-table mechanism
+is gone. Scatter star-diamonds, Notable IVs composites, and the
+collection table now key off the two archetype names (plumbing was
+name-agnostic). docs/concepts.md vocabulary updated.
+
+Gates: 710 passed + 14 xfailed (sentinel 722→724; +3 new tests, −1
+retired); engine files untouched so no bench/oracle rerun required.
+Smoke HTML: /tmp scale, 2.97MB, tables capped, dense mirrorWinsByIv
+confirmed.
+
+Watch item for S6 re-dives: Tinkaton's Anchors-First cohort is broad
+(1,349 IVs clear the max-cleared parent count) — ranking makes the
+top rows meaningful, but if broad cohorts recur, consider requiring
+all counted parents or tightening the selectivity gate.
+
 ## 2026-06-10 — Form-change plumbing in dive workers (perf+correctness arc S1)
 
 The deep-dive sweep/slayer workers (and the phase-1 moveset screen)
