@@ -69,24 +69,26 @@ def build_inputs(n_focal_profiles, n_opp_profiles):
 
 
 def run_sims(focal, opps, fm_template, cms_template, types):
+    # Mirrors slayer_iter_worker: one BattlePokemon pair per (focal, opp),
+    # reset_for_battle between shield scenarios (keeps caches warm).
     n = 0
     for atk_f, def_f, hp_f in focal:
         for atk_o, def_o, hp_o in opps:
+            bp0 = BattlePokemon(
+                species=SPECIES, types=types,
+                atk=atk_f, def_=def_f, max_hp=hp_f,
+                fast_move=dict(fm_template),
+                charged_moves=[dict(cm) for cm in cms_template],
+            )
+            bp1 = BattlePokemon(
+                species=SPECIES, types=types,
+                atk=atk_o, def_=def_o, max_hp=hp_o,
+                fast_move=dict(fm_template),
+                charged_moves=[dict(cm) for cm in cms_template],
+            )
             for s0, s1 in SHIELD_SCENARIOS:
-                bp0 = BattlePokemon(
-                    species=SPECIES, types=types,
-                    atk=atk_f, def_=def_f, max_hp=hp_f,
-                    fast_move=dict(fm_template),
-                    charged_moves=[dict(cm) for cm in cms_template],
-                    shields=s0,
-                )
-                bp1 = BattlePokemon(
-                    species=SPECIES, types=types,
-                    atk=atk_o, def_=def_o, max_hp=hp_o,
-                    fast_move=dict(fm_template),
-                    charged_moves=[dict(cm) for cm in cms_template],
-                    shields=s1,
-                )
+                bp0.reset_for_battle(s0, opponent=bp1)
+                bp1.reset_for_battle(s1, opponent=bp0)
                 simulate(bp0, bp1,
                          charged_policy_0=pvpoke_dp,
                          charged_policy_1=pvpoke_dp)

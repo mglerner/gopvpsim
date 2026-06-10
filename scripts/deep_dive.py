@@ -1184,21 +1184,24 @@ def _sweep_worker(profile_chunk):
     for profile_key, atk_stat, def_stat, hp_stat in profile_chunk:
         per_opp = {}
         for oi, opp in enumerate(opp_cache):
+            # One BattlePokemon pair per (profile, opponent), reset between
+            # scenarios — keeps the damage/DP caches warm across the
+            # shield-scenario axis instead of rebuilding them per sim.
+            bp0 = BattlePokemon(
+                species=species, types=focal_types,
+                atk=atk_stat, def_=def_stat, max_hp=hp_stat,
+                fast_move=dict(fm_template),
+                charged_moves=[dict(cm) for cm in cms_template],
+            )
+            bp1 = BattlePokemon(
+                species=opp['species'], types=opp['types'],
+                atk=opp['atk'], def_=opp['def_'], max_hp=opp['hp'],
+                fast_move=dict(opp['fm']),
+                charged_moves=[dict(cm) for cm in opp['cms']],
+            )
             for si, (s_focal, s_opp) in enumerate(shield_scenarios):
-                bp0 = BattlePokemon(
-                    species=species, types=focal_types,
-                    atk=atk_stat, def_=def_stat, max_hp=hp_stat,
-                    fast_move=dict(fm_template),
-                    charged_moves=[dict(cm) for cm in cms_template],
-                    shields=s_focal,
-                )
-                bp1 = BattlePokemon(
-                    species=opp['species'], types=opp['types'],
-                    atk=opp['atk'], def_=opp['def_'], max_hp=opp['hp'],
-                    fast_move=dict(opp['fm']),
-                    charged_moves=[dict(cm) for cm in opp['cms']],
-                    shields=s_opp,
-                )
+                bp0.reset_for_battle(s_focal, opponent=bp1)
+                bp1.reset_for_battle(s_opp, opponent=bp0)
                 result = simulate(bp0, bp1,
                                   charged_policy_0=focal_policy,
                                   charged_policy_1=pvpoke_dp)
