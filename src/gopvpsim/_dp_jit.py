@@ -43,8 +43,10 @@ TTL_STACK_CAP = 2048
 
 try:
     from numba import njit
+    from numba.core import types as _nbt
 except ImportError:                     # pragma: no cover - numba optional
     njit = None
+    _nbt = None
 
 
 def _make_jit():
@@ -57,7 +59,30 @@ def _make_jit():
     if njit is None:
         return None
 
-    @njit(cache=True)
+    # Explicit signature: compiles eagerly at import (served from the
+    # on-disk cache after the first build) and skips lazy type inference
+    # on first call in every worker process.
+    _i8, _f8, _b1 = _nbt.int64, _nbt.float64, _nbt.boolean
+    _sig = _nbt.Tuple((_b1, _i8, _i8, _i8, _i8, _i8, _f8, _i8, _i8))(
+        _f8[:],            # cm_dmgs
+        _i8[:],            # cm_energy
+        _nbt.int8[:],      # cm_self_debuf
+        _nbt.int8[:],      # cm_debuf_delta
+        _nbt.int8[:],      # cm_buff_delta
+        _f8[:, :],         # cm_dmgs_stage
+        _i8[:],            # fast_dmg_stage
+        _i8,               # root_atk_stage
+        _i8,               # n_cms
+        _i8,               # start_energy
+        _f8,               # start_hp
+        _i8,               # start_shields
+        _i8,               # fast_damage
+        _i8,               # fast_energy
+        _i8,               # fast_turns
+        _b1,               # intended_pruning
+    )
+
+    @njit(_sig, cache=True)
     def _near_ko_dp_jit(
         cm_dmgs,            # float64[:] (root-stage damage; used for max-dmg ordering)
         cm_energy,          # int64[:]
@@ -385,7 +410,24 @@ def _make_ttl_jit():
     if njit is None:
         return None
 
-    @njit(cache=True)
+    _i8, _f8, _b1 = _nbt.int64, _nbt.float64, _nbt.boolean
+    _sig = _nbt.Tuple((_b1, _f8))(
+        _i8,               # start_hp
+        _i8,               # start_op_e
+        _i8,               # start_turn
+        _i8,               # start_shields
+        _i8,               # opp_fast_damage
+        _i8,               # opp_fast_energy
+        _i8,               # opp_fast_turns
+        _i8,               # atk_fast_turns
+        _b1,               # wins_cmp
+        _b1,               # cmp_bonus
+        _i8[:],            # d_cm_dmgs
+        _i8[:],            # d_cm_energy
+        _i8,               # energy_cap
+    )
+
+    @njit(_sig, cache=True)
     def _calc_ttl_jit(
         start_hp,           # int — attacker hp in the initial state
         start_op_e,         # int — defender energy in the initial state
