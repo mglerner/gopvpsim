@@ -87,6 +87,35 @@ divergences (Aegislash bug #3, Morpeko bug #8). Engine behavior is
 bit-identical against live PvPoke; S5 changed where values are
 computed, never what they are.
 
+## Addendum: S5e — the post-S5 re-evaluation found the render bottleneck
+
+Michael asked for one more holistic look before S6. Replay-profiling
+the render path (S4's `replay_analysis.py` makes this trivial) showed
+`find_matchup_boundaries` (deep_dive_analysis.py) at **95% of render
+cProfile time** — a pure-Python threshold sweep that arc S3-S5 had
+promoted from "hidden behind sims" to ~48% of smoke-dive wall-clock
+(it runs inside narrative pre-render, per-moveset narratives, AND
+analysis sections — 12 calls per smoke dive).
+
+Vectorized in `181ae1d`: stat-threshold partitions are suffixes of
+the stat-sorted IV order (one reversed cumsum per scenario instead of
+an O(nIvs) scan per threshold); same trick over the HP-sorted order
+for the phase-2 co-condition sweep. Records carry the original Python
+objects, so output is bitwise unchanged.
+
+- Replay render (Tinkaton GL blob): **73.0s → 5.8s wall (12.6x)**,
+  HTML **byte-identical**.
+- Warm re-run of the full smoke dive command (S4 all-hits cache +
+  this fix): **10.8s end-to-end** (53s this morning, ~140s cold).
+- Oracle: old implementation preserved verbatim in
+  `tests/test_matchup_boundaries.py`; 35 randomized equivalence
+  cases. Engine untouched.
+
+Post-S5e render profile is flat (largest item ~1.4s cumulative under
+cProfile). The evaluation's verdict: no remaining >10% target on
+either the engine or render side without structural changes — the
+arc's perf work is done; proceed to S6.
+
 ## Notes for the next profiler
 
 Post-S5 profile shape (cProfile, same workload): `pvpoke_dp` body
