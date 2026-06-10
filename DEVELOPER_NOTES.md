@@ -95,6 +95,37 @@ Mienfoo vs Medicham (9/9) resolved by the `would_shield` buff-reset
 ordering and CMP cancellation fixes. Full root-cause writeup in
 `CHANGELOG.md` under `2026-04-04 to 2026-04-06`.
 
+## Performance baseline (regression gate)
+
+**Rule: after any change to `battle.py`, `_dp_jit.py`, or `moves.py`,
+re-run the benchmark below and compare against the current baseline.
+A drop of more than ~10% means stop and investigate before
+committing.** This rule exists because the 2026-04-15 correctness arc
+silently halved engine throughput (the stage-aware DP fix `141eee1`
+rebuilt per-atk-stage damage tables on every `pvpoke_dp` call) and
+nobody noticed for eight weeks — the 2026-04-07 "26k sims/s" figure
+kept being quoted while real dives ran at half that.
+
+Canonical benchmark (single-process, ~10s, Annihilape mirror):
+
+```
+python scripts/profile_slayer.py --n-focal 60 --n-opp 20
+```
+
+| Date       | Code                                  | sims/s    | Note                                               |
+| ---------- | ------------------------------------- | --------- | -------------------------------------------------- |
+| 2026-04-07 | `a57c39f` (recorded then)             | 3,055     | Pre-June gamemaster; not directly comparable       |
+| 2026-06-10 | `a57c39f` (re-run, current data)      | 2,255     | Controlled baseline for the regression measurement |
+| 2026-06-10 | `d419306` (pre-fix HEAD)              | 1,121     | The 2.0x regression, root-caused to `141eee1`      |
+| 2026-06-10 | `154536a` (DP setup cache + log gate) | **2,278** | **Current baseline**                               |
+
+Gamemaster data changes shift battle lengths and therefore sims/s
+(that's the 3,055 → 2,255 gap on identical code), so when the
+rankings/gamemaster cache refreshes, expect drift — re-baseline by
+re-running on a commit with a known-good number rather than comparing
+across data vintages. cProfile runs (`--profile`) are ~2-5x slower
+than wall-time runs; only compare like with like.
+
 ## PvPoke bugs found
 
 <!-- sync:pvpoke_bugs_documented -->5<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8 —
