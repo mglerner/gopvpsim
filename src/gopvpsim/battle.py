@@ -2002,26 +2002,58 @@ class BattlePokemon:
         # calc_damage (floor semantics) rather than multiplicatively
         # scaling the root-stage damage — keeps KO thresholds exact at
         # the 1-HP margin.
-        def_eff_val = defender.def_ * _stat_stage_mult(defender.def_stage)
-        atk_base = self.atk
-        atk_types = self.types
-        def_types = defender.types
-        fm_power = self.fast_move['power']
-        fm_type  = self.fast_move['type']
-        cm_dmgs_by_stage: list[list[int]] = []
-        fast_dmg_by_stage: list[int] = []
-        for _s_off in range(9):         # stage -4 .. +4
-            _s = _s_off - 4
-            _atk_eff = atk_base * _stat_stage_mult(_s)
-            cm_dmgs_by_stage.append([
-                calc_damage(cm['power'], _atk_eff, def_eff_val,
-                            cm['type'], atk_types, def_types)
-                for cm in cms
-            ])
-            fast_dmg_by_stage.append(
-                calc_damage(fm_power, _atk_eff, def_eff_val,
-                            fm_type, atk_types, def_types)
-            )
+        #
+        # The row at the CURRENT atk stage is identical to the damage
+        # cache populated above (same calc_damage inputs), so it is
+        # reused rather than recomputed. And when no charged move
+        # carries a chance-1 atk-stage delta (cm_buff_delta all zero —
+        # the common case), the DP's plan exploration can never leave
+        # the current stage: the cache key pins this entry to one
+        # atk_stage, and only buff deltas move the stage row index
+        # mid-plan. The other 8 rows are then unreachable, so they are
+        # filled with references to the root row instead of
+        # 8 x (n_cms + 1) calc_damage calls — this rebuild was ~97% of
+        # all damage computations in the 2026-06-10 profile.
+        cm_buff_delta = [_cm_buff_delta(m) for m in cms]
+        root_row  = [cm_dmgs_root[idx_map[id(m)]] for m in cms]
+        fast_root = self._cached_fast_dmg
+        root_off  = self.atk_stage + 4
+        if not any(cm_buff_delta):
+            cm_dmgs_by_stage  = [root_row] * 9
+            fast_dmg_by_stage = [fast_root] * 9
+        else:
+            # Some moves move the plan's atk stage. Stages strictly above
+            # root are reachable only via a positive delta, below root
+            # only via a negative one — fill unreachable rows with the
+            # root row (never indexed) and compute the rest.
+            has_pos = any(d > 0 for d in cm_buff_delta)
+            has_neg = any(d < 0 for d in cm_buff_delta)
+            def_eff_val = defender.def_ * _stat_stage_mult(defender.def_stage)
+            atk_base = self.atk
+            atk_types = self.types
+            def_types = defender.types
+            fm_power = self.fast_move['power']
+            fm_type  = self.fast_move['type']
+            cm_dmgs_by_stage = []
+            fast_dmg_by_stage = []
+            for _s_off in range(9):         # stage -4 .. +4
+                if (_s_off == root_off
+                        or (_s_off > root_off and not has_pos)
+                        or (_s_off < root_off and not has_neg)):
+                    cm_dmgs_by_stage.append(root_row)
+                    fast_dmg_by_stage.append(fast_root)
+                    continue
+                _s = _s_off - 4
+                _atk_eff = atk_base * _stat_stage_mult(_s)
+                cm_dmgs_by_stage.append([
+                    calc_damage(cm['power'], _atk_eff, def_eff_val,
+                                cm['type'], atk_types, def_types)
+                    for cm in cms
+                ])
+                fast_dmg_by_stage.append(
+                    calc_damage(fm_power, _atk_eff, def_eff_val,
+                                fm_type, atk_types, def_types)
+                )
 
         dp = {
             'opp_id':    id(defender),
@@ -2032,7 +2064,7 @@ class BattlePokemon:
             'cm_self_debuf':  [1 if m.get('selfDebuffing', False) else 0
                                for m in cms],
             'cm_debuf_delta': [_cm_debuf_delta(m) for m in cms],
-            'cm_buff_delta':  [_cm_buff_delta(m) for m in cms],
+            'cm_buff_delta':  cm_buff_delta,
             'cm_dmgs_by_stage':  cm_dmgs_by_stage,
             'fast_dmg_by_stage': fast_dmg_by_stage,
         }
