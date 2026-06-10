@@ -117,7 +117,9 @@ python scripts/profile_slayer.py --n-focal 60 --n-opp 20
 | 2026-04-07 | `a57c39f` (recorded then)             | 3,055     | Pre-June gamemaster; not directly comparable       |
 | 2026-06-10 | `a57c39f` (re-run, current data)      | 2,255     | Controlled baseline for the regression measurement |
 | 2026-06-10 | `d419306` (pre-fix HEAD)              | 1,121     | The 2.0x regression, root-caused to `141eee1`      |
-| 2026-06-10 | `154536a` (DP setup cache + log gate) | **2,278** | **Current baseline**                               |
+| 2026-06-10 | `154536a` (DP setup cache + log gate) | 2,278     | Post-regression-fix baseline                       |
+| 2026-06-10 | `d4d8ed2` (arc S5: TTL JIT, stage-row | **3,160** | **Current baseline** (warm JIT cache; first run    |
+|            | reachability, DP-cache precompute)    |           | after an engine edit pays ~1-2s compile)           |
 
 Gamemaster data changes shift battle lengths and therefore sims/s
 (that's the 3,055 → 2,255 gap on identical code), so when the

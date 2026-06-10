@@ -6,6 +6,41 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-10 — Engine round 3: +37.5% single-core (perf+correctness arc S5)
+
+Four commits (`4c38c6a..d4d8ed2`), each gated on full suite + oracle
+harness + the canonical benchmark; net 2,295 → **3,160 sims/s**
+(new regression-gate baseline in DEVELOPER_NOTES), dive-level
+interactive sweeps ~+33% (Tinkaton GL smoke, 21-24k sims/s).
+Engine behavior bit-identical against live PvPoke throughout —
+S5 changed where values are computed, never what they are.
+
+- **S5a `4c38c6a`** — `_calc_turns_to_live` JIT'd
+  (`_dp_jit._calc_ttl_jit`) with defender-side int64 buffers rebuilt
+  alongside the damage cache (no per-call asarray — the 2026-04-07
+  round-3 false-start fix). Only +1.8%: numba dispatch eats most of
+  the tiny-kernel win; kept for exactness + scaling headroom.
+- **S5b `40b0168`** — DP stage tables compute only REACHABLE rows:
+  root row reused from the damage cache; all rows alias root when no
+  charged move has a chance-1 atk-stage delta; one-sided fill
+  otherwise. The 9-row rebuild was ~97% of all damage computations.
+  +8.2% on the (near-worst-case, Rage-Fist-carrying) benchmark.
+- **S5c `840bbd8`** — bestChargedMove selection + farm-down constants
+  (bestCycleDamage, min_cycle_thr, debuf swap) precomputed in
+  `_ensure_dp_cache` (key-stable inputs only); bait-wait + bandaid
+  chain array-ified (~20 dict/closure sites → cm_dpe/cm_self_debuf/
+  cm_self_buff/cm_energy/cm_dmgs_root). raw_dpe == actual_dpe ==
+  cm_dpe identity collapsed the two closures. +20%, the session's
+  big win. Bandaid[866]'s `_cached_damage` OMT-side-effect subgate
+  untouched (intentional divergence, DEVELOPER_NOTES).
+- **S5d `d4d8ed2`** — explicit JIT signatures, eager compile at
+  import (disk-cached), +2-3%, warm import 0.74s.
+
+Full writeup: `docs/perf/2026-06-10_s5_engine_speedups.md`. Arc
+scorecard updated (no-buff sweep now ≈11.4x vs the morning-of-
+2026-06-10 state). S6 re-dive runs cold-cache (engine hash changed —
+expected).
+
 ## 2026-06-10 — Sweep disk cache + replay-from-saved-state (perf+correctness arc S4)
 
 Two iteration-speed features, both exact-by-construction:
