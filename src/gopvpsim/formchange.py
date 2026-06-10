@@ -303,8 +303,10 @@ def apply_form_change(bp, opponent):
     # Rebuild charged move identity index
     bp._cm_id_to_idx = {id(cm): i for i, cm in enumerate(bp.charged_moves)}
 
-    # Invalidate damage caches on both sides
+    # Invalidate damage + DP setup caches on both sides
     bp._dmg_cache_opp_id = -1
     opponent._dmg_cache_opp_id = -1
+    bp._dp_cache = None
+    opponent._dp_cache = None
 
     bp._form_is_alt = not bp._form_is_alt
