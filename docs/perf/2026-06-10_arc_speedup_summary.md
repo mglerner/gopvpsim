@@ -31,6 +31,11 @@ figures are multiprocess wall-clock from
 |                                   | (Tinkaton, either bait mode)   |          |             |               |
 |                                   | sweep wall-clock, form-change  | 47.7s    | 35.2s       | **1.36x**     |
 |                                   | focal (Aegislash (Shield))     |          |             |               |
+| S4 sweep disk cache + replay      | unchanged-dive re-run (smoke)  | 113s     | 53s, 0 sims | cache-hit     |
+|                                   |                                |          |             | re-runs only  |
+| S5 engine round 3 (TTL JIT,       | engine sims/s (single core)    | ~2,295   | ~3,160      | **1.38x**     |
+| stage-row reachability, DP-cache  | interactive sweep sims/s       | 16,073-  | 21,157-     | **~1.33x**    |
+| precompute, JIT signatures)       | (Tinkaton GL smoke, 9 workers) | 16,947   | 23,792      |               |
 
 Correctness shipped alongside (not speed, but why the arc exists):
 S1 wired real form mechanics into every dive worker (Aegislash
@@ -70,13 +75,25 @@ correctness arc then silently halved the engine for eight weeks
 gate in DEVELOPER_NOTES "Performance baseline" that exists so it
 can't happen silently again).
 
+## Compounding update (post-S5)
+
+With S5's 1.38x engine on top, the per-moveset sweep relative to the
+morning of 2026-06-10 is now ≈ 2.03 × 1.38 × dedup-factor:
+
+- typical no-buff moveset: ≈ **11.4x faster**
+- typical buff-carrying moveset: ≈ **6.0x faster**
+- Aegislash-class form changer: ≈ **3.8x faster**
+
+(S4's disk cache sits on top of all of these for re-runs: unchanged
+columns are free. S5's engine edits changed the engine hash, so the
+S6 re-dive runs cold-cache — expected.)
+
 ## Still to land (update this file when they do)
 
-- **S4** replay-from-saved-state + sweep disk cache: re-runs of an
-  unchanged dive command → near-zero sims; renderer iteration
-  without re-simming.
-- **S5** round-3 numpy buffers + farm-down JIT: est. 25-35%
-  single-core engine headroom (gates apply hard; highest-risk
-  session).
 - **S6** full re-dive: the real end-to-end before/after for the
   website chain — record actual dive wall-clocks here.
+
+(S4 landed 2026-06-10, commit `87c209c` — full design in CHANGELOG +
+DEVELOPER_NOTES "Sweep disk cache". S5 landed 2026-06-10, commits
+`4c38c6a..d4d8ed2` — details in
+`docs/perf/2026-06-10_s5_engine_speedups.md`.)
