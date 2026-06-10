@@ -6,6 +6,38 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-10 — Damage-signature dedup in IV sweeps (perf+correctness arc S3)
+
+Sweep sims now dedup per-opponent by **damage signature**: the audit
+of battle.py/_dp_jit.py established that focal stats enter a battle
+only through (1) floor-quantized damage tables both directions (per
+stat-stage where a stage axis is movable), (2) the 3-way sign of the
+pairwise atk comparison (engine uses `>`, `>=`, `<`, `!=`), and
+(3) integer max HP. Profiles matching on all three vs a given
+opponent fight bit-identical battles; one representative sims, the
+score fans out. New `scripts/deep_dive_signature.py` (vectorized,
+bit-exact mirror of `moves.damage`, form-change aware: per-form
+tables from `build_form_change_state`'s per-IV alt stats — the S1
+hazard note); `iv_sweep` dispatches (representative, opponent) pairs;
+`--no-signature-dedup` restores the per-profile path; dedup factor
+logged per sweep.
+
+**Verification** (`scripts/verify_signature_dedup.py`, full sweep
+both ways, raw-float equality across 774,144 cells per species per
+mode, 21 opponents incl. Aegislash (Shield) opp-side, all 9
+scenarios): EXACT for Azumarill (4.50x dedup / 4.07x wall-clock),
+Tinkaton bait+nobait (2.23x / 2.13-2.16x, identical grouping both
+modes — policy independence confirmed), Aegislash (Shield) focal
+(1.43x / 1.36x — more than claws back S1's per-IV expansion, exactly
+this time). Full writeup: docs/perf/2026-06-10_signature_dedup.md.
+
+Tests: +5 (tests/test_signature_dedup.py — bitwise damage_vec parity,
+every-member-vs-representative score equality for Tinkaton and
+Aegislash, axis movability; sentinel 724→729);
+tests/test_dive_worker_form_change.py updated to the pair-based
+worker contract. Engine files untouched (read-only audit) — no
+bench/oracle rerun required.
+
 ## 2026-06-10 — Mirror-slayer redesign: archetypes + tie-explosion fix (perf+correctness arc S2)
 
 Interactive design session with Michael; his four decisions: replace
