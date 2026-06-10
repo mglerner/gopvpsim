@@ -2,8 +2,8 @@
 
 This document defines the terms used throughout the deep-dive HTML outputs and the
 threshold configuration files. If you've opened a deep-dive report and seen labels
-like "Atk Slayer [lickitung_brkp, cmp_vs_lurgan]" or "survivor cohort" and want to know
-what they mean, this is the place.
+like "Anchors-First Slayer [lickitung_brkp, cmp_vs_lurgan]" or "survivor cohort" and
+want to know what they mean, this is the place.
 
 For the TOML file format that *configures* these things, see
 [`threshold_schema.md`](threshold_schema.md). This document is purely conceptual and
@@ -32,7 +32,10 @@ stat-cutoff) or as a hand-picked list (use IV-list).
 The set of IVs that *survived* a slayer iteration — i.e., the IVs that, when tested
 against an opponent set, won enough matchups to be considered viable slayers. The
 mirror slayer iteration converges to a cohort by repeatedly re-testing focals against
-the previous round's cohort until the survivor set stabilizes.
+the previous round's cohort until the survivor set stabilizes. Since the 2026-06
+redesign the cohort's job is to be the *mirror opponent population* — the
+denominator behind the mirror CMP % and mirror-wins columns — rather than the
+optimization target itself.
 
 A survivor cohort is just an IV-list spread with a particular *origin* (the
 iteration). It's not a special data type.
@@ -63,25 +66,31 @@ its move KOs the opponent, the opponent's move is cancelled. "Winning CMP" means
 having strictly higher atk than the opponent. CMP is binary and brutal — a single
 point of effective atk can decide a mirror.
 
-### Slayer categories
+### Slayer archetypes
 
-Three classes used to highlight notable IVs in a survivor cohort. They're meant to
-correspond to *distinct strategies*, not three different cuts of the same metric:
+Two build archetypes used to highlight notable IVs. They correspond to *distinct
+lexicographic strategies* — which goal comes first:
 
-- **Atk Slayer** — IVs that clear a *named damage breakpoint or set of breakpoints*
-  against a notable opponent. The point is not "above-median attack" (which is
-  vacuous); the point is "this IV reaches a damage tier the median doesn't."
-- **Bulk Slayer** — IVs that either (a) have notably high HP+def (above the survivor
-  median, structural) or (b) clear a *named bulkpoint* against a notable opponent —
-  i.e., reach a defense tier at which one of the opponent's moves deals strictly less
-  damage. Both routes route into the same category; the structural pool is the
-  default fallback when no bulkpoint anchors are configured.
-- **CMP Slayer** — IVs whose raw attack stat is high enough to win CMP ties against a
-  reference opponent (e.g., the converged mirror cohort, or a community-defined
-  baseline).
+- **Anchors-First Slayer** — hit the important break/bulkpoints first, then win CMP
+  as much as possible. Members are the IVs that clear the *maximum achievable
+  number* of counted anchor parents, ranked among themselves by Top-Mirror CMP %
+  and then attack. Explicit TOML anchors always count; auto-generated anchors count
+  only when *selective* (cleared by less than half the IV space), so "everyone
+  passes it" anchors can't saturate the archetype.
+- **CMP-First Slayer** (the "lab mon") — win Charge Move Priority first, pick up
+  anchors as a secondary goal. Members are the max-attack spreads; no anchor is
+  required for membership. The per-row anchor checklist *reports* which anchors
+  each spread clears vs sacrifices.
 
-A single IV can belong to multiple categories. The most versatile IVs are the ones
-tagged with all three.
+Both archetypes are computed directly from the anchor thresholds and the sweep
+scores — no extra simulation. The mirror iteration's role is supplying the opponent
+population behind the CMP % and mirror-wins columns, not being the objective. A
+single IV can belong to both archetypes (cross-category badges mark the overlap).
+
+(Until 2026-06 the dive surfaced three post-hoc labels — Atk / Bulk / CMP Slayer —
+applied to the Nash survivor pool. They were retired: Atk and CMP membership are now
+visible directly in the per-row anchor checklist, and Bulk's HP+def-above-median
+rule was structurally saturated; see TODO "Slayer-card signal-loss audit.")
 
 ---
 
@@ -117,7 +126,7 @@ a comparison against some derived numeric threshold. The slayer categorizer asks
 each focal IV in the survivor pool, "which anchors does this IV pass?" and labels the
 IV with the set of anchor names.
 
-That set is what makes the Atk Slayer category informative. Instead of "atk above
+That set is what makes the anchor checklist informative. Instead of "atk above
 median" (vacuous), you get "passes lickitung_brkp + cmp_vs_lurgan" (actionable: it
 tells you what this IV does that others don't).
 
@@ -177,30 +186,29 @@ steps down."
 4. The Level 2 anchor's check becomes: "the smallest def above 102.9 at which any
    threat move's damage drops" — pick the earliest threshold across all moves.
 
-The output gets tagged into the **Bulk Slayer** category (parallel to how BP anchors
-route into Atk Slayer). Each focal IV that meets the def threshold for at least one
-named bulkpoint is highlighted; the structural HP+def-above-median pool remains as
-a fallback layer so the category is never empty.
+Bulkpoint tags show up in the per-row anchor checklist with a " bulk" suffix on the
+badge (parallel to how BP anchor tags appear). Each focal IV that meets the def
+threshold for at least one named bulkpoint counts that parent toward its
+Anchors-First total.
 
 ### Atk-side vs def-side anchors
 
 The two "ladder" anchor kinds are mirror images. Same shape, same three precision
 levels, different stat targets:
 
-|                      | **damage_breakpoint**                       | **bulkpoint**                               |
-| -------------------- | ------------------------------------------- | ------------------------------------------- |
-| Tests focal          | attack                                      | defense                                     |
-| Damage direction     | outgoing (focal hits opponent)              | incoming (opponent hits focal)              |
-| Threshold semantic   | "smallest atk that deals ≥ N damage"        | "smallest def above which damage ≤ N"       |
-| Threat moves         | focal's movepool                            | opponent's movepool                         |
-| Opponent reference   | effective *defense* (bulkiest IV in spread) | effective *attack* (punchiest IV in spread) |
-| Routes into category | Atk Slayer                                  | Bulk Slayer                                 |
-| TOML keys            | `move`, `deals_at_least`, `above_atk`       | `move`, `takes_at_most`, `above_def`        |
+|                    | **damage_breakpoint**                       | **bulkpoint**                               |
+| ------------------ | ------------------------------------------- | ------------------------------------------- |
+| Tests focal        | attack                                      | defense                                     |
+| Damage direction   | outgoing (focal hits opponent)              | incoming (opponent hits focal)              |
+| Threshold semantic | "smallest atk that deals ≥ N damage"        | "smallest def above which damage ≤ N"       |
+| Threat moves       | focal's movepool                            | opponent's movepool                         |
+| Opponent reference | effective *defense* (bulkiest IV in spread) | effective *attack* (punchiest IV in spread) |
+| Badge suffix       | (none)                                      | " bulk"                                     |
+| TOML keys          | `move`, `deals_at_least`, `above_atk`       | `move`, `takes_at_most`, `above_def`        |
 
-A focal IV can clear both kinds in the same anchor pass — the slayer categorizer
-looks at every tag the IV passes and routes it into all the categories it qualifies
-for, so a high-atk + above-bulkpoint IV ends up in both Atk Slayer and Bulk Slayer
-with cross-category badges.
+A focal IV can clear both kinds in the same anchor pass — every cleared parent
+shows in the row's anchor checklist and counts toward the Anchors-First total, so a
+high-atk + above-bulkpoint IV gets credit on both axes.
 
 ---
 
@@ -266,32 +274,26 @@ mechanism for the override lives in [`threshold_schema.md`](threshold_schema.md)
 
 ## How this shows up in the deep-dive HTML
 
-When you read a deep-dive report, the slayer survivor table will look something like
-this (sketch — actual rendering may differ):
+When you read a deep-dive report, the Slayer Builds archetype tables will look
+something like this (sketch — actual rendering may differ):
 
 ```
-Atk Slayer (3 of 30 survivors clear at least one named breakpoint)
-─────────────────────────────────────────────────────────────────
-IVs        Atk      Def     HP    Tags                       Wins
-15/3/2     129.44   99.69   134   lickitung_brkp, cmp_vs_lurgan, cmp_vs_mirror, bulk    87/270
-15/2/4     129.44   99.14   135   lickitung_brkp, cmp_vs_lurgan                          90/270
-15/15/0    129.44   101.91  131   cmp_vs_lurgan                                        45/270
+Anchors-First Slayer (12 IVs)
+──────────────────────────────────────────────────────────────────────────────
+IVs        Atk      Def     HP    Anchors                        Top-Mirror CMP %   Avg
+15/3/2     129.44   99.69   134   2/2  lickitung cmp:lurgan      96%                612.4
+15/2/4     129.44   99.14   135   2/2  lickitung cmp:lurgan      96%                610.8
 ...
 ```
 
-The Atk Slayer category is *hidden* when no survivor in the cohort clears any named
-breakpoint. The category is only shown when there's something specific to point at,
-and each row's "Tags" column tells you exactly what that IV does that distinguishes
-it.
+The Anchors-First Slayer table is *hidden* when no counted anchor resolves — it is
+only shown when there's something specific to point at, and each row's Anchors
+column tells you exactly what that IV does that distinguishes it. The CMP-First
+Slayer table is always shown (it needs no anchors); its checklist column reports
+what each max-attack spread keeps or gives up.
 
-The CMP Slayer category shows the IVs that pass at least one `cmp_*` anchor. Bulk
-Slayer continues to use the HP+def-above-median heuristic (it's structural rather
-than anchor-driven). The most versatile IVs — those that appear in multiple
-categories — are highlighted at the top of each table.
-
-Tables are expandable to show the full survivor cohort, not just the highlighted
-rows; the highlighting calls out the IVs that matter most under whichever lens you're
-using (e.g., the top quartile by anchor-tag count).
+Tables show the top rows by each archetype's ranking and expand to the larger
+cohort; the top-quartile rows are highlighted.
 
 ---
 

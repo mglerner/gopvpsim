@@ -184,7 +184,7 @@ _build_focal_meta = slayer.build_focal_meta
 iterative_slayer_discovery = slayer.iterative_slayer_discovery
 
 
-categorize_slayers = slayer.categorize_slayers
+build_slayer_archetypes = slayer.build_slayer_archetypes
 
 IVCategory = rendering.IVCategory
 parse_mode = rendering.parse_mode
@@ -199,7 +199,7 @@ def build_iv_categories(data_obj, slayer_categories=None,
     Inputs:
         data_obj: the JS-bound data object (already populated with tiers,
             ivAllTiers, ivAtk/ivDef/ivHp, nIvs, ivA/ivD/ivS).
-        slayer_categories: dict from ``categorize_slayers``. May be None
+        slayer_categories: dict from ``build_slayer_archetypes``. May be None
             if the run didn't include slayer iteration; in that case the
             slayer-kind branch is skipped.
         iv_idx_by_triple: optional precomputed (atk_iv, def_iv, sta_iv)
@@ -239,18 +239,20 @@ def build_iv_categories(data_obj, slayer_categories=None,
     categories: list = []
 
     # ---- Slayer categories ----
-    # Iterate categorize_slayers output and lift each non-empty bucket
+    # Iterate build_slayer_archetypes output and lift each non-empty bucket
     # into an IVCategory. The slayer survivors carry the rich
     # _anchor_tags dict that we want to preserve as member_meta so the
     # renderer can show which specific anchors fired per IV.
     if slayer_categories:
         SLAYER_KIND_DESC = {
-            'Atk Slayer': 'IVs that clear at least one named damage '
-                          'breakpoint anchor against a notable opponent.',
-            'Bulk Slayer': 'IVs at or above the survivor-pool HP+def median, '
-                           'or that clear at least one named bulkpoint anchor.',
-            'CMP Slayer': 'IVs whose raw attack beats at least one named '
-                          'CMP cohort, winning Charge Move Priority ties.',
+            'Anchors-First Slayer': 'IVs that clear the maximum achievable '
+                                    'number of counted anchor parents '
+                                    '(break/bulkpoints first), ranked by '
+                                    'mirror CMP among the survivors.',
+            'CMP-First Slayer': 'The max-attack "lab mon" spreads — win '
+                                'Charge Move Priority first; the anchor '
+                                'checklist reports what each clears vs '
+                                'sacrifices.',
         }
         for cat_name, survivors in slayer_categories.items():
             if not survivors:
@@ -324,8 +326,8 @@ def build_iv_categories(data_obj, slayer_categories=None,
     # ---- Composite categories: slayer ∩ tier ----
     # Round one uses literal-intersection naming. The composite_meta
     # entries inherit from both parents so the renderer can show, e.g.,
-    # "Atk Slayer member with mirror wins 45/132, also clears Top 5%
-    # (HP≥139)".
+    # "Anchors-First Slayer member with mirror wins 45/132, also clears
+    # Top 5% (HP≥139)".
     slayer_cats = [c for c in categories if c.kind == 'slayer']
     tier_cats = [c for c in categories if c.kind == 'tier']
     for slayer in slayer_cats:
@@ -2960,13 +2962,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     data_obj['clusterGaps'] = cluster_gaps
 
     # Slayer IV overlay: extract canonical IV indices that landed in any
-    # slayer category from the iterative-slayer-discovery result. Rendered
-    # as a separate legend entry on the scatter plot with a distinct
-    # marker shape (star-diamond) so users can see what avg-score trade
-    # a "slayer-quality" spread costs vs the avg-score-optimal cluster.
-    # Slayer membership is fundamentally a different optimization target
-    # than avg score (mirror-match wins under even-strict), so the two
-    # often don't coincide - visualizing the gap is the whole point.
+    # slayer archetype (Anchors-First / CMP-First) from
+    # build_slayer_archetypes. Rendered as a separate legend entry on the
+    # scatter plot with a distinct marker shape (star-diamond) so users
+    # can see what avg-score trade a "slayer-quality" spread costs vs the
+    # avg-score-optimal cluster. Archetype membership is a different
+    # optimization target than avg score (anchor coverage / CMP first),
+    # so the two often don't coincide - visualizing the gap is the point.
     # The slayer iteration stores ``iv`` as a (a_iv, d_iv, s_iv) triple
     # (see line ~529 in iterative_slayer_discovery), but the JS plot
     # indexes IVs by their canonical position in iv_a/iv_d/iv_s. Build a
@@ -3070,13 +3072,24 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     #     PvPoke-default opponent IV cohort. Always available.
     #   * winsRank1: same but vs rank-1-stat-product opponents. Only
     #     available if --opp-ivs is rank1 or both.
-    #   * winsMirror: total mirror-match wins from the slayer iteration's
-    #     final round. SPARSE - only the ~tens of slayer survivors have
-    #     a value here; all other IVs are dropped from the plot when
-    #     this mode is active.
+    #   * winsMirror: mirror-match wins vs the slayer iteration's final
+    #     opponent population. DENSE since the 2026-06 redesign — the
+    #     iteration's last round scores every focal IV, exported as
+    #     'all_scores' (triple -> (total_wins, frac_wins, avg_score,
+    #     n_pairs)). Falls back to the sparse final-pool data for old
+    #     replay blobs that predate all_scores.
     mirror_wins_by_idx: dict = {}
     mirror_wins_max = 0
-    if slayer_iter_result and slayer_iter_result.get('final'):
+    if slayer_iter_result and slayer_iter_result.get('all_scores'):
+        for iv_triple, mw in slayer_iter_result['all_scores'].items():
+            idx = iv_idx_by_triple.get(tuple(iv_triple))
+            if idx is None:
+                continue
+            wins = mw[0]
+            mirror_wins_by_idx[idx] = wins
+            if wins > mirror_wins_max:
+                mirror_wins_max = wins
+    elif slayer_iter_result and slayer_iter_result.get('final'):
         for r in slayer_iter_result['final']:
             iv_triple = r.get('iv')
             wins = r.get('total_wins', 0)
@@ -3929,7 +3942,7 @@ var _scoresReady = (async function() {
     html += 'meta rankings, and battle simulation reference. '
     html += 'PvPoke is open-source: github.com/pvpoke/pvpoke.</li>'
     html += '<li><b>RyanSwag</b> - mirror slayer IV framework '
-    html += '(Pure Slayer / Bulky Slayer / CMP Slayer categories).</li>'
+    html += '(the inspiration for the slayer-archetype analysis).</li>'
     html += '</ul>'
     html += '<p><b>Methodology</b></p>'
     html += '<ul style="margin:4px 0 8px 20px">'
@@ -4248,26 +4261,31 @@ def main():
     parser.add_argument('--mirror-slayer', action=argparse.BooleanOptionalAction,
                         default=True,
                         help='Run iterative slayer discovery for the focal species '
-                             '(Nash-style mirror match iteration). Adds ~2-5 min to '
-                             'the deep dive but classifies survivors into Atk Slayer, '
-                             'Bulk Slayer, and CMP Slayer categories. Results are '
-                             'cached on disk for fast re-runs. ENABLED by default; '
-                             'pass --no-mirror-slayer to skip.')
+                             '(Nash-style mirror match iteration). Produces the '
+                             'mirror opponent population behind the Slayer Builds '
+                             'archetypes (Anchors-First / CMP-First) and the mirror '
+                             'CMP/wins columns. Results are cached on disk for fast '
+                             're-runs. ENABLED by default; pass --no-mirror-slayer '
+                             'to skip.')
     parser.add_argument('--mirror-slayer-metric', default='all',
                         choices=['all', 'even', 'even-strict'],
-                        help='Slayer iteration metric: "all" counts wins across all '
-                             '9 scenarios (default), "even" counts only 0v0/1v1/2v2, '
-                             '"even-strict" requires winning ALL 3 even scenarios.')
+                        help='Slayer iteration metric (graded: per-opponent credit '
+                             'is fractional, with avg-score tiebreak): "all" credits '
+                             'scenarios won / 9 (default), "even" only 0v0/1v1/2v2, '
+                             '"even-strict" full credit only when ALL 3 even '
+                             'scenarios are won.')
     parser.add_argument('--mirror-slayer-rounds', type=int, default=4,
                         help='Max rounds for mirror slayer iteration (default 4). '
                              'Set to 1 for "beat the typical opponent" mode (no '
                              'Nash iteration).')
     parser.add_argument('--mirror-slayer-pool', type=int, default=30,
                         help='Number of survivors to keep per iteration round '
-                             '(default 30). Larger = more inclusive surviving '
-                             'cohort, more IVs reported in final categories.')
+                             '(default 30). Honored exactly except on exact '
+                             'metric ties. Larger = broader mirror population '
+                             'for the CMP/wins columns.')
     parser.add_argument('--mirror-slayer-show', type=int, default=20,
-                        help='Number of IVs to show per category in final output '
+                        help='Number of IVs in the CMP-First Slayer archetype '
+                             'and shown per category in console output '
                              '(default 20).')
     parser.add_argument('--no-cache', action='store_true',
                         help='Disable disk cache for slayer iteration')
@@ -4967,7 +4985,7 @@ def main():
                                 f"{n_at_max} at max wins {max_w}, "
                                 f"top avg score: {top[0]['avg_score']:.1f})")
 
-                # Resolve anchors so categorize_slayers can tag each survivor
+                # Resolve anchors so build_slayer_archetypes can tag each IV
                 # with what it clears. Two layers feed the resolver:
                 #   1. Explicit anchors from --thresholds + --anchor-file +
                 #      --anchor (already in threshold_registry).
@@ -5071,17 +5089,23 @@ def main():
                 # Stash on the iter_result for HTML rendering
                 slayer_iter_result['resolved_anchors'] = resolved
 
-                categories = categorize_slayers(
-                    survivors, resolved_anchors=resolved,
+                categories = build_slayer_archetypes(
+                    results, resolved_anchors=resolved,
+                    iter_result=slayer_iter_result,
+                    cmp_first_n=args.mirror_slayer_show,
                 )
                 # Build cross-category map (IV -> set of category names)
                 iv_categories = {}
                 for cn, civs in categories.items():
                     for r in civs:
                         iv_categories.setdefault(r['iv'], set()).add(cn)
-                CAT_AB = {'Atk Slayer': 'A', 'Bulk Slayer': 'B', 'CMP Slayer': 'C'}
-                logger.info(f"    Final survivors classified into "
-                            f"{sum(1 for v in categories.values() if v)} categories:")
+                CAT_AB = {'Anchors-First Slayer': 'AF', 'CMP-First Slayer': 'CF'}
+                logger.info(f"    IV space classified into "
+                            f"{sum(1 for v in categories.values() if v)} "
+                            f"archetypes: "
+                            + ', '.join(f"{cn} ({len(civs)})"
+                                        for cn, civs in categories.items()
+                                        if civs))
                 for cat_name, cat_ivs in categories.items():
                     if not cat_ivs:
                         continue
@@ -5092,16 +5116,17 @@ def main():
                         a, d, s = r['iv']
                         others = sorted(iv_categories.get(r['iv'], set()) - {cat_name})
                         also = ' [+' + ''.join(CAT_AB.get(o, '?') for o in others) + ']' if others else ''
-                        # Anchor-tag labels for Atk / CMP rows
                         tag_bits = []
                         for parent, subs in sorted(r.get('_anchor_tags', {}).items()):
                             labels = [a.label or a.name for a in subs]
                             tag_bits.append(f"{parent}[{','.join(labels)}]")
                         tag_str = ' ' + ' '.join(tag_bits) if tag_bits else ''
+                        cmp_str = (f" cmp {r['top_mirror_cmp']:.0f}%"
+                                   if r.get('top_mirror_cmp') is not None else '')
                         logger.debug(f"        {a:2d}/{d:2d}/{s:2d}  "
                                      f"atk={r['atk']:.2f} def={r['def_']:.2f} hp={r['hp']}  "
-                                     f"wins {r['total_wins']}/"
-                                     f"{r['n_pairs']*len(shield_scenarios)} "
+                                     f"anchors {r['n_parents_cleared']}/"
+                                     f"{r['n_counted_parents']}{cmp_str} "
                                      f"avg {r['avg_score']:.1f}{also}{tag_str}")
                 # Stash for HTML rendering
                 slayer_iter_result['categories'] = categories

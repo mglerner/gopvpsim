@@ -1,10 +1,11 @@
-"""Mirror-slayer iteration and IV categorization.
+"""Mirror-slayer iteration and slayer archetype classification.
 
 Iterative slayer discovery: repeatedly simulate the focal species against
-its own top meta picks, converging on the IV cohort that wins the most
-mirror-like matchups. The surviving IVs are then categorized into named
-groups (Atk Slayer, CMP Slayer, Bulk Slayer) based on their stat profiles
-and anchor pass/fail patterns.
+its own top meta picks, converging on a mirror opponent population. The
+population's role is to supply per-IV mirror performance and the CMP%
+denominator — the first-class outputs are the two slayer archetypes built
+by ``build_slayer_archetypes`` (Anchors-First and CMP-First), which are
+closed-form over the anchor resolver and need no extra sims.
 """
 import multiprocessing
 import os
@@ -212,6 +213,27 @@ def build_focal_meta(species, league, shadow, iv_floor=None):
     return iv_to_idx, iv_meta
 
 
+def _cut_pool(focal_scores, top_per_round):
+    """Cut a sorted focal_scores list to the round pool.
+
+    Takes the top ``top_per_round`` rows and extends only through rows that
+    EXACTLY tie the cutoff row's (frac_wins, avg_score) key. With the graded
+    metric, exact ties are rare, so the pool cap holds — unlike the old
+    keep-all-at-cutoff-win-count rule, which kept thousands of integer-tied
+    rows and made Round 1 cost ~80% of a dive's sim budget.
+    """
+    if len(focal_scores) <= top_per_round:
+        return list(focal_scores)
+    cut = focal_scores[top_per_round - 1]
+    cut_key = (cut['frac_wins'], cut['avg_score'])
+    top = focal_scores[:top_per_round]
+    for r in focal_scores[top_per_round:]:
+        if (r['frac_wins'], r['avg_score']) != cut_key:
+            break  # sorted input — ties with the cutoff row are contiguous
+        top.append(r)
+    return top
+
+
 def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                                 shield_scenarios, initial_opp_iv,
                                 max_rounds=4, top_per_round=10, cache=None,
@@ -231,6 +253,14 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     Returns dict with:
         'history': list of per-round top sets (each is list of (focal_idx, total_wins, avg_score, atk, def, hp))
         'final': the final top set (list of dicts)
+        'all_scores': dict keyed by (a, d, s) IV triple -> (total_wins,
+                      frac_wins, avg_score, n_pairs) for EVERY focal IV,
+                      scored against the last round's opponent population.
+                      This is
+                      the per-IV mirror-performance surface the archetype
+                      builder and the winsMirror y-axis consume — the Nash
+                      cohort's role is supplying this population, not being
+                      the optimization target.
         'rounds_run': how many rounds executed
         'converged': bool
         'cache_stats': string from cache
@@ -293,6 +323,7 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     current_opponent_indices = [iv_to_idx[initial_iv]]
     history = []
     converged = False
+    last_focal_scores = []
 
     import time as _time
     n_workers = min(max(1, multiprocessing.cpu_count() - reserve_cpus), 16)
@@ -398,11 +429,19 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
         even_indices = [i for i, (s0, s1) in enumerate(shield_scenarios) if s0 == s1]
         n_even = len(even_indices)
 
-        # Score each focal IV vs current opponents
+        # Score each focal IV vs current opponents. Two metrics per IV:
+        #   total_wins — integer scenario-win count (display continuity).
+        #   frac_wins  — graded per-opponent credit (scenarios won / counted
+        #                scenarios), summed across opponents. Same fractional
+        #                formulation as the Matchups Kept column (bb6f63e).
+        #                Integer win counts vs few opponents produce massive
+        #                exact ties (the Round-1 8.2M-sim explosion, 2026-06-10);
+        #                the fractional metric plus avg-score tiebreak makes
+        #                ties rare so --mirror-slayer-pool is actually honored.
         focal_scores = []
         for focal_idx in range(n_focal):
             total_wins = 0
-            even_wins_per_opp = []  # for "even-strict" mode
+            total_frac = 0.0
             total_score = 0
             n_pairs = 0
             for opp_idx, _ in opp_data_list:
@@ -410,20 +449,21 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                 if cached is None:
                     continue
 
-                if metric == 'all':
-                    wins = sum(1 for s in cached if s >= 500)
-                elif metric == 'even':
+                if metric == 'even':
                     wins = sum(1 for i in even_indices if cached[i] >= 500)
+                    frac = wins / n_even if n_even else 0.0
                 elif metric == 'even-strict':
                     # Counts only IVs that win ALL even scenarios vs this opponent
                     won_all_even = all(cached[i] >= 500 for i in even_indices)
                     wins = n_even if won_all_even else 0
-                    even_wins_per_opp.append(won_all_even)
-                else:
+                    frac = 1.0 if won_all_even else 0.0
+                else:  # 'all' and any unknown metric
                     wins = sum(1 for s in cached if s >= 500)
+                    frac = wins / len(cached) if cached else 0.0
 
                 avg = sum(cached) / len(cached)
                 total_wins += wins
+                total_frac += frac
                 total_score += avg
                 n_pairs += 1
             if n_pairs == 0:
@@ -435,24 +475,17 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                 'iv': (a, d, s),
                 'atk': atk_, 'def_': def_, 'hp': hp_,
                 'total_wins': total_wins,
+                'frac_wins': total_frac,
                 'avg_score': avg_score,
                 'n_pairs': n_pairs,
             })
 
-        # Sort by total wins desc, then avg score desc
-        focal_scores.sort(key=lambda x: (-x['total_wins'], -x['avg_score']))
+        # Sort by fractional wins desc, then avg score desc
+        focal_scores.sort(key=lambda x: (-x['frac_wins'], -x['avg_score']))
 
-        # Keep ALL IVs tied with the top_per_round threshold's win count.
-        # When many IVs share the same max win count (common in mirror analysis
-        # where ~80% of IVs win the same scenarios), we keep the full tied pool
-        # rather than tie-breaking by avg score (which biases toward HP-heavy
-        # IVs that win their losses by smaller margins).
-        if len(focal_scores) > top_per_round:
-            cutoff_wins = focal_scores[top_per_round - 1]['total_wins']
-            top = [r for r in focal_scores if r['total_wins'] >= cutoff_wins]
-        else:
-            top = focal_scores
+        top = _cut_pool(focal_scores, top_per_round)
 
+        last_focal_scores = focal_scores
         history.append(top)
 
         # Convergence check: same focal_idx set as previous round
@@ -480,102 +513,139 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     return {
         'history': history,
         'final': history[-1] if history else [],
+        'all_scores': {
+            r['iv']: (r['total_wins'], r['frac_wins'], r['avg_score'],
+                      r['n_pairs'])
+            for r in last_focal_scores
+        },
         'rounds_run': len(history),
         'converged': converged,
         'cache_stats': cache.stats(),
     }
 
 
-def categorize_slayers(survivors, resolved_anchors=None, iv_meta_list=None, top_n=None):
-    """
-    Classify slayer survivors into three strategic categories, using anchor
-    tagging for Atk and CMP slayers and the structural HP+def heuristic for
-    Bulk slayers.
+def build_slayer_archetypes(results, resolved_anchors=None, iter_result=None,
+                            top_mirror_n=50, cmp_first_n=20):
+    """Classify the full IV space into the two first-class slayer archetypes.
 
-    Each survivor dict is mutated to add an ``_anchor_tags`` field mapping the
-    TOML parent anchor name to the list of ResolvedAnchors it passes (so the
-    HTML renderer can display what each IV actually clears).
+    Both archetypes are sim-free given the anchor resolver and the sweep
+    results — anchor membership is closed-form from (atk, def), and CMP% is
+    an atk comparison against an opponent population. The Nash iteration's
+    role is reduced to supplying per-IV mirror performance (via
+    ``iter_result['all_scores']``) and the niche Nash-cohort CMP column;
+    it is no longer the optimization target.
 
-    Categories:
-      Atk Slayer — at least one damage_breakpoint anchor passed. If no
-                   survivor clears any BP anchor, this category is empty and
-                   the HTML renderer hides it.
-      CMP Slayer — at least one cmp anchor passed. Same empty-hide rule.
-      Bulk Slayer — HP and def both at or above survivor median (structural)
-                    OR clears at least one named bulkpoint anchor. Always
-                    shown; the structural pool is the default fallback when
-                    no bulkpoint anchors are configured.
+    Archetype 1 — **Anchors-First Slayer**: hit the important break/bulk
+        points first, then win CMP as much as possible. Members = IVs that
+        clear the maximum achievable number of *counted* anchor parents;
+        ranked by Top-Mirror CMP%, then atk.
+    Archetype 2 — **CMP-First Slayer** (the "lab mon"): win CMP as the first
+        priority, pick up anchors as a secondary goal. Members = top
+        ``cmp_first_n`` rows by (atk, avg_score). No anchor filter — the
+        per-row checklist reports what each spread clears vs sacrifices.
 
-    Survivors in multiple categories appear in each (cross-category badges in
-    the HTML make the overlap visible).
+    Counted parents: explicit (non-``auto_``) parents always count;
+    auto-generated parents count only when selective (cleared by < 50% of
+    the IV space). This is the slayer-card signal-loss fix — an auto anchor
+    that everyone clears can't define the archetype.
 
     Args:
-        survivors: list of survivor dicts from iterative_slayer_discovery.
-        resolved_anchors: list of ResolvedAnchor objects from
-            gopvpsim.anchors.resolve_anchors(). Empty/None means no anchor
-            tagging — Atk/CMP categories will be empty.
-        top_n: deprecated — full sorted lists are returned; the HTML layer
-            handles truncation and expand-all.
+        results: full per-IV sweep result dicts (must carry atk_iv/def_iv/
+            sta_iv, atk, def_, hp, avg_score; level/cp optional).
+        resolved_anchors: list of ResolvedAnchor from resolve_anchors().
+        iter_result: dict from iterative_slayer_discovery (may be None);
+            supplies 'all_scores' (mirror wins) and 'final' (Nash cohort).
+        top_mirror_n: cohort size for Top-Mirror CMP% (matches the JS
+            TOP_MIRROR_N so the table column agrees with the Top IVs table).
+        cmp_first_n: CMP-First membership cap.
 
-    Returns dict of category name -> list of survivor dicts (full, sorted).
+    Returns dict of archetype name -> list of row dicts sorted by the
+    archetype's lexicographic key. Rows carry the survivor-dict shape
+    (iv, atk, def_, hp, total_wins, avg_score, _anchor_tags) plus
+    frac_wins, n_parents_cleared, n_counted_parents, top_mirror_cmp,
+    nash_cmp. Anchors-First is empty when no counted parent is cleared
+    by any IV (renderer hides it).
     """
-    if not survivors:
+    if not results:
         return {}
-
     resolved_anchors = resolved_anchors or []
+    n = len(results)
 
-    # Tag each survivor with the anchors it passes (mutates the dict)
-    for r in survivors:
+    # Tag every IV; tally per-parent pass rates over the full IV space.
+    tags_by_i = []
+    parent_pass_counts: dict = {}
+    for r in results:
         tags = tag_iv(r['atk'], r['def_'], resolved_anchors)
-        r['_anchor_tags'] = tags
+        tags_by_i.append(tags)
+        for parent in tags:
+            parent_pass_counts[parent] = parent_pass_counts.get(parent, 0) + 1
 
-    # Structural medians for Bulk slayer classification
-    n = len(survivors)
-    defs = sorted(r['def_'] for r in survivors)
-    hps = sorted(r['hp'] for r in survivors)
-    def_med = defs[n // 2]
-    hp_med = hps[n // 2]
+    counted_parents = set()
+    for a in resolved_anchors:
+        p = a.parent
+        if p in counted_parents:
+            continue
+        if p.startswith('auto_'):
+            rate = parent_pass_counts.get(p, 0) / n
+            if rate >= 0.5:
+                continue  # non-selective auto anchor — everyone clears it
+        counted_parents.add(p)
 
-    atk_slayers: list = []
-    bulk_slayers: list = []
-    cmp_slayers: list = []
+    # CMP% helpers — semantics match the JS (_computeTopMirrorCmpPct /
+    # _computeMirrorCmpPct): both sides rounded to 2dp, ties count as
+    # beats, focal included in its own cohort.
+    from bisect import bisect_right
 
-    for r in survivors:
-        tags = r['_anchor_tags']
-        # Partition anchor tags by kind using the ResolvedAnchor.kind field
-        has_bp = any(
-            any(a.kind == 'damage_breakpoint' for a in subs)
-            for subs in tags.values()
-        )
-        has_cmp = any(
-            any(a.kind == 'cmp' for a in subs)
-            for subs in tags.values()
-        )
-        has_bulkpoint = any(
-            any(a.kind == 'bulkpoint' for a in subs)
-            for subs in tags.values()
-        )
-        if has_bp:
-            atk_slayers.append(r)
-        if has_cmp:
-            cmp_slayers.append(r)
-        # Bulk Slayer membership: structural HP+def above median OR clears
-        # at least one named bulkpoint anchor.
-        if (r['hp'] >= hp_med and r['def_'] >= def_med) or has_bulkpoint:
-            bulk_slayers.append(r)
+    def _cmp_pct(atk, cohort_sorted):
+        if not cohort_sorted:
+            return None
+        return 100.0 * bisect_right(cohort_sorted, round(atk, 2)) / len(cohort_sorted)
 
-    # Sort each by total_wins desc, then by the relevant tiebreaker.
-    # Atk Slayer tiebreaks by atk (higher = clears more BPs typically).
-    # CMP Slayer tiebreaks by atk too (CMP is about raw atk).
-    # Bulk Slayer tiebreaks by hp+def.
-    atk_slayers.sort(key=lambda r: (-r['total_wins'], -r['atk']))
-    bulk_slayers.sort(key=lambda r: (-r['total_wins'], -(r['hp'] + r['def_'])))
-    cmp_slayers.sort(key=lambda r: (-r['total_wins'], -r['atk']))
+    by_score = sorted(results, key=lambda r: -r['avg_score'])
+    top_mirror_atks = sorted(round(r['atk'], 2) for r in by_score[:top_mirror_n])
+    nash_atks = []
+    if iter_result and iter_result.get('final'):
+        nash_atks = sorted(round(s['atk'], 2) for s in iter_result['final']
+                           if s.get('atk') is not None)
+    all_scores = (iter_result or {}).get('all_scores') or {}
+
+    rows = []
+    for i, r in enumerate(results):
+        triple = (r['atk_iv'], r['def_iv'], r['sta_iv'])
+        tags = tags_by_i[i]
+        n_cleared = sum(1 for p in tags if p in counted_parents)
+        mw = all_scores.get(triple)
+        rows.append({
+            'iv': triple,
+            'atk': r['atk'], 'def_': r['def_'], 'hp': r['hp'],
+            'level': r.get('level'), 'cp': r.get('cp'),
+            'avg_score': r['avg_score'],
+            'total_wins': mw[0] if mw else 0,
+            'frac_wins': mw[1] if mw else 0.0,
+            'n_pairs': mw[3] if mw else 0,
+            '_anchor_tags': tags,
+            'n_parents_cleared': n_cleared,
+            'n_counted_parents': len(counted_parents),
+            'top_mirror_cmp': _cmp_pct(r['atk'], top_mirror_atks),
+            'nash_cmp': _cmp_pct(r['atk'], nash_atks),
+        })
+
+    anchors_first: list = []
+    if counted_parents:
+        max_cleared = max(r['n_parents_cleared'] for r in rows)
+        if max_cleared > 0:
+            anchors_first = [r for r in rows
+                             if r['n_parents_cleared'] == max_cleared]
+            anchors_first.sort(
+                key=lambda r: (-(r['top_mirror_cmp'] or 0), -r['atk'],
+                               -r['avg_score']))
+
+    cmp_first = sorted(rows, key=lambda r: (-round(r['atk'], 2),
+                                            -r['avg_score']))[:cmp_first_n]
 
     return {
-        'Atk Slayer': atk_slayers,
-        'Bulk Slayer': bulk_slayers,
-        'CMP Slayer': cmp_slayers,
+        'Anchors-First Slayer': anchors_first,
+        'CMP-First Slayer': cmp_first,
     }
 
 

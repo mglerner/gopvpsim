@@ -283,30 +283,6 @@ DEEP_DIVE_CSS = """
   padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
   margin:6px 0; }
 .dd-tags-toggle:hover { background:#1a3a6e; color:#fff; }
-.dd-filter-hidden { display: none !important; }
-.dd-filter-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
-  padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
-  margin:6px 0 4px 0; }
-.dd-filter-toggle:hover { background:#1a3a6e; color:#fff; }
-.dd-filter-panel { background:#0a1a30; border:1px solid #1a3a6e; border-radius:4px;
-  padding:8px 10px; margin:4px 0 8px 0; font-size:0.78rem; }
-.dd-filter-panel-group { margin-bottom:6px; padding-bottom:4px;
-  border-bottom:1px solid #16213e; }
-.dd-filter-panel-group:last-child { border-bottom:none; }
-.dd-filter-master { font-weight:600; color:#58a6ff; display:block; }
-.dd-filter-children { margin:2px 0 0 18px; display:flex; flex-wrap:wrap;
-  gap:4px 10px; }
-.dd-filter-children label { font-family:monospace; font-size:0.72rem;
-  color:#b0b8c4; cursor:pointer; }
-.dd-filter-children label:hover { color:#fff; }
-.dd-filter-controls { margin-top:6px; padding-top:6px; border-top:1px solid #16213e;
-  display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-.dd-filter-controls button { background:#1a3a6e; color:#fff; border:none;
-  padding:3px 8px; border-radius:3px; cursor:pointer; font-size:0.75rem; }
-.dd-filter-controls button:hover { background:#264a8a; }
-.dd-filter-status { color:#8b949e; font-size:0.72rem; margin-left:auto; }
-.dd-auto-marker { color:#d29922; font-size:0.7rem; font-weight:400;
-  font-style:italic; }
 /* Notable IVs section: dd-notable-only is a section-level class that
    hides every dd-not-notable card. The header checkbox toggles the
    class via ddNotableToggle(); default state is "only notable". */
@@ -499,7 +475,8 @@ class IVCategory:
     tiers, future matchup-conditional categories) so a single renderer can
     surface them all uniformly. Composite categories (intersections of
     multiple parents) are the framework's payoff: ``13/0/11 is the rare
-    bulk-floor slayer`` falls out as ``Atk Slayer ∩ Top 5%`` with one IV.
+    bulk-floor slayer`` falls out as ``Anchors-First Slayer ∩ Top 5%``
+    with one IV.
 
     Fields are intentionally permissive: a slayer kind populates
     ``source_anchors``, a tier kind populates ``source_tier`` and
@@ -1291,8 +1268,8 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
         'slayer optimum for a broader-meta floor (or vice versa). '
         'Matchup cards surface non-trivial '
         '(opponent,&nbsp;scenario)&nbsp;partitions for selective '
-        'matchups. Pure slayer cards live in the Mirror Slayer '
-        'Iteration block below; pure tier cards in the Threshold Tiers '
+        'matchups. Pure slayer-archetype cards live in the Slayer '
+        'Builds block below; pure tier cards in the Threshold Tiers '
         'section above.</p>\n'
     )
 
@@ -2286,14 +2263,90 @@ def pearson_r(xs, ys):
 # Mirror slayer iteration HTML
 # ---------------------------------------------------------------------------
 
+def _anchor_tags_cell(r):
+    """Badge-wall HTML + cell-level summary tooltip for a row's anchor tags.
+
+    One badge per parent anchor. Badge VISIBLE TEXT uses
+    derive_short_name() -- typically 3-6 characters (e.g. "lic", "mirb",
+    "lic^lur", "c:lur"). The badge HOVER tooltip carries the long form
+    (parent_display_name) plus the per-sub-anchor labels (e.g.
+    "close_combat->125, rage_fist->78"), so the abbreviation stays
+    decipherable. The returned cell title is a one-line summary (parent
+    count + kind breakdown) rather than a per-parent dump.
+
+    Returns (tags_cell_html, cell_title_text).
+    """
+    tag_bits = []
+    n_parents_by_kind = {'damage_breakpoint': 0, 'bulkpoint': 0, 'cmp': 0}
+    n_total_subs = 0
+    anchor_tags = r.get('_anchor_tags', {}) or {}
+    for parent in sorted(anchor_tags.keys()):
+        subs = anchor_tags[parent]
+        if not subs:
+            continue
+        labels = sorted({s_.label or s_.name for s_ in subs})
+        long_name = (subs[0].parent_display_name or parent)
+        short = derive_short_name(parent)
+        n_subs = len(labels)
+        if n_subs == 1:
+            badge_text = short
+            sub_labels_text = labels[0]
+            # Single-sub-anchor parents (Level 1, Level 2, CMP): no count
+            # suffix; the tooltip leads with "clears <single sub-anchor>".
+            hover_first_line = f'{long_name} · clears {sub_labels_text}'
+        else:
+            badge_text = (f'{short}<span class="dd-anchor-tag-count">'
+                          f'×{n_subs}</span>')
+            sub_labels_text = ", ".join(labels)
+            # Level 3 discover-mode parents: badge shows "<short>xN"; the
+            # tooltip explains that xN means "this IV passes N of the
+            # parent's sub-anchors" so the abbreviation isn't cryptic.
+            hover_first_line = f'{long_name} · clears {n_subs} sub-anchors'
+        hover_text_str = (
+            f'{hover_first_line}\n'
+            f'{parent}\n'
+            f'{sub_labels_text}'
+        )
+        tag_bits.append(
+            f'<span class="dd-anchor-tag"'
+            f'{tooltip_attr(hover_text_str)}>'
+            f'{badge_text}</span>'
+        )
+        kind = subs[0].kind
+        if kind in n_parents_by_kind:
+            n_parents_by_kind[kind] += 1
+        n_total_subs += n_subs
+    tags_cell = ' '.join(tag_bits) if tag_bits else '-'
+    n_total_parents = sum(n_parents_by_kind.values())
+    if n_total_parents == 0:
+        cell_title = 'No anchors cleared'
+    else:
+        kind_parts = []
+        if n_parents_by_kind['damage_breakpoint']:
+            kind_parts.append(f"{n_parents_by_kind['damage_breakpoint']} brkp")
+        if n_parents_by_kind['bulkpoint']:
+            kind_parts.append(f"{n_parents_by_kind['bulkpoint']} blkp")
+        if n_parents_by_kind['cmp']:
+            kind_parts.append(f"{n_parents_by_kind['cmp']} cmp")
+        cell_title = (
+            f'Clears {n_total_parents} anchors '
+            f'({" · ".join(kind_parts)}) '
+            f'· {n_total_subs} sub-anchors total. '
+            f'Hover any badge for per-anchor detail.'
+        )
+    return tags_cell, cell_title
+
+
 def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
                               data_obj=None, moveset_idx=0):
-    """Render the Mirror Slayer Iteration section of the Results pane.
+    """Render the Slayer Builds section of the Results pane.
 
-    Accepts either an ``AnalysisContext`` as the first positional arg or
-    explicit keyword args (``slayer_iter_result``, ``data_obj``,
-    ``moveset_idx``).  Returns an HTML string (empty if no slayer
-    iteration ran).
+    Two first-class archetype tables (Anchors-First, CMP-First) built by
+    ``build_slayer_archetypes``, plus the Nash-iteration round diagnostics
+    in a collapsed details block. Accepts either an ``AnalysisContext`` as
+    the first positional arg or explicit keyword args
+    (``slayer_iter_result``, ``data_obj``, ``moveset_idx``).  Returns an
+    HTML string (empty if no slayer iteration ran).
     """
     if ctx_or_slayer is not None and isinstance(ctx_or_slayer, AnalysisContext):
         slayer_iter_result = ctx_or_slayer.slayer_iter_result
@@ -2306,32 +2359,50 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
     metric_label = slayer_iter_result.get('metric', 'all')
     max_rounds_arg = slayer_iter_result.get('max_rounds_arg', 4)
     metric_explain = {
-        'all': 'all 9 shield scenarios count toward win totals',
-        'even': 'only even shields (0v0/1v1/2v2) count toward win totals',
-        'even-strict': 'only IVs that win ALL three even shields against an opponent get credit',
+        'all': 'per opponent, credit = shield scenarios won / 9',
+        'even': 'per opponent, credit = even shields (0v0/1v1/2v2) won / 3',
+        'even-strict': 'per opponent, credit = 1 only when ALL three even shields are won',
     }.get(metric_label, '')
     rounds_run = slayer_iter_result.get('rounds_run', 0)
     converged = slayer_iter_result.get('converged', False)
     final_pool = len(slayer_iter_result.get('final', []))
+    categories = slayer_iter_result.get('categories', {})
+    n_af = len(categories.get('Anchors-First Slayer', []) or [])
+    n_cf = len(categories.get('CMP-First Slayer', []) or [])
     parts.append(
         f'<details class="dd-collapsible">'
         f'<summary class="dd-h3" style="cursor:pointer">'
-        f'Mirror Slayer Iteration '
+        f'Slayer Builds '
         f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
-        f'({final_pool} survivors, {rounds_run} round{"s" if rounds_run != 1 else ""}, '
+        f'({n_af} anchors-first, {n_cf} cmp-first; mirror population '
+        f'{final_pool}, {rounds_run} round{"s" if rounds_run != 1 else ""}, '
         f'{"converged" if converged else "max rounds reached"})</span>'
         f'</summary>\n'
+    )
+    parts.append(
+        f'<p class="dd-small dd-prose">Two mirror-focused build archetypes '
+        f'for {data_obj.get("species", "this species")}. '
+        f'<strong>Anchors-First</strong>: lock in the named break/bulkpoints, '
+        f'then take as much Charge Move Priority as possible. '
+        f'<strong>CMP-First</strong> (the &ldquo;lab mon&rdquo;): take the '
+        f'max-attack spreads and see which anchors they keep or sacrifice. '
+        f'Both are computed directly from the anchor thresholds — the '
+        f'Nash-style mirror iteration below only supplies the opponent '
+        f'population that the CMP and mirror-wins columns are measured '
+        f'against.</p>\n'
     )
 
     # Iteration details -- collapsed by default
     parts.append(
         '<details class="dd-flip-detail">'
-        '<summary>Iteration details</summary>\n'
+        '<summary>Mirror population (iteration details)</summary>\n'
     )
-    parts.append(f'<p>Nash-style iterative discovery of IVs that beat the '
-                 f'{data_obj.get("species", "mirror")} mirror match. '
-                 f'Each round tests focal IVs against the previous round\'s top winners. '
-                 f'Survivors are classified into RyanSwag\'s three patterns.</p>\n')
+    parts.append(f'<p>Nash-style iterative discovery of the '
+                 f'{data_obj.get("species", "mirror")} mirror opponent '
+                 f'population. Each round tests focal IVs against the '
+                 f'previous round\'s top pool under a graded metric '
+                 f'(fractional wins, avg-score tiebreak), so the pool cap '
+                 f'holds instead of exploding on integer-win ties.</p>\n')
     parts.append(f'<p class="dd-small"><b>Metric:</b> <code>{metric_label}</code> '
                  f'({metric_explain}) | <b>Max rounds:</b> {max_rounds_arg}</p>\n')
     parts.append(f'<p class="dd-small">'
@@ -2349,8 +2420,7 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
         parts.append('</table>\n')
     parts.append('</details>\n')
 
-    # Categorized survivors
-    categories = slayer_iter_result.get('categories', {})
+    # Archetype cards
     resolved_anchors = slayer_iter_result.get('resolved_anchors', []) or []
 
     # Summarize resolved anchors (for the intro paragraph and
@@ -2360,40 +2430,22 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
         anchor_parents.setdefault(a.parent, []).append(a)
 
     CATEGORY_DESCRIPTIONS = {
-        'Atk Slayer': 'IVs that clear at least one named damage '
-                      'breakpoint against a notable opponent. Membership '
-                      'is binary per breakpoint: an IV is in this '
-                      'category iff its effective attack reaches the '
-                      'minimum needed to deal one extra damage with some '
-                      'move against some named opponent - not just '
-                      '&ldquo;has higher attack than other survivors.&rdquo; '
-                      'Each row&rsquo;s Tags column lists the specific '
-                      'breakpoint(s) cleared (hover for the move&nbsp;+&nbsp;'
-                      'tier detail). <strong>Hidden if no survivor '
-                      'clears any named breakpoint</strong> - an '
-                      'empty Atk Slayer box means no anchors fired '
-                      'against the current opponent set.',
-        'Bulk Slayer': 'IVs that either (a) have HP and defense both at '
-                       'or above the survivor-pool median (structural '
-                       'high-bulk pool, always shown) <strong>or</strong> '
-                       '(b) clear at least one named <em>bulkpoint</em> '
-                       'anchor against a notable opponent - '
-                       'reaching a defense tier at which one of the '
-                       'opponent&rsquo;s threat moves deals strictly '
-                       'less damage to the focal. Each row&rsquo;s Tags '
-                       'column shows which bulkpoint(s) the IV clears '
-                       '(badges with the &ldquo;b&rdquo; suffix or '
-                       '&ldquo;&uarr;&rdquo; reference markers); hover '
-                       'for the move&nbsp;+&nbsp;damage&nbsp;tier '
-                       'detail. The structural pool is the default '
-                       'fallback when no bulkpoint anchors are '
-                       'configured for the species.',
-        'CMP Slayer': 'IVs whose raw attack beats at least one named '
-                      'CMP anchor (e.g., the max attack of a reference '
-                      'cohort). Wins Charge Move Priority against the '
-                      'cohort when both fire a charged move on the same '
-                      'turn. <strong>Hidden if no survivor clears any '
-                      'CMP anchor</strong>.',
+        'Anchors-First Slayer': (
+            'Hit the important break/bulkpoints first, then win Charge '
+            'Move Priority as much as possible. Members clear the '
+            '<em>maximum achievable number</em> of counted anchor '
+            'parents — explicit TOML anchors always count, '
+            'auto-generated ones only when they are selective (cleared '
+            'by less than half the IV space, so &ldquo;everyone passes '
+            'it&rdquo; anchors can&rsquo;t saturate the archetype). '
+            'Ranked by Top-Mirror CMP&nbsp;%, then attack. '
+            '<strong>Hidden when no counted anchor resolves.</strong>'),
+        'CMP-First Slayer': (
+            'The &ldquo;lab mon&rdquo; build: win Charge Move Priority '
+            'first, pick up anchors as a secondary goal. Rows are the '
+            'max-attack spreads in the IV space, ranked by attack; the '
+            'Anchors column reports what each clears vs sacrifices — '
+            'no anchor is required for membership.'),
     }
 
     if categories:
@@ -2408,87 +2460,33 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
         if resolved_anchors:
             n_parents = len(anchor_parents)
             n_subs = len(resolved_anchors)
+            n_counted = next(
+                (r['n_counted_parents'] for civs in categories.values()
+                 for r in civs if 'n_counted_parents' in r), 0)
             parts.append(
-                f'<p class="dd-small">Each survivor is tagged with the '
+                f'<p class="dd-small">Each row is tagged with the '
                 f'set of named anchors it passes. {n_parents} parent '
                 f'anchor(s) resolved to {n_subs} concrete threshold '
                 f'check(s) - Level&nbsp;3 discover-mode anchors expand '
                 f'into a family of sub-anchors (one per discovered '
-                f'(move,&nbsp;tier) breakpoint). See the Tags column in '
-                f'each category for per-IV detail. IVs that fit '
-                f'<em>multiple</em> categories are marked with extra '
+                f'(move,&nbsp;tier) breakpoint). {n_counted} parent(s) '
+                f'are counted for Anchors-First membership. See the '
+                f'Tags column for per-IV detail; IVs that fit '
+                f'<em>both</em> archetypes are marked with '
                 f'cross-category badges.</p>\n'
             )
         else:
             parts.append(
                 '<p class="dd-small">No named anchors are configured '
-                'for this species/league (or none resolved against the '
-                'survivor cohort). Atk Slayer and CMP Slayer will be '
-                'empty; Bulk Slayer remains as a structural '
-                'HP+def-above-median view. Add anchors to the species '
-                '<code>thresholds/*.toml</code> file to enable '
-                'breakpoint-based categorization.</p>\n'
+                'for this species/league (or none resolved). '
+                'Anchors-First Slayer will be empty; CMP-First Slayer '
+                'still ranks the max-attack spreads. Add anchors to the '
+                'species <code>thresholds/*.toml</code> file to enable '
+                'the anchor checklist.</p>\n'
             )
 
-        # JS for the filter panel -- defined once, used by all cards.
+        # Tag-compactness JS -- defined once, used by all cards.
         parts.append("""<script>
-function ddSlayerApplyFilter(cardId) {
-  var table = document.getElementById(cardId + '-table');
-  if (!table) return;
-  var checked = new Set();
-  document.querySelectorAll('.dd-anchor-cb[data-card="' + cardId + '"]:checked').forEach(function(cb) {
-    checked.add(cb.getAttribute('data-anchor-idx'));
-  });
-  var showAllCb = document.querySelector('.dd-show-all-mons[data-card="' + cardId + '"]');
-  var showAll = showAllCb ? showAllCb.checked : false;
-  var visible = 0, total = 0;
-  table.querySelectorAll('tr[data-anchors]').forEach(function(row) {
-    total++;
-    var passes;
-    if (showAll) {
-      passes = true;
-    } else {
-      var raw = row.getAttribute('data-anchors') || '';
-      var rowAnchors = raw.split(' ').filter(Boolean);
-      if (rowAnchors.length === 0) {
-        passes = false;
-      } else {
-        passes = rowAnchors.some(function(a) { return checked.has(a); });
-      }
-    }
-    row.classList.toggle('dd-filter-hidden', !passes);
-    if (passes) visible++;
-  });
-  document.querySelectorAll('.dd-anchor-master[data-card="' + cardId + '"]').forEach(function(master) {
-    var grp = master.getAttribute('data-parent-grp');
-    var children = document.querySelectorAll('.dd-anchor-cb[data-card="' + cardId + '"][data-parent-grp="' + grp + '"]');
-    var n = 0, t = 0;
-    children.forEach(function(c) { t++; if (c.checked) n++; });
-    master.checked = (n === t);
-    master.indeterminate = (n > 0 && n < t);
-  });
-  var counter = document.getElementById(cardId + '-visible-count');
-  if (counter) counter.textContent = visible + ' / ' + total;
-}
-function ddSlayerToggleMaster(cb) {
-  var card = cb.getAttribute('data-card');
-  var grp = cb.getAttribute('data-parent-grp');
-  var checked = cb.checked;
-  document.querySelectorAll('.dd-anchor-cb[data-card="' + card + '"][data-parent-grp="' + grp + '"]').forEach(function(c) { c.checked = checked; });
-  ddSlayerApplyFilter(card);
-}
-function ddSlayerResetFilter(cardId, defaultShowAll) {
-  document.querySelectorAll('.dd-anchor-cb[data-card="' + cardId + '"]').forEach(function(c) { c.checked = true; });
-  var sa = document.querySelector('.dd-show-all-mons[data-card="' + cardId + '"]');
-  if (sa) sa.checked = defaultShowAll;
-  ddSlayerApplyFilter(cardId);
-}
-function ddSlayerToggleFilterPanel(cardId) {
-  var p = document.getElementById(cardId + '-filter');
-  if (!p) return;
-  var hidden = (p.style.display === 'none' || p.style.display === '');
-  p.style.display = hidden ? 'block' : 'none';
-}
 function ddToggleTagsCompact(btn) {
   // Toggle the dd-tags-compact class on every inner tag wrapper across all
   // slayer cards. The wrapper is a <div> nested inside the <td> because
@@ -2521,147 +2519,45 @@ function ddToggleTagsCompactCell(event) {
             'onclick="ddToggleTagsCompact(this)">Expand all tags</button>\n'
         )
         parts.append('<div class="dd-rec-grid">\n')
-        CAT_ABBREV = {'Atk Slayer': 'A', 'Bulk Slayer': 'B', 'CMP Slayer': 'C'}
-        CAT_COLORS = {'Atk Slayer': '#f85149', 'Bulk Slayer': '#3fb950',
-                      'CMP Slayer': '#d29922'}
-        # Unique ID per card to scope filter JS -- moveset index + category index.
+        CAT_ABBREV = {'Anchors-First Slayer': 'AF', 'CMP-First Slayer': 'CF'}
+        CAT_COLORS = {'Anchors-First Slayer': '#f85149',
+                      'CMP-First Slayer': '#d29922'}
+        # Hard cap on rows emitted into the HTML per card. Anchors-First
+        # membership can be broad when the max-cleared anchor tier is easy;
+        # the full member set still feeds the scatter overlay and Notable
+        # IVs, but the table emits at most this many rows and the note
+        # under the table says how many were dropped (no silent caps).
+        HTML_ROW_CAP = 100
         _table_uid = 0
         _ms_prefix = f"ms{moveset_idx}"
         for cat_name, cat_ivs in categories.items():
             if not cat_ivs:
-                continue  # hide empty categories (Atk/CMP when no anchors fired)
+                continue  # hide empty archetypes (Anchors-First w/o anchors)
             desc = CATEGORY_DESCRIPTIONS.get(cat_name, '')
             n_total = len(cat_ivs)
-            n_visible = min(n_total, 10)  # top N visible by default
-            # Top-quartile highlighting: first ceil(n_total / 4) rows
-            n_quartile = max(1, (n_total + 3) // 4)
+            emitted = cat_ivs[:HTML_ROW_CAP]
+            n_emitted = len(emitted)
+            n_visible = min(n_emitted, 10)  # top N visible by default
+            # Top-quartile highlighting: first ceil(n_emitted / 4) rows
+            n_quartile = max(1, (n_emitted + 3) // 4)
 
             _table_uid += 1
             card_id = f"{_ms_prefix}-slayer-{_table_uid}"
             # External-link anchor on the rec-card div, derived from the
-            # category name (e.g. 'mirror-atk-slayer'). card_id above is
-            # kept as the moveset-scoped prefix for filter-panel JS so
-            # the internal handles don't collide across movesets on a
-            # single page; the outer anchor is the stable external
-            # target. Each split-moveset file renders one mirror block,
-            # so category-name slugs are unique within a file.
+            # category name (e.g. 'mirror-anchors-first-slayer'). card_id
+            # above is the moveset-scoped prefix for the expand toggle so
+            # handles don't collide across movesets on a single page.
             mirror_slug = f'mirror-{opp_slug(cat_name)}'
-
-            # Determine which anchor kinds apply to this category card.
-            # Bulk Slayer surfaces all kinds (bulkpoint anchors are its
-            # native kind; bp/cmp tags also show as cross-info).
-            want_kinds = {
-                'Atk Slayer': {'damage_breakpoint'},
-                'CMP Slayer': {'cmp'},
-                'Bulk Slayer': {'damage_breakpoint', 'cmp', 'bulkpoint'},
-            }.get(cat_name, {'damage_breakpoint', 'cmp', 'bulkpoint'})
-
-            # Build the per-card sub-anchor index. anchor_parents was computed
-            # earlier from resolved_anchors. We filter to only sub-anchors
-            # whose kind matches this category, and assign each a stable
-            # integer index for the data-anchors row attribute and the
-            # filter checkboxes. Order: parent name asc, then threshold asc.
-            card_anchor_index: dict[tuple, int] = {}
-            card_parent_to_subs: dict[str, list] = {}
-            for parent in sorted(anchor_parents.keys()):
-                relevant_subs = [s_ for s_ in anchor_parents[parent]
-                                 if s_.kind in want_kinds]
-                if not relevant_subs:
-                    continue
-                relevant_subs.sort(key=lambda x: x.threshold_value)
-                for sub in relevant_subs:
-                    key = (parent, sub.label or sub.name)
-                    if key in card_anchor_index:
-                        continue
-                    idx = len(card_anchor_index)
-                    card_anchor_index[key] = idx
-                    card_parent_to_subs.setdefault(parent, []).append((idx, sub))
-
-            # Per-card default for "show all mons":
-            # Bulk Slayer is structural, so untagged rows must be visible by
-            # default. Atk/CMP Slayer membership requires anchor pass, so
-            # default off.
-            any_tagless = any(
-                not any(
-                    any(s_.kind in want_kinds for s_ in subs)
-                    for subs in r.get('_anchor_tags', {}).values()
-                )
-                for r in cat_ivs
-            )
-            default_show_all = any_tagless
-            show_all_attr = ' checked' if default_show_all else ''
 
             parts.append(f'<div class="dd-rec-card" id="{mirror_slug}">\n')
             parts.append(
                 f'<h4>{cat_name} '
                 f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
-                f'({n_total} survivor{"s" if n_total != 1 else ""})'
+                f'({n_total} IV{"s" if n_total != 1 else ""})'
                 f'</span></h4>\n'
             )
             if desc:
                 parts.append(f'<p class="dd-small dd-prose">{desc}</p>\n')
-
-            # Filter panel toggle button + collapsed panel body
-            if card_anchor_index:
-                n_anchors_total = len(card_anchor_index)
-                parts.append(
-                    f'<button class="dd-filter-toggle" '
-                    f'onclick="ddSlayerToggleFilterPanel(\'{card_id}\')">'
-                    f'Filter anchors ({n_anchors_total})'
-                    f'</button>\n'
-                )
-                parts.append(
-                    f'<div class="dd-filter-panel" id="{card_id}-filter" '
-                    f'style="display:none">\n'
-                )
-                for parent, subs_list in card_parent_to_subs.items():
-                    parts.append('<div class="dd-filter-panel-group">\n')
-                    is_auto = parent.startswith('auto_')
-                    auto_marker = (
-                        ' <span class="dd-auto-marker">(auto)</span>'
-                        if is_auto else ''
-                    )
-                    parts.append(
-                        f'<label class="dd-filter-master">'
-                        f'<input type="checkbox" class="dd-anchor-master" '
-                        f'data-card="{card_id}" data-parent-grp="{parent}" '
-                        f'checked '
-                        f'onchange="ddSlayerToggleMaster(this)"> '
-                        f'{parent} ({len(subs_list)}){auto_marker}'
-                        f'</label>\n'
-                    )
-                    parts.append('<div class="dd-filter-children">\n')
-                    for idx, sub in subs_list:
-                        label = sub.label or sub.name
-                        parts.append(
-                            f'<label><input type="checkbox" class="dd-anchor-cb" '
-                            f'data-card="{card_id}" data-parent-grp="{parent}" '
-                            f'data-anchor-idx="{idx}" checked '
-                            f'onchange="ddSlayerApplyFilter(\'{card_id}\')"> '
-                            f'{label}</label>\n'
-                        )
-                    parts.append('</div>\n')  # children
-                    parts.append('</div>\n')  # group
-                # Controls row
-                sa_default_js = 'true' if default_show_all else 'false'
-                parts.append('<div class="dd-filter-controls">\n')
-                parts.append(
-                    f'<button onclick="ddSlayerResetFilter(\'{card_id}\', '
-                    f'{sa_default_js})">Reset</button>\n'
-                )
-                parts.append(
-                    f'<label><input type="checkbox" class="dd-show-all-mons" '
-                    f'data-card="{card_id}"{show_all_attr} '
-                    f'onchange="ddSlayerApplyFilter(\'{card_id}\')"> '
-                    f'Show all mons (ignore filter)</label>\n'
-                )
-                parts.append(
-                    f'<span class="dd-filter-status">visible: '
-                    f'<span id="{card_id}-visible-count">{n_total} / {n_total}</span>'
-                    f'</span>\n'
-                )
-                parts.append('</div>\n')  # controls
-                parts.append('</div>\n')  # filter-panel
 
             # Table
             parts.append(
@@ -2669,11 +2565,15 @@ function ddToggleTagsCompactCell(event) {
             )
             parts.append(
                 '<tr><th>IVs</th><th>Atk</th><th>Def</th><th>HP</th>'
-                '<th>Wins</th><th>Avg</th><th>Also</th><th>Tags</th></tr>\n'
+                f'<th{tooltip_attr("Counted anchor parents cleared / total counted. Hover the badges for per-anchor detail.")}>Anchors</th>'
+                f'<th{tooltip_attr("Fraction of the top-50 same-species IVs (by avg battle score) whose atk this row ties or beats.")}>Top-Mirror CMP&nbsp;%</th>'
+                f'<th{tooltip_attr("Same atk comparison, vs the Nash-converged mirror population (see iteration details above).")}>Nash CMP&nbsp;%</th>'
+                f'<th{tooltip_attr("Expected matchups won vs the mirror population (fractional shield-scenario credit) / population size.")}>Mirror Wins</th>'
+                '<th>Avg</th><th>Also</th></tr>\n'
             )
-            for idx, r in enumerate(cat_ivs):
+            for idx, r in enumerate(emitted):
                 a, d, s = r['iv']
-                # Cross-category badges
+                # Cross-archetype badges
                 others = sorted(iv_categories.get(r['iv'], set()) - {cat_name})
                 badges = ''
                 for o in others:
@@ -2685,117 +2585,16 @@ function ddToggleTagsCompactCell(event) {
                         f'{tooltip_attr(o)}>{ab}</span> '
                     )
 
-                # Ultra-short tag rendering: one badge per parent.
-                # Badge VISIBLE TEXT uses derive_short_name() -- typically
-                # 3-6 characters (e.g. "lic", "mirb", "lic^lur", "c:lur").
-                # The badge HOVER tooltip carries the long form
-                # (parent_display_name) plus the per-sub-anchor labels
-                # (e.g. "close_combat->125, rage_fist->78"), so the
-                # abbreviation stays decipherable. The cell-level title=
-                # also includes the full parent name for fallback hover.
-                tag_bits = []
-                row_anchor_indices = []
-                # Per-row counters for the cell-level summary tooltip.
-                # Each parent contributes once to its kind bucket and
-                # n_subs to the total sub-anchor count.
-                n_parents_by_kind = {
-                    'damage_breakpoint': 0,
-                    'bulkpoint': 0,
-                    'cmp': 0,
-                }
-                n_total_subs = 0
-                for parent in sorted(r.get('_anchor_tags', {}).keys()):
-                    subs = r['_anchor_tags'][parent]
-                    relevant = [s_ for s_ in subs if s_.kind in want_kinds]
-                    if not relevant:
-                        continue
-                    labels = sorted({s_.label or s_.name for s_ in relevant})
-                    for s_ in relevant:
-                        key = (parent, s_.label or s_.name)
-                        if key in card_anchor_index:
-                            row_anchor_indices.append(card_anchor_index[key])
-                    # Long form (filter panel + tooltip) and short form
-                    # (visible badge text). Both derive from the parent
-                    # name; long form is also stored on the resolved
-                    # anchor as parent_display_name in case the TOML
-                    # set it explicitly.
-                    long_name = (relevant[0].parent_display_name or parent)
-                    short = derive_short_name(parent)
-                    n_subs = len(labels)
-                    if n_subs == 1:
-                        badge_text = short
-                        sub_labels_text = labels[0]
-                        # For single-sub-anchor parents (Level 1, Level 2,
-                        # CMP) the badge has no count suffix and the
-                        # tooltip leads with "clears <single sub-anchor>".
-                        hover_first_line = (
-                            f'{long_name} \u00b7 clears {sub_labels_text}'
-                        )
-                    else:
-                        badge_text = (f'{short}'
-                                      f'<span class="dd-anchor-tag-count">'
-                                      f'\u00d7{n_subs}</span>')
-                        sub_labels_text = ", ".join(labels)
-                        # For Level 3 discover-mode parents the badge
-                        # shows "<short>xN"; the tooltip explains that
-                        # xN means "this IV passes N of the parent's
-                        # sub-anchors" so the abbreviation isn't cryptic.
-                        hover_first_line = (
-                            f'{long_name} \u00b7 '
-                            f'clears {n_subs} sub-anchors'
-                        )
-                    # Hover tooltip on the badge: long display name +
-                    # explicit count meaning + full anchor name +
-                    # the sub-anchor labels.
-                    hover_text_str = (
-                        f'{hover_first_line}\n'
-                        f'{parent}\n'
-                        f'{sub_labels_text}'
-                    )
-                    tag_bits.append(
-                        f'<span class="dd-anchor-tag"'
-                        f'{tooltip_attr(hover_text_str)}>'
-                        f'{badge_text}</span>'
-                    )
-                    # Tally for the cell-level summary tooltip. Use the
-                    # kind from the first relevant ResolvedAnchor (all
-                    # share kind for a given parent).
-                    kind = relevant[0].kind
-                    if kind in n_parents_by_kind:
-                        n_parents_by_kind[kind] += 1
-                    n_total_subs += n_subs
-                tags_cell = ' '.join(tag_bits) if tag_bits else '-'
-                # Cell-level title is now a one-line summary instead of
-                # the previous per-parent dump (which was 2000+ chars
-                # and literally taller than a screen for rows with 40+
-                # parents). Per-badge tooltips still hold the per-anchor
-                # detail, so this summary just gives an at-a-glance
-                # signal of how many parents the row clears and the
-                # kind breakdown.
-                n_total_parents = sum(n_parents_by_kind.values())
-                if n_total_parents == 0:
-                    cell_title_attr = 'No anchors cleared'
-                else:
-                    kind_parts = []
-                    if n_parents_by_kind['damage_breakpoint']:
-                        kind_parts.append(
-                            f"{n_parents_by_kind['damage_breakpoint']} brkp"
-                        )
-                    if n_parents_by_kind['bulkpoint']:
-                        kind_parts.append(
-                            f"{n_parents_by_kind['bulkpoint']} blkp"
-                        )
-                    if n_parents_by_kind['cmp']:
-                        kind_parts.append(
-                            f"{n_parents_by_kind['cmp']} cmp"
-                        )
-                    cell_title_attr = (
-                        f'Clears {n_total_parents} anchors '
-                        f'({" \u00b7 ".join(kind_parts)}) '
-                        f'\u00b7 {n_total_subs} sub-anchors total. '
-                        f'Hover any badge for per-anchor detail.'
-                    )
-                data_anchors = ' '.join(str(i) for i in sorted(set(row_anchor_indices)))
+                tags_cell, cell_title_attr = _anchor_tags_cell(r)
+                anchors_count = (f"{r.get('n_parents_cleared', 0)}/"
+                                 f"{r.get('n_counted_parents', 0)}")
+                tm = r.get('top_mirror_cmp')
+                nc = r.get('nash_cmp')
+                tm_cell = f'{tm:.0f}%' if tm is not None else '-'
+                nc_cell = f'{nc:.0f}%' if nc is not None else '-'
+                npairs = r.get('n_pairs', 0)
+                mw_cell = (f"{r.get('frac_wins', 0.0):.1f}/{npairs}"
+                           if npairs else '-')
 
                 # Row classes: collapse-hidden beyond top N until expanded;
                 # highlighted if in the top quartile.
@@ -2804,27 +2603,30 @@ function ddToggleTagsCompactCell(event) {
                     row_cls_parts.append('dd-slayer-top')
                 if idx >= n_visible:
                     row_cls_parts.append('dd-slayer-hidden')
-                row_cls = f'class="{" ".join(row_cls_parts)}" ' if row_cls_parts else ''
+                row_cls = f' class="{" ".join(row_cls_parts)}"' if row_cls_parts else ''
 
                 parts.append(
-                    f'<tr {row_cls}data-anchors="{data_anchors}">'
+                    f'<tr{row_cls}>'
                     f'<td>{a}/{d}/{s}</td>'
                     f'<td>{r["atk"]:.2f}</td>'
                     f'<td>{r["def_"]:.2f}</td>'
                     f'<td>{r["hp"]}</td>'
-                    f'<td class="dd-gain">{r["total_wins"]}</td>'
-                    f'<td>{r["avg_score"]:.1f}</td>'
-                    f'<td>{badges}</td>'
                     f'<td class="dd-anchor-tags-cell"'
                     f'{tooltip_attr(cell_title_attr)}>'
+                    f'<b>{anchors_count}</b> '
                     f'<div class="dd-anchor-tags-inner dd-tags-compact" '
                     f'onclick="ddToggleTagsCompactCell(event)">'
-                    f'{tags_cell}</div></td></tr>\n'
+                    f'{tags_cell}</div></td>'
+                    f'<td class="dd-gain">{tm_cell}</td>'
+                    f'<td>{nc_cell}</td>'
+                    f'<td>{mw_cell}</td>'
+                    f'<td>{r["avg_score"]:.1f}</td>'
+                    f'<td>{badges}</td></tr>\n'
                 )
             parts.append('</table>\n')
 
-            # Expand-all toggle if there are hidden rows
-            if n_total > n_visible:
+            # Expand toggle if there are hidden rows
+            if n_emitted > n_visible:
                 parts.append(
                     f'<button class="dd-slayer-toggle" '
                     f'onclick="(function(btn){{'
@@ -2832,10 +2634,17 @@ function ddToggleTagsCompactCell(event) {
                     f'var rows=t.querySelectorAll(\'tr.dd-slayer-hidden\');'
                     f'var shown=rows.length>0 && rows[0].classList.contains(\'dd-slayer-shown\');'
                     f'rows.forEach(function(r){{r.classList.toggle(\'dd-slayer-shown\', !shown);}});'
-                    f'btn.textContent=shown?\'Show all {n_total}\':\'Collapse to top {n_visible}\';'
+                    f'btn.textContent=shown?\'Show all {n_emitted}\':\'Collapse to top {n_visible}\';'
                     f'}})(this)" >'
-                    f'Show all {n_total}'
+                    f'Show all {n_emitted}'
                     f'</button>\n'
+                )
+            if n_total > n_emitted:
+                parts.append(
+                    f'<p class="dd-small">Showing the top {n_emitted} of '
+                    f'{n_total} member IVs by this archetype\'s ranking; '
+                    f'{n_total - n_emitted} more are in the cohort (all '
+                    f'still appear in the scatter overlay).</p>\n'
                 )
             parts.append('</div>\n')  # rec-card
         parts.append('</div>\n')  # rec-grid
@@ -3519,7 +3328,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
     if notable_html:
         parts.append(notable_html)
 
-    # -- Mirror Slayer Iteration --
+    # -- Slayer Builds --
     slayer_html = render_mirror_slayer_html(
         slayer_iter_result=slayer_iter_result,
         data_obj=data_obj, moveset_idx=moveset_idx)
