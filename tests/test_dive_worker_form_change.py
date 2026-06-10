@@ -113,21 +113,23 @@ def test_sweep_worker_matches_from_pokemon():
     _init_sweep_worker_state(opp_cache, SCENARIOS)
 
     focal_iv_list = [(4, 14, 15), (0, 15, 15), (15, 15, 15)]
-    chunk = [_focal_profile(ivs) for ivs in focal_iv_list]
+    profiles = [_focal_profile(ivs) for ivs in focal_iv_list]
+    chunk = [(prof, oi) for prof in profiles
+             for oi in range(len(opp_cache))]
     results, n_sims = deep_dive._sweep_worker(chunk)
 
     assert n_sims == len(focal_iv_list) * len(opp_cache) * len(SCENARIOS)
 
     opp_specs = [('Azumarill', AZU_MOVESET, azu_ivs),
                  (AEGI_SPECIES, (AEGI_FAST, AEGI_CHARGED), aegi_opp_ivs)]
-    for ivs, prof in zip(focal_iv_list, chunk):
-        per_opp = results[prof[0]]
+    for ivs, prof in zip(focal_iv_list, profiles):
         for oi, (opp_species, opp_moveset, opp_ivs) in enumerate(opp_specs):
+            scores = results[(prof[0], oi)]
             for si, (s_focal, s_opp) in enumerate(SCENARIOS):
                 expected = _reference_score(ivs, s_focal, s_opp,
                                             opp_species, opp_moveset,
                                             opp_ivs)
-                got = per_opp[(si, oi)]
+                got = scores[si]
                 assert got == expected, (
                     f"IV {ivs} vs {opp_species} {s_focal}v{s_opp}: "
                     f"worker={got}, from_pokemon={expected}")
@@ -144,9 +146,9 @@ def test_sweep_worker_pins_pvpoke_oracle_score():
                                   AZU_MOVESET[1], (4, 15, 13))]
     _init_sweep_worker_state(opp_cache, [(0, 0)])
 
-    chunk = [_focal_profile((4, 14, 15))]
-    results, _ = deep_dive._sweep_worker(chunk)
-    score = results[chunk[0][0]][(0, 0)]
+    prof = _focal_profile((4, 14, 15))
+    results, _ = deep_dive._sweep_worker([(prof, 0)])
+    score = results[(prof[0], 0)][0]
     assert round(score) == 773
 
     # Pre-S1 behavior: same stats, no form-change state attached.
@@ -154,7 +156,7 @@ def test_sweep_worker_pins_pvpoke_oracle_score():
     focal_mon = next(m for m in gm['pokemon']
                      if m['speciesName'] == AEGI_SPECIES)
     fast_db, charged_db = get_moves()
-    _, atk, def_, hp, *_rest = chunk[0]
+    _, atk, def_, hp, *_rest = prof
     bp0 = BattlePokemon(
         species=AEGI_SPECIES, types=parse_types(focal_mon),
         atk=atk, def_=def_, max_hp=hp,

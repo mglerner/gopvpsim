@@ -1190,13 +1190,14 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
             pvpoke_dp, bait_shields=False)
 
 
-def _sweep_worker(profile_chunk):
+def _sweep_worker(pair_chunk):
     """
-    Sim a chunk of focal stat profiles against the cached opponent list.
+    Sim a chunk of (focal stat profile, opponent index) pairs across the
+    shield-scenario axis.
 
-    profile_chunk: list of (profile_key, atk, def, hp,
-                            atk_iv, def_iv, sta_iv, level) tuples.
-    Returns dict of profile_key -> per_opp (which is dict of (scenario_idx, opp_idx) -> score).
+    pair_chunk: list of ((profile_key, atk, def, hp, atk_iv, def_iv,
+                          sta_iv, level), opp_idx) tuples.
+    Returns ({(profile_key, opp_idx): [score per scenario]}, n_sims).
     """
     ws = _worker_state
     species = ws['species']
@@ -1212,50 +1213,58 @@ def _sweep_worker(profile_chunk):
 
     results = {}
     n_sims = 0
-    for profile_key, atk_stat, def_stat, hp_stat, a_iv, d_iv, s_iv, lv in profile_chunk:
-        per_opp = {}
-        for oi, opp in enumerate(opp_cache):
-            # One BattlePokemon pair per (profile, opponent), reset between
-            # scenarios — keeps the damage/DP caches warm across the
-            # shield-scenario axis instead of rebuilding them per sim.
-            bp0 = BattlePokemon(
-                species=species, types=focal_types,
-                atk=atk_stat, def_=def_stat, max_hp=hp_stat,
-                fast_move=dict(fm_template),
-                charged_moves=[dict(cm) for cm in cms_template],
-            )
-            attach_form_change(bp0, focal_mon, a_iv, d_iv, s_iv, lv,
-                               league_cp, focal_shadow)
-            bp1 = BattlePokemon(
-                species=opp['species'], types=opp['types'],
-                atk=opp['atk'], def_=opp['def_'], max_hp=opp['hp'],
-                fast_move=dict(opp['fm']),
-                charged_moves=[dict(cm) for cm in opp['cms']],
-            )
-            attach_form_change(bp1, opp['mon'], *opp['ivs'], opp['level'],
-                               league_cp, opp['shadow'])
-            for si, (s_focal, s_opp) in enumerate(shield_scenarios):
-                bp0.reset_for_battle(s_focal, opponent=bp1)
-                bp1.reset_for_battle(s_opp, opponent=bp0)
-                result = simulate(bp0, bp1,
-                                  charged_policy_0=focal_policy,
-                                  charged_policy_1=pvpoke_dp)
-                per_opp[(si, oi)] = result.pvpoke_score(0)
-                n_sims += 1
-        results[profile_key] = per_opp
+    for (profile_key, atk_stat, def_stat, hp_stat, a_iv, d_iv, s_iv, lv), oi in pair_chunk:
+        opp = opp_cache[oi]
+        # One BattlePokemon pair per (profile, opponent), reset between
+        # scenarios — keeps the damage/DP caches warm across the
+        # shield-scenario axis instead of rebuilding them per sim.
+        bp0 = BattlePokemon(
+            species=species, types=focal_types,
+            atk=atk_stat, def_=def_stat, max_hp=hp_stat,
+            fast_move=dict(fm_template),
+            charged_moves=[dict(cm) for cm in cms_template],
+        )
+        attach_form_change(bp0, focal_mon, a_iv, d_iv, s_iv, lv,
+                           league_cp, focal_shadow)
+        bp1 = BattlePokemon(
+            species=opp['species'], types=opp['types'],
+            atk=opp['atk'], def_=opp['def_'], max_hp=opp['hp'],
+            fast_move=dict(opp['fm']),
+            charged_moves=[dict(cm) for cm in opp['cms']],
+        )
+        attach_form_change(bp1, opp['mon'], *opp['ivs'], opp['level'],
+                           league_cp, opp['shadow'])
+        scores = []
+        for s_focal, s_opp in shield_scenarios:
+            bp0.reset_for_battle(s_focal, opponent=bp1)
+            bp1.reset_for_battle(s_opp, opponent=bp0)
+            result = simulate(bp0, bp1,
+                              charged_policy_0=focal_policy,
+                              charged_policy_1=pvpoke_dp)
+            scores.append(result.pvpoke_score(0))
+            n_sims += 1
+        results[(profile_key, oi)] = scores
     return results, n_sims
 
 
 def iv_sweep(species, fast_id, charged_ids, league, shadow,
              opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke',
              iv_floor=None, log_path=None, verbose=False,
-             threshold_registry=None, reserve_cpus=0):
+             threshold_registry=None, reserve_cpus=0, signature_dedup=True):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
     multiprocessing - IVs with identical effective stats produce identical
     battles, so we sim each profile once and copy the result to all
     matching IVs (~1.7x speedup).
+
+    With ``signature_dedup`` (default), profiles are further grouped
+    per-opponent by damage signature (see deep_dive_signature.py):
+    profiles whose damage tables, CMP sign, and HP all match vs a given
+    opponent fight bit-identical battles, so one representative sim per
+    (signature, opponent) covers the whole group. Provably exact;
+    ``--no-signature-dedup`` / signature_dedup=False restores the
+    per-profile path (used by the verification script and tests).
 
     opp_iv_mode may be a composite mode string encoding a bait-shields axis:
       'pvpoke', 'rank1'        - bait-on (default pvpoke_dp behavior)
@@ -1317,13 +1326,42 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         iv_meta, per_iv=focal_per_iv)
     profile_list = [(pk, *dat) for pk, dat in profile_data.items()]
 
+    # Signature dedup: per opponent, group profiles whose battles are
+    # provably bit-identical (same damage tables both ways, same CMP
+    # sign, same HP — see deep_dive_signature.py) and sim one
+    # representative per group.
+    n_profiles = len(profile_list)
+    if signature_dedup:
+        import deep_dive_signature as sig
+        focal_side = sig.build_focal_side(
+            focal_mon, focal_types, fm_template, cms_template,
+            profile_list, LEAGUE_CAPS[league], shadow)
+        groups_by_opp = [
+            sig.signature_groups(focal_side,
+                                 sig.build_opp_side(opp, LEAGUE_CAPS[league]))
+            for opp in opp_cache
+        ]
+    else:
+        trivial = [(pos, [pos]) for pos in range(n_profiles)]
+        groups_by_opp = [trivial for _ in opp_cache]
+
+    pair_list = [(profile_list[rep_pos], oi)
+                 for oi, groups in enumerate(groups_by_opp)
+                 for rep_pos, _members in groups]
+    total_pairs = n_profiles * len(opp_cache)
+    if signature_dedup and pair_list:
+        logger.info(f"      signature dedup: {n_profiles} profiles x "
+                    f"{len(opp_cache)} opponents -> {len(pair_list)} "
+                    f"representative pairs "
+                    f"({total_pairs / len(pair_list):.2f}x)")
+
     # Parallel sim: ~100 chunks across the worker pool. imap_unordered
     # hands chunks out as workers free up - finer granularity gives more
     # frequent progress reports and better load balancing.
     n_workers = min(max(1, multiprocessing.cpu_count() - reserve_cpus), 16)
     n_chunks_target = 100
-    chunk_size = max(1, (len(profile_list) + n_chunks_target - 1) // n_chunks_target)
-    chunks = [profile_list[i:i+chunk_size] for i in range(0, len(profile_list), chunk_size)]
+    chunk_size = max(1, (len(pair_list) + n_chunks_target - 1) // n_chunks_target)
+    chunks = [pair_list[i:i+chunk_size] for i in range(0, len(pair_list), chunk_size)]
 
     import time as _time
     sim_start = _time.time()
@@ -1350,12 +1388,22 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                             f"({frac*100:.0f}%), eta {eta:.0f}s")
                 last_print = now
 
-    # Merge profile results
-    profile_per_opp = {}
+    # Merge pair results, then fan each representative's scores out to
+    # every profile in its signature group.
+    pair_scores = {}
     n_sims = 0
-    for prof_res, chunk_sims in chunk_results:
-        profile_per_opp.update(prof_res)
+    for pair_res, chunk_sims in chunk_results:
+        pair_scores.update(pair_res)
         n_sims += chunk_sims
+
+    profile_per_opp = {}
+    for oi, groups in enumerate(groups_by_opp):
+        for rep_pos, members in groups:
+            scores = pair_scores[(profile_list[rep_pos][0], oi)]
+            for pos in members:
+                per_opp = profile_per_opp.setdefault(profile_list[pos][0], {})
+                for si, sc in enumerate(scores):
+                    per_opp[(si, oi)] = sc
 
     # Build per-IV results by expanding profile sims to all matching IVs.
     # The list is built in canonical iteration order (matches iv_meta order).
@@ -4333,6 +4381,12 @@ def main():
                              'responsive. Default 0 (use up to min(cpu_count, 16)). '
                              'Applies to both the per-moveset sim sweep and the '
                              'slayer iteration pool.')
+    parser.add_argument('--no-signature-dedup', action='store_true',
+                        help='Disable per-opponent damage-signature dedup in '
+                             'the IV sweep (sim every stat profile vs every '
+                             'opponent). The dedup is provably exact; this '
+                             'flag exists for verification runs '
+                             '(scripts/verify_signature_dedup.py) and debugging.')
 
     args = parser.parse_args()
 
@@ -4843,6 +4897,7 @@ def main():
             log_path=log_path, verbose=args.verbose,
             threshold_registry=threshold_registry,
             reserve_cpus=args.reserve_cpus,
+            signature_dedup=not args.no_signature_dedup,
         )
 
         elapsed = time.time() - t0
@@ -5218,6 +5273,7 @@ def main():
                             log_path=log_path, verbose=args.verbose,
                             threshold_registry=threshold_registry,
                             reserve_cpus=args.reserve_cpus,
+                            signature_dedup=not args.no_signature_dedup,
                         )
                         elapsed = time.time() - t0
                         rate = n_sims / elapsed if elapsed > 0 else 0
@@ -5252,6 +5308,7 @@ def main():
                             log_path=log_path, verbose=args.verbose,
                             threshold_registry=threshold_registry,
                             reserve_cpus=args.reserve_cpus,
+                            signature_dedup=not args.no_signature_dedup,
                         )
                         elapsed = time.time() - t0
                         logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
@@ -5288,6 +5345,7 @@ def main():
                             log_path=log_path, verbose=args.verbose,
                             threshold_registry=threshold_registry,
                             reserve_cpus=args.reserve_cpus,
+                            signature_dedup=not args.no_signature_dedup,
                         )
                         elapsed = time.time() - t0
                         rate = ref_n / elapsed if elapsed > 0 else 0
