@@ -1,90 +1,103 @@
 # Top 50 GL overall rankings (PvPoke) union the championshipseries group.
-# Generated 2026-06-02 by scripts/build_opponent_pool.py against the
-# afa3ad740 PvPoke pull. 63 species from the auto recipe + 3 hand-
-# extended focals = 66 total.
+# Generated 2026-06-10 by scripts/build_opponent_pool.py against current
+# GitHub-master rankings (post-June-2026 move rebalance; PvPoke pushed
+# the regenerated rankings after the local 06-05 `bc532fbda` pull).
+# 67 species from the auto recipe + 4 hand-extended = 71 total.
 #
-# Hand-extended 2026-06-02 with the three focal species that dropped
-# out of the rebuilt top-50 so each dive's opponent pool includes the
-# cross-form / alt-form partner (Oinkologne Male/Female) and the new
-# focal species (Seismitoad). deep_dive.py auto-appends the focal
-# species for mirror analysis, so having them explicit here makes the
-# cross-form matchups symmetric across focals.
+# Rebalance churn vs the 2026-06-02 pool: in — Umbreon, Milotic,
+# Dondozo, Primeape (+Shadow), Shelgon (+Shadow), Dragonair (+Shadow),
+# Fearow, Furret, Lumineon; out — Blastoise, Clefable, Dartrix,
+# Drapion (Shadow), Dusclops (+Shadow), Florges.
 #
-# Aegislash (Blade) is present as a bare entry but PvPoke's GL
-# rankings only list Aegislash (Shield) (Blade is the in-battle
-# transform state, not separately ranked). The default-moveset
-# rejection is handled in src/gopvpsim/data.py via the
-# _DEFAULT_MOVESET_FALLBACK dict (pins PSYCHO_CUT/SHADOW_BALL/
-# GYRO_BALL for aegislash_blade), so this pool can stay clean.
+# Hand-extended focals: dive focals that don't clear the auto recipe,
+# kept so each dive's opponent pool includes the cross-form / alt-form
+# partner and cross-focal matchups stay symmetric (deep_dive.py only
+# auto-appends the dive's own focal for mirror analysis).
+#   - Oinkologne / Oinkologne (Female): out of top-50 since 2026-06-02.
+#   - Sylveon: NAIC focal (2026-06), never in the auto recipe.
+#   - Jumpluff (Shadow): left top-50 in the rebalance while Jumpluff
+#     stays — retained per the keep-shadow-pairs policy (players prep
+#     against each form deliberately), and it's a dive focal.
+#
+# Aegislash: both (Shield) and (Blade) now come out of the auto recipe
+# (Blade via the championshipseries group), so no hand entry is needed.
+# Blade's default-moveset rejection is handled in src/gopvpsim/data.py
+# via _DEFAULT_MOVESET_FALLBACK (pins PSYCHO_CUT/SHADOW_BALL/GYRO_BALL
+# for aegislash_blade).
 #
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
-# --- hand-extended focals (2026-06-02) ---
+# --- hand-extended focals (2026-06-10) ---
 Oinkologne
 Oinkologne (Female)
-Seismitoad
+Sylveon
+Jumpluff (Shadow)
 
 # --- auto recipe (top 50 GL ∪ championshipseries) ---
 Lickilicky
-Feraligatr
-Feraligatr (Shadow)
 Altaria
-Corsola (Galarian)
-Jellicent
-Quagsire
-Quagsire (Shadow)
-Tinkaton
-Forretress
 Altaria (Shadow)
 Empoleon
+Jellicent
+Quagsire (Shadow)
+Corsola (Galarian)
+Quagsire
+Empoleon (Shadow)
+Tinkaton
+Ninetales
+Seaking
 Azumarill
-Forretress (Shadow)
+Forretress
+Feraligatr
+Guzzlord
+Mantine
+Ninetales (Shadow)
+Malamar
 Kingdra
 Corviknight
-Empoleon (Shadow)
+Fearow
+Forretress (Shadow)
 Kingdra (Shadow)
-Aegislash (Blade)
-Mantine
+Feraligatr (Shadow)
+Dragonair (Shadow)
 Medicham
-Ninetales
-Jumpluff
+Aegislash (Blade)
 Sableye (Shadow)
-Seaking
-Guzzlord
-Malamar
+Shelgon
+Sliggoo
+Jumpluff
+Stunfisk (Galarian)
+Dragonair
+Seismitoad
+Shelgon (Shadow)
+Clodsire
+Furret
+Lapras
+Sealeo
+Sealeo (Shadow)
 Stunfisk
 Talonflame
-Clodsire
-Sliggoo
-Lapras
-Dragonair (Shadow)
-Dusclops
-Sealeo
-Greedent
-Grumpig
+Umbreon
 Pelipper
-Sealeo (Shadow)
-Annihilape
-Sableye
+Dondozo
+Grumpig
+Lumineon
+Milotic
+Greedent
+Aegislash (Shield)
 Charjabug
 Cradily
-Drapion (Shadow)
-Stunfisk (Galarian)
-Blastoise
-Clefable
-Dusclops (Shadow)
-Florges
-Jumpluff (Shadow)
-Aegislash (Shield)
-Dartrix
 Dewgong
 Diggersby
 Dusknoir (Shadow)
 Gourgeist (Super)
-Ninetales (Shadow)
+Sableye
 Steelix
 Talonflame (Shadow)
 Togekiss
 Togetic
 Weezing (Galarian) (Shadow)
 Wigglytuff
+Annihilape
+Primeape
+Primeape (Shadow)
