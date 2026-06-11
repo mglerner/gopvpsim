@@ -1868,3 +1868,33 @@ def test_buff_meter_proc_schedule(chance, expected_procs):
         if defender.def_stage != 0:
             procs.append(use)
     assert procs == expected_procs
+
+
+# ---------------------------------------------------------------------------
+# wouldShield selfAttackDebuffing final-override clause (ActionLogic.js:1186)
+# ---------------------------------------------------------------------------
+
+def test_would_shield_self_attack_debuff_override():
+    """PvPoke's final wouldShield clause: 'Shield the first in a series of
+    Attack debuffing moves like Superpower' — selfAttackDebuffing AND
+    damage/hp > 0.55 forces a shield even when every other clause says no.
+    The numbers below sit in the window where no other clause fires
+    (damage 67 vs hp 120: 0.558 > 0.55, but < hp/1.4 and < hp - cycle),
+    so the flag alone flips the decision.
+    """
+    def make_superpower(atk_debuff: bool):
+        return {'moveId': 'FAKE_SUPERPOWER', 'name': 'Fake Superpower',
+                'type': 'normal', 'power': 85, 'energy': 40, 'energyGain': 0,
+                'buffs': [-1, -1], 'buffTarget': 'self',
+                'buffApplyChance': '1', 'selfDebuffing': True,
+                'selfAttackDebuffing': atk_debuff,
+                'selfDefenseDebuffing': True}
+
+    from gopvpsim.battle import would_shield
+    move_on = make_superpower(True)
+    att_on = make_bp(charged=[move_on])
+    assert would_shield(att_on, make_bp(hp=120, shields=1), move_on) is True
+
+    move_off = make_superpower(False)
+    att_off = make_bp(charged=[move_off])
+    assert would_shield(att_off, make_bp(hp=120, shields=1), move_off) is False

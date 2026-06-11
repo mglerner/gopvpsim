@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (2026-04-06)
 
-<!-- sync:test_count -->822<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->823<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The simulator matches PvPoke's
 simulate-mode score table exactly (±0) for <!-- sync:pvpoke_matchups_verified -->8<!-- /sync --> matchups
@@ -335,7 +335,22 @@ combos. Mimi's actual SS timing was correct all along; the
 
 ## Open divergences
 
-(none currently outstanding — see "Known divergences" for intentional ones)
+### Snorlax vs Obstagoon GL — score-margin cluster (found 2026-06-11)
+
+Probing the E3 wouldShield port surfaced a pre-existing divergence:
+Snorlax 4/14/5 L17.5 (Lick / Body Slam + Super Power) vs Obstagoon
+5/15/12 L21 (Counter / Night Slash + Cross Chop). Winners and
+chargedLogs match PvPoke on all 9 cells, but 5 cells differ on score
+margin: ours −26 to −29 in Snorlax-favored cells (0v0, 1v0, 2v0, 2v1)
+and +4 at 1v2 — roughly one Counter's worth of Snorlax HP. The 0v0
+delta proves it is NOT shield-policy-related; with identical throw
+sequences it must be end-of-battle fast-move timing or turn accounting
+(E5/E15 family in the 2026-06-11 review doc). Localize with decideLog
+tracing before the next engine-fidelity step; do NOT fixture this
+matchup until understood.
+
+(Otherwise none outstanding — see "Known divergences" for intentional
+ones.)
 
 ## Known divergences from PvPoke implementation
 

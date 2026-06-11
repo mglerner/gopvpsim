@@ -537,6 +537,16 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
             if _shield_trace:
                 cm_reasons.append(f"{cm.get('moveId')}({cm_dmg})≥hp-cycle({defender.hp}-{cycle_damage}={defender.hp-cycle_damage})")
 
+    # "Shield the first in a series of Attack debuffing moves like
+    # Superpower, if they would do major damage" — ActionLogic.js:1186-1190,
+    # the final override of wouldShield. Uses the incoming move's damage
+    # (PvPoke's move.damage, freshly computed at the top of wouldShield).
+    if move.get('selfAttackDebuffing', False) and damage / defender.hp > 0.55:
+        use_shield = True
+        if _shield_trace:
+            cm_reasons.append(
+                f"selfAtkDebuff dmg({damage})/hp({defender.hp})>0.55")
+
     if _shield_trace:
         buff_note = ""
         if move_buffs != [0, 0]:
