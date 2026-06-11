@@ -521,8 +521,21 @@ move selection closed 2026-04-15 as not-a-real-issue.)
 
 ## Slayer card UX (post-bulkpoint shipped 2026-04-08)
 
-* **Slayer-card signal-loss audit + design discussion** *(needs design
-  before implementing; broader than originally scoped)* — With Level 3
+* **Slayer-card signal-loss — REMEDY SHIPPED 2026-06-11 (Michael's
+  pick: the 4+3 hybrid).** Slayer Builds tables now hoist parents
+  cleared by EVERY emitted build into a single "Every build below
+  clears:" callout (option 4) and rarity-code the remaining per-row
+  badges by within-table clear rate (option 3; ≤25% hot, ≤60% mid).
+  Verified on the Oinkologne replay: all 143 parents hoisted, ~360KB
+  lighter HTML, rows read "common set only" — which surfaced the
+  deeper diagnosis: **Anchors-First saturation is STRUCTURAL**
+  (membership = clearing the max parent set), so within-table
+  differentiation lives in the CMP%/atk columns by design. The S2
+  note's "all-counted-parents membership or tighter selectivity gate"
+  is the follow-up if real within-table spread is wanted. The
+  SYSTEMIC audit below (other surfaces: threshold-tier dropdown,
+  banding, Notable-IVs badges) remains open. *(original entry kept
+  for the audit scope:)* — With Level 3
   auto-bulkpoint enumeration shipped, every survivor in the converged
   cohort passes nearly every parent's *lowest* sub-anchor (which is
   trivially cleared). Result: Bulk Slayer membership = 100% of the

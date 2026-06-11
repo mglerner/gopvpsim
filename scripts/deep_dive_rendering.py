@@ -261,6 +261,10 @@ DEEP_DIVE_CSS = """
   padding:1px 6px; border-radius:3px; font-size:0.72rem; margin:1px 2px 1px 0;
   font-family:monospace; cursor:help; }
 .dd-anchor-tag:hover { background:#1a3a6e; color:#fff; }
+.dd-anchor-tag.dd-tag-rare { background:#5a3a00; color:#ffd166; }
+.dd-anchor-tag.dd-tag-rare:hover { background:#7a5200; color:#fff; }
+.dd-anchor-tag.dd-tag-uncommon { background:#1a4731; color:#7ee787; }
+.dd-anchor-tag.dd-tag-uncommon:hover { background:#256d4a; color:#fff; }
 .dd-anchor-tag-count { color:#d29922; font-weight:600; }
 .dd-anchor-tags-cell { max-width: 480px; }
 .dd-anchor-tags-cell .dd-anchor-tag { vertical-align: baseline; }
@@ -2314,7 +2318,30 @@ def pearson_r(xs, ys):
 # Mirror slayer iteration HTML
 # ---------------------------------------------------------------------------
 
-def _anchor_tags_cell(r):
+def _parent_clear_stats(rows):
+    """Per-parent clear rates over a table's emitted rows.
+
+    Returns (rates, saturated): rates maps parent -> fraction of rows
+    clearing at least one of its sub-anchors; saturated is the set of
+    parents cleared by EVERY row. Feeds the signal-loss remedy
+    (2026-06-11, Michael's 4+3 hybrid pick): saturated parents are
+    hoisted into a single "every build clears" callout instead of
+    repeating on each row, and the remaining badges are rarity-coded.
+    """
+    n = len(rows)
+    if n == 0:
+        return {}, set()
+    counts: dict = {}
+    for r in rows:
+        for parent, subs in (r.get('_anchor_tags', {}) or {}).items():
+            if subs:
+                counts[parent] = counts.get(parent, 0) + 1
+    rates = {p: c / n for p, c in counts.items()}
+    saturated = {p for p, c in counts.items() if c == n}
+    return rates, saturated
+
+
+def _anchor_tags_cell(r, parent_rates=None, skip_parents=None):
     """Badge-wall HTML + cell-level summary tooltip for a row's anchor tags.
 
     One badge per parent anchor. Badge VISIBLE TEXT uses
@@ -2330,10 +2357,16 @@ def _anchor_tags_cell(r):
     tag_bits = []
     n_parents_by_kind = {'damage_breakpoint': 0, 'bulkpoint': 0, 'cmp': 0}
     n_total_subs = 0
+    n_skipped = 0
     anchor_tags = r.get('_anchor_tags', {}) or {}
     for parent in sorted(anchor_tags.keys()):
         subs = anchor_tags[parent]
         if not subs:
+            continue
+        if skip_parents and parent in skip_parents:
+            # Saturated parent: hoisted into the table-level
+            # "every build below clears" callout (option 4).
+            n_skipped += 1
             continue
         labels = sorted({s_.label or s_.name for s_ in subs})
         long_name = (subs[0].parent_display_name or parent)
@@ -2353,13 +2386,25 @@ def _anchor_tags_cell(r):
             # tooltip explains that xN means "this IV passes N of the
             # parent's sub-anchors" so the abbreviation isn't cryptic.
             hover_first_line = f'{long_name} · clears {n_subs} sub-anchors'
+        rate = (parent_rates or {}).get(parent)
+        rarity_cls = ''
+        rate_line = ''
+        if rate is not None:
+            # Rarity coding (option 3): the rarer a parent is within
+            # this table's builds, the hotter its badge.
+            if rate <= 0.25:
+                rarity_cls = ' dd-tag-rare'
+            elif rate <= 0.60:
+                rarity_cls = ' dd-tag-uncommon'
+            rate_line = f'\ncleared by {rate:.0%} of the builds in this table'
         hover_text_str = (
             f'{hover_first_line}\n'
             f'{parent}\n'
             f'{sub_labels_text}'
+            f'{rate_line}'
         )
         tag_bits.append(
-            f'<span class="dd-anchor-tag"'
+            f'<span class="dd-anchor-tag{rarity_cls}"'
             f'{tooltip_attr(hover_text_str)}>'
             f'{badge_text}</span>'
         )
@@ -2367,7 +2412,13 @@ def _anchor_tags_cell(r):
         if kind in n_parents_by_kind:
             n_parents_by_kind[kind] += 1
         n_total_subs += n_subs
-    tags_cell = ' '.join(tag_bits) if tag_bits else '-'
+    if tag_bits:
+        tags_cell = ' '.join(tag_bits)
+    elif n_skipped:
+        # Everything this row clears is in the shared callout above.
+        tags_cell = '<span style="color:#8b949e">common set only</span>'
+    else:
+        tags_cell = '-'
     n_total_parents = sum(n_parents_by_kind.values())
     if n_total_parents == 0:
         cell_title = 'No anchors cleared'
@@ -2610,6 +2661,36 @@ function ddToggleTagsCompactCell(event) {
             if desc:
                 parts.append(f'<p class="dd-small dd-prose">{desc}</p>\n')
 
+            # Signal-loss remedy (2026-06-11, Michael's 4+3 hybrid pick):
+            # parents cleared by EVERY emitted build say so ONCE here
+            # instead of repeating on each row, and the per-row badges
+            # that remain are rarity-coded by their clear rate within
+            # this table. Cohort = the emitted rows (what the reader
+            # sees; membership beyond the HTML cap feeds the scatter
+            # and Notable IVs unchanged).
+            parent_rates, saturated = _parent_clear_stats(emitted)
+            if saturated:
+                sat_bits = []
+                for parent in sorted(saturated):
+                    long_name = parent
+                    for _r in emitted:
+                        _subs = (_r.get('_anchor_tags', {}) or {}).get(parent)
+                        if _subs:
+                            long_name = _subs[0].parent_display_name or parent
+                            break
+                    sat_bits.append(
+                        f'<span class="dd-anchor-tag"'
+                        f'{tooltip_attr(long_name + chr(10) + parent + chr(10) + "cleared by every build in this table")}>'
+                        f'{derive_short_name(parent)}</span>'
+                    )
+                parts.append(
+                    f'<p class="dd-small" style="margin:4px 0">'
+                    f'Every build below clears: {" ".join(sat_bits)} '
+                    f'<span style="color:#8b949e">(omitted from the '
+                    f'per-row badges; remaining badges are color-coded '
+                    f'by rarity within this table)</span></p>\n'
+                )
+
             # Table
             parts.append(
                 f'<table class="dd-table dd-narrow" id="{card_id}-table">\n'
@@ -2636,7 +2717,8 @@ function ddToggleTagsCompactCell(event) {
                         f'{tooltip_attr(o)}>{ab}</span> '
                     )
 
-                tags_cell, cell_title_attr = _anchor_tags_cell(r)
+                tags_cell, cell_title_attr = _anchor_tags_cell(
+                    r, parent_rates=parent_rates, skip_parents=saturated)
                 anchors_count = (f"{r.get('n_parents_cleared', 0)}/"
                                  f"{r.get('n_counted_parents', 0)}")
                 tm = r.get('top_mirror_cmp')
