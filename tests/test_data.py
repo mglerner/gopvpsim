@@ -95,3 +95,63 @@ def test_default_moveset_unknown_species_raises():
 def test_default_moveset_invalid_league_raises():
     with pytest.raises(ValueError):
         get_default_moveset('Medicham', league='kiddie')
+
+
+# ---------------------------------------------------------------------------
+# _fetch_json cache robustness (2026-06-11 review finding L5)
+# ---------------------------------------------------------------------------
+
+def _patch_fetch_env(monkeypatch, tmp_path, payload):
+    """Point the cache at tmp_path and fake the network to return payload."""
+    import json as _json
+    import io
+    import gopvpsim.data as data
+
+    monkeypatch.setattr(data, 'CACHE_DIR', tmp_path)
+
+    class _FakeResponse(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_urlopen(url, context=None):
+        return _FakeResponse(_json.dumps(payload).encode())
+
+    monkeypatch.setattr(data.urllib.request, 'urlopen', fake_urlopen)
+    return data
+
+
+def test_corrupt_fresh_cache_falls_through_to_refetch(monkeypatch, tmp_path):
+    # A fresh-but-corrupt cache file used to raise JSONDecodeError before
+    # the network path was ever tried.
+    data = _patch_fetch_env(monkeypatch, tmp_path, {'ok': 1})
+    cache_file = tmp_path / 'testkey.json'
+    cache_file.write_text('{"truncated": ')   # fresh mtime, corrupt body
+    result = data._fetch_json('testkey', url='https://example.invalid/x.json')
+    assert result == {'ok': 1}
+    # The corrupt file was healed by the (atomic) rewrite.
+    import json as _json
+    assert _json.loads(cache_file.read_text()) == {'ok': 1}
+
+
+def test_fetch_writes_no_tmp_residue(monkeypatch, tmp_path):
+    data = _patch_fetch_env(monkeypatch, tmp_path, {'ok': 2})
+    data._fetch_json('testkey2', url='https://example.invalid/x.json')
+    assert (tmp_path / 'testkey2.json').exists()
+    assert not list(tmp_path.glob('*.tmp'))
+
+
+def test_corrupt_stale_cache_with_no_network_raises_nodata(monkeypatch, tmp_path):
+    import gopvpsim.data as data
+    monkeypatch.setattr(data, 'CACHE_DIR', tmp_path)
+    monkeypatch.setattr(data, 'CACHE_TTL', -1)   # force the stale path
+
+    def dead_urlopen(url, context=None):
+        raise OSError('no network')
+
+    monkeypatch.setattr(data.urllib.request, 'urlopen', dead_urlopen)
+    (tmp_path / 'testkey3.json').write_text('{"truncated": ')
+    with pytest.raises(data.NoDataError):
+        data._fetch_json('testkey3', url='https://example.invalid/x.json')

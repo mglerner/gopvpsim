@@ -51,7 +51,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # Path globs use these literal calendar-month dirs. Kept as a module constant
 # so a future 'next-CD' chain type can override just the log-dir without
 # restating the whole glob shape.
-LOG_DIR_GLOB = 'userdata/logs/2026-*'
+LOG_DIR_GLOB = 'userdata/logs/20[0-9][0-9]-*'  # decade-safe: 2026-* went blind on 2027-01-01
 
 # Preset chain configurations. Each is (status_file, pgrep_pattern,
 # wrapper_log_glob). Per-dive log glob is shared since deep_dive.py writes
@@ -199,7 +199,9 @@ def parse_wrapper_dive_banner(wrapper_log: Path) -> tuple[str | None, str | None
     except OSError:
         return None, None
     banners = re.findall(
-        r'\[(\d+/\d+)\]\s+([a-z-]+-(?:great|ultra|master)-league)',
+        # [a-z0-9-]: slugs can carry digits (porygon2-great-league);
+        # a digit-less class silently dropped those Dive lines.
+        r'\[(\d+/\d+)\]\s+([a-z0-9-]+-(?:great|ultra|master)-league)',
         text,
     )
     if not banners:
