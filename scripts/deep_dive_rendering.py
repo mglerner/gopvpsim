@@ -2398,7 +2398,7 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
         f'then take as much Charge Move Priority as possible. '
         f'<strong>CMP-First</strong> (the &ldquo;lab mon&rdquo;): take the '
         f'max-attack spreads and see which anchors they keep or sacrifice. '
-        f'Both are computed directly from the anchor thresholds — the '
+        f'Both are computed directly from the anchor thresholds - the '
         f'Nash-style mirror iteration below only supplies the opponent '
         f'population that the CMP and mirror-wins columns are measured '
         f'against.</p>\n'
@@ -2446,7 +2446,7 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
             'Hit the important break/bulkpoints first, then win Charge '
             'Move Priority as much as possible. Members clear the '
             '<em>maximum achievable number</em> of counted anchor '
-            'parents — explicit TOML anchors always count, '
+            'parents - explicit TOML anchors always count, '
             'auto-generated ones only when they are selective (cleared '
             'by less than half the IV space, so &ldquo;everyone passes '
             'it&rdquo; anchors can&rsquo;t saturate the archetype). '
@@ -2456,7 +2456,7 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
             'The &ldquo;lab mon&rdquo; build: win Charge Move Priority '
             'first, pick up anchors as a secondary goal. Rows are the '
             'max-attack spreads in the IV space, ranked by attack; the '
-            'Anchors column reports what each clears vs sacrifices — '
+            'Anchors column reports what each clears vs sacrifices - '
             'no anchor is required for membership.'),
     }
 

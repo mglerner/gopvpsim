@@ -375,6 +375,18 @@ clock). Porting the minigame bookkeeping would complicate the hot loop
 for zero observable effect. Revisit only if a real matchup is ever
 found that times out in either sim.
 
+**Team-sim caveat (Michael, 2026-06-11):** the 240 s is the real
+game's MATCH timer for a full 3v3 — PvPoke's per-1v1 cap inherits it,
+and the minigame-time bookkeeping exists because charged-move
+animations consume the shared match clock. In a 1v1 sim no single
+pairing approaches it; in a future team sim the three pairings SPLIT
+one 240 s budget, so timing out becomes a real outcome (games are won
+on the clock) and this bookkeeping becomes load-bearing, not a guard.
+If/when the TODO "Team/multi-mon simulation" item lands, port
+PvPoke's clock semantics (500 ms turns; charged rounds REPLACE the
+turn's 500 ms with 10,000 ms minigame time; shielded rounds discount
+one minigame) as match-level state.
+
 ### Near-KO DP plan choice: nuke-with-self-debuff vs serial-Fly (intentional)
 
 **Mechanism (localized 2026-04-15 followup session):** The divergence
