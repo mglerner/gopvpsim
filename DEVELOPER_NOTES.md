@@ -335,22 +335,33 @@ combos. Mimi's actual SS timing was correct all along; the
 
 ## Open divergences
 
-### Snorlax vs Obstagoon GL — score-margin cluster (found 2026-06-11)
+### Snorlax vs Obstagoon GL [1,2] — +4 score margin (residual, found 2026-06-11)
 
-Probing the E3 wouldShield port surfaced a pre-existing divergence:
-Snorlax 4/14/5 L17.5 (Lick / Body Slam + Super Power) vs Obstagoon
-5/15/12 L21 (Counter / Night Slash + Cross Chop). Winners and
-chargedLogs match PvPoke on all 9 cells, but 5 cells differ on score
-margin: ours −26 to −29 in Snorlax-favored cells (0v0, 1v0, 2v0, 2v1)
-and +4 at 1v2 — roughly one Counter's worth of Snorlax HP. The 0v0
-delta proves it is NOT shield-policy-related; with identical throw
-sequences it must be end-of-battle fast-move timing or turn accounting
-(E5/E15 family in the 2026-06-11 review doc). Localize with decideLog
-tracing before the next engine-fidelity step; do NOT fixture this
-matchup until understood.
+The lone survivor of the resolved margin cluster below: at [1,2] our
+Snorlax scores 102 vs PvPoke 98 (winner + chargedLog identical).
+Obstagoon holds shields there, so the resolved OMT KO-override (which
+requires shields == 0) is not the mechanism. Small, cosmetic-adjacent;
+trace when next in the area. The MG-vs-Florges [1,2] cosmetic
+Fly-vs-BB log divergence (pinned in the oracle audit) may share a
+root.
 
-(Otherwise none outstanding — see "Known divergences" for intentional
-ones.)
+### RESOLVED 2026-06-11 — Snorlax/Obstagoon margin cluster (OMT
+self-debuffing KO-override deviation falsified)
+
+The cluster (ours −26..−29 at 0v0/1v0/2v0/2v1, logs identical) was
+localized via decideLog tracing to OUR intentional deviation in the
+OMT "can KO with a charged move" override: we excluded self-debuffing
+moves, reasoned to be score-neutral ("the debuff fires after the KO").
+False: while OMT keeps delaying the lethal self-debuffing throw, the
+opponent's fast moves keep landing — Snorlax ate exactly one extra
+Counter per battle waiting to throw a Superpower whose debuff could
+not matter. Removed the exclusion (battle.py `_optimize_move_timing`,
+now matches ActionLogic.js:317-329 exactly); 8/9 Snorlax cells now
+match PvPoke exactly, all other gates unchanged (suite, 153-cell
+audit, benchmark). Lesson for the divergence policy: "score-neutral"
+claims about decision-timing deviations need a trace, not reasoning —
+the deviation cost real HP in every shields-down endgame where the
+closer is self-debuffing (Superpower/HJK/Draco users vs walls).
 
 ## Known divergences from PvPoke implementation
 
