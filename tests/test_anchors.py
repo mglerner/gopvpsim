@@ -262,6 +262,30 @@ class TestBuildAutoAnchorsGating:
         assert "auto_lickitung_brkp_any" not in anchor_names
         assert "auto_cmp_vs_cohort" in anchor_names
 
+    def test_build_auto_anchors_passes_focal_shadow_to_cohort(self, monkeypatch):
+        # Review finding L1 (focal side): a shadow focal's auto-CMP cohort
+        # must be computed from shadow-multiplied attacks, or the p75
+        # threshold sits ~17% below the focal IVs it gets compared against.
+        from gopvpsim import pokemon
+
+        class FakeMon:
+            def __init__(self, atk):
+                self.atk = atk
+
+        def fake(species, a, d, s, league='great', shadow=False):
+            return FakeMon((100.0 + a) * (1.2 if shadow else 1.0))
+
+        monkeypatch.setattr(pokemon.Pokemon, "at_best_level", fake)
+
+        kw = dict(species="Sableye", league="great", opponent_species=[],
+                  survivor_ivs=[(15, 0, 0), (10, 0, 0), (5, 0, 0)],
+                  existing_anchor_kinds={"damage_breakpoint", "bulkpoint"})
+        reg_n = A.build_auto_anchors(**kw)
+        reg_s = A.build_auto_anchors(**kw, shadow=True)
+        spread_n = reg_n.species("Sableye").leagues["Great"].spreads[A.AUTO_COHORT_SPREAD_NAME]
+        spread_s = reg_s.species("Sableye").leagues["Great"].spreads[A.AUTO_COHORT_SPREAD_NAME]
+        assert spread_s.attack == pytest.approx(spread_n.attack * 1.2)
+
     def test_existing_cmp_suppresses_only_cmp_path(self):
         # No survivors needed for the BP-only path (gamemaster-free)
         reg = A.build_auto_anchors(
@@ -364,6 +388,33 @@ class TestBuildAutoAnchorsGating:
         lt = sp.leagues["Great"]
         # Slug strips parens and lowercases
         assert "auto_quagsire_shadow_brkp_any" in lt.anchors
+
+
+class TestShadowOpponentResolution:
+    """Review finding L1: opponents named 'X (Shadow)' must resolve with
+    shadow multipliers. The gamemaster's shadow entries carry the normal
+    form's baseStats — shadowness exists only via the multiplier flag, so
+    forgetting it silently yields normal-form stats (def 6/5 too high for
+    breakpoint anchors, atk 1/1.2 too low for bulkpoint anchors)."""
+
+    @pytest.mark.integration
+    def test_opponent_ref_applies_shadow_def_multiplier(self):
+        from gopvpsim.pokemon import SHADOW_DEF_MULT
+        normal = A._opponent_ref('Quagsire', 'great', ivs=(0, 15, 14))
+        shadow = A._opponent_ref('Quagsire (Shadow)', 'great', ivs=(0, 15, 14))
+        assert normal is not None and shadow is not None
+        # Shadow CP equals normal CP, so both fit at the same level; the
+        # effective def must differ by exactly the shadow def multiplier.
+        assert shadow[0] == pytest.approx(normal[0] * SHADOW_DEF_MULT)
+        assert shadow[1] == normal[1]  # same types
+
+    @pytest.mark.integration
+    def test_opponent_atk_ref_applies_shadow_atk_bonus(self):
+        from gopvpsim.pokemon import SHADOW_ATK_BONUS
+        normal = A._opponent_atk_ref('Quagsire', 'great', ivs=(4, 12, 14))
+        shadow = A._opponent_atk_ref('Quagsire (Shadow)', 'great', ivs=(4, 12, 14))
+        assert normal is not None and shadow is not None
+        assert shadow[0] == pytest.approx(normal[0] * SHADOW_ATK_BONUS)
 
 
 class TestBuildAutoAnchorsCmpThreshold:

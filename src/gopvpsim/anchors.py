@@ -283,9 +283,15 @@ def _opponent_ref(
     """Return (effective_def, types) for the opponent species under the given
     league, using either explicit IVs or PvPoke's defaults.
 
+    A ' (Shadow)' species suffix implies shadow=True: the gamemaster's shadow
+    entries carry the normal form's baseStats (shadowness exists only via the
+    multiplier flag), so the suffix must set the flag or the resolved stats
+    silently come out un-multiplied.
+
     Returns None if the opponent can't be resolved (not in gamemaster, can't
     fit under the CP cap, etc.).
     """
+    shadow = shadow or opponent_species.endswith(' (Shadow)')
     try:
         if ivs is None:
             _lv, a_iv, d_iv, s_iv = pvpoke_default_ivs(opponent_species, league=league)
@@ -324,9 +330,12 @@ def _opponent_atk_ref(
     against a focal defender — symmetric to ``_opponent_ref`` (which returns
     effective defense for the breakpoint resolver).
 
+    A ' (Shadow)' species suffix implies shadow=True (see ``_opponent_ref``).
+
     Returns ``None`` if the opponent can't be resolved (not in gamemaster,
     can't fit under the CP cap, etc.).
     """
+    shadow = shadow or opponent_species.endswith(' (Shadow)')
     try:
         if ivs is None:
             _lv, a_iv, d_iv, s_iv = pvpoke_default_ivs(opponent_species, league=league)
@@ -802,6 +811,7 @@ def build_auto_anchors(
     fast_move_id: Optional[str] = None,
     survivor_ivs: Optional[list[tuple[int, int, int]]] = None,
     existing_anchor_kinds: Optional[set[str]] = None,
+    shadow: bool = False,
 ) -> ThresholdRegistry:
     """Build a synthetic registry overlay containing auto-generated anchors.
 
@@ -855,13 +865,17 @@ def build_auto_anchors(
             derived as the capitalized form.
         opponent_species: list of opponent species names from the dive's
             opponent set. Order is preserved in the auto-anchor list.
-        fast_move_id: optional moveId of the focal's fast move; when set,
-            auto-Atk anchors are restricted to this move only.
+        fast_move_id: optional moveId of the focal's fast move; accepted for
+            forward-compat but ignored (see the Auto-Atk-Slayer paragraph
+            above for the rationale).
         survivor_ivs: optional list of (atk_iv, def_iv, sta_iv) tuples from
             the slayer iteration's converged cohort. Required for auto-CMP.
         existing_anchor_kinds: set of kinds the user already provided
             explicitly. Auto-generation is skipped for these kinds, so
             explicit user input always wins.
+        shadow: True when the FOCAL species is shadow. The auto-CMP cohort
+            attacks must carry the shadow atk bonus or the p75 threshold
+            sits below the (multiplied) focal attacks it is compared to.
 
     Returns:
         A ThresholdRegistry containing the synthetic spreads and anchors.
@@ -925,6 +939,7 @@ def build_auto_anchors(
             try:
                 mon = Pokemon.at_best_level(
                     species, iv[0], iv[1], iv[2], league=league.lower(),
+                    shadow=shadow,
                 )
             except (KeyError, ValueError):
                 continue
