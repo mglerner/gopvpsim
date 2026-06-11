@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (2026-04-06)
 
-<!-- sync:test_count -->816<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->822<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The simulator matches PvPoke's
 simulate-mode score table exactly (±0) for <!-- sync:pvpoke_matchups_verified -->8<!-- /sync --> matchups
