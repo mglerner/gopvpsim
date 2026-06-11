@@ -143,7 +143,15 @@ break invariants that weren't yet nailed down by tests.
 
 ## Battle simulator
 
-* **File PvPoke bug reports** — Eight bugs found in PvPoke's JS:
+* **File PvPoke bug reports** — paste-ready GitHub-issue drafts now
+  live in `docs/pvpoke_bug_reports.md` (2026-06-11): 7 curated reports
+  — the list below minus the retracted Mimikyu timing item (#5, our
+  own logging artifact) and the debunked-premise bestChargedMove item
+  (#2, initializeMove DOES set move.damage at init; the real issue
+  there is the DPE-overwrite, drafted as report 4) — plus the new
+  Blade→Shield CPM-table overflow found 2026-06-11. Filing them
+  upstream is Michael's action. Original discovery list, kept for
+  history — eight bugs found in PvPoke's JS:
   1. BattleState `.hp`/`.oppHealth` naming inconsistency (dead-code dominance checks)
   2. bestChargedMove using `move.damage` (undefined at init) instead of `move.power`
   3. bestChargedMove not recomputed on opponent form change (stale DPE cache)
