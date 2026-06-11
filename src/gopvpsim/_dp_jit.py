@@ -134,6 +134,12 @@ def _make_jit():
         q_size = 1
 
         found = False
+        # Set when a non-dominated state is DROPPED because the
+        # preallocated queue is full. The kernel then returns
+        # iters = -1 as an overflow sentinel (signature-stable) and
+        # the caller re-runs the unbounded Python loop — mirroring
+        # the TTL kernel's ok=False fallback (review finding E9).
+        overflowed = False
         out_first = -1
         out_max_idx = -1
         out_has_deb = np.int8(0)
@@ -267,7 +273,9 @@ def _make_jit():
                             while i < q_size and q_turn[i] <= new_t:
                                 i += 1
 
-                        if not dominated and q_size < QUEUE_CAP:
+                        if not dominated and q_size >= QUEUE_CAP:
+                            overflowed = True
+                        elif not dominated:
                             # Insert at position i (shift right).
                             for k in range(q_size, i, -1):
                                 q_energy[k]  = q_energy[k - 1]
@@ -318,7 +326,9 @@ def _make_jit():
                         while i < q_size and q_turn[i] < new_t:
                             i += 1
 
-                    if not dominated and q_size < QUEUE_CAP:
+                    if not dominated and q_size >= QUEUE_CAP:
+                        overflowed = True
+                    elif not dominated:
                         for k in range(q_size, i, -1):
                             q_energy[k]  = q_energy[k - 1]
                             q_hp[k]      = q_hp[k - 1]
@@ -361,7 +371,9 @@ def _make_jit():
                     while i < q_size and q_turn[i] <= fd_turn:
                         i += 1
 
-                if not blocked and q_size < QUEUE_CAP:
+                if not blocked and q_size >= QUEUE_CAP:
+                    overflowed = True
+                elif not blocked:
                     for k in range(q_size, i, -1):
                         q_energy[k]  = q_energy[k - 1]
                         q_hp[k]      = q_hp[k - 1]
@@ -383,6 +395,8 @@ def _make_jit():
                     q_atk_stg[i] = curr_atk_stg
                     q_size += 1
 
+        if overflowed:
+            iters = -1
         return (found, out_first, out_max_idx, int(out_has_deb), out_deb_cnt,
                 out_turn, out_hp, out_shields, iters)
 

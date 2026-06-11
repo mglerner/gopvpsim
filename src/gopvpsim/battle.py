@@ -1303,7 +1303,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     cm_dmgs_by_stage  = dp_cache['cm_dmgs_by_stage']
     fast_dmg_by_stage = dp_cache['fast_dmg_by_stage']
 
-    if _NEAR_KO_DP_JIT is not None:
+    _use_jit = _NEAR_KO_DP_JIT is not None
+    if _use_jit:
         # Numba-JIT'd inner DP. Same algorithm as the Python loop below;
         # operates on numpy scalar arrays for ~5-10x inner-loop speedup.
         # The root-stage damage row of the stage table is computed by the
@@ -1327,14 +1328,26 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             int(fast_turns),
             bool(intended_pruning),
         )
-        if found:
+        if iters < 0:
+            # Queue overflow inside the kernel (iters = -1 sentinel):
+            # non-dominated states were DROPPED, so the JIT result can't
+            # be trusted — re-run on the unbounded Python loop below.
+            # Mirrors the TTL kernel's ok=False fallback (review finding
+            # E9); never expected at QUEUE_CAP=1024 (~50 steady state),
+            # this is the backstop that makes JIT/Python parity
+            # structural rather than probabilistic.
+            _use_jit = False
+            found = False
+            final_state = None
+            iters = 0
+        elif found:
             final_state = _DPState(0, _f_hp, _f_turn, _f_sh,
                                    _first, _max_idx, _has_deb, _deb_cnt)
         # else: final_state stays None → fall through to greedy fallback
-    else:
-        # Pure-Python fallback (numba unavailable). Same algorithm as the
-        # JIT in _dp_jit.py — kept here so the project still runs without
-        # numba installed.
+    if not _use_jit:
+        # Pure-Python fallback (numba unavailable, or the JIT signalled
+        # queue overflow). Same algorithm as the JIT in _dp_jit.py —
+        # kept here so the project still runs without numba installed.
         queue: list = [_DPState(attacker.energy, float(defender.hp), 0,
                                  defender.shields, -1, -1, 0, 0,
                                  root_atk_stage)]
