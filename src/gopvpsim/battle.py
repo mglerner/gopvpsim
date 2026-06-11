@@ -746,10 +746,18 @@ def _cm_debuf_delta(m: dict) -> int:
 def _cm_buff_delta(m: dict) -> int:
     """Per-cm atk-stage delta applied to the ATTACKER on throw.
 
-    Mirrors PvPoke ActionLogic.js lines 519-535: chance-1 self-atk-buff
-    increases attackMult, chance-1 opp-def-debuff also increases
-    attackMult (scaling atk/def). Only chance-1 effects contribute —
-    PvPoke zeros changeTTKChance unconditionally before the DP.
+    Mirrors PvPoke ActionLogic.js:519-536 exactly — SIGNED on both axes:
+    chance-1 self-target moves contribute ``attackMult += buffs[0]``
+    (so Superpower/Draco Meteor plans have their later throws computed
+    at REDUCED attack), and chance-1 opponent-target moves contribute
+    ``attackMult -= buffs[1]`` (def-debuffs accelerate plans). Only
+    chance-1 effects count — PvPoke zeros changeTTKChance
+    unconditionally before the DP. buffTarget 'both' (Obstruct) has no
+    clause in PvPoke's DP, so it contributes nothing here either.
+
+    (Until 2026-06-11 the self clause dropped negative deltas, so
+    multi-nuke self-atk-debuff plans looked stronger to our DP than to
+    PvPoke's — review finding E4.)
     """
     buffs = m.get('buffs')
     if not buffs:
@@ -758,9 +766,9 @@ def _cm_buff_delta(m: dict) -> int:
     if float(m.get('buffApplyChance', 0) or 0) != 1.0:
         return 0
     bt = m.get('buffTarget', '')
-    if bt == 'self' and buffs[0] > 0:
+    if bt == 'self':
         return buffs[0]
-    if bt == 'opponent' and buffs[1] < 0:
+    if bt == 'opponent':
         return -buffs[1]
     return 0
 
