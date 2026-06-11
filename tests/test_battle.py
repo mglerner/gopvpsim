@@ -1718,3 +1718,119 @@ def test_reset_for_battle_reuse_matches_fresh(p0_spec, p1_spec):
             expected.winner, expected.turns, expected.hp_remaining,
             expected.energy_remaining, expected.shields_remaining,
             expected.timeline), f"{s0}v{s1}: reuse diverged from fresh"
+
+
+# ---------------------------------------------------------------------------
+# JIT ↔ pure-Python DP parity
+# ---------------------------------------------------------------------------
+
+_JIT_PARITY_MATCHUPS = [
+    pytest.param(('Medicham', 'PSYCHO_CUT', ['DYNAMIC_PUNCH', 'PSYCHIC'], (5, 15, 15), False,
+                  'Azumarill', 'BUBBLE', ['ICE_BEAM', 'HYDRO_PUMP'], (8, 15, 15), False),
+                 id='medicham-azumarill'),
+    pytest.param(('Swampert', 'MUD_SHOT', ['HYDRO_CANNON', 'EARTHQUAKE'], (15, 15, 15), True,
+                  'Registeel', 'LOCK_ON', ['FLASH_CANNON', 'FOCUS_BLAST'], (15, 15, 15), False),
+                 id='shadow-swampert-registeel'),
+    pytest.param(('Obstagoon', 'COUNTER', ['OBSTRUCT', 'NIGHT_SLASH'], (5, 15, 12), False,
+                  'Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), False),
+                 id='obstagoon-azumarill'),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("spec", _JIT_PARITY_MATCHUPS)
+@pytest.mark.parametrize("shields", [(1, 1), (2, 2)])
+def test_jit_and_python_dp_paths_agree(monkeypatch, spec, shields):
+    """The numba kernels (_near_ko_dp_jit / _calc_ttl_jit) and the pure-
+    Python fallbacks in battle.py are hand-mirrored implementations with no
+    other automated parity check: the full suite only ever exercises
+    whichever path the running machine takes. Run the same battle with the
+    kernels enabled and forcibly disabled and require identical outcomes.
+    (On a machine without numba both runs take the Python path and this
+    pins nothing — acceptable; dev machines install [perf].)
+    """
+    import gopvpsim.battle as B
+
+    def run():
+        sp0, f0, c0, iv0, sh0, sp1, f1, c1, iv1, sh1 = spec
+        bp0 = _make_battle_pokemon(sp0, f0, c0, 'great', shields[0], *iv0, shadow=sh0)
+        bp1 = _make_battle_pokemon(sp1, f1, c1, 'great', shields[1], *iv1, shadow=sh1)
+        result = simulate(bp0, bp1,
+                          charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp,
+                          shield_policy_0=pvpoke_simulate_shield,
+                          shield_policy_1=pvpoke_simulate_shield,
+                          log=True)
+        return (round(result.pvpoke_score(0)), result.winner,
+                result.hp_remaining, _extract_battle_log(result))
+
+    jit_outcome = run()
+    monkeypatch.setattr(B, '_NEAR_KO_DP_JIT', None)
+    monkeypatch.setattr(B, '_CALC_TTL_JIT', None)
+    py_outcome = run()
+    assert py_outcome == jit_outcome, (
+        f"JIT and pure-Python DP paths disagree at {shields}: "
+        f"jit={jit_outcome} py={py_outcome}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Defender-bestCM selfDefenseDebuffing shield gate (Battle.js:1105-1124 port)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_mg,shields_flo,expected_winner,expected_mg_score,expected_log", [
+    # Moltres (Galarian) 4/11/11 L29.5 (SUCKER_PUNCH / FLY + BRAVE_BIRD)
+    # vs Florges 4/13/15 L28.5 (FAIRY_WIND / CHILLING_WATER + DISARMING_VOICE),
+    # Ultra League. Fixture generated 2026-06-11 from scripts/pvpoke_trace.js
+    # (all six moves + both baseStats verified identical between the clone
+    # and the live gamemaster).
+    #
+    # This is the PASSING pin for the defender-bestCM-selfDefenseDebuffing
+    # shield gate (ported 2026-04-15, commit 359e693): MG's bestChargedMove
+    # is Brave Bird ([0,-3] self-def-debuff), so every cell where MG holds
+    # shields routes Florges' incoming charged moves through wouldShield
+    # instead of always-shield. Until now the only tests through that path
+    # were the MG near-KO xfails, where a gate regression would stay
+    # invisible (a different wrong score still XFAILs). The Florges matchup
+    # has no near-KO-plan divergence, so these cells pin the gate green.
+    (0, 0, 1, 318, ["Florges: Disarming Voice", "Moltres (Galarian): Fly", "Florges: Chilling Water"]),
+    (0, 1, 1, 143, ["Florges: Disarming Voice", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water"]),
+    (0, 2, 1, 143, ["Florges: Disarming Voice", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water"]),
+    (1, 0, 0, 563, ["Florges: Disarming Voice (shielded)", "Moltres (Galarian): Fly", "Florges: Disarming Voice", "Moltres (Galarian): Fly"]),
+    (1, 1, 1, 339, ["Florges: Disarming Voice", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly", "Florges: Chilling Water"]),
+    # [1,2]: score/winner/HP match PvPoke exactly (199, Florges wins, 0/86);
+    # the only difference is which move MG throws into Florges' SECOND
+    # shield — ours Fly (45e), PvPoke Brave Bird (55e). Both are shielded
+    # for 1 damage and MG dies before throwing again, so the divergence is
+    # cosmetic; per the CLAUDE.md divergence policy we pin OUR log. Open
+    # lead for the engine-fidelity round: shielded-throw move choice
+    # (review findings E5/E15 family).
+    (1, 2, 1, 199, ["Florges: Disarming Voice", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water"]),
+    (2, 0, 0, 772, ["Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Brave Bird"]),
+    (2, 1, 1, 318, ["Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly", "Florges: Disarming Voice"]),
+    (2, 2, 1, 202, ["Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly (shielded)", "Florges: Disarming Voice"]),
+])
+def test_moltres_galarian_vs_florges_shield_gate(shields_mg, shields_flo, expected_winner,
+                                                 expected_mg_score, expected_log):
+    bp_mg = _make_battle_pokemon('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'],
+                                 'ultra', shields_mg, 4, 11, 11)
+    bp_flo = _make_battle_pokemon('Florges', 'FAIRY_WIND', ['CHILLING_WATER', 'DISARMING_VOICE'],
+                                  'ultra', shields_flo, 4, 13, 15)
+    result = simulate(bp_mg, bp_flo,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp,
+                      shield_policy_0=pvpoke_simulate_shield,
+                      shield_policy_1=pvpoke_simulate_shield,
+                      log=True)
+    assert result.winner == expected_winner, (
+        f"{shields_mg}v{shields_flo}: expected winner={expected_winner}, "
+        f"got {result.winner}  HP={result.hp_remaining}"
+    )
+    mg_score = round(result.pvpoke_score(0))
+    assert mg_score == expected_mg_score, (
+        f"{shields_mg}v{shields_flo}: expected MG score={expected_mg_score}, "
+        f"got {mg_score}  (delta={mg_score - expected_mg_score:+d})"
+    )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_mg}v{shields_flo}: battle log mismatch"
+    )
