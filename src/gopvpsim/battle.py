@@ -181,10 +181,16 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     self_def_debuffing  = move.get('selfDefenseDebuffing', False)
     buffs = move.get('buffs')
     bt    = move.get('buffTarget')
-    # PvPoke Battle.js:1091-1092 sub-filter: self-atk-buff or opp-def-debuff
+    # PvPoke Battle.js:1091-1100 sub-filter: self-atk-buff or opp-def-debuff;
+    # buffTarget 'both' qualifies via buffsSelf[0] > 0 or buffsOpponent[1] < 0.
+    _bs = move.get('buffsSelf')
+    _bo = move.get('buffsOpponent')
     sb_subroute = (self_buffing and buffs is not None
                    and ((bt == 'self' and buffs[0] > 0)
-                        or (bt == 'opponent' and buffs[1] < 0)))
+                        or (bt == 'opponent' and buffs[1] < 0)
+                        or (bt == 'both' and _bs is not None
+                            and _bo is not None
+                            and (_bs[0] > 0 or _bo[1] < 0))))
     use_heuristic_incoming = sb_subroute or self_def_debuffing
     if use_heuristic_incoming:
         use_shield = would_shield(attacker, defender, move)
@@ -2184,15 +2190,19 @@ def _apply_move_buffs(
 
     if meter >= threshold:
         attacker._buff_apply_meters[move_id] = 0
-        atk_chg = buffs[0]
-        def_chg = buffs[1]
-        target  = move.get('buffTarget', 'opponent')
+        target = move.get('buffTarget', 'opponent')
+        # buffTarget 'both' carries separate per-target arrays (Battle.js:
+        # 1406-1442 selects buffsSelf for the attacker and buffsOpponent for
+        # the defender; the generic 'buffs' equals buffsSelf for OBSTRUCT,
+        # the only such move, but must not reach the defender).
         if target in ('self', 'both'):
-            attacker.atk_stage = max(-4, min(4, attacker.atk_stage + atk_chg))
-            attacker.def_stage = max(-4, min(4, attacker.def_stage + def_chg))
+            sb = move.get('buffsSelf', buffs) if target == 'both' else buffs
+            attacker.atk_stage = max(-4, min(4, attacker.atk_stage + sb[0]))
+            attacker.def_stage = max(-4, min(4, attacker.def_stage + sb[1]))
         if target in ('opponent', 'both'):
-            defender.atk_stage = max(-4, min(4, defender.atk_stage + atk_chg))
-            defender.def_stage = max(-4, min(4, defender.def_stage + def_chg))
+            ob = move.get('buffsOpponent', buffs) if target == 'both' else buffs
+            defender.atk_stage = max(-4, min(4, defender.atk_stage + ob[0]))
+            defender.def_stage = max(-4, min(4, defender.def_stage + ob[1]))
     else:
         attacker._buff_apply_meters[move_id] = meter
 
