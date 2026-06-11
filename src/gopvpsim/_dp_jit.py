@@ -521,11 +521,11 @@ def _make_ttl_jit():
             else:
                 if sp >= TTL_STACK_CAP:
                     return False, 0.0
-                new_e = c_op_e + opp_fast_energy
-                if new_e > energy_cap:
-                    new_e = energy_cap
+                # NO energy cap — mirrors PvPoke's turnsToLive DP and the
+                # pure-Python fallback (review finding E7). energy_cap
+                # stays in the signature for compile-cache stability.
                 s_hp[sp] = c_hp - opp_fast_damage
-                s_e[sp]  = new_e
+                s_e[sp]  = c_op_e + opp_fast_energy
                 s_t[sp]  = c_turn + opp_fast_turns
                 s_sh[sp] = c_shields
                 sp += 1
