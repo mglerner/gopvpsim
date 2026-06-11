@@ -16,15 +16,6 @@ harness audit, and the Morpeko form-toggle resolution all shipped
 
 ### Open follow-ups from the pre-ship arc
 
-- **Mirror-tier synth dropped from IV Flavor Guide.** Synth-tier
-  (commits `ee8b026`, `dede396`, `fe75e08`) is silently dropped
-  from the IV Flavor Guide section by `refine_flavor_names`'s
-  dedup pass when broader than another flavor (pain point #9 in
-  `project_post_ship_cleanup_pain_points.md`,
-  `feedback_synth_mirror_tier_in_iv_flavor_guide.md`). Add to IV
-  Flavor Guide without removing existing flavors when the synth
-  tier is mirror-axis-specific.
-
 - **G16 — methodology-details guide pointer.** Replace the
   in-article hidden-but-present methodology prose with a one-line
   guide pointer (the hide layer is already in place; G16 is the
