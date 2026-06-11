@@ -4667,6 +4667,17 @@ def main():
             sys.exit("--shield-scenario must be S1,S2 (e.g. 1,1), 'all', or 'even'")
         shield_scenarios = [(int(parts[0]), int(parts[1]))]
 
+    # Interactive mode always renders all 9 scenarios, so expand BEFORE any
+    # simulation — Phase 2, threshold auto-discovery, the mirror-slayer
+    # iteration, and the slayer archetypes must all see the same scenario
+    # set the page displays. (Until 2026-06-11 the expansion happened after
+    # Phase 2, so the slayer iteration and archetype tables were computed
+    # on the 1v1 scenario only, and the graded round metric degenerated to
+    # 0/1 — the tie-explosion fix's pool cap was blown ~40x.)
+    if args.interactive and shield_scenarios == [(1, 1)]:
+        logger.info("  Interactive mode: expanding to all 9 shield scenarios")
+        shield_scenarios = ALL_NINE
+
     # Parse charged moves
     user_charged = None
     if args.charged:
@@ -5461,74 +5472,40 @@ def main():
                 for bm in _bait_modes
             ]
 
-            # Force all shield scenarios for interactive mode
-            if shield_scenarios == [(1, 1)]:
-                logger.info("  Interactive mode: auto-expanding to all 9 shield scenarios")
-                shield_scenarios = ALL_NINE
-                # Re-run sweeps with all scenarios
-                all_moveset_results = []
-                for mi, (fast_id, charged_ids) in enumerate(surviving):
-                    label = moveset_label(fast_id, charged_ids)
-                    scores_by_mode = {}
-                    meta = None
-                    for mode in opp_iv_modes_to_run:
-                        mode_label = mode_pretty_label(mode)
-                        logger.info(f"  Interactive sweep [{mi+1}/{len(surviving)}] "
-                                    f"{label} ({mode_label}, all shields)...")
-                        t0 = time.time()
-                        results, n_sims, cs, cm = iv_sweep(
-                            args.species, fast_id, charged_ids, args.league, args.shadow,
-                            opponents, opp_movesets_full, shield_scenarios,
-                            opp_iv_mode=mode,
-                            iv_floor=args.iv_floor,
-                            log_path=log_path, verbose=args.verbose,
-                            threshold_registry=threshold_registry,
-                            reserve_cpus=args.reserve_cpus,
-                            signature_dedup=not args.no_signature_dedup,
-                            use_sweep_cache=not args.no_sweep_cache,
-                        )
-                        elapsed = time.time() - t0
-                        rate = n_sims / elapsed if elapsed > 0 else 0
-                        logger.info(f"    {n_sims:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
-                        scores_by_mode[mode] = cs
-                        if meta is None:
-                            meta = cm
-                    all_moveset_results.append((fast_id, charged_ids, results,
-                                                scores_by_mode, meta))
-            else:
-                # Already ran with the right scenarios - repack Phase 2
-                # results and fill in any additional composite modes
-                # (extra opp-IV mode and/or bait mode) that weren't run
-                # originally. The cached Phase 2 result corresponds to
-                # ``opp_iv_mode`` at bait-on (the Phase 2 default).
-                cached_mode = opp_iv_mode  # bait-on, no :nobait suffix
-                new_results = []
-                for fast_id, charged_ids, results, cs, cm in all_moveset_results:
-                    scores_by_mode = {cached_mode: cs}
-                    for mode in opp_iv_modes_to_run:
-                        if mode in scores_by_mode:
-                            continue
-                        mode_label = mode_pretty_label(mode)
-                        logger.info(f"  Running {moveset_label(fast_id, charged_ids)} "
-                                    f"({mode_label})...")
-                        t0 = time.time()
-                        _, n2, cs2, _ = iv_sweep(
-                            args.species, fast_id, charged_ids, args.league, args.shadow,
-                            opponents, opp_movesets_full, shield_scenarios,
-                            opp_iv_mode=mode,
-                            iv_floor=args.iv_floor,
-                            log_path=log_path, verbose=args.verbose,
-                            threshold_registry=threshold_registry,
-                            reserve_cpus=args.reserve_cpus,
-                            signature_dedup=not args.no_signature_dedup,
-                            use_sweep_cache=not args.no_sweep_cache,
-                        )
-                        elapsed = time.time() - t0
-                        logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
-                        scores_by_mode[mode] = cs2
-                    new_results.append((fast_id, charged_ids, results,
-                                        scores_by_mode, cm))
-                all_moveset_results = new_results
+            # Scenario expansion for interactive mode happens BEFORE Phase 2
+            # (see the parse block after format_cli_args), so Phase 2 already
+            # ran with the right scenarios. Repack its results and fill in
+            # any additional composite modes (extra opp-IV mode and/or bait
+            # mode) that weren't run originally. The cached Phase 2 result
+            # corresponds to ``opp_iv_mode`` at bait-on (the Phase 2 default).
+            cached_mode = opp_iv_mode  # bait-on, no :nobait suffix
+            new_results = []
+            for fast_id, charged_ids, results, cs, cm in all_moveset_results:
+                scores_by_mode = {cached_mode: cs}
+                for mode in opp_iv_modes_to_run:
+                    if mode in scores_by_mode:
+                        continue
+                    mode_label = mode_pretty_label(mode)
+                    logger.info(f"  Running {moveset_label(fast_id, charged_ids)} "
+                                f"({mode_label})...")
+                    t0 = time.time()
+                    _, n2, cs2, _ = iv_sweep(
+                        args.species, fast_id, charged_ids, args.league, args.shadow,
+                        opponents, opp_movesets_full, shield_scenarios,
+                        opp_iv_mode=mode,
+                        iv_floor=args.iv_floor,
+                        log_path=log_path, verbose=args.verbose,
+                        threshold_registry=threshold_registry,
+                        reserve_cpus=args.reserve_cpus,
+                        signature_dedup=not args.no_signature_dedup,
+                        use_sweep_cache=not args.no_sweep_cache,
+                    )
+                    elapsed = time.time() - t0
+                    logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
+                    scores_by_mode[mode] = cs2
+                new_results.append((fast_id, charged_ids, results,
+                                    scores_by_mode, cm))
+            all_moveset_results = new_results
 
             # Resolve and run reference moveset
             reference_idx = -1
