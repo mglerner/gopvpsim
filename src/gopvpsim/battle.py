@@ -2172,9 +2172,18 @@ def _apply_move_buffs(
     Apply stat stage changes from a charged move.
 
     Fires even when the move is shielded (shieldBuffModifier defaults to 0 in
-    PvPoke, meaning no suppression).  Uses a deterministic meter for moves with
-    buffApplyChance < 1: the buff fires every floor(1/chance) uses (simulate
-    mode equivalent of PvPoke's buffApplyMeter logic).
+    PvPoke, meaning no suppression).
+
+    Chance buffs (buffApplyChance < 1) use PvPoke's deterministic meter,
+    ported exactly (Battle.js:1389-1397 + Pokemon.js:686-706): a float
+    accumulator INITIALIZED TO THE CHANCE ITSELF (0.0 for exactly-50%
+    moves), incremented by the chance per activation, firing whenever it
+    crosses a whole number — and never reset. Python and JS share IEEE-754
+    doubles, so the proc schedule matches PvPoke bit-exactly, float drift
+    included (chance 0.1 procs on use 10, not 9, because ten accumulated
+    0.1s are still < 1.0). The chance-shifted init makes the early procs
+    land where intuition expects (0.3 → use 3) but the schedule is NOT
+    periodic: 0.3 procs at uses 3, 6, 10, 13...; 0.2 at 4, 10, 14...
     """
     buffs = move.get('buffs')
     if not buffs:
@@ -2184,12 +2193,19 @@ def _apply_move_buffs(
     if chance <= 0:
         return
 
-    move_id   = move.get('moveId', '')
-    meter     = attacker._buff_apply_meters.get(move_id, 0) + 1
-    threshold = round(1.0 / chance)   # matches PvPoke's Math.round(1/buffApplyChance)
+    if chance >= 1:
+        fire = True   # guaranteed buffs always apply (Battle.js buffRoll += 1)
+    else:
+        move_id = move.get('moveId', '')
+        meter = attacker._buff_apply_meters.get(move_id)
+        if meter is None:
+            meter = 0.0 if chance == 0.5 else chance   # Pokemon.js:696-700
+        start = math.floor(meter)
+        meter += chance
+        attacker._buff_apply_meters[move_id] = meter
+        fire = math.floor(meter) > start
 
-    if meter >= threshold:
-        attacker._buff_apply_meters[move_id] = 0
+    if fire:
         target = move.get('buffTarget', 'opponent')
         # buffTarget 'both' carries separate per-target arrays (Battle.js:
         # 1406-1442 selects buffsSelf for the attacker and buffsOpponent for
@@ -2203,8 +2219,6 @@ def _apply_move_buffs(
             ob = move.get('buffsOpponent', buffs) if target == 'both' else buffs
             defender.atk_stage = max(-4, min(4, defender.atk_stage + ob[0]))
             defender.def_stage = max(-4, min(4, defender.def_stage + ob[1]))
-    else:
-        attacker._buff_apply_meters[move_id] = meter
 
 
 # ---------------------------------------------------------------------------

@@ -1834,3 +1834,37 @@ def test_moltres_galarian_vs_florges_shield_gate(shields_mg, shields_flo, expect
     assert _extract_battle_log(result) == expected_log, (
         f"{shields_mg}v{shields_flo}: battle log mismatch"
     )
+
+
+# ---------------------------------------------------------------------------
+# Deterministic buff-meter proc schedule (PvPoke accumulator port)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("chance,expected_procs", [
+    # PvPoke Battle.js:1389-1397 + Pokemon.js:686-706: float accumulator
+    # initialized to the chance (0.0 for exactly 0.5), += chance per use,
+    # fires on whole-number crossings, never reset. Schedules below are
+    # the bit-exact IEEE-754 outcomes (note 0.3's gap pattern 3,6,10 and
+    # 0.1 proc'ing on use 10 only via float drift).
+    (0.5, [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]),
+    (0.3, [3, 6, 10, 13, 16, 20]),
+    (0.2, [4, 10, 14, 19]),
+    (0.125, [7, 15]),
+    (0.1, [10, 19]),
+    (1.0, list(range(1, 21))),
+])
+def test_buff_meter_proc_schedule(chance, expected_procs):
+    from gopvpsim.battle import _apply_move_buffs
+    move = {'moveId': 'FAKE_CHANCE_BUFF', 'power': 50, 'energy': 40,
+            'energyGain': 0, 'type': 'normal',
+            'buffs': [0, -1], 'buffTarget': 'opponent',
+            'buffApplyChance': str(chance)}
+    attacker = make_bp(charged=[move])
+    defender = make_bp()
+    procs = []
+    for use in range(1, 21):
+        defender.def_stage = 0
+        _apply_move_buffs(attacker, defender, move)
+        if defender.def_stage != 0:
+            procs.append(use)
+    assert procs == expected_procs
