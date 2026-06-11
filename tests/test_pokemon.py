@@ -654,3 +654,70 @@ class TestAegislashBladeWholeLevels:
             f'compute_iv_metadata emitted {len(half_levels)} Aegislash '
             f'(Blade) entries with half-level levels; the focal-species '
             f'whole-level rounding regressed.')
+
+
+# ===========================================================================
+# Aegislash (Blade) -> Shield reverse-level CPM-table overflow
+# (regression guard for the 2026-06-11 arc-S6 dive crash)
+#
+# _aegislash_shield_level mirrors PvPoke getFormStats(): GL start level
+# is blade_level * 2 + 2, deliberately overshooting so the caller can
+# walk down whole levels until CP fits. A low-IV Blade focal caps at
+# level 25 in GL (whole-level rule above), putting the raw start at
+# 52.0 — off the end of the CPM table (max 51.0) — so
+# build_form_change_state raised KeyError before the walk-down could
+# run. PvPoke has the same latent overflow (cpms[index] -> undefined)
+# but computes form stats lazily at form-change time; our S1 dive
+# plumbing builds per-IV configs eagerly at sweep setup, so the first
+# Aegislash (Blade) GL dive after S1 crashed on it. Fix: clamp the
+# start to max(CPM) in _aegislash_shield_level.
+# ===========================================================================
+
+class TestAegislashShieldLevelOverflow:
+    """build_form_change_state must survive every legal Blade focal IV."""
+
+    @staticmethod
+    def _entry_and_moveset():
+        from gopvpsim.formchange import build_form_change_state
+        from gopvpsim.moves import get_moves
+        from gopvpsim.pokemon import get_pokemon_entry
+        entry = get_pokemon_entry('Aegislash (Blade)')
+        all_fast, all_charged = get_moves()
+        fm = dict(all_fast['PSYCHO_CUT'])
+        cms = [dict(all_charged['SHADOW_BALL']),
+               dict(all_charged['GYRO_BALL'])]
+        return build_form_change_state, entry, fm, cms
+
+    @pytest.mark.integration
+    def test_low_iv_blade_gl_does_not_overflow_cpm_table(self):
+        """The exact crash repro: 0/0/0 Blade lands at L25 in GL
+        (whole-level rule), raw reverse formula = 25*2+2 = 52.0 ->
+        KeyError pre-fix."""
+        build, entry, fm, cms = self._entry_and_moveset()
+        bs = entry['baseStats']
+        lvl = best_level(bs['atk'], bs['def'], bs['hp'], 0, 0, 0,
+                         max_cp=1500, max_level=51.0)
+        assert lvl == 25.0, (
+            f'precondition drifted: 0/0/0 Blade GL expected L25, got {lvl} '
+            f'(gamemaster base stats may have changed)')
+        cfg = build(entry, 0, 0, 0, lvl, 1500, False, fm, cms)
+        assert cfg is not None
+
+    @pytest.mark.integration
+    def test_all_blade_ivs_build_form_change_state_both_leagues(self):
+        """Exhaustive: every 4096-IV Blade focal in GL and UL builds a
+        config without walking off the CPM table."""
+        build, entry, fm, cms = self._entry_and_moveset()
+        bs = entry['baseStats']
+        for league_cp in (1500, 2500):
+            for a in range(16):
+                for d in range(16):
+                    for s in range(16):
+                        lvl = best_level(bs['atk'], bs['def'], bs['hp'],
+                                         a, d, s, max_cp=league_cp,
+                                         max_level=51.0)
+                        if lvl is None:
+                            continue
+                        cfg = build(entry, a, d, s, lvl, league_cp,
+                                    False, fm, cms)
+                        assert cfg is not None, (league_cp, a, d, s)
