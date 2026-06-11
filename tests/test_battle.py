@@ -1368,6 +1368,7 @@ def test_morpeko_vs_azumarill_form_change(shields_m, shields_a, expected_morpeko
 # divergence the chargedLog reveals, not just "scores don't match".
 # Captured 2026-04-15 from scripts/pvpoke_trace.js harness.
 _AEGI_XFAIL_GB_SHIELD_FIRST = pytest.mark.xfail(
+    strict=True,   # XPASS must be loud: it means PvPoke fixed bug #3 upstream
     reason=(
         "PvPoke bug #3: picks Gyro Ball over Shadow Ball for the first "
         "(shielded) throw. GB and SB cost the same energy; SB does "
@@ -1375,6 +1376,7 @@ _AEGI_XFAIL_GB_SHIELD_FIRST = pytest.mark.xfail(
         "score the same, but the chargedLog disagrees on which move was "
         "thrown. Our Aegislash correctly picks SB."))
 _AEGI_XFAIL_GB_CASCADE = pytest.mark.xfail(
+    strict=True,   # XPASS must be loud: it means PvPoke fixed bugs #2/#3
     reason=(
         "PvPoke bug #3 + #2: Aegislash throws 3x Gyro Ball where we "
         "throw 3x Shadow Ball (with a Play Rough shielded in between). "
@@ -1575,6 +1577,7 @@ def test_mimikyu_vs_azumarill_form_change(shields_m, shields_a,
 # Per CLAUDE.md "When our sim diverges from PvPoke" policy: we document
 # and xfail; XPASS on any of these alerts us to re-evaluate.
 _MG_NEARKO_PLAN = pytest.mark.xfail(
+    strict=True,   # XPASS must be loud: the divergence pin vanished — re-vet
     reason=(
         "Intentional divergence: our near-KO DP returns [Brave Bird] (fast "
         "self-debuffing nuke); PvPoke returns [Fly, Fly, ...] (slow non-"
@@ -1583,6 +1586,7 @@ _MG_NEARKO_PLAN = pytest.mark.xfail(
         "flip where PvPoke's slower plan is correct. See DEVELOPER_NOTES "
         "'Known divergences: Near-KO DP plan choice'."))
 _MG_NEARKO_PLAN_FLIP = pytest.mark.xfail(
+    strict=True,   # XPASS must be loud: the winner flip resolved — re-vet
     reason=(
         "Same root cause as _MG_NEARKO_PLAN but this case is a WINNER "
         "FLIP: PvPoke's Fly-Fly-Fly plan correctly predicts MG wins "
