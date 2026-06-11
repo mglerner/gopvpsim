@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (2026-04-06)
 
-<!-- sync:test_count -->826<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->828<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The simulator matches PvPoke's
 simulate-mode score table exactly (±0) for <!-- sync:pvpoke_matchups_verified -->8<!-- /sync --> matchups
@@ -390,15 +390,26 @@ the self-debuffing nuke to `activeChargedMoves[0]` (Fly) whenever:
     AND poke.hp / poke.stats.hp > 0.5
     AND finalState.moves[0].damage / opp.hp < 0.8
 
-PvPoke's `move.damage` field is set as a side effect of OMT line 320
-(`activeChargedMoves[n].damage = DamageCalculator.damage(...)`),
-which runs unconditionally per-move whenever `opponent.shields == 0`.
-Our port caches damage at battle.py:652 but subgates the assignment
-on `attacker.energy >= cm['energy']` — so in the Moltres-G cluster
+*(Mechanism paragraph corrected 2026-06-11, review finding E11.)*
+PvPoke's `move.damage` is essentially NEVER undefined: `initializeMove`
+(Pokemon.js:830-839) sets it for every move at battle init (both the
+with-opponent and without-opponent branches assign), `wouldShield`
+refreshes it on every evaluation (ActionLogic.js:1121), and the OMT
+side effect (line 320, fires per-move whenever `opponent.shields == 0`)
+keeps it freshest. So PvPoke's bandaid[885] always evaluates its
+`damage/opp.hp < 0.8` ratio — possibly with a stale value. Our port
+caches damage at battle.py:652 but subgates the assignment on
+`attacker.energy >= cm['energy']` — so in the Moltres-G cluster
 (energy < BB's 55 at the T20 DP-entry state) our `_cached_damage`
-stays `None`, bandaid[866] skips its `_cached_dmg / opp.hp < 0.8`
-test, the DP plan is left alone, and bandaid[918] stacks BB until
-energy reaches 100 → single-BB nuke instead of Fly-chain.
+stays `None`, bandaid[866] skips its ratio test entirely, the DP plan
+is left alone, and bandaid[918] stacks BB until energy reaches 100 →
+single-BB nuke instead of Fly-chain. NOTE the divergence surface is
+therefore broader than the MG cluster: our bandaid[866] skips wherever
+`_cached_damage` is None, while PvPoke's always fires — the empirical
+cluster measurements and the keep-our-behavior decision below stand
+(they were measured from actual traces), but an earlier version of
+this paragraph wrongly claimed the field is "undefined in JS" unless
+OMT fired.
 
 **Why we don't fix it:** faithfully mirroring PvPoke's OMT side
 effect (so bandaid[866] fires when PvPoke's bandaid[885] would) swaps

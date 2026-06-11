@@ -1679,6 +1679,24 @@ _REUSE_MATCHUPS = [
         ('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
          'great', 4, 15, 13, False),
         id='aegislash-azumarill'),
+    # Stateful one-shot form mechanics (review finding T7): the disguise
+    # is consumed once per battle and leaves a permanent -1 def stage
+    # after busting — exactly the state most likely to leak across the
+    # 9-scenario reuse loop.
+    pytest.param(
+        ('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'],
+         'great', 5, 13, 15, False),
+        ('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+         'great', 4, 15, 13, False),
+        id='mimikyu-azumarill'),
+    # Hunger toggle: Morpeko must re-enter every battle in Full Belly
+    # (verified in-game 2026-06-06) and toggle per charged move.
+    pytest.param(
+        ('Morpeko (Full Belly)', 'THUNDER_SHOCK',
+         ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS'], 'great', 5, 14, 15, False),
+        ('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+         'great', 4, 15, 13, False),
+        id='morpeko-azumarill'),
 ]
 
 
