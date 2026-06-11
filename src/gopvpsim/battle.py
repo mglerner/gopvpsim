@@ -1498,16 +1498,24 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     final_first_thrown = final_state.first_idx
     final_max_dmg_idx  = final_state.max_dmg_idx
 
-    # Bait-wait check (ActionLogic.js lines 820-835):
+    # Bait-wait check (ActionLogic.js lines 839-853):
     # If shields are up and we can't yet afford cms[1] but it has better DPE
     # than our planned first move → wait for cms[1] instead.
-    # PvPoke uses raw dpe (power/energy) here.
+    # PvPoke uses raw dpe (damage/energy) here.
     # Skipped entirely when bait_shields=False (never delay a ready shot to
     # set up a bait).
+    #
+    # NOTE: until 2026-06-11 this also required `not cm_self_debuf[1]` — a
+    # condition the reference does NOT have, so the hold never fired when
+    # the pricier move was Superpower/Brave-Bird-class. That silently
+    # produced the Snorlax [1,2] and MG-vs-Florges [1,2] divergences
+    # (cheap bait thrown immediately where PvPoke holds, then fires the
+    # big move under TTL pressure — our fire_now path supplies the same
+    # escape). PvPoke's only self-debuff consideration here is cm0's
+    # selfBuffing exemption below.
     if bait_shields and defender.shields > 0 and n_cms > 1:
         if (attacker.energy < cm_energy[1]
-                and cm_dpe[1] > cm_dpe[final_first_thrown]
-                and not cm_self_debuf[1]):
+                and cm_dpe[1] > cm_dpe[final_first_thrown]):
             bait = True
             # Don't bait if an effective self-buffing move exists (line 826).
             # PvPoke also uses raw damage/energy here (selectBestChargedMove

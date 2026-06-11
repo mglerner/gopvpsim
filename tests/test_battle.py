@@ -1816,14 +1816,11 @@ def test_jit_and_python_dp_paths_agree(monkeypatch, spec, shields):
     (0, 2, 1, 143, ["Florges: Disarming Voice", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water"]),
     (1, 0, 0, 563, ["Florges: Disarming Voice (shielded)", "Moltres (Galarian): Fly", "Florges: Disarming Voice", "Moltres (Galarian): Fly"]),
     (1, 1, 1, 339, ["Florges: Disarming Voice", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly", "Florges: Chilling Water"]),
-    # [1,2]: score/winner/HP match PvPoke exactly (199, Florges wins, 0/86);
-    # the only difference is which move MG throws into Florges' SECOND
-    # shield — ours Fly (45e), PvPoke Brave Bird (55e). Both are shielded
-    # for 1 damage and MG dies before throwing again, so the divergence is
-    # cosmetic; per the CLAUDE.md divergence policy we pin OUR log. Open
-    # lead for the engine-fidelity round: shielded-throw move choice
-    # (review findings E5/E15 family).
-    (1, 2, 1, 199, ["Florges: Disarming Voice", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water"]),
+    # [1,2]: matches PvPoke exactly since the 2026-06-11 bait-wait fix
+    # (the hold wrongly excluded self-debuffing cms[1], so we used to
+    # throw a second Fly here where PvPoke holds and then fires Brave
+    # Bird under TTL pressure).
+    (1, 2, 1, 199, ["Florges: Disarming Voice", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Brave Bird (shielded)", "Florges: Chilling Water"]),
     (2, 0, 0, 772, ["Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Brave Bird"]),
     (2, 1, 1, 318, ["Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly", "Florges: Disarming Voice"]),
     (2, 2, 1, 202, ["Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly (shielded)", "Florges: Chilling Water (shielded)", "Moltres (Galarian): Fly (shielded)", "Florges: Disarming Voice"]),
