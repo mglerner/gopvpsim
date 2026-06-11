@@ -349,8 +349,8 @@ def apply_form_change(bp, opponent):
     bp._cm_id_to_idx = {id(cm): i for i, cm in enumerate(bp.charged_moves)}
 
     # Invalidate damage + DP setup caches on both sides
-    bp._dmg_cache_opp_id = -1
-    opponent._dmg_cache_opp_id = -1
+    bp._dmg_cache_opp = None
+    opponent._dmg_cache_opp = None
     bp._dp_cache = None
     opponent._dp_cache = None
 

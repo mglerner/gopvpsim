@@ -1708,14 +1708,27 @@ def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int
 
 @dataclass(slots=True)
 class BattlePokemon:
-    """Wraps a Pokemon with the mutable state needed during a battle."""
+    """Wraps a Pokemon with the mutable state needed during a battle.
+
+    OWNERSHIP INVARIANT: ``fast_move`` and ``charged_moves`` must be
+    PRIVATE copies (``dict(move)``), never the shared dicts from
+    ``get_moves()``. Battle code writes into them ('_turns',
+    '_cached_damage', the Zap-Cannon clause's buff keys), so two
+    BattlePokemon sharing a move dict silently cross-contaminate — worst
+    in mirrors, where one side's cached damage is computed with the other
+    side's attack. Every current caller copies; this note exists so the
+    next one does too. (Moves are resolved by identity in
+    ``charged_move_damage``, so copies must happen at construction —
+    passing a fresh copy of an attached move later raises KeyError by
+    design.)
+    """
     species:         str
     types:           list[str]   # 1 or 2 type strings
     atk:             float       # effective attack = (base_atk + atk_iv) * cpm
     def_:            float       # effective defense
     max_hp:          int
-    fast_move:       dict        # gamemaster move dict
-    charged_moves:   list[dict]  # gamemaster move dicts
+    fast_move:       dict        # gamemaster move dict — private copy (see docstring)
+    charged_moves:   list[dict]  # gamemaster move dicts — private copies
     shields:         int = 2
     initial_energy:  int = 0     # energy at battle start (0–100)
 
@@ -1738,7 +1751,10 @@ class BattlePokemon:
     # types). The pvpoke_dp policy can call this hundreds of times per
     # simulate() with the same inputs — we memoize the full per-move table
     # and invalidate via key comparison.
-    _dmg_cache_opp_id:    int       = field(init=False, repr=False)
+    # Held REFERENCE, compared with `is`: an id() key can alias when
+    # CPython reuses a freed object's address; a held reference keeps
+    # the opponent alive so it cannot. (2026-06-11 review finding E8.)
+    _dmg_cache_opp: "BattlePokemon | None" = field(init=False, repr=False)
     _dmg_cache_atk_stage: int       = field(init=False, repr=False)
     _dmg_cache_def_stage: int       = field(init=False, repr=False)
     _cached_fast_dmg:     int       = field(init=False, repr=False)
@@ -1776,7 +1792,7 @@ class BattlePokemon:
         self.def_stage         = 0
         self._buff_apply_meters = {}
         # Damage cache starts invalid (opp id -1 never matches any real id).
-        self._dmg_cache_opp_id    = -1
+        self._dmg_cache_opp       = None
         self._dmg_cache_atk_stage = 0
         self._dmg_cache_def_stage = 0
         self._cached_fast_dmg     = 0
@@ -1883,7 +1899,7 @@ class BattlePokemon:
     def _ensure_dmg_cache(self, defender: "BattlePokemon") -> None:
         """Populate _cached_fast_dmg and _cached_charged_dmgs vs `defender`
         at the current stat stages, if not already valid."""
-        if (self._dmg_cache_opp_id == id(defender)
+        if (self._dmg_cache_opp is defender
                 and self._dmg_cache_atk_stage == self.atk_stage
                 and self._dmg_cache_def_stage == defender.def_stage):
             return
@@ -1909,7 +1925,7 @@ class BattlePokemon:
                 self._cached_charged_dmgs, dtype=_np.int64)
             self._cm_energy_np = _np.asarray(
                 [cm['energy'] for cm in self.charged_moves], dtype=_np.int64)
-        self._dmg_cache_opp_id    = id(defender)
+        self._dmg_cache_opp       = defender
         self._dmg_cache_atk_stage = self.atk_stage
         self._dmg_cache_def_stage = defender.def_stage
 
@@ -1939,12 +1955,13 @@ class BattlePokemon:
           *_np               numpy views for the JIT
                              (present only when numba is available)
 
-        Same staleness caveats as the damage cache: keyed on id(defender)
-        plus both stat stages, explicitly invalidated on form change.
+        Same staleness caveats as the damage cache: keyed on the held
+        defender reference plus both stat stages, explicitly invalidated
+        on form change.
         """
         dp = self._dp_cache
         if (dp is not None
-                and dp['opp_id'] == id(defender)
+                and dp['opp'] is defender
                 and dp['atk_stage'] == self.atk_stage
                 and dp['def_stage'] == defender.def_stage):
             return dp
@@ -2090,7 +2107,7 @@ class BattlePokemon:
             farm_swap_idx = 0
 
         dp = {
-            'opp_id':    id(defender),
+            'opp':       defender,
             'atk_stage': self.atk_stage,
             'def_stage': defender.def_stage,
             'order':          [idx_map[id(m)] for m in cms],
@@ -2124,14 +2141,14 @@ class BattlePokemon:
         return dp
 
     def fast_move_damage(self, defender: "BattlePokemon") -> int:
-        if (self._dmg_cache_opp_id != id(defender)
+        if (self._dmg_cache_opp is not defender
                 or self._dmg_cache_atk_stage != self.atk_stage
                 or self._dmg_cache_def_stage != defender.def_stage):
             self._ensure_dmg_cache(defender)
         return self._cached_fast_dmg
 
     def charged_move_damage(self, move: dict, defender: "BattlePokemon") -> int:
-        if (self._dmg_cache_opp_id != id(defender)
+        if (self._dmg_cache_opp is not defender
                 or self._dmg_cache_atk_stage != self.atk_stage
                 or self._dmg_cache_def_stage != defender.def_stage):
             self._ensure_dmg_cache(defender)
