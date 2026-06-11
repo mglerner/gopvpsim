@@ -385,6 +385,11 @@ def main():
     print(f"Found {len(dives)} dive(s) to run:\n")
     for d in dives:
         print(f"  - {d['slug']}")
+    # Copy-paste monitor recipe (Michael's standing ask: every dive/chain
+    # kick should hand over the watch command for a second terminal).
+    print("\nMonitor in a second terminal:\n"
+          "  watch -c -n 5 scripts/chain_status.py --chain overnight\n",
+          flush=True)
     print()
 
     for i, dive in enumerate(dives):
