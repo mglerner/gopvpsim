@@ -269,6 +269,21 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
                   key=lambda f: f['n_qualifying'])
     result = general + rest[:3]
 
+    # The mirror-synth tier always makes the cut (feedback memory
+    # synth_mirror_tier_in_iv_flavor_guide: readers want the
+    # mirror-axis story in the Flavor Guide itself, not only in
+    # Threshold Tiers). It is typically broad — low selectivity — so
+    # the cap above used to cut it silently (2026-06-11 review, R1
+    # drop site #1). Append-only: nothing else is displaced.
+    def _is_mirror_flavor(f):
+        return (f['name'].endswith(' Mirror Bulk')
+                or f['name'].endswith(' Mirror Atk'))
+    if not any(_is_mirror_flavor(f) for f in result):
+        _mirror_extra = next((f for f in rest[3:] if _is_mirror_flavor(f)),
+                             None)
+        if _mirror_extra is not None:
+            result.append(_mirror_extra)
+
     # Disambiguate duplicate names by appending stat info
     seen = {}
     for f in result:
@@ -615,13 +630,35 @@ def refine_flavor_names(flavors, tradeoffs):
     # Lickilicky, Sealeo) exists.
     to_remove = set()
     non_general = [f for f in flavors if not f['is_general']]
+
+    def _shape(f):
+        return _axis_shape(f.get('atk_cut', 0) or 0,
+                           f.get('def_cut', 0) or 0,
+                           f.get('hp_cut', 0) or 0)
+
     for i, fi in enumerate(non_general):
+        # Mirror-synth tiers are never dedup'd away: the mirror cohort
+        # is deliberately NOT a clean partition (see
+        # synthesize_mirror_tier), so its clean-partition gains are
+        # often a subset of a Fortified flavor's — but the mirror-axis
+        # story is wanted in the guide regardless (2026-06-11 review,
+        # R1 drop site #2; mirrors the _flavor_name_for_tier
+        # passthrough exemption).
+        if (fi['name'].endswith(' Mirror Bulk')
+                or fi['name'].endswith(' Mirror Atk')):
+            continue
         td_i = tradeoffs.get(fi['name'], {})
         gains_i = {g['opponent'] for g in td_i.get('gains', [])}
         if not gains_i:
             continue
         for j, fj in enumerate(non_general):
             if i == j:
+                continue
+            # Same stat axis only — the comment above always claimed
+            # this but the code never checked, so a def-axis flavor
+            # could be removed because its gains were a subset of an
+            # ATK-axis flavor's (review R1).
+            if _shape(fi) != _shape(fj):
                 continue
             td_j = tradeoffs.get(fj['name'], {})
             gains_j = {g['opponent'] for g in td_j.get('gains', [])}
