@@ -195,6 +195,63 @@ def test_pipe_lines_without_separator_left_alone():
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# W1 (2026-06-11 review): indent + escaped-pipe + code-span-pipe handling
+# ---------------------------------------------------------------------------
+
+
+def test_indented_table_keeps_indent_no_phantom_cell():
+    # A table nested in a list item (2-space indent): the indent must be
+    # preserved on re-emit and must NOT become a phantom first cell.
+    lines = [
+        "- item:",
+        "  | a | longer |",
+        "  | --- | --- |",
+        "  | x | y |",
+    ]
+    out = format_md.pad_tables(lines)
+    assert all(l.startswith("  | ") for l in out[1:])
+    # First cell is 'a', not '' (the phantom the old split produced).
+    assert format_md._split_row(out[1])[0] == "a"
+    assert format_md.pad_tables(out) == out  # idempotent
+
+
+def test_four_space_indented_pipes_left_alone():
+    # 4+ spaces is an indented code block in GFM — byte-identical passthrough.
+    lines = [
+        "    | not | a table |",
+        "    | --- | --- |",
+        "    | x | y |",
+    ]
+    assert format_md.pad_tables(lines) == lines
+
+
+def test_escaped_pipe_stays_in_cell():
+    lines = [
+        "| pattern | meaning |",
+        "| --- | --- |",
+        "| a\\|b | alternation |",
+    ]
+    out = format_md.pad_tables(lines)
+    row = format_md._split_row(out[2])
+    assert row[0] == "a\\|b"
+    assert len(row) == 2
+    assert format_md.pad_tables(out) == out
+
+
+def test_code_span_pipe_stays_in_cell():
+    lines = [
+        "| code | meaning |",
+        "| --- | --- |",
+        "| `a|b` | pipe in span |",
+    ]
+    out = format_md.pad_tables(lines)
+    row = format_md._split_row(out[2])
+    assert row[0] == "`a|b`"
+    assert len(row) == 2
+    assert format_md.pad_tables(out) == out
+
+
 def test_format_text_idempotent():
     sample = (
         "# Title\n"
