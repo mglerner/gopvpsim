@@ -123,6 +123,38 @@ def _patch_fetch_env(monkeypatch, tmp_path, payload):
     return data
 
 
+# ---------------------------------------------------------------------------
+# species_id resolution (2026-06-11 review finding L3)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+def test_species_id_handles_punctuated_names():
+    """The old naive slug mangled apostrophes/periods/hyphens, so these
+    ranked species raised KeyError from get_default_moveset and were
+    silently skipped (with a warning) by the dive pool loader."""
+    from gopvpsim.data import species_id
+    assert species_id("Farfetch'd (Galarian)") == 'farfetchd_galarian'
+    assert species_id('Mr. Mime') == 'mr_mime'
+    assert species_id('Ho-Oh') == 'ho_oh'
+    assert species_id("Sirfetch'd") == 'sirfetchd'
+    # Shadow handling: explicit suffix resolves directly; the flag
+    # appends without double-suffixing.
+    assert species_id('Quagsire (Shadow)') == 'quagsire_shadow'
+    assert species_id('Quagsire', shadow=True) == 'quagsire_shadow'
+    assert species_id('Quagsire (Shadow)', shadow=True) == 'quagsire_shadow'
+    # Unknown names fall back to the historical slug (no crash).
+    assert species_id('Fakemon (Weird)') == 'fakemon_weird'
+
+
+@pytest.mark.integration
+def test_default_moveset_punctuated_names_resolve():
+    from gopvpsim.data import get_default_moveset
+    for name in ("Farfetch'd (Galarian)", "Sirfetch'd", "Mr. Mime"):
+        fast, charged = get_default_moveset(name, league='great')
+        assert isinstance(fast, str) and fast
+        assert isinstance(charged, list) and charged
+
+
 def test_corrupt_fresh_cache_falls_through_to_refetch(monkeypatch, tmp_path):
     # A fresh-but-corrupt cache file used to raise JSONDecodeError before
     # the network path was ever tried.

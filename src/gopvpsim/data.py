@@ -150,6 +150,37 @@ _DEFAULT_MOVESET_FALLBACK = {
 }
 
 
+_species_id_index = None  # speciesName -> speciesId, built from the gamemaster
+
+
+def species_id(species_name, *, shadow=False):
+    """Resolve a display speciesName to PvPoke's speciesId.
+
+    Prefers the gamemaster's own speciesName -> speciesId mapping, which
+    is exact for every name PvPoke knows — including the ones a naive
+    slug mangles: "Farfetch'd (Galarian)" -> farfetchd_galarian,
+    "Mr. Mime" -> mr_mime, "Ho-Oh" -> ho_oh, "Sirfetch'd" -> sirfetchd.
+    Falls back to the historical lowercase/underscore/strip-parens slug
+    only for names absent from the gamemaster.
+
+    shadow=True appends '_shadow' unless the resolved id already carries
+    it (names with an explicit ' (Shadow)' suffix resolve directly to
+    their shadow entry).
+    """
+    global _species_id_index
+    if _species_id_index is None:
+        gm = load_gamemaster()
+        _species_id_index = {p['speciesName']: p['speciesId']
+                             for p in gm['pokemon']}
+    sid = _species_id_index.get(species_name)
+    if sid is None:
+        sid = (species_name.lower().replace(' ', '_')
+               .replace('(', '').replace(')', ''))
+    if shadow and not sid.endswith('_shadow'):
+        sid += '_shadow'
+    return sid
+
+
 def get_default_moveset(species_name, league='great', shadow=False):
     """Return (fast_move_id, [charged_move_ids]) from PvPoke's rankings.
 
@@ -171,17 +202,17 @@ def get_default_moveset(species_name, league='great', shadow=False):
     """
     index = _get_rankings_index(league)
 
-    # Build the speciesId key PvPoke uses: lowercase, underscored
-    species_id = species_name.lower().replace(' ', '_').replace('(', '').replace(')', '')
-    if shadow:
-        species_id = species_id + '_shadow'
+    # Resolve the speciesId via the gamemaster mapping (handles
+    # apostrophes/periods/hyphens the old naive slug mangled — those
+    # species raised KeyError despite being ranked).
+    sid = species_id(species_name, shadow=shadow)
 
-    if species_id in index:
-        moveset = index[species_id]['moveset']
+    if sid in index:
+        moveset = index[sid]['moveset']
         return moveset[0], moveset[1:]
 
     # Primary lookup missed — try the explicit-fallback dict before raising.
-    fallback = _DEFAULT_MOVESET_FALLBACK.get((species_id, league))
+    fallback = _DEFAULT_MOVESET_FALLBACK.get((sid, league))
     if fallback is not None:
         return fallback[0], list(fallback[1])
 
