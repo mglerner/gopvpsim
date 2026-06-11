@@ -4316,6 +4316,13 @@ def dump_replay_state(state, path=None):
     import pickle
     from datetime import datetime
     try:
+        # The variant registry is process-local state populated by pool
+        # loading in main(); a replay process never runs that, so without
+        # it parse_opponent_spec mis-reads variant display names
+        # ('Forretress (Bug Bite)') and their opp-info entries silently
+        # vanish from the replayed render (review finding D4).
+        state = {**state,
+                 'opponent_variant_registry': dict(_OPPONENT_VARIANT_REGISTRY)}
         if path is None:
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
             slug = (state['species'].replace(' ', '_')
@@ -4335,11 +4342,25 @@ def dump_replay_state(state, path=None):
 
 
 def load_replay_state(path):
-    """Load a replay state blob written by dump_replay_state."""
+    """Load a replay state blob written by dump_replay_state.
+
+    Restores the process-local opponent-variant registry from the blob
+    so the replayed render resolves variant display names exactly like
+    the live dive did. Blobs from before 2026-06-11 carry no registry;
+    they load fine, and a variant opponent then logs the opp_info_cache
+    warning instead of silently disappearing.
+    """
     import gzip
     import pickle
     with gzip.open(path, 'rb') as f:
-        return pickle.load(f)
+        state = pickle.load(f)
+    # Transport bookkeeping, not render state: restore the global and
+    # remove the key so the returned dict matches what the caller dumped.
+    reg = state.pop('opponent_variant_registry', None)
+    if reg:
+        _OPPONENT_VARIANT_REGISTRY.clear()
+        _OPPONENT_VARIANT_REGISTRY.update(reg)
+    return state
 
 
 def render_dive_html(state):
