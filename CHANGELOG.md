@@ -6,6 +6,94 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-11 — Fable 5 deep codebase review + 39-commit fix day
+
+A six-agent read-only review of the whole codebase
+(`docs/reviews/2026-06-11_fable5_deep_codebase_review.md`, `7b30cbe`)
+followed by fixing every finding actionable outside a dedicated
+session. The in-flight S6 chain was killed mid-morning because two
+confirmed bugs tainted its output; the re-dive relaunches on this
+state. Personal narrative: `userdata/session_reports/` (gitignored).
+Suite ended 841p+14xf; oracle audit re-baselined at 153 cells = 136
+exact + 17 documented (all 17 = the one intentional near-KO plan
+cluster); benchmark 3,327 sims/s vs the 3,160 gate.
+
+**Publish-blockers (the chain-kill trio):**
+
+- **D1 `ab26a1c`** — interactive scenario expansion moved BEFORE
+  Phase 2: the mirror-slayer iteration / archetypes / threshold
+  auto-discovery had been running on 1v1 only while pages display
+  all 9; at nS=1 the S2 graded metric degenerated and the pool cap
+  blew ~40x.
+- **L1 `92dd629`** — anchor resolution never applied shadow
+  multipliers (opponent side via the ' (Shadow)' suffix, focal side
+  via build_auto_anchors): BP anchors vs shadows ~20% too strict
+  (published Sylveon card anchor resolved 145.7 vs the true 121.44),
+  bulkpoints too lenient.
+- **E1 `d371951`** — buffTarget='both' applied the generic buffs
+  array to both sides: each Obstruct RAISED the opponent's defense.
+  Pinned by a 9-cell Obstagoon/Azumarill harness fixture.
+
+**Engine-fidelity round (oracle-driven, every step gated):** E2
+buff-meter ported as PvPoke's exact float accumulator (`434fece` —
+real first-proc bug for Crunch/Night Slash); E3 wouldShield
+selfAttackDebuffing override (`ae44c43`); E4 signed DP stage deltas
+(`b20fd0f`); E5 lethal slot-1 bait gate (`6fac7f9`); E6 disguise
+break via pre-shuffle cheapest only (`bc533c7`); E7 TTL energy cap
+dropped (`e53483d`); E8 held-reference cache keys (`034434b`); E9
+near-KO JIT overflow sentinel + Python fallback (`4f40250`); E14
+timeout divergence documented-not-matched (`87d77c1`, Carbink-mirror
+probe; 240s = the real 3v3 MATCH timer — port as match state if team
+sim ever lands).
+
+**Two falsified "intentional deviations"** (both extra conditions
+the reference lacks, both with plausible comments — deviations need
+traces, not reasoning): the OMT KO-override's self-debuffing
+exclusion (`632f637`; Snorlax/Obstagoon margin cluster, one wasted
+Counter per shields-down endgame with a Superpower/HJK/Draco closer)
+and the bait-wait hold's self-debuffing gate (`4d315ba`; Snorlax
+9/9 exact, MG/Florges log byte-identical, three jellicent log-only
+audit pins vanished).
+
+**Dive pipeline / caches:** D6+R4 form-matched shadow mirrors +
+sibling-form synth bail (`bb5cbcf`); D2/D3+D12 slayer-cache keys
+(iv_floor, buff fields, engine+gamemaster hashes) + atomic cache
+writes (`b1fc6da`); D5 canonical-tuple reference dedup, D7
+silent-failure logging, L5 data.py corrupt-cache/atomic, W2/W7
+chain_status year+digit fixes, D13 shebang (`03b5397`); D4 replay
+blobs carry the variant registry (`8ef1bd9`); L3 speciesIds resolved
+via the gamemaster map — Farfetch'd/Mr. Mime/Ho-Oh no longer
+silently skipped (`3156373`).
+
+**Render honesty (replay-diff verified):** R5 tier-card HP-rider
+coverage, R2 flavor losses gated on real cohort win rate, R13 stat-
+note heuristics (`0856ab8`); R9 banding crash guard, L10 league-key
+case, W5 article sibling-alignment guard (`b9db11d`); W1 format_md
+indent/escaped-pipe/code-span fixes (`a749d93`); W8 index
+longest-prefix species slugs (`045d46f`); W9 publish gate enumerates
+the whole site tree — instantly caught 75 baked em-dashes (renderer
+strings fixed) + 31 stale anchors that clear on rebuild (`598f5ee`);
+JS trio W3/W4/W6 (`e302759`).
+
+**Features landed same day:** Notable-IVs "Copy for IV scanner"
+buttons emitting gobattlekit user-threshold JSON (`b97113f`); slayer
+signal-loss 4+3 hybrid — saturated-parent callout + rarity-coded
+badges, Oinkologne-verified, ~360KB/dive lighter (`2629fde`);
+monitor watch-hints at dive/chain startup (`77fd880`).
+
+**Test infrastructure:** conftest pins the data-cache TTL (pytest
+can no longer refresh it mid-chain); strict divergence xfails;
+JIT↔Python parity test; MG-vs-Florges passing shield-gate fixture;
+Mimikyu/Morpeko reuse rows; UL matchups added to the oracle audit
+(`66c3ee9`, `73239fb`, `0cfb925`, `043cc03`). Suite 772 → 855
+collected.
+
+**Docs:** 7 paste-ready PvPoke bug-report drafts
+(`docs/pvpoke_bug_reports.md`, curated: Mimikyu-timing retracted,
+bestChargedMove premise debunked, CPM-overflow added); Annihilape
+validation 102.9-floor closed as unrecoverable; E11 bandaid[866]
+mechanism corrected.
+
 ## 2026-06-10 — Engine round 3: +37.5% single-core (perf+correctness arc S5)
 
 Four commits (`4c38c6a..d4d8ed2`), each gated on full suite + oracle
