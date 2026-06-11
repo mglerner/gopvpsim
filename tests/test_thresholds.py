@@ -564,3 +564,28 @@ class TestRepoFiles:
         sp = reg.get_spread("Tinkaton", "Great", "GH Great")
         assert isinstance(sp, th.StatCutoffSpread)
         assert sp.defense == 143.03
+
+
+class TestLeagueKeyCaseNormalization:
+    """2026-06-11 review finding L10: '[Tinkaton.great]' (lowercase) parsed
+    fine and then silently never resolved — the resolver only queries the
+    canonical capitalization. Case-variant known-league keys now normalize
+    on load."""
+
+    def test_lowercase_league_key_normalizes(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+[Testmon.great.spreads.x]
+attack = 120.0
+""")
+        reg = th.load_toml(p)
+        sp = reg.species("Testmon")
+        assert "Great" in sp.leagues
+        assert "great" not in sp.leagues
+
+    def test_canonical_key_unchanged(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+[Testmon.Great.spreads.x]
+attack = 120.0
+""")
+        reg = th.load_toml(p)
+        assert "Great" in reg.species("Testmon").leagues

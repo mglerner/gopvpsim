@@ -2776,7 +2776,14 @@ def render_analysis_alpha_html(scores_flat, nIvs, nS, nO, scenarios,
             else:
                 line += '<td>-</td><td>-</td>'
         d = row['dominant']
-        line += f'<td><strong>{d[0]}</strong> ({d[1]["eta_squared"]:.3f})</td></tr>\n'
+        if d[1] is not None:
+            line += f'<td><strong>{d[0]}</strong> ({d[1]["eta_squared"]:.3f})</td></tr>\n'
+        else:
+            # All three stats had <3 distinct values (heavily floored or
+            # tiny IV pools) — detect_banding returned None for every
+            # band, and max() handed back a None entry. Render a dash
+            # instead of crashing the whole dive render.
+            line += '<td>-</td></tr>\n'
         parts.append(line)
     parts.append('</table>\n')
 
