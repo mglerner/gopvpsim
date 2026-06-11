@@ -4,10 +4,11 @@ Pre-ship arc shipped: items 1-6 all done (cross-form re-dive,
 JRE/RyanSwag comparison, F1-F5, P1-P5 polish, Mirror CMP reframe,
 mirror-tier synth backfill, Dewgong flavor-name fix `dede396`), and the
 site was published via `scripts/publish_website.sh --push` (2026-06-07).
-Post-ship, the post-S5 arc resumes at S13-S17 in
-`~/.claude/plans/post-s5-oinkologne-arc.md` (matchup-flip attribution,
-post-debuff breakpoints, bait policy) — **not pre-ship items, do not
-pull forward**. The open follow-ups below are the residue.
+Post-ship items formerly tracked as post-S5 arc S13-S17
+(matchup-flip attribution, post-debuff breakpoints, bait policy) now
+live in this file's "Analysis goals" / "Policies to add" sections —
+the arc plan file was retired. The open follow-ups below are the
+residue.
 
 (HTTPS on the website, the Oinkologne NAIC re-dive, the full oracle
 harness audit, and the Morpeko form-toggle resolution all shipped
@@ -29,12 +30,6 @@ harness audit, and the Morpeko form-toggle resolution all shipped
   guide pointer (the hide layer is already in place; G16 is the
   last-mile substitution). Logged in
   `docs/jre_ryanswag_comparison.md` §14.4, ~30 min.
-
-- **G3 — RESOLVED 2026-06-11 (Michael's decision): accept the
-  mechanical one-liner.** The F4 schema + renderer hook (`cbc9b28`)
-  stay; verdict editorial remains expert-only, and the article ships
-  with the mechanical line permanently unless Michael later chooses
-  to author prose.
 
 - **G1 + G2 + G7 — richer auto-gen prose template** [post-ship,
   recommended]. F1 Meta Role, F2 key-flips callout, and
@@ -91,21 +86,17 @@ harness audit, and the Morpeko form-toggle resolution all shipped
   envelope-shape to a specific "Cost to XL" judgment) remains
   the original P3 question and has not been addressed.
 
-- **Aegislash UL apply.** `patch_dive_envelope_tags.py` dry-run
-  reports 12 eligible cards; broader apply gated on Michael.
-  Same gate applies for Forretress Volt-Switch (9) and
-  Shadow-VS (8).
+- **Aegislash UL apply — DISSOLVED 2026-06-11.** The S6 full re-dive
+  regenerates all three candidate dives with envelope tags computed
+  natively, so the retrofit patcher question is moot (patcher joins
+  the S7 delete list). Only relevant again for a page deliberately
+  never re-dived.
 
 - **Cross-form opponent expansion (parked).** Item 4 (auto-
   form-sibling expansion in `build_opponent_pool.py`) — design
   done but parked pending review of rendered Oinkologne article;
   decide pool-level vs render-level filter for hypothetical-form
   rows. See memory `project_form_change_pool_expansion_parked.md`.
-
-- **Status-box paste-watch hint.** `run_website_dives.py` and
-  `deep_dive.py` could print a `watch -n 5 'scripts/chain_status.py
-  --chain ...'` recipe at startup when the matching status preset
-  exists. Small.
 
 ## Deferred cleanup: backwards-compatibility removal pass
 
@@ -151,52 +142,15 @@ break invariants that weren't yet nailed down by tests.
   (#2, initializeMove DOES set move.damage at init; the real issue
   there is the DPE-overwrite, drafted as report 4) — plus the new
   Blade→Shield CPM-table overflow found 2026-06-11. Filing them
-  upstream is Michael's action. Original discovery list, kept for
-  history — eight bugs found in PvPoke's JS:
-  1. BattleState `.hp`/`.oppHealth` naming inconsistency (dead-code dominance checks)
-  2. bestChargedMove using `move.damage` (undefined at init) instead of `move.power`
-  3. bestChargedMove not recomputed on opponent form change (stale DPE cache)
-  4. Aegislash selects Gyro Ball over Shadow Ball (same cost, strictly less damage)
-  5. Mimikyu delays Shadow Sneak by 1 SC (suboptimal timing, costs 13 score points)
-  6. initializeMove's buff-adjusted `move.dpe` is overwritten by
-     selectBestChargedMove before use. Pokemon.js:849-864 computes a
-     buff multiplier that inflates DPE for self-atk-buff and opp-def-
-     debuff moves, but Pokemon.js:791-796 (inside the same `resetMoves`
-     call) immediately resets `move.dpe = move.damage / move.energy`
-     on every activeChargedMove. So the buff-adjusted DPE only affects
-     the priority-shuffle ordering (lines 711-787); it never reaches
-     the bait-wait ratio check (ActionLogic.js:843) or any later
-     consumer, despite looking like it should. Likely intent was for
-     the buff adjustment to persist through the ratio check. Discovered
-     2026-04-14 while resolving our Divergence 2.
-  7. needsBoost / non-guaranteed-buff plan selection is dead code.
-     ActionLogic.js:539 unconditionally zeros `changeTTKChance`, so
-     `stateList` never accumulates chance-<1 plans; and `needsBoost`
-     (line 793) is never assigned `true`, so the line 868 plan-reorder
-     gate is inert. Empirically 0 "needs the BOOST" log hits across
-     the 4 GL meta species whose default moveset has a chance-<1
-     charged move (Tinkaton, Corviknight, Clefable, Drapion).
-     Discovered 2026-04-15; writeup in DEVELOPER_NOTES.md §7.
-  8. Morpeko form change is one-way instead of a true toggle.
-     Battle.js:1536 guard `activeFormId != alternativeFormId` (plus
-     `morpeko_hangry` carrying no `formChange`) makes Morpeko stick in
-     Hangry after the first charged move instead of toggling back, even
-     though the gamemaster says `type: "toggle"`. Real game toggles each
-     charged move (Michael verified in-game 2026-06-06; resets to Full
-     Belly on switch-in). Ours is correct. Score-relevant whenever
-     Morpeko throws an unshielded 2nd+ Aura Wheel against an opponent
-     where Electric/Dark effectiveness differs. Discovered 2026-06-06 by
-     `scripts/audit_oracle_harness.py`; writeup in DEVELOPER_NOTES.md §8.
+  upstream is Michael's action. (The discovery list formerly
+  enumerated here duplicated DEVELOPER_NOTES "PvPoke bugs found"
+  and the drafts doc — those two are the sources of truth.)
 
-* **Resolve known PvPoke divergences** — one intentional implementation
-  difference remains: bestChargedMove recomputed per-turn vs PvPoke's
-  init-time cache. Keeping ours (intentional, more correct; see
-  DEVELOPER_NOTES.md "Known divergences").
-
-  (The full oracle harness audit and the Morpeko form-toggle divergence
-  resolution both completed 2026-06-06 — see CHANGELOG.md and
-  DEVELOPER_NOTES.md §8. Re-run the audit anytime:
-  `python scripts/audit_oracle_harness.py`.)
+* **Known PvPoke divergences** — DEVELOPER_NOTES "Known divergences"
+  is the single source of truth (bestChargedMove per-turn recompute,
+  the near-KO plan cluster, the battle-timeout guard). Re-audit
+  anytime: `python scripts/audit_oracle_harness.py` (covers GL + UL;
+  current baseline 153 cells = 136 exact + 17 documented).
 
 * **Deep-dive workers never wire up form changes — FIXED 2026-06-10
   (arc S1)** — `_sweep_worker` / `slayer_iter_worker` (and the phase-1
@@ -595,38 +549,11 @@ move selection closed 2026-04-15 as not-a-real-issue.)
 
 ## Slayer iteration cleanup
 
-* **Mirror-slayer re-look: objective semantics + tie explosion —
-  RESOLVED 2026-06-10 (arc S2)** — Both halves shipped per Michael's
-  four design decisions (output surface: replace section; metric:
-  fractional wins + score tiebreak; CMP population: top-mirror ranks,
-  Nash secondary; old labels: retired).
-
-  - **Semantics**: `build_slayer_archetypes` (deep_dive_slayer.py)
-    makes the two archetypes first-class, sim-free outputs:
-    **Anchors-First Slayer** (clear the max achievable number of
-    counted anchor parents, then rank by Top-Mirror CMP% / atk;
-    explicit TOML parents always count, auto parents only when
-    cleared by <50% of the IV space) and **CMP-First Slayer**
-    (max-atk "lab mon" rows with a clears-vs-sacrifices anchor
-    checklist). The Nash iteration is demoted to producing the
-    mirror opponent population: `all_scores` (dense per-IV mirror
-    wins vs the converged pool) feeds the archetype rows and the
-    winsMirror y-axis; the Nash cohort remains only as the secondary
-    "Nash CMP %" column. Atk/Bulk/CMP Slayer labels retired
-    (vocabulary updated in docs/concepts.md); Notable IVs composites
-    and the scatter star-diamond overlay now key off the two
-    archetypes. The old "Mirror Slayer Iteration" HTML section is
-    replaced by compact "Slayer Builds" tables (top-100 row cap,
-    no per-row data-anchors attribute, filter-panel JS deleted) —
-    this also de-fangs the Jumpluff 60.7MB-table mechanism for
-    future dives.
-  - **Tie explosion**: round metric is now graded (per-opponent
-    fractional scenario credit, same formulation as Matchups Kept
-    `bb6f63e`, avg-score tiebreak); `_cut_pool` honors
-    `--mirror-slayer-pool` exactly except on exact metric ties.
-    (The dracoviz tournament-CP item under "Analysis goals" could
-    eventually supply an *empirical* mirror population to replace
-    the Nash pool entirely.)
+* **Mirror-slayer re-look — RESOLVED 2026-06-10 (arc S2).** Archetypes
+  + graded tie metric shipped per Michael's four design decisions;
+  full writeup in CHANGELOG.md (2026-06-10 S2 entry). The dracoviz
+  tournament-CP item under "Analysis goals" could eventually supply
+  an *empirical* mirror population to replace the Nash pool.
 
 * **Investigate inconsistent slayer Max Wins column** *(cosmetic, not
   blocking — ranking is correct)* — Yesterday's
@@ -809,22 +736,6 @@ across Post-S5 Sessions S6-S10 (2026-04-17/18). Open polish:
   the plot loses all the structure the narrative found. Consider
   feeding narrative flavors back as plot tier annotations, at least
   as a fallback when anchor-derived tiers are sparse.
-
-* **Export Notable IVs cards to external scanner tool** — The user has a
-  separate tool that scans their existing pokemon collection against
-  IV target specs. Each Notable IVs card represents a target the user
-  might want to feed to that scanner: composite cards have stat
-  cutoffs (`atk≥X, def≥Y, hp≥Z`) and matchup cards have an exhaustive
-  IV list. Add per-card "Copy to clipboard" buttons (matchup cards →
-  IV triples; composite cards → stat cutoffs). Possible "Copy all
-  visible" button at the section header for the typical "filter to
-  notable, copy everything" flow. **Format unknown until user
-  specifies what their scanner accepts** — could be plain comma-
-  separated triples (`0/8/15, 0/11/11, ...`), Pokegenie/CalcyIV search
-  strings, JSON, or something specific to the scanner. Ask before
-  implementing. Discovered 2026-04-09 while reviewing the first
-  Annihilape Notable IVs render — a 16-IV matchup card with no way
-  to extract its members surfaced the gap.
 
 * **Hand-named composite categories via TOML** *(round 2 of structured
   IV categories)* — Round 1 shipped 2026-04-09 (commits f3aa4ad, 8ff4469,

@@ -64,15 +64,17 @@ typo class we're auditing for.) Results:
   marked as a known-divergence cell in `scripts/audit_oracle_harness.py`.
   Keeping our behavior per the CLAUDE.md divergence policy.
 
-## Current status (2026-04-06)
+## Current status (updated 2026-06-11)
 
 <!-- sync:test_count -->855<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
-unit and integration tests added since. The simulator matches PvPoke's
-simulate-mode score table exactly (±0) for <!-- sync:pvpoke_matchups_verified -->8<!-- /sync --> matchups
-(<!-- sync:pvpoke_cells_verified -->72<!-- /sync --> cells). The 3 original failures were all Mienfoo vs
-Medicham, root-caused to a `bestChargedMove` selection difference and
-resolved 2026-04-06 (see below).
+unit and integration tests added since. The oracle audit
+(`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
+against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->17<!-- /sync --> matchups
+(<!-- sync:pvpoke_cells_verified -->153<!-- /sync --> cells: 136 exact on score+winner+chargedLog, 17 cells =
+the documented near-KO plan-choice divergence cluster). Historical
+note: the 3 original 2026-04-06 failures were all Mienfoo vs Medicham
+(`bestChargedMove` selection, resolved then).
 
 ### Verified correct
 - **Type effectiveness**: All <!-- sync:type_chart_cells_verified -->324<!-- /sync --> matchups match PvPoke exactly
@@ -179,7 +181,11 @@ delete old ones freely.
 
 <!-- sync:pvpoke_bugs_documented -->5<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8 —
 numbering reflects discovery order; section 4 was retracted 2026-04-15
-and is excluded from the count).
+and is excluded from the count). **Paste-ready GitHub-issue drafts for
+filing upstream live in `docs/pvpoke_bug_reports.md`** (7 reports:
+these five plus the initializeMove DPE-overwrite and the
+Blade→Shield CPM-table overflow, both 2026-06-11; filing is
+Michael's action, no urgency).
 
 ### 1. BattleState .hp/.oppHealth naming inconsistency
 

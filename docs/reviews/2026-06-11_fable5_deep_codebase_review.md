@@ -1,5 +1,15 @@
 # Fable 5 deep codebase review — 2026-06-11
 
+> **Status (end of day 2026-06-11):** every finding actionable
+> outside a dedicated session was fixed the same day — see the
+> CHANGELOG 2026-06-11 entry for the commit-by-commit record. Two
+> findings were partially wrong and corrected by oracle probes (E2's
+> meter-init premise; the [1,2] residual turned out to be our own
+> extra bait-wait condition, not an unported branch). Remaining
+> live content here: §I (the S7 register), §H (the split plan), §G
+> (the invariants list — permanent reference). Read the rest as a
+> point-in-time snapshot.
+
 **Method.** Six parallel read-only review agents (engine core, library,
 dive orchestrator, analysis/rendering, JS+website pipeline,
 tests+harness), each reading its scope in full, cross-checked against
