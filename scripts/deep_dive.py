@@ -5311,6 +5311,7 @@ def main():
                             fast_move_id=fast_id,
                             survivor_ivs=survivor_iv_tuples,
                             existing_anchor_kinds=existing_kinds,
+                            shadow=args.shadow,
                         )
                         # Merge: auto is the base, explicit overlays it so
                         # any user-provided anchor wins on collision (we
