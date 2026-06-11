@@ -91,9 +91,45 @@ MATCHUPS = [
     dict(label='mimikyu_vs_azumarill_form_change',
          p1=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (5, 13, 15), 'mimikyu'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill')),
+    # buffTarget='both' (Obstruct) fixture, added 2026-06-11 with the E1 fix.
+    dict(label='obstagoon_obstruct_vs_azumarill',
+         p1=P('Obstagoon', 'COUNTER', ['OBSTRUCT', 'NIGHT_SLASH'], (5, 15, 12), 'obstagoon'),
+         p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill')),
+    # --- Ultra League (2026-06-11, review finding T6: the hand-typed UL
+    # fixtures previously had no audit coverage at all) ---
+    # Defender-bestCM selfDefenseDebuffing shield-gate fixture. The [1,2]
+    # cell is a documented COSMETIC divergence: score/winner/HP match,
+    # but MG throws Fly into Florges' second shield where PvPoke throws
+    # Brave Bird (both shielded, MG dead either way). E5/E15-family lead.
+    dict(label='moltres_galarian_vs_florges', league='ultra',
+         p1=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (4, 11, 11), 'moltres_galarian'),
+         p2=P('Florges', 'FAIRY_WIND', ['CHILLING_WATER', 'DISARMING_VOICE'], (4, 13, 15), 'florges'),
+         xfail_cells={(1, 2)}),
+    # MG near-KO plan-choice cluster (intentional divergence, DEVELOPER_
+    # NOTES 'Near-KO DP plan choice'): our DP nukes with Brave Bird where
+    # PvPoke serial-Flys. xfail_cells filled from the audited grid.
+    # Audited grid 2026-06-11: (0,x) cells are the documented score-margin
+    # divergences (our MG retains ~29pp more HP, jellicent family d1=-146);
+    # (2,x) cells are LOG-ONLY (identical scores/winner, BB-vs-Fly throw
+    # order under shields — same root cause, score-neutral, hence absent
+    # from the |delta|>20 writeup).
+    dict(label='jellicent_vs_moltres_galarian', league='ultra',
+         p1=P('Jellicent', 'HEX', ['SURF', 'SHADOW_BALL'], (6, 14, 15), 'jellicent'),
+         p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (1, 15, 15), 'moltres_galarian'),
+         xfail_cells={(0, 0), (0, 1), (0, 2), (2, 0), (2, 1), (2, 2)}),
+    dict(label='corviknight_vs_moltres_galarian', league='ultra',
+         p1=P('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], (0, 15, 15), 'corviknight'),
+         p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (1, 15, 15), 'moltres_galarian'),
+         xfail_cells={(0, 0), (0, 1), (0, 2)}),
+    # (1,2) is the documented WINNER FLIP (PvPoke's Fly plan correctly
+    # wins the close fight; ours loses by 1 HP).
+    dict(label='lapras_vs_moltres_galarian', league='ultra',
+         p1=P('Lapras', 'PSYWAVE', ['SPARKLING_ARIA', 'ICE_BEAM'], (0, 15, 15), 'lapras'),
+         p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (1, 15, 15), 'moltres_galarian'),
+         xfail_cells={(1, 2)}),
 ]
 
-LEAGUE = 'great'
+LEAGUE_CP = {'great': '1500', 'ultra': '2500'}
 
 
 def norm_log(entries):
@@ -104,17 +140,19 @@ def norm_log(entries):
 
 
 def run_sim(m, s1, s2):
+    league = m.get('league', 'great')
     a = _make_battle_pokemon(m['p1']['species'], m['p1']['fast'], m['p1']['charged'],
-                             LEAGUE, s1, *m['p1']['ivs'], shadow=m['p1']['shadow'])
+                             league, s1, *m['p1']['ivs'], shadow=m['p1']['shadow'])
     d = _make_battle_pokemon(m['p2']['species'], m['p2']['fast'], m['p2']['charged'],
-                             LEAGUE, s2, *m['p2']['ivs'], shadow=m['p2']['shadow'])
+                             league, s2, *m['p2']['ivs'], shadow=m['p2']['shadow'])
     r = simulate(a, d, charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp, log=True)
     return (round(r.pvpoke_score(0)), round(r.pvpoke_score(1)),
             r.winner, _extract_battle_log(r))
 
 
 def run_harness(m, s1, s2, root):
-    cmd = ['node', str(HARNESS), '--pvpoke-root', str(root), '--cp', '1500',
+    cp = LEAGUE_CP[m.get('league', 'great')]
+    cmd = ['node', str(HARNESS), '--pvpoke-root', str(root), '--cp', cp,
            '--p1', m['p1']['hid'], '--p1-fast', m['p1']['fast'],
            '--p1-charged', ','.join(m['p1']['charged']),
            '--p1-ivs', '{}/{}/{}'.format(*m['p1']['ivs']), '--p1-shields', str(s1),
