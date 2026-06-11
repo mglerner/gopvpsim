@@ -120,14 +120,19 @@ The original three hypotheses for the apparent disagreement were:
 
 ### Followup work surfaced by this resolution
 
-- **The 102.9 def cutoff is not yet representable as a named anchor.** It is a
-  *bulkpoint* threshold — focal def crossing some value to take less damage from
-  some incoming move. Our anchor schema currently has `damage_breakpoint` (atk
-  side) but no `bulkpoint` (def side) kind. Adding the parallel kind, with the
-  same Level 1 / Level 2 / Level 3 precision structure, would let us represent
-  the 102.9 floor as a Level 2 anchor and use Level 3 discovery to identify
-  *which* specific bulkpoint acidicArisen was targeting (which they don't remember).
-  Tracked in TODO.md.
+- **The 102.9 def cutoff — CONCLUDED 2026-04-09 (updated 2026-06-11): the
+  historical calibration is unrecoverable from current data.** The `bulkpoint`
+  anchor kind shipped 2026-04-08 with the same Level 1/2/3 precision
+  structure, and the Level 3 enumeration against the Annihilape mirror was run
+  to identify which bulkpoint acidicArisen's 102.9 floor targeted. Result:
+  the next bulkpoint above 102.9 in today's threat-move set (`shadow_ball
+  <= 149` at def 103.34) is unreachable for the converged cohort (max def
+  ~101.30), and the floor predates Rage Fist entirely — the threat moves it
+  was calibrated against have changed too much to reconstruct the original
+  tier transition. The 102.9 value stands as a frozen historical reference
+  only; promoting it to a Level 1 anchor with full provenance would require
+  acidicArisen's recollection of the original threat move (asked via the
+  Discord question tracked in TODO.md "Analysis goals").
 
 - **Re-run with Lurgan as an explicit opponent variant.** Even though the
   resolution above explains the disagreement, it would still be worth running
