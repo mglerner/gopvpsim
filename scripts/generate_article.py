@@ -345,13 +345,36 @@ def _load_dive_data(dive_dir: Path) -> dict:
     movesets = []
     scenarios = None
     opponents = None
+    first_file = None
     for f in files:
         parsed = _load_one_dive_file(f)
         movesets.append(parsed)
         if scenarios is None:
             scenarios = parsed['scenarios']
+        elif parsed['scenarios'] != scenarios:
+            sys.exit(
+                f'Sibling dive files disagree on scenarios: {f.name} vs '
+                f'{first_file} in {dive_dir}. One sibling is stale — '
+                f're-dive the directory before generating the article.'
+            )
         if opponents is None:
             opponents = parsed['opponents']
+            first_file = f.name
+        elif parsed['opponents'] != opponents:
+            # Every downstream per-opponent zip trusts index-alignment
+            # across siblings. A stale sibling (re-dive against an updated
+            # pool that refreshed only some files) would publish silently
+            # misaligned matchup numbers — fail loudly instead.
+            _only_a = sorted(set(opponents) - set(parsed['opponents']))[:5]
+            _only_b = sorted(set(parsed['opponents']) - set(opponents))[:5]
+            sys.exit(
+                f'Sibling dive files disagree on opponent list/order: '
+                f'{f.name} vs {first_file} in {dive_dir} '
+                f'(only-in-{first_file}: {_only_a}, only-in-{f.name}: '
+                f'{_only_b}; empty lists mean same set, different order). '
+                f'One sibling is stale — re-dive the directory before '
+                f'generating the article.'
+            )
     opponent_label = ''
     for m in movesets:
         if m.get('opponent_label'):

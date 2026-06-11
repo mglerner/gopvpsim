@@ -649,6 +649,13 @@ def _parse_species_table(name: str, raw: dict, *, path: str) -> SpeciesThreshold
         if key in _KNOWN_LEAGUE_NAMES or any(
             k in val for k in ("spreads", "anchors", "meta")
         ):
+            # Normalize case-variant league keys: the resolver only ever
+            # queries the canonical capitalization, so '[Tinkaton.great]'
+            # used to parse fine and then silently never resolve a single
+            # anchor — the worst kind of authoring typo.
+            canon = key.capitalize()
+            if canon != key and canon in _KNOWN_LEAGUE_NAMES:
+                key = canon
             sp.leagues[key] = _parse_league_table(val, path=path, league_name=key)
 
     return sp
