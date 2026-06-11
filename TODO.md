@@ -30,12 +30,11 @@ harness audit, and the Morpeko form-toggle resolution all shipped
   last-mile substitution). Logged in
   `docs/jre_ryanswag_comparison.md` §14.4, ~30 min.
 
-- **G3 — Oinkologne verdict editorial + outlook prose not
-  populated.** `cbc9b28` shipped the F4 schema + renderer hook;
-  article ships with just the mechanical one-liner because verdict
-  editorial is expert-only (no auto-gen template, per
-  `feedback_expert_narrative_not_autogen`). Either 15-30 min of
-  Michael-authored prose pre-ship OR accept the mechanical line.
+- **G3 — RESOLVED 2026-06-11 (Michael's decision): accept the
+  mechanical one-liner.** The F4 schema + renderer hook (`cbc9b28`)
+  stay; verdict editorial remains expert-only, and the article ships
+  with the mechanical line permanently unless Michael later chooses
+  to author prose.
 
 - **G1 + G2 + G7 — richer auto-gen prose template** [post-ship,
   recommended]. F1 Meta Role, F2 key-flips callout, and
@@ -143,8 +142,10 @@ break invariants that weren't yet nailed down by tests.
 
 ## Battle simulator
 
-* **File PvPoke bug reports** — paste-ready GitHub-issue drafts now
-  live in `docs/pvpoke_bug_reports.md` (2026-06-11): 7 curated reports
+* **File PvPoke bug reports** *(NO URGENCY — Michael's explicit call
+  2026-06-11: he'll file when he has time to engage with any upstream
+  responses; do not nag)* — paste-ready GitHub-issue drafts live in
+  `docs/pvpoke_bug_reports.md` (2026-06-11): 7 curated reports
   — the list below minus the retracted Mimikyu timing item (#5, our
   own logging artifact) and the debunked-premise bestChargedMove item
   (#2, initializeMove DOES set move.damage at init; the real issue
