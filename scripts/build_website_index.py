@@ -48,6 +48,27 @@ _FORM_PAREN = {'blade', 'shield', 'busted', 'disguised',
                'super', 'large', 'small', 'average', 'hangry'}
 _LEAGUE_ORDER = {'great': 0, 'ultra': 1, 'master': 2}
 
+_KNOWN_SPECIES_SLUGS: set[str] | None = None
+
+
+def _known_species_slugs() -> set[str]:
+    """Gamemaster speciesNames as lowercase-underscore slugs, for
+    longest-prefix species matching in dive slugs. Multi-word species
+    (Mr. Mime, Tapu Fini, Porygon-Z) span several hyphen tokens; the
+    old first-token-is-the-species rule split them into a bogus
+    species + variant (2026-06-11 review, W8)."""
+    global _KNOWN_SPECIES_SLUGS
+    if _KNOWN_SPECIES_SLUGS is None:
+        import re
+        import sys as _sys
+        _sys.path.insert(0, str(REPO_ROOT / 'src'))
+        from gopvpsim.data import load_gamemaster
+        _KNOWN_SPECIES_SLUGS = {
+            re.sub(r'[^a-z0-9]+', '_', p['speciesName'].lower()).strip('_')
+            for p in load_gamemaster()['pokemon']
+        }
+    return _KNOWN_SPECIES_SLUGS
+
 
 def _slug_to_pretty_title(slug: str) -> str:
     """Convert a dive dir slug to a human-readable title.
@@ -307,8 +328,20 @@ def _parse_dive_slug(slug: str) -> dict | None:
     if not name_tokens:
         return None
 
-    bare = name_tokens[0]
-    moveset_tokens = name_tokens[1:]
+    # Longest known-species prefix wins (mr-mime, tapu-fini, porygon-z
+    # span multiple tokens); a single token needs no lookup — that's
+    # the historical behavior and the fallback for unknown names.
+    bare_k = 1
+    if len(name_tokens) > 1:
+        known = _known_species_slugs()
+        for k in range(len(name_tokens), 1, -1):
+            cand = '_'.join(name_tokens[:k])
+            if cand in known or (regional
+                                 and '_'.join(name_tokens[:k] + regional) in known):
+                bare_k = k
+                break
+    bare = '_'.join(name_tokens[:bare_k])
+    moveset_tokens = name_tokens[bare_k:]
     group_slug = '_'.join([bare] + regional)
     species_display = pretty_species_from_slug(group_slug)
     # Drop the gender parenthetical for the group heading — the group
