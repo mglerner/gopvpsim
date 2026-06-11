@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (2026-04-06)
 
-<!-- sync:test_count -->770<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->772<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The simulator matches PvPoke's
 simulate-mode score table exactly (±0) for <!-- sync:pvpoke_matchups_verified -->8<!-- /sync --> matchups
@@ -698,6 +698,24 @@ CP) instead -- losing a half level of stats. PvPoke's `getFormStats()`
 Caleb Peng (https://www.youtube.com/watch?v=OdHxOD6FZcg&t=167s). When
 choosing which Aegislash to power up, players need to check that the
 Blade form level lands on a favorable whole number.
+
+**3. The Blade->Shield reverse level formula overflows the CPM table.**
+PvPoke's `getFormStats()` aegislash_shield branch starts the Shield
+level at `blade_level / 0.5 + 2` (GL) as a deliberate overshoot, then
+walks down whole levels until CP fits. A low-IV Blade *focal* caps at
+level 25 in GL (whole-level rule above), putting the raw start at 52 —
+past the end of the CPM table (max 51.0). PvPoke survives because it
+computes form stats lazily at form-change time and JS just yields
+`undefined` (`cpms[index]` out of range — a latent PvPoke bug); our
+dive plumbing builds per-IV `FormChangeConfig`s eagerly at sweep setup,
+so the first post-S1 Aegislash (Blade) GL dive crashed with
+`KeyError: 52.0` (2026-06-11). Fix: `_aegislash_shield_level` clamps
+its start to `max(CPM)` — exact, since levels above 51 don't exist and
+the walk-down from 51 reaches the same fixed point. Pinned by
+`tests/test_pokemon.py::TestAegislashShieldLevelOverflow` (exhaustive
+4096-IV × GL/UL build sweep). Blade really does revert to Shield
+in-battle (gamemaster trigger `activate_shield`), so the reverse
+mapping is load-bearing, not hypothetical-only.
 
 ## Active alt-moveset opponent variants
 

@@ -125,14 +125,27 @@ def _aegislash_alt_level(shield_level, league_cp):
 
 
 def _aegislash_shield_level(blade_level, league_cp):
-    """Compute Aegislash Shield form level from Blade form level (reverse)."""
+    """Compute Aegislash Shield form level from Blade form level (reverse).
+
+    Mirrors PvPoke getFormStats() aegislash_shield branch. The formula
+    deliberately overshoots; the caller walks down whole levels until CP
+    fits. Clamp the start to the real level cap (max CPM table key, 51.0):
+    a low-IV Blade caps at level ~25 in GL, putting the raw formula at 52+,
+    which is off the end of the CPM table. PvPoke has the same latent
+    overflow (cpms[index] -> undefined) but computes form stats lazily at
+    form-change time so it rarely fires; we build per-IV configs eagerly at
+    sweep setup, so every overflowing IV hit it (KeyError: 52.0, found on
+    the first Aegislash (Blade) GL dive after arc S1). Clamping is exact:
+    levels above 51 don't exist in the game, and the walk-down from 51
+    reaches the same fixed point the bigger-table walk would.
+    """
     if league_cp <= 1500:
         start = (blade_level / 0.5) + 2
     elif league_cp <= 2500:
         start = round(blade_level / 0.75)
     else:
         return blade_level
-    return float(start)
+    return min(float(start), max(CPM))
 
 
 def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,

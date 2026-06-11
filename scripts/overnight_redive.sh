@@ -52,8 +52,14 @@ step() {
     log "[STEP] $label"
     status "[STEP] $label"
     local t0=$(date +%s)
-    "$@" 2>&1 | tee -a "$LOG"
-    local rc=${PIPESTATUS[0]}
+    # `|| rc=$?` keeps a failing step from tripping `set -e` inside this
+    # function — without it, bash exits HERE and (because ERR traps are
+    # not inherited by functions absent `set -E`) neither the [FAIL]
+    # branch below nor the FATAL trap ever writes a terminal status.
+    # That silent-death mode misattributed the 2026-06-11 Aegislash
+    # (Blade) dive crash to a laptop sleep, twice.
+    local rc=0
+    "$@" 2>&1 | tee -a "$LOG" || rc=$?
     local elapsed=$(( $(date +%s) - t0 ))
     if [[ $rc -ne 0 ]]; then
         log "[FAIL] $label (rc=$rc, ${elapsed}s)"
@@ -63,6 +69,9 @@ step() {
     log "[DONE] $label (${elapsed}s)"
 }
 
+# -E so the ERR trap also fires for failures inside functions (it is
+# not inherited by them otherwise).
+set -E
 trap 'rc=$?; log "[FATAL] overnight chain aborted (rc=$rc) at line $LINENO"; status "[FATAL] aborted (rc=$rc)"; exit $rc' ERR
 
 log "=== overnight chain start ==="
