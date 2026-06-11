@@ -1839,8 +1839,13 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 else:  # atk
                     if atk_cut <= 0 or atk_cut < mb_thresh:
                         continue  # tier has no atk cutoff or too low
-                if mb_hp is not None and hp_cut > 0 and hp_cut < mb_hp:
-                    continue  # tier's hp isn't high enough
+                # A boundary with an HP rider is covered only when the tier
+                # ALSO constrains HP at or above it. A tier with NO HP
+                # cutoff used to pass this filter and claim coverage of
+                # e.g. "141.66 Def + 138 HP" boundaries its sub-138-HP
+                # members don't actually flip (2026-06-11 review, R5).
+                if mb_hp is not None and (hp_cut <= 0 or hp_cut < mb_hp):
+                    continue  # tier doesn't (sufficiently) constrain HP
                 tier_mbs.append(mb)
             # Filter out opponents already shown by anchor bullets
             anchor_opps = {r['opponent'] for r in tier_records}
@@ -2107,9 +2112,11 @@ def generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode
         gain_atk = sum(data['ivAtk'][iv] for iv in gain_ivs) / len(gain_ivs)
         gain_def = sum(data['ivDef'][iv] for iv in gain_ivs) / len(gain_ivs)
         gain_hp = sum(data['ivHp'][iv] for iv in gain_ivs) / len(gain_ivs)
-        pop_atk = sum(data['ivAtk'][iv] for iv in ranked[:50]) / 50
-        pop_def = sum(data['ivDef'][iv] for iv in ranked[:50]) / 50
-        pop_hp = sum(data['ivHp'][iv] for iv in ranked[:50]) / 50
+        top = ranked[:50]
+        ntop = len(top) or 1   # divide by the actual count, not a literal 50
+        pop_atk = sum(data['ivAtk'][iv] for iv in top) / ntop
+        pop_def = sum(data['ivDef'][iv] for iv in top) / ntop
+        pop_hp = sum(data['ivHp'][iv] for iv in top) / ntop
 
         # Which stat differs most?
         diffs = [('Atk', gain_atk - pop_atk, gain_atk),
@@ -2117,7 +2124,12 @@ def generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode
                  ('HP', gain_hp - pop_hp, gain_hp)]
         dominant = max(diffs, key=lambda x: abs(x[1]))
 
-        if abs(dominant[1]) < 0.5 and dominant[0] != 'HP':
+        # Minimum interesting difference: 0.5 for the continuous stats,
+        # a full point for integer HP. (The old rule exempted HP from
+        # suppression entirely, so a 0.2-HP "preference" printed as
+        # "favors higher HP" — 2026-06-11 review, R13.)
+        min_delta = 1.0 if dominant[0] == 'HP' else 0.5
+        if abs(dominant[1]) < min_delta:
             stat_note = ''
         elif dominant[1] > 0:
             stat_note = f' (favors higher {dominant[0]}, avg {dominant[2]:.1f})'

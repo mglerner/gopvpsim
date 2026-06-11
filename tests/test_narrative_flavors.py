@@ -451,3 +451,51 @@ def test_merge_does_not_fire_when_gains_differ():
     assert 'Lapras Slayer' in names
     assert 'Lapras (Shadow) Slayer' in names
     assert 'Lapras / Shadow Lapras Slayer' not in names
+
+
+# ---------------------------------------------------------------------------
+# compute_flavor_tradeoffs: indirect losses gated on real win rate (R2)
+# ---------------------------------------------------------------------------
+
+def _tradeoff_inputs(atk_vals):
+    """4-IV synthetic dive: one bulk-driven opponent (wins iff def>=100,
+    i.e. IVs 0 and 1), one scenario, one mode. General = def>=100;
+    specialist flavor = atk>=100 (membership controlled by atk_vals)."""
+    from deep_dive_narrative import compute_flavor_tradeoffs
+    data_obj = {
+        'nIvs': 4,
+        'ivAtk': atk_vals,
+        'ivDef': [110.0, 110.0, 90.0, 90.0],
+        'ivHp': [140, 140, 140, 140],
+        'oppIvModes': ['pvpoke'],
+    }
+    # scores_flat layout: iv*nS*nO + si*nO + oi (nS=1, nO=1)
+    scores = [700, 700, 300, 300]
+    score_arrays = {'0_pvpoke': scores}
+    flavors = [
+        {'name': 'General Good', 'is_general': True,
+         'atk_cut': 0, 'def_cut': 100.0, 'hp_cut': 0},
+        {'name': 'X Slayer', 'is_general': False,
+         'atk_cut': 100.0, 'def_cut': 0, 'hp_cut': 0},
+    ]
+    td = compute_flavor_tradeoffs(
+        flavors, data_obj, score_arrays, 0,
+        scenarios=[[1, 1]], opponents=['OppBulk'])
+    return td
+
+
+def test_indirect_loss_dropped_when_flavor_cohort_wins():
+    # Flavor cohort = {IV0} (atk 105, def 110): its probe can't cleanly
+    # partition the bulk-driven matchup (fail side is mixed), but the
+    # cohort WINS it — the old set-difference called this a loss anyway.
+    td = _tradeoff_inputs([105.0, 95.0, 95.0, 95.0])
+    loss_opps = [l['opponent'] for l in td['X Slayer']['losses']]
+    assert 'OppBulk' not in loss_opps
+
+
+def test_indirect_loss_kept_when_flavor_cohort_loses():
+    # Flavor cohort = {IV2} (atk 105, def 90): genuinely loses the
+    # bulk-driven matchup General gains — must stay a loss.
+    td = _tradeoff_inputs([95.0, 95.0, 105.0, 95.0])
+    loss_opps = [l['opponent'] for l in td['X Slayer']['losses']]
+    assert 'OppBulk' in loss_opps
