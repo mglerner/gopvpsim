@@ -222,6 +222,37 @@ function computeView() {
   currentYIsSparse = isSparseMode(mode);
 
   yValues = computeYValues(state.movesetIdx);
+  if (!yValues) {
+    // The opp-IV and bait dropdowns are emitted independently, so a
+    // dive built with a partial mode matrix lets the user select a
+    // combination with no SCORES entry — this used to TypeError deep
+    // in computeRanks and freeze the page mid-state (2026-06-11
+    // review, W3). Fall back to the first mode that exists for this
+    // moveset and resync the dropdowns to what is actually shown.
+    var _prefix = state.movesetIdx + '_';
+    var _fallback = null;
+    for (var _sk in SCORES) {
+      if (_sk.indexOf(_prefix) === 0 && SCORES[_sk]) {
+        _fallback = _sk.substring(_prefix.length);
+        break;
+      }
+    }
+    if (_fallback) {
+      state.oppIvMode = _fallback;
+      var _osel = document.getElementById('oppiv-sel');
+      if (_osel) _osel.value = _fallback.split(':')[0];
+      var _bsel = document.getElementById('bait-sel');
+      if (_bsel) _bsel.value = (_fallback.indexOf(':nobait') >= 0) ? 'nobait' : 'bait';
+      yValues = computeYValues(state.movesetIdx);
+    }
+    if (!yValues) {
+      // Last resort (e.g. a wins-mode whose source scores are absent):
+      // render a flat plot instead of dying.
+      console.warn('No score array for moveset ' + state.movesetIdx +
+                   ' in any mode; rendering zeros');
+      yValues = new Float64Array(nIvs);
+    }
+  }
   yRanks = computeRanks(yValues);
   // Top-Mirror cohort depends on the just-refreshed yRanks; invalidate
   // the cache so the next Top-Mirror CMP % read rebuilds it lazily.
@@ -1052,11 +1083,14 @@ function renderMatchesList() {
 // Uses inline display style on rows (skipping the first 5, which
 // always stay visible). Global so the button's onclick handler can
 // reach it from the renderMatchesList output.
+// Shared row cap for collapsible match tables (toggle + sort must agree).
+var MAX_VISIBLE_MATCH_ROWS = 5;
+
 function toggleMatchesSection(sid, btn) {
   var rows = document.querySelectorAll('tr[data-section="' + sid + '"]');
   if (rows.length === 0) return;
   var isExpanding = btn.textContent.indexOf('Show') === 0;
-  for (var i = 5; i < rows.length; i++) {
+  for (var i = MAX_VISIBLE_MATCH_ROWS; i < rows.length; i++) {
     rows[i].style.display = isExpanding ? '' : 'none';
   }
   var count = btn.getAttribute('data-hidden-count');
@@ -1088,6 +1122,14 @@ function sortMatchesTable(tblId, colIdx, thEl) {
     ths[i].textContent = txt;
   }
   thEl.textContent = thEl.textContent + (dir === 'asc' ? ' \u25B2' : ' \u25BC');
+  // Capture collapsed state BEFORE sorting: after the sort, the row at
+  // the cap index may be one that was visible pre-sort, so reading it
+  // post-sort silently expanded a collapsed table while the toggle
+  // button still said "Show N more" (2026-06-11 review, W4).
+  var wasCollapsed = false;
+  for (var r0 = MAX_VISIBLE_MATCH_ROWS; r0 < rows.length; r0++) {
+    if (rows[r0].style.display === 'none') { wasCollapsed = true; break; }
+  }
   // Sort rows by data-sort attribute on the target column
   rows.sort(function(a, b) {
     var ac = a.cells[colIdx], bc = b.cells[colIdx];
@@ -1095,15 +1137,13 @@ function sortMatchesTable(tblId, colIdx, thEl) {
     var bv = bc ? parseFloat(bc.getAttribute('data-sort') || '99999') : 99999;
     return dir === 'asc' ? av - bv : bv - av;
   });
-  // Check if table was collapsed before sorting (any row past 5 hidden)
-  var wasCollapsed = rows.length > 5 && rows[5].style.display === 'none';
   // Re-append in sorted order
   var tbody = rows[0].parentNode;
   for (var r = 0; r < rows.length; r++) {
     tbody.appendChild(rows[r]);
-    // Preserve collapsed state: hide rows past 5 if it was collapsed
+    // Preserve collapsed state: hide rows past the cap if collapsed
     if (wasCollapsed) {
-      rows[r].style.display = (r < 5) ? '' : 'none';
+      rows[r].style.display = (r < MAX_VISIBLE_MATCH_ROWS) ? '' : 'none';
     } else {
       rows[r].style.display = '';
     }
@@ -2797,11 +2837,25 @@ function reattachLegendHandlers() {
     gd.on('plotly_legenddoubleclick', function() { return false; });
     gd._legendHandlersAttached = true;
   }
+  // Generation stamp: a dropdown change can fire updateView while a
+  // previous tryAttach poller is still waiting — without the stamp, two
+  // pollers double-attach to the same nodes.
+  var gen = (gd._legendAttachGen || 0) + 1;
+  gd._legendAttachGen = gen;
   var attempts = 0;
   function tryAttach() {
+    if (gd._legendAttachGen !== gen) return;   // superseded by a newer render
     var items = gd.querySelectorAll('.legend .traces');
     if (items.length === 0 && attempts < 50) { attempts++; setTimeout(tryAttach, 100); return; }
     items.forEach(function(el, idx) {
+      // Plotly's d3 join REUSES legend item nodes across Plotly.react
+      // calls when the trace set is unchanged (the common dropdown
+      // case), so unguarded addEventListener stacked N click handlers
+      // — toggling the lock N times per click made click-to-lock
+      // appear broken after a few dropdown changes (2026-06-11 review,
+      // W6). Per-element guard keeps exactly one set of handlers.
+      if (el._ddLegendWired) { return; }
+      el._ddLegendWired = true;
       el.style.cursor = 'pointer';
       el.addEventListener('mouseenter', function() { if (lockedIdx<0) highlightTrace(idx); });
       el.addEventListener('mouseleave', function() { if (lockedIdx<0) restoreAll(); });
