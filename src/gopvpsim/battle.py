@@ -1080,22 +1080,30 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     cm_buff_delta  = dp_cache['cm_buff_delta']
 
     # ------------------------------------------------------------------ #
-    # Break Mimikyu disguise ASAP (ActionLogic.js lines 236-241)
+    # Break Mimikyu disguise ASAP (ActionLogic.js lines 236-251)
     # When facing a Pokemon with a protect effect and active disguise,
-    # throw cheapest non-self-debuffing charged move immediately.
+    # PvPoke throws ONLY poke.fastestChargedMove — the pre-shuffle
+    # cheapest-by-energy move (Pokemon.js:709: captured right after the
+    # energy sort, BEFORE the priority shuffle; ties keep user order) —
+    # and only when it is affordable and not selfDebuffing. When that
+    # one move doesn't qualify there is NO early throw at all: fall
+    # through to TTL / OMT / the DP. (We previously scanned every
+    # shuffled slot for the first qualifying move — review finding E6.)
     # ------------------------------------------------------------------ #
     if (defender._form_change is not None
             and defender._form_change.effect == 'protect'
             and defender._form_disguise_active
             and defender.shields == 0):
-        for _n in range(n_cms):
-            if (attacker.energy >= cm_energy[_n]
-                    and not cm_self_debuf[_n]):
-                if _policy_debug:
-                    _policy_log.append(
-                        f"  DP[break_disguise]: {attacker.species} fires "
-                        f"{cms[_n].get('moveId')} to break disguise")
-                return cm_orig_idx[_n]
+        _fastest_idx = min(range(len(attacker.charged_moves)),
+                           key=lambda i: attacker.charged_moves[i]['energy'])
+        _fastest_cm = attacker.charged_moves[_fastest_idx]
+        if (attacker.energy >= _fastest_cm['energy']
+                and not _fastest_cm.get('selfDebuffing', False)):
+            if _policy_debug:
+                _policy_log.append(
+                    f"  DP[break_disguise]: {attacker.species} fires "
+                    f"{_fastest_cm.get('moveId')} to break disguise")
+            return _fastest_idx
 
     # ------------------------------------------------------------------ #
     # turnsToLive: fire highest-damage move now if about to be KO'd

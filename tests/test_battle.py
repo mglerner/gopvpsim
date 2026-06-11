@@ -1970,3 +1970,55 @@ def test_cm_buff_delta_is_signed_both_axes():
     assert _cm_buff_delta(cm([0, 1], 'both')) == 0         # Obstruct: no DP clause
     assert _cm_buff_delta(cm([-1, -1], 'self', chance='0.5')) == 0
     assert _cm_buff_delta({'moveId': 'X'}) == 0
+
+
+# ---------------------------------------------------------------------------
+# Disguise-break move selection (ActionLogic.js:236-251)
+# ---------------------------------------------------------------------------
+
+def test_disguise_break_uses_only_pre_shuffle_cheapest_move():
+    """PvPoke breaks a disguise ONLY with poke.fastestChargedMove (the
+    pre-shuffle cheapest-by-energy move) — when that move is unaffordable
+    or self-debuffing there is NO early throw, even if another charged
+    move qualifies. We previously fired the first qualifying shuffled
+    slot instead.
+    """
+    from types import SimpleNamespace
+    import gopvpsim.battle as B
+
+    def build(cheap_debuffs: bool):
+        cheap = {'moveId': 'CHEAP', 'name': 'Cheap', 'type': 'normal',
+                 'power': 40, 'energy': 35, 'energyGain': 0}
+        if cheap_debuffs:
+            cheap.update({'buffs': [-1, -1], 'buffTarget': 'self',
+                          'buffApplyChance': '1', 'selfDebuffing': True})
+        pricey = {'moveId': 'PRICEY', 'name': 'Pricey', 'type': 'normal',
+                  'power': 90, 'energy': 55, 'energyGain': 0}
+        att = make_bp(charged=[cheap, pricey])
+        att.energy = 60   # both affordable
+        dfn = make_bp(hp=200, shields=0)
+        # Minimal protect-form stub: the disguise branch reads only
+        # _form_change.effect and _form_disguise_active.
+        dfn._form_change = SimpleNamespace(effect='protect')
+        dfn._form_disguise_active = True
+        return att, dfn
+
+    orig_debug = B._policy_debug
+    B._policy_debug = True
+    try:
+        # Cheapest move is clean: it (and only it) breaks the disguise.
+        B._policy_log.clear()
+        att, dfn = build(cheap_debuffs=False)
+        idx = B.pvpoke_dp(att, dfn)
+        assert att.charged_moves[idx]['moveId'] == 'CHEAP'
+        assert any('DP[break_disguise]' in line for line in B._policy_log)
+
+        # Cheapest move is self-debuffing: NO early disguise throw —
+        # PvPoke does not substitute the pricier clean move.
+        B._policy_log.clear()
+        att, dfn = build(cheap_debuffs=True)
+        B.pvpoke_dp(att, dfn)
+        assert not any('DP[break_disguise]' in line for line in B._policy_log)
+    finally:
+        B._policy_debug = orig_debug
+        B._policy_log.clear()
