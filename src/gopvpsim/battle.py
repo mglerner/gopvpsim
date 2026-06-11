@@ -469,7 +469,12 @@ def _calc_turns_to_live(
         else:
             stack.append((
                 c_hp - opp_fast_damage,
-                min(ENERGY_CAP, c_op_e + opp_fast_energy),
+                # NO energy cap: PvPoke's turnsToLive DP lets hypothetical
+                # defender energy exceed 100 (ActionLogic.js fast-push has
+                # no Math.min), which changes KO detection near full
+                # energy. The real battle loop caps; this worst-case
+                # estimator deliberately mirrors PvPoke (review finding E7).
+                c_op_e + opp_fast_energy,
                 c_turn + opp_fast_turns,
                 c_shields,
             ))
