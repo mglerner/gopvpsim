@@ -33,6 +33,7 @@ Layout on disk:
 """
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -145,8 +146,13 @@ class SweepCache:
                 if arr.shape == (n_ivs, n_scenarios):
                     self.hits += 1
                     return arr
-        except Exception:
-            pass
+        except Exception as e:
+            # A corrupt stored file self-heals as a miss (re-simmed and
+            # overwritten), but silently it looks like "cache stopped
+            # working" — leave a trace.
+            import logging
+            logging.getLogger('deep_dive').debug(
+                f'sweep cache: failed to load column ({e}); treating as miss')
         self.misses += 1
         return None
 
@@ -158,7 +164,13 @@ class SweepCache:
                 meta_p.write_text(json.dumps(self._focal_fields, indent=1,
                                              sort_keys=True))
             p = self._col_path(col_fields)
-            np.save(p, np.asarray(arr, dtype=np.float64))
+            # Atomic write: a crash (or a concurrent dive of the same
+            # focal) mid-np.save must not leave a truncated column.
+            # File-handle form so np.save can't append a second '.npy'.
+            tmp = p.with_name(p.name + '.tmp')
+            with open(tmp, 'wb') as f:
+                np.save(f, np.asarray(arr, dtype=np.float64))
+            os.replace(tmp, p)
             p.with_suffix('.json').write_text(
                 json.dumps(col_fields, indent=1, sort_keys=True))
         except Exception:
