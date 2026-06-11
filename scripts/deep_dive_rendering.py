@@ -5,6 +5,8 @@ bullets, etc.) for injection into the interactive deep dive page.  Pure
 HTML generation -- no simulation or analysis logic.
 """
 import hashlib
+import html as _html
+import json
 import math
 import re
 
@@ -1366,6 +1368,43 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
             wins = cat.member_meta.get(idx, {}).get('total_wins', 0)
             return (-wins, idx)
         members_sorted = sorted(cat.members, key=_sort_key)
+
+        # Scanner export (2026-06-11; format confirmed from gobattlekit's
+        # user-thresholds loader): per-card copy button emitting a
+        # paste-ready JSON fragment in the shared check_thresholds schema
+        # {species: {League: {card-name: spec}}}. Composite cards export
+        # their stat cutoffs; matchup (and cutoff-less) cards export the
+        # EXPLICIT member IV list -- but only up to 300 members: a
+        # truncated scanner spec silently misses owned mons, so beyond
+        # that the button is omitted rather than wrong (huge matchup
+        # cards aren't meaningful scan targets anyway).
+        _species = data_obj.get('species') or 'Species'
+        _league_t = (data_obj.get('league') or 'great').capitalize()
+        _spec = None
+        if cat.kind == 'composite' and cat.stat_cutoffs:
+            _spec = {
+                'attack': round(float(cat.stat_cutoffs.get('atk', 0) or 0), 2),
+                'defense': round(float(cat.stat_cutoffs.get('def', 0) or 0), 2),
+                'stamina': int(cat.stat_cutoffs.get('hp', 0) or 0),
+            }
+        elif n_members <= 300:
+            _spec = {
+                'attack': 0, 'defense': 0, 'stamina': 0,
+                'ivs': [[data_obj['ivA'][m], data_obj['ivD'][m],
+                         data_obj['ivS'][m]] for m in members_sorted],
+            }
+        if _spec is not None:
+            _scanner_json = _html.escape(
+                json.dumps({_species: {_league_t: {cat.name: _spec}}}),
+                quote=True)
+            parts.append(
+                f'<button class="dd-iv-toggle" style="margin:2px 0 6px 0" '
+                f'data-scanner-json="{_scanner_json}" '
+                f'onclick="copyScannerJson(this)" '
+                f'title="Copy this card as a gobattlekit user-threshold '
+                f'JSON fragment (paste into the IV scanner)">'
+                f'Copy for IV scanner</button>\n'
+            )
 
         # Cap total rendered members to avoid multi-MB HTML for large
         # matchup cards (e.g. 2200 IVs beating Lapras). Top members by
