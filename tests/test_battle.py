@@ -1898,3 +1898,51 @@ def test_would_shield_self_attack_debuff_override():
     move_off = make_superpower(False)
     att_off = make_bp(charged=[move_off])
     assert would_shield(att_off, make_bp(hp=120, shields=1), move_off) is False
+
+
+# ---------------------------------------------------------------------------
+# Early lethal-throw slot gate (ActionLogic.js:221)
+# ---------------------------------------------------------------------------
+
+def test_lethal_throw_slot1_gated_on_bait_shields():
+    """PvPoke's pre-OMT lethal throw checks `n == 0 || (n == 1 &&
+    !poke.baitShields)`: with baiting ON, slot 1 (the pricier move after
+    the energy sort) is NOT eligible for the early lethal fire — the
+    decision falls through to OMT / the DP. Pinned via the DP[lethal]
+    debug log, since downstream logic may converge to the same move.
+    """
+    import gopvpsim.battle as B
+
+    def build():
+        cheap = {'moveId': 'WEAK_CHEAP', 'name': 'Weak Cheap', 'type': 'normal',
+                 'power': 30, 'energy': 35, 'energyGain': 0}
+        strong = {'moveId': 'STRONG_PRICY', 'name': 'Strong Pricy', 'type': 'normal',
+                  'power': 80, 'energy': 45, 'energyGain': 0}
+        att = make_bp(charged=[cheap, strong])
+        att.energy = 50
+        dfn = make_bp(hp=50, shields=0)
+        return att, dfn
+
+    orig_debug = B._policy_debug
+    B._policy_debug = True
+    try:
+        B._policy_log.clear()
+        att, dfn = build()
+        idx_nobait = B.pvpoke_dp(att, dfn, bait_shields=False)
+        log_nobait = list(B._policy_log)
+
+        B._policy_log.clear()
+        att, dfn = build()
+        B.pvpoke_dp(att, dfn, bait_shields=True)
+        log_bait = list(B._policy_log)
+    finally:
+        B._policy_debug = orig_debug
+        B._policy_log.clear()
+
+    # bait OFF: slot 1 is eligible — the strong move fires via the early
+    # lethal path (it KOs hp=50; the cheap one doesn't).
+    assert idx_nobait is not None
+    assert att.charged_moves[idx_nobait]['moveId'] == 'STRONG_PRICY'
+    assert any('DP[lethal]' in line for line in log_nobait)
+    # bait ON: slot 1 is NOT eligible — no early lethal fire.
+    assert not any('DP[lethal]' in line for line in log_bait)

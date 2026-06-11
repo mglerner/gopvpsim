@@ -1160,14 +1160,17 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     #   - move is not self-debuffing
     #   - fast move alone wouldn't also kill (preserve the energy if it's
     #     unnecessary to use a charged move)
-    # Only the first two charged moves (n=0 and n=1) are checked (PvPoke
-    # uses n==0 || (n==1 && !baitShields); pvpoke_dp uses selective bait
-    # so baitShields=True → both n=0 and n=1 are eligible).
+    # Slot eligibility is `n == 0 || (n == 1 && ! poke.baitShields)`
+    # (ActionLogic.js:221): with baiting ON, slot 1 is NOT eligible for
+    # the early lethal throw — PvPoke falls through to OMT / the near-KO
+    # DP instead. (A previous comment here asserted the inverse and the
+    # loop checked both slots unconditionally — review finding E5.)
     # ------------------------------------------------------------------ #
     if defender.shields == 0:
         _fast_dmg = fast_damage
         d_hp      = defender.hp
-        for _n in range(min(2, n_cms)):
+        _lethal_slots = 1 if bait_shields else min(2, n_cms)
+        for _n in range(min(_lethal_slots, n_cms)):
             if attacker.energy >= cm_energy[_n]:
                 if (cm_dmgs[_n] >= d_hp
                         and not cm_self_debuf[_n]
