@@ -339,9 +339,26 @@ def compute_flavor_tradeoffs(flavors, data_obj, score_arrays, moveset_idx,
         # 2. Indirect: matchups General gains that this flavor does NOT gain.
         #    This catches cases where the flavor's stricter cuts narrow the
         #    IV pool so much that the win-rate test can't fire cleanly.
+        #    BUT: the probe not firing only means the flavor's cuts don't
+        #    cleanly PARTITION the matchup — its members may still win it
+        #    comfortably (e.g. an atk-only cut on a bulk-driven matchup).
+        #    Only call it a loss when the flavor cohort actually loses it
+        #    (win rate < 0.5 in every available opp-IV mode); the old
+        #    pure set-difference rendered confident "the drop in bulk
+        #    will cost the X matchup" prose for matchups the cohort wins
+        #    (2026-06-11 review, R2).
+        flavor_wr = _flavor_max_winrates(
+            flavor, data_obj, score_arrays, moveset_idx, scenarios, opponents)
+        scen_index = {tuple(s): si for si, s in enumerate(scenarios)}
+        opp_index = {o: oi for oi, o in enumerate(opponents)}
         for opp, gen_scens in general_gains.items():
             flavor_scens = gains_by_opp.get(opp, set())
             lost_scens = gen_scens - flavor_scens
+            if lost_scens and flavor_wr is not None:
+                oi = opp_index.get(opp)
+                if oi is not None:
+                    lost_scens = {sc for sc in lost_scens
+                                  if flavor_wr[scen_index[sc], oi] < 0.5}
             if lost_scens:
                 losses.setdefault(opp, set()).update(lost_scens)
 
@@ -368,6 +385,40 @@ def compute_flavor_tradeoffs(flavors, data_obj, score_arrays, moveset_idx,
         _attach_boundaries(flavors, tradeoffs, all_matchup_boundaries)
 
     return tradeoffs
+
+
+def _flavor_max_winrates(flavor, data_obj, score_arrays, moveset_idx,
+                         scenarios, opponents):
+    """(nS, nO) win-rate of the flavor's cohort, MAX over opp-IV modes.
+
+    Returns None when stats/scores are unavailable or the cohort is
+    empty. Used to gate the indirect loss method: a matchup only counts
+    as a flavor loss when the cohort loses it in EVERY available mode.
+    """
+    nIvs = data_obj.get('nIvs', 0)
+    nS = len(scenarios)
+    nO = len(opponents)
+    if nIvs == 0 or nO == 0:
+        return None
+    iv_atk, iv_def, iv_hp = _np_stats(data_obj)
+    mask = np.ones(nIvs, dtype=bool)
+    if flavor['atk_cut'] > 0:
+        mask &= iv_atk >= flavor['atk_cut']
+    if flavor['def_cut'] > 0:
+        mask &= iv_def >= flavor['def_cut']
+    if flavor['hp_cut'] > 0:
+        mask &= iv_hp >= flavor['hp_cut']
+    n = int(mask.sum())
+    if n == 0:
+        return None
+    best = None
+    for mode in data_obj.get('oppIvModes', ['pvpoke']):
+        scores = _np_scores(score_arrays, moveset_idx, mode, nIvs, nS, nO)
+        if scores is None:
+            continue
+        wr = (scores[mask] >= 500).sum(axis=0) / n
+        best = wr if best is None else np.maximum(best, wr)
+    return best
 
 
 def _find_losses_vs_general(flavor, general, data_obj, score_arrays,
@@ -1051,14 +1102,15 @@ def _boundary_bullets_for_flavor(flavor, tradeoffs, has_bait_axis=False,
     return '\n'.join(lines[:8])
 
 
-def _general_boundary_bullets(all_matchup_boundaries, flavor, has_bait_axis=False):
-    """Render def-side boundary bullets relevant to the General/bulk flavor."""
+def _general_boundary_bullets(all_matchup_boundaries, flavor, has_bait_axis=False,
+                              stat='def'):
+    """Render boundary bullets on the flavor's primary axis (def for the
+    General/bulk flavor, atk for an atk-leaning sole flavor)."""
     if not all_matchup_boundaries:
         return ''
-    # For General, show def-side boundaries near the flavor's def cut
     relevant = []
     for mb in all_matchup_boundaries:
-        if mb.get('stat', 'def') == 'def':
+        if mb.get('stat', 'def') == stat:
             relevant.append(mb)
     if not relevant:
         return ''
@@ -1182,11 +1234,20 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
     # Single-flavor case: just a stat baseline summary
     if len(flavors) == 1:
         f = flavors[0]
+        # Describe the flavor's ACTUAL axis — the old branch hardcoded
+        # "favors high bulk" (and def-only boundaries) even for an
+        # atk-cut sole flavor (2026-06-11 review, R13).
+        shape = _axis_shape(f.get('atk_cut', 0) or 0,
+                            f.get('def_cut', 0) or 0,
+                            f.get('hp_cut', 0) or 0)
+        atk_leaning = 'A' in shape and 'D' not in shape
+        lean = 'favors attack weight' if atk_leaning else 'favors high bulk'
         parts.append(f'<p class="dd-narrative-prose">'
-                     f'In {league_display}, {species} favors high bulk. '
+                     f'In {league_display}, {species} {lean}. '
                      f'{f["stat_sig"]} is a safe baseline.</p>\n')
         bullets = _general_boundary_bullets(
-            all_matchup_boundaries, f, has_bait_axis)
+            all_matchup_boundaries, f, has_bait_axis,
+            stat='atk' if atk_leaning else 'def')
         if bullets:
             parts.append(f'<ul class="dd-threshold-list">\n{bullets}\n</ul>\n')
         parts.append('</div>\n')
