@@ -359,6 +359,22 @@ implementation. Each is a potential source of score mismatches if we
 hit an edge case. Fix these before assuming a score difference is a
 PvPoke bug.
 
+### Battle timeout: flat 500-turn guard vs PvPoke's 240s display clock
+(documented 2026-06-11, review finding E14)
+
+PvPoke ends battles when `time > 240000` ms (Battle.js:653), where
+`time` mixes 500 ms turns with 10,000 ms charged-move "minigame"
+adjustments (Battle.js:523-530: a charged round REPLACES the turn's
+500 ms with minigame time, and a shielded round discounts one). Its
+effective turn cap therefore shrinks with every charged throw. Ours is
+a flat `MAX_TURNS = 500` guard. Intentionally NOT matching: both are
+infinite-loop guards, and neither is reachable in practice — the
+bulkiest realistic GL wall fight (Carbink mirror, 2v2, traced
+2026-06-11) ends at 85 turns with 8 charged throws (~118 s on PvPoke's
+clock). Porting the minigame bookkeeping would complicate the hot loop
+for zero observable effect. Revisit only if a real matchup is ever
+found that times out in either sim.
+
 ### Near-KO DP plan choice: nuke-with-self-debuff vs serial-Fly (intentional)
 
 **Mechanism (localized 2026-04-15 followup session):** The divergence

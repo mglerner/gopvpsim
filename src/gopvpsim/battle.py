@@ -40,7 +40,14 @@ except Exception:                       # pragma: no cover - jit optional
     _CALC_TTL_JIT = None
 
 ENERGY_CAP = 100
-MAX_TURNS  = 500   # ~4 minutes; prevents infinite loops
+# Infinite-loop guard, NOT a faithful port of PvPoke's timeout. PvPoke ends
+# battles when its display clock passes 240,000 ms (Battle.js:653), and that
+# clock mixes 500 ms turns with 10,000 ms charged-move minigame adjustments —
+# so its effective turn cap shrinks with every charged throw. Documented as
+# an intentional divergence (DEVELOPER_NOTES "Known divergences"): the
+# bulkiest realistic GL wall fight (Carbink mirror, 2v2) ends at 85 turns,
+# so neither guard is reachable in practice.
+MAX_TURNS  = 500
 
 
 def _stat_stage_mult(stage: int) -> float:
@@ -2203,7 +2210,10 @@ class BattleResult:
         >500 means this player won, <500 means they lost.
         """
         opp = 1 - player
-        # Match PvPoke's Math.floor formula exactly: opp_hp can be negative (overkill counts)
+        # Match PvPoke's Math.floor formula exactly. (Both sims clamp HP at
+        # 0 in the battle loop — Battle.js:1349 and our simulate() — so the
+        # max(0, ...) below is defensive; an earlier comment claiming
+        # "overkill counts" was wrong.)
         return math.floor(
             500 * (self.max_hp[opp] - self.hp_remaining[opp]) / self.max_hp[opp]
             + 500 * max(0, self.hp_remaining[player]) / self.max_hp[player]
