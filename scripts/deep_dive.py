@@ -4696,6 +4696,10 @@ def main():
     )
     if log_path is not None:
         logger.info(f"Log file: {log_path}")
+        # Copy-paste monitor recipes for a second terminal (Michael's
+        # standing ask on every dive kick).
+        logger.info("Monitor: watch -c -n 5 scripts/chain_status.py "
+                    "--chain single   (or: tail -f userdata/logs/latest.log)")
 
     # Capture the equivalent command line for forensic reproducibility.
     # Printed to console and embedded in HTML output so any future reader can
