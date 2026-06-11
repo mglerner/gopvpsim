@@ -335,7 +335,33 @@ def _iv_tuple(raw, *, path: str) -> tuple[int, int, int]:
     return (out[0], out[1], out[2])
 
 
+# Recognized keys per table type. Unknown keys are REJECTED: the parser
+# used to ignore them silently, so a typo'd field name didn't error — it
+# changed semantics ('deal_at_least' for 'deals_at_least' silently turned
+# a Level-1 anchor into a Level-3 discover-and-tag anchor; 'atack' beside
+# 'defense' silently dropped the attack constraint). Review finding L4.
+_SPREAD_KEYS = {"description", "source", "deprecated",
+                "ivs", "attack", "defense", "stamina"}
+_COMMON_ANCHOR_KEYS = {"kind", "description", "source", "display_name"}
+_ANCHOR_KEYS_BY_KIND = {
+    "cmp": _COMMON_ANCHOR_KEYS | {"spread", "strict"},
+    "damage_breakpoint": _COMMON_ANCHOR_KEYS | {
+        "opponent", "move", "moves", "deals_at_least", "above_atk",
+        "opponent_ivs", "opponent_spread"},
+    "bulkpoint": _COMMON_ANCHOR_KEYS | {
+        "opponent", "move", "moves", "takes_at_most", "above_def",
+        "opponent_ivs", "opponent_spread"},
+}
+
+
 def _parse_spread(name: str, raw: dict, *, path: str) -> Spread:
+    unknown = set(raw) - _SPREAD_KEYS
+    _require(
+        not unknown,
+        f"spread {name!r} has unrecognized key(s) {sorted(unknown)} "
+        f"(recognized: {sorted(_SPREAD_KEYS)})",
+        path=path,
+    )
     description = raw.get("description", "")
     source = raw.get("source", "")
     deprecated = bool(raw.get("deprecated", False))
@@ -479,6 +505,13 @@ def _parse_anchor(name: str, raw: dict, *, path: str) -> Anchor:
         kind in ("cmp", "damage_breakpoint", "bulkpoint"),
         f"anchor {name!r} has unknown or missing kind {kind!r} "
         f"(expected 'cmp', 'damage_breakpoint', or 'bulkpoint')",
+        path=path,
+    )
+    unknown = set(raw) - _ANCHOR_KEYS_BY_KIND[kind]
+    _require(
+        not unknown,
+        f"anchor {name!r} ({kind}) has unrecognized key(s) {sorted(unknown)} "
+        f"(recognized for this kind: {sorted(_ANCHOR_KEYS_BY_KIND[kind])})",
         path=path,
     )
     description = raw.get("description", "")
