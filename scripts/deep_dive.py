@@ -2218,7 +2218,7 @@ def _recompute_tier_assignments(data_obj, plot_tiers):
 def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
                                     scenarios, opponents, opp_iv_modes,
                                     has_toml_tiers, resolved_anchors=None,
-                                    *, species=None):
+                                    *, species=None, focal_shadow=False):
     """Generate narrative HTML for one moveset.
 
     Computes matchup boundaries (and optionally anchor-flip records if
@@ -2318,6 +2318,7 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
                     opponents=opponents,
                     resolved_anchors=resolved_anchors or [],
                     existing_tiers=effective_tiers,
+                    focal_shadow=focal_shadow,
                 )
                 if _mirror_tier:
                     effective_tiers = list(effective_tiers) + [_mirror_tier]
@@ -2353,7 +2354,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                has_toml_tiers=False,
                                anchor_passing_sink=None,
                                threshold_registry=None,
-                               moveset0_flavors_for_rename=None):
+                               moveset0_flavors_for_rename=None,
+                               focal_shadow=False):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
@@ -2643,6 +2645,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 opponents=opponents,
                 resolved_anchors=resolved_anchors_top,
                 existing_tiers=effective_tiers,
+                focal_shadow=focal_shadow,
             )
             if _mirror_tier:
                 effective_tiers = list(effective_tiers) + [_mirror_tier]
@@ -3807,7 +3810,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
         has_toml_tiers,
         resolved_anchors=_resolved_anchors,
-        species=species,
+        species=species, focal_shadow=shadow,
     )
     logger.info(f"  Moveset 0 narrative (pre-render for rename) in "
                 f"{_time.time() - _nar0_start:.1f}s")
@@ -3834,7 +3837,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         has_toml_tiers=has_toml_tiers,
         anchor_passing_sink=anchor_passing_sink,
         threshold_registry=threshold_registry,
-        moveset0_flavors_for_rename=moveset0_flavors)
+        moveset0_flavors_for_rename=moveset0_flavors,
+        focal_shadow=shadow)
     # Tripwire: a split-mode file must carry its OWN moveset's analysis.
     # This is what would have caught the fa34f39 cache immediately.
     if split_info is not None:
@@ -3864,7 +3868,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                 opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
                 has_toml_tiers,
                 resolved_anchors=None,
-                species=species,
+                species=species, focal_shadow=shadow,
             )
             logger.info(f"    Narrative moveset {mi+1}/{n_movesets} "
                         f"rendered in {_time.time() - _mi_start:.1f}s")
@@ -4978,13 +4982,18 @@ def main():
                     register_opponent_variant(display, base, is_shadow)
                     n_variants += 1
 
-        if args.species not in opponents:
+        # The mirror entry must match the focal's FORM: a shadow focal's
+        # mirror is '<species> (Shadow)' (shadow stats + shadow-rankings
+        # moveset). Appending the plain name would sim a chimera mirror
+        # (shadow moveset on non-shadow stats).
+        _mirror_name = args.species + (' (Shadow)' if args.shadow else '')
+        if _mirror_name not in opponents:
             try:
                 focal_fast, focal_charged = get_default_moveset(
                     args.species, league=args.league, shadow=args.shadow)
-                opponents.append(args.species)
+                opponents.append(_mirror_name)
                 opp_movesets_full.append((focal_fast, focal_charged))
-                logger.info(f"  (added {args.species} to opponents for mirror analysis)")
+                logger.info(f"  (added {_mirror_name} to opponents for mirror analysis)")
             except (KeyError, ValueError) as _e:
                 logger.warning(f"could not append focal species for mirror: {_e}")
         focal_in_opponents = True
@@ -4998,10 +5007,12 @@ def main():
     else:
         screen_n = args.screen_opponents or args.opponents
         opponents = get_top_opponents(args.league, args.opponents)
-        # Always include focal species for mirror analysis (append if not in top N)
-        if args.species not in opponents:
-            opponents.append(args.species)
-            logger.info(f"  (added {args.species} to opponents for mirror analysis)")
+        # Always include focal species for mirror analysis (append if not in
+        # top N). Form-matched: a shadow focal's mirror is the shadow entry.
+        _mirror_name = args.species + (' (Shadow)' if args.shadow else '')
+        if _mirror_name not in opponents:
+            opponents.append(_mirror_name)
+            logger.info(f"  (added {_mirror_name} to opponents for mirror analysis)")
         focal_in_opponents = True
         opponent_label = f"Top {len(opponents)} from {args.league} rankings"
         logger.info(f"  {len(opponents)} meta opponents (top from {args.league} rankings)")
@@ -5136,11 +5147,20 @@ def main():
 
         # Slayer discovery: always check for mirror slayer thresholds on first moveset
         if mi == 0:
+            # Prefer the form-matched mirror entry (shadow focal -> shadow
+            # opponent); fall back to a form-stripped match so a plain
+            # focal still finds a shadow-only pool entry.
+            _mirror_name = args.species + (' (Shadow)' if args.shadow else '')
             mirror_idx = None
             for oi, opp_name in enumerate(opponents):
-                if opp_name == args.species or opp_name.replace(' (Shadow)', '') == args.species:
+                if opp_name == _mirror_name:
                     mirror_idx = oi
                     break
+            if mirror_idx is None:
+                for oi, opp_name in enumerate(opponents):
+                    if opp_name.replace(' (Shadow)', '') == args.species:
+                        mirror_idx = oi
+                        break
             if mirror_idx is not None:
                 slayer_thresh, slayer_scored = discover_slayer_thresholds(
                     results, mirror_idx, len(shield_scenarios), args.species

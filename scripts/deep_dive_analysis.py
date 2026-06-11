@@ -5,6 +5,7 @@ Pure-analysis functions that partition IV cohorts by stat thresholds
 rendering — that stays in deep_dive.py.
 """
 import math
+import re
 
 import numpy as np
 
@@ -864,6 +865,7 @@ def synthesize_mirror_tier(
     data_obj, scenarios, opponents,
     resolved_anchors, existing_tiers,
     *, min_clean_scenarios=None, win_threshold=500,
+    focal_shadow=False,
 ):
     """Synthesize a "Species Mirror Bulk" or "Species Mirror Atk" tier
     from auto-anchors when none of the existing tiers references the
@@ -921,25 +923,32 @@ def synthesize_mirror_tier(
         # contested mirror; "majority" (5/9) catches the equal+
         # shield states where bulk actually pays off.
         min_clean_scenarios = max(1, math.ceil(nS / 2))
-    _log.info(f"  [mirror-synth] starting for species={species!r}, "
+    # The true mirror for a shadow focal is the SHADOW pool entry — the
+    # plain entry has unmultiplied stats and the non-shadow moveset, so
+    # matching it would derive the tier against a different Pokemon.
+    mirror_name = f'{species} (Shadow)' if focal_shadow else species
+    _log.info(f"  [mirror-synth] starting for mirror={mirror_name!r}, "
               f"{len(opponents)} opponents, {len(resolved_anchors)} resolved anchors, "
               f"{len(existing_tiers)} existing tiers, nS={nS}, "
               f"min_clean={min_clean_scenarios}")
     # Find focal species' opponent index (mirror in opponent pool).
     opp_idx = None
     for oi, name in enumerate(opponents):
-        if name == species:
+        if name == mirror_name:
             opp_idx = oi
             break
     if opp_idx is None:
-        _log.info(f"  [mirror-synth] BAIL: focal species {species!r} not in "
+        _log.info(f"  [mirror-synth] BAIL: mirror {mirror_name!r} not in "
                   f"opponent list (sample: {opponents[:5]})")
         return None
 
-    # Skip if any existing tier already names the focal species.
-    species_lower = species.lower()
+    # Skip if any existing tier already names the focal species — but only
+    # THIS form: a name continuing with ' (' is a different form (e.g.
+    # focal 'Oinkologne' must not bail on an 'Oinkologne (Female) Bulk'
+    # tier), so the match requires the name NOT be followed by ' ('.
+    mirror_pat = re.compile(re.escape(mirror_name.lower()) + r'(?! \()')
     for t in existing_tiers:
-        if species_lower in (t.get('name', '') or '').lower():
+        if mirror_pat.search((t.get('name', '') or '').lower()):
             _log.info(f"  [mirror-synth] BAIL: existing tier {t.get('name')!r} "
                       f"already names focal species")
             return None
@@ -950,9 +959,9 @@ def synthesize_mirror_tier(
     # the Level-3 expansion gives a family of resolved anchors at
     # different damage-tier thresholds.
     mirror_anchors = [a for a in resolved_anchors
-                       if a.opponent == species]
+                       if a.opponent == mirror_name]
     _log.info(f"  [mirror-synth] {len(mirror_anchors)} mirror anchors found "
-              f"(opponent=={species!r})")
+              f"(opponent=={mirror_name!r})")
     if not mirror_anchors:
         sample_opps = sorted({getattr(a, 'opponent', None) for a in resolved_anchors
                               if getattr(a, 'opponent', None)})[:8]
@@ -1055,10 +1064,10 @@ def synthesize_mirror_tier(
     # "<species> Mirror Atk" (atk-side). Handles species with
     # parenthesized form names (e.g. "Aegislash (Shield)") cleanly.
     tier_kind = 'Bulk' if target_stat == 'def' else 'Atk'
-    tier_name = f'{species} Mirror {tier_kind}'
+    tier_name = f'{mirror_name} Mirror {tier_kind}'
 
     desc = (f'Mirror {tier_kind.lower()}point: passing cohort wins '
-            f'{n_clean} of {nS} scenarios vs rank-1 SP {species} '
+            f'{n_clean} of {nS} scenarios vs rank-1 SP {mirror_name} '
             f'({n_pass} IVs pass).')
 
     return {
