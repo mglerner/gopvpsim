@@ -681,9 +681,9 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     if turns_planned > ttl:
         return False
 
-    # Can KO opponent with a non-self-debuffing charged move (shields == 0 only)
-    # — PvPoke ActionLogic.js lines 298-309: if any charged move would KO now,
-    # don't optimize (fire the charged move, don't delay for timing).
+    # Can KO opponent with a charged move (shields == 0 only) — PvPoke
+    # ActionLogic.js lines 317-329: if any AFFORDABLE charged move would KO
+    # now, don't optimize (fire it, don't delay for timing).
     #
     # PvPoke itself does not gate this on "fast could also KO" — the fast
     # move's next-fire turn is governed by cooldown, not available right now,
@@ -695,19 +695,19 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     # could fire immediately; with mid-cooldown timing, delay costs real
     # turns of incoming opponent damage.
     #
-    # One intentional deviation kept: `not cm.get('selfDebuffing', False)`.
-    # Don't self-debuff to KO when we could have fast-KO'd instead -- PvPoke
-    # happily throws HJK / Superpower etc. for the kill; we leave the
-    # attacker un-debuffed for whatever comes next. This gate only matters
-    # when a future multi-mon layer reads post-KO state, which PvPoke doesn't
-    # track. Single-mon score is identical either way under this gate because
-    # the self-debuff fires AFTER the KO check.
+    # History: until 2026-06-11 this override ALSO excluded self-debuffing
+    # moves ("leave the attacker un-debuffed for whatever comes next"),
+    # reasoned to be score-neutral because the debuff fires after the KO.
+    # The Snorlax-vs-Obstagoon localization falsified that: while OMT
+    # delays the lethal self-debuffing throw, the opponent's fast moves
+    # keep LANDING (one extra Counter = the whole -26..-29 margin cluster),
+    # so the deviation traded real HP for avoiding a debuff with zero
+    # post-KO effect. Removed — matches PvPoke exactly.
     if defender.shields == 0:
         for cm in attacker.charged_moves:
             if attacker.energy >= cm['energy']:
                 cm['_cached_damage'] = attacker.charged_move_damage(cm, defender)
-                if (cm['_cached_damage'] >= defender.hp
-                        and not cm.get('selfDebuffing', False)):
+                if cm['_cached_damage'] >= defender.hp:
                     return False
 
     # Opponent's next charged move can KO within our fast-move window
