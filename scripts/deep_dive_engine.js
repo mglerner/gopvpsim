@@ -1150,6 +1150,33 @@ function sortMatchesTable(tblId, colIdx, thEl) {
   }
 }
 
+// Copy a Notable-IVs card's gobattlekit user-threshold JSON fragment
+// (built server-side into data-scanner-json) to the clipboard, with a
+// transient button-label acknowledgement and an execCommand fallback
+// for non-secure contexts (file:// pages).
+function copyScannerJson(btn) {
+  var payload = btn.getAttribute('data-scanner-json');
+  if (!payload) return;
+  var orig = btn.textContent;
+  function done(ok) {
+    btn.textContent = ok ? 'Copied!' : 'Copy failed';
+    setTimeout(function() { btn.textContent = orig; }, 1500);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(payload).then(
+      function() { done(true); }, function() { done(false); });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = payload;
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    done(ok);
+  }
+}
+
 // Minimal HTML escape for values that go into innerHTML (species names,
 // tier names). Prevents a stray '<' in a custom TOML tier name from
 // breaking the match list layout.
@@ -2880,6 +2907,7 @@ window._summarySortClick = _summarySortClick;
 // and the handlers throw ReferenceError.
 window.toggleMatchesSection = toggleMatchesSection;
 window.sortMatchesTable = sortMatchesTable;
+window.copyScannerJson = copyScannerJson;
 // Highlight-IVs controls (applied from the plot control strip).
 window.applyHighlight = applyHighlight;
 window.clearHighlight = clearHighlight;
