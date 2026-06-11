@@ -608,6 +608,105 @@ def test_azumarill_vs_forretress_rt_only(shields_azu, shields_forr,
 
 
 # ---------------------------------------------------------------------------
+# buffTarget == 'both' (Obstruct) — per-target buff arrays
+# ---------------------------------------------------------------------------
+
+def make_both_target_move():
+    """Minimal Obstruct-shaped charged move: buffTarget='both' with distinct
+    buffsSelf / buffsOpponent arrays (gamemaster OBSTRUCT: self +1 def,
+    opponent -1 def, guaranteed)."""
+    return {'moveId': 'FAKE_OBSTRUCT', 'name': 'Fake Obstruct', 'type': 'dark',
+            'power': 15, 'energy': 40, 'energyGain': 0,
+            'buffs': [0, 1], 'buffsSelf': [0, 1], 'buffsOpponent': [0, -1],
+            'buffTarget': 'both', 'buffApplyChance': '1'}
+
+
+class TestBuffTargetBoth:
+    """PvPoke Battle.js:1406-1442: for buffTarget 'both', the attacker gets
+    buffsSelf and the defender gets buffsOpponent — the generic 'buffs'
+    array must not be applied to the defender."""
+
+    def test_apply_move_buffs_uses_per_target_arrays(self):
+        from gopvpsim.battle import _apply_move_buffs
+        attacker = make_bp()
+        defender = make_bp()
+        _apply_move_buffs(attacker, defender, make_both_target_move())
+        assert attacker.atk_stage == 0
+        assert attacker.def_stage == 1    # buffsSelf [0, +1]
+        assert defender.atk_stage == 0
+        assert defender.def_stage == -1   # buffsOpponent [0, -1]
+
+    def test_shield_policy_routes_both_move_through_would_shield(self):
+        # Battle.js:1097-1100: a 'both' move with buffsSelf[0] > 0 or
+        # buffsOpponent[1] < 0 routes through wouldShield instead of the
+        # always-shield default. With a weak attacker, wouldShield says
+        # don't shield — so the policy must return False here.
+        move = make_both_target_move()
+        move['selfBuffing'] = True   # PvPoke GameMaster.js:873 'both' clause
+        # The move must be the attacker's own dict (charged_move_damage
+        # resolves moves by identity).
+        attacker = make_bp(atk=80.0, charged=[move])
+        defender = make_bp(shields=2)
+        assert pvpoke_simulate_shield(attacker, defender, move) is False
+
+    @pytest.mark.integration
+    def test_obstruct_gamemaster_flags(self):
+        from gopvpsim.moves import get_moves
+        _, charged = get_moves()
+        m = charged['OBSTRUCT']
+        # buffsSelf [0, +1] is a guaranteed positive self-buff →
+        # selfBuffing per GameMaster.js:873 'both' clause.
+        assert m['selfBuffing'] is True
+        # selfDebuffing only applies to buffTarget == 'self' moves.
+        assert m['selfDebuffing'] is False
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_obs,shields_azu,expected_winner,expected_obs_score,expected_log", [
+    # Obstagoon 5/15/12 L21 (COUNTER / OBSTRUCT + NIGHT_SLASH)
+    # vs Azumarill 4/15/13 L43 (BUBBLE / ICE_BEAM + PLAY_ROUGH), Great League.
+    # Fixture generated 2026-06-11 from scripts/pvpoke_trace.js (PvPoke clone
+    # bc532fbda; OBSTRUCT/COUNTER/NIGHT_SLASH/BUBBLE/ICE_BEAM/PLAY_ROUGH and
+    # both species' baseStats verified identical between the clone and the
+    # live gamemaster). Pins the buffTarget='both' per-target arrays fix:
+    # each Obstruct gives Obstagoon +1 def and Azumarill -1 def.
+    (0, 0, 1, 235, ["Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash", "Azumarill: Ice Beam"]),
+    (0, 1, 1, 170, ["Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash (shielded)", "Azumarill: Ice Beam"]),
+    (0, 2, 1, 170, ["Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash (shielded)", "Azumarill: Ice Beam"]),
+    (1, 0, 1, 374, ["Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash", "Azumarill: Ice Beam"]),
+    (1, 1, 1, 295, ["Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash (shielded)", "Azumarill: Ice Beam"]),
+    (1, 2, 1, 295, ["Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough", "Obstagoon: Night Slash (shielded)", "Azumarill: Ice Beam"]),
+    (2, 0, None, 500, ["Obstagoon: Obstruct", "Azumarill: Ice Beam (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Night Slash", "Azumarill: Play Rough", "Obstagoon: Night Slash"]),
+    (2, 1, 1, 429, ["Obstagoon: Obstruct", "Azumarill: Ice Beam (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Night Slash (shielded)", "Azumarill: Play Rough", "Obstagoon: Night Slash"]),
+    (2, 2, 1, 350, ["Obstagoon: Obstruct", "Azumarill: Ice Beam (shielded)", "Obstagoon: Obstruct", "Azumarill: Play Rough (shielded)", "Obstagoon: Night Slash (shielded)", "Azumarill: Play Rough", "Obstagoon: Night Slash (shielded)"]),
+])
+def test_obstagoon_obstruct_vs_azumarill(shields_obs, shields_azu, expected_winner,
+                                         expected_obs_score, expected_log):
+    bp_obs = _make_battle_pokemon('Obstagoon', 'COUNTER', ['OBSTRUCT', 'NIGHT_SLASH'],
+                                  'great', shields_obs, 5, 15, 12)
+    bp_azu = _make_battle_pokemon('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+                                  'great', shields_azu, 4, 15, 13)
+    result = simulate(bp_obs, bp_azu,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp,
+                      shield_policy_0=pvpoke_simulate_shield,
+                      shield_policy_1=pvpoke_simulate_shield,
+                      log=True)
+    assert result.winner == expected_winner, (
+        f"{shields_obs}v{shields_azu}: expected winner={expected_winner}, "
+        f"got {result.winner}  HP={result.hp_remaining}"
+    )
+    obs_score = round(result.pvpoke_score(0))
+    assert obs_score == expected_obs_score, (
+        f"{shields_obs}v{shields_azu}: expected Obstagoon score={expected_obs_score}, "
+        f"got {obs_score}  (delta={obs_score - expected_obs_score:+d})"
+    )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_obs}v{shields_azu}: battle log mismatch"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Buff/debuff matchups — verified at pvpoke.com/battle/
 # ---------------------------------------------------------------------------
 

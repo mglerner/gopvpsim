@@ -191,10 +191,14 @@ def get_moves():
             # self-buff OR guaranteed opponent debuff (any kind).  The name is
             # misleading but PvPoke uses the same flag for both categories
             # (Psychic Fangs, Sand Tomb, Acid Spray, etc. all count).
+            # buffTarget 'both' (OBSTRUCT) qualifies via a positive buffsSelf.
+            bs = m.get('buffsSelf')
             m['selfBuffing'] = bool(
                 buffs and chance == 1
                 and ((bt == 'opponent')
-                     or (bt == 'self' and (buffs[0] > 0 or buffs[1] > 0))))
+                     or (bt == 'self' and (buffs[0] > 0 or buffs[1] > 0))
+                     or (bt == 'both' and bs is not None
+                         and (bs[0] > 0 or bs[1] > 0))))
     return _fast_moves, _charged_moves
 
 
