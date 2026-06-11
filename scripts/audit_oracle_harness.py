@@ -98,25 +98,23 @@ MATCHUPS = [
     # --- Ultra League (2026-06-11, review finding T6: the hand-typed UL
     # fixtures previously had no audit coverage at all) ---
     # Defender-bestCM selfDefenseDebuffing shield-gate fixture. The [1,2]
-    # cell is a documented COSMETIC divergence: score/winner/HP match,
-    # but MG throws Fly into Florges' second shield where PvPoke throws
-    # Brave Bird (both shielded, MG dead either way). E5/E15-family lead.
+    # cell matched PvPoke exactly once the 2026-06-11 bait-wait fix
+    # landed (the hold wrongly excluded self-debuffing cms[1]).
     dict(label='moltres_galarian_vs_florges', league='ultra',
          p1=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (4, 11, 11), 'moltres_galarian'),
-         p2=P('Florges', 'FAIRY_WIND', ['CHILLING_WATER', 'DISARMING_VOICE'], (4, 13, 15), 'florges'),
-         xfail_cells={(1, 2)}),
+         p2=P('Florges', 'FAIRY_WIND', ['CHILLING_WATER', 'DISARMING_VOICE'], (4, 13, 15), 'florges')),
     # MG near-KO plan-choice cluster (intentional divergence, DEVELOPER_
     # NOTES 'Near-KO DP plan choice'): our DP nukes with Brave Bird where
     # PvPoke serial-Flys. xfail_cells filled from the audited grid.
     # Audited grid 2026-06-11: (0,x) cells are the documented score-margin
-    # divergences (our MG retains ~29pp more HP, jellicent family d1=-146);
-    # (2,x) cells are LOG-ONLY (identical scores/winner, BB-vs-Fly throw
-    # order under shields — same root cause, score-neutral, hence absent
-    # from the |delta|>20 writeup).
+    # divergences (our MG retains ~29pp more HP, jellicent family d1=-146;
+    # near-KO plan choice, see DEVELOPER_NOTES). The (2,x) LOG-ONLY cells
+    # pinned earlier the same day vanished with the bait-wait fix (the
+    # hold wrongly excluded self-debuffing cms[1]).
     dict(label='jellicent_vs_moltres_galarian', league='ultra',
          p1=P('Jellicent', 'HEX', ['SURF', 'SHADOW_BALL'], (6, 14, 15), 'jellicent'),
          p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (1, 15, 15), 'moltres_galarian'),
-         xfail_cells={(0, 0), (0, 1), (0, 2), (2, 0), (2, 1), (2, 2)}),
+         xfail_cells={(0, 0), (0, 1), (0, 2)}),
     dict(label='corviknight_vs_moltres_galarian', league='ultra',
          p1=P('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], (0, 15, 15), 'corviknight'),
          p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (1, 15, 15), 'moltres_galarian'),
