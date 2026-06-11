@@ -2,6 +2,7 @@
 Fetch and cache PvPoke game data.
 """
 import json
+import os
 import pathlib
 import ssl
 import time
@@ -30,12 +31,18 @@ class NoDataError(Exception):
     pass
 
 
-def _fetch_json(key):
+def _fetch_json(key, url=None):
     """Fetch a JSON file from PvPoke, using a local cache.
 
-    Uses cached data if it is less than CACHE_TTL seconds old.
-    Falls back to stale cache if the network is unavailable.
+    Uses cached data if it is less than CACHE_TTL seconds old; a corrupt
+    fresh cache (truncated write, partial download) falls through to a
+    refetch instead of raising. Falls back to stale cache if the network
+    is unavailable. The cache write is atomic (tmp + os.replace) so a
+    crash mid-write can never leave a truncated file for the next reader.
     Raises NoDataError if neither network nor cache is available.
+
+    ``url`` defaults to ``URLS[key]``; pass it explicitly for keys that
+    aren't in the static table (custom groups).
     """
     CACHE_DIR.mkdir(exist_ok=True, parents=True)
     cache_file = CACHE_DIR / f"{key}.json"
@@ -43,19 +50,27 @@ def _fetch_json(key):
     if cache_file.exists():
         age = time.time() - cache_file.stat().st_mtime
         if age < CACHE_TTL:
-            return json.loads(cache_file.read_text())
+            try:
+                return json.loads(cache_file.read_text())
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"Corrupt cache for {key} ({e}); refetching")
 
     try:
         ssl_context = ssl.create_default_context(cafile=certifi.where())
-        with urllib.request.urlopen(URLS[key], context=ssl_context) as r:
+        with urllib.request.urlopen(url or URLS[key], context=ssl_context) as r:
             data = json.loads(r.read().decode())
-        cache_file.write_text(json.dumps(data))
+        tmp = cache_file.with_name(cache_file.name + ".tmp")
+        tmp.write_text(json.dumps(data))
+        os.replace(tmp, cache_file)
         return data
     except Exception as e:
         print(f"Fetch error for {key}: {e}")
 
     if cache_file.exists():
-        return json.loads(cache_file.read_text())
+        try:
+            return json.loads(cache_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass  # stale cache is corrupt too — fall through to the error
 
     raise NoDataError(
         f"Could not fetch '{key}' and no cached data is available. "
@@ -104,33 +119,12 @@ def _get_rankings_index(league):
 def load_group(group_name):
     """Load a PvPoke custom group (e.g. 'championshipseries').
 
-    Fetches from GitHub and caches locally, same as gamemaster/rankings.
-    Returns the raw JSON list of group entries.
+    Fetches from GitHub and caches locally, same as gamemaster/rankings
+    (shares ``_fetch_json``'s TTL / corrupt-cache / stale-fallback /
+    atomic-write behavior). Returns the raw JSON list of group entries.
     """
-    cache_key = f"group_{group_name}"
-    CACHE_DIR.mkdir(exist_ok=True, parents=True)
-    cache_file = CACHE_DIR / f"{cache_key}.json"
-
-    if cache_file.exists():
-        age = time.time() - cache_file.stat().st_mtime
-        if age < CACHE_TTL:
-            return json.loads(cache_file.read_text())
-
-    url = GROUP_URL_TEMPLATE.format(group_name)
-    try:
-        ssl_context = ssl.create_default_context(cafile=certifi.where())
-        with urllib.request.urlopen(url, context=ssl_context) as r:
-            data = json.loads(r.read().decode())
-        cache_file.write_text(json.dumps(data))
-        return data
-    except Exception as e:
-        if cache_file.exists():
-            print(f"Fetch error for group {group_name}: {e}; using cache")
-            return json.loads(cache_file.read_text())
-        raise NoDataError(
-            f"Could not fetch group '{group_name}' and no cached data is available. "
-            f"Check the group name and try again."
-        )
+    return _fetch_json(f"group_{group_name}",
+                       url=GROUP_URL_TEMPLATE.format(group_name))
 
 
 # Explicit per-species fallback movesets for species absent from PvPoke's

@@ -49,6 +49,11 @@ def discover_slayer_thresholds(results, opponent_idx, n_scenarios, opponent_name
     Only stats meaningfully separate the winners from losers are reported.
     """
     if not results or len(results) < 50:
+        import logging
+        logging.getLogger('deep_dive').debug(
+            f'discover_slayer_thresholds: only '
+            f'{len(results) if results else 0} results (<50); '
+            f'skipping threshold discovery')
         return {}, []
 
     # Score each IV by win count + avg score vs the target opponent

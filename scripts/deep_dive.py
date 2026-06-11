@@ -2215,6 +2215,27 @@ def _recompute_tier_assignments(data_obj, plot_tiers):
     data_obj['ivAllTiers'] = iv_all_tiers
 
 
+def _mirror_synth_scores(score_arrays, moveset_idx):
+    """Score array for mirror-tier synthesis: prefer the bait-on pvpoke
+    mode, else fall back to any available mode for this moveset.
+
+    A rank1-only or bait-off dive never has a bare '{mi}_pvpoke' key
+    (compose_mode yields 'pvpoke:nobait' / 'rank1...'), and the hardcoded
+    lookup silently skipped synthesis for those dives.
+    """
+    key = f'{moveset_idx}_pvpoke'
+    scores = score_arrays.get(key)
+    if scores:
+        return scores
+    prefix = f'{moveset_idx}_'
+    for k in sorted(score_arrays):
+        if k.startswith(prefix) and score_arrays[k]:
+            logger.info(f"  [mirror-synth] mode {key!r} absent; "
+                        f"falling back to {k!r}")
+            return score_arrays[k]
+    return None
+
+
 def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
                                     scenarios, opponents, opp_iv_modes,
                                     has_toml_tiers, resolved_anchors=None,
@@ -2307,7 +2328,7 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
         # rationale. Append-only. Skipped when species was not
         # threaded through (older callers).
         if species:
-            _mirror_scores = score_arrays.get(f'{moveset_idx}_pvpoke')
+            _mirror_scores = _mirror_synth_scores(score_arrays, moveset_idx)
             if _mirror_scores:
                 _mirror_tier = _synthesize_mirror_tier(
                     species=species,
@@ -2439,8 +2460,14 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 'atk': opp_pokemon.atk, 'def_': opp_pokemon.def_,
                 'types': opp_types, 'moves': opp_moves_list,
             }
-        except Exception:
-            pass  # skip opponents we can't resolve
+        except Exception as e:
+            # Skip opponents we can't resolve, but never silently: a
+            # missing entry here silently drops the opponent from
+            # breakpoint narration and flip annotations (e.g. the replay
+            # variant-registry gap surfaced exactly this way).
+            logger.warning(f"  opp_info_cache: could not resolve "
+                           f"{opp_name!r} ({type(e).__name__}: {e}); "
+                           f"narration for this opponent will be omitted")
 
     ref_atk = data_obj['ivAtk'][ref_iv]
     ref_def = data_obj['ivDef'][ref_iv]
@@ -2607,7 +2634,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         # `synthesize_mirror_tier` docstring for the gate rationale.
         # Append-only; no existing tier is removed or replaced.
         _focal_species = data_obj.get('species') or ''
-        _mirror_scores = score_arrays.get(f'{moveset_idx}_pvpoke') if _focal_species else None
+        _mirror_scores = (_mirror_synth_scores(score_arrays, moveset_idx)
+                          if _focal_species else None)
         if _mirror_scores:
             # Optional state pickle for offline iteration on the synth
             # gate. Set DUMP_SYNTH_STATE=/path/to/file.pkl on the dive
@@ -5535,10 +5563,17 @@ def main():
             if ref_moveset:
                 ref_fast, ref_charged = ref_moveset
                 ref_label = moveset_label(ref_fast, ref_charged)
-                # Check if reference is already a surviving moveset
+                # Check if reference is already a surviving moveset.
+                # Compare canonical (fast, sorted-charged) tuples, NOT label
+                # strings: screened movesets carry sorted charged pairs but
+                # --reference / rankings order is arbitrary, and a label
+                # mismatch on the same pair re-sweeps the reference AND
+                # emits a duplicate moveset page (2026-06-02 incident,
+                # previously patched only by a comment-enforced ordering
+                # convention in run_website_dives.py).
+                ref_key = (ref_fast, tuple(sorted(ref_charged)))
                 for mi, entry in enumerate(all_moveset_results):
-                    existing_label = moveset_label(entry[0], entry[1])
-                    if existing_label == ref_label:
+                    if (entry[0], tuple(sorted(entry[1]))) == ref_key:
                         reference_idx = mi
                         break
                 if reference_idx < 0:

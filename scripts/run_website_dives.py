@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Run deep dives for the website, sequentially.
 
 Dive configurations live in the DIVES list below. Each entry specifies
