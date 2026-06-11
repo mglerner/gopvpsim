@@ -112,3 +112,35 @@ def test_standalone_tag_inlines_on_success(monkeypatch):
                         lambda *a, **k: FakeResponse())
     tag = deep_dive._plotly_script_tag(standalone=True)
     assert tag == '<script>/* plotly */</script>'
+
+
+# ---------------------------------------------------------------------------
+# Replay state round-trips the opponent-variant registry (review finding D4)
+# ---------------------------------------------------------------------------
+
+def test_replay_state_roundtrips_variant_registry(tmp_path, monkeypatch):
+    """The variant registry is process-local state populated by pool
+    loading in main(); a replay process never runs that, so the blob
+    must carry it — otherwise parse_opponent_spec mis-reads variant
+    display names in the replayed render."""
+    monkeypatch.setattr(deep_dive, '_OPPONENT_VARIANT_REGISTRY', {},
+                        raising=True)
+    deep_dive.register_opponent_variant(
+        'Forretress (Bug Bite)', 'Forretress', False)
+    deep_dive.register_opponent_variant(
+        'Forretress (Shadow) (Bug Bite)', 'Forretress', True)
+
+    blob = tmp_path / 'x.replay.pkl.gz'
+    out = deep_dive.dump_replay_state({'species': 'Testmon'}, path=str(blob))
+    assert out == str(blob)
+
+    # Simulate a fresh replay process: empty registry, then load.
+    deep_dive._OPPONENT_VARIANT_REGISTRY.clear()
+    state = deep_dive.load_replay_state(str(blob))
+    assert state['species'] == 'Testmon'
+    # Registry restored: the variant name resolves to its base species.
+    parsed = deep_dive.parse_opponent_spec('Forretress (Bug Bite)')
+    assert parsed[0] == 'Forretress'
+    parsed_shadow = deep_dive.parse_opponent_spec('Forretress (Shadow) (Bug Bite)')
+    assert parsed_shadow[0] == 'Forretress'
+    assert parsed_shadow[2] is True
