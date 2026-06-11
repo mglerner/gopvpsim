@@ -335,15 +335,33 @@ combos. Mimi's actual SS timing was correct all along; the
 
 ## Open divergences
 
-### Snorlax vs Obstagoon GL [1,2] — +4 score margin (residual, found 2026-06-11)
+### Bait-wait hold unported (localized 2026-06-11) — Snorlax [1,2] +4
+and MG-vs-Florges [1,2] Fly-vs-BB share this root
 
-The lone survivor of the resolved margin cluster below: at [1,2] our
-Snorlax scores 102 vs PvPoke 98 (winner + chargedLog identical).
-Obstagoon holds shields there, so the resolved OMT KO-override (which
-requires shields == 0) is not the mechanism. Small, cosmetic-adjacent;
-trace when next in the area. The MG-vs-Florges [1,2] cosmetic
-Fly-vs-BB log divergence (pinned in the oracle audit) may share a
-root.
+Mechanism (decideLog-traced): PvPoke's bait logic includes a WAIT
+branch (~ActionLogic.js:853, logged "doesn't use X because it wants
+to bait") that holds an affordable cheap bait until more energy
+accrues; under death pressure it then fires the biggest affordable
+move instead (line ~206, "because it has 1 turn(s) before it is
+KO'd"). We never ported the hold: our DP throws the bait as soon as
+it is affordable. Observed consequences, both with identical winners:
+
+- Snorlax vs Obstagoon GL [1,2]: ours throws Body Slam at energy 37;
+  PvPoke holds, then panic-throws Superpower at 40 into the shield.
+  Ours scores 102 vs PvPoke 98 — our simpler play is slightly BETTER.
+- Moltres-G vs Florges UL [1,2]: same shape (our cheap Fly vs
+  PvPoke's pressure-forced Brave Bird, both shielded, scores equal) —
+  the "cosmetic" cell pinned in the oracle audit.
+
+Per the divergence policy: PvPoke is not demonstrably better (equal
+or worse in both observed cells), so we keep our behavior for now —
+but this is an UNPORTED branch, not a reasoned deviation, and it
+plausibly shifts other bait-on shield endgames in either direction.
+Porting it properly is a dedicated oracle-driven session: implement
+the hold + the death-pressure override, then re-run the full GL/UL
+harness grids (every bait-on matchup could move). Until then both
+cells stay pinned (the Snorlax one only via this note; deliberately
+not fixtured).
 
 ### RESOLVED 2026-06-11 — Snorlax/Obstagoon margin cluster (OMT
 self-debuffing KO-override deviation falsified)
