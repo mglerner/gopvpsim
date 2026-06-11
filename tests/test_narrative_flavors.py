@@ -493,6 +493,62 @@ def test_indirect_loss_dropped_when_flavor_cohort_wins():
     assert 'OppBulk' not in loss_opps
 
 
+# ---------------------------------------------------------------------------
+# refine_flavor_names dedup: mirror exemption + same-axis guard (R1)
+# ---------------------------------------------------------------------------
+
+def _flavor(name, gains, atk=0, def_=0, hp=0, general=False):
+    f = {'name': name, 'is_general': general, 'recommended': general,
+         'atk_cut': atk, 'def_cut': def_, 'hp_cut': hp,
+         'n_qualifying': 10, 'stat_sig': 'x', 'tier_name': name}
+    td = {'gains': [{'opponent': g, 'scenarios': [(1, 1)]} for g in gains],
+          'losses': []}
+    return f, td
+
+
+def _run_refine(specs):
+    from deep_dive_narrative import refine_flavor_names
+    flavors, tradeoffs = [], {}
+    for f, td in specs:
+        flavors.append(f)
+        tradeoffs[f['name']] = td
+    refine_flavor_names(flavors, tradeoffs)
+    return [f['name'] for f in flavors]
+
+
+def test_mirror_tier_survives_subset_dedup():
+    # The mirror tier's gains are a strict subset of Fortified Corv's —
+    # the old dedup silently dropped it (the known pre-ship follow-up).
+    names = _run_refine([
+        _flavor('General Good', ['A', 'B', 'C'], def_=100, general=True),
+        _flavor('Fortified Corviknight', ['Corviknight', 'Lickilicky'], def_=105),
+        _flavor('Dewgong Mirror Bulk', ['Corviknight'], def_=107),
+    ])
+    assert 'Dewgong Mirror Bulk' in names
+
+
+def test_cross_axis_subset_survives():
+    # def-axis flavor whose gains subset an ATK-axis flavor's must NOT
+    # be removed — the comment always said "same stat axis"; the code
+    # never checked until 2026-06-11.
+    names = _run_refine([
+        _flavor('General Good', ['A'], def_=100, general=True),
+        _flavor('Big Atk Slayer', ['X', 'Y', 'Z'], atk=120),
+        _flavor('Fortified Sealeo', ['X', 'Y'], def_=108),
+    ])
+    assert 'Fortified Sealeo' in names
+
+
+def test_same_axis_subset_still_removed():
+    names = _run_refine([
+        _flavor('General Good', ['A'], def_=100, general=True),
+        _flavor('Fortified Corviknight', ['X', 'Y', 'Z'], def_=105),
+        _flavor('Fortified Sealeo', ['X', 'Y'], def_=108),
+    ])
+    assert 'Fortified Sealeo' not in names
+    assert 'Fortified Corviknight' in names
+
+
 def test_indirect_loss_kept_when_flavor_cohort_loses():
     # Flavor cohort = {IV2} (atk 105, def 90): genuinely loses the
     # bulk-driven matchup General gains — must stay a loss.
