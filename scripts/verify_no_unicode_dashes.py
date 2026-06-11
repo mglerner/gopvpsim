@@ -120,22 +120,26 @@ class _DashScanner(HTMLParser):
 
 
 def _find_ship_surfaces() -> list[Path]:
-    """Return the pre-ship surface set (mirrors verify_article_links.py)."""
-    article = (WEBSITE_DIR / 'articles'
-               / 'oinkologne-cd-2026-05' / 'index.html')
-    compare = (WEBSITE_DIR / 'comparisons'
-               / 'oinkologne-male-vs-female' / 'index.html')
-    site_index = WEBSITE_DIR / 'index.html'
+    """Every user-facing HTML the publish rsync will ship.
 
-    surfaces = [site_index, article, compare]
-    for dive_slug in ('oinkologne-great-league',
-                      'oinkologne-female-great-league'):
-        dive_dir = WEBSITE_DIR / dive_slug
-        if not dive_dir.is_dir():
+    Enumerated from the site tree rather than a hardcoded list: the old
+    frozen Oinkologne-era set silently decayed as new dives, articles,
+    and guides shipped -- rsync --delete publishes the WHOLE tree, so
+    the gate now verifies the whole tree (2026-06-11 review, W9).
+    """
+    surfaces: list[Path] = []
+    site_index = WEBSITE_DIR / 'index.html'
+    if site_index.exists():
+        surfaces.append(site_index)
+    for sub in sorted(WEBSITE_DIR.iterdir()):
+        if not sub.is_dir():
             continue
-        surfaces.append(dive_dir / 'index.html')
-        for p in sorted(dive_dir.glob('index_m*.html')):
-            surfaces.append(p)
+        if sub.name in ('articles', 'comparisons', 'guides'):
+            surfaces.extend(sorted(sub.rglob('index*.html')))
+        else:
+            # Dive dirs: landing page + split-moveset pages.
+            surfaces.extend(sorted(sub.glob('index.html')))
+            surfaces.extend(sorted(sub.glob('index_m*.html')))
     return [s for s in surfaces if s.exists()]
 
 

@@ -1147,6 +1147,10 @@ guide from `ai` to `expert` is the closing of that commitment.
   switching. Add team composition and switch-timing support. When this
   lands, honor `reset_on_switch`: Morpeko must re-enter in Full Belly on
   every switch-in (confirmed in-game 2026-06-06; see DEVELOPER_NOTES §8).
+  Also port the MATCH-level 240 s clock (Michael, 2026-06-11): the real
+  game's timer spans the whole 3v3, charged-move animations consume it,
+  and games are genuinely won on time — see DEVELOPER_NOTES "Battle
+  timeout" divergence entry for PvPoke's clock semantics to mirror.
 
 ---
 
