@@ -129,12 +129,16 @@ function evalSource(src, filename) {
 function instrumentActionLogic(src) {
   // Insert a trace hook inside the terminal-state detection for debug.
   const termAnchor = '\t\t\t\tstateList.push(currState);';
-  if (src.includes(termAnchor)) {
-    src = src.replace(
-      termAnchor,
-      `\t\t\t\tif (typeof global.__pvpoke_term_trace === 'function') { global.__pvpoke_term_trace(battle, poke, currState); }\n${termAnchor}`
-    );
+  if (!src.includes(termAnchor)) {
+    // Throw like every other probe: this was the one anchor that
+    // previously degraded silently on upstream drift (2026-06-11
+    // review finding T9).
+    throw new Error('pvpoke_trace: termAnchor not found in ActionLogic.js — upstream drift, re-vet the shim');
   }
+  src = src.replace(
+    termAnchor,
+    `\t\t\t\tif (typeof global.__pvpoke_term_trace === 'function') { global.__pvpoke_term_trace(battle, poke, currState); }\n${termAnchor}`
+  );
 
   // --- decideAction entry/return tracing ---
   // Stamp every `return;` / `return action;` inside decideAction with a

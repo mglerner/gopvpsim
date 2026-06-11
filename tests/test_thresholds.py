@@ -589,3 +589,45 @@ attack = 120.0
 """)
         reg = th.load_toml(p)
         assert "Great" in reg.species("Testmon").leagues
+
+
+class TestUnknownKeyRejection:
+    """2026-06-11 review finding L4: unknown keys used to be silently
+    ignored, so a typo'd field name changed semantics instead of erroring
+    ('deal_at_least' turned a Level-1 anchor into Level-3
+    discover-and-tag; 'atack' beside 'defense' dropped the attack
+    constraint)."""
+
+    def test_anchor_typo_deal_at_least_rejected(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+[Testmon.Great.anchors.bp]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+move = "FAIRY_WIND"
+deal_at_least = 5
+""")
+        with pytest.raises(th.ThresholdError, match="deal_at_least"):
+            th.load_toml(p)
+
+    def test_spread_typo_atack_rejected(self, tmp_path):
+        p = _write(tmp_path, "a.toml", """
+[Testmon.Great.spreads.x]
+atack = 120.0
+defense = 100.0
+""")
+        with pytest.raises(th.ThresholdError, match="atack"):
+            th.load_toml(p)
+
+    def test_kind_specific_keys_rejected_cross_kind(self, tmp_path):
+        # 'takes_at_most' is a bulkpoint field; on a damage_breakpoint
+        # anchor it must error rather than silently dangle.
+        p = _write(tmp_path, "a.toml", """
+[Testmon.Great.anchors.bp]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+move = "FAIRY_WIND"
+deals_at_least = 5
+takes_at_most = 3
+""")
+        with pytest.raises(th.ThresholdError, match="takes_at_most"):
+            th.load_toml(p)
