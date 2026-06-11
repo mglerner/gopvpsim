@@ -1946,3 +1946,27 @@ def test_lethal_throw_slot1_gated_on_bait_shields():
     assert any('DP[lethal]' in line for line in log_nobait)
     # bait ON: slot 1 is NOT eligible — no early lethal fire.
     assert not any('DP[lethal]' in line for line in log_bait)
+
+
+def test_cm_buff_delta_is_signed_both_axes():
+    """ActionLogic.js:519-536: the DP's attackMult tracking is SIGNED —
+    chance-1 self-target moves contribute buffs[0] (Superpower -1,
+    Draco Meteor -2, Power-Up Punch +1) and chance-1 opponent-target
+    moves contribute -buffs[1]. 'both'-target moves and chance<1 moves
+    contribute nothing.
+    """
+    from gopvpsim.battle import _cm_buff_delta
+
+    def cm(buffs, target, chance='1'):
+        return {'moveId': 'X', 'buffs': buffs, 'buffTarget': target,
+                'buffApplyChance': chance}
+
+    assert _cm_buff_delta(cm([-1, -1], 'self')) == -1      # Superpower
+    assert _cm_buff_delta(cm([-2, 0], 'self')) == -2       # Draco Meteor
+    assert _cm_buff_delta(cm([1, 0], 'self')) == 1         # Power-Up Punch
+    assert _cm_buff_delta(cm([0, -1], 'opponent')) == 1    # def debuff
+    assert _cm_buff_delta(cm([0, -2], 'opponent')) == 2    # Acid Spray
+    assert _cm_buff_delta(cm([-1, 0], 'opponent')) == 0    # Icy Wind (atk side)
+    assert _cm_buff_delta(cm([0, 1], 'both')) == 0         # Obstruct: no DP clause
+    assert _cm_buff_delta(cm([-1, -1], 'self', chance='0.5')) == 0
+    assert _cm_buff_delta({'moveId': 'X'}) == 0
