@@ -25,10 +25,17 @@ CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'slayer'
 
 
 def _move_hash(move_dict):
-    """Stable hash of move stats relevant to damage calc."""
+    """Stable hash of move stats relevant to battle outcomes.
+
+    Includes the buff fields: rebalances routinely tweak only
+    buffs/buffApplyChance, and those change scores just as surely as
+    power/energy do.
+    """
     if not move_dict:
         return 'none'
-    fields = ['power', 'energy', 'energyGain', 'cooldown', 'turns', 'type']
+    fields = ['power', 'energy', 'energyGain', 'cooldown', 'turns', 'type',
+              'buffs', 'buffTarget', 'buffApplyChance',
+              'buffsSelf', 'buffsOpponent']
     parts = []
     for k in fields:
         if k in move_dict:
@@ -37,16 +44,33 @@ def _move_hash(move_dict):
 
 
 def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_stats,
-                      shield_scenarios=None):
+                      shield_scenarios=None, iv_floor=None):
     """
     Build a stable cache key string identifying a slayer-iteration scenario.
 
     Two runs with the same key are guaranteed to produce identical sims.
-    Cache key includes the shield scenario list — different scenario sets
-    produce different cached score-tuple shapes, so they must not collide.
+    Cache key includes:
+
+    - the shield scenario list — different scenario sets produce different
+      cached score-tuple shapes, so they must not collide;
+    - ``iv_floor`` — cache entries are keyed by POSITIONAL iv_meta indices,
+      and the floor changes the index↔IV mapping, so floored and floorless
+      runs of the same species must not share a file;
+    - the engine-source hash from sweep_cache (battle.py & friends) — any
+      engine edit invalidates automatically, instead of relying on a manual
+      CACHE_VERSION bump (which was forgotten once already, see v2 note);
+    - the gamemaster content hash — covers data the explicit move/stat
+      hashes can't see (e.g. a form-change species' ALT-form stats live in
+      a different gamemaster entry than the ``base_stats`` passed here).
     """
+    # Local import: sweep_cache lives in the same scripts/ dir and caches
+    # both hashes per-process, so this is cheap after the first call.
+    from sweep_cache import engine_hash, gamemaster_hash
+
     h = hashlib.md5()
     h.update(f'v{CACHE_VERSION}'.encode())
+    h.update(engine_hash().encode())
+    h.update(gamemaster_hash().encode())
     h.update(species.encode())
     h.update(league.encode())
     h.update(b'shadow' if shadow else b'normal')
@@ -57,6 +81,8 @@ def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_st
     if shield_scenarios:
         scen_str = ','.join(f'{s0}v{s1}' for s0, s1 in shield_scenarios)
         h.update(scen_str.encode())
+    if iv_floor is not None:
+        h.update(f'floor={tuple(iv_floor)}'.encode())
     return f'{species}_{league}_{h.hexdigest()[:12]}'
 
 
@@ -81,7 +107,11 @@ class SlayerCache:
             if p.exists():
                 with open(p, 'rb') as f:
                     self.data = pickle.load(f)
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger('deep_dive').debug(
+                f'slayer cache: failed to load {self.cache_key} ({e}); '
+                f'starting empty')
             self.data = {}
 
     def save(self):
@@ -90,8 +120,12 @@ class SlayerCache:
         try:
             CACHE_DIR.mkdir(parents=True, exist_ok=True)
             p = self._path()
-            with open(p, 'wb') as f:
+            # Atomic write: a crash mid-pickle must not leave a truncated
+            # file that the next run silently discards.
+            tmp = p.with_name(p.name + '.tmp')
+            with open(tmp, 'wb') as f:
                 pickle.dump(self.data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            os.replace(tmp, p)
         except Exception:
             pass  # cache is best-effort
 

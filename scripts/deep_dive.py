@@ -5220,6 +5220,7 @@ def main():
                 [charged_moves_db.get(cid, {}) for cid in charged_ids],
                 base_stats_dict,
                 shield_scenarios=shield_scenarios,
+                iv_floor=args.iv_floor,
             )
             slayer_cache = SlayerCache(cache_key=cache_key, disk=not args.no_cache)
 
