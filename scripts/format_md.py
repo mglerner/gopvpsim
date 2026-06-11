@@ -158,18 +158,46 @@ def collapse_blank_lines(lines: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _split_cells(s: str) -> list[str]:
+    """Split on '|' EXCEPT escaped pipes (\\|) and pipes inside backtick
+    code spans — both are cell content, and a naive split() shifted every
+    subsequent column (2026-06-11 review finding W1)."""
+    cells: list[str] = []
+    buf: list[str] = []
+    in_code = False
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        if ch == "`":
+            in_code = not in_code
+            buf.append(ch)
+        elif ch == "\\" and i + 1 < len(s) and s[i + 1] == "|":
+            buf.append("\\|")
+            i += 1
+        elif ch == "|" and not in_code:
+            cells.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+        i += 1
+    cells.append("".join(buf))
+    return cells
+
+
 def _split_row(line: str) -> list[str]:
     """Split a markdown table row line into trimmed cell strings.
 
-    Strips a single leading and trailing pipe if present (the convention
-    in this repo). Cells are returned with surrounding whitespace stripped.
+    Strips leading indent (the caller validates it's <= 3 spaces) and a
+    single leading and trailing pipe if present (the convention in this
+    repo). Cells are returned with surrounding whitespace stripped.
+    Escaped pipes and pipes inside backtick code spans stay in their cell.
     """
-    s = line.rstrip("\n")
+    s = line.rstrip("\n").lstrip()
     if s.startswith("|"):
         s = s[1:]
-    if s.endswith("|"):
+    if s.endswith("|") and not s.endswith("\\|"):
         s = s[:-1]
-    return [c.strip() for c in s.split("|")]
+    return [c.strip() for c in _split_cells(s)]
 
 
 def _is_separator_row(cells: list[str]) -> bool:
@@ -292,6 +320,16 @@ def pad_tables(lines: list[str]) -> list[str]:
                 block.append(lines[i])
                 i += 1
 
+            # GFM: a table may be indented up to 3 spaces; 4+ is an
+            # indented code block. Previously the indent leaked into the
+            # first cell AND the re-emit dropped it (review finding W1).
+            indents = [l[:len(l) - len(l.lstrip())] for l in block]
+            if any(len(ind.expandtabs(4)) >= 4 for ind in indents):
+                # Indented code block (or tab-indented content) — leave
+                # every line byte-identical.
+                out.extend(block)
+                continue
+
             rows = [_split_row(l) for l in block]
             sep_index = -1
             for k, r in enumerate(rows):
@@ -305,7 +343,11 @@ def pad_tables(lines: list[str]) -> list[str]:
                 continue
 
             aligns = [_alignment(c) for c in rows[sep_index]]
-            out.extend(_render_table(rows, sep_index, aligns))
+            # Re-emit with the first line's indent (normalizing ragged
+            # indents within the block, which is this tool's job anyway).
+            indent = indents[0]
+            out.extend(indent + rendered
+                       for rendered in _render_table(rows, sep_index, aligns))
             continue
 
         out.append(line)
