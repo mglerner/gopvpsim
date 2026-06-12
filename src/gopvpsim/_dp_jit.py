@@ -79,7 +79,6 @@ def _make_jit():
         _i8,               # fast_damage
         _i8,               # fast_energy
         _i8,               # fast_turns
-        _b1,               # intended_pruning
     )
 
     @njit(_sig, cache=True)
@@ -99,7 +98,6 @@ def _make_jit():
         fast_damage,        # int (unused — kept for signature stability)
         fast_energy,        # int
         fast_turns,         # int
-        intended_pruning,   # bool
     ):
         """Run the near-KO DP. Returns a 9-tuple of scalars:
 
@@ -258,24 +256,16 @@ def _make_jit():
                     q_size = qsz
 
                     if insert_element:
-                        # Phase 2 dominance (intended-pruning only).
+                        # (PvPoke's Phase-2 dominance check here is dead
+                        # code in the JS — see _dp_insert_ready — so no
+                        # pruning: just find the <= insertion point.)
                         i = 0
-                        dominated = False
-                        if intended_pruning:
-                            while i < q_size and q_turn[i] <= new_t:
-                                if (q_hp[i] <= new_hp
-                                        and q_energy[i] >= new_e
-                                        and q_shields[i] <= new_sh):
-                                    dominated = True
-                                    break
-                                i += 1
-                        else:
-                            while i < q_size and q_turn[i] <= new_t:
-                                i += 1
+                        while i < q_size and q_turn[i] <= new_t:
+                            i += 1
 
-                        if not dominated and q_size >= QUEUE_CAP:
+                        if q_size >= QUEUE_CAP:
                             overflowed = True
-                        elif not dominated:
+                        else:
                             # Insert at position i (shift right).
                             for k in range(q_size, i, -1):
                                 q_energy[k]  = q_energy[k - 1]
@@ -312,23 +302,14 @@ def _make_jit():
                     else:
                         new_hp = curr_hp - curr_fast_dmg * fm_needed - move_dmg
 
+                    # (Dominance check dead in PvPoke — no pruning.)
                     i = 0
-                    dominated = False
-                    if intended_pruning:
-                        while i < q_size and q_turn[i] < new_t:
-                            if (q_hp[i] <= new_hp
-                                    and q_energy[i] >= new_e
-                                    and q_shields[i] <= new_sh):
-                                dominated = True
-                                break
-                            i += 1
-                    else:
-                        while i < q_size and q_turn[i] < new_t:
-                            i += 1
+                    while i < q_size and q_turn[i] < new_t:
+                        i += 1
 
-                    if not dominated and q_size >= QUEUE_CAP:
+                    if q_size >= QUEUE_CAP:
                         overflowed = True
-                    elif not dominated:
+                    else:
                         for k in range(q_size, i, -1):
                             q_energy[k]  = q_energy[k - 1]
                             q_hp[k]      = q_hp[k - 1]
@@ -356,24 +337,15 @@ def _make_jit():
                 fd_turn = curr_t + fm_to_ko * fast_turns
                 fd_energy = curr_e + fast_energy * fm_to_ko
 
-                # Insert AFTER same-turn (<=). Intended-pruning would block
-                # if any earlier same-turn state already has hp < 0; we
-                # carry an int8 dummy for that since farm-down hp == 0.
+                # Insert AFTER same-turn (<=). (PvPoke's blocking check
+                # here is dead code in the JS — no pruning.)
                 i = 0
-                blocked = False
-                if intended_pruning:
-                    while i < q_size and q_turn[i] <= fd_turn:
-                        if q_hp[i] < 0.0:
-                            blocked = True
-                            break
-                        i += 1
-                else:
-                    while i < q_size and q_turn[i] <= fd_turn:
-                        i += 1
+                while i < q_size and q_turn[i] <= fd_turn:
+                    i += 1
 
-                if not blocked and q_size >= QUEUE_CAP:
+                if q_size >= QUEUE_CAP:
                     overflowed = True
-                elif not blocked:
+                else:
                     for k in range(q_size, i, -1):
                         q_energy[k]  = q_energy[k - 1]
                         q_hp[k]      = q_hp[k - 1]

@@ -209,24 +209,6 @@ def get_final_forms(species_name: str) -> list:
     return _load_pre_to_finals().get(species_name, [species_name])
 
 
-def get_final_form(species_name: str) -> str:
-    """Return a single final evolution for a species name.
-
-    Raises ``ValueError`` if the species has a branching evolution
-    (multiple possible finals) — callers that might encounter branches
-    should use :func:`get_final_forms` instead.
-
-    Kept for backwards compatibility with callers that know they're
-    dealing with unambiguous chains (e.g. Tinkatink, Bunnelby).
-    """
-    finals = get_final_forms(species_name)
-    if len(finals) > 1:
-        raise ValueError(
-            f"{species_name!r} has branching evolutions: {finals}. "
-            f"Use get_final_forms() to handle all cases.")
-    return finals[0]
-
-
 def invalidate_cache() -> None:
     """Clear the cached dicts. Next call rebuilds from the gamemaster."""
     global _evolution_lines_cache, _pre_to_finals_cache
