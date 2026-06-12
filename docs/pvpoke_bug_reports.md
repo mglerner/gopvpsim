@@ -101,6 +101,15 @@ Removing Gyro Ball from the moveset RAISES Aegislash's 1v2 score from
 what its own moveset supports; "more moves can only help" intuition
 is violated.
 
+**Winner-flip evidence (found 2026-06-12, Great League):** Azumarill
+(Bubble / Ice Beam + Play Rough, 4/15/13) vs Aegislash (Shield)
+(4/14/15), shields 2v1 and 2v2: the simulator reports Azumarill
+WINNING 623-376 because Aegislash burns both of Azumarill's shields
+on Gyro Ball and then lands a third Gyro Ball instead of Shadow
+Balls. With Shadow Ball selected (identical 50 energy, strictly more
+damage), Aegislash wins the same matchup 510-489. The bug does not
+just shave score margins - it flips published matchup outcomes.
+
 ---
 
 ## Report 4 — initializeMove's buff-adjusted DPE is immediately overwritten
