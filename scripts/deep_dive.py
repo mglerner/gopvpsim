@@ -1545,6 +1545,7 @@ PLOTLY_CDN = "https://cdn.plot.ly/plotly-2.35.2.min.js"
 PLOTLY_FILENAME = "plotly-2.35.2.min.js"
 PLOTLY_DOWNLOAD_TIMEOUT = 60        # seconds per attempt
 PLOTLY_DOWNLOAD_BACKOFF = (1, 5, 15)  # retry sleep schedule (3 attempts total)
+PLOTLY_CACHE_DIR = Path.home() / '.cache' / 'gopvpsim'
 
 
 def _download_plotly_with_retry():
@@ -1599,6 +1600,29 @@ def _download_plotly_with_retry():
     return None
 
 
+def _plotly_bytes_cached():
+    """Return plotly.min.js bytes, preferring the local version-keyed cache.
+
+    ``PLOTLY_CDN`` pins an exact version, so the cache file (keyed by
+    ``PLOTLY_FILENAME`` under ``PLOTLY_CACHE_DIR``) can never go stale:
+    bumping the pinned version changes the filename, which misses the
+    cache and forces a fresh download. Returns ``None`` when the cache
+    is cold and the download fails persistently (callers fall back to
+    the CDN ``<script src>`` reference).
+    """
+    cache_path = Path(PLOTLY_CACHE_DIR) / PLOTLY_FILENAME
+    if cache_path.exists():
+        return cache_path.read_bytes()
+    logger.info(f"  Plotly.js cache cold; downloading to {cache_path}")
+    data = _download_plotly_with_retry()
+    if data is not None:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = cache_path.with_suffix('.tmp')
+        tmp.write_bytes(data)
+        tmp.replace(cache_path)  # atomic: a killed run can't leave a torn cache
+    return data
+
+
 def _plotly_script_tag(standalone, shared_plotly_dir=None, html_path=None):
     """Return the <script> tag for Plotly.js.
 
@@ -1612,20 +1636,21 @@ def _plotly_script_tag(standalone, shared_plotly_dir=None, html_path=None):
         inline blob; file works in isolation).
       otherwise: emit a CDN <script src=...> reference.
 
-    Robustness: both download paths use ``_download_plotly_with_retry``,
-    which times out (60s/attempt), retries with backoff (1s/5s/15s),
-    and on persistent failure returns None — callers then fall back
-    to the plain CDN ``<script src>`` reference so the dive still
-    ships (just online-only instead of offline-portable). See that
-    function's docstring for context.
+    Robustness: both embedding paths source bytes from
+    ``_plotly_bytes_cached`` — a local version-keyed cache backed by
+    ``_download_plotly_with_retry`` (60s timeout/attempt, 1s/5s/15s
+    backoff). On a cold cache with persistent download failure it
+    returns None — callers then fall back to the plain CDN
+    ``<script src>`` reference so the dive still ships (just
+    online-only instead of offline-portable).
     """
     if shared_plotly_dir is not None:
         shared = Path(shared_plotly_dir)
         shared.mkdir(parents=True, exist_ok=True)
         plotly_path = shared / PLOTLY_FILENAME
         if not plotly_path.exists():
-            logger.info(f"  Downloading Plotly.js to shared dir: {plotly_path}")
-            plotly_bytes = _download_plotly_with_retry()
+            logger.info(f"  Writing Plotly.js to shared dir: {plotly_path}")
+            plotly_bytes = _plotly_bytes_cached()
             if plotly_bytes is None:
                 return f'<script src="{PLOTLY_CDN}"></script>'
             plotly_path.write_bytes(plotly_bytes)
@@ -1639,8 +1664,7 @@ def _plotly_script_tag(standalone, shared_plotly_dir=None, html_path=None):
         return f'<script src="{rel}"></script>'
     if not standalone:
         return f'<script src="{PLOTLY_CDN}"></script>'
-    logger.info("  Downloading Plotly.js for standalone HTML...")
-    plotly_bytes = _download_plotly_with_retry()
+    plotly_bytes = _plotly_bytes_cached()
     if plotly_bytes is None:
         return f'<script src="{PLOTLY_CDN}"></script>'
     return f'<script>{plotly_bytes.decode()}</script>'
