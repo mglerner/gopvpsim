@@ -1,0 +1,200 @@
+# Clodsire — Great League thresholds, spreads, and slayer anchors.
+#
+# Sources:
+#   - RyanSwag "Clodsire PvP IV Deep-Dive" (GamePress, series #2, last
+#     updated 2023-11-06). Fetched 2026-06-12 via Wayback snapshot
+#     20231207045631 of gamepress.gg/pokemongo/clodsire-pvp-iv-deep-dive.
+#   - Sim-discovery anchors against the 2026-06-10 GL top-50 ∪
+#     championshipseries opponent pool (opponent_pools/gl_top50_plus_cs.txt).
+#
+# FRESHNESS CAVEAT: the RyanSwag writeup predates the June-2026 move
+# rebalance by ~2.5 years. Several of its calibration opponents
+# (Serperior, Lickitung, Trevenant, Deoxys-D, Clefable, Lanturn,
+# Swampert, Alolan Ninetales, Shadow Alolan Sandslash, Noctowl) are not
+# in the current GL pool. The stat numbers themselves are stable (the
+# BP/bulkpoint calculus only depends on the opponents' stats), but
+# matchup relevance should be re-checked against current rankings.
+# Clodsire is GL meta rank 37 as of 2026-06.
+
+[Clodsire]
+sources = """
+RyanSwag Clodsire PvP IV Deep-Dive (GamePress, series #2, last updated
+2023-11-06; Wayback snapshot 20231207045631) + sim-discovery anchors vs
+the 2026-06-10 GL top-50 + championshipseries pool.
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — stat-cutoff tiers from the RyanSwag writeup
+# ─────────────────────────────────────────────────────────────────────
+
+[Clodsire.Great.spreads."High Bulk"]
+attack = 0
+defense = 119.51
+stamina = 212
+description = """
+RyanSwag High Bulk tier: 119.51 def + 212 hp. Manages the Serperior 1-1,
+Lickitung 2-1, Medicham 0-0, Trevenant 1-1, and Deoxys-D 0-0. RyanSwag:
++ 212 hp may work but + 214 hp is safer ("2 HP above the recommendations
+will be more consistent"); 119.40 def or better is also more resilient
+vs the mirror, Deoxys-D (0-0), and Trevenant (1-1).
+"""
+source = "RyanSwag Clodsire deep dive (GamePress, 2023-11-06)"
+
+[Clodsire.Great.spreads."High Bulk Alt"]
+attack = 0
+defense = 121.23
+stamina = 210
+description = """
+RyanSwag alternate High Bulk tier, trading 2 HP for more def: 121.23 def
++ 210 hp. For the (now off-meta) Lickitung 1-1, RyanSwag cites
+121.23 def + 212 hp or 118.00 def + 215 hp as the spreads that may
+maintain it.
+"""
+source = "RyanSwag Clodsire deep dive (GamePress, 2023-11-06)"
+
+[Clodsire.Great.spreads."Atk Weighted"]
+attack = 96.5
+defense = 117.0
+stamina = 199
+description = """
+RyanSwag Atk Weighted tier: 96.50 atk with 117.00 def + 199 hp.
+96.50 atk enables the Medicham 1-1 (Sludge Bomb & Earthquake BP) and
+Deoxys-D 1-2. An atk-focused build can soften to 118.09 def (Powder
+Snow A-Ninetales 0-0 potential). Off-current-pool atk BP ladder from
+the writeup, rank-1 opponents unless stated: 94.00 atk Swampert 1-0
+(Mud Shot; 96.20 atk for Poison Sting); 94.48 atk Shadow A-Sandslash
+0-0 EQ BP (ps); 95.55 atk Powder Snow A-Ninetales 2-2 SB BP (ps);
+95.78 atk Charm Shadow A-Ninetales 1-2 SB BP (ms); 96.49 atk Deoxys-D
+1-2 Mud Shot BP; 96.60 atk Spark Lanturn 0-1 EQ BP (ms); 96.80 atk for
+Clefable 1-2 (MS) and Spark Lanturn 0-1 (MS) per the summary table
+(96.86 atk Clefable 1-2 Mud Shot BP in the body); 97.15 atk Noctowl
+0-0 SB BP (ms); 97.40 atk for Lickitung CMP (1-1 flip); 98.09 atk
+Lanturn 1-2 EQ BP (ps).
+"""
+source = "RyanSwag Clodsire deep dive (GamePress, 2023-11-06)"
+
+[Clodsire.Great.spreads."Mirror Def Floor"]
+attack = 0
+defense = 116.45
+stamina = 0
+description = """
+116.45 def protects against the rank-1 mirror's Mud Shot breakpoint —
+RyanSwag's def floor for both flavors ("the higher the better").
+"""
+source = "RyanSwag Clodsire deep dive (GamePress, 2023-11-06)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Opponents picked from the current GL pool where Clodsire's
+# Poison/Ground typing makes the def/hp check plausible and the matchup
+# close: resisted Fighting/Fairy/Poison pressure (Medicham, Azumarill),
+# neutral spam (Lickilicky, Umbreon, Sableye, Jumpluff), and
+# super-effective Water/Ground threats where one damage tier decides
+# how many charge moves Clodsire reaches (Quagsire, Mantine, G-Fisk).
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror — required anchor. RyanSwag's def floor lives here.
+[Clodsire.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Clodsire"
+description = "Discover all mirror Clodsire bulkpoints. RyanSwag: 116.45 def avoids the rank-1 mirror's Mud Shot breakpoint; 119.40 def is more resilient against higher-atk mirrors."
+source = "RyanSwag Clodsire deep dive (GamePress, 2023-11-06)"
+
+# Medicham: Fighting resisted by Poison — the bulk tier holds the 0-0.
+[Clodsire.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. RyanSwag: the 119.51 def + 212 hp High Bulk tier manages the Medicham 0-0."
+source = "RyanSwag Clodsire deep dive (GamePress, 2023-11-06)"
+
+# Lickilicky: Body Slam spam, the current-pool heir to the writeup's
+# Lickitung 2-1 / 1-1 bulk checks (Lickitung itself left the pool).
+# RyanSwag's numbers were calibrated vs Lickitung, so they are recorded
+# on the High Bulk spreads, not here — rediscover vs Lickilicky.
+[Clodsire.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam tier shifts decide how many charge moves Clodsire banks in the long 1-1."
+
+# Azumarill: resisted Fairy spam plus super-effective Hydro Pump /
+# Play Rough mix — classic def/hp tier matchup.
+[Clodsire.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints in the survivor def range."
+
+# Quagsire: GL #1 region, super-effective ground pressure; one
+# Mud Shot tier decides the energy race.
+[Clodsire.Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire bulkpoints in the survivor def range."
+
+# Galarian Stunfisk: Mud Shot + Earthquake, the other big Ground check.
+[Clodsire.Great.anchors.stunfisk_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all Galarian Stunfisk bulkpoints in the survivor def range."
+
+# Mantine: super-effective Water spam; the writeup treats the 2-2 as
+# swingy (atk-side BP at 94.70 — see brkp anchor below), so the def
+# side of the same matchup is worth tagging too.
+[Clodsire.Great.anchors.mantine_blkp_any]
+kind = "bulkpoint"
+opponent = "Mantine"
+description = "Discover all Mantine bulkpoints in the survivor def range. Def side of the close 2-2 RyanSwag flags on the atk side."
+
+# Umbreon: neutral Snarl/Foul Play grind — pure bulk-tier matchup.
+[Clodsire.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints in the survivor def range."
+
+# Jumpluff: nearest in-pool analog to the writeup's demanding
+# Serperior 1-1 grass check (Serperior left the pool).
+[Clodsire.Great.anchors.jumpluff_blkp_any]
+kind = "bulkpoint"
+opponent = "Jumpluff"
+description = "Discover all Jumpluff bulkpoints. In-pool stand-in for the writeup's Serperior 1-1 bulk check."
+
+# Sableye: Shadow Claw chip — def tiers decide the 0-0 race that
+# RyanSwag flags on the atk side at 95.80.
+[Clodsire.Great.anchors.sableye_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye"
+description = "Discover all Sableye bulkpoints in the survivor def range."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# The four in-pool matchups RyanSwag's atk BP ladder flips.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror BP RyanSwag headlines ("including a mirror breakpoint").
+[Clodsire.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Clodsire"
+description = "Discover all mirror damage breakpoints. RyanSwag: 97.15 atk hits the Mud Shot mirror BP (0-0, 1-1, 2-2 potential); the summary table cites 97.22 atk for the Mud Shot BP vs the rank-1 mirror."
+source = "RyanSwag Clodsire deep dive (GamePress, 2023-11-06)"
+
+# Medicham: the key Atk Weighted calibration point.
+[Clodsire.Great.anchors.medicham_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+description = "Discover all Medicham damage breakpoints. RyanSwag: 96.50 atk Sludge Bomb & Earthquake BP enables the Medicham 1-1."
+source = "RyanSwag Clodsire deep dive (GamePress, 2023-11-06)"
+
+# Sableye: cheap BP low in the ladder.
+[Clodsire.Great.anchors.sableye_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Sableye"
+description = "Discover all Sableye damage breakpoints. RyanSwag: 95.80 atk Sludge Bomb & Earthquake BP for the 0-0 (Poison Sting)."
+source = "RyanSwag Clodsire deep dive (GamePress, 2023-11-06)"
+
+# Mantine: lowest in-pool rung of the ladder.
+[Clodsire.Great.anchors.mantine_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Mantine"
+description = "Discover all Mantine damage breakpoints. RyanSwag: 94.70 atk Sludge Bomb BP for the 2-2 (Poison Sting)."
+source = "RyanSwag Clodsire deep dive (GamePress, 2023-11-06)"

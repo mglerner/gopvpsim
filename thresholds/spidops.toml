@@ -1,0 +1,201 @@
+# Spidops — Great League thresholds, spreads, and slayer anchors.
+#
+# Sources:
+#   - HomeSliceHenry Discord #iv-tech deep dive (local copy:
+#     docs/spidops_deep_dive_reference.md). Atk-side breakpoints, def-side
+#     bulk checks, and the recommended stat tiers all come from there.
+#   - GoBattleKit DEFAULT_THRESHOLDS (gobattlekit/src/gobattlekit/data/
+#     thresholds.py) ships the same three tiers (Atk / Bulk / Bulk+) under
+#     the same names — the spreads below mirror those app-shipped keys so
+#     the downstream exporter can regex-verify staleness.
+#
+# Focal moveset context (gamemaster): pure Bug; fast Shadow Claw (also
+# learns Bug Bite, Counter); charged Lunge / Rock Tomb (also X-Scissor,
+# Grass Knot). The HSH writeup's numbers reference Shadow Claw, Lunge,
+# and Rock Tomb damage tiers.
+
+[Spidops]
+sources = "HomeSliceHenry Discord deep dive (local copy: docs/spidops_deep_dive_reference.md); GoBattleKit DEFAULT_THRESHOLDS (Atk / Bulk / Bulk+ tiers shipped in-app)"
+
+[Spidops.Great.meta]
+notes = """
+Spidops sits below top-40 in the current (post-June-2026 rebalance) GL meta
+but ships in GoBattleKit today. The HSH writeup itself notes Spidops is less
+meta-relevant now than when the dive was written — treat its matchup claims
+as calibration provenance, not current meta advice. Florges and Blastoise
+have since dropped out of the top-50 pool; their expert anchors are kept via
+TOML anchor opponent injection (same convention as tinkaton.toml's Shadow
+Drapion / Shadow Politoed).
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — stat-cutoff tiers from the HSH summary, named to match the
+# GoBattleKit DEFAULT_THRESHOLDS keys exactly.
+# ─────────────────────────────────────────────────────────────────────
+
+[Spidops.Great.spreads.Atk]
+attack = 113.03
+defense = 138.88
+stamina = 0
+description = "Slight attack-weight tier: 113.03 atk + 138.88 def, then as much hp as possible (1/7/1 cited as a strong spread). The atk cutoff is the rank #2 Forretress breakpoint."
+source = "HomeSliceHenry Discord deep dive; shipped in GoBattleKit as 'Atk'"
+
+[Spidops.Great.spreads.Bulk]
+attack = 109.82
+defense = 138.88
+stamina = 0
+description = "Bulk-focus tier (minimum def): 109.82 atk + 138.88 def, then as much hp as possible. The atk cutoff is the rank #1 Cradily breakpoint; the def cutoff covers default Tinkaton and default Shadow Talonflame."
+source = "HomeSliceHenry Discord deep dive; shipped in GoBattleKit as 'Bulk'"
+
+[Spidops.Great.spreads."Bulk+"]
+attack = 109.82
+defense = 140.67
+stamina = 0
+description = "Bulk-focus tier (preferred def): 109.82 atk + 140.67 def, then as much hp as possible (2/15/15 cited). The def cutoff adds the rank #1 Altaria no-bait 1s flip."
+source = "HomeSliceHenry Discord deep dive; shipped in GoBattleKit as 'Bulk+'"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), Level 3 discover-all.
+#
+# Each anchor's description carries the HSH calibration atk so the
+# resolved sub-anchor distribution can be checked against the writeup.
+# ─────────────────────────────────────────────────────────────────────
+
+# The Bulk-tier atk calibration point.
+[Spidops.Great.anchors.cradily_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Cradily"
+description = "Discover all Cradily damage breakpoints. 109.82 atk nets a breakpoint vs rank #1 Cradily that flips the 0s — this is the Bulk-tier atk floor."
+source = "HomeSliceHenry Discord deep dive"
+
+# Out of the current top-50 pool; injected via this anchor.
+[Spidops.Great.anchors.golisopod_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Golisopod"
+description = "Discover all Golisopod damage breakpoints. 110.24 atk picks up the rank #2 (0/12/12) in the 0s; 111.58 atk picks up the hp-skewed rank #1 (0/8/15). Any Spidops wins the 0s vs the default 4/15/13."
+source = "HomeSliceHenry Discord deep dive"
+
+# Out of the current top-50 pool; injected via this anchor.
+[Spidops.Great.anchors.moltres_galarian_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Moltres (Galarian)"
+description = "Discover all Galarian Moltres damage breakpoints. 110.54 atk nets a breakpoint vs the default 4/10/15 that flips the 2s."
+source = "HomeSliceHenry Discord deep dive"
+
+# Florges left the top-50 pool in the 2026-06 rebalance; injected here.
+[Spidops.Great.anchors.florges_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Florges"
+description = "Discover all Florges damage breakpoints. 110.92 atk picks up the 0s and 1-0s: a breakpoint before the first Chilling Water, plus one extra Shadow Claw damage after two Chilling Waters."
+source = "HomeSliceHenry Discord deep dive"
+
+[Spidops.Great.anchors.stunfisk_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Stunfisk"
+description = "Discover all (Unovan) Stunfisk damage breakpoints. 111.34 atk picks up the 1-2s vs rank #1 Stunfisk by raising Lunge damage enough to KO after four Lunges."
+source = "HomeSliceHenry Discord deep dive"
+
+[Spidops.Great.anchors.togekiss_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Togekiss"
+description = "Discover all Togekiss damage breakpoints. 112.03 atk picks up the default IV Togekiss in the 0s via extra Rock Tomb damage; 113.14 atk is needed for the rank #1."
+source = "HomeSliceHenry Discord deep dive"
+
+# Shadow Annihilape is not in the current pool (non-shadow is); injected here.
+[Spidops.Great.anchors.annihilape_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Annihilape (Shadow)"
+description = "Discover all Shadow Annihilape damage breakpoints. 112.46 atk nets a breakpoint vs the default 4/13/13 that flips the 0s; 113.57 atk covers the rank #1."
+source = "HomeSliceHenry Discord deep dive"
+
+# The Atk-tier calibration point.
+[Spidops.Great.anchors.forretress_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Forretress"
+description = "Discover all Forretress damage breakpoints. 113.03 atk nets a breakpoint vs the rank #2 Forretress (rank #1 is hp-skewed) that flips the 1-0s and 2-1s — this is the Atk-tier calibration."
+source = "HomeSliceHenry Discord deep dive"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side), Level 3 discover-all.
+#
+# First the HSH-calibrated targets (each description carries the def/hp
+# numbers), then sim-zone discovery anchors for in-pool opponents where
+# the type matchup makes def/hp checks plausible.
+# ─────────────────────────────────────────────────────────────────────
+
+[Spidops.Great.anchors.furret_blkp_any]
+kind = "bulkpoint"
+opponent = "Furret"
+description = "Discover all Furret bulkpoints. 135.74 def + 130 hp flips the 2-1s vs the rank #1; 137.51 def + 130 hp covers the default 4/14/13."
+source = "HomeSliceHenry Discord deep dive"
+
+[Spidops.Great.anchors.tinkaton_blkp_any]
+kind = "bulkpoint"
+opponent = "Tinkaton"
+description = "Discover all Tinkaton bulkpoints. 137.51 def + 132 hp flips the 1-2s vs the rank #1; 138.88 def + 132 hp covers the default 4/15/14 — this is the Bulk-tier def calibration."
+source = "HomeSliceHenry Discord deep dive"
+
+# Shadow Kanto Marowak is not in the current pool; injected here.
+[Spidops.Great.anchors.marowak_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Marowak (Shadow)"
+description = "Discover all Shadow Marowak bulkpoints. 138.09 def + 132 hp covers the rank #1 in the 1-2s; near-max hp is needed to beat attack-weighted IV spreads."
+source = "HomeSliceHenry Discord deep dive"
+
+[Spidops.Great.anchors.talonflame_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Talonflame (Shadow)"
+description = "Discover all Shadow Talonflame bulkpoints. 138.88 def + 132 hp covers the default 4/12/15 in the 2-1s; very IV dependent on both sides (double super-effective incoming Fire/Flying)."
+source = "HomeSliceHenry Discord deep dive"
+
+# Blastoise left the top-50 pool in the 2026-06 rebalance; injected here.
+[Spidops.Great.anchors.blastoise_blkp_any]
+kind = "bulkpoint"
+opponent = "Blastoise"
+description = "Discover all Blastoise bulkpoints. 139.94 def + 133 hp flips the 1s vs the rank #1; higher-attack Blastoise can still be flipped with more def/hp as long as two Hydro Cannons are survived."
+source = "HomeSliceHenry Discord deep dive"
+
+# The Bulk+ tier def calibration point.
+[Spidops.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. 140.67 def + 132 hp flips the 1s vs the rank #1 without baits by reducing Sky Attack damage — the Bulk+ def calibration; 140.85 def + 133 hp covers the default 4/12/13."
+source = "HomeSliceHenry Discord deep dive"
+
+# ── Sim-zone bulkpoint discovery (no expert source) ──────────────────
+
+# The mirror.
+[Spidops.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Spidops"
+description = "Discover all mirror Spidops bulkpoints. CMP-adjacent mirror: Shadow Claw / Lunge tiers decide who wins the fast-move race."
+
+[Spidops.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Neutral both ways and decided on bulk: Bubble / Ice Beam / Play Rough damage tiers in a long grind."
+
+[Spidops.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Classic Body Slam spam target — def tiers that drop Body Slam by 1 swing close races."
+
+[Spidops.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Bug resists Counter, so the matchup hinges on Psychic / Ice Punch damage tiers against Spidops' super-effective Lunge pressure."
+
+[Spidops.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Long neutral fast-move race (Snarl/Foul Play) against Spidops' super-effective Bug damage — def tiers matter over many turns."
+
+[Spidops.Great.anchors.sableye_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye"
+description = "Discover all Sableye bulkpoints. Shadow Claw spam duel; Spidops hits the Dark half super-effectively, so dropping Sableye's fast-move damage by 1 flips close endings."
+
+[Spidops.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. Bug resists Counter; Shadow Ball / Rage Fist tiers decide whether bulky Spidops holds the matchup."

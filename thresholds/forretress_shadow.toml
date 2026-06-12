@@ -1,0 +1,161 @@
+# Forretress (Shadow) — Great League thresholds (split from forretress.toml so
+# deep_dive.py auto-discovery finds it; see docs/threshold_schema.md).
+
+# ═════════════════════════════════════════════════════════════════════
+# Shadow Forretress — same base stats and Volt Switch / Sand Tomb /
+# Rock Tomb moveset, shadow atk/def multipliers (rank-1 0/9/15 @ L25.5:
+# 130.3 atk / 120.3 def / 132 hp). The shadow trades the base form's
+# deep bulk for breakpoint pressure: its 1-1 card swaps the base's
+# close losses (Lickilicky, Feraligatr) into knife-edge wins while
+# dropping new close losses to neutral chip it can no longer wall
+# (Umbreon, Grumpig, Charjabug, Aegislash). With shadow-reduced def,
+# bulkpoints are scarcer and each one is worth proportionally more.
+# ═════════════════════════════════════════════════════════════════════
+
+["Forretress (Shadow)"]
+sources = """
+Simulator-derived. Same 1-1 shield sim sweep as the base table
+(sim_score/pvpoke_dp, rank-1 0/9/15, default Volt Switch / Sand Tomb /
+Rock Tomb, 2026-06-12) over opponent_pools/gl_top50_plus_cs.txt +
+PvPoke GL rankings 2026-06-10 (Forretress (Shadow) rank 23; Lickilicky
+listed at 496 from the Lickilicky side — the knife-edge this table
+anchors). No known expert writeup; anchors chosen from current-meta
+matchup logic.
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror (shadow vs shadow). Both sides carry the shadow atk boost
+# into shadow-reduced def, so every tier shifts relative to the base
+# mirror; the 1-1 sim's role asymmetry (347 as P0) says timing/CMP
+# integers are doing real work — exactly what discovery probes.
+["Forretress (Shadow)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Forretress (Shadow)"
+description = "Discover all shadow-mirror bulkpoints — boosted chip into reduced def shifts every tier vs the base mirror; 1-1 role asymmetry shows the integers matter."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Cross-variant mirror: the base form's deeper bulk makes this a 571
+# win at 1-1 — def tiers vs the base's resisted Volt Switch and Sand
+# Tomb keep it that way across shadow IV variance.
+["Forretress (Shadow)".Great.anchors.base_mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Forretress"
+description = "Discover all bulkpoints vs base Forretress — cross-variant mirror, 571 win to keep; expect to face both variants."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Lickilicky, 503 — the knife-edge the whole shadow card pivots on
+# (PvPoke shows 496 from the Lickilicky side). Resisted Body Slam spam
+# means one step-down per Slam plausibly decides it outright.
+["Forretress (Shadow)".Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Knife-edge 503 (Lickilicky's side: 496) — a resisted Body Slam step-down is the single most valuable shadow def tier."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Annihilape, 478 — the closest loss. Low Kick nets neutral and Rage
+# Fist is neutral; with shadow def, one chip tier back is the most
+# plausible def-side flip on the card.
+["Forretress (Shadow)".Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. Closest loss (478) — Low Kick chip and Rage Fist tiers into shadow-reduced def; the likeliest def-side flip."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Umbreon, 480 — Snarl/Foul Play are neutral and Last Resort resisted;
+# a Snarl step-down compounds every turn of a long Dark grind.
+["Forretress (Shadow)".Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Close loss (480) — a Snarl fast-damage step-down compounds across the long grind; Foul Play tiers set shield math."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Aegislash (Shield), 460 — a matchup the base form wins (560) and the
+# shadow's thinner def drops. Psycho Cut/Gyro Ball stay resisted;
+# whether a def/hp tier survives the extra Shadow Ball is the question.
+["Forretress (Shadow)".Great.anchors.aegislash_shield_blkp_any]
+kind = "bulkpoint"
+opponent = "Aegislash (Shield)"
+description = "Discover all Aegislash (Shield) bulkpoints. 460 loss where the base wins — Shadow Ball survival tiers are the recovery path."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Grumpig, 492 — Psywave is resisted (Psychic into Steel) so the coin
+# flip rides on Dynamic Punch / Shadow Ball tiers; resisted-chip
+# step-downs are cheap to find in the survivor def range.
+["Forretress (Shadow)".Great.anchors.grumpig_blkp_any]
+kind = "bulkpoint"
+opponent = "Grumpig"
+description = "Discover all Grumpig bulkpoints. 492 coin flip — resisted Psywave chip plus Dynamic Punch/Shadow Ball survival tiers."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Charjabug, 496 — the Volt Switch head-to-head. X-Scissor is resisted
+# and both fast moves are neutral Electric chip; a one-point swing on
+# either side's Volt Switch decides a literal coin flip.
+["Forretress (Shadow)".Great.anchors.charjabug_blkp_any]
+kind = "bulkpoint"
+opponent = "Charjabug"
+description = "Discover all Charjabug bulkpoints. 496 coin flip — mutual Volt Switch chip war where a single fast-move integer decides it."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Feraligatr (Shadow), 511 — razor win the base form also scraps over.
+# Shadow Claw is high-volume neutral chip and Ice Beam is resisted; a
+# Shadow Claw step-down or Hydro Cannon survival tier keeps the 511.
+["Forretress (Shadow)".Great.anchors.feraligatr_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr (Shadow)"
+description = "Discover all Shadow Feraligatr bulkpoints. Razor win (511) — Shadow Claw chip step-downs and Hydro Cannon tiers keep it secure."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Furret, 515 — Sucker Punch is neutral but Swift is resisted and
+# Trailblaze double-resisted; the thin win rides on how much Sucker
+# Punch chip the focal eats per cycle.
+["Forretress (Shadow)".Great.anchors.furret_blkp_any]
+kind = "bulkpoint"
+opponent = "Furret"
+description = "Discover all Furret bulkpoints. Thin win (515) — Sucker Punch is the only unresisted pressure; its step-down is the whole matchup."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# The shadow's reason to exist is the atk boost: find which Volt Switch
+# / Sand Tomb / Rock Tomb tiers the boost buys in the razor matchups,
+# and which shadow IVs keep them.
+# ─────────────────────────────────────────────────────────────────────
+
+# Lickilicky: the 503 knife-edge from the atk side — Volt Switch chip
+# tiers into Lickilicky's huge bulk are what the shadow boost is paying
+# for; find which sub-tier the rank-1 clears and which IVs lose it.
+["Forretress (Shadow)".Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Knife-edge 503 — the shadow-boosted Volt Switch tier is what keeps this a win; map which IVs hold it."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Annihilape: closest loss (478) — Rock Tomb is NVE but Sand Tomb and
+# Volt Switch are neutral; an atk tier plus the -1 def from Sand Tomb
+# is the atk-side flip candidate.
+["Forretress (Shadow)".Great.anchors.annihilape_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape damage breakpoints. Closest loss (478) — Volt Switch/Sand Tomb tiers are the atk-side flip candidates."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Umbreon: 480 into deep Dark bulk — neutral Volt Switch tiers shorten
+# the grind the Snarl bulkpoint above is trying to survive.
+["Forretress (Shadow)".Great.anchors.umbreon_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon damage breakpoints. Close loss (480) — Volt Switch tiers into Umbreon's bulk shorten the grind from the atk side."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Aegislash (Shield): Sand Tomb is super-effective into the Steel/Ghost
+# frame — its damage tiers (cheap 40-energy debuff cycles) are the
+# likeliest atk-side route back into the 460.
+["Forretress (Shadow)".Great.anchors.aegislash_shield_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Aegislash (Shield)"
+description = "Discover all Aegislash (Shield) damage breakpoints. 460 loss — SE Sand Tomb tiers (with its -1 def debuff) are the atk-side recovery route."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"

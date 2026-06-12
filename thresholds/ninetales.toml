@@ -1,0 +1,198 @@
+# Ninetales (Kantonian) — Great League thresholds, spreads, and slayer anchors.
+# Covers both the base form ([Ninetales]) and the GL-meta-relevant shadow
+# variant (["Ninetales (Shadow)"]); the loader (gopvpsim.thresholds.load_toml)
+# registers every top-level species table in a file, so one file serves both
+# focals. NOTE: deep_dive.py's auto-discover for a "Ninetales (Shadow)" focal
+# looks for thresholds/ninetales_shadow.toml — pass
+# `--thresholds thresholds/ninetales.toml` explicitly for shadow dives.
+#
+# Sources:
+#   - JRE47, "A PvP Analysis on Community Day Ninetales (and Ninetales!)",
+#     pokemongohub.net, 2026-02-01 (fetched live 2026-06-12). Covers the
+#     Vulpix CD Energy Ball addition for Kantonian Ninetales and Chilling
+#     Water for Alolan; discusses Shadow Kantonian Ninetales qualitatively
+#     ("more or less the same story"), but gives numeric GL stats only for
+#     the non-shadow forms. Kantonian — not Alolan — is the form in the
+#     current GL meta pool (rank ~11; Alolan is absent from
+#     opponent_pools/gl_top50_plus_cs.txt), so this file covers Kantonian
+#     base + shadow only.
+#   - Opponent pool: opponent_pools/gl_top50_plus_cs.txt (2026-06-10,
+#     post-June-2026 rebalance). All anchor opponents below use exact
+#     spellings from that pool.
+#
+# Moveset context (JRE47): legacy Ember (post-Season-24 rework: low damage,
+# very high energy) + Weather Ball (Fire) "pretty much a given", with
+# Overheat vs the new CD Energy Ball as the second-slot decision. Energy
+# Ball buys coverage on Waters/Grounds/Rocks (Azumarill, Gastrodon, Sealeo);
+# Overheat keeps the highest ceiling. No `moves` filters are used on the
+# Level-3 anchors below so every carried move's tiers get discovered.
+
+[Ninetales]
+sources = "JRE47 CD Ninetales + Alolan Ninetales article (pokemongohub.net, 2026-02-01, fetched 2026-06-12); opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — JRE47's published GL stat lines (Kantonian, non-shadow)
+# ─────────────────────────────────────────────────────────────────────
+
+# JRE47's headline GL stat line for Kantonian Ninetales (first number of
+# each Kantonian/Alolan pair in the article's stats table).
+[Ninetales.Great.spreads.jre47_stat_line]
+attack = 114.0
+defense = 136.0
+stamina = 126
+description = "JRE47 headline GL stat line for Kantonian Ninetales: 114.00 atk, 136.00 def + 126 hp."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# JRE47's highest-stat-product spread for Kantonian Ninetales:
+# 0-15-15, 1495 CP, Level 25.
+[Ninetales.Great.spreads.jre47_hsp]
+ivs = [[0, 15, 15]]
+description = "JRE47 highest-stat-product Kantonian Ninetales, 0/15/15 at 1495 CP (Level 25): 113.00 atk, 137.00 def + 128 hp."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Opponents picked from gl_top50_plus_cs.txt where the type matchup
+# makes a def/hp check plausible and the matchup is close per JRE47's
+# 1v1-shielding win/loss lists.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Fire resists Fire, so mirror chip damage sits in tiny
+# integer tiers where a single bulkpoint can decide the race.
+[Ninetales.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Ninetales"
+description = "Discover all mirror-Ninetales bulkpoints in the survivor def range. Resisted Fire chip makes the mirror tier-sensitive."
+source = "Mirror anchor; JRE47 stat-table calibration"
+
+# Level 2: anchored at JRE47's published 136 def headline stat. Finds the
+# first mirror damage step-down strictly above the article's stat line.
+[Ninetales.Great.anchors.mirror_blkp_above_jre47]
+kind = "bulkpoint"
+opponent = "Ninetales"
+above_def = 136.0
+description = "Smallest def above JRE47's published 136.00 def at which any mirror threat move's damage to the focal steps down."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Shadow mirror — the shadow variant is also in the GL pool and hits
+# harder (shadow atk multiplier), so its tiers sit elsewhere.
+[Ninetales.Great.anchors.shadow_mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Ninetales (Shadow)"
+description = "Discover all Shadow Ninetales bulkpoints. Shadow atk multiplier shifts the resisted-Fire chip tiers vs the base mirror."
+source = "JRE47 (shadow discussed: 'more or less the same story with Shadow Ninetales')"
+
+# Annihilape: JRE47 lists it as an Overheat-build win; neutral Counter /
+# Rage Fist chip means the win hinges on how much each Counter deals.
+[Ninetales.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. JRE47 win for Overheat builds; Counter chip tiers decide the race."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Empoleon: JRE47 says Overheat builds "often" take Empoleon — an
+# explicitly conditional win. Fire resists Steel fast moves but Water
+# charges are super-effective; surviving one more Waterfall/charge is
+# exactly a def/hp check.
+[Ninetales.Great.anchors.empoleon_blkp_any]
+kind = "bulkpoint"
+opponent = "Empoleon"
+description = "Discover all Empoleon bulkpoints. JRE47: Overheat 'often' wins this — bulk decides the conditional matchup."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Lickilicky: JRE47 Overheat-build win. Classic Body Slam integer-tier
+# bulk check against a neutral normal-type spammer.
+[Ninetales.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. JRE47 win; Body Slam damage tiers are the canonical def/hp check."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Galarian Corsola: JRE47 Overheat-build win. Neutral ghost chip
+# (Astonish/Night Shade-style pressure) in a slow, close matchup.
+[Ninetales.Great.anchors.corsola_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover all G-Corsola bulkpoints. JRE47 win; slow neutral ghost chip makes the matchup tier-sensitive."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Sableye: JRE47 Overheat-build win. Shadow Claw chip + Foul Play; a
+# close neutral matchup where one fast-move tier swings the race.
+[Ninetales.Great.anchors.sableye_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye"
+description = "Discover all Sableye bulkpoints. JRE47 win; Shadow Claw chip tiers decide the close neutral race."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Azumarill: JRE47 says Energy Ball builds outrace Azumarill (a flip vs
+# Overheat builds). Super-effective Bubble chip means the focal must
+# survive long enough to land Energy Ball — a def/hp check.
+[Ninetales.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. JRE47: Energy Ball builds outrace Azu — surviving Bubble chip tiers enables the flip."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Togekiss: JRE47 shields-down win. Charm chip is brutal; each Charm
+# damage tier shaved is a whole extra fast move of survival.
+[Ninetales.Great.anchors.togekiss_blkp_any]
+kind = "bulkpoint"
+opponent = "Togekiss"
+description = "Discover all Togekiss bulkpoints. JRE47 shields-down win; Charm damage tiers dominate the race."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Malamar: JRE47 shields-down win. Psycho Cut chip + Superpower nuke;
+# close neutral matchup where the charge-move tier can flip survival.
+[Ninetales.Great.anchors.malamar_blkp_any]
+kind = "bulkpoint"
+opponent = "Malamar"
+description = "Discover all Malamar bulkpoints. JRE47 shields-down win; surviving Superpower at a lower tier flips the endgame."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Furret: JRE47 shields-down win. Sucker Punch chip + Trailblaze; a
+# tight neutral race in the post-rebalance pool.
+[Ninetales.Great.anchors.furret_blkp_any]
+kind = "bulkpoint"
+opponent = "Furret"
+description = "Discover all Furret bulkpoints. JRE47 shields-down win; Sucker Punch chip tiers decide the close race."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side)
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 2: anchored at JRE47's highest-stat-product 113 atk (0/15/15).
+# Finds the first damage step-up strictly above the rank-1-bulk build —
+# i.e., the cheapest reason to trade bulk for attack vs Azumarill.
+[Ninetales.Great.anchors.azumarill_brkp_above_jre47]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+above_atk = 113.0
+description = "Smallest atk above JRE47's HSP 113.00 atk at which any focal move's damage to default Azumarill steps up. JRE47: Energy Ball builds outrace Azu."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Level 3: full Azumarill BP map — which Energy Ball / Weather Ball /
+# Ember tiers actually move the outrace claim.
+[Ninetales.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints in the survivor atk range. Calibrates the Energy Ball outrace."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Level 3: Empoleon — JRE47's "often" win. Fire is super-effective on
+# Steel, so Weather Ball (Fire) tiers vs Empoleon are where extra atk
+# converts the conditional win into a secure one.
+[Ninetales.Great.anchors.empoleon_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Empoleon"
+description = "Discover all Empoleon damage breakpoints. Extra Weather Ball (Fire) damage secures JRE47's conditional 'often' win."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Level 3: Annihilape — close JRE47 win; neutral Fire damage tiers
+# against a sub-100-def target step frequently.
+[Ninetales.Great.anchors.annihilape_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape damage breakpoints in the survivor atk range."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"

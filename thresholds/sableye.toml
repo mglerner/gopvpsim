@@ -1,0 +1,192 @@
+# Sableye — Great League thresholds, spreads, and slayer anchors.
+#
+# Sources:
+#   - RyanSwag "Sableye PvP IV Deep Dive" (GamePress, series #33, last
+#     updated 2021-11-26). Fetched 2026-06-12 via Wayback Machine snapshot:
+#     https://web.archive.org/web/20251212134418/https://pogo.gamepress.gg/sableye-pvp-iv-deep-dive
+#   - Current-meta opponent selection from
+#     opponent_pools/gl_top50_plus_cs.txt (generated 2026-06-10,
+#     post-June-2026 move rebalance; Sableye is GL meta rank 29).
+#
+# FRESHNESS CAVEAT (same shape as _shared.toml's): the RyanSwag writeup
+# is from the 2021 level-50-cap / Skarmory era. Skarmory, Froslass,
+# Vigoroth, Bastiodon, Obstagoon, Galvantula, Meganium, Mew,
+# Deoxys (Defense), and Abomasnow are NOT in the 2026-06-10 pool; their
+# numbers are preserved in the tier-spread descriptions below as
+# historical expert calibration (the stat math is stable; the meta
+# relevance is not). Jellicent, Lapras, Dewgong, Stunfisk (Galarian),
+# and Greedent ARE still in the pool, so those calibration points get
+# live Level-3 anchors.
+#
+# The writeup is about PURIFIED Sableye: Return is the second charge
+# move of choice ("Power Gem and Shadow Sneak are that bad"), and
+# Return is purified-exclusive. All stat checks below are base-form
+# (= purified-form) stats. RyanSwag's bottom line: Purified Sableye
+# favors high SP — if a candidate can't meet the High Def or Med Def
+# tier, save the XL candy. Slight atk weights are tie-breakers, not
+# goals. Mega Sableye footnote: the Mega mirror suggests at least
+# 108 hp, but the Mega has different enough stats that none of the
+# base-form checks transfer to it.
+#
+# The SHADOW form is meta-relevant too (in the 2026-06-10 pool) and
+# lives in its own file, thresholds/sableye_shadow.toml (deep_dive.py
+# auto-discovery maps "Sableye (Shadow)" -> sableye_shadow.toml, same
+# per-form precedent as altaria.toml / altaria_shadow.toml). The shadow
+# cannot be purified, so the Return-centric analysis does not transfer.
+
+[Sableye]
+sources = "RyanSwag's Sableye PvP IV Deep Dive (GamePress series #33, last updated 2021-11-26, via Wayback snapshot 2025-12-12, fetched 2026-06-12); opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+[Sableye.Great.meta]
+notes = "GL meta rank 29 (2026-06). RyanSwag's verdict: Purified Sableye with Return is almost non-negotiable, which makes the IV hunt hard — only 133 of 2774 possible spreads hit his four tables (15-29 catches at 51-75% probability, 47+ for 90%). HP ladder: 123 hp is generally safe, 125 hp is the next major check, 126 hp ties the 1-1 mirror. Re-discover which def/atk steps still flip matchups under the 2026 pool via the Level-3 anchors below."
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — RyanSwag's named tiers (stat-cutoff form, same style as
+# tinkaton.toml's "GH Great"/"GH Good"). Historical calibration numbers
+# for opponents no longer in the pool are preserved in the descriptions.
+# ─────────────────────────────────────────────────────────────────────
+
+[Sableye.Great.spreads."High Def"]
+attack = 0
+defense = 124.7
+stamina = 123
+description = "RyanSwag's High Def tier: 124.70 def + 123 hp (more HP the better). Tops the Skarmory 1-1/2-2 band (122.40 def to 124.70 def, may need the 123 hp), buys Vigoroth 0-1/2-2 potential at 124.70 def, Lapras 2-2 at 124.41 def, Obstagoon 0-0 at 124.26 def, Hex Jellicent 0-1/1-2 potential at 123.70 def, and Bastiodon 1-2 potential at 123.22 def — the latter three calibrated vs very-low-atk 'high SP' opponents. Going High Def lets you overlook most HP checks and settle at 123 hp."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+[Sableye.Great.spreads."Med Def"]
+attack = 0
+defense = 122.4
+stamina = 125
+description = "RyanSwag's Med Def tier: 122.40 def + 125 hp (126 hp for the 1-1 mirror; Med Def builds want 125-126 hp to make up for the lower def). Enters the Skarmory band at 122.40 def and covers Dewgong 1-1 potential at 122.13 def, the Froslass 1-1 band from 117.86 def to 121.54 def, Galar Stunfisk 1-1 at 120.35 def, Galvantula 1-1 at 118.72 def, and Shadow Nidoqueen potential at about 119.00 def."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+[Sableye.Great.spreads."Desperation Def"]
+attack = 0
+defense = 121.54
+stamina = 123
+description = "RyanSwag's fallback floor: 121.54 def is acceptable if you truly don't believe you'll get a better split — it adds about 47 more spreads (180 vs 133). Anything below this, hold out for a better Purified Sableye."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+[Sableye.Great.spreads."Slight Atk"]
+attack = 120.8
+defense = 0
+stamina = 0
+description = "RyanSwag's Slight Atk tie-breaker tier: 120.80 atk gets CMP on high-SP Froslass; 120.61 atk fully farms Deoxys Defense Forme in the 1-1; the Meganium 2-2 band runs 118.58 atk (max-SP Meganium) to 122.64 atk (max-def Meganium); Mew CMP from 119.30 atk with the cap at 121.50 atk (only 1 Mew of 216); 120.23 atk to 121.01 atk are the safer overall goals. Atk BPs are tie-breakers between similar builds, not goals."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+[Sableye.Great.spreads."High Atk"]
+attack = 121.6
+defense = 0
+stamina = 0
+description = "RyanSwag's High Atk tier: 121.60 atk for Greedent 1-1 potential with straight Foul Play (watch out for debuffs); 120.96 atk gets Abomasnow and Shadow Abomasnow 1-1 with straight Foul Play; 121.50 atk is the Mew atk cap for CMP."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level-3 discover-all), key
+# close matchups from gl_top50_plus_cs.txt (2026-06-10)
+# ─────────────────────────────────────────────────────────────────────
+
+# Greedent: in the current pool AND a RyanSwag atk calibration point.
+[Sableye.Great.anchors.greedent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Greedent"
+description = "Discover all Greedent damage breakpoints. RyanSwag: 121.60 atk gives Greedent 1-1 potential with straight Foul Play (no Return bait), debuffs permitting — the headline number of his High Atk tier."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+# The mirror: Shadow Claw chip war where single fast-move damage steps
+# compound; RyanSwag frames the mirror as HP-decided (126 hp), so the
+# atk side is where a tier up can beat the HP ladder.
+[Sableye.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Sableye"
+description = "Discover all mirror-Sableye damage breakpoints. The mirror is a Shadow Claw chip war RyanSwag calls at 126 hp for the 1-1; an outgoing Shadow Claw tier is the other way to win it."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26); simulator discovery"
+
+# Jellicent: ghost-on-ghost chip race (Hex vs Shadow Claw), and the
+# def side already has a RyanSwag number — discovery covers the atk side.
+[Sableye.Great.anchors.jellicent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent damage breakpoints. Mutual ghost chip race vs a premium-bulk wall; an outgoing Shadow Claw or Foul Play tier shifts the same close matchup RyanSwag calibrated on the def side."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all), opponents
+# chosen from gl_top50_plus_cs.txt (2026-06-10) where the type matchup
+# makes def/hp checks plausible and the matchup is close
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. RyanSwag: 126 hp ties the 1-1 mirror (123 safe, 125 next).
+[Sableye.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye"
+description = "Discover all mirror-Sableye bulkpoints (Shadow Claw incoming tiers). RyanSwag's HP ladder: 123 hp generally safe, 125 hp next, 126 hp for the 1-1 mirror; def steps interact with that ladder."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+# Cross-form: the shadow runs x1.2 atk, so its Shadow Claw tiers are the
+# hardest fast-move chip a base Sableye faces from its own kind.
+[Sableye.Great.anchors.sableye_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye (Shadow)"
+description = "Discover all Shadow Sableye bulkpoints (cross-form fight). Shadow-boosted Shadow Claw chip into the base form's bulk decides which form wins the in-family matchup."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Jellicent: RyanSwag def calibration point, still in the pool.
+[Sableye.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. RyanSwag: 123.70 def opens 0-1 and 1-2 potential vs Hex Jellicent (calibrated vs very-low-atk 'high SP' Jellicent)."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+# Lapras: RyanSwag def calibration point, still in the pool.
+[Sableye.Great.anchors.lapras_blkp_any]
+kind = "bulkpoint"
+opponent = "Lapras"
+description = "Discover all Lapras bulkpoints. RyanSwag: 124.41 def flips the Lapras 2-2; Ice Shard chip plus heavy charge moves make the def steps count twice."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+# Dewgong: RyanSwag def calibration point, still in the pool.
+[Sableye.Great.anchors.dewgong_blkp_any]
+kind = "bulkpoint"
+opponent = "Dewgong"
+description = "Discover all Dewgong bulkpoints. RyanSwag: 122.13 def gives Dewgong 1-1 potential — the marquee check of his Med Def tier; Ice Shard chip tiers decide a slow neutral fight."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+# Galarian Stunfisk: RyanSwag def calibration point, still in the pool.
+[Sableye.Great.anchors.stunfisk_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all Galarian Stunfisk bulkpoints. RyanSwag: 120.35 def takes the G-Fisk 1-1; Mud Shot comes constantly, so a single incoming tier compounds across the whole matchup."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26)"
+
+# Greedent: the def-side complement of the 121.60-atk breakpoint above —
+# Body Slam spam makes incoming tiers compound in the same chip race.
+[Sableye.Great.anchors.greedent_blkp_any]
+kind = "bulkpoint"
+opponent = "Greedent"
+description = "Discover all Greedent bulkpoints. Body Slam spam in a close neutral chip race; each incoming tier down buys back the HP the 1-1 turns on."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Lickilicky: #1 of the 2026-06-10 pool; close neutral Body Slam chip
+# race against a wall Sableye can't nuke efficiently.
+[Sableye.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam spam vs the #1 pool entry; one incoming damage tier compounds across a long, close chip war."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Altaria: GL meta rank 2; close neutral Dragon Breath chip fight (the
+# reverse anchor already exists in altaria.toml).
+[Sableye.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Dragon Breath chip in a close neutral fight vs the rank-2 bulk dragon; incoming fast-move tiers set the pace either way."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Umbreon: dark-on-dark; Foul Play / Snarl land roughly neutral on
+# Dark/Ghost, and Umbreon's bulk makes it a long, close grind.
+[Sableye.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Dark-on-dark grind (Umbreon re-entered the pool in the 2026-06 rebalance); Snarl and Foul Play tiers decide a matchup measured in fast-move cycles."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"

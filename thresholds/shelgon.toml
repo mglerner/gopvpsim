@@ -1,0 +1,146 @@
+# Shelgon — Great League thresholds and slayer anchors.
+#
+# EXPERT-NUMBER STATUS: no known expert writeup exists for GL Shelgon —
+# it entered the GL top-50 in the June 2026 move rebalance (current GL
+# meta rank 30; #1 ranked moveset Dragon Breath / Twister / Flamethrower,
+# with Dragon Pulse and Crunch also learnable). This file is
+# simulator-derived: anchors are designed purely from current-meta
+# matchup logic and resolved by Level-3 discovery, not from community
+# calibration numbers. No stat numbers are invented.
+#
+# MATCHUP LOGIC: Shelgon is a pure Dragon tank (base 172/155/163 —
+# def-and-hp-heavy for its CP slot). It resists Water, Fire, Grass, and
+# Electric, and is weak to Dragon, Ice, and Fairy. The GL pool is thick
+# with Dragon Breath users (Altaria, Dragonair, Kingdra, Sliggoo, the
+# mirror) and Ice coverage (Feraligatr, Azumarill, Lapras), so the
+# matchups that decide Shelgon's meta role are mutual-super-effective
+# dragon wars and neutral chip races — exactly the fights where one
+# incoming or outgoing fast-move damage tier swings the result. Hence:
+# bulkpoint-heavy discovery vs the dragon cohort and the big Normal
+# tanks, plus atk-side breakpoints for the closest dragon wars.
+# Azumarill and Lapras are deliberately omitted: Fairy double-resists
+# Dragon Breath and Lapras' Ice pressure is overwhelming — those are
+# walk-away losses, not tier-sensitive checks.
+#
+# Opponent selection from opponent_pools/gl_top50_plus_cs.txt
+# (2026-06-10, post-June-2026 rebalance); Shelgon and Shelgon (Shadow)
+# are both in that pool. Shadow-focal anchors live in
+# thresholds/shelgon_shadow.toml per the aegislash_blade /
+# aegislash_shield and altaria / altaria_shadow per-form precedent.
+
+[Shelgon]
+sources = "Simulator-derived (no expert writeup on record): opponent pool gl_top50_plus_cs.txt (2026-06-10, post-June-2026 rebalance) + PvPoke GL rankings (Shelgon meta rank 30, moveset DRAGON_BREATH/TWISTER/FLAMETHROWER) + type-matchup logic."
+
+[Shelgon.Great.meta]
+notes = "Pure-Dragon bulk pivot: mutual super-effective Dragon Breath wars (mirror, Altaria, Dragonair, Sliggoo, Guzzlord) and neutral chip races (Lickilicky) dominate its close matchups, so fast-move damage tiers on both sides carry unusual weight. Fairy and Ice matchups are losses by typing, not by tiers, and are not anchored."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level-3 discover-all) for the
+# closest matchups where an outgoing tier plausibly flips shield states.
+# ─────────────────────────────────────────────────────────────────────
+
+# Shadow Dragonair: mutual SE Dragon Breath into shadow-reduced def —
+# the densest outgoing-tier ladder available to this focal.
+[Shelgon.Great.anchors.dragonair_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair damage breakpoints. Mutual super-effective Dragon Breath into shadow-reduced def — each outgoing DB tier swings the dragon war, and Shelgon resists the Aqua Tail answer."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close dragon-war matchup, shadow def eases tier access; simulator-derived"
+
+# Altaria: GL #2; SE Dragon Breath both ways, Flamethrower resisted.
+[Shelgon.Great.anchors.altaria_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria"
+description = "Discover all Altaria damage breakpoints. Super-effective Dragon Breath both ways vs the GL #2; Shelgon resists Flamethrower, so the DB exchange rate is the whole matchup."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close dragon-war matchup vs GL #2; simulator-derived"
+
+# Lickilicky: GL #1; pure neutral chip race vs a premium tank.
+[Shelgon.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Neutral Dragon Breath chip into the GL #1 tank — a one-point fast-move step compounds over a long Body Slam attrition fight."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close neutral attrition vs GL #1; simulator-derived"
+
+# Guzzlord: SE Dragon Breath into the pool's softest dragon defense.
+[Shelgon.Great.anchors.guzzlord_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord damage breakpoints. Super-effective Dragon Breath into Guzzlord's low defense steps often; the race is mutual-SE (Dragon Tail back), so each outgoing tier directly buys back time under fire."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): mutual-SE race, low opponent def makes tiers dense; simulator-derived"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all). Shelgon's stat
+# shape is def/hp-heavy, so incoming-tier steps are the natural
+# investment currency. Opponents chosen where the type matchup makes a
+# def/hp check plausible and the matchup is close.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror: mutual SE Dragon Breath — the canonical tier-sensitive fight.
+[Shelgon.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Shelgon"
+description = "Discover all mirror-Shelgon bulkpoints. Mutual super-effective Dragon Breath means a single incoming-DB step down is worth multiple fast moves of effective HP across the mirror."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10); mirror anchor convention; simulator-derived"
+
+# Cross-form: the shadow sibling is also in the pool; players run both.
+[Shelgon.Great.anchors.shelgon_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Shelgon (Shadow)"
+description = "Discover all Shadow Shelgon bulkpoints (cross-form fight). Shadow-boosted super-effective Dragon Breath incoming — the tier ladder that decides whether base bulk beats shadow pressure in-family."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): cross-form partner in pool, shadow atk pressure; simulator-derived"
+
+# Dragonair: SE DB incoming; Aqua Tail resisted.
+[Shelgon.Great.anchors.dragonair_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair"
+description = "Discover all Dragonair bulkpoints. Super-effective Dragon Breath incoming with the Aqua Tail bait resisted — stepping the incoming DB tier down decides a near-even dragon war."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close dragon-war matchup, rebalance returnee; simulator-derived"
+
+# Shadow Dragonair: the punchier variant of the same fight.
+[Shelgon.Great.anchors.dragonair_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair bulkpoints. Shadow-boosted super-effective Dragon Breath is among the highest sustained fast-move pressure Shelgon faces; each step down is a genuine def/hp check."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close dragon-war matchup, shadow atk pressure; simulator-derived"
+
+# Altaria: GL #2; DB SE incoming, Sky Attack neutral, Flamethrower resisted.
+[Shelgon.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Incoming super-effective Dragon Breath plus neutral Sky Attack from the GL #2 — surviving an extra DB cycle or shaving Sky Attack a point flips close shield states."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close dragon-war matchup vs GL #2; simulator-derived"
+
+# Shadow Altaria: GL #3; the shadow-boosted version of the same check.
+[Shelgon.Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints. Shadow-boosted Dragon Breath / Sky Attack tiers from the GL #3; high shadow IV variance on the opponent side makes the discovered ladder worth reading in full."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close dragon-war matchup, shadow atk pressure; simulator-derived"
+
+# Guzzlord: mutual-SE race; Dragon Tail tiers set the clock.
+[Shelgon.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Super-effective Dragon Tail incoming in a mutual-SE race — stepping it down a point buys the extra fast moves Shelgon needs to win the trade."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): mutual-SE race, def-check plausible; simulator-derived"
+
+# Lickilicky: GL #1; the long neutral attrition fight.
+[Shelgon.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Rollout chip and Body Slam spam compound every incoming tier over a long neutral attrition fight vs the GL #1 — classic bulkpoint territory for a def/hp-heavy focal."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close neutral attrition vs GL #1; simulator-derived"
+
+# Feraligatr: Hydro Cannon resisted; Ice Beam is the live threat.
+[Shelgon.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Shelgon resists Shadow Claw chip's Water partner (Hydro Cannon) but Ice Beam is super-effective — whether the Ice Beam tier steps down decides if the typing edge holds."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): typing-favored but Ice-coverage-checked, close matchup; simulator-derived"
+
+# Sliggoo: fellow GL dragon; mutual SE DB plus Body Slam pressure.
+[Shelgon.Great.anchors.sliggoo_blkp_any]
+kind = "bulkpoint"
+opponent = "Sliggoo"
+description = "Discover all Sliggoo bulkpoints. Mutual super-effective Dragon Breath with neutral Body Slam on top; another near-even dragon war where one incoming step decides the 1-1."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close dragon-war matchup; simulator-derived"

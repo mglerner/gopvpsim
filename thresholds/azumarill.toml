@@ -1,0 +1,231 @@
+# Azumarill — Great League thresholds, spreads, and slayer anchors.
+#
+# Sources:
+#   - RyanSwag, "Azumarill PvP IV Deep-Dive", GamePress, last updated
+#     2022-05-13 (SwagTips era). Fetched 2026-06-12 from the Wayback
+#     Machine snapshot 20220514104954 of
+#     https://gamepress.gg/pokemongo/azumarill-pvp-iv-deep-dive
+#     Headline: no critical atk/def breakpoints; maintain >= 135.78 def
+#     and ~192 hp with a 1:2 def:hp tradeoff ratio; slight atk weight
+#     (>= 92.15 atk) is a worthy tie-breaker (Talonflame/Cofagrigus BPs,
+#     mirror CMP). Validated against KiengIV (2022 Indianapolis Champion)
+#     and ThoTechtical.
+#   - SwagTips-era SENTIMENTAL_DEFAULT_THRESHOLDS block in gobattlekit
+#     (src/gobattlekit/data/thresholds.py) — the four GL tiers preserved
+#     there (Medi Wall / Min / General / Slight Atk) match the article.
+#   - Opponent pool: opponent_pools/gl_top50_plus_cs.txt (2026-06-10,
+#     post-June-2026 rebalance). Azumarill is GL meta rank 13.
+#
+# FRESHNESS CAVEAT: the RyanSwag dive is from May 2022 — pre the
+# 2022-09 season move shakeups and four years of meta churn. Several of
+# its calibration opponents (Cofagrigus, Skarmory, Trevenant, Walrein,
+# Drifblim, Nidoqueen) are out of the current GL top-50 pool. The stat
+# thresholds themselves are stable physics (def/atk tiers vs a fixed
+# opponent spread); whether each matchup still matters is what the
+# Level-3 discovery anchors against the current pool re-establish.
+
+[Azumarill]
+sources = "RyanSwag GamePress 'Azumarill PvP IV Deep-Dive' (2022-05-13; Wayback 20220514104954) + SwagTips-era SENTIMENTAL_DEFAULT_THRESHOLDS (gobattlekit) + gl_top50_plus_cs opponent pool (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — stat-cutoff tiers from the SwagTips-era writeup
+# ─────────────────────────────────────────────────────────────────────
+
+[Azumarill.Great.spreads."Medi Wall"]
+attack = 0
+defense = 137.64
+stamina = 0
+description = "Premium bulk tier: 137.64 def reaches the Medicham bulkpoint (1-1 consistency, 1-2 potential with Play Rough) plus all lower def checks."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13); SwagTips 'Medi Wall' tier"
+
+[Azumarill.Great.spreads.Min]
+attack = 0
+defense = 135.78
+stamina = 192
+description = "RyanSwag's baseline bulk rule: 135.78 def + 192 hp (the def value is the min for the rank-1 Walrein EQ check). Below either stat, ballpark a 1:2 def:hp tradeoff to stay functionally equivalent — e.g. 134.78 def + 194 hp."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13); SwagTips 'Min' tier"
+
+[Azumarill.Great.spreads.General]
+attack = 0
+defense = 132.8
+stamina = 187
+description = "General-purpose bulk floor from the SwagTips tier list: 132.80 def + 187 hp. Looser than the article's 1:2-ratio baseline; everyday keep/transfer cutoff."
+source = "SwagTips-era SENTIMENTAL_DEFAULT_THRESHOLDS (gobattlekit thresholds.py)"
+
+[Azumarill.Great.spreads."Slight Atk"]
+attack = 92.0
+defense = 132.8
+stamina = 187
+description = "Slight-atk-weight tier: 92.00 atk on top of the general 132.80 def + 187 hp bulk floor. The article favors >= 92.15 atk to potentiate Talonflame and Cofagrigus breakpoints plus Charge Move Priority in the mirror; the SwagTips tier rounds the atk cutoff to 92.00 atk."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13); SwagTips 'Slight Atk' tier"
+
+[Azumarill.Great.spreads.kieng_champion]
+attack = 0
+defense = 133.7
+stamina = 196
+description = "KiengIV's 2022 Indianapolis Championship Azumarill: 133.70 def + 196 hp (rank 23, slight atk weight). Below the 135.78 def baseline but inside the 1:2 def:hp ratio; meets the Cofagrigus BP with high potential for Lickitung/Skarmory BPs. Encoded as a real-tournament reference cutoff."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13), KiengIV validation section"
+
+[Azumarill.Great.spreads.atk_stretch]
+attack = 93.09
+defense = 0
+stamina = 0
+description = "Stretch atk tier the article names but advises against: 92.76 atk reaches Skarmory 1-1 with Ice Beam; 93.09 atk reaches Trevenant 2-1 potential. Per RyanSwag, 'may be too unreasonable to pursue' given the bulk drop (and Trevenant prefers def weight)."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — CMP (atk-side)
+# ─────────────────────────────────────────────────────────────────────
+
+[Azumarill.Great.anchors.cmp_vs_slight_atk]
+kind = "cmp"
+spread = "Slight Atk"
+strict = false
+description = "Match or beat the SwagTips slight-atk tier (92.00 atk) for Charge Move Priority in the Azumarill mirror — the article calls higher atk 'a useful tie-breaker'."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side)
+#
+# RyanSwag: "Azumarill doesn't have any critical Atk or Def Breakpoints
+# that are worth worrying about" — these are tie-breakers, not goals.
+# Level 3 discovery re-derives the exact (move, tier) under the current
+# gamemaster so each 2022 number can be confirmed or retired.
+# ─────────────────────────────────────────────────────────────────────
+
+# Talonflame is in the current pool; this is the highest-value atk claim.
+[Azumarill.Great.anchors.talonflame_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Talonflame"
+description = "Discover all Talonflame damage breakpoints. RyanSwag: 91.70 atk flips the 0-0 and adds fast-move farming potential; most Azumarill meet this (the rank-1 doesn't)."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"
+
+# Cofagrigus is out of the current pool but was the dive's marquee BP
+# (seconded by ThoTechtical); anchor opponents are auto-injected.
+[Azumarill.Great.anchors.cofagrigus_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Cofagrigus"
+description = "Discover all Cofagrigus damage breakpoints. RyanSwag: 91.92 atk (vs rank-1 Cofagrigus) flips the 2-2 straight Play Rough and 1-1 straight Hydro Pump; 93.03 atk covers most def-weighted Cofagrigus. Atk weight beyond that not worth the bulk drop."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"
+
+# Lickitung: out of the current pool (Lickilicky took its slot) but a
+# named calibration; shared.Great.spreads.lickitung_atk_weighted holds
+# the atk-weighted variants if a pessimistic opponent_spread is wanted.
+[Azumarill.Great.anchors.lickitung_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickitung"
+description = "Discover all Lickitung damage breakpoints. RyanSwag: 92.15 atk (vs raid-IV def-weighted Lickitung) through 92.96 atk (vs rank-1) opens 1-0 and 2-1 potential; flagged relatively inconsistent / low priority."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"
+
+# The mirror: no expert (move, tier) on record — pure discovery so the
+# CMP-vs-92-atk advice can be paired with any real mirror BPs.
+[Azumarill.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all damage breakpoints against a default mirror Azumarill. Complements cmp_vs_slight_atk — the article credits atk weight with mirror CMP, not a specific damage tier."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10); no expert calibration on record"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side), current-pool opponents
+#
+# Opponents picked from gl_top50_plus_cs.txt (2026-06-10) where the
+# type matchup makes a def/hp check plausible and the matchup is close.
+# ─────────────────────────────────────────────────────────────────────
+
+# Medicham: Azumarill resists Fighting; the classic SwagTips wall check.
+[Azumarill.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. RyanSwag: 137.64 def gives 1-1 consistency and 1-2 potential (with Play Rough) — the 'Medi Wall' tier."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13); SwagTips 'Medi Wall' tier"
+
+# The mirror: bulk side of the CMP/atk jockeying above.
+[Azumarill.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all mirror-Azumarill bulkpoints in the survivor def range — which def tiers shave a point off the opposing Azumarill's fast or charged moves."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10); mirror anchor convention"
+
+# Lickilicky: Body Slam spam, neutral both ways, classically close.
+[Azumarill.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Neutral Body Slam spam decides a close matchup; shaving a Body Slam damage tier shifts the 1-1 farm-down."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): GL #1, close neutral matchup"
+
+# Shadow Altaria: punchier Sky Attack pressure than the regular form.
+[Azumarill.Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints. Ice Beam makes this close-but-favorable; the shadow atk boost makes surviving an extra Sky Attack a genuine def/hp check. High shadow IV variance noted."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close lead matchup, shadow atk pressure"
+
+# Umbreon: Fairy resists Dark; long, bait-dependent attrition fight.
+[Azumarill.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Azumarill resists Foul Play / Snarl; a resisted-damage tier drop can swing the long attrition mirror of bulk-vs-bulk."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): rebalance returnee, close attrition matchup"
+
+# Feraligatr: Hydro Cannon / Ice Beam vs a Water-resist — close either way.
+[Azumarill.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Both sides resist Water; Shadow Claw chip and Ice Beam trades make incoming damage tiers matter in an even matchup."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close water-core matchup"
+
+# Jellicent: water/ghost core enemy; Shadow Ball is the def check.
+[Azumarill.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Mutual Water resists drag the matchup out; surviving an extra Shadow Ball or shaving Hex damage flips close shield states."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close water/ghost matchup"
+
+# Galarian Stunfisk: resists Play Rough and Ice Beam; Azu leans on
+# Hydro Pump. Surviving Earthquake/Rock Slide is the def side.
+[Azumarill.Great.anchors.stunfisk_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all Galarian Stunfisk bulkpoints. Steel blanks Azumarill's fairy/ice damage, so the matchup hinges on Hydro Pump timing — shaving a Mud Shot or Earthquake damage tier buys the energy to get there."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close steel matchup, def-check plausible"
+
+# Tinkaton: Gigaton Hammer nuke; the def/hp check mirrors tinkaton.toml's
+# 143.03-def azumarill_blkp_any from the opposite side.
+[Azumarill.Great.anchors.tinkaton_blkp_any]
+kind = "bulkpoint"
+opponent = "Tinkaton"
+description = "Discover all Tinkaton bulkpoints. Tinkaton resists fairy and ice, so Azumarill needs to survive Gigaton Hammer pressure to win on Hydro Pump — the inverse of the 143.03 def Tinkaton-side bulkpoint vs Azumarill."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10); cross-reference thresholds/tinkaton.toml azumarill_blkp_any"
+
+# Dewgong: Icy Wind debuff cycle keeps the matchup close despite typing.
+[Azumarill.Great.anchors.dewgong_blkp_any]
+kind = "bulkpoint"
+opponent = "Dewgong"
+description = "Discover all Dewgong bulkpoints. Ice Shard chip plus Icy Wind atk-debuff cycling makes incoming damage tiers (and Drill Run coverage) matter across shield states."
+source = "Pool selection (gl_top50_plus_cs 2026-06-10): close water/ice matchup"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side), expert calibration opponents
+# outside the current pool (auto-included via anchor opponent injection)
+# ─────────────────────────────────────────────────────────────────────
+
+# Walrein: the article's baseline def check — source of the 135.78 floor.
+[Azumarill.Great.anchors.walrein_blkp_any]
+kind = "bulkpoint"
+opponent = "Walrein"
+description = "Discover all Walrein bulkpoints. RyanSwag: 137.28 def takes the 1-1 vs straight Earthquake from an atk-weighted Walrein (could be lower if it isn't atk-weighted); 135.78 def is the min vs the rank-1 Walrein and anchors the baseline bulk rule."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"
+
+# Drifblim: Ice Beam race; one shaved damage tier flips the 1-1.
+[Azumarill.Great.anchors.drifblim_blkp_any]
+kind = "bulkpoint"
+opponent = "Drifblim"
+description = "Discover all Drifblim bulkpoints. RyanSwag: 137.82 def opens 1-1 potential (with Ice Beam)."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"
+
+# Shadow Nidoqueen: farm-down survival check from the 2022 dive.
+[Azumarill.Great.anchors.nidoqueen_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Nidoqueen (Shadow)"
+description = "Discover all Shadow Nidoqueen bulkpoints. RyanSwag: ~138.04 def gives the potential to reach a 2nd Ice Beam while getting farmed in the 0-1; an atk-weighted Shadow Queen may assume you won't reach it."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"

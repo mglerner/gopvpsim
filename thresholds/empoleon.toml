@@ -1,0 +1,215 @@
+# Empoleon — Great League thresholds, spreads, and slayer anchors.
+# Covers both the base form and the GL-meta-relevant Shadow variant
+# (both are in opponent_pools/gl_top50_plus_cs.txt; base is current GL
+# meta rank 4).
+#
+# VALIDATION NOTE (2026-06-12): the two-species-in-one-file layout is
+# only half-supported. gopvpsim.thresholds.load_toml does register every
+# top-level species table it finds, so an EXPLICIT
+# `--thresholds thresholds/empoleon.toml` works for either form. But
+# deep_dive.py AUTO-DISCOVERY maps the focal "Empoleon (Shadow)" to
+# thresholds/empoleon_shadow.toml (one file per form — see the
+# altaria.toml / altaria_shadow.toml and aegislash_blade/shield
+# precedent in docs/threshold_schema.md), so a Shadow dive run without
+# an explicit --thresholds flag will silently load NO thresholds from
+# this file. TODO: move the ["Empoleon (Shadow)"] table below into
+# thresholds/empoleon_shadow.toml verbatim. Until then, run Shadow dives
+# with `--thresholds thresholds/empoleon.toml`.
+#
+# Sources:
+#   - JRE47, "A PvP Analysis on Community Day Classic Empoleon",
+#     Pokémon GO Hub, 2026-01-03 (live URL 403s; fetched via Wayback
+#     Machine snapshot 20260104204249). Discusses base AND shadow:
+#     GL stats table, highest-stat-product IVs 0/13/15 @ L19.5,
+#     Metal Sound / Hydro Cannon / Drill Peck moveset, and the
+#     base-vs-shadow win/loss swap lists.
+#   - Opponent pool: opponent_pools/gl_top50_plus_cs.txt (2026-06-10,
+#     post-June-2026 rebalance) for current-meta anchor opponents.
+
+[Empoleon]
+sources = """
+JRE47 'A PvP Analysis on Community Day Classic Empoleon', Pokémon GO Hub,
+2026-01-03 (via Wayback Machine 20260104204249) + GL top-50/CS opponent
+pool 2026-06-10 (Empoleon GL meta rank 4).
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — stat tiers named by the JRE47 writeup
+# ─────────────────────────────────────────────────────────────────────
+
+# JRE47's GL stats table lists the highest-stat-product build explicitly:
+# IVs 0/13/15 at 1500 CP, Level 19.5.
+[Empoleon.Great.spreads.jre_hsp]
+description = "JRE47 highest-stat-product GL build: IVs 0/13/15 at Level 19.5 (1500 CP). Article's High Stat Product column: 124.00 atk, 117.00 def + 125 hp."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+ivs = [
+    [0, 13, 15],
+]
+
+# Stat-cutoff form of the article's headline GL stats column (the
+# non-HSP numbers, i.e. the PvPoke-default-style build). Membership:
+# at least the listed bulk; attack unconstrained.
+[Empoleon.Great.spreads.jre_gl_listed]
+description = "Bulk tier from JRE47's listed GL stats column: 125.00 atk, 117.00 def + 122 hp. Cutoff keeps the listed def/hp floor; atk unconstrained."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+attack = 0
+defense = 117.0
+stamina = 122
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Opponents chosen from gl_top50_plus_cs.txt where the type matchup
+# makes a def/hp check plausible and the matchup is close. The JRE47
+# article's base-vs-shadow swap list is the main close-matchup signal:
+# matchups the base wins but the lower-bulk shadow loses (Altaria,
+# Feraligatr, Forretress, Diggersby) are exactly the ones where
+# Empoleon's defense tier decides the outcome.
+# ─────────────────────────────────────────────────────────────────────
+
+# Altaria: base Empoleon wins "even with Flamethrower" per JRE47, but
+# Shadow Empoleon loses — the canonical bulk-decided matchup.
+[Empoleon.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. JRE47: base wins even vs Flamethrower; shadow's lower bulk flips this to a loss, so def tiers decide it."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Shadow Altaria: punchier variant of the same check (Empoleon resists
+# the Dragon/Flying pressure; Flamethrower/charge damage is the threat).
+[Empoleon.Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints — higher-atk version of the bulk-decided Altaria matchup."
+source = "JRE47 article (Altaria swap entry) + gl_top50_plus_cs pool 2026-06-10"
+
+# Feraligatr: JRE47 calls the base win out explicitly ("even
+# Feraligatr") while shadow loses it. Neutral Water race where
+# surviving an extra Hydro Cannon / Ice Beam tier matters.
+[Empoleon.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. JRE47: base win, shadow loss — a def-tier race between two Water spammers."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Forretress: top-meta Bug that base Empoleon "handles" but shadow
+# drops. Resisted fast pressure both ways; charge-move damage tiers
+# (and thus focal def) decide the race.
+[Empoleon.Great.anchors.forretress_blkp_any]
+kind = "bulkpoint"
+opponent = "Forretress"
+description = "Discover all Forretress bulkpoints. JRE47: base win, shadow loss — bulk-decided among the top meta Bugs."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Diggersby: JRE47 — Metal Sound is "spammy enough to outrace
+# Diggersby", but shadow loses it. Outracing means surviving Mud Shot
+# + Drill Run tiers one cycle longer; a def/hp check.
+[Empoleon.Great.anchors.diggersby_blkp_any]
+kind = "bulkpoint"
+opponent = "Diggersby"
+description = "Discover all Diggersby bulkpoints. JRE47: base outraces it; shadow's lower bulk loses the race. Ground damage vs Water typing makes this the closest of the wins."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Lickilicky: JRE47 win "at least without Earthquake". Resisted Body
+# Slam spam means the matchup hinges on how many Body Slam tiers the
+# focal shaves off.
+[Empoleon.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. JRE47: win without Earthquake — Body Slam damage tiers decide how comfortable it is."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Shadow Dusknoir: named win in the JRE47 article. Dynamic Punch is the
+# one scary (Fighting) hit — surviving a tier of it is a classic
+# def+hp check.
+[Empoleon.Great.anchors.dusknoir_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Dusknoir (Shadow)"
+description = "Discover all Shadow Dusknoir bulkpoints. JRE47 names this a base win; Dynamic Punch tiers are the survival check."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Corviknight: JRE47 names it (with G-Moltres) as the notable Flyer
+# exception via Payback. Resisted fast moves both ways; whether a def
+# tier blunts Payback enough to flip the loss is worth discovering.
+[Empoleon.Great.anchors.corviknight_blkp_any]
+kind = "bulkpoint"
+opponent = "Corviknight"
+description = "Discover all Corviknight bulkpoints. JRE47: a named exception among Flyers (Payback) — check whether any def tier blunts Payback into a flip."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Jellicent: JRE47 loss ("most other meta Water types outlast
+# Empoleon") but a close resisted-spam war; def tiers vs Bubble /
+# Shadow Ball matter for energy-race outcomes.
+[Empoleon.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. JRE47 lists it as a loss among meta Waters; close enough that def tiers shape the race."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# The mirror (required anchor): base-vs-base.
+[Empoleon.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Empoleon"
+description = "Discover all mirror-Empoleon bulkpoints. Resisted Metal Sound + neutral Hydro Cannon tiers decide the GL rank-4 mirror."
+source = "gl_top50_plus_cs pool 2026-06-10 (mirror; Empoleon GL meta rank 4)"
+
+# Cross-variant mirror: the punchier Shadow Empoleon is also in the
+# current pool, and per JRE47 the two variants are GL sidegrades —
+# expect to face both.
+[Empoleon.Great.anchors.mirror_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Empoleon (Shadow)"
+description = "Discover all bulkpoints vs Shadow Empoleon — the higher-atk cross-variant mirror (JRE47 calls the variants 'true sidegrade options' in GL)."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Level 2: reproduce the JRE47 listed-defense tier. Smallest def above
+# the article's stat-table defense at which any mirror threat move's
+# damage steps down — ties the article number to a concrete bulkpoint.
+[Empoleon.Great.anchors.mirror_blkp_above_jre]
+kind = "bulkpoint"
+opponent = "Empoleon"
+above_def = 117.0
+description = "Smallest def > 117.00 def (JRE47's listed GL defense stat) at which a mirror threat move's damage steps down. Promotes the article's stat-table number to a discoverable bulkpoint."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side)
+#
+# Key close matchups where the article says attack decides the swing
+# (shadow's higher atk flips Malamar; Diggersby/Jellicent are races).
+# ─────────────────────────────────────────────────────────────────────
+
+# Malamar: base loss (Fighting coverage: Superpower), but JRE47 says
+# shadow's higher attack flips it to a win — so there is an atk tier in
+# range that matters. Discover which (move, tier) it is.
+[Empoleon.Great.anchors.malamar_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Malamar"
+description = "Discover all Malamar damage breakpoints. JRE47: base loses, shadow's higher atk flips it — find the (move, tier) doing the flipping."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Diggersby: the outrace win — Metal Sound / Hydro Cannon damage tiers
+# directly shorten the race the bulkpoint above is trying to survive.
+[Empoleon.Great.anchors.diggersby_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Diggersby"
+description = "Discover all Diggersby damage breakpoints in the survivor atk range — the atk side of the JRE47 'spammy enough to outrace Diggersby' race."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Jellicent: resisted-Water war; Hydro Cannon/Metal Sound tiers against
+# Jellicent's bulk determine whether the JRE47 loss is ever in reach.
+[Empoleon.Great.anchors.jellicent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent damage breakpoints in the survivor atk range — checks whether any atk tier tightens the JRE47-listed loss."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# Level 2: probe the headroom above the article's listed attack stat.
+# JRE47 lists 125 atk for the headline GL build; the shadow flip vs
+# Malamar lives somewhere above it.
+[Empoleon.Great.anchors.malamar_brkp_above_jre]
+kind = "damage_breakpoint"
+opponent = "Malamar"
+above_atk = 125.0
+description = "Smallest atk > 125.00 atk (JRE47's listed GL attack stat) at which damage to Malamar steps up — locates the tier the shadow's atk boost exploits."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"

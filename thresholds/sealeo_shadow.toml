@@ -1,0 +1,121 @@
+# Sealeo (Shadow) — Great League thresholds and slayer anchors.
+#
+# Per-form file following the aegislash_blade.toml / aegislash_shield.toml
+# precedent (see also altaria_shadow.toml): deep_dive.py auto-discovery
+# maps the focal "Sealeo (Shadow)" to thresholds/sealeo_shadow.toml.
+# Base-form data lives in thresholds/sealeo.toml.
+#
+# Status: SIMULATOR-DERIVED. No known expert writeup exists for GL Sealeo
+# in either form; nothing here is inherited from a community calibration.
+# The shadow multipliers (atk x1.2, def x0.8333) mean the base form's
+# atk breakpoint bands largely come free while every def check gets
+# harder — so this file, like altaria_shadow.toml, is bulkpoint-heavy
+# discovery, with the breakpoint anchors retained to map which *extra*
+# tiers shadow atk unlocks.
+#
+# Opponent selection from opponent_pools/gl_top50_plus_cs.txt
+# (2026-06-10, post-June-2026 rebalance); Sealeo (Shadow) is in that
+# pool alongside base Sealeo (GL meta rank 40).
+
+["Sealeo (Shadow)"]
+sources = "Simulator-derived (no expert writeup, either form). Anchor set designed 2026-06-12 from current-meta type-matchup logic against opponent_pools/gl_top50_plus_cs.txt (2026-06-10 pool, post-June-2026 rebalance). Base-form anchors live in thresholds/sealeo.toml."
+
+["Sealeo (Shadow)".Great.meta]
+notes = "Shadow trade-off: x1.2 atk buys the base form's Powder Snow / Body Slam breakpoint bands cheaply; x0.8333 def means the resist-grind bulk checks that define base Sealeo's game plan need rediscovery rather than inheritance. Level-3 anchors below enumerate both sides."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all). The shadow def
+# penalty makes these the binding constraint.
+# ─────────────────────────────────────────────────────────────────────
+
+# The shadow mirror.
+["Sealeo (Shadow)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Sealeo (Shadow)"
+description = "Discover every shadow-mirror bulkpoint. Powder Snow is double-resisted both ways, so shadow-boosted Body Slam / Aurora Beam tiers into shadow-reduced def decide the mirror; the def ladder needs its own discovery pass."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Cross-form: shadow vs base Sealeo, both in the pool; players run both.
+["Sealeo (Shadow)".Great.anchors.sealeo_blkp_any]
+kind = "bulkpoint"
+opponent = "Sealeo"
+description = "Discover all bulkpoints vs base Sealeo (cross-form fight). Base-form charged tiers against a shadow-def focal decide which form wins the in-family matchup."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Azumarill: the resist grind that base Sealeo plays close gets harder
+# at shadow def — each recovered tier matters more, not less.
+["Sealeo (Shadow)".Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. The mutual-resist grind tilts against a shadow-def focal: Bubble chip and neutral Play Rough tiers are the steps that keep the matchup playable."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Galarian Stunfisk: super-effective Rock Slide into shadow def is the
+# scariest incoming charged move this focal faces in a close fight.
+["Sealeo (Shadow)".Great.anchors.stunfisk_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all G-Stunfisk bulkpoints. Super-effective Rock Slide into shadow-reduced def is the highest-value incoming tier this focal can step down; Mud Shot chip tiers compound the same race."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lickilicky: neutral Body Slam war vs pool #1, now at reduced def.
+["Sealeo (Shadow)".Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Neutral Body Slam spam compounds every incoming tier over a long chip race; shadow def makes each recoverable step precious."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Dewgong: same-typing near-mirror; Drill Run tiers into shadow def.
+["Sealeo (Shadow)".Great.anchors.dewgong_blkp_any]
+kind = "bulkpoint"
+opponent = "Dewgong"
+description = "Discover all Dewgong bulkpoints. Near-mirror typing double-resists the fast moves both ways; Drill Run / Icy Wind tiers into shadow-reduced def decide whether the shadow's extra atk actually converts to a win."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lapras: in-family Water/Ice grind.
+["Sealeo (Shadow)".Great.anchors.lapras_blkp_any]
+kind = "bulkpoint"
+opponent = "Lapras"
+description = "Discover all Lapras bulkpoints. The in-family resist grind runs long; neutral charged threats (e.g. Skull Bash) into shadow def are the tiers that swing it."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Feraligatr: neutral Shadow Claw chip vs a shadow-def focal.
+["Sealeo (Shadow)".Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Its Water/Ice charged moves are resisted, so neutral Shadow Claw chip carries the fight — at shadow def, a fast-move step down is worth many turns."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Umbreon: fully neutral wall grind, the purest def-tier test.
+["Sealeo (Shadow)".Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Fully neutral both ways against a premier wall; Snarl chip and Foul Play tiers into shadow-reduced def decide a fight that always goes the distance."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), key close matchups. Shadow
+# atk reaches tiers base Sealeo can't; discovery maps which ones.
+# ─────────────────────────────────────────────────────────────────────
+
+# Azumarill: resisted Powder Snow means fragile damage tiers — shadow
+# atk is exactly what buys them back.
+["Sealeo (Shadow)".Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints for the shadow focal. Resisted Powder Snow tiers that base Sealeo struggles to reach come into range at x1.2 atk; discovery shows which ones flip the grind."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Galarian Stunfisk: shorten the race before Rock Slide lands.
+["Sealeo (Shadow)".Great.anchors.stunfisk_galarian_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all G-Stunfisk damage breakpoints. The shadow races incoming Rock Slide on a thinner HP budget; Powder Snow and super-effective Water Pulse tiers unlocked by shadow atk shorten the race."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Shadow Dragonair: shadow-vs-shadow, super-effective Powder Snow.
+["Sealeo (Shadow)".Great.anchors.dragonair_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair damage breakpoints. Super-effective Powder Snow at x1.2 atk into shadow-reduced def gives the densest tier ladder this focal sees; each tier banked ends the dragon fight cycles earlier."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"

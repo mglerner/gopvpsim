@@ -1,0 +1,140 @@
+# Sableye (Shadow) — Great League thresholds and slayer anchors.
+#
+# Per-form file following the aegislash_blade.toml / aegislash_shield.toml
+# and altaria.toml / altaria_shadow.toml precedent: deep_dive.py
+# auto-discovery maps the focal "Sableye (Shadow)" to
+# thresholds/sableye_shadow.toml. Base-form data lives in
+# thresholds/sableye.toml.
+#
+# EXPERT-NUMBER STATUS: RyanSwag's Sableye PvP IV Deep Dive (GamePress
+# series #33, last updated 2021-11-26, fetched 2026-06-12 via Wayback
+# snapshot 2025-12-12) is about PURIFIED Sableye — Return is the whole
+# build, and Return is purified-exclusive, so a shadow can never run his
+# moveset and the writeup contains no shadow-specific stat numbers. None
+# are encoded here (no numbers are invented). Where a base-form number
+# is quoted below it is context, not a shadow target: the shadow
+# multipliers (atk x1.2, def x0.8333) mean the base form's atk
+# breakpoints largely come free while every def/hp check from the
+# writeup's High Def (124.70 def + 123 hp) / Med Def (122.40 def +
+# 125 hp) tiers is out of reach at shadow def and must be rediscovered,
+# which is why this file is bulkpoint-heavy discovery — same shape as
+# altaria_shadow.toml and kingdra_shadow.toml.
+#
+# Opponent selection from opponent_pools/gl_top50_plus_cs.txt
+# (generated 2026-06-10, post-June-2026 rebalance); Sableye (Shadow) is
+# in that pool alongside base Sableye (GL meta rank 29). All opponent
+# names below use that file's exact PvPoke speciesName spellings.
+
+["Sableye (Shadow)"]
+sources = "Discovery-only: opponent pool gl_top50_plus_cs.txt (2026-06-10). RyanSwag's GamePress Sableye deep dive (2021-11-26, Wayback 2025-12-12) covers only Purified/base Sableye — no shadow-specific numbers exist; base-form expert encoding lives in thresholds/sableye.toml."
+
+["Sableye (Shadow)".Great.meta]
+notes = "Shadow trade-off: x1.2 atk buys the base form's Slight Atk / High Atk bands (e.g. the 121.60 atk Greedent calibration) cheaply and opens tiers the purified form can't reach; x0.8333 def means the writeup's def/hp tiers don't transfer and the 126-hp mirror-tie logic needs rediscovery. No Return: the shadow leans on Foul Play plus the weaker Power Gem / Shadow Sneak coverage, so winning fast-move tiers matters even more. Level-3 anchors below enumerate both sides; promote discovered (move, tier) pairs that split the survivor cohort to Level-1 anchors."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level-3 discover-all), key
+# close matchups. Shadow atk reaches tiers base Sableye can't.
+# ─────────────────────────────────────────────────────────────────────
+
+# Greedent: the base form needed RyanSwag's High Atk tier (121.60 atk)
+# for the straight-Foul-Play 1-1; shadow atk clears that trivially —
+# discovery shows which further tiers open up.
+["Sableye (Shadow)".Great.anchors.greedent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Greedent"
+description = "Discover all Greedent damage breakpoints for the shadow focal. Base-form calibration (RyanSwag: 121.60 atk for the straight-Foul-Play 1-1) is trivially cleared by shadow atk; discovery shows which Shadow Claw / Foul Play tiers open beyond it."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26, base-form context); simulator discovery"
+
+# Cross-form: shadow vs base Sableye, both in the pool; players run both.
+["Sableye (Shadow)".Great.anchors.sableye_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Sableye"
+description = "Discover all base-Sableye damage breakpoints (cross-form fight). Shadow-boosted Shadow Claw into the base form's High Def builds decides the in-family chip war."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Jellicent: ghost-on-ghost chip race vs a premium-bulk wall; shadow atk
+# may step Shadow Claw or Foul Play up a tier the base form misses.
+["Sableye (Shadow)".Great.anchors.jellicent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent damage breakpoints. Mutual ghost chip vs a premium-bulk wall; shadow atk puts extra Shadow Claw / Foul Play tiers in reach of the same close matchup RyanSwag calibrated def-side for the base form."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all). The shadow def
+# penalty makes these the binding constraint; opponents from the
+# 2026-06-10 pool where def/hp checks are plausible and close.
+# ─────────────────────────────────────────────────────────────────────
+
+# The shadow mirror.
+["Sableye (Shadow)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye (Shadow)"
+description = "Discover all shadow-mirror bulkpoints (shadow-boosted Shadow Claw incoming tiers). The base form's 126 hp 1-1 mirror-tie logic doesn't transfer under the shadow def penalty — rediscover the tiers."
+source = "Simulator discovery; RyanSwag base-form HP ladder as context only"
+
+# Cross-form: base Sableye's Shadow Claw into shadow-reduced def.
+["Sableye (Shadow)".Great.anchors.sableye_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye"
+description = "Discover all bulkpoints vs base Sableye (cross-form fight). Base-form Shadow Claw tiers against a shadow-def focal decide which form wins the in-family matchup."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Jellicent: base-form calibration was 123.70 def for 0-1/1-2 potential;
+# at shadow def that band is unreachable — find what's still steppable.
+["Sableye (Shadow)".Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. The base form's 123.70 def calibration (RyanSwag, 0-1/1-2 potential vs high-SP Hex Jellicent) is out of reach at shadow def — find which Hex tiers a shadow build can still step down."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26, base-form context); simulator discovery"
+
+# Lapras: base-form 124.41 def flipped the 2-2; rediscover at shadow def.
+["Sableye (Shadow)".Great.anchors.lapras_blkp_any]
+kind = "bulkpoint"
+opponent = "Lapras"
+description = "Discover all Lapras bulkpoints. Base-form calibration 124.41 def (RyanSwag, Lapras 2-2) doesn't transfer at shadow def; Ice Shard chip plus heavy charge moves make any surviving def step high-value."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26, base-form context); simulator discovery"
+
+# Dewgong: base-form 122.13 def gave 1-1 potential; rediscover.
+["Sableye (Shadow)".Great.anchors.dewgong_blkp_any]
+kind = "bulkpoint"
+opponent = "Dewgong"
+description = "Discover all Dewgong bulkpoints. Base-form calibration 122.13 def (RyanSwag, Dewgong 1-1 potential) is unreachable at shadow def — find which Ice Shard tiers remain steppable."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26, base-form context); simulator discovery"
+
+# Galarian Stunfisk: base-form 120.35 def took the 1-1; Mud Shot spam
+# makes each surviving incoming tier compound.
+["Sableye (Shadow)".Great.anchors.stunfisk_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all Galarian Stunfisk bulkpoints. Base-form calibration 120.35 def (RyanSwag, G-Fisk 1-1) sits above shadow-def reach; Mud Shot comes constantly, so whatever tier is still reachable compounds across the matchup."
+source = "RyanSwag GamePress Sableye deep dive (2021-11-26, base-form context); simulator discovery"
+
+# Lickilicky: #1 pool entry; Body Slam chip war into reduced def.
+["Sableye (Shadow)".Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam spam vs the #1 pool entry compounds every incoming tier; shadow def makes each recoverable step precious."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Altaria: close neutral Dragon Breath chip; altaria.toml already
+# encodes the reverse anchor against this shadow focal.
+["Sableye (Shadow)".Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Dragon Breath chip from the rank-2 bulk dragon into shadow-reduced def; fast-move def steps carry the matchup both ways (altaria.toml carries the mirror-image anchor)."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Umbreon: dark-on-dark grind; long matchups amplify the def penalty.
+["Sableye (Shadow)".Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Dark-on-dark grind measured in fast-move cycles; at shadow def the Snarl / Foul Play tiers need rediscovery (Umbreon re-entered the pool in the 2026-06 rebalance)."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Greedent: def-side complement of the atk-side anchor above.
+["Sableye (Shadow)".Great.anchors.greedent_blkp_any]
+kind = "bulkpoint"
+opponent = "Greedent"
+description = "Discover all Greedent bulkpoints. Body Slam chip race where shadow atk wins the damage war but shadow def loses the attrition war — incoming tiers decide which effect dominates."
+source = "Simulator discovery; opponent pool gl_top50_plus_cs.txt (2026-06-10)"

@@ -1,0 +1,147 @@
+# Quagsire (and Quagsire (Shadow)) — Great League thresholds, spreads,
+# and slayer anchors.
+#
+# Sources:
+#   - RyanSwag "Quagsire PvP IV Deep-Dive" (GamePress series #8, Last
+#     Updated 2023-11-04). Fetched 2026-06-12 from the Wayback Machine
+#     snapshot 20231104183954 of gamepress.gg/pokemongo/quagsire-pvp-iv-deep-dive
+#     (the pogo.gamepress.gg slug listed in
+#     docs/reference_deep_dives/ryanswag/INDEX.md only has error-page
+#     captures; the older gamepress.gg/pokemongo/ slug has the real 200).
+#   - Opponent selection for discovery anchors: current GL meta pool
+#     opponent_pools/gl_top50_plus_cs.txt (2026-06-10, post-rebalance).
+#
+# FRESHNESS CAVEAT (same as _shared.toml): the RyanSwag dive predates the
+# June-2026 move rebalance and the current meta pool (it was written for
+# the late-2023 Carbink/Sableye/Medicham meta; Carbink, Lanturn, Gligar,
+# Froslass, Vigoroth, and Emolga are no longer in our pool). His def/atk
+# stat thresholds are opponent-stat arithmetic and remain verifiable as
+# written, but whether each cited matchup flip still holds under the
+# current gamemaster should be re-checked via the Level-3 discovery
+# anchors below.
+#
+# Both forms live in this one file: the loader (gopvpsim.thresholds
+# .load_toml) reads every top-level species table, and PvPoke speciesName
+# keys are used exactly ("Quagsire", "Quagsire (Shadow)"). NOTE:
+# deep_dive.py's auto-discover path derives thresholds/quagsire_shadow.toml
+# for a "Quagsire (Shadow)" focal, so shadow dives should pass
+# `--thresholds thresholds/quagsire.toml` explicitly.
+#
+# CMP note (tinkaton.toml precedent): RyanSwag flags "Cofagrigus CMP
+# potential" at 110 atk for the shadow and "Swamp/Venu CMP" Sableye
+# builds for the base form. CMP anchors need IV-list spreads for those
+# opponents; deferred until CMP anchors support single-opponent
+# shorthand. The atk-side BP anchors below carry the numbers.
+
+[Quagsire]
+sources = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04; Wayback 20231104183954) + GL meta pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Quagsire (base) — spreads (stat-cutoff tiers named by the writeup)
+# ─────────────────────────────────────────────────────────────────────
+
+[Quagsire.Great.spreads."High Bulk"]
+attack = 0
+defense = 112.0
+stamina = 163
+description = "RyanSwag 'Non-Shadow, High Bulk' tier: 112.00 def + 163 hp. Enables the Sableye 0-0 & 2-2, fortifies the Carbink 0-1 & 1-2 and Charjabug 1-1, avoids Medicham's Counter breakpoint; 163 hp keeps the Water Gun Lanturn 1-2 (Mud Bomb), Froslass 1-2, and Powder Snow Shadow A-Ninetales 0-1 consistent. Preference ordering within the tier: 113.66 def, then 112.68 def + 164 hp, then raw 164 hp."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Quagsire (base) — bulkpoint anchors (def-side, Level 3 discover-all)
+# Opponents picked from gl_top50_plus_cs.txt where Quagsire's def/hp
+# checks plausibly move a close matchup.
+# ─────────────────────────────────────────────────────────────────────
+
+[Quagsire.Great.anchors.sableye_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye"
+description = "Discover all Sableye bulkpoints. RyanSwag: 112.00 def covers rank-1 Sableye (atk 119.5) for the 0-0 & 2-2; 113.66 def covers CMP-minded Sableye builds (atk up to 121.4, the Swampert/Venusaur-CMP weighting)."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+[Quagsire.Great.anchors.sableye_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye (Shadow)"
+description = "Discover all Shadow Sableye bulkpoints. The shadow runs hotter fast-move pressure than the non-shadow Sableye RyanSwag calibrated against; discovery re-derives the def tiers under the current pool."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Quagsire.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. RyanSwag: 112.00 def avoids Medicham's Counter breakpoint; 113.66 def covers mirror-slayer Medicham builds (atk up to 108.9, the AXN Medicham)."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+[Quagsire.Great.anchors.charjabug_blkp_any]
+kind = "bulkpoint"
+opponent = "Charjabug"
+description = "Discover all Charjabug bulkpoints. RyanSwag: 112.00 def fortifies the Charjabug 1-1 (Quagsire is the counter-swap into it; Ground immunity blanks Spark/Discharge but the Bug-side damage still has tiers)."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+[Quagsire.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Long neutral grind where Foul Play / fast-move damage tiers decide the 1-0 and 1-1; rebalance re-entry to the pool, no expert number for the base form."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Quagsire.Great.anchors.pelipper_blkp_any]
+kind = "bulkpoint"
+opponent = "Pelipper"
+description = "Discover all Pelipper bulkpoints. Close Water/Flying matchup (resists both Quagsire fast moves); Wing Attack and Weather Ball damage tiers are where the focal's def can move the 0-0."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Quagsire.Great.anchors.clodsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Clodsire"
+description = "Discover all Clodsire bulkpoints. The other GL mud boi: slow neutral fast-move war where per-tier damage drops compound over many throws. RyanSwag flags the Clodsire matchup as central to the post-2023 meta."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04) names the matchup; threshold via discovery"
+
+[Quagsire.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Bulky-Normal Body Slam spam is a classic def-tier matchup; RyanSwag's note that very high def 'could catch Lickitung off guard' suggests the evolved form (the one actually in the pool) has discoverable tiers too — no number is borrowed across species."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Quagsire.Great.anchors.stunfisk_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all G-Stunfisk bulkpoints. Quagsire is a designated Steel counter; the close mud-mirror is decided by Mud Shot / Rock Slide damage tiers on the focal."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Quagsire.Great.anchors.quagsire_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire (Shadow)"
+description = "Discover all bulkpoints against the cross-form Shadow Quagsire (its shadow atk multiplier shifts every damage tier vs the base mirror)."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Quagsire.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all mirror Quagsire bulkpoints. RyanSwag notes Aqua Tail aids the 'mud boi mirror'; def tiers vs Mud Shot / Mud Bomb / Aqua Tail decide it."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04) names the mirror; threshold via discovery"
+
+# ─────────────────────────────────────────────────────────────────────
+# Quagsire (base) — damage-breakpoint anchors (atk-side)
+# ─────────────────────────────────────────────────────────────────────
+
+[Quagsire.Great.anchors.medicham_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+description = "Discover all Medicham damage breakpoints. RyanSwag: 113.28 atk opens 'interesting tech' vs Lanturn, Gligar, Shadow Gligar, and Medicham — Medicham is the one still in the current pool. He cautions the bulk cost usually isn't worth it on the non-shadow."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+[Quagsire.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. RyanSwag credits Mud Bomb's 'stronger neutral damage' with helping the Azumarill matchup; Level 3 finds which Mud Shot / Mud Bomb tiers actually move this close neutral grind."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04) names the matchup; threshold via discovery"
+
+# ─────────────────────────────────────────────────────────────────────
+# Quagsire (base) — expert call-out outside the current pool
+# (auto-included via TOML anchor opponent injection; tinkaton.toml precedent)
+# ─────────────────────────────────────────────────────────────────────
+
+[Quagsire.Great.anchors.carbink_blkp_any]
+kind = "bulkpoint"
+opponent = "Carbink"
+description = "Discover all Carbink bulkpoints. RyanSwag: 112.68 def covers raid-IV atk-weighted Carbink (atk 86 to 86.6), fortifying the 0-1 & 1-2. Carbink left our pool post-rebalance but is the writeup's central calibration target."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"

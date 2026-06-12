@@ -1,0 +1,173 @@
+# Seaking — Great League thresholds and slayer anchors.
+#
+# SIMULATOR-DERIVED (2026-06-12). No known expert IV writeup exists for
+# GL Seaking (current meta rank 12 post-June-2026 rebalance) — every
+# anchor below is designed from current-meta matchup logic and will be
+# calibrated by the Level-3 discover-all dives, not by community data.
+#
+# Matchup picture (PvPoke GL rankings, 2026-06-10 pool; rank-1 Seaking
+# 121.9 atk / 108.9 def / 138 hp; default moveset Peck / Drill Run /
+# Icy Wind):
+#   close wins   — Ninetales (Shadow) 518, Tinkaton 554, Altaria 608,
+#                  Jumpluff 612, Empoleon 641
+#   close losses — Guzzlord 477, Lickilicky 484
+#   hard losses  — Quagsire 375, Sableye (Shadow) 356, Jellicent 336
+#                  (not anchored: too far gone for a def/hp tier to flip)
+#
+# No spreads are authored yet: with no community spread to encode, the
+# named tiers should come out of the dive results (promote the winning
+# Level-3 sub-anchors to spreads/Level-1 anchors once measured).
+
+[Seaking]
+sources = """
+Simulator-derived. PvPoke GL rankings (post-June-2026 move rebalance;
+GitHub-master pull behind opponent_pools/gl_top50_plus_cs.txt,
+2026-06-10). No known expert writeup for GL Seaking — anchors chosen
+from current-meta matchup logic: bulkpoints target the close wins it
+must keep (Ninetales (Shadow) 518, Tinkaton 554) and the close losses
+a def/hp tier might flip (Guzzlord 477, Lickilicky 484); damage
+breakpoints target the same razor-thin matchups from the atk side.
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Seaking's rank-1 build is bulk-leaning (108.9 def / 138 hp); the
+# def-side tiers are where the close matchups above are won or kept.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Peck + Drill Run are mutually neutral, so mirror outcomes
+# hinge on fast-move damage tiers and CMP — discover which def tiers
+# shave Peck (or Waterfall/Poison Jab variants) by 1.
+[Seaking.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Seaking"
+description = "Discover all mirror-Seaking bulkpoints in the survivor def range. Neutral Peck/Drill Run mirror — fast-move damage tiers decide it."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Ninetales (Shadow), rating 518 — the thinnest win on the card. Fire
+# damage is resisted but the shadow atk boost claws a tier back; a def
+# tier that re-shaves Ember or a charged fire move keeps the win safe
+# across opposing IV variance.
+[Seaking.Great.anchors.ninetales_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Ninetales (Shadow)"
+description = "Discover all Shadow Ninetales bulkpoints. Closest win (518) — shadow atk boost can step resisted fire damage back up; find the def tiers that step it down again."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Tinkaton, rating 554. Gigaton Hammer is the single biggest nuke
+# Seaking eats in a winning matchup; a def/hp tier that survives a
+# hammer (or shaves Fairy Wind by 1) is the difference between a close
+# win and a flip.
+[Seaking.Great.anchors.tinkaton_blkp_any]
+kind = "bulkpoint"
+opponent = "Tinkaton"
+description = "Discover all Tinkaton bulkpoints. Close win (554) decided by Gigaton Hammer damage and Fairy Wind chip — def/hp tiers here protect the matchup."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Guzzlord, rating 477 — the closest loss. Snarl is high-volume fast
+# pressure; shaving 1 damage per Snarl compounds across the whole fight
+# and is exactly the kind of bulkpoint that flips a 477.
+[Seaking.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Closest loss (477) — a Snarl fast-damage step-down compounds every turn and is the most plausible def-side flip."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Lickilicky, rating 484 — the other close loss. Body Slam spam is the
+# classic bulkpoint target (cheap, frequent, integer-sensitive); Rollout
+# chip tiers matter too.
+[Seaking.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Close loss (484) — Body Slam is cheap and frequent, so a 1-damage step-down per Slam (or per Rollout) is a plausible flip."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Empoleon, rating 641. Hydro Cannon is resisted; the matchup is carried
+# by neutral Steel Wing / Flash Cannon damage, so steel-move def tiers
+# are what keep this win comfortable against high-atk Empoleon builds.
+[Seaking.Great.anchors.empoleon_blkp_any]
+kind = "bulkpoint"
+opponent = "Empoleon"
+description = "Discover all Empoleon bulkpoints. Win (641) carried by resisting Hydro Cannon — def tiers vs neutral Steel Wing/Flash Cannon keep it safe vs punchier Empoleon IVs."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Altaria, rating 608. All-neutral both ways (Dragon Breath chip + Sky
+# Attack nukes vs Peck/Icy Wind); fast-move chip tiers and Sky Attack
+# damage tiers decide how much HP Seaking banks for the rest of the set.
+[Seaking.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Neutral chip war (608) — Dragon Breath and Sky Attack damage tiers set how much HP the win costs."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Jumpluff, rating 612 but opponent-side rating 387: the win is real but
+# grass coverage hits Seaking super-effectively, so Bullet Seed / Energy
+# Ball damage tiers govern how safe the matchup stays under shielding.
+[Seaking.Great.anchors.jumpluff_blkp_any]
+kind = "bulkpoint"
+opponent = "Jumpluff"
+description = "Discover all Jumpluff bulkpoints. Win (612) despite SE grass coverage — Bullet Seed/Energy Ball tiers determine how much the matchup can swing."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Azumarill — perennial bulky Water/Fairy core; Bubble is resisted, so
+# the fight comes down to neutral Play Rough / Ice Beam damage vs
+# Seaking's neutral Drill Run pressure. Tight enough that integer tiers
+# plausibly matter on both axes.
+[Seaking.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Resists Bubble; close neutral grind vs Play Rough/Ice Beam where charged-damage tiers plausibly decide the 1-shield lines."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Feraligatr — Shadow Claw volume plus resisted Hydro Cannon / neutral
+# Ice Beam. Like Guzzlord, a fast-move (Shadow Claw) step-down compounds
+# every turn in a near-even Water-on-Water fight.
+[Seaking.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Near-even Water mirror — a Shadow Claw fast-damage step-down compounds across the fight; Hydro Cannon is resisted."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# Same four razor-thin matchups attacked from the atk axis: which Peck /
+# Drill Run / Icy Wind damage tiers secure the 518/554 wins or flip the
+# 477/484 losses, and what atk they cost off the bulk-leaning rank-1.
+# ─────────────────────────────────────────────────────────────────────
+
+# Ninetales (Shadow): shadow def drop makes focal breakpoints cheaper —
+# a Peck or Drill Run tier here is the atk-side way to lock the 518.
+[Seaking.Great.anchors.ninetales_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Ninetales (Shadow)"
+description = "Discover all Shadow Ninetales damage breakpoints. Closest win (518); the shadow def drop makes Peck/Drill Run tiers cheap to reach and worth locking in."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Tinkaton: Drill Run is super-effective into the Fairy/Steel frame —
+# a Drill Run damage tier is the most likely single number deciding the
+# 554, and Peck chip tiers feed the energy race.
+[Seaking.Great.anchors.tinkaton_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Tinkaton"
+description = "Discover all Tinkaton damage breakpoints. SE Drill Run into Fairy/Steel — its damage tiers are the likeliest deciders of the close 554 win."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Guzzlord: Icy Wind is super-effective (Dragon) and Megahorn doubly
+# relevant (Dark); per-charged-move tiers plus Peck chip are the atk-side
+# route to flipping the closest loss.
+[Seaking.Great.anchors.guzzlord_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord damage breakpoints. Closest loss (477); SE Icy Wind/Megahorn tiers are the atk-side flip candidates."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"
+
+# Lickilicky: pure-neutral grind where Lickilicky's huge bulk makes
+# every integer matter — find the Peck and Drill Run tiers and what atk
+# they demand before trading rank-1 bulk away for them.
+[Seaking.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Close loss (484) into deep bulk — Peck/Drill Run tiers are the atk-side flip candidates, priced against the bulk they cost."
+source = "Simulator-derived; PvPoke GL rankings 2026-06-10"

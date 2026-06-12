@@ -1,0 +1,180 @@
+# Jumpluff — Great League thresholds and slayer anchors.
+#
+# SIMULATOR-DERIVED FILE: no known expert IV writeup exists for GL
+# Jumpluff (checked 2026-06-12). All anchors below are Level-3
+# discover-all anchors designed from current-meta matchup logic — type
+# math against the live opponent pool plus current PvPoke default
+# movesets — not from published expert calibration numbers. The deep
+# dive discovers the actual (move, tier) ladders; nothing here encodes
+# a pre-computed stat target.
+#
+# Sources:
+#   - Opponent pool: opponent_pools/gl_top50_plus_cs.txt (generated
+#     2026-06-10, post-June-2026 move rebalance). All anchor opponents
+#     use exact spellings from that pool.
+#   - PvPoke GL rankings (cached gamemaster/rankings, post-rebalance):
+#     Jumpluff is GL meta rank 32, default moveset Fairy Wind /
+#     Energy Ball / Acrobatics. Opponent movesets cited in anchor
+#     descriptions are the same rankings' current defaults (notably:
+#     Lickilicky now leads with ROLLOUT; Medicham runs PSYCHO_CUT, not
+#     Counter; Quagsire's default set is Mud Shot / Aqua Tail / Mud
+#     Bomb — fully resisted, so that matchup is no longer close and
+#     gets no anchor).
+#   - Reciprocal expert context (Altaria side only): RyanSwag's Altaria
+#     deep dive (GamePress 2022-10-27, encoded in thresholds/altaria.toml)
+#     used Jumpluff as a calibration point both ways (102.85 atk flips
+#     Altaria's Jumpluff 1-1/0-1; 149.61 def opens its Jumpluff 0-0
+#     band). That establishes the Altaria matchup as tier-sensitive
+#     from this side too, but gives no Jumpluff-side numbers.
+#
+# Typing cheat-sheet used for opponent selection (Grass/Flying focal):
+# resists Water/Grass/Fighting/Ground(2x); weak to Ice(2x), Fire,
+# Flying, Rock, Poison. Fairy Wind chips super-effectively into the
+# pool's Dragons, Darks, and Fighters; Energy Ball punishes Waters.
+# The close matchups are therefore the resisted-fast-move-plus-Ice-nuke
+# Waters (Azumarill, Feraligatr), the SE-chip top of the pool
+# (Lickilicky's Rollout, Altaria's flying war), and the neutral chip
+# races Fairy Wind tilts (shadow dragons/darks, Medicham, the mirror).
+#
+# The SHADOW form is also in the 2026-06-10 pool (kept per the
+# keep-shadow-pairs policy) and is a separate dive focal; per the
+# altaria.toml / altaria_shadow.toml precedent its focal-side anchors
+# would live in thresholds/jumpluff_shadow.toml. This file covers the
+# base form only; Jumpluff (Shadow) appears below as an opponent.
+
+[Jumpluff]
+sources = "Simulator-derived (no expert IV writeup known as of 2026-06-12). Opponent pool gl_top50_plus_cs.txt (2026-06-10, post-June-2026 rebalance); PvPoke GL rankings via cached gamemaster (rank 32; Fairy Wind / Energy Ball / Acrobatics); reciprocal matchup context from RyanSwag's Altaria deep dive (thresholds/altaria.toml)"
+
+[Jumpluff.Great.meta]
+notes = "GL meta rank 32 (2026-06, post-rebalance). Ships simulator-derived: Level-3 anchors only, no expert spreads — the dive output is the calibration, not a check against published numbers. Fairy Wind chip + Energy Ball/Acrobatics closers; the IV question is whether def steps blunt the pool's SE chip (Rollout, Sky Attack, shadow Dragon Breath) and Ice nukes, and whether atk steps speed the Fairy Wind races it wants to win."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all), opponents
+# chosen from gl_top50_plus_cs.txt (2026-06-10) where the type matchup
+# makes def/hp checks plausible and the matchup is close
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Mutual neutral Fairy Wind chip both ways (Fairy is
+# neutral into Grass/Flying) — a long, symmetric fast-move race where
+# a single incoming tier down is the whole edge.
+[Jumpluff.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Jumpluff"
+description = "Discover all mirror-Jumpluff bulkpoints. Symmetric neutral Fairy Wind chip race; one incoming Fairy Wind tier down decides the mirror."
+source = "Mirror anchor; simulator-derived (PvPoke GL rankings 2026-06, rank 32)"
+
+# Shadow pair: Jumpluff (Shadow) stayed in the pool under the
+# keep-shadow-pairs policy and hits the base form with shadow-boosted
+# Fairy Wind, so its chip tiers sit above the base mirror's.
+[Jumpluff.Great.anchors.jumpluff_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Jumpluff (Shadow)"
+description = "Discover all Shadow Jumpluff bulkpoints. Shadow-boosted Fairy Wind relocates the mirror chip tiers upward; the cross-form race is decided by whether base bulk steps them back down."
+source = "Simulator-derived; shadow pair retained in gl_top50_plus_cs.txt (2026-06-10) per keep-shadow-pairs policy"
+
+# Lickilicky: #1 in the current pool, and its post-rebalance default
+# fast move is ROLLOUT — Rock chip that hits Jumpluff super-effectively.
+# Every Rollout tier shaved compounds across the whole grind.
+[Jumpluff.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Post-rebalance Rollout chips super-effectively into Grass/Flying; an incoming Rollout tier down is the highest-leverage def check vs the #1 pool entry."
+source = "Simulator-derived; Lickilicky default moveset ROLLOUT/BODY_SLAM/SHADOW_BALL per current PvPoke GL rankings (2026-06)"
+
+# Altaria: #2 in the pool; the flying war. Dragon Breath chips
+# neutrally but Sky Attack and Flamethrower both land super-effective.
+# RyanSwag's Altaria dive treated this matchup as tier-sensitive from
+# the other side (his 102.85 atk flips Altaria's Jumpluff 1-1/0-1),
+# so the def steps that undo those flips are worth discovering here.
+[Jumpluff.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Dragon Breath chip plus super-effective Sky Attack/Flamethrower; RyanSwag showed the matchup swings on single damage tiers from the Altaria side, so the counter-tiers live here."
+source = "Simulator-derived; reciprocal context from RyanSwag's Altaria deep dive (GamePress 2022-10-27, see thresholds/altaria.toml)"
+
+# Azumarill: the classic razor-thin GL matchup for a grass. Bubble is
+# resisted, but Ice Beam hits 2x super-effective — one Ice Beam damage
+# step down is worth several Bubble cycles of effective HP.
+[Jumpluff.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Resisted Bubble chip but 2x super-effective Ice Beam — stepping the Ice Beam tier down is the single biggest bulk check in this razor-thin matchup."
+source = "Simulator-derived; Azumarill default moveset BUBBLE/ICE_BEAM/PLAY_ROUGH per current PvPoke GL rankings (2026-06)"
+
+# Feraligatr: same shape as Azumarill — Hydro Cannon is resisted,
+# Shadow Claw is neutral, and Ice Beam is the 2x super-effective flip
+# threat that bulk can blunt.
+[Jumpluff.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Hydro Cannon resisted, Shadow Claw neutral; the 2x super-effective Ice Beam tier decides whether Energy Ball pressure converts before the flip."
+source = "Simulator-derived; Feraligatr default moveset SHADOW_CLAW/HYDRO_CANNON/ICE_BEAM per current PvPoke GL rankings (2026-06)"
+
+# Medicham: post-rebalance default is Psycho Cut (neutral chip) with
+# Dynamic Punch resisted — so the matchup hinges entirely on Ice
+# Punch, a 2x super-effective nuke whose damage tier def can step down.
+[Jumpluff.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Psycho Cut neutral, Dynamic Punch resisted; the 2x super-effective Ice Punch tier is the one number that decides a matchup Fairy Wind otherwise favors."
+source = "Simulator-derived; Medicham default moveset PSYCHO_CUT/ICE_PUNCH/DYNAMIC_PUNCH per current PvPoke GL rankings (2026-06)"
+
+# Shadow Dragonair: rebalance newcomer. Fairy Wind chips the dragon
+# super-effectively, but shadow-boosted Dragon Breath comes back
+# neutrally hard — the chip war is close and tier-driven both ways.
+[Jumpluff.Great.anchors.dragonair_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair bulkpoints. Shadow-boosted Dragon Breath chip vs a Fairy-Wind-favored dragon duel; incoming DB tiers set whether Jumpluff banks the race it should win on paper."
+source = "Simulator-derived; Dragonair (Shadow) pool entry (2026-06 rebalance newcomer), default DRAGON_BREATH/WRAP/AQUA_TAIL per current PvPoke GL rankings"
+
+# Shadow Sableye: shadow-boosted Shadow Claw chip in a close neutral
+# race that Fairy Wind (super-effective into Dark) tilts toward
+# Jumpluff — if it survives the chip.
+[Jumpluff.Great.anchors.sableye_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye (Shadow)"
+description = "Discover all Shadow Sableye bulkpoints. Shadow-boosted Shadow Claw chip against Fairy Wind's super-effective Dark pressure; fast-move def steps carry the close race."
+source = "Simulator-derived; Sableye (Shadow) default SHADOW_CLAW/FOUL_PLAY/DRAIN_PUNCH per current PvPoke GL rankings (2026-06)"
+
+# Umbreon: back in the pool since the rebalance. Slow Snarl/Foul Play
+# grind that Fairy Wind chips super-effectively — a long race where
+# each incoming tier down is a full extra fast move of survival.
+[Jumpluff.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Slow neutral Snarl/Foul Play grind vs super-effective Fairy Wind; in a race this long, one incoming damage tier compounds the most."
+source = "Simulator-derived; Umbreon rejoined gl_top50_plus_cs.txt in the 2026-06 rebalance, default SNARL/FOUL_PLAY/LAST_RESORT"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level-3 discover-all), key
+# close matchups where outgoing Fairy Wind / Energy Ball tiers
+# plausibly flip the race
+# ─────────────────────────────────────────────────────────────────────
+
+# Azumarill: the atk-side half of the razor-thin matchup above. Energy
+# Ball is the super-effective closer and Fairy Wind the constant chip;
+# a tier up on either compresses the window Ice Beam has to flip it.
+[Jumpluff.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. A Fairy Wind or super-effective Energy Ball tier up shortens the race before Ice Beam lands — the atk-side mirror of the Ice Beam bulk check."
+source = "Simulator-derived; Azumarill default moveset per current PvPoke GL rankings (2026-06)"
+
+# Altaria: RyanSwag's numbers prove the matchup turns on single fast-
+# move damage steps from the Altaria side; Jumpluff's own Fairy Wind
+# tiers into Altaria are the symmetric lever.
+[Jumpluff.Great.anchors.altaria_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria"
+description = "Discover all Altaria damage breakpoints. The flying war is fast-move tier-sensitive both ways (RyanSwag flipped it from the Altaria side at 102.85 atk); Jumpluff's Fairy Wind steps are the counter-lever."
+source = "Simulator-derived; reciprocal context from RyanSwag's Altaria deep dive (GamePress 2022-10-27, see thresholds/altaria.toml)"
+
+# Medicham: Fairy Wind lands super-effectively into the Fighting half,
+# so outgoing chip tiers determine whether Jumpluff outraces Medicham
+# before an Ice Punch connects.
+[Jumpluff.Great.anchors.medicham_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+description = "Discover all Medicham damage breakpoints. Super-effective Fairy Wind chip tiers decide whether Jumpluff banks the race before Ice Punch flips it — paired with the Ice Punch bulkpoint above."
+source = "Simulator-derived; Medicham default moveset per current PvPoke GL rankings (2026-06)"

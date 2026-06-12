@@ -1,0 +1,167 @@
+# Sliggoo — Great League thresholds and slayer anchors.
+#
+# Sources:
+#   - Simulator-derived. No known expert IV writeup exists for GL Sliggoo
+#     (current meta rank 31), so unlike tinkaton.toml there are no
+#     pre-measured stat thresholds to transcribe. Anchors below are
+#     Level-3 discover-all probes designed from current-meta matchup
+#     logic against the 2026-06-10 opponent pool
+#     (opponent_pools/gl_top50_plus_cs.txt, post-June-2026 rebalance).
+#
+# Matchup logic in brief: Sliggoo is a defense-skewed Dragon whose
+# standard set (Water Gun / Body Slam / Ancient Power) carries no
+# dragon-type damage, so it plays like a bulky neutral grinder that
+# resists Water / Fire / Grass / Electric and fears Dragon, Ice, and
+# Fairy chip. The interesting IV questions are therefore def-side:
+# which def tiers step down super-effective Dragon Breath / Dragon Tail
+# chip and neutral Body Slam / Mud Shot chip in its many close grinds.
+# Atk-side fast-move tiers (Water Gun) matter in the tightest neutral
+# races. Per-anchor `source` is set to the simulator-derived attribution
+# (every entry cites its provenance); there is deliberately no expert
+# name anywhere in this file.
+
+[Sliggoo]
+sources = "Simulator-derived (no known expert writeup). Anchors designed 2026-06-12 from current-meta matchup logic vs opponent_pools/gl_top50_plus_cs.txt (2026-06-10 pool, post-June-2026 rebalance)."
+
+[Sliggoo.Great.meta]
+notes = "Defense-skewed Dragon, GL meta rank 31. No dragon-type damage in the standard Water Gun / Body Slam / Ancient Power set, so type pressure is one-directional: opponents' Dragon/Ice/Fairy chip hits SE while Sliggoo deals neutral. Bulkpoints dominate; Water Gun breakpoints decide the closest neutral races."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Opponents chosen where Sliggoo's def/hp checks are plausible and the
+# matchup is close under current-meta movesets. SE Dragon chip
+# (Altaria, Dragonair, Guzzlord) makes each damage step-down worth a
+# full extra fast move of effective bulk; the neutral grinds
+# (mirror, Lickilicky, Quagsire, Feraligatr, Jellicent) are long enough
+# that single fast-move tiers swing the 1-shield lines.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror: Water Gun + Body Slam both ways, dragon resists water, so
+# it is a pure neutral bulk grind — def tiers against the mirror's
+# Water Gun / Body Slam decide it.
+[Sliggoo.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Sliggoo"
+description = "Discover all mirror-Sliggoo bulkpoints. Long neutral Water Gun / Body Slam grind; fast-move damage tiers decide the mirror."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Altaria: Dragon Breath hits Sliggoo SE while Sliggoo's whole set is
+# neutral back — close matchup where stepping Dragon Breath down one
+# damage tier compounds over a very long fight.
+[Sliggoo.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. SE Dragon Breath chip vs Sliggoo's neutral return damage; each Dragon Breath step-down compounds over the long grind."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Shadow Altaria: the punchier variant shifts every Dragon Breath tier
+# upward; kept as a separate anchor per the pool's keep-shadow-pairs
+# policy (players prep against each form deliberately).
+[Sliggoo.Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints. The shadow atk boost moves every Dragon Breath tier relative to non-shadow; def checks differ between the pair."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Dragonair: rebalance returnee. Same SE Dragon Breath problem as
+# Altaria from a frailer body — bulkpoints can flip a narrow line.
+[Sliggoo.Great.anchors.dragonair_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair"
+description = "Discover all Dragonair bulkpoints. SE Dragon Breath chip from a frailer attacker than Altaria; a single fast-move tier can flip the close line."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Lickilicky: the canonical neutral bulk grind — Body Slam pressure
+# both ways, no type leverage for either side.
+[Sliggoo.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Pure neutral Body Slam war with zero type leverage either way; def tiers against Lickilicky's chip decide the longest grind in the pool."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Quagsire: Mud Shot chips neutrally and Sliggoo resists the water-type
+# charge damage; Sliggoo's Water Gun lands neutral (SE-vs-Ground cancels
+# the Water resistance). Close fast-move race where def tiers vs Mud
+# Shot matter.
+[Sliggoo.Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire bulkpoints. Neutral Mud Shot chip vs resisted water charge damage; a Mud Shot step-down buys real energy margin in a close race."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Feraligatr: Sliggoo resists Hydro Cannon and water fast damage, but
+# post-rebalance Gatr's neutral ghost chip and SE Ice Beam coverage
+# keep the matchup close.
+[Sliggoo.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Resisted water damage vs neutral fast chip and SE Ice Beam coverage; def/hp checks against the coverage line are plausible flips."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Jellicent: Sliggoo resists the water half of Jellicent's kit and
+# takes the ghost half neutrally — a close two-bulk-monster grind.
+[Sliggoo.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Water damage resisted, ghost damage neutral; long two-tank grind where single damage tiers shift the shield math."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Azumarill: Bubble is resisted, but Ice Beam / Play Rough both hit SE.
+# Sliggoo is the narrow loser by default; a charge-move bulkpoint is
+# the kind of tier that flips a 1-shield line.
+[Sliggoo.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Resisted Bubble chip but SE Ice Beam / Play Rough; survival tiers against the SE charge moves are the plausible flip."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Guzzlord: Dragon Tail chips Sliggoo SE while Sliggoo's neutral set
+# exploits Guzzlord's paper defense — close race where stepping Dragon
+# Tail down a tier matters every single turn cycle.
+[Sliggoo.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. SE Dragon Tail chip vs Sliggoo's neutral pressure on Guzzlord's low def; a Dragon Tail step-down pays out on every fast move of a long fight."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# Restricted to the closest neutral races, where one Water Gun /
+# Body Slam tier is plausibly worth the bulk traded for it.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror, atk-side: the same Water Gun / Body Slam tiers seen from
+# the attacker's seat. Together with mirror_blkp_any this brackets the
+# rank-1-vs-high-atk tradeoff in the mirror.
+[Sliggoo.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Sliggoo"
+description = "Discover all mirror-Sliggoo damage breakpoints. Water Gun / Body Slam tiers from the atk side; brackets the mirror together with mirror_blkp_any."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Altaria: Water Gun lands neutral and the matchup is tight enough that
+# a fast-move tier can offset part of the SE Dragon Breath disadvantage.
+[Sliggoo.Great.anchors.altaria_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria"
+description = "Discover all Altaria damage breakpoints. Neutral Water Gun tiers against the pool's premier dragon; a fast-move tier partially offsets the SE Dragon Breath deficit."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Lickilicky: the neutral grind is long enough that one Water Gun or
+# Body Slam tier is several HP of swing by the end.
+[Sliggoo.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. In the longest neutral grind in the pool, one Water Gun / Body Slam tier compounds into several HP of swing."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"
+
+# Quagsire: Water Gun is effectively neutral (SE-vs-Ground cancels the
+# Water resistance), so fast-move tiers race directly against Mud Shot
+# energy in a very close matchup.
+[Sliggoo.Great.anchors.quagsire_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire damage breakpoints. Effectively-neutral Water Gun (SE-vs-Ground cancels the Water resist) racing Mud Shot energy; the closest atk-side tiers Sliggoo has."
+source = "Simulator-derived (2026-06-12 current-meta matchup logic)"

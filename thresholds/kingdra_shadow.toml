@@ -1,0 +1,139 @@
+# Kingdra (Shadow) — Great League thresholds and slayer anchors.
+#
+# Per-form file following the aegislash_blade.toml / aegislash_shield.toml
+# and altaria.toml / altaria_shadow.toml precedent: deep_dive.py
+# auto-discovery maps the focal "Kingdra (Shadow)" to
+# thresholds/kingdra_shadow.toml. Base-form data lives in
+# thresholds/kingdra.toml.
+#
+# SIMULATOR-DERIVED: no known expert IV writeup exists for GL Kingdra
+# in either form — all anchors are Level-3 discovery designed from
+# current-meta matchup logic; no numbers are invented.
+#
+# Shadow trade-off: x1.2 atk means the base form's outgoing Dragon
+# Breath tiers largely come free and new ones open up; x0.8333 def means
+# every incoming-DB check in the dragon wars gets harder and must be
+# rediscovered rather than inherited from the base-form file. That makes
+# this file bulkpoint-heavy, same shape as altaria_shadow.toml.
+#
+# Opponent selection from opponent_pools/gl_top50_plus_cs.txt
+# (generated 2026-06-10, post-June-2026 rebalance); Kingdra (Shadow) is
+# in that pool alongside base Kingdra (GL meta rank 20). All opponent
+# names below use that file's exact PvPoke speciesName spellings.
+
+["Kingdra (Shadow)"]
+sources = "Simulator-derived (no known expert writeup for either Kingdra form). Opponent selection: opponent_pools/gl_top50_plus_cs.txt (2026-06-10, post-June-2026 rebalance). Moveset/typing from the cached PvPoke gamemaster."
+
+["Kingdra (Shadow)".Great.meta]
+notes = "Shadow trade-off: x1.2 atk buys the base form's Dragon Breath breakpoint bands cheaply; x0.8333 def means the incoming-DB checks in the mutual-super-effective dragon wars are the binding constraint. Level-3 anchors below enumerate both sides; promote discovered (move, tier) pairs that split the survivor cohort to Level-1 anchors."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level-3 discover-all), key
+# close matchups. Shadow atk reaches tiers base Kingdra can't.
+# ─────────────────────────────────────────────────────────────────────
+
+# Altaria: GL meta rank 2, mutual super-effective Dragon Breath. Shadow
+# atk opens DB tiers vs Altaria's premium bulk that the base form misses.
+["Kingdra (Shadow)".Great.anchors.altaria_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria"
+description = "Discover all Altaria damage breakpoints for the shadow focal. Shadow-boosted super-effective Dragon Breath vs the rank-2 bulk dragon — discovery shows which outgoing tiers open up beyond the base form's reach."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Shadow Dragonair: shadow-on-shadow dragon war — boosted SE DB into
+# reduced def on both sides, so every outgoing step swings it.
+["Kingdra (Shadow)".Great.anchors.dragonair_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair damage breakpoints. Mutual shadow-boosted super-effective Dragon Breath into mutually reduced def — every outgoing damage step swings the shadow-vs-shadow dragon war."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Lickilicky: #1 pool entry; close neutral chip race where shadow atk
+# may step Dragon Breath up a tier the base form misses.
+["Kingdra (Shadow)".Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Close neutral chip race vs the #1 pool entry; shadow atk may buy a Dragon Breath tier that flips the race the base form loses on bulk."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all). The shadow def
+# penalty makes these the binding constraint; opponents from the
+# 2026-06-10 pool where def/hp checks are plausible and close.
+# ─────────────────────────────────────────────────────────────────────
+
+# The shadow mirror. Shadow-boosted SE Dragon Breath into shadow-reduced
+# def — the sharpest tier sensitivity anywhere in this focal's list.
+["Kingdra (Shadow)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Kingdra (Shadow)"
+description = "Discover all shadow-mirror bulkpoints. Shadow-boosted super-effective Dragon Breath into shadow-reduced def — a single incoming DB tier decides the mirror, and base-form tiers don't transfer under the def penalty."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Cross-form: shadow vs base Kingdra, both in the pool.
+["Kingdra (Shadow)".Great.anchors.kingdra_blkp_any]
+kind = "bulkpoint"
+opponent = "Kingdra"
+description = "Discover all bulkpoints vs base Kingdra (cross-form fight). Base-form super-effective Dragon Breath into a shadow-def focal — these tiers decide which form wins the in-family matchup."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Altaria: the def side of the rank-2 dragon war, now under the shadow
+# def penalty.
+["Kingdra (Shadow)".Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Incoming super-effective Dragon Breath at shadow-reduced def — find which chip tiers a shadow build can still step down in the rank-2 dragon war."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Shadow Altaria: shadow-boosted SE DB into shadow-reduced def.
+["Kingdra (Shadow)".Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints. Shadow-boosted super-effective Dragon Breath into shadow-reduced def — among the highest-value def steps in the pool for this focal."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Shadow Dragonair: def side of the shadow-vs-shadow dragon war.
+["Kingdra (Shadow)".Great.anchors.dragonair_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair bulkpoints. Shadow-boosted super-effective Dragon Breath incoming; pairs with the atk-side anchor to bracket the shadow-vs-shadow dragon war from both directions."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Shelgon: bulk dragon, mutual SE Dragon Breath; the shadow def penalty
+# makes the incoming tiers the live question.
+["Kingdra (Shadow)".Great.anchors.shelgon_blkp_any]
+kind = "bulkpoint"
+opponent = "Shelgon"
+description = "Discover all Shelgon bulkpoints. Mutual super-effective Dragon Breath vs a bulk dragon new to the 2026-06 pool; at shadow def, each recoverable incoming tier is precious in a slow fight."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Guzzlord: super-effective Dragon Tail chip into shadow-reduced def.
+["Kingdra (Shadow)".Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Super-effective Dragon Tail into shadow-reduced def — stepping it down a tier keeps the shadow's faster race against Guzzlord's low bulk on schedule."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Shadow Feraligatr: double-resisted Water damage, so shadow-boosted
+# neutral Shadow Claw chip and Ice Beam carry the matchup.
+["Kingdra (Shadow)".Great.anchors.feraligatr_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr (Shadow)"
+description = "Discover all Shadow Feraligatr bulkpoints. Its Water damage is double-resisted, so shadow-boosted neutral Shadow Claw and Ice Beam tiers into a shadow-def focal decide a close water-on-water fight."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Jellicent: slow neutral Hex chip war vs a wall; with shadow def, the
+# incoming Hex tier decides whether the faster race still works.
+["Kingdra (Shadow)".Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Neutral Hex chip vs a top-tier wall; at shadow def, an incoming Hex tier down is what keeps the shadow's damage advantage ahead of the HP deficit."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Lickilicky: Body Slam spam compounds every incoming tier; shadow def
+# makes each recoverable step matter more than for the base form.
+["Kingdra (Shadow)".Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam spam vs the #1 pool entry compounds every incoming tier across the chip race; shadow def makes each step down count double."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"

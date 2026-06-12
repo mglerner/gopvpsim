@@ -1,0 +1,164 @@
+# Drapion — Great League thresholds and slayer anchors (base form).
+#
+# Status: SIMULATOR-DERIVED for the base form. The known expert writeup
+# (HomeSliceHenry's "SHADOW DRAPION PVP IV DEEP DIVE", surfaced on his
+# Discord server and shipped in GoBattleKit's DEFAULT_THRESHOLDS) covers
+# the SHADOW form only — that expert encoding lives in
+# thresholds/drapion_shadow.toml, following the per-form file precedent
+# of aegislash_blade.toml / aegislash_shield.toml and altaria.toml /
+# altaria_shadow.toml. No base-form stat numbers are recorded anywhere
+# in local context, so none are encoded here (no numbers are invented).
+#
+# Base Drapion sits below GL top-40 and is outside the 2026-06-10
+# opponent pool (the shadow form left it in the June-2026 rebalance),
+# but the species ships in the GoBattleKit app today, so the dive is
+# maintained for staleness tracking of the app's thresholds.
+#
+# Typing/moveset logic used to pick opponents (Drapion is Poison/Dark,
+# running Poison Sting chip with Crunch / Aqua Tail / Sludge Bomb):
+#   - Single weakness (Ground) and a wall of resistances: Ghost, Dark,
+#     and net-Psychic chip all come in at 0.625x, while Fighting and
+#     Fairy cancel to net-neutral across the dual type. Its close
+#     fights are therefore long resisted/neutral chip races where one
+#     incoming damage tier compounds — prime bulkpoint territory
+#     (Umbreon, Guzzlord, Lickilicky, Feraligatr, the mirror).
+#   - Super-effective Poison Sting into Fairies (Azumarill) and
+#     super-effective Dark charged moves into Ghosts (Jellicent,
+#     Annihilape) make those lines close-favorable; the def check is
+#     whether Drapion survives the neutral return fire long enough.
+#   - Hard Ground losses (Stunfisk lines, Clodsire, Diggersby) are
+#     deliberately excluded — no plausible def check flips those.
+# Opponent spellings are exact PvPoke speciesNames from
+# opponent_pools/gl_top50_plus_cs.txt (2026-06-10).
+
+[Drapion]
+sources = "Simulator-derived for the base form (no base-form expert numbers exist; HomeSliceHenry's shadow writeup is encoded in thresholds/drapion_shadow.toml). Anchor set designed 2026-06-12 from type-matchup logic against opponent_pools/gl_top50_plus_cs.txt (2026-06-10 pool, post-June-2026 rebalance)."
+
+[Drapion.Great.meta]
+notes = "Base form is the staleness-tracking companion to the GL-meta-relevant shadow form (thresholds/drapion_shadow.toml). Below top-40 GL meta rank but shipped in GoBattleKit today."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. No community spread exists for base Drapion — discover the
+# full mirror bulkpoint ladder first.
+[Drapion.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Drapion"
+description = "Discover every mirror-Drapion bulkpoint in the survivor def range. Mutually resisted Poison Sting / Crunch chip makes the mirror a long grind where one incoming tier decides the race."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Azumarill: the matchup the shadow-form expert writeup keys on. Drapion's
+# Poison Sting is super-effective; Azumarill's Bubble / Ice Beam / Play
+# Rough all land net-neutral, so the def ladder decides the close lines.
+# HomeSliceHenry's Azu-bulk def floor is a SHADOW-form stat and is
+# deliberately not duplicated here — see thresholds/drapion_shadow.toml.
+[Drapion.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Super-effective Poison Sting against all-neutral return fire (Bubble chip, Ice Beam, net-neutral Play Rough); shaving one Bubble or Ice Beam tier is the plausible flip in the close shield lines."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lickilicky: the pool's #1. Lick is resisted, Body Slam is neutral —
+# a very long chip war where each Body Slam tier shaved compounds.
+[Drapion.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Resisted Lick plus neutral Body Slam spam against the pool's top-ranked species; over the long grind a single Body Slam tier shaved banks a full extra fast move of effective HP."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Umbreon: the double-resisted Dark-vs-Dark chip war — both sides deal
+# 0.625x, so the fight runs longest of any close line and every
+# incoming Snarl / Foul Play tier matters twice over.
+[Drapion.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Mutually resisted Dark chip means the longest grind in Drapion's close-matchup set; a Snarl or Foul Play tier shaved compounds over dozens of hits (Umbreon re-entered the pool in the 2026-06 rebalance)."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Feraligatr: top-meta Water line whose Shadow Claw chip is resisted;
+# Hydro Cannon and Ice Beam land neutral. Close neutral race where the
+# resisted fast-move tier is the cheapest def check available.
+[Drapion.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Resisted Shadow Claw chip with neutral Hydro Cannon / Ice Beam nukes; stepping the fast-move damage down stretches Drapion's survival across an extra charged-move cycle."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Jellicent: super-effective Crunch / Bite into the Water/Ghost wall;
+# Hex is resisted, Surf is neutral. Close-favorable — the def check is
+# whether Drapion outlasts Surf pressure to land the second Crunch.
+[Drapion.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Super-effective Dark damage against resisted Hex chip; a Surf tier shaved decides whether Drapion reaches its second charged move in the 1-shield lines."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Medicham: Counter cancels to net-neutral across Poison/Dark, Psychic
+# is resisted, Ice Punch is neutral — closer than the type chart
+# suggests, and Counter's cadence makes its tier valuable.
+[Drapion.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Counter lands net-neutral (Fighting SE into Dark, resisted by Poison) at high cadence; one Counter tier shaved compounds quickly, and Psychic coverage is resisted outright."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Malamar: Psywave chip is resisted and Superpower cancels to
+# net-neutral; Drapion's Dark damage also cancels against Dark/Psychic.
+# A grindy near-neutral race decided by chip tiers.
+[Drapion.Great.anchors.malamar_blkp_any]
+kind = "bulkpoint"
+opponent = "Malamar"
+description = "Discover all Malamar bulkpoints. Resisted Psywave chip and net-neutral Superpower against Drapion's own net-neutral Dark damage; the def ladder shows which incoming tiers swing the long near-neutral race."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Guzzlord: Snarl and Brutal Swing are resisted, and Guzzlord resists
+# Drapion's Dark damage right back — a mutual-resist chip war between
+# two Dark tanks where single tiers are the whole matchup.
+[Drapion.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Mutual Dark resistance on both sides turns this into a pure chip war; an incoming Snarl or Brutal Swing tier shaved is the whole margin."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Annihilape: Counter is net-neutral, Rage Fist is resisted, and
+# Drapion's Dark damage is super-effective into the Ghost half —
+# close-favorable with shields, where the Counter tier decides it.
+[Drapion.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. Net-neutral Counter chip against resisted Rage Fist; shaving a Counter tier preserves the super-effective Dark win condition through the shield exchanges."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# No `moves` filter on any of these: Drapion's charged-move defaults
+# shifted in the 2026 rebalances (Crunch is the current default closer)
+# and we don't want a stale move name silently constraining the scan.
+# ─────────────────────────────────────────────────────────────────────
+
+# Azumarill: the super-effective Poison Sting tier against Azumarill's
+# high defense is the classic swing in the 1-shield lines.
+[Drapion.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. Against Azumarill's high defense, a super-effective Poison Sting tier compounds over the long fight; Sludge Bomb tiers stack on top in the bait lines."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Jellicent: super-effective Dark damage into a high-defense wall —
+# scarce tiers, decisive when found.
+[Drapion.Great.anchors.jellicent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent damage breakpoints. Super-effective Crunch / Bite tiers against the Water/Ghost wall convert the close 1-shield lines; resisted incoming Hex makes each found tier durable."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Umbreon: resisted Dark damage against high defense makes breakpoints
+# scarce — and therefore decisive in the longest grind Drapion plays.
+[Drapion.Great.anchors.umbreon_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon damage breakpoints in the survivor atk range. Resisted chip into Umbreon's high defense leaves few tiers; finding one materially shortens the mutual-resist grind."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
