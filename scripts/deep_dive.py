@@ -156,6 +156,7 @@ build_slayer_archetypes = slayer.build_slayer_archetypes
 
 IVCategory = rendering.IVCategory
 parse_mode = rendering.parse_mode
+parse_energy = rendering.parse_energy
 compose_mode = rendering.compose_mode
 mode_pretty_label = rendering.mode_pretty_label
 
@@ -1134,7 +1135,8 @@ def group_ivs_by_stat_profile(iv_meta_list, per_iv=False):
 def _sweep_worker_init(species, focal_types, fm_template, cms_template,
                        opp_cache, shield_scenarios, focal_bait=True,
                        log_path=None, verbose=False,
-                       focal_mon=None, league_cp=1500, focal_shadow=False):
+                       focal_mon=None, league_cp=1500, focal_shadow=False,
+                       focal_energy=0):
     """Initialize shared state in each sweep worker process."""
     # Spawn-mode workers (default on macOS) do not inherit the parent
     # logger's handlers; re-attach a FileHandler so any worker-side
@@ -1150,6 +1152,7 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
     _worker_state['focal_mon'] = focal_mon
     _worker_state['league_cp'] = league_cp
     _worker_state['focal_shadow'] = focal_shadow
+    _worker_state['focal_energy'] = focal_energy
     if focal_bait:
         _worker_state['focal_policy'] = pvpoke_dp
     else:
@@ -1178,6 +1181,7 @@ def _sweep_worker(pair_chunk):
     focal_mon = ws['focal_mon']
     league_cp = ws['league_cp']
     focal_shadow = ws['focal_shadow']
+    focal_energy = ws.get('focal_energy', 0)
 
     results = {}
     n_sims = 0
@@ -1192,6 +1196,10 @@ def _sweep_worker(pair_chunk):
             fast_move=dict(fm_template),
             charged_moves=[dict(cm) for cm in cms_template],
         )
+        # Energy-lead axis: reset_for_battle re-applies initial_energy
+        # before every scenario, so setting it once here covers the
+        # whole shield-scenario loop below.
+        bp0.initial_energy = focal_energy
         attach_form_change(bp0, focal_mon, a_iv, d_iv, s_iv, lv,
                            league_cp, focal_shadow)
         bp1 = BattlePokemon(
@@ -1242,19 +1250,31 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     default so library callers and tests always sim; the deep_dive CLI
     turns it on unless --no-sweep-cache is passed.
 
-    opp_iv_mode may be a composite mode string encoding a bait-shields axis:
+    opp_iv_mode may be a composite mode string encoding bait-shields and
+    energy-lead axes:
       'pvpoke', 'rank1'        - bait-on (default pvpoke_dp behavior)
       'pvpoke:nobait', 'rank1:nobait'
                                 - bait-off (pvpoke_dp bait_shields=False)
+      'pvpoke:e1', 'pvpoke:nobait:e2'
+                                - focal starts with 1 (2) fast moves of
+                                  stored energy (safe-switch / closer
+                                  carry-over). Raw energy = N x the
+                                  moveset's fast energyGain, capped at
+                                  (100 - cheapest charged cost) since
+                                  higher leads are unreachable in play
+                                  (the charged move would already have
+                                  been thrown). Opponent always starts
+                                  at 0.
     When the ``:nobait`` suffix is present, the focal uses a no-bait policy;
     the opponent still baits normally.
 
     Returns (results, n_sims, canonical_scores, canonical_meta) where results
     is one dict per IV, sorted by avg_score desc.
     """
-    # Split composite mode into opponent-IV and bait axes.
+    # Split composite mode into opponent-IV, bait, and energy-lead axes.
     opp_iv_mode_simple, bait_mode = parse_mode(opp_iv_mode)
     focal_bait = (bait_mode == 'bait')
+    energy_mult = parse_energy(opp_iv_mode)
     import multiprocessing
 
     fast_moves_db, charged_moves_db = get_moves()
@@ -1264,6 +1284,16 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     focal_types = parse_types(focal_mon)
     fm_template = dict(fast_moves_db[fast_id])
     cms_template = [dict(charged_moves_db[cid]) for cid in charged_ids]
+
+    # Energy-lead in raw energy points: fast-move multiples from the
+    # mode string x this moveset's energy gain, capped at the highest
+    # reachable carry-over (you'd have thrown the cheapest charged
+    # move before exceeding it).
+    focal_energy = 0
+    if energy_mult:
+        _eg = fm_template.get('energyGain', 0)
+        _cap = 100 - min(cm['energy'] for cm in cms_template)
+        focal_energy = min(energy_mult * _eg, max(0, _cap))
 
     # Cache opponent stats (BattlePokemon is mutated by simulate, but stats are fixed)
     opp_cache = []
@@ -1317,7 +1347,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         import sweep_cache as swc
         sweep_cache = swc.SweepCache(swc.focal_key_fields(
             species, league, shadow, fast_id, charged_ids,
-            iv_floor, shield_scenarios, bait_mode))
+            iv_floor, shield_scenarios, bait_mode,
+            energy_lead=focal_energy))
         for oi, opp in enumerate(opp_cache):
             col = sweep_cache.get_column(
                 swc.column_key_fields(opp['species'], opp['shadow'],
@@ -1380,7 +1411,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
             initargs=(species, focal_types, fm_template, cms_template,
                       opp_cache, shield_scenarios, focal_bait,
                       log_path, verbose,
-                      focal_mon, LEAGUE_CAPS[league], shadow),
+                      focal_mon, LEAGUE_CAPS[league], shadow,
+                      focal_energy),
         ) as pool:
             last_print = sim_start
             completed = 0
@@ -1869,6 +1901,8 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
     nO = len(opponents)
     _bait_values = {parse_mode(m)[1] for m in opp_iv_modes}
     has_bait_axis = ('bait' in _bait_values and 'nobait' in _bait_values)
+    _energy_values = {parse_energy(m) for m in opp_iv_modes}
+    has_energy_axis = len(_energy_values) > 1
     opp_label = data_obj.get('oppLabel', 'opponent')
 
     # Compute anchor-flip records if we have resolved anchors
@@ -1877,6 +1911,7 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
         _seen = {}
         for _mode in opp_iv_modes:
             bait_mode = parse_mode(_mode)[1]
+            energy_mode = parse_energy(_mode)
             _key = f'{moveset_idx}_{_mode}'
             _scores = score_arrays.get(_key, [])
             if not _scores:
@@ -1887,10 +1922,12 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
             )
             for rec in _recs:
                 rec['bait_modes'] = {bait_mode}
+                rec['energy_modes'] = {energy_mode}
                 dedup_key = (rec['anchor'].name, rec['opponent'],
                              frozenset(tuple(s) for s in rec['scenarios']))
                 if dedup_key in _seen:
                     _seen[dedup_key]['bait_modes'] |= rec['bait_modes']
+                    _seen[dedup_key]['energy_modes'] |= rec['energy_modes']
                 else:
                     _seen[dedup_key] = rec
                     anchor_flip_records.append(rec)
@@ -1900,6 +1937,7 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
     _mb_seen = {}
     for _mode in opp_iv_modes:
         bait_mode = parse_mode(_mode)[1]
+        energy_mode = parse_energy(_mode)
         _key = f'{moveset_idx}_{_mode}'
         _scores = score_arrays.get(_key, [])
         if not _scores:
@@ -1912,11 +1950,13 @@ def _generate_narrative_for_moveset(data_obj, score_arrays, moveset_idx,
             )
             for mb in _mbs:
                 mb['bait_modes'] = {bait_mode}
+                mb['energy_modes'] = {energy_mode}
                 dedup_key = (mb['opponent'], mb['stat'], mb['threshold'],
                              mb.get('hp_threshold'),
                              frozenset(tuple(s) for s in mb['scenarios']))
                 if dedup_key in _mb_seen:
                     _mb_seen[dedup_key]['bait_modes'] |= mb['bait_modes']
+                    _mb_seen[dedup_key]['energy_modes'] |= mb['energy_modes']
                 else:
                     _mb_seen[dedup_key] = mb
                     all_matchup_boundaries.append(mb)
@@ -3260,6 +3300,18 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             html += '    <option value="bait">Selective</option>\n'
             html += '    <option value="nobait">Never</option>\n'
             html += '  </select></label>\n'
+        _energy_values = sorted({parse_energy(m) for m in opp_iv_modes})
+        if len(_energy_values) > 1:
+            html += ('  <label>Energy lead: '
+                     '<select id="energy-sel" onchange="updateView()">\n')
+            for _ev in _energy_values:
+                if _ev == 0:
+                    _ev_label = 'None (cold start)'
+                else:
+                    _ev_label = (f'+{_ev} fast move'
+                                 f'{"s" if _ev > 1 else ""}')
+                html += f'    <option value="{_ev}">{_ev_label}</option>\n'
+            html += '  </select></label>\n'
     if len(y_axis_modes) > 1:
         html += '  <label>Y-axis: <select id="yaxis-sel" onchange="updateView()">\n'
         for ym in y_axis_modes:
@@ -4249,6 +4301,17 @@ def main():
                              "HTML, and annotates bait-dependent matchup "
                              "flips. Doubles compute time. "
                              "Interactive mode only.")
+    parser.add_argument('--energy-lead', default='off',
+                        choices=['off', 'on'],
+                        help="Energy-lead sim axis (safe-switch / closer "
+                             "carry-over): 'on' additionally sweeps the "
+                             "focal with 1 and 2 fast moves of stored "
+                             "energy (capped at the reachable bound for "
+                             "the moveset), adds an Energy lead selector "
+                             "to the interactive HTML, and annotates "
+                             "energy-gated matchup flips. Opponent always "
+                             "starts at 0. Triples compute time. "
+                             "Interactive mode only. Default: off.")
     parser.add_argument('--verbose', action='store_true',
                         help='Route DEBUG-level aggregator diagnostics to the '
                              'log file (stdout unchanged).')
@@ -5169,11 +5232,11 @@ def main():
         # Interactive HTML (the only mode since the 2026-06-12 S7
         # cleanup deleted static generate_html).
         # Interactive mode: embed all data, JS-driven dropdowns.
-        # Determine composite (opp_iv, bait) modes to run. The axis is
-        # 2D: opp-IVs × bait-shields. Composite modes are encoded as
-        # a string ('pvpoke', 'pvpoke:nobait', 'rank1', 'rank1:nobait')
-        # so score_arrays key format ``f'{mi}_{mode}'`` doesn't need
-        # schema changes.
+        # Determine composite (opp_iv, bait, energy) modes to run. The
+        # axis is 3D: opp-IVs × bait-shields × energy-lead. Composite
+        # modes are encoded as a string ('pvpoke', 'pvpoke:nobait',
+        # 'rank1:e1', 'rank1:nobait:e2', ...) so score_arrays key
+        # format ``f'{mi}_{mode}'`` doesn't need schema changes.
         if args.opp_ivs == 'both':
             _base_opp_modes = ['pvpoke', 'rank1']
         else:
@@ -5184,10 +5247,16 @@ def main():
             _bait_modes = ['nobait']
         else:
             _bait_modes = ['bait']
+        # Energy-lead values are fast-move MULTIPLES (0 = cold start);
+        # iv_sweep converts to raw energy per moveset and caps at the
+        # reachable bound, so the mode strings stay uniform across
+        # movesets with different fast moves.
+        _energy_leads = [0, 1, 2] if args.energy_lead == 'on' else [0]
         opp_iv_modes_to_run = [
-            compose_mode(om, bm)
+            compose_mode(om, bm, el)
             for om in _base_opp_modes
             for bm in _bait_modes
+            for el in _energy_leads
         ]
 
         # Scenario expansion for interactive mode happens BEFORE Phase 2

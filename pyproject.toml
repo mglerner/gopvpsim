@@ -33,4 +33,5 @@ packages = ["src/gopvpsim"]
 testpaths = ["tests"]
 markers = [
     "integration: requires network access or a warm cache (pvpoke gamemaster)",
+    "slow: takes more than ~10s; iterate with -m 'not slow', but the full suite (no -m filter) remains the pre-commit gate",
 ]

@@ -439,28 +439,45 @@ def parse_mode(composite_mode):
     """Decompose a composite mode string into (opp_iv_mode, bait_mode).
 
     Accepted forms:
-      'pvpoke'         -> ('pvpoke', 'bait')     # bait-on default
-      'rank1'          -> ('rank1',  'bait')
-      'pvpoke:bait'    -> ('pvpoke', 'bait')
-      'pvpoke:nobait'  -> ('pvpoke', 'nobait')
-      'rank1:nobait'   -> ('rank1',  'nobait')
+      'pvpoke'           -> ('pvpoke', 'bait')     # bait-on default
+      'rank1'            -> ('rank1',  'bait')
+      'pvpoke:bait'      -> ('pvpoke', 'bait')
+      'pvpoke:nobait'    -> ('pvpoke', 'nobait')
+      'rank1:nobait'     -> ('rank1',  'nobait')
+      'pvpoke:nobait:e1' -> ('pvpoke', 'nobait')   # energy tag ignored here
 
     Legacy callers that only know the opp-iv axis can pass
-    ``'pvpoke'``/``'rank1'`` and get the bait-on default.
+    ``'pvpoke'``/``'rank1'`` and get the bait-on default. The energy-lead
+    tag (``:eN``) is parsed separately via ``parse_energy`` so the
+    many existing 2-tuple call sites stay unchanged.
     """
-    if ':' in composite_mode:
-        opp_iv, bait = composite_mode.split(':', 1)
-        return opp_iv, bait
-    return composite_mode, 'bait'
+    parts = composite_mode.split(':')
+    bait = 'nobait' if 'nobait' in parts[1:] else 'bait'
+    return parts[0], bait
 
 
-def compose_mode(opp_iv_mode, bait_mode='bait'):
-    """Inverse of ``parse_mode``. Bait-on collapses to the bare opp-iv form
-    so existing keys (e.g. ``f'{mi}_pvpoke'``) stay unchanged when bait mode
-    isn't part of the sweep."""
+def parse_energy(composite_mode):
+    """Energy-lead axis value from a composite mode string, in FAST-MOVE
+    MULTIPLES (not raw energy): 'pvpoke:e1' -> 1 means "one fast move of
+    stored energy". 0 (no tag) is the cold-start default. Fast-move
+    multiples keep mode keys uniform across movesets whose fast moves
+    generate different energy; the sweep converts to raw energy."""
+    for p in composite_mode.split(':')[1:]:
+        if len(p) > 1 and p[0] == 'e' and p[1:].isdigit():
+            return int(p[1:])
+    return 0
+
+
+def compose_mode(opp_iv_mode, bait_mode='bait', energy_lead=0):
+    """Inverse of ``parse_mode``/``parse_energy``. Bait-on and energy-0
+    collapse to the bare opp-iv form so existing keys (e.g.
+    ``f'{mi}_pvpoke'``) stay unchanged when those axes aren't swept."""
+    mode = opp_iv_mode
     if bait_mode == 'nobait':
-        return f'{opp_iv_mode}:nobait'
-    return opp_iv_mode
+        mode += ':nobait'
+    if energy_lead:
+        mode += f':e{energy_lead}'
+    return mode
 
 
 def mode_pretty_label(composite_mode):
@@ -468,7 +485,11 @@ def mode_pretty_label(composite_mode):
     opp_iv, bait = parse_mode(composite_mode)
     opp_label = 'PvPoke Defaults' if opp_iv == 'pvpoke' else 'Rank 1'
     if bait == 'nobait':
-        return f'{opp_label}, no bait'
+        opp_label = f'{opp_label}, no bait'
+    energy = parse_energy(composite_mode)
+    if energy:
+        plural = 's' if energy > 1 else ''
+        opp_label = f'{opp_label}, +{energy} fast move{plural} energy'
     return opp_label
 
 
@@ -709,6 +730,12 @@ def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
     When *has_bait_axis* is True and a boundary only fires in one bait
     mode, the scenario string is annotated with "no bait" or "with bait".
 
+    When the energy-lead axis was swept and a boundary never fires from
+    a cold start (0 not in its ``energy_modes``), the scenario string is
+    annotated with the minimum lead, e.g. "needs +1 fast move energy".
+    No kwarg needed: without the axis every record carries
+    ``energy_modes == {0}`` and the annotation stays silent.
+
     When *toggle_id* is set and there are more than *top_n* bullets,
     the excess are hidden behind a show/hide toggle button.
 
@@ -730,6 +757,11 @@ def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
         if has_bait_axis and len(bait_modes) == 1:
             bait_tag = 'no bait' if 'nobait' in bait_modes else 'with bait'
             scen_str += f' {bait_tag}'
+        energy_modes = b.get('energy_modes', set())
+        if energy_modes and 0 not in energy_modes:
+            _emin = min(energy_modes)
+            scen_str += (f', needs +{_emin} fast move'
+                         f'{"s" if _emin > 1 else ""} energy')
         hp_str = ''
         if b.get('hp_threshold') is not None:
             hp_str = (f' + <span class="dd-strong">'
@@ -1024,6 +1056,16 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
                 bait_tag = ('no bait' if 'nobait' in bait_union
                             else 'with bait')
                 scen_strs += f' {bait_tag}'
+
+            # Energy-lead: annotate flips that never fire from a cold
+            # start (kwarg-free — see render_matchup_boundary_bullets).
+            energy_union = set()
+            for r in recs:
+                energy_union |= r.get('energy_modes', set())
+            if energy_union and 0 not in energy_union:
+                _emin = min(energy_union)
+                scen_strs += (f', needs +{_emin} fast move'
+                              f'{"s" if _emin > 1 else ""} energy')
 
             # HP co-condition: if any record in the group carries an
             # hp_threshold, show it alongside the def threshold.

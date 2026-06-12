@@ -243,6 +243,11 @@ function computeView() {
       if (_osel) _osel.value = _fallback.split(':')[0];
       var _bsel = document.getElementById('bait-sel');
       if (_bsel) _bsel.value = (_fallback.indexOf(':nobait') >= 0) ? 'nobait' : 'bait';
+      var _esel = document.getElementById('energy-sel');
+      if (_esel) {
+        var _em = _fallback.match(/:e(\d+)/);
+        _esel.value = _em ? _em[1] : '0';
+      }
       yValues = computeYValues(state.movesetIdx);
     }
     if (!yValues) {
@@ -2536,10 +2541,14 @@ function updateView() {
   if (ssel) state.scenarioMode = ssel.value;
   var osel = document.getElementById('oppiv-sel');
   var bsel = document.getElementById('bait-sel');
-  if (osel || bsel) {
+  var esel = document.getElementById('energy-sel');
+  if (osel || bsel || esel) {
     var base = osel ? osel.value : (DATA.oppIvModes[0] || 'pvpoke').split(':')[0];
     var bait = bsel ? bsel.value : 'bait';
-    state.oppIvMode = (bait === 'nobait') ? (base + ':nobait') : base;
+    var elead = esel ? parseInt(esel.value) : 0;
+    var mode = (bait === 'nobait') ? (base + ':nobait') : base;
+    if (elead > 0) mode += ':e' + elead;
+    state.oppIvMode = mode;
   }
   var csel = document.getElementById('color-sel');
   if (csel) state.colorMode = csel.value;

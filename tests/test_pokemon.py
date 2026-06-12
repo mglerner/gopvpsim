@@ -505,6 +505,7 @@ def test_compute_default_ivs_result_is_stat_product_rank2_or_higher():
 
 
 @pytest.mark.integration
+@pytest.mark.slow  # ~77s — 75% of total suite wall time (2026-06-12)
 @pytest.mark.xfail(reason=(
     "compute_default_ivs uses iv_floor=4 (current PvPoke source), but "
     "gamemaster.json was generated with iv_floor≈2 for many Pokemon, so "
