@@ -6,6 +6,38 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-12 — S6 closeout: archive diff, spot-checks, site published (arc S6 DONE)
+
+Judgment half of the S6 landing, after the morning repair below:
+
+- **Dewgong RyanSwag-archive diff** (`002fd1d`,
+  `docs/validations/2026-06-12_dewgong_gl_vs_ryanswag_redive.md`) —
+  the only re-dived species with a local archive (published Stunfisk
+  is the regular form, not Galarian). Delta vs the 2026-04-25
+  side-by-side: Umbreon's pool return revives the article's atk
+  axis with updated numbers (101.08/104.84 vs 2022's 101.79-102.81);
+  the mirror-synth tier (Dewgong Mirror Bulk, 140.61 Def + 152 HP,
+  7/9 vs rank-1 SP) lands inside the article's 138.28-141 range and
+  closes the 04-25 TOML-anchor recommendation; Greedent def
+  reproduces (137.56/138.91 vs 137.53-139.25); the June Drill Run
+  rebalance put the article's moveset back on our landing page.
+  Conformance C1-C8 pass. No sim/renderer action items.
+- **Spot-checks of the 2026-06-11 ship-alongs** on the fresh full
+  dives: mechanical checks (71-mon pool rows incl.
+  Sylveon/Primeape/Umbreon, Aegislash Shield+Blade opponent rows
+  everywhere, scanner-export buttons, Slayer Builds hoist callout +
+  rarity badges, mirror-synth flavor tier) verified from the HTML;
+  interactive checks (clipboard export, sort-vs-collapse, legend
+  rewire, moveset-switch fallback) verified by Michael in-browser.
+- **Site published** via `scripts/publish_website.sh --push`
+  (Michael, 2026-06-12) after a clean dry-run through both ship
+  gates. Live site verified (new index + fresh Dewgong page).
+  Publish notes drafted around the three stacked score-shift
+  reasons: 66→71 pool refresh, arc S1-S5, 2026-06-11 engine fixes.
+
+Arc status: S1-S6 done; only S7 (cleanup, greenlit 2026-06-11)
+remains.
+
 ## 2026-06-12 — S6 chain landing repairs + overnight verification tooling
 
 The 2026-06-11 S6 re-dive chain completed all 20 dives in 3h45m but
