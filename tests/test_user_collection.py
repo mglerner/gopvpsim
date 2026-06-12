@@ -178,6 +178,44 @@ def test_ivs_to_stats_at_cap_applies_shadow_multipliers():
     assert shadow['level']   == normal['level']
 
 
+def test_ivs_to_stats_at_cap_min_level_excludes_over_leveled():
+    """A mon already above the league-optimal level can't power down, so
+    its stats under the cap don't exist (cross-repo CP4 parity with
+    gobattlekit, whose level walk starts at the mon's level)."""
+    base = get_pokemon_index()['Tinkaton']
+    args = (base['atk'], base['def'], base['hp'], 0, 14, 14)
+    free = ivs_to_stats_at_cap(*args, max_level=51.0, max_cp=1500)
+    assert free['level'] == 25.5
+    # Pinning min_level at the optimal level changes nothing.
+    pinned = ivs_to_stats_at_cap(
+        *args, max_level=51.0, max_cp=1500, min_level=25.5)
+    assert pinned == free
+    # Half a level above optimal → no reachable level fits the cap.
+    over = ivs_to_stats_at_cap(
+        *args, max_level=51.0, max_cp=1500, min_level=26.0)
+    assert over is None
+
+
+def test_match_mons_skips_over_leveled_mon():
+    """CP4: the same CSV row must give the same answer in both apps —
+    a level-30 Tinkaton (CP 1750) is not a Great League qualifier."""
+    thresholds = {
+        'Tinkaton': {
+            'Great': {
+                'Permissive': {'attack': 0, 'defense': 0, 'stamina': 0},
+            },
+        },
+    }
+    legal = "Name,Form,CP,Atk IV,Def IV,Sta IV,Level Min,Shadow/Purified,Lucky\n" \
+            "Tinkaton,,1488,0,14,14,25.5,0,0\n"
+    over = "Name,Form,CP,Atk IV,Def IV,Sta IV,Level Min,Shadow/Purified,Lucky\n" \
+           "Tinkaton,,1750,0,14,14,30.0,0,0\n"
+    assert 'Tinkaton' in match_mons(
+        parse_csv_text(legal), thresholds, league='great')
+    assert match_mons(
+        parse_csv_text(over), thresholds, league='great') == {}
+
+
 # ---------------------------------------------------------------------------
 # compute_rank_lookup
 # ---------------------------------------------------------------------------
@@ -318,7 +356,9 @@ def test_check_thresholds_ivs_whitelist():
 _MINI_CSV = (
     "Name,Form,CP,Atk IV,Def IV,Sta IV,Level Min,Shadow/Purified,Lucky\n"
     "Tinkatink,,500,0,15,15,20.0,0,0\n"
-    "Tinkaton,,1498,0,14,14,26.5,0,0\n"
+    # 25.5 is this spread's GL-optimal level (CP 1488) — keep the row
+    # legal so the over-leveled exclusion (CP4) doesn't eat it.
+    "Tinkaton,,1488,0,14,14,25.5,0,0\n"
     # Garbage row — missing CP — should be skipped silently.
     "Tinkaton,,,1,2,3,25.0,0,0\n"
 )
@@ -331,7 +371,7 @@ def test_parse_csv_text_parses_inline_string():
     assert mons[0]['atk_iv'] == 0
     assert mons[0]['is_shadow'] is False
     assert mons[1]['name'] == 'Tinkaton'
-    assert mons[1]['cp'] == 1498
+    assert mons[1]['cp'] == 1488
 
 
 def test_parse_csv_text_strips_utf8_bom():
@@ -532,9 +572,11 @@ def test_match_mons_gender_filter_inert_for_non_gendered_species():
 
     tink_csv = (
         "Name,Form,Gender,CP,Atk IV,Def IV,Sta IV,Level Min,Shadow/Purified,Lucky\n"
-        "Tinkaton,,♂,1490,0,14,14,26.5,0,0\n"
-        "Tinkaton,,♀,1490,0,14,14,26.5,0,0\n"
-        "Tinkaton,,,1490,0,14,14,26.5,0,0\n"
+        # 25.5 is this spread's GL-optimal level — rows must stay
+        # legal under the over-leveled exclusion (CP4).
+        "Tinkaton,,♂,1488,0,14,14,25.5,0,0\n"
+        "Tinkaton,,♀,1488,0,14,14,25.5,0,0\n"
+        "Tinkaton,,,1488,0,14,14,25.5,0,0\n"
     )
     mons = parse_csv_text(tink_csv)
     thresholds = {

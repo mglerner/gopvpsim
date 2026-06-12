@@ -7,6 +7,7 @@ import pytest
 
 from gopvpsim.evolution_lines import (
     get_final_forms,
+    load_evolution_lines,
     get_final_form,
     invalidate_cache,
 )
@@ -101,3 +102,34 @@ def test_get_final_form_raises_on_branching():
     switch to get_final_forms."""
     with pytest.raises(ValueError, match="branching"):
         get_final_form("Lechonk")
+
+
+# ===========================================================================
+# Finals shared across roots — Burmy → Mothim (cross-repo CP13)
+# ===========================================================================
+
+@pytest.mark.integration
+@pytest.mark.parametrize("burmy,wormadam", [
+    ("Burmy (Plant)", "Wormadam (Plant)"),
+    ("Burmy (Sandy)", "Wormadam (Sandy)"),
+    ("Burmy (Trash)", "Wormadam (Trash)"),
+])
+def test_burmy_reaches_own_wormadam_and_shared_mothim(burmy, wormadam):
+    """Regression guard for the 2026-06-12 shared-final fix (gobattlekit
+    review CP13). The family-wide visited set used to keep only the
+    first root's chain to the shared Mothim final, so Burmy (Sandy) /
+    (Trash) rows were invisible to Mothim targets. Every cloak must
+    reach both its own Wormadam and the shared Mothim."""
+    finals = get_final_forms(burmy)
+    assert wormadam in finals
+    assert "Mothim" in finals
+    assert finals == sorted(finals)
+
+
+@pytest.mark.integration
+def test_mothim_chain_merges_all_burmy_roots():
+    """The Mothim entry merges pre-evo members from every root path,
+    with the final staying last (mirrors gobattlekit 2256a80)."""
+    chain = load_evolution_lines()["Mothim"]
+    assert chain[-1] == "Mothim"
+    assert {"Burmy (Plant)", "Burmy (Sandy)", "Burmy (Trash)"} <= set(chain[:-1])

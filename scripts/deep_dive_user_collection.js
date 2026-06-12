@@ -244,13 +244,17 @@
     };
   }
 
-  function bestLevel(baseAtk, baseDef, baseSta, a, d, s, maxCp, maxLevel) {
+  function bestLevel(baseAtk, baseDef, baseSta, a, d, s, maxCp, maxLevel, minLevel) {
     // Python pokemon.best_level walks the sorted level list and picks
-    // the highest level whose CP is <= cap. Mirror that exactly.
+    // the highest level in [minLevel, maxLevel] whose CP is <= cap.
+    // Mirror that exactly. minLevel supports already-powered-up mons
+    // (levels can't go down).
+    if (minLevel == null) minLevel = 1.0;
     var best = null;
     for (var i = 0; i < SORTED_LEVELS.length; i++) {
       var lv = SORTED_LEVELS[i];
       if (lv > maxLevel) break;
+      if (lv < minLevel) continue;
       if (computeCp(baseAtk, baseDef, baseSta, a, d, s, lv) <= maxCp) {
         best = lv;
       }
@@ -263,7 +267,8 @@
     var shadow = !!opts.shadow;
     var maxLevel = (opts.maxLevel != null) ? opts.maxLevel : 51.0;
     var maxCp = (opts.maxCp != null) ? opts.maxCp : 1500;
-    var lv = bestLevel(baseAtk, baseDef, baseSta, a, d, s, maxCp, maxLevel);
+    var minLevel = (opts.minLevel != null) ? opts.minLevel : 1.0;
+    var lv = bestLevel(baseAtk, baseDef, baseSta, a, d, s, maxCp, maxLevel, minLevel);
     if (lv == null) return null;
     var stats = battleStats(baseAtk, baseDef, baseSta, a, d, s, lv);
     var sAtk = shadow ? SHADOW_ATK_BONUS : 1.0;
@@ -394,10 +399,14 @@
         if (!pokemonIndex.hasOwnProperty(finalSpecies)) continue;
 
         var base = pokemonIndex[finalSpecies];
+        // minLevel: power-ups are one-way — an over-leveled row must
+        // not report stats it can never have. MUST mirror Python
+        // match_mons' `min_level=mon.get('level') or 1.0` exactly.
         var stats = ivsToStatsAtCap(
           base.atk, base.def, base.hp,
           mon.atk_iv, mon.def_iv, mon.sta_iv,
-          { shadow: mon.is_shadow, maxLevel: maxLevel, maxCp: maxCp }
+          { shadow: mon.is_shadow, maxLevel: maxLevel, maxCp: maxCp,
+            minLevel: mon.level || 1.0 }
         );
         if (stats == null) continue;
 

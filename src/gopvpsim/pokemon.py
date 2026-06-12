@@ -107,12 +107,17 @@ def stat_product(atk, def_, hp):
 
 
 def best_level(base_atk, base_def, base_sta, atk_iv, def_iv, sta_iv,
-               *, max_cp, max_level=40.0):
-    """Return the highest level at or under max_cp, or None if level 1 already exceeds it."""
+               *, max_cp, max_level=40.0, min_level=1.0):
+    """Return the highest level in [min_level, max_level] at or under max_cp,
+    or None if no level in that range fits. min_level supports mons that are
+    already powered up: levels can't go down, so a mon above the cap at its
+    current level has no legal build for the league."""
     best = None
     for level in _LEVELS:
         if level > max_level:
             break
+        if level < min_level:
+            continue
         if cp(base_atk, base_def, base_sta, atk_iv, def_iv, sta_iv, level) <= max_cp:
             best = level
     return best
