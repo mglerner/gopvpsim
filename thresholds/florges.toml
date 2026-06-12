@@ -1,0 +1,163 @@
+# Florges — Great League thresholds, spreads, and slayer anchors.
+#
+# Sources:
+#   - Inadequance, "A Deep Dive into Chilling Water Florges!" (YouTube,
+#     https://www.youtube.com/watch?v=KXLWLcOw3G4). Title/channel verified
+#     via oEmbed 2026-06-12; the numeric claims below are the ones already
+#     transcribed into GoBattleKit DEFAULT_THRESHOLDS
+#     (src/gobattlekit/data/thresholds.py) from that video. The video body
+#     itself is not machine-fetchable, so no numbers beyond the shipped
+#     transcription are encoded — do not extend without re-watching.
+#   - Opponent selection: opponent_pools/gl_top50_plus_cs.txt (2026-06-10
+#     pool). Florges itself dropped out of the top-50 in the June 2026
+#     rebalance, so the mirror anchor names a non-pool opponent (same
+#     auto-injection mechanism as tinkaton.toml's off-pool anchors).
+#
+# Great League only. Florges is mono-Fairy: it farms Fighting / Dark /
+# Dragon, folds to Steel and Poison, and lives or dies on bulk checks in
+# the neutral Water/Normal/Ghost middle of the meta — hence the def-side
+# Level-3 anchors below.
+
+[Florges]
+sources = "Inadequance 'A Deep Dive into Chilling Water Florges!' YouTube video (KXLWLcOw3G4), numbers as shipped in GoBattleKit DEFAULT_THRESHOLDS; opponent selection from opponent_pools/gl_top50_plus_cs.txt (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — Inadequance tiers (expert-shipped numbers)
+# ─────────────────────────────────────────────────────────────────────
+
+# Stat-cutoff tier the video names "SWak": minimum attack for the SWak
+# check, reference IV 9/6/14. Encoded exactly as shipped in the app.
+[Florges.Great.spreads.swak]
+description = "Inadequance's SWak attack tier: 121.50 atk minimum (reference IV 9/6/14). Which (opponent, move, tier) the 121.50 atk calibrates to is not recorded locally — recover it via the Level 3 breakpoint anchors below before promoting to a Level 1/2 anchor."
+source = "Inadequance YouTube video (KXLWLcOw3G4); shipped as 'SWak 9/6/14' in GoBattleKit DEFAULT_THRESHOLDS"
+attack = 121.5
+defense = 0
+stamina = 0
+
+# Inadequance's explicit GL IV picks from the same video.
+[Florges.Great.spreads.inadequance_picks]
+description = "Inadequance's explicit Great League IV picks: 0/14/13 (bulk pick), 9/6/14 (the SWak reference, clears the 121.50 atk tier), 8/1/8."
+source = "Inadequance YouTube video (KXLWLcOw3G4); shipped as 'Inadequance' in GoBattleKit DEFAULT_THRESHOLDS"
+ivs = [
+    [0, 14, 13],
+    [9, 6, 14],
+    [8, 1, 8],
+]
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Close, type-plausible matchups from the 2026-06-10 GL pool where a
+# def/hp tier on Florges credibly changes a damage number it takes.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror (required; Florges is off-pool post-rebalance, auto-injected).
+[Florges.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Florges"
+description = "Discover all mirror-Florges bulkpoints in the survivor def range. Fairy Wind is resisted in the mirror, so single damage-tier steps on the fast move dominate the CMP-adjacent mirror."
+source = "Authoring pass 2026-06-12; mirror anchor per threshold-file convention"
+
+# Azumarill — the other GL fairy; neutral Bubble/Ice Beam chip both ways
+# makes fast-move and Ice Beam tiers decisive in a famously close fight.
+[Florges.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Neutral Bubble chip plus Ice Beam in a close fairy-vs-fairy matchup; a one-tier drop on either swings the 1s."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+# Shadow Altaria — Florges resists Dragon Breath but Sky Attack is
+# neutral and shadow-boosted; surviving an extra Sky Attack is the swing.
+[Florges.Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints. Dragon Breath is double-resisted but shadow-boosted Sky Attack is neutral; Sky Attack damage tiers decide whether Florges converts its fast-move edge."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+# Medicham — Counter is resisted, Psychic/Ice Punch are neutral; a
+# Florges that drops a Psychic tier closes out the win.
+[Florges.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Counter is resisted but Psychic and Ice Punch land neutral; charged-move damage tiers determine the shield-advantage lines."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+# Annihilape — Counter resisted, but Shadow Ball / Rage Fist are neutral
+# nukes; surviving one more fast move or a tiered-down Rage Fist matters.
+[Florges.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. Florges resists Counter but eats neutral Shadow Ball / Rage Fist; def tiers that shave the charged nukes keep the favored matchup safe through bait scenarios."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+# Lickilicky — neutral Body Slam spam; the classic bulkpoint target.
+[Florges.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Repeated neutral Body Slams make this the textbook def-tier matchup: one damage tier compounds over every Slam in a close fight."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+# Jellicent — fully neutral both ways (Florges lacks SE coverage on it);
+# Surf/Shadow Ball tiers decide a coin-flip matchup.
+[Florges.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Mutually neutral matchup; Surf spam tiers and Shadow Ball survival decide which side of the coin flip Florges lands on."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+# Guzzlord — Dragon Tail is double-resisted but Sludge Bomb is
+# super-effective; surviving the Sludge Bomb tier is the whole matchup.
+[Florges.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Fast-move pressure is double-resisted, so the matchup hinges on whether Florges' def/hp tier survives super-effective Sludge Bomb lines."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+# Feraligatr — neutral Shadow Claw / Hydro Cannon pressure from a top
+# meta threat; fast-move tiers compound over a long neutral fight.
+[Florges.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Neutral Shadow Claw chip plus Hydro Cannon pressure; shaving a Shadow Claw tier compounds across the whole fight against a premier meta attacker."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+# Lapras — neutral Ice Shard / Sparkling Aria; another close neutral
+# water where one fast- or charged-move tier flips the 1s.
+[Florges.Great.anchors.lapras_blkp_any]
+kind = "bulkpoint"
+opponent = "Lapras"
+description = "Discover all Lapras bulkpoints. Neutral Ice Shard chip and Sparkling Aria pressure in a close matchup; a single damage tier on either move flips the even-shield lines."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# Key close matchups where a Florges atk tier plausibly steps its own
+# damage up. Also the recovery path for the SWak 121.50 atk calibration:
+# if one of these enumerations shows a breakpoint landing at ~121.5,
+# promote it to a Level 1 anchor with full provenance.
+# ─────────────────────────────────────────────────────────────────────
+
+[Florges.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints in the survivor atk range. Resisted Fairy Wind in the fairy mirror-adjacent fight means a single fast-move tier is worth a full extra charge cycle."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+[Florges.Great.anchors.altaria_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria damage breakpoints. Super-effective Fairy Wind tiers against the shadow's reduced def determine how fast Florges out-races Sky Attack."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+[Florges.Great.anchors.guzzlord_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord damage breakpoints. Double-super-effective Fairy Wind tiers decide whether Florges closes before the Sludge Bomb race gets dangerous."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"
+
+[Florges.Great.anchors.medicham_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+description = "Discover all Medicham damage breakpoints. Super-effective Fairy Wind tiers against Medicham's modest def shorten the race against neutral Psychic / Ice Punch."
+source = "Authoring pass 2026-06-12; opponent from gl_top50_plus_cs.txt"

@@ -1,0 +1,221 @@
+# Stunfisk (Galarian) — Great League thresholds, spreads, and slayer anchors.
+#
+# EXPERT SOURCE: RyanSwag's Galarian Stunfisk PvP IV Deep-Dive (GamePress,
+# series #24, last updated 2022-09-25), archived via Wayback —
+# web.archive.org/web/2025/https://pogo.gamepress.gg/galarian-stunfisk-pvp-iv-deep-dive
+# — local mirror: docs/reference_deep_dives/ryanswag/galarian_stunfisk.md.
+# Every numeric stat claim from the Great League section is encoded below
+# in the parsable "NNN.NN def" / "NNN.NN atk" (+ "NNN hp") description
+# format. The article's Ultra League section names only IV checkpoints
+# (15 atk IV for mirror CMP, 15 def IV for rank-1 Escavalier, ">12 def IV"
+# for Deoxys-D), not effective-stat thresholds, so nothing UL is encoded;
+# this file is Great League only.
+#
+# FRESHNESS CAVEAT: the writeup is from the 2022 "G-Fisk dominates GL"
+# era. Under the post-June-2026 rebalance rankings G-Fisk sits at GL meta
+# rank 33, and several of the article's calibration opponents (Lanturn,
+# Noctowl, Cofagrigus, Registeel, Mandibuzz, Trevenant, Lickitung) have
+# left the current meta pool. The def/atk numbers are stat-math facts and
+# stay encoded for provenance (off-pool expert opponents kept in their own
+# section per the tinkaton.toml precedent); whether those matchups still
+# matter should be judged against the Level-3 discoveries vs the current
+# pool (opponent_pools/gl_top50_plus_cs.txt, 2026-06-10).
+#
+# Article stat-priority order, for reference:
+#   Ranks 1/2/3 > other high bulk (127+ def, 175 hp) >
+#   mirror slayers w/ 127.88 def > mirror slayers w/ 127.38 def >
+#   101.79 atk / 124.75 def / 172 hp "goldilocks" >
+#   at least 124.75 def with at least 172 hp > everything else.
+#
+# Profile: Ground/Steel, Mud Shot / Rock Slide / Earthquake. Steel-type
+# resistance profile plus Rock+Ground charge coverage; the IV story is
+# bulk-first (def tiers vs the mirror and fast-move pressure, hp tiers
+# for close 2-2/1-2 endgames) with one famous 101.79 atk mirror-slayer
+# breakpoint on the atk side.
+
+["Stunfisk (Galarian)"]
+sources = """
+RyanSwag 'Galarian Stunfisk PvP IV Deep-Dive' (GamePress, series #24,
+last updated 2022-09-25; Wayback-archived, local mirror
+docs/reference_deep_dives/ryanswag/galarian_stunfisk.md) — all named
+stat tiers and def/atk breakpoint numbers below. Opponent selection for
+the discovery anchors from PvPoke GL rankings (post-June-2026 rebalance,
+G-Fisk rank 33) against opponent_pools/gl_top50_plus_cs.txt (2026-06-10).
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — RyanSwag's named stat-cutoff tiers (table section of the
+# article), encoded like tinkaton.toml's GH Great / GH Good tiers.
+# ─────────────────────────────────────────────────────────────────────
+
+["Stunfisk (Galarian)".Great.spreads."High Bulk"]
+attack = 0
+defense = 124.75
+stamina = 174
+description = "RyanSwag 'High Bulk' tier: 124.75 def + 174 hp. Ranks 1 (0/12/15), 2 (0/13/14), 3 (0/15/11) stand above the rest aside from CMP; 125.90 def is the safer minimum for the mirror, and 174 hp gets iffy the further you drop below 127.00 def + 174 hp (below that you may need 175 hp)."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+["Stunfisk (Galarian)".Great.spreads."Pure Mirror Slayer"]
+attack = 101.79
+defense = 127.38
+stamina = 0
+description = "RyanSwag 'Pure Mirror Slayer': 101.79 atk with at least 127.38 def (the article's table line prints 127.34 def; body text asks for 127.38 def, ideally 127.88 def for better mirror coverage). Preferred over the Bulk Mirror Slayer."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+["Stunfisk (Galarian)".Great.spreads."Bulk Mirror Slayer"]
+attack = 101.79
+defense = 124.75
+stamina = 172
+description = "RyanSwag 'Bulk Mirror Slayer': 101.79 atk with 124.75 def + 172 hp — just enough atk and def for mirror slaying, plus more HP. The article calls this exact combo a 'goldilocks zone' (only 4 IV spreads manage it) but generally too inconsistent to pan out."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+["Stunfisk (Galarian)".Great.spreads."Minimum Bulk"]
+attack = 0
+defense = 124.75
+stamina = 172
+description = "RyanSwag 'Minimum bulk': 124.75 def + 172 hp — High Bulk with HP dropped to the floor (HP is the dump stat when thrifting). May still maintain the Azumarill and Altaria matchups; 125.90 def remains the safer mirror minimum."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all) vs the current
+# meta pool. Mirror first, then the close matchups where def/hp tiers
+# plausibly swing the result.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror — carries the article's whole def ladder.
+["Stunfisk (Galarian)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all mirror bulkpoints. RyanSwag's ladder: 124.75 def avoids the low-atk mirror's breakpoint; 127.38 def (ideally 127.88 def) avoids the rank-1 mirror slayers' atk weight of 102.00 atk to 102.40 atk; 125.90 def is the safer everyday minimum, and 124.75 def + 175 hp potentiates mirror tie scenarios."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+# Azumarill — the article's headline HP check.
+["Stunfisk (Galarian)".Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. RyanSwag: 174 hp keeps the Azumarill 2-2 and avoids getting farmed post-Ice Beam — most consistent above 127.00 def + 174 hp; the 124.75 def + 172 hp floor may still hold it."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+# Altaria — GL meta rank 2; Dragon Breath chip vs the 174-hp tier.
+["Stunfisk (Galarian)".Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. RyanSwag: the Altaria 1-2 needs the 124.75 def + 174 hp tier (172 hp may still maintain it at the bottom of the barrel)."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+# Umbreon — back in the pool after the June-2026 rebalance.
+["Stunfisk (Galarian)".Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. RyanSwag: the Umbreon 1-2 needs the 124.75 def + 174 hp tier."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+# Medicham — Counter hits the Steel half super-effectively.
+["Stunfisk (Galarian)".Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. RyanSwag: 124.75 def + 175 hp may enable the Medicham 1-0."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+# Lickilicky — current GL #1. The article's analogous claim (Lickitung
+# 0-1 at 175 hp) is about Lickitung, not Lickilicky, so it does NOT
+# transfer; this anchor is pure current-meta discovery (Body Slam tiers
+# against a Steel-side resist make def/hp checks plausible and close).
+["Stunfisk (Galarian)".Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints (Body Slam damage tiers in the close GL-#1 matchup; no expert number — RyanSwag's 175 hp Lickitung claim does not transfer to Lickilicky)."
+
+# Ninetales — Incinerate is super-effective into the Steel half; close
+# fire matchup where each Incinerate tier matters.
+["Stunfisk (Galarian)".Great.anchors.ninetales_blkp_any]
+kind = "bulkpoint"
+opponent = "Ninetales"
+description = "Discover all Ninetales bulkpoints (Incinerate hits the Steel half super-effectively; def tiers govern how many charge cycles G-Fisk reaches)."
+
+# Talonflame — same Incinerate pressure from the other big GL fire bird;
+# Rock Slide threatens it back, so the race is close.
+["Stunfisk (Galarian)".Great.anchors.talonflame_blkp_any]
+kind = "bulkpoint"
+opponent = "Talonflame"
+description = "Discover all Talonflame bulkpoints (super-effective Incinerate race vs G-Fisk's super-effective Rock Slide — def tiers decide the energy race)."
+
+# Jellicent — neutral Water/Ghost pressure in a slow shield game.
+["Stunfisk (Galarian)".Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints (close neutral matchup; Water Spout/Shadow Ball damage tiers vs G-Fisk's bulk)."
+
+# Tinkaton — reverse evidence already exists: tinkaton.toml carries
+# acidicArisen's Tinkaton-side stat checks; discovery from the G-Fisk
+# side completes the pair.
+["Stunfisk (Galarian)".Great.anchors.tinkaton_blkp_any]
+kind = "bulkpoint"
+opponent = "Tinkaton"
+description = "Discover all Tinkaton bulkpoints (resisted Gigaton Hammer vs super-effective Earthquake — see thresholds/tinkaton.toml for the Tinkaton-side stat checks in this pairing)."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side) for the key close matchups.
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 2: the article's one big atk number. 101.79 atk is the mirror
+# slayer calibration; per RyanSwag the same atk weight also picks up the
+# breakpoint on most high-def Traded Registeel (Registeel is off the
+# current pool, so that claim rides along here rather than getting its
+# own anchor).
+["Stunfisk (Galarian)".Great.anchors.mirror_brkp_above_swag]
+kind = "damage_breakpoint"
+opponent = "Stunfisk (Galarian)"
+above_atk = 101.79
+description = "Smallest atk > 101.79 atk at which any focal move's damage to the default mirror steps up. Reproduces RyanSwag's mirror-slayer calibration; the article notes the same 101.79 atk weight also gets a breakpoint on most high-def Traded Registeel."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+# Level 3: map the full mirror atk ladder, including the rank-1 slayer
+# weight the def ladder defends against.
+["Stunfisk (Galarian)".Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover every mirror damage breakpoint in the survivor atk range. RyanSwag: rank-1 mirror slayers chase an atk weight of 102.00 atk to 102.40 atk — find which (move, tier) that weight buys."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+# Level 3: Azumarill — the closest staple matchup; Mud Shot chip and
+# Earthquake tiers decide whether the 2-2 stays won.
+["Stunfisk (Galarian)".Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints in the survivor atk range (no expert atk number; complements the hp-side 2-2 claim on the bulkpoint anchor)."
+
+# Level 3: Altaria — super-effective Rock Slide tiers in a tight 1-2.
+["Stunfisk (Galarian)".Great.anchors.altaria_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria"
+description = "Discover all Altaria damage breakpoints in the survivor atk range (super-effective Rock Slide tiers in the close 1-2)."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — expert opponents outside the current meta pool
+# (auto-included via TOML anchor opponent injection, tinkaton.toml
+# precedent). Encoded for provenance: these carry the article's
+# remaining def numbers even though the species have left the
+# 2026-06-10 pool.
+# ─────────────────────────────────────────────────────────────────────
+
+# Lanturn: the article distinguishes the fast-move variants — the Level-3
+# discovery runs against the default moveset, so both numbers are kept
+# here for the staleness check.
+["Stunfisk (Galarian)".Great.anchors.lanturn_blkp_any]
+kind = "bulkpoint"
+opponent = "Lanturn"
+description = "Discover all Lanturn bulkpoints. RyanSwag: 125.78 def vs Spark Lanturn (no apparent matchup changes); 128.80 def flips the Water Gun Lanturn 1-1 no bait."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+["Stunfisk (Galarian)".Great.anchors.noctowl_blkp_any]
+kind = "bulkpoint"
+opponent = "Noctowl"
+description = "Discover all Noctowl bulkpoints. RyanSwag: 126.90 def flips the Noctowl 0-1 and 1-2; 128.22 def covers Noctowl built to chase the rank-1 Azumarill's def (see his Noctowl deep dive)."
+source = "RyanSwag GamePress deep dive (2022-09-25)"
+
+["Stunfisk (Galarian)".Great.anchors.cofagrigus_blkp_any]
+kind = "bulkpoint"
+opponent = "Cofagrigus"
+description = "Discover all Cofagrigus bulkpoints. RyanSwag: 128.80 def flips the Cofagrigus 2-2 (same threshold as the Water Gun Lanturn 1-1)."
+source = "RyanSwag GamePress deep dive (2022-09-25)"

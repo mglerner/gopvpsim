@@ -1,0 +1,186 @@
+# Corsola (Galarian) — Great League thresholds and slayer anchors.
+#
+# Status: simulator-derived. No known community/expert IV writeup exists
+# for GL G-Corsola (current GL meta rank 7, post-June-2026 rebalance
+# rankings). All anchors below are designed from current-meta matchup
+# logic against the 2026-06-10 gl_top50_plus_cs opponent pool; treat the
+# Level-3 discoveries as the primary product of the dive, then promote
+# the sub-anchors that actually flip matchups to Level 1.
+#
+# Profile: pure Ghost, base 116/182/155 — a bulk monster (rank-1 GL
+# stats ~99.3 atk / 163 def / 139 hp). Moveset Astonish / Night Shade /
+# Power Gem (Rock Blast alt). Ghost typing double-resists Normal and
+# Fighting, takes super-effective from Ghost and Dark. Because the atk
+# stat is so low and the def stat so high, the interesting IV questions
+# are almost entirely def/hp tiers (bulkpoints) plus a handful of
+# Astonish-chip breakpoints in the ghost mirrors. PvPoke's editor note
+# ("a high rank Galarian Corsola has better neutral matchups than one
+# with hatch IVs") is the closest thing to community testimony: rank-1
+# stat-product is the community default, so the discoveries below tell
+# us which damage tiers that default actually buys.
+#
+# Cross-reference: thresholds/tinkaton.toml carries the reverse anchor
+# (corsola_galarian_blkp_any, "143.04 def + 140 hp flips the 0s"),
+# independent confirmation that the Tinkaton matchup swings on stat
+# tiers from both sides.
+
+["Corsola (Galarian)"]
+sources = """
+Simulator-derived (no known expert IV writeup). Matchup selection from
+PvPoke GL rankings, post-June-2026 move rebalance (rank 7 overall;
+closest scored matchups: Corviknight 490, Tinkaton 464, Jellicent 528,
+Quagsire 543, Ninetales (Shadow) 579, Altaria 600), against the
+2026-06-10 opponent pool opponent_pools/gl_top50_plus_cs.txt. Reverse
+bulkpoint evidence for the Tinkaton matchup in thresholds/tinkaton.toml
+(HomeSliceHenry's Discord, acidicArisen).
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# G-Corsola's whole value proposition is bulk, so these are the core of
+# the file: discover every (threat move, damage tier) in the survivor
+# def range against the opponents where one less damage per hit
+# plausibly flips a close matchup.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Astonish and Night Shade are super-effective both ways, so
+# damage tiers are large and the fast-move war is long — exactly the
+# regime where a single Astonish tier decides the 0s. Include first per
+# convention.
+["Corsola (Galarian)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover every mirror G-Corsola bulkpoint in the survivor def range. SE Astonish chip both ways makes the mirror a fast-move war; an Astonish damage tier likely decides it."
+source = "Simulator-derived; mirror anchor per threshold-file convention"
+
+# Corviknight — the closest scored matchup in the current rankings
+# (counter rating 490). Ghost hits Flying/Steel neutrally and
+# Corviknight's Steel/Flying threat moves come back neutrally, so the
+# matchup is a pure stat grind — prime bulkpoint territory.
+["Corsola (Galarian)".Great.anchors.corviknight_blkp_any]
+kind = "bulkpoint"
+opponent = "Corviknight"
+description = "Discover all Corviknight bulkpoints. Razor-close neutral grind (PvPoke counter rating 490); shaving one damage off the fast-move chip or Sky Attack plausibly flips it."
+source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalance)"
+
+# Tinkaton — counter rating 464, and the matchup is known to swing on
+# stat tiers: tinkaton.toml's corsola_galarian_blkp_any records that
+# 143.04 def + 140 hp Tinkaton flips the 0s from the other side. Find
+# the def tiers on our side of the same fight.
+["Corsola (Galarian)".Great.anchors.tinkaton_blkp_any]
+kind = "bulkpoint"
+opponent = "Tinkaton"
+description = "Discover all Tinkaton bulkpoints. Counter rating 464; reverse-side evidence (tinkaton.toml, acidicArisen) shows this matchup flips on single damage tiers — find the focal def tiers vs Gigaton Hammer and fast-move chip."
+source = "Simulator-derived; reverse-side calibration from thresholds/tinkaton.toml (HomeSliceHenry's Discord)"
+
+# Jellicent — ghost-on-ghost, SE chip both ways (rating 528, narrow
+# win). Hex tiers are large under the SE multiplier, so def tiers here
+# are coarse and each one matters.
+["Corsola (Galarian)".Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Narrow win (rating 528) decided by SE ghost chip; dropping a Hex or Shadow Ball damage tier secures the 1s."
+source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalance)"
+
+# Aegislash (Shield) — the other big ghost in the pool. SE ghost damage
+# both ways and Shield-stance bulk make it another tier-sensitive ghost
+# mirror; Corsola's def range vs Shadow Ball / fast chip is the lever.
+["Corsola (Galarian)".Great.anchors.aegislash_shield_blkp_any]
+kind = "bulkpoint"
+opponent = "Aegislash (Shield)"
+description = "Discover all Aegislash (Shield) bulkpoints. SE ghost damage both directions; focal def tiers vs its ghost chip and Shadow Ball govern a close championship-series matchup."
+source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalance)"
+
+# Quagsire — rating 543, narrow win vs the meta's top mud boy. Mud Shot
+# is low-damage/high-count chip, the regime where a 1-damage bulkpoint
+# compounds the most over a long fight; Stone Edge tiers matter in the
+# 1s.
+["Corsola (Galarian)".Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire bulkpoints. Narrow win (rating 543) over a long Mud Shot war — per-hit chip reduction compounds heavily; Stone Edge tiers decide the 1s."
+source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalance)"
+
+# Altaria — rating 600 but Dragon Breath chip wars are notoriously
+# IV-tier-sensitive: many Astonish/Dragon Breath exchanges over a long
+# fight, so a Dragon Breath bulkpoint shifts total damage by a lot.
+["Corsola (Galarian)".Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Long Dragon Breath chip war; a 1-damage Dragon Breath tier compounds across the whole fight and protects the win from low-def focal IVs."
+source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalance)"
+
+# Ninetales (Shadow) — rating 579 and the shadow atk boost pushes its
+# damage right up against tier edges; def tiers vs boosted fire chip
+# decide whether the neutral grind stays a win.
+["Corsola (Galarian)".Great.anchors.ninetales_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Ninetales (Shadow)"
+description = "Discover all Ninetales (Shadow) bulkpoints. Shadow-boosted fire chip sits near tier edges; focal def tiers determine whether the 579-rated neutral matchup holds for low-def IVs."
+source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalance)"
+
+# Annihilape — Counter is double-resisted (Ghost vs Fighting), so the
+# entire threat is SE ghost charge damage (Rage Fist / Shadow Ball).
+# Whether Corsola survives an extra Rage Fist cycle is a pure def/hp
+# tier question.
+["Corsola (Galarian)".Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. Counter is double-resisted, so the matchup reduces to surviving SE Rage Fist / Shadow Ball cycles — a def/hp tier check."
+source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalance)"
+
+# Feraligatr — Shadow Claw makes the big water starter an honorary
+# ghost: SE fast chip into Corsola plus Hydro Cannon pressure. Close
+# meta fight where a Shadow Claw bulkpoint stretches the fast-move war.
+["Corsola (Galarian)".Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. SE Shadow Claw chip plus Hydro Cannon pressure; dropping a Shadow Claw damage tier stretches the fast-move war in Corsola's favor."
+source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalance)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# Corsola's atk stat is tiny (rank-1 ~99.3), so the survivor atk range
+# is narrow — but PvPoke's editor note says high-rank Corsola wins
+# neutral matchups that hatch-IV Corsola loses, which means at least
+# some Astonish tiers inside that range are live. Discover them in the
+# closest fights.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror, atk side: the same SE Astonish tiers found by
+# mirror_blkp_any, viewed from the attacker. Together the two anchors
+# bracket the mirror's decisive damage tier.
+["Corsola (Galarian)".Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover every damage breakpoint vs the mirror. SE Astonish tiers are large; the atk side of the same tier mirror_blkp_any defends — together they bracket who wins the 0s."
+source = "Simulator-derived; mirror anchor per threshold-file convention"
+
+# Corviknight, atk side of the closest matchup in the rankings. Neutral
+# damage means small tiers — exactly where a fraction of an atk point
+# can step Astonish or Power Gem up by 1.
+["Corsola (Galarian)".Great.anchors.corviknight_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Corviknight"
+description = "Discover all Corviknight damage breakpoints. The 490-rated grind is the closest fight in the rankings; one extra Astonish or Power Gem damage point plausibly flips it."
+source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalance)"
+
+# Tinkaton, atk side. Power Gem is neutralized by Steel/Fairy typing,
+# so Astonish carries the damage; an Astonish tier is the most likely
+# atk-side lever in the 464-rated fight.
+["Corsola (Galarian)".Great.anchors.tinkaton_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Tinkaton"
+description = "Discover all Tinkaton damage breakpoints. Astonish carries the matchup (Power Gem is resisted by Steel); an Astonish tier is the atk-side lever in the 464-rated fight."
+source = "Simulator-derived; reverse-side calibration from thresholds/tinkaton.toml (HomeSliceHenry's Discord)"
+
+# Jellicent, atk side. SE Astonish/Night Shade tiers against a bulky
+# ghost; the 528-rated 1s likely hinge on reaching the next Astonish
+# tier before Jellicent reaches its own.
+["Corsola (Galarian)".Great.anchors.jellicent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent damage breakpoints. SE Astonish/Night Shade tiers vs a bulky ghost; reaching the next Astonish tier first likely decides the 528-rated 1s."
+source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalance)"

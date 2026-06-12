@@ -1,0 +1,118 @@
+# Seismitoad — Great League thresholds and slayer anchors.
+#
+# Sources:
+#   - NO KNOWN EXPERT WRITEUP. This species ships simulator-derived:
+#     every anchor below is a Level-3 discovery anchor designed from
+#     current-meta matchup logic, not from a community/expert number.
+#   - Opponent selection: current GL meta pool
+#     opponent_pools/gl_top50_plus_cs.txt (2026-06-10, post-June-2026
+#     rebalance). Seismitoad sits at GL meta rank 35 in that pool.
+#
+# Matchup logic used to pick opponents (Water/Ground focal, Mud Shot
+# fast pressure, Earth Power + Sludge Bomb charge coverage):
+#   - Only weakness is Grass (double); resists Rock, Steel, Poison,
+#     Fire, and blanks Electric. That means a large slice of the pool
+#     trades neutral fast damage with it, and those slow neutral
+#     grinds (Azumarill, Lickilicky, Jellicent, Dewgong, Medicham,
+#     the mud cohort) are exactly where per-tier def/hp checks and
+#     Mud Shot damage tiers plausibly flip close 1-1s and farm wars.
+#   - Steel/Poison targets it beats via Earth Power (Tinkaton,
+#     Stunfisk (Galarian), Clodsire) are kept because the focal's
+#     bulk tiers decide how cleanly favored those wins are under
+#     shields.
+#   - Grass threats (Jumpluff) and Ground-resisting flyers (Altaria,
+#     Talonflame, Pelipper) are deliberately omitted: those matchups
+#     are decided by typing, not by a one-tier stat check.
+
+[Seismitoad]
+sources = "Simulator-derived (no known expert writeup); opponents from GL meta pool gl_top50_plus_cs.txt (2026-06-10); GL meta rank 35"
+
+# ─────────────────────────────────────────────────────────────────────
+# Bulkpoint anchors (def-side, Level 3 discover-all)
+# Opponents picked from gl_top50_plus_cs.txt where Seismitoad's def/hp
+# checks plausibly move a close matchup. tinkaton.toml style.
+# ─────────────────────────────────────────────────────────────────────
+
+[Seismitoad.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Fully neutral both ways on the fast-move side (Bubble's Water bonus cancels against the focal's Water/Ground typing) while the focal's Sludge Bomb is the super-effective haymaker — a long, close grind where shaving one Bubble or Ice Beam tier plausibly converts the 1-1 and 2-2."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Classic bulky-Normal Body Slam spam vs a neutral-typed focal: per-throw damage tiers compound over many Body Slams, so a one-tier Lick or Body Slam drop is the canonical def-side flip in this matchup."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. All-neutral exchange (Counter, Psycho Cut, Ice Punch, Dynamic Punch all hit Water/Ground neutrally) — the textbook stat-check matchup where surviving one extra Counter cycle or one charge move decides the shielded scenarios."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.stunfisk_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all G-Stunfisk bulkpoints. Seismitoad is a designated Steel counter here (super-effective ground damage, resists Rock Slide), but G-Fisk's neutral Mud Shot + Earthquake still race it down under shields — def tiers determine how cleanly the favored win holds."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire bulkpoints. The mud-cohort quasi-mirror: both sides spam neutral Mud Shot and the focal resists Stone Edge, so the matchup comes down to fast-move tiers and Aqua Tail damage — prime territory for a one-tier def flip."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.tinkaton_blkp_any]
+kind = "bulkpoint"
+opponent = "Tinkaton"
+description = "Discover all Tinkaton bulkpoints. Favored matchup (resists Gigaton Hammer, super-effective Earth Power), but Gigaton Hammer's huge base damage means a single resisted-GH tier drop can be the difference between surviving one hammer or two — worth mapping for the no-shield lines."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.clodsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Clodsire"
+description = "Discover all Clodsire bulkpoints. Favored via super-effective Earth Power and resisted Poison Sting, but Clodsire's neutral Earthquake and Megahorn carry real damage; def tiers against those decide whether the win survives a shield disadvantage."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Mutually neutral water-bulk grind (Hex / Shadow Ball / Ice Beam all neutral into Water/Ground; the focal's whole kit lands neutral back): a slow attrition matchup where fast-move and Shadow Ball damage tiers on the focal plausibly flip the 1-1."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.dewgong_blkp_any]
+kind = "bulkpoint"
+opponent = "Dewgong"
+description = "Discover all Dewgong bulkpoints. Ice Shard / Icy Wind hit Water/Ground neutrally and Icy Wind spam comes in many small increments, so one damage tier compounds heavily across the matchup; the focal hits back only neutrally, keeping it close."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Seismitoad"
+description = "Discover all mirror Seismitoad bulkpoints. The mirror is a pure Mud Shot farm war (both sides resist Sludge Bomb, Earth Power lands neutral): the def tier that drops the opposing Mud Shot or Earth Power by 1 is the whole matchup."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+# ─────────────────────────────────────────────────────────────────────
+# Damage-breakpoint anchors (atk-side, Level 3 discover-all)
+# Key close matchups where the focal's own Mud Shot / charge tiers
+# plausibly flip the result.
+# ─────────────────────────────────────────────────────────────────────
+
+[Seismitoad.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. The focal's side of the same close grind covered by azumarill_blkp_any: an extra Mud Shot tier across dozens of throws, or a Sludge Bomb tier on the super-effective haymaker, is the most plausible atk-side flip in Seismitoad's GL matchup sheet."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.stunfisk_galarian_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all G-Stunfisk damage breakpoints. Mud Shot and Earth Power land super-effectively, so integer tiers step up at tightly spaced atk values; a one-tier gain shortens the race enough to protect the favored win when shields are down."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+[Seismitoad.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Seismitoad"
+description = "Discover all mirror Seismitoad damage breakpoints. The atk-side half of the mirror Mud Shot farm war: the focal that reaches the next Mud Shot tier against the rank-1 mirror wins the energy race outright."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"

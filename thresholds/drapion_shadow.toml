@@ -1,0 +1,189 @@
+# Drapion (Shadow) — Great League thresholds, spreads, and slayer anchors.
+#
+# Per-form file following the aegislash_blade.toml / aegislash_shield.toml
+# precedent (and altaria_shadow.toml): deep_dive.py auto-discovery maps
+# the focal "Drapion (Shadow)" to thresholds/drapion_shadow.toml.
+# Base-form discovery anchors live in thresholds/drapion.toml.
+#
+# EXPERT-NUMBER STATUS (2026-06-12): the known human writeup is
+# HomeSliceHenry's Shadow Drapion deep dive — surfaced on his Discord
+# server and as the YouTube video "SHADOW DRAPION PVP IV DEEP DIVE |
+# Great League" (youtube.com/watch?v=23vI2Hlsj1M, Nov 2021). The video
+# content could not be fetched in this environment (JS-rendered page;
+# web.archive.org unreachable), so only the numbers already recorded in
+# local context are encoded:
+#   - "Azu bul" def floor of 138 (GoBattleKit DEFAULT_THRESHOLDS,
+#     src/gobattlekit/data/thresholds.py, 'Drapion (Shadow)' / Great,
+#     sourced to "the HomeSliceHenry Discord server").
+#   - acidicArisen's attack-weighted Shadow Drapion build at 119.80
+#     effective atk (pogo-simulator CHANGELOG "Shadow / atk-weighted
+#     opponent IVs" thread; docs/validations/
+#     2026-04-06_tinkaton_gh_vs_reference.md). His paired 140.21-def
+#     number is a TINKATON stat (Tinkaton's def vs this build) and is
+#     deliberately not duplicated here, per the altaria_shadow.toml
+#     precedent.
+# No other numbers are invented.
+#
+# Shadow Drapion left the gl_top50_plus_cs pool in the June-2026
+# rebalance (it was in the 2026-06-02 pool) but remains the GL-relevant
+# Drapion variant and ships in the GoBattleKit app today, so the dive is
+# maintained for staleness tracking. Opponent spellings are exact
+# PvPoke speciesNames from opponent_pools/gl_top50_plus_cs.txt
+# (2026-06-10).
+
+["Drapion (Shadow)"]
+sources = "HomeSliceHenry's Discord (Azu-bulk def floor, shipped in GoBattleKit DEFAULT_THRESHOLDS) + his 'SHADOW DRAPION PVP IV DEEP DIVE' YouTube video (Nov 2021, content unfetched 2026-06-12); acidicArisen atk-weighted build stat (CHANGELOG / docs/validations/2026-04-06_tinkaton_gh_vs_reference.md); discovery anchors from opponent_pools/gl_top50_plus_cs.txt (2026-06-10)."
+
+["Drapion (Shadow)".Great.meta]
+notes = "Shadow trade-off: x1.2 atk pushes the base form's super-effective Poison Sting / Crunch tiers up cheaply; x0.8333 def makes the Azu-bulk def floor the binding constraint. Left the 2026-06 pool but shipped in the app — dive kept for threshold staleness tracking."
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — stat-cutoff tiers from the expert record
+# ─────────────────────────────────────────────────────────────────────
+
+# The tier shipped in GoBattleKit's DEFAULT_THRESHOLDS today, verbatim
+# ('Azu bul': attack 0 / defense 138 / stamina 0).
+["Drapion (Shadow)".Great.spreads."Azu bul"]
+attack = 0
+defense = 138.0
+stamina = 0
+description = "HomeSliceHenry's Azu-bulk tier: 138.00 def floor to hold the Azumarill matchup. Shipped verbatim in GoBattleKit DEFAULT_THRESHOLDS as 'Azu bul'; the exact (move, tier) bulkpoint it preserves is rediscovered by the azumarill anchors below."
+source = "HomeSliceHenry's Discord"
+
+# acidicArisen's attack-weighted community build — the variant his
+# Tinkaton prep is calibrated against. Stat-cutoff form only: the local
+# record gives the effective attack, not an IV list, so this cannot yet
+# feed the _shared.toml atk-weighted opponent-injection convention
+# (which needs `ivs`). Whether 119.80 is pre- or post-shadow-multiplier
+# in the original calibration should be confirmed before using this for
+# membership checks — see the CHANGELOG "--opp-ivs custom:119.80" thread.
+["Drapion (Shadow)".Great.spreads.atk_weighted]
+attack = 119.8
+defense = 0
+stamina = 0
+description = "acidicArisen's attack-weighted Shadow Drapion build: 119.80 atk effective attack. The opponent variant that Tinkaton's anti-Drapion bulkpoint is calibrated against; encoded here as the community's punchy-Drapion reference tier."
+source = "acidicArisen (HomeSliceHenry's Discord); pogo-simulator CHANGELOG + docs/validations/2026-04-06_tinkaton_gh_vs_reference.md"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side). The shadow def penalty makes these
+# the binding constraint; Level 3 discover-all unless an expert number
+# pins a Level 2 probe.
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 2: probe upward from HomeSliceHenry's shipped def floor. The
+# exact (move, tier) the floor preserves was never recorded — this
+# reports the next def step above it, and the Level 3 anchor below
+# enumerates the candidates at and below the floor for promotion to a
+# Level 1 anchor with full provenance.
+["Drapion (Shadow)".Great.anchors.azumarill_blkp_above_hsh]
+kind = "bulkpoint"
+opponent = "Azumarill"
+above_def = 138.0
+description = "Smallest def above HomeSliceHenry's 138.00 def Azu-bulk floor at which an Azumarill threat move's damage steps down. Brackets the shipped floor from above; pair with azumarill_blkp_any to identify which (move, tier) the floor itself preserves."
+source = "HomeSliceHenry's Discord"
+
+# Level 3: discover all Azumarill bulkpoints — the expert matchup.
+["Drapion (Shadow)".Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. HomeSliceHenry's Azu-bulk tier puts the floor at 138.00 def; enumerate the Bubble / Ice Beam / Play Rough tiers around it to recover the exact calibration under the current gamemaster."
+source = "HomeSliceHenry's Discord"
+
+# The shadow mirror.
+["Drapion (Shadow)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Drapion (Shadow)"
+description = "Discover all shadow-mirror bulkpoints. Shadow-boosted but mutually resisted Poison Sting / Crunch chip — the base form's mirror ladder doesn't transfer under the x0.8333 def penalty; rediscover the tiers."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Cross-form: shadow vs base Drapion (the in-family fight; players who
+# kept a base build still queue it).
+["Drapion (Shadow)".Great.anchors.drapion_blkp_any]
+kind = "bulkpoint"
+opponent = "Drapion"
+description = "Discover all bulkpoints vs base Drapion (cross-form fight). Base-form chip into shadow-reduced def decides which form wins the in-family matchup."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lickilicky: the pool's #1 — neutral Body Slam spam into shadow def.
+["Drapion (Shadow)".Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Neutral Body Slam spam compounds against shadow-reduced def; each recoverable tier is worth a full extra fast move over the long grind vs the pool's top-ranked species."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Umbreon: the mutual Dark-resist chip war — longest grind in the set,
+# where shadow def makes each Snarl / Foul Play tier precious.
+["Drapion (Shadow)".Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Mutually resisted Dark chip runs longest of any close line; under the shadow def penalty a Snarl or Foul Play tier shaved compounds over dozens of hits (Umbreon re-entered the pool in the 2026-06 rebalance)."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Feraligatr: resisted Shadow Claw chip, neutral Hydro Cannon nukes —
+# the highest-traffic neutral race in the current meta.
+["Drapion (Shadow)".Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Resisted Shadow Claw chip into shadow def with neutral Hydro Cannon / Ice Beam behind it; a fast-move tier stepped down stretches survival across an extra charged cycle."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Jellicent: super-effective Dark damage out, resisted Hex in — the
+# def check is surviving Surf pressure on shadow bulk.
+["Drapion (Shadow)".Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Resisted Hex chip but neutral Surf pressure against shadow-reduced def; a Surf tier shaved decides whether the focal reaches its second charged move."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Medicham: net-neutral Counter at high cadence into shadow def.
+["Drapion (Shadow)".Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Counter lands net-neutral at high cadence and shadow def magnifies every tier; Psychic coverage stays resisted, so the Counter step is the live question."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Malamar: resisted Psywave, net-neutral Superpower — grindy near-neutral
+# race where shadow def needs every recoverable step.
+["Drapion (Shadow)".Great.anchors.malamar_blkp_any]
+kind = "bulkpoint"
+opponent = "Malamar"
+description = "Discover all Malamar bulkpoints. Resisted Psywave chip and net-neutral Superpower into shadow-reduced def; the def ladder shows which incoming tiers swing the long near-neutral race."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Guzzlord: mutual Dark resistance both ways — a pure chip war where
+# the shadow def penalty cuts against the focal.
+["Drapion (Shadow)".Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Mutual Dark resistance turns this into a pure chip war; under shadow def an incoming Snarl or Brutal Swing tier shaved is the whole margin."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all). Shadow
+# atk reaches tiers base Drapion can't; no `moves` filter so the
+# post-rebalance moveset isn't silently constrained by a stale name.
+# ─────────────────────────────────────────────────────────────────────
+
+# Azumarill: the offensive half of the expert matchup — shadow-boosted
+# super-effective Poison Sting tiers against Azumarill's high defense.
+["Drapion (Shadow)".Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. Shadow-boosted super-effective Poison Sting tiers are the offensive half of the matchup HomeSliceHenry's Azu-bulk def floor holds on defense; Sludge Bomb tiers stack in the bait lines."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool); matchup identified via HomeSliceHenry's Azu-bulk tier"
+
+# Jellicent: super-effective Crunch / Bite into the high-defense wall —
+# shadow atk may step up a tier the base form misses.
+["Drapion (Shadow)".Great.anchors.jellicent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent damage breakpoints. Super-effective Dark tiers into the Water/Ghost wall; shadow atk plausibly reaches a Crunch or Bite step the base form misses, converting the close 1-shield lines."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lickilicky: the long neutral grind vs the pool's #1 — over that many
+# fast moves a single shadow-boosted Poison Sting tier compounds.
+["Drapion (Shadow)".Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Over the long neutral grind a single shadow-boosted Poison Sting tier compounds into an extra charged move's worth of damage against the pool's top-ranked species."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"

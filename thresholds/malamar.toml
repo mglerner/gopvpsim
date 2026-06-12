@@ -1,0 +1,174 @@
+# Malamar — Great League thresholds, spreads, and slayer anchors.
+#
+# Current GL meta rank 19 (PvPoke, post-June-2026 rebalance pool).
+#
+# Sources:
+#   - RyanSwag "Malamar PvP IV Deep-Dive" (GamePress, series #25, last
+#     updated 2022-09-02), fetched via Wayback Machine 2026-06-12:
+#     https://web.archive.org/web/2025/https://pogo.gamepress.gg/malamar-pvp-iv-deep-dive
+#   - Opponent pool: opponent_pools/gl_top50_plus_cs.txt (2026-06-10).
+#
+# FRESHNESS CAVEAT (same as _shared.toml): the RyanSwag dive is
+# Season-12-era (Psychic Cup / Willpower Cup framing; Victini, Registeel,
+# Trevenant, Bronzong matchups). The stat math (atk/def/hp thresholds)
+# is stable, but the matchup *relevance* predates the 2026 meta. The
+# bulkpoint anchors below target the current 2026-06-10 GL pool instead;
+# RyanSwag's numbers are preserved as spreads + Level-2 calibration
+# anchors for staleness verification.
+
+[Malamar]
+sources = "RyanSwag Malamar PvP IV Deep-Dive (GamePress series #25, 2022-09-02, via Wayback 2026-06-12); opponent_pools/gl_top50_plus_cs.txt (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — stat-cutoff tiers from the RyanSwag deep dive
+# ─────────────────────────────────────────────────────────────────────
+
+[Malamar.Great.spreads."Swag Floor"]
+attack = 119.94
+defense = 111.2
+stamina = 0
+description = "RyanSwag minimum Atk-weight tier: 119.94 atk + 111.20 def flips the Medicham 1-1 (Psycho Cut breakpoint), Trevenant 1-1, Galarian Stunfisk 0-0, and Registeel 0-0 (even when debuffed), and takes CMP against Talonflame."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+[Malamar.Great.spreads."Swag Recommended"]
+attack = 120.23
+defense = 111.2
+stamina = 136
+description = "RyanSwag recommended build (Research/Raid IV floor): 120.23 atk + 111.20 def + 136 hp; 136 hp overcomes Faint Attack Bronzong in the 0-1. Preferred when available: 120.23 atk + 111.20 def + 137 hp. 120.23 atk covers 89.35% of Victini CMP scenarios."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+[Malamar.Great.spreads."Swag CMP Secure"]
+attack = 121.0
+defense = 111.2
+stamina = 136
+description = "RyanSwag top CMP tier: 121.00 atk covers 99.54% of Victini CMP; the intermediate 120.46 atk tier covers 96.76%. Same 111.20 def + 136 hp bulk floor as the recommended build."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — CMP ties (atk-side)
+#
+# RyanSwag's headline CMP target is Victini (one-time Research mon,
+# opponent atk spontaneously ranges 117.55 to 121.55 — those are
+# *Victini* stats, not focal thresholds, so they live in this comment
+# rather than a parsable description). Encoding the coverage tiers
+# (120.23 / 120.46 / 121.00 focal atk) as CMP anchors would need
+# Victini IV-list spreads; like tinkaton.toml, deferred until CMP
+# anchors support single-opponent shorthand. The coverage tiers are
+# preserved in the spreads above. Talonflame CMP at the 119.94 atk
+# floor is likewise recorded in the "Swag Floor" spread.
+# ─────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side)
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 2: reproduce RyanSwag's Psycho Cut Medicham breakpoint — the
+# calibration point of his whole Atk-weight recommendation.
+[Malamar.Great.anchors.medicham_brkp_above_swag]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+move = "PSYCHO_CUT"
+above_atk = 119.94
+description = "Smallest atk > 119.94 atk at which Psycho Cut damage to default Medicham steps up. Reproduces RyanSwag's Psycho Cut Medicham breakpoint that flips the 1-1."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+# Level 3: discover every Medicham BP in the survivor range, so the
+# Level-2 calibration above can be promoted to Level 1 once resolved.
+[Malamar.Great.anchors.medicham_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+description = "Discover and tag every Medicham damage breakpoint in the survivor atk range. Context for promoting the 119.94 atk Psycho Cut calibration to Level 1."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+# Level 3: Galarian Stunfisk — RyanSwag's 0-0 flip at the Atk floor.
+[Malamar.Great.anchors.stunfisk_galarian_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all Galarian Stunfisk damage breakpoints. RyanSwag: 119.94 atk (with 111.20 def) flips the 0-0."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+# Level 3: the mirror — which Psycho Cut / Foul Play / Superpower tiers
+# separate atk-weighted Malamar from floor builds.
+[Malamar.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Malamar"
+description = "Discover all damage breakpoints against a default mirror Malamar. Anchors mirror-match damage analysis for the atk-weighted vs bulk-weighted split."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Opponents picked from opponent_pools/gl_top50_plus_cs.txt where the
+# type math makes def/hp checks plausible for Dark/Psychic Malamar and
+# the matchup is close: neutral fast pressure (Counter, Incinerate,
+# Mud Shot), spammy neutral charge moves, and the dark-on-dark core.
+# Bug/Fairy threats (double-/super-effective) are omitted — those
+# matchups don't hinge on one damage tier.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror (required anchor). Neutral Psycho Cut chip both ways.
+[Malamar.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Malamar"
+description = "Discover and tag every mirror-Malamar bulkpoint in the survivor def range."
+
+# Medicham: RyanSwag's headline close matchup; Counter / Dynamic Punch
+# damage tiers against the 111.20 def floor.
+[Malamar.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. RyanSwag pairs 111.20 def with the atk floor to flip the 1-1; find which incoming (move, tier) that def preserves."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+# Galarian Stunfisk: Mud Shot chip + Rock Slide tiers in the 0-0 flip.
+[Malamar.Great.anchors.stunfisk_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all Galarian Stunfisk bulkpoints. RyanSwag's 0-0 flip needs 111.20 def alongside the atk floor."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+# Talonflame: Incinerate chip tiers; RyanSwag's CMP target on the atk
+# side, but the fight is decided by how many Incinerates Malamar absorbs.
+[Malamar.Great.anchors.talonflame_blkp_any]
+kind = "bulkpoint"
+opponent = "Talonflame"
+description = "Discover all Talonflame bulkpoints (Incinerate chip tiers in a close neutral fight)."
+
+# Annihilape: Counter pressure nets neutral on Dark/Psychic; close fight
+# where one Counter tier swings the 1-1.
+[Malamar.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints (neutral Counter / Rage Fist damage tiers)."
+
+# Sableye: dark-on-dark attrition; Shadow Claw spam makes per-hit tiers
+# unusually decisive.
+[Malamar.Great.anchors.sableye_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye"
+description = "Discover all Sableye bulkpoints (resisted Shadow Claw spam — per-hit damage tiers decide the attrition race)."
+
+# Umbreon: the other dark wall; Snarl/Foul Play tiers in a long fight.
+[Malamar.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints (resisted Snarl + Foul Play tiers over a long neutral fight)."
+
+# Guzzlord: dark/dragon; mutual resisted Snarl, close attrition.
+[Malamar.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints (resisted Snarl chip; Brutal Swing tiers)."
+
+# Jellicent: Hex chip (neutral net vs Dark/Psychic) in a slow fight
+# where fast-move tiers dominate.
+[Malamar.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints (Hex chip tiers in a slow neutral fight)."
+
+# Feraligatr: Shadow Claw pressure nets neutral; spammy fast damage
+# makes def tiers matter.
+[Malamar.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints (neutral Shadow Claw spam — fast-move damage tiers decide shield math)."

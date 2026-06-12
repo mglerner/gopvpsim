@@ -1,0 +1,188 @@
+# Guzzlord — Great League thresholds, spreads, and slayer anchors.
+#
+# Sources:
+#   - RyanSwag "Guzzlord PvP IV Deep-Dive" (series #21), GamePress,
+#     Last Updated 2022-11-14. Fetched via Wayback snapshot
+#     20221115114954 of gamepress.gg/pokemongo/guzzlord-pvp-iv-deep-dive
+#     (the pogo.gamepress.gg slug from the series INDEX has no Wayback
+#     capture; the older gamepress.gg/pokemongo/ slug does).
+#   - Current GL meta context: Guzzlord is rank 16 in the post-June-2026
+#     rebalance pool (opponent_pools/gl_top50_plus_cs.txt, 2026-06-10).
+#
+# FRESHNESS CAVEAT: the RyanSwag numbers are from the 2022 meta
+# (pre-2026 move rebalances; Froslass / Skuntank / Shadow Drapion /
+# Shadow Nidoqueen / Trevenant / Swampert have since left the GL core).
+# The atk/def stat thresholds themselves are stable physics against the
+# named opponent stats, but whether each matchup still matters should be
+# re-verified by the Level-3 discovery anchors below against the current
+# gamemaster.
+#
+# Guzzlord is an Ultra Beast: no shadow form, single form, so one file.
+# Stats 188 atk / 99 def / 440 hp — extreme HP, dismal def, which is why
+# the def-side checks dominate the expert writeup. Great League only;
+# the article's Ultra League tiers (84/85.45 def, 144.36 atk, 339 hp)
+# are deliberately not encoded here.
+
+[Guzzlord]
+sources = "RyanSwag Guzzlord PvP IV Deep-Dive (GamePress, 2022-11-14; Wayback 20221115114954 of gamepress.gg/pokemongo/guzzlord-pvp-iv-deep-dive) + current GL top-50-plus-CS pool (2026-06-10), where Guzzlord sits at meta rank 16"
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — stat-cutoff tiers from the RyanSwag PvP IV tables
+# ─────────────────────────────────────────────────────────────────────
+
+[Guzzlord.Great.spreads."Altaria Slayer"]
+attack = 114.4
+defense = 63.74
+stamina = 0
+description = "RyanSwag's Altaria Slayer tier: 114.40 atk + 63.74 def takes the Altaria 1-1 and potentially the 2-2 via the atk breakpoint route. Sort by def for best value."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+[Guzzlord.Great.spreads."Bulk Focus"]
+attack = 0
+defense = 64.38
+stamina = 267
+description = "RyanSwag's Bulk Focus tier: 64.38 def + 267 hp — the HP route to the Altaria 2-2 when the atk breakpoint is missed; also firms up the Sableye 1-2 and Swampert 2-2."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+[Guzzlord.Great.spreads."Minimum Def"]
+attack = 0
+defense = 63.74
+stamina = 0
+description = "RyanSwag's Minimum Def tier: 63.74 def (calibrated to rank-7 Altaria) — the settle-here floor if you don't want to keep trading; ~20 Good Friend trades to hit."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side), current-pool opponents
+#
+# Level-3 discover-all anchors against pool opponents where Guzzlord's
+# typing (Dark/Dragon: resists Water/Fire/Grass/Electric/Ghost/Psychic/
+# Dark, dismal 99 base def) makes the matchup close and a def/hp check
+# plausibly flips it. Exact spellings from gl_top50_plus_cs.txt.
+# ─────────────────────────────────────────────────────────────────────
+
+# The headline matchup of the writeup.
+[Guzzlord.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. RyanSwag: 63.74 def (vs rank-7 Altaria) opens the 1-1; the 2-2 needs 63.74 def + 267 hp (bulk route) or the atk breakpoint; 64.38 def covers the range up to max-def / Trevenant-Slayer-atk Altaria variants."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+# Shadow pair of the headline matchup — punchier Dragon Breath, so the
+# def tiers sit higher; discovery anchor, no expert number.
+[Guzzlord.Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints. Shadow counterpart of the calibration matchup; expect the def tiers to sit above the non-shadow ones."
+
+# The mirror (required anchor). Guzzlord resists its own Dark side and
+# both sides' Dragon Tail hits super-effective — def tiers decide it.
+[Guzzlord.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all mirror-Guzzlord bulkpoints. RyanSwag: the 2-2 mirror flips across roughly 62.00 def to 64.17 def depending on the opposing Guzzlord's stats."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+# Medicham: super-effective Counter into Dark; surviving the close-range
+# pressure is a def/hp question.
+[Guzzlord.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Counter hits super-effective; def tiers govern how long Guzzlord's huge HP pool lasts under fighting pressure."
+
+# Sableye: resisted Foul Play both ways; RyanSwag names the 1-2 as a
+# consistency target for higher def/hp (no specific number given).
+[Guzzlord.Great.anchors.sableye_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye"
+description = "Discover all Sableye bulkpoints. RyanSwag: higher def or hp makes the Sableye 1-2 win more consistent (no exact tier cited)."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+# Umbreon: rebalance returnee; mutually-resisted Dark grind where a
+# single Foul Play damage tier swings the long game.
+[Guzzlord.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Mutually resisted dark-on-dark grind; one incoming damage tier matters over many fast moves."
+
+# Dragon Breath duels: super-effective fast damage both ways makes these
+# the classic bulkpoint-sensitive races in the current pool.
+[Guzzlord.Great.anchors.dragonair_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair"
+description = "Discover all Dragonair bulkpoints. Dragon Breath duel — per-tick super-effective damage both ways, so a single def tier can flip the race."
+
+[Guzzlord.Great.anchors.shelgon_blkp_any]
+kind = "bulkpoint"
+opponent = "Shelgon"
+description = "Discover all Shelgon bulkpoints. Rebalance-entrant Dragon Breath duel; same per-tick tier sensitivity as Dragonair."
+
+[Guzzlord.Great.anchors.kingdra_blkp_any]
+kind = "bulkpoint"
+opponent = "Kingdra"
+description = "Discover all Kingdra bulkpoints. Dragon Breath duel with Guzzlord resisting the Water side; close enough that a Dragon Breath tier decides it."
+
+# Talonflame: Incinerate is resisted (Fire into Dragon), so the matchup
+# is a close chip war where incoming fast-move tiers matter.
+[Guzzlord.Great.anchors.talonflame_blkp_any]
+kind = "bulkpoint"
+opponent = "Talonflame"
+description = "Discover all Talonflame bulkpoints. Incinerate is resisted; close chip war where dropping an Incinerate damage tier stretches Guzzlord's HP advantage."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), key close matchups
+# ─────────────────────────────────────────────────────────────────────
+
+# The atk route to the Altaria 2-2 (alternative to the 267-hp bulk route).
+[Guzzlord.Great.anchors.altaria_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria"
+description = "Discover all Altaria damage breakpoints. RyanSwag: 114.40 atk takes the Altaria 2-2 (the atk-route alternative to the bulk route)."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+# Shadow Jumpluff is still in the pool (hand-extended); RyanSwag cites a
+# breakpoint against a bulky variant.
+[Guzzlord.Great.anchors.jumpluff_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jumpluff (Shadow)"
+description = "Discover all Shadow Jumpluff damage breakpoints. RyanSwag: 114.47 atk (or higher) takes the 2-2, calibrated against a Jumpluff at 154.70 def."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+# Medicham: the one move-specific atk callout in the writeup.
+[Guzzlord.Great.anchors.medicham_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+moves = ["BRUTAL_SWING"]
+description = "Discover Brutal Swing breakpoints vs Medicham. RyanSwag: approximately 114.00 atk hits the Brutal Swing breakpoint for the 2-1 (article gives only '~114', so treat the second decimal as soft)."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Expert callouts outside the current pool
+# (tinkaton.toml precedent: anchors for opponents the expert names even
+# when they've fallen out of the top-50 pool — auto-included via TOML
+# anchor opponent injection; resolved at deep-dive run time.)
+# ─────────────────────────────────────────────────────────────────────
+
+# Froslass: the article's reason to consider Brutal Swing at all.
+[Guzzlord.Great.anchors.froslass_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Froslass"
+description = "Discover all Froslass damage breakpoints. RyanSwag: 114.00 atk to 115.03 atk takes the 2-2, calibrated against Froslass at 115.50 def to 116.60 def. Out of the 2026-06 pool; kept for staleness tracking."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+[Guzzlord.Great.anchors.skuntank_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Skuntank"
+description = "Discover all Skuntank damage breakpoints. RyanSwag: 113.85 atk takes the 1-1. Out of the 2026-06 pool; kept for staleness tracking."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+[Guzzlord.Great.anchors.drapion_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Drapion (Shadow)"
+description = "Discover all Shadow Drapion damage breakpoints. RyanSwag: 114.25 atk takes the 1-2 with no bait. Left the pool in the 2026-06 rebalance; kept for staleness tracking."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
+
+[Guzzlord.Great.anchors.nidoqueen_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Nidoqueen (Shadow)"
+description = "Discover all Shadow Nidoqueen bulkpoints. RyanSwag: approximately 64.35 def takes the 1-1, calibrated against a Shadow Nidoqueen at 117.00 atk. Out of the 2026-06 pool; kept for staleness tracking."
+source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"

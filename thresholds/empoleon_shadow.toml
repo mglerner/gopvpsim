@@ -1,0 +1,95 @@
+# Empoleon (Shadow) — Great League thresholds (split from empoleon.toml so
+# deep_dive.py auto-discovery finds it; see docs/threshold_schema.md).
+
+# ═════════════════════════════════════════════════════════════════════
+# Shadow Empoleon — same base stats, shadow atk/def multipliers.
+# JRE47 (2026-01-03) treats it as a GL sidegrade: "Its lower bulk means
+# losses to Marowak, Diggersby, Dunsparce, Forretress, Altaria, Murkrow,
+# and Feraligatr, but the higher Attack allows it [to] fill those holes
+# with new wins over Malamar, Galarian Moltres, Greninja, Sableye,
+# Gourgeist, Shadow Steelix, and Blastoise. Same record, different ways
+# of getting there." The article gives no shadow-specific stat numbers,
+# so anchors below are discover-all (no invented thresholds); opponents
+# restricted to the current pool (Marowak, Dunsparce, Murkrow,
+# G-Moltres, Greninja, Blastoise are not in gl_top50_plus_cs 2026-06-10).
+# ═════════════════════════════════════════════════════════════════════
+
+["Empoleon (Shadow)"]
+sources = """
+JRE47 'A PvP Analysis on Community Day Classic Empoleon', Pokémon GO Hub,
+2026-01-03 (via Wayback Machine 20260104204249) — shadow swap-list
+paragraph + GL top-50/CS opponent pool 2026-06-10 (shadow is
+pool-resident alongside the base form).
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side). The shadow's article losses that are
+# bulk-decided: each is a matchup the base form wins, so the def tiers
+# that claw one back are the highest-value IV question for the shadow.
+# ─────────────────────────────────────────────────────────────────────
+
+["Empoleon (Shadow)".Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints for the shadow. JRE47 lists Altaria as a shadow loss (base win) — find whether any shadow def tier recovers it."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+["Empoleon (Shadow)".Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints for the shadow. JRE47 shadow loss (base win); the Water race is the closest recoverable matchup."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+["Empoleon (Shadow)".Great.anchors.forretress_blkp_any]
+kind = "bulkpoint"
+opponent = "Forretress"
+description = "Discover all Forretress bulkpoints for the shadow. JRE47 shadow loss (base win) among the top meta Bugs."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+["Empoleon (Shadow)".Great.anchors.diggersby_blkp_any]
+kind = "bulkpoint"
+opponent = "Diggersby"
+description = "Discover all Diggersby bulkpoints for the shadow. JRE47 shadow loss (base outraces it) — the Ground-damage race the shadow's bulk drops."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+["Empoleon (Shadow)".Great.anchors.dusknoir_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Dusknoir (Shadow)"
+description = "Discover all Shadow Dusknoir bulkpoints for the shadow focal — Dynamic Punch survival tiers with shadow-reduced defense."
+source = "JRE47 article (base win entry) + gl_top50_plus_cs pool 2026-06-10"
+
+# The mirror (shadow vs shadow) and the cross-variant mirror.
+["Empoleon (Shadow)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Empoleon (Shadow)"
+description = "Discover all shadow-mirror bulkpoints — both sides carry the shadow atk boost, so damage tiers shift relative to the base mirror."
+source = "gl_top50_plus_cs pool 2026-06-10 (shadow mirror)"
+
+["Empoleon (Shadow)".Great.anchors.base_mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Empoleon"
+description = "Discover all bulkpoints vs base Empoleon — the cross-variant mirror (JRE47: GL sidegrades, expect to face both)."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side). The shadow's new wins per
+# JRE47 that survive into the current opponent pool.
+# ─────────────────────────────────────────────────────────────────────
+
+["Empoleon (Shadow)".Great.anchors.malamar_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Malamar"
+description = "Discover all Malamar damage breakpoints. JRE47: a new shadow win via the higher attack — identify the (move, tier) that secures it across the shadow IV range."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+["Empoleon (Shadow)".Great.anchors.sableye_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Sableye"
+description = "Discover all Sableye damage breakpoints. JRE47 lists Sableye as a new shadow win — atk tiers vs its low bulk decide the energy race."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"
+
+["Empoleon (Shadow)".Great.anchors.gourgeist_super_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Gourgeist (Super)"
+description = "Discover all Super Gourgeist damage breakpoints. JRE47 lists Gourgeist as a new shadow win; Drill Peck tiers vs the Grass/Ghost frame carry it."
+source = "JRE47, Pokémon GO Hub, 2026-01-03"

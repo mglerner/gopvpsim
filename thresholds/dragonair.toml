@@ -1,0 +1,136 @@
+# Dragonair — Great League thresholds and slayer anchors.
+#
+# GL meta rank 26 as of the June-2026 move rebalance; Dragonair (and its
+# Shadow) entered opponent_pools/gl_top50_plus_cs.txt in the 2026-06-10
+# pool regeneration. The Shadow form is meta-relevant too and lives in
+# its own file, thresholds/dragonair_shadow.toml (deep_dive.py
+# auto-discovery maps "Dragonair (Shadow)" -> dragonair_shadow.toml,
+# same per-form precedent as aegislash_blade.toml / aegislash_shield.toml
+# and altaria.toml / altaria_shadow.toml).
+#
+# EXPERT-NUMBER STATUS: no known expert writeup for GL Dragonair — this
+# species ships simulator-derived. No community stat numbers are encoded
+# (none are invented); all anchors are Level-3 discover-all, designed
+# from current-meta matchup logic against the 2026-06-10 pool. Per the
+# zone-routing convention in docs/threshold_schema.md, anchors carry no
+# per-anchor `source` field so they render in the Simulation Deep Dive
+# zone, not the Expert Analysis zone.
+#
+# Matchup logic in one line: Dragonair is a Dragon Breath dragon in a
+# pool that the rebalance flooded with other Dragon Breath dragons
+# (Altaria #2, Kingdra, Shelgon, the Shadow pairs) — mutual
+# super-effective fast-move wars where single damage tiers swing entire
+# matchups — plus resisted-fast-move water matchups (Azumarill,
+# Feraligatr) and the Lickilicky neutral chip race at #1.
+
+[Dragonair]
+sources = "Simulator-derived (no known expert writeup). Opponent selection from opponent_pools/gl_top50_plus_cs.txt (2026-06-10, post-June-2026 rebalance); Dragonair GL meta rank 26."
+
+[Dragonair.Great.meta]
+notes = "All anchors are Level-3 discovery: the dragon-war matchups (mirror, Shadow Dragonair, Altaria pair, Kingdra, Shelgon, Guzzlord) trade super-effective Dragon Breath both ways, so both the def-side and atk-side fast-move tiers are live; the water matchups lean on Dragonair's resisted-fast-move chip advantage."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), key close matchups
+# ─────────────────────────────────────────────────────────────────────
+
+# The flagship dragon war: Altaria is GL #2 and resists nothing Dragonair
+# throws except via its own bulk. Mutual super-effective Dragon Breath —
+# each outgoing fast-move tier is worth a full cycle over the matchup.
+[Dragonair.Great.anchors.altaria_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria"
+description = "Discover all Altaria damage breakpoints. Mutual super-effective Dragon Breath vs the #2 pool entry; every outgoing fast-move damage step compounds across the whole matchup."
+
+# Kingdra: another mutual-SE Dragon Breath war, but Dragonair resists
+# Kingdra's water charges, so the fast-move damage race IS the matchup.
+[Dragonair.Great.anchors.kingdra_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Kingdra"
+description = "Discover all Kingdra damage breakpoints. Mutual super-effective Dragon Breath with Kingdra's water charges resisted — the matchup reduces almost entirely to the fast-move damage race, making each atk tier unusually decisive."
+
+# Lickilicky: the #1 pool entry, a neutral Body-Slam-vs-charges chip
+# race close enough that a single fast- or charge-move tier flips ends.
+[Dragonair.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Close neutral chip race against the #1 pool entry; an extra damage tier on Dragon Breath or a charge move shortens the count to each KO."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all). Opponents from
+# the 2026-06-10 pool where incoming damage tiers plausibly flip close
+# matchups: the dragon cohort's super-effective Dragon Breath, plus the
+# resisted-water and neutral-chip fights.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Mutual super-effective Dragon Breath: the highest-density
+# tier ladder in the pool for this focal — one def step down is one
+# fewer incoming damage every single turn.
+[Dragonair.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair"
+description = "Discover all mirror-Dragonair bulkpoints. Mutual super-effective Dragon Breath means each def step that drops incoming fast damage by 1 pays out every turn of the mirror."
+
+# Cross-form: Shadow Dragonair, in the pool alongside the base form.
+# Shadow-boosted super-effective Dragon Breath incoming — the costliest
+# fast move this focal faces; the def tiers here are worth the most HP.
+[Dragonair.Great.anchors.dragonair_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair bulkpoints (cross-form fight). Shadow-boosted super-effective Dragon Breath is the heaviest fast-move chip in the pool for this focal; def steps here decide which form wins the in-family war."
+
+# Altaria, GL #2: incoming super-effective Dragon Breath plus Sky Attack
+# pressure. Close enough that one DB tier decides the 1-shield ends.
+[Dragonair.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Super-effective Dragon Breath incoming from the #2 pool entry; stepping its fast damage down a tier swings the closest dragon war in the meta."
+
+# Shadow Altaria: same war, shadow-boosted incoming Dragon Breath.
+[Dragonair.Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints. Shadow-boosted super-effective Dragon Breath incoming; the def tier that base Altaria misses may still be in reach against this harder-hitting variant."
+
+# Kingdra: incoming super-effective Dragon Breath; its water charges are
+# resisted, so the fast-move tier carries nearly all the matchup value.
+[Dragonair.Great.anchors.kingdra_blkp_any]
+kind = "bulkpoint"
+opponent = "Kingdra"
+description = "Discover all Kingdra bulkpoints. With Kingdra's water charges resisted, its super-effective Dragon Breath is the whole threat — one incoming fast-move tier down effectively decides the race."
+
+# Shelgon: fellow rebalance entrant dragon. Mutual dragon damage in a
+# bulky, drawn-out fight where fast-move tiers accumulate heavily.
+[Dragonair.Great.anchors.shelgon_blkp_any]
+kind = "bulkpoint"
+opponent = "Shelgon"
+description = "Discover all Shelgon bulkpoints. Fellow 2026-06 rebalance entrant; a long, bulky dragon-vs-dragon grind where each incoming damage tier compounds over many turns."
+
+# Guzzlord: Dragon Tail / Snarl pressure with mutual dragon weakness.
+# Big stat total but GL-squashed defense — close both ways.
+[Dragonair.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Mutual dragon weakness — stepping Guzzlord's super-effective Dragon Tail chip down a tier buys cycles in a matchup both sides can win."
+
+# Lickilicky: neutral Body Slam spam from the #1 pool entry. Every
+# incoming Body Slam tier repeats many times over the chip race.
+[Dragonair.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam spam in a close neutral chip race; a recurring charge-move tier down is worth multiple fast moves of HP across the fight."
+
+# Azumarill: Bubble is resisted, so Dragonair races it on chip — but
+# Ice Beam and Play Rough are both super-effective. The charge-move
+# damage tiers decide whether shield-down survival lines exist.
+[Dragonair.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Resisted Bubble makes this a winnable race, but super-effective Ice Beam / Play Rough tiers decide whether Dragonair survives the shield-down nuke lines."
+
+# Feraligatr: Shadow Claw chip is neutral and relentless; the water
+# charges are resisted but Ice Beam variants threaten super-effective
+# damage. Close fight where both incoming tiers matter.
+[Dragonair.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Neutral Shadow Claw chip plus a super-effective Ice Beam threat over resisted water charges — fast- and charge-move def tiers both carry value in a close race."

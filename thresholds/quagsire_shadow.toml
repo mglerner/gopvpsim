@@ -1,0 +1,124 @@
+# Quagsire (Shadow) — Great League thresholds (split from quagsire.toml so
+# deep_dive.py auto-discovery finds it; see docs/threshold_schema.md).
+
+["Quagsire (Shadow)"]
+sources = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04; Wayback 20231104183954) + GL meta pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Quagsire (Shadow) — spreads (stat-cutoff tiers named by the writeup)
+# ─────────────────────────────────────────────────────────────────────
+
+["Quagsire (Shadow)".Great.spreads."High Bulk"]
+attack = 0
+defense = 112.68
+stamina = 163
+description = "RyanSwag 'Shadow, High Bulk' tier: 112.68 def + 163 hp recommended minimum. Enables the Sableye 0-0 (Mud Bomb) & 1-1 (Aqua Tail), potentiates the Gligar 2-1, Umbreon 1-0, and Powder Snow Shadow A-Ninetales 2-2; 164 hp enables the Vigoroth 1-1."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+["Quagsire (Shadow)".Great.spreads."Slight Atk Weight"]
+attack = 110.0
+defense = 110.26
+stamina = 163
+description = "RyanSwag 'Shadow, Slight Atk Weight' tier: 110.00 atk with 110.26 def + 163 hp. The next-best bulk option below High Bulk; 110.26 def is the soft minimum that avoids Carbink's Rock Throw breakpoint and holds the Shadow A-Sandslash 1-2 and Emolga 1-2 (Mud Bomb). 110.00 atk adds Medicham 2-1 (Mud Bomb), Shadow Venusaur 1-0, Noctowl 1-1, and Cofagrigus CMP potential."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+["Quagsire (Shadow)".Great.spreads."Carbink Slayer"]
+attack = 111.89
+defense = 108.0
+stamina = 162
+description = "RyanSwag 'Carbink Slayer' tier: 111.89 atk with 108.00 def + 162 hp. Takes down rank-1 Carbink in the 1-2 (either charge move) and the 0-2 (Mud Bomb); 112.22 atk covers Best Buddy Carbink. Bulk product >= 17748 is safer vs atk-weighted Carbink; going over 109.00 def may maintain the Shadow Venusaur 1-0, and over 110.26 def may enable the Emolga 1-2 (Mud Bomb)."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+["Quagsire (Shadow)".Great.spreads.high_def_honorable_mentions]
+description = "RyanSwag's honorable-mention max-def shadows (0/14/8 and 0/15/6): the def surplus mostly makes up for the hp drop, could catch Pelipper (0-0) off guard and covers mirror-focused Froslass builds needing 114.15 def to 114.46 def — at the cost of a shakier Sableye matchup from the lower hp."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+ivs = [
+    [0, 14, 8],
+    [0, 15, 6],
+]
+
+# ─────────────────────────────────────────────────────────────────────
+# Quagsire (Shadow) — bulkpoint anchors (def-side, Level 3 discover-all)
+# ─────────────────────────────────────────────────────────────────────
+
+["Quagsire (Shadow)".Great.anchors.sableye_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye"
+description = "Discover all Sableye bulkpoints. RyanSwag: 112.68 def + 163 hp is the recommended minimum for the Sableye 0-0 (Mud Bomb) & 1-1 (Aqua Tail); 113.66 def covers CMP-minded Sableye builds (atk up to 121.4) and possibly Froslass."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+["Quagsire (Shadow)".Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. The shadow's reduced def makes Counter/Psychic tiers tighter than the base form's; discovery re-derives where the survivable lines sit under the current pool."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+["Quagsire (Shadow)".Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. RyanSwag: the 112.68 def + 163 hp High Bulk floor potentiates the Umbreon 1-0."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+["Quagsire (Shadow)".Great.anchors.pelipper_blkp_any]
+kind = "bulkpoint"
+opponent = "Pelipper"
+description = "Discover all Pelipper bulkpoints. RyanSwag: the max-def honorable mentions (0/14/8, 0/15/6) could catch Pelipper off guard in the 0-0; discovery finds the exact Wing Attack / Weather Ball tiers."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+["Quagsire (Shadow)".Great.anchors.charjabug_blkp_any]
+kind = "bulkpoint"
+opponent = "Charjabug"
+description = "Discover all Charjabug bulkpoints. RyanSwag's lead role for the shadow is the Charjabug/Carbink/Sableye counter-swap; the shadow def drop makes the Bug-side damage tiers worth mapping."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04) names the role; threshold via discovery"
+
+["Quagsire (Shadow)".Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. RyanSwag says very high def 'could possibly catch Lickitung off guard'; Lickilicky is the family member in the current pool, so discovery maps its Body Slam tiers directly — no cross-species number is borrowed."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+["Quagsire (Shadow)".Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all bulkpoints against the cross-form base Quagsire (the shadow's def multiplier means its mirror tiers sit lower than the base form's)."
+source = "Opponent from gl_top50_plus_cs.txt (2026-06-10); discovery anchor, no expert number"
+
+["Quagsire (Shadow)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire (Shadow)"
+description = "Discover all shadow-mirror Quagsire bulkpoints. RyanSwag notes Aqua Tail aids the mud-boi mirror; the shadow-on-shadow tiers are the relevant ones for atk-weighted shadow builds."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04) names the mirror; threshold via discovery"
+
+# ─────────────────────────────────────────────────────────────────────
+# Quagsire (Shadow) — damage-breakpoint anchors (atk-side)
+# ─────────────────────────────────────────────────────────────────────
+
+["Quagsire (Shadow)".Great.anchors.medicham_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+description = "Discover all Medicham damage breakpoints. RyanSwag: 110.00 atk is the line vs rank-1 Medicham, enabling Medicham 2-1 (Mud Bomb) potential on the Slight Atk Weight build."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Quagsire (Shadow) — expert call-outs outside the current pool
+# (auto-included via TOML anchor opponent injection; tinkaton.toml precedent)
+# ─────────────────────────────────────────────────────────────────────
+
+["Quagsire (Shadow)".Great.anchors.carbink_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Carbink"
+description = "Discover all Carbink damage breakpoints. RyanSwag's signature claim: 111.89 atk takes down rank-1 Carbink in the 1-2 (either charge move) and the 0-2 (Mud Bomb) — one of ~4 non-Steel answers to a 2-shield Carbink without baits; 112.22 atk covers Best Buddy Carbink. Carbink left our pool post-rebalance; kept for expert-claim verification."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+["Quagsire (Shadow)".Great.anchors.carbink_blkp_any]
+kind = "bulkpoint"
+opponent = "Carbink"
+description = "Discover all Carbink bulkpoints. RyanSwag: 110.26 def avoids Carbink's Rock Throw breakpoint, fortifying the 0-1, 1-2, & 2-2 — the def-side half of the Carbink Slayer calculus."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04)"
+
+["Quagsire (Shadow)".Great.anchors.vigoroth_blkp_any]
+kind = "bulkpoint"
+opponent = "Vigoroth"
+description = "Discover all Vigoroth bulkpoints. RyanSwag's Vigoroth-1-1 def/hp ladder (vs a 0/15/10 Vigoroth) as a bulk yardstick when no High Bulk shadow is available: 114.27 def + 163 hp; 112.48 def + 164 hp; 110.75 def + 165 hp; 109.70 def + 166 hp; 107.45 def + 167 hp; 105.87 def + 168 hp."
+source = "RyanSwag Quagsire PvP IV Deep-Dive (GamePress, 2023-11-04), 'Vigoroth Highlight' section"
+opponent_ivs = [0, 15, 10]

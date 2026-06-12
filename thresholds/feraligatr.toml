@@ -1,0 +1,194 @@
+# Feraligatr — Great League thresholds and slayer anchors.
+#
+# Sources:
+#   - Simulator-derived. No known expert (acidicArisen / RyanSwag-style)
+#     IV writeup exists for post-rebalance Feraligatr; anchors below are
+#     designed from current-meta matchup logic against the 2026-06-10
+#     opponent pool (opponent_pools/gl_top50_plus_cs.txt).
+#   - PvPoke GL rankings, post-June-2026 move rebalance (current overall
+#     rank 15; the Shadow variant is independently meta-relevant and
+#     appears in the same pool as "Feraligatr (Shadow)").
+#     Ranked moveset: SHADOW_CLAW / HYDRO_CANNON / ICE_BEAM.
+#
+# Shadow coverage: ONE file serves both variants. Shadow focal dives are
+# invoked as `deep_dive.py Feraligatr --shadow`; args.species stays
+# "Feraligatr", so deep_dive.py auto-loads this same file and re-resolves
+# every anchor with the focal shadow atk bonus / def penalty (the
+# focal_shadow plumbing in scripts/deep_dive.py + gopvpsim/anchors.py).
+# No separate ["Feraligatr (Shadow)"] table or file is needed — only
+# gamemaster forms (aegislash_blade / aegislash_shield precedent) get
+# their own files. Shadow *opponents* are encoded with the " (Shadow)"
+# suffix in the anchor's `opponent` field, which implies the opponent
+# shadow multipliers automatically.
+#
+# Design intent: Feraligatr is the meta's premier Shadow Claw water — a
+# bulky generalist whose game plan is high-frequency ghost chip into
+# Hydro Cannon pressure with Ice Beam coverage. Its defining close
+# matchups split into two families:
+#   1. Fast-move wars where Shadow Claw trades against another spammy
+#      chip move (the mirror, the ghost duels vs Jellicent / G-Corsola,
+#      Mud Shot vs Quagsire, Bubble vs Azumarill, Rollout vs
+#      Lickilicky). These are decided by single damage-tier steps on
+#      either side, so the def-side bulkpoint ladder is the primary
+#      axis, with Shadow Claw breakpoints as the atk-side complement.
+#   2. Charged-tier checks where Shadow Claw is blunted (Lickilicky
+#      double-resists ghost; Umbreon resists it) and the matchup rides
+#      on Hydro Cannon / Ice Beam damage tiers or on surviving one more
+#      chip cycle.
+#
+# Anchors are Level-3 discover-all style (tinkaton.toml model): no
+# expert-calibrated (move, tier) pairs exist yet, so we enumerate every
+# breakpoint/bulkpoint per opponent and promote the ones the deep-dive
+# distribution shows actually matter.
+
+[Feraligatr]
+sources = "Simulator-derived: PvPoke GL rankings (overall rank 15, post-June-2026 rebalance, 2026-06-10 pull); opponent pool opponent_pools/gl_top50_plus_cs.txt; no expert writeup exists for this species. Shadow focal covered via deep_dive.py --shadow against this same table."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, the primary axis: most of Gatr's
+# close matchups are long fast-move wars)
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Hydro Cannon and Ice Beam are both resisted by Water, so
+# the mirror collapses into a pure Shadow Claw race — exactly the kind
+# of matchup where one fast-move damage tier decides everything.
+[Feraligatr.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all mirror-Feraligatr bulkpoints. Hydro Cannon / Ice Beam are mutually resisted, so the mirror is a pure Shadow Claw chip race — dropping the opponent's Shadow Claw a tier decides it."
+source = "Simulator-derived: mirror analysis, both forms in the 2026-06-10 GL pool"
+
+# The shadow mirror. Shadow Gatr's boosted attack pushes its Shadow
+# Claw chip a tier (or more) above the base form's — the def threshold
+# that blunts it sits higher than the base-mirror one and is the more
+# demanding target for anyone expecting to face the shadow.
+[Feraligatr.Great.anchors.mirror_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr (Shadow)"
+description = "Discover all Shadow-Feraligatr bulkpoints. The shadow atk boost pushes its Shadow Claw chip tiers higher than the base mirror's; this is the stricter def target in the mirror family."
+source = "Simulator-derived: shadow variant independently in the 2026-06-10 GL pool"
+
+# Jellicent — the flagship ghost duel. Shadow Claw is super effective
+# both directions while Jellicent resists the Hydro charges, so the
+# matchup stretches into a long SE fast-move war; jellicent.toml
+# carries the same anchor from the other side.
+[Feraligatr.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints (Hex chip, ghost charges). Mutual SE ghost chip with resisted Hydro charges makes this a long, close fast-move race — shaving its Hex a tier swings it."
+source = "Simulator-derived: ghost-duel matchup logic (PvPoke 2026-06-10 pull); mirror-image anchor exists in jellicent.toml"
+
+# Corsola (Galarian) — the other SE ghost duel. Its file calls Gatr an
+# 'honorary' ghost-duel member and flags the Shadow Claw bulkpoint as
+# the lever that stretches the fast-move war.
+[Feraligatr.Great.anchors.corsola_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover all G-Corsola bulkpoints. Mutual SE ghost chip; a tier drop on its fast-move damage stretches the war in Gatr's favor in a close championship-series matchup."
+source = "Simulator-derived: ghost-duel matchup logic (PvPoke 2026-06-10 pull); mirror-image anchor exists in corsola_galarian.toml"
+
+# Lickilicky — the GL rank 1 and a knife-edge fight (rated 515 from
+# Lickilicky's side per lickilicky.toml). Shadow Claw is
+# double-resisted by Normal, so Gatr must out-survive Rollout chip and
+# Body Slam spam long enough for the Hydro charges to land.
+[Feraligatr.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints (Rollout chip, Body Slam). Knife-edge fight vs the GL rank 1 (515 from its side); Shadow Claw is double-resisted, so surviving one more chip cycle is Gatr's most plausible def-side flip."
+source = "Simulator-derived: PvPoke key-matchup rating 515 from Lickilicky's side (2026-06-10 pull, via lickilicky.toml)"
+
+# Azumarill — archetypal bulk pivot. Bubble is resisted and Gatr's
+# Hydro Cannon is resisted back; Ice Beam / Play Rough trade neutrally.
+# A long attrition matchup where Ice Beam and Play Rough nuke tiers and
+# Bubble chip tiers all sit near the survivor def range.
+[Feraligatr.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints (Bubble chip, Ice Beam / Play Rough). Mutually-resisted water STAB turns this into a long attrition war; shaving its chip or a Play Rough tier compounds over the matchup."
+source = "Simulator-derived: archetypal GL bulk-pivot matchup (PvPoke 2026-06-10 pull)"
+
+# Quagsire — bulky-water staple. Net-neutral typing both ways (water
+# halves its own SE on ground); Mud Shot's high frequency makes its
+# chip tier unusually valuable to shave, and Stone Edge / Aqua Tail
+# tiers govern the shield game.
+[Feraligatr.Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire bulkpoints (Mud Shot chip, Stone Edge / Aqua Tail). Neutral bulky-water war; Mud Shot's frequency makes a single chip-tier drop disproportionately valuable."
+source = "Simulator-derived: bulky-water matchup logic (PvPoke 2026-06-10 pull)"
+
+# Umbreon — the meta's great attrition wall. It resists Shadow Claw, so
+# Gatr's chip plan is blunted and the matchup becomes a question of how
+# many Snarl cycles and Foul Plays Gatr can absorb while farming charge.
+[Feraligatr.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints (Snarl chip, Foul Play). Umbreon resists Shadow Claw, so the matchup is won on Gatr's def/hp ladder — surviving an extra Snarl cycle or dropping Foul Play a tier."
+source = "Simulator-derived: attrition-wall matchup logic (PvPoke 2026-06-10 pull)"
+
+# Altaria — Gatr's double-SE Ice Beam makes this a win on paper, but
+# Dragon Breath chip plus a Sky Attack can steal it in even-shield
+# play. Bulkpoints quantify how bait-proof the win is per IV.
+[Feraligatr.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints (Dragon Breath chip, Sky Attack). The win comes from double-SE Ice Beam; def tiers determine whether Dragon Breath chip plus a connected Sky Attack can steal it in even shields."
+source = "Simulator-derived: even-shield steal-risk analysis (PvPoke 2026-06-10 pull)"
+
+# Medicham — the meta's premier fighter. Counter chip is neutral on
+# pure Water and Ice Punch is resisted, so the fight is closer than
+# the type chart suggests; surviving one more Counter cycle or
+# dropping a Dynamic Punch tier is the def-side lever.
+[Feraligatr.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints (Counter chip, Dynamic Punch / Psychic). Neutral Counter chip into resisted Ice Punch keeps this close; one more Counter cycle survived or a Dynamic Punch tier down is the lever."
+source = "Simulator-derived: meta-fighter matchup logic (PvPoke 2026-06-10 pull)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, the SE Shadow Claw duels
+# plus the Lickilicky charged-tier check)
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror, atk-side: complements mirror_blkp_any above. Since the
+# mirror is a pure Shadow Claw race, a Shadow Claw breakpoint vs the
+# default mirror is the single highest-equity atk tier Gatr can buy —
+# and tells us whether a high-atk mirror-slayer build exists in the
+# survivor range at all.
+[Feraligatr.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Feraligatr"
+moves = ["SHADOW_CLAW"]
+description = "Discover all Shadow Claw damage breakpoints vs the default mirror. The mirror is a fast-move race, so a Shadow Claw tier up is the highest-equity atk investment; determines whether a mirror-slayer atk build exists."
+source = "Simulator-derived: mirror analysis, both forms in the 2026-06-10 GL pool"
+
+# Jellicent: SE Shadow Claw breakpoints in the flagship ghost duel.
+# jellicent.toml notes the matchup swings on a single Shadow Claw tier
+# from the defending side; this is the same boundary seen from the
+# attacking side.
+[Feraligatr.Great.anchors.jellicent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jellicent"
+moves = ["SHADOW_CLAW"]
+description = "Discover all SE Shadow Claw damage breakpoints vs Jellicent. The ghost duel is a chip race that a single Shadow Claw tier swings — the atk-side view of the bulkpoint jellicent.toml encodes from its side."
+source = "Simulator-derived: ghost-duel matchup logic (PvPoke 2026-06-10 pull); counterpart anchor in jellicent.toml"
+
+# Corsola (Galarian): same SE chip-race logic as Jellicent — find the
+# Shadow Claw tiers that shorten the fast-move war.
+[Feraligatr.Great.anchors.corsola_galarian_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Corsola (Galarian)"
+moves = ["SHADOW_CLAW"]
+description = "Discover all SE Shadow Claw damage breakpoints vs G-Corsola. A Shadow Claw tier up shortens the mutual-SE fast-move war and protects the win against high-def Corsola IVs."
+source = "Simulator-derived: ghost-duel matchup logic (PvPoke 2026-06-10 pull); counterpart anchor in corsola_galarian.toml"
+
+# Lickilicky: Shadow Claw is double-resisted, so the atk-side levers in
+# the knife-edge rank-1 fight are the Hydro Cannon / Ice Beam damage
+# tiers — exactly the nuke-tier check lickilicky.toml describes from
+# the defending side.
+[Feraligatr.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+moves = ["HYDRO_CANNON", "ICE_BEAM"]
+description = "Discover all Hydro Cannon / Ice Beam damage breakpoints vs Lickilicky. With Shadow Claw double-resisted, the knife-edge rank-1 fight (515 from its side) rides entirely on charged-move damage tiers."
+source = "Simulator-derived: PvPoke key-matchup rating 515 from Lickilicky's side (2026-06-10 pull, via lickilicky.toml)"

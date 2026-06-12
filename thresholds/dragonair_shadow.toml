@@ -1,0 +1,105 @@
+# Dragonair (Shadow) — Great League thresholds and slayer anchors.
+#
+# Per-form file following the aegislash_blade.toml / aegislash_shield.toml
+# (and altaria.toml / altaria_shadow.toml) precedent: deep_dive.py
+# auto-discovery maps the focal "Dragonair (Shadow)" to
+# thresholds/dragonair_shadow.toml. Base-form data lives in
+# thresholds/dragonair.toml.
+#
+# EXPERT-NUMBER STATUS: no known expert writeup for GL Dragonair in
+# either form — this file ships simulator-derived. No community stat
+# numbers are encoded (none are invented); all anchors are Level-3
+# discover-all from current-meta matchup logic. Anchors carry no
+# per-anchor `source` field so they route to the Simulation Deep Dive
+# zone (docs/threshold_schema.md zone-routing convention).
+#
+# Opponent selection from opponent_pools/gl_top50_plus_cs.txt
+# (2026-06-10, post-June-2026 rebalance); Dragonair (Shadow) entered
+# that pool alongside base Dragonair (GL meta rank 26) in the rebalance.
+
+["Dragonair (Shadow)"]
+sources = "Simulator-derived (no known expert writeup). Opponent selection from opponent_pools/gl_top50_plus_cs.txt (2026-06-10, post-June-2026 rebalance); base-form anchors live in thresholds/dragonair.toml."
+
+["Dragonair (Shadow)".Great.meta]
+notes = "Shadow trade-off in a Dragon Breath dragon war pool: x1.2 atk pushes outgoing fast-move tiers a base Dragonair can't reach (atk-side discovery below), while x0.8333 def makes every incoming super-effective Dragon Breath tier harder to hold — the def-side anchors enumerate which bulk checks survive the penalty rather than inheriting anything from the base form."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), key close matchups. Shadow
+# atk reaches Dragon Breath tiers the base form misses; these are the
+# fights where that extra tier is the sale pitch for running shadow.
+# ─────────────────────────────────────────────────────────────────────
+
+["Dragonair (Shadow)".Great.anchors.altaria_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria"
+description = "Discover all Altaria damage breakpoints for the shadow focal. Mutual super-effective Dragon Breath vs the #2 pool entry; shadow atk is exactly what buys the next fast-move tier in the closest dragon war in the meta."
+
+["Dragonair (Shadow)".Great.anchors.kingdra_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Kingdra"
+description = "Discover all Kingdra damage breakpoints. The matchup is a pure fast-move race (Kingdra's water charges are resisted); shadow-boosted Dragon Breath tiers decide it outright."
+
+["Dragonair (Shadow)".Great.anchors.dragonair_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Dragonair"
+description = "Discover all damage breakpoints vs base Dragonair (cross-form fight). Shadow atk steps super-effective Dragon Breath up against the base form's fuller def — which tier the shadow reaches decides the in-family war from the atk side."
+
+["Dragonair (Shadow)".Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Neutral chip race vs the #1 pool entry where the shadow's def penalty bites; an extra outgoing tier is how the shadow keeps the race winnable."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all). The shadow def
+# penalty makes these the binding constraint: the question for every
+# anchor is which incoming-damage tiers remain reachable at x0.8333 def.
+# Opponents from the 2026-06-10 pool where def/hp checks are plausible
+# and the matchup is close.
+# ─────────────────────────────────────────────────────────────────────
+
+# The shadow mirror.
+["Dragonair (Shadow)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all shadow-mirror bulkpoints. Shadow-boosted super-effective Dragon Breath into shadow-reduced def — the steepest tier ladder this focal faces; a single def step repays itself every turn of the mirror."
+
+# Cross-form: base Dragonair, in the pool alongside the shadow.
+["Dragonair (Shadow)".Great.anchors.dragonair_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair"
+description = "Discover all bulkpoints vs base Dragonair (cross-form fight). The base form's super-effective Dragon Breath against a shadow-def focal — whether any def build steps it down decides the def side of the in-family war."
+
+["Dragonair (Shadow)".Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Super-effective Dragon Breath from the #2 pool entry into shadow-reduced def; find which incoming tiers a max-bulk shadow build can still hold."
+
+["Dragonair (Shadow)".Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints. Shadow-boosted super-effective Dragon Breath into shadow-reduced def — the shadow-vs-shadow dragon war is decided a tier at a time on both sides."
+
+["Dragonair (Shadow)".Great.anchors.kingdra_blkp_any]
+kind = "bulkpoint"
+opponent = "Kingdra"
+description = "Discover all Kingdra bulkpoints. Kingdra's water charges are resisted, so its super-effective Dragon Breath tier is the entire threat; at shadow def, holding even one step down keeps the race in reach."
+
+["Dragonair (Shadow)".Great.anchors.shelgon_blkp_any]
+kind = "bulkpoint"
+opponent = "Shelgon"
+description = "Discover all Shelgon bulkpoints. Long, bulky dragon-vs-dragon grind vs a fellow rebalance entrant; the shadow def penalty makes each recoverable incoming tier precious over the fight's many turns."
+
+["Dragonair (Shadow)".Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Mutual dragon weakness; stepping Guzzlord's super-effective Dragon Tail chip down a tier is what keeps the shadow's thinner HP pool ahead of the race."
+
+["Dragonair (Shadow)".Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam spam in a neutral chip race that the shadow def penalty turns from favorable to razor-thin; a recurring charge-move tier down is worth multiple fast moves of HP."
+
+["Dragonair (Shadow)".Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Resisted Bubble keeps the race winnable, but super-effective Ice Beam / Play Rough into shadow-reduced def decide whether any shield-down survival lines remain."

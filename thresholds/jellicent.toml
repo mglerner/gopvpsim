@@ -1,0 +1,150 @@
+# Jellicent — Great League thresholds and slayer anchors.
+#
+# Sources:
+#   - No known expert writeup for GL Jellicent — this file ships as
+#     simulator-derived. Anchors below are designed purely from
+#     current-meta matchup logic (Water/Ghost typing vs the post-June-2026
+#     rebalance meta), not from community stat-check testimony.
+#   - Meta context: GL overall rank 5 (PvPoke, post-June-2026 rebalance);
+#     opponent picks drawn from opponent_pools/gl_top50_plus_cs.txt
+#     (generated 2026-06-10).
+#
+# Typing logic driving the anchor picks: Water/Ghost is weak to Ghost and
+# Dark (and Grass/Electric, absent from the close-matchup set), and
+# resists Water, Ice, Fire, Fighting, Poison, Bug, and Steel. The close
+# matchups therefore split into:
+#   - ghost duels, where super-effective fast damage makes single damage
+#     tiers decisive in both directions (mirror, Corsola (Galarian),
+#     Feraligatr's and Shadow Sableye's Shadow Claw, Annihilape's ghost
+#     charges);
+#   - dark pressure, where Snarl/Foul Play/Crunch tiers govern how long
+#     Jellicent's bulk holds (Umbreon, Guzzlord);
+#   - long neutral grinds against bulky water/normal/dragon cores, where
+#     fast-move damage tiers accumulate over many cycles (Azumarill,
+#     Lickilicky, Altaria).
+# All anchors are Level 3 (discover-all): with no expert calibration
+# points to reproduce, the right move is to enumerate every breakpoint /
+# bulkpoint in the survivor range and let the deep-dive distribution show
+# which ones actually flip matchups.
+
+[Jellicent]
+sources = "Simulator-derived (no known expert writeup). Current-meta matchup logic vs opponent_pools/gl_top50_plus_cs.txt (2026-06-10); GL overall rank 5, PvPoke post-June-2026 rebalance rankings."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Hex is super effective both ways, so the mirror is decided
+# almost entirely by fast-move damage tiers; a one-point drop in incoming
+# Hex compounds over the whole match.
+[Jellicent.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all mirror-Jellicent bulkpoints. Hex is super effective both ways, so the mirror hinges on fast-move damage tiers; dropping the incoming Hex tier compounds every cycle."
+source = "Simulator-derived: mirror matchup logic, current meta (2026-06)"
+
+# Feraligatr leads the ghost-duel set: Shadow Claw is super effective on
+# Jellicent while Jellicent resists the Water charges, making the long
+# fast-move race close and tier-sensitive.
+[Jellicent.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Super-effective Shadow Claw vs resisted Hydro charges makes this a long, close fast-move race — a Shadow Claw tier drop swings it."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"
+
+# Shadow Sableye: super-effective Shadow Claw off a low shadow-boosted
+# attack stat — exactly the regime where focal def tiers are in reach.
+[Jellicent.Great.anchors.sableye_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye (Shadow)"
+description = "Discover all Shadow Sableye bulkpoints. Super-effective Shadow Claw from a low shadow-boosted atk stat puts damage-tier drops within the survivor def range."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"
+
+# Galarian Corsola: the other dedicated ghost duel — its ghost fast
+# damage is super effective and the matchup is a slow tier war.
+[Jellicent.Great.anchors.corsola_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover all G-Corsola bulkpoints. Mutual super-effective ghost damage in a slow matchup; incoming fast-move tier drops decide the war of attrition."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"
+
+# Azumarill: Bubble is resisted and Ice Beam doubly unthreatening, but
+# Play Rough is neutral and the matchup is a near-even bulk grind —
+# classic territory for a fast-move or charge tier to flip the 1-1.
+[Jellicent.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Resisted Bubble plus neutral Play Rough in a near-even bulk grind; small incoming-damage tier drops can flip close shield scenarios."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"
+
+# Lickilicky: neutral Body Slam spam is the whole threat profile — the
+# textbook bulkpoint target (cf. the Annihilape/Lickitung precedent).
+[Jellicent.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Neutral Body Slam spam over a long match makes the Body Slam damage tier the textbook def check."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"
+
+# Altaria: neutral Dragon Breath pressure every turn; a DB tier drop is
+# high-value in a matchup with few shield plays.
+[Jellicent.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Constant neutral Dragon Breath pressure; a one-point Dragon Breath tier drop is high value across the whole matchup."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"
+
+# Guzzlord: super-effective dark fast damage (Snarl) and Crunch; close
+# enough that Jellicent's def tier against the dark pressure matters.
+[Jellicent.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Super-effective Snarl/Crunch pressure against Jellicent's dark weakness; def tiers govern how long the bulk holds."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"
+
+# Umbreon: rebalance returnee; super-effective Snarl + Foul Play into
+# Jellicent's dark weakness, with Umbreon's low atk keeping tier drops
+# plausibly inside the survivor def range.
+[Jellicent.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Super-effective Snarl/Foul Play off Umbreon's modest atk stat — damage-tier drops are plausibly reachable in the survivor def range."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"
+
+# Annihilape: Counter is resisted but the ghost charges (Rage Fist /
+# Shadow Ball) are super effective — surviving an extra Counter cycle or
+# dropping a charge tier changes the shield math.
+[Jellicent.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. Resisted Counter vs super-effective ghost charges; an extra Counter cycle survived or a charge-tier drop changes the shield math."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror, atk side: outgoing Hex tiers are the other half of the
+# fast-move war the mirror bulkpoint anchor covers.
+[Jellicent.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jellicent"
+description = "Discover all mirror-Jellicent damage breakpoints. Outgoing super-effective Hex tiers are the atk-side half of the mirror's fast-move war."
+source = "Simulator-derived: mirror matchup logic, current meta (2026-06)"
+
+# Feraligatr, atk side: neutral Hex into a high-def opponent over a long
+# resisted-charge matchup — the closest top-meta race for Jellicent, so
+# an outgoing fast tier is worth real win-percentage.
+[Jellicent.Great.anchors.feraligatr_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr damage breakpoints. Neutral Hex into a bulky top-meta water over many cycles; stepping the outgoing Hex tier up tightens Jellicent's closest race."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"
+
+# Azumarill, atk side: everything Jellicent throws is neutral into huge
+# bulk, so the 1-1 grind comes down to whether Hex / charge damage steps
+# up a tier.
+[Jellicent.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. Neutral damage into the meta's benchmark bulk; the near-even grind turns on whether Hex or a charge move clears the next tier."
+source = "Simulator-derived: type-matchup logic vs gl_top50_plus_cs pool (2026-06-10)"

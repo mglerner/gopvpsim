@@ -1,0 +1,100 @@
+# Altaria (Shadow) — Great League thresholds and slayer anchors.
+#
+# Per-form file following the aegislash_blade.toml / aegislash_shield.toml
+# precedent: deep_dive.py auto-discovery maps the focal "Altaria (Shadow)"
+# to thresholds/altaria_shadow.toml. Base-form data lives in
+# thresholds/altaria.toml.
+#
+# EXPERT-NUMBER STATUS: RyanSwag's Altaria PvP IV Deep-Dive (GamePress,
+# 2022-10-27, fetched 2026-06-12 via Wayback snapshot 2023-03-21) covers
+# only base Altaria — it contains no shadow-specific stat numbers, so
+# none are encoded here (no numbers are invented). The shadow multipliers
+# (atk x1.2, def x0.8333) mean the base-form atk breakpoints largely come
+# free while every def check gets harder, which is why this file is
+# bulkpoint-heavy discovery. Third-party context: tinkaton.toml's
+# acidicArisen anchor notes "high shadow IV variance" when prepping
+# AGAINST Shadow Altaria — that number (143.04 def) is a Tinkaton stat,
+# not an Altaria one, and is deliberately not duplicated here.
+#
+# Opponent selection from opponent_pools/gl_top50_plus_cs.txt
+# (2026-06-10, post-June-2026 rebalance); Altaria (Shadow) is in that
+# pool alongside base Altaria (GL meta rank 2).
+
+["Altaria (Shadow)"]
+sources = "Discovery-only: opponent pool gl_top50_plus_cs.txt (2026-06-10). RyanSwag's GamePress Altaria deep dive (2022-10-27, Wayback 2023-03-21) has no shadow-specific numbers — base-form expert encoding lives in thresholds/altaria.toml."
+
+["Altaria (Shadow)".Great.meta]
+notes = "Shadow trade-off: x1.2 atk buys the base form's breakpoint bands cheaply; x0.8333 def means the bulk checks (incl. the 139-hp mirror logic) need rediscovery rather than inheritance from the base-form writeup. Level-3 anchors below enumerate both sides."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), key close matchups from the
+# 2026-06-10 pool. Shadow atk reaches tiers base Altaria can't.
+# ─────────────────────────────────────────────────────────────────────
+
+["Altaria (Shadow)".Great.anchors.jumpluff_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jumpluff"
+description = "Discover all Jumpluff damage breakpoints for the shadow focal. Base-form calibration (RyanSwag: 102.85 atk flips 1-1/0-1) is trivially cleared by shadow atk; discovery shows which further tiers open up."
+
+["Altaria (Shadow)".Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Close neutral chip race vs the #1 pool entry; shadow atk may step Sky Attack / Dragon Breath up a tier the base form misses."
+
+["Altaria (Shadow)".Great.anchors.dragonair_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair damage breakpoints. Mutual super-effective Dragon Breath — every outgoing damage step swings the shadow-vs-shadow dragon war."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all). The shadow def
+# penalty makes these the binding constraint; opponents from the
+# 2026-06-10 pool where def/hp checks are plausible and close.
+# ─────────────────────────────────────────────────────────────────────
+
+# The shadow mirror.
+["Altaria (Shadow)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all shadow-mirror bulkpoints (shadow-boosted Dragon Breath / Sky Attack incoming tiers). The base form's 139-hp mirror-tie logic doesn't transfer automatically under the shadow def penalty — rediscover the tiers."
+
+# Cross-form: shadow vs base Altaria, both in the pool; players run both.
+["Altaria (Shadow)".Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all bulkpoints vs base Altaria (cross-form fight). Base-form DB/Sky Attack tiers against a shadow-def focal decide which form wins the in-family matchup."
+
+["Altaria (Shadow)".Great.anchors.jumpluff_blkp_any]
+kind = "bulkpoint"
+opponent = "Jumpluff"
+description = "Discover all Jumpluff bulkpoints. The base form's 0-0 def band (RyanSwag: opens at 149.61 def for base Altaria) is out of reach at shadow def — find which Fairy Wind tiers a shadow build can still step down."
+
+["Altaria (Shadow)".Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Double-weak to Ice Beam with shadow-reduced def; an Ice Beam damage step down is worth multiple Bubble cycles in a razor-thin matchup."
+
+["Altaria (Shadow)".Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam spam compounds every incoming tier across the chip race; shadow def makes each recoverable step precious."
+
+["Altaria (Shadow)".Great.anchors.dragonair_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair bulkpoints. Shadow-boosted super-effective Dragon Breath into shadow-reduced def — the highest-value def steps in the pool for this focal."
+
+["Altaria (Shadow)".Great.anchors.corsola_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover all G-Corsola bulkpoints. Slow Astonish chip war where an incoming fast-move tier decides whether the shadow focal out-paces the wall."
+
+["Altaria (Shadow)".Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Counter is double-resisted; Ice Punch is the super-effective threat — shadow def makes its damage tier the live question."
+
+["Altaria (Shadow)".Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. RyanSwag's base-form Umbreon 1-1 needed the premium-bulk band; at shadow def the Foul Play / Snarl tiers need rediscovery (Umbreon re-entered the pool in the 2026-06 rebalance)."

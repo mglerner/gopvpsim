@@ -1,0 +1,218 @@
+# Forretress — Great League thresholds and slayer anchors.
+# Covers both the base form (current GL meta rank 14) and the GL-meta-
+# relevant Shadow variant (rank 23) — both are in
+# opponent_pools/gl_top50_plus_cs.txt. Both top-level tables live in
+# this one file, following the empoleon.toml precedent: the loader
+# (gopvpsim.thresholds.load_toml) registers every top-level species
+# table it finds, and the two variants share base stats and movepool,
+# so a single file keeps the shared rationale in one place.
+#
+# VALIDATION NOTE (2026-06-12): the two-species-in-one-file layout is
+# only half-supported (same caveat as empoleon.toml, the cited
+# precedent — see its identical note). An EXPLICIT
+# `--thresholds thresholds/forretress.toml` works for either form, but
+# deep_dive.py AUTO-DISCOVERY maps the focal "Forretress (Shadow)" to
+# thresholds/forretress_shadow.toml (one file per form — the
+# altaria.toml / altaria_shadow.toml precedent and the
+# docs/threshold_schema.md "one TOML file per species" rule), so a
+# Shadow dive run without an explicit --thresholds flag will silently
+# load NO thresholds from this file. Likewise a base dive run as
+# `Forretress --shadow` resolves the ["Forretress"] table, not the
+# Shadow one. TODO: move the ["Forretress (Shadow)"] table below into
+# thresholds/forretress_shadow.toml verbatim. Until then, run Shadow
+# dives with `--thresholds thresholds/forretress.toml`.
+#
+# SIMULATOR-DERIVED (2026-06-12). No known expert IV writeup exists for
+# GL Forretress — every anchor below is designed from current-meta
+# matchup logic and will be calibrated by the Level-3 discover-all
+# dives, not by community data.
+#
+# Matchup picture (1-1 shield sim sweep, sim_score/pvpoke_dp, rank-1
+# IVs 0/9/15 @ L25.5, default moveset Volt Switch / Sand Tomb /
+# Rock Tomb, vs the full gl_top50_plus_cs pool, 2026-06-12; PvPoke GL
+# rankings 2026-06-10 cross-checked):
+#
+#   Base (108.6 atk / 144.4 def / 132 hp — deep-bulk rank 1):
+#     close wins   — Corsola (Galarian) 507, Steelix 556,
+#                    Aegislash (Shield) 560, Jellicent 575
+#     coin flips   — mirror 496, Guzzlord 496
+#     close losses — Annihilape 400, Lickilicky 406, Kingdra 440,
+#                    Forretress (Shadow) 441
+#   Shadow (130.3 atk / 120.3 def / 132 hp):
+#     close wins   — Lickilicky 503, Feraligatr (Shadow) 511,
+#                    Furret 515, Forretress (base) 571
+#     close losses — Aegislash (Shield) 460, Annihilape 478,
+#                    Umbreon 480, Grumpig 492, Charjabug 496
+#
+#   Hard losses (not anchored — too far gone for an IV tier to flip):
+#   the Fires (Ninetales 138/154, Ninetales (Shadow) 154/190,
+#   Talonflame 281/255) and fire-coverage Diggersby (212/252).
+#
+# Bug/Steel resists nearly the whole neutral meta's fast pressure
+# (Normal, Rock-net, Dragon, Psychic, Ice, Grass, Fairy, Steel), so
+# def-side step-downs on resisted chip are unusually likely to land in
+# the survivor range; Sand Tomb (-1 opp def) / Rock Tomb (-1 opp atk)
+# debuff cycles make charged-tier integers matter on both axes.
+#
+# No spreads are authored yet: with no community spread to encode, the
+# named tiers should come out of the dive results (promote the winning
+# Level-3 sub-anchors to spreads/Level-1 anchors once measured).
+
+[Forretress]
+sources = """
+Simulator-derived. 1-1 shield sim sweep (sim_score/pvpoke_dp, rank-1
+0/9/15, default Volt Switch / Sand Tomb / Rock Tomb, 2026-06-12) over
+opponent_pools/gl_top50_plus_cs.txt + PvPoke GL rankings (post-June-2026
+move rebalance, 2026-06-10; Forretress rank 14, key wins Tinkaton 687 /
+Empoleon 667 / Jellicent 562, counters Lickilicky 409 / Guzzlord 366).
+No known expert writeup for GL Forretress — anchors chosen from
+current-meta matchup logic: bulkpoints target the coin flips and close
+losses a def/hp tier might swing, damage breakpoints the same razor
+matchups from the atk side.
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Rank-1 Forretress is one of the deepest-bulk builds in GL (144.4 def);
+# the question the dive answers is which def tiers actually buy a
+# damage step-down in the close matchups vs which are wasted bulk.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror (required anchor). Identical typing both ways: resisted
+# Volt Switch chip plus Sand Tomb/Rock Tomb debuff cycles — a 496
+# coin flip at 1-1 where single fast-move integers decide CMP-adjacent
+# races.
+[Forretress.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Forretress"
+description = "Discover all mirror-Forretress bulkpoints. 496 coin flip at 1-1 — resisted Volt Switch chip and Sand Tomb/Rock Tomb tiers decide the debuff war."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Cross-variant mirror: the punchier Shadow Forretress is also
+# pool-resident, and at 1-1 the base drops it 441 — close enough that
+# shaving one tier off the shadow's boosted Volt Switch or Sand Tomb
+# plausibly claws it back.
+[Forretress.Great.anchors.mirror_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Forretress (Shadow)"
+description = "Discover all bulkpoints vs Shadow Forretress — cross-variant mirror, 441 close loss; a tier off the shadow-boosted chip is the recovery path."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Corsola (Galarian), 507 — the thinnest win on the card. Astonish chip
+# and Night Shade spam are neutral; Power Gem nets neutral into
+# Bug/Steel. Every incoming integer matters in a 507.
+[Forretress.Great.anchors.corsola_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover all G-Corsola bulkpoints. Thinnest win (507) — Astonish/Night Shade chip tiers decide it; keep the win safe across opposing IVs."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Guzzlord, 496 — a literal coin flip. Steel resists Dragon Tail and
+# nearly walls Sludge Bomb; Brutal Swing is the one neutral threat. A
+# Dragon Tail step-down compounds every turn and is the most plausible
+# def-side swing.
+[Forretress.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. 496 coin flip — resisted Dragon Tail chip and Brutal Swing tiers; a fast-damage step-down compounds across the fight."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Lickilicky, 406 — the classic bulkpoint target. Body Slam is resisted
+# (cheap, frequent, integer-sensitive) and Rollout nets neutral; PvPoke
+# lists Lickilicky among Forretress's top counters at 409, so a Body
+# Slam or Rollout tier down is the flip candidate.
+[Forretress.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Close loss (406; PvPoke 409) — resisted Body Slam spam and Rollout chip are textbook step-down targets."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Annihilape, 400 — Low Kick nets neutral into Bug/Steel (SE on Steel,
+# NVE on Bug), Rage Fist is neutral and Ice Punch is resisted; close
+# enough that a Low Kick or Rage Fist tier down is worth pricing.
+[Forretress.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. Close loss (400) — Low Kick chip and Rage Fist damage tiers are the def-side flip candidates."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Kingdra, 440 — Dragon Breath is resisted by Steel, Swift is resisted,
+# Surf is the neutral threat. A resisted-fast-move step-down plus a
+# Surf tier is the route back into a 440.
+[Forretress.Great.anchors.kingdra_blkp_any]
+kind = "bulkpoint"
+opponent = "Kingdra"
+description = "Discover all Kingdra bulkpoints. Close loss (440) — resisted Dragon Breath chip step-downs compound; Surf tiers set the shield math."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Steelix, 556 — the steel civil war. Thunder Fang is neutral, Psychic
+# Fangs is resisted, Crunch neutral; def tiers here protect the win
+# against higher-atk Steelix builds.
+[Forretress.Great.anchors.steelix_blkp_any]
+kind = "bulkpoint"
+opponent = "Steelix"
+description = "Discover all Steelix bulkpoints. Close win (556) — Thunder Fang/Crunch tiers keep it safe vs punchier Steelix IVs."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Aegislash (Shield), 560 — Psycho Cut and Gyro Ball are both resisted;
+# Shadow Ball is the one neutral nuke. Whether a def/hp tier survives
+# an extra Shadow Ball cycle decides how comfortable the win stays.
+[Forretress.Great.anchors.aegislash_shield_blkp_any]
+kind = "bulkpoint"
+opponent = "Aegislash (Shield)"
+description = "Discover all Aegislash (Shield) bulkpoints. Close win (560) — resists Psycho Cut/Gyro Ball; Shadow Ball survival tiers are the check."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Jellicent, 575 — a PvPoke headline win (562) carried by SE Volt
+# Switch. Hex chip and Surf/Shadow Ball are neutral; def tiers govern
+# how much HP the win banks for the rest of the set.
+[Forretress.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Close win (575; PvPoke key win 562) — Hex chip and Surf/Shadow Ball tiers set how much the win costs."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# The same razor matchups attacked from the atk axis: which Volt Switch
+# / Sand Tomb / Rock Tomb tiers secure the 496-507 flips, and what atk
+# they cost off the deep-bulk rank-1 (108.6 atk).
+# ─────────────────────────────────────────────────────────────────────
+
+# Guzzlord: Volt Switch is resisted (Dragon), so Brutal-bulk Guzzlord
+# races on Sand Tomb/Rock Tomb tiers — the atk side of the 496 coin
+# flip, with Rock Tomb's -1 atk debuff doubling the value of reaching a
+# tier one cycle sooner.
+[Forretress.Great.anchors.guzzlord_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord damage breakpoints. 496 coin flip — Sand Tomb/Rock Tomb tiers (Volt Switch is resisted) are the atk-side deciders."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Corsola (Galarian): neutral Volt Switch chip into low-atk deep bulk —
+# the 507 is a chip war where one fast-move tier up locks the win.
+[Forretress.Great.anchors.corsola_galarian_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover all G-Corsola damage breakpoints. Thinnest win (507) — a Volt Switch tier up locks the chip war."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Lickilicky: pure-neutral grind into huge bulk; Volt Switch and Sand
+# Tomb tiers are the atk-side flip candidates for the 406, priced
+# against the bulk they cost.
+[Forretress.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Close loss (406) into deep bulk — Volt Switch/Sand Tomb tiers priced against the def they trade away."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"
+
+# Jellicent: Volt Switch is super-effective — its damage tiers are the
+# likeliest single integers deciding the 575, and they're cheap to
+# reach against Jellicent's modest defense.
+[Forretress.Great.anchors.jellicent_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent damage breakpoints. SE Volt Switch carries the 575 — its tiers are cheap and worth locking in."
+source = "Simulator-derived; 1-1 sweep 2026-06-12 (PvPoke GL pool 2026-06-10)"

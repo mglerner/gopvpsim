@@ -1,0 +1,105 @@
+# Ninetales (Shadow) — Great League thresholds (split from ninetales.toml so
+# deep_dive.py auto-discovery finds it; see docs/threshold_schema.md).
+
+# ═════════════════════════════════════════════════════════════════════
+# Shadow Ninetales — also GL-meta-relevant (present in the 2026-06-10
+# opponent pool alongside the base form). JRE47 discusses the shadow
+# qualitatively ("it's more or less the same story with Shadow
+# Ninetales"; "Overheat has the highest ceiling by far, with really only
+# Gastrodon as the outlier that Energy Ball can get") but publishes no
+# shadow-specific GL stat numbers, so no numeric spreads are encoded
+# here — Level-3 discovery anchors carry the load. Same opponent logic
+# as the base form, trimmed to the matchups where the shadow multiplier
+# (more atk, less bulk) most plausibly moves a tier.
+# ═════════════════════════════════════════════════════════════════════
+
+["Ninetales (Shadow)"]
+sources = "JRE47 CD Ninetales + Alolan Ninetales article (pokemongohub.net, 2026-02-01, fetched 2026-06-12) — shadow discussed qualitatively, no shadow GL stat table published; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all). The shadow def
+# penalty makes every one of these checks tighter than on the base form.
+# ─────────────────────────────────────────────────────────────────────
+
+# The shadow mirror.
+["Ninetales (Shadow)".Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Ninetales (Shadow)"
+description = "Discover all shadow-mirror Ninetales bulkpoints. Boosted-but-resisted Fire chip in tiny tiers; the def penalty makes each tier precious."
+source = "Mirror anchor; JRE47 shadow discussion"
+
+# Cross-form mirror: the base form is also in the GL pool.
+["Ninetales (Shadow)".Great.anchors.ninetales_base_blkp_any]
+kind = "bulkpoint"
+opponent = "Ninetales"
+description = "Discover all base-Ninetales bulkpoints for the shadow focal. Cross-form mirror; both forms are in the 2026-06-10 GL pool."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Annihilape: JRE47-style close win; shadow def penalty makes the
+# Counter chip tiers the deciding factor.
+["Ninetales (Shadow)".Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. Shadow def penalty tightens the Counter-chip race JRE47 calls a win for the base form."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Empoleon: 'often'-win for the base form; the shadow's def penalty
+# makes surviving the Water charge cycle even more IV-sensitive.
+["Ninetales (Shadow)".Great.anchors.empoleon_blkp_any]
+kind = "bulkpoint"
+opponent = "Empoleon"
+description = "Discover all Empoleon bulkpoints. JRE47's conditional win gets bulk-gated harder under the shadow def penalty."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Lickilicky: Body Slam tiers vs a shadow-penalized def stat.
+["Ninetales (Shadow)".Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam tiers against the shadow's reduced def."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Sableye: close neutral chip race, tier-sensitive for the shadow.
+["Ninetales (Shadow)".Great.anchors.sableye_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye"
+description = "Discover all Sableye bulkpoints. Shadow Claw chip tiers in a close neutral race."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Azumarill: the Energy Ball outrace claim ('same story' per JRE47)
+# requires surviving super-effective Bubble chip on reduced bulk.
+["Ninetales (Shadow)".Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. JRE47's Energy Ball outrace ('same story' for the shadow) hinges on surviving Bubble chip."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# Togekiss: Charm chip vs shadow-penalized def — each tier shaved is an
+# extra Charm survived.
+["Ninetales (Shadow)".Great.anchors.togekiss_blkp_any]
+kind = "bulkpoint"
+opponent = "Togekiss"
+description = "Discover all Togekiss bulkpoints. Charm damage tiers dominate; the shadow def penalty makes this the tightest bulk check in the set."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side). The shadow atk multiplier
+# relocates every base-form BP; rediscover rather than copy.
+# ─────────────────────────────────────────────────────────────────────
+
+["Ninetales (Shadow)".Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints for the shadow focal. Calibrates the shadow Energy Ball outrace (JRE47: 'same story')."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+["Ninetales (Shadow)".Great.anchors.empoleon_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Empoleon"
+description = "Discover all Empoleon damage breakpoints. Shadow-boosted Weather Ball (Fire) tiers vs Steel are where the conditional win is secured."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"
+
+["Ninetales (Shadow)".Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Shadow atk shifts the neutral Fire tiers against high-bulk normals."
+source = "JRE47 CD Ninetales article (pokemongohub.net, 2026-02-01)"

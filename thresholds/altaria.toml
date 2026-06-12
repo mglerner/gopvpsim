@@ -1,0 +1,207 @@
+# Altaria — Great League thresholds, spreads, and slayer anchors.
+#
+# Sources:
+#   - RyanSwag "Altaria PvP IV Deep-Dive" (GamePress, last updated
+#     2022-10-27). Fetched 2026-06-12 via Wayback Machine snapshot:
+#     https://web.archive.org/web/20230321041348/https://gamepress.gg/pokemongo/altaria-pvp-iv-deep-dive
+#   - SwagTips-era SENTIMENTAL_DEFAULT_THRESHOLDS in gobattlekit
+#     (src/gobattlekit/data/thresholds.py) — its three Altaria GL tiers
+#     (Trev / Bulk+Trev / Bulk) match the writeup's named tables exactly.
+#   - Current-meta opponent selection from
+#     opponent_pools/gl_top50_plus_cs.txt (generated 2026-06-10,
+#     post-June-2026 move rebalance; Altaria is GL meta rank 2).
+#
+# FRESHNESS CAVEAT (same shape as _shared.toml's): the RyanSwag writeup
+# is from the 2022 Trevenant/Lanturn era. Trevenant, Lanturn, Cresselia,
+# Walrein, Whiscash, and Cofagrigus are NOT in the 2026-06-10 pool. The
+# atk/def stat math behind those numbers is stable (it only depends on
+# the opponent's stats and the damage formula), so they are preserved as
+# historical expert anchors; whether those matchups still matter is a
+# meta question, not a math question. The 139-hp mirror logic and the
+# Jumpluff / Umbreon checks remain live — both opponents are in the
+# current pool.
+#
+# The SHADOW form is meta-relevant too and lives in its own file,
+# thresholds/altaria_shadow.toml (deep_dive.py auto-discovery maps
+# "Altaria (Shadow)" -> altaria_shadow.toml, same per-form precedent as
+# aegislash_blade.toml / aegislash_shield.toml).
+
+[Altaria]
+sources = "RyanSwag's Altaria PvP IV Deep-Dive (GamePress 2022-10-27, via Wayback snapshot 2023-03-21, fetched 2026-06-12); SwagTips-era SENTIMENTAL_DEFAULT_THRESHOLDS (gobattlekit); opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+[Altaria.Great.meta]
+notes = "GL meta rank 2 (2026-06). RyanSwag's bottom line: bulk is the name of the game, but slight atk weights (Trev Slayer band) had high tournament utility — NHoff Elite-TM'd a Trev-Slaying IV Altaria to 2nd at Peoria 2023. Re-discover which atk/def steps still flip matchups under the 2026 pool via the Level-3 anchors below."
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — RyanSwag's three named GL tiers (stat-cutoff form, same
+# style as tinkaton.toml's "GH Great"/"GH Good")
+# ─────────────────────────────────────────────────────────────────────
+
+[Altaria.Great.spreads."Trev Slayer"]
+attack = 102.97
+defense = 149.02
+stamina = 139
+description = "RyanSwag's 'Trevenant Slayer' tier: 102.97 atk, 149.02 def + 139 hp. Atk BP for Trevenant 1-2/2-2 plus def bulkpoint for Trevenant 1-1/0-1, both calibrated vs max-def Trevenant, while keeping the 2-2 mirror-tie HP. His general-safety pick; sort by def."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27); mirrored in gobattlekit SENTIMENTAL_DEFAULT_THRESHOLDS 'Trev'"
+
+[Altaria.Great.spreads."Bulk + Trev"]
+attack = 101.95
+defense = 151.63
+stamina = 139
+description = "RyanSwag's 'Bulk + Trevenant maybe' tier: 101.95 atk, 151.63 def + 139 hp. For when you don't want to forgo the bulk life and don't expect high-def Trevenant; the def cutoff also covers the Water Gun Lanturn checks. Tie-breakers: + 140 hp generally better, and 153.95 def more useful than + 141 hp."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27); mirrored in gobattlekit SENTIMENTAL_DEFAULT_THRESHOLDS 'Bulk+Trev'"
+
+[Altaria.Great.spreads."Bulk Focus"]
+attack = 0
+defense = 153.95
+stamina = 139
+description = "RyanSwag's pure-bulk tier: 153.95 def + 139 hp. 139 hp is the golden ticket that ties the 2-2 mirror (and Walrein 2-1); the 139-141 hp checks (Vigoroth 2-2, Venusaur 1-2, Umbreon 1-1) all likely require this def. His verdict: aside from ranks 1, 2 & 7, probably just go for the atk-weighted builds."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27); mirrored in gobattlekit SENTIMENTAL_DEFAULT_THRESHOLDS 'Bulk'"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), current-meta close matchups
+# (opponents from gl_top50_plus_cs.txt 2026-06-10)
+# ─────────────────────────────────────────────────────────────────────
+
+# Jumpluff: in the current pool AND a RyanSwag calibration point. Grass/
+# Flying with Fairy Wind pressure; the fast-move chip war is tight both
+# ways, so single damage steps decide the 1-1 and 0-1.
+[Altaria.Great.anchors.jumpluff_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jumpluff"
+description = "Discover all Jumpluff damage breakpoints. RyanSwag: 102.85 atk flips Jumpluff 1-1 and 0-1 (band starts at 101.69 atk; 102.85 calibrated vs the rank-21 0/15/8 — 22 unorthodox low-HP IVs may require even more)."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27)"
+
+# Shadow Dragonair: post-rebalance pool entry. Dragon Breath war — both
+# sides resist nothing and deal super-effective fast damage, so DB damage
+# tiers decide the matchup. No expert calibration yet; pure discovery.
+[Altaria.Great.anchors.dragonair_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair damage breakpoints. Mutual super-effective Dragon Breath makes every fast-move damage step swing this close matchup; shadow def drop puts extra tiers in reach."
+
+# Lickilicky: top of the 2026-06-10 pool. Close neutral bulk fight —
+# Body Slam chip race where Sky Attack damage steps matter.
+[Altaria.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Close neutral matchup vs the #1 pool entry; a Sky Attack or Dragon Breath damage step is the kind of edge that flips the chip race."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), historical RyanSwag
+# calibration points (NOT in the 2026-06-10 pool; kept so the expert
+# numbers stay verifiable — see FRESHNESS CAVEAT above)
+# ─────────────────────────────────────────────────────────────────────
+
+[Altaria.Great.anchors.trevenant_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Trevenant"
+description = "Discover all Trevenant damage breakpoints. RyanSwag: 102.97 atk secures Trevenant 1-2 and 2-2 (band starts at 101.82 atk; 102.97 calibrated vs max-def Trevenant). Without this BP, Trevenant just needs to land one Shadow Ball to flip and farm. Historical — Trevenant is not in the 2026-06 pool."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27)"
+
+[Altaria.Great.anchors.lanturn_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lanturn"
+description = "Discover all Lanturn damage breakpoints. RyanSwag: 103.31 atk tops the Lanturn band (starts at 101.95 atk) — Spark 1-1 & 2-2 consistency, Water Gun 1-2 consistency (0-0 & 2-2 if Lanturn gets its own atk BP on you). Historical — Lanturn is not in the 2026-06 pool."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27); cross-referenced to his Lanturn deep dive"
+
+[Altaria.Great.anchors.cresselia_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Cresselia"
+description = "Discover all Cresselia damage breakpoints. RyanSwag: 103.40 atk for Moonblast Cresselia 1-1 potential & 2-2 (band starts at 101.48 atk; 103.40 calibrated vs a ~161-def Cresselia). Historical — Cresselia is not in the 2026-06 pool."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27)"
+
+[Altaria.Great.anchors.whiscash_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Whiscash"
+description = "Discover all Whiscash damage breakpoints. RyanSwag: 106.03 atk tops the Whiscash-consistency band (starts at 105.35 atk). He flags these higher atk weights as costing important def and/or hp checks — cup-spice builds only. Historical."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27)"
+
+[Altaria.Great.anchors.cofagrigus_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Cofagrigus"
+description = "Discover all Cofagrigus damage breakpoints. RyanSwag: 107.24 atk flips Cofagrigus 0-0 & 2-2; like the Whiscash weight, it costs important def and/or hp checks. Historical."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all), opponents
+# chosen from gl_top50_plus_cs.txt (2026-06-10) where the type matchup
+# makes def/hp checks plausible and the matchup is close
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. RyanSwag: 139 hp is the golden ticket that ties the 2-2
+# mirror; only the 0/0/15 has enough HP to win it outright. The hp claim
+# is encoded in parsable form on the "Bulk Focus" spread above
+# (153.95 def + 139 hp); this anchor discovers which Dragon Breath /
+# Sky Attack damage tiers the def side of the mirror turns on.
+[Altaria.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all mirror-Altaria bulkpoints (Dragon Breath / Sky Attack incoming tiers). RyanSwag: + 139 hp ties the 2-2 mirror; only the 0/0/15 wins it."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27)"
+
+# Jumpluff: RyanSwag def calibration point, still in the pool.
+[Altaria.Great.anchors.jumpluff_blkp_any]
+kind = "bulkpoint"
+opponent = "Jumpluff"
+description = "Discover all Jumpluff bulkpoints. RyanSwag: 149.61 def opens the Jumpluff 0-0 band (149.61 to 151+); Fairy Wind chip tiers decide the shieldless line."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27)"
+
+# Umbreon: returned to the pool in the 2026-06 rebalance; RyanSwag puts
+# its 1-1 in the premium-bulk band.
+[Altaria.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. RyanSwag: the Umbreon 1-1 sits in the 153.95 def + 139 hp premium-bulk band (hp checks run 139-141); Foul Play / Snarl tiers are what that def buys."
+source = "RyanSwag GamePress Altaria deep dive (2022-10-27)"
+
+# Azumarill: double-weak to Ice Beam, but the matchup is famously close —
+# Bubble chip tiers and the Ice Beam damage step are exactly the def/hp
+# checks bulkpoint discovery exists for.
+[Altaria.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Ice Beam hits 2x super-effective, so a single damage step down is worth multiple Bubble cycles in a razor-thin matchup."
+
+# Lickilicky: close neutral chip race; Body Slam comes constantly, so a
+# Body Slam tier down compounds every cycle.
+[Altaria.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam spam means one incoming damage tier compounds across the whole chip race vs the #1 pool entry."
+
+# Shadow Dragonair: incoming super-effective Dragon Breath, boosted by
+# the shadow atk multiplier — def steps here are worth the most HP of
+# any fast move in the matchup list.
+[Altaria.Great.anchors.dragonair_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair bulkpoints. Shadow-boosted super-effective Dragon Breath makes each def step down the highest-value bulk check in the current pool."
+
+# Galarian Corsola: Astonish chip war vs a wall; Altaria resists nothing
+# relevant, so incoming fast-move tiers decide a slow, close matchup.
+[Altaria.Great.anchors.corsola_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover all G-Corsola bulkpoints. Slow Astonish chip war — an incoming Astonish tier down decides whether Altaria out-paces the wall."
+
+# Medicham: Altaria resists Counter, so the matchup hinges on Ice Punch —
+# a super-effective nuke whose damage tier a bulk Altaria can step down.
+[Altaria.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Counter is double-resisted; Ice Punch is the super-effective threat whose damage tier def investment can blunt."
+
+# Shelgon: rebalance newcomer; another mutual super-effective Dragon
+# Breath fight where incoming DB tiers decide it.
+[Altaria.Great.anchors.shelgon_blkp_any]
+kind = "bulkpoint"
+opponent = "Shelgon"
+description = "Discover all Shelgon bulkpoints. Mutual super-effective Dragon Breath vs a bulk dragon new to the 2026-06 pool; incoming DB tiers set the pace."
+
+# Shadow Sableye: shadow-boosted Shadow Claw chip in a close neutral
+# fight; def steps against the fast move matter most.
+[Altaria.Great.anchors.sableye_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye (Shadow)"
+description = "Discover all Shadow Sableye bulkpoints. Shadow-boosted Shadow Claw chip in a close neutral matchup; fast-move def steps carry the value."

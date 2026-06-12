@@ -1,0 +1,159 @@
+# Lickilicky — Great League thresholds and slayer anchors.
+#
+# Sources:
+#   - Simulator-derived. No known expert (acidicArisen / RyanSwag-style)
+#     IV writeup exists for post-rebalance Lickilicky; anchors below are
+#     designed from current-meta matchup logic against the 2026-06-10
+#     opponent pool (opponent_pools/gl_top50_plus_cs.txt).
+#   - PvPoke GL rankings, post-June-2026 move rebalance (the rebalance
+#     that buffed Rollout and pushed Lickilicky to overall rank 1).
+#     Ranked moveset: ROLLOUT / BODY_SLAM / SHADOW_BALL. Matchup ratings
+#     cited in descriptions are PvPoke key-matchup numbers from that pull.
+#
+# Design intent: Lickilicky is the GL meta's premier Normal-type tank
+# (base 161/181/242). Its game plan is fast-move chip (Rollout) plus
+# Body Slam spam behind enormous bulk, so the def-side bulkpoint ladder
+# is the primary axis — most of its knife-edge matchups (Tinkaton 478,
+# Ninetales (Shadow) 496, Forretress (Shadow) 503, Feraligatr 515) are
+# decided by whether the opponent's chip damage steps down by 1. The
+# atk-side breakpoints that matter are the super-effective Rollout
+# matchups (Altaria, Ninetales) and the mirror.
+#
+# Anchors are Level-3 discover-all style (tinkaton.toml model): no
+# expert-calibrated (move, tier) pairs exist yet, so we enumerate every
+# breakpoint/bulkpoint per opponent and promote the ones the deep-dive
+# distribution shows actually matter.
+
+[Lickilicky]
+sources = "Simulator-derived: PvPoke GL rankings + key-matchup ratings, post-June-2026 rebalance (2026-06-10 pull); opponent pool opponent_pools/gl_top50_plus_cs.txt; no expert writeup exists for this species"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, the primary axis for a tank)
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Rank-1 GL species means the mirror is the single most
+# common matchup; a bulk-off decided by Rollout chip tiers and Body Slam
+# damage. Whoever drops the opponent's Rollout or Body Slam by 1 wins
+# the war of attrition.
+[Lickilicky.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all mirror-Lickilicky bulkpoints (Rollout chip and Body Slam tiers). The mirror is a pure attrition war — a single damage-tier drop on either move decides it."
+source = "Simulator-derived: mirror analysis for the GL rank-1 species (PvPoke 2026-06-10 pull)"
+
+# Tinkaton — Lickilicky's closest loss (rating 478). Fairy Wind chip
+# plus Gigaton Hammer nukes; both sides resist the other's STAB only
+# partially (Tinkaton's steel resists Rollout/Body Slam, so this is won
+# or lost on how much of Tinkaton's output Lickilicky can blunt).
+[Lickilicky.Great.anchors.tinkaton_blkp_any]
+kind = "bulkpoint"
+opponent = "Tinkaton"
+description = "Discover all Tinkaton bulkpoints (Fairy Wind chip, Gigaton Hammer). Closest current loss (478) — shaving Fairy Wind or a Gigaton Hammer tier is the most plausible def-side flip in the meta."
+source = "Simulator-derived: PvPoke key-matchup rating 478 (2026-06-10 pull)"
+
+# Ninetales (Shadow) — knife-edge loss (rating 496). Ember chip plus
+# Weather Ball (Fire); shadow attack boost makes its damage tiers sit
+# right on the edge for a bulky focal.
+[Lickilicky.Great.anchors.ninetales_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Ninetales (Shadow)"
+description = "Discover all Shadow Ninetales bulkpoints (Ember chip, Weather Ball Fire). Knife-edge loss (496) — one Weather Ball or Ember tier down likely flips it."
+source = "Simulator-derived: PvPoke key-matchup rating 496 (2026-06-10 pull)"
+
+# Forretress (Shadow) — knife-edge win (rating 503). Volt Switch chip
+# plus cheap Sand Tomb / Rock Tomb debuffs; securing the win across IV
+# variance means holding the Volt Switch damage tier down.
+[Lickilicky.Great.anchors.forretress_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Forretress (Shadow)"
+description = "Discover all Shadow Forretress bulkpoints (Volt Switch chip, Sand Tomb / Rock Tomb). Narrowest current win (503) — bulkpoints here are about keeping the win secure against high-atk shadow IVs."
+source = "Simulator-derived: PvPoke key-matchup rating 503 (2026-06-10 pull)"
+
+# Feraligatr — close win (rating 515). Its Shadow Claw is double-resisted
+# by Normal, so the matchup hinges entirely on Hydro Cannon / Ice Beam
+# damage tiers — exactly the kind of nuke-tier check bulkpoints encode.
+[Lickilicky.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Shadow Claw is double-resisted, so the close win (515) rides on Hydro Cannon / Ice Beam damage tiers."
+source = "Simulator-derived: PvPoke key-matchup rating 515 (2026-06-10 pull)"
+
+# Altaria — flagship win (rating 631) driven by super-effective Rollout,
+# but in even-shield scenarios Dragon Breath chip plus a Sky Attack can
+# steal it. Bulkpoints quantify how safe the win is per IV.
+[Lickilicky.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints (Dragon Breath chip, Sky Attack). The win (631) comes from SE Rollout; def tiers determine how bait-proof it is in even-shield play."
+source = "Simulator-derived: PvPoke key-matchup rating 631 (2026-06-10 pull)"
+
+# Azumarill — the meta's other archetypal bulk pivot. Bubble chip plus
+# Ice Beam / Play Rough, all neutral both ways: a long fast-move war
+# where a single Bubble damage tier compounds over many turns.
+[Lickilicky.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints (Bubble chip, Ice Beam / Play Rough). Mutual-neutral bulk war — a Bubble tier drop compounds heavily over the long matchup."
+source = "Simulator-derived: archetypal GL bulk-pivot matchup (PvPoke 2026-06-10 pull)"
+
+# Umbreon — the other great attrition wall. Snarl chip and Foul Play,
+# neutral both ways; like the mirror, decided by who blunts the other's
+# fast-move damage first.
+[Lickilicky.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints (Snarl chip, Foul Play). Pure attrition matchup between the meta's two biggest walls; fast-move tiers dominate."
+source = "Simulator-derived: rebalance re-entrant wall matchup (PvPoke 2026-06-10 pull)"
+
+# Greedent — the other GL Normal tank; a pseudo-mirror Body Slam war
+# with Mud Shot chip. Body Slam tier checks both ways decide it.
+[Lickilicky.Great.anchors.greedent_blkp_any]
+kind = "bulkpoint"
+opponent = "Greedent"
+description = "Discover all Greedent bulkpoints (Mud Shot chip, Body Slam). Pseudo-mirror Normal tank war — dropping its Body Slam a tier swings the attrition race."
+source = "Simulator-derived: pseudo-mirror Normal-tank matchup (PvPoke 2026-06-10 pull)"
+
+# Lapras — bulky water/ice with Psywave chip and Sparkling Aria / Ice
+# Beam, all neutral vs Normal. Another long fast-move war where chip
+# tiers decide the race.
+[Lickilicky.Great.anchors.lapras_blkp_any]
+kind = "bulkpoint"
+opponent = "Lapras"
+description = "Discover all Lapras bulkpoints (Psywave chip, Sparkling Aria / Ice Beam). Neutral tank-vs-tank race; Psywave's high fast-move frequency makes its chip tier unusually valuable to shave."
+source = "Simulator-derived: bulky-water attrition matchup (PvPoke 2026-06-10 pull)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, the SE-Rollout matchups
+# plus the mirror)
+# ─────────────────────────────────────────────────────────────────────
+
+# Altaria: rock Rollout is super-effective on the GL #2 — the defining
+# matchup of the post-rebalance meta. SE fast-move chip means Rollout
+# breakpoints are worth disproportionate matchup equity here.
+[Lickilicky.Great.anchors.altaria_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria"
+moves = ["ROLLOUT"]
+description = "Discover all super-effective Rollout damage breakpoints vs Altaria, the meta's #2. SE chip tiers vs the rank-1 Altaria decide how decisively the flagship matchup is won."
+source = "Simulator-derived: GL #1 vs #2 matchup logic (PvPoke 2026-06-10 pull)"
+
+# Ninetales (Shadow): the closest atk-side-flippable loss (rating 496).
+# Rollout is super-effective on Fire; one Rollout tier up is the most
+# plausible breakpoint flip in Lickilicky's loss column.
+[Lickilicky.Great.anchors.ninetales_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Ninetales (Shadow)"
+moves = ["ROLLOUT"]
+description = "Discover all SE Rollout damage breakpoints vs Shadow Ninetales. Knife-edge loss (496); a Rollout tier up is the most plausible atk-side flip in the loss column."
+source = "Simulator-derived: PvPoke key-matchup rating 496 (2026-06-10 pull)"
+
+# The mirror, atk-side: complements mirror_blkp_any above. Which Rollout
+# / Body Slam breakpoints exist in the survivor atk range tells us
+# whether a high-atk mirror-slayer build is even on the table for this
+# species, or whether the mirror is purely a bulk race.
+[Lickilicky.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+moves = ["ROLLOUT", "BODY_SLAM"]
+description = "Discover all Rollout / Body Slam damage breakpoints vs the rank-1 mirror. Determines whether a mirror-slayer atk build exists or the mirror is decided purely on the bulk ladder."
+source = "Simulator-derived: mirror analysis for the GL rank-1 species (PvPoke 2026-06-10 pull)"

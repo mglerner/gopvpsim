@@ -1,0 +1,161 @@
+# Furret — Great League thresholds and slayer anchors.
+#
+# Status: SIMULATOR-DERIVED. No known expert writeup exists for GL Furret.
+# It entered the meta in the post-June-2026 move rebalance (one of the
+# "in" species in the 2026-06-10 gl_top50_plus_cs pool regeneration) and
+# currently sits at PvPoke GL overall rank 38. All anchors below are
+# Level 3 discover-all by design: with a freshly rebalanced moveset and
+# no community calibration points, we let the deep dive enumerate every
+# (move, tier) threshold and promote the matchup-flipping ones to
+# Level 1 anchors with provenance later.
+#
+# Typing/moveset logic used to pick opponents (Furret is pure Normal,
+# running Sucker Punch chip with Trailblaze + Fighting coverage + Swift):
+#   - Pure Normal: weak only to Fighting, immune to Ghost. Most of the
+#     pool hits Furret neutrally, so its close fights are long fast-move
+#     grinds where single damage tiers compound — prime bulkpoint
+#     territory (Lickilicky, Greedent, Diggersby, Umbreon, the mirror).
+#   - Trailblaze (Grass) makes the bulky Water/Ground core (Azumarill,
+#     Quagsire, Lapras, Dewgong) close rather than lost — surviving one
+#     more fast-move tier from them while farming to Trailblaze is the
+#     plausible flip in those lines.
+#   - Wigglytuff's Charm hits in huge discrete chunks; shaving one Charm
+#     tier is worth more effective HP than any other single check here.
+# Opponent spellings are exact PvPoke speciesNames from
+# opponent_pools/gl_top50_plus_cs.txt (2026-06-10).
+
+[Furret]
+sources = "Simulator-derived (no expert writeup). Anchor set designed 2026-06-12 from current-meta type-matchup logic against opponent_pools/gl_top50_plus_cs.txt (2026-06-10 pool, post-June-2026 rebalance); Furret PvPoke GL overall rank 38."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Furret is a new meta entrant, so no community spread exists
+# yet — discover the full mirror bulkpoint ladder first.
+[Furret.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Furret"
+description = "Discover every mirror-Furret bulkpoint in the survivor def range. No community spread exists for this new meta entrant; the mirror's Sucker Punch chip ladder is the starting point for any future bulk calibration."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lickilicky: the pool's #1. Neutral Normal-vs-Normal grind, but Furret's
+# Fighting coverage is super-effective — every Body Slam tier Furret
+# shaves buys time to land it.
+[Furret.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Long neutral Normal-vs-Normal grind against the pool's top-ranked species; Body Slam tiers compound, and Furret's super-effective Fighting coverage makes the close lines winnable."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Greedent: the other bulky Normal rodent — a near-mirror grind with no
+# resistances either way, decided almost entirely by chip tiers.
+[Furret.Great.anchors.greedent_blkp_any]
+kind = "bulkpoint"
+opponent = "Greedent"
+description = "Discover all Greedent bulkpoints. Near-mirror Normal-vs-Normal grind with no resistances either way; fast-move and Body Slam tiers are the whole matchup."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Diggersby: Normal/Ground — Trailblaze is super-effective, but Mud Shot
+# chip arrives fast and often; a single Mud Shot tier compounds over the
+# many hits Furret absorbs while farming to Trailblaze.
+[Furret.Great.anchors.diggersby_blkp_any]
+kind = "bulkpoint"
+opponent = "Diggersby"
+description = "Discover all Diggersby bulkpoints. Trailblaze is super-effective but Mud Shot's high cadence means one chip tier compounds heavily over the fight; the def check decides whether Furret reaches its Grass closer intact."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Umbreon: resists Sucker Punch, so Furret leans on super-effective
+# Fighting coverage while eating Snarl/Foul Play — a very long grind
+# where each incoming tier matters twice over.
+[Furret.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Umbreon resists Sucker Punch so the fight runs extra long; shaving a Snarl or Foul Play tier banks HP across the many hits before Furret's super-effective Fighting coverage lands."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Azumarill: Trailblaze is super-effective, Azumarill's damage is all
+# neutral — the classic close 1-shield where surviving one more Bubble
+# (or an Ice Beam tier) flips the line.
+[Furret.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Super-effective Trailblaze makes this close; Bubble chip and Ice Beam tiers on the incoming side decide whether Furret survives to land the second Grass move."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Quagsire: Trailblaze is double super-effective, so the matchup is
+# Furret-favored on paper — the bulk check is whether Mud Shot + Stone
+# Edge tiers can steal back the 0-shield/energy-disadvantage lines.
+[Furret.Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire bulkpoints. Double super-effective Trailblaze should win, but Mud Shot chip and a Stone Edge tier can steal the shields-down lines; the def ladder shows which tiers secure them."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lapras: Water/Ice — both of Furret's coverage moves are super-effective,
+# but Ice Shard chip plus big charged hits keep the race close.
+[Furret.Great.anchors.lapras_blkp_any]
+kind = "bulkpoint"
+opponent = "Lapras"
+description = "Discover all Lapras bulkpoints. Both Trailblaze and the Fighting move hit super-effectively, but Ice Shard chip and Lapras's heavy charged moves keep it close; an incoming tier shaved is the plausible flip."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Dewgong: same Water/Ice logic as Lapras but with Icy Wind's debuff —
+# surviving one extra Ice Shard tier preserves the win before the
+# attack drops stack up.
+[Furret.Great.anchors.dewgong_blkp_any]
+kind = "bulkpoint"
+opponent = "Dewgong"
+description = "Discover all Dewgong bulkpoints. Double-coverage matchup like Lapras, but Icy Wind's attack debuffs punish long fights; an Ice Shard tier shaved shortens the window where the debuffs decide it."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Wigglytuff: Charm hits in huge discrete chunks — reducing Charm's
+# per-hit damage by one tier is worth more effective HP here than any
+# other single def check in the pool.
+[Furret.Great.anchors.wigglytuff_blkp_any]
+kind = "bulkpoint"
+opponent = "Wigglytuff"
+description = "Discover all Wigglytuff bulkpoints. Charm's large per-hit damage makes each tier unusually valuable; one Charm tier shaved is the biggest single effective-HP swing available to Furret's def stat."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# No `moves` filter on any of these: Furret's moveset was touched in the
+# June-2026 rebalance and we don't want a stale move name silently
+# constraining the scan. Let the discover-all output show which focal
+# moves carry meaningful breakpoints.
+# ─────────────────────────────────────────────────────────────────────
+
+# Umbreon: Sucker Punch is resisted and Umbreon's defense is high, so
+# breakpoints are scarce — and therefore decisive in the long grind.
+[Furret.Great.anchors.umbreon_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon damage breakpoints in the survivor atk range. Resisted Sucker Punch against high defense makes tiers scarce; finding one materially shortens the longest grind in Furret's close-matchup set."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lickilicky: the long neutral grind — over that many fast moves, a
+# single Sucker Punch tier compounds into a full extra charge move.
+[Furret.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. Over the long Normal-vs-Normal grind a single Sucker Punch tier compounds into an extra charge move's worth of damage; super-effective Fighting tiers stack on top."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Azumarill: high-defense target where the super-effective Trailblaze
+# tier is the swing — one more damage per Trailblaze plausibly converts
+# the 1-shield from close-loss to close-win.
+[Furret.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. Against Azumarill's high defense, a super-effective Trailblaze tier is the plausible swing that converts the 1-shield line."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# The mirror: CMP-adjacent — in a chip war between identical species,
+# the first Sucker Punch tier found decides who wins the race.
+[Furret.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Furret"
+description = "Discover all mirror-Furret damage breakpoints. In the identical-species chip war a single Sucker Punch tier decides the race; pairs with the mirror bulkpoint ladder for full mirror calibration."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"

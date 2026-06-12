@@ -1,0 +1,159 @@
+# Fearow — Great League thresholds and slayer anchors.
+#
+# Status: SIMULATOR-DERIVED. No known expert writeup exists for GL Fearow.
+# It entered the meta in the post-June-2026 move rebalance (one of the
+# "in" species in the 2026-06-10 gl_top50_plus_cs pool regeneration) and
+# currently sits at PvPoke GL overall rank 22. All anchors below are
+# Level 3 discover-all by design: with a freshly rebalanced moveset and
+# no community calibration points, we let the deep dive enumerate every
+# (move, tier) threshold and promote the matchup-flipping ones to
+# Level 1 anchors with provenance later.
+#
+# Typing logic used to pick opponents (Fearow is Normal/Flying):
+#   - Double-resists Grass and Bug; resists Fighting; immune to Ghost
+#     and Ground. This makes fighters (Medicham, Annihilape, Primeape)
+#     and grassy fliers (Jumpluff) close, def/hp-check-driven matchups.
+#   - Weak to Electric, Ice, and Rock — Ice coverage moves (Azumarill's
+#     Ice Beam, Medicham's Ice Punch) are the threat moves whose damage
+#     tiers most plausibly decide otherwise-close fights.
+#   - Neutral flier-vs-flier grinds (Talonflame, Pelipper, the mirror)
+#     and Normal-vs-Normal grinds (Lickilicky, Furret) are long fast-move
+#     wars where single damage tiers swing the outcome.
+# Opponent spellings are exact PvPoke speciesNames from
+# opponent_pools/gl_top50_plus_cs.txt (2026-06-10).
+
+[Fearow]
+sources = "Simulator-derived (no expert writeup). Anchor set designed 2026-06-12 from current-meta type-matchup logic against opponent_pools/gl_top50_plus_cs.txt (2026-06-10 pool, post-June-2026 rebalance); Fearow PvPoke GL overall rank 22."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Fearow is a new meta entrant, so no community spread exists
+# yet — discover the full mirror bulkpoint ladder first.
+[Fearow.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Fearow"
+description = "Discover every mirror-Fearow bulkpoint in the survivor def range. No community spread exists for this new meta entrant; the mirror ladder is the starting point for any future bulk calibration."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Medicham: Fearow resists Counter (Flying) but is weak to Ice Punch.
+# A close fight that hinges on shaving the resisted-Counter chip and the
+# super-effective Ice Punch tier.
+[Fearow.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Fearow resists Counter but Ice Punch is super-effective; shaving one tier off either plausibly flips the 1-shield."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Annihilape: resisted Counter, Ghost charge moves blanked by Fearow's
+# Normal typing — the fight comes down to how little resisted fast damage
+# Fearow takes while it farms.
+[Fearow.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. Counter is resisted and Rage Fist/Shadow Ball are blanked by Normal; the Counter damage tier sets how much HP Fearow banks for the rest of the fight."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Primeape: rebalance returnee, same resisted-Fighting fast pressure as
+# Annihilape but with neutral Dark coverage (Night Slash), so the def
+# checks differ from the Annihilape ladder.
+[Fearow.Great.anchors.primeape_blkp_any]
+kind = "bulkpoint"
+opponent = "Primeape"
+description = "Discover all Primeape bulkpoints. Resisted Fighting fast pressure like Annihilape, but neutral Dark coverage keeps the matchup closer — a separate ladder from the Annihilape one."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Azumarill: neutral fast pressure both ways, but Ice Beam is
+# super-effective — the classic "survive the coverage move" def/hp check.
+[Fearow.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Neutral fast-move trade, but super-effective Ice Beam tiers are the plausible swing in the 1-shield lines."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Jumpluff: Fearow double-resists its Grass damage and hits back
+# super-effectively with Flying, but Fairy Wind chip plus neutral Flying
+# coverage keeps the lead matchup closer than typing alone suggests.
+[Fearow.Great.anchors.jumpluff_blkp_any]
+kind = "bulkpoint"
+opponent = "Jumpluff"
+description = "Discover all Jumpluff bulkpoints. Grass damage is double-resisted; the Fairy Wind chip tier and neutral Flying coverage decide how cleanly Fearow wins the flier lead."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Talonflame: neutral flier-vs-flier; Incinerate hits in big discrete
+# chunks, so a single Incinerate tier is worth a lot of effective HP.
+[Fearow.Great.anchors.talonflame_blkp_any]
+kind = "bulkpoint"
+opponent = "Talonflame"
+description = "Discover all Talonflame bulkpoints. Neutral flier war where Incinerate's large per-hit damage makes each tier unusually valuable."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Pelipper: another neutral flier grind — Wing Attack chip and Weather
+# Ball pressure, with no super-effective damage either way.
+[Fearow.Great.anchors.pelipper_blkp_any]
+kind = "bulkpoint"
+opponent = "Pelipper"
+description = "Discover all Pelipper bulkpoints. Fully neutral flier-vs-flier grind; Wing Attack and Weather Ball tiers govern the close energy race."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lickilicky: the pool's #1. Normal-vs-Normal with no resistances either
+# way — a long Body Slam war where def tiers compound over many hits.
+[Fearow.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Neutral Normal-vs-Normal grind against the pool's top-ranked species; Body Slam tiers compound over a long fight."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Furret: fellow rebalance newcomer; its Fighting coverage is resisted
+# and its Grass coverage double-resisted, so the matchup reduces to a
+# neutral fast-move war Fearow can win on bulk tiers.
+[Fearow.Great.anchors.furret_blkp_any]
+kind = "bulkpoint"
+opponent = "Furret"
+description = "Discover all Furret bulkpoints. Furret's Fighting coverage is resisted and Grass coverage double-resisted, leaving a neutral fast-move war decided by chip tiers."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# No `moves` filter on any of these: Fearow's moveset was touched in the
+# June-2026 rebalance and we don't want a stale move name silently
+# constraining the scan. Let the discover-all output show which focal
+# moves carry meaningful breakpoints.
+# ─────────────────────────────────────────────────────────────────────
+
+# Medicham: the def-side ladder above shaves Ice Punch; the atk-side
+# question is whether an extra fast/charged tier closes out the 1-shield
+# before Ice Punch lands.
+[Fearow.Great.anchors.medicham_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+description = "Discover all Medicham damage breakpoints in the survivor atk range. An extra tier against Medicham's modest defense plausibly closes the 1-shield before Ice Punch connects."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Azumarill: high-defense target where breakpoints are scarce and
+# therefore decisive — neutral damage both ways makes the 2-shield hinge
+# on whoever finds a tier.
+[Fearow.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. Against Azumarill's high defense, tiers are scarce and each one materially shifts the neutral 2-shield race."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lickilicky: the long neutral grind — over that many fast moves, a
+# single fast-move tier compounds into a full extra charge move.
+[Fearow.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. In the long Normal-vs-Normal grind a single fast-move tier compounds into a full extra charge move's worth of damage."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Jumpluff: super-effective Flying damage means Fearow's breakpoints come
+# thick here — finding the tier that converts the lead matchup from
+# close-win to clean-win is the goal.
+[Fearow.Great.anchors.jumpluff_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Jumpluff"
+description = "Discover all Jumpluff damage breakpoints. Super-effective Flying damage stacks tiers densely; identify the one that converts the flier lead from close-win to clean-win."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"

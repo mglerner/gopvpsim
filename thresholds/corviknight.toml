@@ -1,0 +1,190 @@
+# Corviknight — Great League thresholds, spreads, and slayer anchors.
+#
+# Current GL meta rank 21 (PvPoke, post-June-2026 rebalance). Steel/Flying:
+# resists Fighting, Fairy, Normal, Grass; the def/hp checks below target the
+# bulky neutral-damage core (ghost-, water-, dark-, and rock-pressure mons)
+# where one damage tier plausibly swings a close 1v1.
+#
+# Sources:
+#   - HomeSliceHenry's Discord #iv-tech stat checks for GL Corviknight, as
+#     shipped in GoBattleKit DEFAULT_THRESHOLDS (gobattlekit
+#     src/gobattlekit/data/thresholds.py): Basic 127.59 def; Atk 111.47 atk
+#     + 127.59 def; Bulk 100 atk / 132.10 def / 149 hp. The underlying
+#     Discord writeup is not web-fetchable (2026-06-12 attempt); the exact
+#     (opponent, move, tier) calibrations behind each number were not
+#     recorded, so they are encoded as Level-2 anchors with Level-3
+#     discovery alongside (annihilape.toml lurgan-floor precedent).
+#   - SwagTips-era per-opponent checks preserved in GoBattleKit
+#     SENTIMENTAL_DEFAULT_THRESHOLDS (same file): Anni 134.61 def,
+#     G-Cors 130.34 def, Azu 108.75 atk, Dig 110 atk, among others.
+#     Opponents no longer in the current pool (Carbink 130.7 def,
+#     Cresselia 134.55 def, Mandibuzz 132.17 def, Drapion 111.4 atk,
+#     Toxapex 112.54 atk, "S-ASlash" 124 atk) are noted here for the
+#     record but not encoded as anchors.
+
+[Corviknight]
+sources = "HomeSliceHenry's Discord #iv-tech (via GoBattleKit DEFAULT_THRESHOLDS); SwagTips-era checks (via GoBattleKit SENTIMENTAL_DEFAULT_THRESHOLDS)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — stat-cutoff tiers from the HomeSliceHenry writeup
+# ─────────────────────────────────────────────────────────────────────
+
+[Corviknight.Great.spreads."HSH Basic"]
+attack = 0
+defense = 127.59
+stamina = 0
+description = "Baseline tier: 127.59 def floor; the entry-level def check from the HomeSliceHenry writeup."
+source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
+
+[Corviknight.Great.spreads."HSH Atk"]
+attack = 111.47
+defense = 127.59
+stamina = 0
+description = "Attack-weighted tier: 111.47 atk on top of the 127.59 def floor; trades rank-1 bulk for breakpoint/CMP pressure."
+source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
+
+[Corviknight.Great.spreads."HSH Bulk"]
+attack = 100
+defense = 132.10
+stamina = 149
+description = "Premium bulk tier: 100.00 atk minimum with 132.10 def + 149 hp."
+source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side), expert Level-2 floors
+#
+# The HomeSliceHenry def floors arrived without their (opponent, move,
+# tier) calibrations. Following the annihilape.toml lurgan-floor
+# precedent, each is encoded as a Level-2 anchor against the mirror,
+# with the Level-3 discover-all anchors below used to identify which
+# opponent/move tier each floor actually preserves — promote to
+# Level 1 once identified.
+# ─────────────────────────────────────────────────────────────────────
+
+[Corviknight.Great.anchors.mirror_blkp_above_hsh_basic]
+kind = "bulkpoint"
+opponent = "Corviknight"
+above_def = 127.59
+description = "Smallest def > 127.59 def (the HomeSliceHenry Basic floor) at which a mirror threat move's damage steps down. Exact original (opponent, move, tier) calibration undocumented — see Level-3 anchors to identify it."
+source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
+
+[Corviknight.Great.anchors.mirror_blkp_above_hsh_bulk]
+kind = "bulkpoint"
+opponent = "Corviknight"
+above_def = 132.10
+description = "Smallest def > 132.10 def (the HomeSliceHenry Bulk-tier floor, paired with + 149 hp in the writeup) at which a mirror threat move's damage steps down. Exact original calibration undocumented."
+source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
+
+[Corviknight.Great.anchors.annihilape_blkp_above_swag]
+kind = "bulkpoint"
+opponent = "Annihilape"
+above_def = 134.61
+description = "Smallest def > 134.61 def at which an Annihilape threat move's damage steps down. Reproduces the SwagTips-era 'Anni (135D)' check; Corviknight resists Counter, so the tier is presumably on Rage Fist or Shadow Ball."
+source = "SwagTips era (via GoBattleKit SENTIMENTAL_DEFAULT_THRESHOLDS)"
+
+[Corviknight.Great.anchors.corsola_galarian_blkp_above_swag]
+kind = "bulkpoint"
+opponent = "Corsola (Galarian)"
+above_def = 130.34
+description = "Smallest def > 130.34 def at which a G-Corsola threat move's damage steps down. Reproduces the SwagTips-era 'G-Cors (130D)' check (Astonish/Night Shade pressure is neutral on Corviknight)."
+source = "SwagTips era (via GoBattleKit SENTIMENTAL_DEFAULT_THRESHOLDS)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side), Level-3 discover-all
+#
+# Opponents picked from opponent_pools/gl_top50_plus_cs.txt where the
+# type matchup makes a def/hp tier plausibly decisive: neutral ghost /
+# dark / water / rock pressure into Corviknight's bulky resist profile,
+# in matchups close enough that one damage tier can swing them.
+# ─────────────────────────────────────────────────────────────────────
+
+[Corviknight.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Corviknight"
+description = "Discover and tag every mirror-Corviknight bulkpoint in the survivor def range. Also the discovery pool for the two HomeSliceHenry def floors above."
+
+[Corviknight.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover all Annihilape bulkpoints. Counter is resisted, so Rage Fist / Shadow Ball tiers decide a close matchup; discovery pool for the 134.61 def SwagTips check."
+source = "SwagTips era (via GoBattleKit SENTIMENTAL_DEFAULT_THRESHOLDS)"
+
+[Corviknight.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Play Rough is resisted; neutral Bubble / Ice Beam / Hydro Pump tiers matter in a long bulky 1v1."
+
+[Corviknight.Great.anchors.corsola_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Corsola (Galarian)"
+description = "Discover all G-Corsola bulkpoints. Neutral ghost fast pressure plus Power Gem; discovery pool for the 130.34 def SwagTips check."
+source = "SwagTips era (via GoBattleKit SENTIMENTAL_DEFAULT_THRESHOLDS)"
+
+[Corviknight.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam is resisted but Lick is neutral; fast-move tiers add up in the long bulk-off."
+
+[Corviknight.Great.anchors.tinkaton_blkp_any]
+kind = "bulkpoint"
+opponent = "Tinkaton"
+description = "Discover all Tinkaton bulkpoints (the reciprocal of tinkaton.toml's corviknight_blkp_any). Fairy Wind and Gigaton Hammer are resisted; Thunderbolt is super-effective and its tier can decide the steel-off."
+
+[Corviknight.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Counter is double-resisted; neutral Psychic / Ice Punch tiers control how comfortably Corviknight farms the matchup."
+
+[Corviknight.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Fully neutral Hex / Shadow Ball / Surf pressure in one of Corviknight's closest bulky-core matchups."
+
+[Corviknight.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Neutral Snarl / Foul Play chip in a long switch-war matchup where one fast-move tier compounds."
+
+[Corviknight.Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire bulkpoints (GL #1 cohort). Mud Shot is resisted; Stone Edge / Aqua Tail tiers decide the close neutral 1v1."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side)
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 2: the HomeSliceHenry Atk-tier floor. Calibration opponent
+# undocumented; numerically adjacent to the SwagTips-era 111.4-atk
+# Drapion check (Drapion left the pool in the June-2026 rebalance), so
+# mirror discovery is used per the annihilape.toml precedent.
+[Corviknight.Great.anchors.mirror_brkp_above_hsh_atk]
+kind = "damage_breakpoint"
+opponent = "Corviknight"
+above_atk = 111.47
+description = "Smallest atk > 111.47 atk (the HomeSliceHenry Atk-tier floor) at which a focal move's damage to the default mirror steps up. Exact original calibration opponent undocumented."
+source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
+
+# Level 2: SwagTips-era Azumarill breakpoint.
+[Corviknight.Great.anchors.azumarill_brkp_above_swag]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+above_atk = 108.75
+description = "Smallest atk > 108.75 atk at which a focal move's damage to default Azumarill steps up. Reproduces the SwagTips-era 'Azu (109A)' check in a close bulky 1v1."
+source = "SwagTips era (via GoBattleKit SENTIMENTAL_DEFAULT_THRESHOLDS)"
+
+# Level 2: SwagTips-era Diggersby breakpoint. Corviknight resists both
+# of Diggersby's fast moves, so the focal damage tier sets the pace.
+[Corviknight.Great.anchors.diggersby_brkp_above_swag]
+kind = "damage_breakpoint"
+opponent = "Diggersby"
+above_atk = 110.00
+description = "Smallest atk > 110.00 atk at which a focal move's damage to default Diggersby steps up. Reproduces the SwagTips-era 'Dig (110A)' check."
+source = "SwagTips era (via GoBattleKit SENTIMENTAL_DEFAULT_THRESHOLDS)"
+
+# Level 3: discover all mirror breakpoints — atk-side complement of
+# mirror_blkp_any, and the discovery pool for the 111.47 floor above.
+[Corviknight.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Corviknight"
+description = "Discover and tag every damage breakpoint against the default mirror Corviknight in the survivor atk range."

@@ -1,0 +1,148 @@
+# Lapras — Great League thresholds and slayer anchors.
+#
+# Sources:
+#   - NO KNOWN EXPERT WRITEUP. This species ships simulator-derived:
+#     every anchor below is a Level-3 discovery anchor designed from
+#     current-meta matchup logic, to be resolved against the current
+#     gamemaster by the deep-dive pipeline. No community spread or
+#     expert stat number is encoded; when the dive surfaces the tiers
+#     that matter, promote them to Level-1 anchors with provenance.
+#   - Current GL meta context: Lapras is meta rank 39 in the
+#     post-June-2026 rebalance pool (opponent_pools/gl_top50_plus_cs.txt,
+#     generated 2026-06-10). All opponent spellings below are exact
+#     speciesName entries from that pool file.
+#
+# Typing logic behind the opponent choices (Water/Ice, 165/174/277):
+# double-resists Ice, resists Water; weak to Fighting, Rock, Grass,
+# Electric; Fire and Steel net out neutral. Lapras's GL identity is a
+# bulky chip-war body whose ice damage punishes Dragons and Flyers, so
+# the def-side checks concentrate on the close neutral grinds (Normal,
+# Dark, Ghost, fellow Water bodies) and the atk-side checks on the
+# resisted/neutral races where one damage tier swings a long matchup.
+# No shadow Lapras and no alternate form exist, so one file.
+# Great League only.
+
+[Lapras]
+sources = "Simulator-derived (no expert writeup): Level-3 discovery anchors designed 2026-06-12 from current-meta matchup logic against the GL top-50-plus-CS pool (opponent_pools/gl_top50_plus_cs.txt, 2026-06-10), where Lapras sits at meta rank 39"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side), current-pool opponents
+#
+# Level-3 discover-all anchors against pool opponents where Lapras's
+# typing and stat shape make the matchup close and a def/hp check
+# plausibly flips it. Simulator-derived; descriptions cite the matchup
+# logic, the dive supplies the numbers.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror (required anchor). Ice is double-resisted both ways, so the
+# mirror collapses into a very long neutral fast-move and charged-move
+# grind on a 277-HP body — exactly the regime where a single incoming
+# damage tier, paid dozens of times, decides the race.
+[Lapras.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Lapras"
+description = "Discover all mirror-Lapras bulkpoints. Ice double-resisted both ways turns the mirror into a long neutral chip war; one incoming fast-move tier over many turns decides it. Simulator-derived (2026-06-10 pool)."
+
+# Azumarill: Bubble is resisted, Play Rough and Ice Beam land neutral.
+# Two bulk monsters trading small numbers — the classic bulkpoint
+# matchup, where shaving one point off the charged or fast tier flips
+# late-game endlines.
+[Lapras.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Bubble resisted, Play Rough/Ice Beam neutral; two premier bulk bodies trading small numbers, so a one-point tier drop swings the endline. Simulator-derived (2026-06-10 pool)."
+
+# Feraligatr: Hydro Cannon is resisted but Shadow Claw chips neutrally
+# at high frequency. Per-tick fast-move tiers paid over a long matchup
+# are where def checks bite hardest.
+[Lapras.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Hydro Cannon resisted, neutral Shadow Claw spam carries the matchup; dropping one Shadow Claw damage tier compounds over dozens of ticks. Simulator-derived (2026-06-10 pool)."
+
+# Quagsire (GL #1 cohort): Mud Shot chip is small, but Stone Edge hits
+# the Ice side super-effectively. Surviving one extra Stone Edge tier is
+# a plausible hp/def flip in an otherwise close matchup.
+[Lapras.Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire bulkpoints. Tiny Mud Shot chip but super-effective Stone Edge nukes; a def/hp tier that turns a Stone Edge KO into a survival flips the matchup. Simulator-derived (2026-06-10 pool)."
+
+# Umbreon: rebalance returnee; fully neutral dark-on-water/ice slugfest
+# between two tanks. Foul Play / fast-move tiers govern the long game.
+[Lapras.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Mutual-neutral tank slugfest; over a matchup this long, dropping one incoming damage tier is worth a whole extra fast move. Simulator-derived (2026-06-10 pool)."
+
+# Lickilicky: Body Slam pressure plus Rollout hitting the Ice side
+# super-effectively. Close normal-type grind where charged-move damage
+# tiers decide how many shields the matchup costs.
+[Lapras.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam spam plus super-effective Rollout into the Ice side; charged-tier drops decide the shield economy of a close grind. Simulator-derived (2026-06-10 pool)."
+
+# Jellicent: water side resisted both ways, ghost damage lands neutral.
+# A slow double-bulk matchup where Hex/Shadow Ball tiers are the only
+# live numbers.
+[Lapras.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Water resisted both ways leaves neutral Hex/Shadow Ball as the live damage; slow double-bulk race decided by those tiers. Simulator-derived (2026-06-10 pool)."
+
+# Dewgong: the intra-Water/Ice cohort race. Ice Shard is double-resisted
+# coming in, so Dewgong leans on Drill Run — surviving one more charge
+# is a def/hp question.
+[Lapras.Great.anchors.dewgong_blkp_any]
+kind = "bulkpoint"
+opponent = "Dewgong"
+description = "Discover all Dewgong bulkpoints. Cohort civil war: incoming Ice Shard double-resisted, so neutral Drill Run tiers and charge survival decide it. Simulator-derived (2026-06-10 pool)."
+
+# Kingdra: Dragon Breath chips neutrally while Lapras's ice hits the
+# Dragon side super-effectively — a close per-tick race where one
+# incoming Dragon Breath tier matters.
+[Lapras.Great.anchors.kingdra_blkp_any]
+kind = "bulkpoint"
+opponent = "Kingdra"
+description = "Discover all Kingdra bulkpoints. Neutral Dragon Breath chip against Lapras's super-effective ice; close race where one Dragon Breath tier paid every turn swings it. Simulator-derived (2026-06-10 pool)."
+
+# Guzzlord: neutral Snarl/Brutal Swing pressure into Lapras's
+# super-effective ice vs the Dragon side. Big-HP-versus-big-HP grind
+# where def tiers stretch the lead.
+[Lapras.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Neutral dark pressure against super-effective ice; an HP-pool-versus-HP-pool grind where dropping a Snarl or Brutal Swing tier stretches Lapras's edge. Simulator-derived (2026-06-10 pool)."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), key close matchups
+#
+# Level-3 discovery for the close matchups where Lapras's own damage
+# tiers plausibly flip the result.
+# ─────────────────────────────────────────────────────────────────────
+
+# Shadow Altaria: the headline atk-side target — ice hits the
+# Dragon/Flying frame double-super-effectively and the shadow def drop
+# puts multiple fast-move tiers in reach. The classic ice-chip
+# breakpoint matchup in the current pool.
+[Lapras.Great.anchors.altaria_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria damage breakpoints. Double-super-effective ice into a shadow-reduced def stat: per-tick fast-move tiers are dense here and each one shortens the race. Simulator-derived (2026-06-10 pool)."
+
+# Azumarill: the atk-side complement of the bulkpoint above. Lapras's
+# water is resisted, so the matchup rides on neutral ice charged tiers —
+# one extra point per Ice Beam-class hit changes the shield math.
+[Lapras.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. Water resisted, so neutral ice charged-move tiers carry the matchup; one point per charge flips the shield math in a tight endline. Simulator-derived (2026-06-10 pool)."
+
+# Feraligatr: everything Lapras throws is resisted, so the absolute
+# numbers are small and proportionally tier-sensitive — a single
+# fast-move step-up is a large relative damage gain in this chip war.
+[Lapras.Great.anchors.feraligatr_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr damage breakpoints. Lapras's water and ice are both resisted; with damage this small, a single fast-move tier step-up is a big relative swing in a long chip war. Simulator-derived (2026-06-10 pool)."

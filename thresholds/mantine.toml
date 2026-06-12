@@ -1,0 +1,150 @@
+# Mantine — Great League thresholds and slayer anchors.
+#
+# No known expert writeup exists for GL Mantine (unlike the acidicArisen
+# Tinkaton notes) — this file ships simulator-derived. Anchors below are
+# designed purely from current-meta matchup logic against the 2026-06-10
+# opponent pool (opponent_pools/gl_top50_plus_cs.txt, post-June-2026
+# rebalance; Mantine sits at GL meta rank 17).
+#
+# Typing logic driving the opponent picks: Mantine is Water/Flying —
+# it resists Water, Fighting, Bug, Fire, Steel and strongly resists
+# Ground, while the current pool carries no Electric attacker and only
+# incidental Rock coverage (Quagsire's Stone Edge). Its meta matchups
+# are therefore mostly close resisted-pressure fights where a single
+# def tier (bulkpoint) or fast-move damage tier (breakpoint) plausibly
+# flips a 1-shield or 0-shield line. Moveset assumed: Wing Attack +
+# Bubble Beam / Ice Beam (PvPoke default).
+
+[Mantine]
+sources = "Simulator-derived (no expert writeup): anchors designed from current-meta matchup logic vs the 2026-06-10 GL top-50 + championshipseries opponent pool"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+#
+# Survive-one-more-fast-move / drop-a-damage-tier checks in Mantine's
+# close meta fights. Level 3 so the deep dive enumerates every
+# (threat move, damage tier) in the survivor def range and reports
+# which tiers actually move win/loss lines.
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Wing Attack vs Wing Attack is a pure stat-tier war; a
+# resisted-Bubble-Beam or Wing Attack damage tier decides who wins the
+# extended 1s/0s farm-down.
+[Mantine.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Mantine"
+description = "Discover all mirror-Mantine bulkpoints. The mirror is a fast-move stat war; a Wing Attack damage tier decides the farm-down."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Pelipper: the near-mirror — same Water/Flying typing, same Wing
+# Attack core. Like the mirror, decided by fast-move damage tiers.
+[Mantine.Great.anchors.pelipper_blkp_any]
+kind = "bulkpoint"
+opponent = "Pelipper"
+description = "Discover all Pelipper bulkpoints. Near-mirror (Water/Flying, Wing Attack core); fast-move tiers dominate the matchup."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Azumarill: Bubble is resisted but the fight goes long, so one Bubble
+# damage tier compounds heavily; Ice Beam / Play Rough land neutral and
+# a def tier can flip whether Mantine reaches its second charge move.
+[Mantine.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Long resisted-Bubble fight where one fast-move tier compounds; neutral Ice Beam/Play Rough tiers gate the 1s."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Feraligatr: Shadow Claw is neutral chip and Hydro Cannon is resisted —
+# a Hydro Cannon or Shadow Claw damage tier decides whether Mantine
+# survives to answer with Bubble Beam debuffs.
+[Mantine.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Neutral Shadow Claw chip + resisted Hydro Cannon; a damage tier on either decides the shield-bait war."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Jellicent: close core-meta fight; resisted Water Gun/Surf, neutral
+# Shadow Ball. Both sides debuff/pressure slowly, so single damage
+# tiers matter across a long fight.
+[Mantine.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Slow resisted-Water fight with neutral Shadow Ball closers; tiers compound over many fast moves."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Quagsire: Mud Shot is double-resisted and Aqua Tail resisted, but
+# Stone Edge is super-effective — the one big rock nuke Mantine meets
+# in this pool. Surviving a Stone Edge tier is the whole matchup.
+[Mantine.Great.anchors.quagsire_blkp_any]
+kind = "bulkpoint"
+opponent = "Quagsire"
+description = "Discover all Quagsire bulkpoints. Mud Shot is double-resisted; the matchup hinges on eating a super-effective Stone Edge one tier lower."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Talonflame: Incinerate is resisted, Fly is neutral — a Fly damage
+# tier (or an Incinerate tier across the long fight) gates whether
+# Mantine wins the 1-shield line.
+[Mantine.Great.anchors.talonflame_blkp_any]
+kind = "bulkpoint"
+opponent = "Talonflame"
+description = "Discover all Talonflame bulkpoints. Resisted Incinerate chip with neutral Fly nukes; a Fly tier gates the 1s line."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Lickilicky: pure neutral Body Slam spam — the classic def/hp check.
+# Dropping one Body Slam damage tier is worth multiple HP bars over a
+# full fight.
+[Mantine.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Neutral Body Slam spam is the canonical def check; one Slam tier is worth several HP over the fight."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Guzzlord: neutral Snarl/Dragon Tail chip into heavy closers while
+# Mantine races with super-effective Ice Beam vs its Dragon half —
+# tight energy race where a def tier buys the extra fast move.
+[Mantine.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Tight energy race (Mantine's Ice Beam is SE vs the Dragon half); a def tier buys the extra fast move."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Medicham: Counter is resisted and Wing Attack is double
+# super-effective back — Mantine is favored, but Psychic/Ice Punch land
+# neutral and a bulkpoint secures the win through a connected closer.
+[Mantine.Great.anchors.medicham_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover all Medicham bulkpoints. Favored matchup (resisted Counter), but a Psychic/Ice Punch tier secures the win through a connected closer."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level 3 discover-all)
+#
+# Key close matchups where one extra point of fast-move (or Bubble
+# Beam) damage plausibly flips a shield line.
+# ─────────────────────────────────────────────────────────────────────
+
+# Azumarill: the long fight means a Wing Attack damage tier compounds
+# over a dozen-plus fast moves — the classic GL breakpoint race.
+[Mantine.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. Wing Attack tiers compound over a long fight; the closest thing Mantine has to a calibration BP."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Medicham: Wing Attack is double super-effective — damage tiers come
+# thick here, and reaching the next one shortens the race to Ice Beam
+# enough to beat shield plays.
+[Mantine.Great.anchors.medicham_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+description = "Discover all Medicham damage breakpoints. Double-SE Wing Attack has dense tiers; the next one shortens the race past shield plays."
+source = "Simulator-derived (current-meta matchup logic)"
+
+# Guzzlord: huge HP pool, tight energy race — a Wing Attack or Ice
+# Beam tier vs its low defense decides whether Mantine closes before
+# the second Brutal Swing lands.
+[Mantine.Great.anchors.guzzlord_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord damage breakpoints. Big HP, low def: one Wing Attack/Ice Beam tier decides who closes the energy race first."
+source = "Simulator-derived (current-meta matchup logic)"

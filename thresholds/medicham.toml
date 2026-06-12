@@ -1,0 +1,256 @@
+# Medicham — Great League thresholds, spreads, and slayer anchors.
+#
+# Current GL meta rank 27 (PvPoke, post-June-2026 rebalance pool).
+# Fighting/Psychic XL spice-core: resists Dark/Fighting/Rock, melts to
+# Ghost/Fairy/Flying. Counter pressure + Ice Punch coverage makes most
+# of its core matchups CMP-races decided by 1-damage fast-move tiers,
+# which is why the def-side bulkpoint ladder below is the heart of this
+# file.
+#
+# Sources:
+#   - RyanSwag SwagTips-era Medicham tier thresholds, preserved as
+#     SENTIMENTAL_DEFAULT_THRESHOLDS in GoBattleKit
+#     (gobattlekit/src/gobattlekit/data/thresholds.py). Numbers encoded
+#     verbatim below; the original article's per-tier opponent
+#     calibrations were not preserved, so tiers are encoded as
+#     stat-cutoff spreads plus mirror-calibrated Level-2 anchors.
+#   - RyanSwag "How to do your own PVP IV analysis" methodology video
+#     (video-confirmed 2026-04-16, docs/ryanswag_methodology_gap_analysis.md
+#     §2): preferred "Best of Both Worlds" Medicham 7/15/14 (106.92 atk)
+#     vs rank-1 NBB 5/15/15 (105.88 atk). Cross-referenced with
+#     shared.Great.spreads.medicham_atk_weighted in _shared.toml.
+#   - Original SwagTips/GamePress Medicham deep dive UNREACHABLE on
+#     2026-06-12 (web.archive.org blocked from this environment;
+#     gamepress.gg redirect target pokebase.app returns 403). Only the
+#     locally recorded numbers above are encoded; nothing is invented.
+#   - Bulkpoint/breakpoint opponent selection: GL top-50 + CS pool,
+#     opponent_pools/gl_top50_plus_cs.txt (2026-06-10).
+#
+# FRESHNESS CAVEAT (same as _shared.toml): the SwagTips-era numbers
+# predate several move rebalances. The stat thresholds are encoded in
+# the parsable "NNN.NN atk / NNN.NN def [+ NNN hp]" format so the
+# downstream exporter can verify them for staleness against current
+# Level-3 discovery output.
+
+[Medicham]
+sources = """
+RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS,
+gobattlekit data/thresholds.py) + RyanSwag methodology video
+(video-confirmed 2026-04-16; 7/15/14 atk-weighted spread, see
+_shared.toml medicham_atk_weighted) + GL top-50+CS opponent pool
+(2026-06-10) for matchup selection. Original GamePress deep dive
+unreachable 2026-06-12.
+"""
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — SwagTips-era stat-cutoff tiers (expert encoding)
+#
+# Encoded exactly as recorded in SENTIMENTAL_DEFAULT_THRESHOLDS. The
+# original tier names were "Good", "Prem", "BB" (Best of Both worlds),
+# and "Mirror"; prefixed with "Swag" here to keep them visually
+# distinct from sim-derived tiers in scatter output.
+# ─────────────────────────────────────────────────────────────────────
+
+[Medicham.Great.spreads."Swag Good"]
+attack = 105.38
+defense = 138.6
+stamina = 140
+description = "SwagTips 'Good' tier: 105.38 atk, 138.60 def + 140 hp. Baseline keeper cutoff from the SwagTips-era Medicham writeup."
+source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
+
+[Medicham.Great.spreads."Swag Prem"]
+attack = 105.87
+defense = 138.64
+stamina = 140
+description = "SwagTips 'Prem' tier: 105.87 atk, 138.64 def + 140 hp. Premium cutoff — slightly higher atk and def floors than 'Good' at the same 140 hp."
+source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
+
+[Medicham.Great.spreads."Swag BB"]
+attack = 105.38
+defense = 140.3
+stamina = 142
+description = "SwagTips 'BB' (Best of Both worlds, bulk side) tier: 105.38 atk, 140.30 def + 142 hp. The max-bulk tier of the writeup — same atk floor as 'Good' with the def/hp floors pushed up."
+source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
+
+[Medicham.Great.spreads."Swag Mirror"]
+attack = 108.0
+defense = 137.64
+stamina = 0
+description = "SwagTips 'Mirror' tier: 108.00 atk, 137.64 def (no hp floor). Atk-weighted build calibrated for the Medicham mirror — see the mirror Level-2 anchors below which reproduce both numbers."
+source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Spreads — IV-list form (RyanSwag methodology-video builds)
+# ─────────────────────────────────────────────────────────────────────
+
+[Medicham.Great.spreads.ryanswag_preferred]
+description = "RyanSwag's preferred 'Best of Both Worlds' Medicham 7/15/14 at 106.92 atk (video-confirmed 2026-04-16). Same IV as shared.Great.spreads.medicham_atk_weighted; duplicated per-species so the CMP anchor below resolves locally. Note PvPoke's cp1500 default for Medicham is already 7/15/14."
+source = "RyanSwag 'How to do your own PVP IV analysis' methodology video (video-confirmed 2026-04-16)"
+ivs = [[7, 15, 14]]
+
+[Medicham.Great.spreads.rank1_nbb]
+description = "Rank-1 no-best-buddy Medicham 5/15/15 at 105.88 atk + 142 hp (video-confirmed 2026-04-16; the transcript's '16 15 14' was '5 15 15' mis-transcribed). The baseline most opponents sim against."
+source = "RyanSwag 'How to do your own PVP IV analysis' methodology video (video-confirmed 2026-04-16)"
+ivs = [[5, 15, 15]]
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — CMP (atk-side, expert encoding)
+# ─────────────────────────────────────────────────────────────────────
+
+[Medicham.Great.anchors.cmp_vs_ryanswag_preferred]
+kind = "cmp"
+spread = "ryanswag_preferred"
+description = "Win CMP ties against RyanSwag's preferred 7/15/14 Medicham at 106.92 atk. Anyone running the video build (or PvPoke's cp1500 default, which is the same IV) loses the mirror CMP to focals clearing this."
+source = "RyanSwag 'How to do your own PVP IV analysis' methodology video (video-confirmed 2026-04-16)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side)
+#
+# Key close matchups only: the mirror (SwagTips-calibrated), Azumarill,
+# and Lickilicky — the three CMP-race matchups where a 1-damage
+# Counter/Psycho Cut tier most plausibly swings the result.
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 2: reproduce the SwagTips Mirror-tier atk floor. The original
+# (move, tier) calibration was not preserved; the resolver will report
+# which fast/charged tier 108.00 sits under so it can be promoted to a
+# Level 1 anchor with full provenance.
+[Medicham.Great.anchors.mirror_brkp_above_swag]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+above_atk = 108.0
+description = "Smallest atk > 108.00 atk at which any focal move's damage to a default mirror Medicham steps up. Reproduces the SwagTips 'Mirror' tier atk floor; original (move, tier) calibration unknown."
+source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
+
+# Level 3: discover every mirror BP in the survivor range, so the
+# resolved Level-2 anchor above can be cross-checked against the full
+# ladder.
+[Medicham.Great.anchors.mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Medicham"
+description = "Discover and tag every damage breakpoint against a default mirror Medicham in the survivor atk range."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10); mirror auto-relevant"
+
+# Level 3: Azumarill — the classic razor-thin GL core matchup. Counter
+# is neutral, Ice Punch is neutral; one fast-move damage tier routinely
+# decides the 1-shield race.
+[Medicham.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover and tag every Azumarill damage breakpoint in the survivor atk range. Counter tiers vs Azumarill decide the closest core matchup Medicham plays."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# Level 3: Lickilicky — super-effective Counter vs a Normal-type wall;
+# the matchup is a long farm-race where Counter damage tiers compound.
+[Medicham.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover and tag every Lickilicky damage breakpoint in the survivor atk range. SE Counter into a Normal wall — each Counter tier compounds over a long matchup."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all ladder)
+#
+# Ten opponents from the current GL top-50+CS pool (exact pool
+# spellings), chosen where the type matchup makes a def/hp check
+# plausible and the matchup is close enough for a 1-damage incoming
+# tier to flip it. Mirror included.
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 2: reproduce the SwagTips Mirror-tier def floor (the second
+# half of the 'Swag Mirror' spread above). Exact (move, tier) unknown;
+# the mirror_blkp_any ladder below identifies candidates for promotion
+# to Level 1.
+[Medicham.Great.anchors.mirror_blkp_above_swag]
+kind = "bulkpoint"
+opponent = "Medicham"
+above_def = 137.64
+description = "Smallest def > 137.64 def at which any mirror threat move's damage to the focal steps down. Reproduces the SwagTips 'Mirror' tier def floor; original (move, tier) calibration unknown."
+source = "RyanSwag SwagTips-era thresholds (SENTIMENTAL_DEFAULT_THRESHOLDS, gobattlekit)"
+
+# Level 3: the mirror. Counter is resisted both ways (Psychic sub-type),
+# so the mirror is a long tier-sensitive grind.
+[Medicham.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Medicham"
+description = "Discover and tag every mirror-Medicham bulkpoint in the survivor def range. Goal: identify which (move, tier) the SwagTips 137.64 def floor was calibrated to."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10); mirror auto-relevant"
+
+# Level 3: Azumarill — SE Play Rough / neutral Bubble into Medicham;
+# the closest core matchup. Bubble and Ice Beam tiers decide the race.
+[Medicham.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover and tag every Azumarill bulkpoint in the survivor def range. Bubble/Ice Beam/Play Rough tiers vs Medicham decide a razor-thin core matchup."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# Level 3: Lickilicky — neutral Body Slam spam; surviving one more
+# Body Slam tier converts the farm-race.
+[Medicham.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover and tag every Lickilicky bulkpoint in the survivor def range. Body Slam tiers govern how much energy Medicham banks in the farm-race."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# Level 3: Annihilape — Counter is resisted by Medicham's Psychic
+# sub-type but Rage Fist is SE Ghost; a close fellow-Fighter matchup
+# where Rage Fist damage tiers matter.
+[Medicham.Great.anchors.annihilape_blkp_any]
+kind = "bulkpoint"
+opponent = "Annihilape"
+description = "Discover and tag every Annihilape bulkpoint in the survivor def range. Resisted Counter in, SE Rage Fist tiers decide the fellow-Fighter matchup."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# Level 3: Umbreon — Snarl/Foul Play both resisted (Dark into
+# Fighting); a long grind where one Foul Play tier is the difference
+# between winning 1-0 and trading.
+[Medicham.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover and tag every Umbreon bulkpoint in the survivor def range. Doubly-resisted Dark damage makes each Foul Play/Snarl tier worth a full swap of the endgame."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# Level 3: Sableye (Shadow) — SE Shadow Claw into the Psychic sub-type
+# from a shadow-boosted attacker; close matchup where shadow atk
+# variance makes the def ladder especially live.
+[Medicham.Great.anchors.sableye_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Sableye (Shadow)"
+description = "Discover and tag every Shadow Sableye bulkpoint in the survivor def range. SE Shadow Claw tiers from a shadow-boosted attacker; high IV variance on the opponent side."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# Level 3: Altaria — SE Sky Attack threat vs Medicham's Fighting
+# sub-type, answered by SE Ice Punch; a coverage-vs-coverage coinflip
+# where Dragon Breath tiers shift the count.
+[Medicham.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover and tag every Altaria bulkpoint in the survivor def range. Dragon Breath chip tiers and SE Sky Attack damage govern whether Ice Punch coverage arrives in time."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# Level 3: Stunfisk (Galarian) — SE Counter out, neutral Mud Shot /
+# Rock Slide in; a close matchup where surviving one extra Rock Slide
+# tier flips shield equity.
+[Medicham.Great.anchors.stunfisk_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover and tag every G-Fisk bulkpoint in the survivor def range. Mud Shot chip and Rock Slide tiers against an SE-Counter target Medicham wants to farm."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# Level 3: Lapras — SE Counter into the Ice half; Lapras answers with
+# heavy neutral Surf/Sparkling Aria pressure, so incoming charged-move
+# tiers decide the trade.
+[Medicham.Great.anchors.lapras_blkp_any]
+kind = "bulkpoint"
+opponent = "Lapras"
+description = "Discover and tag every Lapras bulkpoint in the survivor def range. Surf/Sparkling Aria tiers against an SE-Counter target; close charged-move trade."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"
+
+# Level 3: Guzzlord — Snarl resisted, Counter SE into the Dark half,
+# but Guzzlord's raw stats keep it close; Crabhammer tiers matter for
+# whether Medicham survives to land the second charge.
+[Medicham.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover and tag every Guzzlord bulkpoint in the survivor def range. Resisted Snarl chip plus Crabhammer nuke tiers against a stat-stick Medicham should beat on type."
+source = "Matchup selection: GL top-50+CS pool (gl_top50_plus_cs.txt, 2026-06-10)"

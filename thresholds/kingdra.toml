@@ -1,0 +1,150 @@
+# Kingdra — Great League thresholds and slayer anchors.
+#
+# SIMULATOR-DERIVED: no known expert IV writeup exists for GL Kingdra
+# (no RyanSwag GamePress deep dive, no acidicArisen #iv-tech numbers).
+# Every anchor below is a Level-3 discover-all designed from current-meta
+# matchup logic; no expert stat numbers are encoded because none exist.
+#
+# Matchup logic in brief: Kingdra is Water/Dragon (GL meta rank 20,
+# 2026-06) running Dragon Breath chip. It double-resists Fire and Water,
+# resists Steel, and is weak to Dragon and Fairy. That makes its meta
+# life a series of mutual-super-effective Dragon Breath wars (Altaria,
+# Shadow Dragonair, Shelgon, Guzzlord, the mirror and its shadow) plus
+# neutral chip races against the bulky Water/Normal core — exactly the
+# matchups where single integer damage tiers in either direction decide
+# the fight. Def-side bulkpoints carry most of the value (incoming SE
+# Dragon Breath tiers); atk-side breakpoints cover the outgoing side of
+# the closest dragon wars.
+#
+# Opponent selection from opponent_pools/gl_top50_plus_cs.txt
+# (generated 2026-06-10, post-June-2026 move rebalance); all opponent
+# names below use that file's exact PvPoke speciesName spellings.
+#
+# The SHADOW form is also GL-meta-relevant (in the same pool) and lives
+# in its own file, thresholds/kingdra_shadow.toml — deep_dive.py
+# auto-discovery maps "Kingdra (Shadow)" -> kingdra_shadow.toml, same
+# per-form precedent as aegislash_blade.toml / aegislash_shield.toml
+# and altaria.toml / altaria_shadow.toml.
+
+[Kingdra]
+sources = "Simulator-derived (no known expert writeup). Opponent selection: opponent_pools/gl_top50_plus_cs.txt (2026-06-10, post-June-2026 rebalance); Kingdra is GL meta rank 20. Moveset/typing from the cached PvPoke gamemaster."
+
+[Kingdra.Great.meta]
+notes = "No expert calibration exists for this species — all anchors are Level-3 discovery. The dragon-war opponents (mutual super-effective Dragon Breath) are where tiers flip matchups in both directions; run the dive and promote whichever discovered (move, tier) pairs actually split the survivor cohort to Level-1 anchors with provenance."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side, Level-3 discover-all), key
+# close matchups where outgoing Dragon Breath tiers decide the fight
+# ─────────────────────────────────────────────────────────────────────
+
+# Altaria: GL meta rank 2, mutual super-effective Dragon Breath. The
+# canonical Kingdra dragon war — every outgoing DB damage step is worth
+# a full fast-move cycle against Altaria's premium bulk.
+[Kingdra.Great.anchors.altaria_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Altaria"
+description = "Discover all Altaria damage breakpoints. Mutual super-effective Dragon Breath vs the rank-2 bulk dragon; an outgoing DB tier up is the single highest-leverage atk step in Kingdra's matchup list."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Shadow Dragonair: rebalance newcomer. Mutual super-effective Dragon
+# Breath into shadow-reduced def — extra outgoing tiers are in reach
+# that base-def dragons don't offer.
+[Kingdra.Great.anchors.dragonair_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair damage breakpoints. Mutual super-effective Dragon Breath against shadow-reduced def; the shadow's def penalty puts outgoing DB tiers in reach that decide the dragon-vs-dragon race."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Guzzlord: Dark/Dragon — takes super-effective Dragon Breath and has
+# famously low defense, so Kingdra's chip tiers swing how fast it can
+# race Guzzlord's own super-effective Dragon Tail pressure.
+[Kingdra.Great.anchors.guzzlord_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord damage breakpoints. Super-effective Dragon Breath into a low-def target — each tier shortens the mutual-SE race against Guzzlord's Dragon Tail before the charged-move trade decides it."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level-3 discover-all like the
+# tinkaton.toml model), opponents chosen from gl_top50_plus_cs.txt
+# (2026-06-10) where the type matchup makes def/hp checks plausible
+# and the matchup is close
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Mutual super-effective Dragon Breath both ways — the
+# incoming-DB tier is the whole matchup.
+[Kingdra.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Kingdra"
+description = "Discover all mirror-Kingdra bulkpoints. Mutual super-effective Dragon Breath means a single incoming DB tier down typically decides the mirror chip race outright."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Cross-form: the shadow runs alongside the base form in the pool;
+# players prep both. Shadow-boosted SE Dragon Breath incoming.
+[Kingdra.Great.anchors.kingdra_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Kingdra (Shadow)"
+description = "Discover all bulkpoints vs Kingdra (Shadow) (cross-form fight). Shadow-boosted super-effective Dragon Breath incoming — the def tiers that blunt it decide which form wins the in-family matchup."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Altaria: the def side of the rank-2 dragon war.
+[Kingdra.Great.anchors.altaria_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria"
+description = "Discover all Altaria bulkpoints. Incoming super-effective Dragon Breath from the rank-2 bulk dragon; stepping its chip down a tier buys whole extra fast-move cycles in a razor-thin war."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Shadow Altaria: shadow-boosted SE Dragon Breath — the highest-value
+# incoming fast-move tiers in Kingdra's matchup list.
+[Kingdra.Great.anchors.altaria_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Altaria (Shadow)"
+description = "Discover all Shadow Altaria bulkpoints. Shadow-boosted super-effective Dragon Breath makes each incoming damage step down worth more HP than any other fast move Kingdra faces."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Shadow Dragonair: same shadow-boosted SE Dragon Breath logic.
+[Kingdra.Great.anchors.dragonair_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair bulkpoints. Shadow-boosted super-effective Dragon Breath incoming; the def steps here pair with the atk-side breakpoint to bracket the closest dragon war in the pool."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Shelgon: rebalance newcomer; bulk dragon with mutual SE Dragon Breath.
+[Kingdra.Great.anchors.shelgon_blkp_any]
+kind = "bulkpoint"
+opponent = "Shelgon"
+description = "Discover all Shelgon bulkpoints. Mutual super-effective Dragon Breath vs a bulk dragon new to the 2026-06 pool; incoming DB tiers set the pace of a slow, close fight."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Guzzlord: super-effective Dragon Tail incoming; the def side of the
+# mutual-SE race covered atk-side above.
+[Kingdra.Great.anchors.guzzlord_blkp_any]
+kind = "bulkpoint"
+opponent = "Guzzlord"
+description = "Discover all Guzzlord bulkpoints. Super-effective Dragon Tail chip incoming — stepping it down a tier extends Kingdra's side of the mutual-SE race by full cycles."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Shadow Feraligatr: its Water damage is double-resisted, so the fight
+# runs through shadow-boosted neutral Shadow Claw chip and Ice Beam —
+# a close water-on-water fight decided by incoming tiers.
+[Kingdra.Great.anchors.feraligatr_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr (Shadow)"
+description = "Discover all Shadow Feraligatr bulkpoints. Hydro Cannon/Water Gun are double-resisted, so the matchup rides on shadow-boosted neutral Shadow Claw chip and Ice Beam — incoming tiers there decide a close fight."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Jellicent: neutral Hex chip vs a wall that double-resists Kingdra's
+# Water coverage; slow and close, so incoming fast-move tiers matter.
+[Kingdra.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Slow neutral Hex chip war vs a top-tier wall — an incoming Hex tier down decides whether Kingdra out-paces it to the charged-move trade."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"
+
+# Lickilicky: #1 pool entry; neutral Body Slam chip race where every
+# incoming tier compounds across the whole fight.
+[Kingdra.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Body Slam spam vs the #1 pool entry — one incoming damage tier down compounds across every cycle of a close neutral chip race."
+source = "Simulator-derived; opponent pool gl_top50_plus_cs.txt (2026-06-10)"

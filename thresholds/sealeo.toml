@@ -1,0 +1,147 @@
+# Sealeo — Great League thresholds and slayer anchors.
+#
+# Status: SIMULATOR-DERIVED. No known expert writeup exists for GL Sealeo.
+# It sits at PvPoke GL overall rank 40 in the post-June-2026 rebalance pool
+# (gl_top50_plus_cs.txt, 2026-06-10), alongside its meta-relevant shadow
+# form (thresholds/sealeo_shadow.toml — per-form file following the
+# aegislash_blade.toml / aegislash_shield.toml precedent). All anchors
+# below are Level 3 discover-all by design: with no community calibration
+# points, we let the deep dive enumerate every (move, tier) threshold and
+# promote the matchup-flipping ones to Level 1 anchors with provenance
+# later.
+#
+# Typing logic used to pick opponents (Sealeo is Water/Ice):
+#   - Resists Water (x0.625) and double-resists Ice (x0.39). The pool is
+#     saturated with Water types (Azumarill, Lapras, Dewgong, Feraligatr,
+#     Jellicent), so Sealeo's bread and butter is long resist-grind wars
+#     where a single incoming fast- or charged-move damage tier swings
+#     the whole fight — prime bulkpoint territory.
+#   - Weak to Fighting, Rock, Electric, and Grass. Of those, the live
+#     threat in a close matchup is Galarian Stunfisk's Rock Slide
+#     (the fighters mostly hard-counter rather than play close).
+#   - Powder Snow hits the pool's dragons super-effectively; Body Slam
+#     is the neutral pressure move whose tiers decide the Normal-type
+#     chip wars (Lickilicky, Umbreon).
+# Opponent spellings are exact PvPoke speciesNames from
+# opponent_pools/gl_top50_plus_cs.txt (2026-06-10).
+
+[Sealeo]
+sources = "Simulator-derived (no expert writeup). Anchor set designed 2026-06-12 from current-meta type-matchup logic against opponent_pools/gl_top50_plus_cs.txt (2026-06-10 pool, post-June-2026 rebalance); Sealeo PvPoke GL overall rank 40. Shadow form covered in thresholds/sealeo_shadow.toml."
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — bulkpoints (def-side, Level 3 discover-all)
+# ─────────────────────────────────────────────────────────────────────
+
+# The mirror. Powder Snow is double-resisted in the mirror (x0.39), so
+# the fight is decided by charged-move tiers — exactly what bulkpoint
+# discovery enumerates.
+[Sealeo.Great.anchors.mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Sealeo"
+description = "Discover every mirror-Sealeo bulkpoint in the survivor def range. Powder Snow is double-resisted both ways, so Body Slam / Aurora Beam tiers decide the mirror; no community spread exists to calibrate against."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Cross-form: the shadow runs x1.2 atk, so its damage tiers against a
+# base-form focal land harder. Both forms are in the 2026-06-10 pool.
+[Sealeo.Great.anchors.sealeo_shadow_blkp_any]
+kind = "bulkpoint"
+opponent = "Sealeo (Shadow)"
+description = "Discover every Shadow-Sealeo bulkpoint (cross-form fight). The shadow's boosted Body Slam / Aurora Beam tiers against a base focal decide which form wins the in-family matchup; players run both."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Azumarill: the classic bulky-Water grind. Bubble is resisted, Ice Beam
+# double-resisted; Play Rough is the neutral threat whose tier matters.
+[Sealeo.Great.anchors.azumarill_blkp_any]
+kind = "bulkpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill bulkpoints. Mutual-resist grind: Bubble is resisted and Ice Beam double-resisted, so each Bubble chip tier and the neutral Play Rough tier are the levers in a razor-thin fight."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Galarian Stunfisk: the one close matchup where a super-effective
+# charged move (Rock Slide, x1.6 into Ice) is the deciding threat.
+[Sealeo.Great.anchors.stunfisk_galarian_blkp_any]
+kind = "bulkpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all G-Stunfisk bulkpoints. Rock Slide is super-effective into Sealeo's Ice typing and Mud Shot chips neutrally; stepping either down a tier is the def-side route to flipping a classic close fight."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lickilicky: pool #1, neutral Body Slam war both ways.
+[Sealeo.Great.anchors.lickilicky_blkp_any]
+kind = "bulkpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky bulkpoints. Neutral Body Slam spam from the pool's #1 entry compounds every incoming tier across a long chip race; each recoverable step is worth a full cycle."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Dewgong: the same-typing near-mirror. Ice Shard is double-resisted;
+# Drill Run is the neutral threat.
+[Sealeo.Great.anchors.dewgong_blkp_any]
+kind = "bulkpoint"
+opponent = "Dewgong"
+description = "Discover all Dewgong bulkpoints. Same Water/Ice typing makes this a near-mirror: Ice Shard is double-resisted, so Drill Run / Icy Wind tiers decide a fight that is close by construction."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lapras: the other Water/Ice family member in the pool.
+[Sealeo.Great.anchors.lapras_blkp_any]
+kind = "bulkpoint"
+opponent = "Lapras"
+description = "Discover all Lapras bulkpoints. In-family Water/Ice grind: Ice damage is double-resisted and Water resisted, so the neutral charged threats (e.g. Skull Bash) carry the matchup and their tiers are the live question."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Feraligatr: Shadow Claw chips neutrally while its Water/Ice charged
+# moves are resisted — a long grind where fast-move tiers dominate.
+[Sealeo.Great.anchors.feraligatr_blkp_any]
+kind = "bulkpoint"
+opponent = "Feraligatr"
+description = "Discover all Feraligatr bulkpoints. Hydro Cannon is resisted and Ice Beam double-resisted, so neutral Shadow Claw chip is the damage that matters — a fast-move def step is worth many turns over the full fight."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Umbreon: rebalance re-entrant; fully neutral Snarl/Foul Play grind.
+[Sealeo.Great.anchors.umbreon_blkp_any]
+kind = "bulkpoint"
+opponent = "Umbreon"
+description = "Discover all Umbreon bulkpoints. Fully neutral both ways against a premier wall (re-entered the pool in the 2026-06 rebalance); Snarl chip and Foul Play tiers decide a matchup that goes the distance."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Jellicent: Surf resisted, Ice Beam double-resisted; Hex/Shadow Ball
+# are the neutral threats in another mutual-resist war.
+[Sealeo.Great.anchors.jellicent_blkp_any]
+kind = "bulkpoint"
+opponent = "Jellicent"
+description = "Discover all Jellicent bulkpoints. Its Water damage is resisted and Ice Beam double-resisted, leaving neutral Hex chip and Shadow Ball as the threats whose tiers swing a slow mutual-resist war."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side), key close matchups
+# ─────────────────────────────────────────────────────────────────────
+
+# Azumarill: outgoing Powder Snow is resisted (x0.625), so each atk tier
+# recovered on the fast move (or on neutral Body Slam) is the atk-side
+# half of the Azumarill grind.
+[Sealeo.Great.anchors.azumarill_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Azumarill"
+description = "Discover all Azumarill damage breakpoints. Powder Snow is resisted, so its damage tiers are fragile; stepping the fast move or neutral Body Slam up one tier is the atk-side lever in the closest grind in the pool."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Galarian Stunfisk: Sealeo must win the race before Rock Slide lands.
+# Powder Snow is net-neutral into Ground/Steel; Water Pulse hits super.
+[Sealeo.Great.anchors.stunfisk_galarian_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Stunfisk (Galarian)"
+description = "Discover all G-Stunfisk damage breakpoints. Sealeo races incoming Rock Slide; a Powder Snow tier (net-neutral into Ground/Steel) or a super-effective Water Pulse tier shortens the race by whole fast-move cycles."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Shadow Dragonair: super-effective Powder Snow into shadow-reduced def —
+# the densest breakpoint ladder available to this focal.
+[Sealeo.Great.anchors.dragonair_shadow_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Dragonair (Shadow)"
+description = "Discover all Shadow Dragonair damage breakpoints. Super-effective Powder Snow into shadow-reduced def means tightly spaced tiers; each one banked decides the otherwise-close dragon fight before Dragon Breath chip adds up."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
+
+# Lickilicky: the outgoing half of the Body Slam war against pool #1.
+[Sealeo.Great.anchors.lickilicky_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Lickilicky"
+description = "Discover all Lickilicky damage breakpoints. The outgoing half of the neutral Body Slam war: a one-point fast- or charged-move step compounds over the many cycles this chip race runs."
+source = "Simulator-derived (matchup logic vs 2026-06-10 GL pool)"
