@@ -30,6 +30,29 @@ index, gates) run by hand. Three latent bugs surfaced and fixed:
   write (`_remove_stale_split_siblings`, both split and single-file
   paths), so the chain-killer class can't recur. 3 unit tests.
 
+**Form-change oracle depth (pre-publish gap fill).** Each form-change
+species previously had exactly one oracle opponent (Azumarill), and
+two live-on-every-dive surfaces had no 9-cell coverage at all:
+Blade-as-focal (the Blade→Shield reversion-on-shielding path) and
+opponent-side Aegislash. Added 4 matchups × 9 cells to the audit
+harness (Blade vs Azumarill, Azumarill vs Shield, Mimikyu vs Medicham
+— 9/9 PvPoke-exact, Morpeko vs Galarian Stunfisk where the Aura Wheel
+type flip changes effectiveness class) + offline fixtures in
+`tests/test_form_change_oracle.py`. Every divergent cell traced to a
+known mechanism before pinning: PvPoke bug #3 (its Aegislash throws
+Gyro Ball over strictly-better Shadow Ball — including two winner
+flips where PvPoke's Aegislash loses fights ours wins), bug #8
+(Hangry stickiness), and one near-KO plan-choice cell where PvPoke's
+hold-for-double-Shadow-Ball plan is genuinely better (cluster closed
+as not-fixing). Reversion mechanics verified PvPoke-identical
+(Pokemon.js changeForm swaps stats AND the fast move both ways).
+Audit baseline 153→189 cells (160 exact + 29 documented). The
+tracing also surfaced a REAL bug: `scripts/battle.py`'s
+`make_battle_pokemon` never attached form change (same class as the
+arc-S1 dive-worker bug) — every form-change CLI sim ran formless;
+fixed by routing through `from_pokemon`. Harness gained `--only
+SUBSTR` for triage.
+
 New tooling: `scripts/verify_overnight.py` — one-shot morning check
 aggregating chain status, dive-dir freshness (mixed-vintage/orphan
 detection), opponent-pool sanity markers (Sylveon/Primeape/Umbreon
