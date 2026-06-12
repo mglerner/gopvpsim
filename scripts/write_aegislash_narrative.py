@@ -90,7 +90,7 @@ def build_html(league: str) -> str:
         form-change triggers in battle, Blade form recomputes its
         stats at the whole level below (L22), losing half a level
         worth of attack/defense/HP. This is a real in-game rule, not
-        a sim quirk — it's PvPoke's <code>getFormStats()</code>
+        a sim quirk - it's PvPoke's <code>getFormStats()</code>
         behavior, matches the
         <a href="https://x.com/cascade1185/status/2037456058265075782">
         cascade1185 / Caleb&nbsp;Peng discovery</a>, and our sim mirrors

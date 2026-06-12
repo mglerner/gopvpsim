@@ -50,7 +50,7 @@ would look like in the base scatter underneath. So in the default
 **Color: Threshold tiers** mode, anchor IVs that clear a named tier
 take that tier's color; untiered anchor IVs take a Viridis-by-score
 gradient. Switch the **Color** dropdown to a stat axis like "HP" or
-"Attack" and every anchor fill flips to a fixed gold — the per-tier
+"Attack" and every anchor fill flips to a fixed gold - the per-tier
 mapping doesn't apply outside threshold mode. The cyan border stays
 constant; only the fill responds to the Color setting.
 
