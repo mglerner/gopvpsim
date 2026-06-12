@@ -6,6 +6,54 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-12 (evening) — S7 cleanup pass (arc COMPLETE)
+
+The perf+correctness arc's gated cleanup session (Michael's
+2026-06-11 greenlight; register = deep-review §I + TODO "Deferred
+cleanup" + S6 leftovers). Three commits (`41ecbb8`, `ae679d0`,
+`559967f`), ~1,100 net lines deleted across 35 files. Deletions only
+— the deep_dive.py split refactor is its own future session.
+
+- **20 dead scripts deleted**: analyze/augment_deep_dive
+  (SCORES_GZ-incompatible fossils superseded by replay blobs),
+  audit_chargedlog_fixtures (superseded by audit_oracle_harness),
+  clean_ryanswag_dump, measure_html_size, retrofit_3_dives.sh
+  (+ chain_status 'retrofit' preset), and the entire retrofit
+  patch_dive_* set except chain-live patch_dive_species_narrative.
+  Kept per the register's UNCLEAR call: check_sableye_energy_lead,
+  summarize_perf, scripts/moves.py.
+- **Static `generate_html` deleted** (~390 lines + the only
+  rendering.hover_text consumer): the non-interactive path had been
+  crashing on a NameError since ~S1 with nobody noticing. `--html`
+  now implies `--interactive`. Legacy-JSON `load_thresholds` (zero
+  callers since the TOML registry) went with it.
+- **E12 `intended_pruning` removed** from the DP insertion helpers,
+  `pvpoke_dp`, and the JIT kernel (signatures in lockstep). Zero
+  consumers, and the mode was drifted — it compared only
+  hp/energy/shields where PvPoke's (dead) check also compares buffs,
+  so enabling it would have pruned wrongly. Default behavior
+  unchanged (oracle harness 161 exact + 37 documented; benchmark
+  3,293 sims/s vs 3,160 baseline).
+- **L8 `breakpoints.cmp_threshold`** + orphaned `_floor2`;
+  **`evolution_lines.get_final_form`** (tests converted to
+  get_final_forms; sentinel 914→912); **D11 set** (re-export
+  aliases, screen_n double-assign, write-only focal_in_opponents,
+  unused slayer-worker base-stat params, unused opponent_name
+  param); **R14 `_group_sort_key`**.
+- **CACHE_VERSION bumps** (sweep 1→2, slayer 2→3): worker code in
+  scripts/ is outside the engine source hash; standing rule after
+  the 2026-06-10 near-miss. Engine-file edits also rotate the sweep
+  cache's source hash — post-S7 dives run cold (budgeted by the
+  gobattlekit pipeline's overnight batch).
+- **legacy/historical/backcompat grep audit**: nothing further
+  actionable; remaining hits are protected gobattlekit seams
+  (as_legacy_dict, user_collection schema — its threshold pipeline
+  actively consumes them), live CLI surface, or documentation. §I
+  consolidations (L6/L11/L15/D9/D14/R11/W8/W10/T8) deferred to the
+  split session / natural feature sessions — see TODO.
+- S6 leftover: empty `shadow-sableye-power-gem-great-league/` orphan
+  dir removed.
+
 ## 2026-06-12 (afternoon) — cross-repo parity fixes + plotly cache + site re-render
 
 Same-day follow-ups after the S6 publish, from gobattlekit's

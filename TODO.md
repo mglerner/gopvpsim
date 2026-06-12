@@ -79,9 +79,10 @@ harness audit, and the Morpeko form-toggle resolution all shipped
 
 - **Aegislash UL apply — DISSOLVED 2026-06-11.** The S6 full re-dive
   regenerates all three candidate dives with envelope tags computed
-  natively, so the retrofit patcher question is moot (patcher joins
-  the S7 delete list). Only relevant again for a page deliberately
-  never re-dived.
+  natively, so the retrofit patcher question is moot (patcher deleted
+  in S7, 2026-06-12, along with the rest of the retrofit patcher set).
+  Only relevant again for a page deliberately never re-dived — which
+  would now need a fresh script.
 
 - **Cross-form opponent expansion (parked).** Item 4 (auto-
   form-sibling expansion in `build_opponent_pool.py`) — design
@@ -91,36 +92,36 @@ harness audit, and the Morpeko form-toggle resolution all shipped
 
 ## Deferred cleanup: backwards-compatibility removal pass
 
-Once we've verified all the oracle/sim tests (including direct human
-review by Michael), run a dedicated session to **remove
-backwards-compatibility shims, historical artifacts, and
-"just-in-case" abstractions** that accumulated during feature work.
-The goal is to simplify the code now that we've confirmed the new
-behavior is right.
+**S7 RAN 2026-06-12** (arc S7, Michael's greenlight 2026-06-11; see
+CHANGELOG). Shipped: the §I dead-code register of
+`docs/reviews/2026-06-11_fable5_deep_codebase_review.md` (E12
+intended_pruning, L8 cmp_threshold, D11 set, static generate_html +
+hover_text + load_thresholds bundle, R6 analyze/augment fossils, R14,
+T5, 20 dead scripts incl. all retrofit patchers except the chain-live
+patch_dive_species_narrative), plus this section's get_final_form and
+intended_pruning candidates, plus the legacy/historical/backcompat
+grep audit (nothing further actionable — remaining hits are protected
+gobattlekit seams, live CLI surface, or documentation).
 
-Concrete candidates to audit (grows as we spot them):
+Still open (deliberately NOT cut in S7):
 
-- **`gopvpsim.evolution_lines.get_final_form()`** — kept alongside the
-  new `get_final_forms()` for callers that "know they're dealing with
-  unambiguous chains." Delete once nothing in the codebase calls it.
-  Currently used only by tests.
-- **`pvpoke_dp(intended_pruning=...)`** — the flag toggles between
-  "PvPoke's actual JS behavior (dead-code dominance checks)" and
-  "apparently intended behavior." If we're confident one branch is
-  right, collapse to that and drop the flag.
-- **Anything flagged with "historical" / "legacy" / "backcompat"** in
-  code comments — grep for these when the session starts.
 - **Gobattlekit threshold schema compatibility** in
-  `gopvpsim.user_collection.check_thresholds` — once gobattlekit has
-  actually migrated to use the shared module and we've confirmed it
-  works, we may want to simplify the dict schema or unify with
-  pogo-simulator's TOML anchor schema. But not before gobattlekit's
-  migration lands.
-
-Do NOT start this cleanup pass until Michael has explicitly signed
-off that the current oracle tests pass human verification. This rule
-exists because "simplification" mid-feature-work tends to silently
-break invariants that weren't yet nailed down by tests.
+  `gopvpsim.user_collection.check_thresholds` (and `as_legacy_dict` in
+  thresholds.py) — once gobattlekit has actually migrated to use the
+  shared module and we've confirmed it works, we may want to simplify
+  the dict schema or unify with pogo-simulator's TOML anchor schema.
+  But not before gobattlekit's migration lands. **The gobattlekit
+  threshold pipeline actively consumes both as of 2026-06-12 — do not
+  touch without coordinating.**
+- **§I consolidations** (L11 gamemaster index, L15 unified
+  invalidate_caches + effective-stats primitive, L6 league descriptor,
+  D9 SweepConfig, D14 tier recompute, R11 shared scenario/color
+  helpers, W8 slug parser, W10 badge renderer, T8 conftest deep_dive
+  loader) — deferred from S7: D9/D14/T8 are seams the dedicated
+  deep_dive.py split session will rework anyway, and the library
+  consolidations (L6/L11/L15) are behavior-adjacent refactors, not
+  deletions. Bundle them with the split session or their natural
+  feature sessions.
 
 ## Battle simulator
 
@@ -201,6 +202,14 @@ here 2026-06-12; these are the remaining seams.)*
   ETag-cached gamemaster. Add a provider injection point (parameter
   or settable loader) on match_mons / get_pokemon_index /
   evolution_lines.
+
+* **Golden parity-vector emitter** *(seeded by the gobattlekit
+  threshold-pipeline session, 2026-06-12)* — a script that emits
+  (species, IVs, level) → (stats, CP, rank) fixtures from our
+  canonical primitives, checked into gobattlekit as test vectors so
+  its stat math can't drift from ours. Complements the CSV parity
+  corpus below (that one covers parsing/matching; this covers the
+  arithmetic).
 
 * **Shared CSV parity corpus (CP12)** — a small synthetic CSV
   (shadow, over-cap, out-of-range, gendered, branched-evo rows) +
@@ -704,22 +713,11 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   Until then, demoting the section gives most of the operational win
   for none of the engineering cost.
 
-* **Non-interactive `generate_html` is now strictly worse than interactive**
-  — `generate_analysis_sections` (line 2046, which produces the slayer
-  iteration display, breakpoint narration, banding analysis, clusters,
-  etc.) is *only* called from `generate_interactive_html` (line 2866),
-  not from `generate_html` (line 1242). Without `--interactive`, the HTML
-  shows just the top-N table, the plot, and a brief methodology footer —
-  none of the slayer analysis. Fix: either deprecate the non-interactive
-  path entirely, or refactor so both paths render the analysis sections.
-  Discovered 2026-04-08 during anchor-system smoke testing — it's easy
-  to mistakenly run a smoke test without `--interactive` and conclude
-  nothing rendered. *Update 2026-06-10 (arc S1):* the non-interactive
-  path now **crashes outright** — `generate_html` line ~1627
-  references a `shadow` variable that isn't in its signature
-  (`NameError`), evidently since the display-rename line was added.
-  Nobody noticed, which settles how unused the path is; points toward
-  the "deprecate it" option.
+* **Non-interactive `generate_html` — RESOLVED 2026-06-12 (arc S7)**
+  — the static path was deleted outright (it had been crashing on a
+  `NameError` since the S1 era with nobody noticing). `--html` now
+  implies `--interactive`, so the old smoke-test trap (run without
+  the flag, conclude nothing rendered) is gone too.
 
 ## CD article generator — open follow-ups
 
