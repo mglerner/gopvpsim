@@ -188,8 +188,6 @@ def test_slayer_worker_matches_from_pokemon_mirror():
     scenarios = [(1, 1), (0, 0)]
     deep_dive_slayer.slayer_worker_init(
         AEGI_SPECIES, parse_types(focal_mon),
-        focal_mon['baseStats']['atk'], focal_mon['baseStats']['def'],
-        focal_mon['baseStats']['hp'],
         LEAGUE_CAPS[LEAGUE], False,
         dict(fast_db[AEGI_FAST]),
         [dict(charged_db[c]) for c in AEGI_CHARGED],

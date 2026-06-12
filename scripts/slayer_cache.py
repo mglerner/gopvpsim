@@ -20,7 +20,11 @@ from pathlib import Path
 # v2 (2026-06-10): S1 form-change plumbing — slayer workers now sim
 # Aegislash/Morpeko/Mimikyu mirrors with form mechanics, so v1 scores
 # for those species are stale.
-CACHE_VERSION = 2
+# v3 (2026-06-12): S7 cleanup touched slayer_worker_init / worker
+# plumbing (scripts/ is outside the engine source hash; bump is the
+# standing rule for any worker-code change even when outputs are
+# expected identical).
+CACHE_VERSION = 3
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'slayer'
 
 

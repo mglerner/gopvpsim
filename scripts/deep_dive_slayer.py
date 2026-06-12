@@ -12,7 +12,7 @@ import os
 import sys
 
 from gopvpsim.pokemon import (
-    Pokemon, get_species, best_level, CPM,
+    Pokemon, best_level, CPM,
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL,
 )
 from gopvpsim.moves import get_moves, type_effectiveness
@@ -34,7 +34,7 @@ compute_iv_metadata = None
 _worker_state = {}
 
 
-def discover_slayer_thresholds(results, opponent_idx, n_scenarios, opponent_name=None):
+def discover_slayer_thresholds(results, opponent_idx, n_scenarios):
     """
     Discover IV thresholds optimized to beat a specific opponent.
 
@@ -126,16 +126,13 @@ def discover_slayer_thresholds(results, opponent_idx, n_scenarios, opponent_name
 _slayer_state = {}
 
 
-def slayer_worker_init(species, focal_types, base_atk, base_def, base_sta,
+def slayer_worker_init(species, focal_types,
                          max_cp, shadow, fm_template, cms_template,
                          shield_scenarios, log_path=None, verbose=False,
                          focal_mon=None):
     worker_log_setup(log_path, verbose=verbose)
     _slayer_state['species'] = species
     _slayer_state['focal_types'] = focal_types
-    _slayer_state['base_atk'] = base_atk
-    _slayer_state['base_def'] = base_def
-    _slayer_state['base_sta'] = base_sta
     _slayer_state['max_cp'] = max_cp
     _slayer_state['shadow'] = shadow
     _slayer_state['fm_template'] = fm_template
@@ -287,8 +284,6 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     focal_mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
     focal_types = parse_types(focal_mon)
 
-    base = get_species(species)
-    base_atk, base_def, base_sta = base['atk'], base['def'], base['hp']
     max_cp = LEAGUE_CAPS[league]
 
     if cache is None:
@@ -386,7 +381,7 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
             chunk_size = max(1, (len(profile_list) + n_chunks_target - 1) // n_chunks_target)
             chunks = [profile_list[i:i+chunk_size] for i in range(0, len(profile_list), chunk_size)]
 
-            init_args = (species, focal_types, base_atk, base_def, base_sta,
+            init_args = (species, focal_types,
                          max_cp, shadow, fm_template, cms_template,
                          shield_scenarios, log_path, verbose, focal_mon)
             sim_start = _time.time()
