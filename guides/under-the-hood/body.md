@@ -226,7 +226,7 @@ narrative blocks on dives default to "auto" now, replacing earlier
 ai-drafted prose, so there's no unreviewed LLM prose on the main
 deep dives.
 
-## Overriding any of this — for project contributors
+## Overriding any of this - for project contributors
 
 The tool is designed so expert authoring always wins over automation.
 The overrides below all live in `thresholds/<species>.toml` and apply
@@ -246,7 +246,7 @@ contributions flow through the project repo.
 
 For removal: the auto-fallback layer is gated, so a TOML that hand-
 authors anchors against (say) Annihilape will not get auto-fallback
-Annihilape additions stacked on top — only auto-anchors against
+Annihilape additions stacked on top - only auto-anchors against
 opponents the TOML doesn't already cover. If a tier card has too
 many bullets, the right move is usually adding a hand-authored
 narrower anchor against that opponent rather than trying to remove

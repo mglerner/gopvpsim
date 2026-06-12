@@ -150,7 +150,7 @@ is the blue row. Green cells are win rates above 50% (form wins
 that shield scenario outright), red cells are below 50% (form
 loses). Shield asymmetry dominates the extremes: 2v0 / 2v1 cells
 read green near 100% for both forms, 0v1 / 0v2 cells read red near
-zero — per the prose below, the interesting reading is
+zero - per the prose below, the interesting reading is
 <em>within a column</em> (does form choice swing the outcome
 at a given shield count?).
 </figcaption>

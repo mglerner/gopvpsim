@@ -122,7 +122,7 @@ hit at least one qualifying IV spread, with 50-75% probability. The
 column assumes an IV floor of 0/0/0 unless stated otherwise; that
 matches plain wild spawns. Weather-boosted, raid, hatched, traded,
 research-reward, and Shadow-rescue catches use higher IV floors and
-need correspondingly fewer catches — see the
+need correspondingly fewer catches - see the
 [Pokemon Go Wiki's IV floor reference](https://pokemongo.fandom.com/wiki/Individual_Values)
 for the per-source floor table.
 
