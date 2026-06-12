@@ -510,57 +510,6 @@ class IVCategory:
     member_meta: dict = field(default_factory=dict)
 
 
-def hover_text(r, tier_name=None, ref_per_opp=None, ref_label=None,
-                opponent_names=None, shield_scenarios=None):
-    """Build hover text for a single IV result.
-
-    If ref_per_opp is provided (the rank-1 IV's per-opponent scores),
-    show which matchups were gained/lost compared to rank 1.
-    """
-    lines = [
-        f"IVs: {r['atk_iv']}/{r['def_iv']}/{r['sta_iv']}",
-        f"L{r['level']} CP{r['cp']}",
-        f"Atk:{r['atk']:.2f} Def:{r['def_']:.2f} HP:{r['hp']}",
-        f"SP Rank: #{r['sp_rank']} | Battle Rank: #{r['battle_rank']}",
-        f"Avg Score: {r['avg_score']:.1f}",
-    ]
-    if tier_name:
-        lines.append(f"Tier: {tier_name}")
-
-    # Matchup diffs vs rank 1
-    if ref_per_opp and opponent_names and shield_scenarios and 'per_opp' in r:
-        my_opp = r['per_opp']
-        if my_opp is not ref_per_opp:  # skip for rank 1 itself
-            lines.append(f'')
-            lines.append(f'vs {ref_label}:')
-            for si, (s_focal, s_opp) in enumerate(shield_scenarios):
-                gained = []
-                lost = []
-                for oi, opp_name in enumerate(opponent_names):
-                    key = (si, oi)
-                    my_score = my_opp.get(key, 0)
-                    ref_score = ref_per_opp.get(key, 0)
-                    my_win = my_score >= 500
-                    ref_win = ref_score >= 500
-                    # Short name for display
-                    short = opp_name.split('(')[0].strip()[:12]
-                    if my_win and not ref_win:
-                        gained.append(short)
-                    elif not my_win and ref_win:
-                        lost.append(short)
-                scenario_label = f'{s_focal}v{s_opp}'
-                parts = []
-                if gained:
-                    parts.append(f'+{",".join(gained)}')
-                if lost:
-                    parts.append(f'-{",".join(lost)}')
-                if parts:
-                    lines.append(f'  {scenario_label}: {" | ".join(parts)}')
-                else:
-                    lines.append(f'  {scenario_label}: (same matchups)')
-
-    return '<br>'.join(lines)
-
 
 
 def threshold_desc(thresh):
@@ -1020,14 +969,6 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
             order.append(key)
         groups[key].append(rec)
 
-    # Sort groups within each (parent, opponent) family by min threshold
-    # so a parent with multiple moves reads in ascending stat order.
-    def _group_sort_key(key):
-        recs = groups[key]
-        min_thresh = min(r['anchor'].threshold_value for r in recs)
-        # Primary: parent+opponent groups stay together (preserve original
-        # first-seen order via index). Secondary: ascending threshold.
-        return (order.index(key) // 1000, key[0], key[1], min_thresh)
     # Stable group ordering: keep parents+opponents in original first-seen
     # order, then sort within by min threshold. Use a two-pass approach
     # so different parents/opponents don't interleave.

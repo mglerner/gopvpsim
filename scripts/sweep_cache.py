@@ -40,7 +40,9 @@ import numpy as np
 
 # Manual escape hatch: bump on any battle-behavior change that the
 # engine source hash somehow misses (it shouldn't — see _ENGINE_FILES).
-CACHE_VERSION = 1
+# v2 (2026-06-12): S7 cleanup touched dive worker/orchestration code in
+# scripts/ (outside the engine hash); bump per the standing rule.
+CACHE_VERSION = 2
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'sweep'
 
 # Engine sources whose content participates in the focal key. Any edit

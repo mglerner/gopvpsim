@@ -143,42 +143,10 @@ def load_group(group_name):
 
 
 # ---------------------------------------------------------------------------
-# Threshold loading and classification
+# Threshold classification
 # ---------------------------------------------------------------------------
 
-def load_thresholds(path):
-    """
-    Load thresholds from a JSON file.
-
-    Format:
-        {
-            "GH Great": {"attack": 0, "defense": 143.03, "stamina": 138},
-            "GH Good":  {"attack": 0, "defense": 141.66, "stamina": 138}
-        }
-
-    Thresholds should be ordered from most restrictive to least restrictive.
-    A value of 0 means "don't care" for that stat.
-    """
-    with open(path) as f:
-        data = json.load(f)
-    # Validate structure
-    for name, thresh in data.items():
-        for key in ('attack', 'defense', 'stamina'):
-            if key not in thresh:
-                sys.exit(f"Threshold {name!r} missing required key {key!r}")
-    return data
-
-
 discover_slayer_thresholds = slayer.discover_slayer_thresholds
-
-
-_slayer_worker_init = slayer.slayer_worker_init
-
-
-_slayer_iter_worker = slayer.slayer_iter_worker
-
-
-_build_focal_meta = slayer.build_focal_meta
 
 
 iterative_slayer_discovery = slayer.iterative_slayer_discovery
@@ -1670,388 +1638,6 @@ def _plotly_script_tag(standalone, shared_plotly_dir=None, html_path=None):
     return f'<script>{plotly_bytes.decode()}</script>'
 
 
-def generate_html(species, league, moveset_results, html_path, thresholds=None,
-                  opponent_label=None, shield_scenarios=None, opponent_names=None,
-                  opp_iv_mode='pvpoke', standalone=False, cli_args_str=None,
-                  shared_plotly_dir=None):
-    """
-    Generate an interactive HTML file with Plotly.js scatter plots.
-
-    If thresholds are provided, points are colored by which threshold tier they
-    meet (most restrictive first). The legend is interactive - click to
-    isolate/hide groups, hover over legend entries to highlight those points.
-    """
-    # Build threshold tier names and assign colors
-    tier_names = list(thresholds.keys()) if thresholds else []
-    tier_colors = {}
-    for i, name in enumerate(tier_names):
-        tier_colors[name] = THRESHOLD_COLORS[i % len(THRESHOLD_COLORS)]
-
-    opp_desc = opponent_label or "PvPoke rankings"
-
-    plots_data = []
-    for entry in moveset_results:
-        fast_id, charged_ids, results = entry[0], entry[1], entry[2]
-        label = moveset_label(fast_id, charged_ids)
-
-        # Reference IV for matchup diffs: use the IV that matches the opp_iv_mode.
-        # If opp_iv_mode=pvpoke, compare against PvPoke default IVs for this species.
-        # If opp_iv_mode=rank1, compare against stat-product rank 1.
-        ref_result = None
-        if parse_mode(opp_iv_mode)[0] == 'rank1':
-            # Rank 1 by stat product
-            ref_result = min(results, key=lambda r: r['sp_rank'])
-            ref_label = (f"SP Rank 1 ({ref_result['atk_iv']}/"
-                         f"{ref_result['def_iv']}/{ref_result['sta_iv']})")
-        else:
-            # PvPoke default IVs
-            _lv, da, dd, ds = pvpoke_default_ivs(species, league=league)
-            for r in results:
-                if (r['atk_iv'] == da and r['def_iv'] == dd
-                        and r['sta_iv'] == ds):
-                    ref_result = r
-                    break
-            ref_label = (f"Default ({da}/{dd}/{ds})"
-                         if ref_result else None)
-        ref_per_opp = ref_result.get('per_opp') if ref_result else None
-
-        def hover(r, tier=None):
-            return _hover_text(r, tier_name=tier, ref_per_opp=ref_per_opp,
-                               ref_label=ref_label, opponent_names=opponent_names,
-                               shield_scenarios=shield_scenarios)
-
-        if thresholds:
-            for r in results:
-                r['_tier'] = classify_iv(r, thresholds)
-
-            traces = []
-
-            other = [r for r in results if r['_tier'] is None]
-            if other:
-                traces.append({
-                    'name': 'Other',
-                    'x': [r['sp_rank'] for r in other],
-                    'y': [r['avg_score'] for r in other],
-                    'text': [hover(r) for r in other],
-                    'marker_color': [r['avg_score'] for r in other],
-                    'use_colorscale': True,
-                })
-
-            for tier_name in tier_names:
-                tier_results = [r for r in results if r['_tier'] == tier_name]
-                if tier_results:
-                    thresh = thresholds[tier_name]
-                    thresh_desc = _threshold_desc(thresh)
-                    traces.append({
-                        'name': f'{tier_name} ({thresh_desc})',
-                        'x': [r['sp_rank'] for r in tier_results],
-                        'y': [r['avg_score'] for r in tier_results],
-                        'text': [hover(r, tier_name) for r in tier_results],
-                        'marker_color': tier_colors[tier_name],
-                        'use_colorscale': False,
-                    })
-
-            plots_data.append({'label': label, 'traces': traces, 'results': results})
-        else:
-            traces = [{
-                'name': 'All IVs',
-                'x': [r['sp_rank'] for r in results],
-                'y': [r['avg_score'] for r in results],
-                'text': [hover(r) for r in results],
-                'marker_color': [r['avg_score'] for r in results],
-                'use_colorscale': True,
-            }]
-            plots_data.append({'label': label, 'traces': traces, 'results': results})
-
-    # --- Build HTML ---
-    # Embed CLI invocation as an HTML comment near the top so
-    # `grep '<!-- CLI:' file.html` works for forensic comparison.
-    cli_comment = ''
-    if cli_args_str:
-        from html import escape as _esc_cmt
-        cli_comment = f'<!-- CLI: {_esc_cmt(cli_args_str)} -->\n'
-
-    # Display-rename for non-interactive output; same convention as
-    # generate_interactive_html below. Shadow flag is separate from
-    # species; reconstruct the gamemaster-format name first.
-    _species_for_display = f'{species} (Shadow)' if shadow else species
-    species_pretty = pretty_species(_species_for_display)
-
-    html = f"""<!DOCTYPE html>
-{cli_comment}<html>
-<head>
-<meta charset="utf-8">
-<title>{species_pretty} {league.title()} League IV Deep Dive</title>
-{_plotly_script_tag(standalone, shared_plotly_dir, html_path)}
-<style>
-  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-         margin: 20px; background: #1a1a2e; color: #e0e0e0; }}
-  h1 {{ color: #e94560; }}
-  h2 {{ color: #0f3460; background: #16213e; padding: 8px 12px; border-radius: 4px;
-        color: #e0e0e0; }}
-  .meta {{ color: #888; font-size: 13px; margin-bottom: 15px; }}
-  .plot-container {{ margin-bottom: 30px; }}
-  .summary {{ background: #16213e; padding: 12px; border-radius: 6px;
-              margin-bottom: 20px; font-size: 14px; }}
-  .summary table {{ border-collapse: collapse; width: 100%; }}
-  .summary th, .summary td {{ text-align: left; padding: 4px 10px;
-                               border-bottom: 1px solid #0f3460; }}
-  .summary th {{ color: #e94560; }}
-  .tier-badge {{ display: inline-block; padding: 2px 8px; border-radius: 3px;
-                 font-size: 12px; font-weight: bold; margin-left: 4px; }}
-  .threshold-info {{ background: #16213e; padding: 10px; border-radius: 6px;
-                     margin-bottom: 15px; font-size: 13px; }}
-  .threshold-info span {{ font-weight: bold; }}
-  details.meta {{ cursor: pointer; }}
-  details.meta summary {{ color: #888; font-size: 13px; }}
-</style>
-</head>
-<body>
-<h1>{species_pretty} - {league.title()} League IV Deep Dive</h1>
-<p class="meta">Opponents: {opp_desc}
-| Shield scenario(s): {', '.join(f'{s0}v{s1}' for s0, s1 in (shield_scenarios or [(1,1)]))}
-| Policy: pvpoke_dp</p>
-"""
-
-    # List opponents
-    if opponent_names:
-        html += '<details class="meta"><summary>Opponent list '
-        html += f'({len(opponent_names)} mons)</summary><p style="margin:4px 0 8px 12px">'
-        html += ', '.join(opponent_names)
-        html += '</p></details>\n'
-
-    # Threshold legend box
-    if thresholds:
-        html += '<div class="threshold-info">\n'
-        html += '<strong>IV Thresholds:</strong><br>\n'
-        for tier_name in tier_names:
-            thresh = thresholds[tier_name]
-            color = tier_colors[tier_name]
-            desc = _threshold_desc(thresh)
-            html += (f'<span class="tier-badge" style="background:{color};color:#000">'
-                     f'{tier_name}</span> {desc}<br>\n')
-        html += '<br><em>Hover over legend entries to isolate that tier. '
-        html += 'Click to lock the isolation; click again to unlock.</em>\n'
-        html += '</div>\n'
-
-    for i, pd in enumerate(plots_data):
-        results = pd['results']
-        top10 = results[:10]
-        html += f'<h2>{pd["label"]}</h2>\n'
-
-        # Summary table with threshold badges
-        html += '<div class="summary"><table>\n'
-        html += '<tr><th>Battle Rank</th><th>IVs</th><th>Level</th><th>CP</th>'
-        html += '<th>Atk</th><th>Def</th><th>HP</th><th>SP Rank</th>'
-        html += '<th>Avg Score</th>'
-        if thresholds:
-            html += '<th>Tier</th>'
-        html += '</tr>\n'
-        for r in top10:
-            tier = r.get('_tier', None)
-            tier_html = ''
-            if thresholds:
-                if tier:
-                    color = tier_colors.get(tier, '#666')
-                    tier_html = (f'<td><span class="tier-badge" '
-                                 f'style="background:{color};color:#000">'
-                                 f'{tier}</span></td>')
-                else:
-                    tier_html = '<td>-</td>'
-            html += (f'<tr><td>#{r["battle_rank"]}</td>'
-                     f'<td>{r["atk_iv"]}/{r["def_iv"]}/{r["sta_iv"]}</td>'
-                     f'<td>{r["level"]}</td><td>{r["cp"]}</td>'
-                     f'<td>{r["atk"]:.2f}</td><td>{r["def_"]:.2f}</td><td>{r["hp"]}</td>'
-                     f'<td>#{r["sp_rank"]}</td>'
-                     f'<td>{r["avg_score"]:.1f}</td>{tier_html}</tr>\n')
-        html += '</table></div>\n'
-        html += f'<div id="plot{i}" class="plot-container" style="height:550px;"></div>\n'
-
-    # Plotly traces
-    html += '<script>\n'
-    for i, pd in enumerate(plots_data):
-        # Compute fixed axis ranges from all data so they never rescale
-        all_x = []
-        all_y = []
-        for trace in pd['traces']:
-            all_x.extend(trace['x'])
-            all_y.extend(trace['y'])
-        x_min, x_max = min(all_x), max(all_x)
-        y_min, y_max = min(all_y), max(all_y)
-        x_pad = max(1, (x_max - x_min) * 0.02)
-        y_pad = max(0.5, (y_max - y_min) * 0.03)
-
-        traces_js = []
-        # Track original opacities per trace for hover restore
-        original_opacities = []
-        for trace in pd['traces']:
-            t = {
-                'x': trace['x'],
-                'y': trace['y'],
-                'text': trace['text'],
-                'name': trace['name'],
-                'mode': 'markers',
-                'type': 'scattergl',
-                'hoverinfo': 'text',
-            }
-            if trace['use_colorscale']:
-                # Dim the background "Other" points when tier traces
-                # exist so the tier-colored points are clearly visible.
-                has_tier_traces = any(
-                    not tr['use_colorscale'] for tr in pd['traces'])
-                opacity = 0.4
-                t['marker'] = {
-                    'size': 2,
-                    'color': trace['marker_color'],
-                    'colorscale': 'Viridis',
-                    'opacity': opacity,
-                }
-                if not thresholds:
-                    t['marker']['colorbar'] = {'title': 'Avg Score'}
-            else:
-                opacity = 0.9
-                t['marker'] = {
-                    'size': 6,
-                    'color': trace['marker_color'],
-                    'opacity': opacity,
-                    'line': {'width': 1, 'color': '#000'},
-                }
-            traces_js.append(t)
-            original_opacities.append(opacity)
-
-        layout = {
-            'title': pd['label'],
-            'xaxis': {
-                'title': 'Stat Product Rank (1=best)',
-                'range': [x_max + x_pad, x_min - x_pad],  # reversed
-                'fixedrange': True,
-            },
-            'yaxis': {
-                'title': 'Avg Battle Score',
-                'range': [y_min - y_pad, y_max + y_pad],
-                'fixedrange': True,
-            },
-            'paper_bgcolor': '#1a1a2e',
-            'plot_bgcolor': '#16213e',
-            'font': {'color': '#e0e0e0'},
-            'hovermode': 'closest',
-            'legend': {
-                'bgcolor': 'rgba(22,33,62,0.8)',
-                'bordercolor': '#0f3460',
-                'borderwidth': 1,
-            },
-        }
-        # Use .then() to attach legend hover behavior after Plotly finishes rendering.
-        # Plotly.restyle is the correct API for per-trace marker updates.
-        # We suppress default legend click/doubleclick, and instead use
-        # mouseenter/mouseleave on the legend SVG <g class="traces"> elements
-        # to isolate one tier at a time without rescaling axes.
-        html += f"""
-Plotly.newPlot("plot{i}", {json.dumps(traces_js)}, {json.dumps(layout)},
-  {{responsive: true}}).then(function(gd) {{
-  var origOpacities = {json.dumps(original_opacities)};
-  var nTraces = origOpacities.length;
-  var lockedIdx = -1;  // -1 = not locked; >= 0 = locked to that trace
-
-  gd.on("plotly_legendclick", function() {{ return false; }});
-  gd.on("plotly_legenddoubleclick", function() {{ return false; }});
-
-  function highlightTrace(idx) {{
-    for (var j = 0; j < nTraces; j++) {{
-      var op = (j === idx) ? Math.min(1.0, origOpacities[j] + 0.15) : 0.03;
-      Plotly.restyle(gd, {{"marker.opacity": op}}, [j]);
-    }}
-  }}
-
-  function restoreAll() {{
-    for (var j = 0; j < nTraces; j++) {{
-      Plotly.restyle(gd, {{"marker.opacity": origOpacities[j]}}, [j]);
-    }}
-  }}
-
-  var attempts = 0;
-  function attachLegendHover() {{
-    var items = gd.querySelectorAll(".legend .traces");
-    if (items.length === 0 && attempts < 50) {{
-      attempts++;
-      setTimeout(attachLegendHover, 100);
-      return;
-    }}
-    items.forEach(function(el, idx) {{
-      el.style.cursor = "pointer";
-      el.addEventListener("mouseenter", function() {{
-        if (lockedIdx < 0) highlightTrace(idx);
-      }});
-      el.addEventListener("mouseleave", function() {{
-        if (lockedIdx < 0) restoreAll();
-      }});
-      el.addEventListener("click", function() {{
-        if (lockedIdx === idx) {{
-          lockedIdx = -1;
-          restoreAll();
-        }} else {{
-          lockedIdx = idx;
-          highlightTrace(idx);
-        }}
-      }});
-    }});
-  }}
-  attachLegendHover();
-}});
-"""
-
-    # Methodology footer
-    shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in (shield_scenarios or [(1, 1)]))
-    n_opponents = len(opponent_names) if opponent_names else '?'
-    if parse_mode(opp_iv_mode)[0] == 'rank1':
-        opp_iv_desc = 'stat-product rank 1 IVs'
-    else:
-        opp_iv_desc = ("PvPoke's default IVs (the IVs pvpoke.com uses when you "
-                       "load a matchup)")
-    html += '</script>\n'
-    html += f"""
-<hr style="border-color:#0f3460; margin-top:40px">
-<div style="color:#888; font-size:12px; max-width:800px; margin:10px 0 30px 0; line-height:1.6">
-<strong>Methodology</strong><br>
-Each of the 4096 possible IV spreads (0-15 for Atk/Def/Sta) is leveled to the
-highest level that stays under the {league.title()} League CP cap ({LEAGUE_CAPS[league]}).
-For each IV spread, a battle is simulated against each of the {n_opponents} opponents
-in the {opp_desc} pool in the {shield_desc} shield scenario(s), using the
-<code>pvpoke_dp</code> policy (PvPoke's simulate-mode dynamic programming policy).
-Opponents use {opp_iv_desc} at their best level for this league.
-<br><br>
-<strong>Avg Battle Score</strong> is the mean of the PvPoke battle scores across all
-opponents and shield scenarios. The PvPoke score for a single battle is:
-<code>500 &times; (damage dealt / opponent max HP) + 500 &times; (HP remaining / own max HP)</code>.
-A score of 500 means a tie; above 500 is a win, below is a loss.
-<br><br>
-<strong>Battle Rank</strong> is the IV spread's position when all 4096 spreads are
-sorted by Avg Battle Score (descending). Battle Rank #1 is the IV spread that performs
-best on average against this opponent pool.
-<strong>Stat Product Rank</strong> (x-axis) is the traditional PvP IV rank based on
-Atk &times; Def &times; HP.
-</div>
-"""
-    # Footer: equivalent CLI invocation, kept at the bottom so it's
-    # discoverable but doesn't compete with the actual analysis content.
-    if cli_args_str:
-        from html import escape as _esc
-        html += '<details class="meta" style="margin-top:30px;border-top:1px solid #0f3460;padding-top:10px">'
-        html += '<summary>Run parameters (CLI invocation)</summary>'
-        html += '<pre style="margin:8px 0;background:#16213e;'
-        html += 'padding:10px;border-radius:4px;color:#e0e0e0;font-size:12px;'
-        html += 'white-space:pre-wrap;word-break:break-all">'
-        html += _esc(cli_args_str)
-        html += '</pre></details>\n'
-
-    html += '</body>\n</html>\n'
-
-    with open(html_path, 'w') as f:
-        f.write(html)
-    logger.result(f"  HTML written to {html_path}")
-
-
-_hover_text = rendering.hover_text
 _threshold_desc = rendering.threshold_desc
 _scenario_ranks = rendering.scenario_ranks
 
@@ -4588,7 +4174,9 @@ def main():
     parser.add_argument('--interactive', action='store_true',
                         help='Generate interactive HTML with dropdowns for moveset, '
                              'shield scenario, and opp IV mode switching. '
-                             'Runs all shield scenarios and reference moveset.')
+                             'Runs all shield scenarios and reference moveset. '
+                             'Implied by --html (the former static HTML mode '
+                             'was removed 2026-06-12).')
     parser.add_argument('--reference', default='auto', metavar='SPEC',
                         help='Reference moveset for comparison: auto (PvPoke default, '
                              'shown in interactive mode), none (skip), or '
@@ -4773,6 +4361,14 @@ def main():
         if len(parts) != 2:
             sys.exit("--shield-scenario must be S1,S2 (e.g. 1,1), 'all', or 'even'")
         shield_scenarios = [(int(parts[0]), int(parts[1]))]
+
+    # Static (non-interactive) HTML mode was deleted in the 2026-06-12 S7
+    # cleanup — it had been broken (NameError) since well before, with
+    # nobody noticing. --html now implies --interactive.
+    if args.html and not args.interactive:
+        logger.info("  --html implies --interactive (static HTML mode "
+                    "was removed)")
+        args.interactive = True
 
     # Interactive mode always renders all 9 scenarios, so expand BEFORE any
     # simulation — Phase 2, threshold auto-discovery, the mirror-slayer
@@ -5020,9 +4616,9 @@ def main():
     opponent_label = None
     if args.group and args.opponents_file:
         parser.error('--group and --opponents-file are mutually exclusive')
-    focal_in_opponents = False
     if args.group:
         group_entries = load_group(args.group)
+        focal_in_opponents = False
         opponents = []
         opp_movesets_full = []
         for species_name, fast_move, charged_moves, is_shadow in group_entries:
@@ -5099,7 +4695,6 @@ def main():
                 logger.info(f"  (added {_mirror_name} to opponents for mirror analysis)")
             except (KeyError, ValueError) as _e:
                 logger.warning(f"could not append focal species for mirror: {_e}")
-        focal_in_opponents = True
         opponent_label = (f"Custom pool from {os.path.basename(path)} "
                           f"({len(opponents)} mons)")
         if n_variants:
@@ -5108,7 +4703,6 @@ def main():
                     + (f" (+{n_variants} moveset variant(s))"
                        if n_variants else ""))
     else:
-        screen_n = args.screen_opponents or args.opponents
         opponents = get_top_opponents(args.league, args.opponents)
         # Always include focal species for mirror analysis (append if not in
         # top N). Form-matched: a shadow focal's mirror is the shadow entry.
@@ -5116,7 +4710,6 @@ def main():
         if _mirror_name not in opponents:
             opponents.append(_mirror_name)
             logger.info(f"  (added {_mirror_name} to opponents for mirror analysis)")
-        focal_in_opponents = True
         opponent_label = f"Top {len(opponents)} from {args.league} rankings"
         logger.info(f"  {len(opponents)} meta opponents (top from {args.league} rankings)")
 
@@ -5266,7 +4859,7 @@ def main():
                         break
             if mirror_idx is not None:
                 slayer_thresh, slayer_scored = discover_slayer_thresholds(
-                    results, mirror_idx, len(shield_scenarios), args.species
+                    results, mirror_idx, len(shield_scenarios)
                 )
                 if slayer_scored:
                     # Community nicknames for slayer builds. Default = full species name.
@@ -5573,48 +5166,94 @@ def main():
 
     # HTML output
     if args.html:
-        if args.interactive:
-            # Interactive mode: embed all data, JS-driven dropdowns.
-            # Determine composite (opp_iv, bait) modes to run. The axis is
-            # 2D: opp-IVs × bait-shields. Composite modes are encoded as
-            # a string ('pvpoke', 'pvpoke:nobait', 'rank1', 'rank1:nobait')
-            # so score_arrays key format ``f'{mi}_{mode}'`` doesn't need
-            # schema changes.
-            if args.opp_ivs == 'both':
-                _base_opp_modes = ['pvpoke', 'rank1']
-            else:
-                _base_opp_modes = [opp_iv_mode]
-            if args.bait == 'both':
-                _bait_modes = ['bait', 'nobait']
-            elif args.bait == 'off':
-                _bait_modes = ['nobait']
-            else:
-                _bait_modes = ['bait']
-            opp_iv_modes_to_run = [
-                compose_mode(om, bm)
-                for om in _base_opp_modes
-                for bm in _bait_modes
-            ]
+        # Interactive HTML (the only mode since the 2026-06-12 S7
+        # cleanup deleted static generate_html).
+        # Interactive mode: embed all data, JS-driven dropdowns.
+        # Determine composite (opp_iv, bait) modes to run. The axis is
+        # 2D: opp-IVs × bait-shields. Composite modes are encoded as
+        # a string ('pvpoke', 'pvpoke:nobait', 'rank1', 'rank1:nobait')
+        # so score_arrays key format ``f'{mi}_{mode}'`` doesn't need
+        # schema changes.
+        if args.opp_ivs == 'both':
+            _base_opp_modes = ['pvpoke', 'rank1']
+        else:
+            _base_opp_modes = [opp_iv_mode]
+        if args.bait == 'both':
+            _bait_modes = ['bait', 'nobait']
+        elif args.bait == 'off':
+            _bait_modes = ['nobait']
+        else:
+            _bait_modes = ['bait']
+        opp_iv_modes_to_run = [
+            compose_mode(om, bm)
+            for om in _base_opp_modes
+            for bm in _bait_modes
+        ]
 
-            # Scenario expansion for interactive mode happens BEFORE Phase 2
-            # (see the parse block after format_cli_args), so Phase 2 already
-            # ran with the right scenarios. Repack its results and fill in
-            # any additional composite modes (extra opp-IV mode and/or bait
-            # mode) that weren't run originally. The cached Phase 2 result
-            # corresponds to ``opp_iv_mode`` at bait-on (the Phase 2 default).
-            cached_mode = opp_iv_mode  # bait-on, no :nobait suffix
-            new_results = []
-            for fast_id, charged_ids, results, cs, cm in all_moveset_results:
-                scores_by_mode = {cached_mode: cs}
+        # Scenario expansion for interactive mode happens BEFORE Phase 2
+        # (see the parse block after format_cli_args), so Phase 2 already
+        # ran with the right scenarios. Repack its results and fill in
+        # any additional composite modes (extra opp-IV mode and/or bait
+        # mode) that weren't run originally. The cached Phase 2 result
+        # corresponds to ``opp_iv_mode`` at bait-on (the Phase 2 default).
+        cached_mode = opp_iv_mode  # bait-on, no :nobait suffix
+        new_results = []
+        for fast_id, charged_ids, results, cs, cm in all_moveset_results:
+            scores_by_mode = {cached_mode: cs}
+            for mode in opp_iv_modes_to_run:
+                if mode in scores_by_mode:
+                    continue
+                mode_label = mode_pretty_label(mode)
+                logger.info(f"  Running {moveset_label(fast_id, charged_ids)} "
+                            f"({mode_label})...")
+                t0 = time.time()
+                _, n2, cs2, _ = iv_sweep(
+                    args.species, fast_id, charged_ids, args.league, args.shadow,
+                    opponents, opp_movesets_full, shield_scenarios,
+                    opp_iv_mode=mode,
+                    iv_floor=args.iv_floor,
+                    log_path=log_path, verbose=args.verbose,
+                    threshold_registry=threshold_registry,
+                    reserve_cpus=args.reserve_cpus,
+                    signature_dedup=not args.no_signature_dedup,
+                    use_sweep_cache=not args.no_sweep_cache,
+                )
+                elapsed = time.time() - t0
+                logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
+                scores_by_mode[mode] = cs2
+            new_results.append((fast_id, charged_ids, results,
+                                scores_by_mode, cm))
+        all_moveset_results = new_results
+
+        # Resolve and run reference moveset
+        reference_idx = -1
+        ref_moveset = resolve_reference_moveset(
+            args.species, args.league, args.shadow, args.reference)
+        if ref_moveset:
+            ref_fast, ref_charged = ref_moveset
+            ref_label = moveset_label(ref_fast, ref_charged)
+            # Check if reference is already a surviving moveset.
+            # Compare canonical (fast, sorted-charged) tuples, NOT label
+            # strings: screened movesets carry sorted charged pairs but
+            # --reference / rankings order is arbitrary, and a label
+            # mismatch on the same pair re-sweeps the reference AND
+            # emits a duplicate moveset page (2026-06-02 incident,
+            # previously patched only by a comment-enforced ordering
+            # convention in run_website_dives.py).
+            ref_key = (ref_fast, tuple(sorted(ref_charged)))
+            for mi, entry in enumerate(all_moveset_results):
+                if (entry[0], tuple(sorted(entry[1]))) == ref_key:
+                    reference_idx = mi
+                    break
+            if reference_idx < 0:
+                # Run reference sweep
+                logger.info(f"  Reference sweep: {ref_label}")
+                ref_scores_by_mode = {}
+                ref_meta = None
                 for mode in opp_iv_modes_to_run:
-                    if mode in scores_by_mode:
-                        continue
-                    mode_label = mode_pretty_label(mode)
-                    logger.info(f"  Running {moveset_label(fast_id, charged_ids)} "
-                                f"({mode_label})...")
                     t0 = time.time()
-                    _, n2, cs2, _ = iv_sweep(
-                        args.species, fast_id, charged_ids, args.league, args.shadow,
+                    ref_results, ref_n, ref_cs, ref_cm = iv_sweep(
+                        args.species, ref_fast, ref_charged, args.league, args.shadow,
                         opponents, opp_movesets_full, shield_scenarios,
                         opp_iv_mode=mode,
                         iv_floor=args.iv_floor,
@@ -5625,114 +5264,60 @@ def main():
                         use_sweep_cache=not args.no_sweep_cache,
                     )
                     elapsed = time.time() - t0
-                    logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
-                    scores_by_mode[mode] = cs2
-                new_results.append((fast_id, charged_ids, results,
-                                    scores_by_mode, cm))
-            all_moveset_results = new_results
+                    rate = ref_n / elapsed if elapsed > 0 else 0
+                    logger.info(f"    {ref_n:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
+                    ref_scores_by_mode[mode] = ref_cs
+                    if ref_meta is None:
+                        ref_meta = ref_cm
+                reference_idx = len(all_moveset_results)
+                all_moveset_results.append((ref_fast, ref_charged, ref_results,
+                                            ref_scores_by_mode, ref_meta))
 
-            # Resolve and run reference moveset
-            reference_idx = -1
-            ref_moveset = resolve_reference_moveset(
-                args.species, args.league, args.shadow, args.reference)
-            if ref_moveset:
-                ref_fast, ref_charged = ref_moveset
-                ref_label = moveset_label(ref_fast, ref_charged)
-                # Check if reference is already a surviving moveset.
-                # Compare canonical (fast, sorted-charged) tuples, NOT label
-                # strings: screened movesets carry sorted charged pairs but
-                # --reference / rankings order is arbitrary, and a label
-                # mismatch on the same pair re-sweeps the reference AND
-                # emits a duplicate moveset page (2026-06-02 incident,
-                # previously patched only by a comment-enforced ordering
-                # convention in run_website_dives.py).
-                ref_key = (ref_fast, tuple(sorted(ref_charged)))
-                for mi, entry in enumerate(all_moveset_results):
-                    if (entry[0], tuple(sorted(entry[1]))) == ref_key:
-                        reference_idx = mi
-                        break
-                if reference_idx < 0:
-                    # Run reference sweep
-                    logger.info(f"  Reference sweep: {ref_label}")
-                    ref_scores_by_mode = {}
-                    ref_meta = None
-                    for mode in opp_iv_modes_to_run:
-                        t0 = time.time()
-                        ref_results, ref_n, ref_cs, ref_cm = iv_sweep(
-                            args.species, ref_fast, ref_charged, args.league, args.shadow,
-                            opponents, opp_movesets_full, shield_scenarios,
-                            opp_iv_mode=mode,
-                            iv_floor=args.iv_floor,
-                            log_path=log_path, verbose=args.verbose,
-                            threshold_registry=threshold_registry,
-                            reserve_cpus=args.reserve_cpus,
-                            signature_dedup=not args.no_signature_dedup,
-                            use_sweep_cache=not args.no_sweep_cache,
-                        )
-                        elapsed = time.time() - t0
-                        rate = ref_n / elapsed if elapsed > 0 else 0
-                        logger.info(f"    {ref_n:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
-                        ref_scores_by_mode[mode] = ref_cs
-                        if ref_meta is None:
-                            ref_meta = ref_cm
-                    reference_idx = len(all_moveset_results)
-                    all_moveset_results.append((ref_fast, ref_charged, ref_results,
-                                                ref_scores_by_mode, ref_meta))
+        # Build moveset_data for interactive HTML
+        moveset_data = []
+        for entry in all_moveset_results:
+            fast_id, charged_ids = entry[0], entry[1]
+            scores_by_mode = entry[3]
+            meta = entry[4]
+            moveset_data.append({
+                'label': moveset_label_raw(fast_id, charged_ids),
+                'scores': scores_by_mode,
+                'meta': meta,
+            })
 
-            # Build moveset_data for interactive HTML
-            moveset_data = []
-            for entry in all_moveset_results:
-                fast_id, charged_ids = entry[0], entry[1]
-                scores_by_mode = entry[3]
-                meta = entry[4]
-                moveset_data.append({
-                    'label': moveset_label_raw(fast_id, charged_ids),
-                    'scores': scores_by_mode,
-                    'meta': meta,
-                })
-
-            # All render inputs are now in hand: snapshot them so
-            # scripts/replay_analysis.py can re-render this dive after
-            # renderer/analysis code changes without re-simming.
-            state = {
-                'species': args.species,
-                'league': args.league,
-                'shadow': args.shadow,
-                'html_path': args.html,
-                'split_movesets': args.split_movesets,
-                'standalone': args.standalone,
-                'shared_plotly_dir': args.shared_plotly,
-                'moveset_data': moveset_data,
-                'thresholds': thresholds,
-                'opponent_label': opponent_label,
-                'shield_scenarios': shield_scenarios,
-                'opponent_names': opponents,
-                'opp_iv_modes': opp_iv_modes_to_run,
-                'reference_idx': reference_idx,
-                'slayer_iter_result': main_slayer_iter_result,
-                'cli_args_str': cli_args_str,
-                'has_toml_tiers': _toml_tiers_loaded,
-                'article_slug': _article_slug,
-                'threshold_registry': threshold_registry,
-                'species_narrative': _species_narrative,
-            }
-            if not args.no_replay_dump:
-                _replay_path = dump_replay_state(state)
-                if _replay_path:
-                    logger.info(f"  Replay state: {_replay_path}")
-                    logger.info(f"    (re-render without re-simming: "
-                                f"python scripts/replay_analysis.py "
-                                f"{_replay_path})")
-            render_dive_html(state)
-        else:
-            # Static mode (original behavior)
-            generate_html(args.species, args.league, all_moveset_results, args.html,
-                          thresholds=thresholds, opponent_label=opponent_label,
-                          shield_scenarios=shield_scenarios,
-                          opponent_names=opponents, opp_iv_mode=opp_iv_mode,
-                          standalone=args.standalone,
-                          cli_args_str=cli_args_str,
-                          shared_plotly_dir=args.shared_plotly)
+        # All render inputs are now in hand: snapshot them so
+        # scripts/replay_analysis.py can re-render this dive after
+        # renderer/analysis code changes without re-simming.
+        state = {
+            'species': args.species,
+            'league': args.league,
+            'shadow': args.shadow,
+            'html_path': args.html,
+            'split_movesets': args.split_movesets,
+            'standalone': args.standalone,
+            'shared_plotly_dir': args.shared_plotly,
+            'moveset_data': moveset_data,
+            'thresholds': thresholds,
+            'opponent_label': opponent_label,
+            'shield_scenarios': shield_scenarios,
+            'opponent_names': opponents,
+            'opp_iv_modes': opp_iv_modes_to_run,
+            'reference_idx': reference_idx,
+            'slayer_iter_result': main_slayer_iter_result,
+            'cli_args_str': cli_args_str,
+            'has_toml_tiers': _toml_tiers_loaded,
+            'article_slug': _article_slug,
+            'threshold_registry': threshold_registry,
+            'species_narrative': _species_narrative,
+        }
+        if not args.no_replay_dump:
+            _replay_path = dump_replay_state(state)
+            if _replay_path:
+                logger.info(f"  Replay state: {_replay_path}")
+                logger.info(f"    (re-render without re-simming: "
+                            f"python scripts/replay_analysis.py "
+                            f"{_replay_path})")
+        render_dive_html(state)
 
     logger.info("Done.")
 
