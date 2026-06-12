@@ -37,11 +37,15 @@ from test_battle import _make_battle_pokemon, _extract_battle_log  # noqa: E402
 from gopvpsim.battle import simulate, pvpoke_dp  # noqa: E402
 
 
-def P(species, fast, charged, ivs, hid, shadow=False):
+def P(species, fast, charged, ivs, hid, shadow=False, level=None):
     """One side of a matchup. `species` is our display name; `hid` is the
-    PvPoke speciesId for the harness."""
+    PvPoke speciesId for the harness. `level` pins an explicit level on
+    BOTH engines — needed when our at_best_level (max 51, best buddy)
+    and PvPoke's UI default disagree (e.g. UL Aegislash: PvPoke default
+    is level 50; level 51 Shield yields a level-39 Blade instead of 38
+    and every downstream damage/DP decision shifts)."""
     return dict(species=species, fast=fast, charged=list(charged),
-                ivs=ivs, hid=hid, shadow=shadow)
+                ivs=ivs, hid=hid, shadow=shadow, level=level)
 
 
 # Every oracle matchup with a hand-typed PvPoke score/log in test_battle.py.
@@ -147,6 +151,27 @@ MATCHUPS = [
          p1=P('Morpeko (Full Belly)', 'THUNDER_SHOCK', ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS'], (5, 14, 15), 'morpeko_full_belly'),
          p2=P('Stunfisk (Galarian)', 'MUD_SHOT', ['ROCK_SLIDE', 'EARTHQUAKE'], (5, 15, 13), 'stunfisk_galarian'),
          xfail_cells={(1, 2), (2, 0), (2, 1), (2, 2)}),
+    # UL Aegislash (2026-06-12): Aegislash opponent rows are live on the
+    # published Tinkaton UL dive via ul_top60_plus_aegislash.txt, and UL
+    # uses a different Blade-level formula (x0.75 vs GL's x0.5+1) — zero
+    # UL form-change oracle cells existed. Movesets/IVs are PvPoke UL
+    # defaults; vintage clone==cache verified (Tinkaton moves included).
+    # Levels pinned to 50 on both sides (the PvPoke UI defaults the
+    # dive opponent rows resolve to); our at_best_level would pick 51
+    # (best buddy), which yields a level-39 Blade instead of 38 — a
+    # different Pokemon, not a divergence.
+    # xfails, traced 2026-06-12: every cell agrees on winner; (1,0)/
+    # (1,1) are bug #3 (PvPoke's Aegislash burns Tinkaton's shield with
+    # Gyro Ball and never lands a real charged hit — ours lands a
+    # Shadow Ball, hence the ~280-pt margin gap); the small-margin
+    # cells are Tinkaton-side shield-bait/plan-timing choices (e.g.
+    # PvPoke's Tinkaton throws a third Bulldoze into the shield at
+    # (0,1); ours holds) — the near-KO/plan-choice family. (0,0) is
+    # exact.
+    dict(label='tinkaton_vs_aegislash_shield_form_change', league='ultra',
+         p1=P('Tinkaton', 'FAIRY_WIND', ['GIGATON_HAMMER', 'BULLDOZE'], (12, 15, 15), 'tinkaton', level=50),
+         p2=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (15, 15, 15), 'aegislash_shield', level=50),
+         xfail_cells={(0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)}),
     # buffTarget='both' (Obstruct) fixture, added 2026-06-11 with the E1 fix.
     dict(label='obstagoon_obstruct_vs_azumarill',
          p1=P('Obstagoon', 'COUNTER', ['OBSTRUCT', 'NIGHT_SLASH'], (5, 15, 12), 'obstagoon'),
@@ -196,9 +221,11 @@ def norm_log(entries):
 def run_sim(m, s1, s2):
     league = m.get('league', 'great')
     a = _make_battle_pokemon(m['p1']['species'], m['p1']['fast'], m['p1']['charged'],
-                             league, s1, *m['p1']['ivs'], shadow=m['p1']['shadow'])
+                             league, s1, *m['p1']['ivs'], shadow=m['p1']['shadow'],
+                             max_level=m['p1'].get('level') or 51.0)
     d = _make_battle_pokemon(m['p2']['species'], m['p2']['fast'], m['p2']['charged'],
-                             league, s2, *m['p2']['ivs'], shadow=m['p2']['shadow'])
+                             league, s2, *m['p2']['ivs'], shadow=m['p2']['shadow'],
+                             max_level=m['p2'].get('level') or 51.0)
     r = simulate(a, d, charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp, log=True)
     return (round(r.pvpoke_score(0)), round(r.pvpoke_score(1)),
             r.winner, _extract_battle_log(r))
@@ -213,6 +240,9 @@ def run_harness(m, s1, s2, root):
            '--p2', m['p2']['hid'], '--p2-fast', m['p2']['fast'],
            '--p2-charged', ','.join(m['p2']['charged']),
            '--p2-ivs', '{}/{}/{}'.format(*m['p2']['ivs']), '--p2-shields', str(s2)]
+    for side in ('p1', 'p2'):
+        if m[side].get('level'):
+            cmd += [f'--{side}-level', str(m[side]['level'])]
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         raise RuntimeError(f'harness rc={proc.returncode}: {proc.stderr.strip()}')

@@ -28,11 +28,13 @@ from test_battle import _make_battle_pokemon, _extract_battle_log  # noqa: E402
 from gopvpsim.battle import simulate, pvpoke_dp  # noqa: E402
 
 
-def _run(p1_args, p2_args, s1, s2):
+def _run(p1_args, p2_args, s1, s2, max_level=51.0):
     # p_args = (species, fast, charged, league, atk_iv, def_iv, sta_iv);
     # _make_battle_pokemon takes shields between league and the IVs.
-    a = _make_battle_pokemon(*p1_args[:4], s1, *p1_args[4:])
-    d = _make_battle_pokemon(*p2_args[:4], s2, *p2_args[4:])
+    a = _make_battle_pokemon(*p1_args[:4], s1, *p1_args[4:],
+                             max_level=max_level)
+    d = _make_battle_pokemon(*p2_args[:4], s2, *p2_args[4:],
+                             max_level=max_level)
     r = simulate(a, d, charged_policy_0=pvpoke_dp,
                  charged_policy_1=pvpoke_dp, log=True)
     return (round(r.pvpoke_score(0)), round(r.pvpoke_score(1)),
@@ -50,6 +52,10 @@ MORPEKO = ('Morpeko (Full Belly)', 'THUNDER_SHOCK',
            ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS'], 'great')
 GFISK = ('Stunfisk (Galarian)', 'MUD_SHOT',
          ['ROCK_SLIDE', 'EARTHQUAKE'], 'great')
+TINKATON_UL = ('Tinkaton', 'FAIRY_WIND',
+               ['GIGATON_HAMMER', 'BULLDOZE'], 'ultra')
+AEGI_SHIELD_UL = ('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT',
+                  ['SHADOW_BALL', 'GYRO_BALL'], 'ultra')
 
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner,log", [
@@ -140,6 +146,33 @@ def test_morpeko_vs_gfisk_aura_wheel_type_flip(s1, s2, score0, score1,
     (Hangry stickiness); our two-way toggle is in-game-verified."""
     ss0, ss1, sw, slog = _run((*MORPEKO, 5, 14, 15),
                               (*GFISK, 5, 15, 13), s1, s2)
+    assert (ss0, ss1, sw) == (score0, score1, winner), \
+        f"{s1}v{s2}: scores/winner moved"
+    assert slog == log, f"{s1}v{s2}: chargedLog moved"
+
+
+@pytest.mark.parametrize("s1,s2,score0,score1,winner,log", [
+    (0, 0, 316, 683, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (0, 1, 316, 683, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
+    (0, 2, 316, 683, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
+    (1, 0, 671, 328, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (see audit harness)
+    (1, 1, 654, 345, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze (shielded)', 'Tinkaton: Gigaton Hammer']),  # PvPoke-divergent cell (see audit harness)
+    (1, 2, 387, 612, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
+    (2, 0, 946, 53, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (see audit harness)
+    (2, 1, 929, 70, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Tinkaton: Gigaton Hammer']),  # PvPoke-divergent cell (see audit harness)
+    (2, 2, 643, 356, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (see audit harness)
+])
+def test_tinkaton_ul_vs_aegislash_shield(s1, s2, score0, score1,
+                                         winner, log):
+    """UL Aegislash as opponent (live rows on the published Tinkaton UL
+    dive). Levels pinned to 50 on both sides — PvPoke's UI default;
+    best-buddy level 51 yields a level-39 Blade instead of 38, a
+    different Pokemon. Divergent cells: bug #3 (Gyro Ball into the
+    shield at (1,0)/(1,1)) + Tinkaton-side plan-timing, winner agrees
+    in all 9."""
+    ss0, ss1, sw, slog = _run((*TINKATON_UL, 12, 15, 15),
+                              (*AEGI_SHIELD_UL, 15, 15, 15), s1, s2,
+                              max_level=50.0)
     assert (ss0, ss1, sw) == (score0, score1, winner), \
         f"{s1}v{s2}: scores/winner moved"
     assert slog == log, f"{s1}v{s2}: chargedLog moved"
