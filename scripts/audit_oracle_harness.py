@@ -91,6 +91,62 @@ MATCHUPS = [
     dict(label='mimikyu_vs_azumarill_form_change',
          p1=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (5, 13, 15), 'mimikyu'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill')),
+    # --- Form-change depth (2026-06-12, pre-publish gap fill: each form
+    # species previously had exactly ONE oracle opponent, all Azumarill,
+    # and Blade-as-focal / opponent-side form change had no 9-cell
+    # coverage at all). IVs are PvPoke defaultIVs / already-audited
+    # spreads; movesets via get_default_moveset or already-audited
+    # variants. Data vintage verified clone==cache for all species+moves
+    # 2026-06-12. ---
+    # Blade-as-focal: exercises the Blade->Shield reversion-on-shielding
+    # path in battle (the 07c6388 clamp fix only tested the level math).
+    # Reversion itself verified identical to PvPoke (both swap stats AND
+    # the fast move per Pokemon.js changeForm:2386-2394). xfails, traced
+    # 2026-06-12: (1,2) is PvPoke bug #3 (its Aegislash throws Gyro Ball
+    # where ours throws strictly-better Shadow Ball); (1,1) is the
+    # near-KO plan-choice cluster — PvPoke banks 100 energy in safe
+    # Shield form then double-Shadow-Balls (T44/T45) and WINS the cell;
+    # ours throws at 50, re-Blades into paper form early, dies to chip.
+    # PvPoke's plan is better in this cell, but the cluster is closed
+    # as not-fixing (matching inverts the 6:1 cluster ratio — see
+    # DEVELOPER_NOTES 'Near-KO DP plan choice').
+    dict(label='aegislash_blade_vs_azumarill_form_change',
+         p1=P('Aegislash (Blade)', 'PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_blade'),
+         p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
+         xfail_cells={(1, 1), (1, 2)}),
+    # Opponent-side form change: expands the single 0v0 cell (the "773"
+    # oracle pin in test_dive_worker_form_change) to the full grid —
+    # every GL dive carries Aegislash opponent rows in all 9 scenarios.
+    # xfails, traced 2026-06-12: ALL six are PvPoke bug #3 seen from the
+    # opponent side — every diverging log line is its Aegislash throwing
+    # Gyro Ball where ours throws Shadow Ball. (2,1)/(2,2) are winner
+    # flips: PvPoke's Aegislash burns Azu's shields on the weaker move
+    # and LOSES a fight ours wins — the documented 'GB availability
+    # actively hurts Aegislash' effect, not a new divergence. Azumarill's
+    # own move choices agree in every cell (no bug-#2 manifestation).
+    dict(label='azumarill_vs_aegislash_shield_form_change',
+         p1=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
+         p2=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_shield'),
+         xfail_cells={(1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)}),
+    # Disguise vs fast-move pressure (Azumarill's Bubble is slow; Counter
+    # chips the disguise differently and CMP differs).
+    dict(label='mimikyu_vs_medicham_form_change',
+         p1=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (5, 13, 15), 'mimikyu'),
+         p2=P('Medicham', 'COUNTER', ['DYNAMIC_PUNCH', 'ICE_PUNCH'], (7, 15, 14), 'medicham')),
+    # Hangry where the Aura Wheel type flip matters: vs ground/steel the
+    # Electric wheel is double-resisted but the Dark wheel is merely
+    # steel-resisted, so Full Belly->Hangry changes effectiveness class.
+    # xfails, traced 2026-06-12: all four are PvPoke bug #8 (Hangry
+    # stickiness — its Battle.js:1536 guard leaves Morpeko stuck in
+    # Hangry; our two-way toggle is in-game-verified 2026-06-06).
+    # (2,0)/(2,1) are log-only (form label on the final move); (1,2)/
+    # (2,2) cascade into score differences (same winner) because
+    # G-Fisk's DP sees a different Aura Wheel threat from a stuck-
+    # Hangry Morpeko and times Earthquake differently.
+    dict(label='morpeko_vs_stunfisk_galarian_form_change',
+         p1=P('Morpeko (Full Belly)', 'THUNDER_SHOCK', ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS'], (5, 14, 15), 'morpeko_full_belly'),
+         p2=P('Stunfisk (Galarian)', 'MUD_SHOT', ['ROCK_SLIDE', 'EARTHQUAKE'], (5, 15, 13), 'stunfisk_galarian'),
+         xfail_cells={(1, 2), (2, 0), (2, 1), (2, 2)}),
     # buffTarget='both' (Obstruct) fixture, added 2026-06-11 with the E1 fix.
     dict(label='obstagoon_obstruct_vs_azumarill',
          p1=P('Obstagoon', 'COUNTER', ['OBSTRUCT', 'NIGHT_SLASH'], (5, 15, 12), 'obstagoon'),
@@ -168,9 +224,17 @@ def run_harness(m, s1, s2, root):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--pvpoke-root', type=Path, default=DEFAULT_PVPOKE_ROOT)
+    ap.add_argument('--only', metavar='SUBSTR',
+                    help='audit only matchups whose label contains SUBSTR '
+                         '(triage helper; the full run is the gate)')
     args = ap.parse_args()
     if not args.pvpoke_root.exists():
         sys.stderr.write(f'PvPoke root not found: {args.pvpoke_root}\n')
+        return 2
+    matchups = [m for m in MATCHUPS
+                if not args.only or args.only in m['label']]
+    if not matchups:
+        sys.stderr.write(f'--only {args.only!r} matched no labels\n')
         return 2
 
     new_divergences = []   # sim != harness on a cell NOT marked xfail
@@ -178,7 +242,7 @@ def main():
     confirmed_div = []     # sim != harness on an xfail cell (expected)
     n_cells = 0
 
-    for m in MATCHUPS:
+    for m in matchups:
         xfail = m.get('xfail_cells', set())
         print(f'\n{m["label"]}')
         for s1 in (0, 1, 2):

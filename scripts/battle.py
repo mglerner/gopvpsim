@@ -93,13 +93,15 @@ def make_battle_pokemon(species, fast_id, charged_ids, league, shields,
     mon = next((m for m in gm['pokemon'] if m['speciesName'] == species), None)
     if mon is None:
         sys.exit(f"Unknown species: {species!r}")
-    from gopvpsim.data import parse_types
-    types = parse_types(mon)
 
-    return BattlePokemon(
-        species=species, types=types,
-        atk=pokemon.atk, def_=pokemon.def_, max_hp=pokemon.hp,
-        fast_move=fm, charged_moves=cms, shields=shields,
+    # from_pokemon (not direct construction) so form changes attach —
+    # direct construction silently simmed Aegislash/Mimikyu/Morpeko
+    # with no form mechanics (same bug class as the 2026-06-10 arc-S1
+    # dive-worker fix; found 2026-06-12 via the Blade-focal oracle).
+    from gopvpsim.pokemon import LEAGUE_CAPS
+    return BattlePokemon.from_pokemon(
+        pokemon, fm, cms, shields=shields,
+        league_cp=LEAGUE_CAPS[league],
     )
 
 
