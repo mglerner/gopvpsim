@@ -26,12 +26,19 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 # sys.modules BEFORE exec is required here (unlike the other dive
 # tests): iv_sweep's pool pickles _sweep_worker by module name, and
 # pickle must find this exact module object under "deep_dive".
-DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
-_spec = importlib.util.spec_from_file_location("deep_dive", DEEP_DIVE_PATH)
-deep_dive = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-sys.modules["deep_dive"] = deep_dive
-_spec.loader.exec_module(deep_dive)
+# Get-or-create (shared contract with test_energy_lead.py): a second
+# exec would rebind the name and break worker pickling for whichever
+# test file bound it first.
+if "deep_dive" in sys.modules:
+    deep_dive = sys.modules["deep_dive"]
+else:
+    DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
+    _spec = importlib.util.spec_from_file_location("deep_dive",
+                                                   DEEP_DIVE_PATH)
+    deep_dive = importlib.util.module_from_spec(_spec)
+    assert _spec.loader is not None
+    sys.modules["deep_dive"] = deep_dive
+    _spec.loader.exec_module(deep_dive)
 
 import sweep_cache  # noqa: E402
 

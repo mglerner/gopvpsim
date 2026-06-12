@@ -42,7 +42,10 @@ import numpy as np
 # engine source hash somehow misses (it shouldn't — see _ENGINE_FILES).
 # v2 (2026-06-12): S7 cleanup touched dive worker/orchestration code in
 # scripts/ (outside the engine hash); bump per the standing rule.
-CACHE_VERSION = 2
+# v3 (2026-06-12): energy-lead axis added to _sweep_worker plumbing
+# (focal starting energy threaded through worker init); bump per the
+# same rule.
+CACHE_VERSION = 3
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'sweep'
 
 # Engine sources whose content participates in the focal key. Any edit
@@ -94,8 +97,16 @@ def _key_hash(fields, n=16):
 
 
 def focal_key_fields(species, league, shadow, fast_id, charged_ids,
-                     iv_floor, shield_scenarios, bait_mode):
-    """Focal-side key dict shared by every column of one sweep."""
+                     iv_floor, shield_scenarios, bait_mode,
+                     energy_lead=0):
+    """Focal-side key dict shared by every column of one sweep.
+
+    ``energy_lead`` is the focal's starting energy in RAW energy points
+    (already converted from the mode string's fast-move multiples and
+    capped by the sweep), so two movesets whose 'e1' resolves to the
+    same raw energy correctly share nothing here — the moveset is
+    keyed separately anyway via ``fast``/``charged``.
+    """
     return {
         'v': CACHE_VERSION,
         'species': species,
@@ -106,6 +117,7 @@ def focal_key_fields(species, league, shadow, fast_id, charged_ids,
         'iv_floor': list(iv_floor) if iv_floor else None,
         'scenarios': [[s0, s1] for s0, s1 in shield_scenarios],
         'bait': bait_mode,
+        'energy_lead': energy_lead,
         'engine': engine_hash(),
         'gamemaster': gamemaster_hash(),
     }
