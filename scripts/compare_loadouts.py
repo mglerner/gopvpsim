@@ -30,6 +30,7 @@ import gzip
 import html
 import itertools
 import json
+import re
 import struct
 import sys
 import tomllib
@@ -97,17 +98,31 @@ def _moveset_slug(fast_move: str, charged_moves: tuple[str, ...]) -> str:
     return '_'.join(parts)
 
 
+def _label_key(label: str) -> tuple:
+    """Canonicalize ``FAST / C1, C2`` with charged moves as a set.
+
+    Charged-move order in dive output follows PvPoke's rankings, which
+    reorder on rebalances; it never affects the sim, so loadout matching
+    must not depend on it.
+    """
+    fast, _, charged = label.partition(' / ')
+    return fast.strip(), frozenset(c.strip() for c in charged.split(','))
+
+
 def _find_moveset_file(dive_dir: Path, spec: LoadoutSpec) -> Path:
     """Find the split-movesets HTML for this loadout's exact moveset.
 
     Matches on filename slug (``mud_slap_body_slam_trailblaze``), which is
     how ``deep_dive.py --split-movesets`` composes the suffix. Falls back
     to scanning ``DATA.movesets[0].label`` when the slug convention does
-    not hit (e.g. reference / landing file).
+    not hit (e.g. reference / landing file). Charged-move order is
+    ignored in both paths.
     """
-    slug = _moveset_slug(spec.fast_move, spec.charged_moves)
-    for candidate in sorted(dive_dir.glob(f'index_m*_{slug}.html')):
-        return candidate
+    for perm in itertools.permutations(spec.charged_moves):
+        slug = _moveset_slug(spec.fast_move, perm)
+        for candidate in sorted(dive_dir.glob(f'index_m*_{slug}.html')):
+            return candidate
+    want = _label_key(spec.moveset_label)
     for candidate in sorted(dive_dir.glob('index*.html')):
         try:
             content = candidate.read_text()
@@ -119,7 +134,7 @@ def _find_moveset_file(dive_dir: Path, spec: LoadoutSpec) -> Path:
         if not movesets:
             continue
         ms_label = movesets[0].get('label') or ''
-        if ms_label == spec.moveset_label:
+        if _label_key(ms_label) == want:
             return candidate
     raise FileNotFoundError(
         f'No dive HTML in {dive_dir} matches loadout '
@@ -172,6 +187,10 @@ def load_loadout_data(spec: LoadoutSpec) -> dict:
     return {
         'spec': spec,
         'path': path,
+        # Dives emit id="opp-<slug>" only for opponents with at least one
+        # matchup-flip boundary bullet; deep links must check membership
+        # or they 404 on never-flips opponents.
+        'opp_anchor_ids': set(re.findall(r'id="opp-([a-z0-9-]+)"', content)),
         'win_rate': win_rate,
         'per_scenario_win_rate': per_scenario_rate,
         'per_opponent_win_rate': per_opponent_rate,
@@ -544,7 +563,8 @@ def _render_all_in_row_matchup_table(
                 badge_cls = 'flip-pos' if is_win else 'flip-neg'
                 wl = 'W' if is_win else 'L'
                 href = None
-                if spec.dive_slug and opp_anchor:
+                if (spec.dive_slug and opp_anchor
+                        and opp_anchor in ld['opp_anchor_ids']):
                     href = (f'../../{spec.dive_slug}/index.html'
                             f'#opp-{opp_anchor}')
                 if href:
