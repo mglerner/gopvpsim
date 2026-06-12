@@ -6,6 +6,37 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-12 — S6 chain landing repairs + overnight verification tooling
+
+The 2026-06-11 S6 re-dive chain completed all 20 dives in 3h45m but
+died at the first post-dive step: `generate_article.py`'s freshness
+gate (correctly) refused to run because the rebalance changed moveset
+enumerations, leaving 52 old-pool `index_m*.html` split files as stale
+orphans beside the fresh dives. Manual repair: orphans quarantined to
+/tmp, post-dive steps (article, 5 comparisons, Aegislash draft, site
+index, gates) run by hand. Three latent bugs surfaced and fixed:
+
+- **compare_loadouts matcher order-sensitivity + broken deep links**
+  (`d9fa744`): loadout→dive-HTML matching now treats charged moves as
+  a set (rankings reorder them on rebalances; sim is order-blind), and
+  flip-badge `#opp-<slug>` deep links are gated on the anchor actually
+  existing in the dive HTML (dives only emit ids for opponents with a
+  matchup-flip boundary; 21 broken links on the Forretress 4-way).
+- **Em-dashes in ship surfaces** (`32f243f`): 5 guide body.md sources
+  + the Aegislash narrative template; newly flagged because the
+  2026-06-11 gates went tree-enumerated.
+- **Stale split-orphan prevention** (this entry's commit):
+  `deep_dive.py` now deletes `{stem}_m*.html` siblings it didn't just
+  write (`_remove_stale_split_siblings`, both split and single-file
+  paths), so the chain-killer class can't recur. 3 unit tests.
+
+New tooling: `scripts/verify_overnight.py` — one-shot morning check
+aggregating chain status, dive-dir freshness (mixed-vintage/orphan
+detection), opponent-pool sanity markers (Sylveon/Primeape/Umbreon
+prove the post-rebalance pool loaded), and both ship gates. Documented
+as the morning check in `overnight_redive.sh` + the arc plan's S6
+landing checklist. Suite 847p+14xf (sentinel 858→861).
+
 ## 2026-06-11 — Fable 5 deep codebase review + 39-commit fix day
 
 A six-agent read-only review of the whole codebase

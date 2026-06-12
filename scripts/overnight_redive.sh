@@ -21,8 +21,11 @@
 #   userdata/logs/2026-04/overnight_YYYYMMDD_HHMMSS.log  (full output)
 #   userdata/logs/overnight_status.txt                   (single status line)
 #
-# Morning check: `tail userdata/logs/overnight_status.txt` for pass/fail,
-# then scan the log file for per-step elapsed times.
+# Morning check: `python scripts/verify_overnight.py` — one-shot
+# aggregate of chain status, dive-dir freshness (stale split-orphan
+# detection), opponent-pool sanity markers, and both ship gates.
+# (`tail userdata/logs/overnight_status.txt` is the raw pass/fail line;
+# scan the log file for per-step elapsed times.)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

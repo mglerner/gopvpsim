@@ -2918,6 +2918,29 @@ def _build_split_file_list(moveset_data, reference_idx, base_html_path):
     return files
 
 
+def _remove_stale_split_siblings(base_html_path, written_paths):
+    """Delete ``{stem}_m*{ext}`` siblings left over from a previous dive.
+
+    A re-dive whose moveset enumeration changed (rankings churn, a
+    different ``--top-movesets``) writes differently-named split files,
+    so the old ones survive as orphans carrying outdated data. Downstream
+    consumers read every sibling in the directory — generate_article.py's
+    freshness gate refuses to run on mixed vintages (this killed the
+    2026-06-11 overnight chain) and publish would ship the stale pages.
+    """
+    import glob as _glob
+    import os as _os
+    directory = _os.path.dirname(base_html_path) or '.'
+    stem, ext = _os.path.splitext(_os.path.basename(base_html_path))
+    keep = {_os.path.abspath(p) for p in written_paths}
+    pattern = _os.path.join(directory, _glob.escape(stem) + f'_m[0-9]*{ext}')
+    for p in sorted(_glob.glob(pattern)):
+        if _os.path.abspath(p) not in keep:
+            _os.remove(p)
+            logger.info(f"  Removed stale split sibling: "
+                        f"{_os.path.basename(p)}")
+
+
 def generate_interactive_html(species, league, moveset_data, html_path,
                               thresholds=None, opponent_label=None,
                               shield_scenarios=None, opponent_names=None,
@@ -4412,10 +4435,13 @@ def render_dive_html(state):
                 species_narrative=state['species_narrative'],
                 shared_plotly_dir=state['shared_plotly_dir'],
             )
+        _remove_stale_split_siblings(
+            state['html_path'], [f['path'] for f in split_files])
     else:
         if state['split_movesets']:
             logger.warning("--split-movesets: only one moveset surviving - "
                            "writing a single file")
+        _remove_stale_split_siblings(state['html_path'], [])
         generate_interactive_html(
             state['species'], state['league'], moveset_data, state['html_path'],
             thresholds=state['thresholds'],
