@@ -23,7 +23,6 @@ Solving for def (bulkpoint — minimum defense that reduces damage to D):
 These formulas match PvPoke's DamageCalculator.breakpoint / .bulkpoint.
 """
 
-import math
 from typing import NamedTuple
 
 from .moves import (
@@ -36,11 +35,6 @@ from .pokemon import (
     battle_stats,
     SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
 )
-
-
-def _floor2(x: float) -> float:
-    """Truncate to 2 decimal places (the format used in PvP IV deep dives)."""
-    return math.floor(x * 100) / 100
 
 
 # ---------------------------------------------------------------------------
@@ -337,48 +331,3 @@ def iv_bulkpoints(
 
     results.sort(key=lambda r: (r['damage'], -r['stat_product']))
     return results
-
-
-# ---------------------------------------------------------------------------
-# CMP threshold analysis
-# ---------------------------------------------------------------------------
-
-def cmp_threshold(
-    subject_species: str,
-    opponent_atk: float,
-    *,
-    league: str = 'great',
-    subject_max_level: float = 51.0,
-    subject_shadow: bool = False,
-) -> dict | None:
-    """
-    Minimum discrete effective attack for subject_species that wins CMP vs
-    opponent_atk (i.e. subject.atk > opponent_atk).
-
-    Returns a dict with:
-        atk_threshold  : floor-to-2-dp value (the deep-dive format)
-        atk_exact      : exact floating-point value
-        atk_iv/def_iv/sta_iv : one example IV combo that achieves it
-        rank           : stat-product rank of that IV combo
-    Returns None if no subject IV can beat opponent_atk in this league.
-    """
-    from .pokemon import iv_rank
-    ranks = iv_rank(subject_species, league=league, max_level=subject_max_level,
-                    shadow=subject_shadow)
-    min_atk  = None
-    best_row = None
-    for r in ranks:
-        if r['atk'] > opponent_atk:
-            if min_atk is None or r['atk'] < min_atk:
-                min_atk  = r['atk']
-                best_row = r
-    if best_row is None:
-        return None
-    return {
-        'atk_threshold': _floor2(min_atk),
-        'atk_exact':     min_atk,
-        'atk_iv':        best_row['atk_iv'],
-        'def_iv':        best_row['def_iv'],
-        'sta_iv':        best_row['sta_iv'],
-        'rank':          best_row['rank'],
-    }

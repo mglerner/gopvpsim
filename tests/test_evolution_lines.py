@@ -8,7 +8,6 @@ import pytest
 from gopvpsim.evolution_lines import (
     get_final_forms,
     load_evolution_lines,
-    get_final_form,
     invalidate_cache,
 )
 
@@ -86,22 +85,16 @@ def test_oinkologne_female_final_form_self_lookup():
 
 
 # ===========================================================================
-# get_final_form (singular) — error on branching
+# Lechonk branches (Male + Female Oinkologne)
 # ===========================================================================
 
 @pytest.mark.integration
-def test_get_final_form_singular_on_unambiguous():
-    assert get_final_form("Tinkatink") == "Tinkaton"
-
-
-@pytest.mark.integration
-def test_get_final_form_raises_on_branching():
-    """get_final_form (singular) is for callers that KNOW the chain
-    is unambiguous. Lechonk is now branching (Male + Female), so
-    callers that pass Lechonk should get the ValueError nudge to
-    switch to get_final_forms."""
-    with pytest.raises(ValueError, match="branching"):
-        get_final_form("Lechonk")
+def test_lechonk_branches_to_both_oinkologne_forms():
+    """Lechonk is a branching chain (Male + Female Oinkologne) — pinned
+    here because the gendered split is easy to lose in a gamemaster
+    refresh."""
+    finals = get_final_forms("Lechonk")
+    assert "Oinkologne" in finals and "Oinkologne (Female)" in finals
 
 
 # ===========================================================================

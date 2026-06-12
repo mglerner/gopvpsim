@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from gopvpsim.evolution_lines import (
-    get_final_form, get_final_forms, invalidate_cache,
+    get_final_forms, invalidate_cache,
     load_evolution_lines,
 )
 from gopvpsim.pokemon import Pokemon, get_pokemon_index, iv_rank
@@ -51,28 +51,23 @@ def test_evolution_lines_tinkaton_chain():
     assert lines['Tinkaton'] == ['Tinkatink', 'Tinkatuff', 'Tinkaton']
 
 
-def test_get_final_form_tinkatink_unambiguous():
-    assert get_final_form('Tinkatink') == 'Tinkaton'
-    assert get_final_form('Tinkatuff') == 'Tinkaton'
-    assert get_final_form('Tinkaton') == 'Tinkaton'
+def test_get_final_forms_tinkatink_unambiguous():
+    assert get_final_forms('Tinkatink') == ['Tinkaton']
+    assert get_final_forms('Tinkatuff') == ['Tinkaton']
+    assert get_final_forms('Tinkaton') == ['Tinkaton']
 
 
-def test_get_final_form_bunnelby():
-    assert get_final_form('Bunnelby') == 'Diggersby'
+def test_get_final_forms_bunnelby():
+    assert get_final_forms('Bunnelby') == ['Diggersby']
 
 
-def test_get_final_form_mankey_three_stage():
+def test_get_final_forms_mankey_three_stage():
     # Annihilape was added in gen 9 — confirms the chain includes the new
     # third-stage evolution.
-    assert get_final_form('Mankey') == 'Annihilape'
+    assert get_final_forms('Mankey') == ['Annihilape']
     assert load_evolution_lines()['Annihilape'] == [
         'Mankey', 'Primeape', 'Annihilape',
     ]
-
-
-def test_get_final_form_eevee_raises_on_branching():
-    with pytest.raises(ValueError, match='branching evolutions'):
-        get_final_form('Eevee')
 
 
 def test_get_final_forms_eevee_returns_all_eeveelutions():
