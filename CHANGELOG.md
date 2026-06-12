@@ -46,7 +46,13 @@ flips where PvPoke's Aegislash loses fights ours wins), bug #8
 hold-for-double-Shadow-Ball plan is genuinely better (cluster closed
 as not-fixing). Reversion mechanics verified PvPoke-identical
 (Pokemon.js changeForm swaps stats AND the fast move both ways).
-Audit baseline 153→189 cells (160 exact + 29 documented). The
+A fifth matchup covers UL Aegislash (Tinkaton vs Shield at PvPoke's
+default level 50 — pinning levels on both engines exposed that
+best-buddy level 51 yields a level-39 Blade instead of 38, a
+different Pokémon, which masqueraded as 9 false divergences until
+the harness gained per-side `level` pins; the 8 real xfails are
+bug #3 + Tinkaton-side plan timing, winner agreeing in all 9).
+Audit baseline 153→198 cells (161 exact + 37 documented). The
 tracing also surfaced a REAL bug: `scripts/battle.py`'s
 `make_battle_pokemon` never attached form change (same class as the
 arc-S1 dive-worker bug) — every form-change CLI sim ran formless;
