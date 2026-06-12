@@ -177,6 +177,39 @@ break invariants that weren't yet nailed down by tests.
   baseline" for the regression gate and `docs/perf/` for the writeup.
   The vs-PvPoke-JS throughput comparison itself remains open.)*
 
+## Shared user_collection module — Option-2 migration prep
+
+*(from gobattlekit's 2026-06-11/12 deep review, sections F/J — CP9 +
+CP12. Not urgent; gobattlekit is otherwise ready to consume
+`gopvpsim.user_collection` and has aligned its matching semantics to
+ours. The CP4 over-leveled-mon fix and CP13 Burmy→Mothim fix shipped
+here 2026-06-12; these are the remaining seams.)*
+
+* **Split heavy deps into extras** — `pyproject.toml` hard-requires
+  `numpy` + `markdown`, but the `user_collection` import path
+  (user_collection → evolution_lines + pokemon → data) needs neither.
+  numpy on iOS via BeeWare is a real packaging problem. Move them to
+  an extra (e.g. `gopvpsim[sim]`) so a mobile app can take a core
+  dependency. Note the user_collection docstring's "stdlib only"
+  claim is false at package level until `certifi` (imported by
+  data.py at module load) is also dealt with.
+
+* **Injectable gamemaster/CPM source** — `match_mons` hardwires
+  `get_pokemon_index()` → data.py's network-backed cache
+  (`~/Documents/gopvpsim_cache/`, 24h TTL, NoDataError when offline
+  with no cache). gobattlekit needs to supply its own bundled +
+  ETag-cached gamemaster. Add a provider injection point (parameter
+  or settable loader) on match_mons / get_pokemon_index /
+  evolution_lines.
+
+* **Shared CSV parity corpus (CP12)** — a small synthetic CSV
+  (shadow, over-cap, out-of-range, gendered, branched-evo rows) +
+  golden expected-results JSON, checked into BOTH repos and run by
+  both suites, so the row-for-row contract can't silently drift
+  again (it demonstrably did: gender, shadow, level-gating). Until
+  Option 2 deletes the duplicate implementation, this is the only
+  tripwire.
+
 ## Policies to add
 
 * **PvPoke "Selective" baiting** — PvPoke's UI offers a bait toggle; "Selective"

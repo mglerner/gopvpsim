@@ -32,7 +32,11 @@ def _build_evolution_lines() -> dict:
         {'Tinkaton': ['Tinkatink', 'Tinkatuff', 'Tinkaton'], ...}
 
     Families with branching evolutions (e.g. Eevee) produce one entry
-    per final form, each with its own chain from the shared root.
+    per final form, each with its own chain from the shared root. A
+    final reachable from several roots (Burmy's three cloaks all evolve
+    to one Mothim) gets a single entry whose pre-evo members merge
+    every root path — so the value is a member list ending in the
+    final, not necessarily a literal power-up path.
     """
     gm = load_gamemaster()
     id_to_name = {m['speciesId']: m['speciesName'] for m in gm['pokemon']}
@@ -75,6 +79,17 @@ def _build_evolution_lines() -> dict:
                 lines.append(new_path)
             else:
                 for evo_id in evos:
+                    if evo_id in visited:
+                        # An already-visited LEAF evolution still ends
+                        # this path: a final shared by several roots
+                        # (Burmy → Mothim) must map every root, not
+                        # only the first one walked. Non-leaf revisits
+                        # stay blocked — that's the cycle guard.
+                        evo = id_map.get(evo_id)
+                        if evo is not None and not evo['evolutions']:
+                            lines.append(
+                                new_path + [id_to_name.get(evo_id, evo_id)])
+                        continue
                     traverse(evo_id, new_path)
 
         for root in roots:
@@ -84,8 +99,18 @@ def _build_evolution_lines() -> dict:
     result: dict = {}
     for fam_id, members in families.items():
         for line in build_family_lines(members):
-            if line:
-                result[line[-1]] = line
+            if not line:
+                continue
+            final = line[-1]
+            if final in result:
+                # Final reachable along several paths: merge pre-evo
+                # members (first-seen order); the final stays last.
+                existing = result[final]
+                merged = existing[:-1] + [m for m in line[:-1]
+                                          if m not in existing]
+                result[final] = merged + [final]
+            else:
+                result[final] = line
 
     # Post-process: catch sibling final-form species that the
     # forward walk missed. PvPoke's gamemaster lists Lechonk's

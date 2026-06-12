@@ -207,6 +207,7 @@ def ivs_to_stats_at_cap(
     base_atk: float, base_def: float, base_sta: float,
     atk_iv: int, def_iv: int, sta_iv: int,
     *, shadow: bool = False, max_level: float = 51.0, max_cp: int = 1500,
+    min_level: float = 1.0,
 ) -> "dict | None":
     """Return max-achievable battle stats under a CP cap.
 
@@ -215,8 +216,15 @@ def ivs_to_stats_at_cap(
     PvPoke's ×1.2 atk / ×5/6 def multipliers on the returned
     ``attack`` and ``defense`` (CP itself is unaffected by shadow).
 
-    Returns ``None`` if no level under ``max_level`` fits the CP cap
-    (rare — happens for low-base-stat species in higher leagues).
+    ``min_level`` is the mon's current level: power-ups are one-way,
+    so a mon already above the league-optimal level for these IVs has
+    no legal build under the cap. The default of 1.0 preserves the
+    "any level reachable" hypothetical for callers ranking IV spreads
+    in the abstract.
+
+    Returns ``None`` if no level in ``[min_level, max_level]`` fits
+    the CP cap (over-leveled mons, or low-base-stat species in higher
+    leagues).
 
     Return dict::
 
@@ -228,7 +236,7 @@ def ivs_to_stats_at_cap(
     multiplication, matching gobattlekit's historical convention.
     """
     lv = best_level(base_atk, base_def, base_sta, atk_iv, def_iv, sta_iv,
-                    max_cp=max_cp, max_level=max_level)
+                    max_cp=max_cp, max_level=max_level, min_level=min_level)
     if lv is None:
         return None
     stats = battle_stats(base_atk, base_def, base_sta,
@@ -365,11 +373,16 @@ def match_mons(
                         continue
 
             base = pokemon_index[final_species]
+            # min_level: evolution preserves level and power-ups are
+            # one-way, so a row already above the league cap at its
+            # current level must not be reported with stats it can
+            # never have (cross-repo CP4 parity with gobattlekit).
             stats = ivs_to_stats_at_cap(
                 base['atk'], base['def'], base['hp'],
                 mon['atk_iv'], mon['def_iv'], mon['sta_iv'],
                 shadow=mon['is_shadow'],
                 max_level=max_level, max_cp=max_cp,
+                min_level=mon.get('level') or 1.0,
             )
             if stats is None:
                 continue
