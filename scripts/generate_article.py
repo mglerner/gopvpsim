@@ -2371,8 +2371,7 @@ def _opp_slug(name: str) -> str:
     """Slugify an opponent display name for dive deep-link anchors.
 
     'Stunfisk (Galarian)' -> 'stunfisk-galarian'. Must stay in lock-step
-    with ``deep_dive_rendering.opp_slug`` and
-    ``scripts/patch_dive_opp_anchors.opp_slug``; drift produces
+    with ``deep_dive_rendering.opp_slug``; drift produces
     article-side links that don't resolve.
     """
     import re
@@ -2388,9 +2387,7 @@ def _tier_card_href(tier: dict | str, dive_slug: str,
     Targets ``#tier-card-<slug>`` (on the visible card ``<div>``), not
     the legacy ``tier-card-yours-<slug>`` span which is ``display:none``
     until paste-box populates it and therefore cannot be scrolled to.
-    Older dive HTML is patched in place by
-    ``scripts/patch_dive_tier_anchors.py``; fresh dives emit this id
-    natively.
+    Dives emit this id natively.
 
     Accepts either a tier dict or a bare name string for callers that
     don't have the dict handy. When a dict is passed, prefers

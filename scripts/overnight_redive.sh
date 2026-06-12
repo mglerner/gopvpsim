@@ -93,15 +93,11 @@ log ""
 step "Running 19 dives via run_website_dives.py" \
     python scripts/run_website_dives.py
 
-# The scripts/patch_dive_*.py patchers are retrofit-only tools: they
-# existed to carry a feature (opp anchors, Member IVs enhance, Top IVs
-# CMP union, Mirror CMP tolerance) back into HTMLs shipped before the
-# renderer/engine change landed. All four are now baked into the
-# renderer + engine.js, so a successful Step 1 re-dive produces fresh
-# HTMLs that already carry the behavior. The patchers remain available
-# for ad-hoc retrofits of HTMLs outside this list; they are intentionally
-# NOT in the overnight chain so an unexpected "[no-match]" log line from
-# a healthy overnight doesn't read as a failure.
+# The retrofit-only patch_dive_*.py patchers were deleted in the S7
+# cleanup (2026-06-12): everything they carried is baked into the
+# renderer + engine.js, and a successful Step 1 re-dive produces fresh
+# HTMLs natively. patch_dive_species_narrative.py (run inside
+# run_website_dives.py) is the only surviving patcher.
 
 # 2. Oinkologne CD article (per-form Matchup Delta table needs both
 #    Male and Female dives fresh, which Step 1 guarantees).

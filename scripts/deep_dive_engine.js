@@ -948,11 +948,8 @@ function renderMatchesList() {
       var cls = '';
       if (rc.mon.is_shadow) cls += ' shadow';
       if (rc.mon.lucky) cls += ' lucky';
-      // Inline display:none for rows past MAX_VISIBLE. Was previously
-      // done via a .matches-hidden-row CSS class, but that CSS lives
-      // in the Python HTML generator — existing dives patched via
-      // patch_dive_engine.py didn't get the CSS update, so the class
-      // toggled with no visual effect. Inline style is self-contained.
+      // Inline display:none for rows past MAX_VISIBLE — self-contained,
+      // no dependency on CSS that lives in the Python HTML generator.
       var attr = ' data-section="' + sid + '"';
       if (cls) attr += ' class="' + cls.trim() + '"';
       if (k >= MAX_VISIBLE) attr += ' style="display:none"';

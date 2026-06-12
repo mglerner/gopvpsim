@@ -835,7 +835,7 @@ def opp_slug(name: str) -> str:
     """Slugify an opponent display name for deep-link anchor ids.
 
     'Stunfisk (Galarian)' -> 'stunfisk-galarian'. Shared with
-    ``generate_article.py`` and ``patch_dive_opp_anchors.py`` so the
+    ``generate_article.py`` so the
     article's Matchup Delta opponent links land on the matching
     ``#opp-<slug>`` id inside the dive's standalone Matchup-Flipping
     Boundaries / Anchor-Driven Matchup Flips sections.

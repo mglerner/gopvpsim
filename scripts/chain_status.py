@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 """Formatted status display for a running dive chain.
 
-Supports any chain that follows the overnight_redive.sh / retrofit_3_dives.sh
-shape:
+Supports any chain that follows the overnight_redive.sh shape:
 
 * a single-line status file that the wrapper updates at each [STEP]
 * a wrapper log under userdata/logs/YYYY-MM/<prefix>_YYYYMMDD_HHMMSS.log
@@ -13,9 +12,8 @@ shape:
 Invocation::
 
     scripts/chain_status.py --chain overnight
-    scripts/chain_status.py --chain retrofit
     scripts/chain_status.py --chain single
-    watch -n 5 scripts/chain_status.py --chain retrofit
+    watch -n 5 scripts/chain_status.py --chain overnight
 
 The ``single`` preset watches the most recent standalone
 ``python scripts/deep_dive.py ...`` run — it picks the freshest
@@ -61,11 +59,6 @@ CHAINS = {
         'status_file': 'userdata/logs/overnight_status.txt',
         'pgrep': 'overnight_redive.sh',
         'wrapper_log_glob': f'{LOG_DIR_GLOB}/overnight_*.log',
-    },
-    'retrofit': {
-        'status_file': 'userdata/logs/retrofit_status.txt',
-        'pgrep': 'retrofit_3_dives.sh',
-        'wrapper_log_glob': f'{LOG_DIR_GLOB}/retrofit_*.log',
     },
     # Single-dive preset: for ad-hoc `python scripts/deep_dive.py ...`
     # runs that aren't driven by a wrapper script. Sentinel status_file
