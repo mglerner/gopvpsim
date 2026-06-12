@@ -6,6 +6,40 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-12 (afternoon) — cross-repo parity fixes + plotly cache + site re-render
+
+Same-day follow-ups after the S6 publish, from gobattlekit's
+2026-06-11/12 deep review (its sections F/J flagged three items for
+this repo; each was verified against current code before changing):
+
+- **CP4 — level-aware CP-cap matching** (`3928b31`): `match_mons`
+  ignored the mon's actual level, so an over-leveled mon (e.g. a
+  level-30 Tinkaton) was reported as a GL qualifier with stats it
+  can never have (power-ups are one-way). `best_level` /
+  `ivs_to_stats_at_cap` gained `min_level`; the JS port mirrors it;
+  verify_js_parser passes on the 2,296-mon personal fixture. Two
+  test fixtures carried fictional level-26.5 Tinkaton rows — made
+  legal (25.5).
+- **CP13 — shared-final evolution merge** (`3928b31`): the
+  family-wide visited set kept only the first root's chain to a
+  shared final, so Burmy (Sandy)/(Trash) never mapped to Mothim.
+  Ported gobattlekit's fix (their `2256a80`): visited LEAF
+  evolutions still terminate each path; same-final lines merge
+  members. CP9/CP12 (dep extras split, injectable data layer,
+  shared parity corpus) recorded in TODO "Shared user_collection
+  module".
+- **Plotly.js version-keyed local cache** (`62eb4de`): every
+  `--standalone` render re-downloaded the pinned 4.35MB
+  plotly-2.35.2.min.js; now cached at `~/.cache/gopvpsim/` (atomic
+  write, cache key = pinned filename so it can never go stale).
+  Warm-cache replays touch no network.
+- **Site re-rendered + republished** (Michael): all 20 dives via
+  replay_analysis.py (~2 min/dive — blob unpickle + split-file
+  renders dominate; the 5.8s S5e figure is smoke-dive-render-only)
+  to pick up the CP4 JS-port fix in the paste-box, then
+  publish_website.sh --push. Live site verified byte-identical to
+  local.
+
 ## 2026-06-12 — S6 closeout: archive diff, spot-checks, site published (arc S6 DONE)
 
 Judgment half of the S6 landing, after the morning repair below:
