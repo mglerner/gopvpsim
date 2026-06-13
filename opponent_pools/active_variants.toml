@@ -31,3 +31,41 @@ species = "Forretress"
 shadow = true
 fast = "BUG_BITE"
 note = "Shadow Forretress also has a meta-relevant Bug Bite variant; see the four shipped Forretress dive HTMLs."
+
+# --- CS-2026 tournament moveset corrections (audit 2026-06-12) ---
+# Field-dominant or near-majority sets our pool never simmed. The five
+# smaller splits from the same audit (Furret, Talonflame, Ninetales-S,
+# Sableye, Weezing-G-S, 25-37% shares) are listed in
+# userdata/moveset_pool_audit_2026-06-12.html pending per-stanza review.
+
+[[variants]]
+species = "Cradily"
+fast = "ACID"
+note = "CS 2026 field: 79% of 75 Cradily entries across 7 events run Acid + Grass Knot / Rock Tomb (moveset pool audit 2026-06-12)."
+
+[[variants]]
+species = "Primeape"
+charged = ["CLOSE_COMBAT", "RAGE_FIST"]
+note = "CS 2026 field: 78% of 36 Primeape entries across 7 events run Karate Chop + Close Combat / Rage Fist (moveset pool audit 2026-06-12)."
+
+[[variants]]
+species = "Primeape"
+shadow = true
+charged = ["CLOSE_COMBAT", "RAGE_FIST"]
+note = "CS 2026 field: Shadow Primeape splits the same way as regular (CC+RF dominant; n=14 small sample) (moveset pool audit 2026-06-12)."
+
+[[variants]]
+species = "Annihilape"
+charged = ["CLOSE_COMBAT", "RAGE_FIST"]
+note = "CS 2026 field: 59% of 29 Annihilape entries across 7 events run Low Kick + Close Combat / Rage Fist (moveset pool audit 2026-06-12)."
+
+[[variants]]
+species = "Quagsire"
+shadow = true
+charged = ["AQUA_TAIL", "STONE_EDGE"]
+note = "CS 2026 field: 45% of 248 Quagsire (Shadow) entries run Mud Shot + Aqua Tail / Stone Edge - both sets are meta (moveset pool audit 2026-06-12)."
+
+[[variants]]
+species = "Quagsire"
+charged = ["AQUA_TAIL", "STONE_EDGE"]
+note = "CS 2026 field: 35% of 88 Quagsire entries run Mud Shot + Aqua Tail / Stone Edge (moveset pool audit 2026-06-12)."
