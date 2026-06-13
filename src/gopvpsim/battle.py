@@ -125,25 +125,27 @@ def pvpoke_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: di
     return would_shield(attacker, defender, move)
 
 def _estimate_best_cm(owner: "BattlePokemon", opponent: "BattlePokemon") -> "tuple[int, dict] | tuple[None, None]":
-    """Approximate PvPoke's bestChargedMove for `owner` vs `opponent`.
+    """PvPoke's bestChargedMove for `owner` vs `opponent`.
 
-    Returns (idx, move) where idx indexes owner.charged_moves. Picks the
-    move with the highest actual damage-per-energy against `opponent` at
-    current stat stages. This mirrors PvPoke's selectBestChargedMove
-    (Pokemon.js:791-822) outcome for the common cases without replicating
-    the full priority shuffle from pvpoke_dp's lines 815-898.
+    Returns (idx, move) where idx indexes owner.charged_moves. Delegates
+    to the pvpoke_dp setup cache, whose ``best_idx`` runs PvPoke's
+    selectBestChargedMove (Pokemon.js:790-822) on the energy-sorted,
+    priority-shuffled move list — including the literal SUPER_POWER
+    carve-out (Pokemon.js:799): Superpower only displaces the incumbent
+    when its DPE edge exceeds .3, where any other move needs just .03.
+
+    The previous max-actual-DPE approximation here returned SUPER_POWER
+    for Malamar-likes, which wrongly entered the Battle.js:1105-1124
+    defender-bestCM shield branch below; PvPoke's bestChargedMove there
+    is the shuffled, carved-out pick (Foul Play for Malamar vs most of
+    the GL pool), so PvPoke never enters that branch and always-shields.
+    (2026-06-12 oracle grid, bestcm_estimate family: 38 cells.)
     """
     if not owner.charged_moves:
         return (None, None)
-    best_i = 0
-    best_dpe = owner.charged_move_damage(owner.charged_moves[0], opponent) / owner.charged_moves[0]['energy']
-    for i in range(1, len(owner.charged_moves)):
-        m = owner.charged_moves[i]
-        d = owner.charged_move_damage(m, opponent) / m['energy']
-        if d > best_dpe:
-            best_dpe = d
-            best_i = i
-    return (best_i, owner.charged_moves[best_i])
+    dp = owner._ensure_dp_cache(opponent)
+    slot = dp['best_idx']
+    return (dp['order'][slot], dp['cms'][slot])
 
 
 def _cheapest_cm(owner: "BattlePokemon") -> "dict | None":
