@@ -163,11 +163,21 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     PvPoke's simulate-mode shield policy (Battle.js line 1077).
 
     For standard charged moves: always shield (useShield = true).
-    For selfBuffing or selfDefensiveDebuffing moves: use wouldShield heuristic.
-    This mirrors Battle.js: useShield = true, then overridden for
-    move.selfBuffing and move.selfDefensiveDebuffing, and for the
+    For selfBuffing moves (sub-filtered to self-atk-buff / opp-def-debuff):
+    use the wouldShield heuristic.
+    This mirrors Battle.js: useShield = true, then overridden only for
+    move.selfBuffing (Battle.js:1090-1101) and for the
     defender-bestChargedMove-selfDefenseDebuffing branch (Battle.js:1105-1124)
     where the defender saves shields for the post-self-debuff window.
+
+    Note the INCOMING move's selfDefenseDebuffing flag routes nothing in
+    Battle.js: its only selfDefenseDebuffing test (line 1105) is on the
+    defender's own bestChargedMove. A self-def-debuffing nuke like
+    Superpower is not selfBuffing (GameMaster.js:873 sets selfBuffing only
+    for positive self-buffs and guaranteed opponent debuffs), so PvPoke
+    simply always-shields it. We previously also routed incoming
+    selfDefenseDebuffing moves through wouldShield — a port error removed
+    2026-06-13 (see DEVELOPER_NOTES "Open divergences", RESOLVED entry).
     """
     if defender.shields <= 0:
         if _shield_trace:
@@ -183,8 +193,7 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     # opponent debuffs AND positive self-buffs.  The shield check
     # (Battle.js:1090-1101) sub-filters to self-atk-buff or opp-def-debuff
     # before routing to wouldShield.  We replicate that sub-filter here.
-    self_buffing        = move.get('selfBuffing', False)
-    self_def_debuffing  = move.get('selfDefenseDebuffing', False)
+    self_buffing = move.get('selfBuffing', False)
     buffs = move.get('buffs')
     bt    = move.get('buffTarget')
     # PvPoke Battle.js:1091-1100 sub-filter: self-atk-buff or opp-def-debuff;
@@ -197,13 +206,11 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
                         or (bt == 'both' and _bs is not None
                             and _bo is not None
                             and (_bs[0] > 0 or _bo[1] < 0))))
-    use_heuristic_incoming = sb_subroute or self_def_debuffing
+    use_heuristic_incoming = sb_subroute
     if use_heuristic_incoming:
         use_shield = would_shield(attacker, defender, move)
         if _shield_trace:
-            tag = ("selfDefDebuff" if self_def_debuffing
-                   else "oppDefDebuff" if bt == 'opponent'
-                   else "selfBuff")
+            tag = "oppDefDebuff" if bt == 'opponent' else "selfBuff"
             _policy_log.append(
                 f"  shield({defender.species} sh={defender.shields} vs"
                 f" {move.get('moveId')} [incoming {tag}]): → wouldShield={use_shield}")
