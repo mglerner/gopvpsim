@@ -344,6 +344,36 @@ combos. Mimi's actual SS timing was correct all along; the
 
 ## Open divergences
 
+### RESOLVED 2026-06-13 — incoming selfDefenseDebuffing shield gate
+(port error: extra routing condition the reference lacks)
+
+`pvpoke_simulate_shield` routed the defender's shield decision
+through `wouldShield` whenever the INCOMING charged move was
+`selfDefenseDebuffing` (`use_heuristic_incoming = sb_subroute or
+self_def_debuffing`, introduced with the policy itself in ead46c1,
+2026-04-15). The reference has no such condition: Battle.js:1090
+overrides the always-shield default only for `move.buffs &&
+move.selfBuffing` (sub-filtered to self-atk-buff / opp-def-debuff),
+and its only selfDefenseDebuffing test (line 1105) is on the
+DEFENDER's own bestChargedMove. A self-def-debuffing nuke
+(Superpower, Brave Bird, Close Combat, HJK, Wild Charge, ...) is not
+selfBuffing (GameMaster.js:873), so PvPoke simply always-shields it;
+our gate let wouldShield decline the shield — but "can survive" is
+not "should tank": the defender burned real HP to save a shield it
+never got better value for. The docstring claimed reference parity
+the reference does not contain. Decisive trace: Tinkaton vs Malamar
+GL [1,0] — ours tanked the Superpower (702/297); PvPoke shields
+(861/138); with the condition removed our cell is 861/138 with a
+byte-identical chargedLog. GL top-20 grid (3420 cells): 3086 → 3098
+exact, +12 fixed (all tinkaton<->malamar cells — Malamar is that
+pool's only reachable carrier), 0 broken, max margin move 159, no
+winner flips in-pool (carrier users elsewhere can plausibly flip
+winners). Third instance of the 2026-06-11 pattern (after the OMT
+KO-override and the bait-wait hold): an extra condition the
+reference lacks, carrying a plausible comment, producing real margin
+errors. Full writeup:
+userdata/oracle_grid_2026-06-12/incoming_gate_writeup.md.
+
 ### RESOLVED 2026-06-11 (same evening) — bait-wait hold: one extra
 condition, not an unported branch
 
