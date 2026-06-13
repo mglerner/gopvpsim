@@ -611,10 +611,16 @@ Revisit only if PvPoke removes line 539 or fixes the
   has shields, override directly; if attacker has 0 shields, override
   only when defender's next charged-cycle would KO the attacker
   (cycleDamage and CMP-aware turn-comparison gates). Helper
-  `_estimate_best_cm` selects the defender's best-actual-DPE charged
-  move; `_cheapest_cm` proxies attacker.activeChargedMoves[0] (full
-  priority shuffle from pvpoke_dp not factored out — pragmatic
-  approximation, sufficient for the cases tested).
+  `_estimate_best_cm` *(updated 2026-06-13)* now delegates to the
+  pvpoke_dp setup cache's `best_idx` — the energy-sorted,
+  priority-shuffled selectBestChargedMove with the literal
+  SUPER_POWER carve-out (Pokemon.js:799: Superpower needs a DPE edge
+  > .3 to displace, others .03). The original best-actual-DPE
+  approximation wrongly returned Superpower for Malamar-likes and
+  entered this branch when PvPoke (best = Foul Play) always-shields
+  instead — the 38-cell `bestcm_estimate` family in the 2026-06-12
+  oracle grid. `_cheapest_cm` still proxies
+  attacker.activeChargedMoves[0].
   Probe: MG vs Florges [2,0] previously d1=+230, now d1=0 (same
   chargedLog as before, but MG correctly skips shielding the second
   Disarming Voice → 9% HP remaining instead of 55%, matching PvPoke).
