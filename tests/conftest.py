@@ -53,3 +53,21 @@ def mock_gm(monkeypatch):
     pokemon_module._pokemon_index = None
     yield
     pokemon_module._pokemon_index = None
+
+
+@pytest.fixture(autouse=True, scope='session')
+def _pin_gamemaster_cache():
+    """Freeze the on-disk gamemaster/rankings cache for the whole test
+    session (T1, 2026-06-12). Without this, any pytest invocation whose
+    tests hit load_gamemaster/load_rankings can refresh the 24h-TTL
+    cache mid-run — which silently changes opponent resolution for any
+    concurrently running dive chain (the reason "no pytest while a dive
+    chain runs" was a standing rule). Pinning the TTL to infinity makes
+    the suite read-only on the cache: stale-but-present data is always
+    served, a fetch only happens if no cache file exists at all.
+    """
+    import gopvpsim.data as _data
+    old = _data.CACHE_TTL
+    _data.CACHE_TTL = float('inf')
+    yield
+    _data.CACHE_TTL = old
