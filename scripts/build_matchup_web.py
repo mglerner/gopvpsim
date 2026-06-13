@@ -183,8 +183,10 @@ def render_html(entries, scores, pool_name, n_sims, elapsed):
         outline-offset: -1px; }}
   table.matrix th.sortkey {{ color: #f0d890; }}
   table.matrix thead th .sortglyph {{ display: block; text-align: center;
-        color: #5b7398; font-size: 12px; padding-top: 2px; }}
-  table.matrix thead th .sortglyph:hover {{ color: #f0d890; }}
+        color: #5b7398; font-size: 11px; padding-top: 2px;
+        filter: grayscale(1) opacity(0.45); }}
+  table.matrix thead th .sortglyph:hover {{ filter: none; }}
+  table.matrix thead th .sortglyph.pinnedglyph {{ filter: none; }}
   #panel {{ background: #16213e; border-radius: 6px; padding: 12px 16px;
         margin: 16px 0; display: none; }}
   #panel h2 {{ color: #c8a2d0; margin: 0 0 4px 0; font-size: 1.1em; }}
@@ -214,12 +216,12 @@ def render_html(entries, scores, pool_name, n_sims, elapsed):
 </div>
 <p class="hint">Cells are PvPoke-style battle ratings from the
 <b>row</b> species' perspective: &gt;500 (green) = row wins, &lt;500
-(red) = row loses. <b>Click</b> a row name or column header to pin it
-to the top/left (click again to unpin). <b>Hover</b> a row name or
-column header for that species' best wins / worst losses. The
-<b>&#8597;</b> glyph in a column header sorts rows by that matchup;
-the <b>avg</b> header sorts by row average; the corner header sorts
-alphabetically.</p>
+(red) = row loses. <b>Click</b> a row name to pin that row to the top
+(click again to unpin); pinned rows float above the sort. Click a
+<b>column header</b> to sort rows by that matchup (avg header = row
+average, corner = alphabetical); the <b>&#128204;</b> glyph under a
+column name pins that column to the left. <b>Hover</b> a row name or
+column header for that species' best wins / worst losses.</p>
 
 <div id="panel"></div>
 
@@ -306,15 +308,16 @@ function render() {{
     const pinned = pinnedCols.includes(j);
     h += '<th class="' + (sortMode === j ? "sortkey" : "") +
          (pinned ? " pinned" : "") +
-         '" onclick="togglePinCol(' + j + ')"' +
-         ' onmouseenter="showPanel(' + j + ')" title="' +
-         (pinned ? "Unpin column" : "Pin column to the left") + '">' +
+         '" onclick="setSort(' + j + ')"' +
+         ' onmouseenter="showPanel(' + j + ')"' +
+         ' title="Sort rows by score vs ' + escAttr(SPECIES[j]) + '">' +
          '<div class="vert">' + (pinned ? "&#128204; " : "") +
          esc(SPECIES[j]) + "</div>" +
-         '<span class="sortglyph" ' +
-         'onclick="event.stopPropagation(); setSort(' + j + ')" ' +
-         'title="Sort rows by score vs ' + escAttr(SPECIES[j]) +
-         '">&#8597;</span></th>';
+         '<span class="sortglyph' + (pinned ? " pinnedglyph" : "") + '" ' +
+         'onclick="event.stopPropagation(); togglePinCol(' + j + ')" ' +
+         'title="' + (pinned ? "Unpin column" :
+                      "Pin column to the left") +
+         '">&#128204;</span></th>';
   }}
   h += "</tr></thead><tbody>";
   for (const i of order) {{
