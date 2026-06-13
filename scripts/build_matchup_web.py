@@ -177,10 +177,14 @@ def render_html(entries, scores, pool_name, n_sims, elapsed):
   table.matrix thead th.corner {{ left: 0; z-index: 3; }}
   table.matrix td {{ text-align: center; min-width: 30px; }}
   table.matrix td.diag {{ background: #10162a; color: #3d5580; }}
-  table.matrix tr.sel th {{ background: #2b2615; color: #f0d890; }}
-  table.matrix tr.sel td {{ outline: 1px solid #7a6a30;
+  table.matrix tbody th.pinned {{ background: #2b2615; color: #f0d890; }}
+  table.matrix thead th.pinned {{ background: #2b2615; color: #f0d890; }}
+  table.matrix tr.pinned td {{ outline: 1px solid #7a6a30;
         outline-offset: -1px; }}
   table.matrix th.sortkey {{ color: #f0d890; }}
+  table.matrix thead th .sortglyph {{ display: block; text-align: center;
+        color: #5b7398; font-size: 12px; padding-top: 2px; }}
+  table.matrix thead th .sortglyph:hover {{ color: #f0d890; }}
   #panel {{ background: #16213e; border-radius: 6px; padding: 12px 16px;
         margin: 16px 0; display: none; }}
   #panel h2 {{ color: #c8a2d0; margin: 0 0 4px 0; font-size: 1.1em; }}
@@ -210,10 +214,12 @@ def render_html(entries, scores, pool_name, n_sims, elapsed):
 </div>
 <p class="hint">Cells are PvPoke-style battle ratings from the
 <b>row</b> species' perspective: &gt;500 (green) = row wins, &lt;500
-(red) = row loses. Click a <b>column header</b> to sort rows by that
-matchup, the <b>avg</b> header to sort by row average, the corner
-header for alphabetical. Click a <b>row name</b> to highlight it and
-see its best wins / worst losses.</p>
+(red) = row loses. <b>Click</b> a row name or column header to pin it
+to the top/left (click again to unpin). <b>Hover</b> a row name or
+column header for that species' best wins / worst losses. The
+<b>&#8597;</b> glyph in a column header sorts rows by that matchup;
+the <b>avg</b> header sorts by row average; the corner header sorts
+alphabetically.</p>
 
 <div id="panel"></div>
 
@@ -234,7 +240,8 @@ const N = SPECIES.length;
 
 let scenario = "1-1";
 let sortMode = "avg";   // "avg" | "alpha" | column index
-let selected = -1;
+let pinnedRows = [];    // species indices in pin order (render at top)
+let pinnedCols = [];    // species indices in pin order (render at left)
 
 function rowAvg(mat, i) {{
   let s = 0, c = 0;
@@ -260,7 +267,15 @@ function rowOrder() {{
       return b - a;
     }});
   }}
-  return idx;
+  // Pinned rows float to the top in pin order; the rest keep sortMode order.
+  const rest = idx.filter(i => !pinnedRows.includes(i));
+  return pinnedRows.concat(rest);
+}}
+
+function colOrder() {{
+  const idx = Array.from({{length: N}}, (_, j) => j);
+  const rest = idx.filter(j => !pinnedCols.includes(j));
+  return pinnedCols.concat(rest);
 }}
 
 function cellStyle(s) {{
@@ -279,6 +294,7 @@ function cellStyle(s) {{
 function render() {{
   const mat = DATA[scenario];
   const order = rowOrder();
+  const cols = colOrder();
   let h = "<thead><tr>";
   h += '<th class="corner' + (sortMode === "alpha" ? " sortkey" : "") +
        '" onclick="setSort(\\'alpha\\')" title="Sort alphabetically">' +
@@ -286,21 +302,33 @@ function render() {{
   h += '<th class="' + (sortMode === "avg" ? "sortkey" : "") +
        '" onclick="setSort(\\'avg\\')" title="Sort by row average">' +
        '<div class="vert">avg</div></th>';
-  for (let j = 0; j < N; j++) {{
+  for (const j of cols) {{
+    const pinned = pinnedCols.includes(j);
     h += '<th class="' + (sortMode === j ? "sortkey" : "") +
-         '" onclick="setSort(' + j + ')" title="Sort rows by score vs ' +
-         escAttr(SPECIES[j]) + '"><div class="vert">' + esc(SPECIES[j]) +
-         "</div></th>";
+         (pinned ? " pinned" : "") +
+         '" onclick="togglePinCol(' + j + ')"' +
+         ' onmouseenter="showPanel(' + j + ')" title="' +
+         (pinned ? "Unpin column" : "Pin column to the left") + '">' +
+         '<div class="vert">' + (pinned ? "&#128204; " : "") +
+         esc(SPECIES[j]) + "</div>" +
+         '<span class="sortglyph" ' +
+         'onclick="event.stopPropagation(); setSort(' + j + ')" ' +
+         'title="Sort rows by score vs ' + escAttr(SPECIES[j]) +
+         '">&#8597;</span></th>';
   }}
   h += "</tr></thead><tbody>";
   for (const i of order) {{
+    const rowPinned = pinnedRows.includes(i);
     h += '<tr data-i="' + i + '"' +
-         (i === selected ? ' class="sel"' : "") + ">";
-    h += '<th onclick="selectSpecies(' + i + ')" title="' +
-         escAttr(MOVESETS[i] + " | IVs " + IVS[i]) + '">' +
-         esc(SPECIES[i]) + "</th>";
+         (rowPinned ? ' class="pinned"' : "") + ">";
+    h += '<th' + (rowPinned ? ' class="pinned"' : "") +
+         ' onclick="togglePinRow(' + i + ')"' +
+         ' onmouseenter="showPanel(' + i + ')" title="' +
+         escAttr((rowPinned ? "Unpin | " : "Pin row to the top | ") +
+                 MOVESETS[i] + " | IVs " + IVS[i]) + '">' +
+         (rowPinned ? "&#128204; " : "") + esc(SPECIES[i]) + "</th>";
     h += '<td style="color:#9bb0d0">' + rowAvg(mat, i).toFixed(0) + "</td>";
-    for (let j = 0; j < N; j++) {{
+    for (const j of cols) {{
       const s = mat[i][j];
       if (s === null) {{
         h += '<td class="diag">&mdash;</td>';
@@ -319,16 +347,20 @@ function render() {{
 function setScenario(v) {{ scenario = v; render(); }}
 function setSort(m) {{ sortMode = m; render(); }}
 
-function selectSpecies(i) {{
-  selected = (selected === i) ? -1 : i;
-  renderPanel();
+function togglePinRow(i) {{
+  const k = pinnedRows.indexOf(i);
+  if (k >= 0) pinnedRows.splice(k, 1); else pinnedRows.push(i);
   render();
 }}
 
-function renderPanel() {{
+function togglePinCol(j) {{
+  const k = pinnedCols.indexOf(j);
+  if (k >= 0) pinnedCols.splice(k, 1); else pinnedCols.push(j);
+  render();
+}}
+
+function showPanel(i) {{
   const panel = document.getElementById("panel");
-  if (selected < 0) {{ panel.style.display = "none"; return; }}
-  const i = selected;
   const rows = [];
   let w = 0, l = 0, t = 0;
   for (let j = 0; j < N; j++) {{
