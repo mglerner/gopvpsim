@@ -172,6 +172,7 @@ def slayer_iter_worker(args):
             bp0 = BattlePokemon(
                 species=species, types=focal_types,
                 atk=atk_stat, def_=def_stat, max_hp=hp_stat,
+                shadow=shadow,
                 fast_move=dict(fm_template),
                 charged_moves=[dict(cm) for cm in cms_template],
             )
@@ -180,6 +181,7 @@ def slayer_iter_worker(args):
             bp1 = BattlePokemon(
                 species=species, types=focal_types,
                 atk=opp_atk, def_=opp_def, max_hp=opp_hp,
+                shadow=shadow,
                 fast_move=dict(fm_template),
                 charged_moves=[dict(cm) for cm in cms_template],
             )

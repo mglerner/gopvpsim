@@ -247,7 +247,7 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
                 att_fast_to_next = math.ceil(
                     max(0, a_first['energy'] - attacker.energy) / a_fast_energy)
                 att_turns_to_next = att_fast_to_next * a_fast_turns
-                if attacker.atk > defender.atk:
+                if attacker.cmp_atk > defender.cmp_atk:
                     att_turns_to_next -= 1
 
                 if (turns_to_next >= att_turns_to_next
@@ -378,7 +378,7 @@ def _calc_turns_to_live(
     opp_fast_energy   = defender.fast_move.get('energyGain', 5)
     opp_fast_turns    = defender.fast_move.get('_turns', 1)
     atk_fast_turns    = attacker.fast_move.get('_turns', 1)
-    wins_cmp          = attacker.atk >= defender.atk
+    wins_cmp          = attacker.cmp_atk >= defender.cmp_atk
 
     # Build initial state.
     # In our timing model, fast moves with D ≤ 2 always land before the action-
@@ -403,7 +403,7 @@ def _calc_turns_to_live(
         # Defender-side damage/energy buffers were rebuilt alongside the
         # damage cache by fast_move_damage() above — no per-call asarray.
         # The CMP turn bonus is loop-invariant, so it's hoisted here.
-        cmp_bonus = (attacker.atk > defender.atk
+        cmp_bonus = (attacker.cmp_atk > defender.cmp_atk
                      and defender.fast_move.get('cooldown', 500)
                          % attacker.fast_move.get('cooldown', 500) == 0)
         ok, ttl = _CALC_TTL_JIT(
@@ -465,7 +465,7 @@ def _calc_turns_to_live(
                             turns_to_live = c_turn
                         opp_cd = defender.fast_move.get('cooldown', 500)
                         atk_cd = attacker.fast_move.get('cooldown', 500)
-                        if attacker.atk > defender.atk and opp_cd % atk_cd == 0:
+                        if attacker.cmp_atk > defender.cmp_atk and opp_cd % atk_cd == 0:
                             turns_to_live += 1
                         break
                     stack.append((
@@ -683,7 +683,7 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
         return False
     cheapest_energy = min(m['energy'] for m in affordable_cms)
     turns_planned = atk_turns + (attacker.energy // cheapest_energy)
-    if attacker.atk < defender.atk:
+    if attacker.cmp_atk < defender.cmp_atk:
         turns_planned += 1
     ttl = _calc_turns_to_live(attacker, defender)
     if turns_planned > ttl:
@@ -1044,7 +1044,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     atk_fast_cd      = dp_cache['atk_fast_cd']
     opp_fast_cd      = defender.fast_move.get('cooldown', 500)
     opp_fast_damage  = defender.fast_move_damage(attacker)
-    wins_cmp         = attacker.atk >= defender.atk
+    wins_cmp         = attacker.cmp_atk >= defender.cmp_atk
 
     # original-charged-moves index for each sorted entry — used by callers
     # that need to return an index into attacker.charged_moves
@@ -1743,6 +1743,7 @@ class BattlePokemon:
     charged_moves:   list[dict]  # gamemaster move dicts — private copies
     shields:         int = 2
     initial_energy:  int = 0     # energy at battle start (0–100)
+    shadow:          bool = False    # CMP uses the unboosted attack (see cmp_atk)
 
     # Mutable battle state
     hp:                 int   = field(init=False)
@@ -1821,6 +1822,13 @@ class BattlePokemon:
         self._form_is_alt = False
         self._form_disguise_active = False
 
+    @property
+    def cmp_atk(self) -> float:
+        """Attack used for CMP / charge-move priority. Shadow's x1.2
+        boosts damage but NOT priority (live-game behavior; PvPoke
+        compares shadow-free stats.atk), so strip it here"""
+        return self.atk / 1.2 if self.shadow else self.atk
+
     @classmethod
     def from_pokemon(cls, pokemon, fast_move: dict, charged_moves: list[dict],
                      shields: int = 2, initial_energy: int = 0,
@@ -1835,6 +1843,7 @@ class BattlePokemon:
             species        = pokemon.species,
             types          = types,
             atk            = pokemon.atk,
+            shadow         = pokemon.shadow,
             def_           = pokemon.def_,
             max_hp         = pokemon.hp,
             fast_move      = fast_move,
@@ -2318,7 +2327,7 @@ def simulate(
         p.fast_move['_turns'] = p.fast_move.get('cooldown', 500) // 500
 
     # Priority: higher effective attack breaks ties on charged moves
-    use_priority = (p0.atk != p1.atk)
+    use_priority = (p0.cmp_atk != p1.cmp_atk)
 
     def log_event(msg: str):
         # Call sites must gate on `if log:` themselves — the f-string
@@ -2411,7 +2420,7 @@ def simulate(
         # moves land simultaneously, the game resolves them in descending atk
         # order (higher effective attack fires first). PvPoke matches this.
         if len(fast_landings) > 1:
-            fast_landings.sort(key=lambda ia: pokemon[ia[0]].atk, reverse=True)
+            fast_landings.sort(key=lambda ia: pokemon[ia[0]].cmp_atk, reverse=True)
         for actor_idx, move in fast_landings:
             attacker = pokemon[actor_idx]
             defender = pokemon[1 - actor_idx]
@@ -2438,7 +2447,7 @@ def simulate(
         # --- 4. Resolve charged moves (higher priority first) ---
         # Skip if defender was already killed by the fast move this turn.
         if use_priority and len(charged_actions) == 2:
-            charged_actions.sort(key=lambda ia: pokemon[ia[0]].atk, reverse=True)
+            charged_actions.sort(key=lambda ia: pokemon[ia[0]].cmp_atk, reverse=True)
 
         charged_ko = set()  # track Pokemon KO'd by charged moves this turn
 

@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->920<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->930<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
@@ -343,6 +343,35 @@ combos. Mimi's actual SS timing was correct all along; the
 "Localization meta-finding" entry below for the broader lesson.
 
 ## Open divergences
+
+### RESOLVED 2026-06-13 — shadow ×1.2 wrongly folded into CMP attack
+
+CMP (charged-move priority — who throws first on a simultaneous charged
+turn, plus the CMP turn-bonus/penalty in the shield + DP heuristics) was
+decided on `BattlePokemon.atk`, which folds the shadow ×1.2 attack bonus.
+The shadow bonus boosts *damage* but NOT priority: the live game compares
+the unboosted attack stat (Michael, domain expert, 2026-06-13), and
+PvPoke compares its shadow-free `stats.atk` in every CMP-flavored check.
+Fix: `BattlePokemon` gained a `shadow` flag and a `cmp_atk` property
+(`atk / 1.2` for shadow, else `atk`); all 9 CMP comparison/ordering sites
+in battle.py switched from `.atk` to `.cmp_atk` (250, 381, 406, 468, 686,
+1047, the `use_priority` test, and both the fast-landing and charged
+priority sorts). `shadow` is threaded through `from_pokemon` (→ CLI,
+matchup web, tests) and the deep_dive / slayer dive workers; harness_grid
+is non-shadow by design (filters `_shadow`) and needs none.
+
+This resolves the 204-cell `shadow_cmp` family from the 2026-06-12 GL
+top-20 grid (every one of the grid's 30 winner flips). Spot-checked 10/10
+distinct shadow pairs exact vs `pvpoke_trace.js` post-fix, including
+base-vs-shadow mirrors that correctly resolve to 500/500 mutual-KO draws
+(`use_priority` becomes False once the bonus is stripped and equal-IV
+mirrors tie on `cmp_atk` — the simultaneous-charged draw path the live
+game produces, engaged for free by this fix, not a separate port).
+Pinned by `test_shadow_quagsire_vs_feraligatr_cmp` (9 PvPoke-verified
+cells incl. the [0,0] winner flip: pre-fix Quagsire wrongly won 555/444,
+now Feraligatr 464/536) and `test_cmp_atk_strips_shadow_bonus` (unit).
+Caches auto-invalidate (engine_hash covers battle.py/pokemon.py for both
+sweep and slayer caches). Benchmark 3,224 sims/s (baseline 3,160).
 
 ### RESOLVED 2026-06-13 — incoming selfDefenseDebuffing shield gate
 (port error: extra routing condition the reference lacks)
