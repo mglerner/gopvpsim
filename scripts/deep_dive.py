@@ -1193,6 +1193,7 @@ def _sweep_worker(pair_chunk):
         bp0 = BattlePokemon(
             species=species, types=focal_types,
             atk=atk_stat, def_=def_stat, max_hp=hp_stat,
+            shadow=focal_shadow,
             fast_move=dict(fm_template),
             charged_moves=[dict(cm) for cm in cms_template],
         )
@@ -1205,6 +1206,7 @@ def _sweep_worker(pair_chunk):
         bp1 = BattlePokemon(
             species=opp['species'], types=opp['types'],
             atk=opp['atk'], def_=opp['def_'], max_hp=opp['hp'],
+            shadow=opp['shadow'],
             fast_move=dict(opp['fm']),
             charged_moves=[dict(cm) for cm in opp['cms']],
         )

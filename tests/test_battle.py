@@ -30,7 +30,7 @@ def make_charged(power=50, energy=40, type_='normal'):
             'power': power, 'energy': energy, 'energyGain': 0}
 
 def make_bp(atk=100.0, def_=100.0, hp=100, types=None,
-            fast=None, charged=None, shields=2):
+            fast=None, charged=None, shields=2, shadow=False):
     """Return a BattlePokemon with sensible defaults."""
     return BattlePokemon(
         species       = 'Testmon',
@@ -41,6 +41,7 @@ def make_bp(atk=100.0, def_=100.0, hp=100, types=None,
         fast_move     = fast or make_fast(),
         charged_moves = charged or [make_charged()],
         shields       = shields,
+        shadow        = shadow,
     )
 
 
@@ -172,6 +173,21 @@ def test_battlepokemon_starts_at_full_hp():
 def test_battlepokemon_starts_at_zero_energy():
     bp = make_bp()
     assert bp.energy == 0
+
+def test_cmp_atk_strips_shadow_bonus():
+    """CMP / charge-move priority uses the *unboosted* attack. Shadow's
+    x1.2 boost damage (.atk) but not priority (.cmp_atk) - live-game
+    behavior, matching PvPoke's shadow-free stats.atk."""
+    # Non-shadow: cmp_atk is just atk
+    base = make_bp(atk=120.0)
+    assert base.shadow is False
+    assert base.cmp_atk == base.atk
+
+    # Shadow x1.2 stripped for priority, kept in .atk for damage
+    shadow = make_bp(atk=144.0, shadow=True) # 144 == 120 * 1.2
+    assert shadow.atk == 144.0
+    assert shadow.cmp_atk == pytest.approx(120.0)
+    assert shadow.cmp_atk < shadow.atk
 
 def test_battlepokemon_starts_with_zero_cooldown():
     bp = make_bp()
@@ -957,6 +973,50 @@ def test_shadow_swampert_vs_registeel(shields_swam, shields_regi, expected_winne
     )
     assert _extract_battle_log(result) == expected_log, (
         f"{shields_swam}v{shields_regi}: battle log mismatch"
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("shields_quag,shields_fera,expected_winner,expected_quag_score,expected_log", [
+    # Quagsire (Shadow) MUD_SHOT / [AQUA_TAIL, MUD_BOMB] 4/15/10
+    # vs Feraligatr SHADOW_CLAW / [HYDRO_CANNON, ICE_BEAM] 5/11/14, Great League
+    # Policy: pvpoke_dp. CMP is decided on the SHADOW-FREE attack: shadow
+    # Quagsire's cmp_atk is 108.4 (= 130.1 / 1.2), so it does NOT win the
+    # priority race its boosted .atk would imply. Pre-fix (boosted CMP) the
+    # [0,0] cell wrongly had Quagsire win 555/444; PvPoke (and now we) give
+    # it to Feraligatr 464/536. PvPoke-verified via pvpoke_trace.js.
+    (0, 0, 1, 464, ['Feraligatr: Hydro Cannon', 'Quagsire: Mud Bomb', 'Quagsire: Aqua Tail', 'Feraligatr: Hydro Cannon']),
+    (0, 1, 1, 344, ['Feraligatr: Hydro Cannon', 'Quagsire: Aqua Tail (shielded)', 'Quagsire: Mud Bomb', 'Feraligatr: Hydro Cannon']),
+    (0, 2, 1, 116, ['Feraligatr: Hydro Cannon', 'Quagsire: Aqua Tail (shielded)', 'Quagsire: Mud Bomb (shielded)', 'Feraligatr: Hydro Cannon']),
+    (1, 0, 0, 552, ['Feraligatr: Hydro Cannon (shielded)', 'Quagsire: Mud Bomb', 'Feraligatr: Hydro Cannon', 'Quagsire: Mud Bomb']),
+    (1, 1, 1, 392, ['Feraligatr: Hydro Cannon (shielded)', 'Quagsire: Aqua Tail (shielded)', 'Quagsire: Mud Bomb', 'Feraligatr: Hydro Cannon']),
+    (1, 2, 1, 276, ['Feraligatr: Hydro Cannon (shielded)', 'Quagsire: Aqua Tail (shielded)', 'Quagsire: Aqua Tail (shielded)', 'Feraligatr: Hydro Cannon', 'Quagsire: Aqua Tail']),
+    (2, 0, 0, 807, ['Feraligatr: Hydro Cannon (shielded)', 'Quagsire: Mud Bomb', 'Feraligatr: Hydro Cannon (shielded)', 'Quagsire: Mud Bomb']),
+    (2, 1, 0, 751, ['Feraligatr: Hydro Cannon (shielded)', 'Quagsire: Aqua Tail (shielded)', 'Quagsire: Mud Bomb', 'Feraligatr: Hydro Cannon (shielded)', 'Quagsire: Aqua Tail']),
+    (2, 2, 1, 408, ['Feraligatr: Hydro Cannon (shielded)', 'Quagsire: Aqua Tail (shielded)', 'Quagsire: Aqua Tail (shielded)', 'Feraligatr: Hydro Cannon (shielded)', 'Quagsire: Mud Bomb', 'Feraligatr: Hydro Cannon']),
+])
+def test_shadow_quagsire_vs_feraligatr_cmp(shields_quag, shields_fera,
+                                           expected_winner, expected_quag_score,
+                                           expected_log):
+    bp_quag = _make_battle_pokemon('Quagsire', 'MUD_SHOT', ['AQUA_TAIL', 'MUD_BOMB'],
+                                   'great', shields_quag, 4, 15, 10, shadow=True)
+    bp_fera = _make_battle_pokemon('Feraligatr', 'SHADOW_CLAW', ['HYDRO_CANNON', 'ICE_BEAM'],
+                                   'great', shields_fera, 5, 11, 14)
+    result = simulate(bp_quag, bp_fera,
+                      charged_policy_0=pvpoke_dp,
+                      charged_policy_1=pvpoke_dp,
+                      log=True)
+    assert result.winner == expected_winner, (
+        f"{shields_quag}v{shields_fera}: expected winner={expected_winner}, "
+        f"got {result.winner}  HP={result.hp_remaining}"
+    )
+    quag_score = round(result.pvpoke_score(0))
+    assert quag_score == expected_quag_score, (
+        f"{shields_quag}v{shields_fera}: expected Quag score={expected_quag_score}, "
+        f"got {quag_score}  (delta={quag_score - expected_quag_score:+d})"
+    )
+    assert _extract_battle_log(result) == expected_log, (
+        f"{shields_quag}v{shields_fera}: battle log mismatch"
     )
 
 
