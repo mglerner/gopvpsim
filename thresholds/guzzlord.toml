@@ -144,7 +144,7 @@ source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
 [Guzzlord.Great.anchors.jumpluff_shadow_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Jumpluff (Shadow)"
-description = "Discover all Shadow Jumpluff damage breakpoints. RyanSwag: 114.47 atk (or higher) takes the 2-2, calibrated against a Jumpluff at 154.70 def."
+description = "Discover all Shadow Jumpluff damage breakpoints. RyanSwag: 114.47 atk (or higher) takes the 2-2, calibrated against a Jumpluff at def 154.70."
 source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
 
 # Medicham: the one move-specific atk callout in the writeup.
@@ -166,7 +166,7 @@ source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
 [Guzzlord.Great.anchors.froslass_brkp_any]
 kind = "damage_breakpoint"
 opponent = "Froslass"
-description = "Discover all Froslass damage breakpoints. RyanSwag: 114.00 atk to 115.03 atk takes the 2-2, calibrated against Froslass at 115.50 def to 116.60 def. Out of the 2026-06 pool; kept for staleness tracking."
+description = "Discover all Froslass damage breakpoints. RyanSwag: 114.00 atk to 115.03 atk takes the 2-2, calibrated against Froslass at def 115.50 to 116.60. Out of the 2026-06 pool; kept for staleness tracking."
 source = "RyanSwag Guzzlord deep dive (GamePress, 2022-11-14)"
 
 [Guzzlord.Great.anchors.skuntank_brkp_any]

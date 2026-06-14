@@ -194,7 +194,7 @@ source = "Pool selection (gl_top50_plus_cs 2026-06-10): close steel matchup, def
 [Azumarill.Great.anchors.tinkaton_blkp_any]
 kind = "bulkpoint"
 opponent = "Tinkaton"
-description = "Discover all Tinkaton bulkpoints. Tinkaton resists fairy and ice, so Azumarill needs to survive Gigaton Hammer pressure to win on Hydro Pump — the inverse of the 143.03 def Tinkaton-side bulkpoint vs Azumarill."
+description = "Discover all Tinkaton bulkpoints. Tinkaton resists fairy and ice, so Azumarill needs to survive Gigaton Hammer pressure to win on Hydro Pump — the inverse of the Tinkaton-side bulkpoint vs Azumarill (def 143.03)."
 source = "Pool selection (gl_top50_plus_cs 2026-06-10); cross-reference thresholds/tinkaton.toml azumarill_blkp_any"
 
 # Dewgong: Icy Wind debuff cycle keeps the matchup close despite typing.
