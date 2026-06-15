@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Overnight re-dive + article regen + comparison + verify pipeline.
 #
-# Runs all 19 website dives serially (per run_website_dives.py;
+# Runs all 20 website dives serially (per run_website_dives.py;
 # Oinkologne M/F GL, Tinkaton GL/UL, Aegislash Blade/Shield GL,
 # Forretress normal/shadow x Volt-Switch/Bug-Bite GL, Dewgong GL,
 # Stunfisk GL, Galarian Corsola GL, plus 2026-06-02 new-season
@@ -86,11 +86,11 @@ log "  watch -n 5 -c 'scripts/chain_status.py --chain overnight'              # 
 log "  while true; do clear; scripts/chain_status.py --chain overnight; sleep 5; done   # no deps"
 log ""
 
-# 1. Twelve website dives (serial, per run_website_dives.py). Aegislash GL
+# 1. Twenty website dives (serial, per run_website_dives.py). Aegislash GL
 #    rejoined the chain 2026-04-21 so the 2026-04-21 rename refactor
 #    (drop compound <br> tier names, auto-gen standalone-mode narrative
 #    for non-CD species) reaches every shipped dive.
-step "Running 19 dives via run_website_dives.py" \
+step "Running 20 dives via run_website_dives.py" \
     python scripts/run_website_dives.py
 
 # The retrofit-only patch_dive_*.py patchers were deleted in the S7
