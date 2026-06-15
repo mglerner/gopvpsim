@@ -8,7 +8,7 @@ awkwardly in prose; the modifier-first form ("Shadow Forretress",
 internal lookups still use the gamemaster name; only HTML emission
 goes through `pretty_species`.
 
-See `userdata/reviews/phase4_plan.md` for the original design.
+See `docs/validations/2026-05_guide_reviews/phase4_plan.md` for the original design.
 """
 from __future__ import annotations
 
