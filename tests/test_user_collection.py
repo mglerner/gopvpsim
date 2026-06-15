@@ -1,10 +1,9 @@
 """
 Tests for gopvpsim.user_collection and gopvpsim.evolution_lines.
 
-The Poke Genie fixture at ``userdata/fixtures/poke_genie_export.csv``
-is gitignored (personal collection data). Tests that need it skip
-cleanly when it's absent — CI and other developers get green runs;
-the user's local dev has the full coverage.
+The Poke Genie fixture at ``tests/fixtures/poke_genie_export.csv`` is a
+checked-in export of the maintainer's collection. Tests that need it
+still skip cleanly when it's absent, so a stripped checkout stays green.
 """
 from pathlib import Path
 
@@ -22,7 +21,7 @@ from gopvpsim.user_collection import (
 
 
 FIXTURE_PATH = (
-    Path(__file__).parent.parent / 'userdata' / 'fixtures' / 'poke_genie_export.csv'
+    Path(__file__).parent / 'fixtures' / 'poke_genie_export.csv'
 )
 
 
@@ -30,9 +29,7 @@ def _fixture_or_skip():
     """Return the fixture path, or pytest.skip if it's not present."""
     if not FIXTURE_PATH.exists():
         pytest.skip(
-            f"Poke Genie fixture not available at {FIXTURE_PATH}. "
-            f"See DEVELOPER_NOTES.md for the convention — the fixture "
-            f"is gitignored (personal collection data)."
+            f"Poke Genie fixture not available at {FIXTURE_PATH}."
         )
     return FIXTURE_PATH
 
