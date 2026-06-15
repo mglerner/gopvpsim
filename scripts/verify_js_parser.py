@@ -9,8 +9,8 @@ JS port: anytime ``scripts/deep_dive_user_collection.js`` changes, run
 this script before committing.
 
 Requires node.js on PATH. The fixture at
-``userdata/fixtures/poke_genie_export.csv`` is personal data and
-gitignored — if missing, the script explains how to supply one.
+``tests/fixtures/poke_genie_export.csv`` is a checked-in export of the
+maintainer's collection — if missing, the script explains how to supply one.
 """
 import json
 import os
@@ -268,7 +268,7 @@ def diff_first(py, js, path=''):
 
 
 def main():
-    fixture = REPO / 'userdata' / 'fixtures' / 'poke_genie_export.csv'
+    fixture = REPO / 'tests' / 'fixtures' / 'poke_genie_export.csv'
     if not fixture.exists():
         print(f'Fixture not found: {fixture}', file=sys.stderr)
         print('Drop a Poke Genie CSV export there to run the harness.',
