@@ -168,20 +168,40 @@ Pluggable policy. Simulate all three shield scenarios (0-0, 1-1, 2-2).
 
 ## Running Python
 This project requires Python **3.13+** (`pyproject.toml` `requires-python =
-">=3.13"`). On Michael's machine the interpreter is selected by **pyenv**
-via `~/coding/MGLPoGo/.python-version` (currently `3.13` → resolves to the
-installed 3.13.x). Bare `python` is the correct invocation; it picks up the
-pyenv shim and lands on the right interpreter. Bare `python3` resolves to
-the macOS-default `/usr/bin/python3` (3.9.6) and will fail on stdlib imports
-like `tomllib`. **Always invoke `python`, never `python3`**, for any project
-script, `-c` one-liner, or test runner. Script shebangs all use
-`#!/usr/bin/env python` to reinforce this.
+">=3.13"`). The environment is **uv-managed** (switched from pyenv
+2026-06-15): `uv venv` created `.venv/` (Python 3.13.x), and `.envrc`
+auto-activates `.venv/bin` via **direnv** when you enter the directory.
+`uv.lock` is committed for reproducibility.
 
-The pyenv environment is barebones — install runtime + dev + perf deps with
-`python -m pip install -e ".[dev,perf]"`. Runtime deps are declared in
-`pyproject.toml` (currently `certifi`, `markdown`, `numpy`); `[dev]` adds
-`pytest`; `[perf]` adds `numba` (optional — `_dp_jit.py` falls back to pure
-Python if not importable).
+**How bare `python` resolves depends on the shell:**
+
+- **Interactive terminal (Michael's shell, Emacs/eglot):** direnv is
+  hooked in, so `.venv/bin` is on PATH and bare `python` is correct.
+  **Always invoke `python`, never `python3`** — `python3` resolves to
+  the macOS-default `/usr/bin/python3` (3.9.6) and fails on stdlib
+  imports like `tomllib`.
+- **Claude Code's Bash tool (non-interactive shell):** direnv is **NOT**
+  loaded, so bare `python` is *not found*. Claude must invoke project
+  Python one of these ways — prefer the first:
+  - `direnv exec . <cmd>` — loads `.envrc`, puts `.venv/bin` on PATH,
+    so the command's internal bare-`python`/`#!/usr/bin/env python`
+    calls all resolve. **This is how to launch scripts and chains**
+    (e.g. `direnv exec . scripts/overnight_redive.sh`).
+  - `.venv/bin/python …` — direct interpreter, fine for one-off
+    `-c` checks.
+  - `uv run python …` — resolves the project env without direnv.
+
+Script shebangs all use `#!/usr/bin/env python`, which lands on
+`.venv/bin/python` whenever the venv is on PATH (no per-script edits
+were needed for the uv switch).
+
+**Install / fresh-machine setup:** `uv venv` → `uv pip install -e
+".[dev,perf]"` → `direnv allow`. Runtime deps are declared in
+`pyproject.toml` (currently `certifi`, `markdown`, `numpy`); `[dev]`
+adds `pytest`; `[perf]` adds `numba`. **Do not skip `[perf]`:**
+`_dp_jit.py` falls back to a pure-Python inner loop without numba, and
+deep dives run several × slower (the 2026-06-15 uv switch initially
+missed `[perf]`, which is the kind of regression to watch for).
 
 ## Testing
 - `python -m pytest tests/test_battle.py -q` — run all battle tests (99/102 passing)
