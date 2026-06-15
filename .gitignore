@@ -36,3 +36,7 @@ htmlcov/
 # See DEVELOPER_NOTES.md "Deep dive output file layout" for the convention
 # on userdata/dives/ vs /tmp/ for HTML output files.
 userdata/
+
+# In-session scratch grids (reproducible; findings live in DEVELOPER_NOTES.md).
+# The oracle-grid expansion (2026-06-12) is regenerable via run_grid.py.
+scratch_oracle_grid/
