@@ -401,7 +401,7 @@ winners). Third instance of the 2026-06-11 pattern (after the OMT
 KO-override and the bait-wait hold): an extra condition the
 reference lacks, carrying a plausible comment, producing real margin
 errors. Full writeup:
-userdata/oracle_grid_2026-06-12/incoming_gate_writeup.md.
+docs/validations/2026-06-12_oracle_grid/incoming_gate_writeup.md.
 
 ### RESOLVED 2026-06-11 (same evening) — bait-wait hold: one extra
 condition, not an unported branch
