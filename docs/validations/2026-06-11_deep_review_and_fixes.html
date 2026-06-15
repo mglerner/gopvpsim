@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>2026-06-11 — Deep Codebase Review &amp; Fix Day</title>
+<style>
+  body { background:#0d1117; color:#c9d1d9; font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+         max-width: 920px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55; }
+  h1 { color:#e6edf3; border-bottom: 2px solid #30363d; padding-bottom:.4rem; }
+  h2 { color:#79c0ff; margin-top:2.2rem; border-bottom:1px solid #21262d; padding-bottom:.3rem; }
+  h3 { color:#e6edf3; margin-top:1.6rem; }
+  code { background:#161b22; padding:.1em .35em; border-radius:4px; font-size:.92em; color:#a5d6ff; }
+  pre  { background:#161b22; padding:.8em 1em; border-radius:6px; overflow-x:auto; }
+  table { border-collapse: collapse; margin: 1rem 0; width:100%; }
+  th, td { border: 1px solid #30363d; padding: .45rem .7rem; text-align:left; vertical-align:top; }
+  th { background:#161b22; color:#e6edf3; }
+  .sev-crit { color:#ff7b72; font-weight:600; }
+  .sev-bug  { color:#ffa657; font-weight:600; }
+  .sev-hard { color:#d2a8ff; font-weight:600; }
+  .ok   { color:#7ee787; }
+  .commit { font-family: ui-monospace, monospace; color:#8b949e; font-size:.88em; }
+  .box { background:#161b22; border:1px solid #30363d; border-radius:8px; padding: .9rem 1.1rem; margin: 1rem 0; }
+  .why { color:#8b949e; font-style: italic; }
+  summary { cursor: pointer; color:#79c0ff; font-weight: 600; }
+  details { margin: .6rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Deep Codebase Review &amp; Fix Day — 2026-06-11</h1>
+
+<p class="box"><strong>TL;DR.</strong> A six-agent Fable&nbsp;5 review of the whole codebase
+(~52k lines) produced a findings doc with 3 confirmed correctness bugs, ~25 likely bugs,
+and a cleanup register. You killed the tainted S6 overnight chain; over the rest of the
+day we fixed every publish-blocking finding, the entire engine-fidelity round, the
+render-honesty batch, the operational guards, and (evening) resolved the
+Snorlax-margin mystery, shipped the signal-loss hybrid and the scanner export, and
+actioned your whole decision batch — <strong>36 commits</strong>, all pushed, suite at
+<strong>841 passed + 14 xfailed</strong>, oracle audit clean after every engine change
+(153 cells: 132 exact + 21 documented divergences), benchmark steady (~3,150–3,300
+sims/s vs the 3,160 baseline). <strong>Every review finding actionable without a
+dedicated session is closed; the re-dive is ready to kick.</strong> Bonus deliverable:
+<code>docs/pvpoke_bug_reports.md</code> — 7 paste-ready GitHub-issue drafts (curated from
+the TODO's 8: the retracted Mimikyu item and the debunked-premise bestChargedMove item
+are excluded; the new CPM-overflow bug is added).</p>
+
+<h2>1. The review itself</h2>
+<p>Six parallel read-only reviewer agents (engine core, library, dive orchestrator,
+analysis/rendering, website/JS, tests/harness), each reading its scope in full and
+cross-checking against the local PvPoke clone and the project docs. I then spot-verified
+the most consequential claims by hand before believing them. Full findings:
+<code>docs/reviews/2026-06-11_fable5_deep_codebase_review.md</code>
+<span class="commit">(7b30cbe)</span> — it also carries the merged list of 27 load-bearing
+invariants and the revised <code>deep_dive.py</code> split plan for S7.</p>
+
+<p class="why">A recurring theme below: a "review finding" is a <em>lead</em>, not a fact.
+One headline engine finding (E2) was half-wrong about PvPoke's behavior, and the probe
+that proved it wrong also uncovered the real bug underneath. That's why every engine fix
+ran oracle-first: probe PvPoke's actual JS via <code>scripts/pvpoke_trace.js</code>,
+then fix, then re-verify.</p>
+
+<h2>2. The three publish-blockers (why you killed the chain)</h2>
+
+<h3><span class="sev-crit">D1</span> — Mirror-slayer ran on the 1v1 scenario only <span class="commit">ab26a1c</span></h3>
+<p><strong>The bug:</strong> interactive dives expand to all 9 shield scenarios — but the
+expansion happened <em>after</em> Phase 2. The slayer iteration, slayer archetypes, and
+threshold auto-discovery all consumed Phase-2 results, so every published Slayer Builds /
+Top-Mirror CMP table was computed against 1v1-only mirror fights while everything else on
+the page is all-9.</p>
+<p><strong>Knock-on:</strong> at one scenario the S2 graded round metric degenerates to 0/1
+wins, so the tie-explosion fix stopped working — the morning chain's log showed a round-1
+pool of <strong>1,772</strong> IVs against <code>--mirror-slayer-pool 30</code>.</p>
+<p><strong>The fix:</strong> expand scenarios at parse time, before anything sims. Bonus: the
+old flow re-swept the base mode after expansion; that redundant sweep is gone. Smoke dive
+verified: graded multi-scenario wins, pools of 37/31 against the cap of 30.</p>
+
+<h3><span class="sev-crit">L1</span> — Shadow opponents resolved without shadow multipliers in anchors <span class="commit">92dd629</span></h3>
+<p><strong>The bug:</strong> the gamemaster's shadow entries ("Quagsire (Shadow)") carry the
+<em>normal</em> form's base stats — shadowness exists only as a multiplier flag. The anchor
+resolvers had a <code>shadow</code> parameter that no call site passed and never parsed the
+name suffix. Every breakpoint anchor vs a shadow opponent was ~20% too strict (def 6/5 too
+high); every bulkpoint too lenient (atk 1/1.2 too low).</p>
+<p><strong>Proof it was live:</strong> the published Sylveon dive's card-verified
+<code>squag_fairy_wind_5</code> anchor (expert card: atk ≥ 121.70) resolved to ~145.7 and
+tagged <strong>0 of 78</strong> rows. Post-fix it resolves to 121.44 — the exact formula
+boundary below the card's first-attainable 121.70.</p>
+<p><strong>Same family, focal side:</strong> <code>build_auto_anchors</code> didn't take a
+shadow flag either, so shadow-focal dives (Shadow Sableye/Jumpluff/Ninetales) computed their
+auto-CMP cohort threshold from unmultiplied attacks (~17% low). Both fixed and pinned by
+multiplier-ratio tests.</p>
+
+<h3><span class="sev-crit">E1</span> — Obstruct RAISED the opponent's defense <span class="commit">d371951</span></h3>
+<p><strong>The bug:</strong> for <code>buffTarget='both'</code> moves, our buff application
+used the generic <code>buffs</code> array for both sides. OBSTRUCT (the only such move) has
+<code>buffsSelf [0,+1]</code> / <code>buffsOpponent [0,-1]</code> — so each Obstruct gave the
+opponent <strong>+1 defense instead of −1</strong>, a 2-stage error per throw, compounding to
+an inverted matchup over a long fight. Two same-root fixes rode along: the
+<code>selfBuffing</code> flag derivation and the shield-policy sub-route both needed PvPoke's
+'both' clauses.</p>
+<p><strong>Pinned by:</strong> a 9-cell Obstagoon (Counter / Obstruct + Night Slash) vs
+Azumarill oracle fixture generated from PvPoke's own engine — all 9 match exactly on score,
+winner, and move log, including a genuine 2v0 tie. (No published impact: Obstagoon is only
+in the CS tournament pool today.)</p>
+
+<h2>3. The engine-fidelity round (oracle-driven)</h2>
+
+<h3><span class="sev-bug">E2</span> — The buff meter: a wrong finding hiding a real bug <span class="commit">434fece</span></h3>
+<p>The reviewer claimed PvPoke's deterministic chance-buff meter fires on different uses than
+ours (e.g. Air Cutter on use 4 vs our 3) — which would contradict our passing Corviknight
+9/9 fixture. The probe found the reviewer's error: <strong>PvPoke initializes the meter to the
+chance itself</strong> (and to 0 for exactly-50% moves), so 0.3 → fires on use 3, matching us…
+at first. The <em>real</em> divergence: our counter reset after each proc and used
+<code>round(1/chance)</code>; PvPoke's float accumulator never resets, so the schedule isn't
+periodic. Concretely wrong in our sim before the fix:</p>
+<table>
+<tr><th>Chance</th><th>Moves</th><th>PvPoke procs</th><th>Ours (old)</th></tr>
+<tr><td>0.2</td><td><strong>Crunch</strong>, Shadow Bone</td><td>4, 10, 14, 19</td><td>5, 10, 15, 20 — <strong>first proc late</strong></td></tr>
+<tr><td>0.125</td><td><strong>Night Slash</strong>, Cross Poison</td><td>7, 15</td><td>8, 16 — first proc late</td></tr>
+<tr><td>0.3</td><td>Air Cutter, Scald…</td><td>3, 6, <strong>10</strong>, 13…</td><td>3, 6, 9, 12…</td></tr>
+<tr><td>0.5, 0.33</td><td>Bulldoze, Zap Cannon…</td><td colspan="2">identical — which is why the suite never caught it</td></tr>
+</table>
+<p>Python and JS share IEEE-754 doubles, so the verbatim port reproduces PvPoke's schedule
+<em>bit-exactly</em>, float-drift quirks included (chance 0.1 procs on use 10 only because ten
+accumulated 0.1s are still &lt; 1.0). Pinned by parametrized 20-use schedule tests.</p>
+
+<h3>The rest of the round</h3>
+<table>
+<tr><th>ID</th><th>What was wrong</th><th>Fix / disposition</th><th>Commit</th></tr>
+<tr><td><span class="sev-bug">E3</span></td><td><code>wouldShield</code> was missing PvPoke's final override: "shield the first in a series of Attack debuffing moves like Superpower" (selfAttackDebuffing &amp;&amp; damage/hp &gt; 0.55).</td><td>Ported; pinned by a unit test in the window where only this clause fires.</td><td class="commit">ae44c43</td></tr>
+<tr><td><span class="sev-bug">E4</span></td><td>The DP's attack-stage tracking dropped <em>negative</em> deltas, so Superpower/Draco-Meteor multi-nuke plans had later throws computed at full damage where PvPoke discounts them.</td><td>Signed deltas on both axes; the stage-table machinery already supported negatives. MG cluster unaffected (Brave Bird's atk component is 0 — confirmed by strict xfails staying put).</td><td class="commit">b20fd0f</td></tr>
+<tr><td><span class="sev-bug">E5</span></td><td>Early lethal throw allowed slot 1 with baiting ON; PvPoke gates it on <code>!baitShields</code>. Our comment asserted the inverse of the JS.</td><td>Gated; pinned white-box via the <code>DP[lethal]</code> debug log.</td><td class="commit">6fac7f9</td></tr>
+<tr><td><span class="sev-bug">E6</span></td><td>Disguise break (Mimikyu) fired the first qualifying <em>shuffled</em> move; PvPoke uses only the pre-shuffle cheapest, else throws nothing early.</td><td>Matched; existing Mimikyu oracle unaffected (Ice Beam is cheapest+clean there).</td><td class="commit">bc533c7</td></tr>
+<tr><td><span class="sev-bug">E7</span></td><td>Our turnsToLive estimator capped hypothetical defender energy at 100; PvPoke's doesn't, shifting KO detection near full energy.</td><td>Cap dropped in both the Python loop and JIT kernel (parity test covers both).</td><td class="commit">e53483d</td></tr>
+<tr><td><span class="sev-hard">E8</span></td><td>Engine caches validated on <code>id(defender)</code> — CPython reuses freed addresses, so a stale cache could alias (hardening; no live bug).</td><td>Held references compared with <code>is</code> — can't alias, zero cost. + E10: move-dict ownership invariant documented on BattlePokemon.</td><td class="commit">034434b</td></tr>
+<tr><td><span class="sev-hard">E14</span></td><td>Our flat 500-turn guard vs PvPoke's 240s clock (which shrinks with charged throws).</td><td><strong>Documented, not matched</strong>: probed the bulkiest realistic wall fight (Carbink mirror 2v2) = 85 turns — neither guard is reachable.</td><td class="commit">87d77c1</td></tr>
+<tr><td><span class="sev-hard">E11</span></td><td>DEVELOPER_NOTES misdescribed why our bandaid[866] diverges (PvPoke's <code>move.damage</code> is essentially never undefined).</td><td>Writeup corrected; decision unchanged.</td><td class="commit">0cfb925</td></tr>
+</table>
+
+<div class="box"><strong>Discovery → resolution (the day's best detective story).</strong>
+Probing E3 with a Snorlax (Super Power) vs Obstagoon fixture surfaced a <em>pre-existing</em>
+divergence: 5 of 9 cells off by ~one Counter of HP with identical winners and move logs,
+present even at 0v0 where shields don't exist. The evening decideLog trace walked it to a
+single decision turn — PvPoke releases the lethal Superpower at T18 while ours held one more
+Lick — and from there to the mechanism: <strong>our own intentional deviation</strong>. The
+OMT "can KO with a charged move" override excluded self-debuffing moves, with a comment
+claiming score-neutrality ("the debuff fires after the KO"). The trace falsified the claim:
+while OMT keeps delaying the lethal throw, the opponent's fast moves keep landing — one
+extra Counter per battle, in every shields-down endgame with a self-debuffing closer
+(Superpower / HJK / Draco users vs walls). Removed the exclusion
+<span class="commit">(632f637)</span>; Snorlax cells went 4/9 → 8/9 exact with all other
+gates unchanged. The lone <strong>+4 residual at [1,2]</strong> (Obstagoon holds shields
+there — a different, smaller mechanism) is the remaining open divergence, documented in
+DEVELOPER_NOTES. Moral, now recorded next to the divergence policy: "score-neutral" claims
+about decision-timing deviations need a trace, not reasoning.</div>
+
+<h2>4. Dive-pipeline &amp; cache fixes</h2>
+<table>
+<tr><th>ID</th><th>What was wrong</th><th>Why it mattered</th><th>Commit</th></tr>
+<tr><td><span class="sev-bug">D6</span></td><td>Shadow-focal dives appended the <em>plain</em> species as their mirror: shadow moveset on non-shadow stats — a chimera Pokemon. Mirror-tier synthesis matched the plain entry too.</td><td>Affects Shadow Sableye/Jumpluff/Ninetales dives; masked only because current pools carry both forms. + R4: a sibling-form tier name ('Oinkologne (Female) Bulk') no longer suppresses the male form's mirror tier.</td><td class="commit">bb5cbcf</td></tr>
+<tr><td><span class="sev-bug">D2/D3</span></td><td>Slayer cache: entries keyed by positional IV indices but <code>iv_floor</code> (which remaps them) wasn't in the key; move hash ignored buff fields; no engine hash (the manual version bump was already forgotten once).</td><td>A <code>--species-iv-floor</code> run could silently read the floorless run's scores. Key now includes floor + buffs + engine/gamemaster hashes. + D12: both disk caches write atomically.</td><td class="commit">b1fc6da</td></tr>
+<tr><td><span class="sev-bug">D5</span></td><td>Reference-moveset dedup compared label strings; charged-move order differs between screening and <code>--reference</code>.</td><td>Caused the 2026-06-02 duplicate-page incident; was held off only by a comment-enforced convention. Now canonical-tuple compare.</td><td class="commit">03b5397</td></tr>
+<tr><td><span class="sev-bug">D7</span></td><td>Three silent-failure sites: mirror synth hardcoded the bait-on score key (rank1-only/bait-off dives silently never synthesized); a blanket except-pass dropped unresolvable opponents from narration; slayer threshold discovery returned empty under 50 results with no log.</td><td>All three now log (the synth also falls back to any available mode).</td><td class="commit">03b5397</td></tr>
+<tr><td><span class="sev-bug">D4</span></td><td>Replay blobs didn't carry the opponent-variant registry, so replayed renders mis-read variant names ('Forretress (Bug Bite)') and dropped their info — on every GL dive, contradicting the S4 byte-identical contract.</td><td>Registry now rides in the blob and is restored on load; old blobs still load.</td><td class="commit">8ef1bd9</td></tr>
+<tr><td><span class="sev-bug">L3</span></td><td><code>get_default_moveset</code> built speciesIds with a naive slug that mangles punctuation: Farfetch'd (Galarian), Mr. Mime, Ho-Oh, Sirfetch'd raised KeyError despite being ranked → silently skipped from pools.</td><td>New <code>data.species_id()</code> resolves via the gamemaster's own name→id mapping.</td><td class="commit">3156373</td></tr>
+<tr><td><span class="sev-bug">L5</span></td><td>data.py cache: a fresh-but-corrupt cache file raised before the network was ever tried; writes weren't atomic; <code>load_group</code> duplicated the whole dance.</td><td>Corrupt cache falls through to refetch; tmp+rename writes; one code path.</td><td class="commit">03b5397</td></tr>
+</table>
+
+<h2>5. Guards that turn silent wrongness into loud errors</h2>
+<table>
+<tr><th>ID</th><th>Fix</th><th>Commit</th></tr>
+<tr><td>L4</td><td>TOML anchors/spreads now REJECT unknown keys per kind. Before: <code>deal_at_least</code> (typo) silently became a different anchor level; <code>atack</code> beside <code>defense</code> silently dropped the attack constraint. All 8 shipped TOMLs verified clean first.</td><td class="commit">f218410</td></tr>
+<tr><td>L10</td><td><code>[Tinkaton.great]</code> (lowercase league) used to parse fine and then never resolve a single anchor. Case-variants normalize on load.</td><td class="commit">b9db11d</td></tr>
+<tr><td>W5</td><td>Article generator now exits loudly if sibling dive files disagree on opponent order (a stale sibling used to publish silently misaligned matchup numbers).</td><td class="commit">b9db11d</td></tr>
+<tr><td>W1</td><td><code>format_md</code> (the always-on .md hook): indented tables no longer grow a phantom cell + lose their indent; <code>\|</code> and pipes inside backtick spans no longer split cells; 4+-space-indented blocks pass through untouched.</td><td class="commit">a749d93</td></tr>
+<tr><td>W2/W7</td><td><code>chain_status</code>: log glob was hardcoded <code>2026-*</code> (would go blind on Jan 1) and the dive-slug regex rejected digits (porygon2-…).</td><td class="commit">03b5397</td></tr>
+<tr><td>W8</td><td>Website-index slug parsing: multi-word species (mr-mime, tapu-fini) grouped as species "Mr"/"Tapu" with the rest as variant chips. Now longest-prefix matched against gamemaster species; all current single-word dive dirs parse byte-identically.</td><td class="commit">045d46f</td></tr>
+<tr><td>R5/R2/R13</td><td><strong>Render-honesty batch</strong>, verified by replay before/after diffs: tier cards no longer claim boundaries whose HP rider they don't constrain (Oinkologne diff: bogus "115.70 Atk + 149 HP flips Jellicent" bullets gone); flavor "loss" prose now requires the cohort to actually LOSE the matchup (Tinkaton diff: a note claiming losses the cohort wins disappeared; the true loss — the mirror — survives); stat-preference notes drop the /50 literal and need a ≥1-point HP delta.</td><td class="commit">0856ab8</td></tr>
+<tr><td>R9</td><td>Banding table no longer crashes the whole dive render on degenerate IV pools (all stats &lt;3 distinct values).</td><td class="commit">b9db11d</td></tr>
+<tr><td>T9</td><td>The one pvpoke_trace shim probe that silently skipped on upstream drift now throws like its siblings.</td><td class="commit">f218410</td></tr>
+<tr><td>W9</td><td><strong>Publish gate now verifies the whole site tree</strong> (100 files, was a frozen 9-file Oinkologne-era list while rsync shipped everything). Immediately caught 75 em-dashes (three S2 Slayer-Builds template strings × 25 dive pages — fixed at the renderer source, so the re-dive ships clean) and 31 stale cross-page anchors (article/comparison → opponents that left the pool; the post-redive regeneration clears them).</td><td class="commit">598f5ee</td></tr>
+</table>
+
+<h2>6. Test-infrastructure safety (the quiet enablers)</h2>
+<ul>
+<li><strong>T1</strong> <span class="commit">(66c3ee9)</span> — pytest can no longer refresh the 24h gamemaster/rankings disk cache mid-run (conftest pins the TTL). This was the exact hazard that forced the morning's review to avoid running tests while your chain was alive.</li>
+<li><strong>T2</strong> <span class="commit">(73239fb)</span> — first JIT↔pure-Python DP equivalence test: same battles with the numba kernels force-disabled must produce identical outcomes. This is what made E7's two-sided change safely verifiable.</li>
+<li><strong>T3</strong> <span class="commit">(73239fb)</span> — the selfDefenseDebuffing shield gate finally has a <em>passing</em> fixture (Moltres-G vs Florges, 9 cells; previously only reachable through xfails, where a regression stays invisible).</li>
+<li><strong>T4</strong> <span class="commit">(66c3ee9)</span> — the divergence-pin xfails are now strict: an unexpected XPASS fails the suite loudly (the Mimikyu-precedent re-vet trigger).</li>
+<li><strong>T7</strong> <span class="commit">(0cfb925)</span> — Mimikyu (consumed disguise + post-bust def stage) and Morpeko (hunger toggle) added to the reset-reuse equivalence matrix. Both clean.</li>
+<li><strong>T6</strong> <span class="commit">(043cc03)</span> — the oracle audit now covers the Ultra League fixtures (it was GL-only, so the xfailed Moltres-G cells had no staleness check at all). The discovery run reconciled exactly with DEVELOPER_NOTES — 7 documented score/flip cells plus 3 previously-unrecorded <em>log-only</em> cells (same root cause, score-neutral). New audit baseline: 153 cells = 132 exact + 21 documented.</li>
+<li><strong>T9</strong> <span class="commit">(f218410)</span> — the one pvpoke_trace shim probe that silently skipped on upstream drift now throws like its siblings.</li>
+</ul>
+
+<h2>7. Where things stand</h2>
+<div class="box">
+<p><strong>Re-dive: ready.</strong> Every fix that affects dive output is in. Both disk caches
+will run cold (engine hash + key schemas changed — correct, not a bug). Publish notes should
+mention: slayer tables are now all-9-scenario, shadow-opponent anchors corrected, plus the
+66→71 GL pool refresh — score shifts have correctness <em>and</em> meta components.</p>
+<p><strong>What the chain ships beyond the morning fixes</strong> (everything below is
+already in the renderer/engine the dives embed): the OMT self-debuffing-closer fix (engine —
+shifts Superpower/HJK/Draco endgame margins), the signal-loss callout + rarity badges, the
+"Copy for IV scanner" buttons, the render-honesty batch (tier-card coverage, flavor losses,
+stat notes), de-dashed slayer UI strings, the JS trio (crash fallback, sort-collapse,
+legend-lock), and form-matched shadow mirrors for the three shadow-focal dives.</p>
+<p><strong>Publish-flow expectation change (W9):</strong> the <code>--ship</code> gate now
+verifies all ~100 pages. It will (correctly) FAIL until the full rebuild completes: the
+75 published em-dashes clear when the re-dive re-renders every dive page from the fixed
+templates, and the 31 stale anchors clear when the article + Forretress comparison
+regenerate against the new pool. If something still fails at publish time, it's real.</p>
+<p><code>scripts/overnight_redive.sh</code> &nbsp;·&nbsp; monitor:
+<code>watch -c -n 5 scripts/chain_status.py --chain overnight</code></p>
+</div>
+
+<h2>7b. The two explainers you asked for</h2>
+
+<p class="box"><strong>UPDATE — both decisions landed same evening.</strong> You picked the
+4+3 hybrid; it's implemented and Oinkologne-verified <span class="commit">(2629fde)</span>:
+Slayer Builds tables hoist parents cleared by every build into one "Every build below
+clears:" line, remaining badges are rarity-coded (gold ≤25%, green ≤60%) with the rate in
+the tooltip, and rows whose anchors are all shared read "common set only". The acceptance
+run sharpened the diagnosis: on Oinkologne all 143 parents hoisted (~360KB lighter HTML)
+because <em>Anchors-First saturation is structural</em> — membership is defined by clearing
+the max parent set, so within-table differentiation lives in the CMP%/atk columns by
+design. The deeper lever, if you want real within-table spread, is the S2 follow-up note
+(all-counted-parents membership / tighter selectivity gate). The systemic audit of OTHER
+surfaces (threshold-tier dropdown, banding, Notable-IVs badges) stays open in TODO.
+Also landed: <strong>E9</strong> <span class="commit">(4f40250)</span> — the near-KO JIT now
+signals queue overflow and falls back to the Python loop, making JIT/Python parity
+structural rather than probabilistic; and the <strong>scanner export</strong>
+<span class="commit">(b97113f)</span> per your gobattlekit pointer.</p>
+
+<h3>Slayer signal-loss: what it is, what S2 already fixed, what the options would do</h3>
+<p><strong>The problem in one example.</strong> On the Oinkologne GL dive, the "slayer" IVs
+(yellow markers) cluster in the top-RIGHT of the scatter — i.e. they're also the rank-1-ish
+bulk IVs — instead of the classic Lurgan-Ape pattern where slayers sit LEFT (worse bulk,
+traded for attack). Mechanism: Oinkologne caps at level ~22 in GL, so the attack range
+across all 4096 IVs is narrow, and Mud Slap's low damage-per-energy means one extra point
+of attack rarely crosses a damage tier. The slayer attack breakpoint therefore lands
+<em>below</em> where premium-bulk IVs already sit — so the "slayer" tag selects nearly
+everyone and distinguishes nothing. The same saturation shows up wherever an auto-anchor's
+lowest tier is cleared by ~100% of the cohort.</p>
+<p><strong>What the S2 redesign already did about it.</strong> The Anchors-First archetype
+table only COUNTS auto-anchor parents that fewer than 50% of the IV space clears — that's
+the review's "option 1" (suppress non-differentiating anchors) already applied to the
+archetype membership. What it did NOT touch: the per-row anchor-tag badges and the
+Threshold Tiers / Notable-IVs surfaces can still display parents everyone passes, and the
+50% gate is membership-only, so a saturated parent still shows in row detail.</p>
+<p><strong>The four TODO options, concretely on the Oinkologne scatter:</strong></p>
+<table>
+<tr><th>Option</th><th>What changes on the page</th><th>Trade-off</th></tr>
+<tr><td>1. Suppress 100%-cleared sub-anchors in the resolver</td><td>Saturated tags vanish everywhere (badges, bullets, tiers), not just from archetype membership.</td><td>Cohort-dependent: two dives with different pools show different anchor sets for the same TOML.</td></tr>
+<tr><td>2. Badge only above-median parents per row</td><td>Rows show only what makes THEM special.</td><td>Hides "everyone passes 6/6," which is itself information.</td></tr>
+<tr><td>3. Rarity-coded badge colors</td><td>All info kept; saturated tags fade visually, rare ones pop.</td><td>More visual complexity; doesn't shrink the HTML.</td></tr>
+<tr><td>4. Move 100%-pass parents to a one-line "everyone clears:" callout</td><td>Cleanest cards; saturation stated once instead of per-row.</td><td>Extra renderer state.</td></tr>
+</table>
+<p><strong>My recommendation:</strong> 4 + 3 — hoist fully-saturated parents into a single
+"every IV here clears: X, Y" line per section (so the fact isn't lost, but stops repeating),
+and rarity-shade the remaining badges. Option 1's resolver-level suppression makes TOML
+anchors behave differently per pool, which will eventually confuse a re-dive comparison.
+Test case stays the Oinkologne scatter: success = the yellow markers stop being "everything
+good" and the remaining tags visibly separate the left-cluster trade-offs.</p>
+
+<h3>Envelope-tag applies: this decision is (mostly) moot after tonight</h3>
+<p>The pending "apply" was for <code>patch_dive_envelope_tags.py</code> — a RETROFIT patcher
+that injects envelope-position tags (the "sits above/below the anchor band at the same SP
+rank" annotations) into already-published dive HTML. The dry-runs said: Aegislash UL has 12
+eligible cards, Forretress Volt-Switch 9, Shadow-VS 8 — and the gate was your per-dive
+approval to patch published pages.</p>
+<p><strong>But the re-dive regenerates all of those pages from scratch</strong>, and freshly
+rendered dives compute envelope positions natively (the retrofit only existed because
+re-diving used to cost hours). So: if tonight's chain covers those dives — it does; they're
+all in the 20-dive set — the patcher question dissolves. The tags appear on the regenerated
+pages automatically, and the patcher goes onto the S7 delete list with the other retrofit
+scripts. The only reason to ever run it again would be a one-off page you deliberately
+don't re-dive.</p>
+
+<h3>Final state of the ledger (end of day)</h3>
+<ul>
+<li><strong>Closed today, beyond the review register:</strong> the Snorlax margin cluster
+(OMT deviation, see the detective-story box in §3); E9 (JIT overflow sentinel + Python
+fallback, <span class="commit">4f40250</span>); the signal-loss 4+3 hybrid
+(<span class="commit">2629fde</span>, Oinkologne-verified); the gobattlekit scanner export
+(<span class="commit">b97113f</span>); both doc chores (bug-report drafts + the Annihilape
+validation closure). Your decision batch is fully actioned: S7 greenlit, G3 closed as
+mechanical-line, bug-report filing marked no-urgency, envelope applies dissolved by the
+re-dive, signal-loss decided and shipped.</li>
+<li><strong>Genuinely still open:</strong>
+  <ul>
+  <li><strong>S7 cleanup session</strong> — greenlit; runs as its own session against the
+      review doc's §I register (dead code, generate_html deletion, the deep_dive.py split
+      per the revised plan in §H).</li>
+  <li><strong>Bait-wait (was: the [1,2] residual) — RESOLVED the same hour</strong>
+      <span class="commit">(43f57bd localization → 4d315ba fix)</span>: the trace first
+      read it as an unported hold, but our port HAD the hold — with an extra
+      <code>not selfDebuffing</code> gate the reference lacks, so it never fired for
+      Superpower/Brave-Bird-class moves. One condition removed: Snorlax goes
+      <strong>9/9 exact</strong>, the MG-vs-Florges log is byte-identical to PvPoke, and
+      the three jellicent log-only cells pinned earlier today vanish too. Audit baseline:
+      153 cells = <strong>136 exact + 17 documented</strong>, all remaining divergences
+      now the single genuine near-KO plan cluster. That's the <em>second</em> falsified
+      "intentional deviation" today — both were plausible-sounding extra conditions; the
+      lesson (deviations need traces, not reasoning) is recorded in DEVELOPER_NOTES.
+      E15's leftover clamp deltas are now the only crumbs in that family.</li>
+  <li><strong>Systemic signal-loss audit</strong> — the hybrid fixed the Slayer Builds
+      tables; the threshold-tier dropdown, banding analysis, and Notable-IVs badges
+      still need the same "does this saturate?" sweep (TODO).</li>
+  <li><strong>Browser spot-check</strong> of the JS trio + scanner buttons + signal-loss
+      styling on the first freshly built dive (all are embedded-engine changes verified
+      by replay render, not by clicking).</li>
+  <li><strong>Yours, no clock:</strong> file the PvPoke bug reports when you want to
+      engage upstream; acidicArisen items (Lurgan question, flavor-guide writeup);
+      guide promotions from <code>ai</code> as you review.</li>
+  </ul></li>
+</ul>
+
+<p class="box"><strong>Late-evening additions (commits through <code>a9c5299</code>, 42 total):</strong>
+the bait-wait fix described above; <strong>R1</strong> <span class="commit">(f39aa00)</span> —
+the mirror-synth tier is no longer silently dropped from the IV Flavor Guide (your owed
+pre-ship follow-up: it now survives both the selectivity cap and the subset dedup, and the
+dedup finally enforces its own documented same-axis rule); the monitor watch-hints; and the
+<strong>doc-hygiene pass</strong> <span class="commit">(2fb60e9)</span> — CHANGELOG gained
+the canonical 2026-06-11 entry, TODO was pruned of everything shipped or duplicated
+(including the stale pointer to the retired post-S5 arc plan and the dissolved
+envelope-apply item), DEVELOPER_NOTES' status section was refreshed from its April
+snapshot to the audit reality (17 matchups / 153 cells), and the review doc now carries a
+point-in-time status header. Single-source-of-truth map: CHANGELOG = shipped, TODO = open
+only, DEVELOPER_NOTES = current invariants/divergences/baselines, review doc §G/§H/§I =
+permanent reference, this report = the narrative.</p>
+
+<p class="why">Generated 2026-06-11 during the live session; lives at
+<code>userdata/session_reports/2026-06-11_deep_review_and_fixes.html</code> (gitignored).
+Companion technical doc: <code>docs/reviews/2026-06-11_fable5_deep_codebase_review.md</code>.</p>
+
+</body>
+</html>

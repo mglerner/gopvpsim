@@ -187,7 +187,7 @@ A six-agent read-only review of the whole codebase
 followed by fixing every finding actionable outside a dedicated
 session. The in-flight S6 chain was killed mid-morning because two
 confirmed bugs tainted its output; the re-dive relaunches on this
-state. Personal narrative: `userdata/session_reports/` (gitignored).
+state. Personal narrative: `docs/validations/2026-06-11_deep_review_and_fixes.html`.
 Suite ended 841p+14xf; oracle audit re-baselined at 153 cells = 136
 exact + 17 documented (all 17 = the one intentional near-KO plan
 cluster); benchmark 3,327 sims/s vs the 3,160 gate.
