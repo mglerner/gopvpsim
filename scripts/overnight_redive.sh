@@ -12,7 +12,8 @@
 # patches per-opponent anchors, regenerates the Oinkologne CD article,
 # renders the two Aegislash form-change comparison pages and the two
 # Aegislash first-draft narrative articles (auto-prose, flag before
-# shipping), rebuilds the site index, and runs the link verifier.
+# shipping), rebuilds the Great League matchup web, rebuilds the site
+# index, and runs the link verifier.
 #
 # Usage:
 #   nohup scripts/overnight_redive.sh &
@@ -137,12 +138,20 @@ step "Rendering Kanto Ninetales regular-vs-Shadow comparison" \
 step "Generating Aegislash GL first-draft article" \
     python scripts/write_aegislash_narrative.py great
 
-# 7. Rebuild site index so the new pages show up in the top-level link
+# 7. Great League matchup web (cross-species all-pairs matrix). Standalone
+#    page with its own pool sim (~9s), not derived from the dives, but
+#    rebuilt here so the published matrix carries the current engine's
+#    scores. Added 2026-06-15 after it was found stale at a pre-shadow-CMP
+#    vintage because it had been missing from this chain.
+step "Building Great League matchup web" \
+    python scripts/build_matchup_web.py
+
+# 8. Rebuild site index so the new pages show up in the top-level link
 #    page.
 step "Rebuilding website index" \
     python scripts/build_website_index.py
 
-# 8. Final link-verification sweep. --ship runs the Oinkologne pre-ship
+# 9. Final link-verification sweep. --ship runs the Oinkologne pre-ship
 #    surface; links from Aegislash/Tinkaton pages aren't covered by the
 #    default ship set but will surface any broken hrefs if present.
 step "Running article link verification" \
