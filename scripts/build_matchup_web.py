@@ -237,13 +237,13 @@ const SPECIES = {species_json};
 const MOVESETS = {movesets_json};
 const IVS = {ivs_json};
 const DATA = {data_json};
-const EVEN = DATA["1-1"];
 const N = SPECIES.length;
 
 let scenario = "1-1";
 let sortMode = "avg";   // "avg" | "alpha" | column index
 let pinnedRows = [];    // species indices in pin order (render at top)
 let pinnedCols = [];    // species indices in pin order (render at left)
+let panelIndex = null;  // species shown in the side panel (null = hidden)
 
 function rowAvg(mat, i) {{
   let s = 0, c = 0;
@@ -347,7 +347,11 @@ function render() {{
   document.getElementById("matrix").innerHTML = h;
 }}
 
-function setScenario(v) {{ scenario = v; render(); }}
+function setScenario(v) {{
+  scenario = v;
+  render();
+  if (panelIndex !== null) showPanel(panelIndex);  // keep an open panel in sync
+}}
 function setSort(m) {{ sortMode = m; render(); }}
 
 function togglePinRow(i) {{
@@ -363,11 +367,14 @@ function togglePinCol(j) {{
 }}
 
 function showPanel(i) {{
+  panelIndex = i;
   const panel = document.getElementById("panel");
+  const mat = DATA[scenario];
+  const scLabel = scenario.replace("-", "v");  // "1-1" -> "1v1", "0-2" -> "0v2"
   const rows = [];
   let w = 0, l = 0, t = 0;
   for (let j = 0; j < N; j++) {{
-    const s = EVEN[i][j];
+    const s = mat[i][j];
     if (s === null) continue;
     rows.push([j, s]);
     if (s > 500) w++; else if (s < 500) l++; else t++;
@@ -380,11 +387,11 @@ function showPanel(i) {{
   panel.innerHTML =
     "<h2>" + esc(SPECIES[i]) + "</h2>" +
     '<div class="meta">' + esc(MOVESETS[i]) + " &middot; IVs " + IVS[i] +
-    " &middot; 1v1 even shields: " + w + "W&ndash;" + l + "L" +
+    " &middot; " + scLabel + " shields: " + w + "W&ndash;" + l + "L" +
     (t ? "&ndash;" + t + "T" : "") + "</div>" +
-    '<div class="cols"><div><h3 class="wins">Top 5 best wins (1v1)</h3>' +
+    '<div class="cols"><div><h3 class="wins">Top 5 best wins (' + scLabel + ')</h3>' +
     "<ol>" + (wins.map(li).join("") || "<li>none</li>") + "</ol></div>" +
-    '<div><h3 class="losses">Top 5 worst losses (1v1)</h3><ol>' +
+    '<div><h3 class="losses">Top 5 worst losses (' + scLabel + ')</h3><ol>' +
     (losses.map(li).join("") || "<li>none</li>") + "</ol></div></div>";
   panel.style.display = "block";
 }}
