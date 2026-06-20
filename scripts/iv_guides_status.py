@@ -34,6 +34,50 @@ def live_workers():
         return 0
 
 
+def _species_from_cmd(cmd):
+    """Pull the focal species out of an iv_envelope_analysis.py command line,
+    dropping flags (handles species with spaces, e.g. 'Palkia (Shadow)')."""
+    after = cmd.split('iv_envelope_analysis.py', 1)[-1].split()
+    toks, i = [], 0
+    while i < len(after):
+        t = after[i]
+        if t in ('--all-shields', '--no-cache'):
+            i += 1
+        elif t == '--pool':
+            i += 2
+        else:
+            toks.append(t)
+            i += 1
+    return ' '.join(toks) or '?'
+
+
+def active_dives():
+    """One row per live worker: (species, cpu%float, cpu_time, wall_elapsed).
+    cpu% near 100 and cpu_time tracking wall_elapsed = healthy; cpu% ~0 or
+    cpu_time frozen between ticks = stalled."""
+    try:
+        out = subprocess.run(
+            ['ps', '-axo', 'pid=,%cpu=,time=,etime=,command='],
+            capture_output=True, text=True).stdout
+    except Exception:
+        return []
+    rows = []
+    for line in out.splitlines():
+        if 'iv_envelope_analysis.py' not in line or 'pgrep' in line:
+            continue
+        parts = line.split(None, 4)
+        if len(parts) < 5:
+            continue
+        _pid, cpu, cputime, etime, cmd = parts
+        try:
+            cpuf = float(cpu)
+        except ValueError:
+            cpuf = 0.0
+        rows.append((_species_from_cmd(cmd), cpuf, cputime, etime))
+    rows.sort(key=lambda r: r[0].lower())
+    return rows
+
+
 def main():
     if not os.path.exists(LOG):
         print(col(f"no batch log at {LOG} yet", 'dim'))
@@ -91,6 +135,18 @@ def main():
         print(f"  {col('avg', 'dim')} {avg:.1f} min/guide   "
               f"{col('eta', 'dim')} ~{eta:.0f} min "
               f"({eta/60:.1f} h) at {slots}-wide")
+
+    dives = active_dives()
+    if dives:
+        print(col('  active workers (cpu% · cpu-time · wall-elapsed):', 'dim'))
+        for sp, cpu, cputime, etime in dives:
+            warn = cpu < 20
+            cpu_s = col(f'{cpu:4.0f}%', 'red' if warn else 'grn')
+            flag = col('  <- LOW CPU, may be stalled', 'red') if warn else ''
+            print(f"    {sp:<24} {cpu_s}  {cputime:>9} cpu  "
+                  f"{etime:>10} elapsed{flag}")
+        print(col('    (cpu-time should climb each tick and track elapsed; '
+                  'if elapsed >> cpu-time the machine slept)', 'dim'))
 
     if done:
         print(col('  recent:', 'dim'))
