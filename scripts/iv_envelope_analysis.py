@@ -38,6 +38,7 @@ from gopvpsim.breakpoints import _get_types
 from gopvpsim.battle import simulate, pvpoke_dp, BattlePokemon
 from gopvpsim.data import get_default_moveset
 from deep_dive import _parse_opponent_pool_line, parse_opponent_spec
+from iv_envelope_cache import WonSetCache, sig_fields
 
 LEAGUE    = 'master'
 POOL_FILE = 'opponent_pools/master_top60.txt'
@@ -53,10 +54,12 @@ EVEN_SHIELDS = [(0, 0), (1, 1), (2, 2)]
 ALL9_SHIELDS = [(a, b) for a in (0, 1, 2) for b in (0, 1, 2)]
 SHIELDS = EVEN_SHIELDS             # reassigned in main() per --all-shields
 FOCAL_SHADOW = False               # reassigned in main() once focal is resolved
-# The recommended-IV table only needs the two quadrants the article renders
-# (best-buddy and no-best-buddy, both vs a best-buddy meta), so we don't sim
-# all four there -- keeps the all-9 run from getting 3x more expensive.
-REC_QUADRANTS = ['wbb_vs_bb', 'nobb_vs_bb']
+CACHE = None                       # WonSetCache, set in main() unless --no-cache
+# The recommended-IV table renders all four quadrants: both your-best-buddy
+# states, each vs a best-buddy AND a non-best-buddy meta. The vs-non-BB-meta
+# pair is the more expensive half (another full 64-combo sweep at opp L50), but
+# the won-set cache makes re-runs cheap, so we sim all four.
+REC_QUADRANTS = ['wbb_vs_bb', 'nobb_vs_bb', 'wbb_vs_nonbb', 'nobb_vs_nonbb']
 LEVELS = {'nobb': 50.0, 'bb': 51.0}
 # Quadrant key -> (my_level, opp_level)
 QUADRANTS = {
@@ -121,6 +124,10 @@ def load_opponents():
 
 def won_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
     """Set of (opp_display, shields) this spread wins, over the SHIELDS set."""
+    if CACHE is not None:
+        hit = CACHE.get(ivs, my_lvl, opp_lvl)
+        if hit is not None:
+            return hit
     won = set()
     for o in opponents:
         for shf, sho in SHIELDS:
@@ -132,6 +139,8 @@ def won_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
                          charged_policy_1=pvpoke_dp)
             if r.pvpoke_score(0) > r.pvpoke_score(1):
                 won.add((o['display'], (shf, sho)))
+    if CACHE is not None:
+        CACHE.put(ivs, my_lvl, opp_lvl, won)
     return won
 
 
@@ -200,7 +209,7 @@ def cmp_lost(focal_base, opponents, my_lvl, opp_lvl, stat_iv):
 
 def main():
     import argparse
-    global SHIELDS, FOCAL_SHADOW, POOL_FILE
+    global SHIELDS, FOCAL_SHADOW, POOL_FILE, CACHE
     ap = argparse.ArgumentParser(description='ML IV envelope analysis -> JSON.')
     ap.add_argument('species', nargs='?', default='Dialga (Origin)')
     ap.add_argument('--all-shields', action='store_true',
@@ -210,6 +219,9 @@ def main():
     ap.add_argument('--pool', default=POOL_FILE,
                     help='opponent pool file (default: %(default)s). Override '
                          'for a fast smaller-pool smoke/repro run.')
+    ap.add_argument('--no-cache', action='store_true',
+                    help='skip the won-set disk cache (force fresh sims; for '
+                         'timing/debugging).')
     a = ap.parse_args()
     species = a.species
 
@@ -240,6 +252,11 @@ def main():
     slug = species.lower().replace(' ', '_').replace('(', '').replace(')', '')
     suffix = '_all9' if a.all_shields else ''
     out_path = f"userdata/dives/{slug}_iv_envelope{suffix}.json"
+
+    if not a.no_cache:
+        sig = sig_fields(base_clean, FOCAL_SHADOW, fast_id, charged_ids,
+                         SHIELDS, opponents)
+        CACHE = WonSetCache(slug, variant, sig, enabled=True)
 
     print(f"{species}: {len(opponents)} opponents, build {fast_id} / "
           f"{', '.join(charged_ids)}")
@@ -376,6 +393,9 @@ def main():
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, 'w') as f:
         json.dump(data, f, indent=2)
+    if CACHE is not None:
+        CACHE.flush()
+        print(f"won-set cache: {CACHE.hits} hits, {CACHE.misses} misses")
     print(f"\nWrote {out_path}")
 
 

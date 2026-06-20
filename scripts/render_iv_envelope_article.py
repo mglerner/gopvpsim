@@ -45,8 +45,10 @@ NAV = [
     ('defense', 'Defense IVs', [(f'def-{q}', QUAD_SHORT[q]) for q in QUAD_ORDER]),
     ('hp', 'HP IVs', [(f'hp-{q}', QUAD_SHORT[q]) for q in QUAD_ORDER]),
     ('recommended', 'Recommended IVs', [
-        ('rec-bb', 'Best buddy (L51) table'),
-        ('rec-nobb', 'No best buddy (L50) table'),
+        ('rec-bb', 'Best buddy (L51), vs BB meta'),
+        ('rec-nobb', 'No best buddy (L50), vs BB meta'),
+        ('rec-bb-nonbb', 'Best buddy (L51), vs non-BB meta'),
+        ('rec-nobb-nonbb', 'No best buddy (L50), vs non-BB meta'),
     ]),
     ('method', 'Method & caveats', []),
 ]
@@ -365,13 +367,21 @@ def rec_table(d, lvkey, meta_quad, title, note, anchor):
 
 
 def verdict(d):
+    # vs-non-best-buddy-meta tables are present only when the analysis simmed
+    # all four REC_QUADRANTS; older 2-quadrant JSON still renders (BB-meta only).
+    has_nonbb = 'wbb_vs_nonbb' in d['recommended'][0]['drops']
+    meta_note = (
+        'The first two tables compare against a best-buddied meta (the '
+        'realistic, harder case); the last two against a non-best-buddied meta, '
+        'which is strictly easier.' if has_nonbb else
+        'The realistic meta is best-buddied, so both tables compare against a '
+        'best-buddy meta.')
     out = ['<h2 id="recommended">Recommended IVs</h2>',
            '<p class="sub">Every spread with all three IVs from 12 to 15 (the '
            'practical range above the 10/10/10 legendary catch floor), sorted '
            'so the spreads that drop nothing come first. "Premium" drops no '
            'matchups versus a perfect IV in the stated case; everything else '
-           'lists exactly what it gives up. The realistic meta is best-buddied, '
-           'so both tables compare against a best-buddy meta.</p>']
+           f'lists exactly what it gives up. {meta_note}</p>']
     out.append(rec_table(
         d, 'bb', 'wbb_vs_bb',
         'If you best buddy (L51), vs a best-buddy meta',
@@ -382,6 +392,19 @@ def verdict(d):
         'If you do not best buddy (L50), vs a best-buddy meta',
         'CP and stats at L50; drops measured in the no-best-buddy vs best-buddy case.',
         'rec-nobb'))
+    if has_nonbb:
+        out.append(rec_table(
+            d, 'bb', 'wbb_vs_nonbb',
+            'If you best buddy (L51), vs a non-best-buddy meta',
+            'CP and stats at L51; drops measured in the best-buddy vs '
+            'no-best-buddy-meta case.',
+            'rec-bb-nonbb'))
+        out.append(rec_table(
+            d, 'nobb', 'nobb_vs_nonbb',
+            'If you do not best buddy (L50), vs a non-best-buddy meta',
+            'CP and stats at L50; drops measured in the no-best-buddy vs '
+            'no-best-buddy-meta case.',
+            'rec-nobb-nonbb'))
     return "\n".join(out) + "\n"
 
 
