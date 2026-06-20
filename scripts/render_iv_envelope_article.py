@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """Render an IV-envelope JSON (from iv_envelope_analysis.py) into a
 XehrFelrose-style ML IV guide article, matching the pogo-dives website
-article house style. Re-run freely to tweak presentation without re-simulating.
+dark article house style with a sticky sidebar nav. Re-run freely to tweak
+presentation without re-simulating.
 
 Usage: python scripts/render_iv_envelope_article.py userdata/dives/<slug>_iv_envelope.json
 
@@ -20,45 +21,95 @@ QUAD_LABEL = {
 QUAD_ORDER = ['nobb_vs_nonbb', 'nobb_vs_bb', 'wbb_vs_nonbb', 'wbb_vs_bb']
 STAT_LABEL = {'atk': 'Attack', 'def': 'Defense', 'hp': 'HP'}
 
+# Sidebar nav: (anchor id, label)
+NAV = [
+    ('covers', 'What this covers'),
+    ('terms', 'Terms to know'),
+    ('build', 'The build'),
+    ('meta', 'Vs the meta'),
+    ('bestbuddy', 'What best buddy changes'),
+    ('attack', 'Attack IVs'),
+    ('defense', 'Defense IVs'),
+    ('hp', 'HP IVs'),
+    ('recommended', 'Recommended IVs'),
+    ('method', 'Method & caveats'),
+]
+
 
 def esc(s):
     return html.escape(str(s))
 
 
 def joinm(lst):
-    return ", ".join(esc(x) for x in lst) if lst else "-"
+    return ", ".join(esc(x) for x in lst) if lst else '<span class="none">-</span>'
 
 
 def style():
     return """
-  body { max-width: 980px; margin: 24px auto; padding: 0 16px;
-         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-         line-height: 1.5; color: #1a1a24; }
-  h1 { margin-bottom: 0.15em; }
-  h2 { margin-top: 1.8em; border-bottom: 2px solid #e3e3dc; padding-bottom: .15em; }
-  h3 { margin-top: 1.3em; color: #333; }
-  h4 { margin: 1em 0 .3em; color: #555; font-size: 1em; }
-  code { background: #f3f3f3; padding: 1px 4px; border-radius: 3px; }
-  ul li { margin-bottom: 0.35em; }
-  table { border-collapse: collapse; width: 100%; margin: .6em 0 1.2em; font-size: 0.9em; }
-  th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: left; vertical-align: top; }
-  th { background: #f4f6fb; }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .banner { background: #fff3cd; border: 2px solid #ffc107; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
-  .twocol { display: flex; gap: 2em; flex-wrap: wrap; }
-  .twocol > div { flex: 1; min-width: 240px; }
-  .terms dt { font-weight: 600; margin-top: .5em; }
-  .terms dd { margin: 0 0 .2em 1.2em; color: #444; }
-  .none { color: #888; }
-  .sub { color: #666; font-size: .92em; }
-  caption { text-align: left; font-weight: 600; color: #555; padding: .3em 0; }
+  :root { --bg:#1a1a2e; --fg:#e0e0e0; --red:#e94560; --pur:#c8a2d0;
+          --grn:#9be89b; --panel:#16213e; --cell:#0f162a; --rule:#0f3460;
+          --sub:#8ea1bd; --blue:#5b8dd9; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+         background:var(--bg); color:var(--fg); line-height:1.6; margin:0; }
+  a { color:var(--grn); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .topbar { max-width:1180px; margin:0 auto; padding:32px 16px 0; }
+  h1 { color:var(--red); margin:0 0 6px; }
+  h2 { color:var(--pur); border-bottom:1px solid var(--rule);
+       padding-bottom:6px; margin-top:34px; scroll-margin-top:14px; }
+  h3 { color:var(--pur); margin-top:20px; font-size:1.05em; }
+  h4 { color:var(--sub); margin:12px 0 4px; font-size:.95em; }
+  code { background:var(--panel); padding:2px 5px; border-radius:3px; font-size:.9em; }
+  p { margin:10px 0; }
+  .sub { color:var(--sub); font-size:.92em; }
+  .none { color:#6b7a93; }
+  table { border-collapse:collapse; width:100%; margin:.6em 0 1.3em; font-size:.88em; }
+  th, td { border:1px solid var(--rule); padding:5px 9px; text-align:left; vertical-align:top; }
+  thead th { background:var(--panel); color:var(--pur); }
+  tbody td { background:var(--cell); color:var(--fg); }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  caption { text-align:left; font-weight:600; color:var(--pur); padding:.3em 0; }
+  .banner { background:#1a2333; color:#8ab4f8; border-radius:6px;
+            padding:10px 16px 10px 20px; margin:16px 0; font-size:14px;
+            position:relative; }
+  .banner::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
+            width:4px; border-radius:2px; background:var(--blue); }
+  .twocol { display:flex; gap:2em; flex-wrap:wrap; }
+  .twocol > div { flex:1; min-width:240px; }
+  .terms dt { font-weight:600; margin-top:.5em; color:var(--pur); }
+  .terms dd { margin:0 0 .2em 1.2em; color:var(--fg); }
+  .panel { background:var(--panel); border-radius:6px; padding:10px 14px 10px 18px;
+           margin:12px 0; position:relative; }
+  .panel::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
+           width:3px; border-radius:2px; background:var(--blue); }
+  footer { color:#667; font-size:13px; margin-top:40px;
+           border-top:1px solid var(--rule); padding-top:12px; }
+  /* layout + sidebar */
+  .layout { display:flex; gap:28px; max-width:1180px; margin:8px auto 0;
+            padding:0 16px 40px; align-items:flex-start; }
+  nav.toc { position:sticky; top:14px; flex:0 0 190px; font-size:13px;
+            background:var(--panel); border-radius:6px; padding:12px 14px; }
+  nav.toc strong { color:var(--pur); display:block; margin-bottom:6px;
+            font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  nav.toc a { display:block; color:var(--grn); padding:3px 0; }
+  main { flex:1; min-width:0; }
+  main h2:first-child { margin-top:6px; }
+  @media (max-width:820px) {
+    .layout { flex-direction:column; }
+    nav.toc { position:static; flex:none; width:auto; }
+  }
 """
+
+
+def nav_html():
+    links = "".join(f'<a href="#{i}">{esc(l)}</a>' for i, l in NAV)
+    return f'<nav class="toc"><strong>On this page</strong>{links}</nav>'
 
 
 def build_card(d):
     b = d['build']
     bs = d['base_stats']
-    return (f'<h2>The build</h2>\n<p class="sub">This guide assumes '
+    return (f'<h2 id="build">The build</h2>\n<p class="sub">This guide assumes '
             f'<b>{esc(d["species"])}</b> with its signature move. Base stats '
             f'atk {bs["atk"]} / def {bs["def"]} / hp {bs["hp"]}.</p>\n'
             f'<ul><li>Fast: <code>{esc(b["fast"])}</code></li>'
@@ -66,7 +117,7 @@ def build_card(d):
 
 
 def terms():
-    return """<h2>Terms to know</h2>
+    return """<h2 id="terms">Terms to know</h2>
 <dl class="terms">
 <dt>Breakpoint</dt><dd>An attack-stat threshold where your fast move deals 1 more damage to a specific opponent. Most impactful on fast moves that fire every turn.</dd>
 <dt>Bulkpoint</dt><dd>A defense-stat threshold where a specific opponent's fast move deals 1 less damage to you.</dd>
@@ -79,7 +130,7 @@ def terms():
 
 
 def key_winloss(d):
-    out = ['<h2>Versus the Master League meta</h2>']
+    out = ['<h2 id="meta">Versus the Master League meta</h2>']
     q = d['headline_quadrant']
     ml, ol = d['quadrant_levels'][q]
     out.append(f'<p class="sub">Consistent results (all even shields) at a perfect IV, '
@@ -100,24 +151,27 @@ def key_winloss(d):
 
 def bb_differences(d):
     hw = {q: set(v) for q, v in d['hundo_won'].items()}
-    out = ['<h2>What best buddy changes (at a perfect IV)</h2>',
-           '<p class="sub">Matchups best buddy (L51) gains over not best-buddying (L50), holding the meta\'s best-buddy status fixed. Even shields, perfect IV.</p>']
-    for meta_key, meta_label, wbb, nobb in [
-            ('nonbb', 'a non-best-buddy meta', 'wbb_vs_nonbb', 'nobb_vs_nonbb'),
-            ('bb', 'a best-buddy meta', 'wbb_vs_bb', 'nobb_vs_bb')]:
+    out = ['<h2 id="bestbuddy">What best buddy changes (at a perfect IV)</h2>',
+           '<p class="sub">Matchups best buddy (L51) gains over not best-buddying (L50), holding the meta\'s best-buddy status fixed. Even shields, perfect IV.</p>',
+           '<div class="panel">']
+    for meta_label, wbb, nobb in [
+            ('a non-best-buddy meta', 'wbb_vs_nonbb', 'nobb_vs_nonbb'),
+            ('a best-buddy meta', 'wbb_vs_bb', 'nobb_vs_bb')]:
         gained = sorted(hw[wbb] - hw[nobb])
         lost = sorted(hw[nobb] - hw[wbb])
         out.append(f'<h4>Vs {meta_label}</h4>')
-        out.append(f'<ul><li><b>Gains:</b> {joinm(gained)}</li>')
+        out.append(f'<div><b>Gains:</b> {joinm(gained)}</div>')
         if lost:
-            out.append(f'<li><b>Gives up:</b> {joinm(lost)}</li>')
-        out.append('</ul>')
+            out.append(f'<div><b>Gives up:</b> {joinm(lost)}</div>')
+    out.append('</div>')
     return "\n".join(out) + "\n"
 
 
 def stat_section(d, stat):
     sv = d['stat_values']
-    out = [f'<h2>{STAT_LABEL[stat]} IVs</h2>']
+    out = [f'<h2 id="{stat if stat!="atk" else "attack"}">{STAT_LABEL[stat]} IVs</h2>'
+           if stat == 'atk' else
+           f'<h2 id="{"defense" if stat=="def" else "hp"}">{STAT_LABEL[stat]} IVs</h2>']
     out.append(f'<p class="sub">{STAT_LABEL[stat]} at a perfect IV: '
                f'<b>{sv["bb"][stat]["15"]}</b> at L51 (best buddy), '
                f'<b>{sv["nobb"][stat]["15"]}</b> at L50. '
@@ -126,7 +180,6 @@ def stat_section(d, stat):
     for q in QUAD_ORDER:
         qd = d['quadrants'][q][stat]
         out.append(f'<h3>{esc(QUAD_LABEL[q])}</h3>')
-        # header
         if stat == 'atk':
             cols = ['IV', STAT_LABEL[stat], 'CMP lost', 'Breakpoint lost',
                     '0s drops', '1s drops', '2s drops']
@@ -135,9 +188,9 @@ def stat_section(d, stat):
                     '0s drops', '1s drops', '2s drops']
         else:
             cols = ['IV', STAT_LABEL[stat], '0s drops', '1s drops', '2s drops']
-        out.append('<table><tr>'
+        out.append('<table><thead><tr>'
                    + "".join(f'<th class="num">{c}</th>' if i <= 1 else f'<th>{c}</th>'
-                             for i, c in enumerate(cols)) + '</tr>')
+                             for i, c in enumerate(cols)) + '</tr></thead><tbody>')
         for iv in [iv for iv in d['iv_range'] if iv != 15]:
             e = qd[str(iv)]
             drp = e['dropped']
@@ -152,19 +205,18 @@ def stat_section(d, stat):
             cells.append(f'<td>{joinm(drp.get("1-1", []))}</td>')
             cells.append(f'<td>{joinm(drp.get("2-2", []))}</td>')
             out.append('<tr>' + "".join(cells) + '</tr>')
-        out.append('</table>')
+        out.append('</tbody></table>')
     return "\n".join(out) + "\n"
 
 
 def rec_table(d, lvkey, meta_quad, title, note):
     rows = d['recommended']
     out = [f'<h3>{esc(title)}</h3>', f'<p class="sub">{esc(note)}</p>']
-    out.append('<table><tr>'
+    out.append('<table><thead><tr>'
                '<th class="num">CP</th><th class="num">IVs (A/D/S)</th>'
                '<th class="num">IV %</th><th class="num">Atk</th>'
                '<th class="num">Def</th><th class="num">HP</th>'
-               '<th>Drops vs a perfect IV</th></tr>')
-    # sort: fewest drops first, then highest IV %
+               '<th>Drops vs a perfect IV</th></tr></thead><tbody>')
     srt = sorted(rows, key=lambda r: (len(r['drops'][meta_quad]),
                                       -r[f'perfect_{lvkey}']))
     for r in srt:
@@ -180,12 +232,12 @@ def rec_table(d, lvkey, meta_quad, title, note):
                    f'<td class="num">{pa}</td><td class="num">{pd}</td>'
                    f'<td class="num">{ph}</td>'
                    f'<td>{dcell}</td></tr>')
-    out.append('</table>')
+    out.append('</tbody></table>')
     return "\n".join(out) + "\n"
 
 
 def verdict(d):
-    out = ['<h2>Recommended IVs</h2>',
+    out = ['<h2 id="recommended">Recommended IVs</h2>',
            '<p class="sub">Every spread with all three IVs from 12 to 15 (the '
            'practical range above the 10/10/10 legendary catch floor), sorted '
            'so the spreads that drop nothing come first. "Premium" drops no '
@@ -205,7 +257,32 @@ def verdict(d):
 
 def render(d):
     sp = esc(d['species'])
-    parts = [f"""<!DOCTYPE html>
+    main_parts = [f"""<h2 id="covers">What this covers</h2>
+<ul>
+<li>{sp} against the Master League meta (PvPoke top-{d['n_opponents']}).</li>
+<li>Attack, Defense, and HP IVs from 15 down to 12, compared to a perfect IV.</li>
+<li>The full grid of best-buddy / no-best-buddy, for you and for the meta.</li>
+<li>The minimum recommended IV spreads, and exactly what each gives up.</li>
+</ul>
+"""]
+    main_parts.append(terms())
+    main_parts.append(build_card(d))
+    main_parts.append(key_winloss(d))
+    main_parts.append(bb_differences(d))
+    for stat in ('atk', 'def', 'hp'):
+        main_parts.append(stat_section(d, stat))
+    main_parts.append(verdict(d))
+    main_parts.append(f"""<h2 id="method">Method and caveats</h2>
+<ul>
+<li>Simulator: this project's PvPoke-style 1v1 engine. A win is a higher 1v1 battle rating than the opponent.</li>
+<li>Opponents: <code>{esc(d['pool'])}</code>, all modeled at a perfect IV. {esc(d['shield_convention'])}.</li>
+<li>Master League has no CP cap, so L50 (regular) and L51 (best buddy) are pure level steps on both sides.</li>
+<li>Breakpoints/bulkpoints are for the fast move ({esc(d['build']['fast'])}); CMP uses the attack stat.</li>
+<li>{sp} assumed to know its signature move. Data: <code>scripts/iv_envelope_analysis.py</code>; rendered by <code>scripts/render_iv_envelope_article.py</code>.</li>
+</ul>
+""")
+    main_html = "\n".join(main_parts)
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -214,43 +291,27 @@ def render(d):
 <style>{style()}</style>
 </head>
 <body>
+<div class="topbar">
 <h1>{sp}: Master League IV Guide</h1>
 <p class="sub">How far your IVs can slip before this Master League attacker
 gives up specific matchups, with the move on it. Breakpoints, bulkpoints, CMP,
 and named matchups across the full best-buddy grid.</p>
-
 <div class="banner"><strong>First-draft, auto-generated article.</strong> Every
 number is from the simulator; the structure follows XehrFelrose's IV-deep-dive
 format. No gameplay or teambuilding judgment is made here, only the mechanics
 and matchups. Review and rewrite before shipping.</div>
-
-<h2>What this covers</h2>
-<ul>
-<li>{sp} against the Master League meta (PvPoke top-{d['n_opponents']}).</li>
-<li>Attack, Defense, and HP IVs from 15 down to 12, compared to a perfect IV.</li>
-<li>The full grid of best-buddy / no-best-buddy, for you and for the meta.</li>
-<li>The minimum recommended IV spreads, and exactly what each gives up.</li>
-</ul>
-"""]
-    parts.append(terms())
-    parts.append(build_card(d))
-    parts.append(key_winloss(d))
-    parts.append(bb_differences(d))
-    for stat in ('atk', 'def', 'hp'):
-        parts.append(stat_section(d, stat))
-    parts.append(verdict(d))
-    parts.append(f"""<h2>Method and caveats</h2>
-<ul>
-<li>Simulator: this project's PvPoke-style 1v1 engine. A win is a higher 1v1 battle rating than the opponent.</li>
-<li>Opponents: <code>{esc(d['pool'])}</code>, all modeled at a perfect IV. {esc(d['shield_convention'])}.</li>
-<li>Master League has no CP cap, so L50 (regular) and L51 (best buddy) are pure level steps on both sides.</li>
-<li>Breakpoints/bulkpoints are for the fast move ({esc(d['build']['fast'])}); CMP uses the attack stat.</li>
-<li>{sp} assumed to know its signature move. Data: <code>scripts/iv_envelope_analysis.py</code>; rendered by <code>scripts/render_iv_envelope_article.py</code>.</li>
-</ul>
+</div>
+<div class="layout">
+{nav_html()}
+<main>
+{main_html}
+<footer>Generated by <code>scripts/iv_envelope_analysis.py</code> +
+<code>scripts/render_iv_envelope_article.py</code>.</footer>
+</main>
+</div>
 </body>
 </html>
-""")
-    return "\n".join(parts)
+"""
 
 
 def main():
