@@ -60,16 +60,43 @@ def joinm(lst):
     return ", ".join(esc(x) for x in lst) if lst else '<span class="none">-</span>'
 
 
-def drop_cell(by_sh, shields):
-    """Compact 'matchups dropped' cell: one line per shield label that has
-    drops, in shield order. Scales to all 9 scenarios without 9 columns."""
-    lines = []
+EVEN_LABELS = {'0-0', '1-1', '2-2'}
+
+
+def _sh_class(lab):
+    return 'sh-even' if lab in EVEN_LABELS else 'sh-uneven'
+
+
+def tagged_lines(by_sh, shields):
+    """One <div> per shield label with drops, tagged sh-even/sh-uneven so the
+    shield-view toggle can hide the uneven ones client-side."""
+    out = []
     for lab in shields:
         opps = by_sh.get(lab, [])
         if opps:
-            lines.append(f'<div><b>{esc(lab)}</b> '
-                         + ", ".join(esc(o) for o in opps) + '</div>')
-    return "".join(lines) if lines else '<span class="none">-</span>'
+            out.append(f'<div class="sh-line {_sh_class(lab)}"><b>{esc(lab)}</b> '
+                       + ", ".join(esc(o) for o in opps) + '</div>')
+    return out
+
+
+def drop_cell(by_sh, shields, empty_text='-'):
+    """Compact 'matchups dropped' cell: tagged lines + a JS-managed empty
+    marker (shown when no lines are visible in the current shield view)."""
+    lines = tagged_lines(by_sh, shields)
+    if not lines:
+        # No drops at all (in any view) -> static marker, no toggle needed.
+        return f'<span class="none">{empty_text}</span>'
+    return (f'<div class="dropcell"><span class="empty-marker none hidden">{empty_text}</span>'
+            + "".join(lines) + '</div>')
+
+
+def drops_to_by_sh(drop_strings):
+    """Convert ['Opp Name 1-2', ...] -> {'1-2': ['Opp Name'], ...}."""
+    by_sh = {}
+    for s in drop_strings:
+        opp, lab = s.rsplit(' ', 1)
+        by_sh.setdefault(lab, []).append(opp)
+    return by_sh
 
 
 def style():
@@ -91,6 +118,16 @@ def style():
   p { margin:10px 0; }
   .sub { color:var(--sub); font-size:.92em; }
   .none { color:#6b7a93; }
+  .shieldtoggle { background:var(--panel); border-radius:6px; padding:9px 14px;
+                  margin:14px 0; font-size:14px; position:relative; }
+  .shieldtoggle::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
+                  width:3px; border-radius:2px; background:var(--pur); }
+  .shieldtoggle b { color:var(--pur); margin-right:10px; }
+  .shieldtoggle label { margin-right:18px; cursor:pointer; }
+  .shieldtoggle input { margin-right:5px; vertical-align:middle; }
+  .sh-line { line-height:1.4; }
+  body.shields-even .sh-uneven { display:none; }
+  .hidden { display:none; }
   table { border-collapse:collapse; width:100%; margin:.6em 0 1.3em; font-size:.88em; }
   th, td { border:1px solid var(--rule); padding:5px 9px; text-align:left; vertical-align:top; }
   thead th { background:var(--panel); color:var(--pur); }
@@ -289,14 +326,21 @@ def rec_table(d, lvkey, meta_quad, title, note, anchor):
                '<th class="num">IV %</th><th class="num">Atk</th>'
                '<th class="num">Def</th><th class="num">HP</th>'
                '<th>Drops vs a perfect IV</th></tr></thead><tbody>')
+    compact = len(d['shields']) > 3
     srt = sorted(rows, key=lambda r: (len(r['drops'][meta_quad]),
                                       -r[f'perfect_{lvkey}']))
     for r in srt:
         a, dd, s = r['ivs']
         pa, pd, ph = r[f'pvp_{lvkey}']
         drops = r['drops'][meta_quad]
-        dcell = ('<span class="none">drops nothing (Premium)</span>'
-                 if not drops else joinm(drops))
+        if compact:
+            # grouped, shield-tagged lines so the toggle can hide uneven drops;
+            # JS shows the Premium marker when no drops are visible in the view.
+            dcell = drop_cell(drops_to_by_sh(drops), d['shields'],
+                              'drops nothing (Premium)')
+        else:
+            dcell = ('<span class="none">drops nothing (Premium)</span>'
+                     if not drops else joinm(drops))
         out.append('<tr>'
                    f'<td class="num">{r[f"cp_{lvkey}"]}</td>'
                    f'<td class="num">{a}/{dd}/{s}</td>'
@@ -334,6 +378,28 @@ def render(d):
     credit_name = esc(CREDIT_NAME)
     credit_url = esc(CREDIT_URL)
     shieldconv = esc(d['shield_convention'])
+    compact = len(d['shields']) > 3
+    toggle_html = ("""
+<div class="shieldtoggle"><b>Shield view:</b>
+  <label><input type="radio" name="sv" value="all" checked> All 9 shields</label>
+  <label><input type="radio" name="sv" value="even"> Even shields only (0-0, 1-1, 2-2)</label>
+</div>""" if compact else "")
+    toggle_script = ("""
+<script>
+function updShields(){
+  var even = document.querySelector('input[name="sv"]:checked').value === 'even';
+  document.body.classList.toggle('shields-even', even);
+  document.querySelectorAll('.dropcell').forEach(function(c){
+    var anyVisible = Array.prototype.some.call(
+      c.querySelectorAll('.sh-line'), function(l){ return l.offsetParent !== null; });
+    var m = c.querySelector('.empty-marker');
+    if (m) m.classList.toggle('hidden', anyVisible);
+  });
+}
+Array.prototype.forEach.call(document.querySelectorAll('input[name="sv"]'),
+  function(r){ r.addEventListener('change', updShields); });
+updShields();
+</script>""" if compact else "")
     main_parts = [f"""<h2 id="covers">What this covers</h2>
 <ul>
 <li>{sp} against the Master League meta (PvPoke top-{d['n_opponents']}).</li>
@@ -386,7 +452,7 @@ data tables are auto-generated from this project's simulator; the explanatory
 prose is Claude-drafted, restating {credit_name}'s framing in our own words. No
 gameplay or teambuilding judgment is made here, only the mechanics and matchups.
 A human should review the prose (and confirm the attribution is fair) before
-this ships.</div>
+this ships.</div>{toggle_html}
 </div>
 <div class="layout">
 {nav_html()}
@@ -397,7 +463,7 @@ IV deep dives</a>; numbers independently simulated. Generated by
 <code>scripts/iv_envelope_analysis.py</code> +
 <code>scripts/render_iv_envelope_article.py</code>.</footer>
 </main>
-</div>
+</div>{toggle_script}
 </body>
 </html>
 """
