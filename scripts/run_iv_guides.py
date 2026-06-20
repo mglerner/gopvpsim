@@ -25,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ANALYSIS = os.path.join(ROOT, 'scripts', 'iv_envelope_analysis.py')
 RENDER = os.path.join(ROOT, 'scripts', 'render_iv_envelope_article.py')
+INDEX = os.path.join(ROOT, 'scripts', 'build_website_index.py')
 DEFAULT_POOL = os.path.join(ROOT, 'opponent_pools', 'master_top60.txt')
 PY = sys.executable
 
@@ -95,6 +96,8 @@ def main():
                     help='max concurrent dives (default: physical cores - reserve)')
     ap.add_argument('--skip-existing', action='store_true',
                     help='skip species whose article dir already exists')
+    ap.add_argument('--no-index-refresh', action='store_true',
+                    help='do not rebuild the website index after each guide')
     a = ap.parse_args()
 
     species = a.species if a.species else read_pool(a.pool)
@@ -122,6 +125,11 @@ def main():
             print(f'[{n}/{len(species)}] {"OK  " if ok else "FAIL"} '
                   f'{sp} ({dt / 60:.1f} min) {info}', flush=True)
             results.append((sp, ok, info))
+            # Refresh the website index as each new guide lands. This loop runs
+            # in the main thread, so the rebuilds are serialized (no race on
+            # index.html) even though the dives ran concurrently.
+            if ok and not a.no_index_refresh:
+                subprocess.run([PY, INDEX], cwd=ROOT, capture_output=True)
 
     bad = [r for r in results if not r[1]]
     print(f'\nDone in {(time.time() - t0) / 60:.1f} min: '
