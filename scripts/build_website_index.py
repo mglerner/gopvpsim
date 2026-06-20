@@ -470,14 +470,43 @@ def _render_dives_grouped(dives: list[dict], empty_msg: str) -> str:
     return '\n'.join(items)
 
 
+def _render_iv_guides(guides: list[dict]) -> str:
+    """Compact chip grid for the ML IV guides. There are ~60 (one per top-60
+    meta species), so a chip per species beats a wall of description cards; the
+    shared methodology lives in the section intro, the per-guide description in
+    each chip's hover title."""
+    chips = []
+    for g in sorted(guides, key=lambda d: d['title'].lower()):
+        label = g['title'].replace(' Master League IV Guide', '').strip()
+        chips.append(
+            f'<a class="chip" href="{html.escape(g["href"])}" '
+            f'title="{html.escape(g["description"][:160])}">'
+            f'{html.escape(label)}</a>')
+    return ' '.join(chips)
+
+
 def render_index(dives: list[dict],
                  articles: list[dict],
                  comparisons: list[dict],
                  *,
+                 iv_guides: list[dict] | None = None,
                  guides_landing: dict | None = None) -> str:
     dives_html = _render_dives_grouped(dives, 'No dives published yet.')
     articles_html = _render_entry_list(articles, 'No articles published yet.')
     comparisons_html = _render_entry_list(comparisons, 'No comparisons published yet.')
+
+    iv_guides_section = ''
+    if iv_guides:
+        iv_guides_section = (
+            '\n<h2>Master League IV Guides</h2>\n'
+            '<p class="section-intro">XehrFelrose-style "what IVs do you '
+            'actually need" guides for the Master League meta (PvPoke top-60): '
+            'attack breakpoints, defense bulkpoints, CMP, and the exact '
+            'matchups each IV gives up from 15 down to 12, across the full '
+            'best-buddy grid. AI-drafted from this project\'s simulator, '
+            'pending human review.</p>\n'
+            f'<p>{_render_iv_guides(iv_guides)}</p>\n'
+        )
 
     articles_section = ''
     if articles:
@@ -553,7 +582,7 @@ open it.</p>
 <ul>
 {dives_html}
 </ul>
-{articles_section}{comparisons_section}{guides_section}
+{iv_guides_section}{articles_section}{comparisons_section}{guides_section}
 <p class="about">Built with <a href="https://github.com/pvpoke/pvpoke">PvPoke</a>
 game data. If you find something broken or surprising, email me.</p>
 </body>
@@ -570,6 +599,10 @@ def main() -> int:
         exclude=frozenset({'articles', 'comparisons', 'guides'}),
     )
     articles = load_entries(ARTICLES_DIR, href_prefix='articles/')
+    # The ML IV guides (slug "<species>-ml-iv-guide[-even]") get their own
+    # section; the rest (CD articles, etc.) stay under "Articles".
+    iv_guides = [a for a in articles if '-ml-iv-guide' in a['slug']]
+    articles = [a for a in articles if '-ml-iv-guide' not in a['slug']]
     comparisons = load_entries(COMPARISONS_DIR, href_prefix='comparisons/')
 
     # Guides landing-page entry. build_guides.py writes
@@ -590,10 +623,12 @@ def main() -> int:
             guides_landing = None
 
     index_html = render_index(dives, articles, comparisons,
+                              iv_guides=iv_guides,
                               guides_landing=guides_landing)
     INDEX_PATH.write_text(index_html)
     print(f"Wrote {INDEX_PATH} ({len(dives)} dive(s), "
-          f"{len(articles)} article(s), {len(comparisons)} comparison(s))")
+          f"{len(articles)} article(s), {len(iv_guides)} IV guide(s), "
+          f"{len(comparisons)} comparison(s))")
     for d in dives:
         print(f"  - [dive] {d['title']} -> {d['href']}")
     for a in articles:
