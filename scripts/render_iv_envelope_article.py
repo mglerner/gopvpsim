@@ -19,20 +19,29 @@ QUAD_LABEL = {
     'wbb_vs_bb':     'Best buddy, vs a best-buddy meta',
 }
 QUAD_ORDER = ['nobb_vs_nonbb', 'nobb_vs_bb', 'wbb_vs_nonbb', 'wbb_vs_bb']
+QUAD_SHORT = {
+    'nobb_vs_nonbb': 'No BB vs non-BB',
+    'nobb_vs_bb':    'No BB vs BB',
+    'wbb_vs_nonbb':  'BB vs non-BB',
+    'wbb_vs_bb':     'BB vs BB',
+}
 STAT_LABEL = {'atk': 'Attack', 'def': 'Defense', 'hp': 'HP'}
 
-# Sidebar nav: (anchor id, label)
+# Sidebar nav: (anchor id, label, [(sub id, sub label), ...]).
 NAV = [
-    ('covers', 'What this covers'),
-    ('terms', 'Terms to know'),
-    ('build', 'The build'),
-    ('meta', 'Vs the meta'),
-    ('bestbuddy', 'What best buddy changes'),
-    ('attack', 'Attack IVs'),
-    ('defense', 'Defense IVs'),
-    ('hp', 'HP IVs'),
-    ('recommended', 'Recommended IVs'),
-    ('method', 'Method & caveats'),
+    ('covers', 'What this covers', []),
+    ('terms', 'Terms to know', []),
+    ('build', 'The build', []),
+    ('meta', 'Vs the meta', []),
+    ('bestbuddy', 'What best buddy changes', []),
+    ('attack', 'Attack IVs', [(f'atk-{q}', QUAD_SHORT[q]) for q in QUAD_ORDER]),
+    ('defense', 'Defense IVs', [(f'def-{q}', QUAD_SHORT[q]) for q in QUAD_ORDER]),
+    ('hp', 'HP IVs', [(f'hp-{q}', QUAD_SHORT[q]) for q in QUAD_ORDER]),
+    ('recommended', 'Recommended IVs', [
+        ('rec-bb', 'Best buddy (L51) table'),
+        ('rec-nobb', 'No best buddy (L50) table'),
+    ]),
+    ('method', 'Method & caveats', []),
 ]
 
 
@@ -69,11 +78,12 @@ def style():
   tbody td { background:var(--cell); color:var(--fg); }
   td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
   caption { text-align:left; font-weight:600; color:var(--pur); padding:.3em 0; }
-  .banner { background:#1a2333; color:#8ab4f8; border-radius:6px;
+  /* orange = AI-drafted prose, not yet human-reviewed (authored-ai tier) */
+  .banner { background:#2e241a; color:#e8d4bb; border-radius:6px;
             padding:10px 16px 10px 20px; margin:16px 0; font-size:14px;
             position:relative; }
   .banner::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
-            width:4px; border-radius:2px; background:var(--blue); }
+            width:4px; border-radius:2px; background:#e8903a; }
   .twocol { display:flex; gap:2em; flex-wrap:wrap; }
   .twocol > div { flex:1; min-width:240px; }
   .terms dt { font-weight:600; margin-top:.5em; color:var(--pur); }
@@ -92,6 +102,8 @@ def style():
   nav.toc strong { color:var(--pur); display:block; margin-bottom:6px;
             font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
   nav.toc a { display:block; color:var(--grn); padding:3px 0; }
+  nav.toc a.sub { padding:2px 0 2px 14px; font-size:12px; color:var(--sub); }
+  nav.toc a.sub:hover { color:var(--grn); }
   main { flex:1; min-width:0; }
   main h2:first-child { margin-top:6px; }
   @media (max-width:820px) {
@@ -102,8 +114,12 @@ def style():
 
 
 def nav_html():
-    links = "".join(f'<a href="#{i}">{esc(l)}</a>' for i, l in NAV)
-    return f'<nav class="toc"><strong>On this page</strong>{links}</nav>'
+    parts = []
+    for i, l, subs in NAV:
+        parts.append(f'<a href="#{i}">{esc(l)}</a>')
+        for sid, sl in subs:
+            parts.append(f'<a class="sub" href="#{sid}">{esc(sl)}</a>')
+    return f'<nav class="toc"><strong>On this page</strong>{"".join(parts)}</nav>'
 
 
 def build_card(d):
@@ -179,7 +195,7 @@ def stat_section(d, stat):
                f'matchups shown are those given up versus a perfect IV.</p>')
     for q in QUAD_ORDER:
         qd = d['quadrants'][q][stat]
-        out.append(f'<h3>{esc(QUAD_LABEL[q])}</h3>')
+        out.append(f'<h3 id="{stat}-{q}">{esc(QUAD_LABEL[q])}</h3>')
         if stat == 'atk':
             cols = ['IV', STAT_LABEL[stat], 'CMP lost', 'Breakpoint lost',
                     '0s drops', '1s drops', '2s drops']
@@ -209,11 +225,11 @@ def stat_section(d, stat):
     return "\n".join(out) + "\n"
 
 
-def rec_table(d, lvkey, meta_quad, title, note):
+def rec_table(d, lvkey, meta_quad, title, note, anchor):
     rows = d['recommended']
-    out = [f'<h3>{esc(title)}</h3>', f'<p class="sub">{esc(note)}</p>']
+    out = [f'<h3 id="{anchor}">{esc(title)}</h3>', f'<p class="sub">{esc(note)}</p>']
     out.append('<table><thead><tr>'
-               '<th class="num">CP</th><th class="num">IVs (A/D/S)</th>'
+               '<th class="num">CP</th><th class="num">IVs (A/D/HP)</th>'
                '<th class="num">IV %</th><th class="num">Atk</th>'
                '<th class="num">Def</th><th class="num">HP</th>'
                '<th>Drops vs a perfect IV</th></tr></thead><tbody>')
@@ -247,11 +263,13 @@ def verdict(d):
     out.append(rec_table(
         d, 'bb', 'wbb_vs_bb',
         'If you best buddy (L51), vs a best-buddy meta',
-        'CP and stats at L51; drops measured in the best-buddy vs best-buddy case.'))
+        'CP and stats at L51; drops measured in the best-buddy vs best-buddy case.',
+        'rec-bb'))
     out.append(rec_table(
         d, 'nobb', 'nobb_vs_bb',
         'If you do not best buddy (L50), vs a best-buddy meta',
-        'CP and stats at L50; drops measured in the no-best-buddy vs best-buddy case.'))
+        'CP and stats at L50; drops measured in the no-best-buddy vs best-buddy case.',
+        'rec-nobb'))
     return "\n".join(out) + "\n"
 
 
@@ -296,10 +314,11 @@ def render(d):
 <p class="sub">How far your IVs can slip before this Master League attacker
 gives up specific matchups, with the move on it. Breakpoints, bulkpoints, CMP,
 and named matchups across the full best-buddy grid.</p>
-<div class="banner"><strong>First-draft, auto-generated article.</strong> Every
-number is from the simulator; the structure follows XehrFelrose's IV-deep-dive
-format. No gameplay or teambuilding judgment is made here, only the mechanics
-and matchups. Review and rewrite before shipping.</div>
+<div class="banner"><strong>AI-drafted, not yet human-reviewed.</strong> The
+data tables are auto-generated from the simulator, but the explanatory prose
+(intro, term definitions, framing) is Claude-drafted. No gameplay or
+teambuilding judgment is made here, only the mechanics and matchups. A human
+should review the prose before this ships.</div>
 </div>
 <div class="layout">
 {nav_html()}
@@ -323,12 +342,17 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, 'index.html'), 'w') as f:
         f.write(render(d))
+    # authorship = "ai": data tables are auto-generated, but the explanatory
+    # prose is Claude-drafted (the orange "ai" tier), so the whole article is
+    # AI-drafted-pending-review until a human edits the prose. Kept out of
+    # ship-tracked articles/*.toml so the pre-commit policy isn't bypassed.
     meta = (f'title       = "{d["species"]} Master League IV Guide"\n'
-            f'description = "First-draft auto-generated XehrFelrose-style IV deep dive for '
-            f'{d["species"]} in Master League (with the signature move): breakpoints, '
-            f'bulkpoints, CMP, and named matchups given up at each IV from 15 to 12, across '
-            f'the full best-buddy grid, plus recommended IV spreads. Needs expert review before ship."\n'
-            f'authorship  = "auto"\n'
+            f'description = "AI-drafted (auto data tables + Claude-drafted prose), not yet '
+            f'human-reviewed. XehrFelrose-style IV deep dive for {d["species"]} in Master '
+            f'League (with the signature move): breakpoints, bulkpoints, CMP, and named '
+            f'matchups given up at each IV from 15 to 12, across the full best-buddy grid, '
+            f'plus recommended IV spreads. Human review of the prose needed before ship."\n'
+            f'authorship  = "ai"\n'
             f'landing     = "index.html"\n')
     with open(os.path.join(outdir, 'meta.toml'), 'w') as f:
         f.write(meta)
