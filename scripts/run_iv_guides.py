@@ -71,6 +71,12 @@ def run_one(species):
     json_path = os.path.join(
         'userdata', 'dives', f'{json_slug(species)}_iv_envelope_all9.json')
     t0 = time.time()
+    # TODO (deferred 2026-06-20): for per-phase progress in iv_guides_status.py
+    # (hundo -> detail -> recommended N/64), tee this stdout to
+    # userdata/logs/iv_guides/<slug>.log instead of capturing it in memory, add
+    # incremental progress prints in iv_envelope_analysis.py's recommended loop,
+    # and have the status script show each running dive's last log line. Only
+    # takes effect on a fresh launch. See memory project_ml_iv_guide_pipeline.
     a = subprocess.run([PY, ANALYSIS, '--all-shields', species],
                        cwd=ROOT, capture_output=True, text=True)
     if a.returncode != 0:
