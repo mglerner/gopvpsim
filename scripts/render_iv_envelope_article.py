@@ -474,8 +474,10 @@ def main():
     d = json.load(open(json_path))
     slug = (d['species'].lower().replace(' ', '-')
             .replace('(', '').replace(')', ''))
-    # all-9-shield variant gets its own dir so the even-shield guide is kept.
-    variant_suffix = '-all9' if d.get('variant') == 'all9' else ''
+    # The all-9 guide is the canonical one (it has a built-in even-only toggle),
+    # so it lives at the plain -ml-iv-guide path. A standalone even-only render
+    # (if ever produced) gets a -even suffix so it won't clobber the canonical.
+    variant_suffix = '-even' if d.get('variant') == 'even' else ''
     outdir = f"userdata/website/articles/{slug}-ml-iv-guide{variant_suffix}"
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, 'index.html'), 'w') as f:
@@ -484,8 +486,7 @@ def main():
     # prose is Claude-drafted (the orange "ai" tier), so the whole article is
     # AI-drafted-pending-review until a human edits the prose. Kept out of
     # ship-tracked articles/*.toml so the pre-commit policy isn't bypassed.
-    title_suffix = ' (all 9 shields)' if d.get('variant') == 'all9' else ''
-    meta = (f'title       = "{d["species"]} Master League IV Guide{title_suffix}"\n'
+    meta = (f'title       = "{d["species"]} Master League IV Guide"\n'
             f'description = "AI-drafted (auto data tables + Claude-drafted prose), not yet '
             f'human-reviewed. XehrFelrose-style IV deep dive for {d["species"]} in Master '
             f'League (with the signature move): breakpoints, bulkpoints, CMP, and named '
