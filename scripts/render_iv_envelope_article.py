@@ -60,6 +60,18 @@ def joinm(lst):
     return ", ".join(esc(x) for x in lst) if lst else '<span class="none">-</span>'
 
 
+def drop_cell(by_sh, shields):
+    """Compact 'matchups dropped' cell: one line per shield label that has
+    drops, in shield order. Scales to all 9 scenarios without 9 columns."""
+    lines = []
+    for lab in shields:
+        opps = by_sh.get(lab, [])
+        if opps:
+            lines.append(f'<div><b>{esc(lab)}</b> '
+                         + ", ".join(esc(o) for o in opps) + '</div>')
+    return "".join(lines) if lines else '<span class="none">-</span>'
+
+
 def style():
     return """
   :root { --bg:#1a1a2e; --fg:#e0e0e0; --red:#e94560; --pur:#c8a2d0;
@@ -146,37 +158,62 @@ def build_card(d):
             f'<li>Charged: {", ".join("<code>"+esc(c)+"</code>" for c in b["charged"])}</li></ul>\n')
 
 
-def terms():
-    return """<h2 id="terms">Terms to know</h2>
+def terms(d):
+    shields = d['shields']
+    if len(shields) > 3:
+        shield_dd = ('Shield scenarios are written <b>you-opp</b> (your shields '
+                     'first). This guide covers all ' + str(len(shields)) +
+                     ' ordered scenarios (' + ", ".join(esc(s) for s in shields) +
+                     '), so "you 2 / opp 1" (2-1) is distinct from "you 1 / opp 2" '
+                     '(1-2). Even energy, standard movesets.')
+    else:
+        shield_dd = ('Even-shield scenarios, written you-opp: ' +
+                     ", ".join(esc(s) for s in shields) +
+                     '. Even energy, standard movesets.')
+    return ("""<h2 id="terms">Terms to know</h2>
 <dl class="terms">
 <dt>Breakpoint</dt><dd>An attack-stat threshold where your fast move deals 1 more damage to a specific opponent. Most impactful on fast moves that fire every turn.</dd>
 <dt>Bulkpoint</dt><dd>A defense-stat threshold where a specific opponent's fast move deals 1 less damage to you.</dd>
 <dt>CMP (charge-move priority)</dt><dd>When both Pokemon throw a charged move on the same turn, the one with the higher attack stat goes first. "CMP lost" means a lower attack IV drops you below an opponent's attack, so you would lose that simultaneous-throw.</dd>
-<dt>0s / 1s / 2s</dt><dd>Even-shield scenarios: 0-0, 1-1, and 2-2 shields. This guide uses even shields and even energy, standard movesets.</dd>
+<dt>Shields (you-opp)</dt><dd>""" + shield_dd + """</dd>
 <dt>BB (best buddy)</dt><dd>Best-buddy boost adds one level (L50 to L51). In Master League there is no CP cap, so that level fully applies.</dd>
 <dt>Premium vs Thrifty IVs</dt><dd>Terminology from {credit_name} (<a href="{credit_url}">video</a>). Defined here mechanically, not as a gameplay call: a <b>Premium</b> spread drops no matchups versus a perfect (hundo) IV spread in the stated case; a <b>Thrifty</b> spread drops only the matchups listed next to it. Whether those matchups matter is your call.</dd>
 </dl>
 <p class="sub">These terms and the breakdown that follows are adapted from {credit_name}'s Master League IV deep dives.</p>
-""".replace("{credit_name}", esc(CREDIT_NAME)).replace("{credit_url}", esc(CREDIT_URL))
+""").replace("{credit_name}", esc(CREDIT_NAME)).replace("{credit_url}", esc(CREDIT_URL))
 
 
 def key_winloss(d):
+    # Summarize wins/losses on the 3 EVEN shields (the high-level overview);
+    # the full per-shield nuance lives in the per-stat tables below. Recomputed
+    # from hundo_won so it is correct whether the JSON is even- or all-9-shield.
     out = ['<h2 id="meta">Versus the Master League meta</h2>']
     q = d['headline_quadrant']
     ml, ol = d['quadrant_levels'][q]
-    out.append(f'<p class="sub">Consistent results (all even shields) at a perfect IV, '
-               f'in the <b>{esc(QUAD_LABEL[q].lower())}</b> case '
+    evens = {'0-0', '1-1', '2-2'}
+    all_opp = d['key_wins'] + d['key_losses'] + d['key_split']
+    by_opp = {}
+    for entry in d['hundo_won'][q]:
+        opp, lab = entry.rsplit(' ', 1)
+        by_opp.setdefault(opp, set()).add(lab)
+    kw, kl, ks = [], [], []
+    for o in all_opp:
+        n = len(by_opp.get(o, set()) & evens)
+        (kw if n == 3 else kl if n == 0 else ks).append(o)
+    out.append(f'<p class="sub">Win/loss at a perfect IV on the 3 even shields '
+               f'(0-0, 1-1, 2-2), in the <b>{esc(QUAD_LABEL[q].lower())}</b> case '
                f'(you L{int(ml)} vs opponents L{int(ol)}), vs the '
-               f'{d["n_opponents"]}-strong Master top-60.</p>')
+               f'{d["n_opponents"]}-strong Master top-60. The full per-shield '
+               f'picture is in the stat tables below.</p>')
     out.append('<div class="twocol">')
     out.append('<div><h3>Key wins</h3><ul>'
-               + "".join(f"<li>{esc(x)}</li>" for x in d['key_wins']) + '</ul></div>')
+               + "".join(f"<li>{esc(x)}</li>" for x in kw) + '</ul></div>')
     out.append('<div><h3>Key losses</h3><ul>'
-               + "".join(f"<li>{esc(x)}</li>" for x in d['key_losses']) + '</ul></div>')
+               + "".join(f"<li>{esc(x)}</li>" for x in kl) + '</ul></div>')
     out.append('</div>')
-    if d['key_split']:
-        out.append('<p class="sub"><b>Shield-dependent (split):</b> '
-                   + joinm(d['key_split']) + '.</p>')
+    if ks:
+        out.append('<p class="sub"><b>Shield-dependent (split on even shields):</b> '
+                   + joinm(ks) + '.</p>')
     return "\n".join(out) + "\n"
 
 
@@ -208,17 +245,19 @@ def stat_section(d, stat):
                f'<b>{sv["nobb"][stat]["15"]}</b> at L50. '
                f'Each row drops only that one stat (the other two stay 15); '
                f'matchups shown are those given up versus a perfect IV.</p>')
+    shields = d['shields']
+    compact = len(shields) > 3
+    drop_cols = (['Matchups dropped (you-opp)'] if compact
+                 else [f'{s.split("-")[0]}s drops' for s in shields])
     for q in QUAD_ORDER:
         qd = d['quadrants'][q][stat]
         out.append(f'<h3 id="{stat}-{q}">{esc(QUAD_LABEL[q])}</h3>')
         if stat == 'atk':
-            cols = ['IV', STAT_LABEL[stat], 'CMP lost', 'Breakpoint lost',
-                    '0s drops', '1s drops', '2s drops']
+            cols = ['IV', STAT_LABEL[stat], 'CMP lost', 'Breakpoint lost'] + drop_cols
         elif stat == 'def':
-            cols = ['IV', STAT_LABEL[stat], 'Bulkpoint lost',
-                    '0s drops', '1s drops', '2s drops']
+            cols = ['IV', STAT_LABEL[stat], 'Bulkpoint lost'] + drop_cols
         else:
-            cols = ['IV', STAT_LABEL[stat], '0s drops', '1s drops', '2s drops']
+            cols = ['IV', STAT_LABEL[stat]] + drop_cols
         out.append('<table><thead><tr>'
                    + "".join(f'<th class="num">{c}</th>' if i <= 1 else f'<th>{c}</th>'
                              for i, c in enumerate(cols)) + '</tr></thead><tbody>')
@@ -232,9 +271,11 @@ def stat_section(d, stat):
                 cells.append(f'<td>{joinm(e.get("breakpoints_lost", []))}</td>')
             elif stat == 'def':
                 cells.append(f'<td>{joinm(e.get("bulkpoints_lost", []))}</td>')
-            cells.append(f'<td>{joinm(drp.get("0-0", []))}</td>')
-            cells.append(f'<td>{joinm(drp.get("1-1", []))}</td>')
-            cells.append(f'<td>{joinm(drp.get("2-2", []))}</td>')
+            if compact:
+                cells.append(f'<td>{drop_cell(drp, shields)}</td>')
+            else:
+                for s in shields:
+                    cells.append(f'<td>{joinm(drp.get(s, []))}</td>')
             out.append('<tr>' + "".join(cells) + '</tr>')
         out.append('</tbody></table>')
     return "\n".join(out) + "\n"
@@ -292,6 +333,7 @@ def render(d):
     sp = esc(d['species'])
     credit_name = esc(CREDIT_NAME)
     credit_url = esc(CREDIT_URL)
+    shieldconv = esc(d['shield_convention'])
     main_parts = [f"""<h2 id="covers">What this covers</h2>
 <ul>
 <li>{sp} against the Master League meta (PvPoke top-{d['n_opponents']}).</li>
@@ -300,7 +342,7 @@ def render(d):
 <li>The minimum recommended IV spreads, and exactly what each gives up.</li>
 </ul>
 """]
-    main_parts.append(terms())
+    main_parts.append(terms(d))
     main_parts.append(build_card(d))
     main_parts.append(key_winloss(d))
     main_parts.append(bb_differences(d))
@@ -331,7 +373,7 @@ def render(d):
 <h1>{sp}: Master League IV Guide</h1>
 <p class="sub">How far your IVs can slip before this Master League attacker
 gives up specific matchups, with the move on it. Breakpoints, bulkpoints, CMP,
-and named matchups across the full best-buddy grid.</p>
+and named matchups across the full best-buddy grid, over {shieldconv}.</p>
 <div class="credit"><strong>Format credit:</strong> the structure, terminology,
 and presentation of this guide are adapted from
 <a href="{credit_url}">{credit_name}'s Master League IV deep dives</a>. In
@@ -366,7 +408,9 @@ def main():
     d = json.load(open(json_path))
     slug = (d['species'].lower().replace(' ', '-')
             .replace('(', '').replace(')', ''))
-    outdir = f"userdata/website/articles/{slug}-ml-iv-guide"
+    # all-9-shield variant gets its own dir so the even-shield guide is kept.
+    variant_suffix = '-all9' if d.get('variant') == 'all9' else ''
+    outdir = f"userdata/website/articles/{slug}-ml-iv-guide{variant_suffix}"
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, 'index.html'), 'w') as f:
         f.write(render(d))
@@ -374,12 +418,14 @@ def main():
     # prose is Claude-drafted (the orange "ai" tier), so the whole article is
     # AI-drafted-pending-review until a human edits the prose. Kept out of
     # ship-tracked articles/*.toml so the pre-commit policy isn't bypassed.
-    meta = (f'title       = "{d["species"]} Master League IV Guide"\n'
+    title_suffix = ' (all 9 shields)' if d.get('variant') == 'all9' else ''
+    meta = (f'title       = "{d["species"]} Master League IV Guide{title_suffix}"\n'
             f'description = "AI-drafted (auto data tables + Claude-drafted prose), not yet '
             f'human-reviewed. XehrFelrose-style IV deep dive for {d["species"]} in Master '
             f'League (with the signature move): breakpoints, bulkpoints, CMP, and named '
-            f'matchups given up at each IV from 15 to 12, across the full best-buddy grid, '
-            f'plus recommended IV spreads. Format/terminology adapted from {CREDIT_NAME} '
+            f'matchups given up at each IV from 15 to 12, across the full best-buddy grid '
+            f'over {d["shield_convention"]}, plus recommended IV spreads. '
+            f'Format/terminology adapted from {CREDIT_NAME} '
             f'({CREDIT_URL}); numbers independently simulated. Human review of the prose '
             f'needed before ship."\n'
             f'authorship  = "ai"\n'

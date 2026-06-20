@@ -50,6 +50,12 @@ BUILDS = {
 
 IVS = [15, 14, 13, 12]            # per-stat detail range
 EVEN_SHIELDS = [(0, 0), (1, 1), (2, 2)]
+ALL9_SHIELDS = [(a, b) for a in (0, 1, 2) for b in (0, 1, 2)]
+SHIELDS = EVEN_SHIELDS             # reassigned in main() per --all-shields
+# The recommended-IV table only needs the two quadrants the article renders
+# (best-buddy and no-best-buddy, both vs a best-buddy meta), so we don't sim
+# all four there -- keeps the all-9 run from getting 3x more expensive.
+REC_QUADRANTS = ['wbb_vs_bb', 'nobb_vs_bb']
 LEVELS = {'nobb': 50.0, 'bb': 51.0}
 # Quadrant key -> (my_level, opp_level)
 QUADRANTS = {
@@ -113,10 +119,10 @@ def load_opponents():
 # --- Matchup sims ---------------------------------------------------------
 
 def won_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
-    """Set of (opp_display, shields) this spread wins, even shields only."""
+    """Set of (opp_display, shields) this spread wins, over the SHIELDS set."""
     won = set()
     for o in opponents:
-        for shf, sho in EVEN_SHIELDS:
+        for shf, sho in SHIELDS:
             bp0 = build_mon(species, fast_id, charged_ids, ivs, shf, my_lvl)
             bp1 = build_mon(o['base'], o['fast'], o['charged'], (15, 15, 15),
                             sho, opp_lvl, shadow=o['shadow'])
@@ -191,14 +197,30 @@ def cmp_lost(focal_base, opponents, my_lvl, opp_lvl, stat_iv):
 
 
 def main():
-    species = sys.argv[1] if len(sys.argv) > 1 else 'Dialga (Origin)'
+    import argparse
+    ap = argparse.ArgumentParser(description='ML IV envelope analysis -> JSON.')
+    ap.add_argument('species', nargs='?', default='Dialga (Origin)')
+    ap.add_argument('--all-shields', action='store_true',
+                    help='Use all 9 ordered shield scenarios (your x opp) '
+                         'instead of just the 3 evens; writes a separate '
+                         '*_all9 JSON so the even-shield output is preserved.')
+    a = ap.parse_args()
+    species = a.species
+
+    global SHIELDS
+    SHIELDS = ALL9_SHIELDS if a.all_shields else EVEN_SHIELDS
+    variant = 'all9' if a.all_shields else 'even'
+    shield_conv = ('all 9 ordered shields, your-opp (0-0 .. 2-2)'
+                   if a.all_shields else 'even shields only (0-0, 1-1, 2-2)')
+
     fast_id, charged_ids = BUILDS[species]
     focal_base = get_species(species)
     focal_types = _get_types(species)
     fast_move = _FAST_DB[fast_id]
     opponents = load_opponents()
     slug = species.lower().replace(' ', '_').replace('(', '').replace(')', '')
-    out_path = f"userdata/dives/{slug}_iv_envelope.json"
+    suffix = '_all9' if a.all_shields else ''
+    out_path = f"userdata/dives/{slug}_iv_envelope{suffix}.json"
 
     print(f"{species}: {len(opponents)} opponents, build {fast_id} / "
           f"{', '.join(charged_ids)}")
@@ -221,16 +243,20 @@ def main():
         hundo_won[q] = won_set(species, fast_id, charged_ids, (15, 15, 15),
                                ml, ol, opponents)
         print(f"  hundo {q}: {len(hundo_won[q])} won (of "
-              f"{len(opponents) * len(EVEN_SHIELDS)})")
+              f"{len(opponents) * len(SHIELDS)})")
 
-    # 3. Key wins / losses at the headline quadrant (consistent across shields).
+    # 3. Key wins / losses at the headline quadrant, summarized on the 3 EVEN
+    # shields (the high-level overview; requiring all 9 would make almost
+    # everything "split"). The full per-shield detail lives in the quadrant
+    # tables. The renderer also recomputes this, so it stays consistent.
+    even_set = set(EVEN_SHIELDS)
     by_opp = {}
     for (disp, sh) in hundo_won[HEADLINE_QUADRANT]:
-        by_opp.setdefault(disp, set()).add(sh)
+        if sh in even_set:
+            by_opp.setdefault(disp, set()).add(sh)
     key_wins, key_losses, key_split = [], [], []
     for o in opponents:
-        won_sh = by_opp.get(o['display'], set())
-        n = len(won_sh)
+        n = len(by_opp.get(o['display'], set()))
         if n == len(EVEN_SHIELDS):
             key_wins.append(o['display'])
         elif n == 0:
@@ -253,7 +279,7 @@ def main():
                               ml, ol, opponents)
                 dropped = hundo_won[q] - won
                 gained = won - hundo_won[q]
-                by_sh = {shield_label(s): [] for s in EVEN_SHIELDS}
+                by_sh = {shield_label(s): [] for s in SHIELDS}
                 for (disp, sh) in sorted(dropped):
                     by_sh[shield_label(sh)].append(disp)
                 entry = {
@@ -289,9 +315,10 @@ def main():
             row[f'perfect_{lvkey}'] = round(
                 100.0 * stat_product(focal_base, (a, d, s), lv) / sp15[lv], 2)
             row[f'pvp_{lvkey}'] = [round(ea, 1), round(ed, 1), int(eh)]
-        # matchups dropped vs hundo per quadrant
+        # matchups dropped vs hundo, only for the quadrants the article renders
         drops = {}
-        for q, (ml, ol) in QUADRANTS.items():
+        for q in REC_QUADRANTS:
+            ml, ol = QUADRANTS[q]
             won = won_set(species, fast_id, charged_ids, (a, d, s),
                           ml, ol, opponents)
             dr = hundo_won[q] - won
@@ -307,8 +334,9 @@ def main():
         'base_stats': focal_base,
         'pool': POOL_FILE,
         'n_opponents': len(opponents),
-        'shields': [shield_label(s) for s in EVEN_SHIELDS],
-        'shield_convention': 'even shields only (0-0, 1-1, 2-2)',
+        'shields': [shield_label(s) for s in SHIELDS],
+        'shield_convention': shield_conv,
+        'variant': variant,
         'iv_range': IVS,
         'quadrant_levels': {k: list(v) for k, v in QUADRANTS.items()},
         'headline_quadrant': HEADLINE_QUADRANT,
