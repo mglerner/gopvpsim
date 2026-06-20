@@ -18,6 +18,13 @@ QUAD_LABEL = {
     'wbb_vs_nonbb':  'Best buddy, vs a non-best-buddy meta',
     'wbb_vs_bb':     'Best buddy, vs a best-buddy meta',
 }
+# Attribution. The format, structure, and much of the terminology of this
+# article are adapted from XehrFelrose's Master League IV deep dives. Credit
+# is rendered prominently (top credit box, Terms note, and footer). The numbers
+# are independently re-simulated with this project's engine.
+CREDIT_NAME = 'XehrFelrose'
+CREDIT_URL = 'https://www.youtube.com/watch?v=6N3lXp39qtQ'
+
 QUAD_ORDER = ['nobb_vs_nonbb', 'nobb_vs_bb', 'wbb_vs_nonbb', 'wbb_vs_bb']
 QUAD_SHORT = {
     'nobb_vs_nonbb': 'No BB vs non-BB',
@@ -84,6 +91,13 @@ def style():
             position:relative; }
   .banner::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
             width:4px; border-radius:2px; background:#e8903a; }
+  /* gold = source attribution (matches the site's expert/source tier) */
+  .credit { background:#2e2a1a; color:#e8dfcf; border-radius:6px;
+            padding:10px 16px 10px 20px; margin:16px 0; font-size:14px;
+            position:relative; }
+  .credit::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
+            width:4px; border-radius:2px; background:#d29922; }
+  .credit a { color:#f0d98b; }
   .twocol { display:flex; gap:2em; flex-wrap:wrap; }
   .twocol > div { flex:1; min-width:240px; }
   .terms dt { font-weight:600; margin-top:.5em; color:var(--pur); }
@@ -140,9 +154,10 @@ def terms():
 <dt>CMP (charge-move priority)</dt><dd>When both Pokemon throw a charged move on the same turn, the one with the higher attack stat goes first. "CMP lost" means a lower attack IV drops you below an opponent's attack, so you would lose that simultaneous-throw.</dd>
 <dt>0s / 1s / 2s</dt><dd>Even-shield scenarios: 0-0, 1-1, and 2-2 shields. This guide uses even shields and even energy, standard movesets.</dd>
 <dt>BB (best buddy)</dt><dd>Best-buddy boost adds one level (L50 to L51). In Master League there is no CP cap, so that level fully applies.</dd>
-<dt>Premium vs Thrifty IVs</dt><dd>Defined here mechanically, not as a gameplay call: a <b>Premium</b> spread drops no matchups versus a perfect (hundo) IV spread in the stated case; a <b>Thrifty</b> spread drops only the matchups listed next to it. Whether those matchups matter is your call.</dd>
+<dt>Premium vs Thrifty IVs</dt><dd>Terminology from {credit_name} (<a href="{credit_url}">video</a>). Defined here mechanically, not as a gameplay call: a <b>Premium</b> spread drops no matchups versus a perfect (hundo) IV spread in the stated case; a <b>Thrifty</b> spread drops only the matchups listed next to it. Whether those matchups matter is your call.</dd>
 </dl>
-"""
+<p class="sub">These terms and the breakdown that follows are adapted from {credit_name}'s Master League IV deep dives.</p>
+""".replace("{credit_name}", esc(CREDIT_NAME)).replace("{credit_url}", esc(CREDIT_URL))
 
 
 def key_winloss(d):
@@ -275,6 +290,8 @@ def verdict(d):
 
 def render(d):
     sp = esc(d['species'])
+    credit_name = esc(CREDIT_NAME)
+    credit_url = esc(CREDIT_URL)
     main_parts = [f"""<h2 id="covers">What this covers</h2>
 <ul>
 <li>{sp} against the Master League meta (PvPoke top-{d['n_opponents']}).</li>
@@ -297,6 +314,7 @@ def render(d):
 <li>Master League has no CP cap, so L50 (regular) and L51 (best buddy) are pure level steps on both sides.</li>
 <li>Breakpoints/bulkpoints are for the fast move ({esc(d['build']['fast'])}); CMP uses the attack stat.</li>
 <li>{sp} assumed to know its signature move. Data: <code>scripts/iv_envelope_analysis.py</code>; rendered by <code>scripts/render_iv_envelope_article.py</code>.</li>
+<li>Format, structure, and terminology adapted from <a href="{credit_url}">{credit_name}'s Master League IV deep dives</a>. The numbers are independently re-simulated, not lifted from the video.</li>
 </ul>
 """)
     main_html = "\n".join(main_parts)
@@ -314,17 +332,27 @@ def render(d):
 <p class="sub">How far your IVs can slip before this Master League attacker
 gives up specific matchups, with the move on it. Breakpoints, bulkpoints, CMP,
 and named matchups across the full best-buddy grid.</p>
+<div class="credit"><strong>Format credit:</strong> the structure, terminology,
+and presentation of this guide are adapted from
+<a href="{credit_url}">{credit_name}'s Master League IV deep dives</a>. In
+particular the "Terms to know" vocabulary (including the "Premium" vs "Thrifty"
+IV framing), and the per-stat by best-buddy by shield breakdown, follow
+{credit_name}'s work. The numbers here are independently re-simulated with this
+project's own engine, not taken from the video.</div>
 <div class="banner"><strong>AI-drafted, not yet human-reviewed.</strong> The
-data tables are auto-generated from the simulator, but the explanatory prose
-(intro, term definitions, framing) is Claude-drafted. No gameplay or
-teambuilding judgment is made here, only the mechanics and matchups. A human
-should review the prose before this ships.</div>
+data tables are auto-generated from this project's simulator; the explanatory
+prose is Claude-drafted, restating {credit_name}'s framing in our own words. No
+gameplay or teambuilding judgment is made here, only the mechanics and matchups.
+A human should review the prose (and confirm the attribution is fair) before
+this ships.</div>
 </div>
 <div class="layout">
 {nav_html()}
 <main>
 {main_html}
-<footer>Generated by <code>scripts/iv_envelope_analysis.py</code> +
+<footer>Format adapted from <a href="{credit_url}">{credit_name}'s Master League
+IV deep dives</a>; numbers independently simulated. Generated by
+<code>scripts/iv_envelope_analysis.py</code> +
 <code>scripts/render_iv_envelope_article.py</code>.</footer>
 </main>
 </div>
@@ -351,7 +379,9 @@ def main():
             f'human-reviewed. XehrFelrose-style IV deep dive for {d["species"]} in Master '
             f'League (with the signature move): breakpoints, bulkpoints, CMP, and named '
             f'matchups given up at each IV from 15 to 12, across the full best-buddy grid, '
-            f'plus recommended IV spreads. Human review of the prose needed before ship."\n'
+            f'plus recommended IV spreads. Format/terminology adapted from {CREDIT_NAME} '
+            f'({CREDIT_URL}); numbers independently simulated. Human review of the prose '
+            f'needed before ship."\n'
             f'authorship  = "ai"\n'
             f'landing     = "index.html"\n')
     with open(os.path.join(outdir, 'meta.toml'), 'w') as f:
