@@ -52,6 +52,7 @@ IVS = [15, 14, 13, 12]            # per-stat detail range
 EVEN_SHIELDS = [(0, 0), (1, 1), (2, 2)]
 ALL9_SHIELDS = [(a, b) for a in (0, 1, 2) for b in (0, 1, 2)]
 SHIELDS = EVEN_SHIELDS             # reassigned in main() per --all-shields
+FOCAL_SHADOW = False               # reassigned in main() once focal is resolved
 # The recommended-IV table only needs the two quadrants the article renders
 # (best-buddy and no-best-buddy, both vs a best-buddy meta), so we don't sim
 # all four there -- keeps the all-9 run from getting 3x more expensive.
@@ -123,7 +124,8 @@ def won_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
     won = set()
     for o in opponents:
         for shf, sho in SHIELDS:
-            bp0 = build_mon(species, fast_id, charged_ids, ivs, shf, my_lvl)
+            bp0 = build_mon(species, fast_id, charged_ids, ivs, shf, my_lvl,
+                            shadow=FOCAL_SHADOW)
             bp1 = build_mon(o['base'], o['fast'], o['charged'], (15, 15, 15),
                             sho, opp_lvl, shadow=o['shadow'])
             r = simulate(bp0, bp1, charged_policy_0=pvpoke_dp,
@@ -140,7 +142,7 @@ def shield_label(sh):
 # --- Analytic mechanics (breakpoints / bulkpoints / CMP) ------------------
 
 def my_eff(focal_base, ivs, level):
-    return eff_stats(focal_base, ivs, level, shadow=False)
+    return eff_stats(focal_base, ivs, level, shadow=FOCAL_SHADOW)
 
 
 def breakpoints_lost(focal_base, focal_types, fast_move, opponents,
@@ -198,24 +200,41 @@ def cmp_lost(focal_base, opponents, my_lvl, opp_lvl, stat_iv):
 
 def main():
     import argparse
+    global SHIELDS, FOCAL_SHADOW, POOL_FILE
     ap = argparse.ArgumentParser(description='ML IV envelope analysis -> JSON.')
     ap.add_argument('species', nargs='?', default='Dialga (Origin)')
     ap.add_argument('--all-shields', action='store_true',
                     help='Use all 9 ordered shield scenarios (your x opp) '
                          'instead of just the 3 evens; writes a separate '
                          '*_all9 JSON so the even-shield output is preserved.')
+    ap.add_argument('--pool', default=POOL_FILE,
+                    help='opponent pool file (default: %(default)s). Override '
+                         'for a fast smaller-pool smoke/repro run.')
     a = ap.parse_args()
     species = a.species
 
-    global SHIELDS
+    POOL_FILE = a.pool
     SHIELDS = ALL9_SHIELDS if a.all_shields else EVEN_SHIELDS
     variant = 'all9' if a.all_shields else 'even'
     shield_conv = ('all 9 ordered shields, your-opp (0-0 .. 2-2)'
                    if a.all_shields else 'even shields only (0-0, 1-1, 2-2)')
 
-    fast_id, charged_ids = BUILDS[species]
-    focal_base = get_species(species)
-    focal_types = _get_types(species)
+    # Resolve the focal moveset + shadow status. parse_opponent_spec keeps real
+    # form suffixes (e.g. "(Origin)") in the base name but strips "(Shadow)"
+    # into the shadow flag, matching how opponents are parsed. Species listed in
+    # BUILDS use their hand-picked signature move; everything else falls back to
+    # PvPoke's default Master moveset (never guess from the legal-move pool).
+    base_clean, _variant, FOCAL_SHADOW = parse_opponent_spec(species)
+    if species in BUILDS:
+        fast_id, charged_ids = BUILDS[species]
+        build_source = 'signature'
+    else:
+        fast_id, charged_ids = get_default_moveset(
+            base_clean, league=LEAGUE, shadow=FOCAL_SHADOW)
+        charged_ids = list(charged_ids)
+        build_source = 'default'
+    focal_base = get_species(base_clean)
+    focal_types = _get_types(base_clean)
     fast_move = _FAST_DB[fast_id]
     opponents = load_opponents()
     slug = species.lower().replace(' ', '_').replace('(', '').replace(')', '')
@@ -240,7 +259,7 @@ def main():
     # 2. Hundo win-sets per quadrant (drives key wins/losses + the drop diffs).
     hundo_won = {}
     for q, (ml, ol) in QUADRANTS.items():
-        hundo_won[q] = won_set(species, fast_id, charged_ids, (15, 15, 15),
+        hundo_won[q] = won_set(base_clean, fast_id, charged_ids, (15, 15, 15),
                                ml, ol, opponents)
         print(f"  hundo {q}: {len(hundo_won[q])} won (of "
               f"{len(opponents) * len(SHIELDS)})")
@@ -275,7 +294,7 @@ def main():
                     continue
                 ivs = [15, 15, 15]
                 ivs[slot] = iv
-                won = won_set(species, fast_id, charged_ids, tuple(ivs),
+                won = won_set(base_clean, fast_id, charged_ids, tuple(ivs),
                               ml, ol, opponents)
                 dropped = hundo_won[q] - won
                 gained = won - hundo_won[q]
@@ -319,7 +338,7 @@ def main():
         drops = {}
         for q in REC_QUADRANTS:
             ml, ol = QUADRANTS[q]
-            won = won_set(species, fast_id, charged_ids, (a, d, s),
+            won = won_set(base_clean, fast_id, charged_ids, (a, d, s),
                           ml, ol, opponents)
             dr = hundo_won[q] - won
             drops[q] = sorted(f"{disp} {shield_label(sh)}" for (disp, sh) in dr)
@@ -330,7 +349,8 @@ def main():
 
     data = {
         'species': species,
-        'build': {'fast': fast_id, 'charged': charged_ids},
+        'shadow': FOCAL_SHADOW,
+        'build': {'fast': fast_id, 'charged': charged_ids, 'source': build_source},
         'base_stats': focal_base,
         'pool': POOL_FILE,
         'n_opponents': len(opponents),
