@@ -118,13 +118,13 @@ def style():
   p { margin:10px 0; }
   .sub { color:var(--sub); font-size:.92em; }
   .none { color:#6b7a93; }
-  .shieldtoggle { background:var(--panel); border-radius:6px; padding:9px 14px;
-                  margin:14px 0; font-size:14px; position:relative; }
-  .shieldtoggle::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
-                  width:3px; border-radius:2px; background:var(--pur); }
-  .shieldtoggle b { color:var(--pur); margin-right:10px; }
-  .shieldtoggle label { margin-right:18px; cursor:pointer; }
-  .shieldtoggle input { margin-right:5px; vertical-align:middle; }
+  nav.toc .nav-toggle { margin-bottom:10px; padding-bottom:9px;
+                  border-bottom:1px solid var(--rule); }
+  nav.toc .nav-toggle strong { display:block; color:var(--pur); font-size:12px;
+                  text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px; }
+  nav.toc .nav-toggle label { display:block; color:var(--fg); padding:2px 0;
+                  cursor:pointer; font-size:12px; }
+  nav.toc .nav-toggle input { margin-right:6px; vertical-align:middle; }
   .sh-line { line-height:1.4; }
   body.shields-even .sh-uneven { display:none; }
   .hidden { display:none; }
@@ -176,13 +176,18 @@ def style():
 """
 
 
-def nav_html():
+def nav_html(compact=False):
     parts = []
     for i, l, subs in NAV:
         parts.append(f'<a href="#{i}">{esc(l)}</a>')
         for sid, sl in subs:
             parts.append(f'<a class="sub" href="#{sid}">{esc(sl)}</a>')
-    return f'<nav class="toc"><strong>On this page</strong>{"".join(parts)}</nav>'
+    toggle = ("""<div class="nav-toggle"><strong>Shield view</strong>
+<label><input type="radio" name="sv" value="all" checked> All 9 shields</label>
+<label><input type="radio" name="sv" value="even"> Even only</label>
+</div>""" if compact else "")
+    return (f'<nav class="toc">{toggle}'
+            f'<strong>On this page</strong>{"".join(parts)}</nav>')
 
 
 def build_card(d):
@@ -379,11 +384,6 @@ def render(d):
     credit_url = esc(CREDIT_URL)
     shieldconv = esc(d['shield_convention'])
     compact = len(d['shields']) > 3
-    toggle_html = ("""
-<div class="shieldtoggle"><b>Shield view:</b>
-  <label><input type="radio" name="sv" value="all" checked> All 9 shields</label>
-  <label><input type="radio" name="sv" value="even"> Even shields only (0-0, 1-1, 2-2)</label>
-</div>""" if compact else "")
     toggle_script = ("""
 <script>
 function updShields(){
@@ -452,10 +452,10 @@ data tables are auto-generated from this project's simulator; the explanatory
 prose is Claude-drafted, restating {credit_name}'s framing in our own words. No
 gameplay or teambuilding judgment is made here, only the mechanics and matchups.
 A human should review the prose (and confirm the attribution is fair) before
-this ships.</div>{toggle_html}
+this ships.</div>
 </div>
 <div class="layout">
-{nav_html()}
+{nav_html(compact)}
 <main>
 {main_html}
 <footer>Format adapted from <a href="{credit_url}">{credit_name}'s Master League
