@@ -53,10 +53,10 @@ LEAGUE_INFO = {
 
 
 REVIEW_BANNER = (
-    '<div style="background:#fff3cd;border:2px solid #ffc107;'
+    '<div style="background:#2e241a;color:#e8d4bb;border-left:4px solid #e8903a;'
     'padding:12px 16px;margin:16px 0;border-radius:4px;">'
-    '<strong>First-draft auto-generated article.</strong> '
-    'Every section below is templated output, not expert analysis. '
+    '<strong>AI-drafted, not yet human-reviewed.</strong> '
+    'The prose below is Claude-drafted (templated), not expert analysis. '
     'Review and rewrite before shipping. The canonical Aegislash '
     'narrative home (long-term) is the per-form deep-dive Species '
     'blocks, not this article.'
@@ -180,8 +180,8 @@ def build_meta_toml(league: str) -> str:
     title = f'Aegislash Form-Change Guide: {info["display"]}'
     return textwrap.dedent(f'''\
         title       = "{title}"
-        description = "First-draft auto-generated Aegislash Shield/Blade form-change guide for {info['display']}. Links to the per-form deep dives and the Blade-vs-Shield comparison page. Needs expert review before ship."
-        authorship  = "auto"
+        description = "AI-drafted (Claude-drafted templated prose), not yet human-reviewed. Aegislash Shield/Blade form-change guide for {info['display']}. Links to the per-form deep dives and the Blade-vs-Shield comparison page. Needs expert review before ship."
+        authorship  = "ai"
         landing     = "index.html"
     ''')
 
