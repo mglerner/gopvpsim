@@ -1,0 +1,96 @@
+# Baxcalibur — Frigibax Community Day (June 2026)
+#
+# THE CD MOVE IS GLAIVE RUSH. It is already in the gamemaster as an
+# elite move (`eliteMoves = ['GLAIVE_RUSH']`, pvpoke commit 821af1722
+# "Baxcalibur rankings", 2026-06-17), so NO cd_prep injection is needed
+# for the actual CD move — the dive picks it up from the legal pool.
+#
+# Baxcalibur's entire learnable kit is Dragon + Ice (Glaive Rush /
+# Outrage / Dragon Claw + Avalanche / Blizzard / Icy Wind), both of
+# which Steel resists and Fairy resists (Dragon). So it is hard-walled
+# by the Steel/Fairy backbone and "one coverage move away" from being
+# good. The cd_prep table below repurposes the legal-pool injection
+# mechanism to model HYPOTHETICAL future coverage moves (the ones
+# Baxcalibur can learn in the main series AND that already exist in
+# PoGo): Brick Break (Fighting) and Earthquake (Ground). These are NOT
+# CD moves — they are "what to catch for" experiments.
+#
+# Sim findings (gopvpsim deep dives, 2026-06-20; kit Dragon Breath /
+# Glaive Rush / Icy Wind, which out-performed Avalanche):
+#   * Best 2nd move is Icy Wind (bait/debuff), not PvPoke's Avalanche.
+#   * Bulk (high stat product) beats attack-weighting on TOTAL wins in
+#     all three leagues — catch high stat product. Attack-weighting is
+#     a single-target tool (it beats more of the G-Corsola / S-Empoleon
+#     / Furret opponent-IV range via Glaive Rush breakpoints, confirmed
+#     directionally by an opponent-IV sweep; DragapultSim's exact counts
+#     use their own undocumented methodology we could not reproduce).
+#   * Future coverage: Brick Break (Fighting) is the move to hope for
+#     (~+25 GL/UL wins); Earthquake (Ground) is flat-to-negative.
+
+[Baxcalibur]
+sources = "DragapultSim (@DragapultSim) GL breakpoint-guarantee spreads, June 2026 Frigibax CD; gopvpsim deep dives 2026-06-20."
+
+# Hypothetical future-coverage moves injected into the legal pool so we
+# can sim Glaive Rush + <coverage> loadouts. Pass an explicit
+# --charged GLAIVE_RUSH,BRICK_BREAK (etc.) so only the intended pair is
+# used; the current-kit dives are run with --no-thresholds so these
+# never leak into the "today" analysis.
+[Baxcalibur.cd_prep]
+event = "HYPOTHETICAL future coverage (NOT the CD move; CD move = Glaive Rush, already legal)"
+charged_moves = ["BRICK_BREAK", "EARTHQUAKE"]
+notes = "Brick Break (Fighting) + Earthquake (Ground): the two main-series moves that exist in PoGo and fix Baxcalibur's Steel/Fairy coverage hole. Used only for the future-robustness experiment."
+
+# ─────────────────────────────────────────────────────────────────────
+# Great League spreads
+#   Primary catch guidance: bulk (high stat product). DragapultSim's
+#   attack-weighted breakpoint-guarantee spreads ship as the exact
+#   published IVs for the single-target breakpoint hunters.
+# ─────────────────────────────────────────────────────────────────────
+
+[Baxcalibur.Great.spreads."Bulk / R1 (0/15/5)"]
+ivs = [[0, 15, 5]]
+description = "Rank-1 stat product / max GL defense (135.7 atk, 97.79 def, 125 hp). Our sim's highest total-wins spread and the most robust catch — stays best with the realistic future coverage move (Brick Break). DragapultSim's R1 reference spread."
+source = "gopvpsim deep dive 2026-06-20; DragapultSim R1 reference"
+
+[Baxcalibur.Great.spreads."Jumpluff BP (5/8/5)"]
+ivs = [[5, 8, 5]]
+description = "DragapultSim Jumpluff breakpoint-guarantee spread (138.39 atk, 94.04 def). Attack-weighted: trades total wins for guaranteed Glaive Rush breakpoints vs specific targets (G-Corsola / S-Empoleon range; direction sim-confirmed)."
+source = "DragapultSim (@DragapultSim), June 2026 Frigibax CD"
+
+[Baxcalibur.Great.spreads."Furret BP (8/4/5)"]
+ivs = [[8, 4, 5]]
+description = "DragapultSim Furret breakpoint-guarantee spread (140.00 atk, 91.90 def). The most attack-weighted of the three; beats the most G-Corsola / Furret opponent IVs of any spread, at the cost of overall bulk."
+source = "DragapultSim (@DragapultSim), June 2026 Frigibax CD"
+
+[Baxcalibur.Great.spreads."General Bulk (def >= 94)"]
+attack = 0
+defense = 94.0
+stamina = 0
+description = "Practical catch floor: prioritize defense/HP. Sim says bulk wins more total matchups than attack-weighting for Baxcalibur, so a high-def catch is the safe keep when you are not chasing a specific breakpoint."
+source = "gopvpsim deep dive 2026-06-20"
+
+# ─────────────────────────────────────────────────────────────────────
+# Ultra League spreads (sim-derived; DragapultSim covered GL only)
+# ─────────────────────────────────────────────────────────────────────
+
+[Baxcalibur.Ultra.spreads."Bulk / R1 (1/15/15)"]
+ivs = [[1, 15, 15]]
+description = "Rank-1 stat product (173.7 atk, 124.7 def, 166 hp). Highest total-wins UL spread; bulk beats attack-weighting here too (max-atk 15/0/0 loses ~15 matchups vs this)."
+source = "gopvpsim deep dive 2026-06-20"
+
+[Baxcalibur.Ultra.spreads."General Bulk (def >= 120)"]
+attack = 0
+defense = 120.0
+stamina = 0
+description = "Practical UL catch floor: prioritize defense/HP. Same bulk-over-attack finding as GL."
+source = "gopvpsim deep dive 2026-06-20"
+
+# ─────────────────────────────────────────────────────────────────────
+# Master League spreads (no CP cap -> rank-1 stat product is the hundo;
+# Baxcalibur's best league, PvPoke overall rank ~67)
+# ─────────────────────────────────────────────────────────────────────
+
+[Baxcalibur.Master.spreads."Hundo (15/15/15)"]
+ivs = [[15, 15, 15]]
+description = "No CP cap, so rank-1 stat product is the hundo (227.4 atk, 154.7 def, 206 hp). Master is Baxcalibur's strongest league; attack-weighting is free here (no cap) but does not change the catch — take the highest IVs."
+source = "gopvpsim deep dive 2026-06-20"

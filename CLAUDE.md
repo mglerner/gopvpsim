@@ -98,6 +98,35 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - `battle.py` — battle simulation loop with pluggable shield/bait policies
 - `breakpoints.py` — breakpoint and bulkpoint analysis
 
+## gobattlekit (downstream consumer)
+
+The sibling app `../gobattlekit` consumes our spreads read-only — we
+never call into it; it pulls from us. Flow: a per-species
+`thresholds/*.toml` + a deep-dive replay blob
+(`userdata/replay/*.replay.pkl.gz`) →
+`../gobattlekit/tools/threshold_export/export_thresholds.py` (see its
+README) → `bundle_into_app.py` merges into
+`src/gobattlekit/data/default_thresholds.toml`. **The bundler is
+Great-league only** (`glob("*_great.toml")`); Ultra/Master targets are
+hand-maintained in `default_thresholds.toml` and preserved verbatim
+across re-bundles. Don't change the `default_thresholds.toml`
+nested-dict schema without coordinating. (Discoverability detail only —
+read the export tool's README/code for the real contract; it lives with
+the code and won't drift.)
+
+## CD-move prep: verify the gamemaster actually lags before injecting
+
+The `cd_prep` TOML table injects a CD move into the legal pool for
+pre-CD dives. Before reaching for it, **confirm the gamemaster really
+lags**: check the species' `eliteMoves` in the gamemaster and the
+pvpoke git log. PvPoke often updates *ahead* of a CD, in which case the
+move is already legal and injection is wrong. Inferring "the CD move is
+the one missing from the pool" is a trap — absence is ambiguous (could
+be "pending" or "the species just can't learn it"). `eliteMoves` + the
+commit history are unambiguous. (Baxcalibur 2026-06: the CD move Glaive
+Rush was already an `eliteMoves` entry; Brick Break was absent only
+because Baxcalibur can't learn it — not a pending CD move.)
+
 ## When our sim diverges from PvPoke
 
 **Divergence from PvPoke is not the same as a bug.** PvPoke is the
