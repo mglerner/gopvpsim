@@ -4140,6 +4140,11 @@ def main():
                              'Moves not yet in the species pool (CD moves) are allowed.')
     parser.add_argument('--league', default='great',
                         choices=['great', 'ultra', 'master'])
+    parser.add_argument('--max-level', type=float, default=None, metavar='LVL',
+                        help='Override the league max level for BOTH focal and '
+                        'opponents (e.g. 50 for "regular" vs the default 51 '
+                        'best-buddy in Master, where the CP cap never binds). '
+                        'Default: the league default in LEAGUE_MAX_LEVEL.')
     parser.add_argument('--opponents', type=int, default=20, metavar='N',
                         help='Number of top meta opponents from rankings (default: 20). '
                              'Ignored if --group is used.')
@@ -4388,6 +4393,22 @@ def main():
             parser.error('--species-iv-floor must parse as three integers '
                          '(e.g. "13,13,13")')
     args.iv_floor = _iv_floor
+
+    # --max-level: override the league's max build level for BOTH focal and
+    # opponents. Every mon-build site (compute_iv_metadata's focal grid,
+    # iv_sweep's opp_cache, generate_analysis_sections' opp rebuild, the
+    # collection rank lookup, and the library's own at_best_level/iv_rank
+    # defaults) reads LEAGUE_MAX_LEVEL.get(league, ...), and they ALL run in
+    # the main process during setup/render -- workers only consume the
+    # precomputed stat dicts. So mutating the entry once here, before any
+    # build, cleanly threads the override through all of them. Only meaningful
+    # where the CP cap doesn't bind (Master), so the level is what sets stats.
+    if args.max_level is not None:
+        if args.max_level not in CPM:
+            parser.error(
+                f'--max-level {args.max_level} is not a valid level (must be a '
+                f'half-level in [1.0, 51.0], e.g. 50 or 51)')
+        LEAGUE_MAX_LEVEL[args.league] = args.max_level
 
     # Initialize the per-run logger BEFORE anything else emits output. The
     # file handler is opened before the first CLI echo so `tail -f` on

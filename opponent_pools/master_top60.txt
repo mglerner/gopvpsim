@@ -1,0 +1,74 @@
+# PvPoke Master League top-60 opponents (verbatim speciesName, as ranked).
+#
+# Snapshot generated 2026-06-19 for the Dialga (Origin) ETM / IV deep dive,
+# pinning the opponent set against rankings drift (PvPoke rankings are
+# refreshed upstream; see DEVELOPER_NOTES "non-reproducible opponent data").
+# Includes the base/shadow near-duplicates and the Dialga (Origin) mirror at
+# #8, exactly as PvPoke ranks them. All opponents assumed hundo (15/15/15)
+# at the dive's build level.
+#
+# Format: one PvPoke speciesName per line; blank lines and # comments ignored.
+# Re-generate the base top-60 with:
+#   from gopvpsim.data import load_rankings
+#   [e['speciesName'] for e in load_rankings('master')[:60]]
+#
+Zacian (Crowned Sword)
+Palkia (Origin)
+Metagross
+Kyurem (White)
+Lunala
+Xerneas
+Reshiram
+Dialga (Origin)
+Zamazenta (Crowned Shield)
+Kyurem (Black)
+Kyogre
+Zekrom
+Marshadow
+Eternatus
+Palkia (Shadow)
+Lugia
+Metagross (Shadow)
+Lugia (Shadow)
+Necrozma (Dawn Wings)
+Garchomp (Shadow)
+Yveltal
+Garchomp
+Ho-Oh
+Zygarde (Complete Forme)
+Meloetta (Aria)
+Palkia
+Latios
+Latios (Shadow)
+Kyogre (Shadow)
+Necrozma (Dusk Mane)
+Gyarados (Shadow)
+Groudon
+Gholdengo
+Mewtwo (Shadow)
+Florges
+Solgaleo
+Melmetal
+Latias (Shadow)
+Keldeo (Resolute)
+Dialga (Shadow)
+Dialga
+Hydreigon (Shadow)
+Jirachi
+Mewtwo
+Togekiss
+Kyurem
+Annihilape (Shadow)
+Primarina
+Tapu Lele
+Latias
+Dragonite (Shadow)
+Goodra
+Keldeo (Ordinary)
+Sylveon
+Tyranitar (Shadow)
+Landorus (Therian)
+Gyarados
+Groudon (Shadow)
+Annihilape
+Ho-Oh (Shadow)
