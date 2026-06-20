@@ -190,11 +190,18 @@ def nav_html(compact=False):
             f'<strong>On this page</strong>{"".join(parts)}</nav>')
 
 
+def moveword(d):
+    """Noun phrase for the build: signature-move override (BUILDS) vs the
+    PvPoke default Master moveset. Used everywhere the prose names the build."""
+    return ('its signature move' if d['build'].get('source') == 'signature'
+            else 'its standard Master League moveset')
+
+
 def build_card(d):
     b = d['build']
     bs = d['base_stats']
     return (f'<h2 id="build">The build</h2>\n<p class="sub">This guide assumes '
-            f'<b>{esc(d["species"])}</b> with its signature move. Base stats '
+            f'<b>{esc(d["species"])}</b> with {moveword(d)}. Base stats '
             f'atk {bs["atk"]} / def {bs["def"]} / hp {bs["hp"]}.</p>\n'
             f'<ul><li>Fast: <code>{esc(b["fast"])}</code></li>'
             f'<li>Charged: {", ".join("<code>"+esc(c)+"</code>" for c in b["charged"])}</li></ul>\n')
@@ -421,7 +428,7 @@ updShields();
 <li>Opponents: <code>{esc(d['pool'])}</code>, all modeled at a perfect IV. {esc(d['shield_convention'])}.</li>
 <li>Master League has no CP cap, so L50 (regular) and L51 (best buddy) are pure level steps on both sides.</li>
 <li>Breakpoints/bulkpoints are for the fast move ({esc(d['build']['fast'])}); CMP uses the attack stat.</li>
-<li>{sp} assumed to know its signature move. Data: <code>scripts/iv_envelope_analysis.py</code>; rendered by <code>scripts/render_iv_envelope_article.py</code>.</li>
+<li>{sp} modeled with {moveword(d)}. Data: <code>scripts/iv_envelope_analysis.py</code>; rendered by <code>scripts/render_iv_envelope_article.py</code>.</li>
 <li>Format, structure, and terminology adapted from <a href="{credit_url}">{credit_name}'s Master League IV deep dives</a>. The numbers are independently re-simulated, not lifted from the video.</li>
 </ul>
 """)
@@ -438,7 +445,7 @@ updShields();
 <div class="topbar">
 <h1>{sp}: Master League IV Guide</h1>
 <p class="sub">How far your IVs can slip before this Master League attacker
-gives up specific matchups, with the move on it. Breakpoints, bulkpoints, CMP,
+gives up specific matchups, using {moveword(d)}. Breakpoints, bulkpoints, CMP,
 and named matchups across the full best-buddy grid, over {shieldconv}.</p>
 <div class="credit"><strong>Format credit:</strong> the structure, terminology,
 and presentation of this guide are adapted from
@@ -489,7 +496,7 @@ def main():
     meta = (f'title       = "{d["species"]} Master League IV Guide"\n'
             f'description = "AI-drafted (auto data tables + Claude-drafted prose), not yet '
             f'human-reviewed. XehrFelrose-style IV deep dive for {d["species"]} in Master '
-            f'League (with the signature move): breakpoints, bulkpoints, CMP, and named '
+            f'League (with {moveword(d)}): breakpoints, bulkpoints, CMP, and named '
             f'matchups given up at each IV from 15 to 12, across the full best-buddy grid '
             f'over {d["shield_convention"]}, plus recommended IV spreads. '
             f'Format/terminology adapted from {CREDIT_NAME} '
