@@ -5,9 +5,10 @@ generateURLPokeStr + generateURLMoveStr, and by loading sample links):
 
   https://pvpoke.com/battle/{cp}/{p1}/{p2}/{shields}/{moves1}/{moves2}/
 
-  cp       = "10000-51"  (master; level cap 51 so a best-buddy L51 is allowed.
-             Each mon's exact level is set in its poke string, so an L50 mon in
-             the same battle is still pinned to 50.)
+  cp       = "10000"  (master; plain CP, level cap 50 implied. Best-buddy L51 is
+             set PER-MON in the poke string's level field, not via a cap suffix.
+             NB: a "10000-51" cap suffix makes PvPoke fall back to Great League --
+             that was a bug, fixed 2026-06-21.)
   pX       = "{speciesId}-{level}-{atk}-{def}-{hp}-4-4-1-1"
              trailing 4-4-1-1 = no stat buffs (PvPoke stores buff+maxBuffStages,
              default 4), bait on, optimize-timing on.
@@ -94,5 +95,5 @@ def battle_url(focal_display, focal_shadow, focal_ivs, focal_level,
         return None
     m1 = f"{focal_fast}-{focal_charged[0]}-{focal_charged[1]}"
     m2 = f"{moves[0]}-{moves[1][0]}-{moves[1][1]}"
-    return (f"https://pvpoke.com/battle/10000-51/{p1}/{p2}/"
+    return (f"https://pvpoke.com/battle/10000/{p1}/{p2}/"
             f"{focal_shields}{opp_shields}/{m1}/{m2}/")
