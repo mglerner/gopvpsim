@@ -12,6 +12,9 @@ and matchups. The reader decides what matters.
 """
 import sys, os, json, html
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pvpoke_links
+
 QUAD_LABEL = {
     'nobb_vs_nonbb': 'No best buddy, vs a non-best-buddy meta',
     'nobb_vs_bb':    'No best buddy, vs a best-buddy meta',
@@ -58,8 +61,34 @@ def esc(s):
     return html.escape(str(s))
 
 
-def joinm(lst):
-    return ", ".join(esc(x) for x in lst) if lst else '<span class="none">-</span>'
+def _a(name, link=None, fsh=1, osh=1):
+    """A matchup name, linked to its pvpoke.com battle when a linker is given.
+    Best-effort: any failure to build the URL falls back to plain text, so a
+    bad link can never break a render."""
+    if link is None:
+        return esc(name)
+    try:
+        url = link(name, fsh, osh)
+    except Exception:
+        url = None
+    return (f'<a href="{esc(url)}" target="_blank" rel="noopener">{esc(name)}</a>'
+            if url else esc(name))
+
+
+def _linker(d, ivs, my_level, opp_level):
+    """Return f(opp_display, fsh, osh) -> pvpoke battle URL for this focal at
+    these IVs/levels vs that opponent at the given shields."""
+    b = d['build']
+    def fn(opp_display, fsh, osh):
+        return pvpoke_links.battle_url(
+            d['species'], d.get('shadow', False), ivs, my_level,
+            b['fast'], b['charged'], opp_display, opp_level, fsh, osh)
+    return fn
+
+
+def joinm(lst, link=None, fsh=1, osh=1):
+    return (", ".join(_a(x, link, fsh, osh) for x in lst) if lst
+            else '<span class="none">-</span>')
 
 
 EVEN_LABELS = {'0-0', '1-1', '2-2'}
@@ -69,22 +98,36 @@ def _sh_class(lab):
     return 'sh-even' if lab in EVEN_LABELS else 'sh-uneven'
 
 
-def tagged_lines(by_sh, shields):
+def tagged_lines(by_sh, shields, link=None):
     """One <div> per shield label with drops, tagged sh-even/sh-uneven so the
     shield-view toggle can hide the uneven ones client-side."""
     out = []
     for lab in shields:
         opps = by_sh.get(lab, [])
         if opps:
+            fsh, osh = lab.split('-')
             out.append(f'<div class="sh-line {_sh_class(lab)}"><b>{esc(lab)}</b> '
-                       + ", ".join(esc(o) for o in opps) + '</div>')
+                       + ", ".join(_a(o, link, fsh, osh) for o in opps) + '</div>')
     return out
 
 
-def drop_cell(by_sh, shields, empty_text='-'):
+def join_drops(drop_strings, link=None):
+    """Inline 'Name shield, ...' for the non-compact (even-shields) drop cells,
+    linking each name to its battle at the parsed shield count."""
+    if not drop_strings:
+        return '<span class="none">drops nothing (Premium)</span>'
+    parts = []
+    for s in drop_strings:
+        name, lab = s.rsplit(' ', 1)
+        fsh, osh = lab.split('-')
+        parts.append(f'{_a(name, link, fsh, osh)} {esc(lab)}')
+    return ", ".join(parts)
+
+
+def drop_cell(by_sh, shields, empty_text='-', link=None):
     """Compact 'matchups dropped' cell: tagged lines + a JS-managed empty
     marker (shown when no lines are visible in the current shield view)."""
-    lines = tagged_lines(by_sh, shields)
+    lines = tagged_lines(by_sh, shields, link)
     if not lines:
         # No drops at all (in any view) -> static marker, no toggle needed.
         return f'<span class="none">{empty_text}</span>'
@@ -300,8 +343,10 @@ def stat_section(d, stat):
     compact = len(shields) > 3
     drop_cols = (['Matchups dropped (you-opp)'] if compact
                  else [f'{s.split("-")[0]}s drops' for s in shields])
+    slot = {'atk': 0, 'def': 1, 'hp': 2}[stat]
     for q in QUAD_ORDER:
         qd = d['quadrants'][q][stat]
+        my_lvl, opp_lvl = d['quadrant_levels'][q]
         out.append(f'<h3 id="{stat}-{q}">{esc(QUAD_LABEL[q])}</h3>')
         if stat == 'atk':
             cols = ['IV', STAT_LABEL[stat], 'CMP lost', 'Breakpoint lost'] + drop_cols
@@ -315,18 +360,23 @@ def stat_section(d, stat):
         for iv in [iv for iv in d['iv_range'] if iv != 15]:
             e = qd[str(iv)]
             drp = e['dropped']
+            fivs = [15, 15, 15]
+            fivs[slot] = iv
+            link = _linker(d, fivs, my_lvl, opp_lvl)
             cells = [f'<td class="num">{iv}</td>',
                      f'<td class="num">{e["pvp_stat"]}</td>']
+            # CMP/breakpoint/bulkpoint are shield-independent; link them at 1-1.
             if stat == 'atk':
-                cells.append(f'<td>{joinm(e.get("cmp_lost", []))}</td>')
-                cells.append(f'<td>{joinm(e.get("breakpoints_lost", []))}</td>')
+                cells.append(f'<td>{joinm(e.get("cmp_lost", []), link, 1, 1)}</td>')
+                cells.append(f'<td>{joinm(e.get("breakpoints_lost", []), link, 1, 1)}</td>')
             elif stat == 'def':
-                cells.append(f'<td>{joinm(e.get("bulkpoints_lost", []))}</td>')
+                cells.append(f'<td>{joinm(e.get("bulkpoints_lost", []), link, 1, 1)}</td>')
             if compact:
-                cells.append(f'<td>{drop_cell(drp, shields)}</td>')
+                cells.append(f'<td>{drop_cell(drp, shields, link=link)}</td>')
             else:
                 for s in shields:
-                    cells.append(f'<td>{joinm(drp.get(s, []))}</td>')
+                    fsh, osh = s.split('-')
+                    cells.append(f'<td>{joinm(drp.get(s, []), link, fsh, osh)}</td>')
             out.append('<tr>' + "".join(cells) + '</tr>')
         out.append('</tbody></table>')
     return "\n".join(out) + "\n"
@@ -341,20 +391,21 @@ def rec_table(d, lvkey, meta_quad, title, note, anchor):
                '<th class="num">Def</th><th class="num">HP</th>'
                '<th>Drops vs a perfect IV</th></tr></thead><tbody>')
     compact = len(d['shields']) > 3
+    my_lvl, opp_lvl = d['quadrant_levels'][meta_quad]
     srt = sorted(rows, key=lambda r: (len(r['drops'][meta_quad]),
                                       -r[f'perfect_{lvkey}']))
     for r in srt:
         a, dd, s = r['ivs']
         pa, pd, ph = r[f'pvp_{lvkey}']
         drops = r['drops'][meta_quad]
+        link = _linker(d, r['ivs'], my_lvl, opp_lvl)
         if compact:
             # grouped, shield-tagged lines so the toggle can hide uneven drops;
             # JS shows the Premium marker when no drops are visible in the view.
             dcell = drop_cell(drops_to_by_sh(drops), d['shields'],
-                              'drops nothing (Premium)')
+                              'drops nothing (Premium)', link)
         else:
-            dcell = ('<span class="none">drops nothing (Premium)</span>'
-                     if not drops else joinm(drops))
+            dcell = join_drops(drops, link)
         out.append('<tr>'
                    f'<td class="num">{r[f"cp_{lvkey}"]}</td>'
                    f'<td class="num">{a}/{dd}/{s}</td>'
@@ -451,6 +502,7 @@ updShields();
 <li>Opponents: <code>{esc(d['pool'])}</code>, all modeled at a perfect IV. {esc(d['shield_convention'])}.</li>
 <li>Master League has no CP cap, so L50 (regular) and L51 (best buddy) are pure level steps on both sides.</li>
 <li>Breakpoints/bulkpoints are for the fast move ({esc(d['build']['fast'])}); CMP uses the attack stat.</li>
+<li>Each matchup name links to that exact battle on <a href="https://pvpoke.com">pvpoke.com</a>: this {sp} at the row's IVs and level on the left, the opponent at a perfect 15/15/15 on the right, with the stated shields (CMP and breakpoint links, which are shield-independent, use 1-1). Opponent movesets are PvPoke's Master defaults. PvPoke's engine closely matches this project's but can differ in edge cases, so an outcome may occasionally not line up exactly.</li>
 <li>{sp} modeled with {moveword(d)}. Data: <code>scripts/iv_envelope_analysis.py</code>; rendered by <code>scripts/render_iv_envelope_article.py</code>.</li>
 <li>Format, structure, and terminology adapted from <a href="{credit_url}">{credit_name}'s Master League IV deep dives</a>. The numbers are independently re-simulated, not lifted from the video.</li>
 </ul>
