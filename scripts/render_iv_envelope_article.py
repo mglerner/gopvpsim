@@ -30,8 +30,8 @@ CREDIT_URL = 'https://www.youtube.com/watch?v=6N3lXp39qtQ'
 
 QUAD_ORDER = ['nobb_vs_nonbb', 'nobb_vs_bb', 'wbb_vs_nonbb', 'wbb_vs_bb']
 QUAD_SHORT = {
-    'nobb_vs_nonbb': 'No BB vs non-BB',
-    'nobb_vs_bb':    'No BB vs BB',
+    'nobb_vs_nonbb': 'non-BB vs non-BB',
+    'nobb_vs_bb':    'non-BB vs BB',
     'wbb_vs_nonbb':  'BB vs non-BB',
     'wbb_vs_bb':     'BB vs BB',
 }
@@ -49,9 +49,9 @@ NAV = [
     ('hp', 'HP IVs', [(f'hp-{q}', QUAD_SHORT[q]) for q in QUAD_ORDER]),
     ('recommended', 'Recommended IVs', [
         ('rec-bb', 'BB vs BB'),
-        ('rec-nobb', 'No BB vs BB'),
+        ('rec-nobb', 'non-BB vs BB'),
         ('rec-bb-nonbb', 'BB vs non-BB'),
-        ('rec-nobb-nonbb', 'No BB vs non-BB'),
+        ('rec-nobb-nonbb', 'non-BB vs non-BB'),
     ]),
     ('method', 'Method & caveats', []),
 ]
@@ -111,11 +111,12 @@ def tagged_lines(by_sh, shields, link=None):
     return out
 
 
-def join_drops(drop_strings, link=None):
-    """Inline 'Name shield, ...' for the non-compact (even-shields) drop cells,
-    linking each name to its battle at the parsed shield count."""
+def join_drops(drop_strings, link=None,
+               empty='<span class="none">drops nothing (Premium)</span>'):
+    """Inline 'Name shield, ...' for lists of 'Name s-s' strings, linking each
+    name to its battle at the parsed shield count."""
     if not drop_strings:
-        return '<span class="none">drops nothing (Premium)</span>'
+        return empty
     parts = []
     for s in drop_strings:
         name, lab = s.rsplit(' ', 1)
@@ -307,15 +308,18 @@ def key_winloss(d):
                f'(you L{int(ml)} vs opponents L{int(ol)}), vs the '
                f'{d["n_opponents"]}-strong Master top-60. The full per-shield '
                f'picture is in the stat tables below.</p>')
+    # Perfect-IV summaries over the even shields; link to the headline quadrant
+    # at a representative 1-1.
+    link = _linker(d, (15, 15, 15), ml, ol)
     out.append('<div class="twocol">')
     out.append('<div><h3>Key wins</h3><ul>'
-               + "".join(f"<li>{esc(x)}</li>" for x in kw) + '</ul></div>')
+               + "".join(f"<li>{_a(x, link, 1, 1)}</li>" for x in kw) + '</ul></div>')
     out.append('<div><h3>Key losses</h3><ul>'
-               + "".join(f"<li>{esc(x)}</li>" for x in kl) + '</ul></div>')
+               + "".join(f"<li>{_a(x, link, 1, 1)}</li>" for x in kl) + '</ul></div>')
     out.append('</div>')
     if ks:
         out.append('<p class="sub"><b>Shield-dependent (split on even shields):</b> '
-                   + joinm(ks) + '.</p>')
+                   + joinm(ks, link, 1, 1) + '.</p>')
     return "\n".join(out) + "\n"
 
 
@@ -329,10 +333,15 @@ def bb_differences(d):
             ('a best-buddy meta', 'wbb_vs_bb', 'nobb_vs_bb')]:
         gained = sorted(hw[wbb] - hw[nobb])
         lost = sorted(hw[nobb] - hw[wbb])
+        # These are perfect-IV (15/15/15) matchups; link to the best-buddy
+        # (L51) focal at this meta's level, with the entry's shields.
+        my_lvl, opp_lvl = d['quadrant_levels'][wbb]
+        link = _linker(d, (15, 15, 15), my_lvl, opp_lvl)
         out.append(f'<h4>Vs {meta_label}</h4>')
-        out.append(f'<div><b>Gains:</b> {joinm(gained)}</div>')
+        out.append(f'<div><b>Gains:</b> '
+                   f'{join_drops(gained, link, "<span class=\"none\">-</span>")}</div>')
         if lost:
-            out.append(f'<div><b>Gives up:</b> {joinm(lost)}</div>')
+            out.append(f'<div><b>Gives up:</b> {join_drops(lost, link)}</div>')
     out.append('</div>')
     return "\n".join(out) + "\n"
 
@@ -510,7 +519,7 @@ updShields();
 <li>Opponents: <code>{esc(d['pool'])}</code>, all modeled at a perfect IV. {esc(d['shield_convention'])}.</li>
 <li>Master League has no CP cap, so L50 (regular) and L51 (best buddy) are pure level steps on both sides.</li>
 <li>Breakpoints/bulkpoints are for the fast move ({esc(d['build']['fast'])}); CMP uses the attack stat.</li>
-<li>Each matchup name links to that exact battle on <a href="https://pvpoke.com">pvpoke.com</a>: this {sp} at the row's IVs and level on the left, the opponent at a perfect 15/15/15 on the right, with the stated shields (CMP and breakpoint links, which are shield-independent, use 1-1). Opponent movesets are PvPoke's Master defaults. PvPoke's engine closely matches this project's but can differ in edge cases, so an outcome may occasionally not line up exactly.</li>
+<li>Each matchup name links to that exact battle on <a href="https://pvpoke.com">pvpoke.com</a>: this {sp} at the row's IVs and level on the left, the opponent at a perfect 15/15/15 on the right, with the stated shields. Links not tied to a single shield count -- CMP, breakpoint/bulkpoint, and the perfect-IV summary lists (key wins/losses and best-buddy changes) -- use 1-1. Opponent movesets are PvPoke's Master defaults. PvPoke's engine closely matches this project's but can differ in edge cases, so an outcome may occasionally not line up exactly.</li>
 <li>{sp} modeled with {moveword(d)}. Data: <code>scripts/iv_envelope_analysis.py</code>; rendered by <code>scripts/render_iv_envelope_article.py</code>.</li>
 <li>Format, structure, and terminology adapted from <a href="{credit_url}">{credit_name}'s Master League IV deep dives</a>. The numbers are independently re-simulated, not lifted from the video.</li>
 </ul>
