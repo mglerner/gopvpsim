@@ -130,3 +130,27 @@ like `default_thresholds.toml`. The on-device screen (modeled on
 evolution line, looks up its IV in the artifact, and renders the breakdown.
 **Open product decision before building:** which leagues/species to bundle
 (bundle-size vs coverage on a mobile app).
+
+### Extractor built + the size finding (2026-06-21)
+
+`scripts/export_owned_breakdown_bundle.py` extracts the breakdown from a dive's
+embedded `SCORES_GZ` (decode base64+gzip uint16, index `iv*nS*nO + si*nO + oi`,
+win = score>=500), diffs every IV's even-shield win set against
+`DATA.rank1RefIvIdx`, and emits `{rank1, drops:{"a/d/h":[...]}}`. It uses key
+`0_pvpoke` (moveset 0, dive's default opponents), so it **matches the website
+"Gives up vs #1" column** (same SCORES, same convention — the dive's PvPoke-default
+opponents, NOT the CLI's 15/15/15).
+
+**The size finding:** the full per-IV dropped-list JSON is **~25.6 MB for 15
+species** — almost every IV gives up at least one marginal (opponent, scenario)
+cell vs rank-1, so the "omit drops-nothing" compaction barely helps (only rank-1
++ a couple of exact ties are empty). Too big to bundle on iOS.
+
+**Mobile format (do this before bundling):** store a per-IV **bitmask** over the
+even-shield (opponent × scenario) cells dropped vs rank-1 — 82 opp × 3 = 246 bits
+= ~31 bytes/IV × 4096 ≈ 127 KB/species (gzips much smaller), plus a one-time
+header `{opponents:[...], scenarios:[...]}`. The on-device screen decodes the
+mask to render the dropped list. The human-readable JSON the extractor emits now
+is fine for the website-equivalent / debugging, but the iOS bundle needs the
+bitmask form. **Remaining: the bitmask exporter variant + the Toga screen +
+parity vectors.**
