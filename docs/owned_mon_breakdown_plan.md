@@ -100,3 +100,33 @@ Key files: `scripts/iv_envelope_analysis.py` (canonical core, L125-207),
 `src/gopvpsim/user_collection.py` (`match_mons` to fork, L296-412),
 `gobattlekit/src/gobattlekit/data/iv_checker.py` + `screens/user_iv_checker.py`,
 artifact schema `userdata/dives/<slug>_iv_envelope.json`.
+
+## Status (2026-06-21)
+
+- **Python reference** (`scripts/owned_breakdown.py`): DONE, end-to-end on a real
+  PokeGenie CSV (incl. evolution walk). The oracle.
+- **Website column-add** (`scripts/deep_dive_engine.js`): DONE + pushed. A
+  "Gives up vs #1" column in the paste-box collection table (per-tier + Slayer
+  sections), count + hover list, reusing the scatter hover's proven SCORES diff.
+  Re-render a dive to see it (replay is enough); paste a CSV to populate it.
+- **gobattlekit screen**: NOT built. Needs the bake below + UI review.
+
+### gobattlekit bake: extract from existing dives, do NOT re-sim top-K
+
+A first exporter that sim'd the **top-K stat-product spreads** was a dead end:
+those spreads are exactly the bulk-leaning cluster, so they all "give up nothing"
+vs rank-1 — the differentiation lives in the **attack-weighted / lower-SP
+spreads**, and an owned collection holds **arbitrary** IVs anyway. So the bake
+needs full-grid coverage, and re-simming all 4096 per species would just
+duplicate work the dive already did.
+
+**Correct approach:** the deep dive already computes the **full 4096-IV ×
+scenario × opponent score grid** (the same `SCORES` the website embeds). The
+gobattlekit bake should **extract per-IV dropped-vs-rank-1 lists from an existing
+dive's grid** (via the replay blob / the computed sweep), emit a compact
+per-(species, league) artifact `{rank1, drops: {"a/d/h": [...]}}`, and bundle it
+like `default_thresholds.toml`. The on-device screen (modeled on
+`screens/user_iv_checker.py`) parses the owned CSV, resolves each mon through its
+evolution line, looks up its IV in the artifact, and renders the breakdown.
+**Open product decision before building:** which leagues/species to bundle
+(bundle-size vs coverage on a mobile app).
