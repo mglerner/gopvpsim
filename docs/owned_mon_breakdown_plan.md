@@ -1,0 +1,102 @@
+# Owned-mon breakdown: "which of my mons should I build?"
+
+Point the ML-IV-guide breakdown at the Pokemon you actually own (a PokeGenie
+export): for each owned copy of a species, show what it gives up versus the
+best-possible spread, so you can decide which to power up. Wanted on both the
+**website** and the **gobattlekit iOS app**.
+
+This plan is backed by a parallel investigation of the three codebases
+(2026-06-21). Bottom line: **feasible on all three surfaces with no new battle
+engine** — a precompute-once / read-everywhere design.
+
+## The two-layer core (shared spec)
+
+Every surface reproduces the same computation, split into two layers:
+
+1. **Analytic layer** — closed-form, port everywhere, must be bit-identical:
+   - stat formula (`pokemon.py:94-101`), damage formula (`moves.py:227-242`).
+   - attack breakpoints lost (`dx < d15`), defense bulkpoints lost (`dx > d15`),
+     CMP lost (kept at 15 uses `>=`, lost uses strict `<`) —
+     `iv_envelope_analysis.py:157-207`. Watch the asymmetric comparisons.
+2. **Simulation layer** — expensive; **precompute once, read everywhere**.
+   "Matchups dropped" = `hundo_won - won` set difference, where a win is
+   `pvpoke_score(focal) > pvpoke_score(opp)` (`iv_envelope_analysis.py:125-144`).
+   Needs the full engine + `pvpoke_dp` charge policy. **Do not port it to JS or
+   onto the device.**
+
+**Three invariants** (a port that breaks any of these silently diverges):
+1. win is strict `>` (ties lose);
+2. opponent IVs are always 15/15/15;
+3. shadow multipliers ×1.2 atk / ×0.8333 def apply to effective stats, never to
+   CP or HP.
+
+Validate any port by round-tripping a known `userdata/dives/<slug>_iv_envelope.json`.
+
+## How it meshes with what already exists (coherence)
+
+This is an **enhancement of existing features on both apps, not a new silo** —
+and both apps already take a PokeGenie CSV as input, so it plugs into existing
+ingestion.
+
+**Website** — the deep dive's **"Check my collection" paste-box** already:
+parses your PokeGenie CSV client-side, recomputes at-cap stats, threshold-matches
+your mons to the dive's tiers, overlays them on the scatter, AND already computes
+"give up vs the best IV" as `_computePerShieldScoreDelta`
+(`deep_dive_engine.js:2276-2283`, surfaced in the Top-IVs table). The deep-dive
+HTML also embeds the **full 4096-IV × scenario × opponent score grid**
+(`SCORES_GZ`, `deep_dive.py:3644-3713`), and the paste-box already resolves a
+pasted IV to its grid index (`canonicalIvIdx`). So the breakdown is a
+**column-add to the collection table** via the proven `extras` mechanism
+(`renderMatchesList` ~L1047-1075, exactly how the Slayer-IVs section adds its
+Top-Mirror CMP % / Matchups-Kept columns). No re-simulation, no new Python
+export, no change to the parity-locked `user_collection.js` matcher.
+
+**gobattlekit (iOS)** — the **IV-check screen** (`screens/user_iv_checker.py`)
+already ingests your PokeGenie CSV (iOS share-sheet → Inbox poll) and checks
+owned mons against **pre-baked** per-species thresholds (`default_thresholds.toml`)
+using a parity-pinned pure-Python stat/IV engine (`data/iv_checker.py`). The
+breakdown is a **richer version of the same question** — not just "does it clear
+the tier floors" but "what does it give up." It is a new Toga screen modeled on
+`user_iv_checker.py`, fed by breakdown data **baked offline** through the
+existing `tools/threshold_export/` pipeline (the app has no battle sim and must
+not get one — that would break the lean iOS build).
+
+**Fidelity/coverage gradient** (worth knowing): Python re-sim (any species/league,
+slow) ⊇ website (full grid, but limited to the dive's opponent pool + swept
+modes + on-grid IVs) ⊇ iOS (baked subset of species/IVs). A true "scan my whole
+collection across species" wants breadth — served per-dived-species on the web,
+per-baked-species on iOS, or by the Python CLI iterating meta species.
+
+## Per-surface plan
+
+| Surface                                   | Status                      | Approach                                                                                                                                                                                                                                                   |
+| ----------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Python** (`scripts/owned_breakdown.py`) | **DONE (reference/oracle)** | Re-sims each owned spread vs the league pool; reads a real PokeGenie CSV via `user_collection` + evolution walk; ranks owned copies and lists drops vs rank-1. League-aware via `at_best_level`.                                                           |
+| **Website JS**                            | scoped, not built           | Column-add to the paste-box collection table. On-grid: read `SCORES[key][iv*nS*nO+si*nO+oi]`, threshold ≥500, diff vs rank-1/pvpoke ref IV for per-matchup drops; reuse `_computePerShieldScoreDelta` for the aggregate. Touch `deep_dive_engine.js` only. |
+| **iOS (gobattlekit)**                     | scoped, not built           | New Toga screen modeled on `user_iv_checker.py`; bake per-IV breakdown data into the bundle via `tools/threshold_export/`; analytic layer recomputed on-device, simulation layer consumed pre-baked. Add `tests/test_parity_vectors.py` vectors.           |
+
+## Build order
+
+1. **Python reference** (DONE) — the oracle the other two are checked against.
+2. **Website column-add** — highest value/effort: all data already ships; it is a
+   rendering extension following a proven template. Needs visual review.
+3. **gobattlekit screen** — bake the data, add the screen, pin parity vectors.
+
+## Top risks
+
+1. **Off-grid / pruned dives (web):** score deltas exist only for on-grid IVs;
+   a `--species-iv-floor` dive leaves some owned mons scoreless (show `-`).
+   Mitigation: assume/guarantee an unpruned full-4096 dive (the default).
+2. **Silent cross-port divergence** on the three invariants. Mitigation:
+   round-trip a known JSON + parity vectors before shipping any re-implementation.
+3. **gobattlekit parity is hand-maintained** (`iv_checker.py` is a port, not a
+   shared import). Mitigation: add parity vectors for every new analytic helper;
+   keep the simulation layer as consumed pre-baked data so it cannot drift.
+
+Key files: `scripts/iv_envelope_analysis.py` (canonical core, L125-207),
+`scripts/owned_breakdown.py` (Python reference),
+`scripts/deep_dive_engine.js` (web extension point ~L1047-1075,
+`_computePerShieldScoreDelta` L2276-2283),
+`src/gopvpsim/user_collection.py` (`match_mons` to fork, L296-412),
+`gobattlekit/src/gobattlekit/data/iv_checker.py` + `screens/user_iv_checker.py`,
+artifact schema `userdata/dives/<slug>_iv_envelope.json`.
