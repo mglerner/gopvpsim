@@ -162,7 +162,7 @@ def style():
   /* layout + sidebar */
   .layout { display:flex; gap:28px; max-width:1180px; margin:8px auto 0;
             padding:0 16px 40px; align-items:flex-start; }
-  nav.toc { position:sticky; top:14px; flex:0 0 190px; font-size:13px;
+  nav.toc { position:sticky; top:14px; flex:0 0 260px; font-size:13px;
             background:var(--panel); border-radius:6px; padding:12px 14px; }
   nav.toc strong { color:var(--pur); display:block; margin-bottom:6px;
             font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
