@@ -30,6 +30,8 @@ from gopvpsim.pokemon import (
 from gopvpsim.moves import get_moves
 from gopvpsim.battle import simulate, pvpoke_dp, BattlePokemon
 from gopvpsim.data import get_default_moveset
+from gopvpsim.user_collection import parse_csv_text, get_species_name
+from gopvpsim.evolution_lines import get_final_forms
 from deep_dive import _parse_opponent_pool_line, parse_opponent_spec
 
 _FAST, _CHARGED = get_moves()
@@ -156,13 +158,18 @@ def _fmt(res):
 
 def main():
     ap = argparse.ArgumentParser(description='Owned-mon IV breakdown.')
-    ap.add_argument('species')
+    ap.add_argument('species', help='PvPoke speciesName, base form (form OK, no '
+                    '"(Shadow)" suffix -- use --shadow)')
     ap.add_argument('--league', default='great', choices=list(LEAGUE_CAPS))
     ap.add_argument('--shadow', action='store_true')
-    ap.add_argument('--ivs', nargs='+', required=True,
+    ap.add_argument('--ivs', nargs='+',
                     help='owned spreads as a/d/h, e.g. --ivs 0/15/15 1/14/14')
+    ap.add_argument('--csv', help='PokeGenie CSV export; owned copies of '
+                    '<species> are pulled from it (use --ivs OR --csv)')
     ap.add_argument('--fast'); ap.add_argument('--charged', nargs='+')
     ap.add_argument('--pool')
+    ap.add_argument('--top', type=int, default=12,
+                    help='show only your best N spreads (+ rank-1); default 12')
     a = ap.parse_args()
 
     if a.fast and a.charged:
@@ -171,10 +178,36 @@ def main():
         fast, charged = get_default_moveset(a.species.replace(' (Shadow)', ''),
                                             league=a.league, shadow=a.shadow)
         charged = list(charged)
-    owned = [tuple(int(x) for x in s.split('/')) for s in a.ivs]
+
+    if a.csv:
+        target = a.species + (' (Shadow)' if a.shadow else '')
+        mons = parse_csv_text(open(a.csv, encoding='utf-8-sig').read())
+        # Include pre-evolutions: IVs carry through evolution unchanged, so a
+        # Tinkatink counts as an owned Tinkaton-to-be. Shadow status also
+        # carries through, so it must match.
+        spreads = [(m['atk_iv'], m['def_iv'], m['sta_iv']) for m in mons
+                   if m['is_shadow'] == a.shadow
+                   and a.species in get_final_forms(
+                       get_species_name(m['name'], m['form'], False))]
+        if not spreads:
+            print(f"No owned {target} (or its pre-evos) found in {a.csv}.")
+            return
+        owned = sorted(set(spreads))
+        print(f"Found {len(spreads)} owned {target} (incl. pre-evos); "
+              f"{len(owned)} distinct IV spreads.\n")
+    elif a.ivs:
+        owned = [tuple(int(x) for x in s.split('/')) for s in a.ivs]
+    else:
+        ap.error('provide --csv or --ivs')
+
     res = breakdown(a.species, a.league, fast, charged, owned,
                     shadow=a.shadow, pool_path=a.pool)
+    shown = len(res['rows'])
+    res['rows'] = res['rows'][:max(1, a.top)]
     print(_fmt(res))
+    if shown > len(res['rows']):
+        print(f"  ... ({shown - len(res['rows'])} more distinct spreads; "
+              f"--top {shown} to show all)")
 
 
 if __name__ == '__main__':
