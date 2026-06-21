@@ -1012,6 +1012,44 @@ function renderMatchesList() {
     return out;
   }
 
+  // "Gives up vs #1": the collection-table version of the IV-guide "what you
+  // give up" breakdown -- matchups the rank-1 (stat-product) spread wins but
+  // this owned IV loses, over the selected shield scenarios. Reuses the exact
+  // SCORES indexing the scatter hover's matchup-diff uses (score >= 500 = win),
+  // so the two always agree. On-grid only (canonicalIvIdx >= 0); off-grid '-'.
+  var HELP_GIVES_UP = 'Matchups the rank-1 (stat-product #1) IV wins but this ' +
+    'one loses, over the selected shield scenarios. Hover the number to list ' +
+    'them. "0" = gives up nothing; "-" = off-grid IV (not simulated).';
+  function _cellGivesUp(rc) {
+    var iv = rc.canonicalIvIdx;
+    if (iv == null || iv < 0) return '-';
+    var refIv = (DATA.rank1RefIvIdx != null && DATA.rank1RefIvIdx >= 0)
+                ? DATA.rank1RefIvIdx : DATA.pvpokeRefIvIdx;
+    if (refIv == null || refIv < 0) return '-';
+    if (iv === refIv) return '<span style="color:#9be89b">rank-1</span>';
+    var scores = getScores(state.movesetIdx, state.oppIvMode);
+    if (!scores) return '-';
+    var sis = getActiveScenarioIndices();
+    var lost = [];
+    for (var k = 0; k < sis.length; k++) {
+      var si = sis[k];
+      var sc = DATA.scenarios[si];
+      var lab = sc[0] + 'v' + sc[1];
+      for (var oi = 0; oi < nO; oi++) {
+        var refW = scores[refIv * nS * nO + si * nO + oi] >= 500;
+        var myW = scores[iv * nS * nO + si * nO + oi] >= 500;
+        if (refW && !myW) lost.push(shortName(DATA.opponents[oi]) + ' ' + lab);
+      }
+    }
+    if (lost.length === 0) return '<span style="color:#9be89b">0</span>';
+    var CAP = 14;
+    var shown = lost.slice(0, CAP).join(', ');
+    if (lost.length > CAP) shown += ', +' + (lost.length - CAP) + ' more';
+    var color = lost.length <= 3 ? '#d4a017' : '#e07b7b';
+    return '<span style="color:' + color + '" title="' +
+           shown.replace(/"/g, '&quot;') + '">' + lost.length + '</span>';
+  }
+
   var html = '';
   for (var ti = 0; ti < tierNames.length; ti++) {
     // Per-tier section. "Also in" shows other tiers this mon clears
@@ -1032,7 +1070,8 @@ function renderMatchesList() {
                 also = also.concat(rc.slayerCats);
               }
               return listOrDash(also);
-          } }
+          } },
+          { header: 'Gives up vs #1', cell: _cellGivesUp, help: HELP_GIVES_UP }
         ],
         isDefTier ? 'atk' : null
       );
@@ -1070,7 +1109,8 @@ function renderMatchesList() {
       { header: 'Slayer type',      cls: 'wrap', cell: function(rc) { return listOrDash(rc.slayerCats); } },
       { header: 'Also in',          cls: 'wrap', cell: function(rc) { return listOrDash(rc.matched); } },
       { header: 'Top-Mirror CMP %', cell: _cellTopMirror,    help: HELP_TOP_MIRROR_CMP },
-      { header: 'Matchups Kept',    cell: _cellMatchupsKept, help: HELP_MATCHUPS_KEPT }
+      { header: 'Matchups Kept',    cell: _cellMatchupsKept, help: HELP_MATCHUPS_KEPT },
+      { header: 'Gives up vs #1',   cell: _cellGivesUp,      help: HELP_GIVES_UP }
     ]
   );
 
