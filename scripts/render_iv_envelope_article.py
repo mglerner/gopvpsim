@@ -48,10 +48,10 @@ NAV = [
     ('defense', 'Defense IVs', [(f'def-{q}', QUAD_SHORT[q]) for q in QUAD_ORDER]),
     ('hp', 'HP IVs', [(f'hp-{q}', QUAD_SHORT[q]) for q in QUAD_ORDER]),
     ('recommended', 'Recommended IVs', [
-        ('rec-bb', 'Best buddy (L51), vs BB meta'),
-        ('rec-nobb', 'No best buddy (L50), vs BB meta'),
-        ('rec-bb-nonbb', 'Best buddy (L51), vs non-BB meta'),
-        ('rec-nobb-nonbb', 'No best buddy (L50), vs non-BB meta'),
+        ('rec-bb', 'BB vs BB'),
+        ('rec-nobb', 'No BB vs BB'),
+        ('rec-bb-nonbb', 'BB vs non-BB'),
+        ('rec-nobb-nonbb', 'No BB vs non-BB'),
     ]),
     ('method', 'Method & caveats', []),
 ]
@@ -167,8 +167,8 @@ def style():
                   border-bottom:1px solid var(--rule); }
   nav.toc .nav-toggle strong { display:block; color:var(--pur); font-size:12px;
                   text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px; }
-  nav.toc .nav-toggle label { display:block; color:var(--fg); padding:2px 0;
-                  cursor:pointer; font-size:12px; }
+  nav.toc .nav-toggle label { display:inline-block; color:var(--fg);
+                  margin-right:12px; padding:2px 0; cursor:pointer; font-size:12px; }
   nav.toc .nav-toggle input { margin-right:6px; vertical-align:middle; }
   .sh-line { line-height:1.4; }
   body.shields-even .sh-uneven { display:none; }
@@ -206,11 +206,15 @@ def style():
   .layout { display:flex; gap:28px; max-width:1180px; margin:8px auto 0;
             padding:0 16px 40px; align-items:flex-start; }
   nav.toc { position:sticky; top:14px; flex:0 0 260px; font-size:13px;
-            background:var(--panel); border-radius:6px; padding:12px 14px; }
+            background:var(--panel); border-radius:6px; padding:12px 14px;
+            max-height:calc(100vh - 28px); overflow-y:auto; }
   nav.toc strong { color:var(--pur); display:block; margin-bottom:6px;
             font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
-  nav.toc a { display:block; color:var(--grn); padding:3px 0; }
-  nav.toc a.sub { padding:2px 0 2px 14px; font-size:12px; color:var(--sub); }
+  nav.toc a { display:block; color:var(--grn); padding:2px 0; }
+  nav.toc .subnav { display:flex; flex-wrap:wrap; gap:1px 10px;
+            padding:0 0 4px 12px; line-height:1.3; }
+  nav.toc a.sub { padding:0; font-size:11.5px;
+            color:var(--sub); white-space:nowrap; }
   nav.toc a.sub:hover { color:var(--grn); }
   main { flex:1; min-width:0; }
   main h2:first-child { margin-top:6px; }
@@ -225,8 +229,12 @@ def nav_html(compact=False):
     parts = []
     for i, l, subs in NAV:
         parts.append(f'<a href="#{i}">{esc(l)}</a>')
-        for sid, sl in subs:
-            parts.append(f'<a class="sub" href="#{sid}">{esc(sl)}</a>')
+        if subs:
+            # Flow the sub-links horizontally (wrapping) so the four
+            # per-section jump links take ~one line instead of four.
+            sub = "".join(f'<a class="sub" href="#{sid}">{esc(sl)}</a>'
+                          for sid, sl in subs)
+            parts.append(f'<div class="subnav">{sub}</div>')
     toggle = ("""<div class="nav-toggle"><strong>Shield view</strong>
 <label><input type="radio" name="sv" value="all" checked> All 9 shields</label>
 <label><input type="radio" name="sv" value="even"> Even only</label>
