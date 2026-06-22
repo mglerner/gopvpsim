@@ -2658,8 +2658,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # cover_breakpoints / cover_bulkpoints are the opponent sets (per kind) for
     # which this spread clears a NOTABLE tier. Absolute (not differential vs the
     # lead), so the bulk pole's own characteristic coverage shows even when the
-    # lead happens to share a low tier; the rarity gate keeps it from being
-    # noise. n_breaks counts distinct notable-breakpoint opponents.
+    # lead happens to share a low tier; the rarity gate keeps it from being noise.
     if _anchor_mode:
         for iv in chosen_ivs:
             cleared = _named_cover(iv) & notable_tiers
@@ -2670,7 +2669,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             rc = by_iv[iv]
             rc['cover_breakpoints'] = bp
             rc['cover_bulkpoints'] = blk
-            rc['n_breaks'] = len(bp)
 
     # Reorder chosen rc dicts so the lead (rank-1 battle-score) spread leads
     # (card headline / _rec_idx read chosen_recs[0]), then by composite score.
