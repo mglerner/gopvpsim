@@ -3836,7 +3836,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                     league, opponent_names or [], shield_scenarios,
                     k=card_robust_k)
         _card_model = _ddcard.build_card_model(
-            data_obj, _card_ctx, types=_types,
+            data_obj, _card_ctx, types=_types, shadow=shadow,
             robust_winrate=_robust, sprite_uri=_sprite)
         html += _ddcard.render_card_html(_card_model, standalone=False)
         html = html.replace('</style>\n</head>',
