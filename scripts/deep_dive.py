@@ -3008,12 +3008,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     _sp1 = next((i for i in range(nIvs)
                  if _spranks and i < len(_spranks) and _spranks[i] == 1), None)
     if _sp1 is not None and _sp1 != _rec_idx and nS and nO:
-        def _win_frac(iv):
-            base = iv * nS * nO
-            w = sum(1 for _si in range(nS) for _oi in range(nO)
-                    if scores_flat[base + _si * nO + _oi] > 500)
-            return w / (nS * nO)
-
         def _ivstr(iv):
             return (f"{data_obj['ivA'][iv]}/{data_obj['ivD'][iv]}/"
                     f"{data_obj['ivS'][iv]}")
@@ -3022,13 +3016,14 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             base = iv * nS * nO
             return [sum(scores_flat[base + _si * nO + _oi]
                         for _si in range(nS)) / nS for _oi in range(nO)]
-        _bs_frac = _siv_w / _siv_t if _siv_t else 0.0  # battle-#1 == _rec_idx
-        _sp_frac = _win_frac(_sp1)
-        # Concrete examples for the blurb: opponents the stat-product #1 wins
-        # that battle-#1 gives up, and opponents battle-#1 wins by a clearly
-        # bigger margin (>= 40 on the 0-1000 PvPoke scale). Per-opponent average
-        # over all 9 shields -- same basis as the card's key wins/losses. Names
-        # are stored raw; the card prettifies them.
+        # Win COUNTS (matchups > 500) + average BATTLE SCORES for each #1, so the
+        # blurb can quantify "wins more convincingly" with real numbers.
+        _bs_wins = _siv_w  # battle-#1 == _rec_idx; count computed above
+        _sp_wins = sum(1 for _si in range(nS) for _oi in range(nO)
+                       if scores_flat[_sp1 * nS * nO + _si * nO + _oi] > 500)
+        # "Picking up": opponents the stat-product #1 wins on average that
+        # battle-#1 gives up. Per-opponent average over all 9 shields (same basis
+        # as the card's key wins/losses). Names stored raw; the card prettifies.
         _bs_oavg = _opp_avgs(_rec_idx)
         _sp_oavg = _opp_avgs(_sp1)
         _onames = opponent_names or [f'opp{_oi}' for _oi in range(nO)]
@@ -3036,18 +3031,15 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                             if _sp_oavg[oi] > 500 >= _bs_oavg[oi]),
                            key=lambda oi: _sp_oavg[oi] - _bs_oavg[oi],
                            reverse=True)
-        _wins_big = sorted((oi for oi in range(nO)
-                            if _bs_oavg[oi] > 500
-                            and _bs_oavg[oi] - _sp_oavg[oi] >= 40),
-                           key=lambda oi: _bs_oavg[oi] - _sp_oavg[oi],
-                           reverse=True)
         _two_ones = {
-            'bs_iv': _ivstr(_rec_idx), 'bs_frac': _bs_frac,
-            'sp_iv': _ivstr(_sp1), 'sp_frac': _sp_frac,
-            'sp_wins_more': _sp_frac > _bs_frac,
+            'bs_iv': _ivstr(_rec_idx), 'bs_wins': _bs_wins,
+            'bs_score': round(avg_scores[_rec_idx]),
+            'sp_iv': _ivstr(_sp1), 'sp_wins': _sp_wins,
+            'sp_score': round(avg_scores[_sp1]),
+            'total': nS * nO,
+            'sp_wins_more': _sp_wins > _bs_wins,
             'gives_up': [_onames[oi] for oi in _gives_up[:3]],
             'gives_up_n': len(_gives_up),
-            'wins_bigger': [_onames[oi] for oi in _wins_big[:3]],
         }
     data_obj['_cardCtx'] = {
         'two_number_ones': _two_ones,
