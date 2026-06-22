@@ -53,6 +53,7 @@ NAV = [
     ('covers', 'What this covers', []),
     ('terms', 'Terms to know', []),
     ('build', 'The build', []),
+    ('checkmyivs', 'Check my IVs', []),
     ('meta', 'Vs the meta', []),
     ('bestbuddy', 'What best buddy changes', []),
     ('attack', 'Attack IVs', [(f'atk-{q}', QUAD_SHORT[q]) for q in QUAD_ORDER]),
@@ -156,6 +157,261 @@ def drops_to_by_sh(drop_strings):
     return by_sh
 
 
+def _combo_key(ivs):
+    return "/".join(str(v) for v in ivs)
+
+
+def iv_box_blob(d):
+    """Compact per-combo data the client-side 'check my IVs' box reads.
+
+    The 64-combo recommended set is the single backbone: every baked 12-15 combo
+    carries its stats, dropped matchups, and (new) per-combo close-calls per
+    quadrant. Single-stat combos (one stat below 15) additionally get the
+    breakpoint/bulkpoint/CMP detail from the per-stat sections -- that is
+    Michael's 15/15/14 vs 15/14/15 showcase case; multi-stat combos honestly get
+    win/loss/close only. Keyed by 'a/d/h'. Only baked IVs (12-15) appear; the box
+    flags anything else as out of range and never guesses."""
+    iv_range = d['iv_range']
+    lo, hi = min(iv_range), max(iv_range)
+    combos = {}
+    for r in d['recommended']:
+        key = _combo_key(r['ivs'])
+        combos[key] = {
+            'stats': {'bb': r['pvp_bb'], 'nobb': r['pvp_nobb']},
+            'drops': r['drops'],
+            'cc': r.get('close_calls', {q: [] for q in r['drops']}),
+        }
+    # Overlay single-stat mechanic detail (bp/bulk/CMP) onto the matching combo
+    # keys, per quadrant. Shield-independent, so keyed only by quadrant.
+    for stat, slot in (('atk', 0), ('def', 1), ('hp', 2)):
+        for iv in [v for v in iv_range if v != 15]:
+            spread = [15, 15, 15]
+            spread[slot] = iv
+            key = _combo_key(spread)
+            if key not in combos:
+                continue
+            mech = {}
+            for q in QUAD_ORDER:
+                qe = d['quadrants'][q][stat][str(iv)]
+                m = {}
+                if stat == 'atk':
+                    if qe.get('breakpoints_lost'):
+                        m['bp'] = qe['breakpoints_lost']
+                    if qe.get('cmp_lost'):
+                        m['cmp'] = qe['cmp_lost']
+                elif stat == 'def':
+                    if qe.get('bulkpoints_lost'):
+                        m['bulk'] = qe['bulkpoints_lost']
+                if m:
+                    mech[q] = m
+            combos[key]['single'] = True
+            if mech:
+                combos[key]['mech'] = mech
+    return {
+        'shields': d['shields'],
+        'quadrants': QUAD_ORDER,
+        'quadrant_labels': {q: QUAD_SHORT[q] for q in QUAD_ORDER},
+        'headline': d['headline_quadrant'],
+        'iv_lo': lo, 'iv_hi': hi,
+        'combos': combos,
+    }
+
+
+IV_CHECK_JS = r"""
+(function(){
+  var D = JSON.parse(document.getElementById('ivc-data').textContent);
+  var inEl = document.getElementById('ivc-input');
+  var qEl  = document.getElementById('ivc-quad');
+  var out  = document.getElementById('ivc-out');
+  var note = document.getElementById('ivc-note');
+  var KIND = { shield:'shield spent', neardeath:'near-death win',
+               energy:'energy banked' };
+
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  function parseSpreads(text){
+    return text.split(',').map(function(t){ return t.trim(); })
+      .filter(function(t){ return t.length; })
+      .map(function(t){
+        var nums = t.split(/[\/\s-]+/).map(function(n){ return parseInt(n,10); });
+        return { raw: t, ivs: nums };
+      });
+  }
+
+  // -> {raw, status:'ok'|'range'|'parse', key?, label, data?}
+  function classify(sp){
+    if (sp.ivs.length !== 3 || sp.ivs.some(function(n){ return isNaN(n); }))
+      return { raw: sp.raw, status: 'parse', label: esc(sp.raw) + ' (unrecognized)' };
+    if (sp.ivs.some(function(v){ return v < D.iv_lo || v > D.iv_hi; }))
+      return { raw: sp.raw, status: 'range',
+               label: sp.ivs.join('/') + ' (out of range; this guide covers '
+                      + D.iv_hi + ' down to ' + D.iv_lo + ')' };
+    var key = sp.ivs.join('/');
+    if (!(key in D.combos))
+      return { raw: sp.raw, status: 'range', label: key + ' (not baked)' };
+    return { raw: sp.raw, status: 'ok', key: key, label: key, data: D.combos[key] };
+  }
+
+  // status of one column for one (opp, shield): {kind:'win'|'loss'|'cc'|'na', cc?}
+  function cell(col, quad, opp, sh){
+    if (col.status !== 'ok') return { kind: 'na' };
+    var tag = opp + ' ' + sh;
+    if ((col.data.drops[quad] || []).indexOf(tag) !== -1) return { kind: 'loss' };
+    var ccs = (col.data.cc || {})[quad] || [];
+    for (var i = 0; i < ccs.length; i++)
+      if (ccs[i].opp === opp && ccs[i].shield === sh)
+        return { kind: 'cc', cc: ccs[i] };
+    return { kind: 'win' };
+  }
+
+  // signature for the "columns differ?" test. Two close calls are equal only if
+  // kind AND margin match, so a barely-survives vs comfortably-wins still differs.
+  function sig(c){
+    if (c.kind === 'cc') return 'cc:' + c.cc.kind + ':' + c.cc.margin;
+    return c.kind;
+  }
+
+  // Seed candidate (opp,shield) cells only from columns that HAVE data (a loss
+  // or a close call). A clean-win-everywhere opponent never enters, so it can
+  // never produce a row.
+  function candidates(ok, quad){
+    var set = {};
+    ok.forEach(function(c){
+      (c.data.drops[quad] || []).forEach(function(tag){
+        var i = tag.lastIndexOf(' ');
+        set[tag] = [tag.slice(0, i), tag.slice(i + 1)];
+      });
+      ((c.data.cc || {})[quad] || []).forEach(function(x){
+        set[x.opp + ' ' + x.shield] = [x.opp, x.shield];
+      });
+    });
+    return Object.keys(set).map(function(k){ return set[k]; });
+  }
+
+  // The (opp,shield) cells whose status differs across the in-range columns.
+  function diffRows(ok, quad){
+    return candidates(ok, quad).filter(function(cs){
+      var sigs = ok.map(function(c){ return sig(cell(c, quad, cs[0], cs[1])); });
+      for (var i = 1; i < sigs.length; i++) if (sigs[i] !== sigs[0]) return true;
+      return false;
+    });
+  }
+
+  function render(){
+    var cols = parseSpreads(inEl.value).map(classify);
+    var quad = qEl.value;
+    out.innerHTML = '';
+    note.innerHTML = '';
+    if (!cols.length){ note.textContent = 'Enter at least one spread above.'; return; }
+
+    var bad = cols.filter(function(c){ return c.status !== 'ok'; });
+    if (bad.length)
+      note.innerHTML = 'Skipped: ' + bad.map(function(c){
+        return '<span class="ivc-bad">' + c.label + '</span>'; }).join(', ')
+        + '. Only baked, in-range spreads are compared.';
+
+    var ok = cols.filter(function(c){ return c.status === 'ok'; });
+    if (!ok.length) return;
+
+    var rows = diffRows(ok, quad);
+    rows.sort(function(a, b){
+      return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : (a[1] < b[1] ? -1 : 1); });
+
+    var h = ['<table class="ivc-table"><thead><tr><th>Opponent</th>'
+             + '<th class="num">Shields</th>'];
+    var lvkey = quad.indexOf('wbb') === 0 ? 'bb' : 'nobb';
+    cols.forEach(function(c){
+      var lab = c.status === 'ok' ? esc(c.label)
+                : '<span class="ivc-bad">' + esc(c.raw) + '</span>';
+      var st = '';
+      if (c.status === 'ok'){
+        var pv = c.data.stats[lvkey];
+        st = '<br><span class="sub">' + pv[0] + ' / ' + pv[1] + ' / ' + pv[2] + '</span>';
+      }
+      h.push('<th class="ivc-cell">' + lab + st + '</th>');
+    });
+    h.push('</tr></thead><tbody>');
+
+    if (!rows.length){
+      var elsewhere = false;
+      for (var qi = 0; qi < qEl.options.length; qi++){
+        var oq = qEl.options[qi].value;
+        if (oq !== quad && diffRows(ok, oq).length){ elsewhere = true; break; }
+      }
+      var msg = 'No matchups differ across these spreads in this case. They win '
+        + 'and lose the same matchups, with the same close-call status.';
+      if (elsewhere) msg += ' They DO differ in another Case; try the Case '
+        + 'selector above.';
+      h.push('<tr><td colspan="' + (2 + cols.length) + '" class="sub">'
+        + msg + '</td></tr>');
+    } else {
+      rows.forEach(function(cs){
+        var opp = cs[0], sh = cs[1];
+        h.push('<tr><td>' + esc(opp) + '</td><td class="num">' + esc(sh) + '</td>');
+        cols.forEach(function(c){
+          var st = cell(c, quad, opp, sh);
+          if (st.kind === 'na'){ h.push('<td class="ivc-cell none">-</td>'); return; }
+          if (st.kind === 'loss'){ h.push('<td class="ivc-cell ivc-loss">loss</td>'); return; }
+          if (st.kind === 'cc'){
+            h.push('<td class="ivc-cell ivc-win">win <span class="cc-tag cc-'
+              + esc(st.cc.kind) + '" title="' + esc(st.cc.margin) + '">'
+              + esc(KIND[st.cc.kind] || st.cc.kind) + '</span></td>'); return;
+          }
+          h.push('<td class="ivc-cell ivc-win">win</td>');
+        });
+        h.push('</tr>');
+      });
+    }
+    h.push('</tbody></table>');
+    out.innerHTML = h.join('');
+
+    var anyMulti = ok.some(function(c){ return !c.data.single; });
+    if (ok.length === 1)
+      out.innerHTML += '<p class="sub">Enter two or more spreads to compare '
+        + 'where they differ.</p>';
+    if (anyMulti)
+      out.innerHTML += '<p class="sub">Breakpoint, bulkpoint, and CMP detail is '
+        + 'only computed for spreads that drop a single stat (such as 15/15/14). '
+        + 'Multi-stat spreads show win, loss, and close calls only.</p>';
+  }
+
+  document.getElementById('ivc-go').addEventListener('click', render);
+  inEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') render(); });
+  qEl.addEventListener('change', render);
+})();
+"""
+
+
+def iv_check_box(d):
+    blob = json.dumps(iv_box_blob(d), separators=(',', ':'))
+    quad_opts = "".join(
+        f'<option value="{esc(q)}"{" selected" if q == d["headline_quadrant"] else ""}>'
+        f'{esc(QUAD_SHORT[q])}</option>' for q in QUAD_ORDER)
+    lo = min(d['iv_range'])
+    hi = max(d['iv_range'])
+    return f"""<h2 id="checkmyivs">Check my IVs</h2>
+<p class="sub">Paste one or more candidate spreads as <code>atk/def/hp</code>
+(for example <code>15/15/14, 15/14/15</code>), and this builds a PvPoke-style
+matchups table showing <b>only the matchups where those spreads differ</b>.
+Spreads that agree everywhere are hidden, so the table stays scannable. This
+guide covers IVs {hi} down to {lo}; the richest close-call detail is on spreads
+that drop a single stat.</p>
+<div class="ivcheck panel">
+  <div class="ivcheck-controls">
+    <input id="ivc-input" type="text" placeholder="15/15/14, 15/14/15"
+           autocomplete="off" spellcheck="false" aria-label="Candidate IV spreads">
+    <label class="sub">Case <select id="ivc-quad">{quad_opts}</select></label>
+    <button id="ivc-go" type="button">Compare</button>
+  </div>
+  <div id="ivc-note" class="sub"></div>
+  <div id="ivc-out"></div>
+</div>
+<script type="application/json" id="ivc-data">{blob}</script>
+<script>{IV_CHECK_JS}</script>
+"""
+
+
 def style():
     return """
   :root { --bg:#1a1a2e; --fg:#e0e0e0; --red:#e94560; --pur:#c8a2d0;
@@ -238,6 +494,26 @@ def style():
   .cc-shield { background:#1a2333; color:#8ab4f8; }
   .cc-energy { background:#2e2a1a; color:#e8dfcf; }
   .cc-neardeath { background:#2e1a1f; color:#e8b0b8; }
+  /* check-my-ivs box */
+  .ivcheck-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+            margin-bottom:8px; }
+  #ivc-input { flex:1; min-width:220px; background:var(--cell); color:var(--fg);
+            border:1px solid var(--rule); border-radius:4px; padding:6px 9px;
+            font-size:14px; }
+  #ivc-quad { background:var(--cell); color:var(--fg); border:1px solid var(--rule);
+            border-radius:4px; padding:5px 6px; }
+  #ivc-go { background:var(--blue); color:#fff; border:none; border-radius:4px;
+            padding:6px 14px; cursor:pointer; font-size:14px; }
+  #ivc-go:hover { filter:brightness(1.1); }
+  #ivc-note { margin:4px 0 8px; }
+  .ivc-bad { color:var(--red); }
+  td.ivc-cell, th.ivc-cell { text-align:center; }
+  td.ivc-win { color:var(--grn); }
+  td.ivc-loss { color:var(--red); font-weight:600; }
+  /* near-miss marker in the recommended table */
+  .nm-flag { font-size:.7em; color:#e8b06a; text-decoration:none;
+            vertical-align:super; font-weight:700; }
+  .nm-flag:hover { color:#f0c98b; }
   @media (max-width:820px) {
     .layout { flex-direction:column; }
     nav.toc { position:static; flex:none; width:auto; }
@@ -457,20 +733,39 @@ def stat_section(d, stat):
 
 def rec_table(d, lvkey, meta_quad, title, note, anchor):
     rows = d['recommended']
-    out = [f'<h3 id="{anchor}">{esc(title)}</h3>', f'<p class="sub">{esc(note)}</p>']
+    compact = len(d['shields']) > 3
+    my_lvl, opp_lvl = d['quadrant_levels'][meta_quad]
+    srt = sorted(rows, key=lambda r: (len(r['drops'][meta_quad]),
+                                      -r[f'perfect_{lvkey}']))
+
+    def _hidden_cost(r):
+        # "Deceptive Premium": drops nothing but still spends a shield or banks a
+        # charged move less. This is the ONLY case a per-row marker adds info the
+        # Drops column doesn't already show -- a resource close-call on a row that
+        # already drops matchups is redundant, and near-death wins fire on most
+        # rows (noise). Often 0 (Garchomp has no deceptive-Premium rows); the full
+        # near-miss detail lives in the Check my IVs box regardless.
+        return (not r['drops'][meta_quad]) and any(
+            c.get('kind') in ('shield', 'energy')
+            for c in (r.get('close_calls') or {}).get(meta_quad, []))
+
+    any_marker = any(_hidden_cost(r) for r in srt)
+    legend = ('  A <span class="nm-flag">&#9650;</span> marks a spread that '
+              'drops nothing but still spends a shield or banks a charged move '
+              'less; see <a href="#checkmyivs">Check my IVs</a>.'
+              if any_marker else '')
+    out = [f'<h3 id="{anchor}">{esc(title)}</h3>',
+           f'<p class="sub">{esc(note)}{legend}</p>']
     out.append('<table><thead><tr>'
                '<th class="num">CP</th><th class="num">IVs (A/D/HP)</th>'
                '<th class="num">IV %</th><th class="num">Atk</th>'
                '<th class="num">Def</th><th class="num">HP</th>'
                '<th>Drops vs a perfect IV</th></tr></thead><tbody>')
-    compact = len(d['shields']) > 3
-    my_lvl, opp_lvl = d['quadrant_levels'][meta_quad]
-    srt = sorted(rows, key=lambda r: (len(r['drops'][meta_quad]),
-                                      -r[f'perfect_{lvkey}']))
     for r in srt:
         a, dd, s = r['ivs']
         pa, pd, ph = r[f'pvp_{lvkey}']
         drops = r['drops'][meta_quad]
+        near_miss = _hidden_cost(r)
         link = _linker(d, r['ivs'], my_lvl, opp_lvl)
         if compact:
             # grouped, shield-tagged lines so the toggle can hide uneven drops;
@@ -479,9 +774,14 @@ def rec_table(d, lvkey, meta_quad, title, note, anchor):
                               'drops nothing (Premium)', link)
         else:
             dcell = join_drops(drops, link)
+        iv_cell = f'{a}/{dd}/{s}'
+        if near_miss:
+            iv_cell += (' <a href="#checkmyivs" class="nm-flag" title="Drops '
+                        'nothing but still spends a shield or banks a charged '
+                        'move less; see Check my IVs">&#9650;</a>')
         out.append('<tr>'
                    f'<td class="num">{r[f"cp_{lvkey}"]}</td>'
-                   f'<td class="num">{a}/{dd}/{s}</td>'
+                   f'<td class="num">{iv_cell}</td>'
                    f'<td class="num">{r[f"perfect_{lvkey}"]:.2f}%</td>'
                    f'<td class="num">{pa}</td><td class="num">{pd}</td>'
                    f'<td class="num">{ph}</td>'
@@ -564,6 +864,7 @@ updShields();
 """]
     main_parts.append(terms(d))
     main_parts.append(build_card(d))
+    main_parts.append(iv_check_box(d))
     main_parts.append(key_winloss(d))
     main_parts.append(bb_differences(d))
     for stat in ('atk', 'def', 'hp'):

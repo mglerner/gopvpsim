@@ -307,6 +307,12 @@ def main():
     ap.add_argument('--no-cache', action='store_true',
                     help='skip the won-set disk cache (force fresh sims; for '
                          'timing/debugging).')
+    ap.add_argument('--rec-close-calls-all-quadrants', action='store_true',
+                    help='compute the recommended-table per-combo close-calls '
+                         'for all four quadrants, not just the headline one. '
+                         'Much slower (4x the rec-table margin sims); reserve '
+                         'for a staged full re-bake, not a shared/iterative '
+                         'run. Default: headline quadrant only.')
     a = ap.parse_args()
     species = a.species
 
@@ -388,13 +394,15 @@ def main():
 
     # 4. Per quadrant / stat / iv: dropped matchups + mechanics.
     quadrants = {}
+    base_metrics_by_q = {}        # hundo end-state per quadrant; reused in step 5
     for q, (ml, ol) in QUADRANTS.items():
         quadrants[q] = {'my_level': ml, 'opp_level': ol,
                         'atk': {}, 'def': {}, 'hp': {}}
         # Hundo end-state baseline for this quadrant, simmed once and reused
-        # across every stat/iv close-call diff in it.
+        # across every stat/iv close-call diff in it AND the rec-table combos.
         base_metrics = result_metrics(base_clean, fast_id, charged_ids,
                                       (15, 15, 15), ml, ol, opponents)
+        base_metrics_by_q[q] = base_metrics
         for stat, slot in (('atk', 0), ('def', 1), ('hp', 2)):
             for iv in IVS:
                 if iv == 15:
@@ -434,30 +442,53 @@ def main():
     # 5. Neutral recommended-IV table: all stats 12-15 (64 combos).
     #    For each, CP/% at L50 & L51 and matchups dropped vs hundo in each
     #    quadrant. No "critical" labels -- just what each spread keeps/drops.
+    #    Also (new) the per-combo close-calls -- kept wins whose post-match
+    #    margin shifts enough to matter -- so the "check my IVs" box can show
+    #    close-call detail for ANY 12-15 spread. Same significance gate as
+    #    close_calls(), filtered at compute time so the JSON stays compact.
+    #    Headline quadrant only by default (the box defaults there and the box
+    #    is the only consumer); --rec-close-calls-all-quadrants does all four
+    #    (4x the margin sims) for a staged full re-bake.
+    cc_quads = (REC_QUADRANTS if a.rec_close_calls_all_quadrants
+                else [HEADLINE_QUADRANT])
     sp15 = {lv: stat_product(focal_base, (15, 15, 15), lv) for lv in (50.0, 51.0)}
     rec_rows = []
     combos = [c for c in product(IVS, repeat=3)]
-    for (a, d, s) in combos:
-        row = {'ivs': [a, d, s]}
+    for (av, dv, sv) in combos:
+        row = {'ivs': [av, dv, sv]}
         for lvkey, lv in LEVELS.items():
-            ea, ed, eh = my_eff(focal_base, (a, d, s), lv)
+            ea, ed, eh = my_eff(focal_base, (av, dv, sv), lv)
             row[f'cp_{lvkey}'] = calc_cp(focal_base['atk'], focal_base['def'],
-                                         focal_base['hp'], a, d, s, lv)
+                                         focal_base['hp'], av, dv, sv, lv)
             row[f'perfect_{lvkey}'] = round(
-                100.0 * stat_product(focal_base, (a, d, s), lv) / sp15[lv], 2)
+                100.0 * stat_product(focal_base, (av, dv, sv), lv) / sp15[lv], 2)
             row[f'pvp_{lvkey}'] = [round(ea, 1), round(ed, 1), int(eh)]
-        # matchups dropped vs hundo, only for the quadrants the article renders
+        # matchups dropped vs hundo (all rendered quadrants) + per-combo
+        # close-calls (the cc_quads subset only).
         drops = {}
+        ccalls = {}
+        is_perfect = (av, dv, sv) == (15, 15, 15)
         for q in REC_QUADRANTS:
             ml, ol = QUADRANTS[q]
-            won = won_set(base_clean, fast_id, charged_ids, (a, d, s),
+            won = won_set(base_clean, fast_id, charged_ids, (av, dv, sv),
                           ml, ol, opponents)
             dr = hundo_won[q] - won
             drops[q] = sorted(f"{disp} {shield_label(sh)}" for (disp, sh) in dr)
+            if q not in cc_quads:
+                ccalls[q] = []
+            elif is_perfect:
+                ccalls[q] = []        # the hundo IS the baseline: no close-calls
+            else:
+                drop_metrics = result_metrics(base_clean, fast_id, charged_ids,
+                                              (av, dv, sv), ml, ol, opponents)
+                ccalls[q] = close_calls(base_metrics_by_q[q], drop_metrics,
+                                        cheapest_cost)
         row['drops'] = drops
+        row['close_calls'] = ccalls
         rec_rows.append(row)
     rec_rows.sort(key=lambda r: -r['perfect_bb'])
-    print(f"  recommended table: {len(rec_rows)} combos")
+    print(f"  recommended table: {len(rec_rows)} combos "
+          f"(close-calls: {', '.join(cc_quads)})")
 
     data = {
         'species': species,
