@@ -944,7 +944,7 @@ function renderMatchesList() {
       for (var xh = 0; xh < extras.length; xh++) {
         var _xhCls = extras[xh].cls ? (' class="' + extras[xh].cls + '"') : '';
         var _xhTitle = extras[xh].help ? (' title="' + extras[xh].help.replace(/"/g, '&quot;') + '"') : '';
-        h += '<th' + _xhCls + _xhTitle + '>' + escapeHtml(extras[xh].header) + '</th>';
+        h += '<th' + _xhCls + _xhTitle + '>' + escapeHtml(extras[xh].header).replace(/\n/g, '<br>') + '</th>';
       }
     }
     h += '</tr>';
@@ -1025,7 +1025,7 @@ function renderMatchesList() {
       if (DATA.yAxisModes[_ym].id === _guMode) { _guLabel = DATA.yAxisModes[_ym].label; break; }
     }
   }
-  var givesUpHeader = 'Gives up vs #1 (' + _guLabel + ')';
+  var givesUpHeader = 'Gives up vs #1\n(' + _guLabel + ')';
   var HELP_GIVES_UP = 'Matchups the #1 IV on the current y-axis (' + _guLabel +
     ') wins but this one loses, over the selected shields. Hover the number to ' +
     'list them. "0" = gives up nothing; "-" = off-grid IV (not simulated). ' +
