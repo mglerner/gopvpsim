@@ -38,6 +38,10 @@ QUAD_SHORT = {
     'wbb_vs_bb':     'BB vs BB',
 }
 STAT_LABEL = {'atk': 'Attack', 'def': 'Defense', 'hp': 'HP'}
+# Short label for the per-stat IV column header + close-call IV tags, so a row
+# self-identifies its stat ("13 Atk") even when the reader has scrolled past
+# the section heading.
+STAT_ABBR = {'atk': 'Atk', 'def': 'Def', 'hp': 'HP'}
 CLOSE_CALL_KIND_LABEL = {
     'shield': 'shield spent',
     'neardeath': 'near-death win',
@@ -361,7 +365,7 @@ def bb_differences(d):
     return "\n".join(out) + "\n"
 
 
-def close_calls_block(qd, iv_range, link_factory):
+def close_calls_block(qd, iv_range, link_factory, stat):
     """Compact 'Close calls' callout for one quadrant of a stat section: kept
     wins whose post-match margin moved enough to matter, per dropped IV. Renders
     nothing when no IV in this quadrant has any close call (keeps the article
@@ -380,7 +384,8 @@ def close_calls_block(qd, iv_range, link_factory):
                          f'<span class="sub">{esc(c["shield"])}</span> '
                          f'<span class="cc-tag cc-{esc(c["kind"])}">{tag}</span>: '
                          f'{esc(c["margin"])}</li>')
-        rows.append(f'<div><b>IV {iv}:</b><ul>' + "".join(items) + '</ul></div>')
+        rows.append(f'<div><b>{iv} {STAT_ABBR[stat]}:</b><ul>'
+                    + "".join(items) + '</ul></div>')
     if not rows:
         return ''
     return ('<div class="panel close-calls"><b>Close calls</b> '
@@ -410,11 +415,11 @@ def stat_section(d, stat):
         my_lvl, opp_lvl = d['quadrant_levels'][q]
         out.append(f'<h3 id="{stat}-{q}">{esc(QUAD_LABEL[q])}</h3>')
         if stat == 'atk':
-            cols = ['IV', STAT_LABEL[stat], 'CMP lost', 'Breakpoint lost'] + drop_cols
+            cols = [STAT_ABBR[stat], STAT_LABEL[stat], 'CMP lost', 'Breakpoint lost'] + drop_cols
         elif stat == 'def':
-            cols = ['IV', STAT_LABEL[stat], 'Bulkpoint lost'] + drop_cols
+            cols = [STAT_ABBR[stat], STAT_LABEL[stat], 'Bulkpoint lost'] + drop_cols
         else:
-            cols = ['IV', STAT_LABEL[stat]] + drop_cols
+            cols = [STAT_ABBR[stat], STAT_LABEL[stat]] + drop_cols
         out.append('<table><thead><tr>'
                    + "".join(f'<th class="num">{c}</th>' if i <= 1 else f'<th>{c}</th>'
                              for i, c in enumerate(cols)) + '</tr></thead><tbody>')
@@ -443,7 +448,8 @@ def stat_section(d, stat):
         cc_block = close_calls_block(
             qd, d['iv_range'],
             lambda iv, slot=slot, ml=my_lvl, ol=opp_lvl: _linker(
-                d, [15 if j != slot else iv for j in range(3)], ml, ol))
+                d, [15 if j != slot else iv for j in range(3)], ml, ol),
+            stat)
         if cc_block:
             out.append(cc_block)
     return "\n".join(out) + "\n"
