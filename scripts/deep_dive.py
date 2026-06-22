@@ -657,6 +657,12 @@ REC_MAX_SPREADS = 6
 #                         while the broad battle-#1 lead keeps no notable tier.
 REC_STRONG_POOL_N = 512
 REC_NOTABLE_MAX_CLEAR_FRAC = 0.25
+# The "Why this IV?" two-#1s blurb only earns card space when the rank-1 stat
+# product IV wins MEANINGFULLY MORE matchups than our battle-score #1 (the
+# counterintuitive "why not the hundo?" case). Below this win-rate gap the two
+# are interchangeable (Tinkaton/Shadow Corviknight are both within ~1%) and the
+# blurb is suppressed.
+REC_TWO_ONES_MIN_WINRATE_GAP = 0.03
 
 _FORM_CHANGE_SPECIES_CACHE: dict = {}
 
@@ -2514,15 +2520,28 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     _spranks = data_obj.get('spRanks') or []  # used by the two-#1s blurb below
     lead_iv = ranked[0] if ranked and ranked[0] in by_iv else rec_candidates[0]['iv']
     if _anchor_mode:
-        # Attack pole = max effective ATK over the FULL valid grid (range(nIvs)),
-        # NOT just the strong pool. The meta breakpoints (Tinkaton atk ~107.6+:
-        # Jellicent, Annihilape) sit just ABOVE the top-50's atk ceiling (~107.3)
-        # -- a strong-pool max-atk pole falls a hair short and clears none of
-        # them. Tie-break on def then hp so the atk pole is the bulkiest spread
-        # at the max atk.
-        atk_iv = max(range(nIvs), key=lambda iv: (data_obj['ivAtk'][iv],
-                                                  data_obj['ivDef'][iv],
-                                                  data_obj['ivHp'][iv]))
+        # Attack pole = max BREAKPOINT COVERAGE, tie-broken by BULK (def then hp)
+        # -- the "Focused" attack spread (cf. Dragapult-Sim's "Ninetales Focused"
+        # 11/12/5: a buildable line that still hits the key breakpoints, NOT a
+        # max-atk glass cannon). Symmetric to the bulk pole: don't atk-max PAST
+        # the hardest breakpoint; among IVs clearing the same breakpoint tiers,
+        # prefer the bulkier one. The meta breakpoints sit just above the top-50
+        # atk ceiling, so coverage is computed over the FULL grid. Falls back to
+        # raw max-atk when no breakpoints resolve.
+        _bp_anchors = [a for a in resolved_anchors_top
+                       if a.opponent and a.kind == 'damage_breakpoint']
+
+        def _atk_cover(iv):
+            atk, dfn = data_obj['ivAtk'][iv], data_obj['ivDef'][iv]
+            return sum(1 for a in _bp_anchors if a.passes(atk, dfn))
+        if _bp_anchors:
+            atk_iv = max(range(nIvs),
+                         key=lambda iv: (_atk_cover(iv), data_obj['ivDef'][iv],
+                                         data_obj['ivHp'][iv]))
+        else:
+            atk_iv = max(range(nIvs), key=lambda iv: (data_obj['ivAtk'][iv],
+                                                      data_obj['ivDef'][iv],
+                                                      data_obj['ivHp'][iv]))
         # Bulk pole = max BULKPOINT COVERAGE, tie-broken by HP (Michael's
         # refinement, 2026-06-22). Don't def-max PAST the hardest bulkpoint:
         # among IVs that clear the same set of bulkpoint tiers, prefer the
@@ -3006,39 +3025,42 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     _sp1 = next((i for i in range(nIvs)
                  if _spranks and i < len(_spranks) and _spranks[i] == 1), None)
     if _sp1 is not None and _sp1 != _rec_idx and nS and nO:
-        def _ivstr(iv):
-            return (f"{data_obj['ivA'][iv]}/{data_obj['ivD'][iv]}/"
-                    f"{data_obj['ivS'][iv]}")
-
-        def _opp_avgs(iv):
-            base = iv * nS * nO
-            return [sum(scores_flat[base + _si * nO + _oi]
-                        for _si in range(nS)) / nS for _oi in range(nO)]
-        # Win COUNTS (matchups > 500) + average BATTLE SCORES for each #1, so the
-        # blurb can quantify "wins more convincingly" with real numbers.
+        # Win COUNTS (matchups > 500) for each #1. Gate the blurb on a MEANINGFUL
+        # gap: only when the stat-product #1 wins notably MORE matchups than our
+        # battle-score #1 (the confusing "why not the hundo?" case); near-ties are
+        # suppressed.
         _bs_wins = _siv_w  # battle-#1 == _rec_idx; count computed above
         _sp_wins = sum(1 for _si in range(nS) for _oi in range(nO)
                        if scores_flat[_sp1 * nS * nO + _si * nO + _oi] > 500)
-        # "Picking up": opponents the stat-product #1 wins on average that
-        # battle-#1 gives up. Per-opponent average over all 9 shields (same basis
-        # as the card's key wins/losses). Names stored raw; the card prettifies.
-        _bs_oavg = _opp_avgs(_rec_idx)
-        _sp_oavg = _opp_avgs(_sp1)
-        _onames = opponent_names or [f'opp{_oi}' for _oi in range(nO)]
-        _gives_up = sorted((oi for oi in range(nO)
-                            if _sp_oavg[oi] > 500 >= _bs_oavg[oi]),
-                           key=lambda oi: _sp_oavg[oi] - _bs_oavg[oi],
-                           reverse=True)
-        _two_ones = {
-            'bs_iv': _ivstr(_rec_idx), 'bs_wins': _bs_wins,
-            'bs_score': round(avg_scores[_rec_idx]),
-            'sp_iv': _ivstr(_sp1), 'sp_wins': _sp_wins,
-            'sp_score': round(avg_scores[_sp1]),
-            'total': nS * nO,
-            'sp_wins_more': _sp_wins > _bs_wins,
-            'gives_up': [_onames[oi] for oi in _gives_up[:3]],
-            'gives_up_n': len(_gives_up),
-        }
+        if (_sp_wins - _bs_wins) >= REC_TWO_ONES_MIN_WINRATE_GAP * nS * nO:
+            def _ivstr(iv):
+                return (f"{data_obj['ivA'][iv]}/{data_obj['ivD'][iv]}/"
+                        f"{data_obj['ivS'][iv]}")
+
+            def _opp_avgs(iv):
+                base = iv * nS * nO
+                return [sum(scores_flat[base + _si * nO + _oi]
+                            for _si in range(nS)) / nS for _oi in range(nO)]
+            # "Picking up": opponents the stat-product #1 wins on average that
+            # battle-#1 gives up. Per-opponent avg over all 9 shields. Names raw;
+            # the card prettifies.
+            _bs_oavg = _opp_avgs(_rec_idx)
+            _sp_oavg = _opp_avgs(_sp1)
+            _onames = opponent_names or [f'opp{_oi}' for _oi in range(nO)]
+            _gives_up = sorted((oi for oi in range(nO)
+                                if _sp_oavg[oi] > 500 >= _bs_oavg[oi]),
+                               key=lambda oi: _sp_oavg[oi] - _bs_oavg[oi],
+                               reverse=True)
+            _two_ones = {
+                'bs_iv': _ivstr(_rec_idx), 'bs_wins': _bs_wins,
+                'bs_score': round(avg_scores[_rec_idx]),
+                'sp_iv': _ivstr(_sp1), 'sp_wins': _sp_wins,
+                'sp_score': round(avg_scores[_sp1]),
+                'total': nS * nO,
+                'sp_wins_more': True,
+                'gives_up': [_onames[oi] for oi in _gives_up[:3]],
+                'gives_up_n': len(_gives_up),
+            }
     data_obj['_cardCtx'] = {
         'two_number_ones': _two_ones,
         'rec_candidates': chosen_recs,
