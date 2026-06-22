@@ -415,6 +415,7 @@ render();
         movesets_json=json.dumps(movesets),
         ivs_json=json.dumps(ivs),
         data_json=json.dumps(scores, separators=(',', ':')),
+        PVPOKE_ATTRIBUTION_SHORT=PVPOKE_ATTRIBUTION_SHORT,
     )
 
 

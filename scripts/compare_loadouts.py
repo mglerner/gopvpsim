@@ -38,7 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
-from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML  # type: ignore[import-not-found]
+from gopvpsim.attribution import PVPOKE_ATTRIBUTION_SHORT  # type: ignore[import-not-found]
 
 from gopvpsim.data import (  # type: ignore[import-not-found]
     load_gamemaster,

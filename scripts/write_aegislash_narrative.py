@@ -35,6 +35,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
 ARTICLES_DIR = WEBSITE_DIR / 'articles'
 
+sys.path.insert(0, str(REPO_ROOT / 'src'))
+from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML  # noqa: E402
+
 LEAGUE_INFO = {
     'great': {
         'suffix': 'gl',
@@ -170,6 +173,9 @@ def build_html(league: str) -> str:
         <h1>{html.escape(title)}</h1>
         {REVIEW_BANNER}
         {sections}
+        <footer style="color:#667;font-size:13px;margin-top:40px;
+                       border-top:1px solid #ccc;padding-top:12px">
+        {PVPOKE_ATTRIBUTION_HTML}</footer>
         </body>
         </html>
     ''')
