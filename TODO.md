@@ -1,3 +1,30 @@
+## NEXT SESSION (queued 2026-06-21): gobattlekit owned-mon breakdown screen
+
+Build the "which of my mons should I build?" breakdown in the gobattlekit iOS
+app — the same feature already live on the website (the deep-dive paste-box
+"Gives up vs #1" column) and as a Python reference (`scripts/owned_breakdown.py`).
+
+- **Scope (decided):** GL + UL, the species we've already dived (zero new sims,
+  smallest mobile bundle).
+- **Architecture:** EXTRACT per-IV dropped-vs-rank-1 from existing dive grids
+  (no re-sim) — the dive embeds the full 4096-IV score grid. gobattlekit has NO
+  battle engine and must not get one (lean iOS build); it consumes pre-baked
+  data + recomputes only the analytic layer on-device.
+- **Two remaining build steps:**
+  1. **Bitmask exporter.** `scripts/export_owned_breakdown_bundle.py` already
+     extracts the breakdown but emits a full-list JSON that is **~25.6 MB for 15
+     species — too big for mobile**. Add a per-IV BITMASK variant: 246 even-shield
+     (opp × scenario) cells -> ~31 bytes/IV + a one-time names header, decoded
+     on-device. (top-K-stat-product bake was a DEAD END — those spreads all give
+     up nothing; owned mons have arbitrary IVs.)
+  2. **Toga screen** modeled on `gobattlekit/src/gobattlekit/screens/user_iv_checker.py`,
+     reading the baked artifact (bundle like `default_thresholds.toml` via
+     `tools/threshold_export/`); resolve owned mons through their evolution line;
+     **add parity vectors** to gobattlekit `tests/test_parity_vectors.py`.
+- **Full plan + findings + file:line pointers:** `docs/owned_mon_breakdown_plan.md`.
+  Memory: `project_owned_mon_breakdown.md`. Convention note: web + iOS use the
+  dive's opponent IVs; the Python CLI uses 15/15/15 (they differ slightly).
+
 ## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
 
 Pre-ship arc shipped: items 1-6 all done (cross-form re-dive,
