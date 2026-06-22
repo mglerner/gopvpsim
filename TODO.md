@@ -827,6 +827,65 @@ Shadow Corviknight GL pre-release, `userdata/dives/shadow_corviknight*.html`.)*
   path and 404 → graceful CSS typing-block fallback. Add a slug-override
   map only if/when a non-base-form dive wants its real sprite.
 
+## Upcoming plan-mode session: dive/article content + information architecture
+
+A dedicated plan-mode session (fresh, not mid-stream) to settle WHAT the
+dives/articles/card show and HOW it's organized, before nailing down card
+placement. Scoped with Michael 2026-06-22. Collected items:
+
+1. **Articles vs dives distinction.** It's murky. Today: a *deep dive* =
+   one species' full interactive IV/moveset analysis; a *CD article* =
+   editorial CD-move writeup linking to dives; *ML IV-guides* = a third
+   thing (XehrFelrose-style). Decide: merge, or rename "CD articles" ->
+   "articles" + clarify the taxonomy + site nav.
+
+2. **Dive content + organization audit.** Some info looks
+   duplicated/overlapping across sections; the organization may not be
+   clear. Take a hard look at what a dive should show and in what order
+   (this is the "what should the dive actually present" question, which is
+   why it's plan-mode not a patch).
+
+3. **Card placement.** Graph-as-headline vs card-at-top. The card injection
+   point is a ~one-line move; decide AFTER 1+2. (Card currently sits above
+   "Deep Dive Results", below the interactive scatter.)
+
+4. **Breakpoint-coverage card spreads (was card item 3).** The current
+   spread selection (top-3 rec_candidates by composite score) clusters near
+   rank-1 -- e.g. Shadow Corviknight showed 0/13/14 (SP#1) and 0/12/14
+   (SP#4) as near-twins. Replace/augment with a HYBRID: keep our anchors
+   (rank-1 bulk + max-atk/CMP) + add breakpoint-coverage spreads (each
+   targeting a named opponent's break/bulkpoint, using the anchor data we
+   already compute), and dedupe near-identical spreads. Variable **2-6**
+   spreads via a **distinctness-gated greedy cap**: order by priority, add a
+   candidate only if it clears/wins a materially different set than those
+   already shown; floor 2 (bulk + attack poles), cap 6, stop early when no
+   candidate adds distinct value; tunable threshold. Consider also a
+   "newly-cleared breakpoints" list like Dragapult-Sim's "18 guaranteed
+   breakpoints".
+
+5. **ML IV-guide article enrichment (Michael loves these; strong automation
+   example).** Today they report net wins/losses -- the biggest part of the
+   story. Add the matchup-QUALITY delta: gained/lost break/bulkpoints that
+   meaningfully change post-match state (how much HP/energy we vs the
+   opponent have left), EVEN WHEN the win/loss doesn't flip. E.g. "still
+   wins vs X but banks a charged move of energy for the next mon" or "loses
+   the bulkpoint vs Y so you eat one more Y charged move". We already
+   compute break/bulkpoints (anchor system) and have post-match HP/energy in
+   the sim; this is surfacing the MARGIN, not just the binary flip. Connect
+   to: the energy-lead axis (post-match energy carry-over), post-debuff
+   breakpoints, and the matchup-flip annotation work. Generated from sim
+   data, no hand-authoring -> stays ship-mode clean.
+   **CLUTTER is the central design risk (Michael, 2026-06-22): he wants to
+   explore this but NOT at the cost of the articles' concision** -- their
+   value is partly that they're clean and scannable. So this is a "surface
+   the MEANINGFUL margin deltas only" problem, not "show every
+   break/bulkpoint": needs a significance filter (only deltas big enough to
+   change a shield/energy decision) and likely progressive disclosure
+   (collapsed-by-default detail / a one-line summary / top-N), consistent
+   with the project's "hide don't remove" + signal-loss patterns. Decide the
+   default-visible surface vs the drill-down in the plan session -- overlaps
+   directly with audit item 2 (content + organization).
+
 ## CD article generator — open follow-ups
 
 The Python article generator (`scripts/generate_article.py`) shipped
