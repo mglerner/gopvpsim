@@ -280,41 +280,32 @@ def _two_ones_html(t: dict | None) -> str:
         return ''
     bs = html.escape(str(t['bs_iv']))
     sp = html.escape(str(t['sp_iv']))
-    bs_pct = f"{int(t['bs_frac'] * 100 + 0.5)}%"
-    sp_pct = f"{int(t['sp_frac'] * 100 + 0.5)}%"
-    if t.get('sp_wins_more'):
-        body = (f'The rank-1 stat-product IV <span class="iv">{sp}</span> '
-                f'actually wins more matchups here ({sp_pct} vs {bs_pct}). We '
-                f'still lead with <span class="iv">{bs}</span> because our '
-                f'ranking is <b>battle score</b> (how decisively each of the 9 '
-                f'shield scenarios goes), not raw win count. An IV that wins more '
-                f'matchups but by thinner margins, and loses worse where it '
-                f'loses, scores lower on average. Battle score tracks matchup '
-                f'<b>quality</b>, not just count.')
-    else:
-        body = (f'Our #1 by <b>battle score</b> '
-                f'(<span class="iv">{bs}</span>, {bs_pct}) differs from the '
-                f'rank-1 stat-product IV (<span class="iv">{sp}</span>, {sp_pct}). '
-                f'We lead by battle score (matchup quality across all 9 shield '
-                f'scenarios), not stat product.')
-    # Concrete examples: what battle-#1 wins more decisively, and the few
-    # matchups stat-product-#1 takes that we give up.
-    ex = []
-    wb = t.get('wins_bigger') or []
+    N, M, tot = t['bs_wins'], t['sp_wins'], t['total']
+    A, B = t['bs_score'], t['sp_score']
+    # "picking up": the few matchups the stat-product #1 wins that battle-#1 gives
+    # up (empty -> the clause is dropped).
     gu = t.get('gives_up') or []
-    if wb:
-        ex.append(f'<span class="iv">{bs}</span> wins '
-                  + ', '.join(html.escape(o) for o in wb) + ' more decisively')
+    pick = ''
     if gu:
         n = t.get('gives_up_n') or len(gu)
         more = f' (+{n - len(gu)} more)' if n > len(gu) else ''
-        ex.append(f'<span class="iv">{sp}</span> takes '
-                  + ', '.join(html.escape(o) for o in gu) + more)
-    ex_html = f' Concretely: {"; ".join(ex)}.' if ex else ''
-    return f'<div class="ddcard-note"><b>Why this IV?</b> {body}{ex_html}</div>'
+        pick = ', picking up ' + ', '.join(html.escape(o) for o in gu) + more
+    if t.get('sp_wins_more'):
+        body = (f'The <span class="iv">{sp}</span> (#1 stat product) wins more '
+                f'matchups here ({M} vs {N} of {tot}){pick}. We still lead with '
+                f'<span class="iv">{bs}</span> (#1 battle score) because it wins '
+                f'more <b>convincingly</b>: average battle score {A} vs {B} (out '
+                f'of 1000; 500 is an even fight).')
+    else:
+        body = (f'The <span class="iv">{bs}</span> (#1 battle score) wins {N} of '
+                f'{tot} meta matchups; the <span class="iv">{sp}</span> (#1 stat '
+                f'product) wins {M}{pick}. The <span class="iv">{bs}</span> also '
+                f'wins more <b>convincingly</b>: average battle score {A} vs {B} '
+                f'(out of 1000; 500 is an even fight).')
+    return f'<div class="ddcard-note"><b>Why this IV?</b> {body}</div>'
 
 
-_COVER_MAX_OPPS = 5  # truncate long coverage lists on the card; "+N more"
+_COVER_MAX_OPPS = 10  # truncate long coverage lists on the card; "+N more"
 
 
 def _cover_html(s: Spread):
