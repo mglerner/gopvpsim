@@ -25,6 +25,9 @@ import sys
 import tomllib
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
+from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML  # noqa: E402
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
 ARTICLES_DIR = WEBSITE_DIR / 'articles'
@@ -583,8 +586,8 @@ open it.</p>
 {dives_html}
 </ul>
 {iv_guides_section}{articles_section}{comparisons_section}{guides_section}
-<p class="about">Built with <a href="https://github.com/pvpoke/pvpoke">PvPoke</a>
-game data. If you find something broken or surprising, email me.</p>
+<p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
+<p class="about">If you find something broken or surprising, email me.</p>
 </body>
 </html>
 """
