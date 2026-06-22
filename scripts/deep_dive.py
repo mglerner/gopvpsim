@@ -704,23 +704,35 @@ def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
 
 def _compute_card_robustness(species, focal_fast, focal_charged, focal_shadow,
                              focal_ivs, league, opponent_names,
-                             shield_scenarios, k=512):
+                             shield_scenarios, opp_movesets=None,
+                             k=DEFAULT_CARD_ROBUST_K):
     """Aggregate opp_iv_robustness for ONE focal IV across the curated pool.
 
-    Skips opponents whose default moveset can't be cleanly resolved (the
-    annotated alt-move pool variants like "Forretress (Bug Bite)"); the
-    headline reports the count actually covered. Returns
+    When ``opp_movesets`` (parallel to ``opponent_names``, each a
+    ``(fast_id, [charged_ids])`` tuple) is supplied, reuse the dive's
+    ALREADY-resolved opponent loadouts -- base species via
+    parse_opponent_spec + that resolved moveset -- so EVERY opponent the dive
+    simmed is covered, including the self-mirror and annotated alt-move
+    variants (the card's single-IV and robustness numbers then share a
+    denominator). Without it, falls back to get_default_moveset(base), which
+    skips unresolvable names (legacy callers / old replay blobs). Returns
     {'frac','pool','k','scenarios'} or None if nothing resolved.
     """
     from gopvpsim.data import get_default_moveset
     wins = total = 0.0
     n_ok = 0
-    for name in opponent_names:
-        base, oshadow = name, False
-        if base.endswith(' (Shadow)'):
-            base, oshadow = base[:-len(' (Shadow)')], True
+    _movesets = (opp_movesets if opp_movesets is not None
+                 else [None] * len(opponent_names))
+    for name, ms in zip(opponent_names, _movesets):
         try:
-            of, oc = get_default_moveset(base, league=league, shadow=oshadow)
+            if ms is not None:
+                base, _variant, oshadow = parse_opponent_spec(name)
+                of, oc = ms
+            else:
+                base, oshadow = name, False
+                if base.endswith(' (Shadow)'):
+                    base, oshadow = base[:-len(' (Shadow)')], True
+                of, oc = get_default_moveset(base, league=league, shadow=oshadow)
             r = opp_iv_robustness(species, focal_fast, focal_charged,
                                   focal_shadow, focal_ivs, base, of, oc,
                                   oshadow, league, shield_scenarios, k=k)
@@ -2770,7 +2782,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               species_narrative=None,
                               shared_plotly_dir=None,
                               card_out_path=None,
-                              card_robust_k=DEFAULT_CARD_ROBUST_K):
+                              card_robust_k=DEFAULT_CARD_ROBUST_K,
+                              opp_movesets=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -3834,7 +3847,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                     (data_obj['ivA'][_ri], data_obj['ivD'][_ri],
                      data_obj['ivS'][_ri]),
                     league, opponent_names or [], shield_scenarios,
-                    k=card_robust_k)
+                    opp_movesets=opp_movesets, k=card_robust_k)
         _card_model = _ddcard.build_card_model(
             data_obj, _card_ctx, types=_types, shadow=shadow,
             robust_winrate=_robust, sprite_uri=_sprite)
@@ -4331,6 +4344,7 @@ def render_dive_html(state):
                 shared_plotly_dir=state['shared_plotly_dir'],
                 card_out_path=state.get('card_path'),
                 card_robust_k=state.get('card_robust_k', DEFAULT_CARD_ROBUST_K),
+                opp_movesets=state.get('opp_movesets'),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
@@ -4358,6 +4372,7 @@ def render_dive_html(state):
             shared_plotly_dir=state['shared_plotly_dir'],
             card_out_path=state.get('card_path'),
             card_robust_k=state.get('card_robust_k', DEFAULT_CARD_ROBUST_K),
+            opp_movesets=state.get('opp_movesets'),
         )
 
 
@@ -5033,11 +5048,25 @@ def main():
             try:
                 focal_fast, focal_charged = get_default_moveset(
                     args.species, league=args.league, shadow=args.shadow)
+            except (KeyError, ValueError) as _e:
+                # Unranked focal (e.g. a pre-release shadow): no rankings
+                # default for the self-mirror. Fall back to the focal's
+                # EXPLICIT moveset so the mirror still sims (constructed stats
+                # + focal moveset) instead of being silently dropped. The
+                # mirror's IVs resolve fine -- resolve_opp_ivs uses the ranked
+                # BASE species, only the shadow-form moveset lookup fails.
+                if args.fast and args.charged:
+                    focal_fast = args.fast
+                    focal_charged = [c.strip() for c in args.charged.split(',')]
+                    logger.info(f"  (mirror {_mirror_name}: no rankings default, "
+                                f"using explicit focal moveset)")
+                else:
+                    focal_fast = None
+                    logger.warning(f"could not append focal species for mirror: {_e}")
+            if focal_fast is not None:
                 opponents.append(_mirror_name)
                 opp_movesets_full.append((focal_fast, focal_charged))
                 logger.info(f"  (added {_mirror_name} to opponents for mirror analysis)")
-            except (KeyError, ValueError) as _e:
-                logger.warning(f"could not append focal species for mirror: {_e}")
         opponent_label = (f"Custom pool from {os.path.basename(path)} "
                           f"({len(opponents)} mons)")
         if n_variants:
@@ -5660,6 +5689,7 @@ def main():
             'species_narrative': _species_narrative,
             'card_path': args.card_out,
             'card_robust_k': args.card_robust_k,
+            'opp_movesets': opp_movesets_full,
         }
         if not args.no_replay_dump:
             _replay_path = dump_replay_state(state)
