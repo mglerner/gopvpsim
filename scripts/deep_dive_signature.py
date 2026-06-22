@@ -137,7 +137,7 @@ def build_focal_side(focal_mon, focal_types, fm_template, cms_template,
                     cfg0.forms[0].types, cfg0.forms[0].fast_move,
                     cfg0.forms[0].charged_moves, b_atk, b_def))
     native_atk, native_def = _native_movability([cfg0])
-    return {'forms': forms, 'hp': hp,
+    return {'forms': forms, 'hp': hp, 'shadow': bool(shadow),
             'native_atk': native_atk, 'native_def': native_def}
 
 
@@ -160,7 +160,7 @@ def build_opp_side(opp, league_cp):
                 forms.append(_form_dict(f0.types, f0.fast_move,
                                         f0.charged_moves, f0.atk, f0.def_))
     native_atk, native_def = _native_movability([cfg])
-    return {'forms': forms,
+    return {'forms': forms, 'shadow': bool(opp['shadow']),
             'native_atk': native_atk, 'native_def': native_def}
 
 
@@ -231,6 +231,13 @@ def signature_groups(focal_side, opp_side):
     n = len(focal_side['hp'])
     f_atk_mov, f_def_mov = movable_axes(focal_side, opp_side)
     o_atk_mov, o_def_mov = movable_axes(opp_side, focal_side)
+    # CMP is decided on the UNBOOSTED attack: shadow's x1.2 boosts damage but
+    # not priority (battle.py cmp_atk, 2026-06-13 fix). Strip it per side so
+    # the CMP column matches the engine even for shadow-mismatched pairs.
+    # (Defaults False so any caller that pre-dates the 'shadow' key is treated
+    # as non-shadow, i.e. the old effective-atk behavior.)
+    f_cmp_div = 1.2 if focal_side.get('shadow') else 1.0
+    o_cmp_div = 1.2 if opp_side.get('shadow') else 1.0
     a_f = FULL_STAGES if f_atk_mov else ZERO_STAGE
     d_f = FULL_STAGES if f_def_mov else ZERO_STAGE
     a_o = FULL_STAGES if o_atk_mov else ZERO_STAGE
@@ -239,8 +246,9 @@ def signature_groups(focal_side, opp_side):
     cols = [focal_side['hp']]
     for ff in focal_side['forms']:
         for of in opp_side['forms']:
-            # CMP: 3-way sign covers >, >=, <, != comparisons
-            cols.append(np.sign(ff['atk'] - of['atk']).astype(np.int64))
+            # CMP: 3-way sign covers >, >=, <, != comparisons, on cmp_atk
+            cols.append(np.sign(
+                ff['atk'] / f_cmp_div - of['atk'] / o_cmp_div).astype(np.int64))
             for m in [ff['fast'], *ff['charged']]:
                 for a_s in a_f:
                     atk_eff = ff['atk'] * _stat_stage_mult(a_s)

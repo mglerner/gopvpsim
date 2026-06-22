@@ -68,6 +68,12 @@ def engine_hash():
         h = hashlib.md5()
         for name in _ENGINE_FILES:
             h.update((pkg / name).read_bytes())
+        # scripts/deep_dive_signature.py is not in the gopvpsim package but
+        # DOES affect sweep scores: it picks which IVs share a representative
+        # sim, so a dedup-logic change can change a column. Hash it too.
+        _sig = Path(__file__).parent / 'deep_dive_signature.py'
+        if _sig.exists():
+            h.update(_sig.read_bytes())
         _ENGINE_HASH = h.hexdigest()[:12]
     return _ENGINE_HASH
 

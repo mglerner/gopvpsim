@@ -653,15 +653,20 @@ def _species_has_form_change(species_name):
 
 def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
                       focal_ivs, opponent, opp_fast, opp_charged, opp_shadow,
-                      league, shield_scenarios, k=512):
+                      league, shield_scenarios, k=512, dedup='signature'):
     """Opponent-IV robustness for ONE fixed focal IV vs ONE opponent.
 
     Sweeps the opponent across its top-``k`` stat-product IV spreads (the
     "top-512 ranks" robustness notion: do we beat this opponent regardless
-    of which good IV it rolled?), dedups by effective stat profile when
-    safe, sims the fixed focal vs each distinct profile over every
-    ``shield_scenarios`` pair, and weights each profile by how many of the
-    top-k IVs collapsed into it.
+    of which good IV it rolled?), groups those IVs into sets that fight
+    bit-identical battles vs the fixed focal (``dedup``), sims one
+    representative per group over every ``shield_scenarios`` pair, and
+    weights each group by its size.
+
+    ``dedup`` (see _opp_robustness_groups): 'signature' (default, exact
+    damage-signature dedup, ~1.5x fewer sims than no-dedup on a top-512
+    cohort), 'profile' (effective-stat dedup), or 'none' (one sim per IV,
+    the test reference).
 
     Returns ``(weighted_wins, weighted_total)`` floats (caller sums across
     opponents and divides), or ``None`` if the opponent has no valid IVs.
@@ -669,25 +674,34 @@ def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
     Opponents are built via make_battle_pokemon (raw IVs + shadow flag),
     so shadow multipliers are applied exactly once and form-change
     transforms (Aegislash) are wired up like the oracle path.
+
+    Caveat (signature dedup): deep_dive_signature's CMP column uses
+    effective atk, but the engine decides CMP on the unboosted cmp_atk
+    (2026-06-13 fix). For shadow-MISMATCHED focal/opponent pairs the two can
+    disagree in a narrow CMP band, so a rare IV could mis-group. Verified
+    bit-identical to no-dedup on representative shadow + non-shadow cases
+    (test_opp_iv_robustness_signature_dedup_is_exact); for a headline summary
+    a 1-in-k misgroup shifts the % by <0.2% (invisible at integer display).
+    See TODO "deep_dive_signature CMP predates cmp_atk" -- it may also touch
+    the focal sweep.
     """
     from gopvpsim.pokemon import iv_rank
     ranked = iv_rank(opponent, league=league, shadow=opp_shadow)
     if not ranked:
         return None
     ranked = ranked[:k]
-    # Effective-stat dedup is exact for fixed-form opponents; for
-    # form-change species it can collapse IVs that diverge after the
-    # transform, so sim each distinct IV (per_iv=True).
-    per_iv = _species_has_form_change(opponent)
-    groups, _ = group_ivs_by_stat_profile(ranked, per_iv=per_iv)
     a0, d0, s0 = focal_ivs
     focal_bp = make_battle_pokemon(focal_species, focal_fast, focal_charged,
                                    league, 2, a0, d0, s0, shadow=focal_shadow)
+    groups = _opp_robustness_groups(
+        focal_bp, focal_species, focal_fast, focal_charged, focal_shadow,
+        focal_ivs, opponent, opp_fast, opp_charged, opp_shadow, league, ranked,
+        dedup=dedup)
     wins = 0.0
     total = 0.0
-    for _key, idxs in groups.items():
-        rep = ranked[idxs[0]]
-        w = len(idxs)
+    for members in groups:
+        rep = ranked[members[0]]
+        w = len(members)
         opp_bp = make_battle_pokemon(
             opponent, opp_fast, opp_charged, league, 2,
             rep['atk_iv'], rep['def_iv'], rep['sta_iv'], shadow=opp_shadow)
@@ -700,6 +714,61 @@ def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
             if res.pvpoke_score(0) > 500:
                 wins += w
     return wins, total
+
+
+def _opp_robustness_groups(focal_bp, focal_species, focal_fast, focal_charged,
+                           focal_shadow, focal_ivs, opponent, opp_fast,
+                           opp_charged, opp_shadow, league, ranked,
+                           dedup='signature'):
+    """Group the opponent's top-k IVs (``ranked``) into sets that fight
+    bit-identical battles vs the fixed focal, so one representative sim
+    covers each set. Returns a list of member-position lists (indexing
+    ``ranked``).
+
+    ``dedup``:
+      'signature' - exact damage-signature dedup (deep_dive_signature) for
+        fixed-form opponents; collapses the top-512 cohort hard. Form-change
+        opponents always fall back to per-IV (their alt-form stats are
+        non-linear in raw IVs+level, and the signature CMP column predates
+        the cmp_atk fix -- see opp_iv_robustness docstring).
+      'profile'   - effective-stat dedup (the conservative original).
+      'none'      - one group per IV (the no-dedup reference for tests).
+    """
+    n = len(ranked)
+    if dedup == 'none' or _species_has_form_change(opponent):
+        return [[i] for i in range(n)]
+    if dedup == 'profile':
+        groups, _ = group_ivs_by_stat_profile(ranked, per_iv=False)
+        return list(groups.values())
+    # signature dedup
+    import deep_dive_signature as _sig
+    league_cp = LEAGUE_CAPS[league]
+    fast_db, charged_db = get_moves()
+    gm = load_gamemaster()
+    opp_mon = next((m for m in gm['pokemon']
+                    if m['speciesName'] == opponent), None)
+    focal_mon = next((m for m in gm['pokemon']
+                      if m['speciesName'] == focal_species), None)
+    if opp_mon is None or focal_mon is None:
+        return [[i] for i in range(n)]
+    profile_list = [(None, r['atk'], r['def_'], r['hp'],
+                     r['atk_iv'], r['def_iv'], r['sta_iv'], r['level'])
+                    for r in ranked]
+    swept = _sig.build_focal_side(
+        opp_mon, parse_types(opp_mon), dict(fast_db[opp_fast]),
+        [dict(charged_db[c]) for c in opp_charged],
+        profile_list, league_cp, opp_shadow)
+    focal_pk = Pokemon.at_best_level(focal_species, *focal_ivs,
+                                     league=league, shadow=focal_shadow)
+    fixed = _sig.build_opp_side({
+        'types': parse_types(focal_mon),
+        'fm': dict(fast_db[focal_fast]),
+        'cms': [dict(charged_db[c]) for c in focal_charged],
+        'atk': focal_bp.atk, 'def_': focal_bp.def_,
+        'mon': focal_mon, 'ivs': tuple(focal_ivs), 'level': focal_pk.level,
+        'shadow': focal_shadow,
+    }, league_cp)
+    return [members for _rep, members in _sig.signature_groups(swept, fixed)]
 
 
 def _compute_card_robustness(species, focal_fast, focal_charged, focal_shadow,

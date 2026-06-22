@@ -781,16 +781,36 @@ Shadow Corviknight GL pre-release, `userdata/dives/shadow_corviknight*.html`.)*
   opponent-IV-variance theme) and the Tinkaton/Altaria shadow-IV-variance
   caveats. Do NOT build until there's a concrete consumer.
 
-* **Robustness headline is slow (~5.5 min for a full GL pool).** The
-  `--card-out` headline sims the rec IV vs each opponent's top-512 IVs ×
-  all 9 shields (71 opponents resolved → ~hundreds of k sims). Effective-
-  stat dedup (`group_ivs_by_stat_profile`) barely collapses the top-512
-  bulk cohort (many distinct atk/def/hp). Speed it up with the
-  damage-signature dedup (`scripts/deep_dive_signature.py`
-  `signature_groups`, "provably exact") which collapses by actual damage
-  tables — should cut the cohort ~4-5×. Until then, `--card-robust-k`
-  caps the cohort for fast smokes (all 9 shields kept). Don't reach for
-  this until robustness runs on a dive that actually ships repeatedly.
+* **Robustness headline speed — signature dedup landed, gain modest.**
+  `opp_iv_robustness` now uses the damage-signature dedup
+  (`deep_dive_signature.signature_groups`) for fixed-form opponents
+  (`dedup='signature'`, default), verified bit-identical to no-dedup
+  (`test_opp_iv_robustness_signature_dedup_is_exact`). But the top-512
+  stat-product cohort has diverse damage signatures, so it only collapses
+  ~1.5× (less for shadow opponents) — the ~5.5 min full-pool headline drops
+  to ~3.5-4 min, not the 4-5× originally hoped. `--card-robust-k` still
+  caps the cohort for fast smokes. If robustness needs to be genuinely fast
+  (e.g. card on every published dive), the lever is caching the per-(focal-
+  IV, opponent) robustness result, not tighter exact dedup (1.5× is the
+  exact-dedup ceiling here).
+
+* **`deep_dive_signature` CMP column — FIXED 2026-06-22, NO published
+  pollution found.** `signature_groups` built the CMP column from
+  *effective* atk, but the engine decides CMP on unboosted `cmp_atk`
+  (2026-06-13 fix). For shadow-MISMATCHED pairs the two boundaries differ by
+  the ×1.2 shadow factor, so a profile could in principle mis-group.
+  **Measured impact first:** focal sweep with signature-dedup vs the
+  CMP-safe path across 12 shadow-mismatched matchups (both directions, incl.
+  the published shadow dives), all 9 shields, all 4096 IVs = 442,368 cells →
+  **0 differences**. Reason it never bites: two IVs share a signature group
+  only if their *damage* tables match, which pins effective atk to a band
+  finer than the 20% CMP gap, so a group can't straddle the real CMP
+  boundary. Fixed anyway for hygiene: threaded each side's shadow flag into
+  the side struct and compute the CMP column on `atk/1.2` (same-shadow and
+  non-shadow pairs are unchanged by construction). Also closed a latent
+  cache gap: `engine_hash` now hashes `scripts/deep_dive_signature.py`
+  (covers BOTH sweep + slayer caches; slayer reuses engine_hash). No re-dive
+  needed.
 
 * **`_species_has_form_change` keys on the form name (latent nit).** It is
   exact for today's meta only because the sole stat-divergent form-change
