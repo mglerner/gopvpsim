@@ -48,6 +48,7 @@ from render_article import (  # type: ignore[import-not-found]
 
 from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
 from gopvpsim.pokemon import iv_rank  # type: ignore[import-not-found]
+from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML  # type: ignore[import-not-found]
 import auto_gen_narrative  # type: ignore[import-not-found]
 
 from compare_loadouts import (  # type: ignore[import-not-found]
@@ -3429,10 +3430,10 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
 {sections_html}
 
 <footer>
-  By {author} | Generated from simulation data by
-  <code>scripts/generate_article.py</code>. Built with
-  <a href="https://github.com/pvpoke/pvpoke">PvPoke</a> game data. |
-  <a href="../../guides/">Reader's Guide</a>
+  <p>By {author} | Generated from simulation data by
+  <code>scripts/generate_article.py</code>. |
+  <a href="../../guides/">Reader's Guide</a></p>
+  <p>{PVPOKE_ATTRIBUTION_HTML}</p>
 </footer>
 <script>
 (function() {{

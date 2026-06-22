@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from gopvpsim.battle import simulate, pvpoke_dp
 from gopvpsim.data import get_default_moveset
+from gopvpsim.attribution import PVPOKE_ATTRIBUTION_SHORT
 from gopvpsim.pokemon import pvpoke_default_ivs
 from deep_dive import make_battle_pokemon, _parse_opponent_pool_line
 
@@ -229,8 +230,9 @@ column header for that species' best wins / worst losses.</p>
   <table class="matrix" id="matrix"></table>
 </div>
 
-<footer>Matchup web &middot; gopvpsim &middot; even-shields (1v1) data
-drives the per-species panel regardless of the dropdown.</footer>
+<footer><p>Matchup web &middot; gopvpsim &middot; even-shields (1v1) data
+drives the per-species panel regardless of the dropdown.</p>
+<p>{PVPOKE_ATTRIBUTION_SHORT}</p></footer>
 
 <script>
 const SPECIES = {species_json};

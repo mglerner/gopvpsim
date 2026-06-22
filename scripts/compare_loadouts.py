@@ -38,6 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
+from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML  # type: ignore[import-not-found]
 
 from gopvpsim.data import (  # type: ignore[import-not-found]
     load_gamemaster,
@@ -947,7 +948,9 @@ def render_standalone_html(title: str, description: str,
         )
         dive_link_html = f'<div class="related"><strong>Source dives</strong><ul>{items}</ul></div>'
 
-    author_html = f'<footer>By {html.escape(authored_by)}</footer>' if authored_by else ''
+    _by = f'By {html.escape(authored_by)} &middot; ' if authored_by else ''
+    author_html = (f'<footer><p>{_by}gopvpsim</p>'
+                   f'<p>{PVPOKE_ATTRIBUTION_SHORT}</p></footer>')
     _sidebar_css = sidebar_css([
         '.related', 'p.verdict-line',
         'div.compare-summary', 'details.methodology-details',

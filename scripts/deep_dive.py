@@ -59,6 +59,7 @@ from gopvpsim.pokemon import (
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL, cp as calc_cp, pvpoke_default_ivs,
 )
 from gopvpsim.moves import get_moves, type_effectiveness, stab
+from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML
 from gopvpsim.data import (
     load_gamemaster, load_rankings, get_default_moveset, parse_types,
     load_group as fetch_group,
@@ -3777,6 +3778,11 @@ var _scoresReady = (async function() {
              'guide in plain language.</p>\n')
 
     # About / Credits section
+    # Always-visible PvPoke attribution (the collapsible credits below
+    # add detail, but the core credit must show without a click).
+    html += ('<p style="margin-top:30px;border-top:1px solid #0f3460;'
+             'padding-top:12px;font-size:0.85rem;color:#b0b8c4;'
+             'line-height:1.6">' + PVPOKE_ATTRIBUTION_HTML + '</p>\n')
     html += '<details class="meta" style="margin-top:10px;border-top:1px solid #0f3460;padding-top:10px">'
     html += '<summary>About &amp; Credits</summary>'
     html += '<div style="margin:8px 0;font-size:0.85rem;color:#b0b8c4;line-height:1.6">'
@@ -3784,9 +3790,12 @@ var _scoresReady = (async function() {
     html += 'for Pokemon GO PvP IVs.</p>'
     html += '<p><b>Data &amp; Simulation Reference</b></p>'
     html += '<ul style="margin:4px 0 8px 20px">'
-    html += '<li><b>PvPoke</b> (pvpoke.com) - species data (gamemaster.json), '
-    html += 'meta rankings, and battle simulation reference. '
-    html += 'PvPoke is open-source: github.com/pvpoke/pvpoke.</li>'
+    html += '<li><b>PvPoke</b> (pvpoke.com) - this project is built on PvPoke. '
+    html += "Our battle simulator is a Python port of PvPoke's open-source battle "
+    html += 'logic, and all game data (gamemaster.json, move stats, type chart, '
+    html += 'and meta rankings) comes from PvPoke. PvPoke is by Empoleon_Dynamite '
+    html += 'and is MIT-licensed: github.com/pvpoke/pvpoke. This project would not '
+    html += 'exist without it.</li>'
     html += '<li><b>RyanSwag</b> - mirror slayer IV framework '
     html += '(the inspiration for the slayer-archetype analysis).</li>'
     html += '</ul>'
