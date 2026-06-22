@@ -651,6 +651,25 @@ move selection closed 2026-04-15 as not-a-real-issue.)
 
 ## HTML output paths
 
+* **Orphaned-artifact detector for the publish pipeline** *(noted
+  2026-06-21 during the PvPoke-attribution site-wide re-render)* — Stale
+  files accumulate under `userdata/dives/` and `userdata/website/` that
+  nothing links to and that were simply never deleted. Concrete instance
+  found: some ML IV-guides have BOTH a current
+  `<slug>_iv_envelope_all9.json` (the canonical `--all-shields` artifact
+  the site is built from) AND an older-format `<slug>_iv_envelope.json`
+  left over from before the all-shields switch. The site links only to
+  the `_all9`-derived guide HTML; the plain-`_iv_envelope` JSON (and any
+  HTML it once produced) is an orphan. (This is why the re-render had to
+  dedup-by-slug-prefer-`_all9`; that nuance only exists because the old
+  artifacts were never cleaned up.) Build a pipeline step / tool that:
+  (a) enumerates generated artifacts (`userdata/dives/*.json`,
+  `userdata/website/**`), (b) cross-references what the site index +
+  pages actually link to (and what the current renderers would produce),
+  (c) reports the orphans for review, and (d) optionally deletes with a
+  `--execute` gate (dry-run default, like `scripts/clean_logs.py`).
+  Don't auto-delete without the gate. Separate session.
+
 * **Re-render published split-moveset dives** *(follow-up to the
   2026-06-10 split-analysis-cache fix)* — The fixed bug was worse than
   the original "wrong subheader" report: from 2026-04-12 to 2026-06-10
