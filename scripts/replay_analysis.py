@@ -38,6 +38,16 @@ def main():
     parser.add_argument('--html', default=None, metavar='PATH',
                         help='Override the output HTML path (default: the '
                              "dive's original output path)")
+    parser.add_argument('--card-out', default=None, metavar='PATH',
+                        help='Also (re)generate the standalone dive card to '
+                             'PATH (recomputes the opponent-IV robustness '
+                             'headline; deterministic, so byte-identical to '
+                             'the live-dive card)')
+    parser.add_argument('--card-robust-k', type=int, default=None, metavar='N',
+                        help='Override the opponent-IV cohort size for the card '
+                             'robustness headline (default: the value baked into '
+                             'the blob, or 512). Lower it for fast smoke '
+                             'iterations; all shield scenarios are kept.')
     args = parser.parse_args()
 
     state = deep_dive.load_replay_state(args.blob)
@@ -46,6 +56,13 @@ def main():
 
     if args.html:
         state['html_path'] = args.html
+    if args.card_out:
+        state['card_path'] = args.card_out
+        card_parent = os.path.dirname(os.path.abspath(args.card_out))
+        if card_parent:
+            os.makedirs(card_parent, exist_ok=True)
+    if args.card_robust_k is not None:
+        state['card_robust_k'] = args.card_robust_k
     out_parent = os.path.dirname(os.path.abspath(state['html_path']))
     if out_parent:
         os.makedirs(out_parent, exist_ok=True)

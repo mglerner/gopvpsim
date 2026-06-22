@@ -1,0 +1,34 @@
+# Shadow Corviknight (Great League) -- PRE-RELEASE, speculative.
+# Split into its own file so deep_dive.py auto-discovery finds it for a
+# `--shadow` Corviknight dive (table name carries the " (Shadow)" suffix;
+# filename carries the _shadow suffix). Modeled on thresholds/corviknight.toml
+# (non-shadow) and thresholds/forretress_shadow.toml. Data only -- no
+# narrative blocks (see ship-mode policy in CLAUDE.md).
+
+["Corviknight (Shadow)"]
+sources = """
+Pre-release speculative dive. Shadow Corviknight releases 2026-06-25 and is
+NOT yet in PvPoke rankings, so the focal is CONSTRUCTED from the released
+non-shadow Corviknight stats with the shadow multipliers applied
+(x1.2 atk / x0.8333 def), and the moveset is supplied explicitly
+(Sand Attack / Air Cutter, Payback -- PvPoke's current non-shadow GL
+default; re-confirm at launch). Anchors are Level-3 discover-all only: the
+non-shadow def floors do NOT transfer (shadow trades bulk for attack), so
+no above_def / above_atk literals are carried over from corviknight.toml.
+Re-validate once Shadow Corviknight is live and PvPoke ranks it; do NOT
+promote any anchor to Level 1 until post-release data exists (same
+discipline as the cd_prep re-check in CLAUDE.md).
+"""
+
+# Cross-variant mirror vs the RANKED non-shadow Corviknight (resolves
+# cleanly; the shadow self-mirror would be dropped pre-release because the
+# unranked shadow form has no default moveset). Discover-all.
+["Corviknight (Shadow)".Great.anchors.base_mirror_blkp_any]
+kind = "bulkpoint"
+opponent = "Corviknight"
+description = "Defense thresholds where the non-shadow Corviknight mirror's incoming damage to Shadow Corviknight steps down. Discover-all (Level 3); pre-release, re-validate post-launch."
+
+["Corviknight (Shadow)".Great.anchors.base_mirror_brkp_any]
+kind = "damage_breakpoint"
+opponent = "Corviknight"
+description = "Attack thresholds where Shadow Corviknight's moves step up in integer damage against the non-shadow Corviknight mirror. Discover-all (Level 3); pre-release, re-validate post-launch."
