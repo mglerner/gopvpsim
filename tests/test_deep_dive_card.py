@@ -72,6 +72,21 @@ def test_build_card_model_fields():
     assert m.key_losses[0][0] == 'Medicham'
 
 
+def test_shadow_flag_from_explicit_param():
+    """Regression: data_obj has NO 'shadow' key (the real render path), so the
+    shadow prefix must come from the explicit shadow= param, not data_obj."""
+    data_obj, ctx = _synthetic()
+    del data_obj['shadow']            # mirror the live render path
+    m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'],
+                            shadow=True)
+    assert m.species_display == 'Shadow Corviknight'
+    assert m.shadow is True
+    m2 = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'],
+                             shadow=False)
+    assert m2.species_display == 'Corviknight'
+    assert m2.shadow is False
+
+
 def test_build_card_model_no_robust():
     data_obj, ctx = _synthetic()
     m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'])

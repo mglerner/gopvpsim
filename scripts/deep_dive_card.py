@@ -97,18 +97,24 @@ def _pretty_opp(name: str) -> str:
         return name
 
 
-def build_card_model(data_obj, card_ctx, *, types,
+def build_card_model(data_obj, card_ctx, *, types, shadow=None,
                      robust_winrate=None, sprite_uri=None) -> CardModel:
     """Pure transform: (dive data_obj + analysis card_ctx) -> CardModel.
 
     ``card_ctx`` is the dict deep_dive.generate_analysis_sections stashed on
     ``data_obj['_cardCtx']`` (rec_candidates, rec_idx, flips, key_wins/losses,
     single_iv_winrate, ...). ``types`` is the focal's lowercase gamemaster
-    type list. ``robust_winrate`` is the optional opponent-IV robustness
-    dict {'frac','pool','k','scenarios'} computed by the caller (sims).
+    type list. ``shadow`` is the focal's shadow flag -- pass it explicitly
+    (data_obj has no 'shadow' key; the flag lives on the render kwargs); the
+    data_obj/card_ctx fallback exists only for synthetic-dict unit tests.
+    ``robust_winrate`` is the optional opponent-IV robustness dict
+    {'frac','pool','k','scenarios'} computed by the caller (sims).
     """
     species = data_obj['species']
-    shadow = bool(data_obj.get('shadow') or card_ctx.get('shadow'))
+    if shadow is None:
+        shadow = bool(data_obj.get('shadow') or card_ctx.get('shadow'))
+    else:
+        shadow = bool(shadow)
     disp = pretty_species(species)
     if shadow and 'Shadow' not in disp:
         disp = f'Shadow {disp}'
