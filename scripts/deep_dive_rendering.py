@@ -248,6 +248,20 @@ DEEP_DIVE_CSS = """
 .dd-threshold-list li { --sidebar-color: #0f3460; --sidebar-width: 2px;
   padding: 4px 0 4px 14px; margin: 4px 0; font-size: 0.88rem; }
 .dd-threshold-list .dd-loss-item { --sidebar-color: #f85149; }
+/* Opponent-centric "Threats where your IV matters" view */
+.dd-shield-grid { display:inline-table; border-collapse:collapse; margin:0 0 0 10px;
+  vertical-align:middle; font-size:0.72rem; }
+.dd-shield-grid th, .dd-shield-grid td { width:1.4em; height:1.4em; text-align:center;
+  border:1px solid #0f3460; padding:1px 3px; }
+.dd-shield-grid th { color:#8b949e; background:#0f3460; font-weight:600; }
+.dd-sg-win { color:#3fb950; background:#132a1c; }
+.dd-sg-loss { color:#f85149; background:#2a1416; }
+.dd-sg-na { color:#484f58; }
+.dd-sg-row { color:#8b949e; }
+.dd-spread-grid td, .dd-spread-grid th:not(:first-child) { text-align:center; }
+.dd-opp-row { border-bottom:1px solid #0f3460; padding:4px 0; }
+.dd-opp-detail { padding:4px 0 8px 14px; }
+.dd-opp-name { font-weight:600; }
 .dd-opp-label { color: #8b949e; font-size: 0.75rem; }
 .dd-slayer-top td { background: #1e2d4a; }
 .dd-slayer-top td:first-child { border-left: 3px solid #58a6ff; }
@@ -3194,6 +3208,251 @@ def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
 
 
 # ---------------------------------------------------------------------------
+# Opponent-centric view ("Threats where your IV matters")
+# ---------------------------------------------------------------------------
+# Re-pivots all_matchup_boundaries (by opponent) + scores_flat (per cell)
+# to answer the player's actual question -- "to beat opponent X, what does
+# my IV need?" -- instead of the IV-centric "what does this IV beat?". No
+# new simulation: the boundaries are regrouped and the win/loss cells are
+# direct scores_flat reads. Subsumes the flat "Stat Thresholds & Matchup
+# Flips" boundary dump.
+
+
+def _og_win(scores_flat, iv, si, oi, nS, nO, win_threshold=500):
+    """True iff IV index ``iv`` wins scenario ``si`` vs opponent ``oi``."""
+    return scores_flat[iv * nS * nO + si * nO + oi] >= win_threshold
+
+
+def _render_shield_grid_3x3(scores_flat, iv, oi, scenarios, nS, nO,
+                            win_threshold=500):
+    """Compact 3x3 win/loss read for one IV vs one opponent.
+
+    Rows = my shields (s0 = 0/1/2), cols = opp shields (s1 = 0/1/2). A
+    scenario absent from the swept set renders as a neutral dot. Returns
+    (html, n_wins, n_swept). ASCII/entity marks only (no em-dash).
+    """
+    have = {}
+    for si, scen in enumerate(scenarios):
+        have[(scen[0], scen[1])] = _og_win(scores_flat, iv, si, oi, nS, nO,
+                                            win_threshold)
+    n_wins = sum(1 for v in have.values() if v)
+    n_swept = len(have)
+    rows = ['<table class="dd-shield-grid"><tr><th></th>'
+            '<th>0</th><th>1</th><th>2</th></tr>']
+    for s0 in range(3):
+        cells = [f'<th>{s0}</th>']
+        for s1 in range(3):
+            v = have.get((s0, s1))
+            if v is None:
+                cells.append('<td class="dd-sg-na">&middot;</td>')
+            elif v:
+                cells.append('<td class="dd-sg-win">&#10003;</td>')
+            else:
+                cells.append('<td class="dd-sg-loss">&#10007;</td>')
+        rows.append('<tr>' + ''.join(cells) + '</tr>')
+    rows.append('</table>')
+    return ''.join(rows), n_wins, n_swept
+
+
+def _render_opp_spread_grid(spread_ivs, oi, scenarios, scores_flat, nS, nO,
+                            data_obj, win_threshold=500):
+    """Per-spread x 9-shield win/loss grid for one opponent (expander L2).
+
+    Columns = the card's rec spreads (``spread_ivs`` = IV indices); rows =
+    the 9 shields. Cell = win/loss for (spread, opponent, scenario), plus a
+    trailing wins X/9 tally column. Lets the reader compare what each
+    recommended IV gets vs this single opponent.
+    """
+    def _label(iv):
+        return (f'{data_obj["ivA"][iv]}/{data_obj["ivD"][iv]}/'
+                f'{data_obj["ivS"][iv]}')
+
+    head = ['<tr><th>shields</th>']
+    head += [f'<th>{_label(iv)}</th>' for iv in spread_ivs]
+    head.append('</tr>')
+    rows = [''.join(head)]
+    for si, scen in enumerate(scenarios):
+        cells = [f'<td class="dd-sg-row">{scen[0]}v{scen[1]}</td>']
+        for iv in spread_ivs:
+            if _og_win(scores_flat, iv, si, oi, nS, nO, win_threshold):
+                cells.append('<td class="dd-sg-win">&#10003;</td>')
+            else:
+                cells.append('<td class="dd-sg-loss">&#10007;</td>')
+        rows.append('<tr>' + ''.join(cells) + '</tr>')
+    return ('<table class="dd-table dd-narrow dd-spread-grid">'
+            + ''.join(rows) + '</table>\n')
+
+
+def _render_boundary_cutoff_line(b, has_bait_axis):
+    """One threshold cutoff <li> for a boundary record, reusing the
+    boundary-bullet vocabulary (HP co-condition, bait, energy lead).
+    e.g. '1v1, 2v1 flips at Def >= 141.66 + 138 HP [85 IVs clear it]'.
+    """
+    scen_str = ', '.join(f'{s[0]}v{s[1]}' for s in sorted(b['scenarios']))
+    bait_modes = b.get('bait_modes', set())
+    if has_bait_axis and len(bait_modes) == 1:
+        scen_str += ' no bait' if 'nobait' in bait_modes else ' with bait'
+    energy_modes = b.get('energy_modes', set())
+    if energy_modes and 0 not in energy_modes:
+        _emin = min(energy_modes)
+        scen_str += (f', needs +{_emin} fast move'
+                     f'{"s" if _emin > 1 else ""} energy')
+    stat_label = 'Atk' if b.get('stat') == 'atk' else 'Def'
+    hp_str = (f' + <span class="dd-strong">{b["hp_threshold"]} HP</span>'
+              if b.get('hp_threshold') is not None else '')
+    return (f'<li><span class="dd-gain">{scen_str}</span> flips at '
+            f'<span class="dd-strong">{stat_label} &ge; '
+            f'{b["threshold"]:.2f}</span>{hp_str} '
+            f'<span class="dd-small">[{b["n_passing"]} IVs clear it]</span></li>')
+
+
+def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
+                                    scenarios, opponents, nS, nO, data_obj,
+                                    opp_label, has_bait_axis=False,
+                                    spread_ivs=None, win_threshold=500):
+    """Opponent-centric "Threats where your IV matters" section.
+
+    Pivots ``all_matchup_boundaries`` by opponent. An opponent appears in
+    that list iff a real in-range matchup flip exists for it (the partition
+    is clean somewhere in the survivor stat range) -- that presence is the
+    suppression-gate signal. Each such *decision* opponent gets a row: the
+    headline rec spread (``spread_ivs[0]``) read as a 3x3 win/loss grid over
+    the 9 shields, a "wins X/9" tally, and an expander with the exact stat
+    cutoffs plus a per-spread grid over all the card's rec spreads.
+
+    Opponents with NO boundary record win-or-lose at every IV; they are
+    hoisted into two one-line callouts ("Wins at any IV" / "Loses at any
+    IV"), classified by the headline spread's per-opponent result.
+
+    ``spread_ivs`` defaults to ``data_obj['recIvs']`` (the card's rec-spread
+    set, IV indices). Subsumes the flat boundary dump. No new simulation.
+    Returns '' when there is nothing to show.
+    """
+    if spread_ivs is None:
+        spread_ivs = list(data_obj.get('recIvs') or [])
+    spread_ivs = [iv for iv in spread_ivs if iv is not None]
+    if not spread_ivs or nO == 0 or not scores_flat:
+        return ''
+    headline_iv = spread_ivs[0]
+
+    def _ivstr(iv):
+        return (f'{data_obj["ivA"][iv]}/{data_obj["ivD"][iv]}/'
+                f'{data_obj["ivS"][iv]}')
+
+    # Group boundaries by opponent (the in-range-flip signal).
+    by_opp: dict = {}
+    for b in all_matchup_boundaries or []:
+        by_opp.setdefault(b['opponent'], []).append(b)
+
+    opp_index = {name: oi for oi, name in enumerate(opponents)}
+
+    def _headline_wins(oi):
+        return sum(1 for si in range(nS)
+                   if _og_win(scores_flat, headline_iv, si, oi, nS, nO,
+                              win_threshold))
+
+    # Suppression gate -- an opponent is a decision row only when your IV choice
+    # can change the result AND the headline grid itself shows it:
+    #   no boundary            -> won OR lost at EVERY IV; hoist to Wins/Loses at
+    #                             any IV (the headline result is unanimous there).
+    #   boundary + non-uniform -> decision row (the headline 3x3 shows the flip).
+    #   boundary + uniform     -> the headline sweeps but a non-headline recommended
+    #                             spread flips it; a compact callout, NOT an
+    #                             all-red / all-green row leading the section.
+    decision_rows = []
+    wins_any, loses_any, off_headline = [], [], []
+    for oi, name in enumerate(opponents):
+        hw = _headline_wins(oi)
+        if name not in by_opp:
+            (wins_any if hw > nS // 2 else loses_any).append(name)
+        elif 1 <= hw <= nS - 1:
+            decision_rows.append((oi, name))
+        else:
+            off_headline.append(name)
+
+    parts = []
+    parts.append('<details class="dd-collapsible" id="dd-opp-threats">\n')
+    parts.append(
+        '<summary class="dd-h3" style="cursor:pointer">'
+        'Threats where your IV matters '
+        '<span class="dd-small" style="font-weight:400;color:#8b949e">'
+        f'({len(decision_rows)} decision-relevant)</span></summary>\n')
+    parts.append(
+        f'<p class="dd-small" style="color:#8b949e">Each opponent below has '
+        f'a matchup that <i>flips</i> somewhere inside the IV range vs '
+        f'{opp_label} opponents - so your exact spread decides the result. '
+        f'The grid shows the headline spread '
+        f'<span class="dd-strong">{_ivstr(headline_iv)}</span> across all '
+        f'{nS} shield scenarios (rows = your shields, columns = opponent '
+        f'shields). Expand a row for the exact stat cutoff and how every '
+        f'recommended spread fares.</p>\n')
+
+    # Hoist callouts (won/lost at any IV).
+    def _hoist(label_html, names):
+        if not names:
+            return ''
+        bits = ', '.join(_opp_b(n) for n in sorted(names))
+        return (f'<p class="dd-small" style="margin:4px 0">{label_html} '
+                f'{bits}</p>\n')
+
+    parts.append(_hoist('<span class="dd-gain">Wins at any IV:</span>',
+                        wins_any))
+    parts.append(_hoist('<span class="dd-loss">Loses at any IV:</span>',
+                        loses_any))
+    parts.append(_hoist(
+        '<span class="dd-small" style="color:#9bb0d0">Headline sweeps, but an '
+        'off-headline recommended spread flips it:</span>', off_headline))
+
+    if not decision_rows:
+        parts.append('<p class="dd-small" style="color:#8b949e">No '
+                     'IV-sensitive matchups in this pool - every opponent '
+                     'is decided above.</p>\n')
+        parts.append('</details>\n')
+        return ''.join(parts)
+
+    # Most-contested first (headline closest to a 50/50 split) -- where the IV
+    # choice matters most.
+    decision_rows.sort(key=lambda r: (abs(_headline_wins(r[0]) - nS / 2), r[1]))
+
+    parts.append('<div class="dd-opp-rows">\n')
+    for oi, name in decision_rows:
+        grid_html, n_wins, n_swept = _render_shield_grid_3x3(
+            scores_flat, headline_iv, oi, scenarios, nS, nO, win_threshold)
+        bnds = sorted(by_opp[name],
+                      key=lambda b: (0 if b.get('stat', 'def') == 'def' else 1,
+                                     b['threshold']))
+        # id="opp-<slug>" preserves the deep-link contract the article's
+        # Matchup Delta table scrapes (generate_article.py:269) -- it was
+        # previously emitted by the now-removed standalone boundary dump.
+        parts.append(f'<div class="dd-opp-row" id="opp-{opp_slug(name)}">\n')
+        parts.append('<details class="dd-collapsible">\n')
+        parts.append(
+            f'<summary style="cursor:pointer">'
+            f'<span class="dd-opp-name">{_opp_b(name)}</span> '
+            f'<span class="dd-small" style="color:#8b949e">'
+            f'wins {n_wins}/{n_swept}</span> {grid_html}</summary>\n')
+        parts.append('<div class="dd-opp-detail">\n')
+        parts.append('<ul class="dd-threshold-list" style="margin:6px 0">\n')
+        for b in bnds:
+            parts.append(_render_boundary_cutoff_line(b, has_bait_axis))
+        parts.append('\n</ul>\n')
+        if len(spread_ivs) > 1:
+            parts.append(
+                '<p class="dd-small" style="color:#8b949e;margin:6px 0 2px">'
+                'Your recommended spreads vs this opponent (columns) across '
+                'the 9 shields:</p>\n')
+            parts.append(_render_opp_spread_grid(
+                spread_ivs, oi, scenarios, scores_flat, nS, nO, data_obj,
+                win_threshold))
+        parts.append('</div>\n')   # dd-opp-detail
+        parts.append('</details>\n')
+        parts.append('</div>\n')   # dd-opp-row
+    parts.append('</div>\n')       # dd-opp-rows
+    parts.append('</details>\n')
+    return ''.join(parts)
+
+
+# ---------------------------------------------------------------------------
 # Results section renderer
 # ---------------------------------------------------------------------------
 
@@ -3303,9 +3562,9 @@ def render_results_section(data_obj, moveset_label, opp_label,
             parts.append('\n</ul>\n')
             parts.append(
                 '<p class="dd-small" style="color:#8b949e">'
-                'Full breakpoint details in '
-                '<a href="#dd-stat-thresholds" style="color:#58a6ff" onclick="var el=document.getElementById(\'dd-stat-thresholds\');if(el)el.open=true;">'
-                'Stat Thresholds &amp; Matchup Flips</a> below.</p>\n'
+                'Per-opponent breakdown in '
+                '<a href="#dd-opp-threats" style="color:#58a6ff" onclick="var el=document.getElementById(\'dd-opp-threats\');if(el)el.open=true;">'
+                'Threats where your IV matters</a> below.</p>\n'
             )
 
         parts.append('</div>\n')  # end expert zone
@@ -3314,7 +3573,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
     # Simulation Deep Dive zone
     # ================================================================
     parts.append('<div class="dd-sim-zone">\n')
-    parts.append('<h3>Simulation Deep Dive</h3>\n')
+    parts.append('<h3>Simulation-Derived IV Tiers</h3>\n')
 
     # -- Sim-only Tier Cards (if any auto-derived tiers exist) --
     if sim_tiers:
@@ -3458,20 +3717,14 @@ def render_results_section(data_obj, moveset_label, opp_label,
     if slayer_html:
         parts.append(slayer_html)
 
-    # -- Stat Thresholds & Matchup Flips (merged section) --
+    # -- Threats where your IV matters (opponent-centric view) --
+    # Replaces the flat "Stat Thresholds & Matchup Flips" boundary dump:
+    # re-pivots all_matchup_boundaries by opponent and reads scores_flat
+    # cells for the headline + per-spread grids. No new simulation. The
+    # Key Matchup Thresholds overview and the (separate-dataset)
+    # Anchor-Driven Matchup Flips are preserved alongside it.
     threshold_descs = generate_threshold_descriptions(flips, data_obj, avg_scores, ranked, opp_iv_mode,
                                                       has_bait_axis=has_bait_axis)
-    mb_bullets = []
-    if all_matchup_boundaries:
-        _sorted_mbs = sorted(
-            all_matchup_boundaries,
-            key=lambda m: (0 if m.get('stat', 'def') == 'def' else 1,
-                           m['threshold'], m['opponent']),
-        )
-        mb_bullets = render_matchup_boundary_bullets(
-            _sorted_mbs, has_bait_axis=has_bait_axis,
-            toggle_id='mb-standalone', top_n=10,
-            emit_opponent_ids=True)
     anchor_bullets = []
     if anchor_flip_records:
         anchor_bullets = render_anchor_flip_bullets(
@@ -3479,78 +3732,45 @@ def render_results_section(data_obj, moveset_label, opp_label,
             has_bait_axis=has_bait_axis,
             emit_opponent_ids=True)
 
-    has_any_threshold = threshold_descs or mb_bullets or anchor_bullets
-    if has_any_threshold:
-        # Summary counts for the collapsed header
-        summary_parts = []
-        if threshold_descs:
-            summary_parts.append(f'{len(threshold_descs)} key flips')
-        if mb_bullets:
-            summary_parts.append(f'{len(mb_bullets)} boundaries')
-        if anchor_bullets:
-            summary_parts.append(f'{len(anchor_bullets)} anchors')
-        summary_text = ', '.join(summary_parts)
+    # Key Matchup Thresholds - high-level overview (kept).
+    if threshold_descs:
+        parts.append('<h4 class="dd-h3" id="dd-stat-thresholds">'
+                     'Key Matchup Thresholds</h4>\n')
+        parts.append(f'<p>Matchups that flip vs {opp_label} opponents, '
+                     f'ordered by how many top IVs benefit:</p>\n')
+        parts.append('<ul class="dd-threshold-list">\n')
+        parts.append('\n'.join(threshold_descs))
+        parts.append('\n</ul>\n')
 
+    # Opponent-centric view (subsumes the flat Matchup-Flipping Boundaries
+    # dump: each boundary record is now reached per-opponent via its row).
+    opp_threats_html = render_opponent_threats_section(
+        all_matchup_boundaries, scores_flat, scenarios, opponents,
+        nS, nO, data_obj, opp_label, has_bait_axis=has_bait_axis)
+    if opp_threats_html:
+        parts.append(opp_threats_html)
+
+    # Anchor-Driven Matchup Flips - nested collapsible (a separate dataset:
+    # damage-tier boundaries from named anchors, not all_matchup_boundaries).
+    if anchor_bullets:
         parts.append(
-            f'<details class="dd-collapsible" id="dd-stat-thresholds">'
+            f'<details class="dd-collapsible">'
             f'<summary class="dd-h3" style="cursor:pointer">'
-            f'Stat Thresholds &amp; Matchup Flips '
+            f'Anchor-Driven Matchup Flips '
             f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
-            f'({summary_text})</span>'
+            f'({len(anchor_bullets)} anchors)</span>'
             f'</summary>\n')
-
-        # Key Matchup Thresholds - the high-level overview, always visible on expand
-        if threshold_descs:
-            parts.append('<h4 class="dd-h3">Key Matchup Thresholds</h4>\n')
-            parts.append(f'<p>Matchups that flip vs {opp_label} opponents, '
-                         f'ordered by how many top IVs benefit:</p>\n')
-            parts.append('<ul class="dd-threshold-list">\n')
-            parts.append('\n'.join(threshold_descs))
-            parts.append('\n</ul>\n')
-
-        # Matchup-Flipping Boundaries - nested collapsible
-        if mb_bullets:
-            parts.append(
-                f'<details class="dd-collapsible">'
-                f'<summary class="dd-h3" style="cursor:pointer">'
-                f'Matchup-Flipping Boundaries '
-                f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
-                f'({len(mb_bullets)} boundaries)</span>'
-                f'</summary>\n')
-            parts.append(
-                '<p>The minimum def or atk (+ HP) at which a matchup outcome '
-                'actually changes from loss to win. These are higher than '
-                'damage-tier boundaries because multiple damage changes must '
-                'accumulate across a full battle to flip the result. '
-                f'Vs {opp_label} opponents.</p>\n'
-            )
-            parts.append('<ul class="dd-threshold-list">\n')
-            parts.append('\n'.join(mb_bullets))
-            parts.append('\n</ul>\n')
-            parts.append('</details>\n')
-
-        # Anchor-Driven Matchup Flips - nested collapsible
-        if anchor_bullets:
-            parts.append(
-                f'<details class="dd-collapsible">'
-                f'<summary class="dd-h3" style="cursor:pointer">'
-                f'Anchor-Driven Matchup Flips '
-                f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
-                f'({len(anchor_bullets)} anchors)</span>'
-                f'</summary>\n')
-            parts.append(
-                '<p>Damage-tier boundaries from named anchors - the def/atk '
-                'at which a specific move\'s damage steps up or down by 1. '
-                'These are necessary but not always sufficient to flip a '
-                'matchup (see Matchup-Flipping Boundaries above for the '
-                f'actual stat targets). Vs {opp_label} opponents.</p>\n'
-            )
-            parts.append('<ul class="dd-threshold-list">\n')
-            parts.append('\n'.join(anchor_bullets))
-            parts.append('\n</ul>\n')
-            parts.append('</details>\n')
-
-        parts.append('</details>\n')  # outer collapsible
+        parts.append(
+            '<p>Damage-tier boundaries from named anchors - the def/atk '
+            'at which a specific move\'s damage steps up or down by 1. '
+            'These are necessary but not always sufficient to flip a '
+            'matchup (see the per-opponent cutoffs above for the actual '
+            f'stat targets). Vs {opp_label} opponents.</p>\n'
+        )
+        parts.append('<ul class="dd-threshold-list">\n')
+        parts.append('\n'.join(anchor_bullets))
+        parts.append('\n</ul>\n')
+        parts.append('</details>\n')
 
     parts.append('</div>\n')  # end sim zone
 
