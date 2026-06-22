@@ -314,28 +314,39 @@ def _two_ones_html(t: dict | None) -> str:
     return f'<div class="ddcard-note"><b>Why this IV?</b> {body}{ex_html}</div>'
 
 
+_COVER_MAX_OPPS = 5  # truncate long coverage lists on the card; "+N more"
+
+
 def _cover_html(s: Spread):
     """Named opponent-coverage bullets (Dragapult-Sim style). Empty when the
-    spread covers nothing beyond the reference (incl. the no-anchor fallback,
-    where cover_* lists are empty)."""
+    spread clears no notable tier (incl. the no-anchor fallback, where cover_*
+    lists are empty). Long lists (the bulk pole can list ~10 opponents) are
+    truncated with a "+N more" tail."""
+    def _join(opps):
+        head = ', '.join(html.escape(o) for o in opps[:_COVER_MAX_OPPS])
+        extra = len(opps) - _COVER_MAX_OPPS
+        return head + (f' +{extra} more' if extra > 0 else '')
     lines = []
     if s.cover_breakpoints:
-        opps = ', '.join(html.escape(o) for o in s.cover_breakpoints)
-        lines.append(f'<div class="cover"><b>Breakpoints</b> {opps}</div>')
+        lines.append(f'<div class="cover"><b>Breakpoints</b> '
+                     f'{_join(s.cover_breakpoints)}</div>')
     if s.cover_bulkpoints:
-        opps = ', '.join(html.escape(o) for o in s.cover_bulkpoints)
-        lines.append(f'<div class="cover"><b>Bulkpoints</b> {opps}</div>')
+        lines.append(f'<div class="cover"><b>Bulkpoints</b> '
+                     f'{_join(s.cover_bulkpoints)}</div>')
     return ''.join(lines)
 
 
 def _spread_html(s: Spread):
     role = f'<div class="role">{html.escape(s.style)}</div>' if s.style else ''
     cover = _cover_html(s)
+    nb = (f'<div class="cover"><span class="bpn">{s.n_breaks}</span> guaranteed '
+          f'breakpoint{"s" if s.n_breaks != 1 else ""}</div>'
+          if s.n_breaks else '')
     flips = f'<div class="flips">{html.escape(s.flips)}</div>' if s.flips else ''
     return (f'<div class="ddcard-spread">{role}'
             f'<div class="iv">{html.escape(s.iv_str)}</div>'
             f'<div class="stats">{s.atk:.1f} atk / {s.def_:.1f} def / {s.hp} hp'
-            f' &middot; CP {s.cp} &middot; SP #{s.sp_rank}</div>{cover}{flips}</div>')
+            f' &middot; CP {s.cp} &middot; SP #{s.sp_rank}</div>{cover}{nb}{flips}</div>')
 
 
 def _col(title, items, cls):
