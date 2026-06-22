@@ -1012,23 +1012,51 @@ function renderMatchesList() {
     return out;
   }
 
-  // "Gives up vs #1": the collection-table version of the IV-guide "what you
-  // give up" breakdown -- matchups the rank-1 (stat-product) spread wins but
-  // this owned IV loses, over the selected shield scenarios. Reuses the exact
-  // SCORES indexing the scatter hover's matchup-diff uses (score >= 500 = win),
-  // so the two always agree. On-grid only (canonicalIvIdx >= 0); off-grid '-'.
-  var HELP_GIVES_UP = 'Matchups the rank-1 (stat-product #1) IV wins but this ' +
-    'one loses, over the selected shield scenarios. Hover the number to list ' +
-    'them. "0" = gives up nothing; "-" = off-grid IV (not simulated).';
+  // "Gives up vs #1" -- the collection-table version of the IV-guide "what you
+  // give up" breakdown, keyed to the CURRENT y-axis. The reference "#1" is the
+  // IV ranked first on the active y-axis metric, and a dropped matchup is one
+  // the #1 IV wins but this owned IV loses (same SCORES diff the scatter hover
+  // uses, score >= 500 = win). On-grid only; off-grid '-'. winsMirror has no
+  // per-opponent grid, so it shows the mirror-win shortfall (count only).
+  var _guMode = state.yAxisMode || 'avgScore';
+  var _guLabel = '#1';
+  if (DATA.yAxisModes) {
+    for (var _ym = 0; _ym < DATA.yAxisModes.length; _ym++) {
+      if (DATA.yAxisModes[_ym].id === _guMode) { _guLabel = DATA.yAxisModes[_ym].label; break; }
+    }
+  }
+  var givesUpHeader = 'Gives up vs #1 (' + _guLabel + ')';
+  var HELP_GIVES_UP = 'Matchups the #1 IV on the current y-axis (' + _guLabel +
+    ') wins but this one loses, over the selected shields. Hover the number to ' +
+    'list them. "0" = gives up nothing; "-" = off-grid IV (not simulated). ' +
+    'Updates when you change the y-axis.';
+  // Precompute the y-axis #1 IV + matching score source once per render.
+  var _guRefIv = -1, _guScores = null;
+  if (_guMode !== 'winsMirror') {
+    if (typeof yValues !== 'undefined' && yValues) {
+      var _bestV = -Infinity;
+      for (var _gi = 0; _gi < nIvs; _gi++) {
+        if (yValues[_gi] > _bestV) { _bestV = yValues[_gi]; _guRefIv = _gi; }
+      }
+    }
+    _guScores = (_guMode === 'winsPvpoke') ? getScores(state.movesetIdx, 'pvpoke')
+              : (_guMode === 'winsRank1') ? getScores(state.movesetIdx, 'rank1')
+              : getScores(state.movesetIdx, state.oppIvMode);
+  }
   function _cellGivesUp(rc) {
     var iv = rc.canonicalIvIdx;
     if (iv == null || iv < 0) return '-';
-    var refIv = (DATA.rank1RefIvIdx != null && DATA.rank1RefIvIdx >= 0)
-                ? DATA.rank1RefIvIdx : DATA.pvpokeRefIvIdx;
-    if (refIv == null || refIv < 0) return '-';
-    if (iv === refIv) return '<span style="color:#9be89b">rank-1</span>';
-    var scores = getScores(state.movesetIdx, state.oppIvMode);
-    if (!scores) return '-';
+    if (_guMode === 'winsMirror') {
+      var mw = DATA.mirrorWinsByIv;
+      if (!mw) return '-';
+      var dm = (DATA.mirrorWinsMax || 0) - (mw[iv] || 0);
+      if (dm <= 0) return '<span style="color:#9be89b">0</span>';
+      var mc = dm <= 3 ? '#d4a017' : '#e07b7b';
+      return '<span style="color:' + mc + '" title="fewer mirror-cohort wins ' +
+             'than the #1 IV">' + dm + '</span>';
+    }
+    if (_guRefIv < 0 || !_guScores) return '-';
+    if (iv === _guRefIv) return '<span style="color:#9be89b">#1</span>';
     var sis = getActiveScenarioIndices();
     var lost = [];
     for (var k = 0; k < sis.length; k++) {
@@ -1036,13 +1064,15 @@ function renderMatchesList() {
       var sc = DATA.scenarios[si];
       var lab = sc[0] + 'v' + sc[1];
       for (var oi = 0; oi < nO; oi++) {
-        var refW = scores[refIv * nS * nO + si * nO + oi] >= 500;
-        var myW = scores[iv * nS * nO + si * nO + oi] >= 500;
+        var refW = _guScores[_guRefIv * nS * nO + si * nO + oi] >= 500;
+        var myW = _guScores[iv * nS * nO + si * nO + oi] >= 500;
         if (refW && !myW) lost.push(shortName(DATA.opponents[oi]) + ' ' + lab);
       }
     }
     if (lost.length === 0) return '<span style="color:#9be89b">0</span>';
-    var CAP = 14;
+    // Show the whole list (the count is already in the cell); cap only to
+    // avoid a pathological wall on a terrible IV that drops most matchups.
+    var CAP = 40;
     var shown = lost.slice(0, CAP).join(', ');
     if (lost.length > CAP) shown += ', +' + (lost.length - CAP) + ' more';
     var color = lost.length <= 3 ? '#d4a017' : '#e07b7b';
@@ -1071,7 +1101,7 @@ function renderMatchesList() {
               }
               return listOrDash(also);
           } },
-          { header: 'Gives up vs #1', cell: _cellGivesUp, help: HELP_GIVES_UP }
+          { header: givesUpHeader, cell: _cellGivesUp, help: HELP_GIVES_UP }
         ],
         isDefTier ? 'atk' : null
       );
@@ -1110,7 +1140,7 @@ function renderMatchesList() {
       { header: 'Also in',          cls: 'wrap', cell: function(rc) { return listOrDash(rc.matched); } },
       { header: 'Top-Mirror CMP %', cell: _cellTopMirror,    help: HELP_TOP_MIRROR_CMP },
       { header: 'Matchups Kept',    cell: _cellMatchupsKept, help: HELP_MATCHUPS_KEPT },
-      { header: 'Gives up vs #1',   cell: _cellGivesUp,      help: HELP_GIVES_UP }
+      { header: givesUpHeader,      cell: _cellGivesUp,      help: HELP_GIVES_UP }
     ]
   );
 
@@ -2606,6 +2636,9 @@ function updateView() {
 
   var traces = buildTraces();
   origOpacities = traces.map(function(t) { return t.marker.opacity; });
+  // Refresh the collection table so the "Gives up vs #1" column tracks the
+  // y-axis / opp-IV / moveset selection (no-op when no collection is loaded).
+  renderMatchesList();
 
   // Compute fixed axis ranges from all data
   var allX = [], allY = [];
