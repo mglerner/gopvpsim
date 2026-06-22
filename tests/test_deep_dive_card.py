@@ -142,6 +142,27 @@ def test_opp_iv_robustness_weighting():
     assert 0.0 <= wins <= total
 
 
+def test_compute_card_robustness_covers_all_with_movesets():
+    """With opp_movesets threaded from the dive, EVERY opponent is covered --
+    including the unranked shadow self-mirror that get_default_moveset would
+    drop. This is what unifies the single-IV / robustness denominators."""
+    focal_ivs = tuple(iv_rank('Corviknight', league='great', shadow=True)[0][k]
+                      for k in ('atk_iv', 'def_iv', 'sta_iv'))
+    opps = ['Azumarill', 'Corviknight (Shadow)']
+    movesets = [('BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH']),
+                ('SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'])]
+    res = deep_dive._compute_card_robustness(
+        'Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], True,
+        focal_ivs, 'great', opps, [(1, 1)], opp_movesets=movesets, k=8)
+    assert res is not None
+    assert res['pool'] == 2          # both covered, incl. the unranked mirror
+    # Without movesets, the unranked shadow mirror is dropped (fallback path).
+    res2 = deep_dive._compute_card_robustness(
+        'Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], True,
+        focal_ivs, 'great', opps, [(1, 1)], opp_movesets=None, k=8)
+    assert res2['pool'] == 1         # only Azumarill resolves via defaults
+
+
 def test_opp_iv_robustness_form_change_branch():
     """Lock the per_iv=True path: a form-change opponent (Aegislash, whose
     Blade-side stats diverge) must be detected and still satisfy the weighting
