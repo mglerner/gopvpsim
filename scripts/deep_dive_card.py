@@ -159,6 +159,14 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
                        scenarios=d.get('scenarios', 1),
                        k=d.get('k') if is_robust else None)
 
+    # Prettify the two-#1s example opponent lists (stored raw upstream), mirroring
+    # how key_wins/losses are prettified.
+    tno = card_ctx.get('two_number_ones')
+    if tno:
+        tno = dict(tno)
+        tno['gives_up'] = [_pretty_opp(n) for n in tno.get('gives_up', [])]
+        tno['wins_bigger'] = [_pretty_opp(n) for n in tno.get('wins_bigger', [])]
+
     return CardModel(
         species_display=disp, shadow=shadow,
         types=[t.title() for t in types],
@@ -170,7 +178,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         key_wins=[(_pretty_opp(n), s) for n, s in card_ctx.get('key_wins', [])],
         key_losses=[(_pretty_opp(n), s) for n, s in card_ctx.get('key_losses', [])],
         sprite_uri=sprite_uri,
-        two_number_ones=card_ctx.get('two_number_ones'),
+        two_number_ones=tno,
     )
 
 
@@ -289,7 +297,21 @@ def _two_ones_html(t: dict | None) -> str:
                 f'rank-1 stat-product IV (<span class="iv">{sp}</span>, {sp_pct}). '
                 f'We lead by battle score (matchup quality across all 9 shield '
                 f'scenarios), not stat product.')
-    return f'<div class="ddcard-note"><b>Why this IV?</b> {body}</div>'
+    # Concrete examples: what battle-#1 wins more decisively, and the few
+    # matchups stat-product-#1 takes that we give up.
+    ex = []
+    wb = t.get('wins_bigger') or []
+    gu = t.get('gives_up') or []
+    if wb:
+        ex.append(f'<span class="iv">{bs}</span> wins '
+                  + ', '.join(html.escape(o) for o in wb) + ' more decisively')
+    if gu:
+        n = t.get('gives_up_n') or len(gu)
+        more = f' (+{n - len(gu)} more)' if n > len(gu) else ''
+        ex.append(f'<span class="iv">{sp}</span> takes '
+                  + ', '.join(html.escape(o) for o in gu) + more)
+    ex_html = f' Concretely: {"; ".join(ex)}.' if ex else ''
+    return f'<div class="ddcard-note"><b>Why this IV?</b> {body}{ex_html}</div>'
 
 
 def _cover_html(s: Spread):
