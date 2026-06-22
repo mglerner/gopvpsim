@@ -498,32 +498,38 @@ def render_index(dives: list[dict],
     articles_html = _render_entry_list(articles, 'No articles published yet.')
     comparisons_html = _render_entry_list(comparisons, 'No comparisons published yet.')
 
-    iv_guides_section = ''
-    if iv_guides:
-        iv_guides_section = (
-            '\n<h2>Master League IV Guides</h2>\n'
-            '<p class="section-intro">XehrFelrose-style "what IVs do you '
-            'actually need" guides for the Master League meta (PvPoke top-60): '
-            'attack breakpoints, defense bulkpoints, CMP, and the exact '
-            'matchups each IV gives up from 15 down to 12, across the full '
-            'best-buddy grid. AI-drafted from this project\'s simulator, '
-            'pending human review.</p>\n'
-            f'<p>{_render_iv_guides(iv_guides)}</p>\n'
-        )
-
+    # The "Articles" section also HOSTS the ML IV guides as a labeled chip-row
+    # sub-group (merged from the former standalone "Master League IV Guides"
+    # section; they live at articles/<species>-ml-iv-guide already).
     articles_section = ''
-    if articles:
-        articles_section = (
-            '\n<h2>Articles</h2>\n'
-            '<ul>\n'
-            f'{articles_html}\n'
-            '</ul>\n'
-        )
+    if articles or iv_guides:
+        parts = [
+            '\n<h2>Articles</h2>\n',
+            '<p class="section-intro">Editorial writeups: Community Day move '
+            'analyses, form-change guides, and other one-off pieces. Each links '
+            'to the relevant interactive deep dive(s) for the full per-IV '
+            'detail.</p>\n',
+        ]
+        if articles:
+            parts.append(f'<ul>\n{articles_html}\n</ul>\n')
+        if iv_guides:
+            parts.append(
+                '<h3>Master League IV Guides</h3>\n'
+                '<p class="section-intro">XehrFelrose-style "what IVs do you '
+                'actually need" guides for the Master League meta (PvPoke '
+                'top-60): attack breakpoints, defense bulkpoints, CMP, and the '
+                'exact matchups each IV gives up from 15 down to 12, across the '
+                'full best-buddy grid. AI-drafted from this project\'s '
+                'simulator, pending human review.</p>\n'
+                f'<p>{_render_iv_guides(iv_guides)}</p>\n')
+        articles_section = ''.join(parts)
 
     comparisons_section = ''
     if comparisons:
         comparisons_section = (
             '\n<h2>Comparisons</h2>\n'
+            '<p class="section-intro">Head-to-head pieces pitting two builds, '
+            'forms, or movesets against each other across the meta.</p>\n'
             '<ul>\n'
             f'{comparisons_html}\n'
             '</ul>\n'
@@ -537,6 +543,8 @@ def render_index(dives: list[dict],
         desc_html = f'<p>{desc}</p>' if desc else ''
         guides_section = (
             '\n<h2>Reader\'s Guide</h2>\n'
+            '<p class="section-intro">Background and how-to-read explainers for '
+            'the deep dives and IV guides.</p>\n'
             '<ul>\n'
             f'<li class="dive"><a href="{href}">{title}</a>\n'
             f'{desc_html}\n'
@@ -556,6 +564,7 @@ def render_index(dives: list[dict],
   h1 {{ color: #e94560; }}
   h2 {{ color: #c8a2d0; border-bottom: 1px solid #0f3460;
         padding-bottom: 6px; }}
+  h3 {{ color: #c8a2d0; margin: 20px 0 6px; font-size: 1.08rem; }}
   a {{ color: #9be89b; text-decoration: none; }}
   a:hover {{ text-decoration: underline; }}
   ul {{ list-style: none; padding: 0; }}
@@ -585,7 +594,7 @@ open it.</p>
 <ul>
 {dives_html}
 </ul>
-{iv_guides_section}{articles_section}{comparisons_section}{guides_section}
+{articles_section}{comparisons_section}{guides_section}
 <p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
 <p class="about">If you find something broken or surprising, email me.</p>
 </body>
@@ -602,8 +611,9 @@ def main() -> int:
         exclude=frozenset({'articles', 'comparisons', 'guides'}),
     )
     articles = load_entries(ARTICLES_DIR, href_prefix='articles/')
-    # The ML IV guides (slug "<species>-ml-iv-guide[-even]") get their own
-    # section; the rest (CD articles, etc.) stay under "Articles".
+    # Split the ML IV guides (slug "<species>-ml-iv-guide[-even]") out from the
+    # editorial articles so they render as a labeled chip-row sub-group under
+    # the single "Articles" section (rather than a separate top-level section).
     iv_guides = [a for a in articles if '-ml-iv-guide' in a['slug']]
     articles = [a for a in articles if '-ml-iv-guide' not in a['slug']]
     comparisons = load_entries(COMPARISONS_DIR, href_prefix='comparisons/')
