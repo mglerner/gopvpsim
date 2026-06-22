@@ -51,7 +51,6 @@ class Spread:
     flips: str             # one-line flip summary vs the reference
     cover_breakpoints: list = field(default_factory=list)  # named opps (BP) vs ref
     cover_bulkpoints: list = field(default_factory=list)   # named opps (bulk) vs ref
-    n_breaks: int = 0      # distinct named breakpoint opponents cleared vs ref
 
 
 @dataclass
@@ -149,7 +148,6 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
             flips=_flip_line(flips.get(iv), has_bait),
             cover_breakpoints=rc.get('cover_breakpoints') or [],
             cover_bulkpoints=rc.get('cover_bulkpoints') or [],
-            n_breaks=int(rc.get('n_breaks') or 0),
         ))
 
     def _wr(d, is_robust=False):
@@ -230,7 +228,6 @@ CARD_CSS = """
 .ddcard-spread .flips { font-size:0.74rem; color:#8b949e; margin-top:4px; }
 .ddcard-spread .cover { font-size:0.74rem; color:#9be0a6; margin-top:4px; }
 .ddcard-spread .cover b { color:#e6ecf5; font-weight:700; }
-.ddcard-spread .cover .bpn { color:#58a6ff; font-weight:800; }
 .ddcard-cols { display:flex; gap:18px; flex-wrap:wrap; margin-top:8px; }
 .ddcard-col { flex:1 1 200px; }
 .ddcard-col h4 { margin:0 0 4px; font-size:0.8rem; text-transform:uppercase;
@@ -330,14 +327,11 @@ def _cover_html(s: Spread):
 def _spread_html(s: Spread):
     role = f'<div class="role">{html.escape(s.style)}</div>' if s.style else ''
     cover = _cover_html(s)
-    nb = (f'<div class="cover"><span class="bpn">{s.n_breaks}</span> guaranteed '
-          f'breakpoint{"s" if s.n_breaks != 1 else ""}</div>'
-          if s.n_breaks else '')
     flips = f'<div class="flips">{html.escape(s.flips)}</div>' if s.flips else ''
     return (f'<div class="ddcard-spread">{role}'
             f'<div class="iv">{html.escape(s.iv_str)}</div>'
             f'<div class="stats">{s.atk:.1f} atk / {s.def_:.1f} def / {s.hp} hp'
-            f' &middot; CP {s.cp} &middot; SP #{s.sp_rank}</div>{cover}{nb}{flips}</div>')
+            f' &middot; CP {s.cp} &middot; SP #{s.sp_rank}</div>{cover}{flips}</div>')
 
 
 def _col(title, items, cls):
