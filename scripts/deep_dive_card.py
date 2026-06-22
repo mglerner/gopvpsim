@@ -1,7 +1,7 @@
 """Compact, screenshot-able "dive card" renderer.
 
 A single-glance spec sheet for a deep dive: species + typing + sprite, the
-recommended moveset, up to three target IV spreads with their role labels,
+recommended moveset, up to six distinct target IV spreads with their role labels,
 two headline win-rate numbers (our single-IV convention and a top-512
 opponent-IV robustness number), and key wins / losses. It sits at the top
 of every dive page (embedded variant) and also exports as a self-contained
@@ -30,6 +30,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gopvpsim.display import pretty_species  # noqa: E402
 from deep_dive_analysis import pretty_moveset  # noqa: E402
 
+# Hard cap on rendered recommendation spreads. Mirrors deep_dive.REC_MAX_SPREADS
+# (kept as a local literal to avoid a circular import: deep_dive imports this
+# module). card_ctx already passes a pre-trimmed list of chosen spreads, so this
+# slice is a belt-and-suspenders bound; the .ddcard-spreads auto-fit grid wraps
+# up to 6 cards cleanly.
+REC_MAX_SPREADS = 6
+
 
 @dataclass
 class Spread:
@@ -42,6 +49,9 @@ class Spread:
     sp_rank: int           # stat-product rank (1 = bulkiest)
     style: str             # role label, e.g. "Attack Weight"
     flips: str             # one-line flip summary vs the reference
+    cover_breakpoints: list = field(default_factory=list)  # named opps (BP) vs ref
+    cover_bulkpoints: list = field(default_factory=list)   # named opps (bulk) vs ref
+    n_breaks: int = 0      # distinct named breakpoint opponents cleared vs ref
 
 
 @dataclass
@@ -71,6 +81,7 @@ class CardModel:
     key_wins: list[tuple[str, float]] = field(default_factory=list)
     key_losses: list[tuple[str, float]] = field(default_factory=list)
     sprite_uri: str | None = None
+    two_number_ones: dict | None = None  # battle-#1 vs stat-product-#1 explainer
 
 
 # Type -> accent color (matches common PvP type palettes; used for chips and
@@ -128,7 +139,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
     flips = card_ctx.get('flips') or {}
     has_bait = card_ctx.get('has_bait_axis', False)
     spreads = []
-    for rc in rec_candidates[:3]:
+    for rc in rec_candidates[:REC_MAX_SPREADS]:
         iv = rc['iv']
         spreads.append(Spread(
             iv_str=f"{data_obj['ivA'][iv]}/{data_obj['ivD'][iv]}/{data_obj['ivS'][iv]}",
@@ -136,6 +147,9 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
             hp=data_obj['ivHp'][iv], cp=data_obj['ivCp'][iv],
             sp_rank=data_obj['spRanks'][iv], style=rc.get('style', ''),
             flips=_flip_line(flips.get(iv), has_bait),
+            cover_breakpoints=rc.get('cover_breakpoints') or [],
+            cover_bulkpoints=rc.get('cover_bulkpoints') or [],
+            n_breaks=int(rc.get('n_breaks') or 0),
         ))
 
     def _wr(d, is_robust=False):
@@ -156,6 +170,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         key_wins=[(_pretty_opp(n), s) for n, s in card_ctx.get('key_wins', [])],
         key_losses=[(_pretty_opp(n), s) for n, s in card_ctx.get('key_losses', [])],
         sprite_uri=sprite_uri,
+        two_number_ones=card_ctx.get('two_number_ones'),
     )
 
 
@@ -205,6 +220,9 @@ CARD_CSS = """
 .ddcard-spread .iv { font-size:1.25rem; font-weight:800; color:#fff; margin:2px 0; }
 .ddcard-spread .stats { font-size:0.78rem; color:#9bb0d0; }
 .ddcard-spread .flips { font-size:0.74rem; color:#8b949e; margin-top:4px; }
+.ddcard-spread .cover { font-size:0.74rem; color:#9be0a6; margin-top:4px; }
+.ddcard-spread .cover b { color:#e6ecf5; font-weight:700; }
+.ddcard-spread .cover .bpn { color:#58a6ff; font-weight:800; }
 .ddcard-cols { display:flex; gap:18px; flex-wrap:wrap; margin-top:8px; }
 .ddcard-col { flex:1 1 200px; }
 .ddcard-col h4 { margin:0 0 4px; font-size:0.8rem; text-transform:uppercase;
@@ -214,6 +232,11 @@ CARD_CSS = """
 .ddcard-col ul { margin:0; padding-left:18px; font-size:0.85rem; color:#cdd6e5; }
 .ddcard-foot { font-size:0.72rem; color:#8b949e; margin-top:12px;
   border-top:1px solid #0f3460; padding-top:8px; }
+.ddcard-note { background:#0f3460; border-left:3px solid #f0b429;
+  border-radius:6px; padding:9px 12px; margin:4px 0 12px; font-size:0.82rem;
+  color:#cdd6e5; line-height:1.4; }
+.ddcard-note b { color:#fff; }
+.ddcard-note .iv { color:#f0b429; font-weight:800; }
 """
 
 
@@ -240,13 +263,57 @@ def _wr_box(wr: WinRate, label, sub):
             f'<div class="sub">{html.escape(sub)}</div></div>')
 
 
+def _two_ones_html(t: dict | None) -> str:
+    """Explainer shown only when our headline metric (battle score) and stat
+    product disagree on the #1 IV, and especially when the stat-product #1 wins
+    more matchups. We pitch battle score as the better metric, so the gap needs
+    explaining rather than hiding. Auto-generated, ship-mode clean."""
+    if not t:
+        return ''
+    bs = html.escape(str(t['bs_iv']))
+    sp = html.escape(str(t['sp_iv']))
+    bs_pct = f"{int(t['bs_frac'] * 100 + 0.5)}%"
+    sp_pct = f"{int(t['sp_frac'] * 100 + 0.5)}%"
+    if t.get('sp_wins_more'):
+        body = (f'The rank-1 stat-product IV <span class="iv">{sp}</span> '
+                f'actually wins more matchups here ({sp_pct} vs {bs_pct}). We '
+                f'still lead with <span class="iv">{bs}</span> because our '
+                f'ranking is <b>battle score</b> (how decisively each of the 9 '
+                f'shield scenarios goes), not raw win count. An IV that wins more '
+                f'matchups but by thinner margins, and loses worse where it '
+                f'loses, scores lower on average. Battle score tracks matchup '
+                f'<b>quality</b>, not just count.')
+    else:
+        body = (f'Our #1 by <b>battle score</b> '
+                f'(<span class="iv">{bs}</span>, {bs_pct}) differs from the '
+                f'rank-1 stat-product IV (<span class="iv">{sp}</span>, {sp_pct}). '
+                f'We lead by battle score (matchup quality across all 9 shield '
+                f'scenarios), not stat product.')
+    return f'<div class="ddcard-note"><b>Why this IV?</b> {body}</div>'
+
+
+def _cover_html(s: Spread):
+    """Named opponent-coverage bullets (Dragapult-Sim style). Empty when the
+    spread covers nothing beyond the reference (incl. the no-anchor fallback,
+    where cover_* lists are empty)."""
+    lines = []
+    if s.cover_breakpoints:
+        opps = ', '.join(html.escape(o) for o in s.cover_breakpoints)
+        lines.append(f'<div class="cover"><b>Breakpoints</b> {opps}</div>')
+    if s.cover_bulkpoints:
+        opps = ', '.join(html.escape(o) for o in s.cover_bulkpoints)
+        lines.append(f'<div class="cover"><b>Bulkpoints</b> {opps}</div>')
+    return ''.join(lines)
+
+
 def _spread_html(s: Spread):
     role = f'<div class="role">{html.escape(s.style)}</div>' if s.style else ''
+    cover = _cover_html(s)
     flips = f'<div class="flips">{html.escape(s.flips)}</div>' if s.flips else ''
     return (f'<div class="ddcard-spread">{role}'
             f'<div class="iv">{html.escape(s.iv_str)}</div>'
             f'<div class="stats">{s.atk:.1f} atk / {s.def_:.1f} def / {s.hp} hp'
-            f' &middot; CP {s.cp} &middot; SP #{s.sp_rank}</div>{flips}</div>')
+            f' &middot; CP {s.cp} &middot; SP #{s.sp_rank}</div>{cover}{flips}</div>')
 
 
 def _col(title, items, cls):
@@ -291,6 +358,7 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
     </div>
   </div>
   <div class="ddcard-wr">{wr}</div>
+  {_two_ones_html(m.two_number_ones)}
   <div class="ddcard-spreads">{spreads}</div>
   {cols}
   <div class="ddcard-foot">Auto-generated from this project's simulation data.
