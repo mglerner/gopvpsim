@@ -163,6 +163,37 @@ def test_compute_card_robustness_covers_all_with_movesets():
     assert res2['pool'] == 1         # only Azumarill resolves via defaults
 
 
+def test_opp_iv_robustness_signature_dedup_is_exact():
+    """The damage-signature dedup must give bit-identical (wins, total) to the
+    no-dedup reference, while using strictly fewer sims -- including the
+    shadow-MISMATCH case (shadow focal vs non-shadow opponent), where the
+    signature module's effective-atk CMP column could in principle diverge
+    from the engine's cmp_atk. Locks both correctness and that dedup fires."""
+    from gopvpsim.data import get_default_moveset
+    focal_ivs = tuple(iv_rank('Corviknight', league='great', shadow=True)[0][k]
+                      for k in ('atk_iv', 'def_iv', 'sta_iv'))
+    fbp = deep_dive.make_battle_pokemon(
+        'Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'],
+        'great', 2, *focal_ivs, shadow=True)
+    scen = [(1, 1), (0, 2), (2, 0)]
+    for name, sh in [('Azumarill', False), ('Quagsire', True)]:
+        of, oc = get_default_moveset(name, league='great', shadow=sh)
+        rk = iv_rank(name, league='great', shadow=sh)[:64]
+        g_sig = deep_dive._opp_robustness_groups(
+            fbp, 'Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], True,
+            focal_ivs, name, of, oc, sh, 'great', rk, dedup='signature')
+        g_non = deep_dive._opp_robustness_groups(
+            fbp, 'Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], True,
+            focal_ivs, name, of, oc, sh, 'great', rk, dedup='none')
+        assert sum(len(g) for g in g_sig) == 64        # partition is complete
+        assert len(g_sig) < len(g_non)                 # dedup actually fires
+        args = ('Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], True,
+                focal_ivs, name, of, oc, sh, 'great', scen)
+        r_sig = deep_dive.opp_iv_robustness(*args, k=64, dedup='signature')
+        r_non = deep_dive.opp_iv_robustness(*args, k=64, dedup='none')
+        assert r_sig == r_non, f'{name}: signature {r_sig} != none {r_non}'
+
+
 def test_opp_iv_robustness_form_change_branch():
     """Lock the per_iv=True path: a form-change opponent (Aegislash, whose
     Blade-side stats diverge) must be detected and still satisfy the weighting
