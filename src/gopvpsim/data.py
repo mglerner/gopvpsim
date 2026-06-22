@@ -94,6 +94,69 @@ def parse_types(mon: dict) -> list[str]:
     return [t for t in types if t and t != 'none']
 
 
+def _fetch_bytes(key, url, subdir="sprites", ttl=CACHE_TTL):
+    """Binary sibling of _fetch_json: TTL-cache an arbitrary asset under
+    CACHE_DIR/<subdir>/<key>. Returns bytes, or None on any failure
+    (callers degrade gracefully rather than crash a render). Reuses the
+    same certifi SSL context + atomic tmp+os.replace write + stale
+    fallback as _fetch_json, but reads/writes bytes (no JSON parse)."""
+    d = CACHE_DIR / subdir
+    d.mkdir(exist_ok=True, parents=True)
+    cache_file = d / key
+    if cache_file.exists():
+        if time.time() - cache_file.stat().st_mtime < ttl:
+            try:
+                return cache_file.read_bytes()
+            except OSError:
+                pass
+    try:
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        # Some sprite CDNs (pokemondb) 403 the default Python-urllib UA.
+        req = urllib.request.Request(
+            url, headers={'User-Agent': 'Mozilla/5.0 (gopvpsim sprite fetch)'})
+        # timeout so a hung sprite CDN can't stall the dive render path
+        # (the except below turns a timeout into the graceful None fallback).
+        with urllib.request.urlopen(req, context=ssl_context, timeout=10) as r:
+            data = r.read()
+        tmp = cache_file.with_name(cache_file.name + ".tmp")
+        tmp.write_bytes(data)
+        os.replace(tmp, cache_file)
+        return data
+    except Exception as e:  # noqa: BLE001
+        print(f"Sprite fetch error for {key}: {e}")
+    if cache_file.exists():
+        try:
+            return cache_file.read_bytes()
+        except OSError:
+            pass
+    return None
+
+
+def sprite_data_uri(species_name, shadow=False):
+    """Return a self-contained ``data:image/png;base64,...`` URI for the
+    species' Pokemon-GO sprite, or None if it can't be fetched (the dive
+    card then degrades to a typing-colored CSS block).
+
+    Shadow forms reuse the base sprite (the card adds a CSS flame badge),
+    so the shadow flag is accepted for symmetry but does not change the
+    asset. Sprites are sourced from PokeMiners-derived open GO sprites
+    served by pokemondb (PvPoke's own repo does not expose raw sprite
+    URLs) and cached locally under CACHE_DIR/sprites/ for reproducibility.
+    Best-effort: for non-base forms the speciesId-derived slug may not match
+    pokemondb's path, in which case the fetch 404s and the caller degrades to
+    the typing-colored CSS block (returns None here).
+    """
+    slug = species_id(species_name, shadow=False).replace('_', '-')
+    data = _fetch_bytes(
+        f"{slug}.png",
+        f"https://img.pokemondb.net/sprites/go/normal/{slug}.png",
+    )
+    if not data:
+        return None
+    import base64
+    return "data:image/png;base64," + base64.b64encode(data).decode('ascii')
+
+
 def load_rankings(league):
     """Load rankings for a given league: 'great', 'ultra', or 'master'."""
     if league not in ("great", "ultra", "master"):

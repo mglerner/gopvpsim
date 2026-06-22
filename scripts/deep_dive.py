@@ -62,7 +62,7 @@ from gopvpsim.moves import get_moves, type_effectiveness, stab
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML
 from gopvpsim.data import (
     load_gamemaster, load_rankings, get_default_moveset, parse_types,
-    load_group as fetch_group,
+    sprite_data_uri, load_group as fetch_group,
 )
 from gopvpsim.battle import (
     BattlePokemon, simulate,
@@ -615,6 +615,128 @@ def make_battle_pokemon(species, fast_id, charged_ids, league, shields,
         pokemon, fm, cms, shields=shields,
         league_cp=LEAGUE_CAPS[league],
     )
+
+
+# Ship default for the dive-card opponent-IV robustness cohort (top-N
+# stat-product IVs per opponent). Single source for the argparse default and
+# the render_dive_html .get fallbacks (an old replay blob lacks the key).
+DEFAULT_CARD_ROBUST_K = 512
+
+_FORM_CHANGE_SPECIES_CACHE: dict = {}
+
+
+def _species_has_form_change(species_name):
+    """True if the species' gamemaster entry (looked up by EXACT name)
+    declares a formChange, so its effective stats are NOT a safe dedup key
+    (the alt form's stats are non-linear in raw IVs + level). Cached;
+    defaults False on lookup miss.
+
+    Exactness caveat: this keys on the supplied form NAME. It is correct for
+    today's meta only because the sole opponent whose alt-form stats actually
+    diverge (Aegislash) is pool-named by a formChange-bearing form
+    ('Aegislash (Shield)'/'(Blade)' both carry formChange). Morpeko's pool
+    name 'Morpeko (Hangry)' lacks formChange and so returns False here, but
+    that is harmless: its two forms share identical baseStats, so effective-
+    stat dedup is exact for it anyway. A FUTURE stat-divergent toggle/set
+    species whose pool name lacks the formChange key would be silently
+    misgrouped -- resolve to the base speciesId and check both forms if that
+    ever ships."""
+    if species_name in _FORM_CHANGE_SPECIES_CACHE:
+        return _FORM_CHANGE_SPECIES_CACHE[species_name]
+    gm = load_gamemaster()
+    mon = next((m for m in gm['pokemon']
+                if m['speciesName'] == species_name), None)
+    has = bool(mon and mon.get('formChange'))
+    _FORM_CHANGE_SPECIES_CACHE[species_name] = has
+    return has
+
+
+def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
+                      focal_ivs, opponent, opp_fast, opp_charged, opp_shadow,
+                      league, shield_scenarios, k=512):
+    """Opponent-IV robustness for ONE fixed focal IV vs ONE opponent.
+
+    Sweeps the opponent across its top-``k`` stat-product IV spreads (the
+    "top-512 ranks" robustness notion: do we beat this opponent regardless
+    of which good IV it rolled?), dedups by effective stat profile when
+    safe, sims the fixed focal vs each distinct profile over every
+    ``shield_scenarios`` pair, and weights each profile by how many of the
+    top-k IVs collapsed into it.
+
+    Returns ``(weighted_wins, weighted_total)`` floats (caller sums across
+    opponents and divides), or ``None`` if the opponent has no valid IVs.
+    A win is focal ``pvpoke_score(0) > 500`` (>500 = focal won; 500 = tie).
+    Opponents are built via make_battle_pokemon (raw IVs + shadow flag),
+    so shadow multipliers are applied exactly once and form-change
+    transforms (Aegislash) are wired up like the oracle path.
+    """
+    from gopvpsim.pokemon import iv_rank
+    ranked = iv_rank(opponent, league=league, shadow=opp_shadow)
+    if not ranked:
+        return None
+    ranked = ranked[:k]
+    # Effective-stat dedup is exact for fixed-form opponents; for
+    # form-change species it can collapse IVs that diverge after the
+    # transform, so sim each distinct IV (per_iv=True).
+    per_iv = _species_has_form_change(opponent)
+    groups, _ = group_ivs_by_stat_profile(ranked, per_iv=per_iv)
+    a0, d0, s0 = focal_ivs
+    focal_bp = make_battle_pokemon(focal_species, focal_fast, focal_charged,
+                                   league, 2, a0, d0, s0, shadow=focal_shadow)
+    wins = 0.0
+    total = 0.0
+    for _key, idxs in groups.items():
+        rep = ranked[idxs[0]]
+        w = len(idxs)
+        opp_bp = make_battle_pokemon(
+            opponent, opp_fast, opp_charged, league, 2,
+            rep['atk_iv'], rep['def_iv'], rep['sta_iv'], shadow=opp_shadow)
+        for sf, so in shield_scenarios:
+            focal_bp.reset_for_battle(sf, opponent=opp_bp)
+            opp_bp.reset_for_battle(so, opponent=focal_bp)
+            res = simulate(focal_bp, opp_bp,
+                           charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp)
+            total += w
+            if res.pvpoke_score(0) > 500:
+                wins += w
+    return wins, total
+
+
+def _compute_card_robustness(species, focal_fast, focal_charged, focal_shadow,
+                             focal_ivs, league, opponent_names,
+                             shield_scenarios, k=512):
+    """Aggregate opp_iv_robustness for ONE focal IV across the curated pool.
+
+    Skips opponents whose default moveset can't be cleanly resolved (the
+    annotated alt-move pool variants like "Forretress (Bug Bite)"); the
+    headline reports the count actually covered. Returns
+    {'frac','pool','k','scenarios'} or None if nothing resolved.
+    """
+    from gopvpsim.data import get_default_moveset
+    wins = total = 0.0
+    n_ok = 0
+    for name in opponent_names:
+        base, oshadow = name, False
+        if base.endswith(' (Shadow)'):
+            base, oshadow = base[:-len(' (Shadow)')], True
+        try:
+            of, oc = get_default_moveset(base, league=league, shadow=oshadow)
+            r = opp_iv_robustness(species, focal_fast, focal_charged,
+                                  focal_shadow, focal_ivs, base, of, oc,
+                                  oshadow, league, shield_scenarios, k=k)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"  card robustness: skipping {name} ({e})")
+            r = None
+        if not r:
+            continue
+        w, t = r
+        wins += w
+        total += t
+        n_ok += 1
+    if not n_ok or total == 0:
+        return None
+    return {'frac': wins / total, 'pool': n_ok, 'k': k,
+            'scenarios': len(shield_scenarios)}
 
 
 def get_top_opponents(league, n, exclude_species=None):
@@ -2483,6 +2605,48 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     analysis_parts.append('</details>\n')
     logger.info(f"  Analysis sections complete (moveset {moveset_idx})")
 
+    # ---- Dive-card context (consumed by deep_dive_card.build_card_model) ----
+    # Stash the non-recomputable analysis locals on data_obj so the card
+    # renderer can read them after this returns. Includes the cheap
+    # single-IV win-rate and best/worst matchups (both need the scores_flat
+    # layout, which lives here). The caller MUST pop '_cardCtx' before the
+    # DATA blob is JSON-serialized -- flips carry sets (bait_modes).
+    _rec_idx = (rec_candidates[0]['iv'] if rec_candidates
+                else (ranked[0] if ranked else 0))
+    # Card win-rates span ALL shield scenarios (incl. asymmetric 0-1/1-2/2-1
+    # etc.) -- the asymmetric matchups are the whole point of this card
+    # style. The single-IV number here and the opponent-IV robustness number
+    # in the renderer both use the same full scenario set.
+    _siv_w = _siv_t = 0
+    _opp_sum = [0.0] * nO
+    for _oi in range(nO):
+        for _si in range(nS):
+            _v = scores_flat[_rec_idx * nS * nO + _si * nO + _oi]
+            _opp_sum[_oi] += _v
+            _siv_t += 1
+            if _v > 500:
+                _siv_w += 1
+    _opp_avg = [(_opp_sum[oi] / nS if nS else 0.0) for oi in range(nO)]
+    _names = opponent_names or [f'opp{oi}' for oi in range(nO)]
+    _order = sorted(range(nO), key=lambda oi: _opp_avg[oi])
+    _key_losses = [(_names[oi], _opp_avg[oi]) for oi in _order[:3]
+                   if _opp_avg[oi] < 500]
+    _key_wins = [(_names[oi], _opp_avg[oi])
+                 for oi in reversed(_order) if _opp_avg[oi] > 500][:3]
+    data_obj['_cardCtx'] = {
+        'rec_candidates': rec_candidates[:5],
+        'rec_idx': _rec_idx,
+        'flips': flips,
+        'flip_map': flip_map,
+        'has_bait_axis': has_bait_axis,
+        'opp_label': opp_label,
+        'key_wins': _key_wins,
+        'key_losses': _key_losses,
+        'single_iv_winrate': {
+            'frac': (_siv_w / _siv_t if _siv_t else 0.0),
+            'pool': nO, 'scenarios': nS},
+    }
+
     return css, results_html, ''.join(analysis_parts)
 
 
@@ -2604,7 +2768,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               article_slug='',
                               threshold_registry=None,
                               species_narrative=None,
-                              shared_plotly_dir=None):
+                              shared_plotly_dir=None,
+                              card_out_path=None,
+                              card_robust_k=DEFAULT_CARD_ROBUST_K):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -3631,6 +3797,62 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                 results_html = results_html.replace(
                     sim_marker, narrative_combined + sim_marker, 1)
 
+    # ---- Dive card: compact spec-sheet summary above "Deep Dive Results" ----
+    # Built from the analysis context generate_analysis_sections stashed on
+    # data_obj; popped here so it never reaches the JSON DATA blob (it holds
+    # sets). The opponent-IV robustness headline (a real sim) is computed
+    # only when --card-out is set and only on the landing moveset, to bound
+    # cost; every dive still gets the embedded card with the single-IV rate.
+    import deep_dive_card as _ddcard
+    _card_ctx = data_obj.pop('_cardCtx', None)
+    if _card_ctx is not None:
+        try:
+            _gm = load_gamemaster()
+            _mon = next((m for m in _gm['pokemon']
+                         if m['speciesName'] == species), None)
+            _types = parse_types(_mon) if _mon else []
+            _sprite = sprite_data_uri(species, shadow=shadow)
+        except Exception as _e:  # noqa: BLE001
+            logger.warning(f"  dive card: type/sprite lookup failed ({_e})")
+            _types, _sprite = [], None
+        _is_landing = split_info is None or split_info.get('current', 0) == 0
+        _robust = None
+        if card_out_path and _is_landing and data_obj.get('movesets'):
+            _ri = _card_ctx['rec_idx']
+            _label = data_obj['movesets'][0].get('label', '')
+            if ' / ' in _label:
+                _ff, _cc = _label.split(' / ', 1)
+                # ALL shield scenarios (the asymmetric 0-1/1-2/2-1 matchups
+                # are the whole point of this card style). Smokes can cap
+                # `card_robust_k` to sample fewer opponent IVs for speed.
+                logger.info("  dive card: computing opponent-IV robustness "
+                            f"(top-{card_robust_k}, {len(shield_scenarios)} "
+                            "shield scenarios)...")
+                _robust = _compute_card_robustness(
+                    species, _ff.strip(),
+                    [c.strip() for c in _cc.split(',')], shadow,
+                    (data_obj['ivA'][_ri], data_obj['ivD'][_ri],
+                     data_obj['ivS'][_ri]),
+                    league, opponent_names or [], shield_scenarios,
+                    k=card_robust_k)
+        _card_model = _ddcard.build_card_model(
+            data_obj, _card_ctx, types=_types,
+            robust_winrate=_robust, sprite_uri=_sprite)
+        html += _ddcard.render_card_html(_card_model, standalone=False)
+        html = html.replace('</style>\n</head>',
+                            _ddcard.CARD_CSS + '\n</style>\n</head>', 1)
+        if card_out_path and _is_landing:
+            try:
+                _co = os.path.abspath(card_out_path)
+                os.makedirs(os.path.dirname(_co) or '.', exist_ok=True)
+                with open(_co, 'w') as _f:
+                    _f.write(_ddcard.render_card_html(_card_model,
+                                                      standalone=True))
+                logger.info(f"  Dive card written to {card_out_path}")
+            except OSError as _e:  # noqa: BLE001
+                logger.warning(f"  dive card: could not write "
+                               f"{card_out_path}: {_e}")
+
     # Results section is always visible; analysis is behind a toggle
     html += results_html
     html += analysis_html
@@ -4107,6 +4329,8 @@ def render_dive_html(state):
                 threshold_registry=state['threshold_registry'],
                 species_narrative=state['species_narrative'],
                 shared_plotly_dir=state['shared_plotly_dir'],
+                card_out_path=state.get('card_path'),
+                card_robust_k=state.get('card_robust_k', DEFAULT_CARD_ROBUST_K),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
@@ -4132,6 +4356,8 @@ def render_dive_html(state):
             threshold_registry=state['threshold_registry'],
             species_narrative=state['species_narrative'],
             shared_plotly_dir=state['shared_plotly_dir'],
+            card_out_path=state.get('card_path'),
+            card_robust_k=state.get('card_robust_k', DEFAULT_CARD_ROBUST_K),
         )
 
 
@@ -4239,6 +4465,18 @@ def main():
                              'See docs/threshold_schema.md for full key reference.')
     parser.add_argument('--html', default=None, metavar='FILE',
                         help='Write interactive HTML plot to FILE')
+    parser.add_argument('--card-out', default=None, metavar='PATH',
+                        help='Also write a self-contained, screenshot-able '
+                             '"dive card" (compact spec sheet) to PATH. '
+                             'Triggers the opponent-IV robustness headline '
+                             '(a short extra sim over the curated pool).')
+    parser.add_argument('--card-robust-k', type=int, default=DEFAULT_CARD_ROBUST_K, metavar='N',
+                        help='Opponent-IV cohort size for the card robustness '
+                             'headline: each opponent is swept across its top-N '
+                             'stat-product IVs across ALL shield scenarios '
+                             '(default 512, the ship value). Lower it (e.g. 32) '
+                             'for fast smoke iterations -- it samples fewer '
+                             'opponent IVs without dropping any shield scenario.')
     parser.add_argument('--interactive', action='store_true',
                         help='Generate interactive HTML with dropdowns for moveset, '
                              'shield scenario, and opp IV mode switching. '
@@ -4385,6 +4623,16 @@ def main():
                 parser.error(
                     f'Cannot create --html output directory '
                     f'{_html_parent!r}: {_e}'
+                )
+    if args.card_out:
+        _card_parent = os.path.dirname(os.path.abspath(args.card_out))
+        if _card_parent:
+            try:
+                os.makedirs(_card_parent, exist_ok=True)
+            except OSError as _e:
+                parser.error(
+                    f'Cannot create --card-out directory '
+                    f'{_card_parent!r}: {_e}'
                 )
 
     # Parse --species-iv-floor "ATK,DEF,STA" into a (atk, def, sta) tuple
@@ -5410,6 +5658,8 @@ def main():
             'article_slug': _article_slug,
             'threshold_registry': threshold_registry,
             'species_narrative': _species_narrative,
+            'card_path': args.card_out,
+            'card_robust_k': args.card_robust_k,
         }
         if not args.no_replay_dump:
             _replay_path = dump_replay_state(state)
