@@ -3790,6 +3790,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 <h1>{species_pretty} - {league.title()} League IV Deep Dive</h1>
 <p class="meta">Opponents: {opp_desc}
 | Shield scenario(s): {shield_desc} | Policy: pvpoke_dp{_bait_meta}</p>
+<!-- DIVE_CARD_SLOT -->
 """
 
     # Related article link (bidirectional link contract: docs/article_schema.md)
@@ -4227,7 +4228,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                 results_html = results_html.replace(
                     sim_marker, narrative_combined + sim_marker, 1)
 
-    # ---- Dive card: compact spec-sheet summary above "Deep Dive Results" ----
+    # ---- Dive card: compact spec-sheet summary at the top of the page ----
+    # Injected into the <!-- DIVE_CARD_SLOT --> marker right under the page
+    # header so the card is the first content block, with the scatter +
+    # controls immediately below it.
     # Built from the analysis context generate_analysis_sections stashed on
     # data_obj; popped here so it never reaches the JSON DATA blob (it holds
     # sets). The opponent-IV robustness headline (a real sim) is computed
@@ -4268,7 +4272,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         _card_model = _ddcard.build_card_model(
             data_obj, _card_ctx, types=_types, shadow=shadow,
             robust_winrate=_robust, sprite_uri=_sprite)
-        html += _ddcard.render_card_html(_card_model, standalone=False)
+        html = html.replace('<!-- DIVE_CARD_SLOT -->',
+                             _ddcard.render_card_html(_card_model,
+                                                      standalone=False), 1)
         html = html.replace('</style>\n</head>',
                             _ddcard.CARD_CSS + '\n</style>\n</head>', 1)
         if card_out_path and _is_landing:
@@ -4282,6 +4288,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             except OSError as _e:  # noqa: BLE001
                 logger.warning(f"  dive card: could not write "
                                f"{card_out_path}: {_e}")
+
+    # Drop the marker if no card was injected (card disabled) so no stray
+    # comment ships.
+    html = html.replace('<!-- DIVE_CARD_SLOT -->', '', 1)
 
     # Results section is always visible; analysis is behind a toggle
     html += results_html
