@@ -763,6 +763,50 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   implies `--interactive`, so the old smoke-test trap (run without
   the flag, conclude nothing rendered) is gone too.
 
+## Dive card — open follow-ups
+
+*(Shipped 2026-06-22, commit e6ff5af: compact screenshot-able spec-sheet
+card atop every dive + standalone `--card-out` export, with two headline
+win-rates — single-IV and a top-512 opponent-IV robustness number. Built
+to reproduce the Dragapult-Sim/Lundberger infographic look. First dive:
+Shadow Corviknight GL pre-release, `userdata/dives/shadow_corviknight*.html`.)*
+
+* **Opponent-IV robustness as a first-class sim axis (plan item 1.8).**
+  Today `opp_iv_robustness` is computed ad hoc for the rec IV only, as a
+  card headline. A full opponent-IV dimension in `deep_dive.py` (parallel
+  to the bait / energy-lead axes) would let the WHOLE analysis report
+  robustness per matchup (not just the headline) — e.g. "this IV beats
+  G. Stunfisk regardless of which top-512 IV it rolled." Larger effort;
+  cross-ref the "attack-weighted opponent variants" entry (same
+  opponent-IV-variance theme) and the Tinkaton/Altaria shadow-IV-variance
+  caveats. Do NOT build until there's a concrete consumer.
+
+* **Robustness headline is slow (~5.5 min for a full GL pool).** The
+  `--card-out` headline sims the rec IV vs each opponent's top-512 IVs ×
+  all 9 shields (71 opponents resolved → ~hundreds of k sims). Effective-
+  stat dedup (`group_ivs_by_stat_profile`) barely collapses the top-512
+  bulk cohort (many distinct atk/def/hp). Speed it up with the
+  damage-signature dedup (`scripts/deep_dive_signature.py`
+  `signature_groups`, "provably exact") which collapses by actual damage
+  tables — should cut the cohort ~4-5×. Until then, `--card-robust-k`
+  caps the cohort for fast smokes (all 9 shields kept). Don't reach for
+  this until robustness runs on a dive that actually ships repeatedly.
+
+* **`_species_has_form_change` keys on the form name (latent nit).** It is
+  exact for today's meta only because the sole stat-divergent form-change
+  opponent (Aegislash) is pool-named by a formChange-bearing form. A future
+  stat-divergent toggle/set species whose pool name lacks the formChange
+  key (cf. Morpeko (Hangry), harmless today since its forms share
+  baseStats) would be silently misgrouped by the robustness dedup. Fix by
+  resolving to the base speciesId and checking both forms if that ships.
+  (Comment in place at the function.)
+
+* **Sprite slug for non-base forms.** `sprite_data_uri` derives the
+  pokemondb slug from the PvPoke speciesId; regional/gendered forms
+  (`farfetchd-galarian`, `indeedee-female`, ...) may not match pokemondb's
+  path and 404 → graceful CSS typing-block fallback. Add a slug-override
+  map only if/when a non-base-form dive wants its real sprite.
+
 ## CD article generator — open follow-ups
 
 The Python article generator (`scripts/generate_article.py`) shipped
