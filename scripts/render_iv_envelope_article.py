@@ -38,6 +38,11 @@ QUAD_SHORT = {
     'wbb_vs_bb':     'BB vs BB',
 }
 STAT_LABEL = {'atk': 'Attack', 'def': 'Defense', 'hp': 'HP'}
+CLOSE_CALL_KIND_LABEL = {
+    'shield': 'shield spent',
+    'neardeath': 'near-death win',
+    'energy': 'energy banked',
+}
 
 # Sidebar nav: (anchor id, label, [(sub id, sub label), ...]).
 NAV = [
@@ -221,6 +226,14 @@ def style():
   nav.toc a.sub:hover { color:var(--grn); }
   main { flex:1; min-width:0; }
   main h2:first-child { margin-top:6px; }
+  .close-calls ul { margin:4px 0 8px; padding-left:20px; }
+  .close-calls > div { margin-top:6px; }
+  .close-calls li { margin:2px 0; }
+  .cc-tag { display:inline-block; font-size:.78em; padding:0 5px;
+            border-radius:3px; vertical-align:middle; }
+  .cc-shield { background:#1a2333; color:#8ab4f8; }
+  .cc-energy { background:#2e2a1a; color:#e8dfcf; }
+  .cc-neardeath { background:#2e1a1f; color:#e8b0b8; }
   @media (max-width:820px) {
     .layout { flex-direction:column; }
     nav.toc { position:static; flex:none; width:auto; }
@@ -348,6 +361,35 @@ def bb_differences(d):
     return "\n".join(out) + "\n"
 
 
+def close_calls_block(qd, iv_range, link_factory):
+    """Compact 'Close calls' callout for one quadrant of a stat section: kept
+    wins whose post-match margin moved enough to matter, per dropped IV. Renders
+    nothing when no IV in this quadrant has any close call (keeps the article
+    scannable). link_factory(iv) -> a matchup linker at that dropped IV."""
+    rows = []
+    for iv in [v for v in iv_range if v != 15]:
+        calls = qd[str(iv)].get('close_calls') or []
+        if not calls:
+            continue
+        link = link_factory(iv)
+        items = []
+        for c in calls:
+            fsh, osh = c['shield'].split('-')
+            tag = esc(CLOSE_CALL_KIND_LABEL.get(c['kind'], c['kind']))
+            items.append(f'<li>{_a(c["opp"], link, fsh, osh)} '
+                         f'<span class="sub">{esc(c["shield"])}</span> '
+                         f'<span class="cc-tag cc-{esc(c["kind"])}">{tag}</span>: '
+                         f'{esc(c["margin"])}</li>')
+        rows.append(f'<div><b>IV {iv}:</b><ul>' + "".join(items) + '</ul></div>')
+    if not rows:
+        return ''
+    return ('<div class="panel close-calls"><b>Close calls</b> '
+            '<span class="sub">(still a win, but the post-match margin shifts '
+            'enough to matter: a shield spent, a near-death survival, or roughly '
+            'one fewer charged move of energy banked)</span>'
+            + "".join(rows) + '</div>')
+
+
 def stat_section(d, stat):
     sv = d['stat_values']
     out = [f'<h2 id="{stat if stat!="atk" else "attack"}">{STAT_LABEL[stat]} IVs</h2>'
@@ -398,6 +440,12 @@ def stat_section(d, stat):
                     cells.append(f'<td>{joinm(drp.get(s, []), link, fsh, osh)}</td>')
             out.append('<tr>' + "".join(cells) + '</tr>')
         out.append('</tbody></table>')
+        cc_block = close_calls_block(
+            qd, d['iv_range'],
+            lambda iv, slot=slot, ml=my_lvl, ol=opp_lvl: _linker(
+                d, [15 if j != slot else iv for j in range(3)], ml, ol))
+        if cc_block:
+            out.append(cc_block)
     return "\n".join(out) + "\n"
 
 

@@ -72,6 +72,21 @@ HEADLINE_QUADRANT = 'wbb_vs_bb'    # reference for Key Wins/Losses
 
 _FAST_DB, _CHARGED_DB = get_moves()
 
+# Close-call significance: a KEPT WIN (focal wins at both the hundo and the
+# dropped IV) whose post-match margin moved enough vs the perfect-IV (15)
+# baseline that a teambuilder would act on it. Anchored to end-state
+# BattleResult fields, decision-relevance not raw deltas. One reason per line,
+# in priority order, so each close-call is a single most-actionable note:
+#   shield    -> focal burns a shield it kept at a hundo (shields_remaining drop)
+#   neardeath -> the drop pushes a winning focal under 15% max HP (was >= 15%)
+#   energy    -> focal banks one fewer charged move (energy delta >= cheapest cost)
+# Outright win/loss flips are already the 'dropped' set, so they are excluded.
+NEAR_DEATH_FRAC = 0.15
+# A near-death close-call must also represent a MEANINGFUL HP swing, not just a
+# 1-HP wobble across the 15% line (e.g. base 32 HP -> drop 31 HP both ~15%).
+# Require the dropped IV to shed at least this fraction of max HP vs the hundo.
+NEAR_DEATH_MIN_DELTA_FRAC = 0.10
+
 
 def eff_stats(base, ivs, level, shadow=False):
     """Effective (atk, def, hp) for a base-stats dict at IVs/level."""
@@ -142,6 +157,76 @@ def won_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
     if CACHE is not None:
         CACHE.put(ivs, my_lvl, opp_lvl, won)
     return won
+
+
+def result_metrics(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl,
+                   opponents):
+    """Per (opp_display, shields): the focal's end-state after the fight.
+
+    Returns {(disp, (shf, sho)): {'won','hp','max_hp','energy','shields'}}.
+    Used only for the per-stat close-call diff (a bounded set: one hundo
+    baseline per quadrant + the 9 per-stat-IV spreads the detail loop already
+    walks), so unlike won_set it is deliberately not cached -- the won-set
+    cache stores only the won SET, not these margins."""
+    out = {}
+    for o in opponents:
+        for shf, sho in SHIELDS:
+            bp0 = build_mon(species, fast_id, charged_ids, ivs, shf, my_lvl,
+                            shadow=FOCAL_SHADOW)
+            bp1 = build_mon(o['base'], o['fast'], o['charged'], (15, 15, 15),
+                            sho, opp_lvl, shadow=o['shadow'])
+            r = simulate(bp0, bp1, charged_policy_0=pvpoke_dp,
+                         charged_policy_1=pvpoke_dp)
+            out[(o['display'], (shf, sho))] = {
+                'won': r.pvpoke_score(0) > r.pvpoke_score(1),
+                'hp': max(0, r.hp_remaining[0]),
+                'max_hp': r.max_hp[0],
+                'energy': r.energy_remaining[0],
+                'shields': r.shields_remaining[0],
+            }
+    return out
+
+
+def close_calls(base_metrics, drop_metrics, cheapest_cost):
+    """Significant KEPT-WIN margin shifts at a dropped IV vs the hundo baseline.
+
+    base_metrics / drop_metrics: result_metrics() maps at IV 15/15/15 and at the
+    dropped IV. Emits one compact dict per qualifying (opponent, shield):
+        {'opp','shield','kind','margin'}  (margin is a ready-to-render string)
+    Only kept wins (won at both) qualify; flips are already the 'dropped' set.
+    The first matching kind wins (priority shield > neardeath > energy) so each
+    line carries a single, most-actionable reason. ASCII hyphens only."""
+    calls = []
+    for key, base in base_metrics.items():
+        drop = drop_metrics.get(key)
+        if drop is None or not base['won'] or not drop['won']:
+            continue  # only kept wins; flips are already the 'dropped' set
+        disp, sh = key
+        lab = shield_label(sh)
+        kind = margin = None
+        if drop['shields'] < base['shields']:
+            kind = 'shield'
+            n = base['shields'] - drop['shields']
+            margin = (f"keeps the win but spends {n} more "
+                      f"shield{'s' if n != 1 else ''} "
+                      f"(now {drop['shields']} left, was {base['shields']})")
+        elif (base['hp'] >= NEAR_DEATH_FRAC * base['max_hp']
+              and drop['hp'] < NEAR_DEATH_FRAC * drop['max_hp']
+              and base['hp'] - drop['hp']
+                  >= NEAR_DEATH_MIN_DELTA_FRAC * base['max_hp']):
+            kind = 'neardeath'
+            margin = (f"still wins but barely survives, {drop['hp']} HP left of "
+                      f"{drop['max_hp']} (was {base['hp']})")
+        elif base['energy'] - drop['energy'] >= cheapest_cost:
+            kind = 'energy'
+            margin = (f"still wins but banks {base['energy'] - drop['energy']} "
+                      f"less energy, about one fewer charged move "
+                      f"(now {drop['energy']}, was {base['energy']})")
+        if kind is not None:
+            calls.append({'opp': disp, 'shield': lab,
+                          'kind': kind, 'margin': margin})
+    calls.sort(key=lambda c: (c['opp'], c['shield']))
+    return calls
 
 
 def shield_label(sh):
@@ -248,6 +333,7 @@ def main():
     focal_base = get_species(base_clean)
     focal_types = _get_types(base_clean)
     fast_move = _FAST_DB[fast_id]
+    cheapest_cost = min(_CHARGED_DB[cid]['energy'] for cid in charged_ids)
     opponents = load_opponents()
     slug = species.lower().replace(' ', '_').replace('(', '').replace(')', '')
     suffix = '_all9' if a.all_shields else ''
@@ -305,6 +391,10 @@ def main():
     for q, (ml, ol) in QUADRANTS.items():
         quadrants[q] = {'my_level': ml, 'opp_level': ol,
                         'atk': {}, 'def': {}, 'hp': {}}
+        # Hundo end-state baseline for this quadrant, simmed once and reused
+        # across every stat/iv close-call diff in it.
+        base_metrics = result_metrics(base_clean, fast_id, charged_ids,
+                                      (15, 15, 15), ml, ol, opponents)
         for stat, slot in (('atk', 0), ('def', 1), ('hp', 2)):
             for iv in IVS:
                 if iv == 15:
@@ -318,11 +408,16 @@ def main():
                 by_sh = {shield_label(s): [] for s in SHIELDS}
                 for (disp, sh) in sorted(dropped):
                     by_sh[shield_label(sh)].append(disp)
+                drop_metrics = result_metrics(
+                    base_clean, fast_id, charged_ids, tuple(ivs),
+                    ml, ol, opponents)
                 entry = {
                     'pvp_stat': stat_values['bb' if ml == 51.0 else 'nobb'][stat][iv],
                     'dropped': by_sh,
                     'gained': sorted(f"{d} {shield_label(s)}"
                                      for (d, s) in gained),
+                    'close_calls': close_calls(base_metrics, drop_metrics,
+                                               cheapest_cost),
                 }
                 if stat == 'atk':
                     entry['breakpoints_lost'] = breakpoints_lost(
