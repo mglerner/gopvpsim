@@ -367,6 +367,7 @@ DEEP_DIVE_CSS = """
 .dd-iv-rec-intro { font-size: 0.92rem; font-style: italic; color: #aab2c0;
   margin: 8px 0 16px; line-height: 1.55; }
 .dd-iv-rec-intro .dd-narrative-zone { padding-left: 0; margin: 6px 0; }
+.dd-iv-rec-intro .dd-narrative-zone::before { display: none; }
 /* Opponent-name deep links (tier-card coverage + stealable bucket). */
 .dd-opp-link { text-decoration: none; border-bottom: 1px dotted currentColor; }
 .dd-opp-link:hover { border-bottom-style: solid; }

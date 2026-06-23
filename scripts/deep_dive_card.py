@@ -52,6 +52,7 @@ class Spread:
     cover_bulkpoints: list = field(default_factory=list)   # named opps (bulk) census
     n_breakpoint_opps: int = 0  # census count of distinct BP opponents cleared
     n_bulkpoint_opps: int = 0   # census count of distinct bulk opponents cleared
+    n_breakpoint_newly: int = 0  # BP opps the boost newly guarantees (vs base form)
     flip_fd: dict | None = None  # raw flip data; rendered + linked at render time
     flip_has_bait: bool = False
 
@@ -84,6 +85,7 @@ class CardModel:
     key_losses: list[tuple[str, float]] = field(default_factory=list)
     sprite_uri: str | None = None
     two_number_ones: dict | None = None  # battle-#1 vs stat-product-#1 explainer
+    base_form_display: str | None = None  # item 5: "vs non-shadow X" base label
 
 
 # Type -> accent color (matches common PvP type palettes; used for chips and
@@ -152,8 +154,21 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
             cover_bulkpoints=rc.get('cover_bulkpoints') or [],
             n_breakpoint_opps=rc.get('n_breakpoint_opps') or 0,
             n_bulkpoint_opps=rc.get('n_bulkpoint_opps') or 0,
+            n_breakpoint_newly=rc.get('n_breakpoint_newly') or 0,
             flip_fd=flips.get(iv), flip_has_bait=has_bait,
         ))
+
+    # Item 5: base-form label for the "N newly guaranteed vs base form" line.
+    # Derive the display from the base species (+shadow) so it can't drift from
+    # a stale baked string; the base form is always non-shadow today.
+    _base_form = card_ctx.get('base_form')
+    base_form_display = None
+    if _base_form:
+        _bs = _base_form['species']
+        _bdisp = pretty_species(_bs)
+        if _base_form.get('shadow') and 'Shadow' not in _bdisp:
+            _bdisp = f'Shadow {_bdisp}'
+        base_form_display = _bdisp
 
     def _wr(d, is_robust=False):
         if not d:
@@ -182,6 +197,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         key_losses=[(_pretty_opp(n), s) for n, s in card_ctx.get('key_losses', [])],
         sprite_uri=sprite_uri,
         two_number_ones=tno,
+        base_form_display=base_form_display,
     )
 
 
@@ -344,7 +360,8 @@ _COVER_MAX_OPPS = 7  # names shown before the "+N more" toggle on the card
 _toggle_seq = 0
 
 
-def _cover_html(s: Spread, link_opps=False):
+def _cover_html(s: Spread, link_opps=False, base_form_display=None,
+                shadow=False):
     """Named opponent-coverage bullets (Dragapult-Sim style). Lists the FULL
     census of opponents this spread clears a break/bulkpoint against, led by a
     count headline ("18 guaranteed breakpoints"). Empty when the spread clears
@@ -382,12 +399,22 @@ def _cover_html(s: Spread, link_opps=False):
     if s.cover_bulkpoints:
         lines.append(f'<div class="cover">{_headline(s.n_bulkpoint_opps, "bulkpoint")}'
                      f'{_join(s.cover_bulkpoints)}</div>')
+    # Item 5: breakpoints the boost newly guarantees over the base form. ASCII
+    # only; rendered only when the gate applies (base_form_display present) and
+    # the spread gains at least one breakpoint vs the base.
+    if base_form_display and s.n_breakpoint_newly > 0:
+        n = s.n_breakpoint_newly
+        _via = 'by the shadow boost ' if shadow else ''
+        lines.append(
+            f'<div class="cover newly">{n} newly guaranteed {_via}'
+            f'(vs {html.escape(base_form_display)})</div>')
     return ''.join(lines)
 
 
-def _spread_html(s: Spread, link_opps=False):
+def _spread_html(s: Spread, link_opps=False, base_form_display=None,
+                 shadow=False):
     role = f'<div class="role">{html.escape(s.style)}</div>' if s.style else ''
-    cover = _cover_html(s, link_opps)
+    cover = _cover_html(s, link_opps, base_form_display, shadow)
     _fh = _flip_html(s.flip_fd, s.flip_has_bait, link_opps)
     flips = f'<div class="flips">{_fh}</div>' if _fh else ''
     return (f'<div class="ddcard-spread">{role}'
@@ -422,7 +449,9 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
                    f'scenarios, each swept across its top-{m.robust.k or 512} '
                    'stat-product IVs')
            if m.robust else '')
-    spreads = ''.join(_spread_html(s, link_opps=not standalone)
+    spreads = ''.join(_spread_html(s, link_opps=not standalone,
+                                   base_form_display=m.base_form_display,
+                                   shadow=m.shadow)
                       for s in m.spreads)
     wins = _col('Key wins', m.key_wins, 'wins')
     losses = _col('Key losses', m.key_losses, 'losses')

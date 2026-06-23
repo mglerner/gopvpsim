@@ -72,6 +72,74 @@ def test_build_card_model_fields():
     assert m.key_losses[0][0] == 'Medicham'
 
 
+def test_newly_guaranteed_sentence_shadow():
+    """Item 5: a shadow focal with base_form + n_breakpoint_newly>0 renders the
+    'N newly guaranteed by the shadow boost (vs <base>)' line, ASCII-only."""
+    data_obj, ctx = _synthetic()
+    ctx['rec_candidates'][0]['n_breakpoint_newly'] = 3
+    ctx['base_form'] = {'species': 'Corviknight', 'shadow': False}
+    m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'], shadow=True)
+    assert m.base_form_display == 'Corviknight'
+    assert m.spreads[0].n_breakpoint_newly == 3
+    html = dc.render_card_html(m, standalone=False)
+    assert '3 newly guaranteed by the shadow boost (vs Corviknight)' in html
+    # ASCII only (no em-dash / unicode in the sentence)
+    sentence = [ln for ln in html.split('<') if 'newly guaranteed' in ln][0]
+    assert sentence.encode('ascii')  # raises if non-ascii
+
+
+def test_newly_guaranteed_sentence_sex_variant():
+    """Item 5: a Female-sex focal (non-shadow) drops the 'shadow boost' phrasing
+    and points at the male base sibling."""
+    data_obj, ctx = _synthetic()
+    data_obj['species'] = 'Oinkologne (Female)'
+    data_obj['shadow'] = False
+    ctx['rec_candidates'][0]['n_breakpoint_newly'] = 2
+    ctx['base_form'] = {'species': 'Oinkologne', 'shadow': False}
+    m = dc.build_card_model(data_obj, ctx, types=['normal'], shadow=False)
+    html = dc.render_card_html(m, standalone=False)
+    # pretty_species suffixes the male base with "(Male)" since a Female
+    # sibling exists -- a desirable disambiguation in the card sentence.
+    assert '2 newly guaranteed (vs Oinkologne (Male))' in html
+    assert 'shadow boost' not in html
+
+
+def test_newly_guaranteed_omitted_without_base_form():
+    """Item 5 graceful degrade: no base_form (old blob / non-gated focal) -> the
+    sentence is omitted even if n_breakpoint_newly is somehow present."""
+    data_obj, ctx = _synthetic()
+    ctx['rec_candidates'][0]['n_breakpoint_newly'] = 4  # present but ungated
+    # no ctx['base_form']
+    m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'], shadow=True)
+    assert m.base_form_display is None
+    html = dc.render_card_html(m, standalone=False)
+    assert 'newly guaranteed' not in html
+
+
+def test_newly_guaranteed_omitted_when_zero():
+    """Item 5: gate applies but the spread gains nothing (N==0) -> omit."""
+    data_obj, ctx = _synthetic()
+    ctx['base_form'] = {'species': 'Corviknight', 'shadow': False}
+    # rec_candidates carry no n_breakpoint_newly -> defaults to 0
+    m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'], shadow=True)
+    html = dc.render_card_html(m, standalone=False)
+    assert 'newly guaranteed' not in html
+
+
+def test_base_form_focal_gate():
+    """Item 5: base_form_focal gates shadow + Female only (not Male / regional)."""
+    bff = deep_dive.base_form_focal
+    # Shadow -> same species, non-shadow base.
+    assert bff('Corviknight', True) == ('Corviknight', False, 'Corviknight')
+    # Female -> male sibling base (display gets the "(Male)" disambiguator).
+    assert bff('Oinkologne (Female)', False) == (
+        'Oinkologne', False, 'Oinkologne (Male)')
+    # Male (the base itself) -> no base form.
+    assert bff('Oinkologne', False) is None
+    # Plain non-shadow species -> no base form.
+    assert bff('Tinkaton', False) is None
+
+
 def test_shadow_flag_from_explicit_param():
     """Regression: data_obj has NO 'shadow' key (the real render path), so the
     shadow prefix must come from the explicit shadow= param, not data_obj."""

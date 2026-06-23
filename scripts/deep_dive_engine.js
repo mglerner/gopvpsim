@@ -1842,7 +1842,7 @@ function buildTraces() {
   // state.anchorDisplayMode === 'outline', the filled markers become
   // transparent rings so the named-category traces drawing on top can
   // be read against the envelope edge instead of fighting fill.
-  function buildOverlayTrace(name, ivList, borderColor, subdued, outlineOnly) {
+  function buildOverlayTrace(name, ivList, borderColor, subdued, outlineOnly, bigHighlight) {
     if (!ivList || ivList.length === 0) return null;
     var ox = [], oy = [], ot = [], ocol = [], osym = [];
     for (var k = 0; k < ivList.length; k++) {
@@ -1881,6 +1881,14 @@ function buildTraces() {
       markerLineWidth = 1;
       markerSize = 6;
     }
+    // Spec Card Spreads: the chosen 2-6 card spreads. Render them larger
+    // with a thick outline so this tiny, deliberately-curated set reads
+    // as THE highlight on top of every other overlay (it draws last).
+    if (bigHighlight) {
+      markerOpacity = 1;
+      markerLineWidth = 2;
+      markerSize = 11;
+    }
     return {
       name: name,
       x: ox, y: oy, text: ot,
@@ -1911,7 +1919,12 @@ function buildTraces() {
   if (anchorTrace) traces.push(anchorTrace);
   var slayerTrace = buildOverlayTrace('Slayer IVs', DATA.slayerIvs, '#FFD700');
   if (slayerTrace) traces.push(slayerTrace);
-  var recTrace = buildOverlayTrace('Top Picks', DATA.recIvs, '#e94560');
+  // Spec Card Spreads draws last (after tier traces, below) would be
+  // ideal, but tier traces must own the top z-order for hover. Pushing
+  // here (after slayer) keeps it above the larger overlays; the
+  // bigHighlight size + outline keep the few card spreads legible even
+  // when a tier circle sits on the same point.
+  var recTrace = buildOverlayTrace('Spec Card Spreads', DATA.recIvs, '#e94560', false, false, true);
   if (recTrace) traces.push(recTrace);
 
   // Tier traces go next so they render on top of slayer/anchor overlays.
