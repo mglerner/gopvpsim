@@ -48,9 +48,10 @@ class Spread:
     cp: int
     sp_rank: int           # stat-product rank (1 = bulkiest)
     style: str             # role label, e.g. "Attack Weight"
-    flips: str             # one-line flip summary vs the reference
     cover_breakpoints: list = field(default_factory=list)  # named opps (BP) vs ref
     cover_bulkpoints: list = field(default_factory=list)   # named opps (bulk) vs ref
+    flip_fd: dict | None = None  # raw flip data; rendered + linked at render time
+    flip_has_bait: bool = False
 
 
 @dataclass
@@ -145,9 +146,9 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
             atk=data_obj['ivAtk'][iv], def_=data_obj['ivDef'][iv],
             hp=data_obj['ivHp'][iv], cp=data_obj['ivCp'][iv],
             sp_rank=data_obj['spRanks'][iv], style=rc.get('style', ''),
-            flips=_flip_line(flips.get(iv), has_bait),
             cover_breakpoints=rc.get('cover_breakpoints') or [],
             cover_bulkpoints=rc.get('cover_bulkpoints') or [],
+            flip_fd=flips.get(iv), flip_has_bait=has_bait,
         ))
 
     def _wr(d, is_robust=False):
@@ -180,13 +181,26 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
     )
 
 
-def _flip_line(fd, has_bait):
+def _name_html(link_opps):
+    """Opponent-name renderer: a #opp-<slug> link when the card is embedded in
+    its dive, else just escaped text (a standalone card has no dive to link to,
+    so links would dangle). Uses the dive's own ``opp_slug`` so the card link
+    and the dive anchor agree across naming variants (Galarian/Shadow forms)."""
+    if link_opps:
+        from deep_dive_rendering import opp_slug
+        return lambda o: (f'<a class="ddcard-oplink" href="#opp-{opp_slug(o)}">'
+                          f'{html.escape(o)}</a>')
+    return html.escape
+
+
+def _flip_html(fd, has_bait, link_opps):
     if not fd:
         return ''
     try:
         from deep_dive_rendering import prose_flip_summary
         return prose_flip_summary(fd, max_gains=2, max_losses=1,
-                                  has_bait_axis=has_bait)
+                                  has_bait_axis=has_bait,
+                                  name_html=_name_html(link_opps))
     except Exception:  # noqa: BLE001
         return ''
 
@@ -228,6 +242,9 @@ CARD_CSS = """
 .ddcard-spread .flips { font-size:0.74rem; color:#8b949e; margin-top:4px; }
 .ddcard-spread .cover { font-size:0.74rem; color:#9be0a6; margin-top:4px; }
 .ddcard-spread .cover b { color:#e6ecf5; font-weight:700; }
+.ddcard-oplink { color:inherit; text-decoration:underline;
+  text-decoration-style:dotted; text-decoration-color:#5a7; }
+.ddcard-oplink:hover { text-decoration-style:solid; }
 .ddcard-cols { display:flex; gap:18px; flex-wrap:wrap; margin-top:8px; }
 .ddcard-col { flex:1 1 200px; }
 .ddcard-col h4 { margin:0 0 4px; font-size:0.8rem; text-transform:uppercase;
@@ -305,13 +322,16 @@ def _two_ones_html(t: dict | None) -> str:
 _COVER_MAX_OPPS = 10  # truncate long coverage lists on the card; "+N more"
 
 
-def _cover_html(s: Spread):
+def _cover_html(s: Spread, link_opps=False):
     """Named opponent-coverage bullets (Dragapult-Sim style). Empty when the
     spread clears no notable tier (incl. the no-anchor fallback, where cover_*
     lists are empty). Long lists (the bulk pole can list ~10 opponents) are
-    truncated with a "+N more" tail."""
+    truncated with a "+N more" tail. Opponent names link to their dive row when
+    ``link_opps``."""
+    _nm = _name_html(link_opps)
+
     def _join(opps):
-        head = ', '.join(html.escape(o) for o in opps[:_COVER_MAX_OPPS])
+        head = ', '.join(_nm(o) for o in opps[:_COVER_MAX_OPPS])
         extra = len(opps) - _COVER_MAX_OPPS
         return head + (f' +{extra} more' if extra > 0 else '')
     lines = []
@@ -324,10 +344,11 @@ def _cover_html(s: Spread):
     return ''.join(lines)
 
 
-def _spread_html(s: Spread):
+def _spread_html(s: Spread, link_opps=False):
     role = f'<div class="role">{html.escape(s.style)}</div>' if s.style else ''
-    cover = _cover_html(s)
-    flips = f'<div class="flips">{html.escape(s.flips)}</div>' if s.flips else ''
+    cover = _cover_html(s, link_opps)
+    _fh = _flip_html(s.flip_fd, s.flip_has_bait, link_opps)
+    flips = f'<div class="flips">{_fh}</div>' if _fh else ''
     return (f'<div class="ddcard-spread">{role}'
             f'<div class="iv">{html.escape(s.iv_str)}</div>'
             f'<div class="stats">{s.atk:.1f} atk / {s.def_:.1f} def / {s.hp} hp'
@@ -360,7 +381,8 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
                    f'scenarios, each swept across its top-{m.robust.k or 512} '
                    'stat-product IVs')
            if m.robust else '')
-    spreads = ''.join(_spread_html(s) for s in m.spreads)
+    spreads = ''.join(_spread_html(s, link_opps=not standalone)
+                      for s in m.spreads)
     wins = _col('Key wins', m.key_wins, 'wins')
     losses = _col('Key losses', m.key_losses, 'losses')
     cols = (f'<div class="ddcard-cols">{wins}{losses}</div>'
