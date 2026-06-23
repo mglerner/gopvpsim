@@ -261,7 +261,13 @@ DEEP_DIVE_CSS = """
 .dd-spread-grid td, .dd-spread-grid th:not(:first-child) { text-align:center; }
 .dd-opp-row { border-bottom:1px solid #0f3460; padding:4px 0; }
 .dd-opp-detail { padding:4px 0 8px 14px; }
-.dd-opp-name { font-weight:600; }
+.dd-opp-name { font-weight:600; min-width:150px; display:inline-block; }
+.dd-opp-chip { display:inline-block; font-size:0.78rem; padding:1px 8px;
+  border-radius:10px; margin:1px 4px 1px 0; background:#0f3460; }
+.dd-opp-chip-win { color:#3fb950; }
+.dd-opp-chip-lose { color:#8b6f72; }
+.dd-opp-build { color:#f0b429; font-size:0.78rem; font-weight:600;
+  margin-left:6px; }
 .dd-opp-label { color: #8b949e; font-size: 0.75rem; }
 .dd-slayer-top td { background: #1e2d4a; }
 .dd-slayer-top td:first-child { border-left: 3px solid #58a6ff; }
@@ -3223,37 +3229,6 @@ def _og_win(scores_flat, iv, si, oi, nS, nO, win_threshold=500):
     return scores_flat[iv * nS * nO + si * nO + oi] >= win_threshold
 
 
-def _render_shield_grid_3x3(scores_flat, iv, oi, scenarios, nS, nO,
-                            win_threshold=500):
-    """Compact 3x3 win/loss read for one IV vs one opponent.
-
-    Rows = my shields (s0 = 0/1/2), cols = opp shields (s1 = 0/1/2). A
-    scenario absent from the swept set renders as a neutral dot. Returns
-    (html, n_wins, n_swept). ASCII/entity marks only (no em-dash).
-    """
-    have = {}
-    for si, scen in enumerate(scenarios):
-        have[(scen[0], scen[1])] = _og_win(scores_flat, iv, si, oi, nS, nO,
-                                            win_threshold)
-    n_wins = sum(1 for v in have.values() if v)
-    n_swept = len(have)
-    rows = ['<table class="dd-shield-grid"><tr><th></th>'
-            '<th>0</th><th>1</th><th>2</th></tr>']
-    for s0 in range(3):
-        cells = [f'<th>{s0}</th>']
-        for s1 in range(3):
-            v = have.get((s0, s1))
-            if v is None:
-                cells.append('<td class="dd-sg-na">&middot;</td>')
-            elif v:
-                cells.append('<td class="dd-sg-win">&#10003;</td>')
-            else:
-                cells.append('<td class="dd-sg-loss">&#10007;</td>')
-        rows.append('<tr>' + ''.join(cells) + '</tr>')
-    rows.append('</table>')
-    return ''.join(rows), n_wins, n_swept
-
-
 def _render_opp_spread_grid(spread_ivs, oi, scenarios, scores_flat, nS, nO,
                             data_obj, win_threshold=500):
     """Per-spread x 9-shield win/loss grid for one opponent (expander L2).
@@ -3310,84 +3285,78 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                                     scenarios, opponents, nS, nO, data_obj,
                                     opp_label, has_bait_axis=False,
                                     spread_ivs=None, win_threshold=500):
-    """Opponent-centric "Threats where your IV matters" section.
+    """Opponent-centric "Threats where your build choice matters" section.
 
-    Pivots ``all_matchup_boundaries`` by opponent. An opponent appears in
-    that list iff a real in-range matchup flip exists for it (the partition
-    is clean somewhere in the survivor stat range) -- that presence is the
-    suppression-gate signal. Each such *decision* opponent gets a row: the
-    headline rec spread (``spread_ivs[0]``) read as a 3x3 win/loss grid over
-    the 9 shields, a "wins X/9" tally, and an expander with the exact stat
-    cutoffs plus a per-spread grid over all the card's rec spreads.
-
-    Opponents with NO boundary record win-or-lose at every IV; they are
-    hoisted into two one-line callouts ("Wins at any IV" / "Loses at any
-    IV"), classified by the headline spread's per-opponent result.
-
-    ``spread_ivs`` defaults to ``data_obj['recIvs']`` (the card's rec-spread
-    set, IV indices). Subsumes the flat boundary dump. No new simulation.
-    Returns '' when there is nothing to show.
+    For each opponent, computes whether each recommended spread (``spread_ivs``
+    = the card's rec-spread IV indices) wins the matchup OVERALL (a majority of
+    the 9 shields). An opponent is a decision row only when the spreads DISAGREE
+    -- some recommended build wins it, another loses it -- so the player's build
+    choice decides the result; the row shows a win/loss chip per build, a "build
+    X" hint, and an expander with the exact stat cutoffs + a per-spread x
+    9-shield grid. Opponents every build wins (or every build loses) hoist into
+    two one-line callouts. Subsumes the flat boundary dump. ``spread_ivs`` /
+    ``recStyles`` default to ``data_obj``. No new simulation. Returns '' when
+    there is nothing to show.
     """
     if spread_ivs is None:
         spread_ivs = list(data_obj.get('recIvs') or [])
     spread_ivs = [iv for iv in spread_ivs if iv is not None]
     if not spread_ivs or nO == 0 or not scores_flat:
         return ''
-    headline_iv = spread_ivs[0]
 
     def _ivstr(iv):
         return (f'{data_obj["ivA"][iv]}/{data_obj["ivD"][iv]}/'
                 f'{data_obj["ivS"][iv]}')
 
-    # Group boundaries by opponent (the in-range-flip signal).
+    # Cutoff records grouped by opponent (the per-opponent expander reads these).
     by_opp: dict = {}
     for b in all_matchup_boundaries or []:
         by_opp.setdefault(b['opponent'], []).append(b)
 
-    opp_index = {name: oi for oi, name in enumerate(opponents)}
+    spread_styles = data_obj.get('recStyles') or []
 
-    def _headline_wins(oi):
+    def _style(i):
+        s = spread_styles[i] if i < len(spread_styles) else ''
+        return s or _ivstr(spread_ivs[i])
+
+    def _overall_win(siv, oi):
+        # This build wins the matchup OVERALL == a majority of the 9 shields.
         return sum(1 for si in range(nS)
-                   if _og_win(scores_flat, headline_iv, si, oi, nS, nO,
-                              win_threshold))
+                   if _og_win(scores_flat, siv, si, oi, nS, nO,
+                              win_threshold)) > nS // 2
 
-    # Suppression gate -- an opponent is a decision row only when your IV choice
-    # can change the result AND the headline grid itself shows it:
-    #   no boundary            -> won OR lost at EVERY IV; hoist to Wins/Loses at
-    #                             any IV (the headline result is unanimous there).
-    #   boundary + non-uniform -> decision row (the headline 3x3 shows the flip).
-    #   boundary + uniform     -> the headline sweeps but a non-headline recommended
-    #                             spread flips it; a compact callout, NOT an
-    #                             all-red / all-green row leading the section.
-    decision_rows = []
-    wins_any, loses_any, off_headline = [], [], []
+    # Gate: a decision row is an opponent where the recommended spreads DISAGREE
+    # on the overall matchup -- some build wins it, another loses it -- so your
+    # build CHOICE decides the result. All builds win -> "wins with any build";
+    # all lose -> "loses with any build". Per-shield-only differences where every
+    # build still wins (or loses) the matchup overall are hoisted, not listed --
+    # the section is about where the choice matters.
+    decision_rows = []   # (oi, name, outs:list[bool])
+    wins_any, loses_any = [], []
     for oi, name in enumerate(opponents):
-        hw = _headline_wins(oi)
-        if name not in by_opp:
-            (wins_any if hw > nS // 2 else loses_any).append(name)
-        elif 1 <= hw <= nS - 1:
-            decision_rows.append((oi, name))
+        outs = [_overall_win(siv, oi) for siv in spread_ivs]
+        if all(outs):
+            wins_any.append(name)
+        elif not any(outs):
+            loses_any.append(name)
         else:
-            off_headline.append(name)
+            decision_rows.append((oi, name, outs))
 
     parts = []
     parts.append('<details class="dd-collapsible" id="dd-opp-threats">\n')
     parts.append(
         '<summary class="dd-h3" style="cursor:pointer">'
-        'Threats where your IV matters '
+        'Threats where your build choice matters '
         '<span class="dd-small" style="font-weight:400;color:#8b949e">'
-        f'({len(decision_rows)} decision-relevant)</span></summary>\n')
+        f'({len(decision_rows)})</span></summary>\n')
     parts.append(
-        f'<p class="dd-small" style="color:#8b949e">Each opponent below has '
-        f'a matchup that <i>flips</i> somewhere inside the IV range vs '
-        f'{opp_label} opponents - so your exact spread decides the result. '
-        f'The grid shows the headline spread '
-        f'<span class="dd-strong">{_ivstr(headline_iv)}</span> across all '
-        f'{nS} shield scenarios (rows = your shields, columns = opponent '
-        f'shields). Expand a row for the exact stat cutoff and how every '
-        f'recommended spread fares.</p>\n')
+        '<p class="dd-small" style="color:#8b949e">The opponents below are the '
+        'ones where a different recommended spread <i>flips who wins</i> vs '
+        f'{opp_label} opponents, so your build choice decides the result. The '
+        'chips show which recommended build wins the matchup overall (a majority '
+        f'of the {nS} shields); expand a row for the per-shield grid and the '
+        'exact stat cutoffs.</p>\n')
 
-    # Hoist callouts (won/lost at any IV).
     def _hoist(label_html, names):
         if not names:
             return ''
@@ -3395,52 +3364,59 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
         return (f'<p class="dd-small" style="margin:4px 0">{label_html} '
                 f'{bits}</p>\n')
 
-    parts.append(_hoist('<span class="dd-gain">Wins at any IV:</span>',
-                        wins_any))
-    parts.append(_hoist('<span class="dd-loss">Loses at any IV:</span>',
-                        loses_any))
     parts.append(_hoist(
-        '<span class="dd-small" style="color:#9bb0d0">Headline sweeps, but an '
-        'off-headline recommended spread flips it:</span>', off_headline))
+        '<span class="dd-gain">Wins with any recommended build:</span>',
+        wins_any))
+    parts.append(_hoist(
+        '<span class="dd-loss">Loses with any recommended build:</span>',
+        loses_any))
 
     if not decision_rows:
         parts.append('<p class="dd-small" style="color:#8b949e">No '
-                     'IV-sensitive matchups in this pool - every opponent '
-                     'is decided above.</p>\n')
+                     'build-sensitive matchups in this pool -- every opponent '
+                     'is decided the same way by all recommended spreads.</p>\n')
         parts.append('</details>\n')
         return ''.join(parts)
 
-    # Most-contested first (headline closest to a 50/50 split) -- where the IV
-    # choice matters most.
-    decision_rows.sort(key=lambda r: (abs(_headline_wins(r[0]) - nS / 2), r[1]))
+    # Most constrained first: opponents only ONE recommended build wins (you must
+    # build that one) lead, then the flexible two-build ones; then by name.
+    decision_rows.sort(key=lambda r: (sum(r[2]), r[1]))
 
     parts.append('<div class="dd-opp-rows">\n')
-    for oi, name in decision_rows:
-        grid_html, n_wins, n_swept = _render_shield_grid_3x3(
-            scores_flat, headline_iv, oi, scenarios, nS, nO, win_threshold)
-        bnds = sorted(by_opp[name],
-                      key=lambda b: (0 if b.get('stat', 'def') == 'def' else 1,
-                                     b['threshold']))
-        # id="opp-<slug>" preserves the deep-link contract the article's
-        # Matchup Delta table scrapes (generate_article.py:269) -- it was
-        # previously emitted by the now-removed standalone boundary dump.
+    for oi, name, outs in decision_rows:
+        chips = []
+        for i, siv in enumerate(spread_ivs):
+            cls = 'dd-opp-chip-win' if outs[i] else 'dd-opp-chip-lose'
+            mark = '&#10003;' if outs[i] else '&#10007;'
+            chips.append(
+                f'<span class="dd-opp-chip {cls}">{mark} '
+                f'{_html.escape(_style(i))} '
+                f'<span class="dd-small">{_ivstr(siv)}</span></span>')
+        winners = ' or '.join(_html.escape(_style(i))
+                              for i in range(len(spread_ivs)) if outs[i])
+        # id="opp-<slug>" preserves the deep-link contract the article's Matchup
+        # Delta table scrapes (generate_article.py:269).
         parts.append(f'<div class="dd-opp-row" id="opp-{opp_slug(name)}">\n')
         parts.append('<details class="dd-collapsible">\n')
         parts.append(
-            f'<summary style="cursor:pointer">'
+            '<summary style="cursor:pointer">'
             f'<span class="dd-opp-name">{_opp_b(name)}</span> '
-            f'<span class="dd-small" style="color:#8b949e">'
-            f'wins {n_wins}/{n_swept}</span> {grid_html}</summary>\n')
+            f'{"".join(chips)}'
+            f'<span class="dd-opp-build">&rarr; build {winners}</span>'
+            '</summary>\n')
         parts.append('<div class="dd-opp-detail">\n')
-        parts.append('<ul class="dd-threshold-list" style="margin:6px 0">\n')
-        for b in bnds:
-            parts.append(_render_boundary_cutoff_line(b, has_bait_axis))
-        parts.append('\n</ul>\n')
+        bnds = sorted(by_opp.get(name, []),
+                      key=lambda b: (0 if b.get('stat', 'def') == 'def' else 1,
+                                     b['threshold']))
+        if bnds:
+            parts.append('<ul class="dd-threshold-list" style="margin:6px 0">\n')
+            for b in bnds:
+                parts.append(_render_boundary_cutoff_line(b, has_bait_axis))
+            parts.append('\n</ul>\n')
         if len(spread_ivs) > 1:
             parts.append(
                 '<p class="dd-small" style="color:#8b949e;margin:6px 0 2px">'
-                'Your recommended spreads vs this opponent (columns) across '
-                'the 9 shields:</p>\n')
+                'Each recommended spread (columns) across the 9 shields:</p>\n')
             parts.append(_render_opp_spread_grid(
                 spread_ivs, oi, scenarios, scores_flat, nS, nO, data_obj,
                 win_threshold))
