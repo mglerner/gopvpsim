@@ -202,9 +202,14 @@ def _flip_html(fd, has_bait, link_opps):
         return ''
     try:
         from deep_dive_rendering import prose_flip_summary
-        return prose_flip_summary(fd, max_gains=2, max_losses=1,
-                                  has_bait_axis=has_bait,
-                                  name_html=_name_html(link_opps))
+        prose = prose_flip_summary(fd, max_gains=2, max_losses=1,
+                                   has_bait_axis=has_bait,
+                                   name_html=_name_html(link_opps))
+        if not prose or prose == 'no matchup flips':
+            return prose
+        # The flip is measured against the stat-product #1 (reference) IV; label
+        # it so the lead spread's gains/loses line is not read as absolute.
+        return f'vs stat-product #1: {prose}'
     except Exception:  # noqa: BLE001
         return ''
 
@@ -247,6 +252,14 @@ CARD_CSS = """
 .ddcard-spread .cover { font-size:0.74rem; color:#9be0a6; margin-top:4px; }
 .ddcard-spread .cover b { color:#e6ecf5; font-weight:700; }
 .ddcard-spread .cover .cover-count { color:#e6ecf5; font-weight:700; }
+.cover-toggle { position:absolute; opacity:0; width:0; height:0; }
+.cover-rest { display:none; }
+.cover-toggle:checked ~ .cover-rest { display:inline; }
+.cover-more { color:#58a6ff; cursor:pointer; white-space:nowrap;
+  text-decoration:underline; text-decoration-style:dotted; }
+.cover-more .cm-hide { display:none; }
+.cover-toggle:checked ~ .cover-more .cm-show { display:none; }
+.cover-toggle:checked ~ .cover-more .cm-hide { display:inline; }
 .ddcard-oplink { color:inherit; text-decoration:underline;
   text-decoration-style:dotted; text-decoration-color:#5a7; }
 .ddcard-oplink:hover { text-decoration-style:solid; }
@@ -324,7 +337,11 @@ def _two_ones_html(t: dict | None) -> str:
     return f'<div class="ddcard-note"><b>Why this IV?</b> {body}</div>'
 
 
-_COVER_MAX_OPPS = 10  # truncate long coverage lists on the card; "+N more"
+_COVER_MAX_OPPS = 7  # names shown before the "+N more" toggle on the card
+
+# Per-render counter for unique toggle ids (a card can carry several cover
+# lists, and a dive page can carry several cards).
+_toggle_seq = 0
 
 
 def _cover_html(s: Spread, link_opps=False):
@@ -332,14 +349,28 @@ def _cover_html(s: Spread, link_opps=False):
     census of opponents this spread clears a break/bulkpoint against, led by a
     count headline ("18 guaranteed breakpoints"). Empty when the spread clears
     nothing (incl. the no-anchor fallback, where cover_* lists are empty). Long
-    lists are truncated with a "+N more" tail. Opponent names link to their dive
-    row when ``link_opps``."""
+    lists collapse the tail behind a clickable "+N more" toggle: collapsed by
+    default (so a screenshot stays tight), the full list reveals inline when
+    clicked. Opponent names link to their dive row when ``link_opps``."""
     _nm = _name_html(link_opps)
 
     def _join(opps):
+        global _toggle_seq
         head = ', '.join(_nm(o) for o in opps[:_COVER_MAX_OPPS])
-        extra = len(opps) - _COVER_MAX_OPPS
-        return head + (f' +{extra} more' if extra > 0 else '')
+        rest = opps[_COVER_MAX_OPPS:]
+        if not rest:
+            return head
+        _toggle_seq += 1
+        cid = f'cm{_toggle_seq}'
+        tail = ', '.join(_nm(o) for o in rest)
+        # Checkbox-hack toggle: works with no page JS, in both the embedded and
+        # standalone card variants. Collapsed by default; the label shows
+        # "+N more" collapsed and "less" expanded (CSS swaps the two spans).
+        return (f'{head}<input type="checkbox" class="cover-toggle" id="{cid}">'
+                f'<span class="cover-rest">, {tail}</span>'
+                f'<label class="cover-more" for="{cid}">'
+                f'<span class="cm-show"> +{len(rest)} more</span>'
+                f'<span class="cm-hide"> less</span></label>')
 
     def _headline(n, label):
         return (f'<span class="cover-count">{n} guaranteed {label}'

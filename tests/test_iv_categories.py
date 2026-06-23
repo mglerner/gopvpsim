@@ -238,6 +238,85 @@ def test_matchup_branch_skipped_without_matchup_data():
     assert all(c.kind != 'matchup' for c in cats)
 
 
+def test_matchup_sibling_variant_dupes_merge():
+    """An alt-moveset opponent variant ('Forretress (Bug Bite)') that yields
+    the IDENTICAL winning-IV set as its base ('Forretress') in the same
+    scenario collapses into ONE card naming both variants. The non-duplicate
+    base opponent and the form-tagged opponent stay separate."""
+    data_obj = _make_data_obj()
+    n_ivs = data_obj['nIvs']
+    nS, nO = 1, 4  # scen 0v0; opponents: Forretress, Forretress (Bug Bite),
+    #                Medicham, Aegislash (Blade)
+    scores_flat = [0.0] * (n_ivs * nS * nO)
+
+    def _set(iv, oi, val):
+        scores_flat[iv * nS * nO + 0 * nO + oi] = val
+
+    # Forretress (oi 0) and Forretress (Bug Bite) (oi 1): IVs 0,1 win -> same set
+    for oi in (0, 1):
+        _set(0, oi, 600); _set(1, oi, 700)
+    # Medicham (oi 2): IV 3 wins -> distinct partition, no sibling
+    _set(3, 2, 999)
+    # Aegislash (Blade) (oi 3): IVs 0,1 win -> SAME set as Forretress, but a
+    # different base opponent (form tag, never folds) -> must NOT merge.
+    _set(0, 3, 600); _set(1, 3, 700)
+
+    matchup_data = {
+        'scores_flat': scores_flat,
+        'nS': nS, 'nO': nO,
+        'scenarios': [(0, 0)],
+        'opponents': ['Forretress', 'Forretress (Bug Bite)',
+                      'Medicham', 'Aegislash (Blade)'],
+        'opp_iv_mode': 'pvpoke',
+        'win_threshold': 500,
+    }
+    cats = build_iv_categories(data_obj, matchup_data=matchup_data)
+    matchup_cats = [c for c in cats if c.kind == 'matchup']
+    names = {c.name for c in matchup_cats}
+
+    # 4 raw cards -> 3 after the Forretress pair merges.
+    assert len(matchup_cats) == 3
+    # The merged card uses the base name and drops the moveset tag.
+    assert 'Beats PvPoke default Forretress in the 0v0' in names
+    # The Aegislash (Blade) form variant is preserved separately.
+    assert 'Beats PvPoke default Aegislash (Blade) in the 0v0' in names
+    assert 'Beats PvPoke default Medicham in the 0v0' in names
+
+    merged = next(c for c in matchup_cats
+                  if c.name == 'Beats PvPoke default Forretress in the 0v0')
+    # Both variants recorded in matchup_conditions; winning IVs preserved.
+    merged_opps = {mc['opponent'] for mc in merged.matchup_conditions}
+    assert merged_opps == {'Forretress', 'Forretress (Bug Bite)'}
+    assert merged.members == [0, 1]
+
+
+def test_matchup_variant_diff_iv_set_not_merged():
+    """Same base opponent + scenario but a DIFFERENT winning-IV set must NOT
+    merge -- the dedup key includes the full member set."""
+    data_obj = _make_data_obj()
+    n_ivs = data_obj['nIvs']
+    nS, nO = 1, 2  # Quagsire, Quagsire (Aqua Tail+Stone Edge)
+    scores_flat = [0.0] * (n_ivs * nS * nO)
+
+    def _set(iv, oi, val):
+        scores_flat[iv * nS * nO + 0 * nO + oi] = val
+
+    _set(0, 0, 600); _set(1, 0, 700)            # Quagsire: IVs 0,1
+    _set(0, 1, 600); _set(2, 1, 700)            # variant: IVs 0,2 -> differs
+
+    matchup_data = {
+        'scores_flat': scores_flat,
+        'nS': nS, 'nO': nO,
+        'scenarios': [(0, 0)],
+        'opponents': ['Quagsire', 'Quagsire (Aqua Tail+Stone Edge)'],
+        'opp_iv_mode': 'pvpoke',
+        'win_threshold': 500,
+    }
+    cats = build_iv_categories(data_obj, matchup_data=matchup_data)
+    matchup_cats = [c for c in cats if c.kind == 'matchup']
+    assert len(matchup_cats) == 2  # different IV sets -> stay separate
+
+
 # ---------------------------------------------------------------------------
 # Renderer tests — verify _render_notable_ivs_section produces the
 # expected HTML structure for the Annihilape 13/0/11-style case.

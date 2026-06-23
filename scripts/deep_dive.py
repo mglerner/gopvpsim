@@ -397,7 +397,127 @@ def build_iv_categories(data_obj, slayer_categories=None,
                         member_meta=member_meta,
                     ))
 
+    categories = _merge_matchup_variant_dupes(categories)
+
     return categories
+
+
+# Form/shadow parentheticals that mark a genuinely distinct opponent and
+# must NEVER be folded into a base species. Anything else in a trailing
+# parenthetical (Bug Bite, Close Combat+Rage Fist, atk-weighted, ...) is an
+# alt-moveset / weighting variant and IS foldable -- but only when stripping
+# it yields a name that another opponent in the same pool actually uses.
+_FORM_SHADOW_TAGS = frozenset({
+    'Shadow', 'Blade', 'Shield', 'Galarian', 'Female', 'Male', 'Super',
+    'Alolan', 'Hisuian', 'Origin', 'Altered', 'Incarnate', 'Therian',
+    'Standard', 'Zen',
+})
+
+
+def _base_opponent(opp, all_opps):
+    """Fold a trailing alt-moveset/weighting parenthetical off an opponent
+    name, but only when the stripped stem is itself a present opponent.
+
+    ``Medicham (atk-weighted)`` -> ``Medicham`` (when plain ``Medicham`` is in
+    the pool); ``Aegislash (Blade)`` stays put (form tag); ``Quagsire (Shadow)
+    (Aqua Tail+Stone Edge)`` -> ``Quagsire (Shadow)`` (keeps the Shadow form,
+    drops the moveset tag).
+    """
+    import re
+    cur = opp
+    while True:
+        m = re.match(r'^(.*) \(([^()]+)\)$', cur)
+        if not m:
+            break
+        stem, tag = m.group(1), m.group(2)
+        if tag in _FORM_SHADOW_TAGS:
+            break
+        if stem in all_opps:
+            cur = stem
+            continue
+        break
+    return cur
+
+
+def _merge_matchup_variant_dupes(categories):
+    """Collapse sibling-opponent-variant matchup cards that are exact stat
+    duplicates.
+
+    Two matchup categories merge only when they share the same base opponent
+    (variant tag stripped), the same shield scenario, the same bait mode, and
+    the *identical* winning-IV set. That guarantees we never merge across
+    different IVs or different base opponents -- the merged card is the same
+    matchup, just simmed against an alt-moveset/weighting sibling of the
+    opponent. The surviving card lists every merged variant in its
+    ``matchup_conditions`` so no provenance is lost.
+
+    Non-matchup categories pass through untouched and in place.
+    """
+    matchups = [c for c in categories if c.kind == 'matchup']
+    if len(matchups) < 2:
+        return categories
+
+    all_opps = {c.matchup_conditions[0]['opponent']
+                for c in matchups if c.matchup_conditions}
+
+    # Bucket by the merge key; preserve first-seen order for stable output.
+    buckets: dict = {}
+    order: list = []
+    for c in matchups:
+        cond = c.matchup_conditions[0] if c.matchup_conditions else {}
+        key = (_base_opponent(cond.get('opponent', ''), all_opps),
+               tuple(cond.get('scenario', ())),
+               cond.get('bait'),
+               tuple(c.members))
+        if key not in buckets:
+            buckets[key] = []
+            order.append(key)
+        buckets[key].append(c)
+
+    merged_by_first: dict = {}
+    for key in order:
+        group = buckets[key]
+        first = group[0]
+        if len(group) == 1:
+            merged_by_first[id(first)] = first
+            continue
+        # Collapse onto the first card; rename to the base opponent and list
+        # every variant in matchup_conditions (so matchup_subtitle surfaces
+        # them) and in the description.
+        base_opp = key[0]
+        variants = [g.matchup_conditions[0]['opponent'] for g in group]
+        conds = [dict(g.matchup_conditions[0]) for g in group]
+        scen = first.matchup_conditions[0]['scenario']
+        scen_label = f'{scen[0]}v{scen[1]}'
+        opp_iv_label = ('rank 1'
+                        if first.matchup_conditions[0].get('opponent_ivs')
+                        == 'rank1' else 'PvPoke default')
+        merged = IVCategory(
+            name=f'Beats {opp_iv_label} {base_opp} in the {scen_label}',
+            kind='matchup',
+            members=first.members,
+            description=(
+                f'IVs whose battle score meets the win threshold against '
+                f'{opp_iv_label} {base_opp} in the {scen_label} shield '
+                f'scenario. Identical winning spreads across these opponent '
+                f'movesets/weightings: {", ".join(variants)}.'
+            ),
+            matchup_conditions=conds,
+            member_meta=first.member_meta,
+        )
+        merged_by_first[id(first)] = merged
+
+    # Reassemble: keep non-matchups in place; emit each bucket's (possibly
+    # merged) card at the position of its first card, drop the trailing
+    # duplicates.
+    first_ids = {id(buckets[key][0]) for key in order}
+    out: list = []
+    for c in categories:
+        if c.kind != 'matchup':
+            out.append(c)
+        elif id(c) in first_ids:
+            out.append(merged_by_first[id(c)])
+    return out
 
 
 def auto_discover_thresholds(results, n_tiers=2):
@@ -3281,6 +3401,24 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # prior file's entries must not leak into this one.
     rendering.reset_tooltip_registry()
 
+    # Shadow focal: re-derive the legacy stat-cutoff thresholds from the
+    # registry under the shadow-suffixed species key. A shadow / constructed
+    # focal must only inherit tiers authored for "<Species> (Shadow)" - never
+    # the non-shadow base species' tiers. The base species' gobattlekit-default
+    # expert cutoffs (e.g. HomeSliceHenry / SwagTips def floors) are numerically
+    # invalid for the shadow form (x1.2 atk / x0.833 def shift the floors) and
+    # would falsely credit those experts with analyzing an unreleased mon. If
+    # the registry has no shadow-authored spreads, the result is empty and the
+    # Expert-Analysis zone is correctly absent (pre-release). Authored shadow
+    # spreads (e.g. Drapion (Shadow), Quagsire (Shadow)) are preserved because
+    # they live under the shadow key. Runs on replay blobs too, where the
+    # leak is baked into `thresholds` but the registry still exposes the
+    # (wrong) base-species key, so the shadow-key lookup drops it.
+    if shadow and threshold_registry is not None:
+        thresholds = as_legacy_dict(
+            threshold_registry, f'{species} (Shadow)', league.capitalize(),
+        ) or None
+
     # Build threshold tier info
     tier_names = list(thresholds.keys()) if thresholds else []
     tier_info = []
@@ -4063,6 +4201,19 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             '  </div>\n'
             '</details>\n'
         )
+    else:
+        # No collection data: the focal isn't matchable yet (a shadow /
+        # pre-release / constructed focal whose gamemaster key carries no
+        # rank lookup). Emit a one-line placeholder so the section doesn't
+        # silently vanish - readers know the paste-box returns post-release.
+        html += (
+            '<div id="collection-panel" class="collection-panel" '
+            'style="padding:10px 14px">\n'
+            f'  <b>Check my collection</b> <span style="font-size:12px;'
+            f'color:#aaa">- Collection check returns once {species_pretty} '
+            'is ranked (post-release).</span>\n'
+            '</div>\n'
+        )
 
     # Plot first, then summary table below
     html += '<div id="plot" class="plot-container" style="height:550px;"></div>\n'
@@ -4167,6 +4318,26 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     _resolved_anchors = None
     if slayer_iter_result:
         _resolved_anchors = slayer_iter_result.get('resolved_anchors') or None
+    # Shadow focal: strip expert-source attribution from any resolved anchor
+    # unless the registry carries thresholds authored for "<Species> (Shadow)".
+    # A shadow / constructed focal that resolved its anchors against the
+    # non-shadow base species' registry (e.g. the auto-discover bug, or an old
+    # replay blob baked before the fix) inherits that base species'
+    # gobattlekit-default expert credit (HomeSliceHenry / SwagTips). The
+    # anchors' numeric thresholds are still valid shadow-form sims, so we keep
+    # them - but demote them to the simulation zone by clearing the false
+    # attribution, so the Expert Analysis header never credits those experts
+    # with an unreleased mon. Legitimately shadow-authored anchors (registry
+    # has the "<Species> (Shadow)" key) keep their sources.
+    if shadow and _resolved_anchors:
+        _has_shadow_authored = (
+            threshold_registry is not None
+            and threshold_registry.species(f'{species} (Shadow)') is not None
+        )
+        if not _has_shadow_authored:
+            for _a in _resolved_anchors:
+                if getattr(_a, 'source', None):
+                    _a.source = ''
     import time as _time
     _nar0_start = _time.time()
     moveset0_nar_html, moveset0_flavors = _generate_narrative_for_moveset(
@@ -5240,6 +5411,10 @@ def main():
     _cd_prep_fast: list[str] = []
     _cd_prep_charged: list[str] = []
     _species_narrative: dict = {}
+    # Species key for all registry / raw-TOML lookups. A shadow focal's
+    # tables are keyed "<Species> (Shadow)", so it never matches (and never
+    # inherits) the non-shadow base species' tiers, narrative, or anchors.
+    _thr_species = args.species + (' (Shadow)' if args.shadow else '')
     if args.thresholds:
         try:
             threshold_registry = load_threshold_file(
@@ -5253,7 +5428,7 @@ def main():
             import tomllib as _tomllib
             with open(args.thresholds, 'rb') as _f:
                 _raw_toml = _tomllib.load(_f)
-            _sp = _raw_toml.get(args.species, {})
+            _sp = _raw_toml.get(_thr_species, {})
             for _key in ('intro', 'meta_role', 'verdict'):
                 if _key in _sp and isinstance(_sp[_key], dict):
                     _species_narrative[_key] = _sp[_key]
@@ -5270,13 +5445,15 @@ def main():
         # narrative, leave threshold_registry None.
         logger.info('  --no-thresholds: skipping threshold registry load')
         _species_lower = args.species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+        if args.shadow:
+            _species_lower += '_shadow'
         _narr_toml = Path(__file__).resolve().parent.parent / 'thresholds' / f'{_species_lower}.toml'
         if _narr_toml.exists():
             try:
                 import tomllib as _tomllib
                 with open(_narr_toml, 'rb') as _f:
                     _raw_toml = _tomllib.load(_f)
-                _sp = _raw_toml.get(args.species, {})
+                _sp = _raw_toml.get(_thr_species, {})
                 for _key in ('intro', 'meta_role', 'verdict'):
                     if _key in _sp and isinstance(_sp[_key], dict):
                         _species_narrative[_key] = _sp[_key]
@@ -5287,8 +5464,13 @@ def main():
                 logger.warning(f"narrative load from {_narr_toml.name} failed: {_e}")
     else:
         # Auto-discover: look for thresholds/<species>.toml (case-insensitive)
-        # so the user doesn't have to remember --thresholds every run.
+        # so the user doesn't have to remember --thresholds every run. A
+        # shadow focal discovers thresholds/<species>_shadow.toml instead,
+        # whose tables are keyed "<Species> (Shadow)" - so it never inherits
+        # the non-shadow base species' (gobattlekit-default) expert tiers.
         _species_lower = args.species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+        if args.shadow:
+            _species_lower += '_shadow'
         _auto_toml = Path(__file__).resolve().parent.parent / 'thresholds' / f'{_species_lower}.toml'
         if _auto_toml.exists():
             try:
@@ -5305,7 +5487,7 @@ def main():
                 import tomllib as _tomllib
                 with open(_auto_toml, 'rb') as _f:
                     _raw_toml = _tomllib.load(_f)
-                _article_table = _raw_toml.get(args.species, {}).get('article', {})
+                _article_table = _raw_toml.get(_thr_species, {}).get('article', {})
                 _article_slug = _article_table.get('slug', '')
                 if _article_slug:
                     logger.info(f"  Article link: articles/{_article_slug}/")
@@ -5318,7 +5500,7 @@ def main():
             # registry and are threaded through to the renderer directly.
             _species_narrative = {}
             try:
-                _sp = _raw_toml.get(args.species, {})
+                _sp = _raw_toml.get(_thr_species, {})
                 for _key in ('intro', 'meta_role', 'verdict'):
                     if _key in _sp and isinstance(_sp[_key], dict):
                         _species_narrative[_key] = _sp[_key]
@@ -5332,7 +5514,7 @@ def main():
             # it yet. The actual injection happens in enumerate_movesets
             # below; logging here lets the reader see the event / fast /
             # charged trio that drove the moveset enumeration.
-            _cd_prep = _raw_toml.get(args.species, {}).get('cd_prep', {})
+            _cd_prep = _raw_toml.get(_thr_species, {}).get('cd_prep', {})
             if _cd_prep:
                 _event = _cd_prep.get('event', '').strip()
                 _cd_prep_fast = list(_cd_prep.get('fast_moves') or [])
@@ -5417,13 +5599,13 @@ def main():
     _toml_tiers_loaded = False
     if threshold_registry is not None:
         thresholds = as_legacy_dict(
-            threshold_registry, args.species, args.league.capitalize(),
+            threshold_registry, _thr_species, args.league.capitalize(),
         ) or None
         if thresholds:
             _toml_tiers_loaded = True
         n_spreads = len(thresholds) if thresholds else 0
         n_anchors = 0
-        sp = threshold_registry.species(args.species)
+        sp = threshold_registry.species(_thr_species)
         if sp is not None:
             lt = sp.leagues.get(args.league.capitalize())
             if lt is not None:
@@ -5582,7 +5764,7 @@ def main():
     # works even when those opponents aren't in the top-N rankings. Only
     # fires when a threshold_registry is loaded (explicit or auto-discovered).
     if threshold_registry is not None:
-        _sp_for_opps = threshold_registry.species(args.species)
+        _sp_for_opps = threshold_registry.species(_thr_species)
         if _sp_for_opps is not None:
             _lt_for_opps = _sp_for_opps.leagues.get(args.league.capitalize())
             if _lt_for_opps is not None:
@@ -5873,7 +6055,7 @@ def main():
                         # provided so the auto-fallback only fills gaps.
                         existing_kinds: set[str] = set()
                         if threshold_registry is not None:
-                            sp_explicit = threshold_registry.species(args.species)
+                            sp_explicit = threshold_registry.species(_thr_species)
                             if sp_explicit is not None:
                                 lt_explicit = sp_explicit.leagues.get(
                                     args.league.capitalize()
@@ -5884,7 +6066,7 @@ def main():
 
                         survivor_iv_tuples = [r['iv'] for r in survivors]
                         auto_overlay = build_auto_anchors(
-                            species=args.species,
+                            species=_thr_species,
                             league=args.league,
                             opponent_species=list(opponents),
                             fast_move_id=fast_id,
@@ -5903,7 +6085,7 @@ def main():
 
                         # Count how many auto vs explicit for the log line
                         n_auto_anchors = 0
-                        sp_auto = auto_overlay.species(args.species)
+                        sp_auto = auto_overlay.species(_thr_species)
                         if sp_auto is not None:
                             lt_auto = sp_auto.leagues.get(
                                 args.league.capitalize()
@@ -5912,7 +6094,7 @@ def main():
                                 n_auto_anchors = len(lt_auto.anchors)
 
                         resolved = resolve_anchors(
-                            effective_registry, args.species, args.league,
+                            effective_registry, _thr_species, args.league,
                             moves_for_anchors, focal_types_for_anchors,
                             atk_min, atk_max,
                             def_min=def_min, def_max=def_max,
