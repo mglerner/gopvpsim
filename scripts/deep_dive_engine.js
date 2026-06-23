@@ -890,6 +890,42 @@ function renderMatchesList() {
     else rec2._rank = 99999;
   }
 
+  // Efficient-IV badges (credit orgodemir, u/orgodemir).
+  //   _isCrown: the mon's IV is globally Pareto-efficient for this
+  //             species/league (DATA.ivEfficient lookup; off-grid mons
+  //             have no canonical index so cannot be crowned).
+  //   _isTrophy: OUR addition. Among the user's QUALIFYING mons (those
+  //             that matched >=1 tier), a mon earns a trophy if it
+  //             dominates another qualifying mon on all three scaled
+  //             stats and none of theirs dominates it (best of what they
+  //             actually caught). Crown OUTRANKS trophy: a crowned mon
+  //             shows only the crown.
+  // Strict inequality (fact 2): identical (atk,def,hp) spreads never
+  // dominate each other, so duplicate-IV mons tie and get the same badge.
+  var _qualRecs = [];
+  for (var rq = 0; rq < state.userRecords.length; rq++) {
+    var _qrec = state.userRecords[rq];
+    _qrec._isCrown = !!(DATA.ivEfficient && _qrec.canonicalIvIdx >= 0 &&
+                        DATA.ivEfficient[_qrec.canonicalIvIdx]);
+    _qrec._isTrophy = false;
+    if (_qrec.matched && _qrec.matched.length > 0 && _qrec.stats) _qualRecs.push(_qrec);
+  }
+  function _dominates(a, b) {
+    var aa = a.stats.attack, ad = a.stats.defense, ah = a.stats.stamina;
+    var ba = b.stats.attack, bd = b.stats.defense, bh = b.stats.stamina;
+    return aa >= ba && ad >= bd && ah >= bh && (aa > ba || ad > bd || ah > bh);
+  }
+  for (var qi = 0; qi < _qualRecs.length; qi++) {
+    var domSomeone = false, dominated = false;
+    for (var qj = 0; qj < _qualRecs.length; qj++) {
+      if (qi === qj) continue;
+      if (_dominates(_qualRecs[qi], _qualRecs[qj])) domSomeone = true;
+      if (_dominates(_qualRecs[qj], _qualRecs[qi])) dominated = true;
+    }
+    // Crown outranks trophy: skip the trophy when already crowned.
+    _qualRecs[qi]._isTrophy = !_qualRecs[qi]._isCrown && domSomeone && !dominated;
+  }
+
   function powerUpText(rc) {
     if (rc.isOverCap) return '<span style="color:#e94560">OVER</span>';
     var curLv = rc.mon.level;
@@ -974,7 +1010,10 @@ function renderMatchesList() {
       h += '<td data-sort="' + hpVal + '">' + (rc.stats ? hpVal : '?') + '</td>';
       h += '<td>' + escapeHtml(rc.csvSpecies || '') +
            (rc.mon.lucky ? ' \u2728' : '') +
-           (rc.mon.is_shadow ? ' \u263d' : '') + '</td>';
+           (rc.mon.is_shadow ? ' \u263d' : '') +
+           (rc._isCrown ? ' <span title="Efficient: globally Pareto-optimal IVs (credit orgodemir)">\ud83d\udc51</span>'
+              : (rc._isTrophy ? ' <span title="Best of your qualifying mons (dominates another of yours on all scaled stats)">\ud83c\udfc6</span>' : '')) +
+           '</td>';
       h += '<td>' + powerUpText(rc) + '</td>';
       h += '<td data-sort="' + mcpVal + '">' + (rc.stats ? rc.stats.cp : '?') + '</td>';
       if (extras) {
@@ -1802,6 +1841,17 @@ function buildTraces() {
     }
   }
 
+  // Efficient (Pareto) overlay: index list derived from the boolean
+  // DATA.ivEfficient (parallel over the canonical IV indices). This is
+  // a lookup, not a recompute - the global Pareto frontier was computed
+  // server-side (gopvpsim.efficiency, credit orgodemir) at render time.
+  var effIvs = [];
+  if (DATA.ivEfficient) {
+    for (var efi = 0; efi < nIvs; efi++) {
+      if (DATA.ivEfficient[efi]) effIvs.push(efi);
+    }
+  }
+
   // Per-IV color: matches "what the point would look like in its base
   // trace." In threshold mode, tier color if tiered or per-point Viridis
   // matched against the Other trace's range if untiered. In stat/score
@@ -1842,7 +1892,7 @@ function buildTraces() {
   // state.anchorDisplayMode === 'outline', the filled markers become
   // transparent rings so the named-category traces drawing on top can
   // be read against the envelope edge instead of fighting fill.
-  function buildOverlayTrace(name, ivList, borderColor, subdued, outlineOnly, bigHighlight) {
+  function buildOverlayTrace(name, ivList, borderColor, subdued, outlineOnly, bigHighlight, forceSymbol, hoverSuffix) {
     if (!ivList || ivList.length === 0) return null;
     var ox = [], oy = [], ot = [], ocol = [], osym = [];
     for (var k = 0; k < ivList.length; k++) {
@@ -1862,9 +1912,9 @@ function buildTraces() {
       if (currentYIsSparse && !isFinite(av)) continue;
       ox.push(sp);
       oy.push(av);
-      ot.push(buildHoverText(iv));
+      ot.push(hoverSuffix ? (buildHoverText(iv) + hoverSuffix) : buildHoverText(iv));
       ocol.push(overlayFill(iv));
-      osym.push(overlaySymbol(iv));
+      osym.push(forceSymbol || overlaySymbol(iv));
     }
     if (ox.length === 0) return null;
     // Outline-only rendering: replace the per-point fill array with a
@@ -1917,6 +1967,14 @@ function buildTraces() {
   var anchorOutline = (state.anchorDisplayMode === 'outline');
   var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff', true, anchorOutline);
   if (anchorTrace) traces.push(anchorTrace);
+  // Efficient (Pareto) overlay: the globally Pareto-optimal IV spreads
+  // (orgodemir's "efficient" - no other spread for this species/league
+  // beats them on all three scaled stats). Subdued + a distinct
+  // 'cross' symbol so this large set reads as context, like Anchor IVs,
+  // without fighting the rarer slayer/rec sets that draw on top.
+  var effTrace = buildOverlayTrace('Efficient (Pareto)', effIvs, '#a020f0', true, false, false, 'cross',
+    '<br>Efficient IV: no other spread beats it on all of atk/def/hp.<br>Concept: orgodemir (u/orgodemir).');
+  if (effTrace) traces.push(effTrace);
   var slayerTrace = buildOverlayTrace('Slayer IVs', DATA.slayerIvs, '#FFD700');
   if (slayerTrace) traces.push(slayerTrace);
   // Spec Card Spreads draws last (after tier traces, below) would be

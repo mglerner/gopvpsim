@@ -54,6 +54,33 @@ The **Check my collection** paste box overlays your own Pokemon. Paste a Poke Ge
 CSV export and the scatter highlights which of your mons (and their pre-evolutions)
 land in each tier. The collection stays in your browser; nothing is uploaded.
 
+The scatter also carries an **Efficient (Pareto)** category. Hover the legend entry
+for the tooltip.
+
+## Efficient IVs: the crown and the trophy
+
+Two badges flag standout IV spreads.
+
+- **Crown (the crown glyph).** An IV spread is *efficient* when no other spread for
+  the same species and league beats it on all three scaled stats at once (Attack,
+  Defense, and HP at the league CP cap, with shadow multipliers applied). A dominated
+  spread wastes free stats, since some other reachable spread is at least as good on
+  every stat and strictly better on one. Efficiency does not depend on the threshold
+  set you are looking at: if a spread is efficient at all, it stays efficient in every
+  list it appears in. The crown shows up on the infographic spreads, the threshold-tier
+  IV lists, the per-matchup IV finder, the scatter "Efficient (Pareto)" category, and
+  your collection table. This is orgodemir's "efficient IV" concept (u/orgodemir,
+  https://www.reddit.com/r/TheSilphArena/comments/yxzg7f/).
+- **Trophy (the trophy glyph).** This is this project's own addition, not orgodemir's.
+  It appears only in your pasted-collection table. Among your mons that qualify for a
+  target, a mon earns a trophy when it dominates another of your own mons on all three
+  scaled stats and none of yours dominates it back: it is the best of what you actually
+  caught. The crown outranks the trophy, so a mon that earns a crown shows only the
+  crown.
+
+Identical IV spreads are treated as ties (the comparison is strict), so duplicate IVs
+all get the same badge.
+
 ## IV Recommendations
 
 The canonical "which IV should I build" section. It folds three things that used to

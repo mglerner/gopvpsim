@@ -371,6 +371,8 @@ DEEP_DIVE_CSS = """
 /* Opponent-name deep links (tier-card coverage + stealable bucket). */
 .dd-opp-link { text-decoration: none; border-bottom: 1px dotted currentColor; }
 .dd-opp-link:hover { border-bottom-style: solid; }
+.dd-eff-crown { cursor: help; position: relative; }
+.dd-eff-crown:hover::after { content: "Efficient IV: no other spread beats it on attack, defense and HP at once (orgodemir)"; position: absolute; left: 1.1em; top: -0.3em; z-index: 30; white-space: nowrap; background: #16213e; color: #e6ecf5; border: 1px solid #0f3460; border-radius: 4px; padding: 3px 7px; font-size: 11px; font-style: normal; font-weight: normal; pointer-events: none; }
 .dd-steal-block { margin: 6px 0; }
 .dd-collapsible { margin: 4px 0; }
 .dd-collapsible > summary { list-style: none; }
@@ -605,6 +607,23 @@ def opp_importance(scores_flat, nIvs, nS, nO, si, top_set, opponents):
 
 def iv_label(data, iv):
     return f"{data['ivA'][iv]}/{data['ivD'][iv]}/{data['ivS'][iv]}"
+
+
+def efficient_crown_html(data, iv):
+    """Crown (orgodemir "efficient") for a globally Pareto-optimal IV, else ''.
+
+    Reads the precomputed ``ivEfficient`` boolean array (parallel over canonical
+    IV indices, built in deep_dive.generate_interactive_html). Per the
+    threshold-independence fact, the efficient IVs within any threshold set are
+    exactly the globally efficient ones, so this same lookup is correct in every
+    qualifying-IV list."""
+    eff = data.get('ivEfficient') or []
+    if iv < len(eff) and eff[iv]:
+        # No per-instance title: the explanation lives once in the .dd-eff-crown
+        # CSS tooltip (these crowns number in the hundreds per dive, so a repeated
+        # title attribute would bloat the HTML by tens of KB).
+        return ' <span class="dd-eff-crown">\U0001F451</span>'
+    return ''
 
 
 
@@ -1483,8 +1502,9 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
                 badge = (f' <span class="dd-atk-weight '
                          f'dd-atk-weight-{_slug}"{tooltip_attr(_tip)}>'
                          f'{_weight}</span>')
+            crown = efficient_crown_html(data_obj, m_idx)
             parts.append(
-                f'<p{row_cls}><b>{label}</b>{badge} - '
+                f'<p{row_cls}><b>{label}</b>{crown}{badge} - '
                 f'atk {atk:.2f}, def {def_:.2f}, hp {hp}, '
                 f'SP&nbsp;#{sp_rank}</p>\n'
             )
@@ -2099,7 +2119,8 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                            if row_i >= max_members_shown else '')
                 parts.append(
                     f'<tr{row_cls}>'
-                    f'<td>{triple[0]}/{triple[1]}/{triple[2]}</td>'
+                    f'<td>{triple[0]}/{triple[1]}/{triple[2]}'
+                    f'{efficient_crown_html(data_obj, iv)}</td>'
                     f'<td>{data_obj["ivAtk"][iv]:.2f}</td>'
                     f'<td>{data_obj["ivDef"][iv]:.2f}</td>'
                     f'<td>{data_obj["ivHp"][iv]}</td>'
