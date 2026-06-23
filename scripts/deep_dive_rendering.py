@@ -2520,7 +2520,7 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
     n_af = len(categories.get('Anchors-First Slayer', []) or [])
     n_cf = len(categories.get('CMP-First Slayer', []) or [])
     parts.append(
-        f'<details class="dd-collapsible">'
+        f'<details class="dd-collapsible" id="dd-slayer-builds">'
         f'<summary class="dd-h3" style="cursor:pointer">'
         f'Slayer Builds '
         f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
