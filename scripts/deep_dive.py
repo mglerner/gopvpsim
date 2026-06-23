@@ -77,6 +77,7 @@ from gopvpsim.anchors import (
     derive_short_name,
 )
 from gopvpsim.display import pretty_species
+from gopvpsim.efficiency import efficient_frontier
 sys.path.insert(0, os.path.dirname(__file__))
 import deep_dive_analysis as analysis
 import deep_dive_rendering as rendering
@@ -3549,6 +3550,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     iv_hp = [m[7] for m in meta]
     iv_sp = [round(m[5] * m[6] * m[7], 1) for m in meta]
 
+    # orgodemir's "efficient IV" frontier (u/orgodemir,
+    # reddit.com/r/TheSilphArena/comments/yxzg7f/): an IV spread is efficient
+    # iff no OTHER spread dominates it on all three scaled stats (>= on each,
+    # strictly > on at least one). Threshold-independent, so compute the global
+    # frontier once over the displayed (rounded) ivAtk/ivDef/ivHp arrays and
+    # reuse everywhere. For a shadow dive these are shadow-boosted, so the
+    # frontier lives in shadow-effective space (correct).
+    iv_efficient = efficient_frontier(list(zip(iv_atk, iv_def, iv_hp)))
+
     # Compute stat product ranks (same for all movesets)
     sp_sorted = sorted(range(n_ivs), key=lambda i: iv_sp[i], reverse=True)
     sp_ranks = [0] * n_ivs
@@ -3635,6 +3645,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'ivA': iv_a, 'ivD': iv_d, 'ivS': iv_s,
         'ivLv': iv_lv, 'ivCp': iv_cp,
         'ivAtk': iv_atk, 'ivDef': iv_def, 'ivHp': iv_hp,
+        'ivEfficient': iv_efficient,
         'ivSp': iv_sp, 'spRanks': sp_ranks, 'ivTiers': iv_tiers, 'ivAllTiers': iv_all_tiers,
     }
 

@@ -48,6 +48,7 @@ class Spread:
     cp: int
     sp_rank: int           # stat-product rank (1 = bulkiest)
     style: str             # role label, e.g. "Attack Weight"
+    is_efficient: bool = False  # globally Pareto-efficient IV (orgodemir crown)
     cover_breakpoints: list = field(default_factory=list)  # named opps (BP) census
     cover_bulkpoints: list = field(default_factory=list)   # named opps (bulk) census
     n_breakpoint_opps: int = 0  # census count of distinct BP opponents cleared
@@ -142,6 +143,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
     rec_candidates = card_ctx.get('rec_candidates') or []
     flips = card_ctx.get('flips') or {}
     has_bait = card_ctx.get('has_bait_axis', False)
+    iv_efficient = data_obj.get('ivEfficient') or []
     spreads = []
     for rc in rec_candidates[:REC_MAX_SPREADS]:
         iv = rc['iv']
@@ -156,6 +158,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
             n_bulkpoint_opps=rc.get('n_bulkpoint_opps') or 0,
             n_breakpoint_newly=rc.get('n_breakpoint_newly') or 0,
             flip_fd=flips.get(iv), flip_has_bait=has_bait,
+            is_efficient=bool(iv_efficient[iv]) if iv < len(iv_efficient) else False,
         ))
 
     # Item 5: base-form label for the "N newly guaranteed vs base form" line.
@@ -417,8 +420,12 @@ def _spread_html(s: Spread, link_opps=False, base_form_display=None,
     cover = _cover_html(s, link_opps, base_form_display, shadow)
     _fh = _flip_html(s.flip_fd, s.flip_has_bait, link_opps)
     flips = f'<div class="flips">{_fh}</div>' if _fh else ''
+    # Crown (orgodemir "efficient" = globally Pareto-optimal IV).
+    crown = (' <span class="ddcard-crown" title="Efficient IV (Pareto-optimal): '
+             'no other spread beats it on all of attack, defense and HP)">'
+             '\U0001F451</span>') if s.is_efficient else ''
     return (f'<div class="ddcard-spread">{role}'
-            f'<div class="iv">{html.escape(s.iv_str)}</div>'
+            f'<div class="iv">{html.escape(s.iv_str)}{crown}</div>'
             f'<div class="stats">{s.atk:.1f} atk / {s.def_:.1f} def / {s.hp} hp'
             f' &middot; CP {s.cp} &middot; SP #{s.sp_rank}</div>{cover}{flips}</div>')
 
