@@ -1460,6 +1460,35 @@ def compute_iv_metadata(species, league, shadow=False, iv_floor=None):
 slayer.compute_iv_metadata = compute_iv_metadata
 
 
+def base_form_focal(species, shadow):
+    """Resolve the "base form" of a boosted/variant focal, for the dive-card
+    "N newly guaranteed vs base form" census (item 5).
+
+    Returns ``(base_species, base_shadow, base_display)`` when a base form
+    exists and the gate applies, else ``None``. Gate (deliberately narrow):
+
+      * SHADOW focal  -> base is the same species, non-shadow. The x1.2 atk /
+        x0.833 def boost reshapes win/loss MEMBERSHIP, so the base set is a
+        real re-sim, not a scalar of the shadow set.
+      * FEMALE sex-variant focal (``"X (Female)"``, e.g. Oinkologne) -> base
+        is the male sibling ``"X"`` (different base stats -> a real re-sim).
+
+    NOT gated: a male focal (it IS the base form), Alolan / Galarian / Kanto
+    regional forms (those are their own species with no shared "base" the
+    reader thinks of as the boost-off comparison).
+    """
+    if shadow:
+        return (species, False, pretty_species(species))
+    if species.endswith(' (Female)'):
+        base = species[:-len(' (Female)')]
+        try:
+            get_species(base)
+        except KeyError:
+            return None
+        return (base, False, pretty_species(base))
+    return None
+
+
 def _stat_profile_key(meta, per_iv=False):
     """Profile key for sweep dedup. With per_iv, the key also carries
     (IVs, level) so every IV spread sims separately — required for
@@ -2394,7 +2423,9 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                                anchor_passing_sink=None,
                                threshold_registry=None,
                                moveset0_flavors_for_rename=None,
-                               focal_shadow=False):
+                               focal_shadow=False,
+                               scores_base_arrays=None,
+                               base_form_info=None):
     """Generate the full analysis HTML for injection into the interactive page.
 
     Returns (css_str, results_html_str, analysis_html_str).
@@ -2701,6 +2732,66 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             c = _census_cache[iv] = (sorted(bp), sorted(blk))
         return c
 
+    # Item 5: BASE-FORM breakpoint census. For a shadow (or Female-sex) focal,
+    # build the SAME census against the base form's own sim + effective stats,
+    # so we can report "N breakpoints newly guaranteed by the boost". The base
+    # set is NOT scalable from the shadow set (the x1.2/x0.833 boost reshapes
+    # win/loss membership), so the base scores come from a real second sim pass
+    # baked at dive time (deep_dive.main's base-form pass -> scores_base_arrays).
+    # Graceful degrade: missing scores_base_arrays (old blobs) -> empty census
+    # -> n_breakpoint_newly stays 0 -> the card sentence is omitted.
+    _base_census_cover = None
+    if scores_base_arrays and base_form_info:
+        try:
+            _bm = compute_iv_metadata(
+                base_form_info['species'], league,
+                shadow=base_form_info.get('shadow', False))
+        except Exception:
+            _bm = []
+        # IV enumeration must line up index-for-index with data_obj / the base
+        # score grid. Shadow shares base stats with its non-shadow form so the
+        # skip-set is identical; a sex sibling with a different skip-set length
+        # would mis-index, so we only proceed on an exact length match.
+        if len(_bm) == nIvs:
+            _base_ivAtk = [m['atk'] for m in _bm]
+            _base_ivDef = [m['def_'] for m in _bm]
+            _base_ivHp = [m['hp'] for m in _bm]
+            _base_data_obj = dict(data_obj)
+            _base_data_obj['ivAtk'] = _base_ivAtk
+            _base_data_obj['ivDef'] = _base_ivDef
+            _base_data_obj['ivHp'] = _base_ivHp
+            _base_boundaries = []
+            _bb_seen = set()
+            for _mode in all_modes:
+                _bscores = scores_base_arrays.get(f'{moveset_idx}_{_mode}', [])
+                if not _bscores:
+                    continue
+                for _sweep in ('def', 'atk'):
+                    for mb in _find_matchup_boundaries(
+                            _bscores, nIvs, nS, nO, _base_data_obj,
+                            scenarios, opponents, sweep_stat=_sweep):
+                        _k = (mb['opponent'], mb['stat'], mb['threshold'])
+                        if _k in _bb_seen:
+                            continue
+                        _bb_seen.add(_k)
+                        _base_boundaries.append(mb)
+            _base_census_cache: dict = {}
+
+            def _base_census_cover(iv):
+                """Base-form (breakpoint_opps, bulkpoint_opps) the spread clears,
+                using the base form's effective stats + its own boundaries."""
+                c = _base_census_cache.get(iv)
+                if c is None:
+                    atk, dfn = _base_ivAtk[iv], _base_ivDef[iv]
+                    bp, blk = set(), set()
+                    for mb in _base_boundaries:
+                        if mb['stat'] == 'atk' and atk >= mb['threshold']:
+                            bp.add(pretty_species(mb['opponent']))
+                        elif mb['stat'] == 'def' and dfn >= mb['threshold']:
+                            blk.add(pretty_species(mb['opponent']))
+                    c = _base_census_cache[iv] = (sorted(bp), sorted(blk))
+                return c
+
     # Rarity-gated NOTABLE tiers: built over the WIDE strong pool so the bulk
     # pole's high def-side tiers are present and counted. A tier is notable iff
     # at most REC_NOTABLE_MAX_CLEAR_FRAC of the strong pool clears it. Reused for
@@ -2862,6 +2953,12 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             rc['cover_bulkpoints'] = blk
             rc['n_breakpoint_opps'] = len(bp)
             rc['n_bulkpoint_opps'] = len(blk)
+            # Item 5: breakpoints the BOOST newly guarantees -- opponents this
+            # spread clears a breakpoint against as a shadow/variant but NOT as
+            # the base form. set difference of display-name sets (per spread).
+            if _base_census_cover is not None:
+                base_bp, _ = _base_census_cover(iv)
+                rc['n_breakpoint_newly'] = len(set(bp) - set(base_bp))
 
     # Reorder chosen rc dicts so the lead (rank-1 battle-score) spread leads
     # (card headline / _rec_idx read chosen_recs[0]), then by composite score.
@@ -3246,6 +3343,9 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         'single_iv_winrate': {
             'frac': (_siv_w / _siv_t if _siv_t else 0.0),
             'pool': nO, 'scenarios': nS},
+        # Item 5: base-form label for the "N newly guaranteed vs base form"
+        # card sentence. None (old blobs / non-gated focals) -> sentence omitted.
+        'base_form': (base_form_info if _base_census_cover is not None else None),
     }
 
     return css, results_html, ''.join(analysis_parts)
@@ -3544,6 +3644,22 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         for mode in opp_iv_modes:
             key = f'{mi}_{mode}'
             score_arrays[key] = md['scores'][mode]
+
+    # Item 5: base-form score arrays (only the movesets that carry a
+    # 'scores_base' -- currently moveset 0 on shadow/Female-sex focals).
+    # Old replay blobs lack the key entirely, so this stays empty and the
+    # downstream census line is silently omitted (graceful degrade).
+    scores_base_arrays = {}
+    base_form_info = None
+    for mi, md in enumerate(moveset_data):
+        sb = md.get('scores_base')
+        if not sb:
+            continue
+        if base_form_info is None:
+            base_form_info = md.get('base_form')
+        for mode in opp_iv_modes:
+            if mode in sb:
+                scores_base_arrays[f'{mi}_{mode}'] = sb[mode]
 
     # Compute cluster gap Y-values per (moveset, opp_iv_mode, scenario)
     # These are the score thresholds where significant gaps appear in the
@@ -4374,7 +4490,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         anchor_passing_sink=anchor_passing_sink,
         threshold_registry=threshold_registry,
         moveset0_flavors_for_rename=moveset0_flavors,
-        focal_shadow=shadow)
+        focal_shadow=shadow,
+        scores_base_arrays=scores_base_arrays,
+        base_form_info=base_form_info)
     # Tripwire: a split-mode file must carry its OWN moveset's analysis.
     # This is what would have caught the fa34f39 cache immediately.
     if split_info is not None:
@@ -6323,6 +6441,42 @@ def main():
                 'scores': scores_by_mode,
                 'meta': meta,
             })
+
+        # ---- Item 5: base-form sim pass (shadow / Female-sex focals only) ----
+        # The dive card's "N newly guaranteed vs base form" line needs a SECOND
+        # focal sim at base stats over the SAME opponents + scenarios + modes +
+        # 4096 IV grid. The shadow boost (or sibling base stats) reshapes
+        # win/loss MEMBERSHIP, so the base census can't be scaled from the
+        # shadow set -- it's a real re-sim. Only moveset 0 feeds the card, so
+        # we re-sim only that moveset. Opponents are unchanged, so the existing
+        # opponent cache / sweep machinery is reused (no opponent re-sim).
+        _base_focal = base_form_focal(args.species, args.shadow)
+        if _base_focal and moveset_data:
+            _base_species, _base_shadow, _base_disp = _base_focal
+            _b_fast, _b_charged = all_moveset_results[0][0], all_moveset_results[0][1]
+            logger.info(f"  Base-form census pass: {_base_disp} "
+                        f"(item 5; reuses opponent cache)")
+            _base_scores_by_mode = {}
+            for mode in opp_iv_modes_to_run:
+                t0 = time.time()
+                _, _bn, _bcs, _ = iv_sweep(
+                    _base_species, _b_fast, _b_charged, args.league, _base_shadow,
+                    opponents, opp_movesets_full, shield_scenarios,
+                    opp_iv_mode=mode,
+                    iv_floor=args.iv_floor,
+                    log_path=log_path, verbose=args.verbose,
+                    threshold_registry=threshold_registry,
+                    reserve_cpus=args.reserve_cpus,
+                    signature_dedup=not args.no_signature_dedup,
+                    use_sweep_cache=not args.no_sweep_cache,
+                )
+                logger.info(f"    base {_bn:,} sims in {time.time() - t0:.1f}s "
+                            f"({mode_pretty_label(mode)})")
+                _base_scores_by_mode[mode] = _bcs
+            moveset_data[0]['scores_base'] = _base_scores_by_mode
+            moveset_data[0]['base_form'] = {
+                'species': _base_species, 'shadow': _base_shadow,
+            }
 
         # All render inputs are now in hand: snapshot them so
         # scripts/replay_analysis.py can re-render this dive after
