@@ -40,3 +40,30 @@ PVPOKE_ATTRIBUTION_TEXT = (
     "battle logic and all game data comes from PvPoke. This project would not "
     "exist without it."
 )
+
+
+def support_footer_html(prefix: str = "") -> str:
+    """Tiny sitewide footer linking the support / credits page.
+
+    Wired into every generated page type (deep dives, the index, articles, and
+    ML IV guides). ``prefix`` is the relative path from the page back to the
+    website root so ``support.html`` resolves at every directory depth:
+
+    * index (``index.html``)            -> ``""``         -> ``support.html``
+    * deep dive (``<dive>/index.html``) -> ``"../"``      -> ``../support.html``
+    * article / guide (``articles/<x>/index.html``) -> ``"../../"``
+
+    ASCII only (no em-dashes) so it renders cleanly as UI text. Kept small so
+    it adds no meaningful per-page weight.
+    """
+    href = f"{prefix}support.html"
+    return (
+        '<footer style="margin-top:30px;border-top:1px solid #0f3460;'
+        'padding-top:12px;font-size:0.8rem;color:#888;text-align:center">'
+        'pogo-dives is free. '
+        f'<a href="{href}" style="color:#9be89b;text-decoration:none">'
+        'Support the developer</a> | '
+        f'<a href="{href}" style="color:#9be89b;text-decoration:none">'
+        'Credits</a>'
+        '</footer>\n'
+    )

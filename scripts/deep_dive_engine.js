@@ -890,7 +890,7 @@ function renderMatchesList() {
     else rec2._rank = 99999;
   }
 
-  // Efficient-IV badges (credit orgodemir, u/orgodemir).
+  // Efficient-IV badges.
   //   _isCrown: the mon's IV is globally Pareto-efficient for this
   //             species/league (DATA.ivEfficient lookup; off-grid mons
   //             have no canonical index so cannot be crowned).
@@ -1011,7 +1011,7 @@ function renderMatchesList() {
       h += '<td>' + escapeHtml(rc.csvSpecies || '') +
            (rc.mon.lucky ? ' \u2728' : '') +
            (rc.mon.is_shadow ? ' \u263d' : '') +
-           (rc._isCrown ? ' <span title="Efficient: globally Pareto-optimal IVs (credit orgodemir)">\ud83d\udc51</span>'
+           (rc._isCrown ? ' <span title="Efficient: globally Pareto-optimal IVs">\ud83d\udc51</span>'
               : (rc._isTrophy ? ' <span title="Best of your qualifying mons (dominates another of yours on all scaled stats)">\ud83c\udfc6</span>' : '')) +
            '</td>';
       h += '<td>' + powerUpText(rc) + '</td>';
@@ -1844,7 +1844,7 @@ function buildTraces() {
   // Efficient (Pareto) overlay: index list derived from the boolean
   // DATA.ivEfficient (parallel over the canonical IV indices). This is
   // a lookup, not a recompute - the global Pareto frontier was computed
-  // server-side (gopvpsim.efficiency, credit orgodemir) at render time.
+  // server-side (gopvpsim.efficiency) at render time.
   var effIvs = [];
   if (DATA.ivEfficient) {
     for (var efi = 0; efi < nIvs; efi++) {
@@ -1968,12 +1968,12 @@ function buildTraces() {
   var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff', true, anchorOutline);
   if (anchorTrace) traces.push(anchorTrace);
   // Efficient (Pareto) overlay: the globally Pareto-optimal IV spreads
-  // (orgodemir's "efficient" - no other spread for this species/league
+  // ("efficient" - no other spread for this species/league
   // beats them on all three scaled stats). Subdued + a distinct
   // 'cross' symbol so this large set reads as context, like Anchor IVs,
   // without fighting the rarer slayer/rec sets that draw on top.
   var effTrace = buildOverlayTrace('Efficient (Pareto)', effIvs, '#a020f0', true, false, false, 'cross',
-    '<br>Efficient IV: no other spread beats it on all of atk/def/hp.<br>Concept: orgodemir (u/orgodemir).');
+    '<br>Efficient IV: no other spread beats it on all of atk/def/hp.');
   if (effTrace) traces.push(effTrace);
   var slayerTrace = buildOverlayTrace('Slayer IVs', DATA.slayerIvs, '#FFD700');
   if (slayerTrace) traces.push(slayerTrace);

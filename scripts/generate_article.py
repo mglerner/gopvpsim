@@ -48,7 +48,10 @@ from render_article import (  # type: ignore[import-not-found]
 
 from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
 from gopvpsim.pokemon import iv_rank  # type: ignore[import-not-found]
-from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML  # type: ignore[import-not-found]
+from gopvpsim.attribution import (  # type: ignore[import-not-found]
+    PVPOKE_ATTRIBUTION_HTML,
+    support_footer_html,
+)
 import auto_gen_narrative  # type: ignore[import-not-found]
 
 from compare_loadouts import (  # type: ignore[import-not-found]
@@ -3502,7 +3505,7 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   }});
 }})();
 </script>
-</body>
+{support_footer_html("../../")}</body>
 </html>
 """
 

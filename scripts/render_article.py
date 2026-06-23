@@ -35,7 +35,10 @@ WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
 ARTICLES_DIR = WEBSITE_DIR / 'articles'
 
 sys.path.insert(0, str(REPO_ROOT / 'src'))
-from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML  # noqa: E402  # type: ignore[import-not-found]
+from gopvpsim.attribution import (  # noqa: E402  # type: ignore[import-not-found]
+    PVPOKE_ATTRIBUTION_HTML,
+    support_footer_html,
+)
 
 
 def load_article(path: Path) -> dict:
@@ -308,7 +311,7 @@ def render_html(article: dict) -> str:
   <p>By {author}</p>
   <p>{PVPOKE_ATTRIBUTION_HTML}</p>
 </footer>
-</body>
+{support_footer_html("../../")}</body>
 </html>
 """
 
