@@ -299,8 +299,9 @@ cohort; the top-quartile rows are highlighted.
 
 ## The infographic and its vocabulary
 
-AI-generated: drafted by Claude (Opus 4.8) on 2026-06-23, accepted as-is by Michael
-Lerner. Below covers the infographic at the top of every
+Attribution: hybrid (AI + expert), the project's "both" tier. The prose was AI-drafted
+by Claude (Opus 4.8) on 2026-06-23 and reviewed by Michael Lerner; the methodology it
+describes was shaped by community experts. Below covers the infographic at the top of every
 dive and the opponent-centric / IV-recommendation sections added in the 2026-06
 content rework.
 

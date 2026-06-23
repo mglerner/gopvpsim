@@ -1,6 +1,6 @@
 # How to read a deep dive
 
-AI-generated: drafted by Claude (Opus 4.8) on 2026-06-23, accepted as-is by Michael Lerner.
+Attribution: hybrid (AI + expert), the project's "both" tier. The prose was AI-drafted by Claude (Opus 4.8) on 2026-06-23 and reviewed by Michael Lerner; the methodology it describes was shaped by community experts.
 
 A deep-dive page packs a lot into one scroll. This guide walks the page top to
 bottom and says what each part answers, so you can jump to the piece you need
