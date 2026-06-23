@@ -1,6 +1,6 @@
 # How to read a deep dive
 
-DRAFT - 2026-06-23, pending review.
+AI-generated: drafted by Claude (Opus 4.8) on 2026-06-23, accepted as-is by Michael Lerner.
 
 A deep-dive page packs a lot into one scroll. This guide walks the page top to
 bottom and says what each part answers, so you can jump to the piece you need
