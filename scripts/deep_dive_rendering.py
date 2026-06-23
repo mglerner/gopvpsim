@@ -611,18 +611,24 @@ def _bait_suffix(entry):
     return ''
 
 
-def prose_flip_summary(flip_data, max_gains=3, max_losses=2, has_bait_axis=False):
+def prose_flip_summary(flip_data, max_gains=3, max_losses=2, has_bait_axis=False,
+                       name_html=None):
     """Generate a natural-language summary of matchup gains/losses.
 
-    Returns a string like "gains Togekiss 1v2, G. Stunfisk 2v0; loses Steelix 0v2, 1v2"
+    Returns a string like "gains Togekiss 1v2, G. Stunfisk 2v0; loses Steelix 0v2, 1v2".
+    ``name_html`` (opp -> html) optionally renders each opponent name as HTML
+    (e.g. an escaped #opp-<slug> link for the dive card); when None the names are
+    plain text (the default for the dive's own callers, which escape downstream).
     """
+    def _nm(o):
+        return name_html(o) if name_html else o
     parts = []
     gains = flip_data.get('gains', [])
     losses = flip_data.get('losses', [])
     if gains:
         # Sort by delta descending
         top = sorted(gains, key=lambda e: e['iv_score'] - e['ref_score'], reverse=True)[:max_gains]
-        gain_strs = [f'{e["opponent"]} {e["scenario"]}{_bait_suffix(e) if has_bait_axis else ""}' for e in top]
+        gain_strs = [f'{_nm(e["opponent"])} {e["scenario"]}{_bait_suffix(e) if has_bait_axis else ""}' for e in top]
         extra = len(gains) - len(top)
         s = 'gains ' + ', '.join(gain_strs)
         if extra > 0:
@@ -630,7 +636,7 @@ def prose_flip_summary(flip_data, max_gains=3, max_losses=2, has_bait_axis=False
         parts.append(s)
     if losses:
         top = sorted(losses, key=lambda e: e['ref_score'] - e['iv_score'], reverse=True)[:max_losses]
-        loss_strs = [f'{e["opponent"]} {e["scenario"]}{_bait_suffix(e) if has_bait_axis else ""}' for e in top]
+        loss_strs = [f'{_nm(e["opponent"])} {e["scenario"]}{_bait_suffix(e) if has_bait_axis else ""}' for e in top]
         extra = len(losses) - len(top)
         s = 'loses ' + ', '.join(loss_strs)
         if extra > 0:
@@ -832,17 +838,29 @@ def anchor_group_id(parent, opponent, target_stat, move_id):
     return 'af-' + _hl.md5(key.encode('utf-8')).hexdigest()[:10]
 
 
-def opp_slug(name: str) -> str:
-    """Slugify an opponent display name for deep-link anchor ids.
+_OPP_FORM_QUALIFIERS = ('shadow', 'galarian', 'alolan', 'hisuian',
+                        'paldean', 'mega')
 
-    'Stunfisk (Galarian)' -> 'stunfisk-galarian'. Shared with
-    ``generate_article.py`` so the
-    article's Matchup Delta opponent links land on the matching
-    ``#opp-<slug>`` id inside the dive's standalone Matchup-Flipping
-    Boundaries / Anchor-Driven Matchup Flips sections.
+
+def opp_slug(name: str) -> str:
+    """Slugify an opponent display name to a deep-link anchor id, CANONICAL
+    across naming variants so card links and dive anchors agree:
+    'Galarian Corsola' and 'Corsola (Galarian)' both -> 'corsola-galarian';
+    'Shadow Altaria' and 'Altaria (Shadow)' both -> 'altaria-shadow'. Form
+    qualifiers are pulled out wherever they appear and appended in sorted
+    order. Plain names are unchanged, and a *display-name* slug is byte-
+    identical to the pre-canonicalization output (qualifiers were already
+    trailing), so the ``generate_article.py`` Matchup-Delta deep-link contract
+    (also via opp_slug) is preserved.
     """
-    return re.sub(r'^-|-$', '',
-                  re.sub(r'[^a-z0-9]+', '-', name.lower()))
+    n = name.lower()
+    quals = []
+    for q in _OPP_FORM_QUALIFIERS:
+        if re.search(rf'(^|[^a-z]){q}([^a-z]|$)', n):
+            quals.append(q)
+            n = re.sub(rf'(^|[^a-z]){q}([^a-z]|$)', r'\1\2', n)
+    base = re.sub(r'^-|-$', '', re.sub(r'[^a-z0-9]+', '-', n))
+    return '-'.join([base] + sorted(quals)) if quals else base
 
 
 def render_species_narrative(narrative: dict) -> str:
@@ -3281,6 +3299,19 @@ def _render_boundary_cutoff_line(b, has_bait_axis):
             f'<span class="dd-small">[{b["n_passing"]} IVs clear it]</span></li>')
 
 
+# On #opp-<slug> navigation (e.g. a click from the dive card), open every
+# ancestor <details> of the target (the section + its row) and scroll to it --
+# anchor links into a collapsed <details> don't auto-open in most browsers.
+_OPP_THREATS_JS = (
+    '<script>(function(){function o(){var h=location.hash;'
+    'if(!h||h.indexOf("#opp-")!==0)return;'
+    'var el=document.getElementById(h.slice(1));if(!el)return;'
+    'var p=el;while(p){if(p.tagName==="DETAILS")p.open=true;p=p.parentElement;}'
+    'el.scrollIntoView();}window.addEventListener("hashchange",o);'
+    'if(document.readyState!=="loading")o();'
+    'else document.addEventListener("DOMContentLoaded",o);})();</script>\n')
+
+
 def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                                     scenarios, opponents, nS, nO, data_obj,
                                     opp_label, has_bait_axis=False,
@@ -3360,7 +3391,11 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
     def _hoist(label_html, names):
         if not names:
             return ''
-        bits = ', '.join(_opp_b(n) for n in sorted(names))
+        # id="opp-<slug>" on each hoisted name so the card's coverage/flip links
+        # land here too (decision rows carry the id on their row div).
+        bits = ', '.join(
+            f'<span id="opp-{opp_slug(n)}">{_opp_b(n)}</span>'
+            for n in sorted(names))
         return (f'<p class="dd-small" style="margin:4px 0">{label_html} '
                 f'{bits}</p>\n')
 
@@ -3376,6 +3411,7 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                      'build-sensitive matchups in this pool -- every opponent '
                      'is decided the same way by all recommended spreads.</p>\n')
         parts.append('</details>\n')
+        parts.append(_OPP_THREATS_JS)
         return ''.join(parts)
 
     # Most constrained first: opponents only ONE recommended build wins (you must
@@ -3425,6 +3461,7 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
         parts.append('</div>\n')   # dd-opp-row
     parts.append('</div>\n')       # dd-opp-rows
     parts.append('</details>\n')
+    parts.append(_OPP_THREATS_JS)
     return ''.join(parts)
 
 
