@@ -4090,6 +4090,33 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .matches-toggle-btn:hover {{ background: #1a3a6e; }}
   span.user-anchor-hits {{ font-size: 11px; font-style: italic;
                            margin-left: 6px; }}
+  /* Section sidenav. Mirrors the ML IV-guide pages
+     (scripts/render_iv_envelope_article.py): sticky side column at wide
+     widths, horizontal bar at the top of the content below the 820px
+     breakpoint. The .layout wrapper begins AFTER the dive card so the
+     infographic stays the first content block; at narrow width the nav
+     stacks under the card (it is the first child of .layout), never
+     above it. */
+  .dd-layout {{ display: flex; gap: 28px; align-items: flex-start; }}
+  nav.dd-toc {{ position: sticky; top: 14px; flex: 0 0 220px;
+                font-size: 13px; background: #16213e; border-radius: 6px;
+                padding: 12px 14px; max-height: calc(100vh - 28px);
+                overflow-y: auto; }}
+  nav.dd-toc strong {{ color: #e94560; display: block; margin-bottom: 6px;
+                       font-size: 12px; text-transform: uppercase;
+                       letter-spacing: .04em; }}
+  nav.dd-toc a {{ display: block; color: #58a6ff; padding: 2px 0;
+                  text-decoration: none; }}
+  nav.dd-toc a:hover {{ text-decoration: underline; }}
+  .dd-main {{ flex: 1; min-width: 0; }}
+  @media (max-width: 820px) {{
+    .dd-layout {{ flex-direction: column; }}
+    nav.dd-toc {{ position: static; flex: none; width: auto; }}
+    nav.dd-toc {{ display: flex; flex-wrap: wrap; gap: 2px 16px;
+                  align-items: center; }}
+    nav.dd-toc strong {{ width: 100%; margin-bottom: 2px; }}
+    nav.dd-toc a {{ display: inline-block; padding: 2px 0; }}
+  }}
 </style>
 </head>
 <body>
@@ -4097,6 +4124,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 <p class="meta">Opponents: {opp_desc}
 | Shield scenario(s): {shield_desc} | Policy: pvpoke_dp{_bait_meta}</p>
 <!-- DIVE_CARD_SLOT -->
+<!-- DD_LAYOUT_OPEN -->
 """
 
     # Related article link (bidirectional link contract: docs/article_schema.md)
@@ -4150,7 +4178,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # No separate threshold-info box needed - graph legend has full detail
 
     # Controls
-    html += '<div class="controls">\n'
+    html += '<div class="controls" id="dd-scatter">\n'
     if split_info is not None:
         # URL-navigating dropdown: onchange jumps to a sibling HTML file
         # for the selected moveset. Uses a distinct id ('moveset-nav-sel')
@@ -4637,6 +4665,36 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # Results section is always visible; analysis is behind a toggle
     html += results_html
     html += analysis_html
+
+    # ---- Section sidenav (mirrors the ML IV-guide pages) ----
+    # Candidate nav items in the on-page section order. Each entry is only
+    # emitted when its target id is actually present in the assembled body
+    # (e.g. #dd-opp-threats / #dd-slayer-builds are absent on some dives),
+    # so every href resolves to a real anchor (zero dangling links). The
+    # .dd-layout wrapper begins right after the dive card so the
+    # infographic stays the first content block; at narrow widths the nav
+    # stacks under the card, never above it.
+    _nav_candidates = [
+        ('dd-scatter', 'Scatter &amp; controls'),
+        ('dd-recommendations', 'IV Recommendations'),
+        ('dd-opp-threats', 'Threats where your build matters'),
+        ('dd-notable-ivs', 'Per-matchup IV finder'),
+        ('dd-stat-thresholds', 'Key Matchup Thresholds'),
+        ('dd-slayer-builds', 'Mirror / Slayer builds'),
+    ]
+    _nav_links = ''.join(
+        f'<a href="#{sid}">{label}</a>\n'
+        for sid, label in _nav_candidates
+        if f'id="{sid}"' in html
+    )
+    _nav_html = (f'<nav class="dd-toc"><strong>On this page</strong>\n'
+                 f'{_nav_links}</nav>\n')
+    # Open the flex layout right after the card (DD_LAYOUT_OPEN marker) and
+    # close it just before the embedded-data script below.
+    html = html.replace('<!-- DD_LAYOUT_OPEN -->',
+                        f'<div class="dd-layout">\n{_nav_html}'
+                        '<main class="dd-main">', 1)
+    html += '</main>\n</div>\n'
 
     # Embed data. Scores are packed as little-endian uint16, gzip-
     # compressed, then base64-encoded for inline embedding. The JS
