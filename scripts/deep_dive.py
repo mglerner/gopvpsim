@@ -2702,6 +2702,9 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # Store the chosen recommended IV indices so the JS engine can render them
     # as a distinct overlay trace on the scatter plot.
     data_obj['recIvs'] = [rc['iv'] for rc in chosen_recs]
+    # Role labels (Balanced / Max Bulk / Attack Weight / ...) parallel to recIvs,
+    # for the opponent-threats "which build wins" chips.
+    data_obj['recStyles'] = [rc.get('style', '') for rc in chosen_recs]
 
     # -- Compute anchor-flip records (used by Threshold Tiers, the flat
     #    Anchor-Driven Matchup Flips section, and Notable IVs below) --
