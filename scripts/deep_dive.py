@@ -2519,6 +2519,40 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # (defensively) ranked[0] is outside the strong pool.
     _spranks = data_obj.get('spRanks') or []  # used by the two-#1s blurb below
     lead_iv = ranked[0] if ranked and ranked[0] in by_iv else rec_candidates[0]['iv']
+
+    # Finer per-IV coverage signature: the set of (opponent_display, kind,
+    # threshold) tiers this IV clears. Only NAMED-opponent kinds
+    # (damage_breakpoint / bulkpoint) enter the signature; cmp/mirror anchors
+    # (opponent=None) are excluded. Reads the full ivAtk/ivDef arrays, so it
+    # works for ANY iv index (the bulk pole may be outside rec_candidates).
+    # Defined BEFORE pole selection so the poles can count NOTABLE-only coverage.
+    _cov_cache: dict = {}
+
+    def _named_cover(iv):
+        c = _cov_cache.get(iv)
+        if c is None:
+            atk, dfn = data_obj['ivAtk'][iv], data_obj['ivDef'][iv]
+            c = _cov_cache[iv] = frozenset(
+                (pretty_species(a.opponent), a.kind, round(a.threshold_value, 2))
+                for a in resolved_anchors_top
+                if a.opponent and a.passes(atk, dfn))
+        return c
+
+    # Rarity-gated NOTABLE tiers: built over the WIDE strong pool so the bulk
+    # pole's high def-side tiers are present and counted. A tier is notable iff
+    # at most REC_NOTABLE_MAX_CLEAR_FRAC of the strong pool clears it. Reused for
+    # the pole coverage (atk/bulk poles count NOTABLE-only), the greedy fill
+    # universe AND the absolute per-spread labels below.
+    notable_tiers: set = set()
+    _tier_clearers: dict = {}
+    if _anchor_mode:
+        _strong = ranked[:min(REC_STRONG_POOL_N, nIvs)]
+        for siv in _strong:
+            for t in _named_cover(siv):
+                _tier_clearers[t] = _tier_clearers.get(t, 0) + 1
+        _gate = REC_NOTABLE_MAX_CLEAR_FRAC * len(_strong)
+        notable_tiers = {t for t, c in _tier_clearers.items() if c <= _gate}
+
     if _anchor_mode:
         # Attack pole = max BREAKPOINT COVERAGE, tie-broken by BULK (def then hp)
         # -- the "Focused" attack spread (cf. Dragapult-Sim's "Ninetales Focused"
@@ -2527,14 +2561,19 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         # the hardest breakpoint; among IVs clearing the same breakpoint tiers,
         # prefer the bulkier one. The meta breakpoints sit just above the top-50
         # atk ceiling, so coverage is computed over the FULL grid. Falls back to
-        # raw max-atk when no breakpoints resolve.
-        _bp_anchors = [a for a in resolved_anchors_top
-                       if a.opponent and a.kind == 'damage_breakpoint']
-
+        # raw max-atk when no breakpoints resolve. Coverage counts only NOTABLE
+        # breakpoint tiers (the rarity-gated hard ones), so the pole stops
+        # atk-maxing once the MEANINGFUL breakpoints are cleared and banks
+        # def/HP from there -- a truer buildable "Focused" spread where the
+        # notable breakpoints sit below the atk ceiling, while staying glassy
+        # where they sit near max atk.
         def _atk_cover(iv):
-            atk, dfn = data_obj['ivAtk'][iv], data_obj['ivDef'][iv]
-            return sum(1 for a in _bp_anchors if a.passes(atk, dfn))
-        if _bp_anchors:
+            return sum(1 for (_opp, kind, _thr) in (_named_cover(iv) & notable_tiers)
+                       if kind == 'damage_breakpoint')
+        # Use the coverage selection only when NOTABLE breakpoints exist; with
+        # none, _atk_cover is uniformly 0 and would collapse to max-def, so fall
+        # through to the plain max-atk pole instead.
+        if any(t[1] == 'damage_breakpoint' for t in notable_tiers):
             atk_iv = max(range(nIvs),
                          key=lambda iv: (_atk_cover(iv), data_obj['ivDef'][iv],
                                          data_obj['ivHp'][iv]))
@@ -2552,13 +2591,13 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         # has no bulkpoint mechanic, so it's free to maximize once coverage is
         # fixed. Falls back to raw max-def when no bulkpoints resolve. _ensure_rc
         # gives each pole an rc dict.
-        _blk_anchors = [a for a in resolved_anchors_top
-                        if a.opponent and a.kind == 'bulkpoint']
-
+        # Coverage counts only NOTABLE bulkpoint tiers (rarity-gated), so the
+        # pole banks HP once the meaningful bulkpoints are cleared.
         def _bulk_cover(iv):
-            atk, dfn = data_obj['ivAtk'][iv], data_obj['ivDef'][iv]
-            return sum(1 for a in _blk_anchors if a.passes(atk, dfn))
-        if _blk_anchors:
+            return sum(1 for (_opp, kind, _thr) in (_named_cover(iv) & notable_tiers)
+                       if kind == 'bulkpoint')
+        # Coverage selection only when NOTABLE bulkpoints exist; else max-def.
+        if any(t[1] == 'bulkpoint' for t in notable_tiers):
             bulk_iv = max(range(nIvs),
                           key=lambda iv: (_bulk_cover(iv), data_obj['ivHp'][iv],
                                           data_obj['ivDef'][iv]))
@@ -2576,23 +2615,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         atk_iv = max(by_iv, key=lambda iv: (data_obj['ivAtk'][iv],
                                             by_iv[iv]['score']))
         bulk_iv = None
-
-    # Finer per-IV coverage signature: the set of (opponent_display, kind,
-    # threshold) tiers this IV clears. Only NAMED-opponent kinds
-    # (damage_breakpoint / bulkpoint) enter the signature; cmp/mirror anchors
-    # (opponent=None) are excluded. Reads the full ivAtk/ivDef arrays, so it
-    # works for ANY iv index (the bulk pole may be outside rec_candidates).
-    _cov_cache: dict = {}
-
-    def _named_cover(iv):
-        c = _cov_cache.get(iv)
-        if c is None:
-            atk, dfn = data_obj['ivAtk'][iv], data_obj['ivDef'][iv]
-            c = _cov_cache[iv] = frozenset(
-                (pretty_species(a.opponent), a.kind, round(a.threshold_value, 2))
-                for a in resolved_anchors_top
-                if a.opponent and a.passes(atk, dfn))
-        return c
 
     # Won-set fallback signature (drives selection only when no anchors).
     _won_cache: dict = {}
@@ -2620,20 +2642,6 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     _admit(atk_iv)
     if _anchor_mode:
         _admit(bulk_iv)
-
-    # Rarity-gated NOTABLE tiers: built over the WIDE strong pool so the bulk
-    # pole's high def-side tiers are present and counted. A tier is notable iff
-    # at most REC_NOTABLE_MAX_CLEAR_FRAC of the strong pool clears it. Reused for
-    # the greedy fill universe AND the absolute per-spread labels below.
-    notable_tiers: set = set()
-    _tier_clearers: dict = {}
-    if _anchor_mode:
-        _strong = ranked[:min(REC_STRONG_POOL_N, nIvs)]
-        for siv in _strong:
-            for t in _named_cover(siv):
-                _tier_clearers[t] = _tier_clearers.get(t, 0) + 1
-        _gate = REC_NOTABLE_MAX_CLEAR_FRAC * len(_strong)
-        notable_tiers = {t for t, c in _tier_clearers.items() if c <= _gate}
 
     if _anchor_mode:
         # Greedy fill of EXTRA spreads (beyond the 3 poles) over the notable-tier
