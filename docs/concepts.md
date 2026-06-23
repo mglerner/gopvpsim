@@ -299,7 +299,8 @@ cohort; the top-quartile rows are highlighted.
 
 ## The infographic and its vocabulary
 
-DRAFT: 2026-06-23, pending review. Below covers the infographic at the top of every
+AI-generated: drafted by Claude (Opus 4.8) on 2026-06-23, accepted as-is by Michael
+Lerner. Below covers the infographic at the top of every
 dive and the opponent-centric / IV-recommendation sections added in the 2026-06
 content rework.
 
