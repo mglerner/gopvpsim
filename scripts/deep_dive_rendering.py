@@ -196,6 +196,19 @@ def _opp_b(name):
     return f'<b style="color:{_opp_color(name)}">{pretty_species(name)}</b>'
 
 
+def _opp_link(name):
+    """Opponent name as a colored deep link to its ``#opp-<slug>`` anchor.
+
+    Same color + pretty-name treatment as ``_opp_b``, wrapped in an
+    ``<a href="#opp-<slug>">``. ``opp_slug`` is canonical across naming
+    variants so the href matches the id emitted by the opponent-threats
+    rows/hoists. Embedded-dive only: those anchors only exist in the dive
+    page, so shared/article renderers must not use this.
+    """
+    return (f'<a class="dd-opp-link" href="#opp-{opp_slug(name)}">'
+            f'{_opp_b(name)}</a>')
+
+
 def _opp_strong(color_key, display_text=None):
     """Wrap text in a colored <strong> tag using the opponent's color.
 
@@ -347,6 +360,17 @@ DEEP_DIVE_CSS = """
 .dd-env-elev-crosser { background:#162318; color:#7db87d; border-left-color:#2f8135; }
 .dd-env-dep-crosser  { background:#2a1e16; color:#d29922; border-left-color:#b07214; }
 .dd-env-rider-bottom { background:#2a181b; color:#e77173; border-left-color:#c04547; }
+/* B1: the auto-gen Flavor Guide prose, folded in as the IV
+   Recommendations section intro (italic lead-in). When the narrative
+   zone div lands inside it, drop its heavy sidebar so it reads as inline
+   intro prose, not a sub-zone. */
+.dd-iv-rec-intro { font-size: 0.92rem; font-style: italic; color: #aab2c0;
+  margin: 8px 0 16px; line-height: 1.55; }
+.dd-iv-rec-intro .dd-narrative-zone { padding-left: 0; margin: 6px 0; }
+/* Opponent-name deep links (tier-card coverage + stealable bucket). */
+.dd-opp-link { text-decoration: none; border-bottom: 1px dotted currentColor; }
+.dd-opp-link:hover { border-bottom-style: solid; }
+.dd-steal-block { margin: 6px 0; }
 .dd-collapsible { margin: 4px 0; }
 .dd-collapsible > summary { list-style: none; }
 .dd-collapsible > summary::-webkit-details-marker { display: none; }
@@ -1283,21 +1307,23 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
     parts.append(
         f'<details class="dd-collapsible" id="dd-notable-ivs">'
         f'<summary class="dd-h3" style="cursor:pointer">'
-        f'Notable IVs &amp; Recommendations '
+        f'Per-matchup IV finder '
         f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
-        f'({n_notable} notable of {len(target)} categories)</span>'
+        f'({len(target)} specific matchups - e.g. &quot;which IV beats a '
+        f'given opponent in a given shield?&quot;)</span>'
         f'</summary>\n')
     parts.append(
-        '<p class="dd-small">Cross-category IVs and notable matchup '
-        'wins. Composite cards (slayer&nbsp;∩&nbsp;tier) surface IVs '
-        'that satisfy a slayer anchor <em>and</em> a stat-cutoff '
-        'threshold tier - the rare intersections that trade some '
-        'slayer optimum for a broader-meta floor (or vice versa). '
-        'Matchup cards surface non-trivial '
-        '(opponent,&nbsp;scenario)&nbsp;partitions for selective '
-        'matchups. Pure slayer-archetype cards live in the Slayer '
-        'Builds block below; pure tier cards in the Threshold Tiers '
-        'section above.</p>\n'
+        '<p class="dd-small">Collapsed by default. This is a per-(opponent, '
+        'shield) lookup: each card is one matchup and the exact IV spreads '
+        'that win it. For "what do I need vs threat X" use '
+        '<a href="#dd-opp-threats" style="color:#58a6ff" '
+        'onclick="var el=document.getElementById(\'dd-opp-threats\');'
+        'if(el)el.open=true;">Threats where your build choice matters</a> '
+        'above, or paste your collection into the scatter. Composite cards '
+        '(slayer&nbsp;∩&nbsp;tier) surface IVs that satisfy a slayer anchor '
+        '<em>and</em> a stat-cutoff tier; pure slayer-archetype cards live '
+        'in the Slayer Builds block below, pure tier cards in the Threshold '
+        'Tiers above.</p>\n'
     )
 
     # Notability filter checkbox. Default ON: show only small,
@@ -1778,7 +1804,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                     scen_set.add(tuple(s))
             prose_parts = []
             if tier_opps:
-                opp_str = ', '.join(tier_opps[:4])
+                opp_str = ', '.join(_opp_link(o) for o in tier_opps[:4])
                 if len(tier_opps) > 4:
                     opp_str += f', +{len(tier_opps) - 4} more'
                 prose_parts.append(
@@ -3362,16 +3388,37 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
     # all lose -> "loses with any build". Per-shield-only differences where every
     # build still wins (or loses) the matchup overall are hoisted, not listed --
     # the section is about where the choice matters.
+    def _shield_wins(siv, oi):
+        # The shields (as 'AvB' labels) this spread wins vs opponent oi.
+        return [f'{scenarios[si][0]}v{scenarios[si][1]}'
+                for si in range(nS)
+                if _og_win(scores_flat, siv, si, oi, nS, nO, win_threshold)]
+
     decision_rows = []   # (oi, name, outs:list[bool])
     wins_any, loses_any = [], []
+    stealable = []       # (oi, name, steals:list[(spread_i, [shield labels])])
     for oi, name in enumerate(opponents):
         outs = [_overall_win(siv, oi) for siv in spread_ivs]
         if all(outs):
             wins_any.append(name)
-        elif not any(outs):
-            loses_any.append(name)
-        else:
+        elif any(outs):
             decision_rows.append((oi, name, outs))
+        else:
+            # Loses overall with EVERY recommended spread. But does some
+            # spread still STEAL at least one specific shield? If so it's a
+            # breakpoint-shield-steal story (the Dragapult-Sim thesis), not
+            # a flat loss -- pull it into its own Stealable bucket. The
+            # per-(spread, shield) win uses _og_win, exactly like decision
+            # rows / the spread grid.
+            steals = []
+            for i, siv in enumerate(spread_ivs):
+                won = _shield_wins(siv, oi)
+                if won:
+                    steals.append((i, won))
+            if steals:
+                stealable.append((oi, name, steals))
+            else:
+                loses_any.append(name)
 
     parts = []
     parts.append('<details class="dd-collapsible" id="dd-opp-threats">\n')
@@ -3379,7 +3426,9 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
         '<summary class="dd-h3" style="cursor:pointer">'
         'Threats where your build choice matters '
         '<span class="dd-small" style="font-weight:400;color:#8b949e">'
-        f'({len(decision_rows)})</span></summary>\n')
+        f'({len(decision_rows)} decision'
+        f'{f", {len(stealable)} stealable" if stealable else ""})'
+        '</span></summary>\n')
     parts.append(
         '<p class="dd-small" style="color:#8b949e">The opponents below are the '
         'ones where a different recommended spread <i>flips who wins</i> vs '
@@ -3402,14 +3451,58 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
     parts.append(_hoist(
         '<span class="dd-gain">Wins with any recommended build:</span>',
         wins_any))
+
+    # -- Stealable: loses the matchup overall with every recommended build,
+    #    but a specific build steals >=1 individual shield (the
+    #    breakpoint-shield-steal thesis). e.g. Shadow Corviknight loses
+    #    Ninetales on average, but the attack build steals the 1-0 and 2-1.
+    #    These would otherwise hoist into "Loses with any build" -- pulling
+    #    them out surfaces the steal story. The stealable <li> carries its
+    #    own id="opp-<slug>" so tier-card coverage links still resolve
+    #    (the opponent no longer appears in the loses_any hoist). --
+    if stealable:
+        parts.append('<div class="dd-steal-block">\n')
+        parts.append(
+            '<p class="dd-small" style="color:#8b949e;margin:8px 0 4px">'
+            '<b style="color:#d29922">Stealable</b> - loses the matchup '
+            'overall against every recommended build, but a build can still '
+            'steal one or more individual shields (a breakpoint shield '
+            'steal). Worth knowing when a specific shield count is close:</p>\n')
+        parts.append('<ul class="dd-threshold-list" style="margin:4px 0">\n')
+        for oi, name, steals in sorted(stealable, key=lambda r: r[1]):
+            # Enabling stat cutoff: the lowest atk-side boundary recorded
+            # for this opponent (the stat axis a steal leans on); fall back
+            # to the lowest boundary on any axis. Pulled from
+            # all_matchup_boundaries via by_opp.
+            bnds = by_opp.get(name, [])
+            atk_bnds = [b for b in bnds if b.get('stat') == 'atk']
+            cut_str = ''
+            if atk_bnds:
+                b = min(atk_bnds, key=lambda b: b['threshold'])
+                cut_str = f' (Atk &ge; {b["threshold"]:.2f})'
+            elif bnds:
+                b = min(bnds, key=lambda b: b['threshold'])
+                _sl = 'Atk' if b.get('stat') == 'atk' else 'Def'
+                cut_str = f' ({_sl} &ge; {b["threshold"]:.2f})'
+            steal_bits = '; '.join(
+                f'{_html.escape(_style(i))} steals {", ".join(shs)}'
+                for i, shs in steals)
+            parts.append(
+                f'<li id="opp-{opp_slug(name)}">{_opp_b(name)} - '
+                f'{steal_bits}{cut_str}</li>\n')
+        parts.append('</ul>\n')
+        parts.append('</div>\n')
+
     parts.append(_hoist(
         '<span class="dd-loss">Loses with any recommended build:</span>',
         loses_any))
 
     if not decision_rows:
-        parts.append('<p class="dd-small" style="color:#8b949e">No '
-                     'build-sensitive matchups in this pool -- every opponent '
-                     'is decided the same way by all recommended spreads.</p>\n')
+        if not stealable:
+            parts.append('<p class="dd-small" style="color:#8b949e">No '
+                         'build-sensitive matchups in this pool -- every '
+                         'opponent is decided the same way by all '
+                         'recommended spreads.</p>\n')
         parts.append('</details>\n')
         parts.append(_OPP_THREATS_JS)
         return ''.join(parts)
@@ -3488,9 +3581,17 @@ def render_results_section(data_obj, moveset_label, opp_label,
     parts = []
 
     parts.append('<div class="dd-section" id="dd-recommendations">\n')
-    parts.append(f'<h2 class="dd-h2">Deep Dive Results</h2>\n')
+    parts.append('<h2 class="dd-h2">IV Recommendations</h2>\n')
     parts.append(f'<p>Moveset: {analysis.pretty_moveset(moveset_label)}. '
                  f'Vs {opp_label} opponents.</p>\n')
+    # Auto-generated IV Flavor Guide prose folds in here as the section
+    # intro (B1). The caller's assembly loop swaps this marker for the
+    # per-moveset narrative divs; the marker is consumed (left empty) when
+    # no flavors were derived. Was previously planted just above the sim
+    # zone by deep_dive.py; emitted here so the prose reads as the lead-in
+    # to the whole IV Recommendations section.
+    parts.append('<div class="dd-iv-rec-intro">'
+                 '<!-- NARRATIVE_ZONE_PLACEHOLDER --></div>\n')
 
     # -- Partition by source for two-zone rendering --
     expert_tiers = [t for t in effective_tiers if t.get('source')]
@@ -3587,6 +3688,8 @@ def render_results_section(data_obj, moveset_label, opp_label,
     # ================================================================
     parts.append('<div class="dd-sim-zone">\n')
     parts.append('<h3>Simulation-Derived IV Tiers</h3>\n')
+    parts.append('<p class="dd-small" style="color:#8b949e;margin:0 0 8px">'
+                 'Auto-derived from the sim (not expert-authored).</p>\n')
 
     # -- Sim-only Tier Cards (if any auto-derived tiers exist) --
     if sim_tiers:

@@ -2538,6 +2538,49 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 if a.opponent and a.passes(atk, dfn))
         return c
 
+    # CENSUS coverage source for the card labels: the full set of matchup-flip
+    # boundaries (atk sweep -> breakpoints, def sweep -> bulkpoints) across the
+    # WHOLE opponent pool, not just the curated resolved anchors. The resolved
+    # anchors (_named_cover) are a small TOML/mirror-slayer set (~3 breakpoint
+    # opponents for Corviknight); the card census wants EVERY opponent a spread
+    # clears a guaranteed break/bulkpoint against (cf. Dragapult-Sim's "18
+    # guaranteed breakpoints"). Computed once here, deduped per (opponent, stat,
+    # threshold); _census_cover(iv) then asks, per spread, which opponents that
+    # spread's atk/def clears. Selection above stays anchor/notable-based; only
+    # these LABELS go census.
+    _census_boundaries = []
+    _cb_seen = set()
+    for _mode in all_modes:
+        _scores = score_arrays.get(f'{moveset_idx}_{_mode}', [])
+        if not _scores:
+            continue
+        for _sweep in ('def', 'atk'):
+            for mb in _find_matchup_boundaries(
+                    _scores, nIvs, nS, nO, data_obj, scenarios, opponents,
+                    sweep_stat=_sweep):
+                _k = (mb['opponent'], mb['stat'], mb['threshold'])
+                if _k in _cb_seen:
+                    continue
+                _cb_seen.add(_k)
+                _census_boundaries.append(mb)
+    _census_cache: dict = {}
+
+    def _census_cover(iv):
+        """(breakpoint_opps, bulkpoint_opps) the spread at ``iv`` clears: distinct
+        opponent display names where atk >= an atk-boundary threshold (breakpoint)
+        or def >= a def-boundary threshold (bulkpoint). Sorted."""
+        c = _census_cache.get(iv)
+        if c is None:
+            atk, dfn = data_obj['ivAtk'][iv], data_obj['ivDef'][iv]
+            bp, blk = set(), set()
+            for mb in _census_boundaries:
+                if mb['stat'] == 'atk' and atk >= mb['threshold']:
+                    bp.add(pretty_species(mb['opponent']))
+                elif mb['stat'] == 'def' and dfn >= mb['threshold']:
+                    blk.add(pretty_species(mb['opponent']))
+            c = _census_cache[iv] = (sorted(bp), sorted(blk))
+        return c
+
     # Rarity-gated NOTABLE tiers: built over the WIDE strong pool so the bulk
     # pole's high def-side tiers are present and counted. A tier is notable iff
     # at most REC_NOTABLE_MAX_CLEAR_FRAC of the strong pool clears it. Reused for
@@ -2681,21 +2724,24 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                     >= REC_DISTINCTNESS_MIN_SYMDIFF:
                 _admit(iv)
 
-    # Attach ABSOLUTE, rarity-gated per-spread coverage for the card:
-    # cover_breakpoints / cover_bulkpoints are the opponent sets (per kind) for
-    # which this spread clears a NOTABLE tier. Absolute (not differential vs the
-    # lead), so the bulk pole's own characteristic coverage shows even when the
-    # lead happens to share a low tier; the rarity gate keeps it from being noise.
+    # Attach ABSOLUTE, CENSUS per-spread coverage for the card:
+    # cover_breakpoints / cover_bulkpoints list EVERY distinct opponent (per
+    # kind) for which this spread clears a guaranteed break/bulkpoint -- the
+    # full matchup-boundary census (cf. Dragapult-Sim's "18 guaranteed
+    # breakpoints" line), NOT the small curated resolved-anchor set and NOT
+    # rarity-gated. Selection above stays anchor/notable-based (the poles bank
+    # def/HP off the rarity-hard tiers); only these card LABELS go census.
+    # n_breakpoint_opps / n_bulkpoint_opps are the headline census counts.
+    # Absolute (not differential vs the lead), so each pole's own coverage shows
+    # in full.
     if _anchor_mode:
         for iv in chosen_ivs:
-            cleared = _named_cover(iv) & notable_tiers
-            bp = sorted({opp for (opp, kind, _thr) in cleared
-                         if kind == 'damage_breakpoint'})
-            blk = sorted({opp for (opp, kind, _thr) in cleared
-                          if kind == 'bulkpoint'})
+            bp, blk = _census_cover(iv)
             rc = by_iv[iv]
             rc['cover_breakpoints'] = bp
             rc['cover_bulkpoints'] = blk
+            rc['n_breakpoint_opps'] = len(bp)
+            rc['n_bulkpoint_opps'] = len(blk)
 
     # Reorder chosen rc dicts so the lead (rank-1 battle-score) spread leads
     # (card headline / _rec_idx read chosen_recs[0]), then by composite score.
@@ -2945,15 +2991,10 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             )
 
     # ======== IV FLAVOR GUIDE (narrative prose zone) ========
-    # Narrative generation is now done per-moveset in the main HTML
-    # assembly loop (_generate_narrative_for_moveset), not here.
-    # This block only inserts a placeholder marker for the narrative
-    # zone so the per-moveset divs can be injected there later.
-    sim_marker = '<div class="dd-sim-zone">'
-    narrative_placeholder = '<!-- NARRATIVE_ZONE_PLACEHOLDER -->'
-    if sim_marker in results_html:
-        results_html = results_html.replace(
-            sim_marker, narrative_placeholder + sim_marker, 1)
+    # Narrative generation is done per-moveset in the main HTML assembly
+    # loop (_generate_narrative_for_moveset). The placeholder marker is
+    # now emitted directly by render_results_section as the IV
+    # Recommendations section intro (B1), so no injection is needed here.
 
     # ======== ANALYSIS section (behind toggle) ========
     analysis_parts = []
