@@ -48,7 +48,7 @@ class Spread:
     cp: int
     sp_rank: int           # stat-product rank (1 = bulkiest)
     style: str             # role label, e.g. "Attack Weight"
-    is_efficient: bool = False  # globally Pareto-efficient IV (orgodemir crown)
+    is_efficient: bool = False  # globally Pareto-efficient IV (crown)
     cover_breakpoints: list = field(default_factory=list)  # named opps (BP) census
     cover_bulkpoints: list = field(default_factory=list)   # named opps (bulk) census
     n_breakpoint_opps: int = 0  # census count of distinct BP opponents cleared
@@ -420,7 +420,7 @@ def _spread_html(s: Spread, link_opps=False, base_form_display=None,
     cover = _cover_html(s, link_opps, base_form_display, shadow)
     _fh = _flip_html(s.flip_fd, s.flip_has_bait, link_opps)
     flips = f'<div class="flips">{_fh}</div>' if _fh else ''
-    # Crown (orgodemir "efficient" = globally Pareto-optimal IV).
+    # Crown ("efficient" = globally Pareto-optimal IV).
     crown = (' <span class="ddcard-crown" title="Efficient IV (Pareto-optimal): '
              'no other spread beats it on all of attack, defense and HP)">'
              '\U0001F451</span>') if s.is_efficient else ''

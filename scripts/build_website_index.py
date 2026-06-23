@@ -26,7 +26,10 @@ import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
-from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML  # noqa: E402
+from gopvpsim.attribution import (  # noqa: E402
+    PVPOKE_ATTRIBUTION_HTML,
+    support_footer_html,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
@@ -34,6 +37,7 @@ ARTICLES_DIR = WEBSITE_DIR / 'articles'
 COMPARISONS_DIR = WEBSITE_DIR / 'comparisons'
 GUIDES_DIR = WEBSITE_DIR / 'guides'
 INDEX_PATH = WEBSITE_DIR / 'index.html'
+SUPPORT_PATH = WEBSITE_DIR / 'support.html'
 
 
 _LEAGUE_SUFFIXES = {
@@ -597,6 +601,95 @@ open it.</p>
 {articles_section}{comparisons_section}{guides_section}
 <p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
 <p class="about">If you find something broken or surprising, email me.</p>
+{support_footer_html("")}</body>
+</html>
+"""
+
+
+# Static support / credits page, published at the website root as
+# support.html. Attribution lives here now (the sitewide footer on every dive,
+# the index, articles, and ML guides links here). userdata/website/ is
+# gitignored, so this script owns the canonical source: re-running the index
+# build re-emits it. ASCII only (no em-dashes) so it renders cleanly as UI
+# text. Keep the credits block current when a new data/concept source is added.
+SUPPORT_PAGE_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Support pogo-dives</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         max-width: 760px; margin: 40px auto; padding: 0 20px;
+         background: #1a1a2e; color: #e0e0e0; line-height: 1.6; }
+  h1 { color: #e94560; }
+  h2 { color: #c8a2d0; border-bottom: 1px solid #0f3460; padding-bottom: 6px;
+       margin-top: 36px; }
+  a { color: #9be89b; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  p { margin: 16px 0; }
+  .btn { display: inline-block; background: #e94560; color: #fff;
+         font-size: 1.05em; font-weight: bold; padding: 12px 28px;
+         border-radius: 8px; text-decoration: none; margin: 8px 0; }
+  .btn:hover { background: #c63350; text-decoration: none; }
+  .credits { color: #aaa; font-size: 14px; line-height: 1.7; }
+  .credits a { color: #9be89b; }
+  .disclaimer { color: #888; font-size: 13px; margin-top: 30px;
+                border-top: 1px solid #0f3460; padding-top: 12px; }
+</style>
+</head>
+<body>
+<h1>Support pogo-dives</h1>
+
+<p>
+  pogo-dives is free because the Pokemon GO PvP community runs on shared work.
+  These deep dives stand on PvPoke's open-source battle engine and on the IV
+  research that so many people give away. If they have helped you build a
+  better team, a small tip is always appreciated.
+</p>
+
+<a href="https://venmo.com/u/mglerner" class="btn">Tip via Venmo @mglerner</a>
+
+<p>
+  You can also support the project by sharing it with your PvP friends.
+</p>
+
+<h2>Credits</h2>
+<div class="credits">
+<p>
+  Game data, meta rankings, and the battle engine come from
+  <a href="https://pvpoke.com">PvPoke</a> by EmpoleonDynamite, released under
+  the MIT license. The simulator here is a Python port of PvPoke's open-source
+  battle logic and would not exist without it.
+</p>
+<p>
+  IV research and methodology draw on the work of
+  <a href="https://www.youtube.com/@SwagTips">Ryan Swag</a>, JRE47,
+  DragapultSim, and HomeSliceHenry.
+</p>
+<p>
+  The efficient-IV concept (no other spread beats a given IV on attack,
+  defense, and HP at once) is from
+  <a href="https://www.reddit.com/user/orgodemir">u/orgodemir</a>
+  (<a href="https://www.reddit.com/r/TheSilphArena/comments/yxzg7f/">original
+  post</a>).
+</p>
+<p>
+  The IV spectrum graph is inspired by the r/TheSilphArena
+  <a href="https://www.reddit.com/r/TheSilphArena/comments/z11xr0/theorycrafting_iv_spectrum_graphs/">IV
+  Spectrum Graphs</a> post.
+</p>
+<p>
+  pogo-dives has a sibling app,
+  <a href="https://mglerner.com/gobattlekit/">GoBattleKit</a>, a Pokemon GO
+  PvP companion for iOS.
+</p>
+</div>
+
+<p class="disclaimer">
+  pogo-dives is an unofficial fan project. It is not affiliated with Niantic,
+  Nintendo, The Pokemon Company, Game Freak, PvPoke, or PokeGenie.
+</p>
 </body>
 </html>
 """
@@ -639,6 +732,8 @@ def main() -> int:
                               iv_guides=iv_guides,
                               guides_landing=guides_landing)
     INDEX_PATH.write_text(index_html)
+    SUPPORT_PATH.write_text(SUPPORT_PAGE_HTML)
+    print(f"Wrote {SUPPORT_PATH}")
     print(f"Wrote {INDEX_PATH} ({len(dives)} dive(s), "
           f"{len(articles)} article(s), {len(iv_guides)} IV guide(s), "
           f"{len(comparisons)} comparison(s))")

@@ -59,7 +59,7 @@ from gopvpsim.pokemon import (
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL, cp as calc_cp, pvpoke_default_ivs,
 )
 from gopvpsim.moves import get_moves, type_effectiveness, stab
-from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML
+from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML, support_footer_html
 from gopvpsim.data import (
     load_gamemaster, load_rankings, get_default_moveset, parse_types,
     sprite_data_uri, load_group as fetch_group,
@@ -4923,6 +4923,10 @@ var _scoresReady = (async function() {
         # Fingerprint is best-effort - don't break HTML generation
         # if the cache file is missing or unreadable.
         pass
+
+    # Sitewide support / credits footer. A dive lives at <dive>/index.html, one
+    # level below the website root, so support.html resolves at ../support.html.
+    html += support_footer_html('../')
 
     html += '</body>\n</html>\n'
 
