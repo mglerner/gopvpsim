@@ -48,8 +48,10 @@ class Spread:
     cp: int
     sp_rank: int           # stat-product rank (1 = bulkiest)
     style: str             # role label, e.g. "Attack Weight"
-    cover_breakpoints: list = field(default_factory=list)  # named opps (BP) vs ref
-    cover_bulkpoints: list = field(default_factory=list)   # named opps (bulk) vs ref
+    cover_breakpoints: list = field(default_factory=list)  # named opps (BP) census
+    cover_bulkpoints: list = field(default_factory=list)   # named opps (bulk) census
+    n_breakpoint_opps: int = 0  # census count of distinct BP opponents cleared
+    n_bulkpoint_opps: int = 0   # census count of distinct bulk opponents cleared
     flip_fd: dict | None = None  # raw flip data; rendered + linked at render time
     flip_has_bait: bool = False
 
@@ -148,6 +150,8 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
             sp_rank=data_obj['spRanks'][iv], style=rc.get('style', ''),
             cover_breakpoints=rc.get('cover_breakpoints') or [],
             cover_bulkpoints=rc.get('cover_bulkpoints') or [],
+            n_breakpoint_opps=rc.get('n_breakpoint_opps') or 0,
+            n_bulkpoint_opps=rc.get('n_bulkpoint_opps') or 0,
             flip_fd=flips.get(iv), flip_has_bait=has_bait,
         ))
 
@@ -242,6 +246,7 @@ CARD_CSS = """
 .ddcard-spread .flips { font-size:0.74rem; color:#8b949e; margin-top:4px; }
 .ddcard-spread .cover { font-size:0.74rem; color:#9be0a6; margin-top:4px; }
 .ddcard-spread .cover b { color:#e6ecf5; font-weight:700; }
+.ddcard-spread .cover .cover-count { color:#e6ecf5; font-weight:700; }
 .ddcard-oplink { color:inherit; text-decoration:underline;
   text-decoration-style:dotted; text-decoration-color:#5a7; }
 .ddcard-oplink:hover { text-decoration-style:solid; }
@@ -323,23 +328,28 @@ _COVER_MAX_OPPS = 10  # truncate long coverage lists on the card; "+N more"
 
 
 def _cover_html(s: Spread, link_opps=False):
-    """Named opponent-coverage bullets (Dragapult-Sim style). Empty when the
-    spread clears no notable tier (incl. the no-anchor fallback, where cover_*
-    lists are empty). Long lists (the bulk pole can list ~10 opponents) are
-    truncated with a "+N more" tail. Opponent names link to their dive row when
-    ``link_opps``."""
+    """Named opponent-coverage bullets (Dragapult-Sim style). Lists the FULL
+    census of opponents this spread clears a break/bulkpoint against, led by a
+    count headline ("18 guaranteed breakpoints"). Empty when the spread clears
+    nothing (incl. the no-anchor fallback, where cover_* lists are empty). Long
+    lists are truncated with a "+N more" tail. Opponent names link to their dive
+    row when ``link_opps``."""
     _nm = _name_html(link_opps)
 
     def _join(opps):
         head = ', '.join(_nm(o) for o in opps[:_COVER_MAX_OPPS])
         extra = len(opps) - _COVER_MAX_OPPS
         return head + (f' +{extra} more' if extra > 0 else '')
+
+    def _headline(n, label):
+        return (f'<span class="cover-count">{n} guaranteed {label}'
+                f'{"" if n == 1 else "s"}</span> ')
     lines = []
     if s.cover_breakpoints:
-        lines.append(f'<div class="cover"><b>Breakpoints</b> '
+        lines.append(f'<div class="cover">{_headline(s.n_breakpoint_opps, "breakpoint")}'
                      f'{_join(s.cover_breakpoints)}</div>')
     if s.cover_bulkpoints:
-        lines.append(f'<div class="cover"><b>Bulkpoints</b> '
+        lines.append(f'<div class="cover">{_headline(s.n_bulkpoint_opps, "bulkpoint")}'
                      f'{_join(s.cover_bulkpoints)}</div>')
     return ''.join(lines)
 
