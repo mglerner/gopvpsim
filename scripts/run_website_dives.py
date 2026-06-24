@@ -369,6 +369,32 @@ DIVES = [
         'no_thresholds': True,
         'extra_args': ['--max-level', '51'],
     },
+    # Corviknight (2026-06-24): Shadow Corviknight is now officially PvPoke-ranked
+    # in GL (a top pick), so it graduates from the constructed pre-release one-off
+    # to a real dive. Both forms are dived so the new sibling-trade card bar is
+    # two-sided -- each form's card shows its breakpoint/bulkpoint trade vs the
+    # other, which is exactly the "shadow or regular?" build question. Default
+    # moveset (Sand Attack / Air Cutter, Payback) via get_default_moveset;
+    # no_thresholds (clean dive, author anchors after eyeballing).
+    {
+        'species': 'Corviknight',
+        'league': 'great',
+        'slug': 'corviknight-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+    },
+    {
+        'species': 'Corviknight',
+        'league': 'great',
+        'slug': 'shadow-corviknight-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'shadow': True,
+    },
 ]
 
 
