@@ -348,34 +348,13 @@ DIVES = [
         'top_movesets': 1,
         'no_thresholds': True,
     },
-    # SUPERSEDED (2026-06-24, Phase 2): the standard 'mimikyu-ultra-league'
-    # dive above now carries an in-page "Allow best-buddy (Level 51)" toggle
-    # (Ultra defaults best-buddy on), so this separate page is redundant.
-    # LEFT IN PLACE pending Michael's call -- delete this entry (and its built
-    # page under userdata/website/) once the toggle on the standard dive is
-    # confirmed to cover the build-comparison use case.
-    #
-    # Best-buddy UL variant: best-buddying adds +1 power-up level. In GL
-    # the 1500 cap binds far below level 50 (Mimikyu sits at L23.5-25.5),
-    # so best-buddy is a no-op and gets no GL variant. In UL the 2500 cap
-    # only binds for the high-attack spreads (15/15/13 and 14/14/15 are
-    # already capped at L50), but the bulk spread 1/14/15 reaches only
-    # 2327 CP at L50 -- so best-buddy lifts it to L51 (2355 CP, higher
-    # atk/def/hp/stat-product). --max-level 51 raises the league max for
-    # focal AND opponents (the existing flag's documented behavior; same
-    # mechanism the Master dives use). Slug '-best-buddy' so Michael can
-    # compare the best-buddied build side-by-side with the standard UL
-    # dive above.
-    {
-        'species': 'Mimikyu',
-        'league': 'ultra',
-        'slug': 'mimikyu-ultra-league-best-buddy',
-        'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
-        'top_movesets': 1,
-        'no_thresholds': True,
-        'extra_args': ['--max-level', '51'],
-    },
+    # (The standalone 'mimikyu-ultra-league-best-buddy' dive was REMOVED
+    # 2026-06-24, Phase 2: the standard 'mimikyu-ultra-league' dive above now
+    # carries an in-page "Allow best-buddy (Level 51)" toggle -- Ultra defaults
+    # best-buddy on -- with the correct focal-only L51 semantics, so the
+    # separate page (which raised BOTH focal and opponents via --max-level 51)
+    # was redundant. Built page + index link removed too. Verified: the standard
+    # UL Mimikyu dive embeds the active toggle (ivL51 + @51 grids).)
     # Corviknight (2026-06-24): Shadow Corviknight is now officially PvPoke-ranked
     # in GL (a top pick), so it graduates from the constructed pre-release one-off
     # to a real dive. Both forms are dived so the new sibling-trade card bar is
