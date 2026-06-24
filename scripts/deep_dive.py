@@ -1527,7 +1527,11 @@ def _form_damage_census(species, shadow, league, focal_moves, focal_types,
         info = opp_info_cache.get(name)
         if info is None:
             continue
-        disp = pretty_species(parse_opponent_spec(name)[0])
+        _osp, _ovar, _oshadow = parse_opponent_spec(name)
+        # Keep the shadow qualifier so the bar's opp link matches the dive
+        # anchor: a shadow-only pool entry ("Dusknoir (Shadow)") must stay
+        # "Shadow Dusknoir" -> #opp-dusknoir-shadow, not bare "dusknoir".
+        disp = pretty_species(f'{_osp} (Shadow)' if _oshadow else _osp)
         opp_atk, opp_def, opp_types = info['atk'], info['def_'], info['types']
         # Outgoing: best integer damage any focal move does to this opponent.
         out_best = None
