@@ -277,22 +277,21 @@ CARD_CSS = """
 .ddcard-oplink { color:inherit; text-decoration:underline;
   text-decoration-style:dotted; text-decoration-color:#5a7; }
 .ddcard-oplink:hover { text-decoration-style:solid; }
-/* Identical grid template + gap to .ddcard-spreads so Key Wins / Key Losses
-   line up vertically UNDER the IV spread cards (column boundaries match). */
-.ddcard-cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-  gap:10px; margin-top:8px; }
-/* Rounded card like .ddcard-spread, but a distinct (consistent) palette shade
-   so Key Wins / Key Losses read as their own pair, not as IV spreads. */
-.ddcard-col { background:#1b2547; border:1px solid #29406e;
-  border-radius:8px; padding:9px 12px; }
-/* The empty side (no entries) keeps its grid cell for L/R stability but shows
-   no box -- :empty matches the headerless placeholder div. */
-.ddcard-col:empty { background:none; border:none; padding:0; }
-.ddcard-col h4 { margin:0 0 4px; font-size:0.8rem; text-transform:uppercase;
+/* Key Wins / Key Losses are a CARD-LEVEL summary for the recommended IV -- NOT
+   per-spread. So they live in ONE full-width panel that spans all the spread
+   columns (a single wide box vs the N narrow spread cards), with a green-wins /
+   red-losses split. Spanning the whole width prevents the "spread 1 wins,
+   spread N loses" misread that column-aligning them would imply, for any N. */
+.ddcard-matchups { display:flex; flex-wrap:wrap; margin-top:8px;
+  background:#1b2547; border:1px solid #29406e; border-radius:8px;
+  overflow:hidden; }
+.ddcard-mcol { flex:1 1 200px; padding:9px 14px; }
+.ddcard-mcol + .ddcard-mcol { border-left:1px solid #29406e; }
+.ddcard-mcol h4 { margin:0 0 4px; font-size:0.8rem; text-transform:uppercase;
   letter-spacing:0.03em; }
-.ddcard-col.wins h4 { color:#3fb950; }
-.ddcard-col.losses h4 { color:#f85149; }
-.ddcard-col ul { margin:0; padding-left:18px; font-size:0.85rem; color:#cdd6e5; }
+.ddcard-mcol.wins h4 { color:#3fb950; }
+.ddcard-mcol.losses h4 { color:#f85149; }
+.ddcard-mcol ul { margin:0; padding-left:18px; font-size:0.85rem; color:#cdd6e5; }
 .ddcard-foot { font-size:0.72rem; color:#8b949e; margin-top:12px;
   border-top:1px solid #0f3460; padding-top:8px; }
 .ddcard-note { background:#0f3460; border-left:3px solid #f0b429;
@@ -577,16 +576,16 @@ def _spread_html(s: Spread, link_opps=False, base_form_display=None,
             f' &middot; CP {s.cp} &middot; SP #{s.sp_rank}</div>{cover}{flips}</div>')
 
 
-def _col(title, items, cls):
-    # Empty side still emits its flex slot (no header) so Key Wins stays on the
-    # LEFT and Key Losses on the RIGHT even when one side has no entries --
-    # otherwise a wins-less card slides Key Losses into the left column.
+def _mcol(title, items, cls):
+    """One half (wins or losses) of the full-width key-matchups panel. Returns
+    '' when empty -- a missing side just leaves the present one full-width, so
+    there is never an empty box or a left/right ambiguity."""
     if not items:
-        return f'<div class="ddcard-col {cls}"></div>'
+        return ''
     lis = ''.join(
         f'<li>{html.escape(n)} <span style="color:#8b949e">({s:.0f})</span></li>'
         for n, s in items)
-    return (f'<div class="ddcard-col {cls}"><h4>{html.escape(title)}</h4>'
+    return (f'<div class="ddcard-mcol {cls}"><h4>{html.escape(title)}</h4>'
             f'<ul>{lis}</ul></div>')
 
 
@@ -604,17 +603,12 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
                                    base_form_display=m.base_form_display,
                                    shadow=m.shadow)
                       for s in m.spreads)
-    wins = _col('Key wins', m.key_wins, 'wins')
-    losses = _col('Key losses', m.key_losses, 'losses')
-    # Give the wins/losses grid the SAME column count as the IV-spread grid by
-    # padding with invisible filler cells BETWEEN wins and losses. auto-fit only
-    # collapses empty tracks and a filler div occupies one, so N spreads ->
-    # N columns in both grids: Key Wins sits under the FIRST spread column and
-    # Key Losses under the LAST, with the middle columns blank (never Losses in
-    # the middle). The two grids wrap identically at narrow widths.
-    _fillers = '<div class="ddcard-col"></div>' * max(0, len(m.spreads) - 2)
-    cols = (f'<div class="ddcard-cols">{wins}{_fillers}{losses}</div>'
-            if (m.key_wins or m.key_losses) else '')
+    # One full-width panel (wins | losses), spanning all the spread columns so
+    # it reads as a card-level summary rather than aligning to any one spread.
+    wins = _mcol('Key wins', m.key_wins, 'wins')
+    losses = _mcol('Key losses', m.key_losses, 'losses')
+    cols = (f'<div class="ddcard-matchups">{wins}{losses}</div>'
+            if (wins or losses) else '')
 
     section = f"""<section class="ddcard">
   <div class="ddcard-head">

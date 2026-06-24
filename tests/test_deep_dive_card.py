@@ -191,39 +191,34 @@ def _model_with(nspreads, key_wins, key_losses):
         spreads=sp, single_iv=None, robust=None,
         key_wins=key_wins, key_losses=key_losses)
 
-def _cols_cells(html_str):
-    """Return the list of `class="..."` values for each .ddcard-col cell, in
-    document (left-to-right column) order, from the wins/losses grid."""
+def _matchup_cells(html_str):
+    """The .ddcard-mcol class values inside the single key-matchups panel, in
+    document (left-to-right) order. Also asserts there's exactly one panel."""
     import re
-    seg = re.search(r'<div class="ddcard-cols">(.*?)</div>\s*<div class="ddcard-foot',
-                    html_str, re.S)
-    if not seg:
+    panels = re.findall(r'<div class="ddcard-matchups">(.*?)</div>\s*<div class="ddcard-foot',
+                        html_str, re.S)
+    assert len(panels) <= 1
+    if not panels:
         return []
-    return re.findall(r'<div class="(ddcard-col[^"]*)"', seg.group(1))
+    return re.findall(r'<div class="(ddcard-mcol[^"]*)"', panels[0])
 
-def test_key_cols_match_spread_column_count():
-    """The Key Wins/Losses grid pads with filler cells so it has the SAME column
-    count as the IV-spread grid -> the two rows align vertically for any N. Key
-    Wins is the FIRST column and Key Losses the LAST (fillers in the middle)."""
+def test_key_matchups_single_panel_any_n():
+    """Key Wins/Losses are ONE full-width panel (wins then losses) regardless of
+    how many IV spreads the card shows -- they do NOT align to the spread
+    columns, so no spread is implied to "own" the wins or the losses."""
     for nspreads in (2, 3, 4, 5, 6):
         html_str = dc.render_card_html(
             _model_with(nspreads, [('A', 600)], [('B', 400)]), standalone=False)
-        cells = _cols_cells(html_str)
-        assert len(cells) == nspreads, f"{nspreads} spreads -> {len(cells)} cells"
-        assert cells[0] == 'ddcard-col wins', f"{nspreads}: wins not first"
-        assert cells[-1] == 'ddcard-col losses', f"{nspreads}: losses not last"
-        # everything between is an empty filler (plain ddcard-col, no wins/losses)
-        assert all(c == 'ddcard-col' for c in cells[1:-1]), f"{nspreads}: middle not filler"
+        assert html_str.count('class="ddcard-matchups"') == 1, f"{nspreads}: not one panel"
+        cells = _matchup_cells(html_str)
+        assert cells == ['ddcard-mcol wins', 'ddcard-mcol losses'], f"{nspreads}: {cells}"
 
-def test_key_cols_losses_only_lands_last():
-    """With no Key Wins, Key Losses still lands in the LAST column (Wins keeps an
-    empty left slot) so it stays right-aligned under the last spread."""
+def test_key_matchups_losses_only_is_just_losses():
+    """With no Key Wins, the panel holds only the losses half (no empty box,
+    no left/right ambiguity)."""
     html_str = dc.render_card_html(
         _model_with(3, [], [('B', 400)]), standalone=False)
-    cells = _cols_cells(html_str)
-    assert cells[0] == 'ddcard-col wins'      # empty wins placeholder, leftmost
-    assert cells[-1] == 'ddcard-col losses'   # losses rightmost
-    assert len(cells) == 3
+    assert _matchup_cells(html_str) == ['ddcard-mcol losses']
 
 
 def test_no_sprite_fallback_renders():
