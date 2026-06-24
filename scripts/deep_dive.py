@@ -3667,7 +3667,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               shared_plotly_dir=None,
                               card_out_path=None,
                               card_robust_k=DEFAULT_CARD_ROBUST_K,
-                              opp_movesets=None, mechanics='legacy'):
+                              opp_movesets=None, mechanics='legacy',
+                              best_buddy=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -3843,12 +3844,77 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'ivSp': iv_sp, 'spRanks': sp_ranks, 'ivTiers': iv_tiers, 'ivAllTiers': iv_all_tiers,
     }
 
-    # Score arrays: one per (moveset_idx, opp_iv_mode)
+    # ---- Best-buddy / L51 level metadata (only when the toggle is active) ----
+    # The level-dependent IV arrays at the alt cap, parallel to the top-level
+    # (L50) ones. ivA/ivD/ivS are level-invariant (same IV set) so they are NOT
+    # duplicated; the JS reads them straight from the top level for both views.
+    # When best-buddy is inactive nothing is emitted, so a feature-off dive is
+    # byte-identical.
+    def _level_meta_arrays(meta_lvl):
+        """JS-facing level-dependent arrays for one level's canonical_meta."""
+        a_lv = [m[3] for m in meta_lvl]
+        c_lv = [m[4] for m in meta_lvl]
+        atk_lv = [round(m[5], 2) for m in meta_lvl]
+        def_lv = [round(m[6], 2) for m in meta_lvl]
+        hp_lv = [m[7] for m in meta_lvl]
+        sp_lv = [round(m[5] * m[6] * m[7], 1) for m in meta_lvl]
+        sp_sorted_lv = sorted(range(len(meta_lvl)), key=lambda i: sp_lv[i], reverse=True)
+        sp_ranks_lv = [0] * len(meta_lvl)
+        for _r, _idx in enumerate(sp_sorted_lv):
+            sp_ranks_lv[_idx] = _r + 1
+        eff_lv = efficient_frontier(list(zip(atk_lv, def_lv, hp_lv)))
+        tiers_lv = [-1] * len(meta_lvl)
+        all_tiers_lv = [[] for _ in range(len(meta_lvl))]
+        if thresholds:
+            for i in range(len(meta_lvl)):
+                for ti, (_tn, th) in enumerate(thresholds.items()):
+                    ok = True
+                    if th['attack'] > 0 and atk_lv[i] < th['attack']:
+                        ok = False
+                    if th['defense'] > 0 and def_lv[i] < th['defense']:
+                        ok = False
+                    if th['stamina'] > 0 and hp_lv[i] < th['stamina']:
+                        ok = False
+                    if ok:
+                        all_tiers_lv[i].append(ti)
+                        if tiers_lv[i] == -1:
+                            tiers_lv[i] = ti
+        rank1_lv = min(range(len(meta_lvl)), key=lambda i: sp_ranks_lv[i]) if meta_lvl else -1
+        return {
+            'ivLv': a_lv, 'ivCp': c_lv,
+            'ivAtk': atk_lv, 'ivDef': def_lv, 'ivHp': hp_lv,
+            'ivSp': sp_lv, 'spRanks': sp_ranks_lv,
+            'ivEfficient': eff_lv, 'ivTiers': tiers_lv, 'ivAllTiers': all_tiers_lv,
+            'rank1RefIvIdx': rank1_lv,
+        }
+
+    _bb_active = bool(best_buddy and best_buddy.get('active')
+                      and moveset_data and moveset_data[0].get('meta_l51'))
+    # Only surface to the client when there's something to show -- an active
+    # toggle, or a "best-buddy changes nothing here" note. A plain dive with the
+    # toggle off (or league no-op) emits nothing, so it stays byte-identical.
+    if _bb_active or (best_buddy and best_buddy.get('note')):
+        # Carry the toggle metadata (and the no-op note) to the client even
+        # when inactive, so the UI can show "best-buddy changes nothing here".
+        data_obj['bestBuddy'] = {
+            'active': _bb_active,
+            'defaultDisplay': best_buddy.get('default_display'),
+            'defaultCap': best_buddy.get('default_cap'),
+            'altCap': best_buddy.get('alt_cap'),
+            'note': best_buddy.get('note'),
+        }
+    if _bb_active:
+        data_obj['ivL51'] = _level_meta_arrays(moveset_data[0]['meta_l51'])
+
+    # Score arrays: one per (moveset_idx, opp_iv_mode). When best-buddy is
+    # active each moveset also carries an L51 grid, keyed '{mi}_{mode}@51'.
     score_arrays = {}
     for mi, md in enumerate(moveset_data):
         for mode in opp_iv_modes:
             key = f'{mi}_{mode}'
             score_arrays[key] = md['scores'][mode]
+            if _bb_active and md.get('scores_l51') and mode in md['scores_l51']:
+                score_arrays[f'{key}@51'] = md['scores_l51'][mode]
 
     # Item 5: base-form score arrays (only the movesets that carry a
     # 'scores_base' -- currently moveset 0 on shadow/Female-sex focals).
@@ -5382,6 +5448,7 @@ def render_dive_html(state):
                 card_robust_k=state.get('card_robust_k', DEFAULT_CARD_ROBUST_K),
                 opp_movesets=state.get('opp_movesets'),
                 mechanics=state.get('mechanics', 'legacy'),
+                best_buddy=state.get('best_buddy'),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
@@ -5411,6 +5478,7 @@ def render_dive_html(state):
             card_robust_k=state.get('card_robust_k', DEFAULT_CARD_ROBUST_K),
             opp_movesets=state.get('opp_movesets'),
             mechanics=state.get('mechanics', 'legacy'),
+            best_buddy=state.get('best_buddy'),
         )
 
 
@@ -5433,6 +5501,20 @@ def main():
                         'opponents (e.g. 50 for "regular" vs the default 51 '
                         'best-buddy in Master, where the CP cap never binds). '
                         'Default: the league default in LEAGUE_MAX_LEVEL.')
+    parser.add_argument('--best-buddy', choices=['auto', 'on', 'off'],
+                        default='auto',
+                        help='Compute a second focal sweep one level higher '
+                        '(best-buddy = +1 level) so the dive can toggle between '
+                        'the league-default level and best-buddy L51. '
+                        '"auto" (default) computes it for Ultra; Great is '
+                        'opt-in via "on"; Master/Little already cap at 51 so '
+                        'the toggle is a no-op there. Suppressed automatically '
+                        'when no IV can actually climb a level.')
+    parser.add_argument('--best-buddy-display', type=int, choices=[50, 51],
+                        default=None,
+                        help='Which level the dive opens on when the best-buddy '
+                        'toggle is active (default: the league-default level, '
+                        'i.e. 50 for Great/Ultra).')
     parser.add_argument('--opponents', type=int, default=20, metavar='N',
                         help='Number of top meta opponents from rankings (default: 20). '
                              'Ignored if --group is used.')
@@ -6768,6 +6850,77 @@ def main():
                 'species': _base_species, 'shadow': _base_shadow,
             }
 
+        # ---- Best-buddy / L51 pass: a second focal sweep one level higher ----
+        # When best-buddy is enabled and actually changes some IV's level, run
+        # the WHOLE sweep again at the alt cap (focal-only -- opponents stay at
+        # their league level, so opponent columns are reused). Both grids are
+        # carried on moveset_data so the dive can toggle the entire view (card +
+        # scatter + prose) between league-default and best-buddy L51. The
+        # base-form census pass above is the template (reuses the opponent cache).
+        from gopvpsim.pokemon import bestbuddy_caps as _bestbuddy_caps
+        _bb_default_cap, _bb_alt_cap = _bestbuddy_caps(args.league)
+        if args.best_buddy == 'on':
+            _bb_want = True
+        elif args.best_buddy == 'off':
+            _bb_want = False
+        else:  # auto: default-on for Ultra; Great opt-in; Master/Little no-op
+            _bb_want = args.league == 'ultra'
+        _bb_active = False
+        _bb_note = None
+        if _bb_want and _bb_alt_cap != _bb_default_cap and moveset_data:
+            # Cheap metadata-time no-op check: if no IV's level moves between the
+            # two caps, best-buddy changes nothing -- skip the second sweep.
+            _md_def = compute_iv_metadata(args.species, args.league,
+                                          shadow=args.shadow, iv_floor=args.iv_floor,
+                                          focal_max_level=_bb_default_cap)
+            _md_alt = compute_iv_metadata(args.species, args.league,
+                                          shadow=args.shadow, iv_floor=args.iv_floor,
+                                          focal_max_level=_bb_alt_cap)
+            _bb_active = any(a['level'] != b['level']
+                             for a, b in zip(_md_def, _md_alt))
+            if not _bb_active:
+                _bb_note = (
+                    f"Best-buddy doesn't change any spread for "
+                    f"{pretty_species(args.species)} in {args.league.title()} "
+                    f"League -- every IV is already CP-capped below level "
+                    f"{_bb_alt_cap:g}.")
+        if _bb_active:
+            logger.info(f"  Best-buddy pass: focal at L{_bb_alt_cap:g} "
+                        f"(everything-toggles; reuses opponent cache)")
+            for mi, md in enumerate(moveset_data):
+                _bb_f, _bb_c = all_moveset_results[mi][0], all_moveset_results[mi][1]
+                _bb_scores = {}
+                _bb_meta = None
+                for mode in opp_iv_modes_to_run:
+                    t0 = time.time()
+                    _br, _bn51, _bcs51, _bcm51 = iv_sweep(
+                        args.species, _bb_f, _bb_c, args.league, args.shadow,
+                        opponents, opp_movesets_full, shield_scenarios,
+                        opp_iv_mode=mode,
+                        iv_floor=args.iv_floor,
+                        log_path=log_path, verbose=args.verbose,
+                        threshold_registry=threshold_registry,
+                        reserve_cpus=args.reserve_cpus,
+                        signature_dedup=not args.no_signature_dedup,
+                        use_sweep_cache=not args.no_sweep_cache,
+                        mechanics=args.mechanics,
+                        focal_max_level=_bb_alt_cap,
+                    )
+                    logger.info(f"    L{_bb_alt_cap:g} {_bn51:,} sims in "
+                                f"{time.time() - t0:.1f}s ({mode_pretty_label(mode)})")
+                    _bb_scores[mode] = _bcs51
+                    if _bb_meta is None:
+                        _bb_meta = _bcm51
+                md['scores_l51'] = _bb_scores
+                md['meta_l51'] = _bb_meta
+        best_buddy = {
+            'active': _bb_active,
+            'default_display': int(args.best_buddy_display or _bb_default_cap),
+            'default_cap': _bb_default_cap,
+            'alt_cap': _bb_alt_cap,
+            'note': _bb_note,
+        }
+
         # All render inputs are now in hand: snapshot them so
         # scripts/replay_analysis.py can re-render this dive after
         # renderer/analysis code changes without re-simming.
@@ -6796,6 +6949,7 @@ def main():
             'card_robust_k': args.card_robust_k,
             'opp_movesets': opp_movesets_full,
             'mechanics': args.mechanics,
+            'best_buddy': best_buddy,
         }
         if not args.no_replay_dump:
             _replay_path = dump_replay_state(state)
