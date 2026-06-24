@@ -303,6 +303,8 @@ CARD_CSS = """
 .ddcard-sib-detail { font-size:0.74rem; color:#9bb0d0; margin-top:3px; }
 .ddcard-sib-detail .sib-bp { color:#9be0a6; }
 .ddcard-sib-detail .sib-blk { color:#e0b89b; }
+.ddcard-sib-foot { font-size:0.66rem; color:#7286a8; margin-top:4px;
+  font-style:italic; }
 """
 
 
@@ -482,8 +484,14 @@ def _sibling_trade_html(trade: dict | None, shadow=False, link_opps=False) -> st
             detail.append(f'<span class="sib-blk">{blk_label}: {blk_list}</span>')
     detail_html = (f'<div class="ddcard-sib-detail">{" &middot; ".join(detail)}</div>'
                    if detail else '')
+    # Basis footnote (ASCII, no em-dash): the bar counts the anchor-based
+    # newly-guaranteed set vs the sibling form, at each opponent's default IV
+    # (the same basis as the per-spread "N newly guaranteed" numbers).
+    foot = ('<div class="ddcard-sib-foot">newly guaranteed vs the '
+            f'{html.escape(trade.get("sibling_display", "base"))} form, '
+            'by damage to each opponent\'s default IV</div>')
     return (f'<div class="ddcard-sib"><div class="ddcard-sib-head">{headline}</div>'
-            f'{detail_html}</div>')
+            f'{detail_html}{foot}</div>')
 
 
 _COVER_MAX_OPPS = 7  # names shown before the "+N more" toggle on the card
