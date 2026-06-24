@@ -720,15 +720,19 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None,
 
 
 def make_battle_pokemon(species, fast_id, charged_ids, league, shields,
-                        atk_iv, def_iv, sta_iv, shadow=False):
+                        atk_iv, def_iv, sta_iv, shadow=False, max_level=None):
     """Build a BattlePokemon from species + IVs + move IDs.
 
     Routes through BattlePokemon.from_pokemon so form-change state
     (Aegislash, Morpeko, Mimikyu) is wired up like the oracle tests
     and the scripts/battle.py CLI.
+
+    ``max_level`` overrides the league max power-up level (best-buddy / L51);
+    ``None`` = league default.
     """
     pokemon = Pokemon.at_best_level(species, atk_iv, def_iv, sta_iv,
-                                    league=league, shadow=shadow)
+                                    league=league, shadow=shadow,
+                                    max_level=max_level)
     fast_moves, charged_moves = get_moves()
     fm = dict(fast_moves[fast_id])
     cms = [dict(charged_moves[cid]) for cid in charged_ids]
@@ -817,7 +821,7 @@ def _species_has_form_change(species_name):
 def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
                       focal_ivs, opponent, opp_fast, opp_charged, opp_shadow,
                       league, shield_scenarios, k=512, dedup='signature',
-                      mechanics='legacy'):
+                      mechanics='legacy', focal_max_level=None):
     """Opponent-IV robustness for ONE fixed focal IV vs ONE opponent.
 
     Sweeps the opponent across its top-``k`` stat-product IV spreads (the
@@ -856,11 +860,12 @@ def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
     ranked = ranked[:k]
     a0, d0, s0 = focal_ivs
     focal_bp = make_battle_pokemon(focal_species, focal_fast, focal_charged,
-                                   league, 2, a0, d0, s0, shadow=focal_shadow)
+                                   league, 2, a0, d0, s0, shadow=focal_shadow,
+                                   max_level=focal_max_level)
     groups = _opp_robustness_groups(
         focal_bp, focal_species, focal_fast, focal_charged, focal_shadow,
         focal_ivs, opponent, opp_fast, opp_charged, opp_shadow, league, ranked,
-        dedup=dedup)
+        dedup=dedup, focal_max_level=focal_max_level)
     wins = 0.0
     total = 0.0
     for members in groups:
@@ -884,7 +889,7 @@ def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
 def _opp_robustness_groups(focal_bp, focal_species, focal_fast, focal_charged,
                            focal_shadow, focal_ivs, opponent, opp_fast,
                            opp_charged, opp_shadow, league, ranked,
-                           dedup='signature'):
+                           dedup='signature', focal_max_level=None):
     """Group the opponent's top-k IVs (``ranked``) into sets that fight
     bit-identical battles vs the fixed focal, so one representative sim
     covers each set. Returns a list of member-position lists (indexing
@@ -924,7 +929,8 @@ def _opp_robustness_groups(focal_bp, focal_species, focal_fast, focal_charged,
         [dict(charged_db[c]) for c in opp_charged],
         profile_list, league_cp, opp_shadow)
     focal_pk = Pokemon.at_best_level(focal_species, *focal_ivs,
-                                     league=league, shadow=focal_shadow)
+                                     league=league, shadow=focal_shadow,
+                                     max_level=focal_max_level)
     fixed = _sig.build_opp_side({
         'types': parse_types(focal_mon),
         'fm': dict(fast_db[focal_fast]),
@@ -939,7 +945,8 @@ def _opp_robustness_groups(focal_bp, focal_species, focal_fast, focal_charged,
 def _compute_card_robustness(species, focal_fast, focal_charged, focal_shadow,
                              focal_ivs, league, opponent_names,
                              shield_scenarios, opp_movesets=None,
-                             k=DEFAULT_CARD_ROBUST_K, mechanics='legacy'):
+                             k=DEFAULT_CARD_ROBUST_K, mechanics='legacy',
+                             focal_max_level=None):
     """Aggregate opp_iv_robustness for ONE focal IV across the curated pool.
 
     When ``opp_movesets`` (parallel to ``opponent_names``, each a
@@ -4754,189 +4761,179 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                 if getattr(_a, 'source', None):
                     _a.source = ''
     import time as _time
-    _nar0_start = _time.time()
-    moveset0_nar_html, moveset0_flavors = _generate_narrative_for_moveset(
-        data_obj, score_arrays, 0,
-        scenarios_list, opponent_names or [],
-        opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
-        has_toml_tiers,
-        resolved_anchors=_resolved_anchors,
-        species=species, focal_shadow=shadow,
-    )
-    logger.info(f"  Moveset 0 narrative (pre-render for rename) in "
-                f"{_time.time() - _nar0_start:.1f}s")
+    import deep_dive_card as _ddcard
 
-    # Deep dive analysis sections (banding, clusters, flips, etc.)
-    # The anchor_passing_sink accumulates {anchor_id: [passing_iv_idx]}
-    # for every anchor-flip bullet rendered inside the analysis layer.
-    # We embed it into DATA below so JS can light up "which of your
-    # IVs hit this breakpoint" annotations when a CSV is loaded.
-    #
-    # NOTE: always computed per call. In split-movesets mode each file's
-    # moveset_data is filtered so index 0 is THAT FILE's moveset — the
-    # analysis genuinely differs per file. A cross-file cache here
-    # (fa34f39, removed 2026-06-10) silently served moveset-0's analysis
-    # sections in every split file for eight weeks; see the tripwire
-    # assertion below. ``moveset0_flavors`` is plumbed through so the
-    # analysis can rename tier cards to the flavor-matched name before
-    # rendering them.
-    anchor_passing_sink = {}
-    analysis_css, results_html, analysis_html = generate_analysis_sections(
-        data_obj, score_arrays, 0, opp_iv_modes[0],
-        shield_scenarios, opponent_names,
-        slayer_iter_result=slayer_iter_result,
-        has_toml_tiers=has_toml_tiers,
-        anchor_passing_sink=anchor_passing_sink,
-        threshold_registry=threshold_registry,
-        moveset0_flavors_for_rename=moveset0_flavors,
-        focal_shadow=shadow,
-        scores_base_arrays=scores_base_arrays,
-        base_form_info=base_form_info)
-    # Tripwire: a split-mode file must carry its OWN moveset's analysis.
-    # This is what would have caught the fa34f39 cache immediately.
-    if split_info is not None:
-        _expected = f"Moveset: {_pretty_moveset(data_obj['movesets'][0]['label'])}"
-        assert _expected in results_html, (
-            f"split-mode analysis subheader mismatch: expected '{_expected}' "
-            f"in the Deep Dive Results section of {html_path}")
-    data_obj['anchorFlipSets'] = anchor_passing_sink
+    def _render_level_body(dobj, sarr, *, write_card_out, robust_max_level,
+                           base_scores, base_info):
+        """Render one level's prose sections + dive card from
+        (data_obj, score_arrays). Mutates ``dobj`` (narrative flavors / tier
+        renames, pops _cardCtx). Returns
+        ``(results_html, analysis_html, card_section, analysis_css, sink)``.
+        The caller decides what to do with the css/sink and how to inject the
+        card -- the level-default pass keeps the historical behavior; the
+        best-buddy pass goes into a <template> for the toggle. ``write_card_out``
+        gates the standalone --card-out file (level-default only);
+        ``robust_max_level`` is the focal cap for the opponent-IV robustness
+        sim (None = league default; the alt cap for the L51 card)."""
+        _n0 = _time.time()
+        ms0_nar, ms0_flavors = _generate_narrative_for_moveset(
+            dobj, sarr, 0, scenarios_list, opponent_names or [],
+            opp_iv_modes or [dobj.get('oppIvModes', ['pvpoke'])[0]],
+            has_toml_tiers, resolved_anchors=_resolved_anchors,
+            species=species, focal_shadow=shadow)
+        logger.info(f"  Moveset 0 narrative (pre-render for rename) in "
+                    f"{_time.time() - _n0:.1f}s")
+        sink = {}
+        a_css, r_html, an_html = generate_analysis_sections(
+            dobj, sarr, 0, opp_iv_modes[0], shield_scenarios, opponent_names,
+            slayer_iter_result=slayer_iter_result, has_toml_tiers=has_toml_tiers,
+            anchor_passing_sink=sink, threshold_registry=threshold_registry,
+            moveset0_flavors_for_rename=ms0_flavors, focal_shadow=shadow,
+            scores_base_arrays=base_scores, base_form_info=base_info)
+        if split_info is not None:
+            _expected = f"Moveset: {_pretty_moveset(dobj['movesets'][0]['label'])}"
+            assert _expected in r_html, (
+                f"split-mode analysis subheader mismatch: expected '{_expected}' "
+                f"in the Deep Dive Results section of {html_path}")
+        # Stash the anchor-passing sets on dobj here (before narratives /
+        # pasteTiers) so the embedded DATA key order matches the historical
+        # single-pass layout exactly.
+        dobj['anchorFlipSets'] = sink
+        # Per-moveset narrative zones (moveset 0 reuses the pre-render).
+        nblocks = []
+        n_ms = len(dobj.get('movesets', [{}]))
+        for mi in range(n_ms):
+            if mi == 0:
+                nh = ms0_nar
+            else:
+                nh, _ = _generate_narrative_for_moveset(
+                    dobj, sarr, mi, scenarios_list, opponent_names or [],
+                    opp_iv_modes or [dobj.get('oppIvModes', ['pvpoke'])[0]],
+                    has_toml_tiers, resolved_anchors=None,
+                    species=species, focal_shadow=shadow)
+            if nh:
+                vis = 'block' if mi == 0 else 'none'
+                nblocks.append(
+                    f'<div class="dd-narrative-moveset" data-moveset="{mi}" '
+                    f'style="display:{vis}">\n{nh}\n</div>')
+        if ms0_flavors and 'tiers' in dobj:
+            _rename_plotly_tiers(dobj, ms0_flavors)
+        if ms0_flavors:
+            _promote_flavors_to_paste_tiers(dobj, ms0_flavors)
+        if nblocks:
+            nc = '\n'.join(nblocks)
+            if '<!-- NARRATIVE_ZONE_PLACEHOLDER -->' in r_html:
+                r_html = r_html.replace('<!-- NARRATIVE_ZONE_PLACEHOLDER -->', nc, 1)
+            else:
+                _sm = '<div class="dd-sim-zone">'
+                if _sm in r_html:
+                    r_html = r_html.replace(_sm, nc + _sm, 1)
+        # Dive card from the analysis context stashed on dobj.
+        cctx = dobj.pop('_cardCtx', None)
+        card_section = ''
+        if cctx is not None:
+            try:
+                _gm = load_gamemaster()
+                _mon = next((m for m in _gm['pokemon']
+                             if m['speciesName'] == species), None)
+                _types = parse_types(_mon) if _mon else []
+                _sprite = sprite_data_uri(species, shadow=shadow)
+            except Exception as _e:  # noqa: BLE001
+                logger.warning(f"  dive card: type/sprite lookup failed ({_e})")
+                _types, _sprite = [], None
+            _is_landing = split_info is None or split_info.get('current', 0) == 0
+            _robust = None
+            if card_out_path and _is_landing and dobj.get('movesets'):
+                _ri = cctx['rec_idx']
+                _label = dobj['movesets'][0].get('label', '')
+                if ' / ' in _label:
+                    _ff, _cc = _label.split(' / ', 1)
+                    logger.info("  dive card: computing opponent-IV robustness "
+                                f"(top-{card_robust_k}, {len(shield_scenarios)} "
+                                "shield scenarios)...")
+                    _robust = _compute_card_robustness(
+                        species, _ff.strip(),
+                        [c.strip() for c in _cc.split(',')], shadow,
+                        (dobj['ivA'][_ri], dobj['ivD'][_ri], dobj['ivS'][_ri]),
+                        league, opponent_names or [], shield_scenarios,
+                        opp_movesets=opp_movesets, k=card_robust_k,
+                        mechanics=mechanics, focal_max_level=robust_max_level)
+            _cm = _ddcard.build_card_model(
+                dobj, cctx, types=_types, shadow=shadow,
+                robust_winrate=_robust, sprite_uri=_sprite)
+            card_section = _ddcard.render_card_html(_cm, standalone=False)
+            if write_card_out and card_out_path and _is_landing:
+                try:
+                    _co = os.path.abspath(card_out_path)
+                    os.makedirs(os.path.dirname(_co) or '.', exist_ok=True)
+                    with open(_co, 'w') as _f:
+                        _f.write(_ddcard.render_card_html(_cm, standalone=True))
+                    logger.info(f"  Dive card written to {card_out_path}")
+                except OSError as _e:  # noqa: BLE001
+                    logger.warning(f"  dive card: could not write "
+                                   f"{card_out_path}: {_e}")
+        return r_html, an_html, card_section, a_css, sink
+
+    # Snapshot a CLEAN L51 data_obj + score arrays BEFORE the level-default
+    # pass mutates data_obj (tier renames, pasteTiers, _cardCtx). Done here so
+    # the L51 prose runs on the original tiers, not the renamed ones.
+    import copy as _copy
+    _dobj51 = _sarr51 = None
+    if _bb_active:
+        _dobj51 = _copy.deepcopy(data_obj)
+        _dobj51.update(_dobj51.pop('ivL51'))   # override level-dependent arrays
+        _dobj51.pop('bestBuddy', None)
+        _sarr51 = {f'{mi}_{mode}': md['scores_l51'][mode]
+                   for mi, md in enumerate(moveset_data)
+                   if md.get('scores_l51')
+                   for mode in opp_iv_modes if mode in md['scores_l51']}
+
+    # ---- Level-default pass: drives the embedded DATA + scatter ----
+    results_html, analysis_html, _card50_html, analysis_css, _sink50 = \
+        _render_level_body(
+            data_obj, score_arrays, write_card_out=True, robust_max_level=None,
+            base_scores=scores_base_arrays, base_info=base_form_info)
+    # (anchorFlipSets was set on data_obj inside the helper, matching the
+    # historical key order in the embedded DATA blob.)
     # Inject analysis CSS into the style block (replace closing tag we already emitted)
     html = html.replace('</style>\n</head>', analysis_css + '\n</style>\n</head>', 1)
-    # Generate per-moveset narrative zones. Moveset 0 was pre-rendered
-    # above for the rename; reuse its cached output here.
-    narrative_blocks = []
-    n_movesets = len(data_obj.get('movesets', [{}]))
-    _nar_start = _time.time()
-    logger.info(f"  Generating narrative for {n_movesets} moveset(s)...")
-    for mi in range(n_movesets):
-        _mi_start = _time.time()
-        if mi == 0:
-            nar_html, flavors = moveset0_nar_html, moveset0_flavors
-            logger.info(f"    Narrative moveset 1/{n_movesets} reused "
-                        f"(pre-rendered)")
+
+    # ---- Best-buddy (L51) pass: rendered into <template>s for the toggle ----
+    _results51 = _analysis51 = _card51_html = ''
+    if _bb_active:
+        _results51, _analysis51, _card51_html, _, _ = _render_level_body(
+            _dobj51, _sarr51, write_card_out=False,
+            robust_max_level=best_buddy.get('alt_cap'),
+            base_scores=None, base_info=None)
+
+    # ---- Dive card injection (host + optional L51 template for the toggle) ----
+    if _card50_html:
+        if _bb_active:
+            _card_block = (
+                f'<div id="dd-bb-card-host" class="dd-bb-host">{_card50_html}</div>'
+                f'<template id="dd-bb-card-tmpl">{_card51_html}</template>')
         else:
-            nar_html, flavors = _generate_narrative_for_moveset(
-                data_obj, score_arrays, mi,
-                scenarios_list, opponent_names or [],
-                opp_iv_modes or [data_obj.get('oppIvModes', ['pvpoke'])[0]],
-                has_toml_tiers,
-                resolved_anchors=None,
-                species=species, focal_shadow=shadow,
-            )
-            logger.info(f"    Narrative moveset {mi+1}/{n_movesets} "
-                        f"rendered in {_time.time() - _mi_start:.1f}s")
-        if nar_html:
-            vis = 'block' if mi == 0 else 'none'
-            narrative_blocks.append(
-                f'<div class="dd-narrative-moveset" data-moveset="{mi}" '
-                f'style="display:{vis}">\n{nar_html}\n</div>'
-            )
-    logger.info(f"  All narratives rendered in "
-                f"{_time.time() - _nar_start:.1f}s "
-                f"({len(narrative_blocks)} non-empty block(s))")
-
-    # Tier rename is now done inside generate_analysis_sections (via the
-    # ``moveset0_flavors_for_rename`` param) so both tier cards and the
-    # Plotly legend see the flavor name. Kept here as a safety net for
-    # the cached-analysis path in split-moveset mode: each per-file call
-    # has its own data_obj['tiers'], and the cache stores only rendered
-    # HTML — so we still need to rename data_obj's in-memory tier names
-    # on subsequent calls for the scatter plot's JS legend.
-    if moveset0_flavors and 'tiers' in data_obj:
-        _rename_plotly_tiers(data_obj, moveset0_flavors)
-
-    # Promote narrative flavors to paste-box-only tiers. ``DATA.tiers``
-    # feeds the scatter plot AND the paste-box, so adding flavors there
-    # would clutter the scatter legend. Emit a separate ``DATA.pasteTiers``
-    # list (plot tiers ∪ non-General flavors not already represented
-    # by name match) that the JS paste-box prefers when present. Fixes
-    # the Tinkaton-GL gap from docs/auto_gen_narrative_plan.md "Problem
-    # observed 2026-04-19": narrative-only flavors like "Fortified
-    # Azumarill" were invisible to the "Check my collection" membership
-    # check because they had no ``DATA.tiers`` entry.
-    if moveset0_flavors:
-        _promote_flavors_to_paste_tiers(data_obj, moveset0_flavors)
-    if narrative_blocks:
-        narrative_combined = '\n'.join(narrative_blocks)
-        placeholder = '<!-- NARRATIVE_ZONE_PLACEHOLDER -->'
-        if placeholder in results_html:
-            results_html = results_html.replace(placeholder, narrative_combined, 1)
-        else:
-            # Fallback: insert before sim zone
-            sim_marker = '<div class="dd-sim-zone">'
-            if sim_marker in results_html:
-                results_html = results_html.replace(
-                    sim_marker, narrative_combined + sim_marker, 1)
-
-    # ---- Dive card: compact spec-sheet summary at the top of the page ----
-    # Injected into the <!-- DIVE_CARD_SLOT --> marker right under the page
-    # header so the card is the first content block, with the scatter +
-    # controls immediately below it.
-    # Built from the analysis context generate_analysis_sections stashed on
-    # data_obj; popped here so it never reaches the JSON DATA blob (it holds
-    # sets). The opponent-IV robustness headline (a real sim) is computed
-    # only when --card-out is set and only on the landing moveset, to bound
-    # cost; every dive still gets the embedded card with the single-IV rate.
-    import deep_dive_card as _ddcard
-    _card_ctx = data_obj.pop('_cardCtx', None)
-    if _card_ctx is not None:
-        try:
-            _gm = load_gamemaster()
-            _mon = next((m for m in _gm['pokemon']
-                         if m['speciesName'] == species), None)
-            _types = parse_types(_mon) if _mon else []
-            _sprite = sprite_data_uri(species, shadow=shadow)
-        except Exception as _e:  # noqa: BLE001
-            logger.warning(f"  dive card: type/sprite lookup failed ({_e})")
-            _types, _sprite = [], None
-        _is_landing = split_info is None or split_info.get('current', 0) == 0
-        _robust = None
-        if card_out_path and _is_landing and data_obj.get('movesets'):
-            _ri = _card_ctx['rec_idx']
-            _label = data_obj['movesets'][0].get('label', '')
-            if ' / ' in _label:
-                _ff, _cc = _label.split(' / ', 1)
-                # ALL shield scenarios (the asymmetric 0-1/1-2/2-1 matchups
-                # are the whole point of this card style). Smokes can cap
-                # `card_robust_k` to sample fewer opponent IVs for speed.
-                logger.info("  dive card: computing opponent-IV robustness "
-                            f"(top-{card_robust_k}, {len(shield_scenarios)} "
-                            "shield scenarios)...")
-                _robust = _compute_card_robustness(
-                    species, _ff.strip(),
-                    [c.strip() for c in _cc.split(',')], shadow,
-                    (data_obj['ivA'][_ri], data_obj['ivD'][_ri],
-                     data_obj['ivS'][_ri]),
-                    league, opponent_names or [], shield_scenarios,
-                    opp_movesets=opp_movesets, k=card_robust_k,
-                    mechanics=mechanics)
-        _card_model = _ddcard.build_card_model(
-            data_obj, _card_ctx, types=_types, shadow=shadow,
-            robust_winrate=_robust, sprite_uri=_sprite)
-        html = html.replace('<!-- DIVE_CARD_SLOT -->',
-                             _ddcard.render_card_html(_card_model,
-                                                      standalone=False), 1)
+            _card_block = _card50_html
+        html = html.replace('<!-- DIVE_CARD_SLOT -->', _card_block, 1)
         html = html.replace('</style>\n</head>',
                             _ddcard.CARD_CSS + '\n</style>\n</head>', 1)
-        if card_out_path and _is_landing:
-            try:
-                _co = os.path.abspath(card_out_path)
-                os.makedirs(os.path.dirname(_co) or '.', exist_ok=True)
-                with open(_co, 'w') as _f:
-                    _f.write(_ddcard.render_card_html(_card_model,
-                                                      standalone=True))
-                logger.info(f"  Dive card written to {card_out_path}")
-            except OSError as _e:  # noqa: BLE001
-                logger.warning(f"  dive card: could not write "
-                               f"{card_out_path}: {_e}")
 
     # Drop the marker if no card was injected (card disabled) so no stray
     # comment ships.
     html = html.replace('<!-- DIVE_CARD_SLOT -->', '', 1)
 
-    # Results section is always visible; analysis is behind a toggle
-    html += results_html
-    html += analysis_html
+    # Results section is always visible; analysis is behind a toggle. When the
+    # best-buddy toggle is active the L50 prose is live and the L51 prose rides
+    # in an inert <template> (its element ids don't collide); the JS swaps the
+    # host's innerHTML between the two on toggle.
+    if _bb_active:
+        html += (f'<div id="dd-bb-prose-host" class="dd-bb-host">'
+                 f'{results_html}{analysis_html}</div>'
+                 f'<template id="dd-bb-prose-tmpl">'
+                 f'{_results51}{_analysis51}</template>')
+    else:
+        html += results_html
+        html += analysis_html
 
     # ---- Section sidenav (mirrors the ML IV-guide pages) ----
     # Candidate nav items in the on-page section order. Each entry is only
