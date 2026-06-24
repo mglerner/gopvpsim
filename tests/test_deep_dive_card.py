@@ -205,7 +205,7 @@ def test_key_cols_match_spread_column_count():
     """The Key Wins/Losses grid pads with filler cells so it has the SAME column
     count as the IV-spread grid -> the two rows align vertically for any N. Key
     Wins is the FIRST column and Key Losses the LAST (fillers in the middle)."""
-    for nspreads in (2, 3, 4, 6):
+    for nspreads in (2, 3, 4, 5, 6):
         html_str = dc.render_card_html(
             _model_with(nspreads, [('A', 600)], [('B', 400)]), standalone=False)
         cells = _cols_cells(html_str)
