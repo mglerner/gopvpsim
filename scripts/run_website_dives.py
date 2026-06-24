@@ -319,6 +319,56 @@ DIVES = [
         'reference': 'FAIRY_WIND,PSYSHOCK,SHADOW_BALL',
         'top_movesets': 3,
     },
+    # Mimikyu (2026-06-24): newly released and PvPoke-ranked in GL+UL;
+    # the disguise mechanic is already ported and PvPoke-exact in our
+    # engine (test_mimikyu_vs_azumarill_form_change 9/9, plus the new
+    # azumarill_vs_mimikyu_form_change opponent-side oracle row 9/9).
+    # No explicit `reference` so the loader pulls get_default_moveset:
+    # SHADOW_CLAW + [SHADOW_SNEAK, PLAY_ROUGH] in both leagues (speciesId
+    # 'mimikyu'; the bare name resolves correctly — 'Mimikyu (Busted)'
+    # maps to mimikyu_busted which is NOT in rankings). Larger standard
+    # pools (gl_top50_plus_cs / ul_top60_plus_aegislash) for a robust
+    # read, both of which now also carry Mimikyu as an opponent.
+    # no_thresholds: clean dive, author anchors after eyeballing.
+    {
+        'species': 'Mimikyu',
+        'league': 'great',
+        'slug': 'mimikyu-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+    },
+    {
+        'species': 'Mimikyu',
+        'league': 'ultra',
+        'slug': 'mimikyu-ultra-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+    },
+    # Best-buddy UL variant: best-buddying adds +1 power-up level. In GL
+    # the 1500 cap binds far below level 50 (Mimikyu sits at L23.5-25.5),
+    # so best-buddy is a no-op and gets no GL variant. In UL the 2500 cap
+    # only binds for the high-attack spreads (15/15/13 and 14/14/15 are
+    # already capped at L50), but the bulk spread 1/14/15 reaches only
+    # 2327 CP at L50 -- so best-buddy lifts it to L51 (2355 CP, higher
+    # atk/def/hp/stat-product). --max-level 51 raises the league max for
+    # focal AND opponents (the existing flag's documented behavior; same
+    # mechanism the Master dives use). Slug '-best-buddy' so Michael can
+    # compare the best-buddied build side-by-side with the standard UL
+    # dive above.
+    {
+        'species': 'Mimikyu',
+        'league': 'ultra',
+        'slug': 'mimikyu-ultra-league-best-buddy',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'extra_args': ['--max-level', '51'],
+    },
 ]
 
 

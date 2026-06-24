@@ -32,6 +32,11 @@ Oinkologne
 Oinkologne (Female)
 Sylveon
 Jumpluff (Shadow)
+# Mimikyu (2026-06-24): newly PvPoke-ranked in GL (speciesId 'mimikyu';
+# bare name resolves to the ranked default moveset). New dive focal and a
+# real GL opponent. NOTE: not Competitor's-Cup-legal, but eligible in GBL
+# Forever Forward, so it is included here for the broad meta.
+Mimikyu
 
 # --- auto recipe (top 50 GL ∪ championshipseries) ---
 Lickilicky
