@@ -898,6 +898,11 @@ def opp_slug(name: str) -> str:
     (also via opp_slug) is preserved.
     """
     n = name.lower()
+    # 'Oinkologne (Male)' is the default form: pretty_species adds the redundant
+    # '(Male)' tag to disambiguate from Female, but the opponent pool anchors it
+    # as bare 'Oinkologne'. Drop Male so the card link and the dive anchor agree;
+    # Female (the non-default form) stays a distinct slug.
+    n = re.sub(r'(^|[^a-z])male([^a-z]|$)', r'\1\2', n)
     quals = []
     for q in _OPP_FORM_QUALIFIERS:
         if re.search(rf'(^|[^a-z]){q}([^a-z]|$)', n):
