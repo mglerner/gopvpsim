@@ -128,7 +128,16 @@ function setBestBuddyLevel(mode) {
     var host = document.getElementById(hid);
     if (host && _bbHostHTML[hid][mode] != null) host.innerHTML = _bbHostHTML[hid][mode];
   }
-  updateView();
+  // If a collection is loaded, re-run it so each owned mon's stats / level /
+  // CP / power-up recompute at the toggled cap (loadCollection ends with its
+  // own updateView, so the scatter refreshes too). Otherwise refresh directly.
+  var _hasColl = (state.csvMons && state.csvMons.length) ||
+                 (state.manualMons && state.manualMons.length);
+  if (_hasColl) {
+    loadCollection(null);
+  } else {
+    updateView();
+  }
   updateSummaryTable();
 }
 window.setBestBuddyLevel = setBestBuddyLevel;
@@ -630,7 +639,17 @@ function loadCollection(csvText) {
   var preToFinals = coll.preToFinals;
   var rankLookup = coll.rankLookup;
   var leagueCap = coll.leagueCap;
+  // When the dive carries a best-buddy toggle, the collection follows it: in the
+  // league-default (L50) view, owned mons are capped at the default level; in the
+  // best-buddy (L51) view they may climb one more. Without a toggle, keep the
+  // baked cap (historical behavior). setBestBuddyLevel re-runs loadCollection so
+  // these stats recompute on toggle.
   var maxLevel = coll.maxLevel;
+  if (DATA.bestBuddy) {
+    maxLevel = (state.levelMode === '51')
+      ? (DATA.bestBuddy.altCap || coll.maxLevel)
+      : (DATA.bestBuddy.defaultCap || 50.0);
+  }
   // Gender filter for gender-differentiated species (Oinkologne /
   // Meowstic / Indeedee). When the focal species is "X (Female)",
   // we set requireGender='female'; when bare "X" with a Female
@@ -996,8 +1015,10 @@ function renderMatchesList() {
     if (curLv == null || maxLv == null) return '?';
     var d = maxLv - curLv;
     if (d <= 0) return '\u2713';
-    var halfLevels = Math.round(d * 2);
-    return '+' + halfLevels + ' \u00bdL';
+    // Show the gap in LEVELS (whole or .5), not a half-level count -- "+18 lv"
+    // reads cleanly, where "+36 1/2L" looked like "36.5 levels".
+    var lv = (Math.abs(d - Math.round(d)) < 1e-6) ? String(Math.round(d)) : d.toFixed(1);
+    return '+' + lv + ' lv';
   }
 
   var sectionIdx = 0;
@@ -1024,7 +1045,12 @@ function renderMatchesList() {
       });
     }
     var sid = 'matches-section-' + (sectionIdx++);
-    var h = '<h5>' + heading + ' - ' + recs.length + ' of yours</h5>';
+    // Heading hugs its OWN table (small bottom margin, no top margin) -- the
+    // card wrapper added at the return is what separates one section from the
+    // next, so a heading like "Slayer IVs" can't visually attach to the table
+    // above it.
+    var h = '<h5 style="margin:0 0 8px;color:#e6ecf5">' +
+            heading + ' - ' + recs.length + ' of yours</h5>';
     h += '<table data-section="' + sid + '-tbl"><tr>';
     var sortHdr = function(label, colIdx, title) {
       var t = title ? ' title="' + title + '"' : '';
@@ -1096,7 +1122,11 @@ function renderMatchesList() {
            'data-hidden-count="' + hiddenCount + '">' +
            'Show ' + hiddenCount + ' more \u2193</button>';
     }
-    return h;
+    // Wrap each section in its own card so the heading + table read as one
+    // unit, clearly separated from the next section (no more "which table does
+    // this heading belong to?" -- it belongs to the one inside its card).
+    return '<div style="background:#10182c;border:1px solid #24314d;' +
+           'border-radius:8px;padding:11px 14px;margin:0 0 14px">' + h + '</div>';
   }
 
   // Helper: list-or-dash cell for tier/slayer cross-info columns.
