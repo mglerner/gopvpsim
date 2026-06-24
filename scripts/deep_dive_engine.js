@@ -637,7 +637,10 @@ function loadCollection(csvText) {
   var leagueLabel = coll.leagueLabel;
   var pokemonIndex = coll.pokemonIndex;
   var preToFinals = coll.preToFinals;
-  var rankLookup = coll.rankLookup;
+  // Off-grid stat-product rank lookup follows the toggle too: alt-cap table in
+  // the L51 view when present (on-grid mons use the toggle-aware DATA.spRanks).
+  var rankLookup = (state.levelMode === '51' && coll.rankLookupAlt)
+    ? coll.rankLookupAlt : coll.rankLookup;
   var leagueCap = coll.leagueCap;
   // When the dive carries a best-buddy toggle, the collection follows it: in the
   // league-default (L50) view, owned mons are capped at the default level; in the
@@ -946,7 +949,10 @@ function renderMatchesList() {
   //            DATA.spRanks for on-grid mons). Used as the
   //            sort-fallback when battle rank isn't available.
   var useBattleRank = (typeof yRanks !== 'undefined' && yRanks != null);
-  var rankLookup = (DATA.collection && DATA.collection.rankLookup) || {};
+  // Off-grid SP rank: alt-cap table in the best-buddy (L51) view when present.
+  var rankLookup = (DATA.collection &&
+                    ((state.levelMode === '51' && DATA.collection.rankLookupAlt)
+                       ? DATA.collection.rankLookupAlt : DATA.collection.rankLookup)) || {};
   var collSpecies = (DATA.collection && DATA.collection.speciesKey) || '';
   function lookupSpRank(rec) {
     // On-grid: use DATA.spRanks — same data, cheaper lookup.
