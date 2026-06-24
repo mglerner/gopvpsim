@@ -1497,12 +1497,20 @@ def base_form_focal(species, shadow):
 
 def _form_damage_census(species, shadow, league, focal_moves, focal_types,
                         iv, opp_info_cache, opp_names):
-    """Per-opponent damage breakpoint / bulkpoint sets for ONE focal FORM.
+    """UNUSED, superseded. Per-opponent RAW-damage break/bulkpoint sets.
+
+    Formerly fed ``form_sibling_trade``'s spanning bar, but the raw-damage
+    set-difference over-counts badly: the shadow's +20% atk beats the
+    non-shadow on ~every opponent and the -16.7% def loses on ~every opponent,
+    so the bar read "whole pool minus a few immunities" (the 73-vs-73 bug,
+    2026-06-24). The bar now uses the ANCHOR-based newly-guaranteed census
+    (the same basis as the per-spread ``n_breakpoint_newly``), computed at the
+    render call site. Kept for reference; no live callers.
 
     Pure damage calc (the floor(0.5*1.3*Power*Atk/Def*Eff*STAB)+1 formula,
     NO win sim) at a single representative IV spread ``iv = (atk_iv, def_iv,
-    sta_iv)``, evaluated under the league CP cap. Used by ``form_sibling_trade``
-    to set-difference a focal form against its sibling.
+    sta_iv)``, evaluated under the league CP cap. Formerly set-differenced a
+    focal form against its sibling for ``form_sibling_trade``.
 
     Returns ``(bp, blk)`` where:
       * ``bp[opp_display]``  = max integer damage this form's BEST-damaging move
@@ -1561,94 +1569,57 @@ def _form_damage_census(species, shadow, league, focal_moves, focal_types,
     return bp, blk
 
 
-def form_sibling_trade(species, focal_shadow, league, focal_moves, focal_types,
-                       iv, opp_info_cache, opp_names):
+def form_sibling_trade(species, focal_shadow, breakpoints_gained,
+                       bulkpoints_lost):
     """Form-level "newly guaranteed vs sibling form" break/bulkpoint trade.
 
-    Dragapult-Sim-style FORM trade (shadow<->non-shadow, Female<->Male),
-    computed ONCE per dive from the pure damage formula (NO win sim). Gated to
-    focals that HAVE a sibling via ``base_form_focal``; returns ``None`` for a
-    no-sibling species (e.g. Tinkaton).
+    Dragapult-Sim-style FORM trade (shadow<->non-shadow, Female<->Male), shown
+    once per dive as a thin spanning bar. The break/bulkpoint sets are the
+    ANCHOR-based newly-guaranteed sets, rolled up to the FORM level by the
+    caller (the union across the recommended spreads of the per-spread census
+    coverage minus the base form's coverage -- exactly the basis behind the
+    per-spread ``rc['n_breakpoint_newly']`` numbers). They are passed in here
+    so this function only resolves the sibling identity + render direction; it
+    does NOT re-derive anything from raw per-opponent damage.
 
     For a SHADOW focal the sibling is the bare non-shadow species (so a
     pre-release shadow constructed ahead of the gamemaster still gets a bar --
     the gate is ``focal_shadow``, not a gamemaster shadow marker). For a Female
-    focal the sibling is the Male base species.
+    focal the sibling is the Male base species. Gated via ``base_form_focal``;
+    returns ``None`` for a no-sibling species (e.g. Tinkaton).
 
-    The focal GAINS breakpoints where its (boosted) attack does +1 damage the
-    sibling can't, and HOLDS bulkpoints where its defense takes -1 damage the
-    sibling can't. Set differences over the per-opponent damage census at the
-    shared representative IV spread ``iv``:
+    ``breakpoints_gained`` = opponents the boosted focal newly guarantees a
+    breakpoint against (vs the base form); ``bulkpoints_lost`` = bulkpoints the
+    base form holds that the boosted focal gives up. Both are already-sorted
+    pretty display-name lists matching the dive anchors, so the bar's opponent
+    links land on the right ``#opp-*`` slugs.
 
-        breakpoints_gained = focal does +1 dmg to X, sibling doesn't
-        bulkpoints_held    = focal takes -1 dmg from X, sibling doesn't
+    The inverse direction (a BARE, shadow-eligible focal whose sibling is its
+    own shadow form -- e.g. the non-shadow Corviknight dive) has no second sim
+    pass for the shadow sibling baked into the blob, so the anchor census is not
+    available there. That bar is omitted (return ``None``); the shadow-boost
+    trade story already lives on the shadow dive's bar.
 
     Returns a dict (or ``None``):
-        {'sibling_display', 'focal_display',
-         'breakpoints_gained': [opp, ...], 'bulkpoints_held': [opp, ...],
-         'breakpoints_lost':   [opp, ...], 'bulkpoints_lost':   [opp, ...]}
-    where *_lost are the symmetric sets the OTHER direction needs (what the
-    SIBLING reaches that the focal doesn't): the non-shadow dive renders
-    "shadow gains N breakpoints; you hold M bulkpoints" from breakpoints_lost /
-    bulkpoints_held inverted -- both directions are stashed so the renderer
-    needn't recompute.
-
-    ``focal_is_boosted`` tells the renderer which side the focal is on: True
-    when the focal is the shadow/Female (gains breakpoints, gives up
-    bulkpoints), False when the focal is the bare/Male side and its SIBLING is
-    the boosted shadow form (the inverse bar: "shadow gains N; you hold M").
+        {'sibling_display', 'focal_display', 'focal_is_boosted',
+         'breakpoints_gained': [opp, ...], 'bulkpoints_lost': [opp, ...]}
     """
     sib = base_form_focal(species, focal_shadow)
-    if sib is not None:
-        sib_species, sib_shadow, sib_display = sib
-        focal_is_boosted = True
-    else:
-        # Inverse direction: a bare, shadow-eligible focal (e.g. non-shadow
-        # Corviknight) whose SIBLING is its own shadow form. base_form_focal
-        # deliberately stays narrow (it gates the per-spread item-5 census to
-        # the boosted dive only), so resolve the shadow sibling here without
-        # touching it. Gated to gamemaster ``shadoweligible`` so a species with
-        # no shadow form (Tinkaton) still gets no bar.
-        if focal_shadow:
-            return None
-        try:
-            tags = get_pokemon_entry(species).get('tags') or []
-        except KeyError:
-            return None
-        if 'shadoweligible' not in tags:
-            return None
-        sib_species, sib_shadow = species, True
-        sib_display = pretty_species(f'{species} (Shadow)')
-        focal_is_boosted = False
-
-    focal_bp, focal_blk = _form_damage_census(
-        species, focal_shadow, league, focal_moves, focal_types,
-        iv, opp_info_cache, opp_names)
-    sib_bp, sib_blk = _form_damage_census(
-        sib_species, sib_shadow, league, focal_moves, focal_types,
-        iv, opp_info_cache, opp_names)
-
-    # Breakpoint: focal does strictly more integer damage than the sibling.
-    bp_gained = sorted(d for d in focal_bp if focal_bp[d] > sib_bp.get(d, -1))
-    bp_lost = sorted(d for d in sib_bp if sib_bp[d] > focal_bp.get(d, -1))
-    # Bulkpoint: focal TAKES strictly less integer damage than the sibling
-    # (higher def). ``inf`` default so an opponent only in one census never
-    # spuriously registers a trade.
-    blk_held = sorted(d for d in focal_blk
-                      if focal_blk[d] < sib_blk.get(d, float('inf')))
-    blk_lost = sorted(d for d in sib_blk
-                      if sib_blk[d] < focal_blk.get(d, float('inf')))
+    if sib is None:
+        # No base sibling: either a bare shadow-eligible focal (inverse
+        # direction, no shadow-sibling census in the blob -> omit) or a
+        # no-sibling species (Tinkaton). Either way, no anchor-based bar.
+        return None
+    sib_species, sib_shadow, sib_display = sib
 
     focal_display = pretty_species(
         f'{species} (Shadow)' if focal_shadow else species)
     return {
         'sibling_display': sib_display,
         'focal_display': focal_display,
-        'focal_is_boosted': focal_is_boosted,
-        'breakpoints_gained': bp_gained,
-        'bulkpoints_held': blk_held,
-        'breakpoints_lost': bp_lost,
-        'bulkpoints_lost': blk_lost,
+        'focal_is_boosted': True,
+        'breakpoints_gained': list(breakpoints_gained),
+        'bulkpoints_lost': list(bulkpoints_lost),
     }
 
 
@@ -3504,18 +3475,33 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 'gives_up_n': len(_gives_up),
             }
     # Form-level "newly guaranteed vs sibling form" break/bulkpoint trade
-    # (Dragapult-Sim style): computed ONCE per dive from the pure damage
-    # formula at the lead IV spread. None for no-sibling species (Tinkaton).
-    # Separate from the per-spread census above -- this is the FORM trade
-    # (shadow<->non-shadow, Female<->Male), shown once as a spanning bar.
+    # (Dragapult-Sim style), shown once per dive as a spanning bar. Built from
+    # the SAME anchor-based census as the per-spread "N newly guaranteed"
+    # numbers (rc['n_breakpoint_newly'] above), rolled up to the FORM level:
+    # the UNION across the recommended spreads of (focal census - base census)
+    # for breakpoints, and the symmetric (base census - focal census) for
+    # bulkpoints. This is the decisive-coverage basis, NOT the old raw-damage
+    # census (which over-counted to ~the whole pool -- the 73-vs-73 bug). The
+    # bar's opponent names are pretty display names matching the dive anchors,
+    # so the bar links land on the right #opp-* slugs.
+    #
+    # Optional future upgrade: report breakpoints guaranteed across each
+    # opponent's TOP-512 IVs (Dragapult-Sim's footnote) instead of the
+    # default-IV point estimate; our per-spread point estimate already tracks
+    # their number closely, so this stays a point estimate for now.
     _sibling_trade = None
     try:
-        _lead_iv_tuple = (data_obj['ivA'][_rec_idx], data_obj['ivD'][_rec_idx],
-                          data_obj['ivS'][_rec_idx])
+        _bp_gained, _blk_lost = set(), set()
+        if _anchor_mode and _base_census_cover is not None:
+            for _rc in chosen_recs:
+                _iv = _rc['iv']
+                _f_bp, _f_blk = _census_cover(_iv)
+                _b_bp, _b_blk = _base_census_cover(_iv)
+                _bp_gained |= (set(_f_bp) - set(_b_bp))
+                _blk_lost |= (set(_b_blk) - set(_f_blk))
         _sibling_trade = form_sibling_trade(
-            data_obj.get('species', ''), focal_shadow, league,
-            focal_moves, focal_types, _lead_iv_tuple,
-            opp_info_cache, opponents)
+            data_obj.get('species', ''), focal_shadow,
+            sorted(_bp_gained), sorted(_blk_lost))
     except Exception as e:
         logger.warning(f"  sibling-trade census failed ({type(e).__name__}: "
                        f"{e}); form trade bar omitted")
