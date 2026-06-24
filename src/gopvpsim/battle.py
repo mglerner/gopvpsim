@@ -102,10 +102,12 @@ ShieldPolicy = Callable[["BattlePokemon", "BattlePokemon", dict], bool]
 ChargedMovePolicy = Callable[["BattlePokemon", "BattlePokemon"], "int | None"]
 
 
-def always_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
+def always_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
+                  mechanics: str = 'legacy') -> bool:
     return defender.shields > 0
 
-def never_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
+def never_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
+                 mechanics: str = 'legacy') -> bool:
     return False
 
 def pvpoke_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
@@ -160,9 +162,20 @@ def _cheapest_cm(owner: "BattlePokemon") -> "dict | None":
     return min(owner.charged_moves, key=lambda m: m['energy'])
 
 
-def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
+def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
+                           mechanics: str = 'legacy') -> bool:
     """
     PvPoke's simulate-mode shield policy (Battle.js line 1077).
+
+    ``mechanics`` is threaded through to ``would_shield`` for the experimental
+    new-turn-system scaffold (mechanics='new'). NOTE: the audit of 2026-06-24
+    found NO mechanically-grounded new-clock adjustment for the shield policy
+    -- the only turn-based gate (the selfDefenseDebuffing cycle-KO branch's
+    ``turns_to_next >= att_turns_to_next`` comparison) shifts +1 on BOTH sides
+    under the new clock (defender's and attacker's charged both resolve one
+    turn later), so it washes out. The parameter is plumbed for future
+    re-tuning; today new == legacy for the shield decision. (The grounded
+    new-clock adjustments live in _calc_turns_to_live and _optimize_move_timing.)
 
     For standard charged moves: always shield (useShield = true).
     For selfBuffing moves (sub-filtered to self-atk-buff / opp-def-debuff):
@@ -210,7 +223,7 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
                             and (_bs[0] > 0 or _bo[1] < 0))))
     use_heuristic_incoming = sb_subroute
     if use_heuristic_incoming:
-        use_shield = would_shield(attacker, defender, move)
+        use_shield = would_shield(attacker, defender, move, mechanics=mechanics)
         if _shield_trace:
             tag = "oppDefDebuff" if bt == 'opponent' else "selfBuff"
             _policy_log.append(
@@ -222,7 +235,7 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     # is selfDefenseDebuffing.  Two sub-branches by attacker.shields.
     d_best_idx, d_best_cm = _estimate_best_cm(defender, attacker)
     if d_best_cm is not None and d_best_cm.get('selfDefenseDebuffing', False):
-        sd_value = would_shield(attacker, defender, move)
+        sd_value = would_shield(attacker, defender, move, mechanics=mechanics)
         if attacker.shields > 0:
             use_shield = sd_value
             if _shield_trace:
@@ -282,14 +295,16 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
             f" {move.get('moveId')}): True (always shield)")
     return use_shield
 
-def use_first_available(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
+def use_first_available(attacker: "BattlePokemon", defender: "BattlePokemon",
+                        mechanics: str = 'legacy') -> "int | None":
     """Throw the first charged move we have enough energy for."""
     for i, move in enumerate(attacker.charged_moves):
         if attacker.energy >= move['energy']:
             return i
     return None
 
-def bait_with_cheapest(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
+def bait_with_cheapest(attacker: "BattlePokemon", defender: "BattlePokemon",
+                       mechanics: str = 'legacy') -> "int | None":
     """
     Bait-shield heuristic: if defender has shields, prefer the cheapest charged
     move first; otherwise use the highest-damage move available.
@@ -307,7 +322,8 @@ def bait_with_cheapest(attacker: "BattlePokemon", defender: "BattlePokemon") -> 
         # No shields -- throw highest damage
         return max(affordable, key=lambda im: im[1]['power'])[0]
 
-def no_bait(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
+def no_bait(attacker: "BattlePokemon", defender: "BattlePokemon",
+            mechanics: str = 'legacy') -> "int | None":
     """
     Never bait: always fire the affordable move with the highest actual
     damage-per-energy, regardless of whether the defender has shields.
@@ -324,7 +340,8 @@ def no_bait(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None
         return attacker.charged_move_damage(m, defender) / m['energy']
     return max(affordable, key=actual_dpe)[0]
 
-def pvpoke_ai(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
+def pvpoke_ai(attacker: "BattlePokemon", defender: "BattlePokemon",
+              mechanics: str = 'legacy') -> "int | None":
     """
     Mimic PvPoke's ActionLogic AI:
     - When defender has shields: throw the cheapest affordable move (bait).
@@ -350,9 +367,22 @@ def pvpoke_ai(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | No
 def _calc_turns_to_live(
     attacker: "BattlePokemon",
     defender: "BattlePokemon",
+    mechanics: str = 'legacy',
 ) -> float:
     """
     Port of PvPoke's turnsToLive sub-DP (ActionLogic.js lines 38-138).
+
+    ``mechanics`` is threaded as scaffold for the experimental new-turn-system
+    decision layer, but currently produces NO behavior change: new == legacy
+    here. A "+1 on the charged-KO branch under new" correction was tried
+    (mechanically grounded -- the defender's charged KO lands one turn later)
+    and REVERTED 2026-06-24: feeding the inflated ttl into pvpoke_dp's fire_now
+    made glass-cannon attackers (e.g. Aegislash Blade) DELAY their lethal
+    charged move and bleed HP, regressing ~8+ GL matchups vs the
+    new-resolution/legacy-decisions baseline (Aegislash Blade vs Tinkaton 2-1:
+    644 -> 132). The grounded new-clock decision changes are being rebuilt
+    against a non-regression corpus (see scripts and docs/validations); until a
+    change clears that floor, new uses the legacy decision path verbatim.
 
     Simulates the defender's attack sequence to estimate how many turns until
     the attacker is KO'd.  Returns math.inf if a KO is not found.
@@ -497,9 +527,16 @@ def _calc_turns_to_live(
     return turns_to_live
 
 
-def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict) -> bool:
+def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
+                 mechanics: str = 'legacy') -> bool:
     """
     Port of PvPoke's ActionLogic.wouldShield.
+
+    ``mechanics`` is accepted for the new-turn-system scaffold but does NOT
+    change behavior: wouldShield's projections are energy/damage-based, not
+    turn-clock-based, so the +1 charged-resolution offset has no grounded
+    effect here (see pvpoke_simulate_shield docstring). Plumbed for future
+    re-tuning only.
 
     Returns True if the defender is expected to use a shield against `move`.
     Checks whether the post-move HP is survivable given incoming cycle damage,
@@ -617,9 +654,18 @@ class _DPState:
         self.atk_stage   = atk_stage
 
 
-def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> bool:
+def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon",
+                          mechanics: str = 'legacy') -> bool:
     """
     Port of ActionLogic.js lines 237-344 (optimizeMoveTiming).
+
+    ``mechanics`` is threaded as scaffold but currently produces NO behavior
+    change: new == legacy here. A "turns_from_cm + 1" correction (opponent's
+    charged resolves one turn later under new) was tried and REVERTED
+    2026-06-24 -- like the TTL +1 it nudged optimizeMoveTiming toward DELAYING
+    the charged, compounding the glass-cannon regression. The grounded new-clock
+    decision changes are being rebuilt against a non-regression corpus; until a
+    change clears that floor, new uses the legacy decision path verbatim.
 
     Returns True if the attacker should throw a fast move instead of a charged
     move this turn, in order to avoid gifting the opponent extra turns.
@@ -685,7 +731,7 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     turns_planned = atk_turns + (attacker.energy // cheapest_energy)
     if attacker.cmp_atk < defender.cmp_atk:
         turns_planned += 1
-    ttl = _calc_turns_to_live(attacker, defender)
+    ttl = _calc_turns_to_live(attacker, defender, mechanics=mechanics)
     if turns_planned > ttl:
         return False
 
@@ -991,9 +1037,17 @@ def _dp_insert_not_ready(queue: list, ns: "_DPState") -> None:
 
 
 def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
-              *, bait_shields: bool = True) -> "int | None":
+              *, bait_shields: bool = True, mechanics: str = 'legacy') -> "int | None":
     """
     PvPoke's DP charged-move AI (ActionLogic.js port, no-buff case).
+
+    ``mechanics`` is threaded through turnsToLive, optimizeMoveTiming, and the
+    shield heuristic as scaffold for the experimental new-turn-system decision
+    layer, but currently produces NO behavior change: new == legacy decisions.
+    The grounded new-clock decision changes are being rebuilt against a
+    non-regression corpus (the first attempt -- TTL/OMT +1 -- regressed
+    glass-cannon attackers and was reverted 2026-06-24). Legacy (default) is
+    byte-identical regardless.
 
     Two phases mirroring PvPoke:
 
@@ -1089,7 +1143,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # turnsToLive: fire highest-damage move now if about to be KO'd
     # Port of ActionLogic.js lines 38-207
     # ------------------------------------------------------------------ #
-    turns_to_live = _calc_turns_to_live(attacker, defender)
+    turns_to_live = _calc_turns_to_live(attacker, defender, mechanics=mechanics)
 
     # Adjustments (ActionLogic.js lines 142-161) -- always applied
     if attacker.hp <= opp_fast_damage * 2 and opp_fast_cd == 500:
@@ -1181,7 +1235,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # ------------------------------------------------------------------ #
     # optimizeMoveTiming (ActionLogic.js lines 237-344)
     # ------------------------------------------------------------------ #
-    if _optimize_move_timing(attacker, defender):
+    if _optimize_move_timing(attacker, defender, mechanics=mechanics):
         return None
 
     # Aegislash Shield form: farm energy before throwing charged moves.
@@ -1512,7 +1566,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         fm0_dpe = cm_dpe[final_first_thrown]
         if fm0_dpe > 0 and attacker.energy >= cm_energy[1]:
             dpe_ratio = cm_dpe[1] / fm0_dpe
-            if dpe_ratio > 1.5 and not would_shield(attacker, defender, cms[1]):
+            if dpe_ratio > 1.5 and not would_shield(attacker, defender, cms[1],
+                                                     mechanics=mechanics):
                 first_idx = 1
 
     first_move = cms[first_idx]
@@ -1683,7 +1738,8 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     return cm_orig_idx[first_idx]
 
 
-def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
+def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon",
+                   mechanics: str = 'legacy') -> "int | None":
     """
     Fire a charged move only on the optimal fast-move counts, as determined by
     the OPTIMAL_TIMING table keyed on (your_fast_turns, their_fast_turns).
@@ -2468,7 +2524,7 @@ def simulate(
                         log_event(f"{attacker.species} changed form")
 
             _, shield_pol = policies[1 - actor_idx]
-            use_shield    = shield_pol(attacker, defender, move)
+            use_shield    = shield_pol(attacker, defender, move, mechanics=mechanics)
 
             if use_shield and defender.shields > 0:
                 dmg = 1
@@ -2580,7 +2636,7 @@ def simulate(
             charged_pol, _ = policies[i]
 
             if p.cooldown == 0 and p._queued_fast is None:
-                move_idx = charged_pol(p, opponent)
+                move_idx = charged_pol(p, opponent, mechanics=mechanics)
                 if move_idx is not None:
                     _pending.append((i, 'charged', move_idx))
                 else:

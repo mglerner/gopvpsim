@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->961<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->1033<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
@@ -150,11 +150,25 @@ The 5 spec changes and how they map onto our 1v1 core:
   They are documented, not faked. They would only matter for the
   out-of-scope team-sim TODO.
 
-**Decision-layer caveat:** the AI policies (`pvpoke_dp`,
-`_optimize_move_timing`, turnsToLive) encode *legacy* timing
-assumptions and are NOT re-optimized for the new model — only the
-resolution step changes. Re-deriving an optimal AI for a turn system
-PvPoke has not shipped would be invention.
+**Decision layer (updated 2026-06-24 — Phase 1 RESOLVED):** `mechanics`
+is now threaded through the whole decision layer (`pvpoke_dp`,
+`_calc_turns_to_live`, `_optimize_move_timing`, `would_shield`,
+`pvpoke_simulate_shield`, and all charged/shield policies) as scaffold,
+but it ships as PURE PLUMBING: under `new` the decision layer runs the
+LEGACY decisions unchanged. This is not laziness — it was corpus-tested.
+Across 3 workflows (~20 focals × full GL pool × 9 shields) every attempt
+to re-optimize the AI for the new clock either washed out or broke a hard
+non-regression floor (legacy decisions are near-optimal on the new clock
+because the post-mortem-charged-survival *resolution* property already
+delivers the one edge a decision change would chase; aggressive
+early-commit collides with energy/shield-bait economy). The
+pure-plumbing invariant is pinned by
+`tests/test_new_turn_mechanics.py::test_new_decisions_identical_to_legacy`.
+A real but non-generalizable sub-optimality is knowingly deferred
+post-ship — full writeup, the specific cases, the resume harness
+(`scripts/corpus_policy_driver.py` + the floor methodology), and the
+GL-only / focal-subset coverage gaps are in
+`docs/validations/new_mechanics_decision_layer_2026_06_24.md`.
 
 **Not threaded:** `scripts/deep_dive_slayer.py` has no `--mechanics`
 flag; its `simulate(...)` calls use the legacy default. Adding `new`
