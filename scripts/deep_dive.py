@@ -977,7 +977,8 @@ def _compute_card_robustness(species, focal_fast, focal_charged, focal_shadow,
             r = opp_iv_robustness(species, focal_fast, focal_charged,
                                   focal_shadow, focal_ivs, base, of, oc,
                                   oshadow, league, shield_scenarios, k=k,
-                                  mechanics=mechanics)
+                                  mechanics=mechanics,
+                                  focal_max_level=focal_max_level)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"  card robustness: skipping {name} ({e})")
             r = None
@@ -1891,6 +1892,13 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     iv_meta = compute_iv_metadata(species, league, shadow=shadow,
                                   iv_floor=iv_floor,
                                   focal_max_level=focal_max_level)
+    # Effective focal level cap for cache keying. ``focal_max_level`` covers the
+    # best-buddy path; the legacy ``--max-level`` flag instead mutates the
+    # global LEAGUE_MAX_LEVEL in place (and does NOT pass focal_max_level), so
+    # key on the resolved cap to keep an L50 and L51 sweep distinct regardless
+    # of which path raised the focal level.
+    _eff_focal_cap = (focal_max_level if focal_max_level is not None
+                      else LEAGUE_MAX_LEVEL.get(league, 51.0))
     profile_to_indices, profile_data = group_ivs_by_stat_profile(
         iv_meta, per_iv=focal_per_iv)
     profile_list = [(pk, *dat) for pk, dat in profile_data.items()]
@@ -1914,7 +1922,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         sweep_cache = swc.SweepCache(swc.focal_key_fields(
             species, league, shadow, fast_id, charged_ids,
             iv_floor, shield_scenarios, bait_mode,
-            energy_lead=focal_energy, focal_max_level=focal_max_level))
+            energy_lead=focal_energy, focal_max_level=_eff_focal_cap))
         for oi, opp in enumerate(opp_cache):
             col = sweep_cache.get_column(
                 swc.column_key_fields(opp['species'], opp['shadow'],
