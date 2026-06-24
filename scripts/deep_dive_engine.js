@@ -10,6 +10,9 @@ var state = {
   // '51' (best-buddy). Only ever '51' when DATA.ivL51 is present (the dive
   // carried a second L51 grid). Drives the score-key suffix in getScoreKey.
   levelMode: '50',
+  // "Compare my candidates" widget: up to 7 user-entered focal IV spreads
+  // ({a,d,s,level}), compared side by side from the embedded grid.
+  compareCandidates: [],
   // Anchor IVs overlay rendering mode:
   //   'filled'  - cyan fill, opacity 0.65 (current default; context
   //               layer that doesn't overwhelm slayer / top-picks)
@@ -139,6 +142,8 @@ function setBestBuddyLevel(mode) {
     updateView();
   }
   updateSummaryTable();
+  // Compare widget reads the level-aware grid; recompute it on toggle too.
+  if (typeof cmpRender === 'function' && state.compareCandidates.length) cmpRender();
 }
 window.setBestBuddyLevel = setBestBuddyLevel;
 
@@ -3157,7 +3162,247 @@ window._summarySortClick = _summarySortClick;
 window.toggleMatchesSection = toggleMatchesSection;
 window.sortMatchesTable = sortMatchesTable;
 window.copyScannerJson = copyScannerJson;
-// Highlight-IVs controls (applied from the plot control strip).
+// ============================================================
+// "Compare my candidates" widget -- a bounded N-way side-by-side of focal IV
+// spreads YOU enter, read entirely from the embedded grid (no new sims).
+// ============================================================
+var CMP_MAX = 7;            // hard cap on candidate spreads
+var CMP_CLOSE_BAND = 50;    // |score-500| <= band  => a "close" matchup
+var CMP_MARGIN_MIN = 0.15;  // leftover-HP spread (max-min) to count as a swing
+var CMP_ROWS = 8;           // rows shown per close-call table
+
+function cmpFindIv(a, d, s) {
+  for (var i = 0; i < DATA.nIvs; i++) {
+    if (DATA.ivA[i] === a && DATA.ivD[i] === d && DATA.ivS[i] === s) return i;
+  }
+  return -1;
+}
+// Score grids for the active moveset/mode at BOTH levels (L51 may be null).
+function cmpGrids() {
+  var base = state.movesetIdx + '_' + state.oppIvMode;
+  return { def: SCORES[base], alt: (DATA.ivL51 ? SCORES[base + '@51'] : null),
+           altCap: (DATA.bestBuddy && DATA.bestBuddy.altCap) || 51 };
+}
+function cmpVal(grid, iv, si, oi) {
+  return grid[iv * DATA.nScenarios * DATA.nOpponents + si * DATA.nOpponents + oi];
+}
+// leftover-HP% proxy: exact for a clean KO win (score-500)/500; |.| for losses.
+function cmpHp(score) { return Math.max(-1, Math.min(1, (score - 500) / 500)); }
+function cmpScenLabel(si) { var s = DATA.scenarios[si]; return s[0] + '-' + s[1]; }
+
+// Per-candidate summary from the active grid (follows the level toggle).
+function cmpSummary(iv) {
+  var g = cmpGrids().def, nO = DATA.nOpponents, nS = DATA.nScenarios;
+  var wins = 0, tot = 0;
+  for (var si = 0; si < nS; si++) for (var oi = 0; oi < nO; oi++) {
+    var v = cmpVal(g, iv, si, oi); tot += v; if (v > 500) wins++;
+  }
+  return { wins: wins, n: nS * nO, avg: tot / (nS * nO) };
+}
+// "Gives up vs #1": avg-score gap to the best battle-IV in the active grid.
+function cmpBestAvg() {
+  if (cmpBestAvg._cache && cmpBestAvg._key === (state.movesetIdx+state.oppIvMode+state.levelMode))
+    return cmpBestAvg._cache;
+  var best = -1;
+  for (var iv = 0; iv < DATA.nIvs; iv++) { var a = cmpSummary(iv).avg; if (a > best) best = a; }
+  cmpBestAvg._cache = best; cmpBestAvg._key = (state.movesetIdx+state.oppIvMode+state.levelMode);
+  return best;
+}
+// Mirror CMP: does this IV's attack reach the converged-cohort attack? (wins the
+// simultaneous-charged tiebreak in the mirror).
+function cmpMirror(iv) {
+  if (!DATA.mirrorCohortAtk || !DATA.mirrorCohortAtk.length) return null;
+  var cohort = DATA.mirrorCohortAtk[0];
+  return DATA.ivAtk[iv] >= cohort - 1e-6;
+}
+function cmpAnchors(iv) {
+  var v = DATA.anchorClearByIv && DATA.anchorClearByIv[String(iv)];
+  return v ? v.length : 0;
+}
+
+function cmpClear() { state.compareCandidates = []; cmpRender(); }
+window.cmpClear = cmpClear;
+
+function cmpAdd() {
+  var a = parseInt(document.getElementById('cmp-a').value, 10);
+  var d = parseInt(document.getElementById('cmp-d').value, 10);
+  var s = parseInt(document.getElementById('cmp-s').value, 10);
+  var lvRaw = document.getElementById('cmp-lv').value;
+  var lv = lvRaw === '' ? null : parseFloat(lvRaw);
+  function ok(x) { return x >= 0 && x <= 15; }
+  if (!(ok(a) && ok(d) && ok(s))) { cmpStatus('Enter Atk/Def/HP 0-15', '#f0916b'); return; }
+  if (state.compareCandidates.length >= CMP_MAX) {
+    cmpStatus('Max ' + CMP_MAX + ' -- remove one to add another', '#d4a017'); return;
+  }
+  for (var i = 0; i < state.compareCandidates.length; i++) {
+    var c = state.compareCandidates[i];
+    if (c.a === a && c.d === d && c.s === s) { cmpStatus('Already added', '#d4a017'); return; }
+  }
+  state.compareCandidates.push({ a: a, d: d, s: s, level: lv });
+  cmpStatus('', '#aaa');
+  cmpRender();
+}
+window.cmpAdd = cmpAdd;
+function cmpStatus(t, c) {
+  var el = document.getElementById('cmp-status'); if (el) { el.textContent = t; el.style.color = c; }
+}
+
+function cmpRender() {
+  var host = document.getElementById('cmp-body');
+  var sec = document.getElementById('cmp-section');
+  if (!host) return;
+  var cands = state.compareCandidates;
+  // Width breaks out toward full-bleed only as candidates accumulate.
+  if (sec) sec.classList.toggle('cmp-wide', cands.length >= 4);
+  var capEl = document.getElementById('cmp-cap');
+  if (capEl) capEl.textContent = cands.length + ' / ' + CMP_MAX + ' added' +
+    (cands.length >= CMP_MAX ? ' (full)' : '');
+  if (cands.length === 0) {
+    host.innerHTML = '<p class="cmp-empty">Add up to ' + CMP_MAX +
+      ' of your IV spreads above to compare them side by side -- wins, mirror, ' +
+      'and the close calls that actually decide the build.</p>';
+    return;
+  }
+  var grids = cmpGrids(), nO = DATA.nOpponents, nS = DATA.nScenarios;
+  // Resolve each candidate to a grid index (off-grid -> no battle data).
+  var rows = cands.map(function(c) {
+    var iv = cmpFindIv(c.a, c.d, c.s);
+    return { c: c, iv: iv,
+             sum: iv >= 0 ? cmpSummary(iv) : null };
+  });
+  var bestAvg = cmpBestAvg();
+
+  // ---- candidate cards ----
+  var h = '<div class="cmp-cards">';
+  rows.forEach(function(r) {
+    var c = r.c, iv = r.iv;
+    var ivs = c.a + '/' + c.d + '/' + c.s;
+    h += '<div class="cmp-card">';
+    h += '<div class="cmp-iv">' + ivs + '<button class="cmp-x" title="remove" ' +
+         'onclick="cmpRemove(' + c.a + ',' + c.d + ',' + c.s + ')">&times;</button></div>';
+    if (iv < 0) { h += '<div class="cmp-sub">not in this dive’s simulated set</div></div>'; return; }
+    h += '<div class="cmp-sub">' + DATA.ivAtk[iv].toFixed(1) + ' atk / ' +
+         DATA.ivDef[iv].toFixed(1) + ' def / ' + DATA.ivHp[iv] + ' hp &middot; CP ' +
+         DATA.ivCp[iv] + ' &middot; SP #' + DATA.spRanks[iv] + '</div>';
+    function xrow(k, v) { return '<div class="cmp-row"><span>' + k + '</span><b>' + v + '</b></div>'; }
+    if (c.level != null && DATA.ivLv[iv] != null) {
+      var dlt = DATA.ivLv[iv] - c.level;
+      var pu = dlt <= 0 ? '✓ maxed'
+        : '+' + ((Math.abs(dlt - Math.round(dlt)) < 1e-6) ? Math.round(dlt) : dlt.toFixed(1)) + ' lv';
+      h += xrow('Power-up', pu);
+    }
+    h += xrow('Wins (all shields)', r.sum.wins + ' / ' + r.sum.n);
+    var gu = Math.round(bestAvg - r.sum.avg);
+    var guc = gu <= 5 ? 'cmp-good' : (gu <= 20 ? 'cmp-mid' : 'cmp-bad');
+    h += '<div class="cmp-row"><span>Gives up vs #1</span><b class="' + guc + '">' + gu + '</b></div>';
+    h += xrow('Anchors cleared', cmpAnchors(iv) + ' opp');
+    var mir = cmpMirror(iv);
+    if (mir !== null) h += '<div class="cmp-pill ' + (mir ? '' : 'cmp-pill-lose') + '">' +
+      (mir ? 'Wins mirror CMP' : 'Loses mirror CMP') + '</div>';
+    h += '</div>';
+  });
+  h += '</div>';
+
+  var live = rows.filter(function(r) { return r.iv >= 0; });
+  if (live.length >= 2) {
+    h += cmpFlipPanel(live, grids);
+    h += cmpMarginPanel(live, grids);
+  }
+  host.innerHTML = h;
+}
+
+// Close calls where candidates DISAGREE on win/loss, or best-buddy flips one.
+function cmpFlipPanel(live, grids) {
+  var nO = DATA.nOpponents, nS = DATA.nScenarios, found = [];
+  for (var oi = 0; oi < nO; oi++) for (var si = 0; si < nS; si++) {
+    var vals = live.map(function(r) { return cmpVal(grids.def, r.iv, si, oi); });
+    var anyWin = false, anyLose = false, minNear = 999;
+    var bbFlip = false;
+    vals.forEach(function(v) { if (v > 500) anyWin = true; else anyLose = true; minNear = Math.min(minNear, Math.abs(v - 500)); });
+    if (grids.alt) live.forEach(function(r) {
+      var d = cmpVal(grids.def, r.iv, si, oi), a = cmpVal(grids.alt, r.iv, si, oi);
+      if ((d <= 500) !== (a <= 500)) bbFlip = true;
+    });
+    var disagree = anyWin && anyLose;
+    if ((disagree || bbFlip) && minNear <= CMP_CLOSE_BAND)
+      found.push({ oi: oi, si: si, vals: vals, near: minNear });
+  }
+  found.sort(function(a, b) { return a.near - b.near; });
+  if (!found.length) return '';
+  var h = '<div class="cmp-panel"><h4 class="cmp-flip-h">Close calls that flip the outcome</h4>' +
+    '<p class="cmp-psub">Near a dead-even 500, where the spread choice — or powering to ' +
+    'best-buddy (<span class="cmp-flip">✦</span>) — changes win/loss. The fights your IV pick decides.</p>';
+  h += '<table class="cmp-tbl"><tr><th>Matchup</th>' +
+    live.map(function(r) { return '<th>' + r.c.a + '/' + r.c.d + '/' + r.c.s + '</th>'; }).join('') + '</tr>';
+  found.slice(0, CMP_ROWS).forEach(function(f) {
+    h += '<tr><td class="cmp-m">' + DATA.opponentsDisplay[f.oi] + ' &middot; ' + cmpScenLabel(f.si) + '</td>';
+    live.forEach(function(r, k) {
+      var d = f.vals[k], win = d > 500;
+      var mark = '';
+      if (grids.alt) { var a = cmpVal(grids.alt, r.iv, f.si, f.oi);
+        if ((d <= 500) !== (a <= 500)) mark = ' <span class="cmp-flip" title="best-buddy (L' +
+          grids.altCap + ') flips this">✦' + (a > 500 ? '→win' : '→loss') + '</span>'; }
+      h += '<td class="' + (win ? 'cmp-win' : 'cmp-lose') + '">' + (win ? 'win ' : 'loss ') +
+           Math.round(d) + mark + '</td>';
+    });
+    h += '</tr>';
+  });
+  if (found.length > CMP_ROWS) h += '<tr><td colspan="' + (live.length + 1) +
+    '" class="cmp-more">+' + (found.length - CMP_ROWS) + ' more close calls</td></tr>';
+  return h + '</table></div>';
+}
+
+// Same result for all, but leftover-HP margin differs a lot.
+function cmpMarginPanel(live, grids) {
+  var nO = DATA.nOpponents, nS = DATA.nScenarios, found = [];
+  for (var oi = 0; oi < nO; oi++) for (var si = 0; si < nS; si++) {
+    var vals = live.map(function(r) { return cmpVal(grids.def, r.iv, si, oi); });
+    var allWin = vals.every(function(v) { return v > 500; });
+    var allLose = vals.every(function(v) { return v <= 500; });
+    if (!(allWin || allLose)) continue;          // disagreements live in the flip panel
+    var hps = vals.map(cmpHp), mn = Math.min.apply(null, hps), mx = Math.max.apply(null, hps);
+    if (mx - mn >= CMP_MARGIN_MIN) found.push({ oi: oi, si: si, hps: hps, spread: mx - mn, win: allWin });
+  }
+  found.sort(function(a, b) { return b.spread - a.spread; });
+  if (!found.length) return '';
+  var h = '<div class="cmp-panel"><h4 class="cmp-marg-h">Same result, but the margin moves a lot</h4>' +
+    '<p class="cmp-psub">All ' + (live.length === 2 ? 'both' : 'these') + ' get the same result, so a ' +
+    'win-count shows nothing — but leftover HP (what your <i>next</i> mon inherits) differs. The ' +
+    'robustness / "win more convincingly" axis.</p>';
+  h += '<table class="cmp-tbl"><tr><th>Matchup</th>' +
+    live.map(function(r) { return '<th>' + r.c.a + '/' + r.c.d + '/' + r.c.s + '</th>'; }).join('') + '</tr>';
+  found.slice(0, CMP_ROWS).forEach(function(f) {
+    h += '<tr><td class="cmp-m">' + DATA.opponentsDisplay[f.oi] + ' &middot; ' + cmpScenLabel(f.si) +
+         (f.win ? '' : ' <span class="cmp-lose">(all lose)</span>') + '</td>';
+    f.hps.forEach(function(hp) {
+      var pct = Math.round(Math.abs(hp) * 100), lo = Math.abs(hp) < 0.2;
+      h += '<td><span class="cmp-bar' + (lo ? ' lo' : '') + '"><span style="width:' +
+           Math.min(100, pct) + '%"></span></span><span class="cmp-hpv">' +
+           (f.win ? '+' : '−') + pct + '%</span></td>';
+    });
+    h += '</tr>';
+  });
+  if (found.length > CMP_ROWS) h += '<tr><td colspan="' + (live.length + 1) +
+    '" class="cmp-more">+' + (found.length - CMP_ROWS) + ' more</td></tr>';
+  h += '</table><div class="cmp-leg">Bars = focal’s leftover HP% at battle end ' +
+       '(from the score). Losses show how close you came.</div></div>';
+  return h;
+}
+
+function cmpRemove(a, d, s) {
+  state.compareCandidates = state.compareCandidates.filter(function(c) {
+    return !(c.a === a && c.d === d && c.s === s);
+  });
+  cmpRender();
+}
+window.cmpRemove = cmpRemove;
+
+function cmpWireHandlers() {
+  var add = document.getElementById('cmp-add');
+  if (add) add.addEventListener('click', cmpAdd);
+  cmpRender();
+}
+
 window.applyHighlight = applyHighlight;
 window.clearHighlight = clearHighlight;
 applyHistogramHash();
@@ -3169,3 +3414,5 @@ _initBestBuddy();
 // once (nIvs, DATA, etc. are all in scope). Safe even if DATA.collection
 // is null — the wire function bails early in that case.
 wireCollectionHandlers();
+// "Compare my candidates" widget (renders empty until you add a spread).
+cmpWireHandlers();
