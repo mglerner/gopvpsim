@@ -816,7 +816,8 @@ def _species_has_form_change(species_name):
 
 def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
                       focal_ivs, opponent, opp_fast, opp_charged, opp_shadow,
-                      league, shield_scenarios, k=512, dedup='signature'):
+                      league, shield_scenarios, k=512, dedup='signature',
+                      mechanics='legacy'):
     """Opponent-IV robustness for ONE fixed focal IV vs ONE opponent.
 
     Sweeps the opponent across its top-``k`` stat-product IV spreads (the
@@ -872,7 +873,8 @@ def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
             focal_bp.reset_for_battle(sf, opponent=opp_bp)
             opp_bp.reset_for_battle(so, opponent=focal_bp)
             res = simulate(focal_bp, opp_bp,
-                           charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp)
+                           charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp,
+                           mechanics=mechanics)
             total += w
             if res.pvpoke_score(0) > 500:
                 wins += w
@@ -937,7 +939,7 @@ def _opp_robustness_groups(focal_bp, focal_species, focal_fast, focal_charged,
 def _compute_card_robustness(species, focal_fast, focal_charged, focal_shadow,
                              focal_ivs, league, opponent_names,
                              shield_scenarios, opp_movesets=None,
-                             k=DEFAULT_CARD_ROBUST_K):
+                             k=DEFAULT_CARD_ROBUST_K, mechanics='legacy'):
     """Aggregate opp_iv_robustness for ONE focal IV across the curated pool.
 
     When ``opp_movesets`` (parallel to ``opponent_names``, each a
@@ -967,7 +969,8 @@ def _compute_card_robustness(species, focal_fast, focal_charged, focal_shadow,
                 of, oc = get_default_moveset(base, league=league, shadow=oshadow)
             r = opp_iv_robustness(species, focal_fast, focal_charged,
                                   focal_shadow, focal_ivs, base, of, oc,
-                                  oshadow, league, shield_scenarios, k=k)
+                                  oshadow, league, shield_scenarios, k=k,
+                                  mechanics=mechanics)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"  card robustness: skipping {name} ({e})")
             r = None
@@ -1309,7 +1312,7 @@ def expand_opponents_with_variants(opponents, opp_movesets, threshold_registry, 
 def sim_score(focal_species, fast_id, charged_ids, league, shields_focal,
               shields_opp, atk_iv, def_iv, sta_iv, shadow,
               opp_species, opp_fast, opp_charged, opp_shadow=False,
-              opp_iv_mode='pvpoke', threshold_registry=None):
+              opp_iv_mode='pvpoke', threshold_registry=None, mechanics='legacy'):
     """Run one sim and return the focal mon's PvPoke score (0-1000)."""
     bp0 = make_battle_pokemon(focal_species, fast_id, charged_ids, league,
                               shields_focal, atk_iv, def_iv, sta_iv, shadow)
@@ -1326,7 +1329,8 @@ def sim_score(focal_species, fast_id, charged_ids, league, shields_focal,
 
     result = simulate(bp0, bp1,
                       charged_policy_0=pvpoke_dp,
-                      charged_policy_1=pvpoke_dp)
+                      charged_policy_1=pvpoke_dp,
+                      mechanics=mechanics)
     return result.pvpoke_score(0)
 
 
@@ -1348,7 +1352,7 @@ def moveset_label_raw(fast_id, charged_ids):
 
 def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
                     shield_scenarios, top_n, opp_iv_mode='pvpoke',
-                    threshold_registry=None):
+                    threshold_registry=None, mechanics='legacy'):
     """
     Quick screen: sim rank-1 IVs for each moveset against opponents.
     Return the top N movesets by average score.
@@ -1376,7 +1380,8 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
                                   s_focal, s_opp, a_iv, d_iv, s_iv, shadow,
                                   opp_name, opp_fast, opp_charged,
                                   opp_iv_mode=opp_iv_mode,
-                                  threshold_registry=threshold_registry)
+                                  threshold_registry=threshold_registry,
+                                  mechanics=mechanics)
                 total += score
                 count += 1
         avg = total / count if count else 0
@@ -1689,7 +1694,7 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
                        opp_cache, shield_scenarios, focal_bait=True,
                        log_path=None, verbose=False,
                        focal_mon=None, league_cp=1500, focal_shadow=False,
-                       focal_energy=0):
+                       focal_energy=0, mechanics='legacy'):
     """Initialize shared state in each sweep worker process."""
     # Spawn-mode workers (default on macOS) do not inherit the parent
     # logger's handlers; re-attach a FileHandler so any worker-side
@@ -1706,6 +1711,7 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
     _worker_state['league_cp'] = league_cp
     _worker_state['focal_shadow'] = focal_shadow
     _worker_state['focal_energy'] = focal_energy
+    _worker_state['mechanics'] = mechanics
     if focal_bait:
         _worker_state['focal_policy'] = pvpoke_dp
     else:
@@ -1735,6 +1741,7 @@ def _sweep_worker(pair_chunk):
     league_cp = ws['league_cp']
     focal_shadow = ws['focal_shadow']
     focal_energy = ws.get('focal_energy', 0)
+    mechanics = ws.get('mechanics', 'legacy')
 
     results = {}
     n_sims = 0
@@ -1771,7 +1778,8 @@ def _sweep_worker(pair_chunk):
             bp1.reset_for_battle(s_opp, opponent=bp0)
             result = simulate(bp0, bp1,
                               charged_policy_0=focal_policy,
-                              charged_policy_1=pvpoke_dp)
+                              charged_policy_1=pvpoke_dp,
+                              mechanics=mechanics)
             scores.append(result.pvpoke_score(0))
             n_sims += 1
         results[(profile_key, oi)] = scores
@@ -1782,7 +1790,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
              opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke',
              iv_floor=None, log_path=None, verbose=False,
              threshold_registry=None, reserve_cpus=0, signature_dedup=True,
-             use_sweep_cache=False):
+             use_sweep_cache=False, mechanics='legacy'):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
@@ -1898,6 +1906,13 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     n_ivs_total = len(iv_meta)
     sweep_cache = None
     cached_cols = {}  # oi -> ndarray (n_ivs, n_scenarios)
+    # The sweep cache key (sweep_cache.focal_key_fields) does NOT include the
+    # turn-mechanics model, so a 'new'-mechanics run would collide with any
+    # legacy-cached columns. The 'new' model is experimental; disable the
+    # persistent cache for it rather than widen the cache-key schema (which
+    # CLAUDE.md flags as coordination-sensitive).
+    if mechanics != 'legacy':
+        use_sweep_cache = False
     if use_sweep_cache:
         import sweep_cache as swc
         sweep_cache = swc.SweepCache(swc.focal_key_fields(
@@ -1967,7 +1982,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                       opp_cache, shield_scenarios, focal_bait,
                       log_path, verbose,
                       focal_mon, LEAGUE_CAPS[league], shadow,
-                      focal_energy),
+                      focal_energy, mechanics),
         ) as pool:
             last_print = sim_start
             completed = 0
@@ -3648,7 +3663,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               shared_plotly_dir=None,
                               card_out_path=None,
                               card_robust_k=DEFAULT_CARD_ROBUST_K,
-                              opp_movesets=None):
+                              opp_movesets=None, mechanics='legacy'):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -4823,7 +4838,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                     (data_obj['ivA'][_ri], data_obj['ivD'][_ri],
                      data_obj['ivS'][_ri]),
                     league, opponent_names or [], shield_scenarios,
-                    opp_movesets=opp_movesets, k=card_robust_k)
+                    opp_movesets=opp_movesets, k=card_robust_k,
+                    mechanics=mechanics)
         _card_model = _ddcard.build_card_model(
             data_obj, _card_ctx, types=_types, shadow=shadow,
             robust_winrate=_robust, sprite_uri=_sprite)
@@ -5361,6 +5377,7 @@ def render_dive_html(state):
                 card_out_path=state.get('card_path'),
                 card_robust_k=state.get('card_robust_k', DEFAULT_CARD_ROBUST_K),
                 opp_movesets=state.get('opp_movesets'),
+                mechanics=state.get('mechanics', 'legacy'),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
@@ -5389,6 +5406,7 @@ def render_dive_html(state):
             card_out_path=state.get('card_path'),
             card_robust_k=state.get('card_robust_k', DEFAULT_CARD_ROBUST_K),
             opp_movesets=state.get('opp_movesets'),
+            mechanics=state.get('mechanics', 'legacy'),
         )
 
 
@@ -5635,8 +5653,23 @@ def main():
                              '(userdata/replay/) that lets '
                              'scripts/replay_analysis.py re-render this '
                              'dive\'s HTML without re-simming.')
+    parser.add_argument('--mechanics', choices=['legacy', 'new'], default='legacy',
+                        help='Turn-resolution model. legacy (default) = the '
+                             'pre-2026-06-23 system used for all published '
+                             'dives. new = the 2026-06-23 PvP turn system '
+                             '(EXPERIMENTAL / UNVALIDATED: PvPoke has not '
+                             'implemented it, so there is no reference to '
+                             'cross-check against, and the sweep disk cache '
+                             'is disabled for it).')
 
     args = parser.parse_args()
+
+    if args.mechanics == 'new':
+        logger.warning(
+            'mechanics=new is EXPERIMENTAL / UNVALIDATED -- it models the '
+            '2026-06-23 PvP turn system, which PvPoke has not implemented. '
+            'There is no reference to cross-check against; treat the output '
+            'as experimental.')
 
     # Fail-fast: ensure --html output directory exists (and is writable)
     # BEFORE running any simulation. Without this, a fresh dive slug
@@ -6203,6 +6236,7 @@ def main():
         screen_opponents, screen_opp_movesets, shield_scenarios,
         args.top_movesets, opp_iv_mode=opp_iv_mode,
         threshold_registry=threshold_registry,
+        mechanics=args.mechanics,
     )
 
     # Phase 2: Full IV sweep for each surviving moveset
@@ -6225,6 +6259,7 @@ def main():
             reserve_cpus=args.reserve_cpus,
             signature_dedup=not args.no_signature_dedup,
             use_sweep_cache=not args.no_sweep_cache,
+            mechanics=args.mechanics,
         )
 
         elapsed = time.time() - t0
@@ -6622,6 +6657,7 @@ def main():
                     reserve_cpus=args.reserve_cpus,
                     signature_dedup=not args.no_signature_dedup,
                     use_sweep_cache=not args.no_sweep_cache,
+                    mechanics=args.mechanics,
                 )
                 elapsed = time.time() - t0
                 logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
@@ -6667,6 +6703,7 @@ def main():
                         reserve_cpus=args.reserve_cpus,
                         signature_dedup=not args.no_signature_dedup,
                         use_sweep_cache=not args.no_sweep_cache,
+                        mechanics=args.mechanics,
                     )
                     elapsed = time.time() - t0
                     rate = ref_n / elapsed if elapsed > 0 else 0
@@ -6717,6 +6754,7 @@ def main():
                     reserve_cpus=args.reserve_cpus,
                     signature_dedup=not args.no_signature_dedup,
                     use_sweep_cache=not args.no_sweep_cache,
+                    mechanics=args.mechanics,
                 )
                 logger.info(f"    base {_bn:,} sims in {time.time() - t0:.1f}s "
                             f"({mode_pretty_label(mode)})")
@@ -6753,6 +6791,7 @@ def main():
             'card_path': args.card_out,
             'card_robust_k': args.card_robust_k,
             'opp_movesets': opp_movesets_full,
+            'mechanics': args.mechanics,
         }
         if not args.no_replay_dump:
             _replay_path = dump_replay_state(state)
