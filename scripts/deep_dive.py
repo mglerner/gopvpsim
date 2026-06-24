@@ -4422,6 +4422,59 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .matches-toggle-btn:hover {{ background: #1a3a6e; }}
   span.user-anchor-hits {{ font-size: 11px; font-style: italic;
                            margin-left: 6px; }}
+  /* "Compare my candidates" widget */
+  .cmp-section {{ background:#16213e; border:1px solid #0f3460; border-radius:10px;
+    padding:6px 16px 14px; margin:14px 0; }}
+  .cmp-section.cmp-wide {{ width:96vw; max-width:1560px; position:relative;
+    left:50%; transform:translateX(-50%); }}
+  .cmp-summary {{ cursor:pointer; font-size:0.95rem; padding:6px 0; }}
+  .cmp-note {{ font-size:0.78rem; color:#8b949e; font-weight:400; }}
+  .cmp-entry {{ display:flex; flex-wrap:wrap; gap:7px; align-items:center;
+    font-size:0.82rem; color:#c9d1d9; margin:6px 0 4px; }}
+  .cmp-entry input {{ width:46px; font-size:0.82rem; }}
+  .cmp-entry input.cmp-lv {{ width:56px; }}
+  .cmp-entry button {{ font-size:0.78rem; padding:3px 10px; border-radius:6px;
+    border:1px solid #1a3a6e; background:#0f3460; color:#e6ecf5; cursor:pointer; }}
+  .cmp-entry button.cmp-clear {{ border-color:#5a3a3a; }}
+  .cmp-cap {{ color:#8b949e; font-size:0.74rem; margin-left:4px; }}
+  .cmp-status {{ font-size:0.74rem; }}
+  .cmp-empty {{ font-size:0.82rem; color:#8b949e; margin:8px 2px; }}
+  .cmp-cards {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:10px; margin:12px 0; }}
+  .cmp-card {{ background:#0f3460; border:1px solid #1a3a6e; border-radius:8px; padding:10px 12px; }}
+  .cmp-iv {{ font-size:1.15rem; font-weight:800; color:#fff; display:flex;
+    justify-content:space-between; align-items:center; }}
+  .cmp-x {{ background:none; border:none; color:#8b949e; font-size:1.05rem; cursor:pointer;
+    line-height:1; padding:0 2px; }}
+  .cmp-x:hover {{ color:#f85149; }}
+  .cmp-sub {{ font-size:0.73rem; color:#9bb0d0; margin:2px 0 4px; }}
+  .cmp-row {{ display:flex; justify-content:space-between; font-size:0.8rem;
+    border-top:1px solid #1a3a6e; padding:4px 0; }}
+  .cmp-row b {{ color:#fff; }}
+  .cmp-good {{ color:#9be89b; }} .cmp-mid {{ color:#d4a017; }} .cmp-bad {{ color:#f0916b; }}
+  .cmp-pill {{ display:inline-block; font-size:0.68rem; padding:1px 7px; border-radius:9px;
+    background:#1b2547; color:#9be0a6; margin-top:6px; }}
+  .cmp-pill-lose {{ color:#e0b89b; }}
+  .cmp-panel {{ background:#10182c; border:1px solid #24314d; border-radius:8px;
+    padding:11px 14px; margin:0 0 14px; }}
+  .cmp-panel h4 {{ margin:0 0 3px; font-size:0.86rem; }}
+  .cmp-flip-h {{ color:#f0b429; }} .cmp-marg-h {{ color:#58a6ff; }}
+  .cmp-psub {{ font-size:0.74rem; color:#8b949e; margin:0 0 9px; }}
+  .cmp-tbl {{ border-collapse:collapse; width:100%; font-size:0.82rem; }}
+  .cmp-tbl th, .cmp-tbl td {{ text-align:left; padding:5px 9px;
+    border-bottom:1px solid #1a2540; white-space:nowrap; }}
+  .cmp-tbl th {{ color:#8b949e; font-weight:600; font-size:0.74rem; }}
+  .cmp-m {{ color:#cdd6e5; }}
+  .cmp-win {{ color:#3fb950; font-weight:700; }}
+  .cmp-lose {{ color:#f85149; font-weight:700; }}
+  .cmp-flip {{ color:#f0b429; }}
+  .cmp-more {{ color:#8b949e; font-size:0.76rem; font-style:italic; }}
+  .cmp-bar {{ display:inline-block; vertical-align:middle; width:64px; height:9px;
+    background:#1a2540; border-radius:5px; overflow:hidden; margin-right:6px; }}
+  .cmp-bar > span {{ display:block; height:100%; background:#3fb950; }}
+  .cmp-bar.lo > span {{ background:#d4a017; }}
+  .cmp-hpv {{ font-size:0.76rem; color:#9bb0d0; }}
+  .cmp-leg {{ font-size:0.72rem; color:#8b949e; margin-top:5px; }}
   /* Section sidenav. Mirrors the ML IV-guide pages
      (scripts/render_iv_envelope_article.py): sticky side column at wide
      widths, horizontal bar at the top of the content below the 820px
@@ -4721,6 +4774,34 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             'is ranked (post-release).</span>\n'
             '</div>\n'
         )
+
+    # "Compare my candidates" widget -- a separate, bounded N-way comparison of
+    # focal IV spreads YOU enter (manual; no auto "top N"). Small until used;
+    # breaks out toward full-bleed as candidates accumulate (JS adds .cmp-wide).
+    # All compute is client-side off the embedded grid (no new sims). Always
+    # emitted -- it only needs DATA.iv* + the score grid, which every dive has.
+    html += (
+        '<details id="cmp-section" class="cmp-section" open>\n'
+        '  <summary class="cmp-summary"><b>Compare my candidates</b> '
+        '<span class="cmp-note">&mdash; up to 7 of your IV spreads, side by '
+        'side: wins, mirror, and the close calls that decide the build</span>'
+        '</summary>\n'
+        '  <div class="cmp-entry">\n'
+        '    <b style="color:#58a6ff">Add a spread:</b>\n'
+        '    Atk <input id="cmp-a" type="number" min="0" max="15" value="15">\n'
+        '    Def <input id="cmp-d" type="number" min="0" max="15" value="15">\n'
+        '    HP <input id="cmp-s" type="number" min="0" max="15" value="15">\n'
+        '    Lvl <input id="cmp-lv" class="cmp-lv" type="number" min="1" '
+        'max="51" step="0.5" placeholder="now">\n'
+        '    <button id="cmp-add" type="button">+ Add</button>\n'
+        '    <button type="button" class="cmp-clear" onclick="cmpClear()">'
+        'Clear all</button>\n'
+        '    <span id="cmp-cap" class="cmp-cap">0 / 7 added</span>\n'
+        '    <span id="cmp-status" class="cmp-status"></span>\n'
+        '  </div>\n'
+        '  <div id="cmp-body"></div>\n'
+        '</details>\n'
+    )
 
     # Plot first, then summary table below
     html += '<div id="plot" class="plot-container" style="height:550px;"></div>\n'
