@@ -675,7 +675,9 @@ SUPPORT_PAGE_HTML = """<!DOCTYPE html>
   post</a>).
 </p>
 <p>
-  The IV spectrum graph is inspired by the r/TheSilphArena
+  The IV spectrum graph is inspired by
+  <a href="https://www.reddit.com/user/poops_all_berries">u/poops_all_berries</a>'s
+  r/TheSilphArena
   <a href="https://www.reddit.com/r/TheSilphArena/comments/z11xr0/theorycrafting_iv_spectrum_graphs/">IV
   Spectrum Graphs</a> post.
 </p>
