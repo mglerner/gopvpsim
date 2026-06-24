@@ -1752,6 +1752,10 @@ class BattlePokemon:
     _fm_since_charge:   int   = field(init=False, repr=False)  # fast moves since last charge (either player)
     # Queued fast move: (queued_on_turn, move_dict) or None
     _queued_fast:    "tuple[int, dict] | None" = field(init=False, repr=False)
+    # Deferred charged move for mechanics='new' (2026-06-23 turn system):
+    # a charged move chosen this turn resolves at the START of the next
+    # turn. Holds the move dict (or None). NEVER set in legacy mode.
+    _pending_charged: "dict | None" = field(init=False, repr=False)
     # Stat stages: each in [-4, +4]
     atk_stage: int = field(init=False, repr=False)
     def_stage: int = field(init=False, repr=False)
@@ -1801,6 +1805,7 @@ class BattlePokemon:
         self.cooldown          = 0
         self._fm_since_charge  = 0
         self._queued_fast      = None
+        self._pending_charged  = None
         self.atk_stage         = 0
         self.def_stage         = 0
         self._buff_apply_meters = {}
@@ -1901,6 +1906,7 @@ class BattlePokemon:
         self.cooldown = 0
         self._fm_since_charge = 0
         self._queued_fast = None
+        self._pending_charged = None
         self.atk_stage = 0
         self.def_stage = 0
         self._buff_apply_meters = {}
@@ -2275,6 +2281,49 @@ def _apply_move_buffs(
 # ---------------------------------------------------------------------------
 # Core simulation
 # ---------------------------------------------------------------------------
+#
+# EXPERIMENTAL TURN MODEL: mechanics='new' (the 2026-06-23 in-game PvP
+# turn system; live 2026-06-23, spec at pokemongo.com/news/pvp-updates2026).
+#
+#   *** UNVALIDATED — there is NO PvPoke reference for this mode. ***
+#   PvPoke still implements the legacy turn system, so the 'new' branch is
+#   coded from the published spec alone and cross-checked only against our
+#   own spec-derived unit tests (tests/test_new_turn_mechanics.py), never
+#   against an external oracle. Treat all 'new'-mode breakpoint/CMP output
+#   as experimental.
+#
+# The spec lists five changes. Mapping to this engine:
+#
+#   1. DAMAGE + ENERGY resolve at the END of each turn. Implemented: in
+#      'new' mode the fast-landing step snapshots damage/energy against the
+#      start-of-step state and applies all results together, so a higher-CMP
+#      fast move can no longer pre-empt (KO) a same-turn fast move.
+#   2. (corollary of 1) one-turn fast attacks on the same turn TIE — both
+#      resolve. Implemented via the simultaneous-apply in change 1 (the
+#      legacy CMP sort that let the higher-attack side land first is skipped).
+#   5. CHARGED attacks begin at the START of the NEXT turn; charged damage
+#      AND effects resolve BEFORE any fast attack finishing during the
+#      charged sequence. Implemented: in 'new' mode a charged decision is
+#      stamped on the actor (_pending_charged) and resolved at the TOP of the
+#      following turn, before that turn's fast landings.
+#
+#   3. SWAPS resolve before damage, and 4. swap costs (quick=1 turn,
+#      forced=0, charged-end=0) are NOT MODELED. Our 1v1 core never switches
+#      (simulate() takes exactly two BattlePokemon and the loop has no
+#      incoming-Pokemon path), so changes 3 and 4 are unreachable here. They
+#      are documented, not faked — see DEVELOPER_NOTES. They would only
+#      matter for the out-of-scope team-sim TODO.
+#
+# Decision-layer caveat: the AI policies (pvpoke_dp, _optimize_move_timing,
+# turnsToLive) encode LEGACY timing assumptions and are NOT re-optimized for
+# the new model — only the resolution step changes. Re-deriving an optimal
+# AI for a turn system PvPoke has not shipped would be invention.
+#
+# PRIME-DIRECTIVE NOTE: every 'new'-mode behavior is guarded by an explicit
+# `if mechanics == 'new':` branch (or a _new_-prefixed helper called only
+# from such a branch). The legacy path is the unguarded existing code and is
+# byte-for-byte unchanged; the default mechanics='legacy' keeps every
+# current caller (oracle harness, tests, CLI, dives) on it.
 
 def simulate(
     p0: BattlePokemon,
@@ -2288,11 +2337,31 @@ def simulate(
     debug: bool = False,
     trace_shields: bool = False,
     trace_dp: bool = False,
+    mechanics: str = 'legacy',
 ) -> BattleResult:
     """
     Run a 1v1 battle between p0 and p1 and return the result.
 
     p0 and p1 are mutated in place — reset them before reuse.
+
+    mechanics selects the turn-resolution model:
+
+      'legacy' (DEFAULT) — the pre-2026-06-23 turn system. This is the
+        only path exercised by the oracle harness and the test suite,
+        and it must stay byte-for-byte behavior-identical. Every caller
+        that omits ``mechanics`` lands here.
+
+      'new' — EXPERIMENTAL / UNVALIDATED. Models the 2026-06-23 in-game
+        PvP turn changes (pokemongo.com/news/pvp-updates2026). PvPoke has
+        NOT implemented these, so there is NO reference implementation to
+        cross-check against; this branch is implemented from the spec
+        alone. It changes damage/energy resolution timing, CMP on
+        simultaneous fast moves, and charged-move timing — so
+        breakpoint/bulkpoint/CMP outputs WILL differ from legacy by
+        design. See the _new_*  helpers and the in-loop ``mechanics ==
+        'new'`` branches below for exactly where it diverges, and the
+        module docstring for the spec mapping and the changes (swaps)
+        that are deliberately NOT modeled in 1v1.
 
     debug=True also enables policy decision logging (OMT fires, DP choices).
     Policy log lines are interleaved into BattleResult.timeline at the turn
@@ -2304,6 +2373,9 @@ def simulate(
     Both imply log=True and debug=True.
     """
     global _policy_debug, _policy_log, _shield_trace, _dp_trace
+
+    if mechanics not in ('legacy', 'new'):
+        raise ValueError(f"mechanics must be 'legacy' or 'new', got {mechanics!r}")
 
     if trace_shields or trace_dp:
         debug = True
@@ -2337,115 +2409,21 @@ def simulate(
         if log:
             timeline.append(f"T{turn:>3}: {msg}")
 
-    while turn < MAX_TURNS:
-        turn += 1
-
-        # --- 1. Decrement cooldowns ---
-        for p in pokemon:
-            p.cooldown = max(0, p.cooldown - 1)
-
-        # --- 2. Decide and queue actions ---
-        # Mirrors PvPoke's cooldownsToSet mechanism: both pokemon see each
-        # other's pre-queuing state at decision time. Implemented in three
-        # phases:
+    def _resolve_charged(charged_actions, allow_dead_attacker=False):
+        # Resolve a list of (actor_index, move_dict) charged moves in CMP
+        # order. Extracted verbatim from the former inline step 4 so that
+        # BOTH the legacy step-4 call site AND the mechanics=='new' deferred
+        # block (which runs this at the TOP of the next turn) share one
+        # implementation. With allow_dead_attacker=False (the default, used by
+        # the legacy step-4 call) behavior is byte-for-byte identical to the
+        # old inline loop, so the legacy path is unchanged (oracle/test
+        # verified).
         #
-        # Phase A — detect fast-move landings (but keep _queued_fast set so
-        #   the turnsToLive DP can see in-flight FMs during decisions).
-        # Phase B — collect decisions (no state mutation; each pokemon sees
-        #   the other's cooldown/energy BEFORE any new queuing this turn).
-        # Phase C — apply decisions and clear landed-FM state.
-        charged_actions = []   # list of (actor_index, move_dict)
-        fast_landings   = []   # fast moves that land this turn
-        _fired_fast     = []   # indices of pokemon whose queued FM fires now
-
-        # Phase A: mark FMs that land this turn (added to fast_landings).
-        # _queued_fast is intentionally NOT cleared here; it stays set so
-        # that Phase B decision-making can observe the in-flight state.
-        for i, p in enumerate(pokemon):
-            if p._queued_fast is not None:
-                queued_turn, qmove = p._queued_fast
-                duration = qmove['_turns']
-                if (turn - queued_turn) >= duration - 1:
-                    fast_landings.append((i, qmove))
-                    _fired_fast.append(i)
-
-        # Phase B: collect decisions; no state changes yet.
-        # Each pokemon with cooldown==0 AND no pending multi-turn FM decides.
-        # Note: pokemon whose FM fired in Phase A still have _queued_fast set
-        # and cooldown > 0, so they cannot decide this turn (correct: the FM
-        # fires in step 3 and only then is their cooldown reset to 0).
-        _pending: list = []   # (i, 'charged'|'fast_1'|'fast_multi', data)
-        for i, p in enumerate(pokemon):
-            opponent = pokemon[1 - i]
-            charged_pol, _ = policies[i]
-
-            if p.cooldown == 0 and p._queued_fast is None:
-                move_idx = charged_pol(p, opponent)
-                if move_idx is not None:
-                    _pending.append((i, 'charged', move_idx))
-                else:
-                    fm = p.fast_move
-                    if log:
-                        log_event(f"{p.species} uses {fm.get('name', fm['moveId'])}")
-                    if fm['_turns'] == 1:
-                        # PvPoke: requiredTimeToPass = 0 → fires same step.
-                        _pending.append((i, 'fast_1', fm))
-                    else:
-                        _pending.append((i, 'fast_multi', fm))
-
-        # Flush any policy-debug entries generated during Phase B.
-        if _policy_debug and _policy_log:
-            for entry in _policy_log:
-                timeline.append(f"T{turn:>3}: {entry.lstrip()}")
-            _policy_log.clear()
-
-        # Phase C: apply decisions and clear fired-FM state.
-        # Clear _queued_fast only for FMs that fired in Phase A.
-        for i in _fired_fast:
-            pokemon[i]._queued_fast = None
-
-        for i, action_type, data in _pending:
-            p = pokemon[i]
-            if action_type == 'charged':
-                charged_actions.append((i, p.charged_moves[data]))
-            elif action_type == 'fast_1':
-                fast_landings.append((i, data))
-                p.cooldown = 1   # blocks re-acting until next turn
-            else:   # 'fast_multi'
-                p._queued_fast = (turn, data)
-                p.cooldown = data['_turns']
-
-        # --- 3. Resolve fast move landings (fire BEFORE charged moves) ---
-        # Naturally-due fast moves resolve before charged moves. When two fast
-        # moves land simultaneously, the game resolves them in descending atk
-        # order (higher effective attack fires first). PvPoke matches this.
-        if len(fast_landings) > 1:
-            fast_landings.sort(key=lambda ia: pokemon[ia[0]].cmp_atk, reverse=True)
-        for actor_idx, move in fast_landings:
-            attacker = pokemon[actor_idx]
-            defender = pokemon[1 - actor_idx]
-
-            # PvPoke Battle.js lines 448-450: a dead pokemon's in-flight fast move
-            # is only invalid if faintSource == "charged".  In step 3 (fast landings)
-            # the only possible kill source is a fast move, so attacker.hp <= 0 here
-            # means faintSource="fast" → still valid.  Skip only on dead defender.
-            if defender.hp <= 0:
-                continue
-
-            dmg = attacker.fast_move_damage(defender)
-            attacker.energy = min(ENERGY_CAP, attacker.energy + move['energyGain'])
-            defender.hp = max(0, defender.hp - dmg)
-            attacker.cooldown = 0
-            attacker._fm_since_charge += 1
-
-            if log:
-                log_event(
-                    f"{attacker.species} fast → {dmg} dmg, "
-                    f"energy {attacker.energy}"
-                )
-
-        # --- 4. Resolve charged moves (higher priority first) ---
-        # Skip if defender was already killed by the fast move this turn.
+        # allow_dead_attacker=True is passed ONLY from the new-mode deferred
+        # block: spec change 1 says a charged move already committed still
+        # resolves even if its user fainted to a fast (here, on the previous
+        # turn). So we skip the "attacker killed by fast" cancel for that path.
+        # The simultaneous-charged CMP cancel (charged_ko) still applies.
         if use_priority and len(charged_actions) == 2:
             charged_actions.sort(key=lambda ia: pokemon[ia[0]].cmp_atk, reverse=True)
 
@@ -2465,7 +2443,7 @@ def simulate(
             # the opponent is also throwing a charged move this turn (the
             # opponentChargedMoveThisTurn exception — simultaneous charged moves
             # are allowed even if one side was killed by a fast move).
-            if attacker.hp <= 0:
+            if attacker.hp <= 0 and not allow_dead_attacker:
                 opponent_also_charged = any(ai == 1 - actor_idx
                                             for ai, _ in charged_actions)
                 if not opponent_also_charged:
@@ -2537,6 +2515,179 @@ def simulate(
                     if log:
                         log_event(f"{attacker.species} changed form")
 
+    while turn < MAX_TURNS:
+        turn += 1
+
+        # --- 1. Decrement cooldowns ---
+        for p in pokemon:
+            p.cooldown = max(0, p.cooldown - 1)
+
+        # --- 1.5 (mechanics=='new' ONLY) Resolve deferred charged moves ---
+        # Spec change 5: a charged move chosen on turn N begins at the START
+        # of turn N+1. We resolve it here, AT THE TOP of the turn — before
+        # this turn's fast landings (step 3) and before the actors decide
+        # again (step 2) — so charged damage AND effects (stat changes) land
+        # before any fast attack that finishes during the charged sequence,
+        # and the actors decide their next move against post-charged state.
+        # _pending_charged is never set in legacy mode, so this block is dead
+        # there. (Energy is consumed inside _resolve_charged at resolution
+        # time, i.e. on turn N+1; see design note (d)2 — resolving energy
+        # with damage lets the legacy and new paths share one resolver.)
+        if mechanics == 'new':
+            _deferred = [(i, pk._pending_charged)
+                         for i, pk in enumerate(pokemon)
+                         if pk._pending_charged is not None]
+            if _deferred:
+                for i, _ in _deferred:
+                    pokemon[i]._pending_charged = None
+                _resolve_charged(_deferred, allow_dead_attacker=True)
+                if p0.hp <= 0 or p1.hp <= 0:
+                    break
+
+        # --- 2. Decide and queue actions ---
+        # Mirrors PvPoke's cooldownsToSet mechanism: both pokemon see each
+        # other's pre-queuing state at decision time. Implemented in three
+        # phases:
+        #
+        # Phase A — detect fast-move landings (but keep _queued_fast set so
+        #   the turnsToLive DP can see in-flight FMs during decisions).
+        # Phase B — collect decisions (no state mutation; each pokemon sees
+        #   the other's cooldown/energy BEFORE any new queuing this turn).
+        # Phase C — apply decisions and clear landed-FM state.
+        charged_actions = []   # list of (actor_index, move_dict)
+        fast_landings   = []   # fast moves that land this turn
+        _fired_fast     = []   # indices of pokemon whose queued FM fires now
+
+        # Phase A: mark FMs that land this turn (added to fast_landings).
+        # _queued_fast is intentionally NOT cleared here; it stays set so
+        # that Phase B decision-making can observe the in-flight state.
+        for i, p in enumerate(pokemon):
+            if p._queued_fast is not None:
+                queued_turn, qmove = p._queued_fast
+                duration = qmove['_turns']
+                if (turn - queued_turn) >= duration - 1:
+                    fast_landings.append((i, qmove))
+                    _fired_fast.append(i)
+
+        # Phase B: collect decisions; no state changes yet.
+        # Each pokemon with cooldown==0 AND no pending multi-turn FM decides.
+        # Note: pokemon whose FM fired in Phase A still have _queued_fast set
+        # and cooldown > 0, so they cannot decide this turn (correct: the FM
+        # fires in step 3 and only then is their cooldown reset to 0).
+        _pending: list = []   # (i, 'charged'|'fast_1'|'fast_multi', data)
+        for i, p in enumerate(pokemon):
+            opponent = pokemon[1 - i]
+            charged_pol, _ = policies[i]
+
+            if p.cooldown == 0 and p._queued_fast is None:
+                move_idx = charged_pol(p, opponent)
+                if move_idx is not None:
+                    _pending.append((i, 'charged', move_idx))
+                else:
+                    fm = p.fast_move
+                    if log:
+                        log_event(f"{p.species} uses {fm.get('name', fm['moveId'])}")
+                    if fm['_turns'] == 1:
+                        # PvPoke: requiredTimeToPass = 0 → fires same step.
+                        _pending.append((i, 'fast_1', fm))
+                    else:
+                        _pending.append((i, 'fast_multi', fm))
+
+        # Flush any policy-debug entries generated during Phase B.
+        if _policy_debug and _policy_log:
+            for entry in _policy_log:
+                timeline.append(f"T{turn:>3}: {entry.lstrip()}")
+            _policy_log.clear()
+
+        # Phase C: apply decisions and clear fired-FM state.
+        # Clear _queued_fast only for FMs that fired in Phase A.
+        for i in _fired_fast:
+            pokemon[i]._queued_fast = None
+
+        for i, action_type, data in _pending:
+            p = pokemon[i]
+            if action_type == 'charged':
+                if mechanics == 'new':
+                    # Spec change 5: defer to the START of the next turn.
+                    # Stamp the move on the actor; it is drained and resolved
+                    # in step 1.5 next turn. charged_actions stays empty in
+                    # 'new' mode, so the same-turn step 4 + floating-fast
+                    # block below are no-ops (they gate on charged_actions).
+                    p._pending_charged = p.charged_moves[data]
+                else:
+                    charged_actions.append((i, p.charged_moves[data]))
+            elif action_type == 'fast_1':
+                fast_landings.append((i, data))
+                p.cooldown = 1   # blocks re-acting until next turn
+            else:   # 'fast_multi'
+                p._queued_fast = (turn, data)
+                p.cooldown = data['_turns']
+
+        # --- 3. Resolve fast move landings (fire BEFORE charged moves) ---
+        if mechanics == 'new':
+            # Spec changes 1+2: damage+energy resolve at the END of the turn,
+            # so simultaneously-landing one-turn fast moves TIE — neither can
+            # pre-empt (KO) the other. We snapshot each landing's damage and
+            # energy against the START-of-step state, then apply all results
+            # together. No CMP sort (the legacy sort exists only to let the
+            # higher-attack side land first, which the tie semantics remove).
+            # A fast against a defender already fainted THIS turn (from the
+            # step-1.5 deferred charged) is still skipped — a faint is a faint.
+            _fast_results = []   # (defender_idx, dmg, attacker_idx, energy)
+            for actor_idx, move in fast_landings:
+                attacker = pokemon[actor_idx]
+                defender = pokemon[1 - actor_idx]
+                if defender.hp <= 0:
+                    continue   # fainted by deferred charged in step 1.5
+                dmg = attacker.fast_move_damage(defender)
+                _fast_results.append((1 - actor_idx, dmg, actor_idx,
+                                      move['energyGain']))
+            for defender_idx, dmg, attacker_idx, energy_gain in _fast_results:
+                attacker = pokemon[attacker_idx]
+                defender = pokemon[defender_idx]
+                attacker.energy = min(ENERGY_CAP, attacker.energy + energy_gain)
+                defender.hp = max(0, defender.hp - dmg)
+                attacker.cooldown = 0
+                attacker._fm_since_charge += 1
+                if log:
+                    log_event(
+                        f"{attacker.species} fast → {dmg} dmg, "
+                        f"energy {attacker.energy}"
+                    )
+        else:
+            # Legacy: naturally-due fast moves resolve before charged moves.
+            # When two fast moves land simultaneously, the game resolves them
+            # in descending atk order (higher effective attack fires first).
+            # PvPoke matches this.
+            if len(fast_landings) > 1:
+                fast_landings.sort(key=lambda ia: pokemon[ia[0]].cmp_atk, reverse=True)
+            for actor_idx, move in fast_landings:
+                attacker = pokemon[actor_idx]
+                defender = pokemon[1 - actor_idx]
+
+                # PvPoke Battle.js lines 448-450: a dead pokemon's in-flight fast move
+                # is only invalid if faintSource == "charged".  In step 3 (fast landings)
+                # the only possible kill source is a fast move, so attacker.hp <= 0 here
+                # means faintSource="fast" → still valid.  Skip only on dead defender.
+                if defender.hp <= 0:
+                    continue
+
+                dmg = attacker.fast_move_damage(defender)
+                attacker.energy = min(ENERGY_CAP, attacker.energy + move['energyGain'])
+                defender.hp = max(0, defender.hp - dmg)
+                attacker.cooldown = 0
+                attacker._fm_since_charge += 1
+
+                if log:
+                    log_event(
+                        f"{attacker.species} fast → {dmg} dmg, "
+                        f"energy {attacker.energy}"
+                    )
+
+        # --- 4. Resolve charged moves (higher priority first) ---
+        # Skip if defender was already killed by the fast move this turn.
+        _resolve_charged(charged_actions)
+
         # After any charged move this turn, fire "floating" fast moves then reset.
         # PvPoke Battle.js: a fast move queued in the same turn as a charged move
         # (timeSinceActivated < requiredTimeToPass) fires at -20 priority (after
@@ -2567,7 +2718,18 @@ def simulate(
 
         # --- 5. Check for faint ---
         if p0.hp <= 0 or p1.hp <= 0:
-            break
+            # mechanics=='new' (spec change 1): a charged move already committed
+            # this turn STILL resolves even if its user is fainting from a fast
+            # this turn. Under our deferral model the commit resolves at the top
+            # of the NEXT turn (step 1.5), so we must not break out while a
+            # _pending_charged is outstanding — let the loop run one more turn so
+            # step 1.5 fires it, then the faint check breaks. (Legacy resolves
+            # charged same-turn, so this never applies there.)
+            if mechanics == 'new' and (p0._pending_charged is not None
+                                       or p1._pending_charged is not None):
+                pass
+            else:
+                break
 
     # Determine winner
     if p0.hp > 0 and p1.hp <= 0:

@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->955<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->961<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
@@ -99,6 +99,67 @@ note: the 3 original 2026-04-06 failures were all Mienfoo vs Medicham
 Mienfoo vs Medicham (9/9) resolved by the `would_shield` buff-reset
 ordering and CMP cancellation fixes. Full root-cause writeup in
 `CHANGELOG.md` under `2026-04-04 to 2026-04-06`.
+
+## Experimental turn model: `mechanics='new'` (2026-06-23 PvP turn system)
+
+`simulate(...)` takes a keyword `mechanics='legacy'|'new'` (default
+`'legacy'`). The `'new'` model implements the in-game PvP turn changes
+that went live 2026-06-23 (spec: pokemongo.com/news/pvp-updates2026).
+
+**UNVALIDATED.** PvPoke has *not* implemented these changes (it still
+runs the legacy turn system), so there is **no reference implementation
+to cross-check against**. The `'new'` branch is coded from the published
+spec alone and pinned only by our own spec-derived unit tests
+(`tests/test_new_turn_mechanics.py`). Treat all `'new'`-mode
+breakpoint/bulkpoint/CMP output as experimental.
+
+`'legacy'` stays the default everywhere and is byte-for-byte
+behavior-identical to the pre-change engine: the oracle harness and the
+full pytest suite never pass `mechanics`, so they exercise only the
+unguarded legacy path. The `--mechanics new` CLI flag exists on
+`scripts/battle.py` and `scripts/deep_dive.py` (default `legacy`); both
+emit an EXPERIMENTAL warning when `new` is selected, and the deep-dive
+sweep disk cache is force-disabled under `new` (its key does not include
+the turn model, so a cached column would otherwise collide with legacy).
+
+The 5 spec changes and how they map onto our 1v1 core:
+
+- **1 (damage+energy resolve at END of turn)** and **2 (same-turn
+  one-turn fast attacks TIE)** — modeled. In `new` mode the fast-landing
+  step snapshots damage/energy against the start-of-step state and
+  applies all results together, so a higher-CMP fast can no longer
+  pre-empt a same-turn fast. NB for 1v1 the legacy engine *already* ties
+  two mutually-lethal one-turn fast moves (it only cancels a fast whose
+  own target is already dead, which never happens in 1v1), so change 2's
+  effect on the 1v1 *winner* is nil; only intermediate ordering differs.
+- **5 (charged begins at the START of the next turn; charged
+  damage+effects resolve before any fast finishing during the
+  sequence)** — modeled. A charged decision is stamped on the actor
+  (`_pending_charged`) and resolved at the TOP of the following turn,
+  before that turn's fast landings. Energy is consumed at resolution
+  time (the next turn), so the legacy and new paths share one resolver
+  (`_resolve_charged`). A charged committed on the turn its user faints
+  to a fast still resolves the next turn (spec change 1's
+  charged-survives clause), via `allow_dead_attacker=True` on the
+  deferred resolve and a guard that withholds the faint `break` while a
+  `_pending_charged` is outstanding.
+- **3 (swaps resolve before damage)** and **4 (swap costs: quick=1 turn,
+  forced=0, charged-end=0)** — **NOT MODELED.** Our 1v1 core never
+  switches: `simulate()` takes exactly two `BattlePokemon` and the loop
+  has no incoming-Pokemon path, so swap mechanics are unreachable here.
+  They are documented, not faked. They would only matter for the
+  out-of-scope team-sim TODO.
+
+**Decision-layer caveat:** the AI policies (`pvpoke_dp`,
+`_optimize_move_timing`, turnsToLive) encode *legacy* timing
+assumptions and are NOT re-optimized for the new model — only the
+resolution step changes. Re-deriving an optimal AI for a turn system
+PvPoke has not shipped would be invention.
+
+**Not threaded:** `scripts/deep_dive_slayer.py` has no `--mechanics`
+flag; its `simulate(...)` calls use the legacy default. Adding `new`
+there is a separate task (it needs its own argparse flag + worker
+initargs thread).
 
 ## Performance baseline (regression gate)
 

@@ -130,6 +130,9 @@ def main():
                         metavar='a/d/s', help='IVs for pokemon 2 (default 15/15/15)')
     parser.add_argument('--policy', default='pvpoke_dp', choices=list(POLICIES),
                         help='Charged move policy for both sides (default: pvpoke_ai)')
+    parser.add_argument('--mechanics', choices=['legacy', 'new'], default='legacy',
+                        help='Turn-resolution model. legacy (default) = pre-2026-06-23. '
+                             'new = 2026-06-23 PvP turn system (EXPERIMENTAL, no PvPoke reference)')
     parser.add_argument('--shadow1', action='store_true', help='Pokemon 1 is shadow')
     parser.add_argument('--shadow2', action='store_true', help='Pokemon 2 is shadow')
     parser.add_argument('--pvpoke-scores', action='store_true',
@@ -156,6 +159,12 @@ def main():
                              '(useful for adding to tests)')
 
     args = parser.parse_args()
+
+    if args.mechanics == 'new':
+        import sys
+        print('WARNING: --mechanics new is EXPERIMENTAL / UNVALIDATED -- it models the '
+              '2026-06-23 PvP turn system, which PvPoke has not implemented, so there is '
+              'no reference to cross-check against.', file=sys.stderr)
 
     # Parse positional args: accept 2, 4, 5, or 6 positional args.
     #   2: species1 species2                    (both use default moves)
@@ -300,7 +309,8 @@ def main():
                               log=do_log,
                               debug=do_debug,
                               trace_shields=do_trace_shields,
-                              trace_dp=do_trace_dp)
+                              trace_dp=do_trace_dp,
+                              mechanics=args.mechanics)
 
             score0 = round(result.pvpoke_score(0))
             score1 = round(result.pvpoke_score(1))
