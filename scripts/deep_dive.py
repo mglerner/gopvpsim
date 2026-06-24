@@ -1406,7 +1406,8 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
 _worker_state = {}
 
 
-def compute_iv_metadata(species, league, shadow=False, iv_floor=None):
+def compute_iv_metadata(species, league, shadow=False, iv_floor=None,
+                        focal_max_level=None):
     """
     Compute metadata for all valid IV spreads of a species/league.
 
@@ -1421,11 +1422,19 @@ def compute_iv_metadata(species, league, shadow=False, iv_floor=None):
     ``deep_dive.py --species-iv-floor ATK,DEF,STA`` to trim the focal
     species' IV space for tight-league dives (e.g. UL at 13/13/13
     collapses 4096 candidates to 27).
+
+    ``focal_max_level`` overrides the league max power-up level for this
+    (focal) species only — used by the best-buddy/L51 toggle to build the
+    focal one level higher WITHOUT touching opponents (who keep reading the
+    global ``LEAGUE_MAX_LEVEL``). ``None`` = the league default (today's
+    behavior, byte-identical).
     """
     from gopvpsim.pokemon import SHADOW_ATK_BONUS, SHADOW_DEF_MULT
     base = get_species(species)
     base_atk, base_def, base_sta = base['atk'], base['def'], base['hp']
     max_cp = LEAGUE_CAPS[league]
+    if focal_max_level is None:
+        focal_max_level = LEAGUE_MAX_LEVEL.get(league, 51.0)
 
     a_floor = d_floor = s_floor = 0
     if iv_floor is not None:
@@ -1442,7 +1451,7 @@ def compute_iv_metadata(species, league, shadow=False, iv_floor=None):
             for s in range(s_floor, 16):
                 lv = best_level(base_atk, base_def, base_sta, a, d, s,
                                 max_cp=max_cp,
-                                max_level=LEAGUE_MAX_LEVEL.get(league, 51.0))
+                                max_level=focal_max_level)
                 if lv is None:
                     continue
                 if _blade_round_down and lv % 1.0 != 0:
@@ -1761,7 +1770,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
              opponents, opp_movesets, shield_scenarios, opp_iv_mode='pvpoke',
              iv_floor=None, log_path=None, verbose=False,
              threshold_registry=None, reserve_cpus=0, signature_dedup=True,
-             use_sweep_cache=False, mechanics='legacy'):
+             use_sweep_cache=False, mechanics='legacy',
+             focal_max_level=None, opp_max_level=None):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
@@ -1802,6 +1812,12 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     When the ``:nobait`` suffix is present, the focal uses a no-bait policy;
     the opponent still baits normally.
 
+    ``focal_max_level`` raises ONLY the focal species' max power-up level
+    (best-buddy/L51 toggle); opponents keep their league default unless
+    ``opp_max_level`` is also set (the opponent over-level seam — e.g. an ML
+    sweep, or a niche meta where everyone runs a best-buddied opponent). Both
+    default ``None`` = league default (today's behavior).
+
     Returns (results, n_sims, canonical_scores, canonical_meta) where results
     is one dict per IV, sorted by avg_score desc.
     """
@@ -1839,7 +1855,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         else:
             oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode_simple)
         opp_pokemon = Pokemon.at_best_level(opp_clean, oa, od, os_,
-                                            league=league, shadow=opp_is_shadow)
+                                            league=league, shadow=opp_is_shadow,
+                                            max_level=opp_max_level)
         opp_mon = next(m for m in gm['pokemon'] if m['speciesName'] == opp_clean)
         opp_types = parse_types(opp_mon)
         opp_fm = dict(fast_moves_db[opp_fast])
@@ -1865,7 +1882,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     # do NOT imply identical battles (see _stat_profile_key).
     focal_per_iv = focal_mon.get('formChange') is not None
     iv_meta = compute_iv_metadata(species, league, shadow=shadow,
-                                  iv_floor=iv_floor)
+                                  iv_floor=iv_floor,
+                                  focal_max_level=focal_max_level)
     profile_to_indices, profile_data = group_ivs_by_stat_profile(
         iv_meta, per_iv=focal_per_iv)
     profile_list = [(pk, *dat) for pk, dat in profile_data.items()]
