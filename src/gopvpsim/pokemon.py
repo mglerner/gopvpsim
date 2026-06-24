@@ -70,6 +70,24 @@ LEAGUE_MAX_LEVEL = {
     'master': 51.0,
 }
 
+# Highest level that exists in the CPM table (the hard ceiling — best-buddy
+# can never push past this).
+MAX_CPM_LEVEL = max(CPM)
+
+
+def bestbuddy_caps(league):
+    """Return (default_cap, alt_cap) for a league's best-buddy toggle.
+
+    ``default_cap`` is the league's normal max power-up level; ``alt_cap`` is
+    one level higher (best-buddy = +1 level), clamped to the CPM table ceiling.
+    When ``alt_cap == default_cap`` the toggle is a no-op for the whole league
+    (Master/Little, already at 51) and callers should suppress it.
+    """
+    default_cap = LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL)
+    alt_cap = min(MAX_CPM_LEVEL, default_cap + 1.0)
+    return default_cap, alt_cap
+
+
 # Sorted level list, built once
 _LEVELS = sorted(CPM.keys())
 
