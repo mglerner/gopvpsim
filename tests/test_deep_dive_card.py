@@ -182,6 +182,50 @@ def test_render_embedded_is_a_section():
     assert '<html' not in emb          # relies on the page's CARD_CSS
 
 
+def _model_with(nspreads, key_wins, key_losses):
+    sp = [dc.Spread(iv_str='0/15/15', atk=1.0, def_=1.0, hp=1, cp=1,
+                    sp_rank=i + 1, style='X') for i in range(nspreads)]
+    return dc.CardModel(
+        species_display='T', shadow=False, types=['steel'],
+        league_display='Ultra League', cp_cap=2500, moveset='a / b',
+        spreads=sp, single_iv=None, robust=None,
+        key_wins=key_wins, key_losses=key_losses)
+
+def _cols_cells(html_str):
+    """Return the list of `class="..."` values for each .ddcard-col cell, in
+    document (left-to-right column) order, from the wins/losses grid."""
+    import re
+    seg = re.search(r'<div class="ddcard-cols">(.*?)</div>\s*<div class="ddcard-foot',
+                    html_str, re.S)
+    if not seg:
+        return []
+    return re.findall(r'<div class="(ddcard-col[^"]*)"', seg.group(1))
+
+def test_key_cols_match_spread_column_count():
+    """The Key Wins/Losses grid pads with filler cells so it has the SAME column
+    count as the IV-spread grid -> the two rows align vertically for any N. Key
+    Wins is the FIRST column and Key Losses the LAST (fillers in the middle)."""
+    for nspreads in (2, 3, 4, 6):
+        html_str = dc.render_card_html(
+            _model_with(nspreads, [('A', 600)], [('B', 400)]), standalone=False)
+        cells = _cols_cells(html_str)
+        assert len(cells) == nspreads, f"{nspreads} spreads -> {len(cells)} cells"
+        assert cells[0] == 'ddcard-col wins', f"{nspreads}: wins not first"
+        assert cells[-1] == 'ddcard-col losses', f"{nspreads}: losses not last"
+        # everything between is an empty filler (plain ddcard-col, no wins/losses)
+        assert all(c == 'ddcard-col' for c in cells[1:-1]), f"{nspreads}: middle not filler"
+
+def test_key_cols_losses_only_lands_last():
+    """With no Key Wins, Key Losses still lands in the LAST column (Wins keeps an
+    empty left slot) so it stays right-aligned under the last spread."""
+    html_str = dc.render_card_html(
+        _model_with(3, [], [('B', 400)]), standalone=False)
+    cells = _cols_cells(html_str)
+    assert cells[0] == 'ddcard-col wins'      # empty wins placeholder, leftmost
+    assert cells[-1] == 'ddcard-col losses'   # losses rightmost
+    assert len(cells) == 3
+
+
 def test_no_sprite_fallback_renders():
     data_obj, ctx = _synthetic()
     m = dc.build_card_model(data_obj, ctx, types=['steel', 'flying'],

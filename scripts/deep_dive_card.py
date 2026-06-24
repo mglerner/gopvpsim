@@ -606,7 +606,14 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
                       for s in m.spreads)
     wins = _col('Key wins', m.key_wins, 'wins')
     losses = _col('Key losses', m.key_losses, 'losses')
-    cols = (f'<div class="ddcard-cols">{wins}{losses}</div>'
+    # Give the wins/losses grid the SAME column count as the IV-spread grid by
+    # padding with invisible filler cells BETWEEN wins and losses. auto-fit only
+    # collapses empty tracks and a filler div occupies one, so N spreads ->
+    # N columns in both grids: Key Wins sits under the FIRST spread column and
+    # Key Losses under the LAST, with the middle columns blank (never Losses in
+    # the middle). The two grids wrap identically at narrow widths.
+    _fillers = '<div class="ddcard-col"></div>' * max(0, len(m.spreads) - 2)
+    cols = (f'<div class="ddcard-cols">{wins}{_fillers}{losses}</div>'
             if (m.key_wins or m.key_losses) else '')
 
     section = f"""<section class="ddcard">
