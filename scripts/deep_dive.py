@@ -4258,6 +4258,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             max_level=LEAGUE_MAX_LEVEL.get(league, 51.0), shadow=shadow)
         _rank_shadow_key = 'shadow' if shadow else 'normal'
         _rank_table = {f'{a},{d},{s}': r for (a, d, s), r in _ranked.items()}
+        # Best-buddy: an off-grid mon's stat-product rank differs at the alt cap
+        # (level-capped IVs climb past the default), so bake a parallel alt-cap
+        # table the JS uses in the L51 view. On-grid mons already read the
+        # toggle-aware DATA.spRanks; this only matters for OFF-grid mons (IV
+        # triples this dive didn't simulate -- only possible on a --species-iv-
+        # floor dive), e.g. a raid-only mon dived with a floor, later scanned
+        # from a wild-release event with low IVs, before a re-dive.
+        _rank_table_alt = None
+        if best_buddy and best_buddy.get('active') and best_buddy.get('alt_cap'):
+            _ranked_alt = _rank_lookup(
+                _collection_species_key, league=league,
+                max_level=best_buddy['alt_cap'], shadow=shadow)
+            _rank_table_alt = {f'{a},{d},{s}': r
+                               for (a, d, s), r in _ranked_alt.items()}
         # Build the threshold dict in the same shape Python's match_mons
         # expects, from the tier info already computed above. This is
         # the dict the JS constructs at CSV-load time; we could build
@@ -4299,6 +4313,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             'tierNames':       [t['name'] for t in tier_info],
             'requireGender':   _require_gender,
         }
+        if _rank_table_alt is not None:
+            _collection_data['rankLookupAlt'] = {
+                _collection_species_key: {_rank_shadow_key: _rank_table_alt}}
     data_obj['collection'] = _collection_data
 
     # --- Build HTML ---
