@@ -4455,6 +4455,34 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # Threshold info folded into controls (legend shows tier name + desc)
     # No separate threshold-info box needed - graph legend has full detail
 
+    # Best-buddy / L51 toggle bar (only when the dive carried an L51 grid).
+    # When best-buddy is a no-op for this species/league, show the explanatory
+    # note instead of a toggle. setBestBuddyLevel() lives in deep_dive_engine.js.
+    if _bb_active:
+        from html import escape as _bb_esc
+        _bb_alt = best_buddy.get('alt_cap')
+        _bb_checked = (' checked'
+                       if int(best_buddy.get('default_display') or 0) == int(_bb_alt)
+                       else '')
+        html += (
+            '<div class="dd-bb-toggle-bar" style="margin:10px 20px 0;'
+            'font-size:0.9rem;color:#c9d1d9;display:flex;align-items:center;'
+            'gap:8px;flex-wrap:wrap">\n'
+            '  <label style="display:flex;align-items:center;gap:6px;'
+            'cursor:pointer"><input type="checkbox" id="dd-bb-toggle" '
+            'onchange="setBestBuddyLevel(this.checked ? \'51\' : \'50\')"'
+            f'{_bb_checked}> <b>Allow best-buddy (Level {_bb_alt:g})</b></label>\n'
+            '  <span style="font-size:0.8rem;color:#8b949e">Recompute every '
+            'spread, score and recommendation as if this mon were your best '
+            'buddy (+1 level). Default shows the league level.</span>\n'
+            '</div>\n')
+    elif best_buddy and best_buddy.get('note'):
+        from html import escape as _bb_esc
+        html += (
+            '<div class="dd-bb-note" style="margin:10px 20px 0;font-size:0.82rem;'
+            'color:#8b949e;border-left:3px solid #30363d;padding:4px 10px">'
+            f'{_bb_esc(best_buddy["note"])}</div>\n')
+
     # Controls
     html += '<div class="controls" id="dd-scatter">\n'
     if split_info is not None:
