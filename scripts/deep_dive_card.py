@@ -569,8 +569,11 @@ def _spread_html(s: Spread, link_opps=False, base_form_display=None,
 
 
 def _col(title, items, cls):
+    # Empty side still emits its flex slot (no header) so Key Wins stays on the
+    # LEFT and Key Losses on the RIGHT even when one side has no entries --
+    # otherwise a wins-less card slides Key Losses into the left column.
     if not items:
-        return ''
+        return f'<div class="ddcard-col {cls}"></div>'
     lis = ''.join(
         f'<li>{html.escape(n)} <span style="color:#8b949e">({s:.0f})</span></li>'
         for n, s in items)
@@ -595,7 +598,7 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
     wins = _col('Key wins', m.key_wins, 'wins')
     losses = _col('Key losses', m.key_losses, 'losses')
     cols = (f'<div class="ddcard-cols">{wins}{losses}</div>'
-            if (wins or losses) else '')
+            if (m.key_wins or m.key_losses) else '')
 
     section = f"""<section class="ddcard">
   <div class="ddcard-head">
