@@ -95,6 +95,15 @@ MATCHUPS = [
     dict(label='mimikyu_vs_azumarill_form_change',
          p1=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (5, 13, 15), 'mimikyu'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill')),
+    # Opponent-side disguise (2026-06-24): every prior Mimikyu oracle row
+    # had Mimikyu as player-0 (focal); now that PvPoke ranks Mimikyu in
+    # GL+UL it is a real OPPONENT, so the dive carries Mimikyu rows where
+    # the disguise mechanics run on the player-1 side. Mirror of
+    # mimikyu_vs_azumarill_form_change with the sides swapped; same IVs /
+    # default moveset.
+    dict(label='azumarill_vs_mimikyu_form_change',
+         p1=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
+         p2=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (5, 13, 15), 'mimikyu')),
     # --- Form-change depth (2026-06-12, pre-publish gap fill: each form
     # species previously had exactly ONE oracle opponent, all Azumarill,
     # and Blade-as-focal / opponent-side form change had no 9-cell

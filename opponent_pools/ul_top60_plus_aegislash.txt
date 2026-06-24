@@ -80,3 +80,8 @@ Aromatisse
 # --- Aegislash hand-extension (see above) ---
 Aegislash (Shield)
 Aegislash (Blade)
+# Mimikyu (2026-06-24): newly PvPoke-ranked in UL (speciesId 'mimikyu';
+# bare name resolves to the ranked default moveset). New dive focal and a
+# real UL opponent. NOTE: not Competitor's-Cup-legal, but eligible in GBL
+# Forever Forward, so it is included here for the broad meta.
+Mimikyu
