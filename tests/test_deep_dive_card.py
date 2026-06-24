@@ -216,23 +216,25 @@ def test_compute_card_robustness_covers_all_with_movesets():
     robustness denominators."""
     focal_ivs = tuple(iv_rank('Corviknight', league='great', shadow=True)[0][k]
                       for k in ('atk_iv', 'def_iv', 'sta_iv'))
-    opps = ['Azumarill', 'Corviknight (Shadow)']
+    # Mewtwo is a Master League box legendary, never Great-League-ranked, so
+    # get_default_moveset drops it. It is the stable "unranked opponent" fixture
+    # (Slaking, despite being unplayable, IS in PvPoke's GL rankings). The shadow
+    # self-mirror (now ranked) tests that a threaded moveset still covers it.
+    opps = ['Azumarill', 'Corviknight (Shadow)', 'Mewtwo']
     movesets = [('BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH']),
-                ('SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'])]
+                ('SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK']),
+                ('CONFUSION', ['PSYCHIC', 'SHADOW_BALL'])]
     res = deep_dive._compute_card_robustness(
         'Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], True,
         focal_ivs, 'great', opps, [(1, 1)], opp_movesets=movesets, k=8)
     assert res is not None
-    assert res['pool'] == 2          # both covered, incl. the self-mirror
-    # Shadow Corviknight became PvPoke-ranked on 2026-06-24, so get_default_moveset
-    # now resolves the self-mirror even without threaded movesets -- the defaults
-    # path no longer drops it (pre-release, when it was unranked, this returned 1).
-    # NOTE: this fixture no longer exercises the moveset-vs-defaults divergence;
-    # re-home that coverage to a guaranteed-unranked opponent if it matters.
+    assert res['pool'] == 3          # all covered via threaded movesets
+    # Without movesets, the unranked Mewtwo is dropped (no GL ranking to read);
+    # Azumarill and the now-ranked shadow self-mirror still resolve via defaults.
     res2 = deep_dive._compute_card_robustness(
         'Corviknight', 'SAND_ATTACK', ['AIR_CUTTER', 'PAYBACK'], True,
         focal_ivs, 'great', opps, [(1, 1)], opp_movesets=None, k=8)
-    assert res2['pool'] == 2         # both now resolve via defaults
+    assert res2['pool'] == 2          # Mewtwo dropped; the two ranked mons resolve
 
 
 def test_opp_iv_robustness_signature_dedup_is_exact():
