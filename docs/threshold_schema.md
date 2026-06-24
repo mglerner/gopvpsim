@@ -142,6 +142,36 @@ is a pure-addition, backwards-compatible feature.
 
 ---
 
+## Best-buddy / L51 toggle (`[Species.best_buddy]`)
+
+Best-buddying a Pokemon adds +1 power-up level (to L51). The dive can compute
+a second focal sweep one level higher and expose an in-page "Allow best-buddy
+(Level 51)" toggle that recomputes the whole view (card + scatter + prose).
+Whether a dive does this is resolved with precedence
+**CLI flag > this TOML table > league policy** (league policy: on for Ultra,
+opt-in for Great; Master/Little already cap at 51 so the toggle is a no-op).
+The toggle is also auto-suppressed when no IV's level can actually move (e.g.
+a species already CP-capped below 50.5), with a short note shown instead.
+
+This is a per-species dive-behavior table read directly by `deep_dive.py`
+(like the un-documented `cd_prep` / `article` raw reads), not a registry
+payload — it persists the best-buddy intent across re-dives:
+
+```toml
+[Mimikyu.best_buddy]
+compute = true          # run the L51 sweep (overrides the league policy)
+default_display = 50    # which level the page opens on: 50 or 51
+```
+
+Both keys are optional. `compute` overrides the league default for THIS
+species; `default_display` picks the level the page opens on (default: the
+league level, i.e. 50 for Great/Ultra). A shadow focal uses the
+`<Species> (Shadow)` key like every other table here. The CLI flags
+`--best-buddy {auto,on,off}` and `--best-buddy-display {50,51}` override this
+table for a one-off run.
+
+---
+
 ## Spreads
 
 A spread is a named set of IVs. It comes in one of two forms, and the two forms are
