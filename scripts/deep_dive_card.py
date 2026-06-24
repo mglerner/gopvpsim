@@ -87,6 +87,7 @@ class CardModel:
     sprite_uri: str | None = None
     two_number_ones: dict | None = None  # battle-#1 vs stat-product-#1 explainer
     base_form_display: str | None = None  # item 5: "vs non-shadow X" base label
+    sibling_trade: dict | None = None  # form-level break/bulkpoint trade vs sibling
 
 
 # Type -> accent color (matches common PvP type palettes; used for chips and
@@ -201,6 +202,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         sprite_uri=sprite_uri,
         two_number_ones=tno,
         base_form_display=base_form_display,
+        sibling_trade=card_ctx.get('sibling_trade'),
     )
 
 
@@ -252,13 +254,6 @@ CARD_CSS = """
   font-size:0.78rem; font-weight:700; color:#0b1020; margin-right:6px; }
 .ddcard-move { color:#cdd6e5; font-size:0.92rem; margin-top:4px; }
 .ddcard-move b { color:#58a6ff; }
-.ddcard-wr { display:flex; gap:14px; flex-wrap:wrap; margin:14px 0 4px; }
-.ddcard-wr-box { flex:1 1 200px; background:#0f3460; border:1px solid #1a3a6e;
-  border-radius:8px; padding:10px 12px; }
-.ddcard-wr-box .pct { font-size:1.7rem; font-weight:800; color:#3fb950; }
-.ddcard-wr-box .lbl { font-size:0.72rem; color:#8b949e; text-transform:uppercase;
-  letter-spacing:0.03em; }
-.ddcard-wr-box .sub { font-size:0.74rem; color:#9bb0d0; margin-top:2px; }
 .ddcard-spreads { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
   gap:10px; margin:12px 0; }
 .ddcard-spread { background:#0f3460; border:1px solid #1a3a6e; border-radius:8px;
@@ -296,6 +291,18 @@ CARD_CSS = """
   color:#cdd6e5; line-height:1.4; }
 .ddcard-note b { color:#fff; }
 .ddcard-note .iv { color:#f0b429; font-weight:800; }
+.ddcard-wr-line { font-size:0.84rem; color:#9bb0d0; margin:10px 0 4px;
+  border:1px solid #1a3a6e; border-radius:8px; padding:8px 12px;
+  background:#0f3460; }
+.ddcard-wr-line .pct { color:#3fb950; font-weight:800; }
+.ddcard-wr-line .sep { color:#5a7299; margin:0 8px; }
+.ddcard-wr-line .pool { color:#8b949e; }
+.ddcard-sib { font-size:0.8rem; color:#cdd6e5; margin:10px 0; padding:7px 12px;
+  border-left:3px solid #b07cff; border-radius:6px; background:#1b2547; }
+.ddcard-sib-head b { color:#fff; font-weight:800; }
+.ddcard-sib-detail { font-size:0.74rem; color:#9bb0d0; margin-top:3px; }
+.ddcard-sib-detail .sib-bp { color:#9be0a6; }
+.ddcard-sib-detail .sib-blk { color:#e0b89b; }
 """
 
 
@@ -314,12 +321,26 @@ def _sprite_html(m: CardModel):
     return (f'<div class="ddcard-spriteph" style="background:{c}">{initial}</div>')
 
 
-def _wr_box(wr: WinRate, label, sub):
-    if not wr:
+def _wr_line(single: WinRate | None, robust: WinRate | None) -> str:
+    """Compact one-row win-rate summary (replaces the two big stat boxes).
+
+    Shows the single-IV % and the top-k opponent-IV robustness % side by side,
+    followed by the shared "N opponents, all S shield scenarios" note. Much
+    smaller than the prior two-box layout, freeing vertical space for the
+    sibling-trade bar. Renders whatever subset is present."""
+    if not single and not robust:
         return ''
-    return (f'<div class="ddcard-wr-box"><div class="pct">{wr.pct}</div>'
-            f'<div class="lbl">{html.escape(label)}</div>'
-            f'<div class="sub">{html.escape(sub)}</div></div>')
+    parts = []
+    if single:
+        parts.append(f'<span class="pct">{single.pct}</span> single-IV')
+    if robust:
+        k = robust.k or 512
+        parts.append(f'<span class="pct">{robust.pct}</span> top-{k} robustness')
+    ref = single or robust
+    note = (f'<span class="pool">{ref.pool} opponents, all {ref.scenarios} '
+            f'shield scenarios</span>')
+    body = '<span class="sep">&middot;</span>'.join(parts + [note])
+    return f'<div class="ddcard-wr-line">{body}</div>'
 
 
 def _two_ones_html(t: dict | None) -> str:
@@ -354,6 +375,115 @@ def _two_ones_html(t: dict | None) -> str:
                 f'wins more <b>convincingly</b>: average battle score {A} vs {B} '
                 f'(out of 1000; 500 is an even fight).')
     return f'<div class="ddcard-note"><b>Why this IV?</b> {body}</div>'
+
+
+_BAR_MAX_OPPS = 6  # opponent names shown before the "+K more" toggle on the bar
+
+
+def _bar_opp_list(opps, link_opps):
+    """Opponent list for the sibling-trade bar: a short head, then the tail
+    behind a checkbox-hack "+K more" toggle (same no-JS pattern as the cover
+    lists). Returns '' for an empty list."""
+    if not opps:
+        return ''
+    _nm = _name_html(link_opps)
+    head = ', '.join(_nm(o) for o in opps[:_BAR_MAX_OPPS])
+    rest = opps[_BAR_MAX_OPPS:]
+    if not rest:
+        return head
+    global _toggle_seq
+    _toggle_seq += 1
+    cid = f'sb{_toggle_seq}'
+    tail = ', '.join(_nm(o) for o in rest)
+    return (f'{head}<input type="checkbox" class="cover-toggle" id="{cid}">'
+            f'<span class="cover-rest">, {tail}</span>'
+            f'<label class="cover-more" for="{cid}">'
+            f'<span class="cm-show"> +{len(rest)} more</span>'
+            f'<span class="cm-hide"> less</span></label>')
+
+
+def _sibling_trade_html(trade: dict | None, shadow=False, link_opps=False) -> str:
+    """Form-level "newly guaranteed vs the sibling form" trade, rendered ONCE
+    per card as a thin spanning bar (Dragapult-Sim style). Separate from the
+    per-spread census: that is decisive-coverage per IV; this is the form trade
+    (shadow<->non-shadow, Female<->Male) from the pure damage formula.
+
+    The compute layer emits a trade for whichever side has a sibling. Two
+    directions, keyed by ``focal_is_boosted``:
+
+      * BOOSTED focal (a shadow or Female dive): the focal GAINS breakpoints
+        from the extra attack and (for shadow) GIVES UP bulkpoints from the
+        lower defense. Reads ``breakpoints_gained`` / ``bulkpoints_lost`` ->
+        "Vs non-shadow X: +N breakpoints, -M bulkpoints from the shadow boost".
+      * BARE focal (a non-shadow, shadow-eligible dive): the SIBLING is the
+        shadow form, which gains breakpoints the focal can't reach, and the
+        focal HOLDS bulkpoints the shadow gives up. Reads ``breakpoints_lost``
+        (the shadow's gains) / ``bulkpoints_held`` (what the focal holds) ->
+        "Vs Shadow X: shadow gains N breakpoints; you hold M bulkpoints".
+
+    Gated to a non-empty trade with at least one breakpoint or bulkpoint in the
+    relevant direction. ASCII only.
+    """
+    if not trade:
+        return ''
+    sib = html.escape(trade.get('sibling_display', 'the base form'))
+    boosted = trade.get('focal_is_boosted', True)
+    if boosted:
+        # A shadow focal's sibling is the bare species; spell out "non-shadow"
+        # so the trade reads unambiguously (this bar lives on the SHADOW dive).
+        if shadow and 'non-shadow' not in sib.lower():
+            sib = f'non-shadow {sib}'
+        gained = trade.get('breakpoints_gained') or []
+        given_up = trade.get('bulkpoints_lost') or []
+    else:
+        # Inverse: focal is the bare form, sibling is the shadow. The shadow
+        # GAINS the breakpoints; the focal HOLDS the bulkpoints.
+        gained = trade.get('breakpoints_lost') or []
+        given_up = trade.get('bulkpoints_held') or []
+    if not gained and not given_up:
+        return ''
+
+    parts = []
+    if boosted:
+        via = 'the shadow boost' if shadow else 'the extra attack'
+        if gained:
+            parts.append(f'<b>+{len(gained)}</b> guaranteed breakpoint'
+                         f'{"" if len(gained) == 1 else "s"}')
+        if given_up:
+            parts.append(f'<b>-{len(given_up)}</b> bulkpoint'
+                         f'{"" if len(given_up) == 1 else "s"}')
+        headline = f'Vs {sib}: {", ".join(parts)} from {via}'
+    else:
+        if gained:
+            parts.append(f'shadow gains <b>{len(gained)}</b> breakpoint'
+                         f'{"" if len(gained) == 1 else "s"}')
+        if given_up:
+            parts.append(f'you hold <b>{len(given_up)}</b> bulkpoint'
+                         f'{"" if len(given_up) == 1 else "s"}')
+        headline = f'Vs {sib}: {"; ".join(parts)}'
+
+    # Opponent lists. The breakpoint and bulkpoint sets are usually identical
+    # (the extra atk and the lower def trade against the same bulky mons), so
+    # collapse to ONE list when they match -- the headline counts already carry
+    # the split. Show two lists only when the sets genuinely differ.
+    bp_label = 'breaks' if boosted else 'shadow breaks'
+    blk_label = 'gives up bulk vs' if boosted else 'you hold bulk vs'
+    detail = []
+    if gained and given_up and gained == given_up:
+        one = _bar_opp_list(gained, link_opps)
+        if one:
+            detail.append(f'<span class="sib-bp">vs: {one}</span>')
+    else:
+        bp_list = _bar_opp_list(gained, link_opps)
+        if bp_list:
+            detail.append(f'<span class="sib-bp">{bp_label}: {bp_list}</span>')
+        blk_list = _bar_opp_list(given_up, link_opps)
+        if blk_list:
+            detail.append(f'<span class="sib-blk">{blk_label}: {blk_list}</span>')
+    detail_html = (f'<div class="ddcard-sib-detail">{" &middot; ".join(detail)}</div>'
+                   if detail else '')
+    return (f'<div class="ddcard-sib"><div class="ddcard-sib-head">{headline}</div>'
+            f'{detail_html}</div>')
 
 
 _COVER_MAX_OPPS = 7  # names shown before the "+N more" toggle on the card
@@ -422,7 +552,7 @@ def _spread_html(s: Spread, link_opps=False, base_form_display=None,
     flips = f'<div class="flips">{_fh}</div>' if _fh else ''
     # Crown ("efficient" = globally Pareto-optimal IV).
     crown = (' <span class="ddcard-crown" title="Efficient IV (Pareto-optimal): '
-             'no other spread beats it on all of attack, defense and HP)">'
+             'no other spread beats it on all of attack, defense and HP">'
              '\U0001F451</span>') if s.is_efficient else ''
     return (f'<div class="ddcard-spread">{role}'
             f'<div class="iv">{html.escape(s.iv_str)}{crown}</div>'
@@ -447,15 +577,9 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
     m = model
     name = html.escape(m.species_display)
     chips = ''.join(_chip(t) for t in m.types)
-    wr = (_wr_box(m.single_iv, 'Win rate (single IV)',
-                  f'{m.single_iv.pool} opponents, all {m.single_iv.scenarios} '
-                  'shield scenarios')
-          if m.single_iv else '')
-    wr += (_wr_box(m.robust, f'Win rate (top-{m.robust.k or 512} opp IVs)',
-                   f'{m.robust.pool} opponents, all {m.robust.scenarios} shield '
-                   f'scenarios, each swept across its top-{m.robust.k or 512} '
-                   'stat-product IVs')
-           if m.robust else '')
+    wr = _wr_line(m.single_iv, m.robust)
+    sib_bar = _sibling_trade_html(m.sibling_trade, shadow=m.shadow,
+                                  link_opps=not standalone)
     spreads = ''.join(_spread_html(s, link_opps=not standalone,
                                    base_form_display=m.base_form_display,
                                    shadow=m.shadow)
@@ -474,7 +598,8 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
       <div class="ddcard-move">{html.escape(m.league_display)} (CP {m.cp_cap}) &middot; <b>{html.escape(m.moveset)}</b></div>
     </div>
   </div>
-  <div class="ddcard-wr">{wr}</div>
+  {wr}
+  {sib_bar}
   {_two_ones_html(m.two_number_ones)}
   <div class="ddcard-spreads">{spreads}</div>
   {cols}
