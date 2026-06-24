@@ -41,7 +41,7 @@ except Exception:                       # pragma: no cover - jit optional
 ENERGY_CAP = 100
 # Infinite-loop guard, NOT a faithful port of PvPoke's timeout. PvPoke ends
 # battles when its display clock passes 240,000 ms (Battle.js:653), and that
-# clock mixes 500 ms turns with 10,000 ms charged-move minigame adjustments —
+# clock mixes 500 ms turns with 10,000 ms charged-move minigame adjustments --
 # so its effective turn cap shrinks with every charged throw. Documented as
 # an intentional divergence (DEVELOPER_NOTES "Known divergences"): the
 # bulkiest realistic GL wall fight (Carbink mirror, 2v2) ends at 85 turns,
@@ -73,7 +73,7 @@ _dp_trace: bool = False
 #
 # Source: gobattlekit/src/gobattlekit/data/gamemaster.py
 #
-# Key: (your_fast_turns, their_fast_turns)  — capped at 5 for each
+# Key: (your_fast_turns, their_fast_turns)  -- capped at 5 for each
 # Value: (start, step) arithmetic sequence of YOUR fast-move counts at which
 #        to throw the charge move, or None if timing doesn't matter.
 #
@@ -130,7 +130,7 @@ def _estimate_best_cm(owner: "BattlePokemon", opponent: "BattlePokemon") -> "tup
     Returns (idx, move) where idx indexes owner.charged_moves. Delegates
     to the pvpoke_dp setup cache, whose ``best_idx`` runs PvPoke's
     selectBestChargedMove (Pokemon.js:790-822) on the energy-sorted,
-    priority-shuffled move list — including the literal SUPER_POWER
+    priority-shuffled move list -- including the literal SUPER_POWER
     carve-out (Pokemon.js:799): Superpower only displaces the incumbent
     when its DPE edge exceeds .3, where any other move needs just .03.
 
@@ -178,7 +178,7 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     Superpower is not selfBuffing (GameMaster.js:873 sets selfBuffing only
     for positive self-buffs and guaranteed opponent debuffs), so PvPoke
     simply always-shields it. We previously also routed incoming
-    selfDefenseDebuffing moves through wouldShield — a port error removed
+    selfDefenseDebuffing moves through wouldShield -- a port error removed
     2026-06-13 (see DEVELOPER_NOTES "Open divergences", RESOLVED entry).
     """
     if defender.shields <= 0:
@@ -217,7 +217,7 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
                 f"  shield({defender.species} sh={defender.shields} vs"
                 f" {move.get('moveId')} [incoming {tag}]): → wouldShield={use_shield}")
 
-    # Battle.js:1105-1124 — defender saves shields for its own post-self-
+    # Battle.js:1105-1124 -- defender saves shields for its own post-self-
     # defense-debuff fragility window.  Fires when defender.bestChargedMove
     # is selfDefenseDebuffing.  Two sub-branches by attacker.shields.
     d_best_idx, d_best_cm = _estimate_best_cm(defender, attacker)
@@ -304,7 +304,7 @@ def bait_with_cheapest(attacker: "BattlePokemon", defender: "BattlePokemon") -> 
         # Throw cheapest to bait a shield
         return min(affordable, key=lambda im: im[1]['energy'])[0]
     else:
-        # No shields — throw highest damage
+        # No shields -- throw highest damage
         return max(affordable, key=lambda im: im[1]['power'])[0]
 
 def no_bait(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int | None":
@@ -364,8 +364,8 @@ def _calc_turns_to_live(
       shields   – attacker's remaining shields
 
     The original PvPoke code does ``queue.unshift()`` and ``queue.shift()``
-    (push/pop at the front).  Both ends behave like a stack here — we read
-    the most-recently-pushed state next — so a list with ``append()``/
+    (push/pop at the front).  Both ends behave like a stack here -- we read
+    the most-recently-pushed state next -- so a list with ``append()``/
     ``pop()`` (LIFO) gives identical exploration order in O(1) per op,
     instead of the O(n) ``insert(0, ...)`` / ``pop(0)`` the dict version
     used.
@@ -401,7 +401,7 @@ def _calc_turns_to_live(
     if _CALC_TTL_JIT is not None:
         # Numba-JIT'd kernel (same loop as the pure-Python below).
         # Defender-side damage/energy buffers were rebuilt alongside the
-        # damage cache by fast_move_damage() above — no per-call asarray.
+        # damage cache by fast_move_damage() above -- no per-call asarray.
         # The CMP turn bonus is loop-invariant, so it's hoisted here.
         cmp_bonus = (attacker.cmp_atk > defender.cmp_atk
                      and defender.fast_move.get('cooldown', 500)
@@ -420,7 +420,7 @@ def _calc_turns_to_live(
         # stack overflow (never expected) → fall through to Python loop
 
     # Pure-Python fallback (numba unavailable). Same algorithm as the JIT
-    # in _dp_jit.py — kept so the project still runs without numba.
+    # in _dp_jit.py -- kept so the project still runs without numba.
     # Hoist defender's charged-move energy + damage into parallel arrays so
     # the inner loop avoids method/dict lookups. The damage cache was
     # populated by defender.fast_move_damage(attacker) above.
@@ -537,7 +537,7 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
     use_shield = post_hp <= cycle_damage
 
     # Reset the temporarily applied buff (ActionLogic.js 1136-1140)
-    # Must happen BEFORE the charged-move loop below — PvPoke evaluates
+    # Must happen BEFORE the charged-move loop below -- PvPoke evaluates
     # charged-move threat with normal stats, not the temporarily-applied
     # buff from the move being evaluated.
     if move_buffs[0] > 0:
@@ -558,7 +558,7 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
                 cm_reasons.append(f"{cm.get('moveId')}({cm_dmg})≥hp-cycle({defender.hp}-{cycle_damage}={defender.hp-cycle_damage})")
 
     # "Shield the first in a series of Attack debuffing moves like
-    # Superpower, if they would do major damage" — ActionLogic.js:1186-1190,
+    # Superpower, if they would do major damage" -- ActionLogic.js:1186-1190,
     # the final override of wouldShield. Uses the incoming move's damage
     # (PvPoke's move.damage, freshly computed at the top of wouldShield).
     if move.get('selfAttackDebuffing', False) and damage / defender.hp > 0.55:
@@ -592,9 +592,9 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
 # thrown in this branch. The post-DP code only needs four pieces of
 # information about the plan:
 #   - the first move thrown      (first_idx)
-#   - the highest-damage move    (max_dmg_idx)  — for the shields-down sort
-#   - whether any move debuffs   (has_debuf)    — gates that sort branch
-#   - net debuff count           (debuf_count)  — for _dp_insert_ready dedup
+#   - the highest-damage move    (max_dmg_idx)  -- for the shields-down sort
+#   - whether any move debuffs   (has_debuf)    -- gates that sort branch
+#   - net debuff count           (debuf_count)  -- for _dp_insert_ready dedup
 #
 # Tracking these as scalars avoids a per-state `list + [n]` allocation in the
 # inner loop and makes the state numba-friendly. With no moves: first_idx is
@@ -664,7 +664,7 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     # With the two-pass decision model, both pokemon see each other's pre-queuing
     # cooldown at decision time (matching PvPoke's cooldownsToSet mechanism).
     if not (opp_cd == 0 or opp_cd > target_cd):
-        return False   # timing is already fine — proceed with charged move
+        return False   # timing is already fine -- proceed with charged move
 
     # --- Override conditions (any True → don't optimize, fire charged move) ---
     opp_fast_dmg = defender.fast_move_damage(attacker)
@@ -689,11 +689,11 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     if turns_planned > ttl:
         return False
 
-    # Can KO opponent with a charged move (shields == 0 only) — PvPoke
+    # Can KO opponent with a charged move (shields == 0 only) -- PvPoke
     # ActionLogic.js lines 317-329: if any AFFORDABLE charged move would KO
     # now, don't optimize (fire it, don't delay for timing).
     #
-    # PvPoke itself does not gate this on "fast could also KO" — the fast
+    # PvPoke itself does not gate this on "fast could also KO" -- the fast
     # move's next-fire turn is governed by cooldown, not available right now,
     # so the "fast would also KO" shortcut is not equivalent in time to the
     # charged KO. Dropping that gate 2026-04-15 after harness localization
@@ -710,7 +710,7 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon") 
     # delays the lethal self-debuffing throw, the opponent's fast moves
     # keep LANDING (one extra Counter = the whole -26..-29 margin cluster),
     # so the deviation traded real HP for avoiding a debuff with zero
-    # post-KO effect. Removed — matches PvPoke exactly.
+    # post-KO effect. Removed -- matches PvPoke exactly.
     if defender.shields == 0:
         for cm in attacker.charged_moves:
             if attacker.energy >= cm['energy']:
@@ -766,18 +766,18 @@ def _cm_debuf_delta(m: dict) -> int:
 def _cm_buff_delta(m: dict) -> int:
     """Per-cm atk-stage delta applied to the ATTACKER on throw.
 
-    Mirrors PvPoke ActionLogic.js:519-536 exactly — SIGNED on both axes:
+    Mirrors PvPoke ActionLogic.js:519-536 exactly -- SIGNED on both axes:
     chance-1 self-target moves contribute ``attackMult += buffs[0]``
     (so Superpower/Draco Meteor plans have their later throws computed
     at REDUCED attack), and chance-1 opponent-target moves contribute
     ``attackMult -= buffs[1]`` (def-debuffs accelerate plans). Only
-    chance-1 effects count — PvPoke zeros changeTTKChance
+    chance-1 effects count -- PvPoke zeros changeTTKChance
     unconditionally before the DP. buffTarget 'both' (Obstruct) has no
     clause in PvPoke's DP, so it contributes nothing here either.
 
     (Until 2026-06-11 the self clause dropped negative deltas, so
     multi-nuke self-atk-debuff plans looked stronger to our DP than to
-    PvPoke's — review finding E4.)
+    PvPoke's -- review finding E4.)
     """
     buffs = m.get('buffs')
     if not buffs:
@@ -826,13 +826,13 @@ def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict) -> None:
             return raw * (4 + eff * chance) / 4
         return raw
 
-    # Line 715-722: same energy — prefer buff or higher damage
+    # Line 715-722: same energy -- prefer buff or higher damage
     if (cms[1]['energy'] == cms[0]['energy']
             and not cms[1].get('selfDebuffing', False)):
         if cms[1].get('buffs') or _get_dmg(cms[1]) > _get_dmg(cms[0]):
             cms[0], cms[1] = cms[1], cms[0]
 
-    # Line 726-730: same energy — prefer higher buffApplyChance
+    # Line 726-730: same energy -- prefer higher buffApplyChance
     if (cms[1]['energy'] == cms[0]['energy']
             and cms[0].get('buffs') and cms[1].get('buffs')
             and not cms[1].get('selfDebuffing', False)
@@ -851,7 +851,7 @@ def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict) -> None:
             cms[0].pop('buffTarget', None)
             cms[0].pop('selfDebuffing', None)
 
-    # Line 756-762: similar energy — promote selfBuffing move
+    # Line 756-762: similar energy -- promote selfBuffing move
     if (cms[1]['energy'] - cms[0]['energy'] <= 10
             and not cms[1].get('selfDebuffing', False)
             and cms[1].get('selfBuffing', False)
@@ -886,11 +886,11 @@ def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict) -> None:
 # BattleState stores those values as ``.oppHealth`` and ``.oppShields``
 # (lines 1190-1192), so ``.hp``/``.shields`` are ``undefined`` in JS.
 # Since ``undefined < 0`` and ``undefined <= number`` are always ``false``
-# in JavaScript, these pruning checks are dead code — they never fire.
+# in JavaScript, these pruning checks are dead code -- they never fire.
 # We replicate PvPoke's *actual* JS behavior: no pruning. (An
 # ``intended_pruning`` flag that enabled the apparently-intended checks
 # existed until the 2026-06-12 S7 cleanup; it had zero consumers, and if
-# ever enabled it would have pruned wrongly — it compared only
+# ever enabled it would have pruned wrongly -- it compared only
 # hp/energy/shields where PvPoke's check also compares buff state.)
 # ---------------------------------------------------------------------------
 
@@ -915,19 +915,19 @@ def _dp_insert_farm_down(queue: list, ns: "_DPState") -> None:
 def _dp_insert_ready(queue: list, ns: "_DPState") -> None:
     """Ready-move insertion (PvPoke lines 541-616).
 
-    Phase 1 — dedup (lines 544-586): scan states at exactly
+    Phase 1 -- dedup (lines 544-586): scan states at exactly
     ``turn == ns.turn``.  If an existing state has the same hp (and
     buffs, always 0), don't insert (different energy) or compare debuff
     counts (same energy).  This check uses ``.oppHealth`` (real field)
     and is always active.
 
-    Phase 2 — PvPoke's dominance check (lines 598-608) uses
+    Phase 2 -- PvPoke's dominance check (lines 598-608) uses
     ``.hp``/``.shields`` (undefined), so it is dead code in PvPoke and
     not ported: we just find the insertion point.
 
     Insert AFTER same-turn states (``<=``).
     """
-    # Phase 1: dedup (always active — uses .oppHealth, a real field)
+    # Phase 1: dedup (always active -- uses .oppHealth, a real field)
     i = 0
     insert_element = True
     n = len(queue)
@@ -938,11 +938,11 @@ def _dp_insert_ready(queue: list, ns: "_DPState") -> None:
     ns_atk_stage = ns.atk_stage
     while i < n and queue[i].turn == ns_turn:
         q = queue[i]
-        # buffs check: require same atk_stage — different stacks are genuinely
+        # buffs check: require same atk_stage -- different stacks are genuinely
         # different states with different future damage trajectories.
         if q.hp == ns_hp and q.atk_stage == ns_atk_stage:
             if q.energy == ns_energy:
-                # Same energy — compare net debuff counts (precomputed
+                # Same energy -- compare net debuff counts (precomputed
                 # scalar on each state, no per-comparison list scan)
                 if q.debuf_count > ns_debuf:
                     queue.pop(i)  # remove worse existing state
@@ -961,7 +961,7 @@ def _dp_insert_ready(queue: list, ns: "_DPState") -> None:
         return
 
     # Phase 2: find the <= insertion point (PvPoke's dominance check
-    # here is dead code in the JS — not ported).
+    # here is dead code in the JS -- not ported).
     i = 0
     while i < n and queue[i].turn <= ns_turn:
         i += 1
@@ -1015,11 +1015,11 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     (after same-turn).
 
     bait_shields:
-        True (default) — PvPoke's simulate-mode default: the attacker
+        True (default) -- PvPoke's simulate-mode default: the attacker
         may throw a cheap charged move first to burn an opponent shield,
         setting up a high-DPE follow-up.  Mirrors ``battle.baitShields=true``.
 
-        False — "never bait." The attacker never deliberately throws a
+        False -- "never bait." The attacker never deliberately throws a
         sub-optimal move to draw a shield. Farm-down always selects
         ``bestChargedMove``; bait-wait is disabled; near-KO plans prefer
         the max-damage move as the first throw. Useful for "can I win
@@ -1028,7 +1028,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # Energy-sorted, priority-shuffled move order plus the per-move scalar
     # arrays, per-atk-stage damage tables, and the key-stable selections
     # (bestChargedMove, farm-down threshold/swap), cached per (opponent,
-    # stat stages) — see BattlePokemon._ensure_dp_cache.
+    # stat stages) -- see BattlePokemon._ensure_dp_cache.
     #
     # cm_dpe is PvPoke's move.dpe (Pokemon.js:792, 796, 845): after
     # selectBestChargedMove runs, move.dpe is overwritten to
@@ -1046,7 +1046,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     opp_fast_damage  = defender.fast_move_damage(attacker)
     wins_cmp         = attacker.cmp_atk >= defender.cmp_atk
 
-    # original-charged-moves index for each sorted entry — used by callers
+    # original-charged-moves index for each sorted entry -- used by callers
     # that need to return an index into attacker.charged_moves
     cm_orig_idx = dp_cache['order']
     cms     = dp_cache['cms']
@@ -1062,13 +1062,13 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # ------------------------------------------------------------------ #
     # Break Mimikyu disguise ASAP (ActionLogic.js lines 236-251)
     # When facing a Pokemon with a protect effect and active disguise,
-    # PvPoke throws ONLY poke.fastestChargedMove — the pre-shuffle
+    # PvPoke throws ONLY poke.fastestChargedMove -- the pre-shuffle
     # cheapest-by-energy move (Pokemon.js:709: captured right after the
-    # energy sort, BEFORE the priority shuffle; ties keep user order) —
+    # energy sort, BEFORE the priority shuffle; ties keep user order) --
     # and only when it is affordable and not selfDebuffing. When that
     # one move doesn't qualify there is NO early throw at all: fall
     # through to TTL / OMT / the DP. (We previously scanned every
-    # shuffled slot for the first qualifying move — review finding E6.)
+    # shuffled slot for the first qualifying move -- review finding E6.)
     # ------------------------------------------------------------------ #
     if (defender._form_change is not None
             and defender._form_change.effect == 'protect'
@@ -1091,7 +1091,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # ------------------------------------------------------------------ #
     turns_to_live = _calc_turns_to_live(attacker, defender)
 
-    # Adjustments (ActionLogic.js lines 142-161) — always applied
+    # Adjustments (ActionLogic.js lines 142-161) -- always applied
     if attacker.hp <= opp_fast_damage * 2 and opp_fast_cd == 500:
         turns_to_live -= 1
 
@@ -1158,9 +1158,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     #     unnecessary to use a charged move)
     # Slot eligibility is `n == 0 || (n == 1 && ! poke.baitShields)`
     # (ActionLogic.js:221): with baiting ON, slot 1 is NOT eligible for
-    # the early lethal throw — PvPoke falls through to OMT / the near-KO
+    # the early lethal throw -- PvPoke falls through to OMT / the near-KO
     # DP instead. (A previous comment here asserted the inverse and the
-    # loop checked both slots unconditionally — review finding E5.)
+    # loop checked both slots unconditionally -- review finding E5.)
     # ------------------------------------------------------------------ #
     if defender.shields == 0:
         _fast_dmg = fast_damage
@@ -1199,7 +1199,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
 
     # PvPoke's bestChargedMove selection (Pokemon.js lines 791-822) and
     # the farm-down constants (bestCycleDamage, cycle threshold, debuf
-    # swap) are precomputed in _ensure_dp_cache — they depend only on
+    # swap) are precomputed in _ensure_dp_cache -- they depend only on
     # cache-key-stable inputs.
     #
     # INTENTIONAL DIVERGENCE (Divergence 3 in DEVELOPER_NOTES.md):
@@ -1223,16 +1223,16 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # the non-debuffing alt (lines 387-393, precomputed as farm_swap_idx)
     # so the first throw is the non-debuff move.  Without this, our code
     # falls through to near-KO DP, picks the debuffing move, and bandaid
-    # [918] waits forever to stack — the Moltres-G cluster root cause
+    # [918] waits forever to stack -- the Moltres-G cluster root cause
     # (2026-04-15).
     # ------------------------------------------------------------------ #
     if defender.hp > dp_cache['min_cycle_thr'] * best_cycle_dmg:
         # Bait: if opponent would shield the expensive move, throw the cheap
         # one instead.  PvPoke checks activeChargedMoves[1] (the more expensive
         # move), not bestChargedMove (ActionLogic.js line 383).
-        # Gated on bait_shields — no-bait mode always keeps selected_idx=best_idx.
+        # Gated on bait_shields -- no-bait mode always keeps selected_idx=best_idx.
         # (The bait pick requires a non-debuffing cms[0], which the debuf
-        # swap never rewrites — so bait → 0, otherwise → farm_swap_idx.)
+        # swap never rewrites -- so bait → 0, otherwise → farm_swap_idx.)
         if (bait_shields
                 and defender.shields > 0 and n_cms > 1
                 and not cm_self_debuf[0]
@@ -1262,11 +1262,11 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     final_state: "_DPState | None" = None
     iters = 0
 
-    # Per-atk-stage damage tables for the DP (cached — see _ensure_dp_cache).
+    # Per-atk-stage damage tables for the DP (cached -- see _ensure_dp_cache).
     # atk_stage runs over [-4, +4]; index as stage + 4 → [0..8].
     # Each entry recomputes damage from raw power/atk/def via calc_damage
     # (floor semantics) rather than multiplicatively scaling the root-stage
-    # damage — keeps KO thresholds exact at the 1-HP margin.
+    # damage -- keeps KO thresholds exact at the 1-HP margin.
     root_atk_stage = attacker.atk_stage
     cm_dmgs_by_stage  = dp_cache['cm_dmgs_by_stage']
     fast_dmg_by_stage = dp_cache['fast_dmg_by_stage']
@@ -1298,7 +1298,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         if iters < 0:
             # Queue overflow inside the kernel (iters = -1 sentinel):
             # non-dominated states were DROPPED, so the JIT result can't
-            # be trusted — re-run on the unbounded Python loop below.
+            # be trusted -- re-run on the unbounded Python loop below.
             # Mirrors the TTL kernel's ok=False fallback (review finding
             # E9); never expected at QUEUE_CAP=1024 (~50 steady state),
             # this is the backstop that makes JIT/Python parity
@@ -1313,7 +1313,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         # else: final_state stays None → fall through to greedy fallback
     if not _use_jit:
         # Pure-Python fallback (numba unavailable, or the JIT signalled
-        # queue overflow). Same algorithm as the JIT in _dp_jit.py —
+        # queue overflow). Same algorithm as the JIT in _dp_jit.py --
         # kept here so the project still runs without numba installed.
         queue: list = [_DPState(attacker.energy, float(defender.hp), 0,
                                  defender.shields, -1, -1, 0, 0,
@@ -1322,7 +1322,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             iters += 1
             curr = queue.pop(0)
 
-            # KO achieved — this is the fastest plan (chance == 1 path → break)
+            # KO achieved -- this is the fastest plan (chance == 1 path → break)
             if curr.hp <= 0:
                 final_state = curr
                 break
@@ -1405,7 +1405,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # Select move from plan
     # ------------------------------------------------------------------ #
     if final_state is None:
-        # No KO found — fallback to best-DPE greedy
+        # No KO found -- fallback to best-DPE greedy
         affordable = [i for i in range(n_cms) if attacker.energy >= cm_energy[i]]
         if not affordable:
             return None
@@ -1414,7 +1414,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
 
     if final_state.first_idx < 0:
         # Farm-down plan: the DP found a fast-move-only KO. PvPoke
-        # (ActionLogic.js:813-823) does NOT just return here — if the
+        # (ActionLogic.js:813-823) does NOT just return here -- if the
         # attacker has a "boost move" (a chance-1 buff/debuff charged move
         # that isn't self-debuffing, per Pokemon.js:1789-1799 getBoostMove),
         # it force-pushes that move onto the plan so the debuff value lands
@@ -1423,7 +1423,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         # higher-DPE charged move of similar/lower energy.
         #
         # getBoostMove iterates `self.chargedMoves` (user order) and lets
-        # each match overwrite the prior — i.e., the LAST matching move
+        # each match overwrite the prior -- i.e., the LAST matching move
         # wins. Mirrored here.
         boost_move = None
         for m in attacker.charged_moves:
@@ -1469,12 +1469,12 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # Skipped entirely when bait_shields=False (never delay a ready shot to
     # set up a bait).
     #
-    # NOTE: until 2026-06-11 this also required `not cm_self_debuf[1]` — a
+    # NOTE: until 2026-06-11 this also required `not cm_self_debuf[1]` -- a
     # condition the reference does NOT have, so the hold never fired when
     # the pricier move was Superpower/Brave-Bird-class. That silently
     # produced the Snorlax [1,2] and MG-vs-Florges [1,2] divergences
     # (cheap bait thrown immediately where PvPoke holds, then fires the
-    # big move under TTL pressure — our fire_now path supplies the same
+    # big move under TTL pressure -- our fire_now path supplies the same
     # escape). PvPoke's only self-debuff consideration here is cm0's
     # selfBuffing exemption below.
     if bait_shields and defender.shields > 0 and n_cms > 1:
@@ -1504,7 +1504,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # Don't-bait-if-won't-shield (ActionLogic.js lines 838-847):
     # This one uses actual damage (move.damage / move.energy).  PvPoke reads
     # final_state.moves[0] (= first thrown) for fm0_dpe, then mutates
-    # moves[0] = 1 — only takes effect when shields > 0 (so the sort branch
+    # moves[0] = 1 -- only takes effect when shields > 0 (so the sort branch
     # above does NOT fire), so we override `first_idx` directly here.
     # Skipped in no-bait mode: the plan-sort branch above already forced
     # max_dmg_idx, and no-bait never rewrites the first throw for bait reasons.
@@ -1589,7 +1589,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         first_move = cms[first_idx]
 
     # [886] Don't bait with self-debuffing moves (raw dpe)
-    # Gated on bait_shields — the whole bandaid is about rerouting a bait
+    # Gated on bait_shields -- the whole bandaid is about rerouting a bait
     # choice, which is a no-op in no-bait mode.
     if bait_shields and defender.shields > 0 and n_cms > 1:
         if (attacker.energy >= cm_energy[1]
@@ -1707,7 +1707,7 @@ def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int
     on_time = fm >= start and (fm - start) % step == 0
     if on_time:
         return pvpoke_ai(attacker, defender)
-    # Not yet at the optimal window — but don't hold energy above the cap;
+    # Not yet at the optimal window -- but don't hold energy above the cap;
     # fire anyway if we can't afford to wait.
     if attacker.energy >= ENERGY_CAP:
         return pvpoke_ai(attacker, defender)
@@ -1715,7 +1715,7 @@ def optimal_timing(attacker: "BattlePokemon", defender: "BattlePokemon") -> "int
 
 
 # ---------------------------------------------------------------------------
-# BattlePokemon — mutable battle state
+# BattlePokemon -- mutable battle state
 # ---------------------------------------------------------------------------
 
 @dataclass(slots=True)
@@ -1726,11 +1726,11 @@ class BattlePokemon:
     PRIVATE copies (``dict(move)``), never the shared dicts from
     ``get_moves()``. Battle code writes into them ('_turns',
     '_cached_damage', the Zap-Cannon clause's buff keys), so two
-    BattlePokemon sharing a move dict silently cross-contaminate — worst
+    BattlePokemon sharing a move dict silently cross-contaminate -- worst
     in mirrors, where one side's cached damage is computed with the other
     side's attack. Every current caller copies; this note exists so the
     next one does too. (Moves are resolved by identity in
-    ``charged_move_damage``, so copies must happen at construction —
+    ``charged_move_damage``, so copies must happen at construction --
     passing a fresh copy of an attached move later raises KeyError by
     design.)
     """
@@ -1739,8 +1739,8 @@ class BattlePokemon:
     atk:             float       # effective attack = (base_atk + atk_iv) * cpm
     def_:            float       # effective defense
     max_hp:          int
-    fast_move:       dict        # gamemaster move dict — private copy (see docstring)
-    charged_moves:   list[dict]  # gamemaster move dicts — private copies
+    fast_move:       dict        # gamemaster move dict -- private copy (see docstring)
+    charged_moves:   list[dict]  # gamemaster move dicts -- private copies
     shields:         int = 2
     initial_energy:  int = 0     # energy at battle start (0–100)
     shadow:          bool = False    # CMP uses the unboosted attack (see cmp_atk)
@@ -1766,7 +1766,7 @@ class BattlePokemon:
     # Within one simulate() call, charged_move_damage(move, defender) is fully
     # determined by (self.atk * stage_mult, defender.def_ * stage_mult, move,
     # types). The pvpoke_dp policy can call this hundreds of times per
-    # simulate() with the same inputs — we memoize the full per-move table
+    # simulate() with the same inputs -- we memoize the full per-move table
     # and invalidate via key comparison.
     # Held REFERENCE, compared with `is`: an id() key can alias when
     # CPython reuses a freed object's address; a held reference keeps
@@ -1877,7 +1877,7 @@ class BattlePokemon:
         re-deriving every damage table) once per scenario.
 
         For form-changing Pokemon the base form is restored first, which
-        changes this object's stats/moves — that staleness reaches the
+        changes this object's stats/moves -- that staleness reaches the
         OPPONENT's caches too, so `opponent` is required in that case
         (mirrors apply_form_change's both-sides invalidation).
         """
@@ -1891,12 +1891,12 @@ class BattlePokemon:
                 apply_form_change(self, opponent)   # swap back to base form
             self._form_disguise_active = (self._form_change.effect == 'protect')
             # The alt form's move dicts may also carry the per-battle
-            # damage memo cleared below — clear both forms' lists.
+            # damage memo cleared below -- clear both forms' lists.
             for form in self._form_change.forms:
                 for cm in form.charged_moves:
                     cm.pop('_cached_damage', None)
         # Per-battle damage memo on the move dicts (set by
-        # _optimize_move_timing, read by the bandaid[866] gate) — must not
+        # _optimize_move_timing, read by the bandaid[866] gate) -- must not
         # leak into the next battle.
         for cm in self.charged_moves:
             cm.pop('_cached_damage', None)
@@ -1946,8 +1946,8 @@ class BattlePokemon:
         ]
         if _CALC_TTL_JIT is not None:
             # Prebuilt buffers for the turnsToLive JIT. Energies are
-            # re-derived here (not __post_init__) so form changes — which
-            # swap the move dicts and invalidate this cache — are covered.
+            # re-derived here (not __post_init__) so form changes -- which
+            # swap the move dicts and invalidate this cache -- are covered.
             self._cached_charged_dmgs_np = _np.asarray(
                 self._cached_charged_dmgs, dtype=_np.int64)
             self._cm_energy_np = _np.asarray(
@@ -2006,19 +2006,19 @@ class BattlePokemon:
         # atk_stage runs over [-4, +4]; index as stage + 4 → [0..8].
         # Each entry recomputes damage from raw power/atk/def via
         # calc_damage (floor semantics) rather than multiplicatively
-        # scaling the root-stage damage — keeps KO thresholds exact at
+        # scaling the root-stage damage -- keeps KO thresholds exact at
         # the 1-HP margin.
         #
         # The row at the CURRENT atk stage is identical to the damage
         # cache populated above (same calc_damage inputs), so it is
         # reused rather than recomputed. And when no charged move
-        # carries a chance-1 atk-stage delta (cm_buff_delta all zero —
+        # carries a chance-1 atk-stage delta (cm_buff_delta all zero --
         # the common case), the DP's plan exploration can never leave
         # the current stage: the cache key pins this entry to one
         # atk_stage, and only buff deltas move the stage row index
         # mid-plan. The other 8 rows are then unreachable, so they are
         # filled with references to the root row instead of
-        # 8 x (n_cms + 1) calc_damage calls — this rebuild was ~97% of
+        # 8 x (n_cms + 1) calc_damage calls -- this rebuild was ~97% of
         # all damage computations in the 2026-06-10 profile.
         cm_buff_delta = [_cm_buff_delta(m) for m in cms]
         root_row  = [cm_dmgs_root[idx_map[id(m)]] for m in cms]
@@ -2030,7 +2030,7 @@ class BattlePokemon:
         else:
             # Some moves move the plan's atk stage. Stages strictly above
             # root are reachable only via a positive delta, below root
-            # only via a negative one — fill unreachable rows with the
+            # only via a negative one -- fill unreachable rows with the
             # root row (never indexed) and compute the rest.
             has_pos = any(d > 0 for d in cm_buff_delta)
             has_neg = any(d < 0 for d in cm_buff_delta)
@@ -2076,7 +2076,7 @@ class BattlePokemon:
 
         if cms:
             # PvPoke's bestChargedMove selection (Pokemon.js lines
-            # 791-822) — verbatim move of the per-call loop that lived in
+            # 791-822) -- verbatim move of the per-call loop that lived in
             # pvpoke_dp; see the INTENTIONAL DIVERGENCE note there for
             # why this recomputes per (opponent, stages) at all.
             best_idx = 0
@@ -2103,7 +2103,7 @@ class BattlePokemon:
                 best_idx = 0
 
             # bestCycleDamage + the farm-down threshold/swap selections
-            # (ActionLogic.js lines 365-415) — also key-stable.
+            # (ActionLogic.js lines 365-415) -- also key-stable.
             fast_energy = self.fast_move.get('energyGain', 5)
             fm_to_charge = math.ceil(cm_energy_l[best_idx] / fast_energy)
             best_cycle_dmg = fast_root * fm_to_charge + root_row[best_idx]
@@ -2207,7 +2207,7 @@ class BattleResult:
         """
         opp = 1 - player
         # Match PvPoke's Math.floor formula exactly. (Both sims clamp HP at
-        # 0 in the battle loop — Battle.js:1349 and our simulate() — so the
+        # 0 in the battle loop -- Battle.js:1349 and our simulate() -- so the
         # max(0, ...) below is defensive; an earlier comment claiming
         # "overkill counts" was wrong.)
         return math.floor(
@@ -2235,7 +2235,7 @@ def _apply_move_buffs(
     ported exactly (Battle.js:1389-1397 + Pokemon.js:686-706): a float
     accumulator INITIALIZED TO THE CHANCE ITSELF (0.0 for exactly-50%
     moves), incremented by the chance per activation, firing whenever it
-    crosses a whole number — and never reset. Python and JS share IEEE-754
+    crosses a whole number -- and never reset. Python and JS share IEEE-754
     doubles, so the proc schedule matches PvPoke bit-exactly, float drift
     included (chance 0.1 procs on use 10, not 9, because ten accumulated
     0.1s are still < 1.0). The chance-shifted init makes the early procs
@@ -2285,7 +2285,7 @@ def _apply_move_buffs(
 # EXPERIMENTAL TURN MODEL: mechanics='new' (the 2026-06-23 in-game PvP
 # turn system; live 2026-06-23, spec at pokemongo.com/news/pvp-updates2026).
 #
-#   *** UNVALIDATED — there is NO PvPoke reference for this mode. ***
+#   *** UNVALIDATED -- there is NO PvPoke reference for this mode. ***
 #   PvPoke still implements the legacy turn system, so the 'new' branch is
 #   coded from the published spec alone and cross-checked only against our
 #   own spec-derived unit tests (tests/test_new_turn_mechanics.py), never
@@ -2298,7 +2298,7 @@ def _apply_move_buffs(
 #      'new' mode the fast-landing step snapshots damage/energy against the
 #      start-of-step state and applies all results together, so a higher-CMP
 #      fast move can no longer pre-empt (KO) a same-turn fast move.
-#   2. (corollary of 1) one-turn fast attacks on the same turn TIE — both
+#   2. (corollary of 1) one-turn fast attacks on the same turn TIE -- both
 #      resolve. Implemented via the simultaneous-apply in change 1 (the
 #      legacy CMP sort that let the higher-attack side land first is skipped).
 #   5. CHARGED attacks begin at the START of the NEXT turn; charged damage
@@ -2311,12 +2311,12 @@ def _apply_move_buffs(
 #      forced=0, charged-end=0) are NOT MODELED. Our 1v1 core never switches
 #      (simulate() takes exactly two BattlePokemon and the loop has no
 #      incoming-Pokemon path), so changes 3 and 4 are unreachable here. They
-#      are documented, not faked — see DEVELOPER_NOTES. They would only
+#      are documented, not faked -- see DEVELOPER_NOTES. They would only
 #      matter for the out-of-scope team-sim TODO.
 #
 # Decision-layer caveat: the AI policies (pvpoke_dp, _optimize_move_timing,
 # turnsToLive) encode LEGACY timing assumptions and are NOT re-optimized for
-# the new model — only the resolution step changes. Re-deriving an optimal
+# the new model -- only the resolution step changes. Re-deriving an optimal
 # AI for a turn system PvPoke has not shipped would be invention.
 #
 # PRIME-DIRECTIVE NOTE: every 'new'-mode behavior is guarded by an explicit
@@ -2342,21 +2342,21 @@ def simulate(
     """
     Run a 1v1 battle between p0 and p1 and return the result.
 
-    p0 and p1 are mutated in place — reset them before reuse.
+    p0 and p1 are mutated in place -- reset them before reuse.
 
     mechanics selects the turn-resolution model:
 
-      'legacy' (DEFAULT) — the pre-2026-06-23 turn system. This is the
+      'legacy' (DEFAULT) -- the pre-2026-06-23 turn system. This is the
         only path exercised by the oracle harness and the test suite,
         and it must stay byte-for-byte behavior-identical. Every caller
         that omits ``mechanics`` lands here.
 
-      'new' — EXPERIMENTAL / UNVALIDATED. Models the 2026-06-23 in-game
+      'new' -- EXPERIMENTAL / UNVALIDATED. Models the 2026-06-23 in-game
         PvP turn changes (pokemongo.com/news/pvp-updates2026). PvPoke has
         NOT implemented these, so there is NO reference implementation to
         cross-check against; this branch is implemented from the spec
         alone. It changes damage/energy resolution timing, CMP on
-        simultaneous fast moves, and charged-move timing — so
+        simultaneous fast moves, and charged-move timing -- so
         breakpoint/bulkpoint/CMP outputs WILL differ from legacy by
         design. See the _new_*  helpers and the in-loop ``mechanics ==
         'new'`` branches below for exactly where it diverges, and the
@@ -2402,7 +2402,7 @@ def simulate(
     use_priority = (p0.cmp_atk != p1.cmp_atk)
 
     def log_event(msg: str):
-        # Call sites must gate on `if log:` themselves — the f-string
+        # Call sites must gate on `if log:` themselves -- the f-string
         # argument is evaluated before the call, and at millions of sims
         # the discarded formatting is measurable. The check here is a
         # backstop only.
@@ -2441,7 +2441,7 @@ def simulate(
             # PvPoke Battle.js lines 471-490: cancel a charged move when the
             # attacker was killed by the opponent's fast move this turn, UNLESS
             # the opponent is also throwing a charged move this turn (the
-            # opponentChargedMoveThisTurn exception — simultaneous charged moves
+            # opponentChargedMoveThisTurn exception -- simultaneous charged moves
             # are allowed even if one side was killed by a fast move).
             if attacker.hp <= 0 and not allow_dead_attacker:
                 opponent_also_charged = any(ai == 1 - actor_idx
@@ -2450,7 +2450,7 @@ def simulate(
                     continue
 
             if attacker.energy < move['energy']:
-                continue   # raced to this — no longer affordable
+                continue   # raced to this -- no longer affordable
 
             if defender.hp <= 0:
                 continue   # defender already fainted from fast move this turn
@@ -2524,14 +2524,14 @@ def simulate(
 
         # --- 1.5 (mechanics=='new' ONLY) Resolve deferred charged moves ---
         # Spec change 5: a charged move chosen on turn N begins at the START
-        # of turn N+1. We resolve it here, AT THE TOP of the turn — before
+        # of turn N+1. We resolve it here, AT THE TOP of the turn -- before
         # this turn's fast landings (step 3) and before the actors decide
-        # again (step 2) — so charged damage AND effects (stat changes) land
+        # again (step 2) -- so charged damage AND effects (stat changes) land
         # before any fast attack that finishes during the charged sequence,
         # and the actors decide their next move against post-charged state.
         # _pending_charged is never set in legacy mode, so this block is dead
         # there. (Energy is consumed inside _resolve_charged at resolution
-        # time, i.e. on turn N+1; see design note (d)2 — resolving energy
+        # time, i.e. on turn N+1; see design note (d)2 -- resolving energy
         # with damage lets the legacy and new paths share one resolver.)
         if mechanics == 'new':
             _deferred = [(i, pk._pending_charged)
@@ -2549,11 +2549,11 @@ def simulate(
         # other's pre-queuing state at decision time. Implemented in three
         # phases:
         #
-        # Phase A — detect fast-move landings (but keep _queued_fast set so
+        # Phase A -- detect fast-move landings (but keep _queued_fast set so
         #   the turnsToLive DP can see in-flight FMs during decisions).
-        # Phase B — collect decisions (no state mutation; each pokemon sees
+        # Phase B -- collect decisions (no state mutation; each pokemon sees
         #   the other's cooldown/energy BEFORE any new queuing this turn).
-        # Phase C — apply decisions and clear landed-FM state.
+        # Phase C -- apply decisions and clear landed-FM state.
         charged_actions = []   # list of (actor_index, move_dict)
         fast_landings   = []   # fast moves that land this turn
         _fired_fast     = []   # indices of pokemon whose queued FM fires now
@@ -2626,13 +2626,13 @@ def simulate(
         # --- 3. Resolve fast move landings (fire BEFORE charged moves) ---
         if mechanics == 'new':
             # Spec changes 1+2: damage+energy resolve at the END of the turn,
-            # so simultaneously-landing one-turn fast moves TIE — neither can
+            # so simultaneously-landing one-turn fast moves TIE -- neither can
             # pre-empt (KO) the other. We snapshot each landing's damage and
             # energy against the START-of-step state, then apply all results
             # together. No CMP sort (the legacy sort exists only to let the
             # higher-attack side land first, which the tie semantics remove).
             # A fast against a defender already fainted THIS turn (from the
-            # step-1.5 deferred charged) is still skipped — a faint is a faint.
+            # step-1.5 deferred charged) is still skipped -- a faint is a faint.
             _fast_results = []   # (defender_idx, dmg, attacker_idx, energy)
             for actor_idx, move in fast_landings:
                 attacker = pokemon[actor_idx]
@@ -2692,7 +2692,7 @@ def simulate(
         # PvPoke Battle.js: a fast move queued in the same turn as a charged move
         # (timeSinceActivated < requiredTimeToPass) fires at -20 priority (after
         # the charged move) rather than being cancelled.  This is simulate mode
-        # only — queuedActions is never cleared by a charged move in simulate mode.
+        # only -- queuedActions is never cleared by a charged move in simulate mode.
         if charged_actions:
             for i, p in enumerate(pokemon):
                 if p._queued_fast is not None:
@@ -2722,7 +2722,7 @@ def simulate(
             # this turn STILL resolves even if its user is fainting from a fast
             # this turn. Under our deferral model the commit resolves at the top
             # of the NEXT turn (step 1.5), so we must not break out while a
-            # _pending_charged is outstanding — let the loop run one more turn so
+            # _pending_charged is outstanding -- let the loop run one more turn so
             # step 1.5 fires it, then the faint check breaks. (Legacy resolves
             # charged same-turn, so this never applies there.)
             if mechanics == 'new' and (p0._pending_charged is not None
