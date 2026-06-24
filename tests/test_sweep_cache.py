@@ -106,7 +106,8 @@ def test_key_separation(tmp_path, monkeypatch):
                   _focal_fields(shadow=True),
                   _focal_fields(charged_ids=['ICE_BEAM']),
                   _focal_fields(shield_scenarios=[(1, 1)]),
-                  _focal_fields(iv_floor=None)):
+                  _focal_fields(iv_floor=None),
+                  _focal_fields(focal_max_level=51.0)):  # best-buddy L51 != default L50
         assert sweep_cache.SweepCache(other).dir != base.dir
     # Any column-side field change lands in a different file.
     base_path = base._col_path(_col_fields())

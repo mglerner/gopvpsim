@@ -1907,7 +1907,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         sweep_cache = swc.SweepCache(swc.focal_key_fields(
             species, league, shadow, fast_id, charged_ids,
             iv_floor, shield_scenarios, bait_mode,
-            energy_lead=focal_energy))
+            energy_lead=focal_energy, focal_max_level=focal_max_level))
         for oi, opp in enumerate(opp_cache):
             col = sweep_cache.get_column(
                 swc.column_key_fields(opp['species'], opp['shadow'],

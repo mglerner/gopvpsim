@@ -45,7 +45,7 @@ import numpy as np
 # v3 (2026-06-12): energy-lead axis added to _sweep_worker plumbing
 # (focal starting energy threaded through worker init); bump per the
 # same rule.
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'sweep'
 
 # Engine sources whose content participates in the focal key. Any edit
@@ -104,7 +104,7 @@ def _key_hash(fields, n=16):
 
 def focal_key_fields(species, league, shadow, fast_id, charged_ids,
                      iv_floor, shield_scenarios, bait_mode,
-                     energy_lead=0):
+                     energy_lead=0, focal_max_level=None):
     """Focal-side key dict shared by every column of one sweep.
 
     ``energy_lead`` is the focal's starting energy in RAW energy points
@@ -112,6 +112,13 @@ def focal_key_fields(species, league, shadow, fast_id, charged_ids,
     capped by the sweep), so two movesets whose 'e1' resolves to the
     same raw energy correctly share nothing here — the moveset is
     keyed separately anyway via ``fast``/``charged``.
+
+    ``focal_max_level`` is the focal's max power-up level when the
+    best-buddy/L51 toggle raised it (``None`` = league default). It changes
+    the focal's per-IV levels and therefore every column's per-IV scores, so
+    an L50 and an L51 sweep of the same species/moveset MUST NOT share columns.
+    (Opponent column keys carry ``opp_level`` separately, so an over-leveled
+    opponent already keys distinctly with no change here.)
     """
     return {
         'v': CACHE_VERSION,
@@ -124,6 +131,7 @@ def focal_key_fields(species, league, shadow, fast_id, charged_ids,
         'scenarios': [[s0, s1] for s0, s1 in shield_scenarios],
         'bait': bait_mode,
         'energy_lead': energy_lead,
+        'focal_max_level': focal_max_level,
         'engine': engine_hash(),
         'gamemaster': gamemaster_hash(),
     }
