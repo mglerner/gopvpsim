@@ -13,8 +13,8 @@ import pytest
 REPO_ROOT_FOR_SCRIPTS = Path(__file__).resolve().parent.parent / 'scripts'
 
 from gopvpsim.pokemon import (
-    CPM, LEAGUE_CAPS, _LEVELS,
-    cp, battle_stats, stat_product, best_level,
+    CPM, LEAGUE_CAPS, _LEVELS, MAX_CPM_LEVEL,
+    cp, battle_stats, stat_product, best_level, bestbuddy_caps,
     get_species, Pokemon, iv_rank,
     pvpoke_default_ivs, compute_default_ivs,
     SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
@@ -171,6 +171,38 @@ def test_best_level_exact_cap_is_valid():
 
 
 # ===========================================================================
+# Best-buddy caps + level-51 reachability
+# ===========================================================================
+
+def test_bestbuddy_caps_great_ultra():
+    """GL/UL default to 50 and best-buddy bumps to 51."""
+    assert bestbuddy_caps('great') == (50.0, 51.0)
+    assert bestbuddy_caps('ultra') == (50.0, 51.0)
+
+def test_bestbuddy_caps_master_is_noop():
+    """Master/Little already cap at 51, so the alt cap equals the default."""
+    assert bestbuddy_caps('master') == (51.0, 51.0)
+    assert bestbuddy_caps('little') == (51.0, 51.0)
+
+def test_bestbuddy_caps_never_exceeds_cpm_table():
+    """alt_cap is clamped to the highest level the CPM table defines."""
+    for league in ('great', 'ultra', 'master', 'little'):
+        _, alt = bestbuddy_caps(league)
+        assert alt in CPM
+        assert alt <= MAX_CPM_LEVEL
+
+def test_best_level_includes_50_5_and_51():
+    """When the CP cap never binds, the half-level grid reaches 50.5 then 51.0."""
+    # A huge CP cap means only max_level limits us.
+    assert best_level(FAKE_BASE_ATK, FAKE_BASE_DEF, FAKE_BASE_STA,
+                      15, 15, 15, max_cp=10**9, max_level=50.0) == 50.0
+    assert best_level(FAKE_BASE_ATK, FAKE_BASE_DEF, FAKE_BASE_STA,
+                      15, 15, 15, max_cp=10**9, max_level=50.5) == 50.5
+    assert best_level(FAKE_BASE_ATK, FAKE_BASE_DEF, FAKE_BASE_STA,
+                      15, 15, 15, max_cp=10**9, max_level=51.0) == 51.0
+
+
+# ===========================================================================
 # Pokemon dataclass — unit tests (mock gamemaster)
 # ===========================================================================
 
@@ -250,6 +282,36 @@ def test_pvpoke_known_cp_values(species, atk_iv, def_iv, sta_iv, league,
         f"{species} {atk_iv}/{def_iv}/{sta_iv} {league}: "
         f"expected CP {expected_cp}, got {p.cp}"
     )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("league", ["great", "ultra"])
+def test_aegislash_blade_whole_levels_at_l51(league):
+    """Aegislash (Blade) powers up in whole-level increments only. Even with the
+    best-buddy cap raised to 51, every reachable Blade level must be a whole
+    number, and building must never index the CPM table past its ceiling."""
+    levels = set()
+    for a in range(0, 16, 3):
+        for d in range(0, 16, 3):
+            for s in range(0, 16, 3):
+                pk = Pokemon.at_best_level('Aegislash (Blade)', a, d, s,
+                                           league=league, max_level=51.0)
+                levels.add(pk.level)
+                assert pk.level in CPM            # never overflow the CPM table
+                assert pk.level <= MAX_CPM_LEVEL
+    assert levels, "expected at least one buildable Blade spread"
+    assert all(lv % 1.0 == 0 for lv in levels), f"non-whole Blade levels: {sorted(levels)}"
+
+
+@pytest.mark.integration
+def test_iv_rank_blade_l51_whole_levels_no_overflow():
+    """iv_rank mirrors the Blade round-down; at cap 51 every ranked entry must
+    carry a whole level and a valid CPM key."""
+    ranked = iv_rank('Aegislash (Blade)', league='great', max_level=51.0)
+    assert ranked
+    for e in ranked:
+        assert e['level'] % 1.0 == 0, f"non-whole Blade level: {e}"
+        assert e['level'] in CPM
 
 
 @pytest.mark.integration
