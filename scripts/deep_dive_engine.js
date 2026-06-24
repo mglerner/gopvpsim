@@ -6,6 +6,10 @@ var state = {
   oppIvMode: '__OPP_IV_MODE_DEFAULT__',
   colorMode: 'threshold',
   yAxisMode: 'avgScore',
+  // Best-buddy / level cap currently displayed: '50' (league default) or
+  // '51' (best-buddy). Only ever '51' when DATA.ivL51 is present (the dive
+  // carried a second L51 grid). Drives the score-key suffix in getScoreKey.
+  levelMode: '50',
   // Anchor IVs overlay rendering mode:
   //   'filled'  - cyan fill, opacity 0.65 (current default; context
   //               layer that doesn't overwhelm slayer / top-picks)
@@ -67,8 +71,67 @@ var HELP_MATCHUPS_KEPT = 'Expected non-mirror matchups won, sampling scenarios u
 var HELP_PER_SHIELD_DELTA = 'Signed avg-score delta vs the best IV in this scenario: +ve beats the best IV here, 0 is the best IV, -ve trades score for something else (atk / HP / bulk). Frozen on the Shields axis so all three show regardless of dropdown; reacts to Opp-IVs + Bait.';
 
 // ---- Helpers ----
-function getScoreKey(mi, mode) { return mi + '_' + mode; }
+// Score key is level-aware: in best-buddy (L51) view it reads the parallel
+// '{mi}_{mode}@51' grid the dive embedded. The '@51' suffix is only added
+// when an L51 grid is actually present (DATA.ivL51), so non-best-buddy dives
+// are unaffected.
+function getScoreKey(mi, mode) {
+  return mi + '_' + mode + ((state.levelMode === '51' && DATA.ivL51) ? '@51' : '');
+}
 function getScores(mi, mode) { return SCORES[getScoreKey(mi, mode)]; }
+
+// ---- Best-buddy / Level-51 toggle ----
+// When DATA.ivL51 is present the dive carries a second (best-buddy L51) grid.
+// Toggling REBINDS the per-IV metadata arrays on DATA (so every existing
+// DATA.ivLv[iv]-style read stays correct) and flips the score-key suffix; the
+// prose + card are swapped from their inert <template>s (only one level's
+// element ids are ever live, so there is no id collision). One Plotly
+// instance, fully recomputed on toggle.
+var _BB_LEVEL_FIELDS = ['ivLv', 'ivCp', 'ivAtk', 'ivDef', 'ivHp', 'ivSp',
+                        'spRanks', 'ivEfficient', 'ivTiers', 'ivAllTiers',
+                        'rank1RefIvIdx'];
+var _bbL50 = null;        // stashed league-default (L50) arrays
+var _bbHostHTML = {};     // hostId -> { '50': html, '51': html }
+
+function _bbInitHost(hostId, tmplId) {
+  var host = document.getElementById(hostId);
+  var tmpl = document.getElementById(tmplId);
+  if (!host || !tmpl) return;
+  _bbHostHTML[hostId] = { '50': host.innerHTML, '51': tmpl.innerHTML };
+}
+
+function _initBestBuddy() {
+  if (!DATA.ivL51) return;
+  _bbL50 = {};
+  for (var i = 0; i < _BB_LEVEL_FIELDS.length; i++) {
+    _bbL50[_BB_LEVEL_FIELDS[i]] = DATA[_BB_LEVEL_FIELDS[i]];
+  }
+  _bbInitHost('dd-bb-prose-host', 'dd-bb-prose-tmpl');
+  _bbInitHost('dd-bb-card-host', 'dd-bb-card-tmpl');
+  var dd = String((DATA.bestBuddy && DATA.bestBuddy.defaultDisplay) || 50);
+  if (dd === '51') {
+    var chk = document.getElementById('dd-bb-toggle');
+    if (chk) chk.checked = true;
+    setBestBuddyLevel('51');
+  }
+}
+
+function setBestBuddyLevel(mode) {
+  if (!DATA.ivL51 || !_bbL50) return;
+  var src = (mode === '51') ? DATA.ivL51 : _bbL50;
+  for (var i = 0; i < _BB_LEVEL_FIELDS.length; i++) {
+    var f = _BB_LEVEL_FIELDS[i];
+    if (src[f] !== undefined) DATA[f] = src[f];
+  }
+  state.levelMode = mode;
+  for (var hid in _bbHostHTML) {
+    var host = document.getElementById(hid);
+    if (host && _bbHostHTML[hid][mode] != null) host.innerHTML = _bbHostHTML[hid][mode];
+  }
+  updateView();
+  updateSummaryTable();
+}
+window.setBestBuddyLevel = setBestBuddyLevel;
 
 // Viridis interpolator: lets the slayer overlay color untiered points
 // the same way the base "Other" trace would (matching Plotly's built-in
@@ -3063,6 +3126,9 @@ window.applyHighlight = applyHighlight;
 window.clearHighlight = clearHighlight;
 applyHistogramHash();
 updateView();
+// Capture the best-buddy L50/L51 grids + prose templates and apply the
+// default display level (no-op unless the dive carried an L51 grid).
+_initBestBuddy();
 // Hook up the collection panel handlers now that updateView has run
 // once (nIvs, DATA, etc. are all in scope). Safe even if DATA.collection
 // is null — the wire function bails early in that case.
