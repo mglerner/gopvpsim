@@ -248,6 +248,25 @@ here 2026-06-12; these are the remaining seams.)*
 
 ## Policies to add
 
+* **Re-optimize the new-mechanics decision layer (POST-SHIP, deferred
+  2026-06-24).** Phase 1 shipped pure plumbing: under `--mechanics new` the
+  decision layer runs LEGACY decisions, which corpus-testing showed are
+  near-optimal on the new clock (the post-mortem-charged-survival resolution
+  property already delivers the edge a decision change would chase). BUT we
+  knowingly leave a real, reproducible sub-optimality on the table: there is a
+  floor-clean win (Aegislash (Shield) vs Talonflame (Shadow) [0,0] 515->595 via
+  `decisive-commit globalmax@1.25`) we dropped as a single edge cell, and we have
+  no *generalizable* counter-strategy — every broad "commit early because I'll
+  die" formulation breaks the no-regression floor on shield-bait-timing species
+  (Tinkaton/Mantine/Jumpluff-S/Quagsire-S) because the opponent baits/farms
+  instead of throwing. Full writeup, the specific cases, why nothing generalizes,
+  the recommended DP-internal direction (`_calc_turns_to_live`/`fire_now` made
+  natively charged-survives-death-aware), the resume harness
+  (`scripts/corpus_policy_driver.py` + the non-regression floor methodology), and
+  the coverage gaps (GL-only — UL/ML untested; curated ~20-focal subset) all live
+  in `docs/validations/new_mechanics_decision_layer_2026_06_24.md`. Come back to
+  this after launch.
+
 * **PvPoke "Selective" baiting** — PvPoke's UI offers a bait toggle; "Selective"
   uses the same ActionLogic.js DP to decide *whether* baiting is worthwhile given
   current state (turnsToLive, bestChargedMove by DPE, minimumCycleThreshold).
@@ -519,6 +538,21 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   The Color By dropdown (HP/Def/Atk) already reveals banding structure
   visually; the automated analysis should match what users see.
 
+* **Visualize where stat product misleads (stat-product as a Color By
+  option + battle-score y-axis)** *(requested 2026-06-24)* — Make it easy to
+  SEE at a glance when ranking by stat product is a bad guide. Two pieces:
+  (1) add "stat product" (or stat-product rank) to the interactive scatter's
+  Color By dropdown (currently HP/Def/Atk); (2) offer battle score (avg,
+  and/or per-scenario wins) as the y-axis. Then a high-stat-product (bright)
+  marker sitting LOW on the battle-score y-axis visually exposes the
+  mismatch — exactly the "stat product != performance" cases (low-DPE or
+  level-capped mons where the attack step between adjacent IVs is tiny, so
+  premium-bulk IVs and high-atk IVs perform nearly the same). Cross-ref the
+  wins-based-y-axis work in the "RyanSwag-style matchup-flip annotations +
+  wins-based y-axis" item above (shared y-axis machinery) and the clustering
+  item (Color By already reveals banding). Don't build in the
+  new-mechanics session.
+
 * **Send acidicArisen a Discord message about the Lurgan 102.9 def floor**
   — Our 2026-04-08 bulkpoint Level 3 enumeration against the Annihilape
   mirror found that the historical Lurgan Ape `def ≥ 102.9` floor is
@@ -770,6 +804,32 @@ card atop every dive + standalone `--card-out` export, with two headline
 win-rates — single-IV and a top-512 opponent-IV robustness number. Built
 to reproduce the Dragapult-Sim/Lundberger infographic look. First dive:
 Shadow Corviknight GL pre-release, `userdata/dives/shadow_corviknight*.html`.)*
+
+* **Card "High HP" pole surfaces a strictly-dominated spread (BUG, flagged
+  2026-06-24).** On the UL Mimikyu card the High HP pole highlighted
+  `0/15/15` (148.7 atk / 179.8 def / 135 hp, **CP 2319** — nowhere near the
+  2500 cap — SP #702, NO crown marker). That spread is strictly dominated:
+  `1/15/15` has the same def + hp but higher atk. We should never headline a
+  strictly-dominated spread. Likely causes / fixes to weigh:
+  (a) **The real disqualifier is the STATS, not the CP** — `0/15/15` is bad
+  because it is strictly dominated (`1/15/15` weakly-dominates it on
+  atk/def/hp), not merely because its CP is low. Primary fix: a
+  strict-dominance filter (drop any candidate that another reachable spread
+  weakly-dominates on atk/def/hp). Do NOT hard-gate on CP — a far-from-cap
+  spread can still be worth building (e.g. a meta-relevant mon that maxes at
+  L51 and still never reaches the league cap). If CP is used at all it is a
+  soft clue only, and the right comparison is "far below the MAX achievable
+  CP for THIS species in THIS league" (already accounts for L51-capped mons),
+  never "far below the league cap (2500)"; (b) consider REQUIRING the crown
+  marker (or whatever marks a
+  rank-relevant / non-dominated spread) for a spread to appear on the top
+  card — open question whether to hard-require it. Pick after looking at the
+  pole-selection code. Cross-ref the spread-selection rework in "Upcoming
+  plan-mode session" item 4 (distinctness-gated greedy cap) — this is the
+  same surface; fold the dominance/CP-floor fix into that work or do it as a
+  focused card-pole bugfix first. Concrete repro: UL Mimikyu card,
+  Shadow Claw / Play Rough + Shadow Sneak. Do NOT fix in the new-mechanics
+  session.
 
 * **Opponent-IV robustness as a first-class sim axis (plan item 1.8).**
   Today `opp_iv_robustness` is computed ad hoc for the rec IV only, as a

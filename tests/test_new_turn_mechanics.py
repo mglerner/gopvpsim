@@ -189,3 +189,65 @@ def test_new_charged_buff_applies():
              shield_policy_1=never_shield, shield_policy_0=never_shield,
              mechanics='new')
     assert atk.atk_stage > 0                 # buff landed in new mode
+
+
+# ---------------------------------------------------------------------------
+# Scaffold invariant: the new-mechanics DECISION layer is PURE PLUMBING.
+#
+# Phase 1 (2026-06-24) threaded `mechanics` through the decision functions but
+# ships new == legacy DECISIONS. Corpus-testing (3 workflows, ~20 focals x full
+# GL pool x 9 shields) found legacy decisions are near-optimal on the new clock:
+# the post-mortem-charged-survival RESOLUTION property already delivers the one
+# edge a decision change would chase, and every aggressive early-commit lever
+# either washed out or broke the non-regression floor. Full writeup +the one
+# known deferred sub-optimality (a single Aegislash-Shield edge cell) live in
+# docs/validations/new_mechanics_decision_layer_2026_06_24.md.
+#
+# These tests PIN that pure-plumbing guarantee: every decision function returns
+# identical results for mechanics='new' vs 'legacy'. They are the TRIPWIRE for
+# the deferred re-optimization -- if a future grounded change makes new
+# decisions diverge, they fail ON PURPOSE, forcing that change to be
+# corpus-floor-verified and these fixtures consciously updated.
+# ---------------------------------------------------------------------------
+import itertools
+from gopvpsim.battle import (pvpoke_dp, _calc_turns_to_live,
+                             _optimize_move_timing, would_shield)
+
+
+def _decision_pair(energy, hp, a_shields, d_shields):
+    a = BattlePokemon(
+        species='Atk', types=['normal'], atk=130.0, def_=120.0, max_hp=160,
+        fast_move=_fast(power=3, energy_gain=8, cooldown_ms=500),
+        charged_moves=[_charged(power=50, energy=40),
+                       _charged(power=90, energy=55)],
+        shields=a_shields, initial_energy=0,
+    )
+    d = BattlePokemon(
+        species='Def', types=['normal'], atk=120.0, def_=110.0, max_hp=170,
+        fast_move=_fast(power=6, energy_gain=7, cooldown_ms=1000),
+        charged_moves=[_charged(power=60, energy=45)],
+        shields=d_shields, initial_energy=30,
+    )
+    a.energy, a.hp = energy, hp
+    for p in (a, d):   # simulate() normally stamps _turns; do it for the helpers
+        p.fast_move['_turns'] = p.fast_move.get('cooldown', 500) // 500
+    return a, d
+
+
+@pytest.mark.parametrize("energy,hp,a_sh,d_sh", list(itertools.product(
+    [0, 40, 55, 100], [12, 80, 160], [0, 2], [0, 1, 2])))
+def test_new_decisions_identical_to_legacy(energy, hp, a_sh, d_sh):
+    """Pure-plumbing invariant: new == legacy for every decision function.
+    Rebuild a fresh pair before each call so one function's caching/temporary
+    stat-stage mutation can't leak into the next."""
+    a, d = _decision_pair(energy, hp, a_sh, d_sh)
+    assert pvpoke_dp(a, d, mechanics='new') == pvpoke_dp(a, d, mechanics='legacy')
+    a, d = _decision_pair(energy, hp, a_sh, d_sh)
+    assert (_calc_turns_to_live(a, d, mechanics='new')
+            == _calc_turns_to_live(a, d, mechanics='legacy'))
+    a, d = _decision_pair(energy, hp, a_sh, d_sh)
+    assert (_optimize_move_timing(a, d, mechanics='new')
+            == _optimize_move_timing(a, d, mechanics='legacy'))
+    a, d = _decision_pair(energy, hp, a_sh, d_sh)
+    assert (would_shield(a, d, a.charged_moves[0], mechanics='new')
+            == would_shield(a, d, a.charged_moves[0], mechanics='legacy'))
