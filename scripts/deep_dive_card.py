@@ -277,12 +277,15 @@ CARD_CSS = """
 .ddcard-oplink { color:inherit; text-decoration:underline;
   text-decoration-style:dotted; text-decoration-color:#5a7; }
 .ddcard-oplink:hover { text-decoration-style:solid; }
-.ddcard-cols { display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; }
+/* Identical grid template + gap to .ddcard-spreads so Key Wins / Key Losses
+   line up vertically UNDER the IV spread cards (column boundaries match). */
+.ddcard-cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:10px; margin-top:8px; }
 /* Rounded card like .ddcard-spread, but a distinct (consistent) palette shade
    so Key Wins / Key Losses read as their own pair, not as IV spreads. */
-.ddcard-col { flex:1 1 200px; background:#1b2547; border:1px solid #29406e;
+.ddcard-col { background:#1b2547; border:1px solid #29406e;
   border-radius:8px; padding:9px 12px; }
-/* The empty side (no entries) keeps its flex slot for L/R stability but shows
+/* The empty side (no entries) keeps its grid cell for L/R stability but shows
    no box -- :empty matches the headerless placeholder div. */
 .ddcard-col:empty { background:none; border:none; padding:0; }
 .ddcard-col h4 { margin:0 0 4px; font-size:0.8rem; text-transform:uppercase;
