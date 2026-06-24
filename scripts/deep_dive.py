@@ -742,6 +742,35 @@ def make_battle_pokemon(species, fast_id, charged_ids, league, shields,
     )
 
 
+def _read_best_buddy_toml(species, shadow):
+    """Read ``[<Species>.best_buddy]`` from the species threshold TOML.
+
+    Returns ``{'compute': bool, 'default_display': int}`` with only the keys
+    present in the file (empty dict if no file / table). Independent of the
+    threshold registry -- a raw tomllib read mirroring the cd_prep / article
+    pattern, so the best-buddy intent persists per species across re-dives.
+    """
+    slug = species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+    if shadow:
+        slug += '_shadow'
+    path = Path(__file__).resolve().parent.parent / 'thresholds' / f'{slug}.toml'
+    if not path.exists():
+        return {}
+    key = species + (' (Shadow)' if shadow else '')
+    try:
+        with open(path, 'rb') as f:
+            raw = tomllib.load(f)
+        bb = raw.get(key, {}).get('best_buddy', {})
+        out = {}
+        if 'compute' in bb:
+            out['compute'] = bool(bb['compute'])
+        if 'default_display' in bb:
+            out['default_display'] = int(bb['default_display'])
+        return out
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 # Ship default for the dive-card opponent-IV robustness cohort (top-N
 # stat-product IVs per opponent). Single source for the argparse default and
 # the render_dive_html .get fallbacks (an old replay blob lacks the key).
@@ -6892,10 +6921,17 @@ def main():
         # base-form census pass above is the template (reuses the opponent cache).
         from gopvpsim.pokemon import bestbuddy_caps as _bestbuddy_caps
         _bb_default_cap, _bb_alt_cap = _bestbuddy_caps(args.league)
+        # Per-species [Species.best_buddy] TOML override (persists across
+        # re-dives, like cd_prep). Resolution precedence (high -> low):
+        #   --best-buddy on/off  >  TOML compute  >  league policy (UL on, GL opt-in)
+        #   --best-buddy-display >  TOML default_display  >  league default cap
+        _bb_toml = _read_best_buddy_toml(args.species, args.shadow)
         if args.best_buddy == 'on':
             _bb_want = True
         elif args.best_buddy == 'off':
             _bb_want = False
+        elif _bb_toml.get('compute') is not None:
+            _bb_want = bool(_bb_toml['compute'])
         else:  # auto: default-on for Ultra; Great opt-in; Master/Little no-op
             _bb_want = args.league == 'ultra'
         _bb_active = False
@@ -6946,9 +6982,16 @@ def main():
                         _bb_meta = _bcm51
                 md['scores_l51'] = _bb_scores
                 md['meta_l51'] = _bb_meta
+        # default display level: CLI > TOML > league default cap.
+        if args.best_buddy_display is not None:
+            _bb_display = int(args.best_buddy_display)
+        elif _bb_toml.get('default_display') is not None:
+            _bb_display = int(_bb_toml['default_display'])
+        else:
+            _bb_display = int(_bb_default_cap)
         best_buddy = {
             'active': _bb_active,
-            'default_display': int(args.best_buddy_display or _bb_default_cap),
+            'default_display': _bb_display,
             'default_cap': _bb_default_cap,
             'alt_cap': _bb_alt_cap,
             'note': _bb_note,

@@ -348,6 +348,13 @@ DIVES = [
         'top_movesets': 1,
         'no_thresholds': True,
     },
+    # SUPERSEDED (2026-06-24, Phase 2): the standard 'mimikyu-ultra-league'
+    # dive above now carries an in-page "Allow best-buddy (Level 51)" toggle
+    # (Ultra defaults best-buddy on), so this separate page is redundant.
+    # LEFT IN PLACE pending Michael's call -- delete this entry (and its built
+    # page under userdata/website/) once the toggle on the standard dive is
+    # confirmed to cover the build-comparison use case.
+    #
     # Best-buddy UL variant: best-buddying adds +1 power-up level. In GL
     # the 1500 cap binds far below level 50 (Mimikyu sits at L23.5-25.5),
     # so best-buddy is a no-op and gets no GL variant. In UL the 2500 cap
@@ -432,6 +439,15 @@ def build_command(dive):
         '--split-movesets',
         '--reserve-cpus', str(dive.get('reserve_cpus', 1)),
     ]
+
+    # Best-buddy / L51 toggle. 'best_buddy' may be 'on'/'off'/'auto' (default
+    # 'auto' = on for Ultra, opt-in for Great). 'best_buddy_display' (50/51)
+    # picks which level the page opens on. Per-species TOML can also set these;
+    # the CLI flag here wins over the TOML.
+    if 'best_buddy' in dive:
+        cmd += ['--best-buddy', dive['best_buddy']]
+    if 'best_buddy_display' in dive:
+        cmd += ['--best-buddy-display', str(dive['best_buddy_display'])]
 
     if 'extra_args' in dive:
         cmd += dive['extra_args']
