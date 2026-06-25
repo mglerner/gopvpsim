@@ -39,6 +39,11 @@ from gopvpsim.attribution import (  # noqa: E402  # type: ignore[import-not-foun
     PVPOKE_ATTRIBUTION_HTML,
     support_footer_html,
 )
+from gopvpsim.theme import (  # noqa: E402  # type: ignore[import-not-found]
+    theme_css,
+    theme_head_script,
+    theme_picker_html,
+)
 
 
 def load_article(path: Path) -> dict:
@@ -99,37 +104,26 @@ def authored_by_class(block: dict) -> str:
     return f'authored-{val}'
 
 
-# Shared sidebar pattern CSS fragment (2026-04-19 refactor, mirrors the
-# dive-side pattern in deep_dive_rendering.py DEEP_DIVE_CSS).
+# Shared callout-border pattern CSS fragment (2026-06-25 theme restyle;
+# was the 2026-04-19 ::before left-bar refactor).
 #
-# Any element whose class appears in the SIDEBAR_SELECTORS list below
-# gets a rounded-cap ::before pseudo-element bar on its left edge
-# instead of a hand-written border-left. Each class sets its own
-# --sidebar-color (and optional --sidebar-width, default 3px) and
-# drops its `border-left` declaration. Adjust left-padding to roughly
-# (old value + 4px) so text keeps a visible gap from the bar.
-#
-# The article-side pattern uses 3px default width (matching the
-# existing 3px solid borders we're replacing). Dive-side uses 4px;
-# the two pages are allowed to differ stylistically.
+# Any element whose class appears in the selector list gets an all-sides
+# 1px border carrying its tier colour, replacing the old rounded-cap
+# left bar. Each class still sets its own --sidebar-color (the tier
+# token, e.g. var(--callout-expert)) plus its own background / colour /
+# radius / padding; this fragment only draws the border, so consumers
+# (e.g. compare_loadouts.py's summary/methodology/verdict panels) keep
+# their own box styling (including border-radius) and just gain the
+# themed all-sides border.
 #
 # This string is substituted via .format(selectors_base=..., selectors_before=...)
-# where each file passes its own comma-separated selector list.
+# where each file passes its own comma-separated selector list. The
+# selectors_before kwarg is retained for call-site compatibility; the
+# all-sides border no longer needs a ::before pseudo-element.
 SIDEBAR_CSS_TEMPLATE = """
-/* ==== Shared sidebar pattern (2026-04-19 refactor) ==== */
+/* ==== Shared callout-border pattern (2026-06-25 theme restyle) ==== */
 {selectors_base} {{
-  position: relative;
-  border-left: none;
-}}
-{selectors_before} {{
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 4px;
-  bottom: 4px;
-  width: var(--sidebar-width, 3px);
-  border-radius: calc(var(--sidebar-width, 3px) / 2);
-  background: var(--sidebar-color, #8b949e);
+  border: 1px solid var(--sidebar-color, var(--text-muted));
 }}
 """
 
@@ -254,48 +248,52 @@ def render_html(article: dict) -> str:
         '.related', '.authorship-banner',
     ])
     return f"""<!DOCTYPE html>
-<html>
+<html data-theme="gruvbox-light">
 <head>
 <meta charset="utf-8">
+{theme_head_script()}
 <title>{title}</title>
-<style>
+<style>{theme_css()}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
          sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px;
-         background: #1a1a2e; color: #e0e0e0; line-height: 1.6; }}
-  h1 {{ color: #e94560; margin-bottom: 6px; }}
-  h2 {{ color: #c8a2d0; border-bottom: 1px solid #0f3460;
-        padding-bottom: 6px; margin-top: 30px; }}
-  a {{ color: #9be89b; text-decoration: none; }}
+         background: var(--bg); color: var(--text); line-height: 1.6; }}
+  h1 {{ color: var(--title); margin-bottom: 6px; }}
+  h2 {{ color: var(--heading); border-bottom: 1px solid var(--border);
+        padding-bottom: 6px; margin-top: 30px; font-size: 1.15em;
+        font-weight: 700; letter-spacing: .02em; }}
+  a {{ color: var(--accent); text-decoration: none; }}
   a:hover {{ text-decoration: underline; }}
   p {{ margin: 10px 0; }}
-  code {{ background: #16213e; padding: 2px 5px; border-radius: 3px;
+  code {{ background: var(--surface); padding: 2px 5px; border-radius: 2px;
           font-size: 0.9em; }}
-  .meta {{ color: #888; font-size: 14px; margin-bottom: 20px; }}
-  .related {{ --sidebar-color: #9be89b;
-              background: #16213e; padding: 12px 16px 12px 20px;
-              border-radius: 6px; margin: 16px 0; }}
-  .obsolete-banner {{ background: #3d1f1f; border: 1px solid #e94560;
-                      padding: 12px 16px; border-radius: 6px;
-                      margin-bottom: 20px; color: #f0a0a0; }}
-  .authorship-banner {{ padding: 10px 16px 10px 20px; border-radius: 6px;
-                        margin-bottom: 16px; font-size: 14px; }}
-  .authorship-banner.expert {{ --sidebar-color: #d4a017;
-                               background: #2a2000; color: #e8d48b; }}
-  .authorship-banner.both {{ --sidebar-color: #7db87d;
-                             background: #1f2a1a; color: #a8d8a8; }}
-  .authorship-banner.auto {{ --sidebar-color: #5b8dd9;
-                             background: #1a2333; color: #8ab4f8; }}
-  .framing {{ display: inline-block; padding: 2px 10px; border-radius: 12px;
+  .meta {{ color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }}
+  .related {{ --sidebar-color: var(--accent);
+              background: var(--surface); padding: 12px 16px 12px 20px;
+              border-radius: 2px; margin: 16px 0; }}
+  /* Danger callout: all-sides --loss border, themed callout box. */
+  .obsolete-banner {{ background: var(--callout-bg); border: 1px solid var(--loss);
+                      padding: 12px 16px; border-radius: 0;
+                      margin-bottom: 20px; color: var(--callout-fg); }}
+  /* Callout: all-sides border (from sidebar_css) carries the tier. */
+  .authorship-banner {{ padding: 10px 14px; border-radius: 0;
+                        margin-bottom: 16px; font-size: 14px;
+                        background: var(--callout-bg); color: var(--callout-fg); }}
+  .authorship-banner.ai {{ --sidebar-color: var(--callout-ai); }}
+  .authorship-banner.auto {{ --sidebar-color: var(--callout-auto); }}
+  .authorship-banner.both {{ --sidebar-color: var(--callout-both); }}
+  .authorship-banner.expert {{ --sidebar-color: var(--callout-expert); }}
+  .framing {{ display: inline-block; padding: 2px 10px; border-radius: 4px;
               font-size: 13px; font-weight: 600; text-transform: uppercase;
-              background: #0f3460; color: #8ab4f8; }}
-  .narrative-attribution {{ color: #8b949e; font-size: 0.85rem;
+              background: var(--surface-2); color: var(--accent); }}
+  .narrative-attribution {{ color: var(--text-muted); font-size: 0.85rem;
                             margin: 6px 0 0 0; font-style: italic; }}
-  footer {{ color: #666; font-size: 13px; margin-top: 40px;
-            border-top: 1px solid #0f3460; padding-top: 12px; }}
+  footer {{ color: var(--text-muted); font-size: 13px; margin-top: 40px;
+            border-top: 1px solid var(--border); padding-top: 12px; }}
   {_sidebar_css}
 </style>
 </head>
 <body>
+{theme_picker_html()}
 <h1>{title}</h1>
 <div class="meta">
   Community Day: {cd_date} | {species} | <span class="framing">{framing}</span>
