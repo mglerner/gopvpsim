@@ -3229,13 +3229,15 @@ function cmpBestAvg() {
 // Mirror CMP: does this IV's attack reach the converged-cohort attack? (wins the
 // simultaneous-charged tiebreak in the mirror).
 function cmpMirror(iv) {
-  if (!DATA.mirrorCohortAtk || !DATA.mirrorCohortAtk.length) return null;
-  // The cohort attack is an L50 construct; compare the L50 attack so the pill
-  // stays consistent under the best-buddy toggle (DATA.ivAtk is rebound to L51
-  // in that view). The boolean is level-invariant anyway -- CMP turns on the
-  // attack-IV ordering, which the shared CPM scaling preserves.
-  var atk = (_bbL50 && _bbL50.ivAtk) ? _bbL50.ivAtk[iv] : DATA.ivAtk[iv];
-  return atk >= DATA.mirrorCohortAtk[0] - 1e-6;
+  // Like-for-like: in best-buddy view use the best-buddy cohort + best-buddy
+  // attack; in default view use the L50 cohort + L50 attack. DATA.ivAtk is
+  // already rebound to the current level, so it pairs with the matching cohort.
+  // If best-buddy view has no best-buddy cohort (e.g. slayer found none), the
+  // pill is HIDDEN rather than shown against a wrong-level cohort.
+  var atL51 = !!DATA.ivL51 && state.levelMode === '51';
+  var cohort = atL51 ? DATA.mirrorCohortAtk51 : DATA.mirrorCohortAtk;
+  if (!cohort || !cohort.length) return null;
+  return DATA.ivAtk[iv] >= cohort[0] - 1e-6;
 }
 function cmpAnchors(iv) {
   var v = DATA.anchorClearByIv && DATA.anchorClearByIv[String(iv)];

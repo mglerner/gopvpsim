@@ -3758,7 +3758,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               card_out_path=None,
                               card_robust_k=DEFAULT_CARD_ROBUST_K,
                               opp_movesets=None, mechanics='legacy',
-                              best_buddy=None):
+                              best_buddy=None, slayer_iter_result_l51=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -4111,6 +4111,31 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             if s.get('atk') is not None
         )
     data_obj['mirrorCohortAtk'] = mirror_cohort_atk
+    # Best-buddy view needs a LIKE-FOR-LIKE cohort so the CMP pill compares
+    # best-buddy attack vs a best-buddy cohort -- not an L50.5/51 attack against
+    # an L50 cohort (wrong in the sub-IV band where the half-level CPM tips the
+    # simultaneous-charge tiebreak).
+    #   (b) authoritative: a cohort re-converged at the best-buddy cap (both
+    #       mirror sides best-buddied) -- slayer_iter_result_l51.
+    #   (a) fallback: recompute the L50-converged survivors' attack at the cap
+    #       (no re-convergence) if the L51 slayer pass is unavailable.
+    if _bb_active and mirror_cohort_atk:
+        _alt = best_buddy.get('alt_cap')
+        _c51 = []
+        if slayer_iter_result_l51 and slayer_iter_result_l51.get('final'):
+            _c51 = sorted(
+                float(s['atk']) for s in slayer_iter_result_l51['final']
+                if s.get('atk') is not None)
+        if not _c51:
+            for s in slayer_iter_result['final']:
+                iv = s.get('iv')
+                if iv is None:
+                    continue
+                _c51.append(Pokemon.at_best_level(
+                    species, iv[0], iv[1], iv[2],
+                    league=league, max_level=_alt, shadow=shadow).atk)
+            _c51 = sorted(_c51)
+        data_obj['mirrorCohortAtk51'] = _c51
 
     # Anchor-clear IV overlay: union the canonical IV indices that pass
     # any anchor for which _aggregate_flips_by_anchor emitted a record.
@@ -5717,6 +5742,7 @@ def render_dive_html(state):
                 opp_movesets=state.get('opp_movesets'),
                 mechanics=state.get('mechanics', 'legacy'),
                 best_buddy=state.get('best_buddy'),
+                slayer_iter_result_l51=state.get('slayer_iter_result_l51'),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
@@ -5747,6 +5773,7 @@ def render_dive_html(state):
             opp_movesets=state.get('opp_movesets'),
             mechanics=state.get('mechanics', 'legacy'),
             best_buddy=state.get('best_buddy'),
+            slayer_iter_result_l51=state.get('slayer_iter_result_l51'),
         )
 
 
@@ -7248,6 +7275,41 @@ def main():
             'note': _bb_note,
         }
 
+        # (b) Re-converge the mirror cohort AT the best-buddy cap, so the compare
+        # widget's CMP pill is like-for-like in best-buddy view (both mirror
+        # sides best-buddied) rather than a best-buddy attack vs an L50 cohort.
+        # One extra slayer pass, only when best-buddy is active and the L50
+        # --mirror-slayer pass actually ran. cache=None: these are distinct
+        # (best-buddy-level) sims, kept out of the L50 slayer cache.
+        main_slayer_iter_result_l51 = None
+        if _bb_active and main_slayer_iter_result and args.mirror_slayer \
+                and all_moveset_results:
+            try:
+                _lv, _da, _dd, _ds = pvpoke_default_ivs(args.species,
+                                                        league=args.league)
+                _bb_init_opp = (_da, _dd, _ds)
+            except (KeyError, ValueError):
+                _bb_init_opp = None
+            if _bb_init_opp:
+                _bb_f0, _bb_c0 = all_moveset_results[0][0], all_moveset_results[0][1]
+                logger.info(f"  Mirror slayer re-convergence at L{_bb_alt_cap:g} "
+                            f"(best-buddy cohort for the compare-widget CMP pill)...")
+                _t_bb = time.time()
+                main_slayer_iter_result_l51 = iterative_slayer_discovery(
+                    args.species, args.league, args.shadow,
+                    _bb_f0, _bb_c0, shield_scenarios, _bb_init_opp,
+                    max_rounds=args.mirror_slayer_rounds,
+                    top_per_round=args.mirror_slayer_pool,
+                    cache=None,
+                    metric=args.mirror_slayer_metric,
+                    iv_floor=args.iv_floor,
+                    log_path=log_path, verbose=args.verbose,
+                    reserve_cpus=args.reserve_cpus,
+                    focal_max_level=_bb_alt_cap,
+                )
+                logger.info(f"    L{_bb_alt_cap:g} cohort in "
+                            f"{time.time() - _t_bb:.1f}s")
+
         # All render inputs are now in hand: snapshot them so
         # scripts/replay_analysis.py can re-render this dive after
         # renderer/analysis code changes without re-simming.
@@ -7267,6 +7329,7 @@ def main():
             'opp_iv_modes': opp_iv_modes_to_run,
             'reference_idx': reference_idx,
             'slayer_iter_result': main_slayer_iter_result,
+            'slayer_iter_result_l51': main_slayer_iter_result_l51,
             'cli_args_str': cli_args_str,
             'has_toml_tiers': _toml_tiers_loaded,
             'article_slug': _article_slug,
