@@ -189,17 +189,20 @@ def result_metrics(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl,
 
 def score_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
     """Like won_set, but ALSO keeps the full per-(opp, shields) battle score
-    (centered on 500). Returns (scores, won):
+    (centered on 500) AND the focal's post-match leftover energy.
+    Returns (scores, won, energy):
       scores: {(opp_display, (shf, sho)): int focal score}
       won:    set of (opp_display, (shf, sho)) the focal wins
+      energy: {(opp_display, (shf, sho)): int focal leftover energy}
 
-    Feeds the guide's 'check my IVs' HP-margin bars + best-buddy flip overlay,
-    which need the raw score (HP% proxy = (score-500)/500) not just win/loss.
-    The `won` set is derived with the EXACT same test won_set uses
-    (pvpoke_score(0) > pvpoke_score(1)), not a `score>500` shortcut -- the two
-    differ by one only in an unreachable timeout where the floor makes the two
-    scores sum to 999, but deriving `won` identically keeps the rec-table drops
-    provably unchanged by this feature.
+    Feeds the guide's 'check my IVs' HP-margin bars + best-buddy flip overlay
+    (the raw score; HP% proxy = (score-500)/500) and the banked-energy line
+    under the bars (leftover energy -> fast-move-equivalents + fractions of each
+    charged move, via the shared cmpMarginPanel energy annotation). The `won`
+    set is derived with the EXACT same test won_set uses (pvpoke_score(0) >
+    pvpoke_score(1)), not a `score>500` shortcut -- the two differ by one only in
+    an unreachable timeout where the floor makes the two scores sum to 999, but
+    deriving `won` identically keeps the rec-table drops provably unchanged.
 
     NOT cached: the won-set disk cache stores only booleans. On a cold/full bake
     these are the SAME sims the rec-table sweep already runs for `drops`, so the
@@ -207,6 +210,7 @@ def score_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
     re-sims the 64 combos; teaching WonSetCache to store scores is the follow-up.)"""
     scores = {}
     won = set()
+    energy = {}
     for o in opponents:
         for shf, sho in SHIELDS:
             bp0 = build_mon(species, fast_id, charged_ids, ivs, shf, my_lvl,
@@ -217,9 +221,31 @@ def score_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
                          charged_policy_1=pvpoke_dp)
             key = (o['display'], (shf, sho))
             scores[key] = int(r.pvpoke_score(0))
+            energy[key] = max(0, int(r.energy_remaining[0]))
             if r.pvpoke_score(0) > r.pvpoke_score(1):
                 won.add(key)
-    return scores, won
+    return scores, won, energy
+
+
+def _move_abbr(mid):
+    """Short move tag for the energy line: multi-word -> initials (Roar Of Time
+    -> ROT), single word -> first 3 letters (Crunch -> CRU). Mirrors the
+    deep-dive's _mv_abbr so the guide's energy breakdown reads the same."""
+    w = mid.replace('_', ' ').title().split()
+    return (''.join(x[0] for x in w).upper() if len(w) > 1
+            else (w[0][:3].upper() if w else '?'))
+
+
+def energy_moves_blob(fast_id, charged_ids):
+    """{fast:{abbr,gain}, charged:[{abbr,cost}]} -- the move energetics the
+    shared cmpMarginPanel uses to render leftover energy as fast-move-equivalents
+    and fractions of each charged move."""
+    return {
+        'fast': {'abbr': _move_abbr(fast_id),
+                 'gain': _FAST_DB[fast_id].get('energyGain', 0)},
+        'charged': [{'abbr': _move_abbr(cid), 'cost': _CHARGED_DB[cid]['energy']}
+                    for cid in charged_ids],
+    }
 
 
 def pack_scores(flat):
@@ -508,6 +534,9 @@ def main():
     # Captured from the SAME sims the rec table already runs (the rec loop now
     # derives `won` from these scores instead of a separate won_set call).
     cmp_score_grid = {q: [] for q in REC_QUADRANTS}
+    # Parallel leftover-energy grids (same shape/order) for the banked-energy
+    # line under the HP-margin bars (shared cmpMarginPanel energy annotation).
+    cmp_energy_grid = {q: [] for q in REC_QUADRANTS}
     for (av, dv, sv) in combos:
         row = {'ivs': [av, dv, sv]}
         for lvkey, lv in LEVELS.items():
@@ -524,12 +553,14 @@ def main():
         is_perfect = (av, dv, sv) == (15, 15, 15)
         for q in REC_QUADRANTS:
             ml, ol = QUADRANTS[q]
-            sc, won = score_set(base_clean, fast_id, charged_ids, (av, dv, sv),
-                                ml, ol, opponents)
-            # Append this combo's scores in scenario-major, opp-inner order.
+            sc, won, en = score_set(base_clean, fast_id, charged_ids,
+                                    (av, dv, sv), ml, ol, opponents)
+            # Append this combo's scores + energy in scenario-major, opp-inner
+            # order (cmpVal indexes both grids identically).
             for (shf, sho) in SHIELDS:
                 for o in opponents:
                     cmp_score_grid[q].append(sc[(o['display'], (shf, sho))])
+                    cmp_energy_grid[q].append(en[(o['display'], (shf, sho))])
             dr = hundo_won[q] - won
             drops[q] = sorted(f"{disp} {shield_label(sh)}" for (disp, sh) in dr)
             if q not in cc_quads:
@@ -559,6 +590,10 @@ def main():
         'quadrants': REC_QUADRANTS,
         'quadrant_levels': {q: list(QUADRANTS[q]) for q in REC_QUADRANTS},
         'grids': {q: pack_scores(cmp_score_grid[q]) for q in REC_QUADRANTS},
+        # Leftover-energy grids (same packing/order as scores) + the build's
+        # move energetics, so the margin panel can show the banked-energy line.
+        'energy_grids': {q: pack_scores(cmp_energy_grid[q]) for q in REC_QUADRANTS},
+        'energy_moves': energy_moves_blob(fast_id, charged_ids),
     }
 
     data = {
