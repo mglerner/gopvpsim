@@ -11,6 +11,7 @@ slug   = "ninetales-regular-vs-shadow"
 title  = "Kanto Ninetales: regular vs Shadow"
 league = "great"
 author = "mglerner"
+authored_by = "human"
 
 order = ["Regular", "Shadow"]
 
