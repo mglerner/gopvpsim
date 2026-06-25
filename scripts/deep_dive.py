@@ -5380,6 +5380,19 @@ _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
     except FileNotFoundError:
         pass
 
+    # Shared compare-panel functions (cmpVal/cmpHp/cmpScenLabel/cmpFlipPanel/
+    # cmpMarginPanel). Injected as a plain <script> BEFORE the engine so its
+    # globals exist when the compare widget renders; the ML IV-guide pages load
+    # the same file, keeping the panels single-sourced. If the file is missing
+    # the engine falls back gracefully only insofar as the compare widget errors
+    # on use -- but it is committed alongside the engine, so this is belt-and-braces.
+    _cmp_js_path = os.path.join(os.path.dirname(__file__), 'cmp_panels.js')
+    try:
+        with open(_cmp_js_path) as _cmpf:
+            html += '<script>\n' + _cmpf.read() + '\n</script>\n'
+    except FileNotFoundError:
+        pass
+
     # JS engine - wrapped in an async IIFE that waits for gzip
     # decompression of score arrays to finish before initializing.
     html += '<script>\n'
