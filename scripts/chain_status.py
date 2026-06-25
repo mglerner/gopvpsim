@@ -606,6 +606,137 @@ def print_recent_products(wrapper_log: Path | None, width: int,
         print(f'  {tag}  {dim(age_str.ljust(9))}  {rel}')
 
 
+# --- ML IV-guide phase (the run_iv_guides.py tail step) ---------------------
+# When the overnight chain enters the ML-guide bake, the dive-cadence machinery
+# above goes stale: there's no fresh per-dive deep_dive log, and overnight_eta
+# extrapolates dive timings into a nonsense ETA. Detect the phase from the
+# status line and show an ML-native block instead (parsed from the [n/N] OK/FAIL
+# completion lines run_iv_guides tees into the wrapper log, plus live worker
+# CPU% for stall-spotting). Mirrors scripts/iv_guides_status.py.
+
+_ML_DONE_RE = re.compile(
+    r'^\[(\d+)/(\d+)\]\s+(OK|FAIL)\s+(.+?)\s+\(([\d.]+)\s*min\)\s*(.*)$')
+
+
+def in_ml_phase(status_file: Path) -> bool:
+    """True while the current chain step is the ML IV-guide bake.
+
+    The status file holds only the latest [STEP] line (overwritten per step),
+    so a plain substring test is unambiguous: it says 'ML IV guides' during the
+    bake and the next step's text afterward.
+    """
+    try:
+        return 'ML IV guides' in status_file.read_text()
+    except OSError:
+        return False
+
+
+def _ml_live_workers() -> int:
+    try:
+        r = subprocess.run(['pgrep', '-f', 'iv_envelope_analysis'],
+                           capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        return 0
+    return len([x for x in r.stdout.split() if x.strip()])
+
+
+def _ml_active_workers() -> list[tuple[str, float]]:
+    """(species, cpu%) per live iv_envelope_analysis worker, for stall-spotting
+    (cpu% near 0 on a worker that should be simming = wedged or machine slept)."""
+    try:
+        out = subprocess.run(['ps', '-axo', '%cpu=,command='],
+                             capture_output=True, text=True, check=False).stdout
+    except FileNotFoundError:
+        return []
+    rows = []
+    for line in out.splitlines():
+        if 'iv_envelope_analysis.py' not in line or 'pgrep' in line:
+            continue
+        parts = line.split(None, 1)
+        if len(parts) < 2:
+            continue
+        try:
+            cpuf = float(parts[0])
+        except ValueError:
+            cpuf = 0.0
+        after = parts[1].split('iv_envelope_analysis.py', 1)[-1].split()
+        sp = next((t for t in after if not t.startswith('--')), '?')
+        rows.append((sp, cpuf))
+    rows.sort(key=lambda r: r[0].lower())
+    return rows
+
+
+def print_ml_guides(wrapper_log: Path | None, width: int) -> None:
+    total = concurrency = None
+    done: list[tuple[bool, str, float]] = []  # (ok, species, minutes)
+    if wrapper_log is not None:
+        try:
+            for line in wrapper_log.read_text().splitlines():
+                m = re.search(r'running up to (\d+) concurrent', line)
+                if m:
+                    concurrency = int(m.group(1))
+                m = re.match(r'(\d+) species to generate', line)
+                if m:
+                    total = int(m.group(1))
+                m = _ML_DONE_RE.match(line)
+                if m:
+                    total = int(m.group(2))
+                    done.append(
+                        (m.group(3) == 'OK', m.group(4), float(m.group(5))))
+        except OSError:
+            pass
+
+    running = _ml_live_workers()
+    n_done = len(done)
+    n_ok = sum(1 for d in done if d[0])
+    n_fail = n_done - n_ok
+    tot = total or (n_done + running)
+    pending = max(0, tot - n_done - running)
+    times = [d[2] for d in done]
+    avg = sum(times) / len(times) if times else 0.0
+
+    print(f'  {bold("ML IV guides")}  {dim("(run_iv_guides.py tail step)")}')
+    bar_w = max(10, min(32, width - 28))
+    frac = (n_done / tot) if tot else 0.0
+    fill = int(bar_w * frac)
+    bar = green('#' * fill) + dim('-' * (bar_w - fill))
+    print(f'  [{bar}] {bold(f"{n_done}/{tot}")}  ({frac * 100:4.1f}%)')
+    print('  ' + '   '.join([
+        green(f'ok {n_ok}'),
+        (red if n_fail else dim)(f'fail {n_fail}'),
+        cyan(f'running {running}'),
+        yellow(f'pending {pending}'),
+    ]))
+
+    if avg:
+        slots = concurrency or max(1, running)
+        eta_s = int((tot - n_done) * avg * 60 / max(1, slots))
+        done_at = datetime.fromtimestamp(datetime.now().timestamp() + eta_s)
+        print(f'  {eta_accent("► ML ETA: ~" + _format_eta_seconds(eta_s))}'
+              f'  {dim(f"(avg {avg:.0f} min/guide, {slots}-wide, "
+                       f"done ~{done_at:%H:%M})")}')
+    elif running:
+        print(f'  {dim("ETA: computing — cold first-wave guides run ~45-118 min, "
+                       "so no completions land until that wave finishes")}')
+
+    workers = _ml_active_workers()
+    if workers:
+        shown = '  '.join(
+            f'{sp} {(red if cpu < 20 else green)(f"{cpu:.0f}%")}'
+            for sp, cpu in workers[:6])
+        more = dim(f'  +{len(workers) - 6} more') if len(workers) > 6 else ''
+        print(f'  {dim("workers cpu%:")} {shown}{more}')
+        n_low = sum(1 for _, cpu in workers if cpu < 20)
+        if n_low:
+            print(f'  {red(f"WARN: {n_low} worker(s) <20% CPU — possible stall "
+                           "(or the machine slept)")}')
+    if done:
+        recent = '  '.join(
+            f'{green("OK") if ok else red("FAIL")} {sp} {m:.0f}m'
+            for ok, sp, m in done[-4:])
+        print(f'  {dim("recent:")} {recent}')
+
+
 def main() -> int:
     global _USE_COLOR
 
@@ -665,37 +796,45 @@ def main() -> int:
 
     wrapper_log = latest_file(str(REPO_ROOT / wrapper_log_glob))
 
-    # Per-dive log: most recent non-wrapper log within the selected
-    # chain's run window. Lower bound: chain start epoch (from wrapper
-    # log filename). Upper bound: now for a live chain (PID alive) /
-    # wrapper-log mtime for a dead chain. Without the upper bound,
-    # the overnight preset picks up per-dive logs from a later
-    # retrofit run that also happen to land in userdata/logs/.
-    start_epoch = chain_start_epoch(wrapper_log)
-    if pid and wrapper_log is not None:
-        end_epoch = None  # no upper bound needed for a live chain
-    elif wrapper_log is not None:
-        end_epoch = wrapper_log.stat().st_mtime + 60  # 1m slop past last step
+    if in_ml_phase(status_file):
+        # ML IV-guide bake: the dive per-dive-log / overnight_eta machinery is
+        # stale here (no fresh deep_dive log; dive-cadence ETA is meaningless).
+        # Show the ML-native progress block instead.
+        print_ml_guides(wrapper_log, width)
+        rule(width)
     else:
-        end_epoch = None
-    per_dive_candidates = [
-        Path(x) for x in glob(str(REPO_ROOT / args.per_dive_log_glob))
-        if not Path(x).name.startswith(('overnight_', 'retrofit_'))
-    ]
-    if start_epoch is not None:
+        # Per-dive log: most recent non-wrapper log within the selected
+        # chain's run window. Lower bound: chain start epoch (from wrapper
+        # log filename). Upper bound: now for a live chain (PID alive) /
+        # wrapper-log mtime for a dead chain. Without the upper bound,
+        # the overnight preset picks up per-dive logs from a later
+        # retrofit run that also happen to land in userdata/logs/.
+        start_epoch = chain_start_epoch(wrapper_log)
+        if pid and wrapper_log is not None:
+            end_epoch = None  # no upper bound needed for a live chain
+        elif wrapper_log is not None:
+            end_epoch = wrapper_log.stat().st_mtime + 60  # 1m slop past last step
+        else:
+            end_epoch = None
         per_dive_candidates = [
-            p for p in per_dive_candidates
-            if p.stat().st_mtime >= start_epoch
-            and (end_epoch is None or p.stat().st_mtime <= end_epoch)
+            Path(x) for x in glob(str(REPO_ROOT / args.per_dive_log_glob))
+            if not Path(x).name.startswith(('overnight_', 'retrofit_'))
         ]
-    per_dive_candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    per_dive_log = per_dive_candidates[0] if per_dive_candidates else None
+        if start_epoch is not None:
+            per_dive_candidates = [
+                p for p in per_dive_candidates
+                if p.stat().st_mtime >= start_epoch
+                and (end_epoch is None or p.stat().st_mtime <= end_epoch)
+            ]
+        per_dive_candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        per_dive_log = per_dive_candidates[0] if per_dive_candidates else None
 
-    print_dive_info(wrapper_log, per_dive_log, width)
-    print_eta(wrapper_log, per_dive_log)
-    rule(width)
-    print_latest_log(per_dive_log, width)
-    rule(width)
+        print_dive_info(wrapper_log, per_dive_log, width)
+        print_eta(wrapper_log, per_dive_log)
+        rule(width)
+        print_latest_log(per_dive_log, width)
+        rule(width)
+
     print_step_transitions(wrapper_log, width)
     rule(width)
     print_recent_products(wrapper_log, width)
