@@ -1,38 +1,56 @@
-## NEXT SESSION (queued 2026-06-25): launch the big re-dive (thread 2 / ship)
+## LAUNCHED 2026-06-25 02:10: the big re-dive (thread 2 / ship)
 
-Prep is DONE as of 2026-06-25 (all committed + pushed on `dive-ia-rework`):
-fresh PvPoke repull (latest master), DIVES focal refresh (40 dives: +16 GL,
-+2 UL, -Sylveon, -male Oink), opponent-pool union (GL 78 / UL 70 / ML 61).
-The session's feature work (ML-guide compare panels + banked-energy line,
-deep-dive Plotly-resize fix, energy-on-by-default in dives, compact +
-narrow-mode-sticky side-navs on both dive & guide) is all live in the code.
+The overnight chain (`overnight_redive.sh`) was launched 2026-06-25 02:10,
+all-cores, detached via `nohup`. It runs the 40 dives -> comparison pages ->
+GL matchup web -> ML IV-guide bake (master_top60, ~7h cold) -> index ->
+link verify. Realistic wall-clock ~14-18h. Prep commit `4f9846c` (NOT pushed).
 
-**Launch = re-dive everything against the fresh data, then publish.** Run it
-in THIS dedicated session. Gotchas found during prep (handle before/while
-launching):
+Launch readiness was assessed by an adversarial workflow (verdict: NO-GO as
+staged -- the chain would have run to completion but silently shipped wrong
+output in 3 ways). What the prep session actually did to fix each gotcha:
 
-1. **`overnight_redive.sh` does NOT run the ML guides.** It chains the 40
-   dives + comparison pages + matchup web + index, but there is no
-   `run_iv_guides.py` step. The ML-guide compare/energy work only reaches the
-   live guides via `run_iv_guides.py` -- add a step to the chain OR run it
-   separately, or the guides ship stale.
-2. **Male Oinkologne dive removed -- DECISION (2026-06-25): archive both Oink
-   pages.** Michael doesn't need the Oinkologne CD article OR the M-vs-F
-   comparison anymore. So: keep the male dive removed, REMOVE Steps 2
-   ("Regenerating Oinkologne CD article") and 3 ("Oinkologne M-vs-F comparison")
-   from `overnight_redive.sh`, and mark BOTH the Oinkologne CD article and the
-   M-vs-F comparison page Archived / known-out-of-date (banner + index note).
-3. `overnight_redive.sh` "Running 20 dives" log label is stale (now 40) --
-   cosmetic; it runs whatever is in DIVES.
-4. **Cradily (Shadow) UL** is PvPoke-ranked but `get_default_moveset` finds no
-   shadow UL moveset; it was SKIPPED from the UL pool union. Worth a data-gap
-   look (would crash any dive that faced it).
-5. Energy-default makes deep dives bypass the sweep cache (full sim time);
-   expected for a cold overnight run. The `WonSetCache`-stores-scores follow-up
-   (below) only helps warm re-runs, so skip it for tonight's cold run.
-6. Launch command per CLAUDE.md: `direnv exec . scripts/overnight_redive.sh`;
-   watch with `scripts/chain_status.py` / `scripts/iv_guides_status.py`.
-   Publish via `scripts/publish_website.sh --push` after the chain.
+1. **ML guides not in the chain -> FIXED.** Added `run_iv_guides.py
+   --no-index-refresh --reserve 0` as a failure-tolerant tail step (runs
+   OUTSIDE `step()` so one bad guide can't abort the final index+verify),
+   sequenced before the index rebuild so the new Reshiram (Shadow) guide gets
+   indexed. NB this is a second ~7h COLD job (the fresh pull orphaned the
+   won-set caches); a cache-migration tool would NOT help (dives bypass the
+   sweep cache under `--compare-energy`, and the guide's dominant cost -- the
+   `score_set` rec-sweep -- is uncached by design; a naive re-key would also
+   ship stale damage for rebalanced moves).
+2. **Oink pages -> DELETED (not banner).** Decision flipped 2026-06-25 from
+   "archive with banner" to "delete from the site" (no banner mechanism
+   existed; Michael doesn't need the pages). Removed Steps 2 & 3 from
+   `overnight_redive.sh` and deleted the 3 stale built dirs
+   (`oinkologne-great-league`, `articles/oinkologne-cd-2026-05`,
+   `comparisons/oinkologne-male-vs-female`). Female Oink dive stays (in DIVES).
+   FOLLOW-UP: the orphaned source TOMLs (`articles/oinkologne-cd-2026-05.toml`,
+   `comparisons/oinkologne-male-vs-female.toml`) and `build_guides.py`'s
+   `oinkologne-great-league` reference are now dangling -- cosmetic cleanup,
+   not a chain blocker.
+3. **Stale "20 dives" label -> FIXED** (header + step label now say 40).
+4. **Cradily UL gap -> ROOT-CAUSED + FIXED, and a SECOND species found.** It
+   was NOT a shadow data gap: the bare names `Cradily` AND `Golisopod` resolve
+   to GL-only clone slugs (`cradily_b` / `golisopodsh`) that are absent from UL
+   rankings, so `get_default_moveset` silently dropped them from every UL dive
+   (the prep's pool union missed both). Pinned the canonical UL default
+   movesets inline in `ul_top60_plus_aegislash.txt` (`Cradily | fast=ACID |
+   charged=ROCK_TOMB,GRASS_KNOT`; `Golisopod | fast=FURY_CUTTER |
+   charged=X_SCISSOR,AQUA_JET`); commented out the dead `Aegislash (Blade)` UL
+   opponent line (no UL moveset, comparison retired). UL pool now 69/69 resolve.
+   FOLLOW-UP (deferred): make `species_id` league-aware so it prefers the
+   canonical slug when the GL clone is absent for that league -- then drop the
+   inline overrides. Cosmetic nit: the override labels these "Cradily (Acid /
+   Rock Tomb+Grass Knot)" in UL tables (consistent with existing variant style).
+5. Energy-default bypasses the sweep cache (full sim) -- expected cold-run cost.
+6. **Morning check:** `python scripts/verify_overnight.py` (chain status,
+   freshness, ship gates). Watch live: `watch -c -n 5 scripts/chain_status.py
+   --chain overnight` and `scripts/iv_guides_status.py` once the ML step starts.
+   Status file: `userdata/logs/overnight_status.txt`. Publish AFTER review via
+   `scripts/publish_website.sh --push` (push still nod-gated).
+   FOLLOW-UP (not done, low risk now that UL resolves 69/69): extend
+   `verify_overnight.py` to assert UL opponent counts so a future silent pool
+   shrink is caught the morning after, not shipped.
 
 ## NEXT SESSION (queued 2026-06-21): gobattlekit owned-mon breakdown screen
 
