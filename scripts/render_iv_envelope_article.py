@@ -483,6 +483,12 @@ def _cmp_embed(d):
 
 
 def iv_check_box(d):
+    # INTENTIONAL UI divergence from the deep-dive "Compare my candidates" widget
+    # (deep_dive.py), which uses per-stat Atk/Def/HP + Lvl spinners + an Add
+    # button. Here we use a single comma-separated paste-box: an ML guide is fixed
+    # L50/L51 Master with no shadow toggle, so there is no per-candidate level or
+    # shadow to enter -- a paste-box is the lighter affordance. Both feed the SAME
+    # shared cmp_panels.js flip/margin panels; only the input differs.
     blob = json.dumps(iv_box_blob(d), separators=(',', ':'))
     quad_opts = "".join(
         f'<option value="{esc(q)}"{" selected" if q == d["headline_quadrant"] else ""}>'
