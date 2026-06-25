@@ -161,7 +161,7 @@ MATCHUPS = [
          p2=P('Stunfisk (Galarian)', 'MUD_SHOT', ['ROCK_SLIDE', 'EARTHQUAKE'], (5, 15, 13), 'stunfisk_galarian'),
          xfail_cells={(1, 2), (2, 0), (2, 1), (2, 2)}),
     # UL Aegislash (2026-06-12): Aegislash opponent rows are live on the
-    # published Tinkaton UL dive via ul_top60_plus_aegislash.txt, and UL
+    # published Tinkaton UL dive via ul_top60.txt, and UL
     # uses a different Blade-level formula (x0.75 vs GL's x0.5+1) — zero
     # UL form-change oracle cells existed. Movesets/IVs are PvPoke UL
     # defaults; vintage clone==cache verified (Tinkaton moves included).

@@ -98,10 +98,8 @@ DIVES = [
         'league': 'ultra',
         'slug': 'tinkaton-ultra-league',
         'html_base': 'index.html',
-        # UL top-60 + Aegislash Shield + Blade so Tinkaton UL sees the
-        # Aegislash forms as opponents (they're not in PvPoke UL top-60
-        # on their own). Matches the GL-side hand-extension pattern.
-        'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
+        # Standard PvPoke UL top-60 opponent pool.
+        'opponents_file': 'opponent_pools/ul_top60.txt',
         'no_thresholds': True,
     },
     # Aegislash (Blade) isn't in PvPoke rankings; pass --fast / --charged
@@ -313,7 +311,7 @@ DIVES = [
     # SHADOW_CLAW + [SHADOW_SNEAK, PLAY_ROUGH] in both leagues (speciesId
     # 'mimikyu'; the bare name resolves correctly — 'Mimikyu (Busted)'
     # maps to mimikyu_busted which is NOT in rankings). Larger standard
-    # pools (gl_top50_plus_cs / ul_top60_plus_aegislash) for a robust
+    # pools (gl_top50_plus_cs / ul_top60) for a robust
     # read, both of which now also carry Mimikyu as an opponent.
     # no_thresholds: clean dive, author anchors after eyeballing.
     {
@@ -330,7 +328,7 @@ DIVES = [
         'league': 'ultra',
         'slug': 'mimikyu-ultra-league',
         'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
+        'opponents_file': 'opponent_pools/ul_top60.txt',
         'top_movesets': 1,
         'no_thresholds': True,
     },
@@ -422,10 +420,10 @@ DIVES = [
      'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
      'top_movesets': 1, 'no_thresholds': True},
     {'species': 'Moltres (Galarian)', 'league': 'ultra', 'slug': 'galarian-moltres-ultra-league',
-     'html_base': 'index.html', 'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/ul_top60.txt',
      'top_movesets': 1, 'no_thresholds': True},
     {'species': 'Lickilicky', 'league': 'ultra', 'slug': 'lickilicky-ultra-league',
-     'html_base': 'index.html', 'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/ul_top60.txt',
      'top_movesets': 1, 'no_thresholds': True},
 ]
 
