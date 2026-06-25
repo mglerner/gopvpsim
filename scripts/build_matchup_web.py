@@ -38,6 +38,11 @@ from gopvpsim.battle import simulate, pvpoke_dp
 from gopvpsim.data import get_default_moveset
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_SHORT, support_footer_html
 from gopvpsim.pokemon import pvpoke_default_ivs
+from gopvpsim.theme import (
+    theme_css,
+    theme_head_script,
+    theme_picker_html,
+)
 from deep_dive import make_battle_pokemon, _parse_opponent_pool_line
 
 LEAGUE = 'great'
@@ -142,68 +147,71 @@ def render_html(entries, scores, pool_name, n_sims, elapsed):
         for a, b in SHIELD_SCENARIOS)
 
     return """<!DOCTYPE html>
-<html>
+<html data-theme="gruvbox-light">
 <head>
 <meta charset="utf-8">
+{THEME_HEAD}
 <title>Great League matchup web</title>
 <style>
+{THEME_CSS}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
          sans-serif; margin: 30px auto; padding: 0 20px; max-width: none;
-         background: #1a1a2e; color: #e0e0e0; line-height: 1.5; }}
-  h1 {{ color: #e94560; margin-bottom: 4px; }}
-  p.subtitle {{ color: #9bb0d0; font-size: 14px; margin-top: 0; }}
+         background: var(--bg); color: var(--text); line-height: 1.5; }}
+  h1 {{ color: var(--title); margin-bottom: 4px; }}
+  p.subtitle {{ color: var(--text-muted); font-size: 14px; margin-top: 0; }}
   .controls {{ margin: 14px 0; font-size: 14px; }}
-  .controls select {{ background: #16213e; color: #e0e0e0;
-        border: 1px solid #0f3460; border-radius: 4px; padding: 4px 8px;
+  .controls select {{ background: var(--surface); color: var(--text);
+        border: 1px solid var(--border); border-radius: 2px; padding: 4px 8px;
         font-size: 13px; }}
-  .hint {{ color: #8ea1bd; font-size: 12.5px; margin: 6px 0 14px 0; }}
+  .hint {{ color: var(--text-muted); font-size: 12.5px; margin: 6px 0 14px 0; }}
   .matrix-wrap {{ overflow: auto; max-height: 82vh;
-        border: 1px solid #0f3460; border-radius: 6px; }}
+        border: 1px solid var(--border); border-radius: 2px; }}
   table.matrix {{ border-collapse: separate; border-spacing: 0;
         font-size: 11px; }}
-  table.matrix th, table.matrix td {{ border-bottom: 1px solid #0f3460;
-        border-right: 1px solid #0f3460; padding: 2px 4px; }}
+  table.matrix th, table.matrix td {{ border-bottom: 1px solid var(--border);
+        border-right: 1px solid var(--border); padding: 2px 4px; }}
   table.matrix thead th {{ position: sticky; top: 0; z-index: 2;
-        background: #16213e; color: #c8a2d0; vertical-align: bottom;
+        background: var(--surface); color: var(--heading); vertical-align: bottom;
         cursor: pointer; }}
-  table.matrix thead th:hover {{ background: #1e2b4a; }}
+  table.matrix thead th:hover {{ background: var(--border-2); }}
   table.matrix thead th .vert {{ writing-mode: vertical-rl;
         transform: rotate(180deg); max-height: 150px; min-height: 110px;
         font-weight: 500; white-space: nowrap; margin: 0 auto; }}
   table.matrix tbody th {{ position: sticky; left: 0; z-index: 1;
-        background: #12192e; color: #9ab0d8; font-weight: 500;
+        background: var(--surface-2); color: var(--text); font-weight: 500;
         text-align: left; white-space: nowrap; cursor: pointer;
         padding: 2px 8px; }}
-  table.matrix tbody th:hover {{ background: #1e2b4a; }}
+  table.matrix tbody th:hover {{ background: var(--border-2); }}
   table.matrix thead th.corner {{ left: 0; z-index: 3; }}
   table.matrix td {{ text-align: center; min-width: 30px; }}
-  table.matrix td.diag {{ background: #10162a; color: #3d5580; }}
-  table.matrix tbody th.pinned {{ background: #2b2615; color: #f0d890; }}
-  table.matrix thead th.pinned {{ background: #2b2615; color: #f0d890; }}
-  table.matrix tr.pinned td {{ outline: 1px solid #7a6a30;
+  table.matrix td.diag {{ background: var(--surface-2); color: var(--text-muted); }}
+  table.matrix tbody th.pinned {{ background: var(--border-2); color: var(--flip); }}
+  table.matrix thead th.pinned {{ background: var(--border-2); color: var(--flip); }}
+  table.matrix tr.pinned td {{ outline: 1px solid var(--flip);
         outline-offset: -1px; }}
-  table.matrix th.sortkey {{ color: #f0d890; }}
+  table.matrix th.sortkey {{ color: var(--flip); }}
   table.matrix thead th .sortglyph {{ display: block; text-align: center;
-        color: #5b7398; font-size: 11px; padding-top: 2px;
+        color: var(--text-muted); font-size: 11px; padding-top: 2px;
         filter: grayscale(1) opacity(0.45); }}
   table.matrix thead th .sortglyph:hover {{ filter: none; }}
   table.matrix thead th .sortglyph.pinnedglyph {{ filter: none; }}
-  #panel {{ background: #16213e; border-radius: 6px; padding: 12px 16px;
+  #panel {{ background: var(--surface); border-radius: 2px; padding: 12px 16px;
         margin: 16px 0; display: none; }}
-  #panel h2 {{ color: #c8a2d0; margin: 0 0 4px 0; font-size: 1.1em; }}
-  #panel .meta {{ color: #8ea1bd; font-size: 12.5px; margin-bottom: 8px; }}
+  #panel h2 {{ color: var(--heading); margin: 0 0 4px 0; font-size: 1.1em; }}
+  #panel .meta {{ color: var(--text-muted); font-size: 12.5px; margin-bottom: 8px; }}
   #panel .cols {{ display: flex; gap: 40px; flex-wrap: wrap; }}
   #panel h3 {{ font-size: 13px; margin: 6px 0 4px 0; }}
-  #panel h3.wins {{ color: #9be89b; }}
-  #panel h3.losses {{ color: #e89b9b; }}
+  #panel h3.wins {{ color: var(--win); }}
+  #panel h3.losses {{ color: var(--loss); }}
   #panel ol {{ margin: 0; padding-left: 22px; font-size: 13px; }}
   #panel li {{ margin: 2px 0; }}
-  #panel .score {{ color: #9bb0d0; font-variant-numeric: tabular-nums; }}
-  footer {{ color: #666; font-size: 13px; margin-top: 24px;
-        border-top: 1px solid #0f3460; padding-top: 10px; }}
+  #panel .score {{ color: var(--text-muted); font-variant-numeric: tabular-nums; }}
+  footer {{ color: var(--text-muted); font-size: 13px; margin-top: 24px;
+        border-top: 1px solid var(--border); padding-top: 10px; }}
 </style>
 </head>
 <body>
+{THEME_PICKER}
 <h1>Great League matchup web</h1>
 <p class="subtitle">Generated {gen_date} &middot; pool:
 <code>{pool_name}</code> &middot; {n} species &middot; {n_sims:,} sims
@@ -286,14 +294,17 @@ function colOrder() {{
 function cellStyle(s) {{
   if (s === null) return "";
   const t = Math.min(Math.abs(s - 500) / 350, 1);
+  // Margin gradient: ramp the fill's alpha 12%->67% with the margin, over
+  // the themed fill color (the strong-vs-marginal contrast lives here).
+  const pct = (12 + 55 * t).toFixed(0);
   if (s > 500) {{
-    return "background: rgba(45,110,45," + (0.12 + 0.55 * t).toFixed(2) +
-           "); color: #b8e8b8;";
+    return "background: color-mix(in srgb, var(--matrix-win-bg) " + pct +
+           "%, transparent); color: var(--matrix-win-fg);";
   }} else if (s < 500) {{
-    return "background: rgba(140,40,40," + (0.12 + 0.55 * t).toFixed(2) +
-           "); color: #ecc0c0;";
+    return "background: color-mix(in srgb, var(--matrix-loss-bg) " + pct +
+           "%, transparent); color: var(--matrix-loss-fg);";
   }}
-  return "background: #232338; color: #b8c4d8;";
+  return "background: var(--matrix-tie-bg); color: var(--matrix-tie-fg);";
 }}
 
 function render() {{
@@ -333,7 +344,7 @@ function render() {{
          escAttr((rowPinned ? "Unpin | " : "Pin row to the top | ") +
                  MOVESETS[i] + " | IVs " + IVS[i]) + '">' +
          (rowPinned ? "&#128204; " : "") + esc(SPECIES[i]) + "</th>";
-    h += '<td style="color:#9bb0d0">' + rowAvg(mat, i).toFixed(0) + "</td>";
+    h += '<td style="color:var(--text-muted)">' + rowAvg(mat, i).toFixed(0) + "</td>";
     for (const j of cols) {{
       const s = mat[i][j];
       if (s === null) {{
@@ -419,6 +430,12 @@ render();
         PVPOKE_ATTRIBUTION_SHORT=PVPOKE_ATTRIBUTION_SHORT,
         # matchups/index.html -> root is one up
         SUPPORT_FOOTER=support_footer_html('../'),
+        # Theme outputs injected as kwargs (not pasted into the template):
+        # their CSS/JS braces would otherwise break .format(). The Gruvbox
+        # credit is already emitted by support_footer_html (SUPPORT_FOOTER).
+        THEME_CSS=theme_css(),
+        THEME_HEAD=theme_head_script(),
+        THEME_PICKER=theme_picker_html(),
     )
 
 

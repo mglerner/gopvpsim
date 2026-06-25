@@ -61,6 +61,21 @@ _TOKENS = {
     # 4th tier; added so it themes correctly on all backgrounds. Tracks the
     # energy-green per theme for now; can diverge later without touching sites.
     "--callout-both":   ("#8ec07c", "#427b58", "#66c6b0", "#138a72"),
+    # Matchup-web heatmap cells (scripts/build_matchup_web.py). The matrix
+    # conveys win/loss MARGIN as a continuous alpha ramp (12%-67%) over a
+    # single fill color per outcome -- NOT discrete shade tiers -- so each
+    # outcome needs one fill (-bg, alpha-ramped at render time via color-mix)
+    # plus one text color (-fg). Tie is a flat bg+fg pair (no ramp; s==500
+    # only). Greens/reds stay clearly green/red per theme (heatmap
+    # convention) while lightness is tuned to each background so the
+    # strong-vs-marginal contrast stays legible. Light themes flip the text
+    # dark; dark themes keep it light.
+    "--matrix-win-bg":  ("#4e8a3a", "#5a8a2e", "#3a8f4a", "#2f9e44"),
+    "--matrix-win-fg":  ("#b8e8b8", "#2f4a14", "#c4f0c4", "#14532d"),
+    "--matrix-loss-bg": ("#b33636", "#b3261e", "#c43a3a", "#e3350d"),
+    "--matrix-loss-fg": ("#ecc0c0", "#6e1410", "#f5cccc", "#7a1c08"),
+    "--matrix-tie-bg":  ("#3c3836", "#ece0bd", "#232b38", "#e6eaf0"),
+    "--matrix-tie-fg":  ("#d5c4a1", "#5c4a1a", "#c4cdd9", "#3a4654"),
 }
 
 # Static chrome for the picker. Uses tokens so it adapts to the active theme.
