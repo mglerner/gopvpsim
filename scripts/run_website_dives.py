@@ -425,6 +425,12 @@ DIVES = [
     {'species': 'Lickilicky', 'league': 'ultra', 'slug': 'lickilicky-ultra-league',
      'html_base': 'index.html', 'opponents_file': 'opponent_pools/ul_top60.txt',
      'top_movesets': 1, 'no_thresholds': True},
+    # Zygarde (Complete Forme) UL focal dive (added 2026-06-25 per Michael).
+    # Already a ul_top60 opponent; this gives it its own dive page. Default
+    # moveset Dragon Tail / Crunch + Earthquake (get_default_moveset).
+    {'species': 'Zygarde (Complete Forme)', 'league': 'ultra', 'slug': 'zygarde-complete-ultra-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/ul_top60.txt',
+     'top_movesets': 1, 'no_thresholds': True},
 ]
 
 
