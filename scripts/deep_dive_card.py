@@ -28,6 +28,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from gopvpsim.display import pretty_species  # noqa: E402
+from gopvpsim.theme import (  # noqa: E402
+    theme_css,
+    theme_head_script,
+    theme_picker_html,
+)
 from deep_dive_analysis import pretty_moveset  # noqa: E402
 
 # Hard cap on rendered recommendation spreads. Mirrors deep_dive.REC_MAX_SPREADS
@@ -236,46 +241,46 @@ def _flip_html(fd, has_bait, link_opps):
 
 
 CARD_CSS = """
-.ddcard { background:#16213e; border:1px solid #0f3460; border-radius:10px;
-  padding:18px 20px; margin:0 0 18px; color:#e6ecf5;
+.ddcard { background:var(--surface); border:1px solid var(--border); border-radius:2px;
+  padding:18px 20px; margin:0 0 18px; color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-.ddcard a { color:#58a6ff; text-decoration:none; }
+.ddcard a { color:var(--accent); text-decoration:none; }
 .ddcard-head { display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
 .ddcard-sprite { width:88px; height:88px; flex:0 0 auto; image-rendering:auto;
-  background:#0f3460; border-radius:10px; }
-.ddcard-spriteph { width:88px; height:88px; flex:0 0 auto; border-radius:10px;
+  background:var(--surface-2); border-radius:2px; }
+.ddcard-spriteph { width:88px; height:88px; flex:0 0 auto; border-radius:2px;
   display:flex; align-items:center; justify-content:center; font-weight:700;
   font-size:28px; color:#0b1020; }
 .ddcard-title { flex:1 1 240px; }
-.ddcard-title h2 { margin:0; font-size:1.5rem; color:#fff; }
-.ddcard-shadow { color:#b07cff; font-weight:700; }
+.ddcard-title h2 { margin:0; font-size:1.5rem; color:var(--title); }
+.ddcard-shadow { color:var(--accent); font-weight:700; }
 .ddcard-chips { margin:6px 0; }
-.ddcard-chip { display:inline-block; padding:2px 10px; border-radius:12px;
+.ddcard-chip { display:inline-block; padding:2px 10px; border-radius:4px;
   font-size:0.78rem; font-weight:700; color:#0b1020; margin-right:6px; }
-.ddcard-move { color:#cdd6e5; font-size:0.92rem; margin-top:4px; }
-.ddcard-move b { color:#58a6ff; }
+.ddcard-move { color:var(--text); font-size:0.92rem; margin-top:4px; }
+.ddcard-move b { color:var(--accent); }
 .ddcard-spreads { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
   gap:10px; margin:12px 0; }
-.ddcard-spread { background:#0f3460; border:1px solid #1a3a6e; border-radius:8px;
+.ddcard-spread { background:var(--surface-2); border:1px solid var(--border-2); border-radius:2px;
   padding:9px 11px; }
-.ddcard-spread .role { color:#e94560; font-weight:700; font-size:0.82rem;
+.ddcard-spread .role { color:var(--title); font-weight:700; font-size:0.82rem;
   text-transform:uppercase; letter-spacing:0.02em; }
-.ddcard-spread .iv { font-size:1.25rem; font-weight:800; color:#fff; margin:2px 0; }
-.ddcard-spread .stats { font-size:0.78rem; color:#9bb0d0; }
-.ddcard-spread .flips { font-size:0.74rem; color:#8b949e; margin-top:4px; }
-.ddcard-spread .cover { font-size:0.74rem; color:#9be0a6; margin-top:4px; }
-.ddcard-spread .cover b { color:#e6ecf5; font-weight:700; }
-.ddcard-spread .cover .cover-count { color:#e6ecf5; font-weight:700; }
+.ddcard-spread .iv { font-size:1.25rem; font-weight:800; color:var(--heading); margin:2px 0; }
+.ddcard-spread .stats { font-size:0.78rem; color:var(--text-muted); }
+.ddcard-spread .flips { font-size:0.74rem; color:var(--text-muted); margin-top:4px; }
+.ddcard-spread .cover { font-size:0.74rem; color:var(--energy); margin-top:4px; }
+.ddcard-spread .cover b { color:var(--text); font-weight:700; }
+.ddcard-spread .cover .cover-count { color:var(--text); font-weight:700; }
 .cover-toggle { position:absolute; opacity:0; width:0; height:0; }
 .cover-rest { display:none; }
 .cover-toggle:checked ~ .cover-rest { display:inline; }
-.cover-more { color:#58a6ff; cursor:pointer; white-space:nowrap;
+.cover-more { color:var(--accent); cursor:pointer; white-space:nowrap;
   text-decoration:underline; text-decoration-style:dotted; }
 .cover-more .cm-hide { display:none; }
 .cover-toggle:checked ~ .cover-more .cm-show { display:none; }
 .cover-toggle:checked ~ .cover-more .cm-hide { display:inline; }
 .ddcard-oplink { color:inherit; text-decoration:underline;
-  text-decoration-style:dotted; text-decoration-color:#5a7; }
+  text-decoration-style:dotted; text-decoration-color:var(--accent); }
 .ddcard-oplink:hover { text-decoration-style:solid; }
 /* Key Wins / Key Losses are a CARD-LEVEL summary for the recommended IV -- NOT
    per-spread. So they live in ONE full-width panel that spans all the spread
@@ -283,35 +288,35 @@ CARD_CSS = """
    red-losses split. Spanning the whole width prevents the "spread 1 wins,
    spread N loses" misread that column-aligning them would imply, for any N. */
 .ddcard-matchups { display:flex; flex-wrap:wrap; margin-top:8px;
-  background:#1b2547; border:1px solid #29406e; border-radius:8px;
+  background:var(--surface-2); border:1px solid var(--border); border-radius:2px;
   overflow:hidden; }
 .ddcard-mcol { flex:1 1 200px; padding:9px 14px; }
-.ddcard-mcol + .ddcard-mcol { border-left:1px solid #29406e; }
-.ddcard-mcol h4 { margin:0 0 4px; font-size:0.8rem; text-transform:uppercase;
+.ddcard-mcol + .ddcard-mcol { border-left:1px solid var(--border); }
+.ddcard-mcol h4 { margin:0 0 4px; font-size:0.8rem;
   letter-spacing:0.03em; }
-.ddcard-mcol.wins h4 { color:#3fb950; }
-.ddcard-mcol.losses h4 { color:#f85149; }
-.ddcard-mcol ul { margin:0; padding-left:18px; font-size:0.85rem; color:#cdd6e5; }
-.ddcard-foot { font-size:0.72rem; color:#8b949e; margin-top:12px;
-  border-top:1px solid #0f3460; padding-top:8px; }
-.ddcard-note { background:#0f3460; border-left:3px solid #f0b429;
-  border-radius:6px; padding:9px 12px; margin:4px 0 12px; font-size:0.82rem;
-  color:#cdd6e5; line-height:1.4; }
-.ddcard-note b { color:#fff; }
-.ddcard-note .iv { color:#f0b429; font-weight:800; }
-.ddcard-wr-line { font-size:0.84rem; color:#9bb0d0; margin:10px 0 4px;
-  border:1px solid #1a3a6e; border-radius:8px; padding:8px 12px;
-  background:#0f3460; }
-.ddcard-wr-line .pct { color:#3fb950; font-weight:800; }
-.ddcard-wr-line .sep { color:#5a7299; margin:0 8px; }
-.ddcard-wr-line .pool { color:#8b949e; }
-.ddcard-sib { font-size:0.8rem; color:#cdd6e5; margin:10px 0; padding:7px 12px;
-  border-left:3px solid #b07cff; border-radius:6px; background:#1b2547; }
-.ddcard-sib-head b { color:#fff; font-weight:800; }
-.ddcard-sib-detail { font-size:0.74rem; color:#9bb0d0; margin-top:3px; }
-.ddcard-sib-detail .sib-bp { color:#9be0a6; }
-.ddcard-sib-detail .sib-blk { color:#e0b89b; }
-.ddcard-sib-foot { font-size:0.66rem; color:#7286a8; margin-top:4px;
+.ddcard-mcol.wins h4 { color:var(--win); }
+.ddcard-mcol.losses h4 { color:var(--loss); }
+.ddcard-mcol ul { margin:0; padding-left:18px; font-size:0.85rem; color:var(--text); }
+.ddcard-foot { font-size:0.72rem; color:var(--text-muted); margin-top:12px;
+  border-top:1px solid var(--border); padding-top:8px; }
+.ddcard-note { background:var(--callout-bg); border:1px solid var(--callout-expert);
+  border-radius:0; padding:9px 12px; margin:4px 0 12px; font-size:0.82rem;
+  color:var(--callout-fg); line-height:1.4; }
+.ddcard-note b { color:var(--callout-strong); }
+.ddcard-note .iv { color:var(--flip); font-weight:800; }
+.ddcard-wr-line { font-size:0.84rem; color:var(--text-muted); margin:10px 0 4px;
+  border:1px solid var(--border-2); border-radius:2px; padding:8px 12px;
+  background:var(--surface-2); }
+.ddcard-wr-line .pct { color:var(--win); font-weight:800; }
+.ddcard-wr-line .sep { color:var(--text-muted); margin:0 8px; }
+.ddcard-wr-line .pool { color:var(--text-muted); }
+.ddcard-sib { font-size:0.8rem; color:var(--callout-fg); margin:10px 0; padding:7px 12px;
+  border:1px solid var(--accent); border-radius:0; background:var(--callout-bg); }
+.ddcard-sib-head b { color:var(--callout-strong); font-weight:800; }
+.ddcard-sib-detail { font-size:0.74rem; color:var(--text-muted); margin-top:3px; }
+.ddcard-sib-detail .sib-bp { color:var(--energy); }
+.ddcard-sib-detail .sib-blk { color:var(--tie); }
+.ddcard-sib-foot { font-size:0.66rem; color:var(--text-muted); margin-top:4px;
   font-style:italic; }
 """
 
@@ -583,7 +588,7 @@ def _mcol(title, items, cls):
     if not items:
         return ''
     lis = ''.join(
-        f'<li>{html.escape(n)} <span style="color:#8b949e">({s:.0f})</span></li>'
+        f'<li>{html.escape(n)} <span style="color:var(--text-muted)">({s:.0f})</span></li>'
         for n, s in items)
     return (f'<div class="ddcard-mcol {cls}"><h4>{html.escape(title)}</h4>'
             f'<ul>{lis}</ul></div>')
@@ -632,10 +637,11 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
     if not standalone:
         return section
     return f"""<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8">
+<html lang="en" data-theme="gruvbox-light"><head><meta charset="utf-8">
+{theme_head_script()}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{name} - dive card</title>
-<style>body{{background:#0b1020;margin:0;padding:18px;}}
+<style>{theme_css()}body{{background:var(--bg);margin:0;padding:18px;}}
 .ddcard{{max-width:760px;margin:0 auto;}}
 {CARD_CSS}</style></head>
-<body>{section}</body></html>"""
+<body>{theme_picker_html()}{section}</body></html>"""

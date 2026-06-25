@@ -60,6 +60,12 @@ from gopvpsim.pokemon import (
 )
 from gopvpsim.moves import get_moves, type_effectiveness, stab
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML, support_footer_html
+from gopvpsim.theme import (
+    GRUVBOX_CREDIT_HTML,
+    theme_css,
+    theme_head_script,
+    theme_picker_html,
+)
 from gopvpsim.data import (
     load_gamemaster, load_rankings, get_default_moveset, parse_types,
     sprite_data_uri, load_group as fetch_group,
@@ -3515,7 +3521,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # -- Alpha features (banding + clusters) -- hidden by default --
     analysis_parts.append("""
 <div style="margin: 8px 0;">
-  <label style="font-size:12px;color:#888"><input type="checkbox" id="alpha-chk"
+  <label style="font-size:12px;color:var(--text-muted)"><input type="checkbox" id="alpha-chk"
     onchange="var on=this.checked;var d=on?'block':'none';document.getElementById('dd-alpha').style.display=d;var m=document.getElementById('dd-alpha-methods');if(m)m.style.display=d;var cw=document.getElementById('cluster-toggle-wrapper');if(cw)cw.style.display=on?'inline':'none';if(!on){var cc=document.getElementById('cluster-chk');if(cc&&cc.checked){cc.checked=false;if(typeof updateView==='function')updateView();}}"
   > Show experimental analysis (banding, clusters)</label>
 </div>
@@ -4310,7 +4316,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     #  - mixed (axis active) → " | Bait: on/off selector" (driven by dropdown)
     _bait_axis_values = {parse_mode(m)[1] for m in (opp_iv_modes or ['pvpoke'])}
     if _bait_axis_values == {'nobait'}:
-        _bait_meta = ' | <b style="color:#e94560">Bait: OFF</b>'
+        _bait_meta = ' | <b style="color:var(--title)">Bait: OFF</b>'
     else:
         _bait_meta = ''
 
@@ -4460,146 +4466,147 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     species_pretty = pretty_species(_species_for_display)
 
     html = f"""<!DOCTYPE html>
-{cli_comment}<html>
+{cli_comment}<html data-theme="gruvbox-light">
 <head>
 <meta charset="utf-8">
+{theme_head_script()}
 <title>{species_pretty} {league.title()} League IV Deep Dive</title>
 {plotly_tag}
-<style>
+<style>{theme_css()}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-         margin: 20px; background: #1a1a2e; color: #e0e0e0; }}
-  h1 {{ color: #e94560; }}
-  .meta {{ color: #888; font-size: 13px; margin-bottom: 15px; }}
+         margin: 20px; background: var(--bg); color: var(--text); }}
+  h1 {{ color: var(--title); }}
+  .meta {{ color: var(--text-muted); font-size: 13px; margin-bottom: 15px; }}
   details.meta {{ cursor: pointer; }}
-  details.meta summary {{ color: #888; font-size: 13px; }}
-  .controls {{ background: #16213e; padding: 10px 14px; border-radius: 6px;
+  details.meta summary {{ color: var(--text-muted); font-size: 13px; }}
+  .controls {{ background: var(--surface); padding: 10px 14px; border-radius: 2px;
                margin-bottom: 15px; display: flex; gap: 18px; align-items: center;
                flex-wrap: wrap; }}
-  .controls label {{ font-size: 13px; color: #aaa; }}
-  .controls select {{ background: #0f3460; color: #e0e0e0; border: 1px solid #1a3a6e;
-                      padding: 4px 8px; border-radius: 4px; font-size: 13px; }}
+  .controls label {{ font-size: 13px; color: var(--text-muted); }}
+  .controls select {{ background: var(--surface-2); color: var(--text); border: 1px solid var(--border-2);
+                      padding: 4px 8px; border-radius: 2px; font-size: 13px; }}
   .plot-container {{ margin-bottom: 20px; }}
-  .summary {{ background: #16213e; padding: 12px; border-radius: 6px;
+  .summary {{ background: var(--surface); padding: 12px; border-radius: 2px;
               margin-bottom: 20px; font-size: 13px; overflow-x: auto; }}
   .summary table {{ border-collapse: collapse; width: 100%; }}
   .summary th, .summary td {{ text-align: left; padding: 3px 8px;
-                               border-bottom: 1px solid #0f3460; }}
+                               border-bottom: 1px solid var(--border); }}
   .summary td {{ white-space: nowrap; }}
-  .summary th {{ color: #e94560; white-space: normal; vertical-align: bottom; }}
-  .tier-badge {{ display: inline-block; padding: 2px 8px; border-radius: 3px;
+  .summary th {{ color: var(--title); white-space: normal; vertical-align: bottom; }}
+  .tier-badge {{ display: inline-block; padding: 2px 8px; border-radius: 4px;
                  font-size: 11px; font-weight: bold; }}
-  .threshold-info {{ background: #16213e; padding: 10px; border-radius: 6px;
+  .threshold-info {{ background: var(--surface); padding: 10px; border-radius: 2px;
                      margin-bottom: 15px; font-size: 13px; }}
   .threshold-info span {{ font-weight: bold; }}
-  .methodology {{ color: #888; font-size: 12px; max-width: 800px;
+  .methodology {{ color: var(--text-muted); font-size: 12px; max-width: 800px;
                   margin: 10px 0 30px 0; line-height: 1.6; }}
-  details.collection-panel {{ background: #16213e; padding: 10px 14px;
-                              border-radius: 6px; margin-bottom: 15px; }}
-  details.collection-panel > summary {{ cursor: pointer; color: #e0e0e0;
+  details.collection-panel {{ background: var(--surface); padding: 10px 14px;
+                              border-radius: 2px; margin-bottom: 15px; }}
+  details.collection-panel > summary {{ cursor: pointer; color: var(--text);
                                          font-size: 13px; }}
   .collection-body {{ margin-top: 10px; }}
-  .collection-instructions {{ font-size: 12px; color: #aaa;
+  .collection-instructions {{ font-size: 12px; color: var(--text-muted);
                               margin-bottom: 8px; line-height: 1.5; }}
-  #collection-csv {{ width: 100%; background: #0f3460; color: #e0e0e0;
-                     border: 1px solid #1a3a6e; border-radius: 4px;
+  #collection-csv {{ width: 100%; background: var(--surface-2); color: var(--text);
+                     border: 1px solid var(--border-2); border-radius: 2px;
                      padding: 6px 8px; font-size: 11px;
                      font-family: monospace; resize: vertical;
                      box-sizing: border-box; }}
   .collection-buttons {{ display: flex; gap: 8px; align-items: center;
                          margin-top: 8px; flex-wrap: wrap; }}
-  .collection-buttons button {{ background: #0f3460; color: #e0e0e0;
-                                border: 1px solid #1a3a6e; border-radius: 4px;
+  .collection-buttons button {{ background: var(--surface-2); color: var(--text);
+                                border: 1px solid var(--border-2); border-radius: 2px;
                                 padding: 4px 10px; font-size: 12px;
                                 cursor: pointer; }}
-  .collection-buttons button:hover {{ background: #1a3a6e; }}
+  .collection-buttons button:hover {{ background: var(--border-2); }}
   .collection-matches {{ margin-top: 12px; }}
   .collection-matches h5 {{ margin: 8px 0 4px 0; font-size: 12px;
-                             color: #e0e0e0; font-weight: 600; }}
+                             color: var(--text); font-weight: 600; }}
   .collection-matches table {{ border-collapse: collapse; font-size: 11px;
-                                color: #e0e0e0; width: auto; }}
+                                color: var(--text); width: auto; }}
   .collection-matches th, .collection-matches td {{ padding: 2px 10px 2px 0;
                                                      text-align: left; }}
   /* Body cells stay on one line by default (keeps numeric columns tidy);
      headers wrap so long labels like "Top-Mirror CMP %" don't blow the
      column width out. Column widths are set by the body cells. */
   .collection-matches td {{ white-space: nowrap; }}
-  .collection-matches th {{ color: #888; font-weight: 500;
-                             border-bottom: 1px solid #0f3460;
+  .collection-matches th {{ color: var(--text-muted); font-weight: 500;
+                             border-bottom: 1px solid var(--border);
                              white-space: normal;
                              vertical-align: bottom; }}
   /* Opt-in wrap class for prose-heavy columns (Slayer type, Also in).
      Applied via the extras 'cls' hint so only the targeted columns wrap.
      No word-break override so "Jirachi" stays "Jirachi", not "Jir\\nachi". */
   .collection-matches td.wrap {{ white-space: normal; max-width: 22em; }}
-  .collection-matches tr.lucky td {{ color: #ffd966; }}
-  .collection-matches tr.shadow td {{ color: #b084e0; }}
-  .collection-matches td.rank {{ color: #9be89b; font-weight: 600; }}
-  .collection-matches td.rank-sp {{ color: #6c7a89; }}
+  .collection-matches tr.lucky td {{ color: var(--tie); }}
+  .collection-matches tr.shadow td {{ color: var(--accent); }}
+  .collection-matches td.rank {{ color: var(--accent); font-weight: 600; }}
+  .collection-matches td.rank-sp {{ color: var(--text-muted); }}
   .collection-matches tr.matches-hidden-row {{ display: none; }}
-  .matches-toggle-btn {{ background: #0f3460; color: #9be89b;
-                         border: 1px solid #1a3a6e; border-radius: 4px;
+  .matches-toggle-btn {{ background: var(--surface-2); color: var(--accent);
+                         border: 1px solid var(--border-2); border-radius: 2px;
                          padding: 3px 10px; font-size: 11px; cursor: pointer;
                          margin: 4px 0 8px 0; }}
-  .matches-toggle-btn:hover {{ background: #1a3a6e; }}
+  .matches-toggle-btn:hover {{ background: var(--border-2); }}
   span.user-anchor-hits {{ font-size: 11px; font-style: italic;
                            margin-left: 6px; }}
   /* "Compare my candidates" widget */
-  .cmp-section {{ background:#16213e; border:1px solid #0f3460; border-radius:10px;
+  .cmp-section {{ background:var(--surface); border:1px solid var(--border); border-radius:2px;
     padding:6px 16px 14px; margin:14px 0; }}
   .cmp-section.cmp-wide {{ width:96vw; max-width:1560px; position:relative;
     left:50%; transform:translateX(-50%); }}
   .cmp-summary {{ cursor:pointer; font-size:0.95rem; padding:6px 0; }}
-  .cmp-note {{ font-size:0.78rem; color:#8b949e; font-weight:400; }}
+  .cmp-note {{ font-size:0.78rem; color:var(--text-muted); font-weight:400; }}
   .cmp-entry {{ display:flex; flex-wrap:wrap; gap:7px; align-items:center;
-    font-size:0.82rem; color:#c9d1d9; margin:6px 0 4px; }}
+    font-size:0.82rem; color:var(--text); margin:6px 0 4px; }}
   .cmp-entry input {{ width:46px; font-size:0.82rem; }}
   .cmp-entry input.cmp-lv {{ width:56px; }}
-  .cmp-entry button {{ font-size:0.78rem; padding:3px 10px; border-radius:6px;
-    border:1px solid #1a3a6e; background:#0f3460; color:#e6ecf5; cursor:pointer; }}
-  .cmp-entry button.cmp-clear {{ border-color:#5a3a3a; }}
-  .cmp-cap {{ color:#8b949e; font-size:0.74rem; margin-left:4px; }}
+  .cmp-entry button {{ font-size:0.78rem; padding:3px 10px; border-radius:2px;
+    border:1px solid var(--border-2); background:var(--surface-2); color:var(--text); cursor:pointer; }}
+  .cmp-entry button.cmp-clear {{ border-color:var(--loss); }}
+  .cmp-cap {{ color:var(--text-muted); font-size:0.74rem; margin-left:4px; }}
   .cmp-status {{ font-size:0.74rem; }}
-  .cmp-empty {{ font-size:0.82rem; color:#8b949e; margin:8px 2px; }}
+  .cmp-empty {{ font-size:0.82rem; color:var(--text-muted); margin:8px 2px; }}
   .cmp-cards {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
     gap:10px; margin:12px 0; }}
-  .cmp-card {{ background:#0f3460; border:1px solid #1a3a6e; border-radius:8px; padding:10px 12px; }}
-  .cmp-iv {{ font-size:1.15rem; font-weight:800; color:#fff; display:flex;
+  .cmp-card {{ background:var(--surface-2); border:1px solid var(--border-2); border-radius:2px; padding:10px 12px; }}
+  .cmp-iv {{ font-size:1.15rem; font-weight:800; color:var(--heading); display:flex;
     justify-content:space-between; align-items:center; }}
-  .cmp-x {{ background:none; border:none; color:#8b949e; font-size:1.05rem; cursor:pointer;
+  .cmp-x {{ background:none; border:none; color:var(--text-muted); font-size:1.05rem; cursor:pointer;
     line-height:1; padding:0 2px; }}
-  .cmp-x:hover {{ color:#f85149; }}
-  .cmp-sub {{ font-size:0.73rem; color:#9bb0d0; margin:2px 0 4px; }}
+  .cmp-x:hover {{ color:var(--loss); }}
+  .cmp-sub {{ font-size:0.73rem; color:var(--text-muted); margin:2px 0 4px; }}
   .cmp-row {{ display:flex; justify-content:space-between; font-size:0.8rem;
-    border-top:1px solid #1a3a6e; padding:4px 0; }}
-  .cmp-row b {{ color:#fff; }}
-  .cmp-good {{ color:#9be89b; }} .cmp-mid {{ color:#d4a017; }} .cmp-bad {{ color:#f0916b; }}
-  .cmp-pill {{ display:inline-block; font-size:0.68rem; padding:1px 7px; border-radius:9px;
-    background:#1b2547; color:#9be0a6; margin-top:6px; }}
-  .cmp-pill-lose {{ color:#e0b89b; }}
-  .cmp-panel {{ background:#10182c; border:1px solid #24314d; border-radius:8px;
+    border-top:1px solid var(--border-2); padding:4px 0; }}
+  .cmp-row b {{ color:var(--text); }}
+  .cmp-good {{ color:var(--win); }} .cmp-mid {{ color:var(--tie); }} .cmp-bad {{ color:var(--loss); }}
+  .cmp-pill {{ display:inline-block; font-size:0.68rem; padding:1px 7px; border-radius:4px;
+    background:var(--surface-2); color:var(--energy); margin-top:6px; }}
+  .cmp-pill-lose {{ color:var(--tie); }}
+  .cmp-panel {{ background:var(--surface-2); border:1px solid var(--border-2); border-radius:2px;
     padding:11px 14px; margin:0 0 14px; }}
   .cmp-panel h4 {{ margin:0 0 3px; font-size:0.86rem; }}
-  .cmp-flip-h {{ color:#f0b429; }} .cmp-marg-h {{ color:#58a6ff; }}
-  .cmp-psub {{ font-size:0.74rem; color:#8b949e; margin:0 0 9px; }}
+  .cmp-flip-h {{ color:var(--flip); }} .cmp-marg-h {{ color:var(--accent-2); }}
+  .cmp-psub {{ font-size:0.74rem; color:var(--text-muted); margin:0 0 9px; }}
   .cmp-tbl {{ border-collapse:collapse; width:100%; font-size:0.82rem; }}
   .cmp-tbl th, .cmp-tbl td {{ text-align:left; padding:5px 9px;
-    border-bottom:1px solid #1a2540; white-space:nowrap; }}
-  .cmp-tbl th {{ color:#8b949e; font-weight:600; font-size:0.74rem; }}
-  .cmp-m {{ color:#cdd6e5; }}
-  .cmp-win {{ color:#3fb950; font-weight:700; }}
-  .cmp-lose {{ color:#f85149; font-weight:700; }}
-  .cmp-tie {{ color:#d4a017; font-weight:700; }}
-  .cmp-flip {{ color:#f0b429; }}
-  .cmp-more {{ color:#8b949e; font-size:0.76rem; font-style:italic; }}
+    border-bottom:1px solid var(--bar-track); white-space:nowrap; }}
+  .cmp-tbl th {{ color:var(--text-muted); font-weight:600; font-size:0.74rem; }}
+  .cmp-m {{ color:var(--text); }}
+  .cmp-win {{ color:var(--win); font-weight:700; }}
+  .cmp-lose {{ color:var(--loss); font-weight:700; }}
+  .cmp-tie {{ color:var(--tie); font-weight:700; }}
+  .cmp-flip {{ color:var(--flip); }}
+  .cmp-more {{ color:var(--text-muted); font-size:0.76rem; font-style:italic; }}
   .cmp-bar {{ display:inline-block; vertical-align:middle; width:64px; height:9px;
-    background:#1a2540; border-radius:5px; overflow:hidden; margin-right:6px; }}
-  .cmp-bar > span {{ display:block; height:100%; background:#3fb950; }}
-  .cmp-bar.lo > span {{ background:#d4a017; }}
+    background:var(--bar-track); border-radius:2px; overflow:hidden; margin-right:6px; }}
+  .cmp-bar > span {{ display:block; height:100%; background:var(--win); }}
+  .cmp-bar.lo > span {{ background:var(--tie); }}
   .cmp-bar.loss {{ display:flex; justify-content:flex-end; }}
-  .cmp-bar.loss > span {{ flex:none; background:#f85149; }}
-  .cmp-hpv {{ font-size:0.76rem; color:#9bb0d0; }}
-  .cmp-env {{ font-size:0.72rem; color:#7fd3b0; }}
-  .cmp-leg {{ font-size:0.72rem; color:#8b949e; margin-top:5px; }}
+  .cmp-bar.loss > span {{ flex:none; background:var(--loss); }}
+  .cmp-hpv {{ font-size:0.76rem; color:var(--text-muted); }}
+  .cmp-env {{ font-size:0.72rem; color:var(--energy); }}
+  .cmp-leg {{ font-size:0.72rem; color:var(--text-muted); margin-top:5px; }}
   /* Section sidenav. Mirrors the ML IV-guide pages
      (scripts/render_iv_envelope_article.py): sticky side column at wide
      widths, horizontal bar at the top of the content below the 820px
@@ -4615,24 +4622,24 @@ def generate_interactive_html(species, league, moveset_data, html_path,
      rest of the left gutter for the main content. max-width caps it defensively. */
   nav.dd-toc {{ position: sticky; top: 14px;
                 flex: 0 0 auto; width: fit-content; max-width: 200px;
-                font-size: 12px; line-height: 1.25; background: #16213e;
-                border-radius: 6px; padding: 9px 11px;
+                font-size: 12px; line-height: 1.25; background: var(--surface);
+                border-radius: 2px; padding: 9px 11px;
                 max-height: calc(100vh - 28px); overflow-y: auto; }}
-  nav.dd-toc strong {{ color: #e94560; display: block; margin-bottom: 5px;
-                       font-size: 11px; text-transform: uppercase;
+  nav.dd-toc strong {{ color: var(--title); display: block; margin-bottom: 5px;
+                       font-size: 11px;
                        letter-spacing: .04em; }}
-  nav.dd-toc a {{ display: block; color: #58a6ff; padding: 1px 0;
+  nav.dd-toc a {{ display: block; color: var(--accent); padding: 1px 0;
                   text-decoration: none; }}
   nav.dd-toc a:hover {{ text-decoration: underline; }}
   /* Best-buddy toggle: a distinct separated block below the jump links. */
   .dd-toc-bb {{ margin-top: 8px; padding-top: 7px;
-                border-top: 1px solid #24314d; }}
+                border-top: 1px solid var(--border-2); }}
   .dd-toc-bb label {{ display: flex; align-items: flex-start; gap: 5px;
-                      cursor: pointer; font-size: 0.78rem; color: #c9d1d9;
+                      cursor: pointer; font-size: 0.78rem; color: var(--text);
                       line-height: 1.3; }}
   .dd-toc-bb input {{ margin-top: 2px; }}
   .dd-toc-bb b {{ font-weight: 600; }}
-  .dd-toc-bb-note {{ font-size: 0.78rem; color: #8b949e; }}
+  .dd-toc-bb-note {{ font-size: 0.78rem; color: var(--text-muted); }}
   .dd-main {{ flex: 1; min-width: 0; }}
   @media (max-width: 820px) {{
     .dd-layout {{ flex-direction: column; }}
@@ -4661,6 +4668,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 </style>
 </head>
 <body>
+{theme_picker_html()}
 <h1>{species_pretty} - {league.title()} League IV Deep Dive</h1>
 <p class="meta">Opponents: {opp_desc}
 | Shield scenario(s): {shield_desc} | Policy: pvpoke_dp{_bait_meta}</p>
@@ -4685,16 +4693,17 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         # Label and color match the article's authorship level
         if _authorship == 'expert':
             _link_label = 'Expert Analysis'
-            _border_color = '#d4a017'  # gold
+            _border_color = 'var(--callout-expert)'  # gold
         elif _authorship == 'both':
             _link_label = 'Analysis'
-            _border_color = '#7db87d'  # green
+            _border_color = 'var(--callout-both)'  # green
         else:
             _link_label = 'Related Article'
-            _border_color = '#5b8dd9'  # blue
+            _border_color = 'var(--callout-auto)'  # blue
         html += (
-            '<div style="background:#16213e;padding:12px 16px;border-radius:6px;'
-            f'margin:10px 0;border-left:3px solid {_border_color}">'
+            '<div style="background:var(--callout-bg);color:var(--callout-fg);'
+            'padding:12px 16px;border-radius:0;'
+            f'margin:10px 0;border:1px solid {_border_color}">'
             f'{_link_label}: <a href="{_article_link}">{_article_title}</a>'
             '</div>\n'
         )
@@ -4761,7 +4770,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             html += (f'    <option value="{finfo["url"]}"{sel}>'
                      f'{finfo["pretty_label"]}</option>\n')
         html += '  </select></label>\n'
-        html += ('  <span style="font-size:11px;color:#888">'
+        html += ('  <span style="font-size:11px;color:var(--text-muted)">'
                  'Switching movesets reloads the page; pasted CSV will need to be re-loaded.'
                  '</span>\n')
     elif len(moveset_data) > 1:
@@ -4842,9 +4851,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # when the user opts into experimental output. The wrapper span is
     # toggled by the alpha-chk onchange handler below (in the analysis
     # sections block).
-    html += '  <span id="cluster-toggle-wrapper" style="display:none"><label style="font-size:12px;color:#aaa"><input type="checkbox" id="cluster-chk" onchange="updateView()" style="margin-left:12px"> Show clusters</label></span>\n'
+    html += '  <span id="cluster-toggle-wrapper" style="display:none"><label style="font-size:12px;color:var(--text-muted)"><input type="checkbox" id="cluster-chk" onchange="updateView()" style="margin-left:12px"> Show clusters</label></span>\n'
     if thresholds:
-        html += '  <span style="font-size:11px;color:#888;margin-left:8px">Threshold tiers (e.g. GH Great / GH Good) are expert stat-cutoff regions defined in <a href="#dd-threshold-tiers" style="color:#58a6ff">Threshold Tiers</a> below. Hover legend to isolate; click to lock.</span>\n'
+        html += '  <span style="font-size:11px;color:var(--text-muted);margin-left:8px">Threshold tiers (e.g. GH Great / GH Good) are expert stat-cutoff regions defined in <a href="#dd-threshold-tiers" style="color:var(--accent)">Threshold Tiers</a> below. Hover legend to isolate; click to lock.</span>\n'
     html += '</div>\n'
 
     # "Your collection" paste-box. Hidden (display:none) until DOMContentLoaded
@@ -4856,7 +4865,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         html += (
             '<details id="collection-panel" class="collection-panel" open>\n'
             '  <summary><b>Check my collection</b> '
-            '<span style="font-size:11px;color:#888">'
+            '<span style="font-size:11px;color:var(--text-muted)">'
             '- Your collection stays in your browser; nothing is uploaded.'
             '</span></summary>\n'
             '  <div class="collection-body">\n'
@@ -4876,15 +4885,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             '      <input id="collection-file-input" type="file" accept=".csv,text/csv" '
             'style="display:none">\n'
             '      <button id="collection-clear-btn" type="button">Clear</button>\n'
-            '      <label style="font-size:12px;color:#aaa">'
+            '      <label style="font-size:12px;color:var(--text-muted)">'
             '<input type="checkbox" id="collection-only-chk"> Show only my mons'
             '</label>\n'
             '      <span id="collection-status" '
-            'style="font-size:12px;color:#aaa;margin-left:6px"></span>\n'
+            'style="font-size:12px;color:var(--text-muted);margin-left:6px"></span>\n'
             '    </div>\n'
             '    <div class="collection-manual" '
-            'style="margin-top:10px;border-top:1px solid #24314d;padding-top:10px">\n'
-            '      <div style="font-size:12px;color:#aaa;margin-bottom:6px">\n'
+            'style="margin-top:10px;border-top:1px solid var(--border-2);padding-top:10px">\n'
+            '      <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">\n'
             '        <b>Or enter one at a time</b> - Atk/Def/HP IVs (0-15), '
             'level, shadow flag. Same format as PvPoke / PvPIVs.\n'
             '      </div>\n'
@@ -4905,7 +4914,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             '        <button id="manual-add-btn" type="button">Add</button>\n'
             '      </div>\n'
             '      <div id="manual-list" '
-            'style="margin-top:6px;font-size:12px;color:#c9d1d9"></div>\n'
+            'style="margin-top:6px;font-size:12px;color:var(--text)"></div>\n'
             '    </div>\n'
             '    <div id="collection-matches" class="collection-matches"></div>\n'
             '  </div>\n'
@@ -4920,7 +4929,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             '<div id="collection-panel" class="collection-panel" '
             'style="padding:10px 14px">\n'
             f'  <b>Check my collection</b> <span style="font-size:12px;'
-            f'color:#aaa">- Collection check returns once {species_pretty} '
+            f'color:var(--text-muted)">- Collection check returns once {species_pretty} '
             'is ranked (post-release).</span>\n'
             '</div>\n'
         )
@@ -4945,7 +4954,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'side: wins, mirror, and the close calls that decide the build</span>'
         '</summary>\n'
         '  <div class="cmp-entry">\n'
-        '    <b style="color:#58a6ff">Add a spread:</b>\n'
+        '    <b style="color:var(--accent)">Add a spread:</b>\n'
         '    Atk <input id="cmp-a" type="number" min="0" max="15" value="15">\n'
         '    Def <input id="cmp-d" type="number" min="0" max="15" value="15">\n'
         '    HP <input id="cmp-s" type="number" min="0" max="15" value="15">\n'
@@ -4974,7 +4983,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += (
         '<div class="highlight-strip" '
         'style="display:flex;justify-content:flex-end;align-items:center;'
-        'gap:4px;margin:6px 20px 0 0;font-size:12px;color:#c9d1d9">\n'
+        'gap:4px;margin:6px 20px 0 0;font-size:12px;color:var(--text)">\n'
         '  <label style="display:flex;align-items:center;gap:4px">'
         'Highlight IVs: '
         '<input id="highlight-input" type="text" '
@@ -4988,22 +4997,22 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         '  <button type="button" onclick="clearHighlight()" '
         'style="font-size:11px;padding:2px 8px">Clear</button>\n'
         '  <span id="highlight-status" '
-        'style="font-size:11px;color:#aaa;margin-left:8px"></span>\n'
+        'style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>\n'
         '</div>\n'
     )
     # Top-IVs table controls. Sit immediately above the table they
     # affect (the #summary div). The "Sort by" UX is column-header
     # clicks (see _summarySortClick in deep_dive_engine.js); only the
     # row-count selector lives here.
-    html += '<div class="summary-controls" style="margin:10px 0 4px 0;font-size:0.9rem;color:#c9d1d9">\n'
-    html += '  <b style="color:#58a6ff">Top IVs</b>\n'
+    html += '<div class="summary-controls" style="margin:10px 0 4px 0;font-size:0.9rem;color:var(--text)">\n'
+    html += '  <b style="color:var(--accent)">Top IVs</b>\n'
     html += '  <label style="margin-left:12px">Rows: <select id="summary-n-sel" onchange="updateSummaryTable()">\n'
     html += '    <option value="10">10</option>\n'
     html += '    <option value="25">25</option>\n'
     html += '    <option value="50">50</option>\n'
     html += '    <option value="100">100</option>\n'
     html += '  </select></label>\n'
-    html += ('  <span style="margin-left:10px;font-size:11px;color:#888">'
+    html += ('  <span style="margin-left:10px;font-size:11px;color:var(--text-muted)">'
              "Ranked by this dive's battle simulation (not fetched from "
              'PvPoke). Click any column header to sort.</span>\n')
     html += '</div>\n'
@@ -5022,9 +5031,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # page load switches the moveset dropdown to the anchored moveset.
     html += ('<section class="histogram-section" '
              'style="margin:20px 0">\n')
-    html += ('<h3 style="color:#58a6ff;margin:0 0 6px 0;'
+    html += ('<h3 style="color:var(--accent-2);margin:0 0 6px 0;'
              'font-size:1.0rem">Battle-Rating Distribution</h3>\n')
-    html += ('<p style="font-size:12px;color:#aaa;margin:0 0 10px 0">'
+    html += ('<p style="font-size:12px;color:var(--text-muted);margin:0 0 10px 0">'
              'Per-matchup battle-rating distribution for the reference '
              'IV (PvPoke default or Rank 1, matching the Opponent-IVs '
              'dropdown) across the opponent pool, under the currently-'
@@ -5041,13 +5050,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             f'data-moveset="{_mi}" data-moveset-slug="{_slug}" '
             f'style="display:{_vis};scroll-margin-top:20px;'
             'max-width:600px;margin:0 auto">\n'
-            f'  <div style="text-align:center;color:#c9d1d9;'
+            f'  <div style="text-align:center;color:var(--text);'
             f'margin:0 0 4px 0;font-size:0.9rem">{_pretty}</div>\n'
             f'  <div class="dd-histogram-plot" '
             'style="height:260px"></div>\n'
             f'  <div class="dd-histogram-caption" '
             'style="text-align:center;margin:6px 0 0 0;font-size:12px;'
-            'color:#c9d1d9"></div>\n'
+            'color:var(--text)"></div>\n'
             '</div>\n'
         )
     html += '</section>\n'
@@ -5487,7 +5496,7 @@ _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
     # methodology deep-dive. Relative path reaches the guides landing
     # from both a dive landing (oinkologne-great-league/) and a
     # split-moveset sibling (same directory).
-    html += ('<p style="margin-top:30px;color:#888;font-size:12px">'
+    html += ('<p style="margin-top:30px;color:var(--text-muted);font-size:12px">'
              'New here? The <a href="../guides/">Reader\'s Guide</a> '
              'explains tier cards, envelope shapes, and the IV flavor '
              'guide in plain language.</p>\n')
@@ -5495,12 +5504,14 @@ _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
     # About / Credits section
     # Always-visible PvPoke attribution (the collapsible credits below
     # add detail, but the core credit must show without a click).
-    html += ('<p style="margin-top:30px;border-top:1px solid #0f3460;'
-             'padding-top:12px;font-size:0.85rem;color:#b0b8c4;'
+    html += ('<p style="margin-top:30px;border-top:1px solid var(--border);'
+             'padding-top:12px;font-size:0.85rem;color:var(--text-muted);'
              'line-height:1.6">' + PVPOKE_ATTRIBUTION_HTML + '</p>\n')
-    html += '<details class="meta" style="margin-top:10px;border-top:1px solid #0f3460;padding-top:10px">'
+    html += ('<p style="margin-top:6px;font-size:0.78rem;color:var(--text-muted)">'
+             + GRUVBOX_CREDIT_HTML + '</p>\n')
+    html += '<details class="meta" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">'
     html += '<summary>About &amp; Credits</summary>'
-    html += '<div style="margin:8px 0;font-size:0.85rem;color:#b0b8c4;line-height:1.6">'
+    html += '<div style="margin:8px 0;font-size:0.85rem;color:var(--text-muted);line-height:1.6">'
     html += '<p><b>PoGo PvP IV Deep Dive</b> - a stat-threshold analysis tool '
     html += 'for Pokemon GO PvP IVs.</p>'
     html += '<p><b>Data &amp; Simulation Reference</b></p>'
@@ -5533,10 +5544,10 @@ _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
     # mtime + first-5 species so a reader can spot drift between dives.
     if cli_args_str:
         from html import escape as _esc
-        html += '<details class="meta" style="margin-top:30px;border-top:1px solid #0f3460;padding-top:10px">'
+        html += '<details class="meta" style="margin-top:30px;border-top:1px solid var(--border);padding-top:10px">'
         html += '<summary>Run parameters (CLI invocation)</summary>'
-        html += '<pre style="margin:8px 0;background:#16213e;'
-        html += 'padding:10px;border-radius:4px;color:#e0e0e0;font-size:12px;'
+        html += '<pre style="margin:8px 0;background:var(--surface);'
+        html += 'padding:10px;border-radius:4px;color:var(--text);font-size:12px;'
         html += 'white-space:pre-wrap;word-break:break-all">'
         html += _esc(cli_args_str)
         html += '</pre></details>\n'
@@ -5554,8 +5565,8 @@ _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
                              for r in rk[:5])
             html += '<details class="meta" style="margin-top:8px">'
             html += '<summary>Rankings data fingerprint</summary>'
-            html += '<pre style="margin:8px 0;background:#16213e;'
-            html += 'padding:10px;border-radius:4px;color:#e0e0e0;font-size:12px;'
+            html += '<pre style="margin:8px 0;background:var(--surface);'
+            html += 'padding:10px;border-radius:4px;color:var(--text);font-size:12px;'
             html += 'white-space:pre-wrap;word-break:break-all">'
             html += f'cache file: {cache_path}\n'
             html += f'cache mtime: {mtime_str}\n'
