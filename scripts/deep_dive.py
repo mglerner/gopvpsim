@@ -4865,6 +4865,14 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # breaks out toward full-bleed as candidates accumulate (JS adds .cmp-wide).
     # All compute is client-side off the embedded grid (no new sims). Always
     # emitted -- it only needs DATA.iv* + the score grid, which every dive has.
+    #
+    # INTENTIONAL UI divergence from the ML IV-guides: this dive widget uses
+    # per-stat Atk/Def/HP + Lvl spinners (the dive sweeps a real level range and
+    # the focal can be shadow, so a candidate needs a level), while the guide's
+    # "Check my IVs" box (render_iv_envelope_article.py) is a comma-separated
+    # paste-box -- a guide is fixed L50/L51 Master with no shadow toggle, so
+    # there is nothing per-candidate to twiddle. Both feed the SAME shared
+    # cmp_panels.js flip/margin panels; only the input affordance differs.
     html += (
         '<details id="cmp-section" class="cmp-section" open>\n'
         '  <summary class="cmp-summary"><b>Compare my candidates</b> '
