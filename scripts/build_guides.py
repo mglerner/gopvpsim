@@ -415,7 +415,7 @@ _AUTHORSHIP_BANNERS = {
     'ai': ("This guide was drafted by an LLM from the site's "
            'methodology; it has not been reviewed by a human expert.'),
     'auto': 'Auto-generated from simulation data.',
-    'both': 'Drafted by an LLM, reviewed and edited by Michael G. Lerner.',
+    'both': 'Drafted by an LLM, reviewed and edited by TitanTrainers15 and others.',
     'expert': 'Written by a human analyst.',
 }
 
