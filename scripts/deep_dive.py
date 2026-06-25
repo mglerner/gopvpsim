@@ -3162,6 +3162,17 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     if _anchor_mode:
         _admit(bulk_iv)
 
+    # Strict-dominance guard for the EXTRA-spread fill below: never admit a
+    # spread that another reachable IV weakly-dominates on (atk, def, hp) -- it
+    # would headline a wasted-IV target (e.g. Aegislash (Shield)'s 'Bait Robust'
+    # 0/9/14, dominated by 0/9/15). Same Pareto test as the crown marker
+    # (efficiency.efficient_frontier), so an extra spread is admitted only if it
+    # would be crowned. The three poles above are EXEMPT: they are seeded
+    # unconditionally as distinct teambuilding extremes, and their atk tie-break
+    # already keeps them on the frontier.
+    _eff_mask = efficient_frontier(
+        list(zip(data_obj['ivAtk'], data_obj['ivDef'], data_obj['ivHp'])))
+
     if _anchor_mode:
         # Greedy fill of EXTRA spreads (beyond the 3 poles) over the notable-tier
         # universe not yet covered by the chosen set. Tie-breaks: prefer the
@@ -3177,6 +3188,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 iv = rc['iv']
                 if iv in chosen_ivs:
                     continue
+                if not _eff_mask[iv]:
+                    continue  # strictly dominated -> never headline it
                 new_tiers = (_named_cover(iv) & notable_tiers) - covered
                 if not new_tiers:
                     continue
@@ -3196,6 +3209,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             iv = rc['iv']
             if iv in chosen_ivs:
                 continue
+            if not _eff_mask[iv]:
+                continue  # strictly dominated -> never headline it
             if min(len(_won_set(iv) ^ _won_set(c)) for c in chosen_ivs) \
                     >= REC_DISTINCTNESS_MIN_SYMDIFF:
                 _admit(iv)
