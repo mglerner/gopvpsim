@@ -3394,11 +3394,12 @@ function cmpMarginPanel(live, grids) {
     '<p class="cmp-psub">All ' + (live.length === 2 ? 'both' : 'these') + ' get the same result, so a ' +
     'win-count shows nothing — but leftover HP (what your <i>next</i> mon inherits) differs. The ' +
     'robustness / "win more convincingly" axis.</p>';
-  // Post-match energy (only with --compare-energy). cheapest charged cost lets
-  // us render "+N energy (~K moves)"; both null -> energy detail is skipped.
+  // Post-match energy (only with --compare-energy). energyMoves carries the
+  // fast move's energy gain + each charged move's cost so we can break leftover
+  // energy into fast-move-equivalents and fractions of each charged move.
   var eg = cmpEnergyGrids();
-  var cheapest = (DATA.movesets[state.movesetIdx] || {}).cheapestChargedCost;
-  var showEnergy = !!(eg.def && cheapest);
+  var em = (DATA.movesets[state.movesetIdx] || {}).energyMoves;
+  var showEnergy = !!(eg.def && em);
   h += '<table class="cmp-tbl"><tr><th>Matchup</th>' +
     live.map(function(r) { return '<th>' + r.c.a + '/' + r.c.d + '/' + r.c.s + '</th>'; }).join('') + '</tr>';
   found.slice(0, CMP_ROWS).forEach(function(f) {
@@ -3409,9 +3410,16 @@ function cmpMarginPanel(live, grids) {
       var enHtml = '';
       if (showEnergy && f.win) {       // banked energy only meaningful on a win
         var en = cmpVal(eg.def, live[k].iv, f.si, f.oi);
-        var moves = Math.floor(en / cheapest);
-        enHtml = '<br><span class="cmp-env">+' + Math.round(en) + ' energy' +
-          (moves > 0 ? ' (~' + moves + (moves === 1 ? ' move' : ' moves') + ')' : '') + '</span>';
+        var parts = [];               // fast-move-equivalents, then each charged move
+        if (em.fast && em.fast.gain > 0)
+          parts.push(em.fast.abbr + ' ' + (en / em.fast.gain).toFixed(1));
+        (em.charged || []).forEach(function(cm) {
+          if (cm.cost > 0) parts.push(cm.abbr + ' ' + (en / cm.cost).toFixed(1));
+        });
+        enHtml = '<br><span class="cmp-env" title="Leftover energy as ' +
+          'fast-move-equivalents and fractions of each charged move you could ' +
+          'throw on your next mon">+' + Math.round(en) + 'e' +
+          (parts.length ? ' (' + parts.join(' · ') + ')' : '') + '</span>';
       }
       h += '<td><span class="cmp-bar' + (lo ? ' lo' : '') + '"><span style="width:' +
            Math.min(100, pct) + '%"></span></span><span class="cmp-hpv">' +
@@ -3423,7 +3431,9 @@ function cmpMarginPanel(live, grids) {
     '" class="cmp-more">+' + (found.length - CMP_ROWS) + ' more</td></tr>';
   h += '</table><div class="cmp-leg">Bars = focal’s leftover HP% at battle end ' +
        '(from the score). Losses show how close you came.' +
-       (showEnergy ? ' Energy = leftover charge banked for your next mon.' : '') +
+       (showEnergy ? ' Energy = leftover charge for your next mon, shown as ' +
+        'fast-move-equivalents then fractions of each charged move (by move ' +
+        'initials).' : '') +
        '</div></div>';
   return h;
 }

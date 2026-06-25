@@ -3924,7 +3924,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'tiers': tier_info,
         'movesets': [{'label': md['label'], 'prettyLabel': _pretty_moveset(md['label']),
                       **({'cheapestChargedCost': md['cheapest_charged_energy']}
-                         if md.get('cheapest_charged_energy') is not None else {})}
+                         if md.get('cheapest_charged_energy') is not None else {}),
+                      **({'energyMoves': md['energy_moves']}
+                         if md.get('energy_moves') is not None else {})}
                      for md in moveset_data],
         # Reference IV indices (for matchup diff in hover text)
         'pvpokeRefIvIdx': pvpoke_ref_iv_idx,
@@ -7102,11 +7104,24 @@ def main():
             }
             if energy_by_mode is not None:
                 # mode -> flat energy list (same shape/order as 'scores'); plus
-                # the cheapest charged cost so the JS can say "banks ~N moves".
+                # per-move energy so the compare widget can break leftover energy
+                # into fast-move-equivalents + fractions of each charged move.
                 _fm_db, _cm_db = get_moves()
                 _md['energy'] = energy_by_mode
                 _md['cheapest_charged_energy'] = min(
                     (_cm_db[cid]['energy'] for cid in charged_ids), default=0)
+                # Multi-word -> initials (Shadow Sneak -> SS); single word ->
+                # first 3 letters (Crunch -> CRU) so it's never a lone letter.
+                def _mv_abbr(mid):
+                    _w = _pretty_name(mid).split()
+                    return (''.join(x[0] for x in _w).upper() if len(_w) > 1
+                            else (_w[0][:3].upper() if _w else '?'))
+                _md['energy_moves'] = {
+                    'fast': {'abbr': _mv_abbr(fast_id),
+                             'gain': _fm_db[fast_id].get('energyGain', 0)},
+                    'charged': [{'abbr': _mv_abbr(cid), 'cost': _cm_db[cid]['energy']}
+                                for cid in charged_ids],
+                }
             moveset_data.append(_md)
 
         # ---- Item 5: base-form sim pass (shadow / Female-sex focals only) ----
