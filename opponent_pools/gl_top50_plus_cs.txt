@@ -107,3 +107,10 @@ Wigglytuff
 Annihilape
 Primeape
 Primeape (Shadow)
+
+# --- 2026-06-25 union additions (current PvPoke top-50) ---
+Dusclops
+Lapras (Shadow)
+Dusclops (Shadow)
+Florges
+Moltres (Galarian)

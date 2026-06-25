@@ -72,3 +72,6 @@ Gyarados
 Groudon (Shadow)
 Annihilape
 Ho-Oh (Shadow)
+
+# --- 2026-06-25 union additions (current PvPoke top-60) ---
+Reshiram (Shadow)
