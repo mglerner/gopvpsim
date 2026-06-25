@@ -430,6 +430,12 @@ DIVES = [
 ]
 
 
+# When set by --reserve-cpus on the CLI, overrides every dive's per-entry
+# reserve_cpus (e.g. 0 to use ALL cores for an unattended overnight run; the
+# per-dive default of 1 exists for keeping a core free during interactive work).
+_RESERVE_OVERRIDE = None
+
+
 def build_command(dive):
     """Build the deep_dive.py command list from a dive config dict."""
     html_path = os.path.join(WEBSITE_DIR, dive['slug'], dive['html_base'])
@@ -462,7 +468,8 @@ def build_command(dive):
         '--mirror-slayer-pool', '30',
         '--mirror-slayer-show', '20',
         '--split-movesets',
-        '--reserve-cpus', str(dive.get('reserve_cpus', 1)),
+        '--reserve-cpus', str(_RESERVE_OVERRIDE if _RESERVE_OVERRIDE is not None
+                              else dive.get('reserve_cpus', 1)),
     ]
 
     # Best-buddy / L51 toggle. 'best_buddy' may be 'on'/'off'/'auto' (default
@@ -488,7 +495,14 @@ def main():
                         help='Substring filter on slug (e.g. "tinkaton", "ultra")')
     parser.add_argument('--dry-run', action='store_true',
                         help='Print commands without running them')
+    parser.add_argument('--reserve-cpus', type=int, default=None,
+                        help='Override every dive\'s --reserve-cpus (e.g. 0 to '
+                             'use all cores for an unattended run; default keeps '
+                             'each dive\'s per-entry value, normally 1)')
     args = parser.parse_args()
+
+    global _RESERVE_OVERRIDE
+    _RESERVE_OVERRIDE = args.reserve_cpus
 
     dives = DIVES
     if args.filter:

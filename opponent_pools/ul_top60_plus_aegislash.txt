@@ -37,7 +37,12 @@ Malamar
 Malamar (Shadow)
 Annihilape
 Annihilape (Shadow)
-Cradily
+# Cradily (2026-06-25): the bare name resolves to a GL-only clone slug
+# ('cradily_b') that is absent from the UL rankings, so get_default_moveset
+# silently drops it from every UL dive. Pin the canonical UL default moveset
+# inline so it stays in the pool (IVs/stats resolve fine off the base name).
+# Remove this override once species_id is made league-aware.
+Cradily | fast=ACID | charged=ROCK_TOMB,GRASS_KNOT
 Forretress (Shadow)
 Ninetales (Alolan)
 Clefable
@@ -65,7 +70,10 @@ Bellibolt
 Ninetales (Shadow)
 Cresselia
 Raikou (Shadow)
-Golisopod
+# Golisopod (2026-06-25): same GL-only clone-slug issue as Cradily above
+# ('golisopodsh' is absent from UL rankings). Pin the canonical UL default
+# moveset inline so it isn't silently dropped from the UL dives.
+Golisopod | fast=FURY_CUTTER | charged=X_SCISSOR,AQUA_JET
 Milotic (Shadow)
 Talonflame (Shadow)
 Togekiss
@@ -82,7 +90,12 @@ Aromatisse
 
 # --- Aegislash hand-extension (see above) ---
 Aegislash (Shield)
-Aegislash (Blade)
+# Aegislash (Blade) (2026-06-25): no UL ranked moveset (it's a form id, not in
+# the UL rankings), so it silently dropped from every UL dive anyway. The UL
+# Aegislash Blade-vs-Shield comparison was retired 2026-05-17, so nothing
+# depends on it as a UL opponent. Commented out rather than ship a phantom
+# pool entry. (Aegislash (Shield) above resolves and stays.)
+# Aegislash (Blade)
 # Mimikyu (2026-06-24): newly PvPoke-ranked in UL (speciesId 'mimikyu';
 # bare name resolves to the ranked default moveset). New dive focal and a
 # real UL opponent. NOTE: not Competitor's-Cup-legal, but eligible in GBL
