@@ -3080,9 +3080,15 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         # none, _atk_cover is uniformly 0 and would collapse to max-def, so fall
         # through to the plain max-atk pole instead.
         if any(t[1] == 'damage_breakpoint' for t in notable_tiers):
+            # Final tie-break on atk so we never headline a strictly-dominated
+            # spread: among IVs tied on (breakpoint-coverage, def, hp) -- e.g. a
+            # below-cap species where 0/15/15 and 1/15/15 share def+hp at max
+            # level -- prefer the higher-atk one (the crowned, efficient-frontier
+            # member). breakpoint-coverage is monotonic in atk, so this can only
+            # raise atk among equals, never trade away a breakpoint.
             atk_iv = max(range(nIvs),
                          key=lambda iv: (_atk_cover(iv), data_obj['ivDef'][iv],
-                                         data_obj['ivHp'][iv]))
+                                         data_obj['ivHp'][iv], data_obj['ivAtk'][iv]))
         else:
             atk_iv = max(range(nIvs), key=lambda iv: (data_obj['ivAtk'][iv],
                                                       data_obj['ivDef'][iv],
@@ -3104,9 +3110,16 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                        if kind == 'bulkpoint')
         # Coverage selection only when NOTABLE bulkpoints exist; else max-def.
         if any(t[1] == 'bulkpoint' for t in notable_tiers):
+            # Final tie-break on atk (same rationale as the attack pole above):
+            # without it, a below-cap species ties 0/15/15 and 1/15/15 on
+            # (bulkpoint-coverage, hp, def) and max() returns the first by index
+            # -- the lower-atk, strictly-dominated, un-crowned spread (the
+            # 2026-06-24 UL Mimikyu card bug). bulkpoint-coverage is monotonic in
+            # def/hp, so adding atk last only breaks pure ties, never costs a
+            # bulkpoint.
             bulk_iv = max(range(nIvs),
                           key=lambda iv: (_bulk_cover(iv), data_obj['ivHp'][iv],
-                                          data_obj['ivDef'][iv]))
+                                          data_obj['ivDef'][iv], data_obj['ivAtk'][iv]))
         else:
             bulk_iv = max(range(nIvs),
                           key=lambda iv: (data_obj['ivDef'][iv],
