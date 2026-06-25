@@ -14,10 +14,13 @@ differs from the dive pages it links to.
 ## When a CD article gets written
 
 One CD article goes up for every announced Community Day we cover, a
-week or two before the event. The reference this guide uses -
-[Oinkologne Community Day: Is Mud Slap Worth It?](../../articles/oinkologne-cd-2026-05/) -
-was written for the 2026-05-09 CD that adds Mud Slap to both
-{{dive:species_display}} forms.
+week or two before the event. The worked example in this guide is drawn
+from our Oinkologne Community Day write-up, "Is Mud Slap Worth It?",
+which covered the 2026-05-09 CD that added Mud Slap to both Oinkologne
+forms. That article and its Male-form dive have since been retired, so
+the figures below illustrate what each section of a CD article shows
+rather than a live page you can open; the layout they walk through is
+unchanged.
 
 Each article links to its paired deep dive pages (one per form, when
 the species has form splits). The dive pages give you the full
