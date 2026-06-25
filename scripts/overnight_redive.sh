@@ -128,11 +128,15 @@ step "Rendering Jumpluff regular-vs-Shadow comparison" \
 step "Rendering Kanto Ninetales regular-vs-Shadow comparison" \
     python scripts/compare_loadouts.py comparisons/ninetales-regular-vs-shadow.toml
 
-# 6. Aegislash first-draft narrative article (GL only). Auto-generated
-#    prose; morning report should flag every authored section before
-#    anything ships. UL dropped 2026-05-17 per mercuryish review (S2).
-step "Generating Aegislash GL first-draft article" \
-    python scripts/write_aegislash_narrative.py great
+# 6. (REMOVED 2026-06-25) Aegislash GL first-draft narrative article.
+#    write_aegislash_narrative.py emits an AI-drafted page via its OWN
+#    bespoke minimal HTML template (not generate_article.py), so it
+#    shipped white/chrome-less and was never expert-reviewed. The page is
+#    deleted from the site; if an Aegislash form-change article is ever
+#    wanted, route it through generate_article.py with an expert TOML like
+#    every other article. UL was already dropped 2026-05-17 (mercuryish S2).
+# step "Generating Aegislash GL first-draft article" \
+#     python scripts/write_aegislash_narrative.py great
 
 # 7. Great League matchup web (cross-species all-pairs matrix). Standalone
 #    page with its own pool sim (~9s), not derived from the dives, but
