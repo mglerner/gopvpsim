@@ -45,7 +45,10 @@ from gopvpsim.data import (  # type: ignore[import-not-found]
     get_default_moveset,
     parse_types,
 )
-from render_article import sidebar_css  # type: ignore[import-not-found]
+from render_article import (  # type: ignore[import-not-found]
+    render_authorship_banner,
+    sidebar_css,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
@@ -777,6 +780,32 @@ def _authored_by_class(authored_by: str) -> str:
     return ''
 
 
+def _authorship_banner_html(authored_by: str) -> str:
+    """Render the prominent top authorship banner for a comparison page.
+
+    Maps the comparison ``authored_by`` enum (``human``/``ai``/``mixed``/
+    ``auto``) onto the article banner vocabulary so the standalone page
+    carries the same colored "who wrote this" bar that deep dives and CD
+    articles show at the top. ``human`` -> expert (gold), ``mixed`` ->
+    both (green), ``auto`` -> auto (blue) all route through
+    ``render_authorship_banner``. ``ai`` has no article-banner tier, so
+    it's emitted directly (amber) to avoid silently stripping the AI
+    attribution. Empty/unknown -> no banner (don't invent a tier).
+    """
+    val = (authored_by or '').strip().lower()
+    mapping = {'human': 'expert', 'mixed': 'both', 'auto': 'auto'}
+    if val in mapping:
+        return render_authorship_banner(mapping[val])
+    if val == 'ai':
+        return (
+            '<div class="authorship-banner ai">'
+            "This page's framing was drafted by an LLM and "
+            'has not been reviewed by a human expert.'
+            '</div>\n'
+        )
+    return ''
+
+
 def build_comparison_fragment(loadouts_data: list[dict], league: str,
                               gm: dict, title: str,
                               summary: str = '',
@@ -936,8 +965,15 @@ details.methodology-details p { margin: 8px 0 0 0; }
 
 def render_standalone_html(title: str, description: str,
                            fragment: str, dive_links: list[tuple[str, str]],
-                           authored_by: str = '') -> str:
-    """Wrap the fragment in a full HTML page for the comparisons/ URL."""
+                           authored_by: str = '',
+                           authored_by_kind: str = '') -> str:
+    """Wrap the fragment in a full HTML page for the comparisons/ URL.
+
+    ``authored_by`` is the free-form attribution shown in the footer
+    (e.g. ``"mglerner"``). ``authored_by_kind`` is the enum
+    (``human``/``ai``/``mixed``/``auto``) that drives the prominent top
+    authorship banner; empty/unknown renders no banner.
+    """
     # Reuse the article stylesheet look-and-feel; duplicate the matchup-delta
     # styles so the standalone page renders correctly on its own.
     dive_link_html = ''
@@ -979,6 +1015,17 @@ def render_standalone_html(title: str, description: str,
               background: #16213e; padding: 12px 16px 12px 20px;
               border-radius: 6px; margin: 16px 0; }}
   .related ul {{ margin: 6px 0 0 0; padding-left: 20px; }}
+  .authorship-banner {{ padding: 10px 16px 10px 20px; border-radius: 6px;
+                        margin-bottom: 16px; font-size: 14px;
+                        border-left: 3px solid var(--sidebar-color, #8b949e); }}
+  .authorship-banner.expert {{ --sidebar-color: #d4a017;
+                               background: #2a2000; color: #e8d48b; }}
+  .authorship-banner.both {{ --sidebar-color: #7db87d;
+                             background: #1f2a1a; color: #a8d8a8; }}
+  .authorship-banner.auto {{ --sidebar-color: #5b8dd9;
+                             background: #1a2333; color: #8ab4f8; }}
+  .authorship-banner.ai {{ --sidebar-color: #d29922;
+                           background: #2a1f00; color: #e8c87b; }}
   table.matchup-delta {{ border-collapse: collapse; margin: 10px 0;
                          width: 100%; font-size: 13px; }}
   table.matchup-delta th, table.matchup-delta td {{ border: 1px solid #0f3460;
@@ -1028,7 +1075,7 @@ def render_standalone_html(title: str, description: str,
 </head>
 <body>
 <h1>{html.escape(title)}</h1>
-<p>{html.escape(description)}</p>
+{_authorship_banner_html(authored_by_kind)}<p>{html.escape(description)}</p>
 {dive_link_html}
 {fragment}
 {author_html}
@@ -1147,6 +1194,7 @@ def main() -> int:
         fragment=fragment,
         dive_links=dive_links,
         authored_by=spec.get('author', ''),
+        authored_by_kind=spec.get('authored_by', ''),
     )
     index_path = out_dir / 'index.html'
     index_path.write_text(page)
