@@ -4601,8 +4601,18 @@ def generate_interactive_html(species, league, moveset_data, html_path,
        overflow the viewport, so Plotly tracks an inflated container. Pin it
        to the container width so #plot and all Plotly SVGs follow the viewport. */
     .dd-main {{ width: 100%; }}
-    nav.dd-toc {{ position: static; flex: none; width: auto; }}
-    nav.dd-toc {{ display: flex; flex-wrap: wrap; gap: 2px 16px;
+    /* Collapsed into the main column: span the FULL width (override the
+       hug-content fit-content + max-width cap from the wide-mode rule, and use
+       border-box so 100% + padding doesn't overflow), flow the links onto one
+       row that wraps only when very skinny, and STICK to the top on scroll
+       (top:0) so the section jumps stay reachable. align-items must be reset to
+       stretch -- the wide-mode .dd-layout uses flex-start, which in a column
+       flex would otherwise size the nav to its content instead of full width. */
+    .dd-layout {{ align-items: stretch; }}
+    nav.dd-toc {{ position: sticky; top: 0; z-index: 5;
+                  flex: none; width: 100%; max-width: none;
+                  box-sizing: border-box; max-height: none; overflow: visible;
+                  display: flex; flex-wrap: wrap; gap: 2px 16px;
                   align-items: center; }}
     nav.dd-toc strong {{ width: 100%; margin-bottom: 2px; }}
     nav.dd-toc a {{ display: inline-block; padding: 2px 0; }}
