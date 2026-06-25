@@ -34,10 +34,11 @@ output in 3 ways). What the prep session actually did to fix each gotcha:
    to GL-only clone slugs (`cradily_b` / `golisopodsh`) that are absent from UL
    rankings, so `get_default_moveset` silently dropped them from every UL dive
    (the prep's pool union missed both). Pinned the canonical UL default
-   movesets inline in `ul_top60_plus_aegislash.txt` (`Cradily | fast=ACID |
+   movesets inline in `ul_top60.txt` (`Cradily | fast=ACID |
    charged=ROCK_TOMB,GRASS_KNOT`; `Golisopod | fast=FURY_CUTTER |
-   charged=X_SCISSOR,AQUA_JET`); commented out the dead `Aegislash (Blade)` UL
-   opponent line (no UL moveset, comparison retired). UL pool now 69/69 resolve.
+   charged=X_SCISSOR,AQUA_JET`). (Aegislash was later removed from this pool
+   entirely 2026-06-25 — not UL-viable; file renamed from
+   `ul_top60_plus_aegislash.txt`.) UL pool now 68/68 resolve.
    FOLLOW-UP (deferred): make `species_id` league-aware so it prefers the
    canonical slug when the GL clone is absent for that league -- then drop the
    inline overrides. Cosmetic nit: the override labels these "Cradily (Acid /
@@ -278,11 +279,13 @@ Still open (deliberately NOT cut in S7):
   1. **Aegislash (Shield) GL + Aegislash (Blade) GL** — focal-side;
      biggest deltas (published dives simmed Shield with no Blade
      transform at all).
-  2. **Every dive using `gl_top50_plus_cs.txt` or
-     `ul_top60_plus_aegislash.txt`** — i.e. the whole website chain:
-     those pools carry Aegislash (Shield)+(Blade), so every dive's
-     Aegislash opponent rows were simmed form-change-less. S6's full
-     re-dive covers this; do NOT trim S6 to "just the form species."
+  2. **Every dive using `gl_top50_plus_cs.txt` or `ul_top60.txt`** —
+     i.e. the whole website chain: `gl_top50_plus_cs.txt` carried
+     Aegislash (Shield)+(Blade), so every GL dive's Aegislash opponent
+     rows were simmed form-change-less. S6's full re-dive covers this;
+     do NOT trim S6 to "just the form species." (`ul_top60.txt`, renamed
+     from `ul_top60_plus_aegislash.txt`, no longer carries Aegislash as of
+     2026-06-25 — not UL-viable.)
   3. **Blade-vs-Shield GL comparison page** (and the form-change
      guide screenshots if numbers moved visibly) — regenerate after
      the Aegislash re-dives.

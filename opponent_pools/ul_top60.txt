@@ -1,14 +1,10 @@
-# PvPoke Ultra League top-60 opponents + Aegislash Shield + Blade.
+# PvPoke Ultra League top-60 opponents.
 #
-# Hand-extended 2026-04-21 (refreshed top-60 2026-06-02) so the Tinkaton UL + Aegislash UL pair can
-# see each other as opponents during dives (Aegislash Shield/Blade
-# are not in PvPoke UL top-60, so --opponents 60 would omit them).
-# Without this file, the Aegislash Blade-vs-Shield UL comparison has
-# no cross-form matchup data on each dive, and Tinkaton UL's matchup
-# delta table has no Aegislash row.
+# Refreshed top-60 2026-06-02; unioned with the current PvPoke top-60 2026-06-25.
+# Aegislash (Shield/Blade) removed 2026-06-25: not UL-viable as an opponent.
 #
 # Generated base list via `get_top_opponents('ultra', 60)` in
-# scripts/deep_dive.py; Aegislash entries appended at the end.
+# scripts/deep_dive.py.
 #
 # Format: one PvPoke speciesName per line; blank lines and # comments
 # ignored. Re-generate the base top-60 by re-running this script:
@@ -88,14 +84,6 @@ Guzzlord
 Seismitoad
 Aromatisse
 
-# --- Aegislash hand-extension (see above) ---
-Aegislash (Shield)
-# Aegislash (Blade) (2026-06-25): no UL ranked moveset (it's a form id, not in
-# the UL rankings), so it silently dropped from every UL dive anyway. The UL
-# Aegislash Blade-vs-Shield comparison was retired 2026-05-17, so nothing
-# depends on it as a UL opponent. Commented out rather than ship a phantom
-# pool entry. (Aegislash (Shield) above resolves and stays.)
-# Aegislash (Blade)
 # Mimikyu (2026-06-24): newly PvPoke-ranked in UL (speciesId 'mimikyu';
 # bare name resolves to the ranked default moveset). New dive focal and a
 # real UL opponent. NOTE: not Competitor's-Cup-legal, but eligible in GBL

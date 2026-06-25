@@ -40,7 +40,7 @@ EVEN_SHIELDS = [(0, 0), (1, 1), (2, 2)]
 # Default meta pools per league (the same pools the dives/guides use).
 DEFAULT_POOLS = {
     'great':  'opponent_pools/gl_top50_plus_cs.txt',
-    'ultra':  'opponent_pools/ul_top60_plus_aegislash.txt',
+    'ultra':  'opponent_pools/ul_top60.txt',
     'master': 'opponent_pools/master_top60.txt',
 }
 
