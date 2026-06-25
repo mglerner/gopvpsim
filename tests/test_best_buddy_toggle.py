@@ -97,7 +97,7 @@ def _sweep(species, league, focal_max_level=None, opp_max_level=None,
         species, fm[0], fm[1], league, False,
         [opponent], [om], [(0, 0), (1, 1)],
         iv_floor=iv_floor, reserve_cpus=RESERVE,
-        focal_max_level=focal_max_level, opp_max_level=opp_max_level)
+        focal_max_level=focal_max_level, opp_max_level=opp_max_level)[:4]
 
 def test_no_op_sweep_is_byte_identical():
     """Best-buddy at GL for a CP-capped species is a true no-op end to end:

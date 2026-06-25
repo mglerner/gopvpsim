@@ -124,7 +124,7 @@ def _run_sweep(opponents, opp_movesets, use_cache):
         opponents, opp_movesets, SCENARIOS,
         iv_floor=IV_FLOOR, reserve_cpus=RESERVE,
         use_sweep_cache=use_cache,
-    )
+    )[:4]
 
 
 def test_iv_sweep_cache_end_to_end(tmp_path, monkeypatch):
