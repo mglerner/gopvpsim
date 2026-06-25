@@ -337,7 +337,7 @@ function render() {{
     for (const j of cols) {{
       const s = mat[i][j];
       if (s === null) {{
-        h += '<td class="diag">&mdash;</td>';
+        h += '<td class="diag">-</td>';
       }} else {{
         h += '<td style="' + cellStyle(s) + '" title="' +
              escAttr(SPECIES[i] + " vs " + SPECIES[j] + ": " + s) + '">' +
@@ -390,8 +390,8 @@ function showPanel(i) {{
   panel.innerHTML =
     "<h2>" + esc(SPECIES[i]) + "</h2>" +
     '<div class="meta">' + esc(MOVESETS[i]) + " &middot; IVs " + IVS[i] +
-    " &middot; " + scLabel + " shields: " + w + "W&ndash;" + l + "L" +
-    (t ? "&ndash;" + t + "T" : "") + "</div>" +
+    " &middot; " + scLabel + " shields: " + w + "W-" + l + "L" +
+    (t ? "-" + t + "T" : "") + "</div>" +
     '<div class="cols"><div><h3 class="wins">Top 5 best wins (' + scLabel + ')</h3>' +
     "<ol>" + (wins.map(li).join("") || "<li>none</li>") + "</ol></div>" +
     '<div><h3 class="losses">Top 5 worst losses (' + scLabel + ')</h3><ol>' +

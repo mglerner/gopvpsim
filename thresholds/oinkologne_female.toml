@@ -12,8 +12,9 @@
 ["Oinkologne (Female)"]
 sources = "pogo-simulator deep dive (2026-04-17); pre-CD Mud Slap analysis (female form)"
 
-["Oinkologne (Female)".article]
-slug = "oinkologne-cd-2026-05"
+# (article block removed 2026-06-25: the Oinkologne CD article was retired;
+# linking to its deleted slug produced dead ../articles/oinkologne-cd-2026-05/
+# links on every Female-dive re-render.)
 
 # Species narrative (Shape 2, 2026-04-19). Renders at the top of the
 # interactive deep dive above the scatter dashboard. The intro / meta_role
