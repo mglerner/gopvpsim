@@ -57,7 +57,10 @@ WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
 GUIDES_OUT = WEBSITE_DIR / 'guides'
 
 sys.path.insert(0, str(REPO_ROOT / 'src'))
-from gopvpsim.attribution import PVPOKE_ATTRIBUTION_SHORT  # noqa: E402
+from gopvpsim.attribution import (  # noqa: E402
+    PVPOKE_ATTRIBUTION_SHORT,
+    support_footer_html,
+)
 
 # Verification-count scalars used by dev:* tokens. DEVELOPER_NOTES.md
 # is the source of truth; the numbers live in prose, each wrapped in
@@ -459,7 +462,7 @@ def _render_page(*, title: str, body_html: str,
 <p class="about">Part of <a href="{html.escape(site_root)}">the PvP deep dive site</a>.
 Explainers regenerate from current dive data every publish, so numbers
 stay in sync with the methodology.{stamp_html}</p>
-</body>
+{support_footer_html(site_root)}</body>
 </html>
 """
 
