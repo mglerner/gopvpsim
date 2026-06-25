@@ -18,6 +18,11 @@ from gopvpsim.attribution import (  # noqa: E402
     PVPOKE_ATTRIBUTION_SHORT,
     support_footer_html,
 )
+from gopvpsim.theme import (  # noqa: E402
+    theme_css,
+    theme_head_script,
+    theme_picker_html,
+)
 import pvpoke_links
 
 QUAD_LABEL = {
@@ -545,140 +550,130 @@ the selected Case.</p>
 
 def style():
     return """
-  :root { --bg:#1a1a2e; --fg:#e0e0e0; --red:#e94560; --pur:#c8a2d0;
-          --grn:#9be89b; --panel:#16213e; --cell:#0f162a; --rule:#0f3460;
-          --sub:#8ea1bd; --blue:#5b8dd9; }
+  /* Palette comes from the shared theme tokens (gopvpsim.theme.theme_css);
+     this renderer references only var(--token). */
   body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-         background:var(--bg); color:var(--fg); line-height:1.6; margin:0; }
-  a { color:var(--grn); text-decoration:none; }
+         background:var(--bg); color:var(--text); line-height:1.6; margin:0; }
+  a { color:var(--accent); text-decoration:none; }
   a:hover { text-decoration:underline; }
   .topbar { max-width:1180px; margin:0 auto; padding:32px 16px 0; }
-  h1 { color:var(--red); margin:0 0 6px; }
-  h2 { color:var(--pur); border-bottom:1px solid var(--rule);
-       padding-bottom:6px; margin-top:34px; scroll-margin-top:14px; }
-  h3 { color:var(--pur); margin-top:20px; font-size:1.05em; }
-  h4 { color:var(--sub); margin:12px 0 4px; font-size:.95em; }
-  code { background:var(--panel); padding:2px 5px; border-radius:3px; font-size:.9em; }
+  h1 { color:var(--title); margin:0 0 6px; }
+  h2 { color:var(--heading); border-bottom:1px solid var(--border);
+       padding-bottom:6px; margin-top:34px; scroll-margin-top:14px;
+       font-size:1.15em; font-weight:700; letter-spacing:.02em; }
+  h3 { color:var(--heading); margin-top:20px; font-size:1.05em; font-weight:700; }
+  h4 { color:var(--text-muted); margin:12px 0 4px; font-size:.95em; }
+  code { background:var(--surface); padding:2px 5px; border-radius:2px; font-size:.9em; }
   p { margin:10px 0; }
-  .sub { color:var(--sub); font-size:.92em; }
-  .none { color:#6b7a93; }
+  .sub { color:var(--text-muted); font-size:.92em; }
+  .none { color:var(--text-muted); }
   nav.toc .nav-toggle { margin-bottom:10px; padding-bottom:9px;
-                  border-bottom:1px solid var(--rule); }
-  nav.toc .nav-toggle strong { display:block; color:var(--pur); font-size:12px;
-                  text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px; }
-  nav.toc .nav-toggle label { display:inline-block; color:var(--fg);
+                  border-bottom:1px solid var(--border); }
+  nav.toc .nav-toggle strong { display:block; color:var(--heading); font-size:12px;
+                  letter-spacing:.02em; margin-bottom:5px; }
+  nav.toc .nav-toggle label { display:inline-block; color:var(--text);
                   margin-right:12px; padding:2px 0; cursor:pointer; font-size:12px; }
   nav.toc .nav-toggle input { margin-right:6px; vertical-align:middle; }
   .sh-line { line-height:1.4; }
   body.shields-even .sh-uneven { display:none; }
   .hidden { display:none; }
   table { border-collapse:collapse; width:100%; margin:.6em 0 1.3em; font-size:.88em; }
-  th, td { border:1px solid var(--rule); padding:5px 9px; text-align:left; vertical-align:top; }
-  thead th { background:var(--panel); color:var(--pur); }
-  tbody td { background:var(--cell); color:var(--fg); }
+  th, td { border:1px solid var(--border); padding:5px 9px; text-align:left; vertical-align:top; }
+  thead th { background:var(--surface); color:var(--heading); }
+  tbody td { background:var(--surface-2); color:var(--text); }
   td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  caption { text-align:left; font-weight:600; color:var(--pur); padding:.3em 0; }
-  /* orange = AI-drafted prose, not yet human-reviewed (authored-ai tier) */
-  .banner { background:#2e241a; color:#e8d4bb; border-radius:6px;
-            padding:10px 16px 10px 20px; margin:16px 0; font-size:14px;
-            position:relative; }
-  .banner::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
-            width:4px; border-radius:2px; background:#e8903a; }
-  /* gold = source attribution (matches the site's expert/source tier) */
-  .credit { background:#2e2a1a; color:#e8dfcf; border-radius:6px;
-            padding:10px 16px 10px 20px; margin:16px 0; font-size:14px;
-            position:relative; }
-  .credit::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
-            width:4px; border-radius:2px; background:#d29922; }
-  /* red = limited-availability caution: game IV floor is below this grid */
-  .limited-banner { background:#2e1a1a; color:#e8c9c9; border-radius:6px;
-            padding:10px 16px 10px 20px; margin:16px 0; font-size:14px;
-            position:relative; }
-  .limited-banner::before { content:""; position:absolute; left:0; top:4px;
-            bottom:4px; width:4px; border-radius:2px; background:#f85149; }
-  .credit a { color:#f0d98b; }
+  caption { text-align:left; font-weight:600; color:var(--heading); padding:.3em 0; }
+  /* Callouts: all-sides border carries the tier (orange=AI-drafted,
+     gold=expert/source, red=limited-availability caution). */
+  .banner, .credit, .limited-banner { background:var(--callout-bg);
+            color:var(--callout-fg); border:1px solid var(--border);
+            border-radius:0; padding:10px 14px; margin:16px 0; font-size:14px; }
+  .banner strong, .credit strong, .limited-banner strong { color:var(--callout-strong); }
+  .banner { border-color:var(--callout-ai); }       /* AI-drafted */
+  .credit { border-color:var(--callout-expert); }   /* expert/source */
+  .limited-banner { border-color:var(--loss); }     /* limited-availability */
+  .credit a { color:var(--accent); }
   .twocol { display:flex; gap:2em; flex-wrap:wrap; }
   .twocol > div { flex:1; min-width:240px; }
-  .terms dt { font-weight:600; margin-top:.5em; color:var(--pur); }
-  .terms dd { margin:0 0 .2em 1.2em; color:var(--fg); }
-  .panel { background:var(--panel); border-radius:6px; padding:10px 14px 10px 18px;
-           margin:12px 0; position:relative; }
-  .panel::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
-           width:3px; border-radius:2px; background:var(--blue); }
-  footer { color:#667; font-size:13px; margin-top:40px;
-           border-top:1px solid var(--rule); padding-top:12px; }
+  .terms dt { font-weight:600; margin-top:.5em; color:var(--heading); }
+  .terms dd { margin:0 0 .2em 1.2em; color:var(--text); }
+  .panel { background:var(--callout-bg); color:var(--callout-fg);
+           border:1px solid var(--callout-auto); border-radius:0;
+           padding:10px 14px; margin:12px 0; }
+  footer { color:var(--text-muted); font-size:13px; margin-top:40px;
+           border-top:1px solid var(--border); padding-top:12px; }
   /* layout + sidebar */
   .layout { display:flex; gap:28px; max-width:1180px; margin:8px auto 0;
             padding:0 16px 40px; align-items:flex-start; }
   nav.toc { position:sticky; top:14px; flex:0 0 260px; font-size:13px;
-            background:var(--panel); border-radius:6px; padding:12px 14px;
+            background:var(--surface); border-radius:2px; padding:12px 14px;
             max-height:calc(100vh - 28px); overflow-y:auto; }
-  nav.toc strong { color:var(--pur); display:block; margin-bottom:6px;
-            font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
-  nav.toc a { display:block; color:var(--grn); padding:2px 0; }
+  nav.toc strong { color:var(--heading); display:block; margin-bottom:6px;
+            font-size:12px; letter-spacing:.02em; }
+  nav.toc a { display:block; color:var(--accent); padding:2px 0; }
   nav.toc .subnav { display:flex; flex-wrap:wrap; gap:1px 10px;
             padding:0 0 4px 12px; line-height:1.3; }
   nav.toc a.sub { padding:0; font-size:11.5px;
-            color:var(--sub); white-space:nowrap; }
-  nav.toc a.sub:hover { color:var(--grn); }
+            color:var(--text-muted); white-space:nowrap; }
+  nav.toc a.sub:hover { color:var(--accent); }
   main { flex:1; min-width:0; }
   main h2:first-child { margin-top:6px; }
   .close-calls ul { margin:4px 0 8px; padding-left:20px; }
   .close-calls > div { margin-top:6px; }
   .close-calls li { margin:2px 0; }
   .cc-tag { display:inline-block; font-size:.78em; padding:0 5px;
-            border-radius:3px; vertical-align:middle; }
-  .cc-shield { background:#1a2333; color:#8ab4f8; }
-  .cc-energy { background:#2e2a1a; color:#e8dfcf; }
-  .cc-neardeath { background:#2e1a1f; color:#e8b0b8; }
+            border-radius:4px; vertical-align:middle; background:var(--surface); }
+  .cc-shield { color:var(--accent); }
+  .cc-energy { color:var(--energy); }
+  .cc-neardeath { color:var(--loss); }
   /* check-my-ivs box */
   .ivcheck-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center;
             margin-bottom:8px; }
-  #ivc-input { flex:1; min-width:220px; background:var(--cell); color:var(--fg);
-            border:1px solid var(--rule); border-radius:4px; padding:6px 9px;
+  #ivc-input { flex:1; min-width:220px; background:var(--surface-2); color:var(--text);
+            border:1px solid var(--border); border-radius:2px; padding:6px 9px;
             font-size:14px; }
-  #ivc-quad { background:var(--cell); color:var(--fg); border:1px solid var(--rule);
-            border-radius:4px; padding:5px 6px; }
-  #ivc-go { background:var(--blue); color:#fff; border:none; border-radius:4px;
+  #ivc-quad { background:var(--surface-2); color:var(--text); border:1px solid var(--border);
+            border-radius:2px; padding:5px 6px; }
+  #ivc-go { background:var(--accent); color:#fff; border:none; border-radius:2px;
             padding:6px 14px; cursor:pointer; font-size:14px; }
   #ivc-go:hover { filter:brightness(1.1); }
   #ivc-note { margin:4px 0 8px; }
-  .ivc-bad { color:var(--red); }
+  .ivc-bad { color:var(--loss); }
   td.ivc-cell, th.ivc-cell { text-align:center; }
-  td.ivc-win { color:var(--grn); }
-  td.ivc-loss { color:var(--red); font-weight:600; }
+  td.ivc-win { color:var(--accent); }
+  td.ivc-loss { color:var(--loss); font-weight:600; }
   /* near-miss marker in the recommended table */
-  .nm-flag { font-size:.7em; color:#e8b06a; text-decoration:none;
+  .nm-flag { font-size:.7em; color:var(--tie); text-decoration:none;
             vertical-align:super; font-weight:700; }
-  .nm-flag:hover { color:#f0c98b; }
+  .nm-flag:hover { color:var(--title); }
   /* shared compare panels (scripts/cmp_panels.js): HP-margin bars + ✦ flip.
      Ported from the deep-dive's .cmp-* rules so the panels render identically
      in the guide. */
-  .cmp-panel { background:#10182c; border:1px solid #24314d; border-radius:8px;
+  .cmp-panel { background:var(--surface-2); border:1px solid var(--border-2); border-radius:2px;
             padding:11px 14px; margin:12px 0 14px; }
   .cmp-panel h4 { margin:0 0 3px; font-size:.92em; }
-  .cmp-flip-h { color:#f0b429; } .cmp-marg-h { color:#58a6ff; }
-  .cmp-psub { font-size:.8em; color:var(--sub); margin:0 0 9px; }
+  .cmp-flip-h { color:var(--flip); } .cmp-marg-h { color:var(--accent-2); }
+  .cmp-psub { font-size:.8em; color:var(--text-muted); margin:0 0 9px; }
   .cmp-tbl { border-collapse:collapse; width:100%; font-size:.86em; margin:0; }
   .cmp-tbl th, .cmp-tbl td { text-align:left; padding:5px 9px;
-            border:none; border-bottom:1px solid #1a2540; white-space:nowrap; }
-  .cmp-tbl th { color:var(--sub); font-weight:600; font-size:.8em; background:none; }
+            border:none; border-bottom:1px solid var(--bar-track); white-space:nowrap; }
+  .cmp-tbl th { color:var(--text-muted); font-weight:600; font-size:.8em; background:none; }
   .cmp-tbl td { background:none; }
-  .cmp-m { color:#cdd6e5; }
-  .cmp-win { color:#3fb950; font-weight:700; }
-  .cmp-lose { color:#f85149; font-weight:700; }
-  .cmp-tie { color:#d4a017; font-weight:700; }
-  .cmp-flip { color:#f0b429; }
-  .cmp-more { color:var(--sub); font-size:.82em; font-style:italic; }
+  .cmp-m { color:var(--text); }
+  .cmp-win { color:var(--win); font-weight:700; }
+  .cmp-lose { color:var(--loss); font-weight:700; }
+  .cmp-tie { color:var(--tie); font-weight:700; }
+  .cmp-flip { color:var(--flip); }
+  .cmp-more { color:var(--text-muted); font-size:.82em; font-style:italic; }
   .cmp-bar { display:inline-block; vertical-align:middle; width:64px; height:9px;
-            background:#1a2540; border-radius:5px; overflow:hidden; margin-right:6px; }
-  .cmp-bar > span { display:block; height:100%; background:#3fb950; }
-  .cmp-bar.lo > span { background:#d4a017; }
+            background:var(--bar-track); border-radius:2px; overflow:hidden; margin-right:6px; }
+  .cmp-bar > span { display:block; height:100%; background:var(--win); }
+  .cmp-bar.lo > span { background:var(--tie); }
   .cmp-bar.loss { display:flex; justify-content:flex-end; }
-  .cmp-bar.loss > span { flex:none; background:#f85149; }
-  .cmp-hpv { font-size:.82em; color:#9bb0d0; }
-  .cmp-env { font-size:.78em; color:#7fd3b0; }
-  .cmp-leg { font-size:.78em; color:var(--sub); margin-top:5px; }
+  .cmp-bar.loss > span { flex:none; background:var(--loss); }
+  .cmp-hpv { font-size:.82em; color:var(--text-muted); }
+  .cmp-env { font-size:.78em; color:var(--energy); }
+  .cmp-leg { font-size:.78em; color:var(--text-muted); margin-top:5px; }
   @media (max-width:820px) {
     .layout { flex-direction:column; align-items:stretch; }
     /* Collapsed into the column: a full-width sticky bar (mirrors the deep-dive
@@ -1066,14 +1061,16 @@ updShields();
 """)
     main_html = "\n".join(main_parts)
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="gruvbox-light">
 <head>
 <meta charset="utf-8">
+{theme_head_script()}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{sp} Master League IV Guide</title>
-<style>{style()}</style>
+<style>{theme_css()}{style()}</style>
 </head>
 <body>
+{theme_picker_html()}
 <div class="topbar">
 <h1>{sp}: Master League IV Guide</h1>
 <p class="sub">How far your IVs can slip before this Master League attacker
