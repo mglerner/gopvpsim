@@ -142,6 +142,23 @@ N-1, drop older) so the cache stops growing unbounded. Note: an `iv_envelope/`
 cache already exists, so the ML path DOES cache its analysis output -- it just
 doesn't share the per-opponent SWEEP-column cache, which is the merge above.
 
+## Limited-availability mons: real IV floors for ML sweeps (PARALLEL, post-ship)
+
+*(2026-06-25, scratch_thoughts)* The ML IV-guide sweeps assume a 12/12/12 IV
+floor (right for traded / grind-able species). But some mons you only get one
+or two of in PoGo -- mostly mythicals (Marshadow, Hoopa, Zygarde) but NOT all
+(Genesect is grind-able; Marshadow/Hoopa/Zygarde are not). Their real-world IV
+floor is LOWER than 12/12/12, so the shipped ML guide can't evaluate a
+legitimately owned spread (Michael's Marshadow is 11/13/11). Steps: (1)
+enumerate which species are in the limited-availability category, (2) determine
+each one's IRL IV floor (research-reward / quest-encounter IVs), (3) re-run the
+ML sweep for any with a floor below 12/12/12. Independent of everything else --
+fire as a PARALLEL task, ship whatever is done, re-ship the corrected guides
+later (they finish after the UI decisions, or get rewritten during UI rework).
+FLAG (never-ship-unflagged-known-wrong rule): until corrected, the limited-mon
+ML guides ship with a floor that is wrong for them -- decide whether to add an
+"assumes a 12/12/12 IV floor" caveat on those pages or ship unflagged.
+
 ## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
 
 Pre-ship arc shipped: items 1-6 all done (cross-form re-dive,
