@@ -73,14 +73,10 @@ DIVES = [
         # different tuples. Alphabetical here keeps them in sync.
         'reference': 'SHADOW_CLAW,DRAIN_PUNCH,FOUL_PLAY',
     },
-    {
-        'species': 'Oinkologne',
-        'league': 'great',
-        'slug': 'oinkologne-great-league',
-        'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
-        'reference': 'TACKLE,BODY_SLAM,TRAILBLAZE',
-    },
+    # Male Oinkologne (rank ~204) dive removed 2026-06-25 -- only Female (the
+    # meta #36) is dived now. NOTE: this retires the male-vs-female comparison
+    # article (it can't be regenerated without the male dive); mark that page
+    # Archived / known-out-of-date at publish time.
     {
         'species': 'Oinkologne (Female)',
         'league': 'great',
@@ -306,19 +302,9 @@ DIVES = [
         'no_thresholds': True,
         'shadow': True,
     },
-    # NAIC GL focal. thresholds/sylveon.toml auto-loads (no no_thresholds)
-    # so the four card tiers (Gatr Slayer / Max Defense / S. Quagsire Focus
-    # / Full Attack) render. reference + top_movesets=3 keep the Psyshock /
-    # Moonblast / Last Resort moveset debate visible in the dropdown.
-    {
-        'species': 'Sylveon',
-        'league': 'great',
-        'slug': 'sylveon-great-league',
-        'html_base': 'index.html',
-        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
-        'reference': 'FAIRY_WIND,PSYSHOCK,SHADOW_BALL',
-        'top_movesets': 3,
-    },
+    # Sylveon (NAIC GL focal) dive removed 2026-06-25 (rank ~115; the NAIC event
+    # pick is no longer a coverage priority). thresholds/sylveon.toml is retained
+    # in case it returns.
     # Mimikyu (2026-06-24): newly released and PvPoke-ranked in GL+UL;
     # the disguise mechanic is already ported and PvPoke-exact in our
     # engine (test_mimikyu_vs_azumarill_form_change 9/9, plus the new
@@ -381,6 +367,66 @@ DIVES = [
         'no_thresholds': True,
         'shadow': True,
     },
+    # Meta-coverage additions (2026-06-25, off the fresh PvPoke pull). Clean
+    # dives on the new-season template: top_movesets=1 (single screened-winner
+    # page), no_thresholds (author anchors later), PvPoke get_default_moveset
+    # (no explicit reference). GL high-meta picks we weren't yet diving + both
+    # Stunfisks (Galarian Steel/Ground AND the regular Electric/Ground we
+    # already shipped), and two UL adds (Galarian Moltres, Lickilicky).
+    {'species': 'Lickilicky', 'league': 'great', 'slug': 'lickilicky-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Altaria', 'league': 'great', 'slug': 'altaria-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Altaria', 'league': 'great', 'slug': 'shadow-altaria-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True, 'shadow': True},
+    {'species': 'Empoleon', 'league': 'great', 'slug': 'empoleon-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Empoleon', 'league': 'great', 'slug': 'shadow-empoleon-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True, 'shadow': True},
+    {'species': 'Feraligatr', 'league': 'great', 'slug': 'feraligatr-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Feraligatr', 'league': 'great', 'slug': 'shadow-feraligatr-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True, 'shadow': True},
+    {'species': 'Kingdra', 'league': 'great', 'slug': 'kingdra-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Kingdra', 'league': 'great', 'slug': 'shadow-kingdra-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True, 'shadow': True},
+    {'species': 'Azumarill', 'league': 'great', 'slug': 'azumarill-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Sableye', 'league': 'great', 'slug': 'sableye-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Medicham', 'league': 'great', 'slug': 'medicham-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Sealeo', 'league': 'great', 'slug': 'shadow-sealeo-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True, 'shadow': True},
+    {'species': 'Grumpig', 'league': 'great', 'slug': 'grumpig-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Talonflame', 'league': 'great', 'slug': 'talonflame-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Stunfisk (Galarian)', 'league': 'great', 'slug': 'galarian-stunfisk-great-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Moltres (Galarian)', 'league': 'ultra', 'slug': 'galarian-moltres-ultra-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
+     'top_movesets': 1, 'no_thresholds': True},
+    {'species': 'Lickilicky', 'league': 'ultra', 'slug': 'lickilicky-ultra-league',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/ul_top60_plus_aegislash.txt',
+     'top_movesets': 1, 'no_thresholds': True},
 ]
 
 
