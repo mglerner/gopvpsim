@@ -3363,9 +3363,12 @@ function cmpFlipPanel(live, grids) {
       if (grids.alt) {
         var a = cmpVal(grids.alt, r.iv, f.si, f.oi);
         if ((d > 500) !== (a > 500)) {  // best-buddy crosses the win line
-          var aw = a > 500 ? 'win' : (a === 500 ? 'tie' : 'loss');
+          // Show the L51 outcome with its score, colored like a normal cell
+          // (green win / amber tie / red loss) -- not a flat amber word.
+          var acls = a > 500 ? 'cmp-win' : (a === 500 ? 'cmp-tie' : 'cmp-lose');
+          var albl = a > 500 ? 'win ' : (a === 500 ? 'tie ' : 'loss ');
           mark = ' <span class="cmp-flip" title="best-buddy (L' + grids.altCap +
-            ') flips this">✦→' + aw + '</span>';
+            ') flips this">✦→</span><span class="' + acls + '">' + albl + a + '</span>';
         }
       }
       h += '<td class="' + cls + '">' + lbl + d + mark + '</td>';
