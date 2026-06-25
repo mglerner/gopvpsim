@@ -252,6 +252,7 @@ const N = SPECIES.length;
 
 let scenario = "1-1";
 let sortMode = "avg";   // "avg" | "alpha" | column index
+let sortDir = -1;       // -1 = descending (high / Z-A first), 1 = ascending
 let pinnedRows = [];    // species indices in pin order (render at top)
 let pinnedCols = [];    // species indices in pin order (render at left)
 let panelIndex = null;  // species shown in the side panel (null = hidden)
@@ -268,16 +269,17 @@ function rowOrder() {{
   const mat = DATA[scenario];
   const idx = Array.from({{length: N}}, (_, i) => i);
   if (sortMode === "alpha") {{
-    idx.sort((x, y) => SPECIES[x].localeCompare(SPECIES[y]));
+    idx.sort((x, y) => SPECIES[x].localeCompare(SPECIES[y]) * sortDir);
   }} else if (sortMode === "avg") {{
-    idx.sort((x, y) => rowAvg(mat, y) - rowAvg(mat, x));
+    idx.sort((x, y) => (rowAvg(mat, x) - rowAvg(mat, y)) * sortDir);
   }} else {{
     const c = sortMode;
     idx.sort((x, y) => {{
       const a = mat[x][c], b = mat[y][c];
-      if (a === null) return 1;
+      if (a === null && b === null) return 0;
+      if (a === null) return 1;   // empty cells always sort last
       if (b === null) return -1;
-      return b - a;
+      return (a - b) * sortDir;
     }});
   }}
   // Pinned rows float to the top in pin order; the rest keep sortMode order.
@@ -307,6 +309,11 @@ function cellStyle(s) {{
   return "background: var(--matrix-tie-bg); color: var(--matrix-tie-fg);";
 }}
 
+function sortArrow(m) {{
+  // Direction glyph for the active sort header (down = descending, up = ascending).
+  return m === sortMode ? (sortDir < 0 ? " &#9662;" : " &#9652;") : "";
+}}
+
 function render() {{
   const mat = DATA[scenario];
   const order = rowOrder();
@@ -314,7 +321,7 @@ function render() {{
   let h = "<thead><tr>";
   h += '<th class="corner' + (sortMode === "alpha" ? " sortkey" : "") +
        '" onclick="setSort(\\'alpha\\')" title="Sort alphabetically">' +
-       "Species &#9662;</th>";
+       "Species" + sortArrow("alpha") + "</th>";
   h += '<th class="' + (sortMode === "avg" ? "sortkey" : "") +
        '" onclick="setSort(\\'avg\\')" title="Sort by row average">' +
        '<div class="vert">avg</div></th>';
@@ -366,7 +373,15 @@ function setScenario(v) {{
   render();
   if (panelIndex !== null) showPanel(panelIndex);  // keep an open panel in sync
 }}
-function setSort(m) {{ sortMode = m; render(); }}
+function setSort(m) {{
+  if (m === sortMode) {{
+    sortDir = -sortDir;                  // same header again: flip direction
+  }} else {{
+    sortMode = m;
+    sortDir = (m === "alpha") ? 1 : -1;  // new header: names A-Z, scores high-first
+  }}
+  render();
+}}
 
 function togglePinRow(i) {{
   const k = pinnedRows.indexOf(i);
