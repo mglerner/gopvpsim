@@ -118,6 +118,18 @@ Bundles with the `WonSetCache`-stores-scores follow-up above (same "cache
 stores only part of what the warm path now needs" shape). Cold cost unchanged;
 this only fixes the warm regression.
 
+**Bundle: merge the ML-sweep and dive sim logic so the ML sweeps cache too.**
+*(2026-06-25, same post-ship arc, AFTER the Reddit post -- bundle with the
+energy-column rework above.)* The ML IV-guide sweeps (`run_iv_guides.py` ->
+`iv_envelope_analysis.py`) run a SEPARATE analysis path from the dive
+`iv_sweep`, and they do not touch the per-opponent sweep cache at all -- which
+is why the 61-guide Master-league bake is a ~9h COLD job every time the
+gamemaster hash changes. Both paths compute the same per-(focal-IV, opponent)
+score columns, so they should share the `iv_sweep` + `sweep_cache` machinery:
+merging the logic lets ML re-bakes reuse warm columns (a large win) and deletes
+a duplicate sim path. Do it together with the energy-column rework above (same
+cache, same "cache must store what the warm path needs" shape).
+
 ## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
 
 Pre-ship arc shipped: items 1-6 all done (cross-form re-dive,
