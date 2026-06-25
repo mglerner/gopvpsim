@@ -21,6 +21,9 @@ Lickilicky
 Zygarde (Complete Forme)
 Jellicent
 Corviknight
+# Corviknight (Shadow) (2026-06-24): PvPoke UL rank ~5, but only the non-shadow
+# was in this pool. Added per the keep-shadow-pairs convention.
+Corviknight (Shadow)
 Florges
 Feraligatr (Shadow)
 Virizion
