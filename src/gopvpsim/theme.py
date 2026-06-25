@@ -56,6 +56,11 @@ _TOKENS = {
     "--callout-ai":     ("#fe8019", "#af3a03", "#ff8c42", "#c2410c"),
     "--callout-auto":   ("#83a598", "#076678", "#3d7dca", "#2a6fc4"),
     "--callout-expert": ("#fabd2f", "#b57614", "#ffcb05", "#b57614"),
+    # "both" = joint LLM+human authorship tier (green). Not in the original
+    # spec table (which listed only ai/auto/expert) but the reader guides use a
+    # 4th tier; added so it themes correctly on all backgrounds. Tracks the
+    # energy-green per theme for now; can diverge later without touching sites.
+    "--callout-both":   ("#8ec07c", "#427b58", "#66c6b0", "#138a72"),
 }
 
 # Static chrome for the picker. Uses tokens so it adapts to the active theme.
