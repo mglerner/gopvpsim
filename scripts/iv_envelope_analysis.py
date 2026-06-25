@@ -187,6 +187,53 @@ def result_metrics(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl,
     return out
 
 
+def score_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
+    """Like won_set, but ALSO keeps the full per-(opp, shields) battle score
+    (centered on 500). Returns (scores, won):
+      scores: {(opp_display, (shf, sho)): int focal score}
+      won:    set of (opp_display, (shf, sho)) the focal wins
+
+    Feeds the guide's 'check my IVs' HP-margin bars + best-buddy flip overlay,
+    which need the raw score (HP% proxy = (score-500)/500) not just win/loss.
+    The `won` set is derived with the EXACT same test won_set uses
+    (pvpoke_score(0) > pvpoke_score(1)), not a `score>500` shortcut -- the two
+    differ by one only in an unreachable timeout where the floor makes the two
+    scores sum to 999, but deriving `won` identically keeps the rec-table drops
+    provably unchanged by this feature.
+
+    NOT cached: the won-set disk cache stores only booleans. On a cold/full bake
+    these are the SAME sims the rec-table sweep already runs for `drops`, so the
+    rec loop derives `won` from this and adds no sims. (A warm-cache iteration
+    re-sims the 64 combos; teaching WonSetCache to store scores is the follow-up.)"""
+    scores = {}
+    won = set()
+    for o in opponents:
+        for shf, sho in SHIELDS:
+            bp0 = build_mon(species, fast_id, charged_ids, ivs, shf, my_lvl,
+                            shadow=FOCAL_SHADOW)
+            bp1 = build_mon(o['base'], o['fast'], o['charged'], (15, 15, 15),
+                            sho, opp_lvl, shadow=o['shadow'])
+            r = simulate(bp0, bp1, charged_policy_0=pvpoke_dp,
+                         charged_policy_1=pvpoke_dp)
+            key = (o['display'], (shf, sho))
+            scores[key] = int(r.pvpoke_score(0))
+            if r.pvpoke_score(0) > r.pvpoke_score(1):
+                won.add(key)
+    return scores, won
+
+
+def pack_scores(flat):
+    """Pack a flat int list as little-endian uint16 -> gzip(level9, mtime=0) ->
+    base64 ascii, the exact pipeline the deep-dive uses (deep_dive.py) so the
+    guide's DecompressionStream decoder is identical. mtime=0 keeps the output
+    byte-stable run-to-run."""
+    import base64, gzip, struct
+    clamped = [max(0, min(65535, int(v))) for v in flat]
+    raw = struct.pack(f'<{len(clamped)}H', *clamped)
+    gz = gzip.compress(raw, compresslevel=9, mtime=0)
+    return base64.b64encode(gz).decode('ascii')
+
+
 def close_calls(base_metrics, drop_metrics, cheapest_cost):
     """Significant KEPT-WIN margin shifts at a dropped IV vs the hundo baseline.
 
@@ -454,6 +501,13 @@ def main():
     sp15 = {lv: stat_product(focal_base, (15, 15, 15), lv) for lv in (50.0, 51.0)}
     rec_rows = []
     combos = [c for c in product(IVS, repeat=3)]
+    # Raw battle-score grids for the 'check my IVs' HP-margin bars + best-buddy
+    # flip overlay. One flat uint16 list per quadrant, in (combo, scenario, opp)
+    # order so the shared cmp_panels.js cmpVal() indexes it as
+    #   grid[combo_idx * nScenarios * nOpponents + si * nOpponents + oi].
+    # Captured from the SAME sims the rec table already runs (the rec loop now
+    # derives `won` from these scores instead of a separate won_set call).
+    cmp_score_grid = {q: [] for q in REC_QUADRANTS}
     for (av, dv, sv) in combos:
         row = {'ivs': [av, dv, sv]}
         for lvkey, lv in LEVELS.items():
@@ -470,8 +524,12 @@ def main():
         is_perfect = (av, dv, sv) == (15, 15, 15)
         for q in REC_QUADRANTS:
             ml, ol = QUADRANTS[q]
-            won = won_set(base_clean, fast_id, charged_ids, (av, dv, sv),
-                          ml, ol, opponents)
+            sc, won = score_set(base_clean, fast_id, charged_ids, (av, dv, sv),
+                                ml, ol, opponents)
+            # Append this combo's scores in scenario-major, opp-inner order.
+            for (shf, sho) in SHIELDS:
+                for o in opponents:
+                    cmp_score_grid[q].append(sc[(o['display'], (shf, sho))])
             dr = hundo_won[q] - won
             drops[q] = sorted(f"{disp} {shield_label(sh)}" for (disp, sh) in dr)
             if q not in cc_quads:
@@ -489,6 +547,19 @@ def main():
     rec_rows.sort(key=lambda r: -r['perfect_bb'])
     print(f"  recommended table: {len(rec_rows)} combos "
           f"(close-calls: {', '.join(cc_quads)})")
+
+    # Pack the score grids for embedding. combos[] is the grid's combo-index
+    # reference (the 'check my IVs' box resolves a typed spread to its index
+    # here); scenarios/opponentsDisplay/quadrant_levels let the box build the
+    # def/alt grids + ✦ best-buddy-flip marker without re-deriving anything.
+    cmp_scores = {
+        'combos': [list(c) for c in combos],
+        'scenarios': [list(s) for s in SHIELDS],
+        'opponentsDisplay': [o['display'] for o in opponents],
+        'quadrants': REC_QUADRANTS,
+        'quadrant_levels': {q: list(QUADRANTS[q]) for q in REC_QUADRANTS},
+        'grids': {q: pack_scores(cmp_score_grid[q]) for q in REC_QUADRANTS},
+    }
 
     data = {
         'species': species,
@@ -515,6 +586,9 @@ def main():
         },
         'quadrants': quadrants,
         'recommended': rec_rows,
+        # Packed raw-score grids for the 'check my IVs' HP-margin bars + ✦
+        # best-buddy flip overlay (see render_iv_envelope_article.py compare box).
+        'cmp_scores': cmp_scores,
     }
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, 'w') as f:

@@ -377,13 +377,109 @@ IV_CHECK_JS = r"""
       out.innerHTML += '<p class="sub">Breakpoint, bulkpoint, and CMP detail is '
         + 'only computed for spreads that drop a single stat (such as 15/15/14). '
         + 'Multi-stat spreads show win, loss, and close calls only.</p>';
+
+    // Shared HP-margin + best-buddy-flip panels (scripts/cmp_panels.js). They
+    // need the raw per-matchup score, so they appear only when the packed score
+    // grids have decoded (CMP_READY) and 2+ in-range spreads are entered. The
+    // decoder calls window._cmpBoxRerender on ready, so a fast typist sees the
+    // panels fill in a moment later rather than never.
+    if (ok.length >= 2 && typeof CMP_READY !== 'undefined' && CMP_READY
+        && typeof cmpFlipPanel === 'function') {
+      var liveRows = ok.map(function(c){
+        var iv = CMP_IDX[c.key];
+        if (iv == null) return null;
+        var p = c.key.split('/');
+        return { c: { a: +p[0], d: +p[1], s: +p[2] }, iv: iv };
+      }).filter(function(x){ return x; });
+      if (liveRows.length >= 2) {
+        var altQ = CMP_BB_PAIR[quad];
+        var grids = { def: SCORES_CMP[quad], alt: SCORES_CMP[altQ] || null,
+                      altCap: CMP_ALTCAP[quad],
+                      // alt is the powered-UP (best-buddy) level only when the
+                      // alt quadrant's my-level exceeds the selected Case's.
+                      altIsBuddy: CMP_ALTCAP[quad] > CMP_MYCAP[quad] };
+        // cmpMarginPanel gets no energy context (v1 embeds scores only) -> HP
+        // bars without the banked-energy line.
+        out.innerHTML += cmpFlipPanel(liveRows, grids)
+                       + cmpMarginPanel(liveRows, grids);
+      }
+    }
   }
 
+  window._cmpBoxRerender = render;
   document.getElementById('ivc-go').addEventListener('click', render);
   inEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') render(); });
   qEl.addEventListener('change', render);
 })();
 """
+
+
+# Sets up the globals the shared cmp_panels.js + the box's panel block read:
+# a minimal DATA (grid sizing), the combo->grid-index map, the same-meta
+# opposite-your-BB pairing for the ✦ flip overlay, and an async decode of the
+# packed score grids (DecompressionStream, identical pipeline to the deep dive).
+CMP_SETUP_JS = r"""
+(function(){
+  var el = document.getElementById('cmp-data');
+  if (!el) return;
+  var CMPDATA = JSON.parse(el.textContent);
+  window.DATA = { nOpponents: CMPDATA.opponentsDisplay.length,
+                  nScenarios: CMPDATA.scenarios.length,
+                  scenarios: CMPDATA.scenarios,
+                  opponentsDisplay: CMPDATA.opponentsDisplay };
+  window.CMP_IDX = {};
+  CMPDATA.combos.forEach(function(c, i){ window.CMP_IDX[c.join('/')] = i; });
+  // Same meta best-buddy status, opposite YOUR best-buddy status: the ✦ flip
+  // overlay shows what powering yourself to L51 (or down to L50) changes.
+  window.CMP_BB_PAIR = { nobb_vs_nonbb:'wbb_vs_nonbb', wbb_vs_nonbb:'nobb_vs_nonbb',
+                         nobb_vs_bb:'wbb_vs_bb', wbb_vs_bb:'nobb_vs_bb' };
+  window.CMP_ALTCAP = {};   // alt quadrant's MY level (the ✦ flip target)
+  window.CMP_MYCAP = {};    // selected quadrant's MY level (the current view)
+  for (var q in CMPDATA.quadrant_levels) {
+    var alt = window.CMP_BB_PAIR[q];
+    window.CMP_MYCAP[q] = Math.round(CMPDATA.quadrant_levels[q][0]);
+    window.CMP_ALTCAP[q] = (alt && CMPDATA.quadrant_levels[alt])
+      ? Math.round(CMPDATA.quadrant_levels[alt][0]) : 51;
+  }
+  window.SCORES_CMP = {};
+  window.CMP_READY = false;
+  (async function(){
+    for (var qq in CMPDATA.grids) {
+      var bin = Uint8Array.from(atob(CMPDATA.grids[qq]), function(c){ return c.charCodeAt(0); });
+      var ds = new DecompressionStream('gzip');
+      var w = ds.writable.getWriter(); w.write(bin); w.close();
+      var chunks = [], reader = ds.readable.getReader();
+      while (true) { var r = await reader.read(); if (r.done) break; chunks.push(r.value); }
+      var total = chunks.reduce(function(s, c){ return s + c.byteLength; }, 0);
+      var merged = new Uint8Array(total), off = 0;
+      for (var i = 0; i < chunks.length; i++) { merged.set(chunks[i], off); off += chunks[i].byteLength; }
+      window.SCORES_CMP[qq] = Array.from(new Uint16Array(merged.buffer));
+    }
+    window.CMP_READY = true;
+    if (window._cmpBoxRerender) window._cmpBoxRerender();
+  })();
+})();
+"""
+
+
+def _cmp_panels_js():
+    """The shared compare-panel functions (also injected into the deep dive)."""
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cmp_panels.js')
+    with open(p) as f:
+        return f.read()
+
+
+def _cmp_embed(d):
+    """cmp-data blob + shared panels + setup/decoder, or '' when the JSON
+    predates the score grids (older guides still render; panels just never
+    appear)."""
+    cmp = d.get('cmp_scores')
+    if not cmp:
+        return ''
+    blob = json.dumps(cmp, separators=(',', ':'))
+    return (f'<script type="application/json" id="cmp-data">{blob}</script>\n'
+            f'<script>{_cmp_panels_js()}</script>\n'
+            f'<script>{CMP_SETUP_JS}</script>\n')
 
 
 def iv_check_box(d):
@@ -399,7 +495,10 @@ def iv_check_box(d):
 matchups table showing <b>only the matchups where those spreads differ</b>.
 Spreads that agree everywhere are hidden, so the table stays scannable. This
 guide covers IVs {hi} down to {lo}; the richest close-call detail is on spreads
-that drop a single stat.</p>
+that drop a single stat. Enter <b>two or more</b> spreads and you also get a
+leftover-HP margin view (how much more convincingly each wins) and a ✦ marker
+for matchups that flip when you toggle your own best-buddy (L50 &harr; L51) in
+the selected Case.</p>
 <div class="ivcheck panel">
   <div class="ivcheck-controls">
     <input id="ivc-input" type="text" placeholder="15/15/14, 15/14/15"
@@ -412,7 +511,7 @@ that drop a single stat.</p>
 </div>
 <script type="application/json" id="ivc-data">{blob}</script>
 <script>{IV_CHECK_JS}</script>
-"""
+{_cmp_embed(d)}"""
 
 
 def style():
@@ -517,6 +616,32 @@ def style():
   .nm-flag { font-size:.7em; color:#e8b06a; text-decoration:none;
             vertical-align:super; font-weight:700; }
   .nm-flag:hover { color:#f0c98b; }
+  /* shared compare panels (scripts/cmp_panels.js): HP-margin bars + ✦ flip.
+     Ported from the deep-dive's .cmp-* rules so the panels render identically
+     in the guide. */
+  .cmp-panel { background:#10182c; border:1px solid #24314d; border-radius:8px;
+            padding:11px 14px; margin:12px 0 14px; }
+  .cmp-panel h4 { margin:0 0 3px; font-size:.92em; }
+  .cmp-flip-h { color:#f0b429; } .cmp-marg-h { color:#58a6ff; }
+  .cmp-psub { font-size:.8em; color:var(--sub); margin:0 0 9px; }
+  .cmp-tbl { border-collapse:collapse; width:100%; font-size:.86em; margin:0; }
+  .cmp-tbl th, .cmp-tbl td { text-align:left; padding:5px 9px;
+            border:none; border-bottom:1px solid #1a2540; white-space:nowrap; }
+  .cmp-tbl th { color:var(--sub); font-weight:600; font-size:.8em; background:none; }
+  .cmp-tbl td { background:none; }
+  .cmp-m { color:#cdd6e5; }
+  .cmp-win { color:#3fb950; font-weight:700; }
+  .cmp-lose { color:#f85149; font-weight:700; }
+  .cmp-tie { color:#d4a017; font-weight:700; }
+  .cmp-flip { color:#f0b429; }
+  .cmp-more { color:var(--sub); font-size:.82em; font-style:italic; }
+  .cmp-bar { display:inline-block; vertical-align:middle; width:64px; height:9px;
+            background:#1a2540; border-radius:5px; overflow:hidden; margin-right:6px; }
+  .cmp-bar > span { display:block; height:100%; background:#3fb950; }
+  .cmp-bar.lo > span { background:#d4a017; }
+  .cmp-hpv { font-size:.82em; color:#9bb0d0; }
+  .cmp-env { font-size:.78em; color:#7fd3b0; }
+  .cmp-leg { font-size:.78em; color:var(--sub); margin-top:5px; }
   @media (max-width:820px) {
     .layout { flex-direction:column; }
     nav.toc { position:static; flex:none; width:auto; }
