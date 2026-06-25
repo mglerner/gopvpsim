@@ -268,7 +268,16 @@ def load_entries(base_dir: Path, *, href_prefix: str = '',
     return entries
 
 
-def _render_entry_list(entries: list[dict], empty_msg: str) -> str:
+def _empty_placeholder_card() -> str:
+    """A styled card (same rectangular ``li.dive`` look as real entries)
+    shown when a section has no entries, so an empty section reads as a
+    deliberate "nothing here yet" rather than a missing / blank block."""
+    return ('  <li class="dive empty">'
+            '<i>Nothing here yet.</i>'
+            '</li>')
+
+
+def _render_entry_list(entries: list[dict]) -> str:
     items = []
     for d in entries:
         items.append(
@@ -279,7 +288,7 @@ def _render_entry_list(entries: list[dict], empty_msg: str) -> str:
             '  </li>'
         )
     if not items:
-        items.append(f'  <li><i>{html.escape(empty_msg)}</i></li>')
+        items.append(_empty_placeholder_card())
     return '\n'.join(items)
 
 
@@ -425,9 +434,9 @@ def _group_dives(dives: list[dict]) -> tuple[list[dict], list[dict]]:
     return result, leftovers
 
 
-def _render_dives_grouped(dives: list[dict], empty_msg: str) -> str:
+def _render_dives_grouped(dives: list[dict]) -> str:
     if not dives:
-        return f'  <li><i>{html.escape(empty_msg)}</i></li>'
+        return _empty_placeholder_card()
     groups, leftovers = _group_dives(dives)
     items: list[str] = []
     for g in groups:
@@ -496,48 +505,61 @@ def render_index(dives: list[dict],
                  articles: list[dict],
                  comparisons: list[dict],
                  *,
+                 matchup_web: list[dict] | None = None,
                  iv_guides: list[dict] | None = None,
                  guides_landing: dict | None = None) -> str:
-    dives_html = _render_dives_grouped(dives, 'No dives published yet.')
-    articles_html = _render_entry_list(articles, 'No articles published yet.')
-    comparisons_html = _render_entry_list(comparisons, 'No comparisons published yet.')
+    dives_html = _render_dives_grouped(dives)
+    articles_html = _render_entry_list(articles)
+    comparisons_html = _render_entry_list(comparisons)
+    matchup_web_html = _render_entry_list(matchup_web or [])
+
+    # Dedicated "Matchup Web" section. The Great League matchup web is an
+    # interactive opponent-vs-opponent grid, not a per-species deep dive, so it
+    # gets its own labeled section rather than being buried among the dives.
+    matchup_web_section = (
+        '\n<h2>Matchup Web</h2>\n'
+        '<p class="section-intro">An interactive grid of how the meta picks '
+        'fare against each other - pick a row and column to read the '
+        'head-to-head.</p>\n'
+        '<ul>\n'
+        f'{matchup_web_html}\n'
+        '</ul>\n'
+    )
 
     # The "Articles" section also HOSTS the ML IV guides as a labeled chip-row
     # sub-group (merged from the former standalone "Master League IV Guides"
     # section; they live at articles/<species>-ml-iv-guide already).
-    articles_section = ''
-    if articles or iv_guides:
-        parts = [
-            '\n<h2>Articles</h2>\n',
-            '<p class="section-intro">Editorial writeups: Community Day move '
-            'analyses, form-change guides, and other one-off pieces. Each links '
-            'to the relevant interactive deep dive(s) for the full per-IV '
-            'detail.</p>\n',
-        ]
-        if articles:
-            parts.append(f'<ul>\n{articles_html}\n</ul>\n')
-        if iv_guides:
-            parts.append(
-                '<h3>Master League IV Guides</h3>\n'
-                '<p class="section-intro">XehrFelrose-style "what IVs do you '
-                'actually need" guides for the Master League meta (PvPoke '
-                'top-60): attack breakpoints, defense bulkpoints, CMP, and the '
-                'exact matchups each IV gives up from 15 down to 12, across the '
-                'full best-buddy grid. AI-drafted from this project\'s '
-                'simulator, pending human review.</p>\n'
-                f'<p>{_render_iv_guides(iv_guides)}</p>\n')
-        articles_section = ''.join(parts)
+    parts = [
+        '\n<h2>Articles</h2>\n',
+        '<p class="section-intro">Editorial writeups: Community Day move '
+        'analyses, form-change guides, and other one-off pieces. Each links '
+        'to the relevant interactive deep dive(s) for the full per-IV '
+        'detail.</p>\n',
+    ]
+    if articles:
+        parts.append(f'<ul>\n{articles_html}\n</ul>\n')
+    if iv_guides:
+        parts.append(
+            '<h3>Master League IV Guides</h3>\n'
+            '<p class="section-intro">XehrFelrose-style "what IVs do you '
+            'actually need" guides for the Master League meta (PvPoke '
+            'top-60): attack breakpoints, defense bulkpoints, CMP, and the '
+            'exact matchups each IV gives up from 15 down to 12, across the '
+            'full best-buddy grid. AI-drafted from this project\'s '
+            'simulator, pending human review.</p>\n'
+            f'<p>{_render_iv_guides(iv_guides)}</p>\n')
+    if not articles and not iv_guides:
+        parts.append(f'<ul>\n{articles_html}\n</ul>\n')
+    articles_section = ''.join(parts)
 
-    comparisons_section = ''
-    if comparisons:
-        comparisons_section = (
-            '\n<h2>Comparisons</h2>\n'
-            '<p class="section-intro">Head-to-head pieces pitting two builds, '
-            'forms, or movesets against each other across the meta.</p>\n'
-            '<ul>\n'
-            f'{comparisons_html}\n'
-            '</ul>\n'
-        )
+    comparisons_section = (
+        '\n<h2>Comparisons</h2>\n'
+        '<p class="section-intro">Head-to-head pieces pitting two builds, '
+        'forms, or movesets against each other across the meta.</p>\n'
+        '<ul>\n'
+        f'{comparisons_html}\n'
+        '</ul>\n'
+    )
 
     guides_section = ''
     if guides_landing:
@@ -575,6 +597,7 @@ def render_index(dives: list[dict],
   li.dive {{ background: #16213e; padding: 14px 18px; border-radius: 6px;
              margin-bottom: 14px; }}
   li.dive p {{ margin: 6px 0 0 0; color: #aaa; font-size: 14px; }}
+  li.dive.empty {{ color: #888; }}
   .section-intro {{ color: #aaa; font-size: 14px; margin: 0 0 14px 0; }}
   .species {{ font-weight: bold; color: #e0e0e0; margin-right: 10px; }}
   a.chip {{ display: inline-block; background: #0f3460; color: #9be89b;
@@ -598,7 +621,7 @@ open it.</p>
 <ul>
 {dives_html}
 </ul>
-{articles_section}{comparisons_section}{guides_section}
+{matchup_web_section}{articles_section}{comparisons_section}{guides_section}
 <p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
 <p class="about">If you find something broken or surprising, reach out on Discord: <a href="https://discord.com/users/460510521112920105">TitanTrainers15</a>.</p>
 {support_footer_html("")}</body>
@@ -711,6 +734,11 @@ def main() -> int:
         WEBSITE_DIR,
         exclude=frozenset({'articles', 'comparisons', 'guides'}),
     )
+    # The matchup web lives at the site root (userdata/website/matchups/) with
+    # no meta.toml, so load_entries() picks it up as a "dive". It is not a
+    # per-species dive, so split it out by slug into its own section.
+    matchup_web = [d for d in dives if d['slug'] == 'matchups']
+    dives = [d for d in dives if d['slug'] != 'matchups']
     articles = load_entries(ARTICLES_DIR, href_prefix='articles/')
     # Split the ML IV guides (slug "<species>-ml-iv-guide[-even]") out from the
     # editorial articles so they render as a labeled chip-row sub-group under
@@ -737,6 +765,7 @@ def main() -> int:
             guides_landing = None
 
     index_html = render_index(dives, articles, comparisons,
+                              matchup_web=matchup_web,
                               iv_guides=iv_guides,
                               guides_landing=guides_landing)
     INDEX_PATH.write_text(index_html)
@@ -747,6 +776,8 @@ def main() -> int:
           f"{len(comparisons)} comparison(s))")
     for d in dives:
         print(f"  - [dive] {d['title']} -> {d['href']}")
+    for m in matchup_web:
+        print(f"  - [matchup-web] {m['title']} -> {m['href']}")
     for a in articles:
         print(f"  - [article] {a['title']} -> {a['href']}")
     for c in comparisons:
