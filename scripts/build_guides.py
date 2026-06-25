@@ -61,6 +61,11 @@ from gopvpsim.attribution import (  # noqa: E402
     PVPOKE_ATTRIBUTION_SHORT,
     support_footer_html,
 )
+from gopvpsim.theme import (  # noqa: E402
+    theme_css,
+    theme_head_script,
+    theme_picker_html,
+)
 
 # Verification-count scalars used by dev:* tokens. DEVELOPER_NOTES.md
 # is the source of truth; the numbers live in prose, each wrapped in
@@ -347,17 +352,18 @@ def _render_markdown(body: str) -> str:
 _GUIDE_CSS = """
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
        sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px;
-       background: #1a1a2e; color: #e0e0e0; line-height: 1.6; }
-h1 { color: #e94560; }
-h2 { color: #c8a2d0; border-bottom: 1px solid #0f3460;
-     padding-bottom: 6px; margin-top: 32px; }
-h3 { color: #c8a2d0; margin-top: 24px; }
-a { color: #9be89b; text-decoration: none; }
+       background: var(--bg); color: var(--text); line-height: 1.6; }
+h1 { color: var(--title); }
+h2 { color: var(--heading); border-bottom: 1px solid var(--border);
+     padding-bottom: 6px; margin-top: 32px;
+     font-size: 1.15em; font-weight: 700; letter-spacing: .02em; }
+h3 { color: var(--heading); margin-top: 24px; font-weight: 700; }
+a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
-code { background: #16213e; padding: 2px 6px; border-radius: 4px;
-       border: 1px solid #0f3460; font-size: 0.92em; }
-pre { background: #16213e; padding: 12px 16px; border-radius: 6px;
-      border: 1px solid #0f3460; overflow-x: auto; margin: 16px 0;
+code { background: var(--surface); padding: 2px 6px; border-radius: 2px;
+       border: 1px solid var(--border); font-size: 0.92em; }
+pre { background: var(--surface); padding: 12px 16px; border-radius: 2px;
+      border: 1px solid var(--border); overflow-x: auto; margin: 16px 0;
       font-size: 0.9em; line-height: 1.5;
       width: fit-content; max-width: 100%; }
 pre code { background: transparent; padding: 0; font-size: inherit;
@@ -366,44 +372,37 @@ ul, ol { padding-left: 22px; }
 li { margin: 4px 0; }
 figure { margin: 20px 0; }
 figure img { max-width: 100%; height: auto; display: block;
-             border-radius: 6px; }
-figcaption { color: #aaa; font-size: 14px; margin-top: 8px;
+             border-radius: 2px; }
+figcaption { color: var(--text-muted); font-size: 14px; margin-top: 8px;
              font-style: italic; }
-.coming-soon { background: #16213e; padding: 20px; border-radius: 6px;
-               border-left: 3px solid #d29922; color: #ccc; }
-.breadcrumb { color: #888; font-size: 14px; margin-bottom: 20px; }
-.breadcrumb a { color: #9be89b; }
+.coming-soon { background: var(--callout-bg); padding: 20px; border-radius: 0;
+               border: 1px solid var(--callout-ai); color: var(--callout-fg); }
+.breadcrumb { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+.breadcrumb a { color: var(--accent); }
 .guide-list { list-style: none; padding: 0; }
-.guide-list li { background: #16213e; padding: 14px 18px;
-                 border-radius: 6px; margin-bottom: 14px; }
-.guide-list li p { margin: 6px 0 0 0; color: #aaa; font-size: 14px; }
-.guide-list li.coming-soon-entry a { color: #888; cursor: not-allowed; }
+.guide-list li { background: var(--surface); padding: 14px 18px;
+                 border-radius: 2px; margin-bottom: 14px; }
+.guide-list li p { margin: 6px 0 0 0; color: var(--text-muted); font-size: 14px; }
+.guide-list li.coming-soon-entry a { color: var(--text-muted); cursor: not-allowed; }
 .guide-list li.coming-soon-entry .badge {
-    font-size: 12px; color: #d29922; margin-left: 8px; }
-.about { color: #888; font-size: 13px; margin-top: 40px;
-         border-top: 1px solid #0f3460; padding-top: 12px; }
-.authorship-banner { padding: 10px 14px 10px 18px; border-radius: 6px;
+    font-size: 12px; color: var(--callout-ai); margin-left: 8px; }
+.about { color: var(--text-muted); font-size: 13px; margin-top: 40px;
+         border-top: 1px solid var(--border); padding-top: 12px; }
+.authorship-banner { padding: 10px 14px; border-radius: 0;
                      margin: 0 0 18px 0; font-size: 14px;
-                     border-left: 3px solid var(--sidebar-color, #8b949e); }
-.authorship-banner.ai     { --sidebar-color: #d29922;
-                            background: #2a1f00; color: #e8c87b; }
-.authorship-banner.auto   { --sidebar-color: #5b8dd9;
-                            background: #1a2333; color: #8ab4f8; }
-.authorship-banner.both   { --sidebar-color: #7db87d;
-                            background: #1f2a1a; color: #a8d8a8; }
-.authorship-banner.expert { --sidebar-color: #d4a017;
-                            background: #2a2000; color: #e8d48b; }
-.auth-chip { display: inline-block; padding: 1px 8px 1px 10px;
-             border-radius: 4px; font-weight: 600;
-             border-left: 3px solid var(--sidebar-color, #8b949e); }
-.auth-chip.ai     { --sidebar-color: #d29922;
-                    background: #2a1f00; color: #e8c87b; }
-.auth-chip.auto   { --sidebar-color: #5b8dd9;
-                    background: #1a2333; color: #8ab4f8; }
-.auth-chip.both   { --sidebar-color: #7db87d;
-                    background: #1f2a1a; color: #a8d8a8; }
-.auth-chip.expert { --sidebar-color: #d4a017;
-                    background: #2a2000; color: #e8d48b; }
+                     background: var(--callout-bg); color: var(--callout-fg);
+                     border: 1px solid var(--sidebar-color, var(--text-muted)); }
+.authorship-banner.ai     { --sidebar-color: var(--callout-ai); }
+.authorship-banner.auto   { --sidebar-color: var(--callout-auto); }
+.authorship-banner.both   { --sidebar-color: var(--callout-both); }
+.authorship-banner.expert { --sidebar-color: var(--callout-expert); }
+.auth-chip { display: inline-block; padding: 1px 8px; border-radius: 4px;
+             font-weight: 600; background: var(--callout-bg); color: var(--callout-fg);
+             border: 1px solid var(--sidebar-color, var(--text-muted)); }
+.auth-chip.ai     { --sidebar-color: var(--callout-ai); }
+.auth-chip.auto   { --sidebar-color: var(--callout-auto); }
+.auth-chip.both   { --sidebar-color: var(--callout-both); }
+.auth-chip.expert { --sidebar-color: var(--callout-expert); }
 """
 
 
@@ -449,13 +448,15 @@ def _render_page(*, title: str, body_html: str,
         if regenerated_stamp else ''
     )
     return f"""<!DOCTYPE html>
-<html>
+<html data-theme="gruvbox-light">
 <head>
 <meta charset="utf-8">
+{theme_head_script()}
 <title>{html.escape(title)}</title>
-<style>{_GUIDE_CSS}</style>
+<style>{theme_css()}{_GUIDE_CSS}</style>
 </head>
 <body>
+{theme_picker_html()}
 {breadcrumb_html}
 {body_html}
 <p class="about">{PVPOKE_ATTRIBUTION_SHORT}</p>
