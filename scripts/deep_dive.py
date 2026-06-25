@@ -6022,14 +6022,16 @@ def main():
                              "energy-gated matchup flips. Opponent always "
                              "starts at 0. Triples compute time. "
                              "Interactive mode only. Default: off.")
-    parser.add_argument('--compare-energy', action='store_true',
+    parser.add_argument('--compare-energy', action=argparse.BooleanOptionalAction,
+                        default=True,
                         help="Capture the focal's POST-MATCH energy per matchup "
                              "and embed it (parallel to scores) so the 'Compare "
-                             "my candidates' widget can show 'banks ~N charged "
-                             "moves'. Bypasses the sweep disk cache (the cache "
-                             "holds only scores) so it costs full sim time; "
-                             "adds ~4%% to the HTML. Default: off (zero new "
-                             "bytes / byte-identical when off).")
+                             "my candidates' widget shows the banked-energy line "
+                             "('+N energy', ~N charged moves). Default: ON. "
+                             "NOTE: it bypasses the sweep disk cache (the cache "
+                             "holds only scores), so a re-run pays full sim time "
+                             "instead of cache hits; adds ~4%% to the HTML. Pass "
+                             "--no-compare-energy to drop it (smaller, cacheable).")
     parser.add_argument('--verbose', action='store_true',
                         help='Route DEBUG-level aggregator diagnostics to the '
                              'log file (stdout unchanged).')
