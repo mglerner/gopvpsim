@@ -13,8 +13,8 @@
 slug   = "aegislash-blade-vs-shield"
 title  = "Aegislash: Shield path vs always-Blade"
 league = "great"
-author = "mglerner"
-authored_by = "human"
+author = ""
+authored_by = "ai"
 
 order = ["Shield", "Blade"]
 
