@@ -1711,7 +1711,7 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
                        opp_cache, shield_scenarios, focal_bait=True,
                        log_path=None, verbose=False,
                        focal_mon=None, league_cp=1500, focal_shadow=False,
-                       focal_energy=0, mechanics='legacy'):
+                       focal_energy=0, mechanics='legacy', capture_energy=False):
     """Initialize shared state in each sweep worker process."""
     # Spawn-mode workers (default on macOS) do not inherit the parent
     # logger's handlers; re-attach a FileHandler so any worker-side
@@ -1729,6 +1729,7 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
     _worker_state['focal_shadow'] = focal_shadow
     _worker_state['focal_energy'] = focal_energy
     _worker_state['mechanics'] = mechanics
+    _worker_state['capture_energy'] = capture_energy
     if focal_bait:
         _worker_state['focal_policy'] = pvpoke_dp
     else:
@@ -1759,8 +1760,10 @@ def _sweep_worker(pair_chunk):
     focal_shadow = ws['focal_shadow']
     focal_energy = ws.get('focal_energy', 0)
     mechanics = ws.get('mechanics', 'legacy')
+    capture_energy = ws.get('capture_energy', False)
 
     results = {}
+    energy_results = {} if capture_energy else None
     n_sims = 0
     for (profile_key, atk_stat, def_stat, hp_stat, a_iv, d_iv, s_iv, lv), oi in pair_chunk:
         opp = opp_cache[oi]
@@ -1790,6 +1793,7 @@ def _sweep_worker(pair_chunk):
         attach_form_change(bp1, opp['mon'], *opp['ivs'], opp['level'],
                            league_cp, opp['shadow'])
         scores = []
+        energies = [] if capture_energy else None
         for s_focal, s_opp in shield_scenarios:
             bp0.reset_for_battle(s_focal, opponent=bp1)
             bp1.reset_for_battle(s_opp, opponent=bp0)
@@ -1798,8 +1802,18 @@ def _sweep_worker(pair_chunk):
                               charged_policy_1=pvpoke_dp,
                               mechanics=mechanics)
             scores.append(result.pvpoke_score(0))
+            if capture_energy:
+                # Focal's leftover energy (0..100) at battle end -- the post-match
+                # state for the compare widget's "banks N charged moves" line.
+                energies.append(result.energy_remaining[0])
             n_sims += 1
         results[(profile_key, oi)] = scores
+        if capture_energy:
+            energy_results[(profile_key, oi)] = energies
+    # Branch the return shape so the off path is byte-identical: callers that
+    # don't capture energy keep unpacking the historical (results, n_sims).
+    if capture_energy:
+        return results, energy_results, n_sims
     return results, n_sims
 
 
@@ -1808,7 +1822,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
              iv_floor=None, log_path=None, verbose=False,
              threshold_registry=None, reserve_cpus=0, signature_dedup=True,
              use_sweep_cache=False, mechanics='legacy',
-             focal_max_level=None, opp_max_level=None):
+             focal_max_level=None, opp_max_level=None, capture_energy=False):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
@@ -1855,8 +1869,14 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     sweep, or a niche meta where everyone runs a best-buddied opponent). Both
     default ``None`` = league default (today's behavior).
 
-    Returns (results, n_sims, canonical_scores, canonical_meta) where results
-    is one dict per IV, sorted by avg_score desc.
+    ``capture_energy`` (opt-in) also records the focal's post-match energy per
+    (IV, scenario, opponent) -- the 5th return ``canonical_energy`` (parallel to
+    ``canonical_scores``); it is ``None`` otherwise. Capturing forces the disk
+    cache off (the cache stores only the score column).
+
+    Returns (results, n_sims, canonical_scores, canonical_meta, canonical_energy)
+    where results is one dict per IV, sorted by avg_score desc, and
+    canonical_energy is None unless ``capture_energy``.
     """
     # Split composite mode into opponent-IV, bait, and energy-lead axes.
     opp_iv_mode_simple, bait_mode = parse_mode(opp_iv_mode)
@@ -1946,6 +1966,12 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     # CLAUDE.md flags as coordination-sensitive).
     if mechanics != 'legacy':
         use_sweep_cache = False
+    # The disk cache stores only the float64 SCORE column; it carries no energy.
+    # Capturing energy must therefore bypass the cache (fresh sims supply both),
+    # exactly like the 'new'-mechanics disable above. capture_energy is opt-in
+    # and rare, so paying the full sim cost is fine.
+    if capture_energy:
+        use_sweep_cache = False
     if use_sweep_cache:
         import sweep_cache as swc
         sweep_cache = swc.SweepCache(swc.focal_key_fields(
@@ -2015,7 +2041,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                       opp_cache, shield_scenarios, focal_bait,
                       log_path, verbose,
                       focal_mon, LEAGUE_CAPS[league], shadow,
-                      focal_energy, mechanics),
+                      focal_energy, mechanics, capture_energy),
         ) as pool:
             last_print = sim_start
             completed = 0
@@ -2034,19 +2060,34 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     # Merge pair results, then fan each representative's scores out to
     # every profile in its signature group.
     pair_scores = {}
+    pair_energy = {} if capture_energy else None
     n_sims = 0
-    for pair_res, chunk_sims in chunk_results:
+    for chunk_res in chunk_results:
+        # Worker return shape branches on capture_energy (see _sweep_worker).
+        if capture_energy:
+            pair_res, pair_en, chunk_sims = chunk_res
+            pair_energy.update(pair_en)
+        else:
+            pair_res, chunk_sims = chunk_res
         pair_scores.update(pair_res)
         n_sims += chunk_sims
 
     profile_per_opp = {}
+    profile_energy_per_opp = {} if capture_energy else None
     for oi, groups in groups_by_opp.items():
         for rep_pos, members in groups:
             scores = pair_scores[(profile_list[rep_pos][0], oi)]
+            energies = (pair_energy[(profile_list[rep_pos][0], oi)]
+                        if capture_energy else None)
             for pos in members:
                 per_opp = profile_per_opp.setdefault(profile_list[pos][0], {})
                 for si, sc in enumerate(scores):
                     per_opp[(si, oi)] = sc
+                if capture_energy:
+                    e_per_opp = profile_energy_per_opp.setdefault(
+                        profile_list[pos][0], {})
+                    for si, en in enumerate(energies):
+                        e_per_opp[(si, oi)] = en
 
     # Fill cache-hit columns: all IVs in a profile share effective
     # stats, hence identical battles, so the profile's first IV index
@@ -2099,10 +2140,13 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         result = dict(meta)  # copy a, d, s, level, cp, atk, def_, hp, stat_product
         result['avg_score'] = avg_score
         result['per_opp'] = per_opp
+        if capture_energy:
+            result['per_opp_energy'] = profile_energy_per_opp[pk]
         results.append(result)
 
     # Build canonical-order score array (in iv_meta order, same as results list)
     canonical_scores = []
+    canonical_energy = [] if capture_energy else None
     canonical_meta = []  # [(a,d,s, lv, cp, atk, def_, hp), ...]
     for r in results:
         canonical_meta.append((
@@ -2113,6 +2157,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         for si in range(n_scenarios):
             for oi in range(n_opponents):
                 canonical_scores.append(round(r['per_opp'][(si, oi)]))
+                if capture_energy:
+                    canonical_energy.append(round(r['per_opp_energy'][(si, oi)]))
 
     # Now sort and rank
     results.sort(key=lambda r: r['avg_score'], reverse=True)
@@ -2123,7 +2169,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     for i, r in enumerate(by_sp):
         r['sp_rank'] = i + 1
 
-    return results, n_sims, canonical_scores, canonical_meta
+    return results, n_sims, canonical_scores, canonical_meta, canonical_energy
 
 
 # ---------------------------------------------------------------------------
@@ -3876,7 +3922,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'opponentLabel': opponent_label or 'PvPoke rankings',
         'referenceIdx': reference_idx,
         'tiers': tier_info,
-        'movesets': [{'label': md['label'], 'prettyLabel': _pretty_moveset(md['label'])} for md in moveset_data],
+        'movesets': [{'label': md['label'], 'prettyLabel': _pretty_moveset(md['label']),
+                      **({'cheapestChargedCost': md['cheapest_charged_energy']}
+                         if md.get('cheapest_charged_energy') is not None else {})}
+                     for md in moveset_data],
         # Reference IV indices (for matchup diff in hover text)
         'pvpokeRefIvIdx': pvpoke_ref_iv_idx,
         'rank1RefIvIdx': rank1_ref_iv_idx,
@@ -3952,13 +4001,22 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 
     # Score arrays: one per (moveset_idx, opp_iv_mode). When best-buddy is
     # active each moveset also carries an L51 grid, keyed '{mi}_{mode}@51'.
+    # energy_arrays mirrors score_arrays EXACTLY (same keys incl. @51), but only
+    # when --compare-energy populated md['energy']; empty otherwise -> embeds
+    # nothing (byte-identical).
     score_arrays = {}
+    energy_arrays = {}
     for mi, md in enumerate(moveset_data):
         for mode in opp_iv_modes:
             key = f'{mi}_{mode}'
             score_arrays[key] = md['scores'][mode]
             if _bb_active and md.get('scores_l51') and mode in md['scores_l51']:
                 score_arrays[f'{key}@51'] = md['scores_l51'][mode]
+            if md.get('energy') and mode in md['energy']:
+                energy_arrays[key] = md['energy'][mode]
+                if (_bb_active and md.get('energy_l51')
+                        and mode in md['energy_l51']):
+                    energy_arrays[f'{key}@51'] = md['energy_l51'][mode]
 
     # Item 5: base-form score arrays (only the movesets that carry a
     # 'scores_base' -- currently moveset 0 on shadow/Female-sex focals).
@@ -4467,6 +4525,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .cmp-m {{ color:#cdd6e5; }}
   .cmp-win {{ color:#3fb950; font-weight:700; }}
   .cmp-lose {{ color:#f85149; font-weight:700; }}
+  .cmp-tie {{ color:#d4a017; font-weight:700; }}
   .cmp-flip {{ color:#f0b429; }}
   .cmp-more {{ color:#8b949e; font-size:0.76rem; font-style:italic; }}
   .cmp-bar {{ display:inline-block; vertical-align:middle; width:64px; height:9px;
@@ -4474,6 +4533,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .cmp-bar > span {{ display:block; height:100%; background:#3fb950; }}
   .cmp-bar.lo > span {{ background:#d4a017; }}
   .cmp-hpv {{ font-size:0.76rem; color:#9bb0d0; }}
+  .cmp-env {{ font-size:0.72rem; color:#7fd3b0; }}
   .cmp-leg {{ font-size:0.72rem; color:#8b949e; margin-top:5px; }}
   /* Section sidenav. Mirrors the ML IV-guide pages
      (scripts/render_iv_envelope_article.py): sticky side column at wide
@@ -5147,6 +5207,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         # (caught by replay-vs-original diffing, arc S4).
         gz = gzip.compress(raw, compresslevel=9, mtime=0)
         packed_scores[key] = base64.b64encode(gz).decode('ascii')
+    # Energy grid: same uint16/gzip/base64 pipeline as scores, keyed identically
+    # (incl. @51). Empty unless --compare-energy populated energy_arrays, in
+    # which case ZERO new bytes are emitted below (byte-identical when off).
+    packed_energy = {}
+    for key, arr in energy_arrays.items():
+        clamped = [max(0, min(65535, int(v))) for v in arr]
+        raw = struct.pack(f'<{len(clamped)}H', *clamped)
+        gz = gzip.compress(raw, compresslevel=9, mtime=0)
+        packed_energy[key] = base64.b64encode(gz).decode('ascii')
     # Dedup'd tooltip table: renderers register tooltip text as they
     # emit data-t="<sid>" attrs; we dump {sid: text} here and a
     # DOMContentLoaded pass (below) populates el.title from the
@@ -5155,6 +5224,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     data_obj['tooltips'] = rendering.dump_tooltip_registry()
     html += f'<script>var DATA = {json.dumps(data_obj)};\n'
     html += f'var SCORES_GZ = {json.dumps(packed_scores)};\n'
+    if packed_energy:
+        html += f'var ENERGY_GZ = {json.dumps(packed_energy)};\n'
     html += """
 // -------------------------------------------------------------------
 // How SCORES_GZ works (for the curious / paranoid):
@@ -5209,7 +5280,41 @@ var _scoresReady = (async function() {
     SCORES[key] = Array.from(new Uint16Array(merged.buffer));
   }
 })();
-
+"""
+    # Parallel ENERGY decoder -- emitted ONLY when --compare-energy embedded a
+    # grid (keeps an energy-off dive byte-identical: no var, no decoder).
+    if packed_energy:
+        html += """
+var ENERGY = {};
+var _energyReady = (async function() {
+  for (var key in ENERGY_GZ) {
+    var bin = Uint8Array.from(atob(ENERGY_GZ[key]), function(c) { return c.charCodeAt(0); });
+    var ds = new DecompressionStream('gzip');
+    var writer = ds.writable.getWriter();
+    writer.write(bin);
+    writer.close();
+    var chunks = [];
+    var reader = ds.readable.getReader();
+    while (true) {
+      var r = await reader.read();
+      if (r.done) break;
+      chunks.push(r.value);
+    }
+    var total = chunks.reduce(function(s, c) { return s + c.byteLength; }, 0);
+    var merged = new Uint8Array(total);
+    var offset = 0;
+    for (var i = 0; i < chunks.length; i++) {
+      merged.set(chunks[i], offset);
+      offset += chunks[i].byteLength;
+    }
+    ENERGY[key] = Array.from(new Uint16Array(merged.buffer));
+  }
+})();
+// Re-render the compare widget once energy is decoded, so the margin panel
+// picks up the "+N energy" detail even if candidates were added during decode.
+_energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
+"""
+    html += """
 // Populate title= attributes from DATA.tooltips lookup.
 // Every element with data-t="<sid>" gets its title set from
 // DATA.tooltips[sid]. Runs at DOMContentLoaded so native browser
@@ -5864,6 +5969,14 @@ def main():
                              "energy-gated matchup flips. Opponent always "
                              "starts at 0. Triples compute time. "
                              "Interactive mode only. Default: off.")
+    parser.add_argument('--compare-energy', action='store_true',
+                        help="Capture the focal's POST-MATCH energy per matchup "
+                             "and embed it (parallel to scores) so the 'Compare "
+                             "my candidates' widget can show 'banks ~N charged "
+                             "moves'. Bypasses the sweep disk cache (the cache "
+                             "holds only scores) so it costs full sim time; "
+                             "adds ~4%% to the HTML. Default: off (zero new "
+                             "bytes / byte-identical when off).")
     parser.add_argument('--verbose', action='store_true',
                         help='Route DEBUG-level aggregator diagnostics to the '
                              'log file (stdout unchanged).')
@@ -6498,7 +6611,7 @@ def main():
                     f"× {len(shield_scenarios)} scenario(s)...")
         t0 = time.time()
 
-        results, n_sims, canonical_scores, canonical_meta = iv_sweep(
+        results, n_sims, canonical_scores, canonical_meta, canonical_energy = iv_sweep(
             args.species, fast_id, charged_ids, args.league, args.shadow,
             opponents, opp_movesets_full, shield_scenarios,
             opp_iv_mode=opp_iv_mode,
@@ -6509,6 +6622,7 @@ def main():
             signature_dedup=not args.no_signature_dedup,
             use_sweep_cache=not args.no_sweep_cache,
             mechanics=args.mechanics,
+            capture_energy=args.compare_energy,
         )
 
         elapsed = time.time() - t0
@@ -6845,7 +6959,8 @@ def main():
         logger.result('')
 
         all_moveset_results.append((fast_id, charged_ids, results,
-                                     canonical_scores, canonical_meta))
+                                     canonical_scores, canonical_meta,
+                                     canonical_energy))
 
     # HTML output
     if args.html:
@@ -6887,8 +7002,9 @@ def main():
         # corresponds to ``opp_iv_mode`` at bait-on (the Phase 2 default).
         cached_mode = opp_iv_mode  # bait-on, no :nobait suffix
         new_results = []
-        for fast_id, charged_ids, results, cs, cm in all_moveset_results:
+        for fast_id, charged_ids, results, cs, cm, ce in all_moveset_results:
             scores_by_mode = {cached_mode: cs}
+            energy_by_mode = {cached_mode: ce} if ce is not None else None
             for mode in opp_iv_modes_to_run:
                 if mode in scores_by_mode:
                     continue
@@ -6896,7 +7012,7 @@ def main():
                 logger.info(f"  Running {moveset_label(fast_id, charged_ids)} "
                             f"({mode_label})...")
                 t0 = time.time()
-                _, n2, cs2, _ = iv_sweep(
+                _, n2, cs2, _, ce2 = iv_sweep(
                     args.species, fast_id, charged_ids, args.league, args.shadow,
                     opponents, opp_movesets_full, shield_scenarios,
                     opp_iv_mode=mode,
@@ -6907,12 +7023,15 @@ def main():
                     signature_dedup=not args.no_signature_dedup,
                     use_sweep_cache=not args.no_sweep_cache,
                     mechanics=args.mechanics,
+                    capture_energy=args.compare_energy,
                 )
                 elapsed = time.time() - t0
                 logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
                 scores_by_mode[mode] = cs2
+                if energy_by_mode is not None:
+                    energy_by_mode[mode] = ce2
             new_results.append((fast_id, charged_ids, results,
-                                scores_by_mode, cm))
+                                scores_by_mode, cm, energy_by_mode))
         all_moveset_results = new_results
 
         # Resolve and run reference moveset
@@ -6939,10 +7058,11 @@ def main():
                 # Run reference sweep
                 logger.info(f"  Reference sweep: {ref_label}")
                 ref_scores_by_mode = {}
+                ref_energy_by_mode = {} if args.compare_energy else None
                 ref_meta = None
                 for mode in opp_iv_modes_to_run:
                     t0 = time.time()
-                    ref_results, ref_n, ref_cs, ref_cm = iv_sweep(
+                    ref_results, ref_n, ref_cs, ref_cm, ref_ce = iv_sweep(
                         args.species, ref_fast, ref_charged, args.league, args.shadow,
                         opponents, opp_movesets_full, shield_scenarios,
                         opp_iv_mode=mode,
@@ -6953,16 +7073,20 @@ def main():
                         signature_dedup=not args.no_signature_dedup,
                         use_sweep_cache=not args.no_sweep_cache,
                         mechanics=args.mechanics,
+                        capture_energy=args.compare_energy,
                     )
                     elapsed = time.time() - t0
                     rate = ref_n / elapsed if elapsed > 0 else 0
                     logger.info(f"    {ref_n:,} sims in {elapsed:.1f}s ({rate:,.0f} sims/s)")
                     ref_scores_by_mode[mode] = ref_cs
+                    if ref_energy_by_mode is not None:
+                        ref_energy_by_mode[mode] = ref_ce
                     if ref_meta is None:
                         ref_meta = ref_cm
                 reference_idx = len(all_moveset_results)
                 all_moveset_results.append((ref_fast, ref_charged, ref_results,
-                                            ref_scores_by_mode, ref_meta))
+                                            ref_scores_by_mode, ref_meta,
+                                            ref_energy_by_mode))
 
         # Build moveset_data for interactive HTML
         moveset_data = []
@@ -6970,11 +7094,20 @@ def main():
             fast_id, charged_ids = entry[0], entry[1]
             scores_by_mode = entry[3]
             meta = entry[4]
-            moveset_data.append({
+            energy_by_mode = entry[5] if len(entry) > 5 else None
+            _md = {
                 'label': moveset_label_raw(fast_id, charged_ids),
                 'scores': scores_by_mode,
                 'meta': meta,
-            })
+            }
+            if energy_by_mode is not None:
+                # mode -> flat energy list (same shape/order as 'scores'); plus
+                # the cheapest charged cost so the JS can say "banks ~N moves".
+                _fm_db, _cm_db = get_moves()
+                _md['energy'] = energy_by_mode
+                _md['cheapest_charged_energy'] = min(
+                    (_cm_db[cid]['energy'] for cid in charged_ids), default=0)
+            moveset_data.append(_md)
 
         # ---- Item 5: base-form sim pass (shadow / Female-sex focals only) ----
         # The dive card's "N newly guaranteed vs base form" line needs a SECOND
@@ -6993,7 +7126,7 @@ def main():
             _base_scores_by_mode = {}
             for mode in opp_iv_modes_to_run:
                 t0 = time.time()
-                _, _bn, _bcs, _ = iv_sweep(
+                _, _bn, _bcs, _, _ = iv_sweep(
                     _base_species, _b_fast, _b_charged, args.league, _base_shadow,
                     opponents, opp_movesets_full, shield_scenarios,
                     opp_iv_mode=mode,
@@ -7060,10 +7193,11 @@ def main():
             for mi, md in enumerate(moveset_data):
                 _bb_f, _bb_c = all_moveset_results[mi][0], all_moveset_results[mi][1]
                 _bb_scores = {}
+                _bb_energy = {} if args.compare_energy else None
                 _bb_meta = None
                 for mode in opp_iv_modes_to_run:
                     t0 = time.time()
-                    _br, _bn51, _bcs51, _bcm51 = iv_sweep(
+                    _br, _bn51, _bcs51, _bcm51, _bce51 = iv_sweep(
                         args.species, _bb_f, _bb_c, args.league, args.shadow,
                         opponents, opp_movesets_full, shield_scenarios,
                         opp_iv_mode=mode,
@@ -7075,14 +7209,19 @@ def main():
                         use_sweep_cache=not args.no_sweep_cache,
                         mechanics=args.mechanics,
                         focal_max_level=_bb_alt_cap,
+                        capture_energy=args.compare_energy,
                     )
                     logger.info(f"    L{_bb_alt_cap:g} {_bn51:,} sims in "
                                 f"{time.time() - t0:.1f}s ({mode_pretty_label(mode)})")
                     _bb_scores[mode] = _bcs51
+                    if _bb_energy is not None:
+                        _bb_energy[mode] = _bce51
                     if _bb_meta is None:
                         _bb_meta = _bcm51
                 md['scores_l51'] = _bb_scores
                 md['meta_l51'] = _bb_meta
+                if _bb_energy is not None:
+                    md['energy_l51'] = _bb_energy
         # default display level: CLI > TOML > league default cap.
         if args.best_buddy_display is not None:
             _bb_display = int(args.best_buddy_display)

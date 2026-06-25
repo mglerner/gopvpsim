@@ -3183,6 +3183,15 @@ function cmpGrids() {
   return { def: SCORES[base], alt: (DATA.ivL51 ? SCORES[base + '@51'] : null),
            altCap: (DATA.bestBuddy && DATA.bestBuddy.altCap) || 51 };
 }
+// Post-match ENERGY grids (only present with --compare-energy). Same key
+// construction as cmpGrids; null when absent -> the energy annotation is
+// silently skipped (graceful degrade on dives without it).
+function cmpEnergyGrids() {
+  if (typeof ENERGY === 'undefined') return { def: null, alt: null };
+  var base = state.movesetIdx + '_' + state.oppIvMode;
+  return { def: ENERGY[base] || null,
+           alt: (DATA.ivL51 && ENERGY[base + '@51']) ? ENERGY[base + '@51'] : null };
+}
 function cmpVal(grid, iv, si, oi) {
   return grid[iv * DATA.nScenarios * DATA.nOpponents + si * DATA.nOpponents + oi];
 }
@@ -3337,13 +3346,21 @@ function cmpFlipPanel(live, grids) {
   found.slice(0, CMP_ROWS).forEach(function(f) {
     h += '<tr><td class="cmp-m">' + DATA.opponentsDisplay[f.oi] + ' &middot; ' + cmpScenLabel(f.si) + '</td>';
     live.forEach(function(r, k) {
-      var d = f.vals[k], win = d > 500;
+      // 500 is a simultaneous KO -> a TIE, not a loss (PvPoke convention; the
+      // win-count still uses >500, so a tie counts as neither).
+      var d = f.vals[k];
+      var cls = d > 500 ? 'cmp-win' : (d === 500 ? 'cmp-tie' : 'cmp-lose');
+      var lbl = d > 500 ? 'win ' : (d === 500 ? 'tie ' : 'loss ');
       var mark = '';
-      if (grids.alt) { var a = cmpVal(grids.alt, r.iv, f.si, f.oi);
-        if ((d <= 500) !== (a <= 500)) mark = ' <span class="cmp-flip" title="best-buddy (L' +
-          grids.altCap + ') flips this">✦' + (a > 500 ? '→win' : '→loss') + '</span>'; }
-      h += '<td class="' + (win ? 'cmp-win' : 'cmp-lose') + '">' + (win ? 'win ' : 'loss ') +
-           Math.round(d) + mark + '</td>';
+      if (grids.alt) {
+        var a = cmpVal(grids.alt, r.iv, f.si, f.oi);
+        if ((d > 500) !== (a > 500)) {  // best-buddy crosses the win line
+          var aw = a > 500 ? 'win' : (a === 500 ? 'tie' : 'loss');
+          mark = ' <span class="cmp-flip" title="best-buddy (L' + grids.altCap +
+            ') flips this">✦→' + aw + '</span>';
+        }
+      }
+      h += '<td class="' + cls + '">' + lbl + d + mark + '</td>';
     });
     h += '</tr>';
   });
@@ -3358,8 +3375,8 @@ function cmpMarginPanel(live, grids) {
   for (var oi = 0; oi < nO; oi++) for (var si = 0; si < nS; si++) {
     var vals = live.map(function(r) { return cmpVal(grids.def, r.iv, si, oi); });
     var allWin = vals.every(function(v) { return v > 500; });
-    var allLose = vals.every(function(v) { return v <= 500; });
-    if (!(allWin || allLose)) continue;          // disagreements live in the flip panel
+    var allLose = vals.every(function(v) { return v < 500; });  // ties (==500) excluded
+    if (!(allWin || allLose)) continue;          // disagreements/ties live in the flip panel
     var hps = vals.map(cmpHp), mn = Math.min.apply(null, hps), mx = Math.max.apply(null, hps);
     if (mx - mn >= CMP_MARGIN_MIN) found.push({ oi: oi, si: si, hps: hps, spread: mx - mn, win: allWin });
   }
@@ -3369,23 +3386,37 @@ function cmpMarginPanel(live, grids) {
     '<p class="cmp-psub">All ' + (live.length === 2 ? 'both' : 'these') + ' get the same result, so a ' +
     'win-count shows nothing — but leftover HP (what your <i>next</i> mon inherits) differs. The ' +
     'robustness / "win more convincingly" axis.</p>';
+  // Post-match energy (only with --compare-energy). cheapest charged cost lets
+  // us render "+N energy (~K moves)"; both null -> energy detail is skipped.
+  var eg = cmpEnergyGrids();
+  var cheapest = (DATA.movesets[state.movesetIdx] || {}).cheapestChargedCost;
+  var showEnergy = !!(eg.def && cheapest);
   h += '<table class="cmp-tbl"><tr><th>Matchup</th>' +
     live.map(function(r) { return '<th>' + r.c.a + '/' + r.c.d + '/' + r.c.s + '</th>'; }).join('') + '</tr>';
   found.slice(0, CMP_ROWS).forEach(function(f) {
     h += '<tr><td class="cmp-m">' + DATA.opponentsDisplay[f.oi] + ' &middot; ' + cmpScenLabel(f.si) +
          (f.win ? '' : ' <span class="cmp-lose">(all lose)</span>') + '</td>';
-    f.hps.forEach(function(hp) {
+    f.hps.forEach(function(hp, k) {
       var pct = Math.round(Math.abs(hp) * 100), lo = Math.abs(hp) < 0.2;
+      var enHtml = '';
+      if (showEnergy && f.win) {       // banked energy only meaningful on a win
+        var en = cmpVal(eg.def, live[k].iv, f.si, f.oi);
+        var moves = Math.floor(en / cheapest);
+        enHtml = '<br><span class="cmp-env">+' + Math.round(en) + ' energy' +
+          (moves > 0 ? ' (~' + moves + (moves === 1 ? ' move' : ' moves') + ')' : '') + '</span>';
+      }
       h += '<td><span class="cmp-bar' + (lo ? ' lo' : '') + '"><span style="width:' +
            Math.min(100, pct) + '%"></span></span><span class="cmp-hpv">' +
-           (f.win ? '+' : '−') + pct + '%</span></td>';
+           (f.win ? '+' : '−') + pct + '%</span>' + enHtml + '</td>';
     });
     h += '</tr>';
   });
   if (found.length > CMP_ROWS) h += '<tr><td colspan="' + (live.length + 1) +
     '" class="cmp-more">+' + (found.length - CMP_ROWS) + ' more</td></tr>';
   h += '</table><div class="cmp-leg">Bars = focal’s leftover HP% at battle end ' +
-       '(from the score). Losses show how close you came.</div></div>';
+       '(from the score). Losses show how close you came.' +
+       (showEnergy ? ' Energy = leftover charge banked for your next mon.' : '') +
+       '</div></div>';
   return h;
 }
 
@@ -3396,6 +3427,9 @@ function cmpRemove(a, d, s) {
   cmpRender();
 }
 window.cmpRemove = cmpRemove;
+// Exposed so the async ENERGY decoder (in the page's appended JS) can trigger a
+// re-render once leftover-energy data is ready, if candidates are already shown.
+window.cmpRender = cmpRender;
 
 function cmpWireHandlers() {
   var add = document.getElementById('cmp-add');

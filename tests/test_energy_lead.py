@@ -120,7 +120,7 @@ def _run_sweep(mode):
         opp_iv_mode=mode,
         iv_floor=IV_FLOOR, reserve_cpus=RESERVE,
         use_sweep_cache=False,
-    )
+    )[:4]
 
 
 def _per_opp(results):
@@ -162,7 +162,7 @@ def test_worker_energy_matches_direct_sim():
     fast_db, _ = deep_dive.get_moves()
     eg = fast_db['BUBBLE']['energyGain']
 
-    results, _, _, _ = deep_dive.iv_sweep(
+    results, _, _, _, _ = deep_dive.iv_sweep(
         FOCAL['species'], FOCAL['fast_id'], FOCAL['charged_ids'],
         LEAGUE, False,
         ['Medicham'], [get_default_moveset('Medicham', LEAGUE)],
