@@ -106,3 +106,33 @@ Render a representative page, then check: 4 `[data-theme="..."]` blocks
 present, picker present, Gruvbox credit present, no leftover OLD palette hex
 in the `<style>` block (allow `#fff`, `_TYPE_COLORS`). Aesthetic pass across
 the 4 themes is human (cannot be auto-verified).
+
+## STATUS UPDATE -- rollout essentially complete
+
+All 7 original renderers themed + committed (foundation 4b542af; ML guide
+582dfde; reader guides ed1ca5f; matchup web + 6 `--matrix-*` shade tokens
+0d08244; deep_dive + card 6f4732f; index + compare + cmp_panels em-dash
+6cdaee9). cmp_panels.js em-dash cleanup done.
+
+Contract additions beyond the original spec table:
+- `--callout-both` (joint authorship tier; reader guides use a 4th tier).
+- `--matrix-win/loss/tie-bg/-fg` (6): the matchup matrix is a CONTINUOUS
+  alpha ramp, not discrete tiers -- preserved via `color-mix(... N%,
+  transparent)` over a themed fill (user-approved option (a)).
+
+Preserved as theme-independent data-viz (do NOT tokenize): `_TYPE_COLORS`
+(type badges) and `THRESHOLD_COLORS` (Plotly tier palette) in
+deep_dive_card.py / deep_dive.py.
+
+8th renderer (discovered late, in progress): `render_article.py` /
+`sidebar_css()` -- used by CD articles AND shared into compare_loadouts'
+summary/methodology/verdict panels. Theming `sidebar_css()` retroactively
+finishes those compare panels (imported at render time). Only article TOML
+is the Oink CD article (being removed); no article page currently ships.
+
+Outstanding verification:
+- deep_dive.py full dive-page render verified at PHASE2 (replay render
+  contends with the running sweep; static checks pass now).
+- Aesthetic pass across all 4 themes x every page type = human, pre-publish.
+- matchup light-theme `--matrix-*-fg` legibility on the 67%-alpha fill is
+  the spot most worth a human look.
