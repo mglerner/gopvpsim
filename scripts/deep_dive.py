@@ -4581,6 +4581,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .dd-main {{ flex: 1; min-width: 0; }}
   @media (max-width: 820px) {{
     .dd-layout {{ flex-direction: column; }}
+    /* In column mode width is the cross axis; align-items:flex-start (from
+       the row-mode rule) would size .dd-main to its max-content width and
+       overflow the viewport, so Plotly tracks an inflated container. Pin it
+       to the container width so #plot and all Plotly SVGs follow the viewport. */
+    .dd-main {{ width: 100%; }}
     nav.dd-toc {{ position: static; flex: none; width: auto; }}
     nav.dd-toc {{ display: flex; flex-wrap: wrap; gap: 2px 16px;
                   align-items: center; }}
