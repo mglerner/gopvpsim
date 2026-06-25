@@ -398,10 +398,13 @@ IV_CHECK_JS = r"""
                       // alt is the powered-UP (best-buddy) level only when the
                       // alt quadrant's my-level exceeds the selected Case's.
                       altIsBuddy: CMP_ALTCAP[quad] > CMP_MYCAP[quad] };
-        // cmpMarginPanel gets no energy context (v1 embeds scores only) -> HP
-        // bars without the banked-energy line.
+        // Banked-energy line under the HP bars: the margin panel shows it when
+        // the energy grid for this Case AND the move energetics are present
+        // (absent on pre-energy JSON -> HP bars only, graceful).
+        var energyCtx = { eg: { def: (window.CMP_ENERGY || {})[quad] || null, alt: null },
+                          em: window.CMP_ENERGY_MOVES };
         out.innerHTML += cmpFlipPanel(liveRows, grids)
-                       + cmpMarginPanel(liveRows, grids);
+                       + cmpMarginPanel(liveRows, grids, energyCtx);
       }
     }
   }
@@ -442,19 +445,24 @@ CMP_SETUP_JS = r"""
       ? Math.round(CMPDATA.quadrant_levels[alt][0]) : 51;
   }
   window.SCORES_CMP = {};
+  window.CMP_ENERGY = {};                       // quadrant -> flat leftover-energy
+  window.CMP_ENERGY_MOVES = CMPDATA.energy_moves || null;
   window.CMP_READY = false;
+  async function decodeGrid(b64) {
+    var bin = Uint8Array.from(atob(b64), function(c){ return c.charCodeAt(0); });
+    var ds = new DecompressionStream('gzip');
+    var w = ds.writable.getWriter(); w.write(bin); w.close();
+    var chunks = [], reader = ds.readable.getReader();
+    while (true) { var r = await reader.read(); if (r.done) break; chunks.push(r.value); }
+    var total = chunks.reduce(function(s, c){ return s + c.byteLength; }, 0);
+    var merged = new Uint8Array(total), off = 0;
+    for (var i = 0; i < chunks.length; i++) { merged.set(chunks[i], off); off += chunks[i].byteLength; }
+    return Array.from(new Uint16Array(merged.buffer));
+  }
   (async function(){
-    for (var qq in CMPDATA.grids) {
-      var bin = Uint8Array.from(atob(CMPDATA.grids[qq]), function(c){ return c.charCodeAt(0); });
-      var ds = new DecompressionStream('gzip');
-      var w = ds.writable.getWriter(); w.write(bin); w.close();
-      var chunks = [], reader = ds.readable.getReader();
-      while (true) { var r = await reader.read(); if (r.done) break; chunks.push(r.value); }
-      var total = chunks.reduce(function(s, c){ return s + c.byteLength; }, 0);
-      var merged = new Uint8Array(total), off = 0;
-      for (var i = 0; i < chunks.length; i++) { merged.set(chunks[i], off); off += chunks[i].byteLength; }
-      window.SCORES_CMP[qq] = Array.from(new Uint16Array(merged.buffer));
-    }
+    for (var qq in CMPDATA.grids) window.SCORES_CMP[qq] = await decodeGrid(CMPDATA.grids[qq]);
+    var eg = CMPDATA.energy_grids || {};        // absent on pre-energy JSON
+    for (var qe in eg) window.CMP_ENERGY[qe] = await decodeGrid(eg[qe]);
     window.CMP_READY = true;
     if (window._cmpBoxRerender) window._cmpBoxRerender();
   })();
@@ -649,8 +657,19 @@ def style():
   .cmp-env { font-size:.78em; color:#7fd3b0; }
   .cmp-leg { font-size:.78em; color:var(--sub); margin-top:5px; }
   @media (max-width:820px) {
-    .layout { flex-direction:column; }
-    nav.toc { position:static; flex:none; width:auto; }
+    .layout { flex-direction:column; align-items:stretch; }
+    /* Collapsed into the column: a full-width sticky bar (mirrors the deep-dive
+       nav). Span the width (border-box so 100% + padding fits), flow the
+       top-level links onto a wrapping row, hide the secondary sub-jump links to
+       keep it short, and stick to the top on scroll. align-items:stretch on
+       .layout fills the column-flex cross axis (the wide rule uses flex-start). */
+    nav.toc { position:sticky; top:0; z-index:5; flex:none; width:100%;
+              max-width:none; box-sizing:border-box; max-height:none;
+              overflow:visible; display:flex; flex-wrap:wrap; gap:2px 14px;
+              align-items:center; }
+    nav.toc strong, nav.toc .nav-toggle { width:100%; }
+    nav.toc a { display:inline-block; padding:1px 0; }
+    nav.toc .subnav { display:none; }
   }
 """
 
