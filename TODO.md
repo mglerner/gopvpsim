@@ -1,3 +1,39 @@
+## NEXT SESSION (queued 2026-06-25): launch the big re-dive (thread 2 / ship)
+
+Prep is DONE as of 2026-06-25 (all committed + pushed on `dive-ia-rework`):
+fresh PvPoke repull (latest master), DIVES focal refresh (40 dives: +16 GL,
++2 UL, -Sylveon, -male Oink), opponent-pool union (GL 78 / UL 70 / ML 61).
+The session's feature work (ML-guide compare panels + banked-energy line,
+deep-dive Plotly-resize fix, energy-on-by-default in dives, compact +
+narrow-mode-sticky side-navs on both dive & guide) is all live in the code.
+
+**Launch = re-dive everything against the fresh data, then publish.** Run it
+in THIS dedicated session. Gotchas found during prep (handle before/while
+launching):
+
+1. **`overnight_redive.sh` does NOT run the ML guides.** It chains the 40
+   dives + comparison pages + matchup web + index, but there is no
+   `run_iv_guides.py` step. The ML-guide compare/energy work only reaches the
+   live guides via `run_iv_guides.py` -- add a step to the chain OR run it
+   separately, or the guides ship stale.
+2. **Removing the male Oinkologne dive breaks two chain steps.** Step 2
+   ("Regenerating Oinkologne CD article") AND Step 3 ("Oinkologne M-vs-F
+   comparison") both read Male + Female dives. DECIDE: (a) put the male Oink
+   dive back in `run_website_dives.py` (CD article + comparison keep working),
+   or (b) remove Steps 2+3 from `overnight_redive.sh` and mark BOTH the
+   Oinkologne CD article and the M-vs-F page Archived / out-of-date.
+3. `overnight_redive.sh` "Running 20 dives" log label is stale (now 40) --
+   cosmetic; it runs whatever is in DIVES.
+4. **Cradily (Shadow) UL** is PvPoke-ranked but `get_default_moveset` finds no
+   shadow UL moveset; it was SKIPPED from the UL pool union. Worth a data-gap
+   look (would crash any dive that faced it).
+5. Energy-default makes deep dives bypass the sweep cache (full sim time);
+   expected for a cold overnight run. The `WonSetCache`-stores-scores follow-up
+   (below) only helps warm re-runs, so skip it for tonight's cold run.
+6. Launch command per CLAUDE.md: `direnv exec . scripts/overnight_redive.sh`;
+   watch with `scripts/chain_status.py` / `scripts/iv_guides_status.py`.
+   Publish via `scripts/publish_website.sh --push` after the chain.
+
 ## NEXT SESSION (queued 2026-06-21): gobattlekit owned-mon breakdown screen
 
 Build the "which of my mons should I build?" breakdown in the gobattlekit iOS
