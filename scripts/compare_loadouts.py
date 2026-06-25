@@ -39,6 +39,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_SHORT, support_footer_html  # type: ignore[import-not-found]
+from gopvpsim.theme import (  # type: ignore[import-not-found]  # noqa: E402
+    theme_css,
+    theme_head_script,
+    theme_picker_html,
+)
 
 from gopvpsim.data import (  # type: ignore[import-not-found]
     load_gamemaster,
@@ -922,43 +927,40 @@ table.base-stat-compare, table.moveset-compare {
 }
 table.base-stat-compare th, table.base-stat-compare td,
 table.moveset-compare th, table.moveset-compare td {
-  border: 1px solid #0f3460; padding: 6px 10px; text-align: left;
+  border: 1px solid var(--border); padding: 6px 10px; text-align: left;
 }
 table.base-stat-compare thead th, table.moveset-compare thead th {
-  background: #16213e; color: #c8a2d0;
+  background: var(--surface); color: var(--heading);
 }
 table.base-stat-compare tbody th, table.moveset-compare tbody th {
-  background: #12192e; color: #9ab0d8; font-weight: 500;
+  background: var(--surface-2); color: var(--text-muted); font-weight: 500;
 }
 table.base-stat-compare tbody td, table.moveset-compare tbody td {
-  background: #0f162a; color: #e0e0e0;
+  background: var(--surface-2); color: var(--text);
 }
-span.move-aside { color: #8ea1bd; font-size: 12px; }
-p.compare-lead { font-size: 14px; color: #b8c4d8; }
-div.compare-summary { --sidebar-color: #7db87d;
-  font-size: 14px; color: #cfe8cf; background: #1a2e1f;
-  padding: 10px 14px 10px 18px; border-radius: 6px; }
+span.move-aside { color: var(--text-muted); font-size: 12px; }
+p.compare-lead { font-size: 14px; color: var(--text-muted); }
+div.compare-summary { --sidebar-color: var(--callout-both);
+  font-size: 14px; color: var(--callout-fg); background: var(--callout-bg);
+  padding: 10px 14px 10px 18px; border-radius: 2px; }
 div.compare-summary p { margin: 0 0 6px 0; }
 div.compare-summary p:last-child { margin-bottom: 0; }
 /* Authorship palette mirrors the dive's Species narrative blocks so a
  * reader recognises gold=human, orange=AI, blue=auto across the site. */
 div.compare-summary.authored-human,
-div.compare-summary.authored-mixed { --sidebar-color: #d29922;
-  background: #2e2a1a; color: #e8dfcf; }
-div.compare-summary.authored-ai { --sidebar-color: #e8903a;
-  background: #2e241a; color: #e8d4bb; }
-div.compare-summary.authored-auto { --sidebar-color: #5b8dd9;
-  background: #1a222e; color: #cfd8e8; }
-div.compare-summary p.narrative-attribution { color: #8b949e;
+div.compare-summary.authored-mixed { --sidebar-color: var(--callout-expert); }
+div.compare-summary.authored-ai { --sidebar-color: var(--callout-ai); }
+div.compare-summary.authored-auto { --sidebar-color: var(--callout-auto); }
+div.compare-summary p.narrative-attribution { color: var(--text-muted);
   font-size: 0.82rem; margin: 6px 0 0 0; font-style: italic; }
 ul.compare-dives { margin: 6px 0 10px 20px; padding: 0; font-size: 14px; }
 ul.compare-dives li { margin: 2px 0; }
-details.methodology-details { --sidebar-color: #5b8dd9;
-  background: #12192e; border-radius: 4px;
-  padding: 8px 12px 8px 16px; font-size: 13px; color: #b8c4d8;
+details.methodology-details { --sidebar-color: var(--callout-auto);
+  background: var(--callout-bg); border-radius: 2px;
+  padding: 8px 12px 8px 16px; font-size: 13px; color: var(--callout-fg);
   margin: 8px 0; }
 details.methodology-details summary { cursor: pointer;
-  color: #c8a2d0; font-weight: 500; }
+  color: var(--heading); font-weight: 500; }
 details.methodology-details p { margin: 8px 0 0 0; }
 """
 
@@ -994,86 +996,87 @@ def render_standalone_html(title: str, description: str,
         'div.compare-summary', 'details.methodology-details',
     ])
     return f"""<!DOCTYPE html>
-<html>
+<html data-theme="gruvbox-light">
 <head>
 <meta charset="utf-8">
+{theme_head_script()}
 <title>{html.escape(title)}</title>
-<style>
+<style>{theme_css()}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
          sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px;
-         background: #1a1a2e; color: #e0e0e0; line-height: 1.6; }}
-  h1 {{ color: #e94560; margin-bottom: 6px; }}
-  h2, h3 {{ color: #c8a2d0; border-bottom: 1px solid #0f3460;
-        padding-bottom: 6px; margin-top: 30px; }}
+         background: var(--bg); color: var(--text); line-height: 1.6; }}
+  h1 {{ color: var(--title); margin-bottom: 6px; }}
+  h2, h3 {{ color: var(--heading); border-bottom: 1px solid var(--border);
+        padding-bottom: 6px; margin-top: 30px; font-size: 1.15em;
+        font-weight: 700; letter-spacing: .02em; }}
   h3 {{ border-bottom: none; margin-top: 18px; font-size: 1.05em; }}
-  a {{ color: #9be89b; text-decoration: none; }}
+  a {{ color: var(--accent); text-decoration: none; }}
   a:hover {{ text-decoration: underline; }}
   p {{ margin: 10px 0; }}
-  code {{ background: #16213e; padding: 2px 5px; border-radius: 3px;
+  code {{ background: var(--surface); padding: 2px 5px; border-radius: 2px;
           font-size: 0.9em; }}
-  .related {{ --sidebar-color: #9be89b;
-              background: #16213e; padding: 12px 16px 12px 20px;
-              border-radius: 6px; margin: 16px 0; }}
+  .related {{ --sidebar-color: var(--accent);
+              background: var(--surface); padding: 12px 16px 12px 20px;
+              border-radius: 2px; margin: 16px 0; }}
   .related ul {{ margin: 6px 0 0 0; padding-left: 20px; }}
-  .authorship-banner {{ padding: 10px 16px 10px 20px; border-radius: 6px;
+  /* Callout: all-sides border carries the authorship tier (no left bar). */
+  .authorship-banner {{ padding: 10px 14px; border-radius: 0;
                         margin-bottom: 16px; font-size: 14px;
-                        border-left: 3px solid var(--sidebar-color, #8b949e); }}
-  .authorship-banner.expert {{ --sidebar-color: #d4a017;
-                               background: #2a2000; color: #e8d48b; }}
-  .authorship-banner.both {{ --sidebar-color: #7db87d;
-                             background: #1f2a1a; color: #a8d8a8; }}
-  .authorship-banner.auto {{ --sidebar-color: #5b8dd9;
-                             background: #1a2333; color: #8ab4f8; }}
-  .authorship-banner.ai {{ --sidebar-color: #d29922;
-                           background: #2a1f00; color: #e8c87b; }}
+                        background: var(--callout-bg); color: var(--callout-fg);
+                        border: 1px solid var(--sidebar-color, var(--text-muted)); }}
+  .authorship-banner.expert {{ --sidebar-color: var(--callout-expert); }}
+  .authorship-banner.both {{ --sidebar-color: var(--callout-both); }}
+  .authorship-banner.auto {{ --sidebar-color: var(--callout-auto); }}
+  .authorship-banner.ai {{ --sidebar-color: var(--callout-ai); }}
   table.matchup-delta {{ border-collapse: collapse; margin: 10px 0;
                          width: 100%; font-size: 13px; }}
-  table.matchup-delta th, table.matchup-delta td {{ border: 1px solid #0f3460;
+  table.matchup-delta th, table.matchup-delta td {{ border: 1px solid var(--border);
         padding: 5px 9px; text-align: left; }}
-  table.matchup-delta thead th {{ background: #16213e; color: #c8a2d0; }}
-  table.matchup-delta tbody td {{ background: #0f162a; color: #e0e0e0; }}
-  table.matchup-delta td.delta-pos {{ color: #9be89b; font-weight: 600; }}
-  table.matchup-delta td.delta-neg {{ color: #e89b9b; font-weight: 600; }}
-  .flip-badge {{ display: inline-block; padding: 1px 8px; border-radius: 10px;
+  table.matchup-delta thead th {{ background: var(--surface); color: var(--heading); }}
+  table.matchup-delta tbody td {{ background: var(--surface-2); color: var(--text); }}
+  table.matchup-delta td.delta-pos {{ color: var(--win); font-weight: 600; }}
+  table.matchup-delta td.delta-neg {{ color: var(--loss); font-weight: 600; }}
+  .flip-badge {{ display: inline-block; padding: 1px 8px; border-radius: 4px;
         font-size: 11px; font-weight: 600; text-transform: uppercase;
         text-decoration: none; }}
   a.flip-badge:hover {{ text-decoration: underline; filter: brightness(1.15); }}
-  .flip-badge.flip-pos {{ background: #1f3a1f; color: #9be89b;
-        border: 1px solid #7db87d; }}
-  .flip-badge.flip-neg {{ background: #3a1f1f; color: #e89b9b;
-        border: 1px solid #b87d7d; }}
-  .flip-badge.flip-none {{ background: #1a2333; color: #8ea1bd;
-        border: 1px solid #3d5580; }}
+  .flip-badge.flip-pos {{ background: var(--surface-2); color: var(--win);
+        border: 1px solid var(--win); }}
+  .flip-badge.flip-neg {{ background: var(--surface-2); color: var(--loss);
+        border: 1px solid var(--loss); }}
+  .flip-badge.flip-none {{ background: var(--surface-2); color: var(--text-muted);
+        border: 1px solid var(--border-2); }}
   .flip-badge.flip-unlinked {{ opacity: 0.75; cursor: help; }}
-  table.matchup-delta tr.matchup-delta-flip-pos td {{ background: #152b1a; }}
-  table.matchup-delta tr.matchup-delta-flip-neg td {{ background: #2b1515; }}
-  /* All-in-row matchup table (N>=3 loadouts): neutral amber row tint
-     for opponents where loadouts disagree on W/L, since there's no
-     single "winning side" to colour toward. */
-  table.matchup-all tr.matchup-delta-flip td {{ background: #2b2615; }}
+  table.matchup-delta tr.matchup-delta-flip-pos td {{ background: var(--surface-2); }}
+  table.matchup-delta tr.matchup-delta-flip-neg td {{ background: var(--surface-2); }}
+  /* All-in-row matchup table (N>=3 loadouts): neutral row tint for
+     opponents where loadouts disagree on W/L, since there's no single
+     "winning side" to colour toward. */
+  table.matchup-all tr.matchup-delta-flip td {{ background: var(--surface-2); }}
   table.matchup-all td.matchup-all-flip {{ padding: 3px 6px; }}
   table.matchup-all td.matchup-all-flip .flip-badge {{ margin: 1px 2px; }}
-  details.abbrev-note {{ --sidebar-color: #5b8dd9;
-        background: #12192e; border-radius: 4px;
-        padding: 8px 12px 8px 16px; font-size: 13px; color: #b8c4d8;
+  details.abbrev-note {{ --sidebar-color: var(--callout-auto);
+        background: var(--callout-bg); border-radius: 2px;
+        padding: 8px 12px 8px 16px; font-size: 13px; color: var(--callout-fg);
         margin: 8px 0; }}
-  details.abbrev-note summary {{ cursor: pointer; color: #c8a2d0;
+  details.abbrev-note summary {{ cursor: pointer; color: var(--heading);
         font-weight: 500; }}
   details.abbrev-note ul.abbrev-list {{ margin: 8px 0 0 0; padding-left: 20px; }}
   details.abbrev-note ul.abbrev-list li {{ margin: 3px 0; }}
-  p.verdict-line {{ --sidebar-color: #7db87d;
-                    background: #1a2e1f; padding: 10px 14px 10px 18px;
-                    color: #cfe8cf; border-radius: 6px; }}
-  p.matchup-delta-summary {{ font-size: 13px; color: #9bb0d0; margin-top: 8px; }}
+  p.verdict-line {{ --sidebar-color: var(--callout-both);
+                    background: var(--callout-bg); padding: 10px 14px 10px 18px;
+                    color: var(--callout-fg); border-radius: 2px; }}
+  p.matchup-delta-summary {{ font-size: 13px; color: var(--text-muted); margin-top: 8px; }}
   table.sortable thead th {{ cursor: pointer; user-select: none; }}
-  table.sortable thead th:hover {{ background: #1e2b4a; }}
-  footer {{ color: #666; font-size: 13px; margin-top: 40px;
-            border-top: 1px solid #0f3460; padding-top: 12px; }}
+  table.sortable thead th:hover {{ background: var(--border-2); }}
+  footer {{ color: var(--text-muted); font-size: 13px; margin-top: 40px;
+            border-top: 1px solid var(--border); padding-top: 12px; }}
 {COMPARE_CSS}
 {_sidebar_css}
 </style>
 </head>
 <body>
+{theme_picker_html()}
 <h1>{html.escape(title)}</h1>
 {_authorship_banner_html(authored_by_kind)}<p>{html.escape(description)}</p>
 {dive_link_html}
