@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # Overnight re-dive + article regen + comparison + verify pipeline.
 #
-# Runs all 20 website dives serially (per run_website_dives.py;
-# Oinkologne M/F GL, Tinkaton GL/UL, Aegislash Blade/Shield GL,
-# Forretress normal/shadow x Volt-Switch/Bug-Bite GL, Dewgong GL,
-# Stunfisk GL, Galarian Corsola GL, plus 2026-06-02 new-season
-# additions: Shadow Sableye GL (4 movesets via shared-dir split,
-# Foul Play paired with all 4 legal partners), Seismitoad GL,
-# Jumpluff GL + Shadow Jumpluff GL, Kanto Ninetales GL +
-# Shadow Kanto Ninetales GL),
-# patches per-opponent anchors, regenerates the Oinkologne CD article,
-# renders the two Aegislash form-change comparison pages and the two
-# Aegislash first-draft narrative articles (auto-prose, flag before
-# shipping), rebuilds the Great League matchup web, rebuilds the site
-# index, and runs the link verifier.
+# Runs all 40 website dives serially (the focal list lives in
+# run_website_dives.DIVES -- 36 GL + 4 UL as of the 2026-06-25 refresh),
+# patches per-opponent anchors, renders the Aegislash form-change comparison
+# page + first-draft narrative article and the Forretress/Jumpluff/Ninetales
+# comparison pages, bakes the Master-league ML IV guides (run_iv_guides.py,
+# whole master_top60 pool), rebuilds the Great League matchup web, rebuilds
+# the site index, and runs the link verifier.
+#
+# 2026-06-25 changes: the Oinkologne CD article + Male-vs-Female comparison
+# steps were removed (both pages archived/deleted from the site -- see
+# TODO.md); the ML IV-guide bake was added as a (long, ~7h cold) tail step;
+# the dives + guides run with all cores (--reserve-cpus 0 / --reserve 0) for
+# the unattended overnight window.
 #
 # Usage:
 #   nohup scripts/overnight_redive.sh &
@@ -91,8 +91,8 @@ log ""
 #    rejoined the chain 2026-04-21 so the 2026-04-21 rename refactor
 #    (drop compound <br> tier names, auto-gen standalone-mode narrative
 #    for non-CD species) reaches every shipped dive.
-step "Running 20 dives via run_website_dives.py" \
-    python scripts/run_website_dives.py
+step "Running 40 dives via run_website_dives.py" \
+    python scripts/run_website_dives.py --reserve-cpus 0
 
 # The retrofit-only patch_dive_*.py patchers were deleted in the S7
 # cleanup (2026-06-12): everything they carried is baked into the
@@ -100,14 +100,10 @@ step "Running 20 dives via run_website_dives.py" \
 # HTMLs natively. patch_dive_species_narrative.py (run inside
 # run_website_dives.py) is the only surviving patcher.
 
-# 2. Oinkologne CD article (per-form Matchup Delta table needs both
-#    Male and Female dives fresh, which Step 1 guarantees).
-step "Regenerating Oinkologne CD article" \
-    python scripts/generate_article.py Oinkologne great "Mud Slap"
-
-# 3. Oinkologne Male-vs-Female comparison page.
-step "Rendering Oinkologne M-vs-F comparison" \
-    python scripts/compare_loadouts.py comparisons/oinkologne-male-vs-female.toml
+# (Steps 2 & 3 -- the Oinkologne CD article and Male-vs-Female comparison --
+#  were removed 2026-06-25. The male Oinkologne dive is no longer in DIVES, so
+#  both pages would have shipped stale male data; both are archived/deleted
+#  from the site. See TODO.md.)
 
 # 4. Aegislash Blade-vs-Shield comparison page (GL only).
 # UL dropped 2026-05-17 per mercuryish review (S2): not competitively
@@ -146,8 +142,33 @@ step "Generating Aegislash GL first-draft article" \
 step "Building Great League matchup web" \
     python scripts/build_matchup_web.py
 
-# 8. Rebuild site index so the new pages show up in the top-level link
-#    page.
+# 7b. Master-league ML IV guides (run_iv_guides.py, whole master_top60 pool).
+#     Independent ~7h COLD job (the fresh 2026-06-25 PvPoke pull changed the
+#     gamemaster hash, orphaning the won-set caches), sequenced AFTER the dives
+#     so the two never oversubscribe the cores. --reserve 0: all cores for the
+#     unattended window. --no-index-refresh: the chain's own index rebuild
+#     (Step 8, next) owns index.html, so the per-guide rebuilds don't race it.
+#
+#     Run OUTSIDE step() ON PURPOSE: run_iv_guides.py exits 1 if ANY single
+#     guide fails (sys.exit at its tail), which through step()'s FATAL trap
+#     would abort the final index+verify steps and lose the new Reshiram (Shadow)
+#     guide from the index. A single bad guide must not kill the rest, so this
+#     block only WARNs on a non-zero rc and lets the chain continue.
+log "[STEP] ML IV guides (run_iv_guides.py, master_top60, all cores)"
+status "[STEP] ML IV guides"
+ml_t0=$(date +%s)
+ml_rc=0
+python scripts/run_iv_guides.py --no-index-refresh --reserve 0 2>&1 | tee -a "$LOG" || ml_rc=$?
+ml_elapsed=$(( $(date +%s) - ml_t0 ))
+if [[ $ml_rc -ne 0 ]]; then
+    log "[WARN] ML IV guides reported failures (rc=$ml_rc, ${ml_elapsed}s) -- continuing to index+verify; grep the log for 'FAILED' lines"
+    status "[WARN] ML guides had failures after ${ml_elapsed}s"
+else
+    log "[DONE] ML IV guides (${ml_elapsed}s)"
+fi
+
+# 8. Rebuild site index so the new pages (incl. the new Reshiram (Shadow) ML
+#    guide) show up in the top-level link page.
 step "Rebuilding website index" \
     python scripts/build_website_index.py
 
