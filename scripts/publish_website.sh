@@ -47,6 +47,19 @@ if [ ! -d "$SRC" ]; then
   exit 1
 fi
 
+# Card-rerender gate: a renderer-side fix landed after the dives were simmed,
+# so the shipped HTML is stale until rebuilt from the replay blobs. The
+# sentinel is dropped when that happens and cleared by rerender_dive_cards.py.
+# (Bypass with --skip-verify, same as the link/dash checks.)
+SENTINEL="${REPO_ROOT}/userdata/.cards_rerender_pending"
+if [ "$SKIP_VERIFY" = false ] && [ -f "$SENTINEL" ]; then
+  echo "error: dive cards need re-rendering before publish." >&2
+  echo "  reason: $(head -1 "$SENTINEL" 2>/dev/null)" >&2
+  echo "  fix:    python scripts/rerender_dive_cards.py   (replays the blobs, clears this gate)" >&2
+  echo "  bypass: re-run with --skip-verify" >&2
+  exit 1
+fi
+
 echo "Regenerating reader guides..."
 python "${REPO_ROOT}/scripts/build_guides.py"
 echo
