@@ -4568,16 +4568,31 @@ def generate_interactive_html(species, league, moveset_data, html_path,
      stacks under the card (it is the first child of .layout), never
      above it. */
   .dd-layout {{ display: flex; gap: 28px; align-items: flex-start; }}
-  nav.dd-toc {{ position: sticky; top: 14px; flex: 0 0 220px;
-                font-size: 13px; background: #16213e; border-radius: 6px;
-                padding: 12px 14px; max-height: calc(100vh - 28px);
-                overflow-y: auto; }}
-  nav.dd-toc strong {{ color: #e94560; display: block; margin-bottom: 6px;
-                       font-size: 12px; text-transform: uppercase;
+  /* Compact sticky side-nav: short, readable labels (full phrase on hover via
+     title=). Width HUGS the content (fit-content) instead of a fixed column, so
+     the box is exactly as wide as its longest item (the header, or the
+     best-buddy label when shown) + padding -- no dead space -- and reclaims the
+     rest of the left gutter for the main content. max-width caps it defensively. */
+  nav.dd-toc {{ position: sticky; top: 14px;
+                flex: 0 0 auto; width: fit-content; max-width: 200px;
+                font-size: 12px; line-height: 1.25; background: #16213e;
+                border-radius: 6px; padding: 9px 11px;
+                max-height: calc(100vh - 28px); overflow-y: auto; }}
+  nav.dd-toc strong {{ color: #e94560; display: block; margin-bottom: 5px;
+                       font-size: 11px; text-transform: uppercase;
                        letter-spacing: .04em; }}
-  nav.dd-toc a {{ display: block; color: #58a6ff; padding: 2px 0;
+  nav.dd-toc a {{ display: block; color: #58a6ff; padding: 1px 0;
                   text-decoration: none; }}
   nav.dd-toc a:hover {{ text-decoration: underline; }}
+  /* Best-buddy toggle: a distinct separated block below the jump links. */
+  .dd-toc-bb {{ margin-top: 8px; padding-top: 7px;
+                border-top: 1px solid #24314d; }}
+  .dd-toc-bb label {{ display: flex; align-items: flex-start; gap: 5px;
+                      cursor: pointer; font-size: 0.78rem; color: #c9d1d9;
+                      line-height: 1.3; }}
+  .dd-toc-bb input {{ margin-top: 2px; }}
+  .dd-toc-bb b {{ font-weight: 600; }}
+  .dd-toc-bb-note {{ font-size: 0.78rem; color: #8b949e; }}
   .dd-main {{ flex: 1; min-width: 0; }}
   @media (max-width: 820px) {{
     .dd-layout {{ flex-direction: column; }}
@@ -4591,6 +4606,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                   align-items: center; }}
     nav.dd-toc strong {{ width: 100%; margin-bottom: 2px; }}
     nav.dd-toc a {{ display: inline-block; padding: 2px 0; }}
+    .dd-toc-bb {{ width: 100%; }}
   }}
 </style>
 </head>
@@ -4665,22 +4681,16 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                        if int(best_buddy.get('default_display') or 0) == int(_bb_alt)
                        else '')
         _bb_nav_ctrl = (
-            '<div class="dd-toc-bb" style="margin-top:10px;padding-top:8px;'
-            'border-top:1px solid #24314d">\n'
-            '  <label style="display:flex;align-items:flex-start;gap:6px;'
-            'cursor:pointer;font-size:0.85rem;color:#c9d1d9"><input '
-            'type="checkbox" id="dd-bb-toggle" style="margin-top:3px" '
+            '<div class="dd-toc-bb">\n'
+            '  <label title="Recompute the whole dive as if this mon were your '
+            'best buddy (+1 level)."><input type="checkbox" id="dd-bb-toggle" '
             'onchange="setBestBuddyLevel(this.checked ? \'51\' : \'50\')"'
-            f'{_bb_checked}> <span><b>Allow best-buddy (Level {_bb_alt:g})</b>'
-            '<br><span style="font-size:0.74rem;color:#8b949e">Recompute the '
-            'whole dive as if this mon were your best buddy (+1 level).</span>'
-            '</span></label>\n'
+            f'{_bb_checked}> <b>Allow best-buddy (L{_bb_alt:g})</b></label>\n'
             '</div>\n')
     elif best_buddy and best_buddy.get('note'):
         from html import escape as _bb_esc
         _bb_nav_ctrl = (
-            '<div class="dd-toc-bb" style="margin-top:10px;padding-top:8px;'
-            'border-top:1px solid #24314d;font-size:0.78rem;color:#8b949e">'
+            '<div class="dd-toc-bb dd-toc-bb-note">'
             f'{_bb_esc(best_buddy["note"])}</div>\n')
 
     # Controls
@@ -5207,17 +5217,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # .dd-layout wrapper begins right after the dive card so the
     # infographic stays the first content block; at narrow widths the nav
     # stacks under the card, never above it.
+    # (sid, short label for the compact nav, full phrase for the hover title).
+    # 'IV Recommendations' -> 'Recs' (not 'IV picks') so only 'IV finder' keeps
+    # the 'IV' prefix -- no two-row scan collision.
     _nav_candidates = [
-        ('dd-scatter', 'Scatter &amp; controls'),
-        ('dd-recommendations', 'IV Recommendations'),
-        ('dd-opp-threats', 'Threats where your build matters'),
-        ('dd-notable-ivs', 'Per-matchup IV finder'),
-        ('dd-stat-thresholds', 'Key Matchup Thresholds'),
-        ('dd-slayer-builds', 'Mirror / Slayer builds'),
+        ('dd-scatter', 'Scatter', 'Scatter &amp; controls'),
+        ('dd-recommendations', 'Recs', 'IV Recommendations'),
+        ('dd-opp-threats', 'Threats', 'Threats where your build matters'),
+        ('dd-notable-ivs', 'IV finder', 'Per-matchup IV finder'),
+        ('dd-stat-thresholds', 'Thresholds', 'Key Matchup Thresholds'),
+        ('dd-slayer-builds', 'Mirror / Slayer', 'Mirror / Slayer builds'),
     ]
     _nav_links = ''.join(
-        f'<a href="#{sid}">{label}</a>\n'
-        for sid, label in _nav_candidates
+        f'<a href="#{sid}" title="{full}">{label}</a>\n'
+        for sid, label, full in _nav_candidates
         if f'id="{sid}"' in html
     )
     _nav_html = (f'<nav class="dd-toc"><strong>On this page</strong>\n'
