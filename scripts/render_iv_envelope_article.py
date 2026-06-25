@@ -33,6 +33,21 @@ QUAD_LABEL = {
 CREDIT_NAME = 'XehrFelrose'
 CREDIT_URL = 'https://www.youtube.com/watch?v=6N3lXp39qtQ'
 
+# Limited-availability species: research/quest/raid-day-only mons you can
+# realistically own only one or a few of, with NO way to re-roll for IVs. In
+# game their IV floor is the research-encounter floor (10/10/10), well below
+# this guide's default 12/12/12 sweep floor -- so a legitimately-owned sub-12
+# spread can fall off the bottom of the grid. We flag that here; a
+# floor-corrected re-sweep for these species is a tracked follow-up (see
+# TODO.md "Limited-availability mons"). Match d['species'] verbatim.
+LIMITED_AVAILABILITY = frozenset({
+    'Marshadow',
+    'Meloetta (Aria)',
+    'Jirachi',
+    'Eternatus',
+    'Zygarde (Complete Forme)',
+})
+
 QUAD_ORDER = ['nobb_vs_nonbb', 'nobb_vs_bb', 'wbb_vs_nonbb', 'wbb_vs_bb']
 QUAD_SHORT = {
     'nobb_vs_nonbb': 'non-BB vs non-BB',
@@ -575,6 +590,12 @@ def style():
             position:relative; }
   .credit::before { content:""; position:absolute; left:0; top:4px; bottom:4px;
             width:4px; border-radius:2px; background:#d29922; }
+  /* red = limited-availability caution: game IV floor is below this grid */
+  .limited-banner { background:#2e1a1a; color:#e8c9c9; border-radius:6px;
+            padding:10px 16px 10px 20px; margin:16px 0; font-size:14px;
+            position:relative; }
+  .limited-banner::before { content:""; position:absolute; left:0; top:4px;
+            bottom:4px; width:4px; border-radius:2px; background:#f85149; }
   .credit a { color:#f0d98b; }
   .twocol { display:flex; gap:2em; flex-wrap:wrap; }
   .twocol > div { flex:1; min-width:240px; }
@@ -992,6 +1013,13 @@ def render(d):
     credit_name = esc(CREDIT_NAME)
     credit_url = esc(CREDIT_URL)
     shieldconv = esc(d['shield_convention'])
+    limited_html = (f"""<div class="limited-banner"><strong>Limited-availability
+species: your IVs may be below this grid.</strong> {sp} comes from research,
+quests, or other capped encounters, so most trainers own only one or a few and
+cannot re-roll for IVs. Those encounters floor at 10/10/10, below this guide's
+12/12/12 sweep floor -- so a legitimately-owned spread under 12 in any stat
+will not appear here. A floor-corrected re-sweep for these species is
+planned.</div>""" if d['species'] in LIMITED_AVAILABILITY else "")
     compact = len(d['shields']) > 3
     toggle_script = ("""
 <script>
@@ -1064,6 +1092,7 @@ prose is Claude-drafted, restating {credit_name}'s framing in our own words. No
 gameplay or teambuilding judgment is made here, only the mechanics and matchups.
 A human should review the prose (and confirm the attribution is fair) before
 this ships.</div>
+{limited_html}
 </div>
 <div class="layout">
 {nav_html(compact)}
