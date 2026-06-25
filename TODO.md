@@ -130,6 +130,18 @@ merging the logic lets ML re-bakes reuse warm columns (a large win) and deletes
 a duplicate sim path. Do it together with the energy-column rework above (same
 cache, same "cache must store what the warm path needs" shape).
 
+**Also fold in: cache size + stale-version GC.** The on-disk cache
+(`~/.cache/gopvpsim/`) is ~45 GB (2026-06-25) and never prunes. Each
+engine/gamemaster-hash bump ORPHANS the prior per-opponent columns instead of
+overwriting them, so old versions pile up indefinitely: `sweep/` holds 1161
+focalhash dirs (124 for `Tinkaton_great` alone -- many of them dead
+old-gamemaster vintages), plus `slayer/` (269 dirs) and `iv_envelope/` (143).
+Do NOT hand-delete the old caches (Michael's call); the rework should add a
+version-aware GC / prune policy (e.g. keep the current gamemaster hash, maybe
+N-1, drop older) so the cache stops growing unbounded. Note: an `iv_envelope/`
+cache already exists, so the ML path DOES cache its analysis output -- it just
+doesn't share the per-opponent SWEEP-column cache, which is the merge above.
+
 ## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
 
 Pre-ship arc shipped: items 1-6 all done (cross-form re-dive,
