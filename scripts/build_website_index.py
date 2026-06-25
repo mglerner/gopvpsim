@@ -600,7 +600,7 @@ open it.</p>
 </ul>
 {articles_section}{comparisons_section}{guides_section}
 <p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
-<p class="about">If you find something broken or surprising, email me.</p>
+<p class="about">If you find something broken or surprising, reach out on Discord: <a href="https://discord.com/users/460510521112920105">TitanTrainers15</a>.</p>
 {support_footer_html("")}</body>
 </html>
 """
@@ -652,6 +652,12 @@ SUPPORT_PAGE_HTML = """<!DOCTYPE html>
 
 <p>
   You can also support the project by sharing it with your PvP friends.
+</p>
+
+<h2>Contact</h2>
+<p>
+  Questions, bug reports, or feedback? The best way to reach me is on Discord:
+  <a href="https://discord.com/users/460510521112920105">TitanTrainers15</a>.
 </p>
 
 <h2>Credits</h2>
