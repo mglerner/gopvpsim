@@ -288,8 +288,11 @@ function rowOrder() {{
 }}
 
 function colOrder() {{
+  // Opponent columns alphabetical (Species + avg are fixed leftmost,
+  // rendered before these). Pinned columns still float left in pin order.
   const idx = Array.from({{length: N}}, (_, j) => j);
-  const rest = idx.filter(j => !pinnedCols.includes(j));
+  const rest = idx.filter(j => !pinnedCols.includes(j))
+                  .sort((a, b) => SPECIES[a].localeCompare(SPECIES[b]));
   return pinnedCols.concat(rest);
 }}
 
