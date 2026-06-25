@@ -96,6 +96,27 @@ unchanged (those sims already ran for `drops`); this only fixes the warm
 regression. All ~60 guides need a re-bake anyway to pick up `cmp_scores`,
 so fold this into that run. See the `score_set` docstring.
 
+## Sweep cache should store energy so `--compare-energy` warm re-dives work (POST-PUBLISH)
+
+*(2026-06-25, post-ship arc -- comes AFTER publish/app/Reddit.)* Michael's
+call: `--compare-energy` is good enough that we'll want it ON by default
+basically always. But capturing post-match energy currently **force-disables
+the sweep disk cache** (`deep_dive.py` ~1973: `capture_energy ->
+use_sweep_cache = False`) because the cache stores only the float64 SCORE
+column, no energy. So every `--compare-energy` dive is a COLD full sim, even on
+a re-dive that would otherwise be a warm cache hit. (This is why tonight's
+40-dive chain ran cold, and why dropping one UL opponent is an ~80-min re-sim
+rather than a fast warm re-render.)
+
+Rework the sweep cache (`scripts/sweep_cache.py`) to ALSO persist the
+per-opponent ENERGY column alongside the score column (bump the cache version;
+the key already covers moveset/scenarios/bait/engine/gamemaster). Then
+`iv_sweep` serves `capture_energy` runs from the warm cache instead of
+bypassing it, and `--compare-energy` becomes cheap enough to default ON.
+Bundles with the `WonSetCache`-stores-scores follow-up above (same "cache
+stores only part of what the warm path now needs" shape). Cold cost unchanged;
+this only fixes the warm regression.
+
 ## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
 
 Pre-ship arc shipped: items 1-6 all done (cross-form re-dive,
