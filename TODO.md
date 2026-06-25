@@ -16,12 +16,12 @@ launching):
    `run_iv_guides.py` step. The ML-guide compare/energy work only reaches the
    live guides via `run_iv_guides.py` -- add a step to the chain OR run it
    separately, or the guides ship stale.
-2. **Removing the male Oinkologne dive breaks two chain steps.** Step 2
-   ("Regenerating Oinkologne CD article") AND Step 3 ("Oinkologne M-vs-F
-   comparison") both read Male + Female dives. DECIDE: (a) put the male Oink
-   dive back in `run_website_dives.py` (CD article + comparison keep working),
-   or (b) remove Steps 2+3 from `overnight_redive.sh` and mark BOTH the
-   Oinkologne CD article and the M-vs-F page Archived / out-of-date.
+2. **Male Oinkologne dive removed -- DECISION (2026-06-25): archive both Oink
+   pages.** Michael doesn't need the Oinkologne CD article OR the M-vs-F
+   comparison anymore. So: keep the male dive removed, REMOVE Steps 2
+   ("Regenerating Oinkologne CD article") and 3 ("Oinkologne M-vs-F comparison")
+   from `overnight_redive.sh`, and mark BOTH the Oinkologne CD article and the
+   M-vs-F comparison page Archived / known-out-of-date (banner + index note).
 3. `overnight_redive.sh` "Running 20 dives" log label is stale (now 40) --
    cosmetic; it runs whatever is in DIVES.
 4. **Cradily (Shadow) UL** is PvPoke-ranked but `get_default_moveset` finds no
