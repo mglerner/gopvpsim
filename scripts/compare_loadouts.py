@@ -38,7 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
-from gopvpsim.attribution import PVPOKE_ATTRIBUTION_SHORT  # type: ignore[import-not-found]
+from gopvpsim.attribution import PVPOKE_ATTRIBUTION_SHORT, support_footer_html  # type: ignore[import-not-found]
 
 from gopvpsim.data import (  # type: ignore[import-not-found]
     load_gamemaster,
@@ -950,7 +950,9 @@ def render_standalone_html(title: str, description: str,
 
     _by = f'By {html.escape(authored_by)} &middot; ' if authored_by else ''
     author_html = (f'<footer><p>{_by}gopvpsim</p>'
-                   f'<p>{PVPOKE_ATTRIBUTION_SHORT}</p></footer>')
+                   f'<p>{PVPOKE_ATTRIBUTION_SHORT}</p></footer>'
+                   # comparisons live at comparisons/<slug>/index.html -> root is two up
+                   + support_footer_html('../../'))
     _sidebar_css = sidebar_css([
         '.related', 'p.verdict-line',
         'div.compare-summary', 'details.methodology-details',
