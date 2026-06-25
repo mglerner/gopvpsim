@@ -3325,15 +3325,23 @@ function cmpFlipPanel(live, grids) {
   var nO = DATA.nOpponents, nS = DATA.nScenarios, found = [];
   for (var oi = 0; oi < nO; oi++) for (var si = 0; si < nS; si++) {
     var vals = live.map(function(r) { return cmpVal(grids.def, r.iv, si, oi); });
-    var anyWin = false, anyLose = false, minNear = 999;
+    // Outcome categories: win (>500), tie (==500), loss (<500). The candidates
+    // "disagree" when they span more than one category -- this catches
+    // win-vs-loss, win-vs-tie AND tie-vs-loss (the last was orphaned when ties
+    // were split off the loss side). An all-same row (incl. all-tie) is not a
+    // flip and, unless all win/all lose with a margin, lives in neither panel.
+    var hasWin = false, hasTie = false, hasLoss = false, minNear = 999;
+    vals.forEach(function(v) {
+      if (v > 500) hasWin = true; else if (v === 500) hasTie = true; else hasLoss = true;
+      minNear = Math.min(minNear, Math.abs(v - 500));
+    });
+    var distinct = (hasWin ? 1 : 0) + (hasTie ? 1 : 0) + (hasLoss ? 1 : 0);
     var bbFlip = false;
-    vals.forEach(function(v) { if (v > 500) anyWin = true; else anyLose = true; minNear = Math.min(minNear, Math.abs(v - 500)); });
     if (grids.alt) live.forEach(function(r) {
       var d = cmpVal(grids.def, r.iv, si, oi), a = cmpVal(grids.alt, r.iv, si, oi);
-      if ((d <= 500) !== (a <= 500)) bbFlip = true;
+      if ((d > 500) !== (a > 500)) bbFlip = true;  // best-buddy crosses the win line
     });
-    var disagree = anyWin && anyLose;
-    if ((disagree || bbFlip) && minNear <= CMP_CLOSE_BAND)
+    if ((distinct > 1 || bbFlip) && minNear <= CMP_CLOSE_BAND)
       found.push({ oi: oi, si: si, vals: vals, near: minNear });
   }
   found.sort(function(a, b) { return a.near - b.near; });
