@@ -653,6 +653,8 @@ def style():
             background:#1a2540; border-radius:5px; overflow:hidden; margin-right:6px; }
   .cmp-bar > span { display:block; height:100%; background:#3fb950; }
   .cmp-bar.lo > span { background:#d4a017; }
+  .cmp-bar.loss { display:flex; justify-content:flex-end; }
+  .cmp-bar.loss > span { flex:none; background:#f85149; }
   .cmp-hpv { font-size:.82em; color:#9bb0d0; }
   .cmp-env { font-size:.78em; color:#7fd3b0; }
   .cmp-leg { font-size:.78em; color:var(--sub); margin-top:5px; }

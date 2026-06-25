@@ -1394,10 +1394,20 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
     Quick screen: sim rank-1 IVs for each moveset against opponents.
     Return the top N movesets by average score.
     """
-    if top_n == 0 or len(movesets) <= top_n:
+    if top_n == 0 or len(movesets) <= 1:
+        # top_n==0 is the explicit "keep my order, don't screen" opt-out;
+        # a single moveset has nothing to order.
         logger.info(f"  {len(movesets)} moveset(s) - skipping screen phase.")
         return movesets
 
+    # When len(movesets) <= top_n there's nothing to *prune*, but we still
+    # run the screen to ORDER the movesets by score: the landing page is
+    # moveset[0], and it must be the best-scoring moveset, not whatever
+    # order the pool/enumeration produced. (Shadow Sableye 2026-06-25:
+    # 4 FP-pairs == top_movesets=4, so the old early-return shipped
+    # Dazzling Gleam as the landing page even though Drain Punch both
+    # scores higher and is the reference moveset.) scored[:top_n] keeps
+    # all of them when len <= top_n.
     logger.info(f"  Phase 1: Screening {len(movesets)} movesets (rank-1 IVs, "
                 f"{len(opponents)} opponents, {len(shield_scenarios)} scenario(s))...")
     t0 = time.time()
@@ -4585,6 +4595,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     background:#1a2540; border-radius:5px; overflow:hidden; margin-right:6px; }}
   .cmp-bar > span {{ display:block; height:100%; background:#3fb950; }}
   .cmp-bar.lo > span {{ background:#d4a017; }}
+  .cmp-bar.loss {{ display:flex; justify-content:flex-end; }}
+  .cmp-bar.loss > span {{ flex:none; background:#f85149; }}
   .cmp-hpv {{ font-size:0.76rem; color:#9bb0d0; }}
   .cmp-env {{ font-size:0.72rem; color:#7fd3b0; }}
   .cmp-leg {{ font-size:0.72rem; color:#8b949e; margin-top:5px; }}

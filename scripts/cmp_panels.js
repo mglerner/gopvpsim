@@ -111,7 +111,7 @@ function cmpMarginPanel(live, grids, energyCtx) {
   if (!found.length) return '';
   var h = '<div class="cmp-panel"><h4 class="cmp-marg-h">Same result, but the margin moves a lot</h4>' +
     '<p class="cmp-psub">All ' + (live.length === 2 ? 'both' : 'these') + ' get the same result, so a ' +
-    'win-count shows nothing — but leftover HP (what your <i>next</i> mon inherits) differs. The ' +
+    'win-count shows nothing — but leftover HP (what you exit the battle with) differs. The ' +
     'robustness / "win more convincingly" axis.</p>';
   // Post-match energy (passed in via energyCtx, not read from engine state).
   // energyMoves carries the fast move's energy gain + each charged move's cost
@@ -140,11 +140,16 @@ function cmpMarginPanel(live, grids, energyCtx) {
         // Two lines: spell out "+N energy" on top, tight per-move breakdown
         // below -- eats vertical space to save horizontal as columns grow.
         enHtml = '<br><span class="cmp-env" title="Leftover energy as ' +
-          'fast-move-equivalents and fractions of each charged move you could ' +
-          'throw on your next mon">+' + Math.round(en) + ' energy</span>' +
+          'fast-move-equivalents and fractions of each charged move you ' +
+          'exit the battle with">+' + Math.round(en) + ' energy</span>' +
           (parts.length ? '<br><span class="cmp-env">' + parts.join(' · ') + '</span>' : '');
       }
-      h += '<td><span class="cmp-bar' + (lo ? ' lo' : '') + '"><span style="width:' +
+      // Wins fill green from the left; losses fill red from the right
+      // (mirror image across the 500 centerline). 'lo' amber only marks
+      // close *wins* -- a loss is always red regardless of how close.
+      // (Metric is clamped to +-100% by cmpHp, so the bar never overflows.)
+      var barCls = 'cmp-bar' + (f.win ? (lo ? ' lo' : '') : ' loss');
+      h += '<td><span class="' + barCls + '"><span style="width:' +
            Math.min(100, pct) + '%"></span></span><span class="cmp-hpv">' +
            (f.win ? '+' : '−') + pct + '%</span>' + enHtml + '</td>';
     });
@@ -154,7 +159,7 @@ function cmpMarginPanel(live, grids, energyCtx) {
     '" class="cmp-more">+' + (found.length - CMP_ROWS) + ' more</td></tr>';
   h += '</table><div class="cmp-leg">Bars = focal’s leftover HP% at battle end ' +
        '(from the score). Losses show how close you came.' +
-       (showEnergy ? ' Energy = leftover charge for your next mon, shown as ' +
+       (showEnergy ? ' Energy = leftover charge you exit the battle with, shown as ' +
         'fast-move-equivalents then fractions of each charged move (by move ' +
         'initials).' : '') +
        '</div></div>';
