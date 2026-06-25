@@ -3413,16 +3413,18 @@ function cmpMarginPanel(live, grids) {
       var enHtml = '';
       if (showEnergy && f.win) {       // banked energy only meaningful on a win
         var en = cmpVal(eg.def, live[k].iv, f.si, f.oi);
-        var parts = [];               // count first so it reads "4.0 SC" = 4 Shadow Claws
+        var parts = [];               // count first + tight (no space) so it reads "4.0SC"
         if (em.fast && em.fast.gain > 0)
-          parts.push((en / em.fast.gain).toFixed(1) + ' ' + em.fast.abbr);
+          parts.push((en / em.fast.gain).toFixed(1) + em.fast.abbr);
         (em.charged || []).forEach(function(cm) {
-          if (cm.cost > 0) parts.push((en / cm.cost).toFixed(1) + ' ' + cm.abbr);
+          if (cm.cost > 0) parts.push((en / cm.cost).toFixed(1) + cm.abbr);
         });
+        // Two lines: spell out "+N energy" on top, tight per-move breakdown
+        // below -- eats vertical space to save horizontal as columns grow.
         enHtml = '<br><span class="cmp-env" title="Leftover energy as ' +
           'fast-move-equivalents and fractions of each charged move you could ' +
-          'throw on your next mon">+' + Math.round(en) + 'e' +
-          (parts.length ? ' (' + parts.join(' · ') + ')' : '') + '</span>';
+          'throw on your next mon">+' + Math.round(en) + ' energy</span>' +
+          (parts.length ? '<br><span class="cmp-env">' + parts.join(' · ') + '</span>' : '');
       }
       h += '<td><span class="cmp-bar' + (lo ? ' lo' : '') + '"><span style="width:' +
            Math.min(100, pct) + '%"></span></span><span class="cmp-hpv">' +
