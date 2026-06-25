@@ -67,12 +67,13 @@ from gopvpsim.attribution import PVPOKE_ATTRIBUTION_SHORT  # noqa: E402
 DEV_COUNTS_SOURCE_PATH = REPO_ROOT / 'DEVELOPER_NOTES.md'
 
 # Reference dive used for data-token resolution when a guide TOML
-# doesn't override. Oinkologne Male GL matches the shipping CD so
-# readers can click through and see the same numbers.
+# doesn't override. The Male GL dive + CD article were retired
+# 2026-06-25 (see TODO.md); Female Oinkologne GL is the surviving
+# Oinkologne dive, so readers can click through and see the numbers.
 DEFAULT_REFERENCE = {
-    'species': 'Oinkologne',
+    'species': 'Oinkologne (Female)',
     'league': 'great',
-    'dive_slug': 'oinkologne-great-league',
+    'dive_slug': 'oinkologne-female-great-league',
 }
 
 
