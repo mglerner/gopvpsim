@@ -198,16 +198,21 @@ def slayer_iter_worker(args):
     return results
 
 
-def build_focal_meta(species, league, shadow, iv_floor=None):
+def build_focal_meta(species, league, shadow, iv_floor=None,
+                     focal_max_level=None):
     """Compute (atk, def, hp, iv_idx) for all valid focal IVs.
 
     Returns (iv_to_idx, iv_meta_tuples) where iv_meta_tuples is a list of
     (a, d, s, atk, def, hp, level). Thin wrapper around compute_iv_metadata
     for backwards compatibility with the slayer iteration code. ``iv_floor``
-    is passed through to prune the focal IV space.
+    is passed through to prune the focal IV space. ``focal_max_level`` raises
+    the level cap (best-buddy/L51); since BOTH mirror sides are built from this
+    meta, it lifts the whole cohort to the best-buddy level for a like-for-like
+    best-buddy mirror.
     """
     iv_meta_dicts = compute_iv_metadata(species, league, shadow=shadow,
-                                        iv_floor=iv_floor)
+                                        iv_floor=iv_floor,
+                                        focal_max_level=focal_max_level)
     iv_to_idx = {}
     iv_meta = []
     for idx, m in enumerate(iv_meta_dicts):
@@ -243,7 +248,7 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                                 max_rounds=4, top_per_round=10, cache=None,
                                 metric='all', iv_floor=None,
                                 log_path=None, verbose=False,
-                                reserve_cpus=0):
+                                reserve_cpus=0, focal_max_level=None):
     """
     Iterative slayer discovery: find IVs that beat the mirror match through
     Nash-style iteration.
@@ -275,7 +280,8 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     from slayer_cache import SlayerCache
 
     iv_to_idx, iv_meta = build_focal_meta(species, league, shadow,
-                                            iv_floor=iv_floor)
+                                            iv_floor=iv_floor,
+                                            focal_max_level=focal_max_level)
     n_focal = len(iv_meta)
 
     fast_moves_db, charged_moves_db = get_moves()
