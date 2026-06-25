@@ -25,6 +25,23 @@ app — the same feature already live on the website (the deep-dive paste-box
   Memory: `project_owned_mon_breakdown.md`. Convention note: web + iOS use the
   dive's opponent IVs; the Python CLI uses 15/15/15 (they differ slightly).
 
+## ML IV-guide compare panels (shipped 2026-06-24) — re-bake perf follow-up
+
+The guide's "Check my IVs" box gained shared HP-margin + best-buddy-flip
+panels (commits 7292132 / e3156e7), backed by a new `cmp_scores` block in
+the `iv_envelope_analysis.py` JSON. `score_set()` captures the raw scores
+from the 64-combo rec-table sweep but is **NOT cached** — `WonSetCache`
+stores only booleans, so on a *warm* re-run the rec loop re-sims all 64
+combos × 4 quadrants (~138k sims, ~tens of min/species).
+
+**Follow-up for the thread-2 full re-bake:** teach `WonSetCache`
+(`scripts/iv_envelope_cache.py`) to also store the per-combo score grid
+(bump `CACHE_VERSION`), and have `score_set` read/write it, so the
+re-bake reuses the warm cache instead of re-simming. Cold cost is
+unchanged (those sims already ran for `drops`); this only fixes the warm
+regression. All ~60 guides need a re-bake anyway to pick up `cmp_scores`,
+so fold this into that run. See the `score_set` docstring.
+
 ## Pre-ship execution order (2026-04-18, for 2026-05-09 CD)
 
 Pre-ship arc shipped: items 1-6 all done (cross-form re-dive,
