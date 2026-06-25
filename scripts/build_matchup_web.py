@@ -195,8 +195,10 @@ def render_html(entries, scores, pool_name, n_sims, elapsed):
         filter: grayscale(1) opacity(0.45); }}
   table.matrix thead th .sortglyph:hover {{ filter: none; }}
   table.matrix thead th .sortglyph.pinnedglyph {{ filter: none; }}
+  /* Always present so the page does not jump when the first hover fills it;
+     min-height reserves the populated panel's height, blank until hovered. */
   #panel {{ background: var(--surface); border-radius: 2px; padding: 12px 16px;
-        margin: 16px 0; display: none; }}
+        margin: 16px 0; min-height: 192px; }}
   #panel h2 {{ color: var(--heading); margin: 0 0 4px 0; font-size: 1.1em; }}
   #panel .meta {{ color: var(--text-muted); font-size: 12.5px; margin-bottom: 8px; }}
   #panel .cols {{ display: flex; gap: 40px; flex-wrap: wrap; }}
