@@ -104,6 +104,7 @@ for t in aegislash-blade-vs-shield forretress-fast-move-shadow \
     run "Rebuild comparison: $t" $PY scripts/compare_loadouts.py "comparisons/$t.toml"
 done
 run "Rebuild Great League matchup web (footer)" $PY scripts/build_matchup_web.py
+run "Rebuild reader guides (TitanTrainers15 attribution banner)" $PY scripts/build_guides.py
 
 # --- 5. Rebuild index + run the ship gate (informational) --------------
 run "Rebuild website index" $PY scripts/build_website_index.py
