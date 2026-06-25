@@ -59,8 +59,8 @@ function cmpFlipPanel(live, grids) {
   found.sort(function(a, b) { return a.near - b.near; });
   if (!found.length) return '';
   var h = '<div class="cmp-panel"><h4 class="cmp-flip-h">Matchups your picks decide differently</h4>' +
-    '<p class="cmp-psub">Where the spread choice — or toggling best-buddy ' +
-    '(<span class="cmp-flip">✦</span>) — changes the win/tie/loss outcome. The fights your ' +
+    '<p class="cmp-psub">Where the spread choice - or toggling best-buddy ' +
+    '(<span class="cmp-flip">✦</span>) - changes the win/tie/loss outcome. The fights your ' +
     'IV pick actually decides, closest calls first.</p>';
   h += '<table class="cmp-tbl"><tr><th>Matchup</th>' +
     live.map(function(r) { return '<th>' + r.c.a + '/' + r.c.d + '/' + r.c.s + '</th>'; }).join('') + '</tr>';
@@ -111,7 +111,7 @@ function cmpMarginPanel(live, grids, energyCtx) {
   if (!found.length) return '';
   var h = '<div class="cmp-panel"><h4 class="cmp-marg-h">Same result, but the margin moves a lot</h4>' +
     '<p class="cmp-psub">All ' + (live.length === 2 ? 'both' : 'these') + ' get the same result, so a ' +
-    'win-count shows nothing — but leftover HP (what you exit the battle with) differs. The ' +
+    'win-count shows nothing - but leftover HP (what you exit the battle with) differs. The ' +
     'robustness / "win more convincingly" axis.</p>';
   // Post-match energy (passed in via energyCtx, not read from engine state).
   // energyMoves carries the fast move's energy gain + each charged move's cost
