@@ -88,3 +88,11 @@ Aegislash (Blade)
 # real UL opponent. NOTE: not Competitor's-Cup-legal, but eligible in GBL
 # Forever Forward, so it is included here for the broad meta.
 Mimikyu
+
+# --- 2026-06-25 union additions (current PvPoke top-60) ---
+Steelix
+Runerigus
+Steelix (Shadow)
+Cresselia (Shadow)
+Ampharos (Shadow)
+Ampharos
