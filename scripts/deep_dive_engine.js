@@ -3410,11 +3410,11 @@ function cmpMarginPanel(live, grids) {
       var enHtml = '';
       if (showEnergy && f.win) {       // banked energy only meaningful on a win
         var en = cmpVal(eg.def, live[k].iv, f.si, f.oi);
-        var parts = [];               // fast-move-equivalents, then each charged move
+        var parts = [];               // count first so it reads "4.0 SC" = 4 Shadow Claws
         if (em.fast && em.fast.gain > 0)
-          parts.push(em.fast.abbr + ' ' + (en / em.fast.gain).toFixed(1));
+          parts.push((en / em.fast.gain).toFixed(1) + ' ' + em.fast.abbr);
         (em.charged || []).forEach(function(cm) {
-          if (cm.cost > 0) parts.push(cm.abbr + ' ' + (en / cm.cost).toFixed(1));
+          if (cm.cost > 0) parts.push((en / cm.cost).toFixed(1) + ' ' + cm.abbr);
         });
         enHtml = '<br><span class="cmp-env" title="Leftover energy as ' +
           'fast-move-equivalents and fractions of each charged move you could ' +
