@@ -3923,8 +3923,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'referenceIdx': reference_idx,
         'tiers': tier_info,
         'movesets': [{'label': md['label'], 'prettyLabel': _pretty_moveset(md['label']),
-                      **({'cheapestChargedCost': md['cheapest_charged_energy']}
-                         if md.get('cheapest_charged_energy') is not None else {}),
                       **({'energyMoves': md['energy_moves']}
                          if md.get('energy_moves') is not None else {})}
                      for md in moveset_data],
@@ -7108,8 +7106,6 @@ def main():
                 # into fast-move-equivalents + fractions of each charged move.
                 _fm_db, _cm_db = get_moves()
                 _md['energy'] = energy_by_mode
-                _md['cheapest_charged_energy'] = min(
-                    (_cm_db[cid]['energy'] for cid in charged_ids), default=0)
                 # Multi-word -> initials (Shadow Sneak -> SS); single word ->
                 # first 3 letters (Crunch -> CRU) so it's never a lone letter.
                 def _mv_abbr(mid):

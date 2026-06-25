@@ -3167,7 +3167,6 @@ window.copyScannerJson = copyScannerJson;
 // spreads YOU enter, read entirely from the embedded grid (no new sims).
 // ============================================================
 var CMP_MAX = 7;            // hard cap on candidate spreads
-var CMP_CLOSE_BAND = 50;    // |score-500| <= band  => a "close" matchup
 var CMP_MARGIN_MIN = 0.15;  // leftover-HP spread (max-min) to count as a swing
 var CMP_ROWS = 8;           // rows shown per close-call table
 
@@ -3177,20 +3176,30 @@ function cmpFindIv(a, d, s) {
   }
   return -1;
 }
-// Score grids for the active moveset/mode at BOTH levels (L51 may be null).
+// Score grids for the active moveset/mode. `def` follows the best-buddy level
+// toggle (mirrors getScoreKey): L50 grid in default view, L51 grid in best-buddy
+// view. `alt` is the OTHER level -- the cross-level flip overlay (L51 when
+// viewing L50 = "powering up flips this"; L50 when viewing L51 = "without
+// best-buddy"). altCap names the alt level for the marker.
 function cmpGrids() {
   var base = state.movesetIdx + '_' + state.oppIvMode;
-  return { def: SCORES[base], alt: (DATA.ivL51 ? SCORES[base + '@51'] : null),
-           altCap: (DATA.bestBuddy && DATA.bestBuddy.altCap) || 51 };
+  var bb = DATA.bestBuddy || {};
+  var atL51 = !!DATA.ivL51 && state.levelMode === '51';
+  return {
+    def: SCORES[base + (atL51 ? '@51' : '')],
+    alt: DATA.ivL51 ? SCORES[base + (atL51 ? '' : '@51')] : null,
+    altCap: atL51 ? (bb.defaultCap || 50) : (bb.altCap || 51),
+  };
 }
 // Post-match ENERGY grids (only present with --compare-energy). Same key
-// construction as cmpGrids; null when absent -> the energy annotation is
-// silently skipped (graceful degrade on dives without it).
+// construction as cmpGrids (incl. the level toggle); null when absent ->
+// the energy annotation is silently skipped (graceful degrade).
 function cmpEnergyGrids() {
   if (typeof ENERGY === 'undefined') return { def: null, alt: null };
   var base = state.movesetIdx + '_' + state.oppIvMode;
-  return { def: ENERGY[base] || null,
-           alt: (DATA.ivL51 && ENERGY[base + '@51']) ? ENERGY[base + '@51'] : null };
+  var atL51 = !!DATA.ivL51 && state.levelMode === '51';
+  return { def: ENERGY[base + (atL51 ? '@51' : '')] || null,
+           alt: DATA.ivL51 ? (ENERGY[base + (atL51 ? '' : '@51')] || null) : null };
 }
 function cmpVal(grid, iv, si, oi) {
   return grid[iv * DATA.nScenarios * DATA.nOpponents + si * DATA.nOpponents + oi];
@@ -3221,8 +3230,12 @@ function cmpBestAvg() {
 // simultaneous-charged tiebreak in the mirror).
 function cmpMirror(iv) {
   if (!DATA.mirrorCohortAtk || !DATA.mirrorCohortAtk.length) return null;
-  var cohort = DATA.mirrorCohortAtk[0];
-  return DATA.ivAtk[iv] >= cohort - 1e-6;
+  // The cohort attack is an L50 construct; compare the L50 attack so the pill
+  // stays consistent under the best-buddy toggle (DATA.ivAtk is rebound to L51
+  // in that view). The boolean is level-invariant anyway -- CMP turns on the
+  // attack-IV ordering, which the shared CPM scaling preserves.
+  var atk = (_bbL50 && _bbL50.ivAtk) ? _bbL50.ivAtk[iv] : DATA.ivAtk[iv];
+  return atk >= DATA.mirrorCohortAtk[0] - 1e-6;
 }
 function cmpAnchors(iv) {
   var v = DATA.anchorClearByIv && DATA.anchorClearByIv[String(iv)];
@@ -3240,6 +3253,11 @@ function cmpAdd() {
   var lv = lvRaw === '' ? null : parseFloat(lvRaw);
   function ok(x) { return x >= 0 && x <= 15; }
   if (!(ok(a) && ok(d) && ok(s))) { cmpStatus('Enter Atk/Def/HP 0-15', '#f0916b'); return; }
+  // Validate the optional level: blank = current level; otherwise a finite
+  // 1..51 (else a typed 'abc' -> NaN renders '+NaN lv' in the card).
+  if (lv !== null && !(isFinite(lv) && lv >= 1 && lv <= 51)) {
+    cmpStatus('Level must be 1-51 (or blank)', '#f0916b'); return;
+  }
   if (state.compareCandidates.length >= CMP_MAX) {
     cmpStatus('Max ' + CMP_MAX + ' -- remove one to add another', '#d4a017'); return;
   }
@@ -3341,14 +3359,19 @@ function cmpFlipPanel(live, grids) {
       var d = cmpVal(grids.def, r.iv, si, oi), a = cmpVal(grids.alt, r.iv, si, oi);
       if ((d > 500) !== (a > 500)) bbFlip = true;  // best-buddy crosses the win line
     });
-    if ((distinct > 1 || bbFlip) && minNear <= CMP_CLOSE_BAND)
+    // Any real disagreement (distinct>1) or best-buddy flip is decision-relevant
+    // regardless of margin -- do NOT gate on closeness, or a genuine win-vs-loss
+    // split (e.g. 565 vs 430) or a bb flip with a far-from-500 base (560->440)
+    // would be silently dropped from BOTH panels. minNear only orders the rows.
+    if (distinct > 1 || bbFlip)
       found.push({ oi: oi, si: si, vals: vals, near: minNear });
   }
   found.sort(function(a, b) { return a.near - b.near; });
   if (!found.length) return '';
-  var h = '<div class="cmp-panel"><h4 class="cmp-flip-h">Close calls that flip the outcome</h4>' +
-    '<p class="cmp-psub">Near a dead-even 500, where the spread choice — or powering to ' +
-    'best-buddy (<span class="cmp-flip">✦</span>) — changes win/loss. The fights your IV pick decides.</p>';
+  var h = '<div class="cmp-panel"><h4 class="cmp-flip-h">Matchups your picks decide differently</h4>' +
+    '<p class="cmp-psub">Where the spread choice — or powering to best-buddy ' +
+    '(<span class="cmp-flip">✦</span>) — changes the win/tie/loss outcome. The fights your ' +
+    'IV pick actually decides, closest calls first.</p>';
   h += '<table class="cmp-tbl"><tr><th>Matchup</th>' +
     live.map(function(r) { return '<th>' + r.c.a + '/' + r.c.d + '/' + r.c.s + '</th>'; }).join('') + '</tr>';
   found.slice(0, CMP_ROWS).forEach(function(f) {
@@ -3367,8 +3390,8 @@ function cmpFlipPanel(live, grids) {
           // (green win / amber tie / red loss) -- not a flat amber word.
           var acls = a > 500 ? 'cmp-win' : (a === 500 ? 'cmp-tie' : 'cmp-lose');
           var albl = a > 500 ? 'win ' : (a === 500 ? 'tie ' : 'loss ');
-          mark = ' <span class="cmp-flip" title="best-buddy (L' + grids.altCap +
-            ') flips this">✦→</span><span class="' + acls + '">' + albl + a + '</span>';
+          mark = ' <span class="cmp-flip" title="at L' + grids.altCap + ' (best-buddy): ' +
+            albl + a + '">✦→</span><span class="' + acls + '">' + albl + a + '</span>';
         }
       }
       h += '<td class="' + cls + '">' + lbl + d + mark + '</td>';
