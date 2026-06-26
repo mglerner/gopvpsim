@@ -1529,7 +1529,12 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
                     f"{moveset_label(scored[0][1], scored[0][2])} "
                     f"(avg={scored[0][0]:.1f}); within {_REF_TIE_MARGIN} pts.")
                 scored.insert(0, scored.pop(_ref_pos))
-                _keep = max(top_n, 2)
+                # Keep the displaced movesets too. If the reference came from
+                # OUTSIDE the original top_n, promoting it would otherwise push
+                # the original #(top_n) out of the kept window -- so keep
+                # top_n + 1 (all original top_n plus the reference). If it was
+                # already within top_n, the set is unchanged (just reordered).
+                _keep = top_n + 1 if _ref_pos >= top_n else max(top_n, 2)
 
     elapsed = time.time() - t0
     logger.info(f"  Screened in {elapsed:.1f}s. Top movesets:")
