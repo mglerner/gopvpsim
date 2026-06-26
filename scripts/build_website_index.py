@@ -450,25 +450,24 @@ def _render_dives_grouped(dives: list[dict]) -> str:
         species = html.escape(g['species'])
         rows = g['entries']
         if len(rows) == 1:
-            d = rows[0]['entry']
-            p = rows[0]['parse']
-            # No sibling chips to carry the variant axes, so fold them
-            # into the display name (Shadow hoisted to a prefix, the rest
-            # appended): shadow-sableye -> "Shadow Sableye", not "Sableye".
-            non_shadow = [t for t in p['variant_tokens'] if t != 'Shadow']
-            name = g['species']
-            if p['shadow']:
-                name = f'Shadow {name}'
-            if non_shadow:
-                name = f'{name} ' + ' '.join(non_shadow)
+            r = rows[0]
+            d = r['entry']
+            p = r['parse']
+            # Render like the multi-variant case for visual consistency: plain
+            # species name followed by a link labelled by the variant (default
+            # "Regular"), never the species name itself as the link. Matches the
+            # Empoleon-style "name + Regular/Shadow links" rather than a bare
+            # "Dewgong" link.
             suffix = ('' if p['league_key'] == 'great'
                       else f' ({html.escape(p["league_pretty"])})')
             title_attr = (f' title="{html.escape(d["description"])}"'
                           if d.get('curated') else '')
             items.append(
                 '  <li class="dive">'
-                f'<b><a href="{html.escape(d["href"])}"{title_attr}>'
-                f'{html.escape(name)}</a></b>{suffix}'
+                f'<span class="species">{species}</span>'
+                f'<span class="variants"><a class="chip" '
+                f'href="{html.escape(d["href"])}"{title_attr}>'
+                f'{html.escape(r["label"])}</a></span>{suffix}'
                 '</li>')
         else:
             chips = []
