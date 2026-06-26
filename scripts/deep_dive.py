@@ -133,6 +133,13 @@ _FORM_CHANGE_NOTES = {
         'cannot reach in an actual battle. The form change is still live: if '
         'it shields, it reverts to Shield form. For the realistic build, see '
         'the Aegislash (Shield) dive.'),
+    'Mimikyu': _form_change_callout(
+        'Mimikyu starts in its <b>Disguise</b> form. The first unshielded '
+        'charged move it takes is absorbed (reduced to 1 damage), busting the '
+        'disguise; from then on Mimikyu is in <b>Busted</b> form with a '
+        'permanent -1 defense for the rest of the battle. This dive simulates '
+        'the Disguise-intact start, with the bust modeled natively from the '
+        'gamemaster form-change data.'),
 }
 
 
