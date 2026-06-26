@@ -120,8 +120,10 @@ DIVES = [
     # explicitly via extra_args and --no-thresholds so the auto-loader
     # doesn't search for aegislash_blade.toml in the ranking-keyed paths.
     # Canonical Shield moveset from get_default_moveset is mirrored on
-    # Blade so the hypothetical always-Blade comparison is apples-to-
-    # apples.
+    # Blade so the hypothetical starts-Blade comparison is apples-to-
+    # apples. (The Blade dive STARTS in Blade form, an unreachable
+    # battle-start state, to isolate Blade-form offense; the in-battle
+    # form change is still live, so it reverts to Shield if it shields.)
     #
     # Aegislash GL dives rejoined the overnight chain 2026-04-21 (was
     # previously out-of-band against cs_2026_orlando_top32.txt). The

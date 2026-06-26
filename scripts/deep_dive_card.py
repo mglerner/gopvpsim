@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gopvpsim.display import pretty_species  # noqa: E402
+from gopvpsim.display import apply_dive_title_override, pretty_species  # noqa: E402
 from gopvpsim.theme import (  # noqa: E402
     data_theme_attr,
     theme_css,
@@ -138,7 +138,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         shadow = bool(data_obj.get('shadow') or card_ctx.get('shadow'))
     else:
         shadow = bool(shadow)
-    disp = pretty_species(species)
+    disp = apply_dive_title_override(pretty_species(species))
     if shadow and 'Shadow' not in disp:
         disp = f'Shadow {disp}'
 

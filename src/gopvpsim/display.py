@@ -175,3 +175,37 @@ def pretty_species(name: str) -> str:
         result = result + ' (Male)'
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Dive-identity display overrides
+# ---------------------------------------------------------------------------
+# A dive's own title/H1/card/index-chip may need a display label that differs
+# from the gamemaster speciesName. The only case today: "Aegislash (Blade)" is
+# a hypothetical that STARTS in Blade form (a state you cannot reach at battle
+# start) to isolate Blade-form offense -- it is not a real lockable form, and
+# the in-battle form change is still live. Labelling it "(Starts Blade)" keeps
+# the dive from reading as a buildable Blade Aegislash.
+#
+# These overrides apply ONLY to a dive's own identity strings, NEVER to
+# opponent labels: as an opponent, "Aegislash (Blade)" stays as-is so matchup
+# tables aren't littered with the parenthetical. The two maps key differently
+# because the call sites carry different strings -- the page H1/card pass the
+# pretty gamemaster name; the index chip passes the dive slug.
+DIVE_TITLE_OVERRIDES = {
+    'Aegislash (Blade)': 'Aegislash (Starts Blade)',
+}
+DIVE_CHIP_OVERRIDES = {
+    'aegislash-blade-great-league': 'Starts Blade',
+}
+
+
+def apply_dive_title_override(pretty_name: str) -> str:
+    """Map a dive's pretty identity name via DIVE_TITLE_OVERRIDES.
+
+    Call on an ALREADY-pretty string (the output of ``pretty_species`` /
+    ``pretty_species_from_slug``) at a dive's own title/H1/card site only.
+    Returns the name unchanged when there is no override. Do NOT call this on
+    opponent labels.
+    """
+    return DIVE_TITLE_OVERRIDES.get(pretty_name, pretty_name)
