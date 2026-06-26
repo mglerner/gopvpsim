@@ -3,15 +3,16 @@
 # This spec drives scripts/compare_loadouts.py to generate the pairwise
 # win-rate delta fragment that the Aegislash form-change guide inlines.
 # Two loadouts: the canonical Shield-path (realistic, with mid-battle
-# form change) and the hypothetical always-Blade profile (Aegislash
-# (Blade) as its own species). Same charged moves on both so the delta
+# form change) and the hypothetical starts-Blade profile (Aegislash
+# (Blade) as its own species, started in Blade form). Same charged
+# moves on both so the delta
 # isolates the form-change effect, not a moveset difference.
 #
 # Output: userdata/website/comparisons/aegislash-blade-vs-shield/
 # Schema: scripts/compare_loadouts.py docstring.
 
 slug   = "aegislash-blade-vs-shield"
-title  = "Aegislash: Shield path vs always-Blade"
+title  = "Aegislash: Shield path vs starts-Blade"
 league = "great"
 author = ""
 authored_by = "ai"
@@ -22,8 +23,9 @@ summary = """
 Aegislash's canonical PvP path starts in Shield (tanky: atk 97 / def 272) \
 and transforms to Blade (glassy: atk 272 / def 97) on first charged move. \
 Our sim models this form change natively. This comparison contrasts the \
-realistic Shield-start-then-transform path with the hypothetical "always \
-Blade" profile, to quantify how much of Aegislash's on-paper performance \
+realistic Shield-start-then-transform path with the hypothetical \
+"starts-Blade" profile (Aegislash started in Blade form), to quantify \
+how much of Aegislash's on-paper performance \
 comes from the form-change sequencing rather than the per-form stats \
 alone.
 """

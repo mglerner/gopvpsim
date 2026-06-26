@@ -86,7 +86,7 @@ from gopvpsim.anchors import (
     resolve_anchors, ResolvedAnchor, build_auto_anchors,
     derive_short_name,
 )
-from gopvpsim.display import pretty_species
+from gopvpsim.display import apply_dive_title_override, pretty_species
 from gopvpsim.efficiency import efficient_frontier
 sys.path.insert(0, os.path.dirname(__file__))
 import deep_dive_analysis as analysis
@@ -97,6 +97,44 @@ from deep_dive_logging import (
 )
 
 logger = get_logger()
+
+
+# ---------------------------------------------------------------------------
+# Form-change explainer notes
+# ---------------------------------------------------------------------------
+# Rendered near the top of a form-changing species' dive page so a reader
+# understands the dive's STARTING form and how the form switches in battle.
+# Keyed by focal speciesName. Kept qualitative on purpose (no per-form stat
+# numbers) so nothing here can drift out of sync with the sim. Extend for
+# Mimikyu / Morpeko when those dives want a note. This is code, not a
+# thresholds/articles ship-mode narrative TOML.
+def _form_change_callout(body_html: str) -> str:
+    return (
+        '<div style="background:var(--callout-bg);color:var(--callout-fg);'
+        'padding:12px 16px;border-radius:0;margin:10px 0;'
+        'border:1px solid var(--callout-auto)">'
+        f'<b>Form change:</b> {body_html}</div>\n'
+    )
+
+
+_FORM_CHANGE_NOTES = {
+    'Aegislash (Shield)': _form_change_callout(
+        'This dive is the real Aegislash. It <b>starts in Shield</b> form '
+        '(bulky, very low attack) using a zero-damage fast move that only '
+        'builds energy, then swaps to <b>Blade</b> form (glassy, high attack) '
+        'on its first charged move for the rest of the fight. If it uses a '
+        'shield it reverts to Shield form. The sim models this natively from '
+        'the gamemaster form-change data.'),
+    'Aegislash (Blade)': _form_change_callout(
+        'The real Aegislash always <em>starts</em> a battle in Shield form and '
+        'only becomes Blade after its first charged move. This dive is a '
+        'hypothetical that <b>starts in Blade</b> form (glassy, high attack) '
+        'from turn one, to isolate Blade-form offense: a starting state you '
+        'cannot reach in an actual battle. The form change is still live: if '
+        'it shields, it reverts to Shield form. For the realistic build, see '
+        'the Aegislash (Shield) dive.'),
+}
+
 
 # ---------------------------------------------------------------------------
 # PvPoke custom group loading (via cached fetch from GitHub)
@@ -4476,7 +4514,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # via a separate flag; reconstruct the gamemaster-format name
     # before pretty_species so shadow-form dives render correctly.
     _species_for_display = f'{species} (Shadow)' if shadow else species
-    species_pretty = pretty_species(_species_for_display)
+    species_pretty = apply_dive_title_override(pretty_species(_species_for_display))
 
     html = f"""<!DOCTYPE html>
 {cli_comment}<html {data_theme_attr()}>
@@ -4563,7 +4601,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .matches-toggle-btn:hover {{ background: var(--border-2); }}
   span.user-anchor-hits {{ font-size: 11px; font-style: italic;
                            margin-left: 6px; }}
-  /* "Compare my candidates" widget */
+  /* "Compare candidates" widget */
   .cmp-section {{ background:var(--surface); border:1px solid var(--border); border-radius:2px;
     padding:6px 16px 14px; margin:14px 0; }}
   .cmp-section.cmp-wide {{ width:96vw; max-width:1560px; position:relative;
@@ -4687,6 +4725,12 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 <!-- DIVE_CARD_SLOT -->
 <!-- DD_LAYOUT_OPEN -->
 """
+
+    # Form-change explainer near the top, for form-changing focal species
+    # (Aegislash today). Keyed by focal speciesName; silent no-op otherwise.
+    _fc_note = _FORM_CHANGE_NOTES.get(species)
+    if _fc_note:
+        html += _fc_note
 
     # Related article link (bidirectional link contract: docs/article_schema.md).
     # Gate emission on the built article dir EXISTING: a retired/deleted article
@@ -4950,7 +4994,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             '</div>\n'
         )
 
-    # "Compare my candidates" widget -- a separate, bounded N-way comparison of
+    # "Compare candidates" widget -- a separate, bounded N-way comparison of
     # focal IV spreads YOU enter (manual; no auto "top N"). Small until used;
     # breaks out toward full-bleed as candidates accumulate (JS adds .cmp-wide).
     # All compute is client-side off the embedded grid (no new sims). Always

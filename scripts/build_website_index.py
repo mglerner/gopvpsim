@@ -413,6 +413,7 @@ def _group_dives(dives: list[dict]) -> tuple[list[dict], list[dict]]:
             {'species': p['species_display'], 'rows': []})
         g['rows'].append({'entry': d, 'parse': p})
 
+    from gopvpsim.display import DIVE_CHIP_OVERRIDES
     result: list[dict] = []
     for g in groups.values():
         rows = g['rows']
@@ -430,6 +431,10 @@ def _group_dives(dives: list[dict]) -> tuple[list[dict], list[dict]]:
                 label = (f'{label} ({p["league_pretty"]})'.strip()
                          if label else p['league_pretty'])
             r['label'] = label or 'Regular'
+            # Dive-identity label override (Blade -> "Starts Blade"); keyed by
+            # the dive's slug. See display.DIVE_CHIP_OVERRIDES.
+            _slug = r['entry'].get('href', '').split('/')[0]
+            r['label'] = DIVE_CHIP_OVERRIDES.get(_slug, r['label'])
         rows.sort(key=lambda r: (
             _LEAGUE_ORDER.get(r['parse']['league_key'], 9),
             r['parse']['shadow'],
