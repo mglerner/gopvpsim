@@ -170,3 +170,48 @@ Owner: the UI session (resumed). Reference artifact showing exactly what breaks:
 left -> the unreadable ones are now visible against light). Commits 582dfde /
 ed1ca5f are the worked tokenization pattern; the canonical map + role rules are
 above.
+
+## PHASE 2 COMPLETE -- semantic tokens baked (2026-06-25)
+
+The "ROLLOUT INCOMPLETE" gaps above are now closed. Spec/governance:
+`/tmp/THEME_PHASE2_SPEC.md` (per-file selector map, AA-verified token values)
+and `docs/palette_governance.md` (the palette authoring contract, now committed).
+The bake values the spec session confirmed are archived at
+`/tmp/THEME_PHASE2_BAKE.md`.
+
+Done this arc (all via adversarially-verified agent workflows; the audits
+caught real bugs each pass -- on-brand AA conflict, tier var/hex drift, a
+mod-8 regression, and a tier-badge index-reconstruction bug):
+
+- `theme.py` `_TOKENS`: 15 tokens re-valued to AA-pass values, ~43 added
+  (opp-1..12, tier-1..8 + tier-mirror, cell tints, envelope, catw/rarity/cat
+  chip families, sex-male/female, on-title/on-accent). `--on-brand` split into
+  `--on-title` / `--on-accent` (the gruvbox-light button-text AA conflict).
+  Added `data_theme_attr()` -- the single site-default emitter; every renderer
+  now sources `data-theme` from it (DEFAULT_THEME dead-code trap closed).
+- Missed CSS modules tokenized: `deep_dive_rendering.py` (dd-* body CSS, opp
+  palette 16->12 mod-12, atk-weight/rarity/env/zone chips, inline styles),
+  `generate_article.py` (full chrome + gender rgba via color-mix + flip cells +
+  banners), `deep_dive_engine.js` (all JS-emitted inline-style/innerHTML hex ->
+  var() strings), `deep_dive_narrative.py`, `patch_dive_species_narrative.py`,
+  `attribution.py`, the `render_article.py` sidebar partial, plus the
+  audit-discovered `write_aegislash_narrative.py`.
+- Unified tier palette across CSS + JS (the migrate-together hazard):
+  THRESHOLD_COLORS + TIER_COLORS_AUTO + narrative-10 collapsed to `--tier-1..8`;
+  badges render as tier-color TEXT on `--surface-2` (no more saturated fill +
+  forced #000). Theme-aware badges use `var(--tier-N)`; Plotly markers get
+  resolved hex via `_TIER_VAR_TO_HEX` at a single injection boundary (now with
+  a guard that raises on an unmapped tier color). A parallel `__TIER_VARS_JS__`
+  array lets the JS summary badge read each tier's OWN var (not an index
+  reconstruction), so badge == card == marker for all tiers incl. mirror and
+  the General-removal case.
+
+STILL OUT (deferred, OK'd): Plotly canvas/marker recoloring -- needs a
+`getComputedStyle` shim so markers theme live; until then markers carry the
+DEFAULT_THEME (gruvbox-light) resolved hex. `_TYPE_COLORS` (type-brand) stays
+out of the contract.
+
+GATE BEFORE GREEN-LIGHT (not yet cleared): an independent adversarial
+verification pass (driven from the other session) against this committed state,
+THEN one full dive re-render eyeballed across all 4 themes. Only after both does
+phase2_preship.sh get armed / anything publish. Push remains nod-gated.
