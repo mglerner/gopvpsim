@@ -1067,6 +1067,11 @@ def narrative_has_human_content(narrative: dict) -> bool:
         block = narrative.get(key) or {}
         if has_content(block):
             val = (block.get('authored_by') or 'human').strip().lower()
+            # Mirror _authored_by_class: an unknown/typo'd value falls back to
+            # 'human' (the renderer colors it as human prose), so the badge
+            # must treat it as human notes too, not silently drop to flat.
+            if val not in {'human', 'ai', 'mixed', 'auto'}:
+                val = 'human'
             if val in {'human', 'mixed'}:
                 return True
     return False
