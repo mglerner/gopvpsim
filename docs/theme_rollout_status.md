@@ -224,15 +224,44 @@ committed code, not regressions. The "hardcoded data-theme" finding is the known
 `.replace()` sentinel (build_matchup_web.py:151 / build_website_index.py:650 ->
 lines 460/791), a false positive.
 
-REMAINING GATE before phase2 / publish -- the full dive re-render, which MUST run
-HEAD `9221908` (do NOT publish the current on-disk PRE-theme output):
-  1. Smoke FIRST: render ONE fresh dive (pick an auto-derive dive so it exercises
-     `_next_color` + the General-removal path + a mirror tier) and ONE comparison,
-     then eyeball all 4 themes. The adversarial pass render-inspected the ML guide
-     / index / matchup end-to-end, but NOT a dive or comparison -- those two
-     page types are source-verified-only (low risk, but un-eyeballed).
-  2. If clean, run the full batch re-render at HEAD.
-  3. Then arm phase2_preship.sh. Push remains nod-gated.
+SMOKE + EYEBALL: DONE and PASSED (2026-06-25). Smoke-rendered Grumpig
+(auto-derive), Talonflame (auto-derive), Stunfisk (auto-derive WITH a mirror
+tier -> `var(--tier-mirror)` badge==marker confirmed), and an Aegislash
+blade-vs-shield comparison, all to /tmp at HEAD. Static checks clean; Michael
+eyeballed a dive + comparison across all 4 themes -- looks good. Plotly scatter
+does NOT re-theme (the documented deferral), confirmed as expected.
+
+FRESH-SESSION RUNBOOK -- full phase2 + publish. DELIBERATELY DEFERRED to a clean
+context; do NOT run this in the authoring session. Scope confirmed: full phase2
+(theme re-render PLUS the corrective re-sims). Run at HEAD `8669f8d`+ (the 4
+phase-2 commits); do NOT publish the current on-disk PRE-theme output.
+
+  1. Confirm clean: `git status` clean, on dive-ia-rework at/above 8669f8d;
+     `git log --oneline -5` shows the 4 phase-2 commits (theme tokens, tier
+     cluster, renderers, docs).
+  2. Run phase2:  `nohup scripts/phase2_preship.sh >/dev/null 2>&1 &`
+     Watch `userdata/logs/phase2_preship.log`; DONE when
+     `userdata/logs/phase2_ready.txt` appears. It RE-SIMS 6 dives (Shadow Sableye
+     GL + 5 UL -- NB the script's "4 UL" comment is STALE; the `ultra` filter
+     catches all 5 incl. zygarde-complete added 2026-06-25), then re-renders all
+     40 dives from blobs + 61 ML guides + 4 comparisons + matchup (~12s re-sim) +
+     reader guides + index, runs the ship gate (informational), and STOPS (never
+     publishes). Long pole = the 6 re-sims, ~1.5-3h at --reserve-cpus 1 (Sableye
+     GL is 4-moveset, ~22-43min).
+     - The `--since-hours 30` blob window is safe ONLY because this morning's
+       chain freshly re-dived all 40 (<30h blobs) while retired dives (e.g. male
+       Oinkologne) have >30h blobs so they stay excluded. If the re-render runs
+       >30h after the last full chain, widen deliberately or pass an explicit
+       blob list (319 blobs back to Jun 10 live in userdata/replay/).
+  3. Eyeball a couple freshly-rendered `userdata/website/` pages across 4 themes
+     (sanity beyond the /tmp smokes).
+  4. Publish:  `scripts/publish_website.sh` (dry-run) THEN
+     `scripts/publish_website.sh --push` (rsync -avzh --delete to
+     mglerner.com:mglerner.com/pogo-dives/ -> https://mglerner.com/pogo-dives/).
+     Its own gates: verify_article_links --ship, verify_no_unicode_dashes --ship,
+     and a `.cards_rerender_pending` sentinel (phase2 clears it). PUSH IS
+     NOD-GATED -- get Michael's explicit OK before `--push`; `--delete` mirrors
+     local to server (retired dives deleted server-side).
 
 KNOWN sub-AA values to batch later (NON-blocking; flagged honestly -- do NOT
 claim "all AA pass"): `--text-muted` gruvbox-light = 4.29:1 (pre-existing chrome
