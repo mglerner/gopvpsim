@@ -93,6 +93,20 @@ DIVES = [
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'reference': 'FAIRY_WIND,BULLDOZE,PLAY_ROUGH',
     },
+    # Fearow GL -- added 2026-06-26 as a launch dive (a one/two-turn fast-move
+    # pick suggested by an HSH Discord member; common in GL, no debuff/boost/
+    # form-change mechanic so the sim is clean). No hand-authored thresholds
+    # exist, so --no-thresholds; default moveset from PvPoke rankings is
+    # Peck / Drill Peck + Drill Run.
+    {
+        'species': 'Fearow',
+        'league': 'great',
+        'slug': 'fearow-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'no_thresholds': True,
+        'reference': 'PECK,DRILL_PECK,DRILL_RUN',
+    },
     {
         'species': 'Tinkaton',
         'league': 'ultra',
