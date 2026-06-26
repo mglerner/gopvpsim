@@ -4966,7 +4966,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # cmp_panels.js flip/margin panels; only the input affordance differs.
     html += (
         '<details id="cmp-section" class="cmp-section" open>\n'
-        '  <summary class="cmp-summary"><b>Compare my candidates</b> '
+        '  <summary class="cmp-summary"><b>Compare candidates</b> '
         '<span class="cmp-note">- up to 7 of your IV spreads, side by '
         'side: wins, mirror, and the close calls that decide the build</span>'
         '</summary>\n'
@@ -4976,7 +4976,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         '    Def <input id="cmp-d" type="number" min="0" max="15" value="15">\n'
         '    HP <input id="cmp-s" type="number" min="0" max="15" value="15">\n'
         '    Lvl <input id="cmp-lv" class="cmp-lv" type="number" min="1" '
-        'max="51" step="0.5" placeholder="now">\n'
+        'max="51" step="0.5" placeholder="max">\n'
         '    <button id="cmp-add" type="button">+ Add</button>\n'
         '    <button type="button" class="cmp-clear" onclick="cmpClear()">'
         'Clear all</button>\n'
