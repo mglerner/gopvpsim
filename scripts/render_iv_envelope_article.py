@@ -665,7 +665,11 @@ def style():
   .cmp-lose { color:var(--loss); font-weight:700; }
   .cmp-tie { color:var(--tie); font-weight:700; }
   .cmp-flip { color:var(--flip); }
-  .cmp-more { color:var(--text-muted); font-size:.82em; font-style:italic; }
+  .cmp-more { color:var(--text-muted); font-size:0.76rem; font-style:italic;
+    cursor:pointer; text-decoration:underline dotted; }
+  .cmp-more:hover { color:var(--text); }
+  .cmp-tbl tr.cmp-xtra { display:none; }
+  .cmp-tbl.cmp-all tr.cmp-xtra { display:table-row; }
   .cmp-bar { display:inline-block; vertical-align:middle; width:64px; height:9px;
             background:var(--bar-track); border-radius:2px; overflow:hidden; margin-right:6px; }
   .cmp-bar > span { display:block; height:100%; background:var(--win); }
