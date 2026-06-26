@@ -9,7 +9,7 @@
 # Deep dive: userdata/website/aegislash-blade-great-league/ (GL).
 # Articles:  articles/aegislash-form-change-guide-gl.toml (GL).
 #
-# UL coverage was dropped 2026-05-17 per mercuryish review: UL
+# UL coverage was dropped 2026-05-17 per an HSH Discord member's review: UL
 # Aegislash is not competitively viable.
 #
 # deep_dive.py is invoked with `--no-thresholds` for Aegislash so this

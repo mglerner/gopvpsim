@@ -15,10 +15,10 @@
 #   - "Azu bul" def floor of 138 (GoBattleKit DEFAULT_THRESHOLDS,
 #     src/gobattlekit/data/thresholds.py, 'Drapion (Shadow)' / Great,
 #     sourced to "the HomeSliceHenry Discord server").
-#   - acidicArisen's attack-weighted Shadow Drapion build at 119.80
+#   - an HSH Discord member's attack-weighted Shadow Drapion build at 119.80
 #     effective atk (pogo-simulator CHANGELOG "Shadow / atk-weighted
 #     opponent IVs" thread; docs/validations/
-#     2026-04-06_tinkaton_gh_vs_reference.md). His paired 140.21-def
+#     2026-04-06_tinkaton_gh_vs_reference.md). Their paired 140.21-def
 #     number is a TINKATON stat (Tinkaton's def vs this build) and is
 #     deliberately not duplicated here, per the altaria_shadow.toml
 #     precedent.
@@ -32,7 +32,7 @@
 # (2026-06-10).
 
 ["Drapion (Shadow)"]
-sources = "HomeSliceHenry's Discord (Azu-bulk def floor, shipped in GoBattleKit DEFAULT_THRESHOLDS) + his 'SHADOW DRAPION PVP IV DEEP DIVE' YouTube video (Nov 2021, content unfetched 2026-06-12); acidicArisen atk-weighted build stat (CHANGELOG / docs/validations/2026-04-06_tinkaton_gh_vs_reference.md); discovery anchors from opponent_pools/gl_top50_plus_cs.txt (2026-06-10)."
+sources = "HomeSliceHenry's Discord (Azu-bulk def floor, shipped in GoBattleKit DEFAULT_THRESHOLDS) + his 'SHADOW DRAPION PVP IV DEEP DIVE' YouTube video (Nov 2021, content unfetched 2026-06-12); an HSH Discord member's atk-weighted build stat (CHANGELOG / docs/validations/2026-04-06_tinkaton_gh_vs_reference.md); discovery anchors from opponent_pools/gl_top50_plus_cs.txt (2026-06-10)."
 
 ["Drapion (Shadow)".Great.meta]
 notes = "Shadow trade-off: x1.2 atk pushes the base form's super-effective Poison Sting / Crunch tiers up cheaply; x0.8333 def makes the Azu-bulk def floor the binding constraint. Left the 2026-06 pool but shipped in the app — dive kept for threshold staleness tracking."
@@ -50,7 +50,7 @@ stamina = 0
 description = "HomeSliceHenry's Azu-bulk tier: 138.00 def floor to hold the Azumarill matchup. Shipped verbatim in GoBattleKit DEFAULT_THRESHOLDS as 'Azu bul'; the exact (move, tier) bulkpoint it preserves is rediscovered by the azumarill anchors below."
 source = "HomeSliceHenry's Discord"
 
-# acidicArisen's attack-weighted community build — the variant his
+# An HSH Discord member's attack-weighted community build — the variant their
 # Tinkaton prep is calibrated against. Stat-cutoff form only: the local
 # record gives the effective attack, not an IV list, so this cannot yet
 # feed the _shared.toml atk-weighted opponent-injection convention
@@ -61,8 +61,8 @@ source = "HomeSliceHenry's Discord"
 attack = 119.8
 defense = 0
 stamina = 0
-description = "acidicArisen's attack-weighted Shadow Drapion build: 119.80 atk effective attack. The opponent variant that Tinkaton's anti-Drapion bulkpoint is calibrated against; encoded here as the community's punchy-Drapion reference tier."
-source = "acidicArisen (HomeSliceHenry's Discord); pogo-simulator CHANGELOG + docs/validations/2026-04-06_tinkaton_gh_vs_reference.md"
+description = "An HSH Discord member's attack-weighted Shadow Drapion build: 119.80 atk effective attack. The opponent variant that Tinkaton's anti-Drapion bulkpoint is calibrated against; encoded here as the community's punchy-Drapion reference tier."
+source = "An HSH Discord member (HomeSliceHenry's Discord); pogo-simulator CHANGELOG + docs/validations/2026-04-06_tinkaton_gh_vs_reference.md"
 
 # ─────────────────────────────────────────────────────────────────────
 # Anchors — bulkpoints (def-side). The shadow def penalty makes these

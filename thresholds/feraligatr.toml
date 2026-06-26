@@ -1,7 +1,7 @@
 # Feraligatr — Great League thresholds and slayer anchors.
 #
 # Sources:
-#   - Simulator-derived. No known expert (acidicArisen / RyanSwag-style)
+#   - Simulator-derived. No known expert (an HSH Discord member / RyanSwag-style)
 #     IV writeup exists for post-rebalance Feraligatr; anchors below are
 #     designed from current-meta matchup logic against the 2026-06-10
 #     opponent pool (opponent_pools/gl_top50_plus_cs.txt).

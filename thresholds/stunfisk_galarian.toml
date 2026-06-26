@@ -147,7 +147,7 @@ opponent = "Jellicent"
 description = "Discover all Jellicent bulkpoints (close neutral matchup; Water Spout/Shadow Ball damage tiers vs G-Fisk's bulk)."
 
 # Tinkaton — reverse evidence already exists: tinkaton.toml carries
-# acidicArisen's Tinkaton-side stat checks; discovery from the G-Fisk
+# An HSH Discord member's Tinkaton-side stat checks; discovery from the G-Fisk
 # side completes the pair.
 ["Stunfisk (Galarian)".Great.anchors.tinkaton_blkp_any]
 kind = "bulkpoint"

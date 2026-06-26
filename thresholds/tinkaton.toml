@@ -1,7 +1,7 @@
 # Tinkaton — Great League thresholds, spreads, and slayer anchors.
 #
 # Sources:
-#   - acidicArisen #iv-tech writeup on HomeSliceHenry Discord server
+#   - an HSH Discord member's #iv-tech writeup on the HomeSliceHenry Discord server
 #     (datamined Gigaton Hammer 130/60, stat checks for GL Tinkaton)
 #   - Legacy JSON thresholds (GH Great / GH Good bulk cutoffs)
 
@@ -9,7 +9,7 @@
 sources = "HomeSliceHenry's Discord #iv-tech; legacy JSON thresholds"
 
 # ─────────────────────────────────────────────────────────────────────
-# Spreads — stat-cutoff tiers from the acidicArisen summary
+# Spreads — stat-cutoff tiers from an HSH Discord member's summary
 # ─────────────────────────────────────────────────────────────────────
 
 [Tinkaton.Great.spreads."GH Great"]
@@ -29,7 +29,7 @@ source = "HomeSliceHenry's Discord"
 # ─────────────────────────────────────────────────────────────────────
 # Anchors — CMP ties (atk-side)
 #
-# acidicArisen notes CMP thresholds at 105.58 (Corviknight), 105.79
+# An HSH Discord member notes CMP thresholds at 105.58 (Corviknight), 105.79
 # (Lickilicky, flips 2s no-bait), 105.90 (Medicham, Jellicent). These
 # require IV-list spreads to encode as CMP anchors in our schema;
 # deferred until CMP anchors support single-opponent shorthand (see
@@ -41,7 +41,7 @@ source = "HomeSliceHenry's Discord"
 # Anchors — damage breakpoints (atk-side)
 # ─────────────────────────────────────────────────────────────────────
 
-# Level 3: discover all Jellicent BPs. acidicArisen notes 106.20 atk
+# Level 3: discover all Jellicent BPs. An HSH Discord member notes 106.20 atk
 # beats Jellicent in 1-0 regardless of bait.
 [Tinkaton.Great.anchors.jellicent_brkp_any]
 kind = "damage_breakpoint"
@@ -49,7 +49,7 @@ opponent = "Jellicent"
 description = "Discover all Jellicent damage breakpoints. 106.20 atk flips the 1-0."
 source = "HomeSliceHenry's Discord"
 
-# Level 3: discover all Annihilape BPs. acidicArisen notes 106.58 atk
+# Level 3: discover all Annihilape BPs. An HSH Discord member notes 106.58 atk
 # gives a bulkpoint vs rank 1 Annihilape (but doesn't flip matchups).
 [Tinkaton.Great.anchors.annihilape_brkp_any]
 kind = "damage_breakpoint"
@@ -60,11 +60,11 @@ source = "HomeSliceHenry's Discord"
 # ─────────────────────────────────────────────────────────────────────
 # Anchors — bulkpoints (def-side)
 #
-# These are the core of the acidicArisen writeup: def thresholds that
+# These are the core of an HSH Discord member's writeup: def thresholds that
 # flip specific matchups by reducing incoming damage.
 # ─────────────────────────────────────────────────────────────────────
 
-# Level 3: discover all Azumarill bulkpoints. acidicArisen: 143.03 def
+# Level 3: discover all Azumarill bulkpoints. An HSH Discord member: 143.03 def
 # flips 1-2 vs rank 1 Azu.
 [Tinkaton.Great.anchors.azumarill_blkp_any]
 kind = "bulkpoint"
@@ -72,7 +72,7 @@ opponent = "Azumarill"
 description = "Discover all Azumarill bulkpoints. 143.03 def flips 1-2."
 source = "HomeSliceHenry's Discord"
 
-# Level 3: discover all Medicham bulkpoints. acidicArisen: 141.66 def +
+# Level 3: discover all Medicham bulkpoints. An HSH Discord member: 141.66 def +
 # 138 hp survives Dynamic Punch to win 1s no bait.
 [Tinkaton.Great.anchors.medicham_blkp_any]
 kind = "bulkpoint"
@@ -80,7 +80,7 @@ opponent = "Medicham"
 description = "Discover all Medicham bulkpoints. 141.66 def + 138 hp flips 1s."
 source = "HomeSliceHenry's Discord"
 
-# Level 3: discover all Corsola (Galarian) bulkpoints. acidicArisen:
+# Level 3: discover all Corsola (Galarian) bulkpoints. An HSH Discord member:
 # 143.04 def + 140 hp reaches two Gigaton Hammers in the 0s.
 [Tinkaton.Great.anchors.corsola_galarian_blkp_any]
 kind = "bulkpoint"
@@ -88,7 +88,7 @@ opponent = "Corsola (Galarian)"
 description = "Discover all G-Corsola bulkpoints. 143.04 def + 140 hp flips 0s."
 source = "HomeSliceHenry's Discord"
 
-# Level 3: discover all Shadow Altaria bulkpoints. acidicArisen:
+# Level 3: discover all Shadow Altaria bulkpoints. An HSH Discord member:
 # 143.04 def + 141 hp flips 0-1 no bait. Shadow IV variance noted.
 [Tinkaton.Great.anchors.altaria_shadow_blkp_any]
 kind = "bulkpoint"
@@ -115,7 +115,7 @@ opponent = "Tinkaton"
 description = "Discover all mirror Tinkaton bulkpoints."
 
 # ─────────────────────────────────────────────────────────────────────
-# Opponents not in top-20 that acidicArisen calls out
+# Opponents not in top-20 that an HSH Discord member calls out
 # (auto-included via TOML anchor opponent injection)
 # ─────────────────────────────────────────────────────────────────────
 

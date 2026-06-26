@@ -32,7 +32,7 @@ closest scored matchups: Corviknight 490, Tinkaton 464, Jellicent 528,
 Quagsire 543, Ninetales (Shadow) 579, Altaria 600), against the
 2026-06-10 opponent pool opponent_pools/gl_top50_plus_cs.txt. Reverse
 bulkpoint evidence for the Tinkaton matchup in thresholds/tinkaton.toml
-(HomeSliceHenry's Discord, acidicArisen).
+(HomeSliceHenry's Discord).
 """
 
 # ─────────────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ source = "Simulator-derived from PvPoke GL matchup data (post-June-2026 rebalanc
 ["Corsola (Galarian)".Great.anchors.tinkaton_blkp_any]
 kind = "bulkpoint"
 opponent = "Tinkaton"
-description = "Discover all Tinkaton bulkpoints. Counter rating 464; reverse-side evidence (tinkaton.toml, acidicArisen) shows this matchup flips on single damage tiers — find the focal def tiers vs Gigaton Hammer and fast-move chip."
+description = "Discover all Tinkaton bulkpoints. Counter rating 464; reverse-side evidence (tinkaton.toml) shows this matchup flips on single damage tiers — find the focal def tiers vs Gigaton Hammer and fast-move chip."
 source = "Simulator-derived; reverse-side calibration from thresholds/tinkaton.toml (HomeSliceHenry's Discord)"
 
 # Jellicent — ghost-on-ghost, SE chip both ways (rating 528, narrow

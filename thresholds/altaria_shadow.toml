@@ -12,7 +12,7 @@
 # (atk x1.2, def x0.8333) mean the base-form atk breakpoints largely come
 # free while every def check gets harder, which is why this file is
 # bulkpoint-heavy discovery. Third-party context: tinkaton.toml's
-# acidicArisen anchor notes "high shadow IV variance" when prepping
+# an HSH Discord member's anchor notes "high shadow IV variance" when prepping
 # AGAINST Shadow Altaria — that number (143.04 def) is a Tinkaton stat,
 # not an Altaria one, and is deliberately not duplicated here.
 #
