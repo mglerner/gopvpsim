@@ -142,6 +142,26 @@ N-1, drop older) so the cache stops growing unbounded. Note: an `iv_envelope/`
 cache already exists, so the ML path DOES cache its analysis output -- it just
 doesn't share the per-opponent SWEEP-column cache, which is the merge above.
 
+## Old/new mechanics user toggle (POST-SHIP, bundles with the cache rework above)
+
+*(2026-06-26, Michael)* Post-ship idea, flagged so it is not lost; do NOT
+pre-ship or design heavily yet. If the site/app gets traction, P!P-series /
+Worlds competitors may want it for prep, and **Worlds runs on the OLD battle
+mechanics**. So expose a user-facing toggle between old and new mechanics on
+the dive site.
+
+Light design notes (not yet designed):
+- Preference storage: cookies (never used here) vs radio buttons vs a query
+  param. Look at what PvPoke does for its "Preview next season" version as
+  prior art before picking.
+- Sequencing: do this AFTER the cache rework above. The cache work should then
+  also (1) key the cache so OUR engine stays at its most-recent level while
+  still caching old-vs-new-mechanics results separately, and (2) add the
+  stale-version GC (keep the current version, delete old after migrating;
+  maybe not fully aggressive). Bundles with the "Sweep cache should store
+  energy" and "cache size + stale-version GC" items above (same cache, same
+  migration).
+
 ## Limited-availability mons: real IV floors for ML sweeps (PARALLEL, post-ship)
 
 *(2026-06-25, scratch_thoughts)* The ML IV-guide sweeps assume a 12/12/12 IV
