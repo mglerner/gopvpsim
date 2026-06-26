@@ -212,7 +212,7 @@ def derive_narrative_flavors(effective_tiers, all_matchup_boundaries, data_obj):
             'hp_cut': hp,
             'is_general': is_general,
             'recommended': False,
-            'tier_color': t.get('color', '#888'),
+            'tier_color': t.get('color', 'var(--text-muted)'),
             'tier_desc': t.get('desc', ''),
             'n_qualifying': _count_qualifying(data_obj, atk, def_, hp),
         })
@@ -976,8 +976,10 @@ def _opp_colored(name):
     # replay-vs-original HTML equality, which is how it was caught —
     # arc S4). Same approach as deep_dive_rendering._opp_color.
     import hashlib
-    colors = ['#58a6ff', '#f85149', '#3fb950', '#d29922', '#bc8cff',
-              '#f0883e', '#e8e6e3', '#79c0ff', '#7ee787', '#d2a8ff']
+    # Opponent-keyed (md5 of the opponent name): use the unified opponent
+    # palette --opp-1..--opp-12, mod 12, matching deep_dive_rendering._opp_color
+    # so the same opponent gets the same hue across renderers.
+    colors = [f'var(--opp-{i})' for i in range(1, 13)]
     idx = int(hashlib.md5(name.encode()).hexdigest(), 16) % len(colors)
     return f'<span style="color:{colors[idx]};font-weight:600">{name}</span>'
 
@@ -1230,21 +1232,21 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
 
     parts = []
     parts.append('<div class="dd-narrative-zone">\n')
-    parts.append(f'<h3 style="color:#9b59b6;margin:0 0 10px 0">'
+    parts.append(f'<h3 style="color:var(--zone-narrative);margin:0 0 10px 0">'
                  f'IV Flavor Guide (Simulation)</h3>\n')
     parts.append(
         '<p style="margin:0 0 10px 0;font-size:0.82rem;font-style:italic;'
-        'color:#8b949e;line-height:1.5">'
+        'color:var(--text-muted);line-height:1.5">'
         'Auto-generated from simulation matchup data. Flavor names '
         '(e.g. "Premium Bulk", "Fortified {Opp}", "{Opp} Slayer") are '
         'derived from which opponents each IV cluster beats, not from '
         'the expert-authored '
-        '<a href="#dd-threshold-tiers" style="color:#a78bca">Threshold '
+        '<a href="#dd-threshold-tiers" style="color:var(--zone-narrative)">Threshold '
         'Tiers</a> section above. This IV Flavor Guide and the '
         'Threshold Tiers answer different questions and may not line '
         'up 1:1. '
         'New to flavor cards? The '
-        '<a href="../guides/iv-flavor-guide/" style="color:#a78bca">IV '
+        '<a href="../guides/iv-flavor-guide/" style="color:var(--zone-narrative)">IV '
         'Flavor Guide</a> walks through the six name families and the '
         'trade-off layout.'
         '</p>\n'
@@ -1263,7 +1265,7 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
             parts.append(
                 f'<p class="dd-narrative-prose" '
                 f'style="margin:0 0 10px 0;font-size:0.88rem;'
-                f'color:#c9d1d9">'
+                f'color:var(--text)">'
                 f'{charmer_context_line(species)}'
                 f'</p>\n'
             )
@@ -1351,7 +1353,7 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
         rec = ' [Recommended]' if f['recommended'] else ''
         name_str = f['name']
         overview_rows.append(
-            f'<tr><td style="color:#e0d0f0;font-weight:600">{name_str}{rec}</td>'
+            f'<tr><td style="color:var(--heading);font-weight:600">{name_str}{rec}</td>'
             f'<td style="text-align:right">{n}</td>'
             f'<td style="text-align:right">{pct:.1f}%</td>'
             f'<td>{cp}</td></tr>'
@@ -1360,7 +1362,7 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
         parts.append(
             '<table class="dd-narrative-overview" style="margin:8px 0 12px 0;'
             'border-collapse:collapse;font-size:0.85rem;width:100%">\n'
-            '<tr style="color:#8b949e;border-bottom:1px solid #30363d">'
+            '<tr style="color:var(--text-muted);border-bottom:1px solid var(--border)">'
             '<th style="text-align:left;padding:2px 8px">Flavor</th>'
             '<th style="text-align:right;padding:2px 8px">IVs</th>'
             '<th style="text-align:right;padding:2px 8px">%</th>'
@@ -1392,7 +1394,7 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
         open_attr = ' open' if is_first else ''
         parts.append(
             f'<details class="dd-collapsible"{open_attr}>\n'
-            f'<summary style="font-weight:600;color:#e0d0f0;cursor:pointer">'
+            f'<summary style="font-weight:600;color:var(--heading);cursor:pointer">'
             f'{summary_label}{rec_badge}</summary>\n'
         )
 

@@ -59,15 +59,15 @@ def support_footer_html(prefix: str = "") -> str:
     it adds no meaningful per-page weight.
     """
     href = f"{prefix}support.html"
-    # Theme tokens with fallbacks to the original hex, so the footer renders
-    # correctly on both theme-wired pages and any not-yet-wired page.
+    # Theme tokens only; every page injects theme_css() so the var() always
+    # resolves. No literal-hex fallbacks (palette lives in theme.py _TOKENS).
     return (
-        '<footer style="margin-top:30px;border-top:1px solid var(--border,#0f3460);'
-        'padding-top:12px;font-size:0.8rem;color:var(--text-muted,#888);text-align:center">'
+        '<footer style="margin-top:30px;border-top:1px solid var(--border);'
+        'padding-top:12px;font-size:0.8rem;color:var(--text-muted);text-align:center">'
         'pogo-dives is free. '
-        f'<a href="{href}" style="color:var(--accent,#9be89b);text-decoration:none">'
+        f'<a href="{href}" style="color:var(--accent);text-decoration:none">'
         'Support the developer</a> | '
-        f'<a href="{href}" style="color:var(--accent,#9be89b);text-decoration:none">'
+        f'<a href="{href}" style="color:var(--accent);text-decoration:none">'
         'Credits</a>'
         f'<br><span style="font-size:0.92em">{GRUVBOX_CREDIT_HTML}</span>'
         '</footer>\n'

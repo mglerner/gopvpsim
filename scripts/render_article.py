@@ -40,6 +40,7 @@ from gopvpsim.attribution import (  # noqa: E402  # type: ignore[import-not-foun
     support_footer_html,
 )
 from gopvpsim.theme import (  # noqa: E402  # type: ignore[import-not-found]
+    data_theme_attr,
     theme_css,
     theme_head_script,
     theme_picker_html,
@@ -248,7 +249,7 @@ def render_html(article: dict) -> str:
         '.related', '.authorship-banner',
     ])
     return f"""<!DOCTYPE html>
-<html data-theme="gruvbox-light">
+<html {data_theme_attr()}>
 <head>
 <meta charset="utf-8">
 {theme_head_script()}

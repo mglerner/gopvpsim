@@ -32,6 +32,7 @@ from gopvpsim.attribution import (  # noqa: E402
 )
 from gopvpsim.theme import (  # noqa: E402
     GRUVBOX_CREDIT_HTML,
+    data_theme_attr,
     theme_css,
     theme_head_script,
     theme_picker_html,
@@ -585,7 +586,7 @@ def render_index(dives: list[dict],
         )
 
     return f"""<!DOCTYPE html>
-<html data-theme="gruvbox-light">
+<html {data_theme_attr()}>
 <head>
 <meta charset="utf-8">
 {theme_head_script()}
@@ -662,7 +663,7 @@ SUPPORT_PAGE_HTML = """<!DOCTYPE html>
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
   p { margin: 16px 0; }
-  .btn { display: inline-block; background: var(--title); color: #fff;
+  .btn { display: inline-block; background: var(--title); color: var(--on-title);
          font-size: 1.05em; font-weight: bold; padding: 12px 28px;
          border-radius: 2px; text-decoration: none; margin: 8px 0; }
   .btn:hover { filter: brightness(1.1); text-decoration: none; }
@@ -787,6 +788,7 @@ def main() -> int:
     # than f-string / .format() (which would require escaping every brace).
     support_html = (
         SUPPORT_PAGE_HTML
+        .replace('data-theme="gruvbox-light"', data_theme_attr())
         .replace('<!--THEME_HEAD-->', theme_head_script())
         .replace('<!--THEME_CSS-->', theme_css())
         .replace('<!--THEME_PICKER-->', theme_picker_html())

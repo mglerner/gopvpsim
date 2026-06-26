@@ -19,6 +19,7 @@ from gopvpsim.attribution import (  # noqa: E402
     support_footer_html,
 )
 from gopvpsim.theme import (  # noqa: E402
+    data_theme_attr,
     theme_css,
     theme_head_script,
     theme_picker_html,
@@ -634,7 +635,7 @@ def style():
             font-size:14px; }
   #ivc-quad { background:var(--surface-2); color:var(--text); border:1px solid var(--border);
             border-radius:2px; padding:5px 6px; }
-  #ivc-go { background:var(--accent); color:#fff; border:none; border-radius:2px;
+  #ivc-go { background:var(--accent); color:var(--on-accent); border:none; border-radius:2px;
             padding:6px 14px; cursor:pointer; font-size:14px; }
   #ivc-go:hover { filter:brightness(1.1); }
   #ivc-note { margin:4px 0 8px; }
@@ -1061,7 +1062,7 @@ updShields();
 """)
     main_html = "\n".join(main_parts)
     return f"""<!DOCTYPE html>
-<html lang="en" data-theme="gruvbox-light">
+<html lang="en" {data_theme_attr()}>
 <head>
 <meta charset="utf-8">
 {theme_head_script()}

@@ -39,6 +39,7 @@ from gopvpsim.data import get_default_moveset
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_SHORT, support_footer_html
 from gopvpsim.pokemon import pvpoke_default_ivs
 from gopvpsim.theme import (
+    data_theme_attr,
     theme_css,
     theme_head_script,
     theme_picker_html,
@@ -456,7 +457,7 @@ render();
         THEME_CSS=theme_css(),
         THEME_HEAD=theme_head_script(),
         THEME_PICKER=theme_picker_html(),
-    )
+    ).replace('data-theme="gruvbox-light"', data_theme_attr())
 
 
 def main():
