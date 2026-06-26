@@ -126,7 +126,7 @@ Tinkaton vs Malamar GL, all 9 shield cells, fixture values from
 
 ## Verification commands (tomorrow, post-batch)
 
-    cd ~/coding/MGLPoGo/pogo-simulator
+    cd ~/coding/MGLPoGo/gopvpsim
     python -m pytest tests/test_battle.py -q          # record baseline counts
     # add the new unit test, confirm it FAILS pre-patch
     python -m pytest tests/test_battle.py -q -k incoming_self_def_debuff

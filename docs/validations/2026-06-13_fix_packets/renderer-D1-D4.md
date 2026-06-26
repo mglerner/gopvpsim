@@ -267,7 +267,7 @@ grep).
 ## Verification commands (tomorrow, after the batch finishes)
 
 ```
-cd ~/coding/MGLPoGo/pogo-simulator
+cd ~/coding/MGLPoGo/gopvpsim
 git apply --check userdata/fix_packets_2026-06-13/renderer-D1-D4.patch
 git apply userdata/fix_packets_2026-06-13/renderer-D1-D4.patch
 python -m pytest tests/test_renderer_d1_d3_d4.py tests/test_slayer_signal_loss.py -q   # after writing the new tests
