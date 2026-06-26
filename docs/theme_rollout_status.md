@@ -211,7 +211,33 @@ STILL OUT (deferred, OK'd): Plotly canvas/marker recoloring -- needs a
 DEFAULT_THEME (gruvbox-light) resolved hex. `_TYPE_COLORS` (type-brand) stays
 out of the contract.
 
-GATE BEFORE GREEN-LIGHT (not yet cleared): an independent adversarial
-verification pass (driven from the other session) against this committed state,
-THEN one full dive re-render eyeballed across all 4 themes. Only after both does
-phase2_preship.sh get armed / anything publish. Push remains nod-gated.
+GREEN-LIGHT STATUS (2026-06-25, post-adversarial-pass):
+
+Independent adversarial verification (other session, 7 agents, refute-by-default,
+read-only) against HEAD `9221908`: NO BLOCK -- green-lit. Token values, the tier
+pipeline (badge == card == marker, mirror distinct, mod-8 wrap, injection guard
+that raises on an unmapped tier), zero-leftover, and theme-switch all verified
+clean at HEAD. The "block" findings it surfaced were STALE-PAGE ARTIFACTS:
+on-disk dives/matchups/index were rendered ~20:00-21:42, before the ~22:55
+commits, so the HTML inspectors read the OLD pre-theme palette -- false against
+committed code, not regressions. The "hardcoded data-theme" finding is the known
+`.replace()` sentinel (build_matchup_web.py:151 / build_website_index.py:650 ->
+lines 460/791), a false positive.
+
+REMAINING GATE before phase2 / publish -- the full dive re-render, which MUST run
+HEAD `9221908` (do NOT publish the current on-disk PRE-theme output):
+  1. Smoke FIRST: render ONE fresh dive (pick an auto-derive dive so it exercises
+     `_next_color` + the General-removal path + a mirror tier) and ONE comparison,
+     then eyeball all 4 themes. The adversarial pass render-inspected the ML guide
+     / index / matchup end-to-end, but NOT a dive or comparison -- those two
+     page types are source-verified-only (low risk, but un-eyeballed).
+  2. If clean, run the full batch re-render at HEAD.
+  3. Then arm phase2_preship.sh. Push remains nod-gated.
+
+KNOWN sub-AA values to batch later (NON-blocking; flagged honestly -- do NOT
+claim "all AA pass"): `--text-muted` gruvbox-light = 4.29:1 (pre-existing chrome
+token, NOT introduced by phase-2; secondary .sub/footer/nav text; best candidate
+for a small darkening). VERIFY `--accent-2` pokemon-light 3.96:1 in `.cmp-marg-h`
+is large-text (>=3:1 ok) -- if it is body text it fails 4.5. Passing on the
+relaxed large-text/UI threshold (fine, no action): `--title` gl 3.33 (h1
+large-text >=3:1), `--callout-ai` border ~3.3 (UI component >=3:1).
