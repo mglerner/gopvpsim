@@ -40,3 +40,7 @@ userdata/
 # In-session scratch grids (reproducible; findings live in DEVELOPER_NOTES.md).
 # The oracle-grid expansion (2026-06-12) is regenerable via run_grid.py.
 scratch_oracle_grid/
+
+# Private launch-prep notes (Discord DMs, TestFlight link) -- never commit
+/RedditPost.md
+/scratch_thoughts.md
