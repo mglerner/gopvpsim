@@ -136,3 +136,37 @@ Outstanding verification:
 - Aesthetic pass across all 4 themes x every page type = human, pre-publish.
 - matchup light-theme `--matrix-*-fg` legibility on the 67%-alpha fill is
   the spot most worth a human look.
+
+## ROLLOUT INCOMPLETE -- handed to the UI session (2026-06-25)
+
+The dive re-render exposed two gaps; "all 8 renderers themed" was wrong.
+
+1. **Missed CSS modules** (never in the renderer list): `deep_dive_rendering.py`
+   (the big `.dd-*` block -- dive tables, section panels, callouts, shield
+   grids, opponent chips, slayer/recommendation cards: ~60 hardcoded hex) and
+   `generate_article.py`. Also the `render_article.py`/`sidebar_css` partial.
+   `deep_dive.py` itself is fully tokenized (0 old hex) -- it's these imported
+   modules that emit most of the dive *body* CSS, so themed dives have light
+   chrome but a dark body on the light themes.
+
+2. **Semantic/categorical colors have no light-mode variants -- the real work.**
+   Pokemon names tinted by type/flavor, delta values (faded `0.0`, green
+   `100%`), flavor labels, threshold %, italic prose, win/loss cell tints --
+   all tuned for a DARK bg, so they fail contrast and go unreadable on the
+   cream light theme (Michael's 2026-06-25 screenshots: items 2,3,4,5,7,8,9,10).
+   This is NOT a hex->token swap; these palettes need contrast-checked light+dark
+   variants. Use a principled system, do NOT hand-guess: **Radix Colors**
+   (paired light/dark scales w/ accessible text steps), **Leonardo**
+   (contrast-targeted ramps), **Okabe-Ito/ColorBrewer** for the categorical
+   type set; verify WCAG AA 4.5:1 / APCA. Add per-theme semantic tokens to the
+   `theme.py` contract (same pattern as the `--matrix-*` tokens).
+
+3. **Plotly graphs (scatter + histogram) -- DEFERRED to a later session** (OK'd).
+   Their colors are Plotly JS layout, not CSS; separate sub-problem (transparent
+   plot bg + theme-aware fonts/grid + relayout-on-theme-switch). Items 1,6.
+
+Owner: the UI session (resumed). Reference artifact showing exactly what breaks:
+`/tmp/altaria-themed-DRAFT.html` (structural tokens applied; semantic colors
+left -> the unreadable ones are now visible against light). Commits 582dfde /
+ed1ca5f are the worked tokenization pattern; the canonical map + role rules are
+above.
