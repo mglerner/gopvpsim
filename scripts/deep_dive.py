@@ -4573,7 +4573,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .cmp-entry {{ display:flex; flex-wrap:wrap; gap:7px; align-items:center;
     font-size:0.82rem; color:var(--text); margin:6px 0 4px; }}
   .cmp-entry input {{ width:46px; font-size:0.82rem; }}
-  .cmp-entry input.cmp-lv {{ width:56px; }}
   .cmp-entry button {{ font-size:0.78rem; padding:3px 10px; border-radius:2px;
     border:1px solid var(--border-2); background:var(--surface-2); color:var(--text); cursor:pointer; }}
   .cmp-entry button.cmp-clear {{ border-color:var(--loss); }}
@@ -4975,8 +4974,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         '    Atk <input id="cmp-a" type="number" min="0" max="15" value="15">\n'
         '    Def <input id="cmp-d" type="number" min="0" max="15" value="15">\n'
         '    HP <input id="cmp-s" type="number" min="0" max="15" value="15">\n'
-        '    Lvl <input id="cmp-lv" class="cmp-lv" type="number" min="1" '
-        'max="51" step="0.5" placeholder="max">\n'
         '    <button id="cmp-add" type="button">+ Add</button>\n'
         '    <button type="button" class="cmp-clear" onclick="cmpClear()">'
         'Clear all</button>\n'
