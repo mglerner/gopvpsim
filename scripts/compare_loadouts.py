@@ -40,6 +40,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_SHORT, support_footer_html  # type: ignore[import-not-found]
 from gopvpsim.theme import (  # type: ignore[import-not-found]  # noqa: E402
+    data_theme_attr,
     theme_css,
     theme_head_script,
     theme_picker_html,
@@ -996,7 +997,7 @@ def render_standalone_html(title: str, description: str,
         'div.compare-summary', 'details.methodology-details',
     ])
     return f"""<!DOCTYPE html>
-<html data-theme="gruvbox-light">
+<html {data_theme_attr()}>
 <head>
 <meta charset="utf-8">
 {theme_head_script()}

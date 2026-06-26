@@ -37,6 +37,12 @@ ARTICLES_DIR = WEBSITE_DIR / 'articles'
 
 sys.path.insert(0, str(REPO_ROOT / 'src'))
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML  # noqa: E402
+from gopvpsim.theme import (  # noqa: E402
+    data_theme_attr,
+    theme_css,
+    theme_head_script,
+    theme_picker_html,
+)
 
 LEAGUE_INFO = {
     'great': {
@@ -56,7 +62,8 @@ LEAGUE_INFO = {
 
 
 REVIEW_BANNER = (
-    '<div style="background:#2e241a;color:#e8d4bb;border-left:4px solid #e8903a;'
+    '<div style="background:var(--callout-bg);color:var(--callout-fg);'
+    'border-left:4px solid var(--callout-ai);'
     'padding:12px 16px;margin:16px 0;border-radius:4px;">'
     '<strong>AI-drafted, not yet human-reviewed.</strong> '
     'The prose below is Claude-drafted (templated), not expert analysis. '
@@ -155,26 +162,29 @@ def build_html(league: str) -> str:
 
     return textwrap.dedent(f'''\
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="en" {data_theme_attr()}>
         <head>
           <meta charset="utf-8">
+          {theme_head_script()}
           <title>{html.escape(title)}</title>
-          <style>
+          <style>{theme_css()}
             body {{ max-width: 920px; margin: 24px auto; padding: 0 16px;
                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                                Roboto, sans-serif; line-height: 1.5; }}
+                                Roboto, sans-serif; line-height: 1.5;
+                   background: var(--bg); color: var(--text); }}
             h1 {{ margin-bottom: 0.2em; }}
             h2 {{ margin-top: 1.6em; }}
-            code {{ background: #f3f3f3; padding: 1px 4px; border-radius: 3px; }}
+            code {{ background: var(--surface); padding: 1px 4px; border-radius: 3px; }}
             ul li {{ margin-bottom: 0.5em; }}
           </style>
         </head>
         <body>
+        {theme_picker_html()}
         <h1>{html.escape(title)}</h1>
         {REVIEW_BANNER}
         {sections}
-        <footer style="color:#667;font-size:13px;margin-top:40px;
-                       border-top:1px solid #ccc;padding-top:12px">
+        <footer style="color:var(--text-muted);font-size:13px;margin-top:40px;
+                       border-top:1px solid var(--border);padding-top:12px">
         {PVPOKE_ATTRIBUTION_HTML}</footer>
         </body>
         </html>

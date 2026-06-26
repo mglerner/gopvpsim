@@ -79,20 +79,20 @@ _NARRATIVE_CSS_OVERRIDE = """
 }
 
 /* Per-zone colours + spacing. */
-.dd-expert-zone { --sidebar-color: #d29922;
+.dd-expert-zone { --sidebar-color: var(--callout-expert);
   padding: 10px 0 10px 20px; margin: 16px 0; }
-.dd-narrative-zone { --sidebar-color: #9b59b6;
+.dd-narrative-zone { --sidebar-color: var(--zone-narrative);
   padding: 12px 0 12px 20px; margin: 20px 0; }
-.dd-sim-zone { --sidebar-color: #58a6ff;
+.dd-sim-zone { --sidebar-color: var(--callout-auto);
   padding: 10px 0 10px 20px; margin: 16px 0; }
-.dd-callout { --sidebar-color: #58a6ff; --sidebar-width: 3px;
+.dd-callout { --sidebar-color: var(--callout-auto); --sidebar-width: 3px;
   padding: 8px 12px 8px 16px; margin: 10px 0; }
-.dd-threshold-list li { --sidebar-color: #0f3460; --sidebar-width: 2px;
+.dd-threshold-list li { --sidebar-color: var(--border); --sidebar-width: 2px;
   padding: 4px 0 4px 14px; margin: 4px 0; }
-.dd-threshold-list .dd-loss-item { --sidebar-color: #f85149; }
+.dd-threshold-list .dd-loss-item { --sidebar-color: var(--loss); }
 .dd-species-narrative-details > summary {
   cursor: pointer;
-  color: #d29922;
+  color: var(--notable);
   font-weight: 600;
   font-size: 1.0rem;
   padding: 6px 0 6px 20px;
@@ -106,17 +106,17 @@ _NARRATIVE_CSS_OVERRIDE = """
 .dd-species-narrative-details[open] > summary::before {
   content: "▾ ";
 }
-.dd-species-narrative-details > summary:hover { color: #e0ae3a; }
+.dd-species-narrative-details > summary:hover { color: var(--notable); }
 .dd-species-narrative .dd-narrative-block {
-  --sidebar-color: #d29922;
+  --sidebar-color: var(--callout-expert);
   padding: 10px 0 10px 20px;
   margin: 8px 0;
 }
 .dd-species-narrative .dd-narrative-block.authored-ai {
-  --sidebar-color: #e8903a;
+  --sidebar-color: var(--callout-ai);
 }
 .dd-species-narrative .dd-narrative-block.authored-auto {
-  --sidebar-color: #5b8dd9;
+  --sidebar-color: var(--callout-auto);
 }
 .dd-species-narrative .dd-narrative-block > h2,
 .dd-species-narrative .dd-narrative-block > h3 {
@@ -149,11 +149,11 @@ _NARRATIVE_CSS_OVERRIDE = """
   bottom: 4px;
   width: var(--sidebar-width, 4px);
   border-radius: calc(var(--sidebar-width, 4px) / 2);
-  background: var(--sidebar-color, #8b949e);
+  background: var(--sidebar-color, var(--text-muted));
 }
 
 .dd-species-narrative p { margin: 8px 0; }
-.dd-species-narrative .narrative-attribution { color: #8b949e;
+.dd-species-narrative .narrative-attribution { color: var(--text-muted);
   font-size: 0.82rem; margin: 6px 0 0 0; font-style: italic; }
 </style>
 """

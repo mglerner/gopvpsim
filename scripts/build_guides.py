@@ -62,6 +62,7 @@ from gopvpsim.attribution import (  # noqa: E402
     support_footer_html,
 )
 from gopvpsim.theme import (  # noqa: E402
+    data_theme_attr,
     theme_css,
     theme_head_script,
     theme_picker_html,
@@ -448,7 +449,7 @@ def _render_page(*, title: str, body_html: str,
         if regenerated_stamp else ''
     )
     return f"""<!DOCTYPE html>
-<html data-theme="gruvbox-light">
+<html {data_theme_attr()}>
 <head>
 <meta charset="utf-8">
 {theme_head_script()}

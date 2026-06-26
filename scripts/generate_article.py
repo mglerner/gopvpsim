@@ -48,6 +48,10 @@ from render_article import (  # type: ignore[import-not-found]
 
 from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
 from gopvpsim.pokemon import iv_rank  # type: ignore[import-not-found]
+from gopvpsim.theme import (  # type: ignore[import-not-found]
+    theme_css,
+    data_theme_attr,
+)
 from gopvpsim.attribution import (  # type: ignore[import-not-found]
     PVPOKE_ATTRIBUTION_HTML,
     support_footer_html,
@@ -3176,126 +3180,124 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
     ])
 
     return f"""<!DOCTYPE html>
-<html>
+<html {data_theme_attr()}>
 <head>
 <meta charset="utf-8">
 <title>{title}</title>
-<style>
+<style>{theme_css()}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
          sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px;
-         background: #1a1a2e; color: #e0e0e0; line-height: 1.6; }}
-  h1 {{ color: #e94560; margin-bottom: 6px; }}
-  h2 {{ color: #c8a2d0; border-bottom: 1px solid #0f3460;
+         background: var(--bg); color: var(--text); line-height: 1.6; }}
+  h1 {{ color: var(--title); margin-bottom: 6px; }}
+  h2 {{ color: var(--heading); border-bottom: 1px solid var(--border);
         padding-bottom: 6px; margin-top: 30px; }}
-  h3 {{ color: #c8a2d0; margin-top: 18px; font-size: 1.05em; }}
-  a {{ color: #9be89b; text-decoration: none; }}
+  h3 {{ color: var(--heading); margin-top: 18px; font-size: 1.05em; }}
+  a {{ color: var(--accent); text-decoration: none; }}
   a:hover {{ text-decoration: underline; }}
   p {{ margin: 10px 0; }}
-  code {{ background: #16213e; padding: 2px 5px; border-radius: 3px;
+  code {{ background: var(--surface); padding: 2px 5px; border-radius: 3px;
           font-size: 0.9em; }}
   section#meta-role p {{ margin: 12px 0; line-height: 1.55; }}
-  p.stats-at-a-glance-note {{ font-size: 13px; color: #8ea1bd;
+  p.stats-at-a-glance-note {{ font-size: 13px; color: var(--text-muted);
                               margin: 4px 0 8px 0; }}
-  p.stats-rank1-ivs {{ font-size: 12px; color: #9ab0d8;
+  p.stats-rank1-ivs {{ font-size: 12px; color: var(--text-muted);
                        margin: 6px 0 0 0; line-height: 1.6; }}
   table.move-pool {{ border-collapse: collapse; margin: 12px 0;
                      width: 100%; font-size: 13px; }}
   table.move-pool th, table.move-pool td {{
-                     border: 1px solid #0f3460; padding: 5px 9px;
+                     border: 1px solid var(--border); padding: 5px 9px;
                      text-align: left; }}
-  table.move-pool thead th {{ background: #16213e; color: #c8a2d0; }}
-  table.move-pool tbody td {{ background: #0f162a; color: #e0e0e0; }}
-  p.move-pool-note {{ font-size: 12px; color: #8ea1bd;
+  table.move-pool thead th {{ background: var(--surface); color: var(--heading); }}
+  table.move-pool tbody td {{ background: var(--surface-2); color: var(--text); }}
+  p.move-pool-note {{ font-size: 12px; color: var(--text-muted);
                       margin: 4px 0 0 0; }}
-  div.key-flips {{ --sidebar-color: #7db87d;
-                   background: #16213e;
+  div.key-flips {{ --sidebar-color: var(--accent);
+                   background: var(--surface);
                    padding: 10px 14px 10px 18px;
                    border-radius: 6px; margin: 12px 0; }}
   div.key-flips h3.key-flips-title {{ margin: 0 0 4px 0; font-size: 1em;
-                                      color: #c8a2d0; border: none;
+                                      color: var(--heading); border: none;
                                       padding: 0; }}
-  p.key-flips-note {{ font-size: 12px; color: #8ea1bd;
+  p.key-flips-note {{ font-size: 12px; color: var(--text-muted);
                       margin: 0 0 8px 0; }}
   ul.key-flips-list {{ margin: 4px 0 0 0; padding-left: 22px;
                        font-size: 13px; }}
   ul.key-flips-list li {{ margin: 5px 0; line-height: 1.5; }}
-  .meta {{ color: #888; font-size: 14px; margin-bottom: 20px; }}
-  .related {{ --sidebar-color: #9be89b;
-              background: #16213e; padding: 12px 16px 12px 20px;
+  .meta {{ color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }}
+  .related {{ --sidebar-color: var(--accent);
+              background: var(--surface); padding: 12px 16px 12px 20px;
               border-radius: 6px; margin: 16px 0; }}
-  .obsolete-banner {{ background: #3d1f1f; border: 1px solid #e94560;
+  .obsolete-banner {{ background: var(--callout-bg); border: 1px solid var(--loss);
                       padding: 12px 16px; border-radius: 6px;
-                      margin-bottom: 20px; color: #f0a0a0; }}
+                      margin-bottom: 20px; color: var(--callout-fg); }}
   .authorship-banner {{ padding: 10px 16px 10px 20px; border-radius: 6px;
-                        margin-bottom: 16px; font-size: 14px; }}
-  .authorship-banner.expert {{ --sidebar-color: #d4a017;
-                               background: #2a2000; color: #e8d48b; }}
-  .authorship-banner.both {{ --sidebar-color: #7db87d;
-                             background: #1f2a1a; color: #a8d8a8; }}
-  .authorship-banner.auto {{ --sidebar-color: #5b8dd9;
-                             background: #1a2333; color: #8ab4f8; }}
+                        margin-bottom: 16px; font-size: 14px;
+                        background: var(--callout-bg); color: var(--callout-fg); }}
+  .authorship-banner.expert {{ --sidebar-color: var(--callout-expert); }}
+  .authorship-banner.both {{ --sidebar-color: var(--callout-both); }}
+  .authorship-banner.auto {{ --sidebar-color: var(--callout-auto); }}
   .framing {{ display: inline-block; padding: 2px 10px; border-radius: 12px;
               font-size: 13px; font-weight: 600; text-transform: uppercase;
-              background: #0f3460; color: #8ab4f8; }}
-  .narrative-attribution {{ color: #8b949e; font-size: 0.85rem;
+              background: var(--surface-2); color: var(--accent); }}
+  .narrative-attribution {{ color: var(--text-muted); font-size: 0.85rem;
                             margin: 6px 0 0 0; font-style: italic; }}
-  .todo-placeholder {{ background: #1a2333; border: 1px dashed #5b8dd9;
-                       border-radius: 6px; padding: 10px 14px; color: #8ab4f8;
+  .todo-placeholder {{ background: var(--surface-2); border: 1px dashed var(--accent);
+                       border-radius: 6px; padding: 10px 14px; color: var(--accent);
                        font-size: 14px; margin: 10px 0; }}
   table.move-compare {{ border-collapse: collapse; margin: 12px 0;
                         width: 100%; font-size: 14px; }}
-  table.move-compare th, table.move-compare td {{ border: 1px solid #0f3460;
+  table.move-compare th, table.move-compare td {{ border: 1px solid var(--border);
         padding: 6px 10px; text-align: left; }}
-  table.move-compare thead th {{ background: #16213e; color: #c8a2d0; }}
-  table.move-compare tbody th {{ background: #12192e; color: #9ab0d8;
+  table.move-compare thead th {{ background: var(--surface); color: var(--heading); }}
+  table.move-compare tbody th {{ background: var(--surface-2); color: var(--text-muted);
                                  font-weight: 500; }}
-  table.move-compare tbody td {{ background: #0f162a; color: #e0e0e0; }}
-  p.move-compare-note {{ color: #8ea1bd; font-size: 13px; margin-top: 4px; }}
-  p.meta-coverage-intro {{ font-size: 14px; color: #b8c4d8; }}
-  div.article-opp-iv-control {{ --sidebar-color: #5b8dd9;
-         background: #16213e; padding: 10px 14px 10px 18px;
+  table.move-compare tbody td {{ background: var(--surface-2); color: var(--text); }}
+  p.move-compare-note {{ color: var(--text-muted); font-size: 13px; margin-top: 4px; }}
+  p.meta-coverage-intro {{ font-size: 14px; color: var(--text-muted); }}
+  div.article-opp-iv-control {{ --sidebar-color: var(--callout-auto);
+         background: var(--surface); padding: 10px 14px 10px 18px;
          border-radius: 6px; margin: 10px 0; }}
   div.article-opp-iv-control label {{ display: inline-block;
-         margin-right: 16px; font-size: 13px; color: #b8c4d8; }}
-  div.article-opp-iv-control span.control-label {{ color: #c8a2d0;
+         margin-right: 16px; font-size: 13px; color: var(--text-muted); }}
+  div.article-opp-iv-control span.control-label {{ color: var(--heading);
          font-weight: 500; }}
-  div.article-opp-iv-control select {{ background: #0f162a; color: #e0e0e0;
-         border: 1px solid #3d5580; border-radius: 3px; padding: 2px 6px;
+  div.article-opp-iv-control select {{ background: var(--surface-2); color: var(--text);
+         border: 1px solid var(--border-2); border-radius: 3px; padding: 2px 6px;
          font-size: 13px; margin-left: 4px; }}
-  p.article-opp-iv-caption {{ font-size: 12px; color: #8ea1bd;
+  p.article-opp-iv-caption {{ font-size: 12px; color: var(--text-muted);
          margin: 6px 0 0 0; }}
   details.article-opp-iv-help summary {{ display: inline; cursor: pointer;
-         color: #c8a2d0; font-size: 11px; margin-left: 6px; }}
+         color: var(--heading); font-size: 11px; margin-left: 6px; }}
   details.article-opp-iv-help[open] summary {{ display: block; }}
   details.article-opp-iv-help > span {{ display: block; margin-top: 6px;
-         font-size: 12px; color: #8ea1bd; }}
-  details.methodology-details {{ --sidebar-color: #5b8dd9;
-         background: #12192e; border-radius: 4px;
-         padding: 8px 12px 8px 16px; font-size: 13px; color: #b8c4d8;
+         font-size: 12px; color: var(--text-muted); }}
+  details.methodology-details {{ --sidebar-color: var(--callout-auto);
+         background: var(--callout-bg); border-radius: 4px;
+         padding: 8px 12px 8px 16px; font-size: 13px; color: var(--callout-fg);
          margin: 8px 0; }}
   details.methodology-details summary {{ cursor: pointer;
-         color: #c8a2d0; font-weight: 500; }}
+         color: var(--heading); font-weight: 500; }}
   details.methodology-details p {{ margin: 8px 0 0 0; }}
   table.meta-coverage {{ border-collapse: collapse; margin: 12px 0;
          width: 100%; font-size: 13px; }}
   table.meta-coverage th, table.meta-coverage td {{
-         border: 1px solid #0f3460; padding: 5px 9px; text-align: left; }}
-  table.meta-coverage thead th {{ background: #16213e; color: #c8a2d0; }}
-  table.meta-coverage tbody th {{ background: #12192e; color: #9ab0d8;
+         border: 1px solid var(--border); padding: 5px 9px; text-align: left; }}
+  table.meta-coverage thead th {{ background: var(--surface); color: var(--heading); }}
+  table.meta-coverage tbody th {{ background: var(--surface-2); color: var(--text-muted);
          font-weight: 500; font-size: 15px; }}
-  table.meta-coverage tbody td {{ background: #0f162a; color: #e0e0e0; }}
+  table.meta-coverage tbody td {{ background: var(--surface-2); color: var(--text); }}
   table.meta-coverage th.num, table.meta-coverage td.num {{
          text-align: right; font-variant-numeric: tabular-nums; }}
-  table.meta-coverage td.delta-pos {{ color: #9be89b; font-weight: 600; }}
-  table.meta-coverage td.delta-neg {{ color: #e89b9b; font-weight: 600; }}
-  table.meta-coverage tbody th.male {{ color: rgba(91,141,217,1); }}
-  table.meta-coverage tbody th.female {{ color: rgba(217,108,145,1); }}
-  p.verdict-line {{ --sidebar-color: #7db87d;
-                    background: #1a2e1f;
+  table.meta-coverage td.delta-pos {{ color: var(--win); font-weight: 600; }}
+  table.meta-coverage td.delta-neg {{ color: var(--loss); font-weight: 600; }}
+  table.meta-coverage tbody th.male {{ color: var(--sex-male); }}
+  table.meta-coverage tbody th.female {{ color: var(--sex-female); }}
+  p.verdict-line {{ --sidebar-color: var(--win);
+                    background: var(--cell-win-bg);
                     padding: 10px 14px 10px 18px;
-                    color: #cfe8cf; border-radius: 6px; }}
-  p.matchup-delta-intro {{ font-size: 14px; color: #b8c4d8; }}
-  p.matchup-delta-summary {{ font-size: 13px; color: #9bb0d0; margin-top: 8px; }}
+                    color: var(--text); border-radius: 6px; }}
+  p.matchup-delta-intro {{ font-size: 14px; color: var(--text-muted); }}
+  p.matchup-delta-summary {{ font-size: 13px; color: var(--text-muted); margin-top: 8px; }}
   ul.matchup-delta-movesets {{ margin: 4px 0 10px 20px; padding: 0;
                                font-size: 14px; }}
   ul.matchup-delta-movesets li {{ margin: 2px 0; }}
@@ -3313,98 +3315,98 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
   table.matchup-delta-perform td.num {{ text-align: right;
          font-variant-numeric: tabular-nums; }}
   table.matchup-delta-perform th.diag-start,
-  table.matchup-delta-perform td.diag-start {{ border-left: 2px solid #3d5580; }}
+  table.matchup-delta-perform td.diag-start {{ border-left: 2px solid var(--border-2); }}
   /* M/F column tints. Non-flip rows get a faint blue/pink wash; flip
      rows layer the same wash on top of their green/red row color via
      multi-background so the form lane stays visible. */
-  table.matchup-delta-perform td.male {{ background: rgba(91,141,217,0.20); }}
-  table.matchup-delta-perform td.female {{ background: rgba(217,108,145,0.20); }}
-  table.matchup-delta-perform thead th.male {{ background: rgba(91,141,217,0.22); }}
-  table.matchup-delta-perform thead th.female {{ background: rgba(217,108,145,0.22); }}
-  table.matchup-delta-perform tr.matchup-delta-flip-pos td {{ background: #152b1a; }}
-  table.matchup-delta-perform tr.matchup-delta-flip-neg td {{ background: #2b1515; }}
+  table.matchup-delta-perform td.male {{ background: color-mix(in srgb, var(--sex-male) 20%, transparent); }}
+  table.matchup-delta-perform td.female {{ background: color-mix(in srgb, var(--sex-female) 20%, transparent); }}
+  table.matchup-delta-perform thead th.male {{ background: color-mix(in srgb, var(--sex-male) 22%, transparent); }}
+  table.matchup-delta-perform thead th.female {{ background: color-mix(in srgb, var(--sex-female) 22%, transparent); }}
+  table.matchup-delta-perform tr.matchup-delta-flip-pos td {{ background: var(--cell-win-bg); }}
+  table.matchup-delta-perform tr.matchup-delta-flip-neg td {{ background: var(--cell-loss-bg); }}
   table.matchup-delta-perform tr.matchup-delta-flip-pos td.male {{
-        background: linear-gradient(rgba(91,141,217,0.22),rgba(91,141,217,0.22)), #152b1a; }}
+        background: linear-gradient(color-mix(in srgb, var(--sex-male) 22%, transparent),color-mix(in srgb, var(--sex-male) 22%, transparent)), var(--cell-win-bg); }}
   table.matchup-delta-perform tr.matchup-delta-flip-pos td.female {{
-        background: linear-gradient(rgba(217,108,145,0.22),rgba(217,108,145,0.22)), #152b1a; }}
+        background: linear-gradient(color-mix(in srgb, var(--sex-female) 22%, transparent),color-mix(in srgb, var(--sex-female) 22%, transparent)), var(--cell-win-bg); }}
   table.matchup-delta-perform tr.matchup-delta-flip-neg td.male {{
-        background: linear-gradient(rgba(91,141,217,0.22),rgba(91,141,217,0.22)), #2b1515; }}
+        background: linear-gradient(color-mix(in srgb, var(--sex-male) 22%, transparent),color-mix(in srgb, var(--sex-male) 22%, transparent)), var(--cell-loss-bg); }}
   table.matchup-delta-perform tr.matchup-delta-flip-neg td.female {{
-        background: linear-gradient(rgba(217,108,145,0.22),rgba(217,108,145,0.22)), #2b1515; }}
-  p.mf-split-filter {{ --sidebar-color: #c8a2d0;
-         margin: 10px 0 6px 0; font-size: 13px; color: #b8c4d8;
-         background: #12192e; padding: 8px 12px 8px 16px;
+        background: linear-gradient(color-mix(in srgb, var(--sex-female) 22%, transparent),color-mix(in srgb, var(--sex-female) 22%, transparent)), var(--cell-loss-bg); }}
+  p.mf-split-filter {{ --sidebar-color: var(--heading);
+         margin: 10px 0 6px 0; font-size: 13px; color: var(--text-muted);
+         background: var(--surface-2); padding: 8px 12px 8px 16px;
          border-radius: 4px; }}
   p.mf-split-filter label {{ cursor: pointer; }}
   p.mf-split-filter input {{ margin-right: 6px; vertical-align: middle; }}
-  span.form-label.male {{ color: rgba(91,141,217,1); font-weight: 600; }}
-  span.form-label.female {{ color: rgba(217,108,145,1); font-weight: 600; }}
+  span.form-label.male {{ color: var(--sex-male); font-weight: 600; }}
+  span.form-label.female {{ color: var(--sex-female); font-weight: 600; }}
   table.matchup-delta-perform.filter-split tbody tr[data-form-split="same"] {{
         display: none; }}
-  table.matchup-delta th, table.matchup-delta td {{ border: 1px solid #0f3460;
+  table.matchup-delta th, table.matchup-delta td {{ border: 1px solid var(--border);
         padding: 5px 9px; text-align: left; }}
-  table.matchup-delta thead th {{ background: #16213e; color: #c8a2d0; }}
-  table.matchup-delta tbody td {{ background: #0f162a; color: #e0e0e0; }}
-  table.matchup-delta tr.matchup-delta-flip td {{ border-color: #5b3d6d; }}
-  table.matchup-delta td.delta-pos {{ color: #9be89b; font-weight: 600; }}
-  table.matchup-delta td.delta-neg {{ color: #e89b9b; font-weight: 600; }}
+  table.matchup-delta thead th {{ background: var(--surface); color: var(--heading); }}
+  table.matchup-delta tbody td {{ background: var(--surface-2); color: var(--text); }}
+  table.matchup-delta tr.matchup-delta-flip td {{ border-color: var(--border-2); }}
+  table.matchup-delta td.delta-pos {{ color: var(--win); font-weight: 600; }}
+  table.matchup-delta td.delta-neg {{ color: var(--loss); font-weight: 600; }}
   .flip-badge {{ display: inline-block; padding: 1px 8px; border-radius: 10px;
         font-size: 11px; font-weight: 600; text-transform: uppercase;
         text-decoration: none; }}
   a.flip-badge:hover {{ text-decoration: underline; filter: brightness(1.15); }}
-  .flip-badge.flip-pos {{ background: #1f3a1f; color: #9be89b;
-        border: 1px solid #7db87d; }}
-  .flip-badge.flip-neg {{ background: #3a1f1f; color: #e89b9b;
-        border: 1px solid #b87d7d; }}
-  .flip-badge.flip-none {{ background: #1a2333; color: #8ea1bd;
-        border: 1px solid #3d5580; }}
+  .flip-badge.flip-pos {{ background: var(--surface-2); color: var(--win);
+        border: 1px solid var(--win); }}
+  .flip-badge.flip-neg {{ background: var(--surface-2); color: var(--loss);
+        border: 1px solid var(--loss); }}
+  .flip-badge.flip-none {{ background: var(--surface-2); color: var(--text-muted);
+        border: 1px solid var(--border-2); }}
   .flip-badge.flip-unlinked {{ opacity: 0.75; cursor: help; }}
-  table.matchup-delta tr.matchup-delta-flip-pos td {{ background: #152b1a; }}
-  table.matchup-delta tr.matchup-delta-flip-neg td {{ background: #2b1515; }}
-  details.matchup-delta-legend {{ --sidebar-color: #c8a2d0;
-        background: #12192e; border-radius: 4px;
-        padding: 8px 12px 8px 16px; font-size: 13px; color: #b8c4d8;
+  table.matchup-delta tr.matchup-delta-flip-pos td {{ background: var(--cell-win-bg); }}
+  table.matchup-delta tr.matchup-delta-flip-neg td {{ background: var(--cell-loss-bg); }}
+  details.matchup-delta-legend {{ --sidebar-color: var(--heading);
+        background: var(--surface-2); border-radius: 4px;
+        padding: 8px 12px 8px 16px; font-size: 13px; color: var(--text-muted);
         margin: 8px 0; }}
-  details.matchup-delta-legend summary {{ cursor: pointer; color: #c8a2d0;
+  details.matchup-delta-legend summary {{ cursor: pointer; color: var(--heading);
         font-weight: 500; }}
   details.matchup-delta-legend ul {{ margin: 8px 0 0 0; padding-left: 20px; }}
   details.matchup-delta-legend li {{ margin: 4px 0; }}
-  p.matchup-delta-pool {{ --sidebar-color: #5b8dd9;
-        background: #16213e; padding: 8px 12px 8px 16px;
-        border-radius: 4px; font-size: 13px; color: #b8c4d8;
+  p.matchup-delta-pool {{ --sidebar-color: var(--callout-auto);
+        background: var(--surface); padding: 8px 12px 8px 16px;
+        border-radius: 4px; font-size: 13px; color: var(--text-muted);
         margin: 8px 0; }}
   table.sortable thead th {{ cursor: pointer; user-select: none; }}
-  table.sortable thead th:hover {{ background: #1e2b4a; }}
-  table.sortable thead th.sort-asc::after {{ content: " \\25B2"; color: #9be89b;
+  table.sortable thead th:hover {{ background: var(--surface-2); }}
+  table.sortable thead th.sort-asc::after {{ content: " \\25B2"; color: var(--accent);
         font-size: 10px; }}
-  table.sortable thead th.sort-desc::after {{ content: " \\25BC"; color: #9be89b;
+  table.sortable thead th.sort-desc::after {{ content: " \\25BC"; color: var(--accent);
         font-size: 10px; }}
-  p.iv-rec-intro {{ font-size: 14px; color: #b8c4d8; }}
+  p.iv-rec-intro {{ font-size: 14px; color: var(--text-muted); }}
   div.iv-rec-grid {{ display: grid; gap: 10px;
                      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
                      margin: 10px 0; }}
-  div.iv-rec-card {{ --sidebar-color: #c8a2d0;
-                     background: #0f162a; border: 1px solid #0f3460;
+  div.iv-rec-card {{ --sidebar-color: var(--heading);
+                     background: var(--surface-2); border: 1px solid var(--border);
                      border-radius: 6px;
                      padding: 10px 12px 10px 16px; font-size: 13px; }}
-  div.iv-rec-card.male {{ --sidebar-color: rgba(91,141,217,0.8);
-                          background: linear-gradient(rgba(91,141,217,0.14),
-                          rgba(91,141,217,0.14)), #0f162a; }}
-  div.iv-rec-card.female {{ --sidebar-color: rgba(217,108,145,0.8);
-                            background: linear-gradient(rgba(217,108,145,0.14),
-                            rgba(217,108,145,0.14)), #0f162a; }}
-  div.iv-rec-card h3 {{ color: #c8a2d0; font-size: 14px; margin: 0 0 4px 0;
+  div.iv-rec-card.male {{ --sidebar-color: var(--sex-male);
+                          background: linear-gradient(color-mix(in srgb, var(--sex-male) 14%, transparent),
+                          color-mix(in srgb, var(--sex-male) 14%, transparent)), var(--surface-2); }}
+  div.iv-rec-card.female {{ --sidebar-color: var(--sex-female);
+                            background: linear-gradient(color-mix(in srgb, var(--sex-female) 14%, transparent),
+                            color-mix(in srgb, var(--sex-female) 14%, transparent)), var(--surface-2); }}
+  div.iv-rec-card h3 {{ color: var(--heading); font-size: 14px; margin: 0 0 4px 0;
                         border-bottom: none; padding-bottom: 0; }}
   div.iv-rec-card h3 a {{ color: inherit; text-decoration: none; }}
   div.iv-rec-card h3 a:hover {{ text-decoration: underline;
                                 filter: brightness(1.1); }}
-  p.iv-rec-cutoffs {{ color: #9ab0d8; margin: 2px 0; font-family: monospace;
+  p.iv-rec-cutoffs {{ color: var(--text-muted); margin: 2px 0; font-family: monospace;
                       font-size: 12px; }}
-  p.iv-rec-members {{ color: #b8c4d8; margin: 2px 0; }}
-  p.iv-rec-desc {{ color: #8ea1bd; margin: 4px 0 0 0; font-style: italic;
+  p.iv-rec-members {{ color: var(--text-muted); margin: 2px 0; }}
+  p.iv-rec-desc {{ color: var(--text-muted); margin: 4px 0 0 0; font-style: italic;
                    font-size: 12px; }}
-  footer {{ color: #666; font-size: 13px; margin-top: 40px;
-            border-top: 1px solid #0f3460; padding-top: 12px; }}
+  footer {{ color: var(--text-muted); font-size: 13px; margin-top: 40px;
+            border-top: 1px solid var(--border); padding-top: 12px; }}
   /* Narrative blocks (intro / meta_role / verdict augment). Gold by
      default; orange when the block was AI-drafted and not yet human-
      reviewed; blue when the block was auto-generated from dive data
@@ -3412,10 +3414,10 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
      --sidebar-color custom property from the
      .authored-{{human,ai,mixed,auto}} modifier, consumed by the
      shared sidebar ::before rule below. */
-  div.article-narrative-block {{ --sidebar-color: #d29922;
+  div.article-narrative-block {{ --sidebar-color: var(--callout-expert);
          padding: 10px 0 10px 20px; margin: 10px 0; }}
-  div.article-narrative-block.authored-ai {{ --sidebar-color: #e8903a; }}
-  div.article-narrative-block.authored-auto {{ --sidebar-color: #5b8dd9; }}
+  div.article-narrative-block.authored-ai {{ --sidebar-color: var(--callout-ai); }}
+  div.article-narrative-block.authored-auto {{ --sidebar-color: var(--callout-auto); }}
 {COMPARE_CSS}
 {_sidebar_css}
 </style>

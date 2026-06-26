@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from gopvpsim.display import pretty_species  # noqa: E402
 from gopvpsim.theme import (  # noqa: E402
+    data_theme_attr,
     theme_css,
     theme_head_script,
     theme_picker_html,
@@ -250,13 +251,13 @@ CARD_CSS = """
   background:var(--surface-2); border-radius:2px; }
 .ddcard-spriteph { width:88px; height:88px; flex:0 0 auto; border-radius:2px;
   display:flex; align-items:center; justify-content:center; font-weight:700;
-  font-size:28px; color:#0b1020; }
+  font-size:28px; }
 .ddcard-title { flex:1 1 240px; }
 .ddcard-title h2 { margin:0; font-size:1.5rem; color:var(--title); }
 .ddcard-shadow { color:var(--accent); font-weight:700; }
 .ddcard-chips { margin:6px 0; }
 .ddcard-chip { display:inline-block; padding:2px 10px; border-radius:4px;
-  font-size:0.78rem; font-weight:700; color:#0b1020; margin-right:6px; }
+  font-size:0.78rem; font-weight:700; margin-right:6px; }
 .ddcard-move { color:var(--text); font-size:0.92rem; margin-top:4px; }
 .ddcard-move b { color:var(--accent); }
 .ddcard-spreads { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
@@ -321,9 +322,28 @@ CARD_CSS = """
 """
 
 
+def _on_chip_text(fill: str) -> str:
+    """Pick '#000' or '#fff' for text drawn ON a type-brand chip fill, by the
+    fill's WCAG relative luminance, so dark types (dark, ghost, dragon, poison,
+    fighting) get light text instead of a forced near-black. The _TYPE_COLORS
+    fills are out-of-contract brand hex, so the on-text is computed here rather
+    than tokenized. Non-hex fills (the var() fallback) default to light text.
+    Per THEME_PHASE2_SPEC section 4."""
+    if not (fill.startswith('#') and len(fill) == 7):
+        return '#fff'
+    def _lin(c):
+        c /= 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    lum = (0.2126 * _lin(int(fill[1:3], 16))
+           + 0.7152 * _lin(int(fill[3:5], 16))
+           + 0.0722 * _lin(int(fill[5:7], 16)))
+    return '#000' if lum > 0.179 else '#fff'
+
+
 def _chip(t):
-    c = _TYPE_COLORS.get(t.lower(), '#8b949e')
-    return f'<span class="ddcard-chip" style="background:{c}">{html.escape(t)}</span>'
+    c = _TYPE_COLORS.get(t.lower(), 'var(--text-muted)')
+    return (f'<span class="ddcard-chip" style="background:{c};'
+            f'color:{_on_chip_text(c)}">{html.escape(t)}</span>')
 
 
 def _sprite_html(m: CardModel):
@@ -331,9 +351,10 @@ def _sprite_html(m: CardModel):
         return (f'<img class="ddcard-sprite" alt="{html.escape(m.species_display)}" '
                 f'src="{m.sprite_uri}">')
     # Typing-colored fallback block (no AI artwork; just a colored initial).
-    c = _TYPE_COLORS.get(m.types[0].lower(), '#5a8ea1') if m.types else '#5a8ea1'
+    c = _TYPE_COLORS.get(m.types[0].lower(), _TYPE_COLORS["steel"]) if m.types else _TYPE_COLORS["steel"]
     initial = html.escape(m.species_display[:1].upper())
-    return (f'<div class="ddcard-spriteph" style="background:{c}">{initial}</div>')
+    return (f'<div class="ddcard-spriteph" style="background:{c};'
+            f'color:{_on_chip_text(c)}">{initial}</div>')
 
 
 def _wr_line(single: WinRate | None, robust: WinRate | None) -> str:
@@ -637,7 +658,7 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
     if not standalone:
         return section
     return f"""<!DOCTYPE html>
-<html lang="en" data-theme="gruvbox-light"><head><meta charset="utf-8">
+<html lang="en" {data_theme_attr()}><head><meta charset="utf-8">
 {theme_head_script()}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{name} - dive card</title>
