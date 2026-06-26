@@ -5303,7 +5303,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                         mechanics=mechanics, focal_max_level=robust_max_level)
             _cm = _ddcard.build_card_model(
                 dobj, cctx, types=_types, shadow=shadow,
-                robust_winrate=_robust, sprite_uri=_sprite)
+                robust_winrate=_robust, sprite_uri=_sprite,
+                has_author_notes=rendering.narrative_has_human_content(
+                    species_narrative))
             card_section = _ddcard.render_card_html(_cm, standalone=False)
             if write_card_out and card_out_path and _is_landing:
                 try:
