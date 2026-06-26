@@ -162,6 +162,29 @@ Light design notes (not yet designed):
   energy" and "cache size + stale-version GC" items above (same cache, same
   migration).
 
+## Form-change "starts in alt form" dives + on-page descriptions (POST-PUBLISH)
+
+*(2026-06-26, Michael)* Aegislash got fixed pre-launch (relabeled "Starts
+Blade" + a top-of-page form-change note on both GL dives) because it was the
+only form-change dive that read as confusing on the site. The rest is
+deferred post-publish:
+
+- **Mimikyu "starts busted" dives, GL and UL.** Rationale: real battles are
+  3v3 with switching, but once Mimikyu is in Busted form it stays Busted for
+  the rest of the battle regardless of swaps, so a "starts in Busted form"
+  dive is legitimately useful (unlike a transient mid-fight state). Add a
+  GL and a UL "starts busted" dive alongside the existing Disguise-intact
+  dives. Mirrors the Aegislash (Blade) "starts in alt form" pattern: a focal
+  species started in the alt form, form change still live.
+- **Form-change descriptions on the Mimikyu dives** (disguise absorbs the
+  first unshielded charged hit -> 1 dmg + permanent -1 def, then Busted for
+  the rest of the battle). Reuse the `_FORM_CHANGE_NOTES` mechanism added in
+  `scripts/deep_dive.py` (keyed by focal speciesName) -- just add Mimikyu
+  keys; keep it qualitative/factual like the Aegislash notes.
+- **If a Morpeko dive is ever added, it must carry a form-change note at the
+  top too** (Full Belly <-> Hangry toggles AURA_WHEEL Electric/Dark after
+  each charged move). Same `_FORM_CHANGE_NOTES` mechanism.
+
 ## Limited-availability mons: real IV floors for ML sweeps (PARALLEL, post-ship)
 
 *(2026-06-25, scratch_thoughts)* The ML IV-guide sweeps assume a 12/12/12 IV
