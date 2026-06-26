@@ -600,15 +600,6 @@ def find_matchup_boundaries(scores_flat, nIvs, nS, nO,
 
 # ---- Tier derivation ----
 
-TIER_COLORS_AUTO = [
-    '#58a6ff',  # blue  — general
-    '#f85149',  # red   — atk specialist
-    '#3fb950',  # green — def specialist
-    '#d29922',  # gold  — premium
-    '#bc8cff',  # purple
-    '#f0883e',  # orange
-]
-
 
 def auto_derive_tiers(anchor_flip_records, data_obj,
                       matchup_boundaries=None):
@@ -668,7 +659,7 @@ def auto_derive_tiers(anchor_flip_records, data_obj,
 
     def _next_color():
         nonlocal color_idx
-        c = TIER_COLORS_AUTO[color_idx % len(TIER_COLORS_AUTO)]
+        c = f'var(--tier-{color_idx % 8 + 1})'
         color_idx += 1
         return c
 
@@ -1072,10 +1063,12 @@ def synthesize_mirror_tier(
 
     return {
         'name': tier_name,
-        'color': '#bc8cff',  # matches Fortified Walrein purple — distinct
-                              # from the auto-derive palette so the mirror
+        'color': 'var(--tier-mirror)',  # distinct purple, theme-aware; set
+                              # apart from the auto-derive palette so the mirror
                               # tier visually stands out as "different
-                              # category" from per-opponent tiers.
+                              # category" from per-opponent tiers. The Plotly
+                              # marker path resolves this var to its theme hex
+                              # via deep_dive._TIER_VAR_TO_HEX.
         'attack': threshold if target_stat == 'atk' else 0,
         'defense': threshold if target_stat == 'def' else 0,
         'stamina': hp_floor,

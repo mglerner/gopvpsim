@@ -164,10 +164,9 @@ def tooltip_attr(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 _OPP_COLORS = [
-    '#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff',
-    '#ff922b', '#cc5de8', '#20c997', '#74c0fc',
-    '#ff8787', '#ffe066', '#8ce99a', '#91a7ff',
-    '#ffa94d', '#e599f7', '#63e6be', '#a5d8ff',
+    'var(--opp-1)', 'var(--opp-2)', 'var(--opp-3)', 'var(--opp-4)',
+    'var(--opp-5)', 'var(--opp-6)', 'var(--opp-7)', 'var(--opp-8)',
+    'var(--opp-9)', 'var(--opp-10)', 'var(--opp-11)', 'var(--opp-12)',
 ]
 
 
@@ -227,78 +226,78 @@ def _opp_strong(color_key, display_text=None):
 # ---------------------------------------------------------------------------
 
 DEEP_DIVE_CSS = """
-.dd-section { background: #16213e; padding: 16px 20px; border-radius: 8px; margin: 20px 0; }
-.dd-h2 { color: #e94560; font-size: 1.3rem; margin: 0 0 12px 0; border-bottom: 1px solid #0f3460; padding-bottom: 6px; }
-.dd-h3 { color: #58a6ff; font-size: 1rem; margin: 14px 0 8px 0; }
+.dd-section { background: var(--surface); padding: 16px 20px; border-radius: 8px; margin: 20px 0; }
+.dd-h2 { color: var(--title); font-size: 1.3rem; margin: 0 0 12px 0; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.dd-h3 { color: var(--accent); font-size: 1rem; margin: 14px 0 8px 0; }
 .dd-table { border-collapse: collapse; margin: 8px 0 12px; font-size: 0.82rem; width: 100%; }
 .dd-table.dd-narrow { width: auto; }
-.dd-table th, .dd-table td { padding: 4px 8px; border: 1px solid #0f3460; text-align: left; }
-.dd-table th { background: #0f3460; color: #58a6ff; font-weight: 600; }
-.dd-table td { background: #1a1a2e; }
-.dd-table tr:hover td { background: #16213e; }
-.dd-gain { color: #3fb950; }
-.dd-loss { color: #f85149; }
-.dd-strong { font-weight: 700; color: #FFD700; }
-.dd-rank-good { color: #3fb950; font-weight: 600; }
-.dd-rank-bad { color: #f85149; }
-.dd-small { font-size: 0.82rem; color: #8b949e; margin: 4px 0; }
-.dd-callout { --sidebar-color: #58a6ff; --sidebar-width: 3px;
-  background: #0f3460; padding: 8px 12px 8px 16px; margin: 10px 0;
+.dd-table th, .dd-table td { padding: 4px 8px; border: 1px solid var(--border); text-align: left; }
+.dd-table th { background: var(--surface-2); color: var(--accent); font-weight: 600; }
+.dd-table td { background: var(--surface-2); }
+.dd-table tr:hover td { background: var(--surface); }
+.dd-gain { color: var(--win); }
+.dd-loss { color: var(--loss); }
+.dd-strong { font-weight: 700; color: var(--notable); }
+.dd-rank-good { color: var(--win); font-weight: 600; }
+.dd-rank-bad { color: var(--loss); }
+.dd-small { font-size: 0.82rem; color: var(--text-muted); margin: 4px 0; }
+.dd-callout { --sidebar-color: var(--accent); --sidebar-width: 3px;
+  background: var(--surface-2); padding: 8px 12px 8px 16px; margin: 10px 0;
   border-radius: 0 4px 4px 0; font-size: 0.85rem; }
 .dd-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; }
 .dd-methods-dl { margin: 8px 0; }
-.dd-methods-dl dt { color: #58a6ff; font-weight: 600; margin-top: 8px; }
-.dd-methods-dl dd { margin-left: 16px; font-size: 0.88rem; color: #aaa; }
+.dd-methods-dl dt { color: var(--accent); font-weight: 600; margin-top: 8px; }
+.dd-methods-dl dd { margin-left: 16px; font-size: 0.88rem; color: var(--text-muted); }
 .dd-flip-detail { margin: 6px 0; }
 .dd-flip-detail summary { cursor: pointer; padding: 4px 0; font-size: 0.9rem; }
-.dd-flip-detail summary:hover { color: #58a6ff; }
+.dd-flip-detail summary:hover { color: var(--accent); }
 .dd-rec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 12px; margin: 12px 0; }
-.dd-rec-card { background: #0f3460; border: 1px solid #1a3a6e; border-radius: 6px; padding: 12px; }
-.dd-rec-card h4 { color: #e94560; margin: 0 0 6px; font-size: 1rem; }
+.dd-rec-card { background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 6px; padding: 12px; }
+.dd-rec-card h4 { color: var(--title); margin: 0 0 6px; font-size: 1rem; }
 .dd-rec-card p { margin: 3px 0; font-size: 0.88rem; }
-.dd-prose { font-size: 0.88rem; color: #b0b8c4; margin: 4px 0 8px 0; font-style: italic; }
+.dd-prose { font-size: 0.88rem; color: var(--text-muted); margin: 4px 0 8px 0; font-style: italic; }
 .dd-threshold-list { list-style: none; padding: 0; margin: 8px 0; }
-.dd-threshold-list li { --sidebar-color: #0f3460; --sidebar-width: 2px;
+.dd-threshold-list li { --sidebar-color: var(--border); --sidebar-width: 2px;
   padding: 4px 0 4px 14px; margin: 4px 0; font-size: 0.88rem; }
-.dd-threshold-list .dd-loss-item { --sidebar-color: #f85149; }
+.dd-threshold-list .dd-loss-item { --sidebar-color: var(--loss); }
 /* Opponent-centric "Threats where your IV matters" view */
 .dd-shield-grid { display:inline-table; border-collapse:collapse; margin:0 0 0 10px;
   vertical-align:middle; font-size:0.72rem; }
 .dd-shield-grid th, .dd-shield-grid td { width:1.4em; height:1.4em; text-align:center;
-  border:1px solid #0f3460; padding:1px 3px; }
-.dd-shield-grid th { color:#8b949e; background:#0f3460; font-weight:600; }
-.dd-sg-win { color:#3fb950; background:#132a1c; }
-.dd-sg-loss { color:#f85149; background:#2a1416; }
-.dd-sg-na { color:#484f58; }
-.dd-sg-row { color:#8b949e; }
+  border:1px solid var(--border); padding:1px 3px; }
+.dd-shield-grid th { color:var(--text-muted); background:var(--surface-2); font-weight:600; }
+.dd-sg-win { color:var(--win); background:var(--cell-win-bg); }
+.dd-sg-loss { color:var(--loss); background:var(--cell-loss-bg); }
+.dd-sg-na { color:var(--text-muted); }
+.dd-sg-row { color:var(--text-muted); }
 .dd-spread-grid td, .dd-spread-grid th:not(:first-child) { text-align:center; }
-.dd-opp-row { border-bottom:1px solid #0f3460; padding:4px 0; }
+.dd-opp-row { border-bottom:1px solid var(--border); padding:4px 0; }
 .dd-opp-detail { padding:4px 0 8px 14px; }
 .dd-opp-name { font-weight:600; min-width:150px; display:inline-block; }
 .dd-opp-chip { display:inline-block; font-size:0.78rem; padding:1px 8px;
-  border-radius:10px; margin:1px 4px 1px 0; background:#0f3460; }
-.dd-opp-chip-win { color:#3fb950; }
-.dd-opp-chip-lose { color:#8b6f72; }
-.dd-opp-build { color:#f0b429; font-size:0.78rem; font-weight:600;
+  border-radius:10px; margin:1px 4px 1px 0; background:var(--surface-2); }
+.dd-opp-chip-win { color:var(--win); }
+.dd-opp-chip-lose { color:var(--text-muted); }
+.dd-opp-build { color:var(--notable); font-size:0.78rem; font-weight:600;
   margin-left:6px; }
-.dd-opp-label { color: #8b949e; font-size: 0.75rem; }
-.dd-slayer-top td { background: #1e2d4a; }
-.dd-slayer-top td:first-child { border-left: 3px solid #58a6ff; }
+.dd-opp-label { color: var(--text-muted); font-size: 0.75rem; }
+.dd-slayer-top td { background: var(--surface-2); }
+.dd-slayer-top td:first-child { border-left: 3px solid var(--accent); }
 .dd-slayer-hidden { display: none; }
 .dd-slayer-hidden.dd-slayer-shown { display: table-row; }
-.dd-slayer-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
+.dd-slayer-toggle { background:var(--surface-2); color:var(--accent); border:1px solid var(--border-2);
   padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
   margin-top:4px; }
-.dd-slayer-toggle:hover { background:#1a3a6e; color:#fff; }
-.dd-anchor-tag { display:inline-block; background:#0f3460; color:#58a6ff;
+.dd-slayer-toggle:hover { background:var(--border-2); color:var(--text); }
+.dd-anchor-tag { display:inline-block; background:var(--surface-2); color:var(--rarity-common);
   padding:1px 6px; border-radius:3px; font-size:0.72rem; margin:1px 2px 1px 0;
   font-family:monospace; cursor:help; }
-.dd-anchor-tag:hover { background:#1a3a6e; color:#fff; }
-.dd-anchor-tag.dd-tag-rare { background:#5a3a00; color:#ffd166; }
-.dd-anchor-tag.dd-tag-rare:hover { background:#7a5200; color:#fff; }
-.dd-anchor-tag.dd-tag-uncommon { background:#1a4731; color:#7ee787; }
-.dd-anchor-tag.dd-tag-uncommon:hover { background:#256d4a; color:#fff; }
-.dd-anchor-tag-count { color:#d29922; font-weight:600; }
+.dd-anchor-tag:hover { background:var(--border-2); color:var(--text); }
+.dd-anchor-tag.dd-tag-rare { background:var(--surface-2); color:var(--rarity-rare); }
+.dd-anchor-tag.dd-tag-rare:hover { background:var(--border-2); color:var(--text); }
+.dd-anchor-tag.dd-tag-uncommon { background:var(--surface-2); color:var(--rarity-uncommon); }
+.dd-anchor-tag.dd-tag-uncommon:hover { background:var(--border-2); color:var(--text); }
+.dd-anchor-tag-count { color:var(--notable); font-weight:600; }
 .dd-anchor-tags-cell { max-width: 480px; }
 .dd-anchor-tags-cell .dd-anchor-tag { vertical-align: baseline; }
 /* The badges live inside an inner <div> rather than directly in the <td>
@@ -317,25 +316,25 @@ DEEP_DIVE_CSS = """
   position: relative; }
 .dd-anchor-tags-inner.dd-tags-compact::after { content: ""; position: absolute;
   bottom: 0; left: 0; right: 0; height: 1.5em; pointer-events: none;
-  background: linear-gradient(transparent, #16213e); }
-.dd-tags-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
+  background: linear-gradient(transparent, var(--surface)); }
+.dd-tags-toggle { background:var(--surface-2); color:var(--accent); border:1px solid var(--border-2);
   padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
   margin:6px 0; }
-.dd-tags-toggle:hover { background:#1a3a6e; color:#fff; }
+.dd-tags-toggle:hover { background:var(--border-2); color:var(--text); }
 /* Notable IVs section: dd-notable-only is a section-level class that
    hides every dd-not-notable card. The header checkbox toggles the
    class via ddNotableToggle(); default state is "only notable". */
 .dd-notable-only .dd-not-notable { display: none; }
-.dd-rec-card.dd-notable { border-color: #d29922; }
+.dd-rec-card.dd-notable { border-color: var(--notable); }
 /* Per-card "Show all N" expand: overflow members render with
    dd-iv-hidden and become visible when ddNotableExpand() adds
    dd-iv-shown. Same pattern as the slayer-card row expand. */
 .dd-rec-card .dd-iv-hidden { display: none; }
 .dd-rec-card .dd-iv-hidden.dd-iv-shown { display: block; }
-.dd-iv-toggle { background:#0f3460; color:#58a6ff; border:1px solid #1a3a6e;
+.dd-iv-toggle { background:var(--surface-2); color:var(--accent); border:1px solid var(--border-2);
   padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;
   margin-top:6px; }
-.dd-iv-toggle:hover { background:#1a3a6e; color:#fff; }
+.dd-iv-toggle:hover { background:var(--border-2); color:var(--text); }
 /* Atk-weight badges on Notable IV member rows. Classifies each spread
    as rank-1 / no-atk / slight / heavy / bulk-max / atk-tilt relative
    to the stat-product-max IV (RyanSwag T2 vocabulary). Muted colors
@@ -343,12 +342,12 @@ DEEP_DIVE_CSS = """
 .dd-atk-weight { display:inline-block; padding:1px 7px; border-radius:3px;
   font-size:0.72rem; font-weight:500; text-transform:lowercase;
   margin-left:6px; letter-spacing:0.02em; cursor:help; }
-.dd-atk-weight-rank-1 { background:#1e2d4a; color:#58a6ff; }
-.dd-atk-weight-no-atk-weight { background:#1b2b1b; color:#7db87d; }
-.dd-atk-weight-slight-atk-weight { background:#2a2617; color:#d29922; }
-.dd-atk-weight-heavy-atk-weight { background:#3a1f1f; color:#e94560; }
-.dd-atk-weight-bulk-max { background:#1b2a33; color:#8ed1d1; }
-.dd-atk-weight-atk-tilt { background:#2a1f2a; color:#c8a2d0; }
+.dd-atk-weight-rank-1 { background:var(--surface-2); color:var(--catw-rank1); }
+.dd-atk-weight-no-atk-weight { background:var(--surface-2); color:var(--catw-none); }
+.dd-atk-weight-slight-atk-weight { background:var(--surface-2); color:var(--catw-slight); }
+.dd-atk-weight-heavy-atk-weight { background:var(--surface-2); color:var(--catw-heavy); }
+.dd-atk-weight-bulk-max { background:var(--surface-2); color:var(--catw-bulk); }
+.dd-atk-weight-atk-tilt { background:var(--surface-2); color:var(--catw-tilt); }
 /* Envelope-position tag (category-level, sits right after the card
    subtitle). Colored by shape: rider-top/elev = above band (green
    family), rider-bottom/dep = below band (red family). The numeric
@@ -356,15 +355,15 @@ DEEP_DIVE_CSS = """
 .dd-env-tag { font-size:0.82rem; margin:2px 0 4px; padding:3px 8px;
   border-radius:3px; border-left:3px solid transparent; cursor:help;
   display:inline-block; }
-.dd-env-rider-top    { background:#132a1c; color:#9be89b; border-left-color:#3fb950; }
-.dd-env-elev-crosser { background:#162318; color:#7db87d; border-left-color:#2f8135; }
-.dd-env-dep-crosser  { background:#2a1e16; color:#d29922; border-left-color:#b07214; }
-.dd-env-rider-bottom { background:#2a181b; color:#e77173; border-left-color:#c04547; }
+.dd-env-rider-top    { background:var(--surface-2); color:var(--env-top); border-left-color:var(--env-top); }
+.dd-env-elev-crosser { background:var(--surface-2); color:var(--env-elev); border-left-color:var(--env-elev); }
+.dd-env-dep-crosser  { background:var(--surface-2); color:var(--env-dep); border-left-color:var(--env-dep); }
+.dd-env-rider-bottom { background:var(--surface-2); color:var(--env-bottom); border-left-color:var(--env-bottom); }
 /* B1: the auto-gen Flavor Guide prose, folded in as the IV
    Recommendations section intro (italic lead-in). When the narrative
    zone div lands inside it, drop its heavy sidebar so it reads as inline
    intro prose, not a sub-zone. */
-.dd-iv-rec-intro { font-size: 0.92rem; font-style: italic; color: #aab2c0;
+.dd-iv-rec-intro { font-size: 0.92rem; font-style: italic; color: var(--text-muted);
   margin: 8px 0 16px; line-height: 1.55; }
 .dd-iv-rec-intro .dd-narrative-zone { padding-left: 0; margin: 6px 0; }
 .dd-iv-rec-intro .dd-narrative-zone::before { display: none; }
@@ -372,28 +371,28 @@ DEEP_DIVE_CSS = """
 .dd-opp-link { text-decoration: none; border-bottom: 1px dotted currentColor; }
 .dd-opp-link:hover { border-bottom-style: solid; }
 .dd-eff-crown { cursor: help; position: relative; }
-.dd-eff-crown:hover::after { content: "Efficient IV: no other spread beats it on attack, defense and HP at once"; position: absolute; left: 1.1em; top: -0.3em; z-index: 30; white-space: nowrap; background: #16213e; color: #e6ecf5; border: 1px solid #0f3460; border-radius: 4px; padding: 3px 7px; font-size: 11px; font-style: normal; font-weight: normal; pointer-events: none; }
+.dd-eff-crown:hover::after { content: "Efficient IV: no other spread beats it on attack, defense and HP at once"; position: absolute; left: 1.1em; top: -0.3em; z-index: 30; white-space: nowrap; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 3px 7px; font-size: 11px; font-style: normal; font-weight: normal; pointer-events: none; }
 .dd-steal-block { margin: 6px 0; }
 .dd-collapsible { margin: 4px 0; }
 .dd-collapsible > summary { list-style: none; }
 .dd-collapsible > summary::-webkit-details-marker { display: none; }
 .dd-collapsible > summary::before { content: "\\25b6"; display: inline-block;
-  margin-right: 6px; font-size: 0.7em; transition: transform 0.15s; color: #58a6ff; }
+  margin-right: 6px; font-size: 0.7em; transition: transform 0.15s; color: var(--accent); }
 .dd-collapsible[open] > summary::before { transform: rotate(90deg); }
-.dd-expert-zone { --sidebar-color: #d29922;
+.dd-expert-zone { --sidebar-color: var(--callout-expert);
   padding: 10px 0 10px 20px; margin: 16px 0; }
-.dd-expert-zone h3 { color: #d29922; margin: 0 0 10px 0; }
-.dd-expert-source { color: #8b949e; font-size: 0.82rem; font-style: italic; margin: 0 0 12px 0; }
+.dd-expert-zone h3 { color: var(--notable); margin: 0 0 10px 0; }
+.dd-expert-source { color: var(--text-muted); font-size: 0.82rem; font-style: italic; margin: 0 0 12px 0; }
 .dd-expert-anchors { margin: 10px 0; }
 .dd-expert-anchors li { margin: 4px 0; }
-.dd-narrative-zone { --sidebar-color: #9b59b6;
+.dd-narrative-zone { --sidebar-color: var(--zone-narrative);
   padding: 12px 0 12px 20px; margin: 20px 0; }
-.dd-narrative-prose { font-size: 0.9rem; color: #c8ccd4; line-height: 1.6; margin: 6px 0; }
-.dd-narrative-rec { color: #3fb950; font-weight: 600; }
-.dd-narrative-loss { color: #f85149; font-size: 0.88rem; font-style: italic; margin: 8px 0 4px 0; }
-.dd-sim-zone { --sidebar-color: #58a6ff;
+.dd-narrative-prose { font-size: 0.9rem; color: var(--text); line-height: 1.6; margin: 6px 0; }
+.dd-narrative-rec { color: var(--win); font-weight: 600; }
+.dd-narrative-loss { color: var(--loss); font-size: 0.88rem; font-style: italic; margin: 8px 0 4px 0; }
+.dd-sim-zone { --sidebar-color: var(--callout-auto);
   padding: 10px 0 10px 20px; margin: 16px 0; }
-.dd-sim-zone > h3 { color: #58a6ff; margin: 0 0 10px 0; }
+.dd-sim-zone > h3 { color: var(--accent); margin: 0 0 10px 0; }
 .dd-species-narrative { margin: 20px 0; }
 /* Collapsed-by-default narrative wrapper so the Plotly scatter (the
  * dive's centerpiece) lands at the top of the page; readers expand
@@ -401,7 +400,7 @@ DEEP_DIVE_CSS = """
  * would have been and inherits the same gold accent. */
 .dd-species-narrative-details > summary {
   cursor: pointer;
-  color: #d29922;
+  color: var(--notable);
   font-weight: 600;
   font-size: 1.0rem;
   padding: 6px 0 6px 20px;
@@ -416,17 +415,17 @@ DEEP_DIVE_CSS = """
 .dd-species-narrative-details[open] > summary::before {
   content: "▾ ";
 }
-.dd-species-narrative-details > summary:hover { color: #e0ae3a; }
+.dd-species-narrative-details > summary:hover { color: var(--notable); }
 .dd-species-narrative .dd-narrative-block {
-  --sidebar-color: #d29922;
+  --sidebar-color: var(--callout-expert);
   padding: 10px 0 10px 20px;
   margin: 8px 0;
 }
 .dd-species-narrative .dd-narrative-block.authored-ai {
-  --sidebar-color: #e8903a;
+  --sidebar-color: var(--callout-ai);
 }
 .dd-species-narrative .dd-narrative-block.authored-auto {
-  --sidebar-color: #5b8dd9;
+  --sidebar-color: var(--callout-auto);
 }
 .dd-species-narrative .dd-narrative-block > h2,
 .dd-species-narrative .dd-narrative-block > h3 {
@@ -436,7 +435,7 @@ DEEP_DIVE_CSS = """
 .dd-species-narrative .dd-narrative-block > h2 { font-size: 1.15rem; }
 .dd-species-narrative .dd-narrative-block > h3 { font-size: 1.0rem; }
 .dd-species-narrative p { margin: 8px 0; }
-.dd-species-narrative .narrative-attribution { color: #8b949e;
+.dd-species-narrative .narrative-attribution { color: var(--text-muted);
   font-size: 0.82rem; margin: 6px 0 0 0; font-style: italic; }
 
 /* ==== Shared sidebar pattern (2026-04-19 refactor) ====
@@ -478,7 +477,7 @@ DEEP_DIVE_CSS = """
   bottom: 4px;
   width: var(--sidebar-width, 4px);
   border-radius: calc(var(--sidebar-width, 4px) / 2);
-  background: var(--sidebar-color, #8b949e);
+  background: var(--sidebar-color, var(--text-muted));
 }
 """
 
@@ -634,14 +633,14 @@ def tier_badge_html(data, iv):
         badges = []
         for ti in all_tiers[iv]:
             t = data['tiers'][ti]
-            badges.append(f'<span class="dd-badge" style="background:{t["color"]};color:#000">{t["name"]}</span>')
+            badges.append(f'<span class="dd-badge" style="color:{t["color"]};background:var(--surface-2)">{t["name"]}</span>')
         return ' ' + ' '.join(badges)
     # Fallback to single tier
     ti = data['ivTiers'][iv]
     if ti < 0:
         return ''
     t = data['tiers'][ti]
-    return f' <span class="dd-badge" style="background:{t["color"]};color:#000">{t["name"]}</span>'
+    return f' <span class="dd-badge" style="color:{t["color"]};background:var(--surface-2)">{t["name"]}</span>'
 
 
 
@@ -1333,7 +1332,7 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
         f'<details class="dd-collapsible" id="dd-notable-ivs">'
         f'<summary class="dd-h3" style="cursor:pointer">'
         f'Per-matchup IV finder '
-        f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+        f'<span class="dd-small" style="font-weight:400;color:var(--text-muted)">'
         f'({len(target)} specific matchups - e.g. &quot;which IV beats a '
         f'given opponent in a given shield?&quot;)</span>'
         f'</summary>\n')
@@ -1341,7 +1340,7 @@ def render_notable_ivs_section(categories, data_obj, opp_iv_mode,
         '<p class="dd-small">Collapsed by default. This is a per-(opponent, '
         'shield) lookup: each card is one matchup and the exact IV spreads '
         'that win it. For "what do I need vs threat X" use '
-        '<a href="#dd-opp-threats" style="color:#58a6ff" '
+        '<a href="#dd-opp-threats" style="color:var(--accent)" '
         'onclick="var el=document.getElementById(\'dd-opp-threats\');'
         'if(el)el.open=true;">Threats where your build choice matters</a> '
         'above, or paste your collection into the scatter. Composite cards '
@@ -1407,7 +1406,7 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
         parts.append(f'<div class="dd-rec-card {notable_cls}" id="{card_id}">\n')
         parts.append(
             f'<h4>{cat.name} '
-            f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+            f'<span class="dd-small" style="font-weight:400;color:var(--text-muted)">'
             f'({n_members} IV spread{"s" if n_members != 1 else ""})'
             f'</span></h4>\n'
         )
@@ -1762,7 +1761,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 axis_note = f' ({" / ".join(tighter_axes)} spreads excluded)'
             parent_diff_html = (
                 f' <span class="dd-small" '
-                f'style="font-weight:400;color:#d29922" '
+                f'style="font-weight:400;color:var(--notable)" '
                 f'title="This tier is a strict subset of the '
                 f'&quot;{parent_name}&quot; tier on IV membership. '
                 f'The primary-bullet list may look similar, but '
@@ -1770,7 +1769,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 f'(−{delta} vs {parent_name}{axis_note})</span>'
             )
 
-        color = t.get('color', '#888')
+        color = t.get('color', 'var(--text-muted)')
         # Slug for the "N of yours qualify" placeholder. Must match the
         # JS computation in deep_dive_engine.js updateTierCardCounts.
         # Slug off ``original_name`` when present so the anchor id stays
@@ -1791,17 +1790,17 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         )
         parts.append(
             f'<h4>'
-            f'<span class="dd-badge" style="background:{color};color:#000">'
+            f'<span class="dd-badge" style="color:{color};background:var(--surface-2)">'
             f'{t["name"]}</span> '
-            f'<span class="dd-small" style="font-weight:400;color:#b0b8c4">'
+            f'<span class="dd-small" style="font-weight:400;color:var(--text-muted)">'
             f'· {cutoffs_str}</span> '
-            f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+            f'<span class="dd-small" style="font-weight:400;color:var(--text-muted)">'
             f'({n_members} IV spread{"s" if n_members != 1 else ""})'
             f'</span>'
             f'{parent_diff_html} '
             f'<span id="tier-card-yours-{_tier_slug}" '
             f'class="dd-small" '
-            f'style="font-weight:400;color:#ff40ff;display:none"></span>'
+            f'style="font-weight:400;color:var(--notable);display:none"></span>'
             f'</h4>\n'
         )
         # --- Goal line from the TOML `description` field ---
@@ -1812,7 +1811,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
         toml_desc = (t.get('toml_description') or '').strip()
         if toml_desc:
             parts.append(
-                f'<p class="dd-prose" style="color:#d29922;font-style:italic;'
+                f'<p class="dd-prose" style="color:var(--notable);font-style:italic;'
                 f'margin-bottom:4px">Goal: {toml_desc}</p>\n'
             )
 
@@ -1907,9 +1906,9 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 parts.append(
                     f'<details class="dd-flip-detail" '
                     f'style="margin-top:6px">'
-                    f'<summary><b style="color:#58a6ff">'
+                    f'<summary><b style="color:var(--accent)">'
                     f'Anchors we get for free</b> '
-                    f'<span class="dd-small" style="color:#8b949e">'
+                    f'<span class="dd-small" style="color:var(--text-muted)">'
                     f'({len(free_bullets)} cleared by every IV in this tier '
                     f'despite no cutoff on the relevant axis)'
                     f'</span></summary>\n'
@@ -1974,7 +1973,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 if mb_bullets:
                     parts.append(
                         '<p class="dd-small" style="margin-top:6px">'
-                        '<b style="color:#3fb950">Matchup-flipping '
+                        '<b style="color:var(--win)">Matchup-flipping '
                         'boundaries</b> (full-battle stat targets, not '
                         'just damage tiers):</p>\n'
                     )
@@ -2004,7 +2003,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                 if _new_opps:
                     parts.append(
                         '<p class="dd-small" style="margin-top:6px">'
-                        '<b style="color:#d29922">Additional matchup flips '
+                        '<b style="color:var(--notable)">Additional matchup flips '
                         'at this tier\'s spec</b> (not explained by a single '
                         'anchor - may involve HP or multi-stat interactions):'
                         '</p>\n'
@@ -2257,9 +2256,9 @@ def generate_threshold_descriptions(flips, data, avg_scores, ranked, opp_iv_mode
         if has_bait_axis:
             bm = opp_scene_bait.get((opp, scene), set())
             if bm == {'bait'}:
-                bait_badge = ' <span class="dd-badge" style="background:#1a3a6e;color:#58a6ff">[bait only]</span>'
+                bait_badge = ' <span class="dd-badge" style="background:var(--surface-2);color:var(--accent)">[bait only]</span>'
             elif bm == {'nobait'}:
-                bait_badge = ' <span class="dd-badge" style="background:#1a3a6e;color:#58a6ff">[no-bait only]</span>'
+                bait_badge = ' <span class="dd-badge" style="background:var(--surface-2);color:var(--accent)">[no-bait only]</span>'
 
         opp_c = _opp_color(opp)
         lines.append(
@@ -2490,7 +2489,7 @@ def _anchor_tags_cell(r, parent_rates=None, skip_parents=None):
         tags_cell = ' '.join(tag_bits)
     elif n_skipped:
         # Everything this row clears is in the shared callout above.
-        tags_cell = '<span style="color:#8b949e">common set only</span>'
+        tags_cell = '<span style="color:var(--text-muted)">common set only</span>'
     else:
         tags_cell = '-'
     n_total_parents = sum(n_parents_by_kind.values())
@@ -2549,7 +2548,7 @@ def render_mirror_slayer_html(ctx_or_slayer=None, *, slayer_iter_result=None,
         f'<details class="dd-collapsible" id="dd-slayer-builds">'
         f'<summary class="dd-h3" style="cursor:pointer">'
         f'Slayer Builds '
-        f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+        f'<span class="dd-small" style="font-weight:400;color:var(--text-muted)">'
         f'({n_af} anchors-first, {n_cf} cmp-first; mirror population '
         f'{final_pool}, {rounds_run} round{"s" if rounds_run != 1 else ""}, '
         f'{"converged" if converged else "max rounds reached"})</span>'
@@ -2696,8 +2695,8 @@ function ddToggleTagsCompactCell(event) {
         )
         parts.append('<div class="dd-rec-grid">\n')
         CAT_ABBREV = {'Anchors-First Slayer': 'AF', 'CMP-First Slayer': 'CF'}
-        CAT_COLORS = {'Anchors-First Slayer': '#f85149',
-                      'CMP-First Slayer': '#d29922'}
+        CAT_COLORS = {'Anchors-First Slayer': 'var(--cat-anchors)',
+                      'CMP-First Slayer': 'var(--cat-cmp)'}
         # Hard cap on rows emitted into the HTML per card. Anchors-First
         # membership can be broad when the max-cleared anchor tier is easy;
         # the full member set still feeds the scatter overlay and Notable
@@ -2728,7 +2727,7 @@ function ddToggleTagsCompactCell(event) {
             parts.append(f'<div class="dd-rec-card" id="{mirror_slug}">\n')
             parts.append(
                 f'<h4>{cat_name} '
-                f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+                f'<span class="dd-small" style="font-weight:400;color:var(--text-muted)">'
                 f'({n_total} IV{"s" if n_total != 1 else ""})'
                 f'</span></h4>\n'
             )
@@ -2760,7 +2759,7 @@ function ddToggleTagsCompactCell(event) {
                 parts.append(
                     f'<p class="dd-small" style="margin:4px 0">'
                     f'Every build below clears: {" ".join(sat_bits)} '
-                    f'<span style="color:#8b949e">(omitted from the '
+                    f'<span style="color:var(--text-muted)">(omitted from the '
                     f'per-row badges; remaining badges are color-coded '
                     f'by rarity within this table)</span></p>\n'
                 )
@@ -2784,10 +2783,10 @@ function ddToggleTagsCompactCell(event) {
                 badges = ''
                 for o in others:
                     ab = CAT_ABBREV.get(o, '?')
-                    col = CAT_COLORS.get(o, '#888')
+                    col = CAT_COLORS.get(o, 'var(--text-muted)')
                     badges += (
                         f'<span class="dd-badge" '
-                        f'style="background:{col};color:#000"'
+                        f'style="color:{col};background:var(--surface-2)"'
                         f'{tooltip_attr(o)}>{ab}</span> '
                     )
 
@@ -2973,7 +2972,7 @@ def render_analysis_alpha_html(scores_flat, nIvs, nS, nO, scenarios,
 
     parts.append('<table class="dd-table"><tr><th>Scenario</th><th>Atk <em>r</em></th><th>Atk &eta;&sup2;</th><th>Def <em>r</em></th><th>Def &eta;&sup2;</th><th>HP <em>r</em></th><th>HP &eta;&sup2;</th><th>Dominant</th></tr>\n')
     for row in sorted_rows:
-        style = ' style="border-top:2px solid #e94560"' if row['is_avg'] else ''
+        style = ' style="border-top:2px solid var(--title)"' if row['is_avg'] else ''
         line = f'<tr{style}><td>{row["label"]}</td>'
         for name, b in row['bands']:
             if b:
@@ -3172,9 +3171,9 @@ def render_analysis_flips_html(data_obj, flip_summary, flips, avg_scores,
                     if has_bait_axis:
                         ebm = e.get('bait_modes', set())
                         if ebm == {'bait'}:
-                            opp_cell += ' <span class="dd-badge" style="background:#1a3a6e;color:#58a6ff">[bait only]</span>'
+                            opp_cell += ' <span class="dd-badge" style="background:var(--surface-2);color:var(--accent)">[bait only]</span>'
                         elif ebm == {'nobait'}:
-                            opp_cell += ' <span class="dd-badge" style="background:#1a3a6e;color:#58a6ff">[no-bait only]</span>'
+                            opp_cell += ' <span class="dd-badge" style="background:var(--surface-2);color:var(--accent)">[no-bait only]</span>'
                     parts.append(f'<tr><td>{e["scenario"]}</td><td>{opp_cell}</td><td>{e["ref_score"]}</td><td class="{cls}">{e["iv_score"]}</td><td class="{cls}">{d:+d}</td><td class="dd-small">{narr}</td></tr>\n')
                 parts.append('</table>\n')
         parts.append('</details>\n')
@@ -3251,7 +3250,7 @@ def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
         fd = flips.get(iv, {'gains': [], 'losses': []})
         prose = prose_flip_summary(fd, max_gains=2, max_losses=1, has_bait_axis=has_bait_axis)
         parts.append('<div class="dd-rec-card">\n')
-        style_color = '#58a6ff' if rc['style'] == 'Bait Robust' else '#e94560'
+        style_color = 'var(--accent)' if rc['style'] == 'Bait Robust' else 'var(--title)'
         parts.append(f'<h4 style="color:{style_color}">{rc["style"]}: {iv_label(data_obj, iv)}{tier_badge_html(data_obj, iv)}</h4>\n')
         parts.append(f'<p>Atk={data_obj["ivAtk"][iv]:.2f}, Def={data_obj["ivDef"][iv]:.2f}, HP={data_obj["ivHp"][iv]}, SP #{data_obj["spRanks"][iv]}</p>\n')
         parts.append(f'<p>Avg score rank: <b>#{rc["avg_rank"]}</b> ({rc["avg_score"]:.1f})</p>\n')
@@ -3278,7 +3277,7 @@ def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
                     if narr:
                         bp_lines.append(narr)
         if bp_lines:
-            parts.append(f'<p class="dd-small"><b style="color:#58a6ff">Key changes</b><br>{"<br>".join(bp_lines)}</p>\n')
+            parts.append(f'<p class="dd-small"><b style="color:var(--accent)">Key changes</b><br>{"<br>".join(bp_lines)}</p>\n')
         parts.append('</div>\n')
     parts.append('</div>\n')
     return ''.join(parts)
@@ -3452,12 +3451,12 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
     parts.append(
         '<summary class="dd-h3" style="cursor:pointer">'
         'Threats where your build choice matters '
-        '<span class="dd-small" style="font-weight:400;color:#8b949e">'
+        '<span class="dd-small" style="font-weight:400;color:var(--text-muted)">'
         f'({len(decision_rows)} decision'
         f'{f", {len(stealable)} stealable" if stealable else ""})'
         '</span></summary>\n')
     parts.append(
-        '<p class="dd-small" style="color:#8b949e">The opponents below are the '
+        '<p class="dd-small" style="color:var(--text-muted)">The opponents below are the '
         'ones where a different recommended spread <i>flips who wins</i> vs '
         f'{opp_label} opponents, so your build choice decides the result. The '
         'chips show which recommended build wins the matchup overall (a majority '
@@ -3490,8 +3489,8 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
     if stealable:
         parts.append('<div class="dd-steal-block">\n')
         parts.append(
-            '<p class="dd-small" style="color:#8b949e;margin:8px 0 4px">'
-            '<b style="color:#d29922">Stealable</b> - loses the matchup '
+            '<p class="dd-small" style="color:var(--text-muted);margin:8px 0 4px">'
+            '<b style="color:var(--notable)">Stealable</b> - loses the matchup '
             'overall against every recommended build, but a build can still '
             'steal one or more individual shields (a breakpoint shield '
             'steal). Worth knowing when a specific shield count is close:</p>\n')
@@ -3526,7 +3525,7 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
 
     if not decision_rows:
         if not stealable:
-            parts.append('<p class="dd-small" style="color:#8b949e">No '
+            parts.append('<p class="dd-small" style="color:var(--text-muted)">No '
                          'build-sensitive matchups in this pool -- every '
                          'opponent is decided the same way by all '
                          'recommended spreads.</p>\n')
@@ -3571,7 +3570,7 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
             parts.append('\n</ul>\n')
         if len(spread_ivs) > 1:
             parts.append(
-                '<p class="dd-small" style="color:#8b949e;margin:6px 0 2px">'
+                '<p class="dd-small" style="color:var(--text-muted);margin:6px 0 2px">'
                 'Each recommended spread (columns) across the 9 shields:</p>\n')
             parts.append(_render_opp_spread_grid(
                 spread_ivs, oi, scenarios, scores_flat, nS, nO, data_obj,
@@ -3647,8 +3646,8 @@ def render_results_section(data_obj, moveset_label, opp_label,
         parts.append(f'<h3>Expert Analysis ({source_label})</h3>\n')
         parts.append(
             '<details class="dd-glossary" style="margin:0 0 12px 0;font-size:0.9rem">\n'
-            '<summary style="cursor:pointer;color:#d29922">What am I looking at? (glossary)</summary>\n'
-            '<ul style="margin:8px 0 4px 18px;line-height:1.55;color:#c9d1d9">\n'
+            '<summary style="cursor:pointer;color:var(--notable)">What am I looking at? (glossary)</summary>\n'
+            '<ul style="margin:8px 0 4px 18px;line-height:1.55;color:var(--text)">\n'
             '<li><b>Tier</b> (a.k.a. <i>spread</i>) - a named stat-cutoff region, e.g. '
             '"GH Great = Def &ge; 143.03, HP &ge; 138." Any IV meeting all the cutoffs is in the tier.</li>\n'
             '<li><b>Anchor</b> - a yes/no rule applied to one IV, e.g. "clears the Medicham '
@@ -3661,7 +3660,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
             'stat increase that turns a simulated loss into a win against a specific opponent and '
             'shield scenario (not just a damage-tier change).</li>\n'
             '</ul>\n'
-            '<p style="margin:6px 0 0 0;font-size:0.82rem;color:#8b949e">'
+            '<p style="margin:6px 0 0 0;font-size:0.82rem;color:var(--text-muted)">'
             'Full definitions in <code>docs/concepts.md</code>.</p>\n'
             '</details>\n'
         )
@@ -3702,9 +3701,9 @@ def render_results_section(data_obj, moveset_label, opp_label,
             parts.append('\n'.join(expert_summary_bullets))
             parts.append('\n</ul>\n')
             parts.append(
-                '<p class="dd-small" style="color:#8b949e">'
+                '<p class="dd-small" style="color:var(--text-muted)">'
                 'Per-opponent breakdown in '
-                '<a href="#dd-opp-threats" style="color:#58a6ff" onclick="var el=document.getElementById(\'dd-opp-threats\');if(el)el.open=true;">'
+                '<a href="#dd-opp-threats" style="color:var(--accent)" onclick="var el=document.getElementById(\'dd-opp-threats\');if(el)el.open=true;">'
                 'Threats where your IV matters</a> below.</p>\n'
             )
 
@@ -3715,7 +3714,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
     # ================================================================
     parts.append('<div class="dd-sim-zone">\n')
     parts.append('<h3>Simulation-Derived IV Tiers</h3>\n')
-    parts.append('<p class="dd-small" style="color:#8b949e;margin:0 0 8px">'
+    parts.append('<p class="dd-small" style="color:var(--text-muted);margin:0 0 8px">'
                  'Auto-derived from the sim (not expert-authored).</p>\n')
 
     # -- Sim-only Tier Cards (if any auto-derived tiers exist) --
@@ -3900,7 +3899,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
             f'<details class="dd-collapsible">'
             f'<summary class="dd-h3" style="cursor:pointer">'
             f'Anchor-Driven Matchup Flips '
-            f'<span class="dd-small" style="font-weight:400;color:#8b949e">'
+            f'<span class="dd-small" style="font-weight:400;color:var(--text-muted)">'
             f'({len(anchor_bullets)} anchors)</span>'
             f'</summary>\n')
         parts.append(
