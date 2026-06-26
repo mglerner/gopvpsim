@@ -10,7 +10,7 @@ var state = {
   // '51' (best-buddy). Only ever '51' when DATA.ivL51 is present (the dive
   // carried a second L51 grid). Drives the score-key suffix in getScoreKey.
   levelMode: '50',
-  // "Compare my candidates" widget: up to 7 user-entered focal IV spreads
+  // "Compare candidates" widget: up to 7 user-entered focal IV spreads
   // ({a,d,s,level}), compared side by side from the embedded grid.
   compareCandidates: [],
   // Anchor IVs overlay rendering mode:
@@ -3168,7 +3168,7 @@ window.toggleMatchesSection = toggleMatchesSection;
 window.sortMatchesTable = sortMatchesTable;
 window.copyScannerJson = copyScannerJson;
 // ============================================================
-// "Compare my candidates" widget -- a bounded N-way side-by-side of focal IV
+// "Compare candidates" widget -- a bounded N-way side-by-side of focal IV
 // spreads YOU enter, read entirely from the embedded grid (no new sims).
 // ============================================================
 var CMP_MAX = 7;            // hard cap on candidate spreads
@@ -3257,15 +3257,8 @@ function cmpAdd() {
   var a = parseInt(document.getElementById('cmp-a').value, 10);
   var d = parseInt(document.getElementById('cmp-d').value, 10);
   var s = parseInt(document.getElementById('cmp-s').value, 10);
-  var lvRaw = document.getElementById('cmp-lv').value;
-  var lv = lvRaw === '' ? null : parseFloat(lvRaw);
   function ok(x) { return x >= 0 && x <= 15; }
   if (!(ok(a) && ok(d) && ok(s))) { cmpStatus('Enter Atk/Def/HP 0-15', 'var(--loss)'); return; }
-  // Validate the optional level: blank = current level; otherwise a finite
-  // 1..51 (else a typed 'abc' -> NaN renders '+NaN lv' in the card).
-  if (lv !== null && !(isFinite(lv) && lv >= 1 && lv <= 51)) {
-    cmpStatus('Level must be 1-51 (or blank)', 'var(--loss)'); return;
-  }
   if (state.compareCandidates.length >= CMP_MAX) {
     cmpStatus('Max ' + CMP_MAX + ' -- remove one to add another', 'var(--notable)'); return;
   }
@@ -3273,7 +3266,10 @@ function cmpAdd() {
     var c = state.compareCandidates[i];
     if (c.a === a && c.d === d && c.s === s) { cmpStatus('Already added', 'var(--notable)'); return; }
   }
-  state.compareCandidates.push({ a: a, d: d, s: s, level: lv });
+  // Level field retired with the optional level input (dive grids score at
+  // cap level only -- no arbitrary-level re-sim on the dive side); kept as
+  // null so the cmpRender Power-up row stays a guarded no-op.
+  state.compareCandidates.push({ a: a, d: d, s: s, level: null });
   cmpStatus('', 'var(--text-muted)');
   cmpRender();
 }
@@ -3377,5 +3373,5 @@ _initBestBuddy();
 // once (nIvs, DATA, etc. are all in scope). Safe even if DATA.collection
 // is null — the wire function bails early in that case.
 wireCollectionHandlers();
-// "Compare my candidates" widget (renders empty until you add a spread).
+// "Compare candidates" widget (renders empty until you add a spread).
 cmpWireHandlers();
