@@ -62,6 +62,10 @@ from gopvpsim.moves import get_moves, type_effectiveness, stab
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML, support_footer_html
 from gopvpsim.theme import (
     GRUVBOX_CREDIT_HTML,
+    DEFAULT_THEME,
+    _THEME_ORDER,
+    _TOKENS as _THEME_TOKENS,
+    data_theme_attr,
     theme_css,
     theme_head_script,
     theme_picker_html,
@@ -2192,18 +2196,27 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
 # HTML output with threshold highlighting
 # ---------------------------------------------------------------------------
 
-# Colors for threshold tiers - most restrictive first, then less restrictive.
-# "Other" (no threshold) uses the Viridis colorscale fallback.
-THRESHOLD_COLORS = [
-    '#00E676',  # bright green - most restrictive tier ("best")
-    '#FFD700',  # gold - next tier
-    '#FF6D00',  # orange
-    '#E040FB',  # purple
-    '#00B0FF',  # blue
-    '#FF1744',  # red
-    '#76FF03',  # lime
-    '#F50057',  # pink
-]
+# Colors for threshold tiers - the ordered --tier-1..--tier-8 palette, indexed
+# mod 8 (most restrictive first). These flow as theme-aware 'var(--tier-N)'
+# STRINGS everywhere (CSS badge renders them as tier-color TEXT on
+# var(--surface-2)); only the Plotly-marker injection boundary resolves them to
+# DEFAULT_THEME hex via _TIER_VAR_TO_HEX (Plotly canvas can't read CSS vars; the
+# deferred JS shim will make that theme-aware later). "Other" (no threshold) uses
+# the Viridis colorscale.
+THRESHOLD_COLORS = [f'var(--tier-{i})' for i in range(1, 9)]
+
+# var->hex resolver for the single Plotly-marker injection boundary. Built from
+# the SAME theme.py _TOKENS values at the DEFAULT_THEME column so badge == marker.
+_DEFAULT_THEME_IDX = _THEME_ORDER.index(DEFAULT_THEME)
+_TIER_VAR_TO_HEX = {
+    f'var(--tier-{i})': _THEME_TOKENS[f'--tier-{i}'][_DEFAULT_THEME_IDX]
+    for i in range(1, 9)
+}
+# Mirror tier shares the same var->hex resolution path (deep_dive_analysis
+# emits 'var(--tier-mirror)'); resolve it here so no raw var string leaks into
+# the Plotly-marker injection (__TIER_COLORS_JS__).
+_TIER_VAR_TO_HEX['var(--tier-mirror)'] = (
+    _THEME_TOKENS['--tier-mirror'][_DEFAULT_THEME_IDX])
 
 
 PLOTLY_CDN = "https://cdn.plot.ly/plotly-2.35.2.min.js"
@@ -2492,7 +2505,7 @@ def _promote_flavors_to_paste_tiers(data_obj, flavors):
             'attack': f.get('atk_cut', 0) or 0,
             'defense': f.get('def_cut', 0) or 0,
             'stamina': f.get('hp_cut', 0) or 0,
-            'color': f.get('tier_color') or '#888',
+            'color': f.get('tier_color') or 'var(--text-muted)',
             'desc': f.get('tier_desc') or '',
         })
         existing_names.add(name)
@@ -4466,7 +4479,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     species_pretty = pretty_species(_species_for_display)
 
     html = f"""<!DOCTYPE html>
-{cli_comment}<html data-theme="gruvbox-light">
+{cli_comment}<html {data_theme_attr()}>
 <head>
 <meta charset="utf-8">
 {theme_head_script()}
@@ -5603,10 +5616,34 @@ def _interactive_js_engine(n_scenarios, n_opponents, opp_iv_modes, reference_idx
 
     The JS body lives in ``scripts/deep_dive_engine.js`` so it can be
     edited as plain JavaScript (with syntax highlighting, no Python
-    f-string brace escaping). Eight placeholders inside that file get
+    f-string brace escaping). Nine placeholders inside that file get
     replaced at runtime with the per-dive values below.
     """
-    tier_colors_js = json.dumps([t['color'] for t in tier_info])
+    # __TIER_COLORS_JS__ feeds Plotly markers, which can't read CSS vars; resolve
+    # each 'var(--tier-N)' to its DEFAULT_THEME hex here (the single injection
+    # boundary). t['color'] itself stays 'var(--tier-N)' for the theme-aware
+    # badges. Non-var literals (e.g. the mirror-tier hex) pass through unchanged.
+    # Guard the injection boundary: every tier color must resolve, either via
+    # _TIER_VAR_TO_HEX or as a literal '#hex'. An unmapped tier color would
+    # silently leak a raw 'var(...)' string into the Plotly hex array; fail
+    # LOUD instead.
+    for t in tier_info:
+        _c = t['color']
+        if _c not in _TIER_VAR_TO_HEX and not (
+                isinstance(_c, str) and _c.startswith('#')):
+            raise ValueError(
+                f"Tier {t['name']!r} color {_c!r} does not resolve: not in "
+                f"_TIER_VAR_TO_HEX and not a literal '#hex'. An unmapped tier "
+                f"color would leak a raw var string into the Plotly hex array "
+                f"(__TIER_COLORS_JS__).")
+    tier_colors_js = json.dumps(
+        [_TIER_VAR_TO_HEX.get(t['color'], t['color']) for t in tier_info])
+    # __TIER_VARS_JS__ feeds the theme-aware summary-table tier badges: the RAW
+    # 'var(--tier-N)' strings, in the SAME order over the SAME tier_info as
+    # __TIER_COLORS_JS__. The badge reads tierVars[i] (theme-aware) which thus
+    # parallels the Plotly marker's tierColors[i] (resolved hex) for every tier
+    # -- including the mirror tier -- with no index reconstruction.
+    tier_vars_js = json.dumps([t['color'] for t in tier_info])
     tier_names_js = json.dumps([t['name'] for t in tier_info])
     scenario_mode_default = '"avg"' if n_scenarios > 1 else '"0"'
     shield_desc_default = f'{shield_scenarios[0][0]}v{shield_scenarios[0][1]}'
@@ -5618,6 +5655,7 @@ def _interactive_js_engine(n_scenarios, n_opponents, opp_iv_modes, reference_idx
         '__SCENARIO_MODE_DEFAULT__': scenario_mode_default,
         '__OPP_IV_MODE_DEFAULT__': opp_iv_modes[0],
         '__TIER_COLORS_JS__': tier_colors_js,
+        '__TIER_VARS_JS__': tier_vars_js,
         '__TIER_NAMES_JS__': tier_names_js,
         '__SHIELD_DESC_DEFAULT__': shield_desc_default,
         '__LEAGUE_TITLE__': league.title(),

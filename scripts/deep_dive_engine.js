@@ -59,6 +59,11 @@ var currentYMax = null;  // for "X / N" formatting on wins-based modes
 var currentYIsSparse = false;  // true for winsMirror; false otherwise
 var lockedIdx = -1;
 var tierColors = __TIER_COLORS_JS__;
+// Theme-aware 'var(--tier-N)' strings parallel to tierColors (same index,
+// same order). The summary-table badge reads tierVars[tier] so it re-themes
+// with CSS and matches the Plotly marker (tierColors[tier]) and the tier card
+// for every tier including mirror -- no index reconstruction, no off-by-one.
+var tierVars = __TIER_VARS_JS__;
 var tierNames = __TIER_NAMES_JS__;
 var nIvs = DATA.nIvs, nS = DATA.nScenarios, nO = DATA.nOpponents;
 
@@ -611,7 +616,7 @@ function getCanonicalIvIdx() {
 // (exact IV triple not in dive's simulated set) get canonicalIvIdx = -1.
 function loadCollection(csvText) {
   if (!ensureCollectionReady()) {
-    setCollectionStatus('collection support unavailable for this dive', '#ff6b6b');
+    setCollectionStatus('collection support unavailable for this dive', 'var(--loss)');
     return;
   }
   // csvText === null means "reprocess with the current csvMons + manualMons"
@@ -621,13 +626,13 @@ function loadCollection(csvText) {
     try {
       state.csvMons = POGOCollection.parseCsvText(csvText);
     } catch (e) {
-      setCollectionStatus('Parse error: ' + e.message, '#ff6b6b');
+      setCollectionStatus('Parse error: ' + e.message, 'var(--loss)');
       return;
     }
   }
   var mons = (state.csvMons || []).concat(state.manualMons || []);
   if (mons.length === 0) {
-    setCollectionStatus('No rows parsed (empty CSV?)', '#ff6b6b');
+    setCollectionStatus('No rows parsed (empty CSV?)', 'var(--loss)');
     return;
   }
 
@@ -824,7 +829,7 @@ function loadCollection(csvText) {
   if (slayerCount > 0) parts.push(slayerCount + ' slayer');
   if (overCapCount > 0) parts.push(overCapCount + ' already over cap');
   if (offGridCount > 0) parts.push(offGridCount + ' off-grid (not in simulated set)');
-  setCollectionStatus(parts.join(' \u00b7 '), '#9be89b');
+  setCollectionStatus(parts.join(' \u00b7 '), 'var(--win)');
   updateTierCardCounts(tierCounts);
   renderMatchesList();
   annotateAnchorBullets();
@@ -870,7 +875,7 @@ function annotateAnchorBullets() {
     }
     if (hits.length === 0) {
       span.textContent = ' - none of yours';
-      span.style.color = '#6c7a89';
+      span.style.color = 'var(--text-muted)';
       span.removeAttribute('title');
       continue;
     }
@@ -882,7 +887,7 @@ function annotateAnchorBullets() {
     }).join(', ');
     var extra = hits.length > 3 ? (' +' + (hits.length - 3) + ' more') : '';
     span.textContent = ' - yours: ' + shown + extra;
-    span.style.color = '#9be89b';
+    span.style.color = 'var(--win)';
     // Full list in the title tooltip for power users.
     var fullList = hits.map(function(h) {
       return 'CP' + h.mon.cp + ' ' + h.mon.atk_iv + '/' + h.mon.def_iv + '/' + h.mon.sta_iv;
@@ -1020,7 +1025,7 @@ function renderMatchesList() {
   }
 
   function powerUpText(rc) {
-    if (rc.isOverCap) return '<span style="color:#e94560">OVER</span>';
+    if (rc.isOverCap) return '<span style="color:var(--title)">OVER</span>';
     var curLv = rc.mon.level;
     var maxLv = rc.stats ? rc.stats.level : null;
     if (curLv == null || maxLv == null) return '?';
@@ -1060,7 +1065,7 @@ function renderMatchesList() {
     // card wrapper added at the return is what separates one section from the
     // next, so a heading like "Slayer IVs" can't visually attach to the table
     // above it.
-    var h = '<h5 style="margin:0 0 8px;color:#e6ecf5">' +
+    var h = '<h5 style="margin:0 0 8px;color:var(--heading)">' +
             heading + ' - ' + recs.length + ' of yours</h5>';
     h += '<table data-section="' + sid + '-tbl"><tr>';
     var sortHdr = function(label, colIdx, title) {
@@ -1136,7 +1141,7 @@ function renderMatchesList() {
     // Wrap each section in its own card so the heading + table read as one
     // unit, clearly separated from the next section (no more "which table does
     // this heading belong to?" -- it belongs to the one inside its card).
-    return '<div style="background:#10182c;border:1px solid #24314d;' +
+    return '<div style="background:var(--surface-2);border:1px solid var(--border);' +
            'border-radius:8px;padding:11px 14px;margin:0 0 14px">' + h + '</div>';
   }
 
@@ -1193,13 +1198,13 @@ function renderMatchesList() {
       var mw = DATA.mirrorWinsByIv;
       if (!mw) return '-';
       var dm = (DATA.mirrorWinsMax || 0) - (mw[iv] || 0);
-      if (dm <= 0) return '<span style="color:#9be89b">0</span>';
-      var mc = dm <= 3 ? '#d4a017' : '#e07b7b';
+      if (dm <= 0) return '<span style="color:var(--win)">0</span>';
+      var mc = dm <= 3 ? 'var(--notable)' : 'var(--loss)';
       return '<span style="color:' + mc + '" title="fewer mirror-cohort wins ' +
              'than the #1 IV">' + dm + '</span>';
     }
     if (_guRefIv < 0 || !_guScores) return '-';
-    if (iv === _guRefIv) return '<span style="color:#9be89b">#1</span>';
+    if (iv === _guRefIv) return '<span style="color:var(--win)">#1</span>';
     var sis = getActiveScenarioIndices();
     var lost = [];
     for (var k = 0; k < sis.length; k++) {
@@ -1212,13 +1217,13 @@ function renderMatchesList() {
         if (refW && !myW) lost.push(shortName(DATA.opponents[oi]) + ' ' + lab);
       }
     }
-    if (lost.length === 0) return '<span style="color:#9be89b">0</span>';
+    if (lost.length === 0) return '<span style="color:var(--win)">0</span>';
     // Show the whole list (the count is already in the cell); cap only to
     // avoid a pathological wall on a terrible IV that drops most matchups.
     var CAP = 40;
     var shown = lost.slice(0, CAP).join(', ');
     if (lost.length > CAP) shown += ', +' + (lost.length - CAP) + ' more';
-    var color = lost.length <= 3 ? '#d4a017' : '#e07b7b';
+    var color = lost.length <= 3 ? 'var(--notable)' : 'var(--loss)';
     return '<span style="color:' + color + '" title="' +
            shown.replace(/"/g, '&quot;') + '">' + lost.length + '</span>';
   }
@@ -1261,7 +1266,7 @@ function renderMatchesList() {
     if (iv == null || iv < 0) return '-';
     var v = _computeTopMirrorCmpPct(iv);
     if (!isFinite(v)) return '-';
-    var color = v >= 90 ? '#9be89b' : (v >= 50 ? '#d4a017' : '#888');
+    var color = v >= 90 ? 'var(--win)' : (v >= 50 ? 'var(--notable)' : 'var(--text-muted)');
     return '<span style="color:' + color + '">' + v.toFixed(0) + '%</span>';
   }
   function _cellMatchupsKept(rc) {
@@ -1271,7 +1276,7 @@ function renderMatchesList() {
     if (!isFinite(v)) return '-';
     var den = _matchupsKeptDenom();
     var frac = den > 0 ? (v / den) : 0;
-    var color = frac >= 0.8 ? '#9be89b' : (frac >= 0.5 ? '#d4a017' : '#888');
+    var color = frac >= 0.8 ? 'var(--win)' : (frac >= 0.5 ? 'var(--notable)' : 'var(--text-muted)');
     var vStr = (Math.abs(v - Math.round(v)) < 1e-6) ? String(Math.round(v)) : v.toFixed(1);
     return '<span style="color:' + color + '">' + vStr + '/' + den + '</span>';
   }
@@ -1288,7 +1293,7 @@ function renderMatchesList() {
   );
 
   if (html === '') {
-    html = '<p style="font-size:12px;color:#888;margin:8px 0">' +
+    html = '<p style="font-size:12px;color:var(--text-muted);margin:8px 0">' +
            'No mons in your collection qualify for any tier or slayer category.</p>';
   }
   el.innerHTML = html;
@@ -1409,7 +1414,7 @@ function clearCollection() {
   if (chk) chk.checked = false;
   var ta = document.getElementById('collection-csv');
   if (ta) ta.value = '';
-  setCollectionStatus('', '#aaa');
+  setCollectionStatus('', 'var(--text-muted)');
   updateTierCardCounts({});
   renderMatchesList();
   annotateAnchorBullets();
@@ -1493,7 +1498,7 @@ function readManualForm() {
 function addManualMon() {
   var mon = readManualForm();
   if (mon == null) {
-    setCollectionStatus('Manual entry invalid - check IVs (0-15) and level.', '#ff6b6b');
+    setCollectionStatus('Manual entry invalid - check IVs (0-15) and level.', 'var(--loss)');
     return;
   }
   if (!state.manualMons) state.manualMons = [];
@@ -1512,7 +1517,7 @@ function removeManualMon(idx) {
   if (state.manualMons.length === 0 && (!state.csvMons || state.csvMons.length === 0)) {
     state.userRecords = null;
     state.ownedByIv = null;
-    setCollectionStatus('', '#aaa');
+    setCollectionStatus('', 'var(--text-muted)');
     updateTierCardCounts({});
     renderMatchesList();
     annotateAnchorBullets();
@@ -1537,9 +1542,9 @@ function renderManualList() {
                 ' L' + m.level;
     chips.push(
       '<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;' +
-      'background:#24314d;border-radius:3px">' + label +
+      'background:var(--border);border-radius:3px">' + label +
       ' <a href="#" data-manual-idx="' + i + '" class="manual-remove" ' +
-      'style="color:#ff6b6b;text-decoration:none;margin-left:4px">&times;</a></span>'
+      'style="color:var(--loss);text-decoration:none;margin-left:4px">&times;</a></span>'
     );
   }
   el.innerHTML = html + chips.join('');
@@ -1557,7 +1562,7 @@ function setCollectionStatus(text, color) {
   var el = document.getElementById('collection-status');
   if (!el) return;
   el.textContent = text;
-  el.style.color = color || '#aaa';
+  el.style.color = color || 'var(--text-muted)';
 }
 
 // Fill in "N of yours qualify" annotations on tier cards. Tier cards
@@ -1689,9 +1694,9 @@ function applyHighlight() {
     if (parsed.invalidTokens.length > 0) {
       if (msg) msg += '; ';
       msg += 'ignored: ' + parsed.invalidTokens.join(', ');
-      status.style.color = '#e89b9b';
+      status.style.color = 'var(--loss)';
     } else {
-      status.style.color = '#9be89b';
+      status.style.color = 'var(--win)';
     }
     status.textContent = msg;
   }
@@ -1702,7 +1707,7 @@ function clearHighlight() {
   var inp = document.getElementById('highlight-input');
   var status = document.getElementById('highlight-status');
   if (inp) inp.value = '';
-  if (status) { status.textContent = ''; status.style.color = '#aaa'; }
+  if (status) { status.textContent = ''; status.style.color = 'var(--text-muted)'; }
   state.highlightIvs = [];
   updateView();
 }
@@ -2641,9 +2646,9 @@ function updateSummaryTable() {
   // Slayer CMP %). Collapsed by default so regulars are not slowed
   // down; sits above the table so new readers see it adjacent to the
   // headers.
-  var h = '<details style="margin:0 0 8px 0;background:#1a1f2a;border:1px solid #2a3040;border-radius:4px;padding:6px 10px">'
-    + '<summary style="cursor:pointer;color:#c9d1d9;font-weight:600">About these metrics (0v0 / 1v1 / 2v2 Δ, Top-Mirror CMP %, Matchups Kept, Mirror Slayer CMP %)</summary>'
-    + '<div style="margin-top:8px;font-size:12px;line-height:1.5;color:#c9d1d9">'
+  var h = '<details style="margin:0 0 8px 0;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:6px 10px">'
+    + '<summary style="cursor:pointer;color:var(--text);font-weight:600">About these metrics (0v0 / 1v1 / 2v2 Δ, Top-Mirror CMP %, Matchups Kept, Mirror Slayer CMP %)</summary>'
+    + '<div style="margin-top:8px;font-size:12px;line-height:1.5;color:var(--text)">'
     + '<p><b>0v0 Δ / 1v1 Δ / 2v2 Δ.</b> Per-even-shield signed avg-score delta vs the best IV in that specific scenario. These three columns are <em>frozen on the Shields axis</em> so all three show regardless of what the Shields dropdown is set to; they do react to Opp-IVs + Bait. Useful for role-specific IV picking: leads weight 2v2 Δ, closers weight 0v0 Δ, mid picks weight 1v1 Δ. Positive = beats the best IV in that scenario (rare; the best IV has 0), negative = trades score for something else (usually atk or bulk).</p>'
     + '<p>The next three columns all ask "how well does this IV compete in the mirror (same-species) matchup," but they answer it from different angles. Read them together, not individually.</p>'
     + '<p><b>Top-Mirror CMP %.</b> Of the top 50 IVs of this species in THIS dive (ranked by the active battle-score column), what fraction does this IV at least tie on attack? This is the "realistic ladder mirror" metric: your cohort is the IVs actually likely to appear on ladder, spanning a range of attack values, so the result spreads meaningfully from 0 to 100. The focal IV is counted in its own cohort, so the denominator stays at 50.</p>'
@@ -2699,7 +2704,7 @@ function updateSummaryTable() {
       var _d = _computePerShieldScoreDelta(iv, _sh);
       if (isFinite(_d)) {
         var _dStr = (_d > 0 ? '+' : '') + _d.toFixed(1);
-        var _dColor = (_d > 0) ? '#9be89b' : (_d < 0 ? '#e89b9b' : '#c9d1d9');
+        var _dColor = (_d > 0) ? 'var(--win)' : (_d < 0 ? 'var(--loss)' : 'var(--text)');
         h += '<td style="color:' + _dColor + '">' + _dStr + '</td>';
       } else {
         h += '<td>-</td>';
@@ -2708,7 +2713,7 @@ function updateSummaryTable() {
     // Top-Mirror CMP %: same colour buckets as Mirror Slayer CMP %.
     var tmc = _computeTopMirrorCmpPct(iv);
     if (isFinite(tmc)) {
-      var tmcColor = tmc >= 90 ? '#9be89b' : (tmc >= 50 ? '#d4a017' : '#888');
+      var tmcColor = tmc >= 90 ? 'var(--win)' : (tmc >= 50 ? 'var(--notable)' : 'var(--text-muted)');
       h += '<td style="color:' + tmcColor + '">' + tmc.toFixed(0) + '%</td>';
     } else {
       h += '<td>-</td>';
@@ -2721,7 +2726,7 @@ function updateSummaryTable() {
     if (isFinite(mk)) {
       var mkDen = _matchupsKeptDenom();
       var mkFrac = mkDen > 0 ? (mk / mkDen) : 0;
-      var mkColor = mkFrac >= 0.8 ? '#9be89b' : (mkFrac >= 0.5 ? '#d4a017' : '#888');
+      var mkColor = mkFrac >= 0.8 ? 'var(--win)' : (mkFrac >= 0.5 ? 'var(--notable)' : 'var(--text-muted)');
       var mkStr = (Math.abs(mk - Math.round(mk)) < 1e-6) ? String(Math.round(mk)) : mk.toFixed(1);
       h += '<td style="color:' + mkColor + '">' + mkStr + '/' + mkDen + '</td>';
     } else {
@@ -2732,7 +2737,7 @@ function updateSummaryTable() {
       if (isFinite(cmp)) {
         // Colour by bucket: >=90 green (beats effectively everyone),
         // 50-90 yellow (beats most), <50 dim (beats a minority).
-        var cmpColor = cmp >= 90 ? '#9be89b' : (cmp >= 50 ? '#d4a017' : '#888');
+        var cmpColor = cmp >= 90 ? 'var(--win)' : (cmp >= 50 ? 'var(--notable)' : 'var(--text-muted)');
         h += '<td style="color:' + cmpColor + '">' + cmp.toFixed(0) + '%</td>';
       } else {
         h += '<td>-</td>';
@@ -2740,7 +2745,7 @@ function updateSummaryTable() {
     }
     if (hasTiers) {
       if (tier >= 0) {
-        h += '<td><span class="tier-badge" style="background:' + tierColors[tier] + ';color:#000">' + tierNames[tier] + '</span></td>';
+        h += '<td><span class="tier-badge" style="color:' + tierVars[tier] + ';background:var(--surface-2)">' + tierNames[tier] + '</span></td>';
       } else h += '<td>-</td>';
     }
     h += '</tr>';
@@ -2749,7 +2754,7 @@ function updateSummaryTable() {
 
   var activeLabel = (activeCol.id === 'yval') ? currentYLabel : activeCol.label;
   var dirWord = (summarySort.dir === 'asc') ? 'ascending' : 'descending';
-  h += '<p style="font-size:11px;color:#888;margin:4px 0 0 0">'
+  h += '<p style="font-size:11px;color:var(--text-muted);margin:4px 0 0 0">'
     + 'Top ' + N + ' IVs, sorted by <b>' + activeLabel + '</b> (' + dirWord + '). '
     + 'Click another column header to re-sort; click the active column again to reverse.'
     + '</p>';
@@ -2762,7 +2767,7 @@ function updateMethodology() {
   var scenDesc = scenSel ? scenSel.options[scenSel.selectedIndex].text : '__SHIELD_DESC_DEFAULT__';
   var modeDesc = state.oppIvMode === 'rank1' ? 'stat-product rank 1 IVs' :
     "PvPoke\'s default IVs (the IVs pvpoke.com uses when you load a matchup)";
-  var h = '<hr style="border-color:#0f3460; margin-top:30px">';
+  var h = '<hr style="border-color:var(--border); margin-top:30px">';
   h += '<strong>Methodology</strong><br>';
   h += 'Each of the '+nIvs+' valid IV spreads is leveled to the highest level under the ';
   h += '__LEAGUE_TITLE__ League CP cap (__LEAGUE_CP_CAP__). For each IV, a battle is simulated ';
@@ -3064,10 +3069,10 @@ function updateHistograms() {
                      DATA.ivD[gathered.refIv] + '/' +
                      DATA.ivS[gathered.refIv];
       captionDiv.innerHTML =
-        '<b style="color:#63b375">Wins: ' + wins + pct(wins) + '</b> &nbsp; ' +
-        '<b style="color:#e94560">Losses: ' + losses + pct(losses) + '</b> &nbsp; ' +
+        '<b style="color:var(--win)">Wins: ' + wins + pct(wins) + '</b> &nbsp; ' +
+        '<b style="color:var(--loss)">Losses: ' + losses + pct(losses) + '</b> &nbsp; ' +
         '<b>Draws: ' + draws + pct(draws) + '</b>' +
-        '<div style="font-size:11px;color:#888;margin-top:2px">' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">' +
         'reference IV: ' + refLabel + ' (' + refIvStr + '), ' +
         nMatches + ' total matchups' +
         '</div>';
@@ -3255,21 +3260,21 @@ function cmpAdd() {
   var lvRaw = document.getElementById('cmp-lv').value;
   var lv = lvRaw === '' ? null : parseFloat(lvRaw);
   function ok(x) { return x >= 0 && x <= 15; }
-  if (!(ok(a) && ok(d) && ok(s))) { cmpStatus('Enter Atk/Def/HP 0-15', '#f0916b'); return; }
+  if (!(ok(a) && ok(d) && ok(s))) { cmpStatus('Enter Atk/Def/HP 0-15', 'var(--loss)'); return; }
   // Validate the optional level: blank = current level; otherwise a finite
   // 1..51 (else a typed 'abc' -> NaN renders '+NaN lv' in the card).
   if (lv !== null && !(isFinite(lv) && lv >= 1 && lv <= 51)) {
-    cmpStatus('Level must be 1-51 (or blank)', '#f0916b'); return;
+    cmpStatus('Level must be 1-51 (or blank)', 'var(--loss)'); return;
   }
   if (state.compareCandidates.length >= CMP_MAX) {
-    cmpStatus('Max ' + CMP_MAX + ' -- remove one to add another', '#d4a017'); return;
+    cmpStatus('Max ' + CMP_MAX + ' -- remove one to add another', 'var(--notable)'); return;
   }
   for (var i = 0; i < state.compareCandidates.length; i++) {
     var c = state.compareCandidates[i];
-    if (c.a === a && c.d === d && c.s === s) { cmpStatus('Already added', '#d4a017'); return; }
+    if (c.a === a && c.d === d && c.s === s) { cmpStatus('Already added', 'var(--notable)'); return; }
   }
   state.compareCandidates.push({ a: a, d: d, s: s, level: lv });
-  cmpStatus('', '#aaa');
+  cmpStatus('', 'var(--text-muted)');
   cmpRender();
 }
 window.cmpAdd = cmpAdd;
