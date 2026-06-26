@@ -28,6 +28,23 @@ function cmpVal(grid, iv, si, oi) {
 function cmpHp(score) { return Math.max(-1, Math.min(1, (score - 500) / 500)); }
 function cmpScenLabel(si) { var s = DATA.scenarios[si]; return s[0] + '-' + s[1]; }
 
+// Clickable "+N more" row. Rows past CMP_ROWS are rendered with class
+// "cmp-xtra" (hidden via CSS); clicking this cell toggles "cmp-all" on the
+// table to reveal/hide them. data-n/data-noun let the toggle rebuild the label.
+function cmpMoreRow(colspan, n, noun) {
+  return '<tr class="cmp-more-row"><td colspan="' + colspan +
+    '" class="cmp-more" onclick="cmpToggleMore(this)" data-n="' + n +
+    '" data-noun="' + noun + '">+' + n + ' ' + noun + '</td></tr>';
+}
+function cmpToggleMore(td) {
+  var tbl = td.closest('table');
+  if (!tbl) return;
+  var open = tbl.classList.toggle('cmp-all');
+  td.textContent = open ? ('show fewer ↑')
+    : ('+' + td.getAttribute('data-n') + ' ' + td.getAttribute('data-noun'));
+}
+window.cmpToggleMore = cmpToggleMore;
+
 // Close calls where candidates DISAGREE on win/loss, or best-buddy flips one.
 function cmpFlipPanel(live, grids) {
   var nO = DATA.nOpponents, nS = DATA.nScenarios, found = [];
@@ -64,8 +81,8 @@ function cmpFlipPanel(live, grids) {
     'IV pick actually decides, closest calls first.</p>';
   h += '<table class="cmp-tbl"><tr><th>Matchup</th>' +
     live.map(function(r) { return '<th>' + r.c.a + '/' + r.c.d + '/' + r.c.s + '</th>'; }).join('') + '</tr>';
-  found.slice(0, CMP_ROWS).forEach(function(f) {
-    h += '<tr><td class="cmp-m">' + DATA.opponentsDisplay[f.oi] + ' &middot; ' + cmpScenLabel(f.si) + '</td>';
+  found.forEach(function(f, _ri) {
+    h += '<tr' + (_ri >= CMP_ROWS ? ' class="cmp-xtra"' : '') + '><td class="cmp-m">' + DATA.opponentsDisplay[f.oi] + ' &middot; ' + cmpScenLabel(f.si) + '</td>';
     live.forEach(function(r, k) {
       // 500 is a simultaneous KO -> a TIE, not a loss (PvPoke convention; the
       // win-count still uses >500, so a tie counts as neither).
@@ -91,8 +108,7 @@ function cmpFlipPanel(live, grids) {
     });
     h += '</tr>';
   });
-  if (found.length > CMP_ROWS) h += '<tr><td colspan="' + (live.length + 1) +
-    '" class="cmp-more">+' + (found.length - CMP_ROWS) + ' more close calls</td></tr>';
+  if (found.length > CMP_ROWS) h += cmpMoreRow(live.length + 1, found.length - CMP_ROWS, 'more close calls');
   return h + '</table></div>';
 }
 
@@ -123,8 +139,8 @@ function cmpMarginPanel(live, grids, energyCtx) {
   var showEnergy = !!(eg.def && em);
   h += '<table class="cmp-tbl"><tr><th>Matchup</th>' +
     live.map(function(r) { return '<th>' + r.c.a + '/' + r.c.d + '/' + r.c.s + '</th>'; }).join('') + '</tr>';
-  found.slice(0, CMP_ROWS).forEach(function(f) {
-    h += '<tr><td class="cmp-m">' + DATA.opponentsDisplay[f.oi] + ' &middot; ' + cmpScenLabel(f.si) +
+  found.forEach(function(f, _ri) {
+    h += '<tr' + (_ri >= CMP_ROWS ? ' class="cmp-xtra"' : '') + '><td class="cmp-m">' + DATA.opponentsDisplay[f.oi] + ' &middot; ' + cmpScenLabel(f.si) +
          (f.win ? '' : ' <span class="cmp-lose">(all lose)</span>') + '</td>';
     f.hps.forEach(function(hp, k) {
       var pct = Math.round(Math.abs(hp) * 100), lo = Math.abs(hp) < 0.2;
@@ -155,8 +171,7 @@ function cmpMarginPanel(live, grids, energyCtx) {
     });
     h += '</tr>';
   });
-  if (found.length > CMP_ROWS) h += '<tr><td colspan="' + (live.length + 1) +
-    '" class="cmp-more">+' + (found.length - CMP_ROWS) + ' more</td></tr>';
+  if (found.length > CMP_ROWS) h += cmpMoreRow(live.length + 1, found.length - CMP_ROWS, 'more');
   h += '</table><div class="cmp-leg">Bars = focal’s leftover HP% at battle end ' +
        '(from the score). Losses show how close you came.' +
        (showEnergy ? ' Energy = leftover charge you exit the battle with, shown as ' +
