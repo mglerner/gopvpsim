@@ -1442,12 +1442,28 @@ def moveset_label_raw(fast_id, charged_ids):
 # Phase 1: Quick screen
 # ---------------------------------------------------------------------------
 
+# Avg-score gap (out of 1000) within which the top moveset and the reference
+# (meta) moveset are treated as a near-tie, so the reference is preferred for
+# the landing page. ~1.5-2.5% of a typical pool avg -- small enough that a
+# clearly-better moveset still keeps the landing.
+_REF_TIE_MARGIN = 10.0
+
+
 def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
                     shield_scenarios, top_n, opp_iv_mode='pvpoke',
-                    threshold_registry=None, mechanics='legacy'):
+                    threshold_registry=None, mechanics='legacy',
+                    reference_moveset=None):
     """
     Quick screen: sim rank-1 IVs for each moveset against opponents.
     Return the top N movesets by average score.
+
+    ``reference_moveset`` is the (fast_id, charged_ids) of the PvPoke meta
+    moveset, if known. When it screens within ``_REF_TIE_MARGIN`` of the
+    top-scoring moveset (a near-tie), it is promoted to the front so the
+    landing page defaults to the meta pick rather than an off-meta move
+    that only edged ahead by sim noise + the alphabetical sort tie-break.
+    (Mimikyu GL 2026-06-26: Thunder vs Play Rough screen within ~0.3 pts;
+    Thunder won the landing purely on 'THUNDER' > 'PLAY_ROUGH'.)
     """
     if top_n == 0 or len(movesets) <= 1:
         # top_n==0 is the explicit "keep my order, don't screen" opt-out;
@@ -1490,14 +1506,39 @@ def screen_movesets(species, movesets, league, shadow, opponents, opp_movesets,
         scored.append((avg, fast_id, charged_ids))
 
     scored.sort(reverse=True)
+
+    # Near-tie -> prefer the reference (meta) moveset for the landing slot.
+    # The sort tie-breaks alphabetically by move id, which can hand the
+    # landing to an off-meta move that screened within sim noise of the
+    # reference. If the reference is within _REF_TIE_MARGIN of the top, move
+    # it to the front so the default page is the meta pick. Keep the moveset
+    # it displaced as a survivor too (even if top_n would prune it) so it
+    # stays a selectable page in the dropdown.
+    _keep = top_n
+    if reference_moveset is not None and scored:
+        _ref_key = (reference_moveset[0], tuple(sorted(reference_moveset[1])))
+        _ref_pos = next(
+            (i for i, (_, f, c) in enumerate(scored)
+             if (f, tuple(sorted(c))) == _ref_key), None)
+        if _ref_pos is not None and _ref_pos != 0:
+            if scored[0][0] - scored[_ref_pos][0] <= _REF_TIE_MARGIN:
+                logger.info(
+                    f"  Near-tie: promoting reference moveset "
+                    f"{moveset_label(scored[_ref_pos][1], scored[_ref_pos][2])} "
+                    f"(avg={scored[_ref_pos][0]:.1f}) to the landing over "
+                    f"{moveset_label(scored[0][1], scored[0][2])} "
+                    f"(avg={scored[0][0]:.1f}); within {_REF_TIE_MARGIN} pts.")
+                scored.insert(0, scored.pop(_ref_pos))
+                _keep = max(top_n, 2)
+
     elapsed = time.time() - t0
     logger.info(f"  Screened in {elapsed:.1f}s. Top movesets:")
-    for i, (avg, fast_id, charged_ids) in enumerate(scored[:top_n]):
+    for i, (avg, fast_id, charged_ids) in enumerate(scored[:_keep]):
         logger.info(f"    {i+1:3d}. {moveset_label(fast_id, charged_ids):<45s} avg={avg:.0f}")
-    if len(scored) > top_n:
-        logger.info(f"    ... ({len(scored) - top_n} more pruned)")
+    if len(scored) > _keep:
+        logger.info(f"    ... ({len(scored) - _keep} more pruned)")
 
-    return [(fast_id, charged_ids) for _, fast_id, charged_ids in scored[:top_n]]
+    return [(fast_id, charged_ids) for _, fast_id, charged_ids in scored[:_keep]]
 
 
 # ---------------------------------------------------------------------------
@@ -6812,12 +6853,17 @@ def main():
     # Phase 1: Screen movesets
     # For screening and the initial sweep, use 'pvpoke' when 'both' is requested
     opp_iv_mode = 'pvpoke' if args.opp_ivs == 'both' else args.opp_ivs
+    # Resolve the reference (meta) moveset up front so the screen can prefer it
+    # for the landing slot on a near-tie. Deterministic lookup, no sim.
+    _ref_for_screen = resolve_reference_moveset(
+        args.species, args.league, args.shadow, args.reference)
     surviving = screen_movesets(
         args.species, movesets, args.league, args.shadow,
         screen_opponents, screen_opp_movesets, shield_scenarios,
         args.top_movesets, opp_iv_mode=opp_iv_mode,
         threshold_registry=threshold_registry,
         mechanics=args.mechanics,
+        reference_moveset=_ref_for_screen,
     )
 
     # Phase 2: Full IV sweep for each surviving moveset
