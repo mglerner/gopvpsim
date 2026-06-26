@@ -201,7 +201,7 @@ the pv log.)
 ## Verification commands (tomorrow, after the batch lands)
 
 ```
-cd ~/coding/MGLPoGo/pogo-simulator
+cd ~/coding/MGLPoGo/gopvpsim
 git apply --check userdata/fix_packets_2026-06-13/bestcm-superpower.patch
 git apply userdata/fix_packets_2026-06-13/bestcm-superpower.patch
 python -m pytest tests/test_battle.py -q

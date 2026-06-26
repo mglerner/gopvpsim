@@ -158,7 +158,7 @@ surfaces.
 
 ## Verification commands (tomorrow, after the overnight batch finishes)
 
-    cd ~/coding/MGLPoGo/pogo-simulator
+    cd ~/coding/MGLPoGo/gopvpsim
     git apply --check userdata/fix_packets_2026-06-13/renderer-D2-D5.patch
     git apply userdata/fix_packets_2026-06-13/renderer-D2-D5.patch
     node --check scripts/deep_dive_engine.js

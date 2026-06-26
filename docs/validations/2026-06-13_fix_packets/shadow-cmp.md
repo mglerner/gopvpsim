@@ -283,7 +283,7 @@ land, then attribute residuals.
 ## 7. Verification commands (tomorrow, post-batch)
 
 ```
-cd ~/coding/MGLPoGo/pogo-simulator
+cd ~/coding/MGLPoGo/gopvpsim
 git apply --check userdata/fix_packets_2026-06-13/shadow-cmp.patch   # sanity
 git apply userdata/fix_packets_2026-06-13/shadow-cmp.patch
 
