@@ -4689,10 +4689,14 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 <!-- DD_LAYOUT_OPEN -->
 """
 
-    # Related article link (bidirectional link contract: docs/article_schema.md)
-    if article_slug:
+    # Related article link (bidirectional link contract: docs/article_schema.md).
+    # Gate emission on the built article dir EXISTING: a retired/deleted article
+    # (built dir removed, but article_slug still baked in older replay blobs) must
+    # not leave a dead ../articles/<slug>/ link on a blob re-render.
+    # (oinkologne-cd-2026-05 retirement, 2026-06-25.)
+    _articles_dir = (Path(html_path).resolve().parent.parent / 'articles' / article_slug) if article_slug else None
+    if article_slug and _articles_dir.exists():
         _article_link = f'../articles/{article_slug}/'
-        _articles_dir = Path(html_path).resolve().parent.parent / 'articles' / article_slug
         _article_meta = _articles_dir / 'meta.toml'
         if _article_meta.exists():
             import tomllib as _tl
