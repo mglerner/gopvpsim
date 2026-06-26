@@ -1040,6 +1040,38 @@ def _authored_by_class(block: dict) -> str:
     return f'authored-{val}'
 
 
+def narrative_has_human_content(narrative: dict) -> bool:
+    """True if a dive's narrative carries genuinely human-written prose.
+
+    Mirrors ``render_species_narrative``'s per-block content test (so an
+    empty-but-present block does not count), then checks the block's
+    ``authored_by`` against the human register: ``human`` (the default for an
+    unmarked block) and ``mixed`` count; ``auto`` template prose and ``ai``
+    drafts do NOT. Drives the dive card's provenance badge -- a dive with
+    human notes reads "Auto-generated + author notes" rather than a flat
+    "Auto-generated". Kept next to ``_authored_by_class`` so the two stay in
+    sync on the enum.
+    """
+    if not narrative:
+        return False
+    content_test = {
+        'intro': lambda b: bool((b.get('body') or '').strip()),
+        'meta_role': lambda b: bool(
+            (b.get('body') or '').strip()
+            or any((b.get(f) or '').strip()
+                   for f in ('good_at', 'bad_at', 'team_role', 'wrap'))),
+        'verdict': lambda b: bool((b.get('editorial') or '').strip()
+                                  or (b.get('outlook') or '').strip()),
+    }
+    for key, has_content in content_test.items():
+        block = narrative.get(key) or {}
+        if has_content(block):
+            val = (block.get('authored_by') or 'human').strip().lower()
+            if val in {'human', 'mixed'}:
+                return True
+    return False
+
+
 def render_anchor_flip_bullets(records, anchor_passing_sink=None,
                                has_bait_axis=False,
                                emit_opponent_ids=False,

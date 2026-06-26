@@ -94,6 +94,7 @@ class CardModel:
     two_number_ones: dict | None = None  # battle-#1 vs stat-product-#1 explainer
     base_form_display: str | None = None  # item 5: "vs non-shadow X" base label
     sibling_trade: dict | None = None  # form-level break/bulkpoint trade vs sibling
+    has_author_notes: bool = False  # dive carries human-written narrative (badge)
 
 
 # Type -> accent color (matches common PvP type palettes; used for chips and
@@ -121,7 +122,8 @@ def _pretty_opp(name: str) -> str:
 
 
 def build_card_model(data_obj, card_ctx, *, types, shadow=None,
-                     robust_winrate=None, sprite_uri=None) -> CardModel:
+                     robust_winrate=None, sprite_uri=None,
+                     has_author_notes=False) -> CardModel:
     """Pure transform: (dive data_obj + analysis card_ctx) -> CardModel.
 
     ``card_ctx`` is the dict deep_dive.generate_analysis_sections stashed on
@@ -209,6 +211,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         two_number_ones=tno,
         base_form_display=base_form_display,
         sibling_trade=card_ctx.get('sibling_trade'),
+        has_author_notes=bool(has_author_notes),
     )
 
 
@@ -253,6 +256,10 @@ CARD_CSS = """
   display:flex; align-items:center; justify-content:center; font-weight:700;
   font-size:28px; }
 .ddcard-title { flex:1 1 240px; }
+.ddcard-prov { margin-left:auto; align-self:flex-start; flex:0 0 auto;
+  font-size:0.7rem; letter-spacing:0.02em; color:var(--text-muted);
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:3px; padding:3px 8px; white-space:nowrap; cursor:help; }
 .ddcard-title h2 { margin:0; font-size:1.5rem; color:var(--title); }
 .ddcard-shadow { color:var(--accent); font-weight:700; }
 .ddcard-chips { margin:6px 0; }
@@ -622,6 +629,17 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
     m = model
     name = html.escape(m.species_display)
     chips = ''.join(_chip(t) for t in m.types)
+    # Provenance badge (top-right of the card). The analysis is computed by the
+    # simulator, not AI-written; a dive carrying human narrative gets the
+    # "+ author notes" variant. Tooltip states the mix honestly.
+    _prov_label = ('Auto-generated + author notes' if m.has_author_notes
+                   else 'Auto-generated')
+    _prov_tip = ("Matchup numbers and tables are computed by this project's "
+                 "open-source PvP simulator from PvPoke game data, not "
+                 "hand-tuned. Editorial commentary, where present, is "
+                 "human-written.")
+    prov = (f'<span class="ddcard-prov" title="{html.escape(_prov_tip)}">'
+            f'{html.escape(_prov_label)}</span>')
     wr = _wr_line(m.single_iv, m.robust)
     sib_bar = _sibling_trade_html(m.sibling_trade, shadow=m.shadow,
                                   link_opps=not standalone)
@@ -644,15 +662,15 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
       <div class="ddcard-chips">{chips}</div>
       <div class="ddcard-move">{html.escape(m.league_display)} (CP {m.cp_cap}) &middot; <b>{html.escape(m.moveset)}</b></div>
     </div>
+    {prov}
   </div>
   {wr}
   {sib_bar}
   {_two_ones_html(m.two_number_ones)}
   <div class="ddcard-spreads">{spreads}</div>
   {cols}
-  <div class="ddcard-foot">Auto-generated from this project's simulation data.
-  Win rate = shield-scenario matchups won (&gt;500), across all shield
-  scenarios including asymmetric ones (0-1, 1-2, 2-1, ...).</div>
+  <div class="ddcard-foot">Win rate = shield-scenario matchups won (&gt;500),
+  across all shield scenarios including asymmetric ones (0-1, 1-2, 2-1, ...).</div>
 </section>"""
 
     if not standalone:
