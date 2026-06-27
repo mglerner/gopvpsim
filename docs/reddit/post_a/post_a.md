@@ -36,8 +36,7 @@ On the website, you can
 
 - Hover over any point to see a lot more detail
 - Enter in your own mons' IVs (either via a PokeGenie export or by hand) to highlight them on the graph.
-
-**[[ADD (your words): one short line crediting u/orgodemir for the efficient-IV crown/trophy badge idea.]]**
+- Inspired by u/orgodemir's [post](https://www.reddit.com/r/TheSilphArena/comments/yxzg7f/), text in the website marks [Pareto-efficient](https://en.wikipedia.org/wiki/Pareto_efficiency) IVs with a crown emoji (👑). The graph marks them with whatever symbol ends up saying it's them in the legend. This is even better in my iPhone app (teaser ... post to come soon)
 
 Here's another one, GL Mimikyu (with Thunder, so sue me, you'll have to go to the [website](https://mglerner.com/pogo-dives/mimikyu-great-league/) to see Play Rough)
 
@@ -45,13 +44,13 @@ Here's another one, GL Mimikyu (with Thunder, so sue me, you'll have to go to th
 
 - You can see several more spreads that trade off for bulk. The Togekiss Bulk (purple) is really interesting because it shows up even on several really highly ranked mons.
 - Check out that band on the right that sits below the main curve! Those are mons with high stat products that are WAY worse than other mons nearby!
-- If you zoom in, you can also see that the stat-product rank 1 sits in that lower band, and is way worse than the rank 5. RyanSwag (u/RyanoftheDay) would be proud.
+- If you zoom in (easy to do on the website), you can also see that the stat-product rank 1 sits in that lower band, and is way worse than the rank 5. RyanSwag (u/RyanoftheDay) would be proud.
 
 Last one: Stunfisk
 
 **[IMAGE: 03-stunfisk-gl-spectrum.png -- Stunfisk GL spectrum graph (WIDE). Insert/upload here.]**
 
-- I took a stab at auto-finding slayer builds (i.e. builds that beat other Stunfisks) You can see that those all have pretty low stat product/battle score (no surprise), but some are way better than others.
+- I took a stab at auto-finding slayer builds (i.e. builds that beat other Stunfisks) You can see that those all have pretty low stat product/battle score (no surprise), but some are way better than others (easier to see on the website at full size ... or zoomed in which you can definitely do).
 - I think this visual does a good job of showing you that there are a lot of high stat product builds that don't actually hit the bulkpoints you might want.
 - It's also fun to see a couple of very unique spreads show up. Check the [site](https://mglerner.com/pogo-dives/stunfisk-great-league/) for more detail.
 
@@ -103,4 +102,4 @@ I don't love it when people pass off AI work as their own, so I tried to make su
 
 - Site: https://mglerner.com/pogo-dives
 - Code (repo): https://github.com/mglerner/gopvpsim
-- GoBattleKit (companion iOS app): a separate post is coming; add the link here once it is up.
+- GoBattleKit (companion iOS app): a separate post is coming, likely tomorrow. If I can still edit, I'll add the link here.
