@@ -6992,6 +6992,13 @@ def main():
             base = get_species(args.species)
             base_stats_dict = {'atk': base['atk'], 'def': base['def'], 'hp': base['hp']}
             fast_moves_db, charged_moves_db = get_moves()
+            # The slayer iteration builds its mirror cohort at the league's
+            # effective focal level cap (iterative_slayer_discovery passes
+            # focal_max_level=None, so build_focal_meta falls back to this
+            # global — which --max-level mutates at parse time). Key on it so
+            # two runs at different --max-level can't serve each other's stale
+            # scores (bug #4, 2026-06-27).
+            _slayer_focal_cap = LEAGUE_MAX_LEVEL.get(args.league, 51.0)
             cache_key = compute_cache_key(
                 args.species, args.league, args.shadow,
                 fast_moves_db.get(fast_id, {}),
@@ -6999,6 +7006,7 @@ def main():
                 base_stats_dict,
                 shield_scenarios=shield_scenarios,
                 iv_floor=args.iv_floor,
+                focal_max_level=_slayer_focal_cap,
             )
             slayer_cache = SlayerCache(cache_key=cache_key, disk=not args.no_cache)
 
