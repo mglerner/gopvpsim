@@ -887,7 +887,7 @@ def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict) -> None:
     if (cms[1]['energy'] == cms[0]['energy']
             and cms[0].get('buffs') and cms[1].get('buffs')
             and not cms[1].get('selfDebuffing', False)
-            and (cms[1].get('buffApplyChance', 0) or 0) > (cms[0].get('buffApplyChance', 0) or 0)):
+            and float(cms[1].get('buffApplyChance', 0) or 0) > float(cms[0].get('buffApplyChance', 0) or 0)):
         cms[0], cms[1] = cms[1], cms[0]
 
     # Line 734-744: Zap Cannon / Registeel clause
@@ -1714,7 +1714,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                        key=lambda m: defender.charged_move_damage(m, attacker))
         if (defender.energy >= opp_best['energy']
                 and not would_shield(defender, attacker, opp_best)
-                and not cm_self_buff[first_idx]):
+                and not cm_self_buff[0]):   # activeChargedMoves[0] (cheapest), not the selected move (ActionLogic.js:929)
             if _dp_trace:
                 _policy_log.append(
                     f"  DP-trace[{attacker.species}]: bandaid[910] defer-self-debuff:"
@@ -2194,7 +2194,7 @@ class BattlePokemon:
                 if (abs(cm_dpe[_i] - cm_dpe[best_idx]) < 0.03
                         and cms[best_idx].get('buffs')
                         and _m.get('buffs')
-                        and _m.get('buffApplyChance', 0) > cms[best_idx].get('buffApplyChance', 0)
+                        and float(_m.get('buffApplyChance', 0) or 0) > float(cms[best_idx].get('buffApplyChance', 0) or 0)
                         and not _m.get('selfDebuffing', False)):
                     best_idx = _i
                 if _m.get('moveId') == 'OBSTRUCT':
