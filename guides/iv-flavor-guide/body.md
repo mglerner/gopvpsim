@@ -1,5 +1,5 @@
 The **IV Flavor Guide** is the purple-bordered zone that sits directly
-below the Deep Dive Results header on every dive page. It groups the
+below the Dive Results header on every dive page. It groups the
 IV space into a short list of named play-style archetypes - a
 "flavor" - each one paired with the specific matchups that flavor
 buys you and the specific matchups it costs.
@@ -9,7 +9,7 @@ right place to start if you're deciding which IV spread to chase.
 
 <figure>
 <img src="screenshots/flavor-example.png"
-     alt="The purple-bordered IV Flavor Guide zone on a deep dive
+     alt="The purple-bordered IV Flavor Guide zone on a dive
           page, showing four flavors with a summary table and an
           expanded 'General Good' flavor below.">
 <figcaption>

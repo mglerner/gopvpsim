@@ -1,4 +1,4 @@
-The **scatter plot** is the centerpiece of every deep dive. Each of
+The **scatter plot** is the centerpiece of every dive. Each of
 the {{dive:iv_space_size}} legal IV spreads becomes one point on the
 plot, positioned by stat-product rank on the x-axis and by battle
 outcome on the y-axis. The plot is a Plotly figure, so every point is

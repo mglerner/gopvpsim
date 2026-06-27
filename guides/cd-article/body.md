@@ -3,7 +3,7 @@ each Community Day. It pairs the incoming CD move with a per-scenario
 read on whether the move is actually worth chasing, which of the
 species's forms benefits most, and which IVs inside each form get the
 biggest lift. It's the page you should open first when Niantic
-announces the next CD; the per-species deep dives are the page you
+announces the next CD; the per-species dives are the page you
 open when you've decided the species is worth a dust commit and you
 want to pick a specific IV spread.
 

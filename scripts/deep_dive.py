@@ -3687,7 +3687,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # -- Collapsible analysis section --
     analysis_parts.append("""
 <details class="dd-collapsible" id="dd-analysis">
-<summary class="dd-h3" style="cursor:pointer">Deep Dive Analysis</summary>
+<summary class="dd-h3" style="cursor:pointer">Dive Analysis</summary>
 """)
 
     # -- Alpha features (banding + clusters) -- hidden by default --
@@ -4642,7 +4642,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 <head>
 <meta charset="utf-8">
 {theme_head_script()}
-<title>{species_pretty} {league.title()} League IV Deep Dive</title>
+<title>{species_pretty} {league.title()} League IV Dive</title>
 {plotly_tag}
 <style>{theme_css()}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -4844,7 +4844,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 </head>
 <body>
 {theme_picker_html()}
-<h1>{species_pretty} - {league.title()} League IV Deep Dive</h1>
+<h1>{species_pretty} - {league.title()} League IV Dive</h1>
 <p class="meta">Opponents: {opp_desc}
 | Shield scenario(s): {shield_desc} | Policy: pvpoke_dp{_bait_meta}</p>
 <!-- DIVE_CARD_SLOT -->
@@ -5697,7 +5697,7 @@ _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
     html += '<details class="meta" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">'
     html += '<summary>About &amp; Credits</summary>'
     html += '<div style="margin:8px 0;font-size:0.85rem;color:var(--text-muted);line-height:1.6">'
-    html += '<p><b>PoGo PvP IV Deep Dive</b> - a stat-threshold analysis tool '
+    html += '<p><b>PoGo PvP IV Dive</b> - a stat-threshold analysis tool '
     html += 'for Pokemon GO PvP IVs.</p>'
     html += '<p><b>Data &amp; Simulation Reference</b></p>'
     html += '<ul style="margin:4px 0 8px 20px">'

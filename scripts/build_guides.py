@@ -461,7 +461,7 @@ def _render_page(*, title: str, body_html: str,
 {breadcrumb_html}
 {body_html}
 <p class="about">{PVPOKE_ATTRIBUTION_SHORT}</p>
-<p class="about">Part of <a href="{html.escape(site_root)}">the PvP deep dive site</a>.
+<p class="about">Part of <a href="{html.escape(site_root)}">the PvP dive site</a>.
 Explainers regenerate from current dive data every publish, so numbers
 stay in sync with the methodology.{stamp_html}</p>
 {support_footer_html(site_root)}</body>

@@ -224,7 +224,7 @@ Every narrative block carries one of four attribution colors:
 The Reader's Guides (including this one) use "ai." The Species
 narrative blocks on dives default to "auto" now, replacing earlier
 ai-drafted prose, so there's no unreviewed LLM prose on the main
-deep dives.
+dives.
 
 ## Overriding any of this - for project contributors
 

@@ -114,15 +114,15 @@ def build_html(league: str) -> str:
         Blade-form stat tax; spreads whose Shield form is already at
         a whole level have zero rounding loss.</p>
 
-        <h2>Per-form deep dives</h2>
+        <h2>Per-form dives</h2>
         <ul>
           <li><a href="{html.escape(shield_href)}">
-              Aegislash (Shield) - {html.escape(info["display"])} deep dive</a>
+              Aegislash (Shield) - {html.escape(info["display"])} dive</a>
               - canonical path (starts Shield, transforms on first
               charged move). Fast: {html.escape(info["shield_fast"])};
               charged: {html.escape(info["shield_charged"])}.</li>
           <li><a href="{html.escape(blade_href)}">
-              Aegislash (Blade) - {html.escape(info["display"])} deep dive</a>
+              Aegislash (Blade) - {html.escape(info["display"])} dive</a>
               - hypothetical always-Blade profile (Aegislash (Blade)
               as its own species; no form change). Useful as a
               counter-factual to quantify how much performance comes
@@ -196,7 +196,7 @@ def build_meta_toml(league: str) -> str:
     title = f'Aegislash Form-Change Guide: {info["display"]}'
     return textwrap.dedent(f'''\
         title       = "{title}"
-        description = "AI-drafted (Claude-drafted templated prose), not yet human-reviewed. Aegislash Shield/Blade form-change guide for {info['display']}. Links to the per-form deep dives and the Blade-vs-Shield comparison page. Needs expert review before ship."
+        description = "AI-drafted (Claude-drafted templated prose), not yet human-reviewed. Aegislash Shield/Blade form-change guide for {info['display']}. Links to the per-form dives and the Blade-vs-Shield comparison page. Needs expert review before ship."
         authorship  = "ai"
         landing     = "index.html"
     ''')

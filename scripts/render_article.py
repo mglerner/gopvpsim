@@ -234,9 +234,9 @@ def render_html(article: dict) -> str:
     if dive_meta_path.exists():
         with open(dive_meta_path, 'rb') as f:
             dive_meta = tomllib.load(f)
-        dive_title = html.escape(dive_meta.get('title', f'{species} IV Deep Dive'))
+        dive_title = html.escape(dive_meta.get('title', f'{species} IV Dive'))
     else:
-        dive_title = f'{species} IV Deep Dive'
+        dive_title = f'{species} IV Dive'
 
     sections_html = []
     for sec in article['sections']:
@@ -301,7 +301,7 @@ def render_html(article: dict) -> str:
 </div>
 {authorship_banner}{banner}
 <div class="related">
-  Simulation Deep Dive: <a href="{html.escape(dive_link)}">{dive_title}</a>
+  Simulation Dive: <a href="{html.escape(dive_link)}">{dive_title}</a>
 </div>
 
 {sections_block}
