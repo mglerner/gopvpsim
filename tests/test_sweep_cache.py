@@ -102,6 +102,22 @@ def test_energy_out_of_range_is_no_store(tmp_path, monkeypatch):
     assert cache.get_column(col_key, 8, 2) is None
 
 
+def test_stale_engine_stamp_is_miss(tmp_path, monkeypatch):
+    # v6: a column stamped with a different engine hash must miss (and not
+    # even load the .npz), so a stale-engine column is never served.
+    monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
+    monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'engine_aaaa')
+    cache = sweep_cache.SweepCache(_focal_fields())
+    col_key = _col_fields()
+    cache.put_column(col_key, {'score': np.zeros((8, 2)),
+                               'energy': np.zeros((8, 2))})
+    # Same engine -> hit.
+    assert cache.get_column(col_key, 8, 2) is not None
+    # Engine changes -> the existing column is now stale -> miss.
+    monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'engine_bbbb')
+    assert sweep_cache.SweepCache(_focal_fields()).get_column(col_key, 8, 2) is None
+
+
 def test_shape_mismatch_is_miss(tmp_path, monkeypatch):
     monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
     cache = sweep_cache.SweepCache(_focal_fields())

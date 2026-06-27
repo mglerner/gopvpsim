@@ -50,7 +50,14 @@ from cache_base import write_planes, read_planes
 # a multi-plane .npz ({score: float64, energy: uint8}). Energy is now
 # always captured + stored so --compare-energy re-dives serve warm instead
 # of force-disabling the cache. Old .npy columns are orphaned (GC cleans).
-CACHE_VERSION = 5
+# v6 (2026-06-27): the engine-source hash moved OUT of the focal key into a
+# PER-COLUMN engine stamp (stored in the .json sidecar). An engine change no
+# longer orphans the whole focal dir; columns self-heal in place (cold), and
+# scripts/migrate_cache.py can selectively BLESS the columns a localized fix
+# provably doesn't touch (e.g. bug #1's shadow-XOR predicate) so the re-dive
+# is warm. gamemaster stays in the focal key, so a blessed column is
+# guaranteed same-gamemaster (the predicate models only the engine delta).
+CACHE_VERSION = 6
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'sweep'
 
 # Engine sources whose content participates in the focal key. Any edit
@@ -137,7 +144,10 @@ def focal_key_fields(species, league, shadow, fast_id, charged_ids,
         'bait': bait_mode,
         'energy_lead': energy_lead,
         'focal_max_level': focal_max_level,
-        'engine': engine_hash(),
+        # NB: the engine hash is intentionally NOT here (v6) — it is a
+        # per-column stamp in the .json sidecar so an engine change doesn't
+        # orphan the dir. gamemaster stays, so all columns in a focal dir
+        # share one gamemaster vintage.
         'gamemaster': gamemaster_hash(),
     }
 
@@ -170,16 +180,37 @@ class SweepCache:
     def _col_path(self, col_fields):
         return self.dir / f'{_key_hash(col_fields)}.npz'
 
+    @staticmethod
+    def read_stamp(json_path):
+        """Read the per-column engine stamp from its .json sidecar, or None.
+
+        The sidecar holds ``{'engine': <hash>, 'col': <col_fields>}`` (v6).
+        Returns the stored engine hash so a stale-engine column can be
+        rejected (or, via migrate_cache, blessed) without touching the .npz.
+        """
+        try:
+            return json.loads(Path(json_path).read_text()).get('engine')
+        except Exception:
+            return None
+
     def get_column(self, col_fields, n_ivs, n_scenarios):
         """Return the column's planes as ``{'score': ndarray, 'energy':
         ndarray}``, or None on a miss.
 
-        A valid column carries both planes at shape ``(n_ivs, n_scenarios)``;
-        a missing/mis-shaped plane (corrupt or partial write) self-heals as a
+        A hit requires the per-column engine stamp to equal the current
+        engine hash (a stale-engine column is a miss — checked from the small
+        sidecar before the big .npz is loaded), and both planes present at
+        shape ``(n_ivs, n_scenarios)``. Corrupt/partial writes self-heal as a
         miss (re-simmed and overwritten).
         """
         try:
-            planes = read_planes(self._col_path(col_fields))
+            p = self._col_path(col_fields)
+            # Cheap stale-engine rejection first: skip loading the .npz if the
+            # sidecar stamp doesn't match the current engine.
+            if self.read_stamp(p.with_suffix('.json')) != engine_hash():
+                self.misses += 1
+                return None
+            planes = read_planes(p)
             if (planes is not None
                     and 'score' in planes and 'energy' in planes
                     and planes['score'].shape == (n_ivs, n_scenarios)
@@ -198,7 +229,8 @@ class SweepCache:
 
     def put_column(self, col_fields, planes):
         """Persist a column from a ``{plane_name: ndarray}`` dict. ``score``
-        is stored float64, ``energy`` uint8 (0..100, asserted)."""
+        is stored float64, ``energy`` uint8 (0..100, asserted). The .json
+        sidecar records the current engine hash as the column's stamp (v6)."""
         try:
             self.dir.mkdir(parents=True, exist_ok=True)
             meta_p = self.dir / 'meta.json'
@@ -215,7 +247,8 @@ class SweepCache:
             p = self._col_path(col_fields)
             write_planes(p, {'score': score,
                              'energy': energy.astype(np.uint8)})
-            p.with_suffix('.json').write_text(
-                json.dumps(col_fields, indent=1, sort_keys=True))
+            p.with_suffix('.json').write_text(json.dumps(
+                {'engine': engine_hash(), 'col': col_fields},
+                indent=1, sort_keys=True))
         except Exception:
             pass  # cache is best-effort
