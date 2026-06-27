@@ -1,3 +1,22 @@
+## >> NEXT ACTION (2026-06-27): warm bug-#1 (shadow-CMP) re-dive
+
+The cache-rework bundle has LANDED on `main` (unified sweep cache + per-column
+engine stamp + `migrate_cache.py`), so the deferred bug-#1 fix can now re-dive
+*warm* instead of cold-baking everything. Steps:
+
+1. Apply the bug-#1 `fire_now` cmp_atk fix to `battle.py` (it's on branch
+   `overnight/2026-06-26`).
+2. `python scripts/migrate_cache.py --list-stamps` -> find the pre-fix engine
+   stamp; then `--from-engine <pre-fix> --predicate shadow_xor --apply` to
+   bless the columns the fix can't touch and drop only the shadow-XOR ones.
+3. Re-dive / re-bake -> only shadow-XOR cells re-sim (warm) -> re-publish.
+
+Reminder: while editing `battle.py` (engine), run dives with
+`--no-sweep-cache` until the fix is trusted (see CLAUDE.md "Sweep cache").
+Detail + rationale: the "Sweep cache should store energy..." section below.
+
+----
+
 ## OVERNIGHT 2026-06-27 (branch `overnight/2026-06-26`, NOT merged/published)
 
 A Claude overnight session. Everything is on the branch for your review;
