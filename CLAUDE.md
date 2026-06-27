@@ -187,6 +187,37 @@ GC's N-1 retention is by gamemaster vintage, not engine, so it never deletes
 your trusted cache because of engine work. Full mechanics + the warm
 re-dive recipe: DEVELOPER_NOTES "Sweep disk cache".
 
+### Before a cold re-dive, check for a tractable migration first
+
+An engine edit changes the engine hash, so **every** cached column goes stale
+and the default consequence is a *cold* re-dive (re-sim everything — many
+hours across the website chain). Before eating that, ask: **is this change's
+touched set cleanly characterizable by a boolean predicate over stored column
+metadata?** If yes and the proof is tractable, write + prove a predicate and
+warm-serve the rest with `scripts/migrate_cache.py` (`--from-engine <old>
+--predicate <name>`) instead of cold re-diving. The sidecars already store
+both sides' movesets, shadow flags, species, IVs, level, and gamemaster hash,
+so most localized fixes (shadow-only, self-debuff-move-only, form-change-only,
+…) are expressible **without** a schema change — a new predicate is just one
+boolean function plus its proof. Don't pre-build predicates speculatively
+(you can't write one until you know the fix); add them on demand, gated by
+this check.
+
+Two soundness guards, or this will quietly serve stale scores:
+
+- **The predicate must cover the ENTIRE engine delta since `from_engine`, not
+  just the one fix you have in mind.** If two engine changes share one hash
+  bump, a predicate for only one of them wrongly blesses columns the other
+  touched. This is why migration pairs with *one localized fix per bump*.
+- **Skip the migration when you're batching with a broad fix that forces cold
+  anyway.** A boundary-scattered change with no clean predicate (e.g. the
+  float32 damage-constant fix) makes the whole batched delta unmigrate-able,
+  so a co-batched localized fix just rides the cold re-dive for free.
+
+Predicates are one-shot: each is pinned to a specific `--from-engine` hash,
+never re-run after its migration, and doesn't interact with the others — so
+there's no growing ruleset to maintain (delete or keep them as history).
+
 ## Key design decisions
 - Core `gopvpsim/` library is pure Python (keeps mobile option open).
   Deep dive scripts (`scripts/`) may use numba/Cython/C extensions for speed.
