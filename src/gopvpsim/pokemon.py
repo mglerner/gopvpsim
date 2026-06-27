@@ -190,8 +190,11 @@ def get_species(name):
 # Pokemon dataclass
 # ---------------------------------------------------------------------------
 
-SHADOW_ATK_BONUS = 6 / 5   # ×1.2
-SHADOW_DEF_MULT  = 5 / 6   # ×0.8333…
+SHADOW_ATK_BONUS = 6 / 5        # ×1.2 (== PvPoke DamageMultiplier.SHADOW_ATK = 1.2, bit-identical)
+SHADOW_DEF_MULT  = 0.83333331   # PvPoke DamageMultiplier.SHADOW_DEF; NOT 5/6 — the 5/6 float64
+                                # (0.8333333333) is the outlier and deals ~1 less damage to shadow
+                                # defenders at floor() breakpoint boundaries (same class as the #2
+                                # float32 fix). Matches the oracle bit-for-bit (DamageCalculator.js:9).
 
 
 @dataclass
