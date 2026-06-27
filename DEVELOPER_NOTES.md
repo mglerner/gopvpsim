@@ -89,8 +89,13 @@ note: the 3 original 2026-04-06 failures were all Mienfoo vs Medicham
 - **selfBuffing/selfDebuffing flags**: Match PvPoke's chance thresholds
   (==1 for selfBuffing, >=0.5 for selfDebuffing)
 - **Shield policy**: pvpoke_simulate_shield uses precomputed flags
-- **Shadow Pokemon**: ×1.2 atk / ×(5/6) def multipliers match PvPoke's
-  SHADOW_ATK=1.2, SHADOW_DEF=0.83333331. Shadow Swampert vs Registeel 9/9.
+- **Shadow Pokemon**: ×1.2 atk / ×0.83333331 def multipliers match PvPoke's
+  SHADOW_ATK=1.2, SHADOW_DEF=0.83333331 (DamageCalculator.js:9). Our atk uses
+  `6/5` (bit-identical to PvPoke's `1.2`); our def uses the literal `0.83333331`,
+  NOT `5/6` — `5/6` (float64 0.8333333333) is ~2.8e-8 larger than the oracle
+  and deals ~1 less damage to shadow defenders at floor() breakpoint boundaries
+  (the deliverable). Fixed 2026-06-27; was previously `5/6`, only ever checked
+  against the non-boundary Shadow Swampert vs Registeel 9/9, which masked it.
 - **Both-side buffs**: Corviknight mirror (Air Cutter only) 9/9. Both mons'
   buffApplyMeter fires independently; unbuffed Air Cutter does 18, buffed does 23.
 
