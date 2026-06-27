@@ -2799,6 +2799,18 @@ function ddToggleTagsCompactCell(event) {
             if desc:
                 parts.append(f'<p class="dd-small dd-prose">{desc}</p>\n')
 
+            # Scanner export: an archetype IS a member-IV set, so it gets the
+            # same "Copy for IV scanner" button as matchup cards -- export the
+            # explicit IV list. Gated at <= 300 members: a truncated IV list
+            # silently misses owned mons, so beyond that omit the button rather
+            # than ship a wrong scan target (matches the matchup-card rule).
+            if n_total <= 300:
+                parts.append(_scanner_button_html(
+                    data_obj.get('species') or 'Species',
+                    data_obj.get('league') or 'great', cat_name,
+                    {'attack': 0, 'defense': 0, 'stamina': 0,
+                     'ivs': [list(r['iv']) for r in cat_ivs]}))
+
             # Signal-loss remedy (2026-06-11, Michael's 4+3 hybrid pick):
             # parents cleared by EVERY emitted build say so ONCE here
             # instead of repeating on each row, and the per-row badges
