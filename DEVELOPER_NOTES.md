@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->1089<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->1098<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
@@ -521,10 +521,11 @@ flips, max margin 273 — small + localized, recurring window-defenders
 Talonflame / Milotic / Guzzlord / Gourgeist / Dusclops. Scope + re-dive
 plan live in TODO.md's cache-rework handoff (warm selective re-dive).
 
-### OPEN 2026-06-27 — engine bug-hunt findings #2–#6 (confirmed, NOT yet fixed)
+### OPEN 2026-06-27 — engine bug-hunt findings #2–#6 (#3 now FIXED; #2,#4–#6 open)
 
 The 2026-06-27 adversarial bug-hunt confirmed five more issues beyond the
-`cmp_atk` fix above. Full report + repros + per-bug recommendations:
+`cmp_atk` fix above (#3 was fixed 2026-06-27, see its entry below; #2 and
+#4–#6 remain open). Full report + repros + per-bug recommendations:
 `docs/reviews/2026-06-27_engine_bug_hunt.md`. Left unfixed pending a
 judgment call or broad re-vet (see TODO.md "OVERNIGHT 2026-06-27" + the
 cache-rework handoff). Recorded here so they aren't lost to TODO pruning:
@@ -536,12 +537,31 @@ cache-rework handoff). Recorded here so they aren't lost to TODO pruning:
   exactly on the breakpoint/bulkpoint boundaries that are the core
   deliverable. Repro: Tinkaton Play Rough vs Gourgeist (Small) — ours 51,
   PvPoke 52. Fix shifts many fixtures → needs a full oracle re-vet.
-- **#3 [MED] farm-down never stacks self-debuffing moves** (throws at first
-  affordability instead of holding/stacking). battle.py ~1283-1311 vs
-  ActionLogic.js:396-405. Repro: Pinsir (Close Combat + Superpower) vs
-  Cresselia 0-0 → ours 631, PvPoke 656 (same winner). Same class as the
-  documented 2026-06-11 Snorlax OMT fix; needs a GL/UL grid winner-flip
-  check before committing.
+- **#3 [MED] farm-down never stacks self-debuffing moves — RESOLVED
+  2026-06-27.** The farm-down ("many-cycle") early-return threw a self-debuffing
+  selected move at first affordability; PvPoke (ActionLogic.js:399-405) holds
+  it via an `energyToReach` gate until energy is within one fast-move-gain of
+  the cap, so the debuffing throws stack back-to-back near the end instead of
+  spending extra turns at -atk. Ported into `pvpoke_dp`'s farm branch
+  (battle.py, after the affordability return); pinned by
+  `tests/test_bug3_farm_stack.py` (Pinsir Close Combat + Super Power vs
+  Cresselia, 9/9 oracle-verified, 0-0 631→656). Verification (adversarial
+  workflow, 3 falsification lenses + independent code re-read): full suite
+  1075p/14xf; **0/2160** default-meta cells changed (every default-meta
+  self-debuff user has a non-debuff alt the farm-swap prefers, so the gate
+  never fires on shipped default movesets — #3 needs no re-dive of default
+  dives); **162/162** two-self-debuff firing configs (Pinsir/Hariyama/
+  Sirfetch'd) match PvPoke; the single-self-debuff-best path (Malamar
+  Super Power + Foul Play vs Umbreon, gate fires because Foul Play is >2x
+  worse DPE) matches PvPoke 18/18 with Super Power firing at energy 99/95
+  (genuine stacking); on a 378-cell both-self-debuff oracle the fix moved 23
+  cells toward PvPoke and broke 0. **NEW FOLLOW-UP surfaced by the review:**
+  that 378-cell scan also exposed ~117 PvPoke divergences (7 winner-flips) on
+  the broader both-self-debuff population (Lurantis LEAF_STORM+SUPER_POWER vs
+  Cresselia, Blaziken BRAVE_BIRD+OVERHEAT vs Registeel, …) that PRE-DATE #3
+  (they already disagreed under the old engine) — likely the near-KO-DP /
+  `_optimize_move_timing` self-debuff-timing cluster, possibly an
+  uncharacterized separate issue. Logged in TODO.md; out of scope for this fix.
 - **#4 [MED] slayer disk-cache key omits the focal level cap** →
   silent-wrong stale hits across `--max-level` in Master mirror-slayer.
   `scripts/slayer_cache.py` `compute_cache_key`; the sweep cache already

@@ -1290,6 +1290,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         # Gated on bait_shields -- no-bait mode always keeps selected_idx=best_idx.
         # (The bait pick requires a non-debuffing cms[0], which the debuf
         # swap never rewrites -- so bait → 0, otherwise → farm_swap_idx.)
+        # NB this bait/swap is mutually exclusive where PvPoke runs them
+        # sequentially (bait then debuf-swap, ActionLogic.js:383-393); the two
+        # forms agree for n_cms <= 2, which is all legal PvP allows.
         if (bait_shields
                 and defender.shields > 0 and n_cms > 1
                 and not cm_self_debuf[0]
@@ -1306,6 +1309,26 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                     f"{cm_energy[selected_idx]})"
                 )
             return None   # wait for the selected move
+
+        # Stack self-debuffing moves: once the selected farm-down move is
+        # affordable but self-debuffing, keep farming fast moves until energy
+        # is within one fast-move-gain of the cap, so the debuffing throws
+        # land back-to-back near the end instead of firing one early and
+        # spending extra turns at -atk while the opponent keeps chipping
+        # (PvPoke ActionLogic.js:399-405; bug #3, 2026-06-27 bug-hunt).
+        if cm_self_debuf[selected_idx]:
+            fast_energy = attacker.fast_move.get('energyGain', 5)
+            energy_to_reach = attacker.energy + (
+                ((ENERGY_CAP - attacker.energy) // fast_energy) * fast_energy)
+            if attacker.energy < energy_to_reach:
+                if _policy_debug:
+                    _policy_log.append(
+                        f"  DP[farm]: {attacker.species} stacks "
+                        f"{cms[selected_idx].get('moveId')} (energy="
+                        f"{attacker.energy}, reach={energy_to_reach})"
+                    )
+                return None   # keep farming to stack the debuffing throw
+
         if _policy_debug:
             _policy_log.append(
                 f"  DP[farm]: {attacker.species} fires "
