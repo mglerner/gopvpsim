@@ -1,3 +1,51 @@
+## OVERNIGHT 2026-06-27 (branch `overnight/2026-06-26`, NOT merged/published)
+
+A Claude overnight session. Everything is on the branch for your review;
+nothing was published to the live site. Five commits:
+
+**Done (pending your review):**
+- **Mimikyu (Busted) starts-busted GL + UL dives** + the engine change they
+  needed: a focal that STARTS in a terminal alt form now carries its native
+  stat buffs (the Busted -1 def, which `reset_for_battle` was silently
+  re-zeroing). Validated by equivalence to the PvPoke-oracle in-battle bust
+  (PvPoke's *direct* `mimikyu_busted` build is the wrong oracle -- it skips
+  `nativeStatBuffs`). Dives built into `userdata/website/mimikyu-busted-*`.
+  `tests/test_mimikyu_starts_busted.py`.
+- **Limited-mon ML IV-floor correction** (the never-ship-unflagged item
+  below): `--iv-floor` flag + floor-aware renderer (no stale "12" labels) +
+  `run_iv_guides.py` auto-sweeps the 6 untradeable mythicals
+  (Marshadow/Meloetta/Jirachi/Keldeo x2/Zygarde-Complete) at 10/10/10.
+  Eternatus left flagged-but-not-resweept -- **its tradeability is unresolved,
+  needs your call.** Floor-12 path verified byte-equivalent; floor-10
+  render validated synthetically.
+- **Engine bug #1 [HIGH] FIXED**: the `fire_now` double-fire CMP gate used
+  shadow-boosted `.atk` (missed 10th site of the 2026-06-13 cmp_atk
+  migration) -- flipped real winners. Oracle-verified, `tests/test_fire_now_cmp_shadow.py`.
+
+**Running when you wake:** the full ML re-bake (`run_iv_guides.py`, 61 guides
+= 55 @ floor 12 fresh cmp-JS + 6 @ floor 10) -- ~94 min/batch, so it runs
+into the day; whatever's done is in `userdata/`, unpublished.
+**Blast-radius note:** the bake started on the PRE-bug-#1 engine, so any
+Master SHADOW guide it produced may carry the #1 behavior -- re-bake the
+shadow ML guides after you accept the #1 fix.
+
+**Bug-hunt follow-ups (open) -- full report `docs/reviews/2026-06-27_engine_bug_hunt.md`:**
+- **#2 [MED]** damage formula uses exact `1.3/1.2/1.6` not the game's
+  float32-truncated constants -> off-by-one on breakpoint boundaries. Real,
+  but shifts many fixtures; needs a broad re-vet (not auto-applied).
+- **#3 [MED]** farm-down never stacks self-debuffing moves (throws at first
+  affordability) -- needs GL/UL grid winner-flip check before fixing.
+- **#4 [MED]** slayer disk-cache key omits the focal level cap -> stale
+  cross-`--max-level` hits in Master mirror-slayer (silent-wrong output).
+  Clean fix (key field + `CACHE_VERSION` bump), left for you to schedule.
+- **#5 [MED/LOW]** `bandaid[929]` stack-switch missing the `bait_shields`
+  gate -- decide gate-to-match vs document-as-divergence.
+- Latent: `_cm_debuf_delta` `'1' == 1` str/int dead branch (cosmetic in
+  tested cases, worth a cheap fix).
+
+**Deliberately deferred:** the gobattlekit bitmask exporter (mobile-format
+design choices better made with you awake).
+
 ## LAUNCHED 2026-06-25 02:10: the big re-dive (thread 2 / ship)
 
 The overnight chain (`overnight_redive.sh`) was launched 2026-06-25 02:10,
