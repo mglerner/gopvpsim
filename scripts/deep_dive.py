@@ -140,6 +140,15 @@ _FORM_CHANGE_NOTES = {
         'permanent -1 defense for the rest of the battle. This dive simulates '
         'the Disguise-intact start, with the bust modeled natively from the '
         'gamemaster form-change data.'),
+    'Mimikyu (Busted)': _form_change_callout(
+        'The real Mimikyu always <em>starts</em> a battle in its Disguise '
+        'form; only after the disguise is busted by the first unshielded '
+        'charged hit does it enter <b>Busted</b> form with a permanent -1 '
+        'defense. This dive is a hypothetical that <b>starts in Busted</b> '
+        'form from turn one (the -1 defense applied immediately), to isolate '
+        'the post-bust state -- a starting state you cannot reach in an '
+        'actual battle. For the realistic Disguise-intact start, see the '
+        'Mimikyu dive.'),
 }
 
 

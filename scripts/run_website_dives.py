@@ -348,6 +348,42 @@ DIVES = [
         'top_movesets': 1,
         'no_thresholds': True,
     },
+    # Mimikyu (Busted) starts-busted dives (2026-06-27): a hypothetical that
+    # STARTS in Busted form (permanent -1 def from turn one), to isolate the
+    # post-bust state -- legitimate because once Busted, Mimikyu stays Busted
+    # for the rest of the battle regardless of swaps. Mirrors the Aegislash
+    # (Blade) starts-in-alt-form pattern: 'Mimikyu (Busted)' is NOT in PvPoke
+    # rankings (maps to mimikyu_busted), so pin get_default_moveset's
+    # SHADOW_CLAW + [SHADOW_SNEAK, PLAY_ROUGH] via extra_args + reference and
+    # use no_thresholds. The -1 def is applied by the engine's native-stat-buff
+    # path (see test_mimikyu_starts_busted.py; the starts-busted state is
+    # validated by equivalence to the PvPoke-oracle in-battle bust). UL inherits
+    # the standard best-buddy-on default, consistent with the base Mimikyu UL
+    # dive above.
+    {
+        'species': 'Mimikyu (Busted)',
+        'league': 'great',
+        'slug': 'mimikyu-busted-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'extra_args': ['--fast', 'SHADOW_CLAW',
+                       '--charged', 'SHADOW_SNEAK,PLAY_ROUGH'],
+        'reference': 'SHADOW_CLAW,SHADOW_SNEAK,PLAY_ROUGH',
+    },
+    {
+        'species': 'Mimikyu (Busted)',
+        'league': 'ultra',
+        'slug': 'mimikyu-busted-ultra-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/ul_top60.txt',
+        'top_movesets': 1,
+        'no_thresholds': True,
+        'extra_args': ['--fast', 'SHADOW_CLAW',
+                       '--charged', 'SHADOW_SNEAK,PLAY_ROUGH'],
+        'reference': 'SHADOW_CLAW,SHADOW_SNEAK,PLAY_ROUGH',
+    },
     # (The standalone 'mimikyu-ultra-league-best-buddy' dive was REMOVED
     # 2026-06-24, Phase 2: the standard 'mimikyu-ultra-league' dive above now
     # carries an in-page "Allow best-buddy (Level 51)" toggle -- Ultra defaults
