@@ -1840,6 +1840,32 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             f'style="font-weight:400;color:var(--notable);display:none"></span>'
             f'</h4>\n'
         )
+        # --- Scanner export (parity with composite cards, ~line 1496) ---
+        # A tier IS a composite stat-cutoff card, so it gets the same
+        # "Copy for IV scanner" button: emit the cutoffs as a gobattlekit
+        # user-threshold fragment {species:{League:{tier-name:spec}}}.
+        # Gated on having at least one positive cutoff -- a no-cutoff tier
+        # would export attack/defense/stamina all 0 ("scan everything"),
+        # which is degenerate, so omit the button there.
+        if atk_cut > 0 or def_cut > 0 or hp_cut > 0:
+            _species = data_obj.get('species') or 'Species'
+            _league_t = (data_obj.get('league') or 'great').capitalize()
+            _spec = {
+                'attack': round(float(atk_cut), 2),
+                'defense': round(float(def_cut), 2),
+                'stamina': int(hp_cut),
+            }
+            _scanner_json = _html.escape(
+                json.dumps({_species: {_league_t: {t['name']: _spec}}}),
+                quote=True)
+            parts.append(
+                f'<button class="dd-iv-toggle" style="margin:2px 0 6px 0" '
+                f'data-scanner-json="{_scanner_json}" '
+                f'onclick="copyScannerJson(this)" '
+                f'title="Copy this tier as a gobattlekit user-threshold '
+                f'JSON fragment (paste into the IV scanner)">'
+                f'Copy for IV scanner</button>\n'
+            )
         # --- Goal line from the TOML `description` field ---
         # Rendered first, styled as the authored goal statement (mirrors
         # the Flavor Guide's tone). Distinct from the auto-generated
