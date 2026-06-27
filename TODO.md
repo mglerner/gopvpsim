@@ -1,19 +1,36 @@
-## >> NEXT ACTION (2026-06-27): warm bug-#1 (shadow-CMP) re-dive
+## >> NEXT ACTION (2026-06-27): re-dive to propagate the landed engine fixes
 
-The cache-rework bundle has LANDED on `main` (unified sweep cache + per-column
-engine stamp + `migrate_cache.py`), so the deferred bug-#1 fix can now re-dive
-*warm* instead of cold-baking everything. Steps:
+The cache-rework bundle LANDED on `main` (unified sweep cache + per-column
+engine stamp + `migrate_cache.py`). **The bug-#1 `fire_now` cmp_atk fix is
+ALSO already in `main`** (commit `b1b58f1`, merged in with the overnight work
+-- the old "apply it, it's on branch `overnight/2026-06-26`" instruction was
+STALE; that fully-merged branch ref can be deleted). The CODE is live; what's
+still pending is the **re-dive** that propagates the fix into the published
+dives + cache columns (those are still pre-fix in their shadow-XOR cells).
 
-1. Apply the bug-#1 `fire_now` cmp_atk fix to `battle.py` (it's on branch
-   `overnight/2026-06-26`).
-2. `python scripts/migrate_cache.py --list-stamps` -> find the pre-fix engine
-   stamp; then `--from-engine <pre-fix> --predicate shadow_xor --apply` to
-   bless the columns the fix can't touch and drop only the shadow-XOR ones.
-3. Re-dive / re-bake -> only shadow-XOR cells re-sim (warm) -> re-publish.
+**OPEN DECISION (scoped this session, 2026-06-27):** batch bug #2 (float32
+damage constants) and do ONE *cold* re-dive that captures #1 + #2 (+ #3), vs
+do the warm shadow-XOR-only re-dive for #1 alone now.
 
-Reminder: while editing `battle.py` (engine), run dives with
-`--no-sweep-cache` until the fix is trusted (see CLAUDE.md "Sweep cache").
-Detail + rationale: the "Sweep cache should store energy..." section below.
+- #2 forces a cold re-dive (boundary-scattered, no clean predicate) and lands
+  on breakpoint boundaries (the core deliverable). Scoped this session: only
+  **1/1075** tests shifts (a synthetic boundary test, not an oracle fixture)
+  -- the "shifts many fixtures" fear did NOT materialize; the fix is small +
+  makes us match PvPoke/game better. A cold re-dive subsumes #1's warm re-dive.
+- #3 (farm-down self-debuff stacking) is now IMPLEMENTED on `main`'s working
+  tree (pending adversarial sign-off + commit) and measured to change **0**
+  default-moveset cells (GL+UL top-40 x pool x 9 shields), and matches PvPoke
+  on 162/162 firing-config oracle cells. It needs NO re-dive of shipped dives;
+  it only affects user-picked self-debuff-dominant movesets.
+
+**Warm path** (only if doing #1 alone, i.e. NOT batching #2):
+`migrate_cache.py --list-stamps` -> find the pre-fix stamp;
+`--from-engine <pre-fix> --predicate shadow_xor --apply` to bless unaffected
+columns and drop the shadow-XOR ones; re-dive (warm) -> re-publish.
+
+Reminder: while editing engine files, run dives with `--no-sweep-cache` until
+trusted (see CLAUDE.md "Sweep cache" + "Before a cold re-dive, check for a
+tractable migration").
 
 ----
 

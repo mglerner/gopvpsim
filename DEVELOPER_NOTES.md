@@ -260,6 +260,19 @@ bless selectively with `scripts/migrate_cache.py` (the warm bug-#1 recipe
 above). There is intentionally no env/flag to redirect the cache dir — the
 guard is `--no-sweep-cache`, not a second cache location.
 
+**Rule: before a cold re-dive, check for a tractable migration first.** An
+engine edit stales every column, so the default is a cold re-dive. But if the
+change's touched set is cleanly characterizable by a boolean predicate over
+stored column metadata (the sidecars carry both sides' movesets, shadow flags,
+species, IVs, level, gamemaster), write + prove a predicate and warm-serve the
+rest via `migrate_cache.py` instead. Two guards: the predicate must cover the
+*entire* engine delta since `--from-engine` (one localized fix per hash bump),
+and skip the migration when batching with a broad, boundary-scattered fix
+(e.g. the float32 damage constants) that forces cold anyway. Predicates are
+one-shot, pinned to a `from_engine` hash, non-interacting — no maintenance
+burden, so add them on demand rather than pre-building. Full policy +
+rationale: CLAUDE.md "Before a cold re-dive, check for a tractable migration".
+
 Operational notes:
 
 - `--no-sweep-cache` forces fresh sims (timing runs, debugging, and any
