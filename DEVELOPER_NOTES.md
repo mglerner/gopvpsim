@@ -242,9 +242,28 @@ Two cache-rework changes worth knowing:
   `--compare-energy` dive serves warm (the old `capture_energy ->
   use_sweep_cache=False` bypass is gone).
 
+**Discipline when changing the engine (IMPORTANT — also in CLAUDE.md).**
+Because the engine hash is a stamp and NOT in the column path, `put_column`
+overwrites a column **in place** under whatever engine produced it. A stale
+stamp is always a safe miss (re-simmed, never served), so correctness is
+never at risk. But running a dive/sweep **with the cache on under a
+work-in-progress engine overwrites the trusted columns** with WIP results
+(re-stamped to the WIP hash). You don't get corrupted output — you lose the
+*warm backup* for every opponent you re-ran, and have to re-sim once back on
+the trusted engine. Note GC's N-1 does NOT cause this: it buckets by
+gamemaster vintage, not engine, so engine churn never makes GC drop anything.
+
+So when iterating on engine code (`battle.py`, `_dp_jit.py`, `moves.py`,
+`formchange.py`, `pokemon.py`): run dives with **`--no-sweep-cache`**. Only
+bake with the cache on once the engine change is trusted; then re-bake, or
+bless selectively with `scripts/migrate_cache.py` (the warm bug-#1 recipe
+above). There is intentionally no env/flag to redirect the cache dir — the
+guard is `--no-sweep-cache`, not a second cache location.
+
 Operational notes:
 
-- `--no-sweep-cache` forces fresh sims (timing runs, debugging).
+- `--no-sweep-cache` forces fresh sims (timing runs, debugging, and any
+  session iterating on engine code — see the discipline note above).
 - Hit log line per sweep: `sweep cache: N/M opponent columns hit`
   (nothing printed on an all-miss sweep).
 - Stale columns accumulate as engine/gamemaster evolve.
