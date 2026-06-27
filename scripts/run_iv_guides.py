@@ -33,10 +33,10 @@ PY = sys.executable
 # 10/10/10 research/raid-reward minimum, NOT the 12/12/12 lucky-trade floor the
 # sweep otherwise assumes. These are swept at floor 10 automatically so a
 # legitimately-owned sub-12 spread is evaluable (e.g. an 11/13/11 Marshadow).
-# Distinct from the renderer's LIMITED_AVAILABILITY banner set: Eternatus is
-# flagged limited there but its tradeability is unresolved (2026-06-27), so it
-# is deliberately NOT resweept here -- it stays at the default 12 floor pending
-# human confirmation. Names must match the pool entries verbatim.
+# Eternatus is included regardless of its trade status: Michael's call
+# (2026-06-27) is that it is rare enough to count as special / one-per-account
+# in practice, so the 10/10/10 research floor is the right one. Names must
+# match the pool entries verbatim.
 FLOOR_10_SPECIES = frozenset({
     'Marshadow',
     'Meloetta (Aria)',
@@ -44,6 +44,7 @@ FLOOR_10_SPECIES = frozenset({
     'Keldeo (Ordinary)',
     'Keldeo (Resolute)',
     'Zygarde (Complete Forme)',
+    'Eternatus',
 })
 DEFAULT_IV_FLOOR = 12
 

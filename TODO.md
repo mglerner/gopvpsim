@@ -15,8 +15,9 @@ nothing was published to the live site. Five commits:
   below): `--iv-floor` flag + floor-aware renderer (no stale "12" labels) +
   `run_iv_guides.py` auto-sweeps the 6 untradeable mythicals
   (Marshadow/Meloetta/Jirachi/Keldeo x2/Zygarde-Complete) at 10/10/10.
-  Eternatus left flagged-but-not-resweept -- **its tradeability is unresolved,
-  needs your call.** Floor-12 path verified byte-equivalent; floor-10
+  Eternatus is now also in the floor-10 set (Michael 2026-06-27: rare enough
+  to count as special, trade status irrelevant). Floor-12 path verified
+  byte-equivalent; floor-10
   render validated synthetically.
 - **Engine bug #1 [HIGH] FIXED**: the `fire_now` double-fire CMP gate used
   shadow-boosted `.atk` (missed 10th site of the 2026-06-13 cmp_atk
