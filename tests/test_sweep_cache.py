@@ -76,23 +76,38 @@ def test_column_roundtrip(tmp_path, monkeypatch):
     col_key = _col_fields()
     assert cache.get_column(col_key, 8, 2) is None  # cold miss
 
-    arr = np.arange(16, dtype=np.float64).reshape(8, 2) + 0.25
-    cache.put_column(col_key, arr)
+    score = np.arange(16, dtype=np.float64).reshape(8, 2) + 0.25
+    energy = (np.arange(16, dtype=np.float64).reshape(8, 2) % 101)
+    cache.put_column(col_key, {'score': score, 'energy': energy})
 
-    # A fresh instance with the same focal fields reads it back exactly.
+    # A fresh instance with the same focal fields reads both planes back exactly.
     cache2 = sweep_cache.SweepCache(_focal_fields())
     got = cache2.get_column(col_key, 8, 2)
     assert got is not None
-    assert np.array_equal(got, arr)
+    assert np.array_equal(got['score'], score)
+    assert np.array_equal(got['energy'], energy)  # uint8 round-trip of 0..100
     # Human-readable sidecars exist for debugging.
     assert (cache2.dir / 'meta.json').exists()
+
+
+def test_energy_out_of_range_is_no_store(tmp_path, monkeypatch):
+    # Energy must be a bounded battle output (0..100); an out-of-range plane
+    # fails the store assert (best-effort -> no-store), so the next get misses
+    # rather than silently wrapping into uint8.
+    monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
+    cache = sweep_cache.SweepCache(_focal_fields())
+    col_key = _col_fields()
+    cache.put_column(col_key, {'score': np.zeros((8, 2)),
+                               'energy': np.full((8, 2), 200.0)})
+    assert cache.get_column(col_key, 8, 2) is None
 
 
 def test_shape_mismatch_is_miss(tmp_path, monkeypatch):
     monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
     cache = sweep_cache.SweepCache(_focal_fields())
     col_key = _col_fields()
-    cache.put_column(col_key, np.zeros((8, 2)))
+    cache.put_column(col_key, {'score': np.zeros((8, 2)),
+                               'energy': np.zeros((8, 2))})
     # Requesting a different scenario count or IV count must miss.
     assert cache.get_column(col_key, 8, 9) is None
     assert cache.get_column(col_key, 4096, 2) is None
@@ -169,6 +184,48 @@ def test_iv_sweep_cache_end_to_end(tmp_path, monkeypatch):
     assert cs3 == ref3[2]
     # The incremental run skipped exactly the cached Medicham column.
     assert ref3[1] - n3 == n_ref
+
+
+def _run_sweep_energy(opponents, opp_movesets, use_cache):
+    """5-tuple sweep with energy captured (returns canonical_scores +
+    canonical_energy at indices 2 and 4)."""
+    return deep_dive.iv_sweep(
+        'Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], LEAGUE, False,
+        opponents, opp_movesets, SCENARIOS,
+        iv_floor=IV_FLOOR, reserve_cpus=RESERVE,
+        use_sweep_cache=use_cache, capture_energy=True,
+    )
+
+
+def test_iv_sweep_energy_warm_cold_bit_identical(tmp_path, monkeypatch):
+    # The v5 cache stores an energy plane, so a --compare-energy dive serves
+    # warm (previously it force-disabled the cache). Warm energy must be
+    # bit-identical to cold, and to a no-cache run.
+    monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
+    med_moveset = get_default_moveset('Medicham', LEAGUE)
+    opponents = ['Medicham']
+    opp_movesets = [med_moveset]
+
+    # No-cache ground truth (energy captured).
+    _, n_ref, cs_ref, _, ce_ref = _run_sweep_energy(opponents, opp_movesets,
+                                                     use_cache=False)
+    assert n_ref > 0
+    assert ce_ref is not None and len(ce_ref) == len(cs_ref)
+    assert all(0 <= e <= 100 for e in ce_ref)
+
+    # Cold cached run: sims everything, stores both planes, matches no-cache.
+    _, n1, cs1, _, ce1 = _run_sweep_energy(opponents, opp_movesets,
+                                           use_cache=True)
+    assert n1 == n_ref
+    assert cs1 == cs_ref
+    assert ce1 == ce_ref
+
+    # Warm run: cache hit (0 sims), energy bit-identical to cold.
+    _, n2, cs2, _, ce2 = _run_sweep_energy(opponents, opp_movesets,
+                                           use_cache=True)
+    assert n2 == 0
+    assert cs2 == cs1
+    assert ce2 == ce1
 
 
 def test_replay_state_roundtrip(tmp_path):

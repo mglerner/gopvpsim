@@ -33,10 +33,11 @@ Layout on disk:
 """
 import hashlib
 import json
-import os
 from pathlib import Path
 
 import numpy as np
+
+from cache_base import write_planes, read_planes
 
 # Manual escape hatch: bump on any battle-behavior change that the
 # engine source hash somehow misses (it shouldn't — see _ENGINE_FILES).
@@ -45,7 +46,11 @@ import numpy as np
 # v3 (2026-06-12): energy-lead axis added to _sweep_worker plumbing
 # (focal starting energy threaded through worker init); bump per the
 # same rule.
-CACHE_VERSION = 4
+# v5 (2026-06-27): columns moved from a single-array .npy (score only) to
+# a multi-plane .npz ({score: float64, energy: uint8}). Energy is now
+# always captured + stored so --compare-energy re-dives serve warm instead
+# of force-disabling the cache. Old .npy columns are orphaned (GC cleans).
+CACHE_VERSION = 5
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'sweep'
 
 # Engine sources whose content participates in the focal key. Any edit
@@ -163,17 +168,24 @@ class SweepCache:
         self.misses = 0
 
     def _col_path(self, col_fields):
-        return self.dir / f'{_key_hash(col_fields)}.npy'
+        return self.dir / f'{_key_hash(col_fields)}.npz'
 
     def get_column(self, col_fields, n_ivs, n_scenarios):
-        """Return the (n_ivs, n_scenarios) float64 column, or None."""
+        """Return the column's planes as ``{'score': ndarray, 'energy':
+        ndarray}``, or None on a miss.
+
+        A valid column carries both planes at shape ``(n_ivs, n_scenarios)``;
+        a missing/mis-shaped plane (corrupt or partial write) self-heals as a
+        miss (re-simmed and overwritten).
+        """
         try:
-            p = self._col_path(col_fields)
-            if p.exists():
-                arr = np.load(p)
-                if arr.shape == (n_ivs, n_scenarios):
-                    self.hits += 1
-                    return arr
+            planes = read_planes(self._col_path(col_fields))
+            if (planes is not None
+                    and 'score' in planes and 'energy' in planes
+                    and planes['score'].shape == (n_ivs, n_scenarios)
+                    and planes['energy'].shape == (n_ivs, n_scenarios)):
+                self.hits += 1
+                return planes
         except Exception as e:
             # A corrupt stored file self-heals as a miss (re-simmed and
             # overwritten), but silently it looks like "cache stopped
@@ -184,21 +196,25 @@ class SweepCache:
         self.misses += 1
         return None
 
-    def put_column(self, col_fields, arr):
+    def put_column(self, col_fields, planes):
+        """Persist a column from a ``{plane_name: ndarray}`` dict. ``score``
+        is stored float64, ``energy`` uint8 (0..100, asserted)."""
         try:
             self.dir.mkdir(parents=True, exist_ok=True)
             meta_p = self.dir / 'meta.json'
             if not meta_p.exists():
                 meta_p.write_text(json.dumps(self._focal_fields, indent=1,
                                              sort_keys=True))
+            score = np.asarray(planes['score'], dtype=np.float64)
+            energy = np.asarray(planes['energy'])
+            # Energy is a bounded battle output (0..100). Fail loud rather than
+            # silently wrapping if a future change ever produces out-of-range
+            # energy — uint8 would corrupt the "banks N charged moves" line.
+            assert energy.min() >= 0 and energy.max() <= 100, (
+                f'energy out of [0,100]: min={energy.min()} max={energy.max()}')
             p = self._col_path(col_fields)
-            # Atomic write: a crash (or a concurrent dive of the same
-            # focal) mid-np.save must not leave a truncated column.
-            # File-handle form so np.save can't append a second '.npy'.
-            tmp = p.with_name(p.name + '.tmp')
-            with open(tmp, 'wb') as f:
-                np.save(f, np.asarray(arr, dtype=np.float64))
-            os.replace(tmp, p)
+            write_planes(p, {'score': score,
+                             'energy': energy.astype(np.uint8)})
             p.with_suffix('.json').write_text(
                 json.dumps(col_fields, indent=1, sort_keys=True))
         except Exception:
