@@ -1800,6 +1800,12 @@ class BattlePokemon:
     shields:         int = 2
     initial_energy:  int = 0     # energy at battle start (0–100)
     shadow:          bool = False    # CMP uses the unboosted attack (see cmp_atk)
+    # Stat stages present at battle START (native form buffs, e.g. Mimikyu
+    # (Busted)'s permanent -1 def). 0/0 for everything else. Persisted as
+    # init fields so reset_for_battle can restore them across the
+    # shield-scenario axis (which otherwise re-zeros the live stages).
+    initial_atk_stage: int = 0
+    initial_def_stage: int = 0
 
     # Mutable battle state
     hp:                 int   = field(init=False)
@@ -1862,8 +1868,8 @@ class BattlePokemon:
         self._fm_since_charge  = 0
         self._queued_fast      = None
         self._pending_charged  = None
-        self.atk_stage         = 0
-        self.def_stage         = 0
+        self.atk_stage         = self.initial_atk_stage
+        self.def_stage         = self.initial_def_stage
         self._buff_apply_meters = {}
         # Damage cache starts invalid (opp id -1 never matches any real id).
         self._dmg_cache_opp       = None
@@ -1963,8 +1969,8 @@ class BattlePokemon:
         self._fm_since_charge = 0
         self._queued_fast = None
         self._pending_charged = None
-        self.atk_stage = 0
-        self.def_stage = 0
+        self.atk_stage = self.initial_atk_stage
+        self.def_stage = self.initial_def_stage
         self._buff_apply_meters = {}
 
     @property
