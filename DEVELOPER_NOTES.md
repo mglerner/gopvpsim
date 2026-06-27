@@ -428,10 +428,12 @@ The shadow bonus boosts *damage* but NOT priority: the live game compares
 the unboosted attack stat (Michael, domain expert, 2026-06-13), and
 PvPoke compares its shadow-free `stats.atk` in every CMP-flavored check.
 Fix: `BattlePokemon` gained a `shadow` flag and a `cmp_atk` property
-(`atk / 1.2` for shadow, else `atk`); all 9 CMP comparison/ordering sites
+(`atk / 1.2` for shadow, else `atk`); the CMP comparison/ordering sites
 in battle.py switched from `.atk` to `.cmp_atk` (250, 381, 406, 468, 686,
 1047, the `use_priority` test, and both the fast-landing and charged
-priority sorts). `shadow` is threaded through `from_pokemon` (→ CLI,
+priority sorts). **This pass was believed complete at 9 sites, but a 10th
+— the `fire_now` double-fire gate — was missed; found and fixed 2026-06-27
+(see the follow-up at the end of this entry).** `shadow` is threaded through `from_pokemon` (→ CLI,
 matchup web, tests) and the deep_dive / slayer dive workers; harness_grid
 is non-shadow by design (filters `_shadow`) and needs none.
 
@@ -447,6 +449,58 @@ cells incl. the [0,0] winner flip: pre-fix Quagsire wrongly won 555/444,
 now Feraligatr 464/536) and `test_cmp_atk_strips_shadow_bonus` (unit).
 Caches auto-invalidate (engine_hash covers battle.py/pokemon.py for both
 sweep and slayer caches). Benchmark 3,224 sims/s (baseline 3,160).
+
+**Follow-up 2026-06-27 — the missed 10th site (the `fire_now` double-fire
+gate).** The 2026-06-27 adversarial engine bug-hunt found that the near-KO
+`fire_now` branch's "I win CMP, fire the move twice" gate (battle.py
+~1177-1188) still compared shadow-boosted `.atk`. The shadow ×1.2 boosts
+damage, not priority, so this flipped real winners whenever a defender's
+attack stat sat between a shadow attacker's `cmp_atk` and its boosted
+`atk`. The gate's outcome changes ONLY in shadow-XOR matchups (exactly one
+side shadow): both-non-shadow is unaffected, and both-shadow is provably
+unaffected (dividing both sides by 1.2 preserves the inequality). Fixed to
+`cmp_atk` (commit on branch `overnight/2026-06-26`); independently
+oracle-reproduced (Shadow Quagsire vs Gastrodon 2v1: pre-fix we wrongly had
+Quagsire win 625/375, oracle + fix → Gastrodon 459/540) and pinned by
+`test_fire_now_cmp_shadow.py` (9-cell oracle snapshot). Note: any dive /
+ML guide generated before this fix carries the bug in its shadow-XOR cells.
+
+### OPEN 2026-06-27 — engine bug-hunt findings #2–#6 (confirmed, NOT yet fixed)
+
+The 2026-06-27 adversarial bug-hunt confirmed five more issues beyond the
+`cmp_atk` fix above. Full report + repros + per-bug recommendations:
+`docs/reviews/2026-06-27_engine_bug_hunt.md`. Left unfixed pending a
+judgment call or broad re-vet (see TODO.md "OVERNIGHT 2026-06-27" + the
+cache-rework handoff). Recorded here so they aren't lost to TODO pruning:
+
+- **#2 [MED] exact damage constants vs the game's float32-truncated ones.**
+  `moves.py` uses exact `1.3/1.2/1.6`; the game (and PvPoke's
+  `DamageCalculator.js`) computes in single precision
+  (`BONUS=1.2999999523…`, etc.). ~0.009% of damage calcs flip by 1, landing
+  exactly on the breakpoint/bulkpoint boundaries that are the core
+  deliverable. Repro: Tinkaton Play Rough vs Gourgeist (Small) — ours 51,
+  PvPoke 52. Fix shifts many fixtures → needs a full oracle re-vet.
+- **#3 [MED] farm-down never stacks self-debuffing moves** (throws at first
+  affordability instead of holding/stacking). battle.py ~1283-1311 vs
+  ActionLogic.js:396-405. Repro: Pinsir (Close Combat + Superpower) vs
+  Cresselia 0-0 → ours 631, PvPoke 656 (same winner). Same class as the
+  documented 2026-06-11 Snorlax OMT fix; needs a GL/UL grid winner-flip
+  check before committing.
+- **#4 [MED] slayer disk-cache key omits the focal level cap** →
+  silent-wrong stale hits across `--max-level` in Master mirror-slayer.
+  `scripts/slayer_cache.py` `compute_cache_key`; the sweep cache already
+  keys on `focal_max_level`. Bundled into the cache-rework session (needs a
+  `CACHE_VERSION` bump).
+- **#5 [MED/LOW] `bandaid[929]` stack-switch missing its `bait_shields` gate**
+  (battle.py:1705 vs ActionLogic.js:947-952). Only bites in no-bait
+  analysis. Decision: gate-to-match-PvPoke vs document-as-intentional; it is
+  currently neither gated nor documented.
+- **#6 (contested) `bandaid[910]` uses defender max-damage move, not
+  `bestChargedMove`** (battle.py:1682). Code divergence real, but a 360-sim
+  sweep showed it cosmetic (16/16 fire-cases match the oracle on
+  score+winner). Low-priority cleanup, not a shipping bug.
+- **Latent:** `_cm_debuf_delta` has a dead `'1' == 1` string-vs-int branch
+  (battle.py:805) — cosmetic in tested cases, cheap to fix.
 
 ### RESOLVED 2026-06-13 — incoming selfDefenseDebuffing shield gate
 (port error: extra routing condition the reference lacks)
