@@ -7,7 +7,7 @@ real gamemaster. Run integration tests with: pytest -m integration
 import pytest
 
 from gopvpsim.moves import (
-    EFFECTIVENESS, STAB_MULTIPLIER,
+    EFFECTIVENESS, STAB_MULTIPLIER, SUPER_EFFECTIVE,
     type_effectiveness, stab, damage, get_moves,
 )
 
@@ -30,7 +30,8 @@ def test_effectiveness_has_all_defender_types():
         assert set(row.keys()) == set(ALL_TYPES), f"Missing defender types for {atk_type}"
 
 def test_effectiveness_values_are_valid():
-    valid = {0.390625, 0.625, 1.0, 1.6}
+    # Super-effective is the float32-truncated 1.6 (= PvPoke SUPER_EFFECTIVE), not exact 1.6.
+    valid = {0.390625, 0.625, 1.0, SUPER_EFFECTIVE}
     for atk_type, row in EFFECTIVENESS.items():
         for def_type, val in row.items():
             assert val in valid, (

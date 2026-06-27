@@ -1,14 +1,14 @@
 """
 Move data and damage formula.
 
-Damage formula: floor(0.5 * power * atk / def * effectiveness * stab) + 1
+Damage formula: floor(0.5 * BONUS * power * atk / def * effectiveness * stab) + 1
 
 Type effectiveness uses PoGo's adjusted multipliers:
   immune / double resist → 0.390625  (mainline: 0 or 0.25)
   not very effective     → 0.625  (mainline: 0.5)
   neutral                → 1.0
-  super effective        → 1.6    (mainline: 2)
-  double super effective → 2.56   (1.6 * 1.6; computed automatically for dual types)
+  super effective        → 1.6    (mainline: 2; stored as float32(1.6), SUPER_EFFECTIVE)
+  double super effective → ~2.56  (float32(1.6)^2; computed automatically for dual types)
 
 Note: PoGo has no true immunities — 0.390625 is used instead of 0.
 """
@@ -16,8 +16,15 @@ import math
 
 from .data import load_gamemaster
 
-STAB_MULTIPLIER = 1.2
-BONUS = 1.3  # PvPoke's global PvP damage multiplier (chargeMultiplier=1 in simulation)
+# Damage constants are the float32-truncated values the game (and PvPoke's
+# DamageCalculator.js) actually use, NOT exact 1.2/1.3/1.6: the game computes
+# damage in single precision, so ~0.009% of calcs land one integer higher than
+# exact doubles would -- precisely on the breakpoint/bulkpoint boundaries that
+# are this project's deliverable. Matching them makes our boundaries agree with
+# PvPoke and the game. (0.625 / 0.390625 resist cells are exact in float32.)
+STAB_MULTIPLIER = 1.2000000476837158203125    # float32(1.2) = PvPoke STAB
+BONUS = 1.2999999523162841796875              # float32(1.3) = PvPoke BONUS (chargeMultiplier=1 in sim)
+SUPER_EFFECTIVE = 1.60000002384185791015625   # float32(1.6) = PvPoke SUPER_EFFECTIVE
 
 # ---------------------------------------------------------------------------
 # Type effectiveness table — effectiveness[attacker_type][defender_type]
@@ -26,7 +33,7 @@ BONUS = 1.3  # PvPoke's global PvP damage multiplier (chargeMultiplier=1 in simu
 # Double resist = 0.390625 = 0.625^2 (exact, matching PvPoke).
 # ---------------------------------------------------------------------------
 
-EFFECTIVENESS = {
+_EFFECTIVENESS_RAW = {
     'normal': {
         'normal': 1.0,        'fire': 1.0,   'water': 1.0,   'electric': 1.0,
         'grass':  1.0,        'ice':  1.0,   'fighting': 1.0, 'poison': 1.0,
@@ -155,6 +162,15 @@ EFFECTIVENESS = {
     },
 }
 
+# Normalize super-effective cells (authored as the readable literal 1.6) to the
+# float32-truncated constant the game uses (PvPoke DamageMultiplier.SUPER_EFFECTIVE);
+# 0.625 / 0.390625 / 1.0 are exact in float32 and pass through unchanged. Done once
+# here so type_effectiveness()'s per-lookup hot path stays branch-free. Dual-type
+# effectiveness (the product of two cells) then yields SUPER_EFFECTIVE**2 for
+# double-SE, matching PvPoke rather than exact 2.56.
+EFFECTIVENESS = {atk: {d: (SUPER_EFFECTIVE if v == 1.6 else v) for d, v in row.items()}
+                 for atk, row in _EFFECTIVENESS_RAW.items()}
+
 # ---------------------------------------------------------------------------
 # Gamemaster access
 # ---------------------------------------------------------------------------
@@ -227,7 +243,7 @@ def stab(move_type, attacker_types):
 def damage(power, atk, def_, move_type, attacker_types, defender_types):
     """Compute damage dealt by one move.
 
-    floor(0.5 * power * atk / def * effectiveness * stab) + 1
+    floor(0.5 * BONUS * power * atk / def * effectiveness * stab) + 1
 
     Args:
         power:          move's base power

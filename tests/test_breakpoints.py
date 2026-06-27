@@ -40,12 +40,18 @@ def test_atk_for_damage_formula():
     assert thresh == pytest.approx((7 - 1) * 100.0 / k)
 
 def test_atk_for_damage_consistency():
-    """calc_damage at the threshold should give exactly the target damage."""
+    """Just above the threshold atk, calc_damage gives exactly the target damage.
+
+    The contract is atk >= thresh -> damage >= dmg. thresh is the exact
+    real-valued boundary; with the game's float32-truncated constants K is no
+    longer a round number, so floating rounding can leave calc_damage AT the
+    exact threshold one below dmg. Check just above (mirrors
+    test_def_for_damage_at_threshold_gives_target_damage).
+    """
     move = make_move(power=10)
     for dmg in range(2, 12):
         thresh = atk_for_damage(dmg, 100.0, move, ['normal'], ['normal'])
-        # At exactly the threshold, damage should be dmg (floor(k*atk/def) = dmg-1)
-        assert calc_damage(10, thresh, 100.0, 'normal', ['normal'], ['normal']) == dmg
+        assert calc_damage(10, thresh * 1.001, 100.0, 'normal', ['normal'], ['normal']) == dmg
 
 def test_atk_for_damage_increases_with_damage():
     move = make_move(power=10)
