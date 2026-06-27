@@ -132,7 +132,7 @@ def _groups_and_member_scores(species, fast_id, charged_ids, profiles,
         focal_shadow=False)
     chunk = [(prof, oi) for prof in profiles
              for oi in range(len(opp_cache))]
-    results, _ = deep_dive._sweep_worker(chunk)
+    results, _energy, _metrics, _ = deep_dive._sweep_worker(chunk)
     all_scores = {
         (pos, oi): results[(profiles[pos][0], oi)]
         for pos in range(len(profiles)) for oi in range(len(opp_cache))
