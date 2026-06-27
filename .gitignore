@@ -24,6 +24,11 @@ htmlcov/
 .idea/
 .vscode/
 
+# Emacs temp / lock / backup files
+*~
+\#*\#
+.\#*
+
 # Cached gamemaster data (stored in ~/Documents, not here)
 *.json.cache
 
