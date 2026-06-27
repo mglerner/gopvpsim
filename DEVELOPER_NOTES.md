@@ -218,22 +218,41 @@ sims. Pass `--no-sweep-cache` for timing runs.
 Two iteration-speed layers shipped 2026-06-10; full design rationale
 in CHANGELOG ("Sweep disk cache + replay-from-saved-state").
 
-**Sweep cache** (`scripts/sweep_cache.py`): `iv_sweep` persists each
-opponent's score column to `~/.cache/gopvpsim/sweep/` and skips
+**Sweep cache** (`scripts/sweep_cache.py`, CACHE_VERSION 6 as of the
+2026-06-27 cache-rework, branch `cache-rework`): `iv_sweep` persists
+each opponent's column to `~/.cache/gopvpsim/sweep/` and skips
 cache-hit opponents entirely. Keys include the moveset, scenarios,
-bait mode, an engine-source hash (battle.py, _dp_jit.py, moves.py,
-formchange.py, pokemon.py — any edit invalidates automatically), and
-a gamemaster content hash; opponent-side keys carry resolved IVs +
-moveset, so rankings drift produces clean misses rather than stale
-hits. Columns are raw float64 in canonical iv_meta order — hits are
-bit-identical to fresh sims (pinned by tests/test_sweep_cache.py).
+bait mode, a gamemaster content hash, and `focal_max_level`;
+opponent-side keys carry resolved IVs + moveset, so rankings drift
+produces clean misses rather than stale hits. Columns are **multi-plane
+`.npz`** (`{score:float64, energy:uint8}`, plus `{won,hp,max_hp,shields}`
+when `capture_metrics`) in canonical iv_meta order — hits are
+bit-identical to fresh sims (pinned by tests/test_sweep_cache.py). The
+shared `.npz` read/write foundation lives in `scripts/cache_base.py`.
+
+Two cache-rework changes worth knowing:
+
+- **Engine hash is now a per-column STAMP**, not part of the key dir. Each
+  column has a tiny `.json` sidecar `{engine, col}`. A stale stamp is a
+  miss (column ignored), and `scripts/migrate_cache.py` can bless columns a
+  localized fix provably doesn't touch (rewrite sidecar to the new engine)
+  while deleting the rest — `--from-engine X --predicate shadow_xor`. This
+  is what makes a warm bug-#1 (shadow-CMP) re-dive possible.
+- **Energy is always captured + stored**, so the default
+  `--compare-energy` dive serves warm (the old `capture_energy ->
+  use_sweep_cache=False` bypass is gone).
+
 Operational notes:
 
 - `--no-sweep-cache` forces fresh sims (timing runs, debugging).
 - Hit log line per sweep: `sweep cache: N/M opponent columns hit`
   (nothing printed on an all-miss sweep).
-- Stale key-dirs accumulate as engine/gamemaster evolve; the cache
-  has no auto-purge. `rm -r ~/.cache/gopvpsim/sweep` is always safe.
+- Stale columns accumulate as engine/gamemaster evolve.
+  `scripts/gc_cache.py` (keep current + N-1 gamemaster vintage, `--dry-run`
+  default) prunes them; `rm -r ~/.cache/gopvpsim/sweep` is still always safe.
+- The ML IV-guide path (`iv_envelope_analysis.py`) now rides this same
+  cache via `iv_sweep` (Phase 6); the old per-guide `iv_envelope/` boolean
+  WonSetCache is retired (that on-disk dir is now legacy, GC-reportable).
 - Library callers (tests, verify scripts) default to OFF; only the
   CLI turns it on.
 
