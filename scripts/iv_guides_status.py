@@ -43,12 +43,33 @@ def _species_from_cmd(cmd):
         t = after[i]
         if t in ('--all-shields', '--no-cache'):
             i += 1
-        elif t == '--pool':
+        elif t in ('--pool', '--iv-floor'):
             i += 2
         else:
             toks.append(t)
             i += 1
     return ' '.join(toks) or '?'
+
+
+def _slug(species):
+    """iv_envelope_analysis's per-guide log slug (same formula it uses)."""
+    return species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+
+
+_PREFIX_RE = re.compile(r'^\[[^\]]+\] +[A-Z]+ +[a-z_]+: *')
+
+
+def worker_phase(species):
+    """Current phase of a live worker = the last meaningful line of its
+    per-guide log (userdata/logs/iv_guides/<slug>.log), stripped of the
+    structured-logger '[ts] LEVEL deep_dive:' prefix. Empty string when the
+    log isn't there yet (worker just started)."""
+    path = os.path.join('userdata', 'logs', 'iv_guides', f'{_slug(species)}.log')
+    try:
+        lines = [ln.rstrip('\n') for ln in open(path) if ln.strip()]
+    except OSError:
+        return ''
+    return _PREFIX_RE.sub('', lines[-1]) if lines else ''
 
 
 def active_dives():
@@ -145,6 +166,9 @@ def main():
             flag = col('  <- LOW CPU, may be stalled', 'red') if warn else ''
             print(f"    {sp:<24} {cpu_s}  {cputime:>9} cpu  "
                   f"{etime:>10} elapsed{flag}")
+            phase = worker_phase(sp)
+            if phase:
+                print(f"      {col(phase, 'cyn')}")
         print(col('    (cpu-time should climb each tick and track elapsed; '
                   'if elapsed >> cpu-time the machine slept)', 'dim'))
 

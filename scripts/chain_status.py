@@ -640,6 +640,43 @@ def _ml_live_workers() -> int:
     return len([x for x in r.stdout.split() if x.strip()])
 
 
+def _ml_species_from_cmd(cmd: str) -> str:
+    """Pull the focal species out of an iv_envelope_analysis.py command line,
+    dropping flags (handles species with spaces/parens, e.g. 'Dialga (Origin)').
+    Mirrors iv_guides_status._species_from_cmd so the slug -> per-guide-log
+    mapping below resolves the SAME path the worker wrote."""
+    after = cmd.split('iv_envelope_analysis.py', 1)[-1].split()
+    toks, i = [], 0
+    while i < len(after):
+        t = after[i]
+        if t in ('--all-shields', '--no-cache'):
+            i += 1
+        elif t in ('--pool', '--iv-floor'):
+            i += 2
+        else:
+            toks.append(t)
+            i += 1
+    return ' '.join(toks) or '?'
+
+
+def _ml_slug(species: str) -> str:
+    """iv_envelope_analysis's per-guide log slug (same formula it uses)."""
+    return species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+
+
+def _ml_worker_phase(species: str) -> str:
+    """Current phase of a live worker = last meaningful line of its per-guide
+    log (userdata/logs/iv_guides/<slug>.log), stripped of the structured-logger
+    prefix. Empty string when the log isn't there yet (worker just started)."""
+    path = REPO_ROOT / 'userdata' / 'logs' / 'iv_guides' / f'{_ml_slug(species)}.log'
+    try:
+        lines = [ln.rstrip('\n') for ln in path.read_text().splitlines()
+                 if ln.strip()]
+    except OSError:
+        return ''
+    return strip_log_prefix(lines[-1]) if lines else ''
+
+
 def _ml_active_workers() -> list[tuple[str, float]]:
     """(species, cpu%) per live iv_envelope_analysis worker, for stall-spotting
     (cpu% near 0 on a worker that should be simming = wedged or machine slept)."""
@@ -659,9 +696,7 @@ def _ml_active_workers() -> list[tuple[str, float]]:
             cpuf = float(parts[0])
         except ValueError:
             cpuf = 0.0
-        after = parts[1].split('iv_envelope_analysis.py', 1)[-1].split()
-        sp = next((t for t in after if not t.startswith('--')), '?')
-        rows.append((sp, cpuf))
+        rows.append((_ml_species_from_cmd(parts[1]), cpuf))
     rows.sort(key=lambda r: r[0].lower())
     return rows
 
@@ -726,6 +761,12 @@ def print_ml_guides(wrapper_log: Path | None, width: int) -> None:
             for sp, cpu in workers[:6])
         more = dim(f'  +{len(workers) - 6} more') if len(workers) > 6 else ''
         print(f'  {dim("workers cpu%:")} {shown}{more}')
+        # Per-worker current phase (last line of each guide's per-guide log),
+        # so the watcher sees motion WITHIN a guide, not just that it's running.
+        for sp, _cpu in workers[:6]:
+            phase = _ml_worker_phase(sp)
+            if phase:
+                print(f'    {cyan(truncate(f"{sp}: {phase}", width - 6))}')
         n_low = sum(1 for _, cpu in workers if cpu < 20)
         if n_low:
             print(f'  {red(f"WARN: {n_low} worker(s) <20% CPU — possible stall "
