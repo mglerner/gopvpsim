@@ -304,6 +304,18 @@ def attach_form_change(bp, mon_entry, atk_iv, def_iv, sta_iv,
         bp._form_change = fc
         if fc.effect == 'protect':
             bp._form_disguise_active = True
+    # A focal that STARTS in a natively stat-buffed form (currently only
+    # Mimikyu (Busted), nativeStatBuffs [0,-1]) carries those stages from
+    # turn one. This must run even when fc is None: a terminal alt form has
+    # no formChange of its own, so build_form_change_state returns None, yet
+    # the static buff still applies for the whole battle. Persist as the
+    # battle-start stages so reset_for_battle restores them per scenario.
+    raw = mon_entry.get('nativeStatBuffs')
+    if raw and any(b != 0 for b in raw):
+        bp.initial_atk_stage = max(-4, min(4, raw[0]))
+        bp.initial_def_stage = max(-4, min(4, raw[1]))
+        bp.atk_stage = bp.initial_atk_stage
+        bp.def_stage = bp.initial_def_stage
     return fc
 
 
