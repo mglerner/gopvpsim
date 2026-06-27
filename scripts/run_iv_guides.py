@@ -17,6 +17,7 @@ Usage:
 """
 import argparse
 import os
+import pathlib
 import subprocess
 import sys
 import time
@@ -91,12 +92,12 @@ def run_one(species, iv_floor=DEFAULT_IV_FLOOR):
         'userdata', 'dives', f'{json_slug(species)}_iv_envelope_all9.json')
     t0 = time.time()
     floor_args = [] if iv_floor == DEFAULT_IV_FLOOR else ['--iv-floor', str(iv_floor)]
-    # TODO (deferred 2026-06-20): for per-phase progress in iv_guides_status.py
-    # (hundo -> detail -> recommended N/64), tee this stdout to
-    # userdata/logs/iv_guides/<slug>.log instead of capturing it in memory, add
-    # incremental progress prints in iv_envelope_analysis.py's recommended loop,
-    # and have the status script show each running dive's last log line. Only
-    # takes effect on a fresh launch. See memory project_ml_iv_guide_pipeline.
+    # Drop any stale per-guide log so iv_guides_status.py / chain_status.py read
+    # only THIS run's phase lines. iv_envelope_analysis's init_logger re-creates
+    # the dir/file (it appends, so a leftover log from a prior run would
+    # otherwise show an out-of-date "current phase").
+    pathlib.Path(ROOT, 'userdata', 'logs', 'iv_guides',
+                 f'{json_slug(species)}.log').unlink(missing_ok=True)
     a = subprocess.run([PY, ANALYSIS, '--all-shields', *floor_args, species],
                        cwd=ROOT, capture_output=True, text=True)
     if a.returncode != 0:
