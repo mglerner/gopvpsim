@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->1101<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->1106<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
@@ -578,8 +578,23 @@ cache-rework handoff). Recorded here so they aren't lost to TODO pruning:
   `bestChargedMove`** (battle.py:1682). Code divergence real, but a 360-sim
   sweep showed it cosmetic (16/16 fire-cases match the oracle on
   score+winner). Low-priority cleanup, not a shipping bug.
-- **Latent:** `_cm_debuf_delta` has a dead `'1' == 1` string-vs-int branch
-  (battle.py:805) — cosmetic in tested cases, cheap to fix.
+- **RESOLVED 2026-06-27 (bug #7):** `_cm_debuf_delta`'s guaranteed-self-buff
+  arm was a dead `'1' == 1` string-vs-int branch (raw gamemaster
+  `buffApplyChance` is the string `'1'`). Fixed to `float(...) == 1.0`, which
+  matches PvPoke's JS `"1" == 1` loose-equality coercion at
+  `ActionLogic.js:575,584` ("prefer the path with more buff chances"). This
+  *removes* a divergence (we now match PvPoke), so it is NOT in
+  `docs/pvpoke_divergences.md`. The branch only feeds the DP dedup tie-break
+  `debuf_count` (sole consumer battle.py:998), so the fix is value-neutral
+  inside a DP node. Impact is **empirically + structurally zero, not a
+  theorem**: it changed 0/10458 dive cells (16 self-buff focals x GL+UL pool x
+  9 shields) and 0 of ~900k worst-case DP-returned-index probes. Structural
+  reason it's inert: every ATK-buffing self-buff move bumps `atk_stage`, which
+  is part of the dedup key, so those states never dedup against each other
+  (inert by construction); only PURE-DEF self-buff moves (Drain Punch, Skull
+  Bash, Oblivion Wing, Parabolic Charge) leave `atk_stage` unchanged and could
+  re-rank a tie, which needs a simultaneous energy+floor-damage tie (none
+  observed). Unit behavior pinned by `tests/test_cm_debuf_delta.py`.
 
 ### RESOLVED 2026-06-13 — incoming selfDefenseDebuffing shield gate
 (port error: extra routing condition the reference lacks)

@@ -802,7 +802,12 @@ def _cm_debuf_delta(m: dict) -> int:
     delta = 0
     if m.get('selfDebuffing', False):
         delta += 1
-    if (m.get('buffApplyChance') == 1
+    # buffApplyChance is a raw-gamemaster STRING ('1' for guaranteed), so the old
+    # `== 1` int compare was always False -- a dead branch (bug #7). PvPoke's JS
+    # `"1" == 1` coerces to True (ActionLogic.js:575,584), so this self-buff credit
+    # ("prefer the path with more buff chances") fired there but not here. Compare
+    # as float to match, like the documented buffApplyChance gotcha elsewhere.
+    if (float(m.get('buffApplyChance') or 0) == 1.0
             and m.get('buffTarget') == 'self'
             and sum(m.get('buffs', [0, 0])) > 0):
         delta -= 1
