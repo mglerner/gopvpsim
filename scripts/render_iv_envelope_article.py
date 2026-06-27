@@ -48,9 +48,9 @@ CREDIT_URL = 'https://www.youtube.com/watch?v=6N3lXp39qtQ'
 # ARE covered; one still at 12/12/12 warns that sub-12 spreads fall off and a
 # re-sweep is planned (see TODO.md "Limited-availability mons"). Match
 # d['species'] verbatim.
-# NOTE (2026-06-27): Eternatus tradeability is unresolved -- it sits here as
-# limited (conservative: keeps the caveat) but the limited_mon scope read it as
-# a tradeable raid legendary. Flagged for human confirmation; not resweept.
+# NOTE (2026-06-27): Eternatus is treated as limited regardless of trade
+# status -- Michael's call that it is rare enough to count as special. It is
+# resweept at the 10/10/10 floor (see run_iv_guides.FLOOR_10_SPECIES).
 LIMITED_AVAILABILITY = frozenset({
     'Marshadow',
     'Meloetta (Aria)',
