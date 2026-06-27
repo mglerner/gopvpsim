@@ -70,8 +70,22 @@ shadow ML guides after you accept the #1 fix.
 - **#2 [MED]** damage formula uses exact `1.3/1.2/1.6` not the game's
   float32-truncated constants -> off-by-one on breakpoint boundaries. Real,
   but shifts many fixtures; needs a broad re-vet (not auto-applied).
-- **#3 [MED]** farm-down never stacks self-debuffing moves (throws at first
-  affordability) -- needs GL/UL grid winner-flip check before fixing.
+- **#3 [MED] FIXED 2026-06-27** -- farm-down now stacks self-debuffing moves
+  (PvPoke ActionLogic.js:399-405 `energyToReach` gate). Adversarially verified
+  (suite 1075p; 0/2160 default-meta cells changed; 162/162 firing configs +
+  Malamar single-best match PvPoke; 378-cell scan moved 23 toward PvPoke, broke
+  0). Zero impact on shipped default-moveset dives. `tests/test_bug3_farm_stack.py`,
+  DEVELOPER_NOTES "#3 ... RESOLVED".
+- **#3-followup [NEW, open]** the bug #3 verification's 378-cell both-self-debuff
+  oracle exposed ~117 PvPoke divergences (7 winner-flips) on the BROADER
+  both-self-debuff population (Lurantis LEAF_STORM+SUPER_POWER vs Cresselia,
+  Blaziken BRAVE_BIRD+OVERHEAT vs Registeel, ...) that PRE-DATE #3 (already
+  disagreed under the old engine, so independent of the stacking fix). Likely
+  the near-KO-DP / `_optimize_move_timing` self-debuff-timing deviation cluster,
+  possibly an uncharacterized separate issue. Investigate: re-run the
+  both-self-debuff grid old-vs-new to confirm pre-existing, localize via
+  `--trace-dp`, then decide keep-as-divergence (CLAUDE.md policy) vs fix. These
+  are non-default movesets, so low ship-priority.
 - **#4 [MED]** slayer disk-cache key omits the focal level cap -> stale
   cross-`--max-level` hits in Master mirror-slayer (silent-wrong output).
   Clean fix (key field + `CACHE_VERSION` bump), left for you to schedule.
