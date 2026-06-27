@@ -60,6 +60,19 @@ from cache_base import write_planes, read_planes
 CACHE_VERSION = 6
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'sweep'
 
+# Compact on-disk dtype per column plane. score is the float64 PvPoke score;
+# energy/shields are tiny bounded ints; won is a flag; hp/max_hp fit u16.
+# Hits reconstruct exact values (all are integer-valued except score, which
+# stays float64), so warm == cold bit-for-bit.
+_PLANE_DTYPES = {
+    'score': np.float64,
+    'energy': np.uint8,
+    'won': np.bool_,
+    'hp': np.uint16,
+    'max_hp': np.uint16,
+    'shields': np.uint8,
+}
+
 # Engine sources whose content participates in the focal key. Any edit
 # (even a comment) invalidates the cache — spurious invalidation is the
 # safe direction, and it removes the "forgot to bump the version"
@@ -193,15 +206,17 @@ class SweepCache:
         except Exception:
             return None
 
-    def get_column(self, col_fields, n_ivs, n_scenarios):
-        """Return the column's planes as ``{'score': ndarray, 'energy':
-        ndarray}``, or None on a miss.
+    def get_column(self, col_fields, n_ivs, n_scenarios,
+                   required_planes=('score', 'energy')):
+        """Return the column's planes as ``{name: ndarray}``, or None on a miss.
 
         A hit requires the per-column engine stamp to equal the current
         engine hash (a stale-engine column is a miss — checked from the small
-        sidecar before the big .npz is loaded), and both planes present at
-        shape ``(n_ivs, n_scenarios)``. Corrupt/partial writes self-heal as a
-        miss (re-simmed and overwritten).
+        sidecar before the big .npz is loaded), and every plane in
+        ``required_planes`` present at shape ``(n_ivs, n_scenarios)``. The ML
+        path requests the metric planes (won/hp/max_hp/shields) too; a column
+        written with only score+energy misses for it. Corrupt/partial writes
+        self-heal as a miss (re-simmed and overwritten).
         """
         try:
             p = self._col_path(col_fields)
@@ -212,9 +227,9 @@ class SweepCache:
                 return None
             planes = read_planes(p)
             if (planes is not None
-                    and 'score' in planes and 'energy' in planes
-                    and planes['score'].shape == (n_ivs, n_scenarios)
-                    and planes['energy'].shape == (n_ivs, n_scenarios)):
+                    and all(name in planes
+                            and planes[name].shape == (n_ivs, n_scenarios)
+                            for name in required_planes)):
                 self.hits += 1
                 return planes
         except Exception as e:
@@ -228,25 +243,25 @@ class SweepCache:
         return None
 
     def put_column(self, col_fields, planes):
-        """Persist a column from a ``{plane_name: ndarray}`` dict. ``score``
-        is stored float64, ``energy`` uint8 (0..100, asserted). The .json
-        sidecar records the current engine hash as the column's stamp (v6)."""
+        """Persist a column from a ``{plane_name: ndarray}`` dict, each cast to
+        its compact dtype (see ``_PLANE_DTYPES``). ``energy`` is asserted in
+        [0,100] so a future out-of-range value fails loud instead of wrapping
+        into uint8. The .json sidecar records the current engine hash as the
+        column's stamp (v6)."""
         try:
             self.dir.mkdir(parents=True, exist_ok=True)
             meta_p = self.dir / 'meta.json'
             if not meta_p.exists():
                 meta_p.write_text(json.dumps(self._focal_fields, indent=1,
                                              sort_keys=True))
-            score = np.asarray(planes['score'], dtype=np.float64)
-            energy = np.asarray(planes['energy'])
-            # Energy is a bounded battle output (0..100). Fail loud rather than
-            # silently wrapping if a future change ever produces out-of-range
-            # energy — uint8 would corrupt the "banks N charged moves" line.
-            assert energy.min() >= 0 and energy.max() <= 100, (
-                f'energy out of [0,100]: min={energy.min()} max={energy.max()}')
+            if 'energy' in planes:
+                e = np.asarray(planes['energy'])
+                assert e.min() >= 0 and e.max() <= 100, (
+                    f'energy out of [0,100]: min={e.min()} max={e.max()}')
+            out = {name: np.asarray(arr, dtype=_PLANE_DTYPES.get(name, np.float64))
+                   for name, arr in planes.items()}
             p = self._col_path(col_fields)
-            write_planes(p, {'score': score,
-                             'energy': energy.astype(np.uint8)})
+            write_planes(p, out)
             p.with_suffix('.json').write_text(json.dumps(
                 {'engine': engine_hash(), 'col': col_fields},
                 indent=1, sort_keys=True))

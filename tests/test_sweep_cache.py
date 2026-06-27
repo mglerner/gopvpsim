@@ -244,6 +244,61 @@ def test_iv_sweep_energy_warm_cold_bit_identical(tmp_path, monkeypatch):
     assert ce2 == ce1
 
 
+def _run_sweep_metrics(opponents, opp_movesets, use_cache):
+    """Sweep with the full ML metric capture (won/hp/max_hp/shields) on."""
+    return deep_dive.iv_sweep(
+        'Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], LEAGUE, False,
+        opponents, opp_movesets, SCENARIOS,
+        iv_floor=IV_FLOOR, reserve_cpus=RESERVE,
+        use_sweep_cache=use_cache, capture_energy=True, capture_metrics=True)
+
+
+def _metric_grid(results):
+    """{(a,d,s): {(metric, si, oi): value}} for stable cold/warm comparison."""
+    out = {}
+    for r in results:
+        cell = {}
+        for m in ('won', 'hp', 'max_hp', 'shields'):
+            for k, v in r['per_opp_' + m].items():
+                cell[(m, *k)] = v
+        out[(r['atk_iv'], r['def_iv'], r['sta_iv'])] = cell
+    return out
+
+
+def test_iv_sweep_metrics_warm_cold_bit_identical(tmp_path, monkeypatch):
+    # The ML guide path caches won/hp/max_hp/shields planes so its warm
+    # re-bake re-sims nothing. Warm metrics must be bit-identical to cold and
+    # to a no-cache run.
+    monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
+    med_moveset = get_default_moveset('Medicham', LEAGUE)
+    opponents = ['Medicham']
+    opp_movesets = [med_moveset]
+
+    res_ref = _run_sweep_metrics(opponents, opp_movesets, use_cache=False)[0]
+    g_ref = _metric_grid(res_ref)
+    # Sanity on the captured fields.
+    for cell in g_ref.values():
+        for (m, _si, _oi), v in cell.items():
+            if m == 'won':
+                assert v in (True, False)
+            elif m == 'shields':
+                assert 0 <= int(v) <= 2
+            elif m in ('hp', 'max_hp'):
+                assert int(v) >= 0
+    for (a, d, s), cell in g_ref.items():
+        for si in range(len(SCENARIOS)):
+            assert cell[('hp', si, 0)] <= cell[('max_hp', si, 0)]
+
+    res_cold, n_cold = _run_sweep_metrics(opponents, opp_movesets,
+                                          use_cache=True)[:2]
+    assert _metric_grid(res_cold) == g_ref
+
+    res_warm, n_warm = _run_sweep_metrics(opponents, opp_movesets,
+                                          use_cache=True)[:2]
+    assert n_warm == 0  # all columns hit (metric planes present)
+    assert _metric_grid(res_warm) == g_ref
+
+
 def test_replay_state_roundtrip(tmp_path):
     state = {
         'species': 'Azumarill', 'league': LEAGUE, 'shadow': False,
