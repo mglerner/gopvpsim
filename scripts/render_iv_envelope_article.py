@@ -43,13 +43,20 @@ CREDIT_URL = 'https://www.youtube.com/watch?v=6N3lXp39qtQ'
 # realistically own only one or a few of, with NO way to re-roll for IVs. In
 # game their IV floor is the research-encounter floor (10/10/10), well below
 # this guide's default 12/12/12 sweep floor -- so a legitimately-owned sub-12
-# spread can fall off the bottom of the grid. We flag that here; a
-# floor-corrected re-sweep for these species is a tracked follow-up (see
-# TODO.md "Limited-availability mons"). Match d['species'] verbatim.
+# spread can fall off the bottom of the grid. The banner is floor-aware: a
+# guide swept at the real 10/10/10 floor (--iv-floor 10) tells the reader they
+# ARE covered; one still at 12/12/12 warns that sub-12 spreads fall off and a
+# re-sweep is planned (see TODO.md "Limited-availability mons"). Match
+# d['species'] verbatim.
+# NOTE (2026-06-27): Eternatus tradeability is unresolved -- it sits here as
+# limited (conservative: keeps the caveat) but the limited_mon scope read it as
+# a tradeable raid legendary. Flagged for human confirmation; not resweept.
 LIMITED_AVAILABILITY = frozenset({
     'Marshadow',
     'Meloetta (Aria)',
     'Jirachi',
+    'Keldeo (Ordinary)',
+    'Keldeo (Resolute)',
     'Eternatus',
     'Zygarde (Complete Forme)',
 })
@@ -976,9 +983,13 @@ def verdict(d):
         'which is strictly easier.' if has_nonbb else
         'The realistic meta is best-buddied, so both tables compare against a '
         'best-buddy meta.')
+    lo, hi = min(d['iv_range']), max(d['iv_range'])
+    floor_note = (f'down to the {lo}/{lo}/{lo} research/raid-reward floor'
+                  if lo <= 10 else
+                  'the practical range above the 10/10/10 legendary catch floor')
     out = ['<h2 id="recommended">Recommended IVs</h2>',
-           '<p class="sub">Every spread with all three IVs from 12 to 15 (the '
-           'practical range above the 10/10/10 legendary catch floor), sorted '
+           f'<p class="sub">Every spread with all three IVs from {lo} to {hi} '
+           f'({floor_note}), sorted '
            'so the spreads that drop nothing come first. "Premium" drops no '
            'matchups versus a perfect IV in the stated case; everything else '
            f'lists exactly what it gives up. {meta_note}</p>']
@@ -1013,13 +1024,25 @@ def render(d):
     credit_name = esc(CREDIT_NAME)
     credit_url = esc(CREDIT_URL)
     shieldconv = esc(d['shield_convention'])
-    limited_html = (f"""<div class="limited-banner"><strong>Limited-availability
+    lo, hi = min(d['iv_range']), max(d['iv_range'])
+    if d['species'] not in LIMITED_AVAILABILITY:
+        limited_html = ""
+    elif lo <= 10:
+        # Swept at the real research floor: the owned-spread caveat no longer
+        # applies, so the banner reassures instead of warning.
+        limited_html = (f"""<div class="limited-banner"><strong>Limited-availability
+species.</strong> {sp} comes from research, quests, or other capped encounters,
+so most trainers own only one or a few and cannot re-roll for IVs. Those
+encounters floor at {lo}/{lo}/{lo} -- and this guide is swept all the way down
+to that floor, so a legitimately-owned spread is covered here.</div>""")
+    else:
+        limited_html = (f"""<div class="limited-banner"><strong>Limited-availability
 species: your IVs may be below this grid.</strong> {sp} comes from research,
 quests, or other capped encounters, so most trainers own only one or a few and
 cannot re-roll for IVs. Those encounters floor at 10/10/10, below this guide's
-12/12/12 sweep floor -- so a legitimately-owned spread under 12 in any stat
-will not appear here. A floor-corrected re-sweep for these species is
-planned.</div>""" if d['species'] in LIMITED_AVAILABILITY else "")
+{lo}/{lo}/{lo} sweep floor -- so a legitimately-owned spread under {lo} in any
+stat will not appear here. A floor-corrected re-sweep for this species is
+planned.</div>""")
     compact = len(d['shields']) > 3
     toggle_script = ("""
 <script>
@@ -1040,7 +1063,7 @@ updShields();
     main_parts = [f"""<h2 id="covers">What this covers</h2>
 <ul>
 <li>{sp} against the Master League meta (PvPoke top-{d['n_opponents']}).</li>
-<li>Attack, Defense, and HP IVs from 15 down to 12, compared to a perfect IV.</li>
+<li>Attack, Defense, and HP IVs from {hi} down to {lo}, compared to a perfect IV.</li>
 <li>The full grid of best-buddy / no-best-buddy, for you and for the meta.</li>
 <li>The minimum recommended IV spreads, and exactly what each gives up.</li>
 </ul>
@@ -1133,7 +1156,7 @@ def main():
             f'description = "AI-drafted (auto data tables + Claude-drafted prose), not yet '
             f'human-reviewed. XehrFelrose-style IV deep dive for {d["species"]} in Master '
             f'League (with {moveword(d)}): breakpoints, bulkpoints, CMP, and named '
-            f'matchups given up at each IV from 15 to 12, across the full best-buddy grid '
+            f'matchups given up at each IV from {max(d["iv_range"])} to {min(d["iv_range"])}, across the full best-buddy grid '
             f'over {d["shield_convention"]}, plus recommended IV spreads. '
             f'Format/terminology adapted from {CREDIT_NAME} '
             f'({CREDIT_URL}); numbers independently simulated. Human review of the prose '
