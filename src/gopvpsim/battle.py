@@ -1174,8 +1174,11 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         max_dmg_idx = None
         prev_dmg    = -1
         a_energy    = attacker.energy
-        a_atk       = attacker.atk
-        d_atk       = defender.atk
+        # CMP (charged-move priority) uses the shadow-FREE attack: the shadow
+        # x1.2 boosts damage, not priority (the 2026-06-13 shadow-CMP fix; this
+        # double-fire gate was the missed 10th site). Use cmp_atk, not atk.
+        a_atk       = attacker.cmp_atk
+        d_atk       = defender.cmp_atk
         for n in range(n_cms - 1, -1, -1):
             cm_e = cm_energy[n]
             if a_energy >= cm_e:
