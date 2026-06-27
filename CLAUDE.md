@@ -169,6 +169,24 @@ case to confirm the fight is actually identical, not just the score.
 Score-coincidence is a real failure mode that the chargedLog
 assertions exist to catch.
 
+## Sweep cache: use `--no-sweep-cache` while changing the engine
+
+The sweep disk cache (`scripts/sweep_cache.py`, cache-rework v6) keys a
+column on focal + opponent + gamemaster but **NOT** the engine hash — the
+engine is a per-column stamp. A stale stamp is a safe miss (re-simmed, never
+served), so correctness is always protected. But `put_column` overwrites a
+column **in place**, so running a dive/sweep **with the cache on under a
+work-in-progress engine overwrites the trusted columns** with WIP results —
+you lose the warm backup (not correctness) for everything you re-ran.
+
+So when you're iterating on engine code (`battle.py`, `_dp_jit.py`,
+`moves.py`, `formchange.py`, `pokemon.py`), run dives with
+**`--no-sweep-cache`**. Only bake with the cache on once the engine change is
+trusted; then re-bake, or bless selectively with `scripts/migrate_cache.py`.
+GC's N-1 retention is by gamemaster vintage, not engine, so it never deletes
+your trusted cache because of engine work. Full mechanics + the warm
+re-dive recipe: DEVELOPER_NOTES "Sweep disk cache".
+
 ## Key design decisions
 - Core `gopvpsim/` library is pure Python (keeps mobile option open).
   Deep dive scripts (`scripts/`) may use numba/Cython/C extensions for speed.
