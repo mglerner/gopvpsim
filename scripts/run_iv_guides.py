@@ -29,6 +29,24 @@ INDEX = os.path.join(ROOT, 'scripts', 'build_website_index.py')
 DEFAULT_POOL = os.path.join(ROOT, 'opponent_pools', 'master_top60.txt')
 PY = sys.executable
 
+# Untradeable mythical / Routes-only mons whose real IRL IV floor is the
+# 10/10/10 research/raid-reward minimum, NOT the 12/12/12 lucky-trade floor the
+# sweep otherwise assumes. These are swept at floor 10 automatically so a
+# legitimately-owned sub-12 spread is evaluable (e.g. an 11/13/11 Marshadow).
+# Distinct from the renderer's LIMITED_AVAILABILITY banner set: Eternatus is
+# flagged limited there but its tradeability is unresolved (2026-06-27), so it
+# is deliberately NOT resweept here -- it stays at the default 12 floor pending
+# human confirmation. Names must match the pool entries verbatim.
+FLOOR_10_SPECIES = frozenset({
+    'Marshadow',
+    'Meloetta (Aria)',
+    'Jirachi',
+    'Keldeo (Ordinary)',
+    'Keldeo (Resolute)',
+    'Zygarde (Complete Forme)',
+})
+DEFAULT_IV_FLOOR = 12
+
 
 def physical_cores():
     """Physical (not hyperthread) core count, so we don't oversubscribe the
@@ -67,17 +85,18 @@ def _last_err(proc):
     return err.splitlines()[-1] if err else f'exit {proc.returncode}'
 
 
-def run_one(species):
+def run_one(species, iv_floor=DEFAULT_IV_FLOOR):
     json_path = os.path.join(
         'userdata', 'dives', f'{json_slug(species)}_iv_envelope_all9.json')
     t0 = time.time()
+    floor_args = [] if iv_floor == DEFAULT_IV_FLOOR else ['--iv-floor', str(iv_floor)]
     # TODO (deferred 2026-06-20): for per-phase progress in iv_guides_status.py
     # (hundo -> detail -> recommended N/64), tee this stdout to
     # userdata/logs/iv_guides/<slug>.log instead of capturing it in memory, add
     # incremental progress prints in iv_envelope_analysis.py's recommended loop,
     # and have the status script show each running dive's last log line. Only
     # takes effect on a fresh launch. See memory project_ml_iv_guide_pipeline.
-    a = subprocess.run([PY, ANALYSIS, '--all-shields', species],
+    a = subprocess.run([PY, ANALYSIS, '--all-shields', *floor_args, species],
                        cwd=ROOT, capture_output=True, text=True)
     if a.returncode != 0:
         return species, False, f'analysis failed: {_last_err(a)}', time.time() - t0
@@ -104,7 +123,16 @@ def main():
                     help='skip species whose article dir already exists')
     ap.add_argument('--no-index-refresh', action='store_true',
                     help='do not rebuild the website index after each guide')
+    ap.add_argument('--iv-floor', type=int, default=DEFAULT_IV_FLOOR,
+                    help='default per-stat IV floor for ALL species (default '
+                         f'{DEFAULT_IV_FLOOR}). The FLOOR_10_SPECIES set is '
+                         'always swept at 10 regardless of this.')
     a = ap.parse_args()
+
+    def floor_for(sp):
+        # Limited-availability mythicals: their real floor (10) wins even when
+        # the run default is 12, so a plain full bake corrects them in one pass.
+        return 10 if sp in FLOOR_10_SPECIES else a.iv_floor
 
     species = a.species if a.species else read_pool(a.pool)
     if a.skip_existing:
@@ -119,17 +147,23 @@ def main():
     jobs = a.jobs if a.jobs is not None else max(1, cores - a.reserve)
     print(f'Detected {cores} physical cores; reserving {a.reserve}; '
           f'running up to {jobs} concurrent dives.')
-    print(f'{len(species)} species to generate.\n', flush=True)
+    print(f'{len(species)} species to generate.', flush=True)
+    floor10 = [s for s in species if s in FLOOR_10_SPECIES]
+    if floor10:
+        print(f'Sweeping at the 10/10/10 floor (limited-availability): '
+              f'{", ".join(floor10)}', flush=True)
+    print(flush=True)
     if not species:
         return
 
     results, t0 = [], time.time()
     with ThreadPoolExecutor(max_workers=jobs) as ex:
-        futs = {ex.submit(run_one, s): s for s in species}
+        futs = {ex.submit(run_one, s, floor_for(s)): s for s in species}
         for n, fut in enumerate(as_completed(futs), 1):
             sp, ok, info, dt = fut.result()
+            floor_tag = ' [floor 10]' if sp in FLOOR_10_SPECIES else ''
             print(f'[{n}/{len(species)}] {"OK  " if ok else "FAIL"} '
-                  f'{sp} ({dt / 60:.1f} min) {info}', flush=True)
+                  f'{sp}{floor_tag} ({dt / 60:.1f} min) {info}', flush=True)
             results.append((sp, ok, info))
             # Refresh the website index as each new guide lands. This loop runs
             # in the main thread, so the rebuilds are serialized (no race on

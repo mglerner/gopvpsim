@@ -367,7 +367,7 @@ def cmp_lost(focal_base, opponents, my_lvl, opp_lvl, stat_iv):
 
 def main():
     import argparse
-    global SHIELDS, FOCAL_SHADOW, POOL_FILE, CACHE
+    global SHIELDS, FOCAL_SHADOW, POOL_FILE, CACHE, IVS
     ap = argparse.ArgumentParser(description='ML IV envelope analysis -> JSON.')
     ap.add_argument('species', nargs='?', default='Dialga (Origin)')
     ap.add_argument('--all-shields', action='store_true',
@@ -386,8 +386,21 @@ def main():
                          'Much slower (4x the rec-table margin sims); reserve '
                          'for a staged full re-bake, not a shared/iterative '
                          'run. Default: headline quadrant only.')
+    ap.add_argument('--iv-floor', type=int, default=12,
+                    help='lowest per-stat IV to sweep (default 12 = the '
+                         'lucky-trade floor). Use 10 for untradeable mythicals '
+                         '/ Routes-only mons whose only obtainable floor is the '
+                         '10/10/10 research-or-raid-reward minimum, so a '
+                         'legitimately-owned sub-12 spread can be evaluated.')
     a = ap.parse_args()
     species = a.species
+
+    if not 0 <= a.iv_floor <= 15:
+        ap.error('--iv-floor must be in [0, 15]')
+    # floor 12 -> [15,14,13,12] (default behavior preserved); floor 10 ->
+    # [15..10]. Propagates to the detail loops, the recommended-combo
+    # product(IVS, repeat=3), and the emitted 'iv_range' (all read this global).
+    IVS = list(range(15, a.iv_floor - 1, -1))
 
     POOL_FILE = a.pool
     SHIELDS = ALL9_SHIELDS if a.all_shields else EVEN_SHIELDS
