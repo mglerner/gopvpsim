@@ -8,25 +8,29 @@ STALE; that fully-merged branch ref can be deleted). The CODE is live; what's
 still pending is the **re-dive** that propagates the fix into the published
 dives + cache columns (those are still pre-fix in their shadow-XOR cells).
 
-**OPEN DECISION (scoped this session, 2026-06-27):** batch bug #2 (float32
-damage constants) and do ONE *cold* re-dive that captures #1 + #2 (+ #3), vs
-do the warm shadow-XOR-only re-dive for #1 alone now.
+**DECISION (2026-06-27): #2 DEFERRED, so do the warm #1-only re-dive.**
+Michael's call this session: leave bug #2 (float32 damage constants) in TODO,
+don't batch it now. With #2 deferred and #3 landed needing no re-dive, the one
+outstanding item is propagating the bug-#1 fix into shipped outputs via the
+**warm shadow-XOR re-dive** (small: ~35 cells / 6 winner flips measured).
 
-- #2 forces a cold re-dive (boundary-scattered, no clean predicate) and lands
-  on breakpoint boundaries (the core deliverable). Scoped this session: only
-  **1/1075** tests shifts (a synthetic boundary test, not an oracle fixture)
-  -- the "shifts many fixtures" fear did NOT materialize; the fix is small +
-  makes us match PvPoke/game better. A cold re-dive subsumes #1's warm re-dive.
-- #3 (farm-down self-debuff stacking) is now IMPLEMENTED on `main`'s working
-  tree (pending adversarial sign-off + commit) and measured to change **0**
-  default-moveset cells (GL+UL top-40 x pool x 9 shields), and matches PvPoke
-  on 162/162 firing-config oracle cells. It needs NO re-dive of shipped dives;
-  it only affects user-picked self-debuff-dominant movesets.
-
-**Warm path** (only if doing #1 alone, i.e. NOT batching #2):
+THE NEXT ACTION (warm #1 re-dive):
 `migrate_cache.py --list-stamps` -> find the pre-fix stamp;
 `--from-engine <pre-fix> --predicate shadow_xor --apply` to bless unaffected
 columns and drop the shadow-XOR ones; re-dive (warm) -> re-publish.
+
+Status of the sibling bugs:
+- **#2 (float32)** -- DEFERRED to TODO (see "OVERNIGHT 2026-06-27" follow-ups +
+  "engine bug-hunt findings"). Scoping done this session: forces a cold re-dive
+  (boundary-scattered, no clean predicate), BUT only **1/1075** tests shifts (a
+  synthetic boundary test, not an oracle fixture) -- the "shifts many fixtures"
+  fear did NOT materialize; the fix is small and makes us match PvPoke/game
+  better. If/when taken, it subsumes #1's warm re-dive (cold captures both).
+- **#3 (farm-down self-debuff stacking)** -- FIXED + committed 2026-06-27
+  (`7a55d43`, `tests/test_bug3_farm_stack.py`). Changes **0** shipped
+  default-moveset cells; only affects user-picked self-debuff-dominant
+  movesets, so it needs no re-dive. (Verification also surfaced ~117
+  PRE-EXISTING both-self-debuff PvPoke divergences -- new follow-up logged.)
 
 Reminder: while editing engine files, run dives with `--no-sweep-cache` until
 trusted (see CLAUDE.md "Sweep cache" + "Before a cold re-dive, check for a
@@ -34,10 +38,12 @@ tractable migration").
 
 ----
 
-## OVERNIGHT 2026-06-27 (branch `overnight/2026-06-26`, NOT merged/published)
+## OVERNIGHT 2026-06-27 (NOW MERGED into `main`; branch deleted 2026-06-27)
 
-A Claude overnight session. Everything is on the branch for your review;
-nothing was published to the live site. Five commits:
+A Claude overnight session. **All five commits below are now in `main`** (the
+branch `overnight/2026-06-26` was an ancestor of `main` via the cache-rework
+merge, and was deleted 2026-06-27). Nothing was auto-published to the live
+site -- publish is still the separate gated step. Commits:
 
 **Done (pending your review):**
 - **Mimikyu (Busted) starts-busted GL + UL dives** + the engine change they
