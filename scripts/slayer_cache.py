@@ -24,7 +24,12 @@ from pathlib import Path
 # plumbing (scripts/ is outside the engine source hash; bump is the
 # standing rule for any worker-code change even when outputs are
 # expected identical).
-CACHE_VERSION = 3
+# v4 (2026-06-27): bug #4 fix — the key now includes ``focal_max_level``.
+# Pre-v4 keys omitted the focal level cap, so a Master mirror-slayer run
+# at one ``--max-level`` could serve another's stale cached scores
+# (the cap changes the whole cohort's per-IV levels). Bump invalidates
+# the level-cap-blind entries.
+CACHE_VERSION = 4
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'slayer'
 
 
@@ -48,7 +53,7 @@ def _move_hash(move_dict):
 
 
 def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_stats,
-                      shield_scenarios=None, iv_floor=None):
+                      shield_scenarios=None, iv_floor=None, focal_max_level=None):
     """
     Build a stable cache key string identifying a slayer-iteration scenario.
 
@@ -60,6 +65,11 @@ def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_st
     - ``iv_floor`` — cache entries are keyed by POSITIONAL iv_meta indices,
       and the floor changes the index↔IV mapping, so floored and floorless
       runs of the same species must not share a file;
+    - ``focal_max_level`` — the focal's max power-up level cap (best-buddy /
+      ``--max-level``). It lifts the WHOLE mirror cohort's per-IV levels, so
+      two runs at different caps produce different scores and must not share a
+      file (bug #4, 2026-06-27). Mirrors the sweep cache's ``focal_max_level``
+      field. ``None`` means the run used the league default;
     - the engine-source hash from sweep_cache (battle.py & friends) — any
       engine edit invalidates automatically, instead of relying on a manual
       CACHE_VERSION bump (which was forgotten once already, see v2 note);
@@ -87,6 +97,7 @@ def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_st
         h.update(scen_str.encode())
     if iv_floor is not None:
         h.update(f'floor={tuple(iv_floor)}'.encode())
+    h.update(f'focal_max_level={focal_max_level}'.encode())
     return f'{species}_{league}_{h.hexdigest()[:12]}'
 
 
