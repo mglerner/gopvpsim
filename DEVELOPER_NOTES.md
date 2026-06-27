@@ -464,6 +464,11 @@ oracle-reproduced (Shadow Quagsire vs Gastrodon 2v1: pre-fix we wrongly had
 Quagsire win 625/375, oracle + fix → Gastrodon 459/540) and pinned by
 `test_fire_now_cmp_shadow.py` (9-cell oracle snapshot). Note: any dive /
 ML guide generated before this fix carries the bug in its shadow-XOR cells.
+Measured impact (2026-06-27 old-vs-new scan, GL pool shadow-XOR matchups,
+2 IV samples x 9 shields = 20,178 cells): 35 changed (0.17%), 6 winner
+flips, max margin 273 — small + localized, recurring window-defenders
+Talonflame / Milotic / Guzzlord / Gourgeist / Dusclops. Scope + re-dive
+plan live in TODO.md's cache-rework handoff (warm selective re-dive).
 
 ### OPEN 2026-06-27 — engine bug-hunt findings #2–#6 (confirmed, NOT yet fixed)
 

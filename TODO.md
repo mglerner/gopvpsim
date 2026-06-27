@@ -168,6 +168,21 @@ GC / ML-sweep-merge items already in this bundle:
    shadow, warm-serve the rest" tool turns the post-#1 re-dive from cold
    into a small warm recompute. Design the predicate-invalidation API so
    future localized fixes (not just shadow) can reuse it.
+
+   **Measured impact of #1 (2026-06-27 scan), to scope the warm re-dive:**
+   ran the GL pool's shadow-XOR matchups old-engine (`152daf82` = `b1b58f1^`)
+   vs new, at 2 IV samples (15/15/15, 0/15/15) x 9 shields = 20,178 cells.
+   Result: **35 cells changed (0.17%), 6 winner flips, max margin 273.**
+   Small + localized -> a full cold re-bake just for #1 is overkill; this is
+   exactly the warm-selective-re-dive case. The flips cluster on shadow
+   attackers (Forretress-S, Ninetales-S, Quagsire-S, Jumpluff-S, Sealeo-S)
+   vs a defender whose atk lands in the `cmp_atk..atk` window -- recurring
+   window-defenders were **Talonflame, Milotic, Guzzlord, Gourgeist
+   (Super), Dusclops(-S)**. A scoped warm re-dive can target guides/dives
+   touching those species. (This was a 2-IV sample, not the full 4096-IV
+   grid; a per-IV sweep of just those matchups gives the exact per-guide
+   count if needed -- methodology: git worktree at `b1b58f1^` for the old
+   battle.py, shadow-XOR pairs only, diff score+winner.)
 2. **Roll in bug #4** (slayer disk-cache key omits the focal level cap ->
    stale cross-`--max-level` hits; `scripts/slayer_cache.py`
    `compute_cache_key`). Same machinery, same CACHE_VERSION-bump concern;
