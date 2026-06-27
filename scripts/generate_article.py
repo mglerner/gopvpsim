@@ -2161,7 +2161,7 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
         pool_line = (
             f'<p class="matchup-delta-pool"><strong>Opponents:</strong> '
             f'{len(opponents)} species - {html.escape(pool_label)}. '
-            f'This is the opponent pool the deep dive was simulated against; '
+            f'This is the opponent pool the dive was simulated against; '
             f'pool recipes live in <code>opponent_pools/</code>. '
             f'For the Great League default (<code>gl_top50_plus_cs.txt</code>) '
             f'that is the top 50 overall PvPoke rankings unioned with the '
@@ -2450,7 +2450,7 @@ def _render_tier_card(tier: dict, members: int, n_ivs: int,
     if link_href:
         heading_html = (
             f'{heading_prefix}<a href="{html.escape(link_href)}" '
-            f'title="Jump to this tier in the deep dive">{escaped_name}</a>'
+            f'title="Jump to this tier in the dive">{escaped_name}</a>'
         )
     else:
         heading_html = f'{heading_prefix}{escaped_name}'
@@ -2511,7 +2511,7 @@ def _render_iv_recommendations_per_form_section(cd_move: str,
         for label, url in dive_links
     )
     intro = (
-        f'<p class="iv-rec-intro">Follow through to each deep dive\'s '
+        f'<p class="iv-rec-intro">Follow through to each dive\'s '
         f'Threshold Tiers section for the per-anchor matchup bullets '
         f'backing each tier: {link_items}. New to tier cards? '
         f'The <a href="../../guides/threshold-tiers/">Threshold Tiers '
@@ -2590,7 +2590,7 @@ def _render_iv_recommendations_section(cd_move: str, species: str,
         f'<p class="iv-rec-intro">Tier cutoffs from the best CD moveset '
         f'(<code>{pretty}</code>). Each tier is a named band of IV spreads '
         f'sharing a stat target. For the per-anchor matchup bullets backing '
-        f'each tier, follow through to the deep dive\'s '
+        f'each tier, follow through to the dive\'s '
     )
     if dive_href:
         intro += (f'<a href="{html.escape(dive_href)}">Threshold Tiers '
@@ -3049,8 +3049,8 @@ def resolve_dive_title(dive_dir: Path, species_fallback: str) -> str:
     if meta_path.exists():
         with open(meta_path, 'rb') as f:
             dive_meta = tomllib.load(f)
-        return dive_meta.get('title', f'{species_fallback} IV Deep Dive')
-    return f'{species_fallback} IV Deep Dive'
+        return dive_meta.get('title', f'{species_fallback} IV Dive')
+    return f'{species_fallback} IV Dive'
 
 
 def resolve_dive_link(article: dict) -> str:
@@ -3429,7 +3429,7 @@ def render_html(article: dict, authorship: str, dive_dir: Path,
 </div>
 {authorship_banner}{banner}
 <div class="related">
-  Simulation Deep Dive: {form_dive_links_html or f'<a href="{html.escape(dive_link)}">{dive_title}</a>'}
+  Simulation Dive: {form_dive_links_html or f'<a href="{html.escape(dive_link)}">{dive_title}</a>'}
 </div>
 
 {sections_html}

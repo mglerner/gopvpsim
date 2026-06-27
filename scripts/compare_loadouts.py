@@ -853,7 +853,7 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
         species = html.escape(ld['spec'].species)
         dive_items.append(
             f'<li><strong>{label}:</strong> {species} '
-            f'(<a href="../../{slug}/">deep dive</a>)</li>'
+            f'(<a href="../../{slug}/">dive</a>)</li>'
         )
     bits.append('<ul class="compare-dives">' + ''.join(dive_items) + '</ul>')
 

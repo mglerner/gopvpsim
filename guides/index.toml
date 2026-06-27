@@ -2,12 +2,12 @@
 # Consumed by scripts/build_guides.py.
 
 title = "Reader's Guide"
-description = "Plain-language explainers for the metrics and figures in our deep dives and CD articles. Aimed at PvP players who want to read the analysis without reading the code."
+description = "Plain-language explainers for the metrics and figures in our dives and CD articles. Aimed at PvP players who want to read the analysis without reading the code."
 
 # Intro paragraph(s) rendered at the top of the landing page.
 # Hand-authored; no tokens.
 body = """
-The interactive deep dives and Community Day articles on this site use a
+The interactive dives and Community Day articles on this site use a
 handful of terms you won't find on PvPoke or GamePress: "envelope position,"
 "threshold tier," "flavor," "slayer category." They aren't new game
 concepts - they're the vocabulary we built to talk about **which IV to

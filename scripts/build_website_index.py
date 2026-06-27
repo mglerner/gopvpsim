@@ -7,7 +7,7 @@ landing page with separate sections for each content type.
 
 Dive/article metadata schema (per subdir ``meta.toml``):
 
-    title       = "Tinkaton - Great League IV Deep Dive"
+    title       = "Tinkaton - Great League IV Dive"
     description = "Free text, can be multi-line."
     landing     = "tinkaton_gl_toml.html"   # relative to the subdir
 
@@ -193,7 +193,7 @@ def _fallback_meta_from_html(sub: Path) -> dict | None:
     # Default description for auto-discovered dives. Good enough for
     # the landing page; curate by authoring a real meta.toml when the
     # dive deserves a richer blurb.
-    description = ('Interactive IV / moveset deep dive. '
+    description = ('Interactive IV / moveset dive. '
                    'Per-opponent matchup data, IV-tier recommendations, '
                    'and a scatter plot of 4,096 IVs by stat product.')
     return {
@@ -544,7 +544,7 @@ def render_index(dives: list[dict],
         '\n<h2>Articles</h2>\n',
         '<p class="section-intro">Editorial writeups: Community Day move '
         'analyses, form-change guides, and other one-off pieces. Each links '
-        'to the relevant interactive deep dive(s) for the full per-IV '
+        'to the relevant interactive dive(s) for the full per-IV '
         'detail.</p>\n',
     ]
     if articles:
@@ -581,7 +581,7 @@ def render_index(dives: list[dict],
         guides_section = (
             '\n<h2>Reader\'s Guide</h2>\n'
             '<p class="section-intro">Background and how-to-read explainers for '
-            'the deep dives and IV guides.</p>\n'
+            'the dives and IV guides.</p>\n'
             '<ul>\n'
             f'<li class="dive"><a href="{href}">{title}</a>\n'
             f'{desc_html}\n'
@@ -594,7 +594,7 @@ def render_index(dives: list[dict],
 <head>
 <meta charset="utf-8">
 {theme_head_script()}
-<title>Pokemon Go PvP Deep Dives</title>
+<title>Pokemon Go PvP Dives</title>
 <style>{theme_css()}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
          sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px;
@@ -612,6 +612,16 @@ def render_index(dives: list[dict],
              margin-bottom: 14px; }}
   li.dive p {{ margin: 6px 0 0 0; color: var(--text-muted); font-size: 14px; }}
   li.dive.empty {{ color: var(--text-muted); }}
+  .dives-box {{ position: relative; }}
+  .dives-scroll {{ max-height: 395px; overflow-y: auto; border: 1px solid var(--border);
+                   border-radius: 4px; padding: 10px 14px 2px; background: var(--bg); }}
+  .dives-scroll ul {{ margin: 0; }}
+  .dives-scroll li.dive:last-child {{ margin-bottom: 12px; }}
+  .dives-box::after {{ content: ""; position: absolute; left: 1px; right: 1px; bottom: 1px;
+                       height: 30px; pointer-events: none; border-radius: 0 0 4px 4px;
+                       background: linear-gradient(transparent, var(--bg)); }}
+  .scroll-hint {{ color: var(--text-muted); font-size: 13px; margin: 4px 0 14px 0;
+                  font-style: italic; }}
   .section-intro {{ color: var(--text-muted); font-size: 14px; margin: 0 0 14px 0; }}
   .species {{ font-weight: bold; color: var(--text); margin-right: 10px; }}
   a.chip {{ display: inline-block; background: var(--surface-2); color: var(--accent);
@@ -624,18 +634,23 @@ def render_index(dives: list[dict],
 </head>
 <body>
 {theme_picker_html()}
-<h1>Pokemon Go PvP Deep Dives</h1>
-<p>Interactive IV / moveset deep dives generated from a homebrew battle
+<h1>Pokemon Go PvP Dives</h1>
+<p>Interactive IV / moveset dives generated from a homebrew battle
 simulator that matches PvPoke's simulate-mode scores. Click a title to
 open the dive. Each page is self-contained and runs in your browser.</p>
-<h2>Deep Dives</h2>
+<h2>Dives</h2>
 <p class="section-intro">Each dive simulates all 4,096 IVs against the meta
 across all 9 shield scenarios, with per-opponent matchup data, IV-tier
 recommendations, and an interactive stat-product scatter. Pick a variant to
 open it.</p>
+<p class="scroll-hint">Scroll within the box below for the full list of dives.</p>
+<div class="dives-box">
+<div class="dives-scroll">
 <ul>
 {dives_html}
 </ul>
+</div>
+</div>
 {matchup_web_section}{articles_section}{comparisons_section}{guides_section}
 <p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
 <p class="about">If you find something broken or surprising, reach out on Discord: <a href="https://discord.com/users/460510521112920105">TitanTrainers15</a>.</p>
