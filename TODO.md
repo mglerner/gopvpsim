@@ -147,6 +147,36 @@ so fold this into that run. See the `score_set` docstring.
 
 ## Sweep cache should store energy so `--compare-energy` warm re-dives work (POST-PUBLISH)
 
+**HANDOFF 2026-06-27 (Michael) -- DO THIS BUNDLE NEXT, ahead of bug fixes.**
+The shadow-CMP bug #1 fix (`docs/reviews/2026-06-27_engine_bug_hunt.md`) is
+INTENTIONALLY DEFERRED until this cache session lands, because fixing it
+edits `battle.py` -> bumps the engine-source hash -> invalidates the WHOLE
+sweep cache -> forces a COLD full re-dive. The point of doing the cache
+work first: make the post-fix re-dive WARM.
+
+Two concrete requirements for this session, on top of the energy-column /
+GC / ML-sweep-merge items already in this bundle:
+
+1. **Selective invalidation by predicate.** Replace (or augment) the
+   blunt all-or-nothing engine-source hash with a mechanism to invalidate
+   only the cache columns a localized engine change actually touches. Bug
+   #1's affected set is cleanly characterizable -- ONLY matchups where
+   exactly one side is shadow (shadow-XOR; both-non-shadow and both-shadow
+   are provably unaffected, since dividing both atks by 1.2 preserves the
+   CMP inequality). So a "invalidate columns where focal-or-opponent is
+   shadow, warm-serve the rest" tool turns the post-#1 re-dive from cold
+   into a small warm recompute. Design the predicate-invalidation API so
+   future localized fixes (not just shadow) can reuse it.
+2. **Roll in bug #4** (slayer disk-cache key omits the focal level cap ->
+   stale cross-`--max-level` hits; `scripts/slayer_cache.py`
+   `compute_cache_key`). Same machinery, same CACHE_VERSION-bump concern;
+   mirror the sweep cache's `focal_max_level` field + add the
+   `test_slayer_cache_key.py` level-cap separation case.
+
+Then: fix #4 + #1, warm-re-dive the shadow-involved cells, re-publish. The
+killed 2026-06-27 ML bake (45/61 done, pre-#1 engine) is throwaway -- the
+warm re-dive regenerates everything incl. the floor-10 limited-mon config.
+
 *(2026-06-25, post-ship arc -- comes AFTER publish/app/Reddit.)* Michael's
 call: `--compare-energy` is good enough that we'll want it ON by default
 basically always. But capturing post-match energy currently **force-disables
