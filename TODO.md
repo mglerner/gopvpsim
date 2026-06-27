@@ -1,14 +1,19 @@
-## >> NEXT ACTION (2026-06-27 PM): finish ML-sweep progress reporting, THEN cold re-dive
+## >> NEXT ACTION (2026-06-27 PM): cold re-dive (ML-sweep progress reporting LANDED)
 
 The pre-redive ENGINE + RENDER batch LANDED this session (2026-06-27 PM); tree
 clean at `96a1c48`, nothing published. The re-dive is now irreducibly **COLD**
-(the float32 fix forces it; the legacy cache is all-None-stamped). Two clean,
-focused sessions remain, IN ORDER:
+(the float32 fix forces it; the legacy cache is all-None-stamped). The remaining
+pre-redive task is now done; ONE focused session remains:
 
-1. **ML-sweep progress reporting** -- a new pre-redive task (see its section
-   immediately below). Do it in a FRESH session; it shares no context with the
-   engine batch. Land it BEFORE the cold re-dive so the long ML bake reports
-   progress into the watch script.
+1. **ML-sweep progress reporting** -- DONE (2026-06-27 PM, commits `df51527`
+   route iv_envelope_analysis progress through the structured logger /
+   `3d0b2e8` unlink stale per-guide log per run / `2d82b51` watch views surface
+   per-worker phase / `0a207a0` tests). The ML sweeps now write a deterministic
+   per-guide log `userdata/logs/iv_guides/<slug>.log` with phase lines
+   ([hundo k/4], [detail k/4], [recommended N/64], Wrote), and
+   `iv_guides_status.py` + `chain_status.py` show each live worker's current
+   phase. Adversarially verified: JSON byte-identical to the clean-tree golden,
+   suite 1098p/14xf/0fail, no engine files touched. See its section below.
 2. **Cold re-dive** (`overnight_redive.sh`) -- fresh, long-running, monitored
    session: re-dive on the new engine + refreshed gamemaster, review,
    re-publish, then GC the legacy cache.
@@ -46,7 +51,11 @@ Reminder: while editing engine files, run dives with `--no-sweep-cache` until
 trusted (see CLAUDE.md "Sweep cache" + "Before a cold re-dive, check for a
 tractable migration").
 
-## ML-sweep progress reporting (PRE-REDIVE -- do BEFORE the cold re-dive)
+## ML-sweep progress reporting (DONE 2026-06-27 PM)
+
+**DONE** -- shipped in `df51527` / `3d0b2e8` / `2d82b51` / `0a207a0` (see NEXT
+ACTION above for the summary + verification). Original task notes kept below for
+reference.
 
 *(2026-06-27 PM, Michael)* The GL/UL dives have nice structured progress
 reporting; the ML IV-guide sweeps do not -- a long ML bake runs mostly silent.
