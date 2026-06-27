@@ -704,6 +704,37 @@ def format_stat_cutoffs(cutoffs):
     return ', '.join(parts)
 
 
+def _cutoff_scanner_spec(atk, def_, hp):
+    """Stat-cutoff scanner spec for a composite/tier card: the
+    {attack, defense, stamina} shape the gobattlekit IV scanner expects.
+    Atk/Def round to 2 dp; stamina is an integer. None/0 inputs -> 0."""
+    return {
+        'attack': round(float(atk or 0), 2),
+        'defense': round(float(def_ or 0), 2),
+        'stamina': int(hp or 0),
+    }
+
+
+def _scanner_button_html(species, league, card_name, spec):
+    """The per-card "Copy for IV scanner" button: a paste-ready gobattlekit
+    user-threshold fragment {species: {League: {card-name: spec}}} in the
+    shared check_thresholds schema. ``spec`` is either a stat-cutoff dict
+    (see _cutoff_scanner_spec) or an explicit IV-list dict
+    {attack:0, defense:0, stamina:0, ivs:[[a,d,s], ...]}. Callers gate
+    emission (composite needs cutoffs; matchup caps at 300 members) before
+    calling. Format confirmed from gobattlekit's user-thresholds loader."""
+    scanner_json = _html.escape(
+        json.dumps({species: {league.capitalize(): {card_name: spec}}}),
+        quote=True)
+    return (
+        f'<button class="dd-iv-toggle" style="margin:2px 0 6px 0" '
+        f'data-scanner-json="{scanner_json}" '
+        f'onclick="copyScannerJson(this)" '
+        f'title="Copy this card as a gobattlekit user-threshold '
+        f'JSON fragment (paste into the IV scanner)">'
+        f'Copy for IV scanner</button>\n'
+    )
+
 
 def composite_tradeoff_prose(member_idx, comp_cat, parent_categories, data_obj):
     """Auto-generate the per-member tradeoff prose for a composite category.
@@ -1490,15 +1521,11 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
         # truncated scanner spec silently misses owned mons, so beyond
         # that the button is omitted rather than wrong (huge matchup
         # cards aren't meaningful scan targets anyway).
-        _species = data_obj.get('species') or 'Species'
-        _league_t = (data_obj.get('league') or 'great').capitalize()
         _spec = None
         if cat.kind == 'composite' and cat.stat_cutoffs:
-            _spec = {
-                'attack': round(float(cat.stat_cutoffs.get('atk', 0) or 0), 2),
-                'defense': round(float(cat.stat_cutoffs.get('def', 0) or 0), 2),
-                'stamina': int(cat.stat_cutoffs.get('hp', 0) or 0),
-            }
+            _spec = _cutoff_scanner_spec(cat.stat_cutoffs.get('atk'),
+                                         cat.stat_cutoffs.get('def'),
+                                         cat.stat_cutoffs.get('hp'))
         elif n_members <= 300:
             _spec = {
                 'attack': 0, 'defense': 0, 'stamina': 0,
@@ -1506,17 +1533,9 @@ function ddNotableExpand(cardId, btn, nHidden, nVisible) {
                          data_obj['ivS'][m]] for m in members_sorted],
             }
         if _spec is not None:
-            _scanner_json = _html.escape(
-                json.dumps({_species: {_league_t: {cat.name: _spec}}}),
-                quote=True)
-            parts.append(
-                f'<button class="dd-iv-toggle" style="margin:2px 0 6px 0" '
-                f'data-scanner-json="{_scanner_json}" '
-                f'onclick="copyScannerJson(this)" '
-                f'title="Copy this card as a gobattlekit user-threshold '
-                f'JSON fragment (paste into the IV scanner)">'
-                f'Copy for IV scanner</button>\n'
-            )
+            parts.append(_scanner_button_html(
+                data_obj.get('species') or 'Species',
+                data_obj.get('league') or 'great', cat.name, _spec))
 
         # Cap total rendered members to avoid multi-MB HTML for large
         # matchup cards (e.g. 2200 IVs beating Lapras). Top members by
@@ -1840,32 +1859,15 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             f'style="font-weight:400;color:var(--notable);display:none"></span>'
             f'</h4>\n'
         )
-        # --- Scanner export (parity with composite cards, ~line 1496) ---
-        # A tier IS a composite stat-cutoff card, so it gets the same
-        # "Copy for IV scanner" button: emit the cutoffs as a gobattlekit
-        # user-threshold fragment {species:{League:{tier-name:spec}}}.
-        # Gated on having at least one positive cutoff -- a no-cutoff tier
-        # would export attack/defense/stamina all 0 ("scan everything"),
-        # which is degenerate, so omit the button there.
+        # --- Scanner export: a tier IS a composite stat-cutoff card, so it
+        # gets the same "Copy for IV scanner" button (see _scanner_button_html).
+        # Gated on at least one positive cutoff -- a no-cutoff tier would
+        # export 0/0/0 ("scan everything"), degenerate, so omit it there.
         if atk_cut > 0 or def_cut > 0 or hp_cut > 0:
-            _species = data_obj.get('species') or 'Species'
-            _league_t = (data_obj.get('league') or 'great').capitalize()
-            _spec = {
-                'attack': round(float(atk_cut), 2),
-                'defense': round(float(def_cut), 2),
-                'stamina': int(hp_cut),
-            }
-            _scanner_json = _html.escape(
-                json.dumps({_species: {_league_t: {t['name']: _spec}}}),
-                quote=True)
-            parts.append(
-                f'<button class="dd-iv-toggle" style="margin:2px 0 6px 0" '
-                f'data-scanner-json="{_scanner_json}" '
-                f'onclick="copyScannerJson(this)" '
-                f'title="Copy this tier as a gobattlekit user-threshold '
-                f'JSON fragment (paste into the IV scanner)">'
-                f'Copy for IV scanner</button>\n'
-            )
+            parts.append(_scanner_button_html(
+                data_obj.get('species') or 'Species',
+                data_obj.get('league') or 'great', t['name'],
+                _cutoff_scanner_spec(atk_cut, def_cut, hp_cut)))
         # --- Goal line from the TOML `description` field ---
         # Rendered first, styled as the authored goal statement (mirrors
         # the Flavor Guide's tone). Distinct from the auto-generated
