@@ -23,7 +23,7 @@ renderer reads this, so wording/layout tweaks need no re-simulation).
 
 Usage: python scripts/iv_envelope_analysis.py ["Dialga (Origin)"]
 """
-import sys, os, json
+import sys, os, json, pathlib
 from itertools import product
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -37,6 +37,9 @@ from gopvpsim.moves import get_moves, damage as calc_damage
 from gopvpsim.breakpoints import _get_types
 from gopvpsim.data import get_default_moveset
 from deep_dive import _parse_opponent_pool_line, parse_opponent_spec
+from deep_dive_logging import init_logger, get_logger
+
+logger = get_logger()
 
 LEAGUE    = 'master'
 POOL_FILE = 'opponent_pools/master_top60.txt'
@@ -420,8 +423,17 @@ def main():
     suffix = '_all9' if a.all_shields else ''
     out_path = f"userdata/dives/{slug}_iv_envelope{suffix}.json"
 
-    print(f"{species}: {len(opponents)} opponents, build {fast_id} / "
-          f"{', '.join(charged_ids)}")
+    # init_logger appends (mode='a'), so drop any stale per-guide log from a
+    # prior standalone run first -- otherwise duplicate phase lines accumulate
+    # and a crashed re-run would leave the previous run's "Wrote" as the last
+    # line, falsely reporting the guide complete to the watch views. The driver
+    # (run_iv_guides.py) unlinks too; this keeps the standalone path idempotent.
+    pathlib.Path('userdata/logs/iv_guides', f'{slug}.log').unlink(missing_ok=True)
+    init_logger(species, 'master', FOCAL_SHADOW,
+                log_file=f'userdata/logs/iv_guides/{slug}.log')
+
+    logger.result(f"{species}: {len(opponents)} opponents, build {fast_id} / "
+                  f"{', '.join(charged_ids)}")
 
     # Run the shared iv_sweep engine once per quadrant; every won_set /
     # score_set / result_metrics below reads these grids instead of re-simming.
@@ -444,10 +456,10 @@ def main():
 
     # 2. Hundo win-sets per quadrant (drives key wins/losses + the drop diffs).
     hundo_won = {}
-    for q, (ml, ol) in QUADRANTS.items():
+    for k, (q, (ml, ol)) in enumerate(QUADRANTS.items(), 1):
         hundo_won[q] = won_set((15, 15, 15), ml, ol)
-        print(f"  hundo {q}: {len(hundo_won[q])} won (of "
-              f"{len(opponents) * len(SHIELDS)})")
+        logger.info(f"[hundo {k}/{len(QUADRANTS)}] {q}: {len(hundo_won[q])} won "
+                    f"(of {len(opponents) * len(SHIELDS)})")
 
     # 3. Key wins / losses at the headline quadrant, summarized on the 3 EVEN
     # shields (the high-level overview; requiring all 9 would make almost
@@ -471,7 +483,7 @@ def main():
     # 4. Per quadrant / stat / iv: dropped matchups + mechanics.
     quadrants = {}
     base_metrics_by_q = {}        # hundo end-state per quadrant; reused in step 5
-    for q, (ml, ol) in QUADRANTS.items():
+    for k, (q, (ml, ol)) in enumerate(QUADRANTS.items(), 1):
         quadrants[q] = {'my_level': ml, 'opp_level': ol,
                         'atk': {}, 'def': {}, 'hp': {}}
         # Hundo end-state baseline for this quadrant, simmed once and reused
@@ -509,7 +521,7 @@ def main():
                     entry['bulkpoints_lost'] = bulkpoints_lost(
                         focal_base, focal_types, opponents, ml, ol, iv)
                 quadrants[q][stat][iv] = entry
-        print(f"  detail {q}: done")
+        logger.info(f"[detail {k}/{len(QUADRANTS)}] {q}: done")
 
     # 5. Neutral recommended-IV table: all stats 12-15 (64 combos).
     #    For each, CP/% at L50 & L51 and matchups dropped vs hundo in each
@@ -536,7 +548,7 @@ def main():
     # Parallel leftover-energy grids (same shape/order) for the banked-energy
     # line under the HP-margin bars (shared cmpMarginPanel energy annotation).
     cmp_energy_grid = {q: [] for q in REC_QUADRANTS}
-    for (av, dv, sv) in combos:
+    for ci, (av, dv, sv) in enumerate(combos, 1):
         row = {'ivs': [av, dv, sv]}
         for lvkey, lv in LEVELS.items():
             ea, ed, eh = my_eff(focal_base, (av, dv, sv), lv)
@@ -572,9 +584,11 @@ def main():
         row['drops'] = drops
         row['close_calls'] = ccalls
         rec_rows.append(row)
+        if ci % 16 == 0 or ci == len(combos):
+            logger.info(f"[recommended {ci}/{len(combos)}] combos")
     rec_rows.sort(key=lambda r: -r['perfect_bb'])
-    print(f"  recommended table: {len(rec_rows)} combos "
-          f"(close-calls: {', '.join(cc_quads)})")
+    logger.info(f"recommended table: {len(rec_rows)} combos "
+                f"(close-calls: {', '.join(cc_quads)})")
 
     # Pack the score grids for embedding. combos[] is the grid's combo-index
     # reference (the 'check my IVs' box resolves a typed spread to its index
@@ -625,7 +639,7 @@ def main():
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, 'w') as f:
         json.dump(data, f, indent=2)
-    print(f"\nWrote {out_path}")
+    logger.result(f"Wrote {out_path}")
 
 
 if __name__ == '__main__':
