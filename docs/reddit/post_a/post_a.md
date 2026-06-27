@@ -6,7 +6,7 @@ Draft of the r/TheSilphArena launch post for the pogo-dives site
 in the Reddit post; they will be swapped to rendered `![]()` links here after
 the post is live.
 
-**Title:** I made a website that shows how all 4096 stack up against the meta, ported PvPoke's battle sim to Python, and a bunch of other stuff.
+**Title:** I made a website that shows how all 4096 stack up against the meta, ported PvPoke's battle sim to Python, and a bunch of other stuff. Bonus: which Palkia-O/Dialga-O do I ETM?!
 
 ---
 
