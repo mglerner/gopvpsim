@@ -75,7 +75,7 @@ def verify_species(species, league, opponents, opp_movesets, scenarios,
         results, n_sims, cs, cm = deep_dive.iv_sweep(
             species, fast, charged, league, shadow,
             opponents, opp_movesets, scenarios,
-            opp_iv_mode=mode, signature_dedup=dedup)
+            opp_iv_mode=mode, signature_dedup=dedup)[:4]
         elapsed = time.time() - t0
         print(f"  {label:12s}: {n_sims:>9,} sims in {elapsed:7.1f}s "
               f"({n_sims/elapsed:,.0f} sims/s)")

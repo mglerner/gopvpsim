@@ -1831,7 +1831,7 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
                        opp_cache, shield_scenarios, focal_bait=True,
                        log_path=None, verbose=False,
                        focal_mon=None, league_cp=1500, focal_shadow=False,
-                       focal_energy=0, mechanics='legacy', capture_energy=False):
+                       focal_energy=0, mechanics='legacy'):
     """Initialize shared state in each sweep worker process."""
     # Spawn-mode workers (default on macOS) do not inherit the parent
     # logger's handlers; re-attach a FileHandler so any worker-side
@@ -1849,7 +1849,6 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
     _worker_state['focal_shadow'] = focal_shadow
     _worker_state['focal_energy'] = focal_energy
     _worker_state['mechanics'] = mechanics
-    _worker_state['capture_energy'] = capture_energy
     if focal_bait:
         _worker_state['focal_policy'] = pvpoke_dp
     else:
@@ -1880,10 +1879,11 @@ def _sweep_worker(pair_chunk):
     focal_shadow = ws['focal_shadow']
     focal_energy = ws.get('focal_energy', 0)
     mechanics = ws.get('mechanics', 'legacy')
-    capture_energy = ws.get('capture_energy', False)
 
+    # Energy is always captured: it is a free read of result.energy_remaining
+    # and is persisted alongside score so --compare-energy re-dives serve warm.
     results = {}
-    energy_results = {} if capture_energy else None
+    energy_results = {}
     n_sims = 0
     for (profile_key, atk_stat, def_stat, hp_stat, a_iv, d_iv, s_iv, lv), oi in pair_chunk:
         opp = opp_cache[oi]
@@ -1913,7 +1913,7 @@ def _sweep_worker(pair_chunk):
         attach_form_change(bp1, opp['mon'], *opp['ivs'], opp['level'],
                            league_cp, opp['shadow'])
         scores = []
-        energies = [] if capture_energy else None
+        energies = []
         for s_focal, s_opp in shield_scenarios:
             bp0.reset_for_battle(s_focal, opponent=bp1)
             bp1.reset_for_battle(s_opp, opponent=bp0)
@@ -1922,19 +1922,13 @@ def _sweep_worker(pair_chunk):
                               charged_policy_1=pvpoke_dp,
                               mechanics=mechanics)
             scores.append(result.pvpoke_score(0))
-            if capture_energy:
-                # Focal's leftover energy (0..100) at battle end -- the post-match
-                # state for the compare widget's "banks N charged moves" line.
-                energies.append(result.energy_remaining[0])
+            # Focal's leftover energy (0..100) at battle end -- the post-match
+            # state for the compare widget's "banks N charged moves" line.
+            energies.append(result.energy_remaining[0])
             n_sims += 1
         results[(profile_key, oi)] = scores
-        if capture_energy:
-            energy_results[(profile_key, oi)] = energies
-    # Branch the return shape so the off path is byte-identical: callers that
-    # don't capture energy keep unpacking the historical (results, n_sims).
-    if capture_energy:
-        return results, energy_results, n_sims
-    return results, n_sims
+        energy_results[(profile_key, oi)] = energies
+    return results, energy_results, n_sims
 
 
 def iv_sweep(species, fast_id, charged_ids, league, shadow,
@@ -2078,7 +2072,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     # canonical iv_meta order, so hits are bit-identical to a fresh sim.
     n_ivs_total = len(iv_meta)
     sweep_cache = None
-    cached_cols = {}  # oi -> ndarray (n_ivs, n_scenarios)
+    cached_cols = {}  # oi -> {'score': ndarray, 'energy': ndarray}
     # The sweep cache key (sweep_cache.focal_key_fields) does NOT include the
     # turn-mechanics model, so a 'new'-mechanics run would collide with any
     # legacy-cached columns. The 'new' model is experimental; disable the
@@ -2086,12 +2080,10 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     # CLAUDE.md flags as coordination-sensitive).
     if mechanics != 'legacy':
         use_sweep_cache = False
-    # The disk cache stores only the float64 SCORE column; it carries no energy.
-    # Capturing energy must therefore bypass the cache (fresh sims supply both),
-    # exactly like the 'new'-mechanics disable above. capture_energy is opt-in
-    # and rare, so paying the full sim cost is fine.
-    if capture_energy:
-        use_sweep_cache = False
+    # Energy is now always captured + stored in the column (v5), so
+    # capture_energy no longer bypasses the cache — a --compare-energy re-dive
+    # serves warm. capture_energy only gates whether energy is exposed on the
+    # returned results.
     if use_sweep_cache:
         import sweep_cache as swc
         sweep_cache = swc.SweepCache(swc.focal_key_fields(
@@ -2161,7 +2153,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                       opp_cache, shield_scenarios, focal_bait,
                       log_path, verbose,
                       focal_mon, LEAGUE_CAPS[league], shadow,
-                      focal_energy, mechanics, capture_energy),
+                      focal_energy, mechanics),
         ) as pool:
             last_print = sim_start
             completed = 0
@@ -2178,36 +2170,31 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                     last_print = now
 
     # Merge pair results, then fan each representative's scores out to
-    # every profile in its signature group.
+    # every profile in its signature group. Energy is always present (the
+    # worker always returns it); whether it reaches the caller is gated by
+    # capture_energy at the end.
     pair_scores = {}
-    pair_energy = {} if capture_energy else None
+    pair_energy = {}
     n_sims = 0
-    for chunk_res in chunk_results:
-        # Worker return shape branches on capture_energy (see _sweep_worker).
-        if capture_energy:
-            pair_res, pair_en, chunk_sims = chunk_res
-            pair_energy.update(pair_en)
-        else:
-            pair_res, chunk_sims = chunk_res
+    for pair_res, pair_en, chunk_sims in chunk_results:
         pair_scores.update(pair_res)
+        pair_energy.update(pair_en)
         n_sims += chunk_sims
 
     profile_per_opp = {}
-    profile_energy_per_opp = {} if capture_energy else None
+    profile_energy_per_opp = {}
     for oi, groups in groups_by_opp.items():
         for rep_pos, members in groups:
             scores = pair_scores[(profile_list[rep_pos][0], oi)]
-            energies = (pair_energy[(profile_list[rep_pos][0], oi)]
-                        if capture_energy else None)
+            energies = pair_energy[(profile_list[rep_pos][0], oi)]
             for pos in members:
                 per_opp = profile_per_opp.setdefault(profile_list[pos][0], {})
+                e_per_opp = profile_energy_per_opp.setdefault(
+                    profile_list[pos][0], {})
                 for si, sc in enumerate(scores):
                     per_opp[(si, oi)] = sc
-                if capture_energy:
-                    e_per_opp = profile_energy_per_opp.setdefault(
-                        profile_list[pos][0], {})
-                    for si, en in enumerate(energies):
-                        e_per_opp[(si, oi)] = en
+                for si, en in enumerate(energies):
+                    e_per_opp[(si, oi)] = en
 
     # Fill cache-hit columns: all IVs in a profile share effective
     # stats, hence identical battles, so the profile's first IV index
@@ -2216,29 +2203,36 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     if cached_cols:
         iv_idx_by_profile = {pk: idxs[0]
                              for pk, idxs in profile_to_indices.items()}
-        for oi, col in cached_cols.items():
+        for oi, planes in cached_cols.items():
+            score_col = planes['score']
+            energy_col = planes['energy']
             for pk, rep_idx in iv_idx_by_profile.items():
                 per_opp = profile_per_opp.setdefault(pk, {})
+                e_per_opp = profile_energy_per_opp.setdefault(pk, {})
                 for si in range(len(shield_scenarios)):
-                    per_opp[(si, oi)] = float(col[rep_idx, si])
+                    per_opp[(si, oi)] = float(score_col[rep_idx, si])
+                    e_per_opp[(si, oi)] = int(energy_col[rep_idx, si])
 
-    # Persist freshly simmed columns (expanded to per-IV order).
+    # Persist freshly simmed columns (expanded to per-IV order), score +
+    # energy planes together.
     if sweep_cache is not None and missing_ois:
         import numpy as _np
         import sweep_cache as swc
+        n_sc = len(shield_scenarios)
         for oi in missing_ois:
             opp = opp_cache[oi]
-            col = _np.empty((n_ivs_total, len(shield_scenarios)),
-                            dtype=_np.float64)
+            score_col = _np.empty((n_ivs_total, n_sc), dtype=_np.float64)
+            energy_col = _np.empty((n_ivs_total, n_sc), dtype=_np.float64)
             for pk, idxs in profile_to_indices.items():
-                scores = [profile_per_opp[pk][(si, oi)]
-                          for si in range(len(shield_scenarios))]
-                col[idxs, :] = scores
+                score_col[idxs, :] = [profile_per_opp[pk][(si, oi)]
+                                      for si in range(n_sc)]
+                energy_col[idxs, :] = [profile_energy_per_opp[pk][(si, oi)]
+                                       for si in range(n_sc)]
             sweep_cache.put_column(
                 swc.column_key_fields(opp['species'], opp['shadow'],
                                       opp['ivs'], opp['level'],
                                       opp['fast_id'], opp['charged_ids']),
-                col)
+                {'score': score_col, 'energy': energy_col})
 
     # Build per-IV results by expanding profile sims to all matching IVs.
     # The list is built in canonical iteration order (matches iv_meta order).
