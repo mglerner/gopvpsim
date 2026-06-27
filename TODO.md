@@ -1,40 +1,76 @@
-## >> NEXT ACTION (2026-06-27): re-dive to propagate the landed engine fixes
+## >> NEXT ACTION (2026-06-27 PM): finish ML-sweep progress reporting, THEN cold re-dive
 
-The cache-rework bundle LANDED on `main` (unified sweep cache + per-column
-engine stamp + `migrate_cache.py`). **The bug-#1 `fire_now` cmp_atk fix is
-ALSO already in `main`** (commit `b1b58f1`, merged in with the overnight work
--- the old "apply it, it's on branch `overnight/2026-06-26`" instruction was
-STALE; that fully-merged branch ref can be deleted). The CODE is live; what's
-still pending is the **re-dive** that propagates the fix into the published
-dives + cache columns (those are still pre-fix in their shadow-XOR cells).
+The pre-redive ENGINE + RENDER batch LANDED this session (2026-06-27 PM); tree
+clean at `96a1c48`, nothing published. The re-dive is now irreducibly **COLD**
+(the float32 fix forces it; the legacy cache is all-None-stamped). Two clean,
+focused sessions remain, IN ORDER:
 
-**DECISION (2026-06-27): #2 DEFERRED, so do the warm #1-only re-dive.**
-Michael's call this session: leave bug #2 (float32 damage constants) in TODO,
-don't batch it now. With #2 deferred and #3 landed needing no re-dive, the one
-outstanding item is propagating the bug-#1 fix into shipped outputs via the
-**warm shadow-XOR re-dive** (small: ~35 cells / 6 winner flips measured).
+1. **ML-sweep progress reporting** -- a new pre-redive task (see its section
+   immediately below). Do it in a FRESH session; it shares no context with the
+   engine batch. Land it BEFORE the cold re-dive so the long ML bake reports
+   progress into the watch script.
+2. **Cold re-dive** (`overnight_redive.sh`) -- fresh, long-running, monitored
+   session: re-dive on the new engine + refreshed gamemaster, review,
+   re-publish, then GC the legacy cache.
 
-THE NEXT ACTION (warm #1 re-dive):
-`migrate_cache.py --list-stamps` -> find the pre-fix stamp;
-`--from-engine <pre-fix> --predicate shadow_xor --apply` to bless unaffected
-columns and drop the shadow-XOR ones; re-dive (warm) -> re-publish.
+What landed this session (all committed, all ride the cold pass for free):
+- **#2 float32 damage constants** -- DONE (`4e57321`). STAB/BONUS/super-effective
+  now use float32-truncated doubles matching the game/PvPoke. Boundary-scattered,
+  no clean predicate -> this is what makes the re-dive cold (so everything else
+  this session rides it for free).
+- **#5 bandaid[929] no-bait swap** -- DOCUMENTED as a kept divergence (`0fcc290`);
+  `docs/pvpoke_divergences.md` #6 + `tests/test_bandaid929_nobait_divergence.py`.
+  Ungated on `bait_shields` on purpose (PvPoke's gated line is strictly
+  dominated); NO engine behavior change. (Measured: gating would flip 284 winners,
+  all in our favor.)
+- **#7 `_cm_debuf_delta` dead branch** -- FIXED + vetted (`377c48e`). The
+  guaranteed-self-buff arm was a `'1' == 1` str/int dead branch; now
+  `float(...) == 1.0`, matching PvPoke (JS `"1"==1` coerces). Empirically +
+  structurally ZERO dive impact (0/10458 cells, 0/~900k DP-decision probes);
+  ultracode-vetted (oracle clean 37 divergences, suite green, bench 3,482 sims/s).
+  `tests/test_cm_debuf_delta.py`. REMOVES a divergence (not added to the
+  divergences doc).
+- **Scanner-button render polish** -- the "Copy for IV scanner" button now also
+  renders on Threshold Tier cards (`08f5c8a`) and Slayer Builds archetype cards
+  (`96a1c48`), DRY'd into `_scanner_button_html` / `_cutoff_scanner_spec` helpers
+  (`bd48fc9`). Render-only, no engine/cache impact.
+- **Pool resolution re-checked** on the refreshed gamemaster: GL 78/78, UL 68/68
+  resolve -- no silent shrinkage.
 
-Status of the sibling bugs:
-- **#2 (float32)** -- DEFERRED to TODO (see "OVERNIGHT 2026-06-27" follow-ups +
-  "engine bug-hunt findings"). Scoping done this session: forces a cold re-dive
-  (boundary-scattered, no clean predicate), BUT only **1/1075** tests shifts (a
-  synthetic boundary test, not an oracle fixture) -- the "shifts many fixtures"
-  fear did NOT materialize; the fix is small and makes us match PvPoke/game
-  better. If/when taken, it subsumes #1's warm re-dive (cold captures both).
-- **#3 (farm-down self-debuff stacking)** -- FIXED + committed 2026-06-27
-  (`7a55d43`, `tests/test_bug3_farm_stack.py`). Changes **0** shipped
-  default-moveset cells; only affects user-picked self-debuff-dominant
-  movesets, so it needs no re-dive. (Verification also surfaced ~117
-  PRE-EXISTING both-self-debuff PvPoke divergences -- new follow-up logged.)
+Sibling-bug status for context: **#1** (`fire_now` cmp_atk) is in `main`
+(`b1b58f1`) -- the cold pass subsumes its old warm shadow-XOR re-dive plan, now
+moot. **#3** (farm-down self-debuff stacking) FIXED in `main` (`7a55d43`), 0
+shipped-cell impact.
 
 Reminder: while editing engine files, run dives with `--no-sweep-cache` until
 trusted (see CLAUDE.md "Sweep cache" + "Before a cold re-dive, check for a
 tractable migration").
+
+## ML-sweep progress reporting (PRE-REDIVE -- do BEFORE the cold re-dive)
+
+*(2026-06-27 PM, Michael)* The GL/UL dives have nice structured progress
+reporting; the ML IV-guide sweeps do not -- a long ML bake runs mostly silent.
+
+GOAL: give the ML sweeps the SAME progress reporting as the GL/UL dives, and
+BAKE IT INTO THE WATCH SCRIPT so the cold ML bake is observable live during the
+re-dive.
+
+- **Match the dive's mechanism**, don't reinvent: the dives use the structured
+  logger (`scripts/deep_dive_logging.py`; `docs/structured_logger_design.md`;
+  CLAUDE.md "Debugging conventions") writing to a status file that the watch
+  view tails. NO bare `print()` from workers (multiprocessing -- route through
+  `logger.*`).
+- **Watch-script parity**: the GL/UL side is watched via
+  `scripts/chain_status.py` (+ `scripts/iv_guides_status.py` once the ML step
+  starts), tailing `userdata/logs/...`. The ML sweep should emit
+  per-guide / per-quadrant / per-opponent progress into that same surface so a
+  single `watch` view covers the whole chain.
+- **Start points**: `scripts/run_iv_guides.py` (driver),
+  `scripts/iv_envelope_analysis.py` (per-guide sweep),
+  `scripts/iv_guides_status.py` (existing ML watch view -- may already be a
+  partial hook), and how the dive chain wires `chain_status.py`.
+- **Why now**: do it in a FRESH session before launching the cold re-dive, so
+  the ~hours-long ML bake in that re-dive is watchable instead of silent.
 
 ----
 
