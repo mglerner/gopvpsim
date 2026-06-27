@@ -1827,11 +1827,17 @@ def group_ivs_by_stat_profile(iv_meta_list, per_iv=False):
     return profile_to_indices, profile_data
 
 
+# Order MUST match the metric tuple the worker appends (won, hp, max_hp,
+# shields). These are the extra per-cell fields the ML guide path needs
+# beyond score/energy; they become cache planes of the same names.
+_METRIC_NAMES = ('won', 'hp', 'max_hp', 'shields')
+
+
 def _sweep_worker_init(species, focal_types, fm_template, cms_template,
                        opp_cache, shield_scenarios, focal_bait=True,
                        log_path=None, verbose=False,
                        focal_mon=None, league_cp=1500, focal_shadow=False,
-                       focal_energy=0, mechanics='legacy', capture_energy=False):
+                       focal_energy=0, mechanics='legacy', capture_metrics=False):
     """Initialize shared state in each sweep worker process."""
     # Spawn-mode workers (default on macOS) do not inherit the parent
     # logger's handlers; re-attach a FileHandler so any worker-side
@@ -1849,7 +1855,7 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
     _worker_state['focal_shadow'] = focal_shadow
     _worker_state['focal_energy'] = focal_energy
     _worker_state['mechanics'] = mechanics
-    _worker_state['capture_energy'] = capture_energy
+    _worker_state['capture_metrics'] = capture_metrics
     if focal_bait:
         _worker_state['focal_policy'] = pvpoke_dp
     else:
@@ -1880,10 +1886,18 @@ def _sweep_worker(pair_chunk):
     focal_shadow = ws['focal_shadow']
     focal_energy = ws.get('focal_energy', 0)
     mechanics = ws.get('mechanics', 'legacy')
-    capture_energy = ws.get('capture_energy', False)
+    capture_metrics = ws.get('capture_metrics', False)
 
+    # Energy is always captured: it is a free read of result.energy_remaining
+    # and is persisted alongside score so --compare-energy re-dives serve warm.
+    # capture_metrics additionally records (won, hp, max_hp, shields) per sim —
+    # the extra per-cell fields the ML guide path needs (won_set / score_set /
+    # result_metrics), so they too come from one shared sweep instead of a
+    # separate sim loop. All are deterministic outputs of the same battle, so
+    # the signature dedup fans them out exactly like score/energy.
     results = {}
-    energy_results = {} if capture_energy else None
+    energy_results = {}
+    metrics_results = {}
     n_sims = 0
     for (profile_key, atk_stat, def_stat, hp_stat, a_iv, d_iv, s_iv, lv), oi in pair_chunk:
         opp = opp_cache[oi]
@@ -1913,7 +1927,8 @@ def _sweep_worker(pair_chunk):
         attach_form_change(bp1, opp['mon'], *opp['ivs'], opp['level'],
                            league_cp, opp['shadow'])
         scores = []
-        energies = [] if capture_energy else None
+        energies = []
+        metrics = [] if capture_metrics else None
         for s_focal, s_opp in shield_scenarios:
             bp0.reset_for_battle(s_focal, opponent=bp1)
             bp1.reset_for_battle(s_opp, opponent=bp0)
@@ -1921,20 +1936,24 @@ def _sweep_worker(pair_chunk):
                               charged_policy_0=focal_policy,
                               charged_policy_1=pvpoke_dp,
                               mechanics=mechanics)
-            scores.append(result.pvpoke_score(0))
-            if capture_energy:
-                # Focal's leftover energy (0..100) at battle end -- the post-match
-                # state for the compare widget's "banks N charged moves" line.
-                energies.append(result.energy_remaining[0])
+            sc0 = result.pvpoke_score(0)
+            scores.append(sc0)
+            # Focal's leftover energy (0..100) at battle end -- the post-match
+            # state for the compare widget's "banks N charged moves" line.
+            energies.append(result.energy_remaining[0])
+            if capture_metrics:
+                metrics.append((
+                    sc0 > result.pvpoke_score(1),       # won
+                    max(0, result.hp_remaining[0]),     # hp
+                    result.max_hp[0],                   # max_hp
+                    result.shields_remaining[0],        # shields
+                ))
             n_sims += 1
         results[(profile_key, oi)] = scores
-        if capture_energy:
-            energy_results[(profile_key, oi)] = energies
-    # Branch the return shape so the off path is byte-identical: callers that
-    # don't capture energy keep unpacking the historical (results, n_sims).
-    if capture_energy:
-        return results, energy_results, n_sims
-    return results, n_sims
+        energy_results[(profile_key, oi)] = energies
+        if capture_metrics:
+            metrics_results[(profile_key, oi)] = metrics
+    return results, energy_results, metrics_results, n_sims
 
 
 def iv_sweep(species, fast_id, charged_ids, league, shadow,
@@ -1942,7 +1961,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
              iv_floor=None, log_path=None, verbose=False,
              threshold_registry=None, reserve_cpus=0, signature_dedup=True,
              use_sweep_cache=False, mechanics='legacy',
-             focal_max_level=None, opp_max_level=None, capture_energy=False):
+             focal_max_level=None, opp_max_level=None, capture_energy=False,
+             capture_metrics=False):
     """
     Sim all 4096 IV spreads for one moveset against all opponents.
     Parallelized across focal stat profiles (deduped by atk/def/hp) using
@@ -2078,7 +2098,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     # canonical iv_meta order, so hits are bit-identical to a fresh sim.
     n_ivs_total = len(iv_meta)
     sweep_cache = None
-    cached_cols = {}  # oi -> ndarray (n_ivs, n_scenarios)
+    cached_cols = {}  # oi -> {'score': ndarray, 'energy': ndarray}
     # The sweep cache key (sweep_cache.focal_key_fields) does NOT include the
     # turn-mechanics model, so a 'new'-mechanics run would collide with any
     # legacy-cached columns. The 'new' model is experimental; disable the
@@ -2086,12 +2106,15 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     # CLAUDE.md flags as coordination-sensitive).
     if mechanics != 'legacy':
         use_sweep_cache = False
-    # The disk cache stores only the float64 SCORE column; it carries no energy.
-    # Capturing energy must therefore bypass the cache (fresh sims supply both),
-    # exactly like the 'new'-mechanics disable above. capture_energy is opt-in
-    # and rare, so paying the full sim cost is fine.
-    if capture_energy:
-        use_sweep_cache = False
+    # Energy is now always captured + stored in the column (v5), so
+    # capture_energy no longer bypasses the cache — a --compare-energy re-dive
+    # serves warm. capture_energy only gates whether energy is exposed on the
+    # returned results.
+    # Planes a column must carry to count as a hit. Dives keep score+energy;
+    # the ML guide path also caches the (won, hp, max_hp, shields) metric
+    # planes (_METRIC_NAMES) so its warm re-bake re-sims nothing.
+    req_planes = (('score', 'energy') + _METRIC_NAMES if capture_metrics
+                  else ('score', 'energy'))
     if use_sweep_cache:
         import sweep_cache as swc
         sweep_cache = swc.SweepCache(swc.focal_key_fields(
@@ -2103,7 +2126,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                 swc.column_key_fields(opp['species'], opp['shadow'],
                                       opp['ivs'], opp['level'],
                                       opp['fast_id'], opp['charged_ids']),
-                n_ivs_total, len(shield_scenarios))
+                n_ivs_total, len(shield_scenarios),
+                required_planes=req_planes)
             if col is not None:
                 cached_cols[oi] = col
         if cached_cols:
@@ -2161,7 +2185,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                       opp_cache, shield_scenarios, focal_bait,
                       log_path, verbose,
                       focal_mon, LEAGUE_CAPS[league], shadow,
-                      focal_energy, mechanics, capture_energy),
+                      focal_energy, mechanics, capture_metrics),
         ) as pool:
             last_print = sim_start
             completed = 0
@@ -2178,36 +2202,42 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                     last_print = now
 
     # Merge pair results, then fan each representative's scores out to
-    # every profile in its signature group.
+    # every profile in its signature group. Energy is always present (the
+    # worker always returns it); whether it reaches the caller is gated by
+    # capture_energy at the end.
     pair_scores = {}
-    pair_energy = {} if capture_energy else None
+    pair_energy = {}
+    pair_metrics = {}
     n_sims = 0
-    for chunk_res in chunk_results:
-        # Worker return shape branches on capture_energy (see _sweep_worker).
-        if capture_energy:
-            pair_res, pair_en, chunk_sims = chunk_res
-            pair_energy.update(pair_en)
-        else:
-            pair_res, chunk_sims = chunk_res
+    for pair_res, pair_en, pair_met, chunk_sims in chunk_results:
         pair_scores.update(pair_res)
+        pair_energy.update(pair_en)
+        pair_metrics.update(pair_met)
         n_sims += chunk_sims
 
     profile_per_opp = {}
-    profile_energy_per_opp = {} if capture_energy else None
+    profile_energy_per_opp = {}
+    # profile_metrics_per_opp[pk][(si, oi)] = (won, hp, max_hp, shields),
+    # in _METRIC_NAMES order. Only populated when capture_metrics.
+    profile_metrics_per_opp = {}
     for oi, groups in groups_by_opp.items():
         for rep_pos, members in groups:
-            scores = pair_scores[(profile_list[rep_pos][0], oi)]
-            energies = (pair_energy[(profile_list[rep_pos][0], oi)]
-                        if capture_energy else None)
+            rep_key = (profile_list[rep_pos][0], oi)
+            scores = pair_scores[rep_key]
+            energies = pair_energy[rep_key]
+            metrics = pair_metrics.get(rep_key)
             for pos in members:
-                per_opp = profile_per_opp.setdefault(profile_list[pos][0], {})
+                pk = profile_list[pos][0]
+                per_opp = profile_per_opp.setdefault(pk, {})
+                e_per_opp = profile_energy_per_opp.setdefault(pk, {})
                 for si, sc in enumerate(scores):
                     per_opp[(si, oi)] = sc
-                if capture_energy:
-                    e_per_opp = profile_energy_per_opp.setdefault(
-                        profile_list[pos][0], {})
-                    for si, en in enumerate(energies):
-                        e_per_opp[(si, oi)] = en
+                for si, en in enumerate(energies):
+                    e_per_opp[(si, oi)] = en
+                if metrics is not None:
+                    m_per_opp = profile_metrics_per_opp.setdefault(pk, {})
+                    for si, mt in enumerate(metrics):
+                        m_per_opp[(si, oi)] = mt
 
     # Fill cache-hit columns: all IVs in a profile share effective
     # stats, hence identical battles, so the profile's first IV index
@@ -2216,29 +2246,52 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     if cached_cols:
         iv_idx_by_profile = {pk: idxs[0]
                              for pk, idxs in profile_to_indices.items()}
-        for oi, col in cached_cols.items():
+        for oi, planes in cached_cols.items():
+            score_col = planes['score']
+            energy_col = planes['energy']
+            metric_cols = ([planes[m] for m in _METRIC_NAMES]
+                           if capture_metrics else None)
             for pk, rep_idx in iv_idx_by_profile.items():
                 per_opp = profile_per_opp.setdefault(pk, {})
+                e_per_opp = profile_energy_per_opp.setdefault(pk, {})
+                m_per_opp = (profile_metrics_per_opp.setdefault(pk, {})
+                             if capture_metrics else None)
                 for si in range(len(shield_scenarios)):
-                    per_opp[(si, oi)] = float(col[rep_idx, si])
+                    per_opp[(si, oi)] = float(score_col[rep_idx, si])
+                    e_per_opp[(si, oi)] = int(energy_col[rep_idx, si])
+                    if m_per_opp is not None:
+                        m_per_opp[(si, oi)] = tuple(
+                            int(mc[rep_idx, si]) for mc in metric_cols)
 
-    # Persist freshly simmed columns (expanded to per-IV order).
+    # Persist freshly simmed columns (expanded to per-IV order): score +
+    # energy planes always, plus the metric planes when captured.
     if sweep_cache is not None and missing_ois:
         import numpy as _np
         import sweep_cache as swc
+        n_sc = len(shield_scenarios)
         for oi in missing_ois:
             opp = opp_cache[oi]
-            col = _np.empty((n_ivs_total, len(shield_scenarios)),
-                            dtype=_np.float64)
+            score_col = _np.empty((n_ivs_total, n_sc), dtype=_np.float64)
+            energy_col = _np.empty((n_ivs_total, n_sc), dtype=_np.float64)
+            metric_planes = ({m: _np.empty((n_ivs_total, n_sc),
+                                           dtype=_np.float64)
+                              for m in _METRIC_NAMES} if capture_metrics
+                             else {})
             for pk, idxs in profile_to_indices.items():
-                scores = [profile_per_opp[pk][(si, oi)]
-                          for si in range(len(shield_scenarios))]
-                col[idxs, :] = scores
+                score_col[idxs, :] = [profile_per_opp[pk][(si, oi)]
+                                      for si in range(n_sc)]
+                energy_col[idxs, :] = [profile_energy_per_opp[pk][(si, oi)]
+                                       for si in range(n_sc)]
+                for mi, m in enumerate(_METRIC_NAMES):
+                    if capture_metrics:
+                        metric_planes[m][idxs, :] = [
+                            profile_metrics_per_opp[pk][(si, oi)][mi]
+                            for si in range(n_sc)]
             sweep_cache.put_column(
                 swc.column_key_fields(opp['species'], opp['shadow'],
                                       opp['ivs'], opp['level'],
                                       opp['fast_id'], opp['charged_ids']),
-                col)
+                {'score': score_col, 'energy': energy_col, **metric_planes})
 
     # Build per-IV results by expanding profile sims to all matching IVs.
     # The list is built in canonical iteration order (matches iv_meta order).
@@ -2262,6 +2315,12 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         result['per_opp'] = per_opp
         if capture_energy:
             result['per_opp_energy'] = profile_energy_per_opp[pk]
+        if capture_metrics:
+            # Split the (won, hp, max_hp, shields) tuples into one per_opp_<m>
+            # dict per metric, so the ML grid-views index each field directly.
+            m_per_opp = profile_metrics_per_opp[pk]
+            for mi, m in enumerate(_METRIC_NAMES):
+                result['per_opp_' + m] = {k: v[mi] for k, v in m_per_opp.items()}
         results.append(result)
 
     # Build canonical-order score array (in iv_meta order, same as results list)
@@ -6992,6 +7051,13 @@ def main():
             base = get_species(args.species)
             base_stats_dict = {'atk': base['atk'], 'def': base['def'], 'hp': base['hp']}
             fast_moves_db, charged_moves_db = get_moves()
+            # The slayer iteration builds its mirror cohort at the league's
+            # effective focal level cap (iterative_slayer_discovery passes
+            # focal_max_level=None, so build_focal_meta falls back to this
+            # global — which --max-level mutates at parse time). Key on it so
+            # two runs at different --max-level can't serve each other's stale
+            # scores (bug #4, 2026-06-27).
+            _slayer_focal_cap = LEAGUE_MAX_LEVEL.get(args.league, 51.0)
             cache_key = compute_cache_key(
                 args.species, args.league, args.shadow,
                 fast_moves_db.get(fast_id, {}),
@@ -6999,6 +7065,7 @@ def main():
                 base_stats_dict,
                 shield_scenarios=shield_scenarios,
                 iv_floor=args.iv_floor,
+                focal_max_level=_slayer_focal_cap,
             )
             slayer_cache = SlayerCache(cache_key=cache_key, disk=not args.no_cache)
 

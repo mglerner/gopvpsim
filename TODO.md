@@ -148,6 +148,43 @@ so fold this into that run. See the `score_set` docstring.
 
 ## Sweep cache should store energy so `--compare-energy` warm re-dives work (POST-PUBLISH)
 
+**LANDED 2026-06-27 (branch `cache-rework`, NOT merged/pushed).** The whole
+bundle below shipped across 7 commits; design + sign-off in
+`docs/design/2026-06-27_cache_rework_design.md`. What changed:
+
+- **Bug #4** (slayer cache focal-level-cap key) FIXED (`slayer_cache` v4).
+- **Energy plane**: sweep columns are now multi-plane `.npz`
+  ({score,energy}); energy is always captured + stored, so the
+  `capture_energy -> use_sweep_cache=False` bypass is gone and the default
+  `--compare-energy` dive serves warm (it was previously running the cache
+  *dead* on every default dive). `sweep_cache` v6; shared
+  `scripts/cache_base.py` foundation.
+- **Selective invalidation**: per-column engine STAMP (in the `.json`
+  sidecar) + `scripts/migrate_cache.py` (`--list-stamps`; `--from-engine X
+  --predicate shadow_xor --apply`). Blesses the columns a localized fix
+  provably doesn't touch, deletes the rest.
+- **ML/dive merge (T2)**: `iv_envelope_analysis` now runs on the shared
+  `iv_sweep` engine (one sweep per quadrant; `won_set`/`score_set`/
+  `result_metrics` are grid views), so ML re-bakes reuse warm columns +
+  signature dedup. `WonSetCache` retired. Verified byte-identical to the old
+  path on standard/shadow/floor-10.
+- **GC**: `scripts/gc_cache.py` (keep current + N-1 gamemaster vintage;
+  `--dry-run` default). ~45 GB / 140k stale columns now prunable.
+
+**NOW-ENABLED FOLLOW-UP (next session): the warm bug-#1 re-dive.** With the
+stamp + `migrate_cache` in place, apply the bug-#1 `fire_now` cmp_atk fix to
+`battle.py` (it's on branch `overnight/2026-06-26`), then:
+1. `python scripts/migrate_cache.py --list-stamps` to find the pre-fix
+   engine stamp;
+2. `migrate_cache.py --from-engine <pre-fix> --predicate shadow_xor --apply`
+   to bless the unaffected (both-shadow / both-non-shadow) columns and drop
+   the shadow-XOR ones;
+3. re-dive / re-bake — only the shadow-XOR cells re-sim (warm), then
+   re-publish. (Original bug-#1 scope/measurements are in the RESOLVED-#1
+   DEVELOPER_NOTES entry.)
+
+----
+
 **HANDOFF 2026-06-27 (Michael) -- DO THIS BUNDLE NEXT, ahead of bug fixes.**
 The shadow-CMP bug #1 fix (`docs/reviews/2026-06-27_engine_bug_hunt.md`) is
 INTENTIONALLY DEFERRED until this cache session lands, because fixing it

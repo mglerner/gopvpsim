@@ -78,3 +78,14 @@ def test_engine_hash_is_embedded():
 def test_scenario_list_changes_key():
     all_nine = [(a, b) for a in range(3) for b in range(3)]
     assert _key(shield_scenarios=all_nine) != _key()
+
+
+def test_focal_max_level_changes_key():
+    # Bug #4 (2026-06-27): the focal level cap lifts the whole mirror cohort's
+    # per-IV levels, so a Master mirror-slayer run at L50 must not serve an
+    # L51 run's cached scores.
+    assert _key(focal_max_level=50.0) != _key(focal_max_level=51.0)
+    # Default (None) is its own bucket, distinct from an explicit cap.
+    assert _key(focal_max_level=None) != _key(focal_max_level=51.0)
+    # Same cap -> same key (stability).
+    assert _key(focal_max_level=51.0) == _key(focal_max_level=51.0)

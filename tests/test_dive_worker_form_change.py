@@ -116,7 +116,7 @@ def test_sweep_worker_matches_from_pokemon():
     profiles = [_focal_profile(ivs) for ivs in focal_iv_list]
     chunk = [(prof, oi) for prof in profiles
              for oi in range(len(opp_cache))]
-    results, n_sims = deep_dive._sweep_worker(chunk)
+    results, _energy, _metrics, n_sims = deep_dive._sweep_worker(chunk)
 
     assert n_sims == len(focal_iv_list) * len(opp_cache) * len(SCENARIOS)
 
@@ -147,7 +147,7 @@ def test_sweep_worker_pins_pvpoke_oracle_score():
     _init_sweep_worker_state(opp_cache, [(0, 0)])
 
     prof = _focal_profile((4, 14, 15))
-    results, _ = deep_dive._sweep_worker([(prof, 0)])
+    results, _energy, _metrics, _ = deep_dive._sweep_worker([(prof, 0)])
     score = results[(prof[0], 0)][0]
     assert round(score) == 773
 

@@ -30,15 +30,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.path.insert(0, os.path.dirname(__file__))
 
 from gopvpsim.pokemon import (
-    Pokemon, LEAGUE_CAPS, battle_stats, get_species, cp as calc_cp,
+    battle_stats, get_species, cp as calc_cp,
     SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
 )
 from gopvpsim.moves import get_moves, damage as calc_damage
 from gopvpsim.breakpoints import _get_types
-from gopvpsim.battle import simulate, pvpoke_dp, BattlePokemon
 from gopvpsim.data import get_default_moveset
 from deep_dive import _parse_opponent_pool_line, parse_opponent_spec
-from iv_envelope_cache import WonSetCache, sig_fields
 
 LEAGUE    = 'master'
 POOL_FILE = 'opponent_pools/master_top60.txt'
@@ -54,7 +52,6 @@ EVEN_SHIELDS = [(0, 0), (1, 1), (2, 2)]
 ALL9_SHIELDS = [(a, b) for a in (0, 1, 2) for b in (0, 1, 2)]
 SHIELDS = EVEN_SHIELDS             # reassigned in main() per --all-shields
 FOCAL_SHADOW = False               # reassigned in main() once focal is resolved
-CACHE = None                       # WonSetCache, set in main() unless --no-cache
 # The recommended-IV table renders all four quadrants: both your-best-buddy
 # states, each vs a best-buddy AND a non-best-buddy meta. The vs-non-BB-meta
 # pair is the more expensive half (another full 64-combo sweep at opp L50), but
@@ -101,15 +98,6 @@ def stat_product(base, ivs, level, shadow=False):
     return a * d * h
 
 
-def build_mon(species, fast_id, charged_ids, ivs, shields, level, shadow=False):
-    p = Pokemon.at_best_level(species, *ivs, league=LEAGUE,
-                              max_level=level, shadow=shadow)
-    fm = dict(_FAST_DB[fast_id])
-    cms = [dict(_CHARGED_DB[cid]) for cid in charged_ids]
-    return BattlePokemon.from_pokemon(p, fm, cms, shields=shields,
-                                      league_cp=LEAGUE_CAPS[LEAGUE])
-
-
 def load_opponents():
     opps = []
     with open(POOL_FILE) as f:
@@ -135,61 +123,79 @@ def load_opponents():
     return opps
 
 
-# --- Matchup sims ---------------------------------------------------------
+# --- Matchup sims (via the shared iv_sweep engine) ------------------------
 
-def won_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
+# GRIDS[(my_lvl, opp_lvl)][ivs_tuple] = {(opp_display, (shf, sho)): cell},
+# cell = {'score','won','energy','hp','max_hp','shields'}. Built once by
+# build_quadrant_grids(); the won_set/score_set/result_metrics views below read
+# it instead of re-simming. ONE iv_sweep per quadrant produces every cell
+# (signature-deduped + disk-cached via the shared sweep cache), so a warm
+# re-bake re-sims nothing — the win that retires the old per-call sim loops
+# (and the boolean-only WonSetCache).
+GRIDS = None
+
+
+def build_quadrant_grids(base_clean, fast_id, charged_ids, opponents, iv_floor,
+                         use_cache=True):
+    """Run iv_sweep once per (my_lvl, opp_lvl) quadrant; index by
+    (ivs, opp_display, shields).
+
+    The ML axes map exactly onto iv_sweep params in master league: the 12-15
+    (or 10-15) focal grid is iv_floor=(f,f,f); the fixed 50/51 levels are
+    focal_max_level/opp_max_level (no CP cap binds, so best_level == the cap);
+    15/15/15 opponents are the pvpoke default; and capture_metrics supplies
+    won/hp/max_hp/shields alongside score/energy. Verified for the whole master
+    pool: every opponent resolves to 15/15/15 and none is a mid-battle
+    form-changer, so this reproduces the old per-(opp,shield) build_mon path
+    exactly (worker == from_pokemon is pinned by test_dive_worker_form_change)."""
+    import deep_dive
+    opp_names = [o['display'] for o in opponents]
+    opp_movesets = [(o['fast'], o['charged']) for o in opponents]
+    floor3 = (iv_floor, iv_floor, iv_floor)
+    grids = {}
+    for q, (ml, ol) in QUADRANTS.items():
+        results = deep_dive.iv_sweep(
+            base_clean, fast_id, charged_ids, LEAGUE, FOCAL_SHADOW,
+            opp_names, opp_movesets, SHIELDS,
+            opp_iv_mode='pvpoke', iv_floor=floor3,
+            focal_max_level=ml, opp_max_level=ol,
+            use_sweep_cache=use_cache,
+            capture_energy=True, capture_metrics=True)[0]
+        g = {}
+        for r in results:
+            cell = g.setdefault((r['atk_iv'], r['def_iv'], r['sta_iv']), {})
+            for si, (shf, sho) in enumerate(SHIELDS):
+                for oi, o in enumerate(opponents):
+                    k = (si, oi)
+                    cell[(o['display'], (shf, sho))] = {
+                        'score': r['per_opp'][k],
+                        'won': bool(r['per_opp_won'][k]),
+                        'energy': int(r['per_opp_energy'][k]),
+                        'hp': int(r['per_opp_hp'][k]),
+                        'max_hp': int(r['per_opp_max_hp'][k]),
+                        'shields': int(r['per_opp_shields'][k]),
+                    }
+        grids[(ml, ol)] = g
+    return grids
+
+
+def won_set(ivs, my_lvl, opp_lvl):
     """Set of (opp_display, shields) this spread wins, over the SHIELDS set."""
-    if CACHE is not None:
-        hit = CACHE.get(ivs, my_lvl, opp_lvl)
-        if hit is not None:
-            return hit
-    won = set()
-    for o in opponents:
-        for shf, sho in SHIELDS:
-            bp0 = build_mon(species, fast_id, charged_ids, ivs, shf, my_lvl,
-                            shadow=FOCAL_SHADOW)
-            bp1 = build_mon(o['base'], o['fast'], o['charged'], (15, 15, 15),
-                            sho, opp_lvl, shadow=o['shadow'])
-            r = simulate(bp0, bp1, charged_policy_0=pvpoke_dp,
-                         charged_policy_1=pvpoke_dp)
-            if r.pvpoke_score(0) > r.pvpoke_score(1):
-                won.add((o['display'], (shf, sho)))
-    if CACHE is not None:
-        CACHE.put(ivs, my_lvl, opp_lvl, won)
-    return won
+    cells = GRIDS[(my_lvl, opp_lvl)][tuple(ivs)]
+    return {key for key, c in cells.items() if c['won']}
 
 
-def result_metrics(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl,
-                   opponents):
-    """Per (opp_display, shields): the focal's end-state after the fight.
-
-    Returns {(disp, (shf, sho)): {'won','hp','max_hp','energy','shields'}}.
-    Used only for the per-stat close-call diff (a bounded set: one hundo
-    baseline per quadrant + the 9 per-stat-IV spreads the detail loop already
-    walks), so unlike won_set it is deliberately not cached -- the won-set
-    cache stores only the won SET, not these margins."""
-    out = {}
-    for o in opponents:
-        for shf, sho in SHIELDS:
-            bp0 = build_mon(species, fast_id, charged_ids, ivs, shf, my_lvl,
-                            shadow=FOCAL_SHADOW)
-            bp1 = build_mon(o['base'], o['fast'], o['charged'], (15, 15, 15),
-                            sho, opp_lvl, shadow=o['shadow'])
-            r = simulate(bp0, bp1, charged_policy_0=pvpoke_dp,
-                         charged_policy_1=pvpoke_dp)
-            out[(o['display'], (shf, sho))] = {
-                'won': r.pvpoke_score(0) > r.pvpoke_score(1),
-                'hp': max(0, r.hp_remaining[0]),
-                'max_hp': r.max_hp[0],
-                'energy': r.energy_remaining[0],
-                'shields': r.shields_remaining[0],
-            }
-    return out
+def result_metrics(ivs, my_lvl, opp_lvl):
+    """Per (opp_display, shields): the focal's end-state after the fight,
+    {'won','hp','max_hp','energy','shields'} — for the close-call diffs."""
+    cells = GRIDS[(my_lvl, opp_lvl)][tuple(ivs)]
+    return {key: {'won': c['won'], 'hp': c['hp'], 'max_hp': c['max_hp'],
+                  'energy': c['energy'], 'shields': c['shields']}
+            for key, c in cells.items()}
 
 
-def score_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
-    """Like won_set, but ALSO keeps the full per-(opp, shields) battle score
-    (centered on 500) AND the focal's post-match leftover energy.
+def score_set(ivs, my_lvl, opp_lvl):
+    """Per-(opp, shields) battle score (centered on 500) + leftover energy.
     Returns (scores, won, energy):
       scores: {(opp_display, (shf, sho)): int focal score}
       won:    set of (opp_display, (shf, sho)) the focal wins
@@ -197,33 +203,16 @@ def score_set(species, fast_id, charged_ids, ivs, my_lvl, opp_lvl, opponents):
 
     Feeds the guide's 'check my IVs' HP-margin bars + best-buddy flip overlay
     (the raw score; HP% proxy = (score-500)/500) and the banked-energy line
-    under the bars (leftover energy -> fast-move-equivalents + fractions of each
-    charged move, via the shared cmpMarginPanel energy annotation). The `won`
-    set is derived with the EXACT same test won_set uses (pvpoke_score(0) >
-    pvpoke_score(1)), not a `score>500` shortcut -- the two differ by one only in
-    an unreachable timeout where the floor makes the two scores sum to 999, but
-    deriving `won` identically keeps the rec-table drops provably unchanged.
-
-    NOT cached: the won-set disk cache stores only booleans. On a cold/full bake
-    these are the SAME sims the rec-table sweep already runs for `drops`, so the
-    rec loop derives `won` from this and adds no sims. (A warm-cache iteration
-    re-sims the 64 combos; teaching WonSetCache to store scores is the follow-up.)"""
-    scores = {}
-    won = set()
-    energy = {}
-    for o in opponents:
-        for shf, sho in SHIELDS:
-            bp0 = build_mon(species, fast_id, charged_ids, ivs, shf, my_lvl,
-                            shadow=FOCAL_SHADOW)
-            bp1 = build_mon(o['base'], o['fast'], o['charged'], (15, 15, 15),
-                            sho, opp_lvl, shadow=o['shadow'])
-            r = simulate(bp0, bp1, charged_policy_0=pvpoke_dp,
-                         charged_policy_1=pvpoke_dp)
-            key = (o['display'], (shf, sho))
-            scores[key] = int(r.pvpoke_score(0))
-            energy[key] = max(0, int(r.energy_remaining[0]))
-            if r.pvpoke_score(0) > r.pvpoke_score(1):
-                won.add(key)
+    under the bars. `won` is the stored flag (pvpoke_score(0) > pvpoke_score(1)),
+    the same test won_set uses -- NOT a `score>500` shortcut -- so the rec-table
+    drops are provably unchanged from the old per-call path."""
+    cells = GRIDS[(my_lvl, opp_lvl)][tuple(ivs)]
+    scores, won, energy = {}, set(), {}
+    for key, c in cells.items():
+        scores[key] = int(c['score'])
+        energy[key] = max(0, int(c['energy']))
+        if c['won']:
+            won.add(key)
     return scores, won, energy
 
 
@@ -367,7 +356,7 @@ def cmp_lost(focal_base, opponents, my_lvl, opp_lvl, stat_iv):
 
 def main():
     import argparse
-    global SHIELDS, FOCAL_SHADOW, POOL_FILE, CACHE, IVS
+    global SHIELDS, FOCAL_SHADOW, POOL_FILE, GRIDS, IVS
     ap = argparse.ArgumentParser(description='ML IV envelope analysis -> JSON.')
     ap.add_argument('species', nargs='?', default='Dialga (Origin)')
     ap.add_argument('--all-shields', action='store_true',
@@ -431,13 +420,15 @@ def main():
     suffix = '_all9' if a.all_shields else ''
     out_path = f"userdata/dives/{slug}_iv_envelope{suffix}.json"
 
-    if not a.no_cache:
-        sig = sig_fields(base_clean, FOCAL_SHADOW, fast_id, charged_ids,
-                         SHIELDS, opponents)
-        CACHE = WonSetCache(slug, variant, sig, enabled=True)
-
     print(f"{species}: {len(opponents)} opponents, build {fast_id} / "
           f"{', '.join(charged_ids)}")
+
+    # Run the shared iv_sweep engine once per quadrant; every won_set /
+    # score_set / result_metrics below reads these grids instead of re-simming.
+    # use_sweep_cache (inside iv_sweep) makes a warm re-bake re-sim nothing.
+    # --no-cache forces fresh sims (timing/debugging).
+    GRIDS = build_quadrant_grids(base_clean, fast_id, charged_ids, opponents,
+                                 a.iv_floor, use_cache=not a.no_cache)
 
     # 1. PvP stat values per level / stat / iv.
     stat_values = {}
@@ -454,8 +445,7 @@ def main():
     # 2. Hundo win-sets per quadrant (drives key wins/losses + the drop diffs).
     hundo_won = {}
     for q, (ml, ol) in QUADRANTS.items():
-        hundo_won[q] = won_set(base_clean, fast_id, charged_ids, (15, 15, 15),
-                               ml, ol, opponents)
+        hundo_won[q] = won_set((15, 15, 15), ml, ol)
         print(f"  hundo {q}: {len(hundo_won[q])} won (of "
               f"{len(opponents) * len(SHIELDS)})")
 
@@ -486,8 +476,7 @@ def main():
                         'atk': {}, 'def': {}, 'hp': {}}
         # Hundo end-state baseline for this quadrant, simmed once and reused
         # across every stat/iv close-call diff in it AND the rec-table combos.
-        base_metrics = result_metrics(base_clean, fast_id, charged_ids,
-                                      (15, 15, 15), ml, ol, opponents)
+        base_metrics = result_metrics((15, 15, 15), ml, ol)
         base_metrics_by_q[q] = base_metrics
         for stat, slot in (('atk', 0), ('def', 1), ('hp', 2)):
             for iv in IVS:
@@ -495,16 +484,13 @@ def main():
                     continue
                 ivs = [15, 15, 15]
                 ivs[slot] = iv
-                won = won_set(base_clean, fast_id, charged_ids, tuple(ivs),
-                              ml, ol, opponents)
+                won = won_set(tuple(ivs), ml, ol)
                 dropped = hundo_won[q] - won
                 gained = won - hundo_won[q]
                 by_sh = {shield_label(s): [] for s in SHIELDS}
                 for (disp, sh) in sorted(dropped):
                     by_sh[shield_label(sh)].append(disp)
-                drop_metrics = result_metrics(
-                    base_clean, fast_id, charged_ids, tuple(ivs),
-                    ml, ol, opponents)
+                drop_metrics = result_metrics(tuple(ivs), ml, ol)
                 entry = {
                     'pvp_stat': stat_values['bb' if ml == 51.0 else 'nobb'][stat][iv],
                     'dropped': by_sh,
@@ -566,8 +552,7 @@ def main():
         is_perfect = (av, dv, sv) == (15, 15, 15)
         for q in REC_QUADRANTS:
             ml, ol = QUADRANTS[q]
-            sc, won, en = score_set(base_clean, fast_id, charged_ids,
-                                    (av, dv, sv), ml, ol, opponents)
+            sc, won, en = score_set((av, dv, sv), ml, ol)
             # Append this combo's scores + energy in scenario-major, opp-inner
             # order (cmpVal indexes both grids identically).
             for (shf, sho) in SHIELDS:
@@ -581,8 +566,7 @@ def main():
             elif is_perfect:
                 ccalls[q] = []        # the hundo IS the baseline: no close-calls
             else:
-                drop_metrics = result_metrics(base_clean, fast_id, charged_ids,
-                                              (av, dv, sv), ml, ol, opponents)
+                drop_metrics = result_metrics((av, dv, sv), ml, ol)
                 ccalls[q] = close_calls(base_metrics_by_q[q], drop_metrics,
                                         cheapest_cost)
         row['drops'] = drops
@@ -641,9 +625,6 @@ def main():
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, 'w') as f:
         json.dump(data, f, indent=2)
-    if CACHE is not None:
-        CACHE.flush()
-        print(f"won-set cache: {CACHE.hits} hits, {CACHE.misses} misses")
     print(f"\nWrote {out_path}")
 
 

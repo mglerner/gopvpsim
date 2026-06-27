@@ -33,10 +33,11 @@ Layout on disk:
 """
 import hashlib
 import json
-import os
 from pathlib import Path
 
 import numpy as np
+
+from cache_base import write_planes, read_planes
 
 # Manual escape hatch: bump on any battle-behavior change that the
 # engine source hash somehow misses (it shouldn't — see _ENGINE_FILES).
@@ -45,8 +46,32 @@ import numpy as np
 # v3 (2026-06-12): energy-lead axis added to _sweep_worker plumbing
 # (focal starting energy threaded through worker init); bump per the
 # same rule.
-CACHE_VERSION = 4
+# v5 (2026-06-27): columns moved from a single-array .npy (score only) to
+# a multi-plane .npz ({score: float64, energy: uint8}). Energy is now
+# always captured + stored so --compare-energy re-dives serve warm instead
+# of force-disabling the cache. Old .npy columns are orphaned (GC cleans).
+# v6 (2026-06-27): the engine-source hash moved OUT of the focal key into a
+# PER-COLUMN engine stamp (stored in the .json sidecar). An engine change no
+# longer orphans the whole focal dir; columns self-heal in place (cold), and
+# scripts/migrate_cache.py can selectively BLESS the columns a localized fix
+# provably doesn't touch (e.g. bug #1's shadow-XOR predicate) so the re-dive
+# is warm. gamemaster stays in the focal key, so a blessed column is
+# guaranteed same-gamemaster (the predicate models only the engine delta).
+CACHE_VERSION = 6
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'sweep'
+
+# Compact on-disk dtype per column plane. score is the float64 PvPoke score;
+# energy/shields are tiny bounded ints; won is a flag; hp/max_hp fit u16.
+# Hits reconstruct exact values (all are integer-valued except score, which
+# stays float64), so warm == cold bit-for-bit.
+_PLANE_DTYPES = {
+    'score': np.float64,
+    'energy': np.uint8,
+    'won': np.bool_,
+    'hp': np.uint16,
+    'max_hp': np.uint16,
+    'shields': np.uint8,
+}
 
 # Engine sources whose content participates in the focal key. Any edit
 # (even a comment) invalidates the cache — spurious invalidation is the
@@ -132,7 +157,10 @@ def focal_key_fields(species, league, shadow, fast_id, charged_ids,
         'bait': bait_mode,
         'energy_lead': energy_lead,
         'focal_max_level': focal_max_level,
-        'engine': engine_hash(),
+        # NB: the engine hash is intentionally NOT here (v6) — it is a
+        # per-column stamp in the .json sidecar so an engine change doesn't
+        # orphan the dir. gamemaster stays, so all columns in a focal dir
+        # share one gamemaster vintage.
         'gamemaster': gamemaster_hash(),
     }
 
@@ -163,17 +191,47 @@ class SweepCache:
         self.misses = 0
 
     def _col_path(self, col_fields):
-        return self.dir / f'{_key_hash(col_fields)}.npy'
+        return self.dir / f'{_key_hash(col_fields)}.npz'
 
-    def get_column(self, col_fields, n_ivs, n_scenarios):
-        """Return the (n_ivs, n_scenarios) float64 column, or None."""
+    @staticmethod
+    def read_stamp(json_path):
+        """Read the per-column engine stamp from its .json sidecar, or None.
+
+        The sidecar holds ``{'engine': <hash>, 'col': <col_fields>}`` (v6).
+        Returns the stored engine hash so a stale-engine column can be
+        rejected (or, via migrate_cache, blessed) without touching the .npz.
+        """
+        try:
+            return json.loads(Path(json_path).read_text()).get('engine')
+        except Exception:
+            return None
+
+    def get_column(self, col_fields, n_ivs, n_scenarios,
+                   required_planes=('score', 'energy')):
+        """Return the column's planes as ``{name: ndarray}``, or None on a miss.
+
+        A hit requires the per-column engine stamp to equal the current
+        engine hash (a stale-engine column is a miss — checked from the small
+        sidecar before the big .npz is loaded), and every plane in
+        ``required_planes`` present at shape ``(n_ivs, n_scenarios)``. The ML
+        path requests the metric planes (won/hp/max_hp/shields) too; a column
+        written with only score+energy misses for it. Corrupt/partial writes
+        self-heal as a miss (re-simmed and overwritten).
+        """
         try:
             p = self._col_path(col_fields)
-            if p.exists():
-                arr = np.load(p)
-                if arr.shape == (n_ivs, n_scenarios):
-                    self.hits += 1
-                    return arr
+            # Cheap stale-engine rejection first: skip loading the .npz if the
+            # sidecar stamp doesn't match the current engine.
+            if self.read_stamp(p.with_suffix('.json')) != engine_hash():
+                self.misses += 1
+                return None
+            planes = read_planes(p)
+            if (planes is not None
+                    and all(name in planes
+                            and planes[name].shape == (n_ivs, n_scenarios)
+                            for name in required_planes)):
+                self.hits += 1
+                return planes
         except Exception as e:
             # A corrupt stored file self-heals as a miss (re-simmed and
             # overwritten), but silently it looks like "cache stopped
@@ -184,22 +242,28 @@ class SweepCache:
         self.misses += 1
         return None
 
-    def put_column(self, col_fields, arr):
+    def put_column(self, col_fields, planes):
+        """Persist a column from a ``{plane_name: ndarray}`` dict, each cast to
+        its compact dtype (see ``_PLANE_DTYPES``). ``energy`` is asserted in
+        [0,100] so a future out-of-range value fails loud instead of wrapping
+        into uint8. The .json sidecar records the current engine hash as the
+        column's stamp (v6)."""
         try:
             self.dir.mkdir(parents=True, exist_ok=True)
             meta_p = self.dir / 'meta.json'
             if not meta_p.exists():
                 meta_p.write_text(json.dumps(self._focal_fields, indent=1,
                                              sort_keys=True))
+            if 'energy' in planes:
+                e = np.asarray(planes['energy'])
+                assert e.min() >= 0 and e.max() <= 100, (
+                    f'energy out of [0,100]: min={e.min()} max={e.max()}')
+            out = {name: np.asarray(arr, dtype=_PLANE_DTYPES.get(name, np.float64))
+                   for name, arr in planes.items()}
             p = self._col_path(col_fields)
-            # Atomic write: a crash (or a concurrent dive of the same
-            # focal) mid-np.save must not leave a truncated column.
-            # File-handle form so np.save can't append a second '.npy'.
-            tmp = p.with_name(p.name + '.tmp')
-            with open(tmp, 'wb') as f:
-                np.save(f, np.asarray(arr, dtype=np.float64))
-            os.replace(tmp, p)
-            p.with_suffix('.json').write_text(
-                json.dumps(col_fields, indent=1, sort_keys=True))
+            write_planes(p, out)
+            p.with_suffix('.json').write_text(json.dumps(
+                {'engine': engine_hash(), 'col': col_fields},
+                indent=1, sort_keys=True))
         except Exception:
             pass  # cache is best-effort
