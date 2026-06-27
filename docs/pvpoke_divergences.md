@@ -35,6 +35,15 @@ test or documented guard, and the full root-cause writeups live in
    that mixes turn time with charged-move animation time; ours is a flat
    500-turn cap. Both are infinite-loop guards and neither is reachable in a
    real 1v1, so the simpler guard costs nothing observable.
+6. **A self-debuffing move is not thrown into a shield it can't get past
+   (no-bait analysis only).** When our attacker's biggest move is self-debuffing
+   (Brave Bird, Superpower, Wild Charge) and the opponent would shield it anyway,
+   we throw a cheaper non-debuffing move instead -- the shield is spent either
+   way, so this only avoids eating the -atk/-def for nothing. PvPoke ties this
+   swap to its bait toggle, so with baiting off it throws the self-debuffing nuke
+   into the shield, a strictly worse line. This only affects bait-off analysis
+   (the oracle runs bait-on and never sees it); ours keeps those matchups honest
+   (traced: Malamar vs Furret 1-1, ours 769 vs PvPoke's 237).
 
 We also deliberately do NOT replicate one block of PvPoke's decision code (its
 non-guaranteed-buff "needsBoost" plan selection): that code is disabled

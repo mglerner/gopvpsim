@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->1100<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->1101<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
@@ -567,10 +567,13 @@ cache-rework handoff). Recorded here so they aren't lost to TODO pruning:
   `scripts/slayer_cache.py` `compute_cache_key`; the sweep cache already
   keys on `focal_max_level`. Bundled into the cache-rework session (needs a
   `CACHE_VERSION` bump).
-- **#5 [MED/LOW] `bandaid[929]` stack-switch missing its `bait_shields` gate**
-  (battle.py:1705 vs ActionLogic.js:947-952). Only bites in no-bait
-  analysis. Decision: gate-to-match-PvPoke vs document-as-intentional; it is
-  currently neither gated nor documented.
+- **#5 [MED/LOW] `bandaid[929]` stack-switch missing its `bait_shields` gate
+  -- RESOLVED 2026-06-27: kept ungated, documented as an INTENTIONAL
+  divergence.** An A/B (focal no-bait vs bait-on opponent, GL+UL self-debuff
+  focals x 9 shields) plus a chargedLog trace showed PvPoke's gated line throws
+  a self-debuffing nuke into a guaranteed shield (strictly dominated): gating
+  would flip 284 winners, ALL in our favor, zero against. See the "Known
+  divergences" subsection below + `tests/test_bandaid929_nobait_divergence.py`.
 - **#6 (contested) `bandaid[910]` uses defender max-damage move, not
   `bestChargedMove`** (battle.py:1682). Code divergence real, but a 360-sim
   sweep showed it cosmetic (16/16 fire-cases match the oracle on
@@ -657,6 +660,38 @@ Places where our code intentionally does NOT match PvPoke's
 implementation. Each is a potential source of score mismatches if we
 hit an edge case. Fix these before assuming a score difference is a
 PvPoke bug.
+
+### bandaid[929] stack-switch is ungated on bait_shields (no-bait only)
+(documented 2026-06-27, engine bug-hunt #5)
+
+In `pvpoke_dp`'s self-debuff-stacking handler, the terminal `elif`
+(battle.py ~1731) swaps a self-debuffing max-damage move to a cheaper
+non-debuffing move when the opponent would shield the nuke (or the cheaper
+move is self-buffing). PvPoke gates this swap on `baitShields`
+(ActionLogic.js:947); we do not. So in no-bait analysis PvPoke keeps the
+self-debuffing move and we swap.
+
+**Why we keep ours.** When `would_shield` is True the move is shielded either
+way (1 damage), so there is no damage tempo at stake -- the swap only avoids
+eating the -atk/-def self-debuff on a throw that is shielded regardless. It is
+avoid-waste, not bait tempo, and sits in the same family as the ungated
+`[910]`/`[918]` self-debuff timing (CLAUDE.md's "throw self-debuffing moves
+only when fast-KO won't suffice" deviation). PvPoke's gated line throws the
+self-debuffing nuke into a guaranteed shield -- strictly dominated.
+
+**Evidence.** Trace: Malamar (Super Power + Foul Play) vs Furret, no-bait, 1-1
+-- ours throws Foul Play into the shield (score 769); gated throws Superpower
+into the same shield and eats the debuff (score 237). A/B across the GL+UL
+self-debuff focals (Talonflame, Malamar, Moltres-G, Annihilape, Raikou +
+shadows) x 9 shields: gating changes 1184 focal-score cells and flips 284
+winners, ALL focal-wins-ungated -> loses-gated, zero the other way, and no cell
+where our swap loses a winnable fight.
+
+**No PvPoke oracle.** `scripts/pvpoke_trace.js` cannot set `baitShields`, so the
+no-bait dimension is never compared upstream -- this divergence is invisible to
+the (bait-on) oracle, which is why it surfaced only in the bug-hunt rather than
+the suite. Pinned by `tests/test_bandaid929_nobait_divergence.py` (our
+behavior). Revisit if a no-bait PvPoke oracle path is ever added.
 
 ### Battle timeout: flat 500-turn guard vs PvPoke's 240s display clock
 (documented 2026-06-11, review finding E14)

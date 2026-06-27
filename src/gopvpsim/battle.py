@@ -1728,9 +1728,19 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                         f"  DP-trace[{attacker.species}]: bandaid[918] stack-self-debuff:"
                         f" energy={attacker.energy}/{target_energy}, waiting")
                 return None
+        # INTENTIONAL DIVERGENCE (engine bug-hunt #5, 2026-06-27): PvPoke gates this
+        # swap on baitShields (ActionLogic.js:947); we do NOT. When would_shield is
+        # True the move is shielded either way (1 dmg), so swapping to the cheaper
+        # non-debuff move is avoid-waste -- skip the self-debuff on a throw that is
+        # shielded regardless -- NOT bait tempo, and consistent with the ungated
+        # [910]/[918] self-debuff timing above. Gating it would make a self-debuff
+        # closer throw its nuke into a guaranteed shield in no-bait analysis
+        # (strictly dominated; traced Malamar vs Furret 1-1: ours 769, gated 237).
+        # See DEVELOPER_NOTES "Known divergences", docs/pvpoke_divergences.md #6,
+        # and tests/test_bandaid929_nobait_divergence.py.
         elif defender.shields > 0 and n_cms > 1:
             # At target energy and shields up: use cheaper non-debuff if self-buffing
-            # or if opponent would shield (line 929-933)
+            # or if opponent would shield (ActionLogic.js:947-952).
             if (cm_energy[0] - cm_energy[first_idx] <= 10
                     and not cm_self_debuf[0]):
                 if (cm_self_buff[0]
