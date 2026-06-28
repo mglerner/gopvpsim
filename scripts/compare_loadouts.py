@@ -52,6 +52,7 @@ from gopvpsim.data import (  # type: ignore[import-not-found]
     parse_types,
 )
 from gopvpsim.pokemon import LEAGUE_CP  # type: ignore[import-not-found]
+from deep_dive_rendering import opp_slug  # type: ignore[import-not-found]
 from render_article import (  # type: ignore[import-not-found]
     render_authorship_banner,
     sidebar_css,
@@ -432,20 +433,6 @@ def _render_moveset_table(loadouts_data: list[dict], gm: dict) -> str:
     )
 
 
-def _opp_anchor_slug(name: str) -> str:
-    """Slugify an opponent display name to match the dive's #opp-<slug> id.
-
-    Must stay in lock-step with ``deep_dive_rendering.opp_slug`` and
-    ``generate_article._opp_slug``: simple ``re.sub`` of non-alphanumeric
-    runs to ``-`` with leading/trailing hyphens stripped. ``Stunfisk
-    (Galarian)`` -> ``stunfisk-galarian``; ``Forretress (Shadow)`` ->
-    ``forretress-shadow``. Drift from the dive-side slugger breaks the
-    anchor-link badges added by the all-in-row matchup table.
-    """
-    import re as _re
-    return _re.sub(r'[^a-z0-9]+', '-', (name or '').lower()).strip('-')
-
-
 def _loadout_abbrev(label: str) -> str:
     """Shorten a loadout label for compact all-in-row table headers.
 
@@ -566,7 +553,7 @@ def _render_all_in_row_matchup_table(
             # jumping-off point for the reader to drill into "why does
             # this loadout win/lose this matchup?" on the richer per-
             # loadout anchor + threshold-tier evidence in the dive.
-            opp_anchor = _opp_anchor_slug(name)
+            opp_anchor = opp_slug(name)
             for ld, abbr, is_win in zip(loadouts_data, abbrevs, wins):
                 spec = ld['spec']
                 badge_cls = 'flip-pos' if is_win else 'flip-neg'
