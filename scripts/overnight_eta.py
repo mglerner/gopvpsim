@@ -31,9 +31,11 @@ Method:
   * For not-yet-started dives, use bucket_avg of the classify() group.
   * Use fallback baselines when a bucket has no completed dives yet;
     these are loose approximations, sharpen as real completions arrive.
-  * Add a fixed ~5 min allowance for post-dive steps 2-10 of
-    overnight_redive.sh (patch anchors, article gen, compare renders,
-    Aegislash narrative drafts, site index, link verify).
+  * Add a fixed ~5 min allowance for the light post-dive steps
+    (compare renders, matchup web, site index, link verify), PLUS a
+    loose ML-bake allowance (step 7b, run_iv_guides.py, ~7h cold) until
+    the chain enters that step -- it's the dominant tail, so omitting it
+    made the whole-script ETA under-report by hours.
 
 Silent if the wrapper log can't be parsed or no dives have been
 enumerated yet — exits 0 with no output so the shell caller can skip
@@ -69,7 +71,14 @@ FALLBACKS = {
     'gl_full':    63.0,
     'ul_full':    80.0,   # 2026-04-19 overnight chain observed median 79.6 (N=2); was 76.0
     'forretress': 25.0,
-    'post_dive':  5.0,   # total for steps 2-10 of overnight_redive.sh
+    'post_dive':  5.0,   # comparison renders + matchup web + index + verify (steps 4-9, sans ML)
+    # Step 7b: the run_iv_guides.py Master-league ML bake (~60 guides, serial /
+    # all-cores-each). A ~7h cold tail per overnight_redive.sh's own header; the
+    # single biggest post-dive cost, so omitting it made the whole-script ETA
+    # under-report by hours. Loose fallback only -- once the bake STARTS,
+    # chain_status.py shows the data-driven ML block (in_ml_phase) instead of
+    # this line, so this number only ever covers the not-yet-reached ML step.
+    'ml_tail':    420.0,
 }
 
 
@@ -187,8 +196,18 @@ def main(wrapper_log_path: str) -> int:
         else:
             total_remaining_min += est
 
-    # Fixed post-dive-pipeline allowance.
+    # Fixed post-dive-pipeline allowance (comparison renders + matchup web +
+    # index + link verify).
     total_remaining_min += FALLBACKS['post_dive']
+
+    # ML IV-guide bake (step 7b) -- the dominant tail. Add it until the chain
+    # actually enters it; once 'ML IV guides' appears in the wrapper log we're
+    # in/past the bake (all dives done), and chain_status.py shows the
+    # data-driven ML block instead of this SCRIPT line, so adding it then would
+    # double-count. Guarded so standalone overnight_eta runs stay honest too.
+    ml_started = 'ML IV guides' in text
+    ml_tail_min = 0.0 if ml_started else FALLBACKS['ml_tail']
+    total_remaining_min += ml_tail_min
 
     now = datetime.now()
     eta_str = _fmt_minutes(total_remaining_min)
@@ -200,8 +219,11 @@ def main(wrapper_log_path: str) -> int:
     bucket_bits = []
     for b in ('gl_full', 'ul_full', 'forretress'):
         bucket_bits.append(f'{b}={bucket_avg[b]:.0f}m ({bucket_source[b]})')
+    if ml_tail_min:
+        bucket_bits.append(f'ml_tail={ml_tail_min:.0f}m (fallback)')
 
-    print(f'SCRIPT: ~{eta_str} remaining, done ~{done_str}')
+    ml_note = ' (incl. ~ML tail)' if ml_tail_min else ''
+    print(f'SCRIPT: ~{eta_str} remaining{ml_note}, done ~{done_str}')
     if current_dive_remaining is not None:
         if current_dive_overshoot:
             # Past the baseline -- don't claim a number we don't
