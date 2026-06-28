@@ -20,6 +20,7 @@ from build_website_index import (  # noqa: E402
     _slug_to_pretty_title,
     _parse_dive_slug,
     _group_dives,
+    load_entries,
 )
 
 
@@ -163,3 +164,48 @@ def test_group_dives_keeps_unparseable_as_leftovers():
     groups, leftovers = _group_dives(dives)
     assert [g['species'] for g in groups] == ["Forretress"]
     assert [d['title'] for d in leftovers] == ["Weird"]
+
+
+# ---- load_entries() dropped-page completeness guard (F1, 2026-06-27) ----
+
+def _make_page(base, name, *, index=True, meta=None):
+    """Create base/name/ with an optional index.html and optional meta.toml."""
+    d = base / name
+    d.mkdir(parents=True)
+    if index:
+        (d / 'index.html').write_text('<html><title>T</title></html>')
+    if meta is not None:
+        d.joinpath('meta.toml').write_text(meta)
+    return d
+
+
+def test_load_entries_flags_dropped_rendered_page(tmp_path):
+    # A dir with a rendered index.html but a meta.toml missing the required
+    # 'title' key is a real page made unreachable -> must be recorded so the
+    # builder can hard-fail instead of silently shipping it.
+    _make_page(tmp_path, 'bad-great-league',
+               meta='description = "d"\nlanding = "index.html"\n')
+    dropped = []
+    entries = load_entries(tmp_path, dropped_pages=dropped)
+    assert entries == []
+    assert dropped == ['{}/bad-great-league'.format(tmp_path.name)]
+
+
+def test_load_entries_does_not_flag_non_page_dir(tmp_path):
+    # A dir with NO index.html is not a rendered page; skipping it is correct
+    # and must NOT be recorded as a dropped page (no false positive).
+    _make_page(tmp_path, 'assets', index=False)
+    dropped = []
+    entries = load_entries(tmp_path, dropped_pages=dropped)
+    assert entries == []
+    assert dropped == []
+
+
+def test_load_entries_valid_page_not_dropped(tmp_path):
+    # A well-formed page is returned and never recorded as dropped.
+    _make_page(tmp_path, 'good-great-league',
+               meta='title = "Good"\ndescription = "d"\nlanding = "index.html"\n')
+    dropped = []
+    entries = load_entries(tmp_path, dropped_pages=dropped)
+    assert [e['slug'] for e in entries] == ['good-great-league']
+    assert dropped == []
