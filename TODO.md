@@ -120,14 +120,19 @@ Three independent adversarial finders run over the under-covered grid cells
   `overnight_redive.sh`.
 
 **Still open from round-2 (orchestration, LOW-MED -- for Michael):**
-- **F2 [low-med]** split-moveset page absence is undetectable by
-  `verify_overnight.py` check [2] (it asserts present-file *freshness*, never a
-  *missing* file). A dive that writes `index.html` but is short a `index_m*.html`
-  split page ships unnoticed. Proposed: in check [2], cross-check each fresh
-  dive dir's `index_m*.html` count against the `top_movesets` declared for that
-  slug in `run_website_dives.DIVES` (import it DRY, the way check [5] imports
-  `run_iv_guides`). Not done: it depends on `deep_dive.py`'s own split-write
-  hard-fail behavior, which I didn't audit (L5, out of the finder's scope).
+- **F2 [low, DOWNGRADED after audit]** split-moveset page absence is invisible
+  to `verify_overnight.py` check [2] (it asserts present-file *freshness*, never
+  a *missing* file). BUT the audited backstop holds: the split-emit loop
+  (`deep_dive.py:6031-6061`) has NO try/except, so a failed `generate_interactive
+  _html` (write/render error) propagates -> the dive exits nonzero -> the chain's
+  `step()` is FATAL -> abort. So a *failed* split write can't silently ship. The
+  only uncovered case is a moveset silently dropped from the split set -- but the
+  split-page COUNT is data-dependent (surviving movesets after screening, not the
+  requested `top_movesets`; see the "only one moveset surviving" warning path at
+  :6065), so the finder's proposed count-vs-top_movesets check would
+  FALSE-POSITIVE on legitimate screening. Net: not worth a naive count guard; if
+  ever wanted, the dive must emit its actual-surviving count for the verifier to
+  assert against. Leaving as-is.
 - **F3 [low]** narrative auto-gen patch is WARN-not-FAIL + unverified
   (`run_website_dives.py` ~624). Low severity -- empty narrative blocks are an
   accepted ship state (human fills them) -- but it's the same WARN-not-FAIL
