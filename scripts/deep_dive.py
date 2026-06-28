@@ -1117,8 +1117,12 @@ def resolve_opp_ivs(species_name, league, shadow, opp_iv_mode):
         r1 = ranked[0]
         return r1['atk_iv'], r1['def_iv'], r1['sta_iv']
     else:
-        # pvpoke default
-        _lv, a, d, s = pvpoke_default_ivs(species_name, league=league)
+        # pvpoke default -- pass shadow so a shadow opponent gets its OWN
+        # PvPoke default IVs (they differ from the base for ~37 species),
+        # matching the rank1 branch above. Was shadow-agnostic: shadow
+        # opponents got base default IVs, then shadow mults on top (wrong
+        # stats; flipped shipped UL winners, e.g. Shadow Raikou/Cresselia).
+        _lv, a, d, s = pvpoke_default_ivs(species_name, league=league, shadow=shadow)
         return a, d, s
 
 
