@@ -51,6 +51,7 @@ from gopvpsim.data import (  # type: ignore[import-not-found]
     get_default_moveset,
     parse_types,
 )
+from gopvpsim.pokemon import LEAGUE_CP  # type: ignore[import-not-found]
 from render_article import (  # type: ignore[import-not-found]
     render_authorship_banner,
     sidebar_css,
@@ -59,8 +60,6 @@ from render_article import (  # type: ignore[import-not-found]
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
 COMPARISONS_DIR = WEBSITE_DIR / 'comparisons'
-
-LEAGUE_CP = {'great': 1500, 'ultra': 2500, 'master': 10000}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -630,7 +629,7 @@ def _render_all_in_row_matchup_table(
     header = '<thead><tr>' + ''.join(header_cells) + '</tr></thead>'
     body = '<tbody>' + ''.join(rows) + '</tbody>'
     table = (
-        '<table class="matchup-delta matchup-all sortable">'
+        '<table class="matchup-delta matchup-all">'
         f'{header}{body}</table>'
     )
     return table, disagree_count
@@ -733,7 +732,7 @@ def _render_pairwise_table(a: dict, b: dict, shared_opponents: list[str],
         )
 
     table = (
-        '<table class="matchup-delta sortable" '
+        '<table class="matchup-delta" '
         'data-default-sort="3" data-default-dir="desc">'
         '<thead><tr>'
         '<th scope="col" data-sort="str">Opponent</th>'
@@ -1068,8 +1067,6 @@ def render_standalone_html(title: str, description: str,
                     background: var(--callout-bg); padding: 10px 14px 10px 18px;
                     color: var(--callout-fg); border-radius: 2px; }}
   p.matchup-delta-summary {{ font-size: 13px; color: var(--text-muted); margin-top: 8px; }}
-  table.sortable thead th {{ cursor: pointer; user-select: none; }}
-  table.sortable thead th:hover {{ background: var(--border-2); }}
   footer {{ color: var(--text-muted); font-size: 13px; margin-top: 40px;
             border-top: 1px solid var(--border); padding-top: 12px; }}
 {COMPARE_CSS}

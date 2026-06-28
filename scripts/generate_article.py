@@ -47,7 +47,7 @@ from render_article import (  # type: ignore[import-not-found]
 )
 
 from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
-from gopvpsim.pokemon import iv_rank  # type: ignore[import-not-found]
+from gopvpsim.pokemon import iv_rank, LEAGUE_CP  # type: ignore[import-not-found]
 from gopvpsim.theme import (  # type: ignore[import-not-found]
     theme_css,
     data_theme_attr,
@@ -1176,9 +1176,6 @@ def _render_verdict_augment(article: dict) -> str:
         f'<div class="article-narrative-block {authored_by_class(block)}">\n'
         f'{body}\n</div>'
     )
-
-
-LEAGUE_CP = {'great': 1500, 'ultra': 2500, 'master': 10000}
 
 
 def _species_id(gm: dict, species: str) -> str | None:
