@@ -99,9 +99,18 @@ function cmpFlipPanel(live, grids) {
           // grid is the powered-UP (best-buddy) level; false means powered down.
           var acls = a > 500 ? 'cmp-win' : (a === 500 ? 'cmp-tie' : 'cmp-lose');
           var albl = a > 500 ? 'win ' : (a === 500 ? 'tie ' : 'loss ');
-          var altWord = grids.altIsBuddy ? ' (best-buddy)' : ' (no best-buddy)';
-          mark = ' <span class="cmp-flip" title="at L' + grids.altCap + altWord + ': ' +
-            albl + a + '">✦→</span><span class="' + acls + '">' + albl + a + '</span>';
+          // Direction-aware: altIsBuddy true means the alt grid is the powered-UP
+          // (best-buddy) level, so toggling TURNS BEST-BUDDY ON ('+'); false means
+          // it turns best-buddy OFF ('-'). The whole mark is wrapped in cmp-altmark
+          // so CSS can fade it -- it's the secondary outcome, less important than
+          // the primary win/loss this spread actually gets.
+          var dirState = grids.altIsBuddy ? 'on' : 'off';
+          var dirWord = grids.altIsBuddy
+            ? 'turn best-buddy ON (to L' + grids.altCap + ')'
+            : 'turn best-buddy OFF (to L' + grids.altCap + ')';
+          mark = ' <span class="cmp-altmark" title="' + dirWord + ': ' + albl + a + '">'
+            + '<span class="cmp-flip">✦' + dirState + '→</span>'
+            + '<span class="' + acls + '">' + albl + a + '</span></span>';
         }
       }
       h += '<td class="' + cls + '">' + lbl + d + mark + '</td>';
