@@ -15,6 +15,7 @@ from typing import Optional
 
 import deep_dive_analysis as analysis
 from gopvpsim.anchors import derive_short_name
+from gopvpsim.battle import WIN_RATING
 from render_article import format_block_attribution, format_body
 from auto_gen_narrative import classify_atk_weight, atk_weight_tip
 
@@ -3346,7 +3347,7 @@ def render_analysis_methods_html(nIvs, nS, nO, data_obj, moveset_label,
   <dt>Matchup flip analysis</dt>
   <dd>For each IV, we check every (opponent, scenario) pair and compare to the reference IV
   ({iv_label(data_obj, ref_iv)}, {opp_label}). A &ldquo;flip&rdquo; occurs when one IV wins
-  (score &ge; 500) and the other loses (&lt; 500). Net flips = gains &minus; losses.</dd>
+  (score &gt; 500) and the other does not (&le; 500; 500 = tie). Net flips = gains &minus; losses.</dd>
   <dt>Breakpoint/bulkpoint narration</dt>
   <dd>For each flip, we compute per-hit damage from each move at the focal IV and reference IV
   stats. Damage changes are reported as breakpoints (your moves do more damage), bulkpoints
@@ -3442,13 +3443,13 @@ def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
 # Flips" boundary dump.
 
 
-def _og_win(scores_flat, iv, si, oi, nS, nO, win_threshold=500):
+def _og_win(scores_flat, iv, si, oi, nS, nO, win_threshold=WIN_RATING):
     """True iff IV index ``iv`` wins scenario ``si`` vs opponent ``oi``."""
-    return scores_flat[iv * nS * nO + si * nO + oi] >= win_threshold
+    return scores_flat[iv * nS * nO + si * nO + oi] > win_threshold
 
 
 def _render_opp_spread_grid(spread_ivs, oi, scenarios, scores_flat, nS, nO,
-                            data_obj, win_threshold=500):
+                            data_obj, win_threshold=WIN_RATING):
     """Per-spread x 9-shield win/loss grid for one opponent (expander L2).
 
     Columns = the card's rec spreads (``spread_ivs`` = IV indices); rows =
@@ -3515,7 +3516,7 @@ _OPP_THREATS_JS = (
 def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                                     scenarios, opponents, nS, nO, data_obj,
                                     opp_label, has_bait_axis=False,
-                                    spread_ivs=None, win_threshold=500):
+                                    spread_ivs=None, win_threshold=WIN_RATING):
     """Opponent-centric "Threats where your build choice matters" section.
 
     For each opponent, computes whether each recommended spread (``spread_ivs``
@@ -3913,7 +3914,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
         nobait_key = f'{moveset_idx}_{nobait_mode}'
         nobait_scores = score_arrays.get(nobait_key, [])
         n_ivs = data_obj['nIvs']
-        win_threshold = 500
+        win_threshold = WIN_RATING
         opp_iv_base = parse_mode(opp_iv_mode)[0]
         opp_iv_label = ('PvPoke default' if opp_iv_base == 'pvpoke'
                         else 'rank 1')
@@ -3931,9 +3932,9 @@ def render_results_section(data_obj, moveset_label, opp_label,
                     nobait_wins = set()
                     for iv in range(n_ivs):
                         idx = iv * nS * nO + si * nO + oi
-                        if scores_flat[idx] >= win_threshold:
+                        if scores_flat[idx] > win_threshold:
                             bait_wins.add(iv)
-                        if nobait_scores[idx] >= win_threshold:
+                        if nobait_scores[idx] > win_threshold:
                             nobait_wins.add(iv)
                     # "Only wins with bait" = bait_wins - nobait_wins
                     only_bait = sorted(bait_wins - nobait_wins)

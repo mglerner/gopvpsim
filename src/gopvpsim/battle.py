@@ -39,6 +39,25 @@ except Exception:                       # pragma: no cover - jit optional
     _CALC_TTL_JIT = None
 
 ENERGY_CAP = 100
+
+# Canonical PvP battle-rating win boundary. pvpoke_score() returns an integer
+# rating on a 0..1000 scale (math.floor of two 500-weighted terms); a rating
+# of EXACTLY 500 is a TIE, not a win (per vendored PvPoke
+# BattleHistogram.js/Interface.js/Battle.js). This single source of truth
+# exists because the boundary drifted three times when it was open-coded as a
+# bare `500` literal AND as a `win_threshold` parameter, with the `>` vs `>=`
+# operator hand-copied at ~20 sites. Route EVERY per-cell win classification
+# through `is_win()` (or `> WIN_RATING`); `is_win` is elementwise-safe, so it
+# works on a numpy score array as well as a scalar. A 500-tie counts as a
+# loss for win-count purposes.
+WIN_RATING = 500
+
+
+def is_win(score):
+    """True iff a PvP battle rating is a win (> 500; exactly 500 is a tie)."""
+    return score > WIN_RATING
+
+
 # Infinite-loop guard, NOT a faithful port of PvPoke's timeout. PvPoke ends
 # battles when its display clock passes 240,000 ms (Battle.js:653), and that
 # clock mixes 500 ms turns with 10,000 ms charged-move minigame adjustments --
