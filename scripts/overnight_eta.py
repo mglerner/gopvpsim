@@ -49,28 +49,30 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Fallback baselines (minutes) for when a bucket has no completed
-# data yet. Recalibrated 2026-04-20 from scripts/summarize_perf.py
-# output against the 2026-04-19 overnight chain's 10 per-dive logs:
+# data yet. Recalibrated 2026-06-28 from the 2026-06-25 cold overnight
+# chain's 40 per-dive logs (overnight_20260625_021003.log) -- the prior
+# 2026-04-20 baselines (gl 63 / ul 80 / forretress 25) were ~3-6x too
+# high after the 2.0x engine-regression fix + cache-rework cut per-dive
+# cold time, which made the launch-time ETA (44 dives x 63m) read ~52h
+# when the real cold run lands ~16-20h. Measured cold means:
 #
-#   gl_full:       median 62.7m across 3 dives (Oink M/F, Tink GL)
-#   ul_full:       mean 76.2m across 2 dives (Tink UL, Aegis Shield UL)
-#   forretress_cs: median 25.3m across 4 dives (skips the 47m Bug Bite
-#                  outlier which appears throughput-limited, not
-#                  structural)
+#   gl_full:    mean 10.2m, median 8.3m  (n=32)
+#   ul_full:    mean 24.6m, median 22.3m (n=4)
+#   forretress: mean  9.3m, median  9.1m (n=4)
+#
+# Rounded slightly up for headroom (cold dives, and this run's pool
+# differs). These are only the cold-start guess; the estimator replaces
+# each bucket with that run's own completed-dive mean as dives finish.
 #
 # Known misclassification: Aegislash Blade UL pins both --fast and
 # --charged so only 1 moveset runs (~26min total), but classify() here
-# puts it in ul_full (expects ~76m). Net effect: overestimates Blade
-# UL's remaining time by ~50min when Blade is the current dive. Bounded
-# impact on the whole-script ETA; fix only if a future chain's Blade-
-# like dive count grows. The summarizer's more precise taxonomy
-# (ul_pinned / forretress_cs / etc.) lives in scripts/summarize_perf.py
-# because it has access to the CLI flags via the logs, which
-# classify() here doesn't.
+# puts it in ul_full. Bounded impact on the whole-script ETA; fix only
+# if a future chain's Blade-like dive count grows. The summarizer's more
+# precise taxonomy lives in scripts/summarize_perf.py.
 FALLBACKS = {
-    'gl_full':    63.0,
-    'ul_full':    80.0,   # 2026-04-19 overnight chain observed median 79.6 (N=2); was 76.0
-    'forretress': 25.0,
+    'gl_full':    11.0,
+    'ul_full':    25.0,
+    'forretress': 10.0,
     'post_dive':  5.0,   # comparison renders + matchup web + index + verify (steps 4-9, sans ML)
     # Step 7b: the run_iv_guides.py Master-league ML bake (~60 guides, serial /
     # all-cores-each). A ~7h cold tail per overnight_redive.sh's own header; the
