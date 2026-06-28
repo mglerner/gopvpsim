@@ -1,15 +1,68 @@
 ## >> NEXT ACTION (2026-06-27 PM): cold re-dive (pre-redive sweep COMPLETE)
 
-Two pre-redive sessions have landed; tree clean at `85e7284`, nothing published.
-The re-dive is irreducibly **COLD** (the float32 fix forces it; the legacy cache
-is all-None-stamped). All pre-redive work is done; ONE step remains:
+Multiple pre-redive sessions have landed, plus a full {layer}x{lens} pre-dive
+sweep (2026-06-27, session 3) that caught 3 launch-gating issues the earlier
+location-oriented passes missed. The re-dive is irreducibly **COLD** (the
+float32 fix forces it; the legacy cache is all-None-stamped). ONE step remains:
 
+0. **STANDING PRE-LAUNCH GATE: run `docs/predive_checklist.md`** before every
+   cold re-dive (it has a ready-to-paste prompt). The DRY lesson: scope the
+   check as a {layer}x{lens} grid, not a walk of files you happen to read --
+   see the checklist + CLAUDE.md "Pre-dive assessment". Session-3's run is
+   recorded in the session-3 batch below; its findings are folded in.
 1. **Cold re-dive** (`overnight_redive.sh`) -- fresh, long-running, monitored
    session: re-dive on the new engine + refreshed gamemaster, review,
    re-publish, then GC the legacy cache. Watch live with `watch -c -n5
    'scripts/chain_status.py --chain overnight'` (+ `scripts/iv_guides_status.py`
    once the ML step starts). NB the ML bake now runs SERIAL (one guide, all
    cores) -- see the parallelism item below.
+
+### Pre-dive {layer}x{lens} sweep (2026-06-27 PM, session 3)
+
+Ran the first full grid sweep (now `docs/predive_checklist.md`). It caught what
+the earlier location-oriented passes missed. LANDED before launch:
+
+- **[GATING, data] Oinkologne (Female) GL reference TACKLE -> MUD_SLAP** -- Mud
+  Slap CD shipped (in fastMoves + eliteMoves, PvPoke default); the TACKLE pin was
+  a pre-CD leftover from the removed CD article. `run_website_dives.py`.
+- **[GATING, silent-incompleteness] ML bake failures now visible.** The ML tail
+  step is WARN-not-FAIL by design, so the chain printed SUCCESS and the morning
+  verifier was blind to a partial/OOM ML bake. Fixed: `overnight_redive.sh` final
+  status surfaces ML failure; `verify_overnight.py` check [5] asserts every
+  ML-pool species has a fresh `_iv_envelope_all9.json` + flags any ML WARN line.
+- **[hardening, resource lens -> code guard] `run_iv_guides.py` concurrency
+  preflight** prints `jobs x per-guide-workers` and HARD-FAILS if > physical
+  cores (`--allow-oversubscribe` to override) -- the ML-oversubscription bug
+  can't recur silently.
+- **[render correctness] `pvp_damage` DRY/precision fix** -- `deep_dive_analysis.py`
+  re-implemented damage with double-precision 1.3/1.2; now imports
+  `moves.BONUS`/`STAB_MULTIPLIER` (bit-for-bit with the engine; was wrong on
+  5394/5.6M boundary cases). Render-path narrative cells only; no engine-hash bump.
+- **[render correctness] win-count 500 boundary unified to `> 500`** (500 = tie,
+  per vendored PvPoke `BattleHistogram.js`/`Interface.js`). The Python census was
+  right; the JS overlay's `>= 500` was the bug. Fixed all JS win-classification
+  sites + Python `_won_set`. Render/overlay only.
+
+FAST-FOLLOW backlog from the sweep (non-gating, render/tooling-only,
+re-renderable via replay -- do NOT block launch; ~17 confirmed findings, top ones):
+
+- **[med, dead affordance]** comparison pages (`compare_loadouts.py`) emit
+  `cursor:pointer` + `data-sort` "sortable" headers with NO sort JS -- clicking
+  does nothing. Either wire up sort or drop the affordance. (The structural
+  affordance-diff hardening in the checklist would auto-catch this class.)
+- **[med, silent-incompleteness]** `build_matchup_web.py` can ship a partial
+  matrix and exit 0 after per-species pool-resolution failures (only aborts if
+  < 2 resolve). Add an expected-count assertion.
+- **[low] Tinkaton GL** reference `PLAY_ROUGH` vs PvPoke default `GIGATON_HAMMER`
+  -- confirm intentional or update (`run_website_dives.py`).
+- **[low] DRY/cleanup:** `gc_cache.py` still iterates the retired `iv_envelope`
+  namespace; `LEAGUE_CAPS`/`LEAGUE_CP` overlap + re-declared in scripts;
+  score-key `{mi}_{mode}@51` format open-coded in Python and JS;
+  `overnight_eta.py` doesn't model the ~7h ML tail.
+- **[low, test-side]** a few tests reimplement won-set with `>= 500`
+  (`test_probe_tier_cutoff_flips.py`, `test_find_losses_vs_general.py`); pass on
+  current fixtures but would diverge from production's `> 500` if an exact-500
+  tie enters. Align if touched.
 
 ### Pre-redive adversarial assessment batch (2026-06-27 PM, session 2)
 
