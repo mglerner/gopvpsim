@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from gopvpsim.pokemon import (
-    Pokemon, LEAGUE_CAPS, battle_stats, best_level, get_species,
+    Pokemon, LEAGUE_CAPS, LEAGUE_MAX_LEVEL, battle_stats, best_level, get_species,
     cp as calc_cp,
 )
 from gopvpsim.moves import get_moves
@@ -118,9 +118,18 @@ def describe(species, league, ivs, shadow, max_level):
 
 
 def breakdown(species, league, fast, charged, owned, shadow=False,
-              pool_path=None, max_level=51.0, opp_level=51.0,
+              pool_path=None, max_level=None, opp_level=None,
               shieldset=EVEN_SHIELDS):
     """Per owned spread: stats + wins + matchups dropped vs the rank-1 spread."""
+    # League-aware level ceiling (great/ultra cap at L50, master/little at L51).
+    # A bare 51.0 here showed GL/UL mons one level too high -- e.g. Carbink
+    # 0/0/0 at L51.0/CP1341 instead of L50.0 -- whenever the CP cap doesn't bind
+    # before L50. Same class as the deep_dive.py:4602 IV-scanner fix.
+    _ceiling = LEAGUE_MAX_LEVEL.get(league, 51.0)
+    if max_level is None:
+        max_level = _ceiling
+    if opp_level is None:
+        opp_level = _ceiling
     pool_path = pool_path or DEFAULT_POOLS[league]
     opponents = load_pool(pool_path, league)
     ref = rank1_spread(species, league, max_level)
