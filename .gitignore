@@ -55,3 +55,7 @@ scratch_oracle_grid/
 /docs/validations/2026-05_guide_reviews/hsh_review_response_discord.md
 /LAUNCH_STATUS.md
 /REDDIT_SESSION_BRIEF.md
+# JRE/RyanSwag published deep dives, used as local reference material
+# while developing these tools. Kept local-only (not published) to
+# avoid reproducing third-party copyrighted text.
+/docs/reference_deep_dives/
