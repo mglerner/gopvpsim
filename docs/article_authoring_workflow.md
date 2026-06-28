@@ -171,9 +171,8 @@ extraction for a pattern.
   separate from the meta-viability story ("but still sub-50%
   aggregate").
 - **Voice target: RyanSwag.** See `docs/article_schema.md` "Voice
-  target for auto / both synthesis" + `docs/jre_ryanswag_comparison.md`
-  §7. Conversational, hedging, direct reader address. NOT JRE's
-  wordy tangential style.
+  target for auto / both synthesis". Conversational, hedging, direct
+  reader address.
 
 ### Reviewing
 
@@ -201,11 +200,6 @@ browser, read the section end to end.
   spec, authorship modes, voice target, calibration warning.
 - `docs/article_generator_design.md` — generator pipeline internals,
   authorship-precedence for section-level expert overrides.
-- `docs/jre_ryanswag_comparison.md` — why the authoring shape looks
-  the way it does, classified gap analysis, F1-F5 follow-ups.
-- `docs/reference_deep_dives/ryanswag/` + `docs/reference_deep_dives/jre/`
-  — reference article archives. RyanSwag is the voice model; JRE is
-  the content-dimension model (not voice).
 - `feedback_hide_not_remove` memory — hide-behind-`<details>` rather
   than delete when pruning our own content. Applies during the
   review-and-regenerate loop.

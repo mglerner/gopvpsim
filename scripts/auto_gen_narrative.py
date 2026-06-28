@@ -964,8 +964,7 @@ def render_intro(
         # ---- Paragraph 4: envelope-shape text-gestalt (F8). ----
         # Only fires when the dive carries S4/P3 envelope-positions data
         # (older dives predating commit 2b15357 return ''). Substitutes
-        # for a static scatter image on the article side per §11.4
-        # path (e); see ``docs/jre_ryanswag_comparison.md``.
+        # for a static scatter image on the article side.
         #
         # Reader's-guide pointer is only emitted for the dive caller
         # (include_supplement=True); the article caller suppresses this
@@ -1053,8 +1052,7 @@ def _opp_str_flip_range(e: dict) -> str:
     range carries the delta implicitly and is more concrete -- a reader
     sees 17%→66% and knows the matchup was losing by a wide margin
     and now wins convincingly, information the ``+49pp`` delta hides.
-    RyanSwag-register cause-and-effect prose (F8 per §11.3 of
-    ``docs/jre_ryanswag_comparison.md``).
+    RyanSwag-register cause-and-effect prose (F8).
     """
     base_pct = int(round(e.get('base_wr', 0.0) * 100))
     cd_pct = int(round(e.get('cd_wr', 0.0) * 100))

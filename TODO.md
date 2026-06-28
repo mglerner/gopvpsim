@@ -368,8 +368,7 @@ harness audit, and the Morpeko form-toggle resolution all shipped
 - **G16 — methodology-details guide pointer.** Replace the
   in-article hidden-but-present methodology prose with a one-line
   guide pointer (the hide layer is already in place; G16 is the
-  last-mile substitution). Logged in
-  `docs/jre_ryanswag_comparison.md` §14.4, ~30 min.
+  last-mile substitution). ~30 min.
 
 - **G1 + G2 + G7 — richer auto-gen prose template** [post-ship,
   recommended]. F1 Meta Role, F2 key-flips callout, and

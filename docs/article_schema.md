@@ -98,10 +98,9 @@ No full Markdown parser -- keep it simple.
 
 A dedicated "Meta Role / Strengths & Weaknesses" section positioned
 after the article's intro (and after the stats-at-a-glance block
-if / when F-stats-block ships) and before Move Comparison. Added
-per `docs/jre_ryanswag_comparison.md` §3.O — both reference styles
-(JRE, RyanSwag) spend significant article space on this framing,
-ours currently has none.
+if / when F-stats-block ships) and before Move Comparison. Both
+reference styles (JRE, RyanSwag) spend significant article space on
+this framing, ours currently has none.
 
 **Schema shape (Design 2 + freeform escape hatch, decided 2026-04-18):**
 
@@ -153,9 +152,7 @@ body = ""
 Auto-synthesised prose should target **RyanSwag's voice**, not JRE's.
 Conversational, lightly hedged ("may be the flavor of choice"),
 direct reader address where it fits, matchup-level specificity over
-high-level generalities. See `docs/reference_deep_dives/ryanswag/`
-for the archive and `docs/jre_ryanswag_comparison.md` §7 for the
-full voice framing.
+high-level generalities.
 
 Rationale: RyanSwag is retired from PvP content production, so our
 auto-synthesis filling that register fills a vacuum rather than
@@ -201,8 +198,7 @@ The Introduction section has a default template that fires from
 front-matter fields (species + CD move + CD date + framing + reader-
 guidance sentence). It's proof-of-life prose, not authored. The
 **augment** is an optional expert-authored override that replaces
-the template entirely. Added per
-`docs/jre_ryanswag_comparison.md` §3.A / §4 F-intro — JRE and
+the template entirely. JRE and
 RyanSwag both open with 1-3 sentence hooks that include an upfront
 verdict and a species-specific angle; the default template can't
 do that.
@@ -244,8 +240,7 @@ sidegrade / downgrade classification + win-rate delta + per-scenario
 exceptions) from sim data. The **augment** is an optional
 expert-authored editorial block appended underneath it, answering
 "should you invest?" in the style of JRE's IN SUMMATION or
-RyanSwag's wrap-up paragraph. Added per
-`docs/jre_ryanswag_comparison.md` §3.R / §4 F4.
+RyanSwag's wrap-up paragraph.
 
 **Schema shape (parallel to Meta Role):**
 

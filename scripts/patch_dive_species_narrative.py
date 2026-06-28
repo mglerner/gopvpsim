@@ -339,8 +339,7 @@ def main() -> int:
         #   absolute win rate, skipping delta prose.
         #
         # The gate is now "does the dive have data" rather than "is
-        # this a CD species" — see docs/jre_ryanswag_comparison.md §10
-        # G5-B for the design motivation.
+        # this a CD species".
         cd_fast_moves = cd_prep.get('fast_moves') or []
         cd_fast = cd_fast_moves[0] if cd_fast_moves else None
         if root.is_dir():
