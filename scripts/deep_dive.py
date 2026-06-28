@@ -4599,7 +4599,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             'isShadow':        shadow,
             'leagueLabel':     _league_label,
             'leagueCap':       LEAGUE_CAPS[league],
-            'maxLevel':        51.0,
+            # Single-source the scanner's level ceiling from the canonical
+            # table (great/ultra=50.0, master/little=51.0) -- matches the
+            # focal grid (line ~1594) and the baked rank table (line ~4562).
+            # A bare 51.0 here showed GL/UL owned mons one level too high in
+            # the IV scanner (best-buddy override only uses this as a fallback,
+            # so that path is unaffected).
+            'maxLevel':        LEAGUE_MAX_LEVEL.get(league, 51.0),
             'shadowAtkBonus':  _SAB,
             'shadowDefMult':   _SDM,
             # CPM table: keys are stringified floats so json.dumps emits
