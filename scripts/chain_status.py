@@ -108,6 +108,20 @@ def terminal_width() -> int:
     return min(max(w, 60), 140)
 
 
+def terminal_height() -> int:
+    """Detect terminal height (rows), clamped to [20, 200]. Falls back to 24.
+
+    Used to grow the variable-length sections (live dive-log tail, ML
+    completion history) so a tall `watch` pane fills with useful context
+    instead of stopping a third of the way down.
+    """
+    try:
+        h = shutil.get_terminal_size(fallback=(80, 24)).lines
+    except Exception:
+        h = 24
+    return min(max(h, 20), 200)
+
+
 def rule(width: int) -> None:
     print('─' * width)
 
@@ -471,7 +485,8 @@ def print_eta(wrapper_log: Path | None,
               f'  {dim(f"(anchor: {anchor!r}, ref: {ref_name})")}')
 
 
-def print_latest_log(per_dive_log: Path | None, width: int) -> None:
+def print_latest_log(per_dive_log: Path | None, width: int,
+                     max_tail: int = 6) -> None:
     if per_dive_log is None or not per_dive_log.exists():
         print(f'  {dim("No per-dive log found yet.")}')
         return
@@ -500,9 +515,12 @@ def print_latest_log(per_dive_log: Path | None, width: int) -> None:
 
     rule(width)
 
-    # Tail: last 6 non-blank lines, each truncated to width.
+    # Tail: last `max_tail` non-blank lines, each truncated to width.
+    # max_tail grows with terminal height so a tall pane shows the dive's
+    # narrative so far (Phase 1 results, moveset pick, Phase 2 start) rather
+    # than just the latest few chunk-progress lines.
     nonblank = [ln for ln in lines if ln.strip()]
-    for line in nonblank[-6:]:
+    for line in nonblank[-max_tail:]:
         clean = strip_log_prefix(line)
         print(f'  {truncate(clean, width - 4)}')
 
@@ -701,7 +719,8 @@ def _ml_active_workers() -> list[tuple[str, float]]:
     return rows
 
 
-def print_ml_guides(wrapper_log: Path | None, width: int) -> None:
+def print_ml_guides(wrapper_log: Path | None, width: int,
+                    fill_budget: int = 8) -> None:
     total = concurrency = None
     done: list[tuple[bool, str, float]] = []  # (ok, species, minutes)
     if wrapper_log is not None:
@@ -772,10 +791,16 @@ def print_ml_guides(wrapper_log: Path | None, width: int) -> None:
             print(f'  {red(f"WARN: {n_low} worker(s) <20% CPU — possible stall "
                            "(or the machine slept)")}')
     if done:
-        recent = '  '.join(
-            f'{green("OK") if ok else red("FAIL")} {sp} {m:.0f}m'
-            for ok, sp, m in done[-4:])
-        print(f'  {dim("recent:")} {recent}')
+        # Completed guides, newest first, one per line so a tall pane fills
+        # with the run's history instead of a single truncated line. Reserve
+        # the rows the worker/cpu block above already used; show at least 4.
+        n_show = max(4, fill_budget - len(workers[:6]) - 2)
+        print(f'  {dim("completed (newest first):")}')
+        for ok, sp, m in reversed(done[-n_show:]):
+            mark = green('OK  ') if ok else red('FAIL')
+            print(f'    {mark} {truncate(f"{sp}  {m:.0f}m", width - 12)}')
+        if len(done) > n_show:
+            print(f'    {dim(f"... +{len(done) - n_show} earlier")}')
 
 
 def main() -> int:
@@ -821,6 +846,14 @@ def main() -> int:
     status_file = (REPO_ROOT / status_file if not status_file.is_absolute()
                    else status_file)
     width = terminal_width()
+    height = terminal_height()
+    # Lines the rest of the display consumes (header, pid/status/dive/eta,
+    # section headers + rules, step transitions, recent products, refresh
+    # hint, plus a couple for watch's own header). Conservative so we
+    # under-fill by a few rows rather than overflow -- watch truncates the
+    # BOTTOM when content exceeds the pane.
+    _FIXED_OVERHEAD = 34
+    fill_budget = max(6, height - _FIXED_OVERHEAD)
 
     # Header + PID liveness.
     label = (args.chain or 'CUSTOM').upper()
@@ -841,7 +874,7 @@ def main() -> int:
         # ML IV-guide bake: the dive per-dive-log / overnight_eta machinery is
         # stale here (no fresh deep_dive log; dive-cadence ETA is meaningless).
         # Show the ML-native progress block instead.
-        print_ml_guides(wrapper_log, width)
+        print_ml_guides(wrapper_log, width, fill_budget)
         rule(width)
     else:
         # Per-dive log: most recent non-wrapper log within the selected
@@ -873,7 +906,7 @@ def main() -> int:
         print_dive_info(wrapper_log, per_dive_log, width)
         print_eta(wrapper_log, per_dive_log)
         rule(width)
-        print_latest_log(per_dive_log, width)
+        print_latest_log(per_dive_log, width, max_tail=min(fill_budget, 45))
         rule(width)
 
     print_step_transitions(wrapper_log, width)
