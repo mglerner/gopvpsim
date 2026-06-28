@@ -253,6 +253,8 @@ IV_CHECK_JS = r"""
   var D = JSON.parse(document.getElementById('ivc-data').textContent);
   var inEl = document.getElementById('ivc-input');
   var qEl  = document.getElementById('ivc-quad');
+  var bbEl = document.getElementById('ivc-bb');
+  var bbWrap = document.getElementById('ivc-bb-wrap');
   var out  = document.getElementById('ivc-out');
   var note = document.getElementById('ivc-note');
   var KIND = { shield:'shield spent', neardeath:'near-death win',
@@ -329,9 +331,181 @@ IV_CHECK_JS = r"""
     });
   }
 
+  // --- "All" case: one merged table across every case ----------------------
+  // Reuses the shared globals from cmp_panels.js (cmpVal/cmpHp/cmpScenLabel/
+  // CMP_MARGIN_MIN) plus the per-quadrant score+energy grids. Gated on
+  // CMP_READY, so by the time it runs the shared script is loaded.
+  // Version-B cell: win/loss score on top, faded best-buddy flip where a toggle
+  // crosses the win line, then the leftover-HP bar (+ energy on wins).
+  function cmpBarHtml(score){
+    var hp = cmpHp(score), pct = Math.round(Math.abs(hp) * 100);
+    var win = score > 500, tie = score === 500, lo = win && Math.abs(hp) < 0.2;
+    var cls = 'cmp-bar' + (win ? (lo ? ' lo' : '') : (tie ? '' : ' loss'));
+    // A nonzero margin that rounds to 0 shows "<1" so a thin win never reads as
+    // dead/zero; an exact tie shows a bare "0% HP". The " HP" disambiguates it
+    // from the adjacent "+N energy" line.
+    var sign = tie ? '' : (win ? '+' : '&minus;');
+    var num = (!tie && pct === 0) ? '&lt;1' : pct;
+    return '<span class="' + cls + '"><span style="width:' + Math.min(100, pct)
+      + '%"></span></span><span class="cmp-hpv">' + sign + num + '% HP</span>';
+  }
+  function allCellHtml(score, altScore, altIsBuddy, altCap, en, em, showMark){
+    var win = score > 500, tie = score === 500;
+    var txt = '<span class="' + (win ? 'cmp-win' : tie ? 'cmp-tie' : 'cmp-lose')
+      + '">' + (win ? 'win ' : tie ? 'tie ' : 'loss ') + score + '</span>';
+    if (showMark && altScore != null && (score > 500) !== (altScore > 500)){
+      var aw = altScore > 500, at = altScore === 500;
+      var albl = aw ? 'win ' : at ? 'tie ' : 'loss ';
+      var ds = altIsBuddy ? 'on' : 'off';
+      var dw = (altIsBuddy ? 'turn best-buddy ON' : 'turn best-buddy OFF')
+        + ' (to L' + altCap + ')';
+      txt += ' <span class="cmp-altmark" title="' + dw + ': ' + albl + altScore + '">'
+        + '<span class="cmp-flip">&#10022;' + ds + '&rarr;</span>'
+        + '<span class="' + (aw ? 'cmp-win' : at ? 'cmp-tie' : 'cmp-lose') + '">'
+        + albl + altScore + '</span></span>';
+    }
+    var enHtml = '';
+    if (en != null && em && win){
+      var parts = [];
+      if (em.fast && em.fast.gain > 0) parts.push((en / em.fast.gain).toFixed(1) + em.fast.abbr);
+      (em.charged || []).forEach(function(cm){
+        if (cm.cost > 0) parts.push((en / cm.cost).toFixed(1) + cm.abbr); });
+      enHtml = '<br><span class="cmp-env">+' + Math.round(en) + ' energy</span>'
+        + (parts.length ? '<br><span class="cmp-env">' + parts.join(' &middot; ') + '</span>' : '');
+    }
+    return '<td><span class="cmp-celltext">' + txt + '</span>' + cmpBarHtml(score) + enHtml + '</td>';
+  }
+  function renderAllView(ok, showBB){
+    if (typeof CMP_READY === 'undefined' || !CMP_READY)
+      return '<p class="sub">Computing all cases (decoding score grids)...</p>';
+    var live = ok.map(function(c){
+      var iv = CMP_IDX[c.key]; if (iv == null) return null;
+      var p = c.key.split('/');
+      return { key:c.key, iv:iv, a:+p[0], d:+p[1], s:+p[2] };
+    }).filter(function(x){ return x; });
+    if (live.length < 2)
+      return '<p class="sub">Enter two or more baked, in-range spreads to compare across all cases.</p>';
+    var QLABEL = {};
+    for (var qi = 0; qi < qEl.options.length; qi++)
+      QLABEL[qEl.options[qi].value] = qEl.options[qi].text;
+    var em = window.CMP_ENERGY_MOVES;
+    var rows = [];
+    var hiddenBB = 0;   // collapsed view: rows that expanding best-buddy would reveal
+    function sgn(v){ return v > 500 ? 'W' : v < 500 ? 'L' : 'T'; }
+    Object.keys(SCORES_CMP).forEach(function(quad){
+      var grid = SCORES_CMP[quad]; if (!grid) return;
+      var altGrid = SCORES_CMP[CMP_BB_PAIR[quad]] || null;
+      var altCap = CMP_ALTCAP[quad], altIsBuddy = CMP_ALTCAP[quad] > CMP_MYCAP[quad];
+      var eg = (window.CMP_ENERGY || {})[quad] || null;
+      for (var oi = 0; oi < DATA.nOpponents; oi++){
+        for (var si = 0; si < DATA.nScenarios; si++){
+          var scores = live.map(function(r){ return cmpVal(grid, r.iv, si, oi); });
+          var altScores = altGrid ? live.map(function(r){ return cmpVal(altGrid, r.iv, si, oi); }) : null;
+          var alts = showBB ? altScores : null;   // only USE the alt for tiering/marking when expanded
+          var hasW = false, hasL = false;
+          scores.forEach(function(v){ if (v > 500) hasW = true; else if (v < 500) hasL = true; });
+          // Per-spread signature: primary outcome, plus the best-buddy-toggled
+          // outcome when expanded. The row is an IV decision (a flip) only when
+          // these signatures DIFFER across spreads. If every spread behaves the
+          // same -- e.g. all win at best-buddy and all drop to the same loss
+          // without it -- the IV pick changes nothing, so it is NOT a flip, and
+          // the best-buddy marker would be identical noise (suppressed below).
+          var sigs = scores.map(function(v, k){ return sgn(v) + (alts ? sgn(alts[k]) : ''); });
+          var sigDiffer = sigs.some(function(s){ return s !== sigs[0]; });
+          var hps = scores.map(cmpHp);
+          var hpSpread = Math.max.apply(null, hps) - Math.min.apply(null, hps);
+          var delta = Math.max.apply(null, scores) - Math.min.apply(null, scores);
+          var tier, include;
+          if (sigDiffer){ tier = 0; include = true; }                  // flip: the pick changes the result
+          else if (hasW){ tier = 1; include = hpSpread >= CMP_MARGIN_MIN; } // win-both: margin swing
+          else if (hasL){ tier = 2; include = hpSpread >= CMP_MARGIN_MIN; } // lose-both: margin swing
+          else { include = false; }                                    // all-tie
+          if (!include){
+            // collapsed view: would expanding best-buddy reveal this row? Primary
+            // sigs are identical here, so a difference can only come from the alt.
+            if (!showBB && altScores){
+              var fsig = scores.map(function(v, k){ return sgn(v) + sgn(altScores[k]); });
+              if (fsig.some(function(s){ return s !== fsig[0]; })) hiddenBB++;
+            }
+            continue;
+          }
+          rows.push({ quad:quad, oi:oi, si:si, tier:tier, delta:delta,
+                      scores:scores, alts:alts, altIsBuddy:altIsBuddy, altCap:altCap, eg:eg,
+                      showMark:(showBB && sigDiffer) });
+        }
+      }
+    });
+    if (!rows.length)
+      return '<p class="sub">No matchups differ enough across these spreads in any case.</p>';
+    rows.sort(function(a, b){ return a.tier - b.tier || b.delta - a.delta; });
+    var nFlip = rows.filter(function(r){ return r.tier === 0; }).length;
+    var TIERNAME = ['Flips - your IV pick changes the result', 'Win in both', 'Lose in both'];
+    var h = '<div class="cmp-panel"><h4 class="cmp-marg-h">All cases'
+      + ' <span class="cmp-count">' + rows.length + ' matchup' + (rows.length === 1 ? '' : 's')
+      + (nFlip ? ', ' + nFlip + ' flip' + (nFlip === 1 ? '' : 's') : '')
+      + ' &middot; scroll for all</span>'
+      + (hiddenBB ? ' <span class="cmp-bbhint" title="Check &quot;Expand best-buddy '
+          + 'flips&quot; above to break these out">' + hiddenBB + ' best-buddy flip'
+          + (hiddenBB === 1 ? '' : 's') + ' hidden</span>' : '')
+      + '</h4>'
+      + '<p class="cmp-psub">Every case, merged. Flips first (your pick changes the '
+      + 'result), then matchups you win in both, then lose in both - each ordered by '
+      + 'score gap, biggest first.</p>'
+      + '<div class="cmp-scroll-wrap"><div class="cmp-scroll"><table class="cmp-tbl"><thead><tr><th>Case</th><th>Matchup</th>'
+      + live.map(function(r){ return '<th>' + r.a + '/' + r.d + '/' + r.s + '</th>'; }).join('')
+      + '</tr></thead><tbody>';
+    var lastTier = -1;
+    rows.forEach(function(row){
+      if (row.tier !== lastTier){
+        h += '<tr class="tier-row"><td colspan="' + (2 + live.length) + '">'
+          + TIERNAME[row.tier] + '</td></tr>';
+        lastTier = row.tier;
+      }
+      h += '<tr><td class="cmp-case">' + esc(QLABEL[row.quad] || row.quad) + '</td>'
+        + '<td class="cmp-m">' + esc(DATA.opponentsDisplay[row.oi]) + ' &middot; ' + cmpScenLabel(row.si) + '</td>';
+      for (var k = 0; k < row.scores.length; k++){
+        var en = row.eg ? cmpVal(row.eg, live[k].iv, row.si, row.oi) : null;
+        h += allCellHtml(row.scores[k], row.alts ? row.alts[k] : null,
+                         row.altIsBuddy, row.altCap, en, em, row.showMark);
+      }
+      h += '</tr>';
+    });
+    h += '</tbody></table></div></div>'
+      + '<div class="cmp-leg"><b>What appears here:</b> a matchup is shown only '
+      + 'when your spreads actually differ - they disagree on the win (a flip), '
+      + (showBB ? 'or respond to best-buddy differently, ' : '')
+      + 'or they all win / all lose but their leftover HP differs by '
+      + Math.round(CMP_MARGIN_MIN * 100) + '%+. Rows where every spread behaves '
+      + 'identically are hidden. Bars = leftover HP% at battle end (from the '
+      + 'score); energy = leftover charge on a win.'
+      + (showBB ? ' Faded &#10022;on/off marks the spread(s) whose result flips '
+          + 'when you toggle your best-buddy.' : ' Best-buddy flip cases are merged '
+          + 'in; check "Expand best-buddy flips" to break out the ones where the '
+          + 'flip differs between your spreads.')
+      + '</div></div>';
+    return h;
+  }
+
+  // Scroll-aware bottom fade: hide it once the box is scrolled to the bottom (or
+  // when the content doesn't overflow at all), show it whenever there is more
+  // below. Re-wired after every render since out.innerHTML is rebuilt.
+  function wireScrollFade(){
+    var sc = out.querySelector('.cmp-scroll');
+    if (!sc) return;
+    var wrap = sc.closest('.cmp-scroll-wrap');
+    if (!wrap) return;
+    function upd(){
+      var atBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight <= 2;
+      wrap.classList.toggle('at-bottom', atBottom);
+    }
+    sc.addEventListener('scroll', upd);
+    upd();
+  }
+
   function render(){
     var cols = parseSpreads(inEl.value).map(classify);
     var quad = qEl.value;
+    if (bbWrap) bbWrap.style.display = (quad === 'all') ? '' : 'none';
     out.innerHTML = '';
     note.innerHTML = '';
     if (!cols.length){ note.textContent = 'Enter at least one spread above.'; return; }
@@ -344,6 +518,8 @@ IV_CHECK_JS = r"""
 
     var ok = cols.filter(function(c){ return c.status === 'ok'; });
     if (!ok.length) return;
+
+    if (quad === 'all'){ out.innerHTML += renderAllView(ok, !!(bbEl && bbEl.checked)); wireScrollFade(); return; }
 
     var rows = diffRows(ok, quad);
     rows.sort(function(a, b){
@@ -441,6 +617,7 @@ IV_CHECK_JS = r"""
   document.getElementById('ivc-go').addEventListener('click', render);
   inEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') render(); });
   qEl.addEventListener('change', render);
+  if (bbEl) bbEl.addEventListener('change', render);
 })();
 """
 
@@ -526,9 +703,8 @@ def iv_check_box(d):
     # shadow to enter -- a paste-box is the lighter affordance. Both feed the SAME
     # shared cmp_panels.js flip/margin panels; only the input differs.
     blob = json.dumps(iv_box_blob(d), separators=(',', ':'))
-    quad_opts = "".join(
-        f'<option value="{esc(q)}"{" selected" if q == d["headline_quadrant"] else ""}>'
-        f'{esc(QUAD_SHORT[q])}</option>' for q in QUAD_ORDER)
+    quad_opts = '<option value="all" selected>All cases</option>' + "".join(
+        f'<option value="{esc(q)}">{esc(QUAD_SHORT[q])}</option>' for q in QUAD_ORDER)
     lo = min(d['iv_range'])
     hi = max(d['iv_range'])
     return f"""<h2 id="checkmyivs">Check my IVs</h2>
@@ -546,6 +722,8 @@ the selected Case.</p>
     <input id="ivc-input" type="text" placeholder="15/15/14, 15/14/15"
            autocomplete="off" spellcheck="false" aria-label="Candidate IV spreads">
     <label class="sub">Case <select id="ivc-quad">{quad_opts}</select></label>
+    <label id="ivc-bb-wrap" class="sub" style="display:none">
+      <input id="ivc-bb" type="checkbox"> Expand best-buddy (&#10022;) flips</label>
     <button id="ivc-go" type="button">Compare</button>
   </div>
   <div id="ivc-note" class="sub"></div>
@@ -687,6 +865,27 @@ def style():
   .cmp-hpv { font-size:.82em; color:var(--text-muted); }
   .cmp-env { font-size:.78em; color:var(--energy); }
   .cmp-leg { font-size:.78em; color:var(--text-muted); margin-top:5px; }
+  /* "All cases" merged view: scrolling box, sticky header, tier dividers */
+  .cmp-count { font-size:.72em; font-weight:600; color:var(--text-muted);
+               text-transform:none; letter-spacing:0; }
+  .cmp-bbhint { font-size:.72em; font-weight:600; color:var(--flip);
+                text-transform:none; letter-spacing:0; cursor:help; }
+  .cmp-scroll-wrap { position:relative; }
+  /* tall, aggressive bottom fade so "there is more below" is unmistakable even
+     on a short view -- reaches fully solid well before the bottom edge */
+  .cmp-scroll-wrap::after { content:''; position:absolute; left:1px; right:1px; bottom:1px;
+                height:104px; pointer-events:none; border-radius:0 0 2px 2px;
+                opacity:1; transition:opacity .12s ease;
+                background:linear-gradient(rgba(0,0,0,0), var(--surface-2) 58%); }
+  .cmp-scroll-wrap.at-bottom::after { opacity:0; }
+  .cmp-scroll { max-height:62vh; overflow-y:auto; border:1px solid var(--border-2);
+                border-radius:2px; }
+  .cmp-scroll thead th { position:sticky; top:0; z-index:1; background:var(--surface-2); }
+  .cmp-case { color:var(--text-muted); }
+  .cmp-celltext { display:block; margin-bottom:3px; }
+  .tier-row td { position:sticky; top:1.9em; z-index:1; background:var(--callout-bg);
+                 color:var(--callout-strong); font-weight:700; font-size:.74em;
+                 text-transform:uppercase; letter-spacing:.05em; padding:4px 9px; }
   @media (max-width:820px) {
     .layout { flex-direction:column; align-items:stretch; }
     /* Collapsed into the column: a full-width sticky bar (mirrors the deep-dive
