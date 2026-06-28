@@ -903,7 +903,6 @@ def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
     standalone section.
     """
     lines = []
-    seen_opponents: set[str] = set()
     for i, b in enumerate(boundaries):
         scen_str = ', '.join(
             f'{s[0]}v{s[1]}' for s in sorted(b['scenarios']))
@@ -924,10 +923,7 @@ def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
         hidden = ''
         if toggle_id and i >= top_n:
             hidden = f' class="dd-iv-hidden" data-tier-card="{toggle_id}"'
-        opp_id = ''
-        if emit_opponent_ids and b['opponent'] not in seen_opponents:
-            seen_opponents.add(b['opponent'])
-            opp_id = f' id="opp-{opp_slug(b["opponent"])}"'
+        opp_id = opp_anchor_id(b['opponent']) if emit_opponent_ids else ''
         lines.append(
             f'<li{hidden}{opp_id}><span class="dd-strong">'
             f'{b["threshold"]:.2f} {stat_label}</span>{hp_str} '
@@ -994,6 +990,29 @@ def opp_slug(name: str) -> str:
             n = re.sub(rf'(^|[^a-z]){q}([^a-z]|$)', r'\1\2', n)
     base = re.sub(r'^-|-$', '', re.sub(r'[^a-z0-9]+', '-', n))
     return '-'.join([base] + sorted(quals)) if quals else base
+
+
+# Per-render registry of opponent anchor ids already emitted on the
+# current page. An id="opp-<slug>" must appear exactly once per page
+# (duplicate ids are invalid HTML and the browser only jumps to the
+# first), so the first section to mention an opponent emits the canonical
+# anchor and later mentions skip it. reset_opp_anchor_registry() clears
+# this at the start of each page render.
+_emitted_opp_anchors: set[str] = set()
+
+
+def reset_opp_anchor_registry() -> None:
+    _emitted_opp_anchors.clear()
+
+
+def opp_anchor_id(name: str) -> str:
+    """Return ` id="opp-<slug>"` (leading space) the first time an opponent
+    is mentioned per render, '' on later mentions (de-dup + DRY)."""
+    slug = opp_slug(name)
+    if slug in _emitted_opp_anchors:
+        return ''
+    _emitted_opp_anchors.add(slug)
+    return f' id="opp-{slug}"'
 
 
 def render_species_narrative(narrative: dict) -> str:
@@ -1226,7 +1245,6 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
         )
 
     lines = []
-    seen_opponents: set[str] = set()
     for family in family_order:
         for key in families[family]:
             recs = groups[key]
@@ -1311,10 +1329,7 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
 
             opp_name = recs[0]["opponent"]
             opp_c = _opp_color(opp_name)
-            opp_id = ''
-            if emit_opponent_ids and opp_name not in seen_opponents:
-                seen_opponents.add(opp_name)
-                opp_id = f' id="opp-{opp_slug(opp_name)}"'
+            opp_id = opp_anchor_id(opp_name) if emit_opponent_ids else ''
             lines.append(
                 f'<li{opp_id}><span class="dd-strong">{min_thresh:.2f} {stat_label}</span>'
                 f'{hp_str} '
@@ -3602,7 +3617,7 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
         # id="opp-<slug>" on each hoisted name so the card's coverage/flip links
         # land here too (decision rows carry the id on their row div).
         bits = ', '.join(
-            f'<span id="opp-{opp_slug(n)}">{_opp_b(n)}</span>'
+            f'<span{opp_anchor_id(n)}>{_opp_b(n)}</span>'
             for n in sorted(names))
         return (f'<p class="dd-small" style="margin:4px 0">{label_html} '
                 f'{bits}</p>\n')
@@ -3647,7 +3662,7 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                 f'{_html.escape(_style(i))} steals {", ".join(shs)}'
                 for i, shs in steals)
             parts.append(
-                f'<li id="opp-{opp_slug(name)}">{_opp_b(name)} - '
+                f'<li{opp_anchor_id(name)}>{_opp_b(name)} - '
                 f'{steal_bits}{cut_str}</li>\n')
         parts.append('</ul>\n')
         parts.append('</div>\n')
@@ -3684,7 +3699,7 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
                               for i in range(len(spread_ivs)) if outs[i])
         # id="opp-<slug>" preserves the deep-link contract the article's Matchup
         # Delta table scrapes (generate_article.py:269).
-        parts.append(f'<div class="dd-opp-row" id="opp-{opp_slug(name)}">\n')
+        parts.append(f'<div class="dd-opp-row"{opp_anchor_id(name)}>\n')
         parts.append('<details class="dd-collapsible">\n')
         parts.append(
             '<summary style="cursor:pointer">'
