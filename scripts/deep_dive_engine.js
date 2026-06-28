@@ -196,7 +196,8 @@ function getActiveScenarioIndices() {
 //
 //   'avgScore'   mean PvPoke score across selected scenarios + opponents
 //                (the original behavior)
-//   'winsPvpoke' count of (opp, scenario) pairs the IV wins (score >= 500)
+//   'winsPvpoke' count of (opp, scenario) pairs the IV wins (score > 500;
+//                500 = tie, excluded -- matches PvPoke)
 //                against the PvPoke-default opponent IV cohort
 //   'winsRank1'  same against rank-1-stat-product opponent IVs
 //   'winsMirror' total mirror-match wins from the slayer iteration's
@@ -239,7 +240,7 @@ function computeYValues(mi) {
         var siW = sis[kW];
         var baseW = ivW * nS * nO + siW * nO;
         for (var oiW = 0; oiW < nO; oiW++) {
-          if (scores[baseW + oiW] >= 500) c++;
+          if (scores[baseW + oiW] > 500) c++;  // >500=win; 500=tie (PvPoke)
         }
       }
       winCounts[ivW] = c;
@@ -549,7 +550,7 @@ function appendMatchupDiff(lines, mi1, iv1, mi2, iv2) {
     for (var oi=0; oi<nO; oi++) {
       var sc1 = s1[iv1*nS*nO + si*nO + oi];
       var sc2 = s2[iv2*nS*nO + si*nO + oi];
-      var w1 = sc1 >= 500, w2 = sc2 >= 500;
+      var w1 = sc1 > 500, w2 = sc2 > 500;  // >500=win; 500=tie (PvPoke)
       if (w1 && !w2) gained.push(shortName(DATA.opponents[oi]));
       else if (!w1 && w2) lost.push(shortName(DATA.opponents[oi]));
     }
@@ -1164,7 +1165,7 @@ function renderMatchesList() {
   // give up" breakdown, keyed to the CURRENT y-axis. The reference "#1" is the
   // IV ranked first on the active y-axis metric, and a dropped matchup is one
   // the #1 IV wins but this owned IV loses (same SCORES diff the scatter hover
-  // uses, score >= 500 = win). On-grid only; off-grid '-'. winsMirror has no
+  // uses, score > 500 = win; 500 = tie). On-grid only; off-grid '-'. winsMirror has no
   // per-opponent grid, so it shows the mirror-win shortfall (count only).
   var _guMode = state.yAxisMode || 'avgScore';
   var _guLabel = '#1';
@@ -1212,8 +1213,8 @@ function renderMatchesList() {
       var sc = DATA.scenarios[si];
       var lab = sc[0] + 'v' + sc[1];
       for (var oi = 0; oi < nO; oi++) {
-        var refW = _guScores[_guRefIv * nS * nO + si * nO + oi] >= 500;
-        var myW = _guScores[iv * nS * nO + si * nO + oi] >= 500;
+        var refW = _guScores[_guRefIv * nS * nO + si * nO + oi] > 500;  // 500=tie (PvPoke)
+        var myW = _guScores[iv * nS * nO + si * nO + oi] > 500;
         if (refW && !myW) lost.push(shortName(DATA.opponents[oi]) + ' ' + lab);
       }
     }
@@ -2441,7 +2442,7 @@ function _computeMatchupsKept(iv) {
     if (mirrorSet[oi]) continue;
     var sceneWins = 0;
     for (var k = 0; k < nSel; k++) {
-      if (scores[iv * nS * nO + sis[k] * nO + oi] >= 500) sceneWins++;
+      if (scores[iv * nS * nO + sis[k] * nO + oi] > 500) sceneWins++;  // 500=tie (PvPoke)
     }
     credit += sceneWins / nSel;
   }
