@@ -225,6 +225,38 @@ def _opp_strong(color_key, display_text=None):
 # Deep dive CSS
 # ---------------------------------------------------------------------------
 
+# Checkbox-hack "+N more"/"less" inline expander, shared by the dive card's
+# coverage lists and the flip summaries (prose_flip_summary). Page-global so the
+# flip toggles work even on a dive page that renders no card. Single source: the
+# standalone card (deep_dive_card.render_card_html) imports this same constant,
+# and the dive-page card injection (CARD_CSS) deliberately omits these rules so
+# they appear exactly once per page. ASCII only.
+COVER_TOGGLE_CSS = """
+.cover-toggle { position:absolute; opacity:0; width:0; height:0; }
+.cover-rest { display:none; }
+.cover-toggle:checked ~ .cover-rest { display:inline; }
+.cover-more { color:var(--accent); cursor:pointer; white-space:nowrap;
+  text-decoration:underline; text-decoration-style:dotted; }
+.cover-more .cm-hide { display:none; }
+.cover-toggle:checked ~ .cover-more .cm-show { display:none; }
+.cover-toggle:checked ~ .cover-more .cm-hide { display:inline; }
+"""
+
+
+def cover_toggle_html(head, rest_text, n_more, cid):
+    """Inline no-JS "+N more"/"less" expander (checkbox-hack), styled by
+    COVER_TOGGLE_CSS. Single markup source shared by the dive card's coverage
+    lists (deep_dive_card: _cover_html / _bar_cover_html) and the flip summaries
+    (prose_flip_summary). ``head`` is always visible; ``rest_text`` (including
+    its own leading ", ") is revealed when toggled; ``cid`` must be page-unique.
+    """
+    return (f'{head}<input type="checkbox" class="cover-toggle" id="{cid}">'
+            f'<span class="cover-rest">{rest_text}</span>'
+            f'<label class="cover-more" for="{cid}">'
+            f'<span class="cm-show"> +{n_more} more</span>'
+            f'<span class="cm-hide"> less</span></label>')
+
+
 DEEP_DIVE_CSS = """
 .dd-section { background: var(--surface); padding: 16px 20px; border-radius: 8px; margin: 20px 0; }
 .dd-h2 { color: var(--title); font-size: 1.3rem; margin: 0 0 12px 0; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
@@ -479,7 +511,7 @@ DEEP_DIVE_CSS = """
   border-radius: calc(var(--sidebar-width, 4px) / 2);
   background: var(--sidebar-color, var(--text-muted));
 }
-"""
+""" + COVER_TOGGLE_CSS
 
 def parse_mode(composite_mode):
     """Decompose a composite mode string into (opp_iv_mode, bait_mode).
@@ -654,37 +686,59 @@ def _bait_suffix(entry):
     return ''
 
 
+# Per-render counter for unique flip-summary toggle ids. A page can carry
+# several flip summaries (one per spread card, plus the flip-detail and
+# rec-card contexts), so the ids must not collide. Distinct from the card's
+# own ``_toggle_seq`` (cm/sb ids) by the caller-supplied prefix.
+_flip_toggle_seq = 0
+
+
 def prose_flip_summary(flip_data, max_gains=3, max_losses=2, has_bait_axis=False,
-                       name_html=None):
+                       name_html=None, expandable=False, id_prefix='flip'):
     """Generate a natural-language summary of matchup gains/losses.
 
     Returns a string like "gains Togekiss 1v2, G. Stunfisk 2v0; loses Steelix 0v2, 1v2".
     ``name_html`` (opp -> html) optionally renders each opponent name as HTML
     (e.g. an escaped #opp-<slug> link for the dive card); when None the names are
     plain text (the default for the dive's own callers, which escape downstream).
+
+    When ``expandable`` is True the remainder beyond max_gains/max_losses is not
+    summarized as a static "(+N more)" count but rendered hidden behind a no-JS
+    checkbox-hack toggle (a "+N more"/"less" label), mirroring ``_cover_html`` in
+    deep_dive_card.py so it matches the sibling coverage control. ``id_prefix``
+    namespaces the toggle ids; combined with the module-global counter the ids
+    are page-unique. When False the original plain-string behavior is kept.
     """
     def _nm(o):
         return name_html(o) if name_html else o
+
+    def _entry_str(e):
+        return f'{_nm(e["opponent"])} {e["scenario"]}{_bait_suffix(e) if has_bait_axis else ""}'
+
+    def _section(verb, items, max_n, sort_key):
+        ordered = sorted(items, key=sort_key, reverse=True)
+        top = ordered[:max_n]
+        rest = ordered[max_n:]
+        s = verb + ' ' + ', '.join(_entry_str(e) for e in top)
+        if not rest:
+            return s
+        if not expandable:
+            return s + f' (+{len(rest)} more)'
+        global _flip_toggle_seq
+        _flip_toggle_seq += 1
+        cid = f'{id_prefix}{_flip_toggle_seq}'
+        tail = ', '.join(_entry_str(e) for e in rest)
+        return cover_toggle_html(s, f', {tail}', len(rest), cid)
+
     parts = []
     gains = flip_data.get('gains', [])
     losses = flip_data.get('losses', [])
     if gains:
-        # Sort by delta descending
-        top = sorted(gains, key=lambda e: e['iv_score'] - e['ref_score'], reverse=True)[:max_gains]
-        gain_strs = [f'{_nm(e["opponent"])} {e["scenario"]}{_bait_suffix(e) if has_bait_axis else ""}' for e in top]
-        extra = len(gains) - len(top)
-        s = 'gains ' + ', '.join(gain_strs)
-        if extra > 0:
-            s += f' (+{extra} more)'
-        parts.append(s)
+        parts.append(_section('gains', gains, max_gains,
+                              lambda e: e['iv_score'] - e['ref_score']))
     if losses:
-        top = sorted(losses, key=lambda e: e['ref_score'] - e['iv_score'], reverse=True)[:max_losses]
-        loss_strs = [f'{_nm(e["opponent"])} {e["scenario"]}{_bait_suffix(e) if has_bait_axis else ""}' for e in top]
-        extra = len(losses) - len(top)
-        s = 'loses ' + ', '.join(loss_strs)
-        if extra > 0:
-            s += f' (+{extra} more)'
-        parts.append(s)
+        parts.append(_section('loses', losses, max_losses,
+                              lambda e: e['ref_score'] - e['iv_score']))
     return '; '.join(parts) if parts else 'no matchup flips'
 
 
@@ -3218,7 +3272,8 @@ def render_analysis_flips_html(data_obj, flip_summary, flips, avg_scores,
     notable = [x for x in flip_summary if abs(x[3]) >= 3 or x[0] in set(ranked[:5])]
     for iv, g, l, net in notable[:8]:
         fd = flips[iv]
-        prose = prose_flip_summary(fd, has_bait_axis=has_bait_axis)
+        prose = prose_flip_summary(fd, has_bait_axis=has_bait_axis,
+                                   expandable=True, id_prefix='fdet')
         parts.append(f'<details class="dd-flip-detail"><summary>{iv_label(data_obj, iv)} - <span class="dd-gain">+{g}</span>/<span class="dd-loss">-{l}</span> (net {net:+d}){tier_badge_html(data_obj, iv)}</summary>\n')
         parts.append(f'<p class="dd-prose">{prose}</p>\n')
         focal_atk_iv = data_obj['ivAtk'][iv]
@@ -3325,7 +3380,8 @@ def _render_iv_recommendations(rec_candidates, flips, opp_label, data_obj,
         iv = rc['iv']
         nc = 'dd-gain' if rc['net'] > 0 else ('dd-loss' if rc['net'] < 0 else '')
         fd = flips.get(iv, {'gains': [], 'losses': []})
-        prose = prose_flip_summary(fd, max_gains=2, max_losses=1, has_bait_axis=has_bait_axis)
+        prose = prose_flip_summary(fd, max_gains=2, max_losses=1, has_bait_axis=has_bait_axis,
+                                   expandable=True, id_prefix='frec')
         parts.append('<div class="dd-rec-card">\n')
         style_color = 'var(--accent)' if rc['style'] == 'Bait Robust' else 'var(--title)'
         parts.append(f'<h4 style="color:{style_color}">{rc["style"]}: {iv_label(data_obj, iv)}{tier_badge_html(data_obj, iv)}</h4>\n')
