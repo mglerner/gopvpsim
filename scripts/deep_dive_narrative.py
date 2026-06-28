@@ -431,7 +431,7 @@ def _flavor_max_winrates(flavor, data_obj, score_arrays, moveset_idx,
         scores = _np_scores(score_arrays, moveset_idx, mode, nIvs, nS, nO)
         if scores is None:
             continue
-        wr = (scores[mask] >= 500).sum(axis=0) / n
+        wr = (scores[mask] > 500).sum(axis=0) / n  # 500 = tie, not a win
         best = wr if best is None else np.maximum(best, wr)
     return best
 
@@ -474,7 +474,7 @@ def _find_losses_vs_general(flavor, general, data_obj, score_arrays,
         scores = _np_scores(score_arrays, moveset_idx, mode, nIvs, nS, nO)
         if scores is None:
             continue
-        wins = scores >= 500
+        wins = scores > 500  # 500 = tie, not a win (matches _won_set / PvPoke)
         flavor_wr = wins[flavor_mask].sum(axis=0) / n_flavor
         general_wr = wins[general_only_mask].sum(axis=0) / n_general_only
         sel = (general_wr >= 0.75) & (flavor_wr <= 0.25)

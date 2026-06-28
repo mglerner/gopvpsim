@@ -71,11 +71,11 @@ def _reference_find_losses(flavor, general, data_obj, score_arrays,
             for oi, opp in enumerate(opponents):
                 flavor_wr = sum(
                     1 for iv in flavor_ivs
-                    if scores_flat[iv * nS * nO + si * nO + oi] >= 500
+                    if scores_flat[iv * nS * nO + si * nO + oi] > 500
                 ) / len(flavor_ivs)
                 general_wr = sum(
                     1 for iv in general_only_ivs
-                    if scores_flat[iv * nS * nO + si * nO + oi] >= 500
+                    if scores_flat[iv * nS * nO + si * nO + oi] > 500
                 ) / len(general_only_ivs)
                 if general_wr >= 0.75 and flavor_wr <= 0.25:
                     losses.setdefault(opp, set()).add(tuple(scen))

@@ -156,11 +156,13 @@ def find_flips(scores_flat, nIvs, nS, nO, ref_iv, test_ivs, scenarios, opponents
             for oi in range(nO):
                 rs = scores_flat[ref_iv * nS * nO + si * nO + oi]
                 ts = scores_flat[iv * nS * nO + si * nO + oi]
-                if (rs >= 500) != (ts >= 500):
+                # > 500: a rating of exactly 500 is a TIE, not a win (PvPoke
+                # BattleHistogram.js/Interface.js); matches canonical _won_set.
+                if (rs > 500) != (ts > 500):
                     entry = {'scenario': f'{scenarios[si][0]}v{scenarios[si][1]}',
                              'opponent': opponents[oi], 'ref_score': rs, 'iv_score': ts,
                              'bait_modes': {bait_mode}}
-                    (gains if ts >= 500 else losses).append(entry)
+                    (gains if ts > 500 else losses).append(entry)
         if gains or losses:
             flips[iv] = {'gains': gains, 'losses': losses}
     return flips
@@ -1121,7 +1123,7 @@ def probe_tier_cutoff_flips(data_obj, score_arrays_all, moveset_idx,
         scores = _np_scores(score_arrays_all, moveset_idx, mode, nIvs, nS, nO)
         if scores is None:
             continue
-        wins = scores >= 500
+        wins = scores > 500  # 500 = tie, not a win (matches _won_set / PvPoke)
         pw = wins[meets].sum(axis=0) / n_pass
         fw = wins[~meets].sum(axis=0) / n_fail
         sel = (pw >= pass_winrate_min) & (fw <= fail_winrate_max)

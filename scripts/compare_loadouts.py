@@ -16,7 +16,7 @@ Design notes:
   deltas are computed with itertools.combinations so N=3 / N=4 are a
   renderer extension, not a data-model rewrite.
 * Win rate is the consumer-facing metric (fraction of matchups with
-  battle-rating >= 500), matching the dive scatter's winsPvpoke y-axis
+  battle-rating > 500; 500 = tie), matching the dive scatter's winsPvpoke y-axis
   and the article verdict line.
 * Opponents are aligned by display name. Only opponents present in
   every loadout's dive are shown.
@@ -179,7 +179,7 @@ def load_loadout_data(spec: LoadoutSpec) -> dict:
         for si in range(n_s):
             base = base_iv + si * n_o
             for oi in range(n_o):
-                if scores[base + oi] >= 500:
+                if scores[base + oi] > 500:  # 500 = tie, not a win
                     per_scenario_wins[si] += 1
                     per_opponent_wins[oi] += 1
                     total_wins += 1
