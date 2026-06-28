@@ -7,7 +7,7 @@ Run integration tests with: pytest -m integration
 """
 import pytest
 from gopvpsim.battle import (
-    BattlePokemon, BattleResult,
+    BattlePokemon, BattleResult, is_win,
     always_shield, never_shield, pvpoke_shield, pvpoke_simulate_shield,
     use_first_available, bait_with_cheapest,
     no_bait, pvpoke_ai, pvpoke_dp, optimal_timing, simulate, ENERGY_CAP, OPTIMAL_TIMING,
@@ -271,6 +271,49 @@ def test_pvpoke_score_perfect_win_is_1000():
     result = simulate(p0, p1, shield_policy_0=never_shield)
     if result.winner == 0 and result.hp_remaining[0] == result.max_hp[0]:
         assert result.pvpoke_score(0) == pytest.approx(1000.0)
+
+# ---------------------------------------------------------------------------
+# Regression: an exact-500 rating is ALWAYS a double-KO tie, never a win/loss.
+# Pins the invariant the ML-guide "tie 500" / per-Case "tie" labeling rests on.
+# (A 2026-06 fix mislabeled 500 as a loss by conflating it with the
+# hundo-relative `drops` set; the root truth is the rating math exercised here.)
+# ---------------------------------------------------------------------------
+
+def _score_result(hp_remaining, max_hp, winner):
+    """Minimal BattleResult for exercising pvpoke_score's rating math directly."""
+    return BattleResult(
+        winner=winner, turns=10,
+        hp_remaining=hp_remaining, max_hp=max_hp,
+        energy_remaining=[0, 0], shields_remaining=[0, 0],
+    )
+
+def test_rating_500_is_a_tie_not_a_win():
+    """is_win() must reject exactly 500: a 500 rating is a TIE, not a win."""
+    assert is_win(501) is True
+    assert is_win(500) is False
+    assert is_win(499) is False
+
+def test_double_ko_scores_exactly_500_for_both():
+    """A double KO (both faint the same turn) is the only end-state that yields
+    a 500 rating -- and it yields it for BOTH players, i.e. a genuine tie."""
+    r = _score_result(hp_remaining=[0, 0], max_hp=[130, 140], winner=None)
+    assert r.pvpoke_score(0) == 500
+    assert r.pvpoke_score(1) == 500
+    assert not is_win(r.pvpoke_score(0))
+
+def test_live_winner_never_scores_exactly_500():
+    """No reachable timeout (MAX_TURNS is an infinite-loop guard), so a winner is
+    always alive while the loser has fainted. A live winner with even 1 HP
+    scores strictly > 500 for any realistic max_hp (no PvP mon exceeds ~500 HP),
+    and a dead loser scores < 500 -- so an exact-500 "thin win" cannot occur
+    in-sim: 500 is unambiguously a double-KO tie."""
+    for max_hp in (60, 130, 250, 500):   # 500 is above any real PvP HP stat
+        win = _score_result(hp_remaining=[1, 0], max_hp=[max_hp, 140], winner=0)
+        assert win.pvpoke_score(0) > 500, f"1-HP win at max_hp={max_hp} must be > 500"
+        assert is_win(win.pvpoke_score(0))
+        loss = _score_result(hp_remaining=[0, 1], max_hp=[max_hp, 140], winner=1)
+        assert loss.pvpoke_score(0) < 500
+        assert not is_win(loss.pvpoke_score(0))
 
 def test_simulate_winner_has_hp_remaining():
     p0 = make_bp(hp=200, atk=150.0, def_=150.0)
