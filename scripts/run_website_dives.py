@@ -538,7 +538,8 @@ def build_command(dive):
     ]
 
     # Best-buddy / L51 toggle. 'best_buddy' may be 'on'/'off'/'auto' (default
-    # 'auto' = on for Ultra, opt-in for Great). 'best_buddy_display' (50/51)
+    # 'auto' = on for Great + Ultra; no-op species show the toggle but it does
+    # nothing, with no extra sims). 'best_buddy_display' (50/51)
     # picks which level the page opens on. Per-species TOML can also set these;
     # the CLI flag here wins over the TOML.
     if 'best_buddy' in dive:

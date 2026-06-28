@@ -4571,11 +4571,17 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         # from a wild-release event with low IVs, before a re-dive.
         _rank_table_alt = None
         if best_buddy and best_buddy.get('active') and best_buddy.get('alt_cap'):
-            _ranked_alt = _rank_lookup(
-                _collection_species_key, league=league,
-                max_level=best_buddy['alt_cap'], shadow=shadow)
-            _rank_table_alt = {f'{a},{d},{s}': r
-                               for (a, d, s), r in _ranked_alt.items()}
+            if best_buddy.get('noop'):
+                # No-op best-buddy: the alt-cap stat-product ranks are provably
+                # identical to the default-cap ones (no IV's level changes), so
+                # alias rather than re-rank at the alt cap (no extra compute).
+                _rank_table_alt = _rank_table
+            else:
+                _ranked_alt = _rank_lookup(
+                    _collection_species_key, league=league,
+                    max_level=best_buddy['alt_cap'], shadow=shadow)
+                _rank_table_alt = {f'{a},{d},{s}': r
+                                   for (a, d, s), r in _ranked_alt.items()}
         # Build the threshold dict in the same shape Python's match_mons
         # expects, from the tier info already computed above. This is
         # the dict the JS constructs at CSV-load time; we could build
@@ -4820,12 +4826,14 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   /* Best-buddy toggle: a distinct separated block below the jump links. */
   .dd-toc-bb {{ margin-top: 8px; padding-top: 7px;
                 border-top: 1px solid var(--border-2); }}
-  .dd-toc-bb label {{ display: flex; align-items: flex-start; gap: 5px;
-                      cursor: pointer; font-size: 0.78rem; color: var(--text);
-                      line-height: 1.3; }}
+  .dd-toc-bb label {{ display: flex; flex-wrap: wrap; align-items: flex-start;
+                      gap: 5px; cursor: pointer; font-size: 0.78rem;
+                      color: var(--text); line-height: 1.3; }}
   .dd-toc-bb input {{ margin-top: 2px; }}
   .dd-toc-bb b {{ font-weight: 600; }}
   .dd-toc-bb-note {{ font-size: 0.78rem; color: var(--text-muted); }}
+  .dd-toc-bb-noop {{ flex-basis: 100%; font-size: 0.72rem;
+                     color: var(--text-muted); }}
   .dd-main {{ flex: 1; min-width: 0; }}
   @media (max-width: 820px) {{
     .dd-layout {{ flex-direction: column; }}
@@ -4935,12 +4943,27 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         _bb_checked = (' checked'
                        if int(best_buddy.get('default_display') or 0) == int(_bb_alt)
                        else '')
+        # The toggle renders on every GL/UL dive for a consistent UI. When
+        # best-buddy provably changes nothing for this mon (_bb_noop), toggling
+        # is a true no-op; we say so in the title + a small hint so it reads as
+        # honest (not a dead affordance).
+        _bb_is_noop = bool(best_buddy.get('noop'))
+        _bb_title = (
+            "Best-buddy (+1 level) doesn't change any spread for this mon -- "
+            "every IV is already CP-capped below L%g, so toggling is a no-op."
+            % _bb_alt
+            if _bb_is_noop else
+            "Recompute the whole dive as if this mon were your best buddy "
+            "(+1 level).")
+        _bb_hint = (' <span class="dd-toc-bb-noop">(no change for this mon)</span>'
+                    if _bb_is_noop else '')
         _bb_nav_ctrl = (
             '<div class="dd-toc-bb">\n'
-            '  <label title="Recompute the whole dive as if this mon were your '
-            'best buddy (+1 level)."><input type="checkbox" id="dd-bb-toggle" '
+            f'  <label title="{_bb_esc(_bb_title)}"><input type="checkbox" '
+            'id="dd-bb-toggle" '
             'onchange="setBestBuddyLevel(this.checked ? \'51\' : \'50\')"'
-            f'{_bb_checked}> <b>Allow best-buddy (L{_bb_alt:g})</b></label>\n'
+            f'{_bb_checked}> <b>Allow best-buddy (L{_bb_alt:g})</b>{_bb_hint}'
+            '</label>\n'
             '</div>\n')
     elif best_buddy and best_buddy.get('note'):
         from html import escape as _bb_esc
@@ -6122,10 +6145,11 @@ def main():
                         help='Compute a second focal sweep one level higher '
                         '(best-buddy = +1 level) so the dive can toggle between '
                         'the league-default level and best-buddy L51. '
-                        '"auto" (default) computes it for Ultra; Great is '
-                        'opt-in via "on"; Master/Little already cap at 51 so '
-                        'the toggle is a no-op there. Suppressed automatically '
-                        'when no IV can actually climb a level.')
+                        '"auto" (default) computes it for Great + Ultra; '
+                        'Master/Little already cap at 51 so the toggle is a '
+                        'no-op there. When no IV can actually climb a level the '
+                        'toggle still renders (consistent UI) but is a provable '
+                        'no-op -- no extra sims are run.')
     parser.add_argument('--best-buddy-display', type=int, choices=[50, 51],
                         default=None,
                         help='Which level the dive opens on when the best-buddy '
@@ -7531,7 +7555,7 @@ def main():
         _bb_default_cap, _bb_alt_cap = _bestbuddy_caps(args.league)
         # Per-species [Species.best_buddy] TOML override (persists across
         # re-dives, like cd_prep). Resolution precedence (high -> low):
-        #   --best-buddy on/off  >  TOML compute  >  league policy (UL on, GL opt-in)
+        #   --best-buddy on/off  >  TOML compute  >  league policy (GL + UL on)
         #   --best-buddy-display >  TOML default_display  >  league default cap
         _bb_toml = _read_best_buddy_toml(args.species, args.shadow)
         if args.best_buddy == 'on':
@@ -7540,8 +7564,12 @@ def main():
             _bb_want = False
         elif _bb_toml.get('compute') is not None:
             _bb_want = bool(_bb_toml['compute'])
-        else:  # auto: default-on for Ultra; Great opt-in; Master/Little no-op
-            _bb_want = args.league == 'ultra'
+        else:  # auto: default-on for Great + Ultra; Master/Little no-op
+            # Great mirrors Ultra (2026-06-28): the focal best-buddy pass only
+            # runs the expensive L51 sweep when it actually changes a spread
+            # (_bb_active); CP-capped GL focals just do the cheap metadata no-op
+            # check and show the "best-buddy changes nothing here" note.
+            _bb_want = args.league in ('great', 'ultra')
         _bb_active = False
         _bb_note = None
         if _bb_want and _bb_alt_cap != _bb_default_cap and moveset_data:
@@ -7603,8 +7631,25 @@ def main():
             _bb_display = int(_bb_toml['default_display'])
         else:
             _bb_display = int(_bb_default_cap)
+        # No-op best-buddy toggle (Michael 2026-06-28: consistent UI -- the
+        # toggle appears on every GL/UL page). When best-buddy is wanted for this
+        # league but provably changes no IV's level (every IV CP-capped below the
+        # alt cap), L51 is byte-identical to L50, so alias the L50 grids as the
+        # L51 grids -- ZERO extra sims. The expensive L51 recomputes (the focal
+        # sweep above, the slayer cohort below, the collection rankLookupAlt) all
+        # stay gated on the *real* _bb_active, so no-op dives cost nothing extra;
+        # only the cheap grid aliases + the toggle render are added.
+        _bb_noop = bool(_bb_want and _bb_alt_cap != _bb_default_cap
+                        and moveset_data and not _bb_active)
+        if _bb_noop:
+            for md in moveset_data:
+                md['scores_l51'] = md['scores']
+                md['meta_l51'] = md['meta']
+                if md.get('energy'):
+                    md['energy_l51'] = md['energy']
         best_buddy = {
-            'active': _bb_active,
+            'active': _bb_active or _bb_noop,   # emit flag (drives the toggle)
+            'noop': _bb_noop,                   # true => toggling is a no-op
             'default_display': _bb_display,
             'default_cap': _bb_default_cap,
             'alt_cap': _bb_alt_cap,
@@ -7618,7 +7663,11 @@ def main():
         # --mirror-slayer pass actually ran. cache=None: these are distinct
         # (best-buddy-level) sims, kept out of the L50 slayer cache.
         main_slayer_iter_result_l51 = None
-        if _bb_active and main_slayer_iter_result and args.mirror_slayer \
+        if _bb_noop and main_slayer_iter_result:
+            # No-op: the mirror cohort is identical at L51, so alias it (no
+            # extra slayer pass) -- keeps the L51-view CMP pill correct.
+            main_slayer_iter_result_l51 = main_slayer_iter_result
+        elif _bb_active and main_slayer_iter_result and args.mirror_slayer \
                 and all_moveset_results:
             try:
                 _lv, _da, _dd, _ds = pvpoke_default_ivs(args.species,
