@@ -711,6 +711,18 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   fallbacks in `deep_dive_user_collection.js:275` (`ivsToStatsAtCap` default,
   caller always passes maxLevel) and `:344` (`matchMons`, zero live call sites)
   — single-source these to a league-aware ceiling if matchMons is ever wired up.
+  **Round-4 (2026-06-28) found the same-class `51.0` latent default in the
+  shared library `src/gopvpsim/user_collection.py:209` (`ivs_to_stats_at_cap`)
+  and `:263` (`compute_rank_lookup`).** NOT currently wrong (every shipped
+  deep_dive bake site overrides it), but it's a league-unaware default that a
+  future caller could hit. **This module is consumed by gobattlekit** (CLAUDE.md
+  "gobattlekit" / shared `user_collection`), so changing the default signature
+  needs cross-repo coordination — do NOT change unattended; either make the
+  default `None` + derive from `league` (like `owned_breakdown.py` `786d437`),
+  or require an explicit cap, after checking gobattlekit's call sites. The JS
+  regression guard `verify_js_parser.py:152,302` ALSO hardcodes `51.0` with
+  `league='great'`, so it can't catch a league-awareness regression — fix the
+  fixture to the league-derived ceiling when adding the strong pin above.
 
 * **No-bait oracle tests from iv-tech deep dives** — `pvpoke_dp`
   accepts `bait_shields=False`; sanity tests for the farm-down gate
