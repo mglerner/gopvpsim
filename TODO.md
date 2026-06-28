@@ -348,9 +348,11 @@ Master SHADOW guide it produced may carry the #1 behavior -- re-bake the
 shadow ML guides after you accept the #1 fix.
 
 **Bug-hunt follow-ups (open) -- full report `docs/reviews/2026-06-27_engine_bug_hunt.md`:**
-- **#2 [MED]** damage formula uses exact `1.3/1.2/1.6` not the game's
-  float32-truncated constants -> off-by-one on breakpoint boundaries. Real,
-  but shifts many fixtures; needs a broad re-vet (not auto-applied).
+- **#2 [MED] FIXED 2026-06-27 (`4e57321`)** -- damage formula now uses the
+  game's float32-truncated `BONUS/STAB_MULTIPLIER/SUPER_EFFECTIVE` constants
+  (was exact `1.3/1.2/1.6` -> off-by-one on breakpoint boundaries). This is
+  the boundary-scattered fix that forces the COLD re-dive; everything else
+  this session rides it for free.
 - **#3 [MED] FIXED 2026-06-27** -- farm-down now stacks self-debuffing moves
   (PvPoke ActionLogic.js:399-405 `energyToReach` gate). Adversarially verified
   (suite 1075p; 0/2160 default-meta cells changed; 162/162 firing configs +
