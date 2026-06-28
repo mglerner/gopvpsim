@@ -1,24 +1,65 @@
-## >> NEXT ACTION (2026-06-27 PM): cold re-dive (ML-sweep progress reporting LANDED)
+## >> NEXT ACTION (2026-06-27 PM): cold re-dive (pre-redive sweep COMPLETE)
 
-The pre-redive ENGINE + RENDER batch LANDED this session (2026-06-27 PM); tree
-clean at `96a1c48`, nothing published. The re-dive is now irreducibly **COLD**
-(the float32 fix forces it; the legacy cache is all-None-stamped). The remaining
-pre-redive task is now done; ONE focused session remains:
+Two pre-redive sessions have landed; tree clean at `85e7284`, nothing published.
+The re-dive is irreducibly **COLD** (the float32 fix forces it; the legacy cache
+is all-None-stamped). All pre-redive work is done; ONE step remains:
 
-1. **ML-sweep progress reporting** -- DONE (2026-06-27 PM, commits `df51527`
-   route iv_envelope_analysis progress through the structured logger /
-   `3d0b2e8` unlink stale per-guide log per run / `2d82b51` watch views surface
-   per-worker phase / `0a207a0` tests). The ML sweeps now write a deterministic
-   per-guide log `userdata/logs/iv_guides/<slug>.log` with phase lines
-   ([hundo k/4], [detail k/4], [recommended N/64], Wrote), and
-   `iv_guides_status.py` + `chain_status.py` show each live worker's current
-   phase. Adversarially verified: JSON byte-identical to the clean-tree golden,
-   suite 1098p/14xf/0fail, no engine files touched. See its section below.
-2. **Cold re-dive** (`overnight_redive.sh`) -- fresh, long-running, monitored
+1. **Cold re-dive** (`overnight_redive.sh`) -- fresh, long-running, monitored
    session: re-dive on the new engine + refreshed gamemaster, review,
-   re-publish, then GC the legacy cache.
+   re-publish, then GC the legacy cache. Watch live with `watch -c -n5
+   'scripts/chain_status.py --chain overnight'` (+ `scripts/iv_guides_status.py`
+   once the ML step starts). NB the ML bake now runs SERIAL (one guide, all
+   cores) -- see the parallelism item below.
 
-What landed this session (all committed, all ride the cold pass for free):
+### Pre-redive adversarial assessment batch (2026-06-27 PM, session 2)
+
+An ultracode adversarial assessment (8 fresh-eyes finders over the engine +
+chain, each finding independently refuted/prioritized) was run before committing
+to the hours-long cold bake. It refuted 11/13 raw findings and surfaced ONE real
+launch-blocker plus several free ride-alongs; all landed, all ride the cold pass:
+
+- **A1 [BLOCKER] SHADOW_DEF_MULT was `5/6`, not the game's value** -- fixed to
+  `float32(5/6) = 0.8333333134651184` (`fb2f9de` -> `f7f9509`). `5/6` (float64
+  0.8333333333) is ~2.8e-8 too large, so we dealt ~1 LESS damage to shadow
+  defenders at floor() breakpoint boundaries (the deliverable). The GAME stores
+  this as float32; PvPoke's `0.83333331` is an imprecise float64 transcription
+  (~3.5e-9 low), so we match the GAME, not PvPoke -- a deliberate, documented
+  game-over-oracle choice (DEVELOPER_NOTES "Engine constant sourcing"). Hid
+  because the only shadow oracle fixture (Shadow Swampert vs Registeel) sits
+  off-boundary. Also fixed a stale `5/6` copy in `deep_dive_user_collection.js`
+  + added `tests/test_js_shadow_constants.py` drift tripwire.
+- **B2 bandaid[910] defer-self-debuff read the wrong index** -- `cm_self_buff[
+  first_idx]` -> `cm_self_buff[0]` (activeChargedMoves[0], per ActionLogic.js:929)
+  (`c5c515e`). Real port bug; ZERO shipped-default impact.
+- **B3 `buffApplyChance` string-compare** -- `float()`-coerced in `_priority_
+  shuffle` + the bestChargedMove tie-break (`c5c515e`); same class as #7. ~Nil
+  shipped-default impact.
+- **ML-sweep parallelism** -- post-cache-rework each guide fans across all cores
+  via `iv_sweep`, so the old concurrent-guides model (overnight `--reserve 0`)
+  oversubscribed ~10x on a 10-core host (thrash + OOM-kill/missing-guide risk;
+  the cache is corruption-SAFE -- atomic .npz writes, disjoint focal dirs, torn
+  files self-heal as a miss -- so no wrong data, but a thrashed run could ship an
+  INCOMPLETE bake). Fixed: `run_iv_guides.py` defaults to SERIAL, overnight uses
+  `--jobs 1` (the GL/UL pattern) (`fd52021`).
+- **UI flip "(+N more)" was dead text** -- now a real no-JS inline expander in
+  all 3 contexts, with the toggle markup DRY'd into one `cover_toggle_html`
+  helper + single `COVER_TOGGLE_CSS` (`85e7284`). Output-neutral (re-render
+  byte-identical).
+- **Cleanup**: deleted the stale `pogo-simulator/` husk (a 16K symlink-to-gopvpsim
+  shell; completes the long-deferred `pogo-simulator -> gopvpsim` rename).
+
+Final gate (whole batch): full suite 1100p/14xf, oracle audit clean, benchmark
+3,436 sims/s.
+
+### Session-1 pre-redive batch (2026-06-27 PM) -- also rides the cold pass
+
+(ML-sweep progress reporting also LANDED 2026-06-27: `df51527` route
+iv_envelope_analysis progress through the structured logger / `3d0b2e8` unlink
+stale per-guide log per run / `2d82b51` watch views surface per-worker phase /
+`0a207a0` tests -- per-guide `userdata/logs/iv_guides/<slug>.log` with phase
+lines, surfaced by `iv_guides_status.py` + `chain_status.py`.)
+
+Session-1 commits (all ride the cold pass for free):
 - **#2 float32 damage constants** -- DONE (`4e57321`). STAB/BONUS/super-effective
   now use float32-truncated doubles matching the game/PvPoke. Boundary-scattered,
   no clean predicate -> this is what makes the re-dive cold (so everything else
