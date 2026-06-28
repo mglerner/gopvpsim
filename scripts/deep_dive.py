@@ -4002,6 +4002,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # Reset so each emitted HTML file has its own tooltip lookup; a
     # prior file's entries must not leak into this one.
     rendering.reset_tooltip_registry()
+    # Same per-page reset for opponent anchor ids: each id="opp-<slug>"
+    # is emitted once per file by whichever section renders first, so the
+    # registry must start empty (otherwise split/replay pages 2+ would
+    # suppress every id).
+    rendering.reset_opp_anchor_registry()
 
     # Shadow focal: re-derive the legacy stat-cutoff thresholds from the
     # registry under the shadow-suffixed species key. A shadow / constructed
