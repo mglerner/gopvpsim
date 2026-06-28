@@ -349,10 +349,13 @@ IV_CHECK_JS = r"""
     return '<span class="' + cls + '"><span style="width:' + Math.min(100, pct)
       + '%"></span></span><span class="cmp-hpv">' + sign + num + '% HP</span>';
   }
-  function allCellHtml(score, altScore, altIsBuddy, altCap, en, em, showMark){
+  function allCellHtml(score, altScore, altIsBuddy, altCap, en, em, showMark, cc){
     var win = score > 500, tie = score === 500;
     var txt = '<span class="' + (win ? 'cmp-win' : tie ? 'cmp-tie' : 'cmp-lose')
       + '">' + (win ? 'win ' : tie ? 'tie ' : 'loss ') + score + '</span>';
+    if (cc)   // close-call badge (shield spent / near-death / energy banked)
+      txt += ' <span class="cc-tag cc-' + cc.kind + '" title="' + esc(cc.margin) + '">'
+        + esc(KIND[cc.kind] || cc.kind) + '</span>';
     if (showMark && altScore != null && (score > 500) !== (altScore > 500)){
       var aw = altScore > 500, at = altScore === 500;
       var albl = aw ? 'win ' : at ? 'tie ' : 'loss ';
@@ -419,13 +422,27 @@ IV_CHECK_JS = r"""
           // the best-buddy marker would be identical noise (suppressed below).
           var sigs = scores.map(function(v, k){ return sgn(v) + (alts ? sgn(alts[k]) : ''); });
           var sigDiffer = sigs.some(function(s){ return s !== sigs[0]; });
+          // Per-spread close-call (shield spent / near-death / energy banked) for
+          // this quad/opp/scenario, from the ivc-data blob -- the same source the
+          // per-Case table uses. Orthogonal to leftover HP: a spread can spend a
+          // shield with ~0 HP-% difference, which the bar misses. So a close-call
+          // that DIFFERS across spreads is its own reason to show the row.
+          var oppN = DATA.opponentsDisplay[oi], shL = cmpScenLabel(si);
+          var ccs = live.map(function(r){
+            var lst = ((D.combos[r.key] && D.combos[r.key].cc) || {})[quad] || [];
+            for (var z = 0; z < lst.length; z++)
+              if (lst[z].opp === oppN && lst[z].shield === shL) return lst[z];
+            return null;
+          });
+          var ccSig = ccs.map(function(c){ return c ? (c.kind + ':' + c.margin) : ''; });
+          var ccDiffer = ccSig.some(function(s){ return s !== ccSig[0]; });
           var hps = scores.map(cmpHp);
           var hpSpread = Math.max.apply(null, hps) - Math.min.apply(null, hps);
           var delta = Math.max.apply(null, scores) - Math.min.apply(null, scores);
           var tier, include;
           if (sigDiffer){ tier = 0; include = true; }                  // flip: the pick changes the result
-          else if (hasW){ tier = 1; include = hpSpread >= CMP_MARGIN_MIN; } // win-both: margin swing
-          else if (hasL){ tier = 2; include = hpSpread >= CMP_MARGIN_MIN; } // lose-both: margin swing
+          else if (hasW){ tier = 1; include = hpSpread >= CMP_MARGIN_MIN || ccDiffer; } // win-both: margin swing or close-call
+          else if (hasL){ tier = 2; include = hpSpread >= CMP_MARGIN_MIN || ccDiffer; } // lose-both: margin swing or close-call
           else { include = false; }                                    // all-tie
           if (!include){
             // collapsed view: would expanding best-buddy reveal this row? Primary
@@ -437,7 +454,7 @@ IV_CHECK_JS = r"""
             continue;
           }
           rows.push({ quad:quad, oi:oi, si:si, tier:tier, delta:delta,
-                      scores:scores, alts:alts, altIsBuddy:altIsBuddy, altCap:altCap, eg:eg,
+                      scores:scores, alts:alts, ccs:ccs, altIsBuddy:altIsBuddy, altCap:altCap, eg:eg,
                       showMark:(showBB && sigDiffer) });
         }
       }
@@ -473,7 +490,7 @@ IV_CHECK_JS = r"""
       for (var k = 0; k < row.scores.length; k++){
         var en = row.eg ? cmpVal(row.eg, live[k].iv, row.si, row.oi) : null;
         h += allCellHtml(row.scores[k], row.alts ? row.alts[k] : null,
-                         row.altIsBuddy, row.altCap, en, em, row.showMark);
+                         row.altIsBuddy, row.altCap, en, em, row.showMark, row.ccs[k]);
       }
       h += '</tr>';
     });
@@ -482,8 +499,10 @@ IV_CHECK_JS = r"""
       + 'when your spreads actually differ - they disagree on the win (a flip), '
       + (showBB ? 'or respond to best-buddy differently, ' : '')
       + 'or they all win / all lose but their leftover HP differs by '
-      + Math.round(CMP_MARGIN_MIN * 100) + '%+. Rows where every spread behaves '
-      + 'identically are hidden. Bars = leftover HP% at battle end (from the '
+      + Math.round(CMP_MARGIN_MIN * 100) + '%+, or one spends a shield / barely '
+      + 'survives / banks less energy (a close call) where another does not. '
+      + 'Rows where every spread behaves identically are hidden. Bars = leftover '
+      + 'HP% at battle end (from the '
       + 'score); energy = leftover charge on a win.'
       + (showBB ? ' Faded &#10022;on/off marks the spread(s) whose result flips '
           + 'when you toggle your best-buddy.' : ' Best-buddy flip cases are merged '
