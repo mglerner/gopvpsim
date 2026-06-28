@@ -60,8 +60,29 @@ non-gating; render/tooling-only ones re-render from replay anytime.
   loud failure mode (KeyError/undefined -> missing data, not silent-wrong). NOT a
   refactor target pre-bake (cache/render data contract); optional
   belt-and-suspenders parity test only.
-- **[tooling] `overnight_eta.py` doesn't model the ~7h ML tail** -> ETA-accuracy
-  enhancement.
+- **[tooling] per-slug historical-timing ETA estimator** (Michael greenlit
+  2026-06-28; BUILD AFTER the in-flight cold bake finishes -- that run is the
+  clean cold per-slug dataset to seed it). Today `overnight_eta.py` classifies
+  every dive into one crude bucket (`gl_full`/`ul_full`/`forretress`) and uses a
+  flat fallback mean, so it's wrong for every *individual* dive: a heavyweight
+  (sableye/medicham/carbink: active best-buddy L51 pass + mirror-slayer) and a
+  cheap no-op (registeel) both read `gl_full` but differ ~5x. Why the live dive
+  logs can't already yield an accurate whole-run ETA: the log emits each phase as
+  it *starts*, never a manifest of total remaining work, and the total is dynamic
+  (mirror-slayer rounds are convergence-capped not fixed; best-buddy active-vs-
+  no-op is decided mid-dive from data). Fix in leverage order: (1) CHEAP+BIG --
+  keep a per-slug cold-timing table (parse `[N/M] slug ... Done in X min` pairs
+  from `userdata/logs/20*/overnight_*.log`, which `overnight_eta` already
+  matches) and key each dive's estimate on its species, bucket-mean only for
+  never-seen slugs; (2) THROUGHPUT -- the log already prints stable sims/sec
+  (`base N sims in Xs`); if the dive emitted its resolved total sim-count, ETA =
+  remaining_sims/throughput; (3) BEST -- have deep_dive.py self-report an overall
+  progress fraction once its plan resolves (it knows; the watcher guesses).
+  Scope (1) is the agreed build. All `scripts/` tooling, nothing engine-hashed.
+  (Session 2026-06-28 already landed the stopgaps: baselines recalibrated to
+  measured cold times `37655db`, and the ~7h ML tail is now *included* in the
+  whole-script ETA `58dc88d` -- so the old "doesn't model the ML tail" gap is
+  closed; remaining work is the per-slug accuracy above.)
 - **[tooling, silent-incompleteness] verify_overnight UL opponent-count
   assertion.** The GL completeness guard (`build_matchup_web.py`) + marker check +
   count are GL-only; a UL opponent silently deranked/renamed by a fresh gamemaster
