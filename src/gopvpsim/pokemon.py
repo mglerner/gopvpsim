@@ -190,11 +190,27 @@ def get_species(name):
 # Pokemon dataclass
 # ---------------------------------------------------------------------------
 
-SHADOW_ATK_BONUS = 6 / 5        # ×1.2 (== PvPoke DamageMultiplier.SHADOW_ATK = 1.2, bit-identical)
-SHADOW_DEF_MULT  = 0.83333331   # PvPoke DamageMultiplier.SHADOW_DEF; NOT 5/6 — the 5/6 float64
-                                # (0.8333333333) is the outlier and deals ~1 less damage to shadow
-                                # defenders at floor() breakpoint boundaries (same class as the #2
-                                # float32 fix). Matches the oracle bit-for-bit (DamageCalculator.js:9).
+# Shadow combat multipliers -- single source of truth (every Python consumer
+# imports these; the shipped JS engines receive them via injection, see
+# deep_dive.py). The GAME is ground truth here, not PvPoke; full rationale in
+# DEVELOPER_NOTES "Engine constant sourcing".
+SHADOW_ATK_BONUS = 6 / 5  # x1.2. The game stores 1.2; float64 6/5 is bit-identical to it
+                          # (and to PvPoke's 1.2), so no float32/oracle conflict on attack.
+# Shadow defense multiplier. PoGo computes damage in single precision and stores
+# this constant as a float32, so its runtime value is float32(5/6) =
+# 0.8333333134651184 -- and every plausible decimal Niantic could store near 5/6
+# (0.8333333, 0.83333331, ...) collapses to that same float32 (ULP ~6e-8). We use
+# that float32 value as a float64 literal, consistent with the float32 damage
+# constants in moves.py (the #2 fix).
+#   NOT 5/6 (0.8333333333): the exact rational is ~2.8e-8 too large, so it deals ~1
+#     LESS damage to shadow defenders at floor() breakpoint boundaries (the
+#     deliverable). That was the bug here until 2026-06-27; it hid because the only
+#     shadow oracle fixture (Shadow Swampert vs Registeel) sits off-boundary.
+#   NOT PvPoke's 0.83333331 (DamageCalculator.js:9): that is a float64 transcription,
+#     ~3.5e-9 below the true float32; no float32 equals it. We match the GAME, not
+#     PvPoke's imprecise constant (the diff is ~10x smaller than the 5/6 bug and
+#     flips ~0 cells, but it's a deliberate, documented game-over-oracle choice).
+SHADOW_DEF_MULT  = 0.8333333134651184
 
 
 @dataclass

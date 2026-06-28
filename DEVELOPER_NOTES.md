@@ -66,7 +66,7 @@ typo class we're auditing for.) Results:
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->1112<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->1114<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
@@ -89,13 +89,13 @@ note: the 3 original 2026-04-06 failures were all Mienfoo vs Medicham
 - **selfBuffing/selfDebuffing flags**: Match PvPoke's chance thresholds
   (==1 for selfBuffing, >=0.5 for selfDebuffing)
 - **Shield policy**: pvpoke_simulate_shield uses precomputed flags
-- **Shadow Pokemon**: ×1.2 atk / ×0.83333331 def multipliers match PvPoke's
-  SHADOW_ATK=1.2, SHADOW_DEF=0.83333331 (DamageCalculator.js:9). Our atk uses
-  `6/5` (bit-identical to PvPoke's `1.2`); our def uses the literal `0.83333331`,
-  NOT `5/6` — `5/6` (float64 0.8333333333) is ~2.8e-8 larger than the oracle
-  and deals ~1 less damage to shadow defenders at floor() breakpoint boundaries
-  (the deliverable). Fixed 2026-06-27; was previously `5/6`, only ever checked
-  against the non-boundary Shadow Swampert vs Registeel 9/9, which masked it.
+- **Shadow Pokemon**: x1.2 atk / x0.8333333134651184 def. Atk uses `6/5`
+  (bit-identical to the game's and PvPoke's `1.2`). Def uses `float32(5/6) =
+  0.8333333134651184` -- the GAME's value (it stores/computes this in float32),
+  NOT `5/6` and NOT PvPoke's `0.83333331`. See "Engine constant sourcing" below
+  for why. Fixed 2026-06-27 (was `5/6`, which deals ~1 less damage to shadow
+  defenders at floor() boundaries; hidden because the only shadow oracle fixture,
+  Shadow Swampert vs Registeel 9/9, sits off-boundary).
 - **Both-side buffs**: Corviknight mirror (Air Cutter only) 9/9. Both mons'
   buffApplyMeter fires independently; unbuffed Air Cutter does 18, buffed does 23.
 
@@ -310,6 +310,46 @@ code (inline edits remain fine for pure JS/CSS tweaks in built
 files). Blobs are ~1MB for smokes, ~10MB for website-scale dives,
 and accumulate in userdata/replay/ (gitignored, never published);
 delete old ones freely.
+
+## Engine constant sourcing (the game is ground truth; PvPoke is the oracle)
+
+Damage-relevant magic numbers come in two tiers, and **when they conflict we
+match the game, not PvPoke**:
+
+- **Primary source = the game.** PoGo computes damage in single precision
+  (float32) and stores its constants (Niantic's GAME_MASTER) as float32. So the
+  correct value of such a constant is `float32(<the true ratio>)`, used as a
+  float64 literal in our otherwise-float64 arithmetic. This is the rule the #2
+  fix established for STAB/BONUS/SUPER_EFFECTIVE (`moves.py`) and that
+  `SHADOW_DEF_MULT` now follows (`pokemon.py`). Note float32's ULP near 0.83 is
+  ~6e-8, so every plausible decimal Niantic could type near 5/6 collapses to the
+  same float32(5/6) = 0.8333333134651184 -- we don't even need the exact typed
+  literal to know the runtime value.
+- **Oracle = PvPoke** (`pvpoke_trace.js` / `audit_oracle_harness.py`). PvPoke
+  usually uses the same float32 values, so game == oracle and there is no
+  conflict. But PvPoke is hand-maintained and occasionally imprecise:
+  `DamageCalculator.js` writes `BONUS` as the full float32 expansion
+  (1.2999999523..., correct) but `SHADOW_DEF` as a truncated decimal
+  `0.83333331` -- a float64 that *no* float32 produces, ~3.5e-9 below the true
+  float32(5/6). We use the game value; PvPoke is ~3.5e-9 low here. That diff is
+  ~10x smaller than the old `5/6` bug and flips ~0 cells, but it is a deliberate,
+  documented game-over-oracle choice (so a stray shadow-defender oracle cell, if
+  one ever lands on that knife-edge, is expected, not a regression).
+
+Where the constants live (single source of truth per language):
+
+- **Python:** `gopvpsim.moves` (STAB_MULTIPLIER / BONUS / SUPER_EFFECTIVE) and
+  `gopvpsim.pokemon` (SHADOW_ATK_BONUS / SHADOW_DEF_MULT). Every Python consumer
+  imports the named constant -- no second copy.
+- **JS:** the shipped dive / user-collection engines RECEIVE these from Python
+  via injection (`deep_dive.py` -> `DATA.collection` -> `opts`), so Python is
+  canonical even for the browser. `deep_dive_user_collection.js` keeps a fallback
+  default that production always overrides; `tests/test_js_shadow_constants.py`
+  asserts that fallback still equals the Python constant so it cannot silently
+  drift. (It did: the JS `SHADOW_DEF_MULT` sat at the wrong `5/6` until
+  2026-06-27 because nothing in production ever read the default.) The JS port
+  does NOT compute raw damage, so the float32 damage constants are not duplicated
+  there -- only the shadow multipliers are.
 
 ## PvPoke bugs found
 

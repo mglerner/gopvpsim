@@ -196,8 +196,15 @@
 
   var CPM = null;             // {level(float) → multiplier(float)}
   var SORTED_LEVELS = null;   // sorted list of levels present in CPM
-  var SHADOW_ATK_BONUS = 6 / 5;
-  var SHADOW_DEF_MULT  = 5 / 6;
+  // Shadow multipliers. CANONICAL SOURCE: gopvpsim.pokemon (Python). Production
+  // ALWAYS overrides these via opts (deep_dive.py injects DATA.collection.shadow*
+  // -> setConstants), so they are fallback defaults only -- but they MUST stay
+  // equal to the Python constants; tests/test_js_shadow_constants.py enforces it.
+  // (SHADOW_DEF_MULT silently sat at the wrong 5/6 until 2026-06-27 because nothing
+  // in production ever read this default.) See DEVELOPER_NOTES "Engine constant
+  // sourcing": the def value is float32(5/6), the GAME's value, not PvPoke's 0.83333331.
+  var SHADOW_ATK_BONUS = 6 / 5;               // x1.2 (game; bit-identical to PvPoke 1.2)
+  var SHADOW_DEF_MULT  = 0.8333333134651184;  // float32(5/6); NOT 5/6, NOT PvPoke's 0.83333331
 
   function setConstants(opts) {
     if (!opts || !opts.cpm) {
