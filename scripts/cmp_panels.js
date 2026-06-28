@@ -174,9 +174,10 @@ function cmpMarginPanel(live, grids, energyCtx) {
       // close *wins* -- a loss is always red regardless of how close.
       // (Metric is clamped to +-100% by cmpHp, so the bar never overflows.)
       var barCls = 'cmp-bar' + (f.win ? (lo ? ' lo' : '') : ' loss');
+      var hpNum = (pct === 0) ? '&lt;1' : pct;   // thin margin never reads as 0
       h += '<td><span class="' + barCls + '"><span style="width:' +
            Math.min(100, pct) + '%"></span></span><span class="cmp-hpv">' +
-           (f.win ? '+' : '−') + pct + '%</span>' + enHtml + '</td>';
+           (f.win ? '+' : '−') + hpNum + '% HP</span>' + enHtml + '</td>';
     });
     h += '</tr>';
   });
