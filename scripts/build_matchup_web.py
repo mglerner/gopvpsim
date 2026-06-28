@@ -471,6 +471,11 @@ def main():
     parser.add_argument('--limit', type=int, default=None,
                         help='only use the first N resolvable pool entries '
                              '(quick correctness/timing check)')
+    parser.add_argument('--allow-skipped', action='store_true',
+                        help='ship a partial matrix even if some pool entries '
+                             'failed to resolve (default: hard-fail so a silent '
+                             'pool-resolution regression cannot ship a partial '
+                             'matrix with exit 0)')
     args = parser.parse_args()
 
     entries, skipped = load_pool(args.pool, limit=args.limit)
@@ -483,6 +488,17 @@ def main():
     if len(entries) < 2:
         print('Need at least 2 resolvable species; aborting.',
               file=sys.stderr)
+        return 1
+    # Completeness guard: a curated pool should resolve in full. Any skip on a
+    # non-limited run is a silent-incompleteness regression (the UL Cradily/
+    # Golisopod GL-clone-slug class), so HARD-FAIL rather than ship a partial
+    # matrix with exit 0. --limit intentionally truncates; --allow-skipped
+    # overrides. (Lens-grid resource/silent-incompleteness guard, baked in.)
+    if skipped and args.limit is None and not args.allow_skipped:
+        print(f'ABORT: {len(skipped)} pool entr'
+              f'{"y" if len(skipped) == 1 else "ies"} failed to resolve '
+              f'(partial matrix would silently ship). Fix the pool or pass '
+              f'--allow-skipped to override.', file=sys.stderr)
         return 1
 
     scores, n_sims, elapsed = run_matrix(entries)
