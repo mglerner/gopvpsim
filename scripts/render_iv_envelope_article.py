@@ -376,8 +376,15 @@ IV_CHECK_JS = r"""
     return '<td><span class="cmp-celltext">' + txt + '</span>' + cmpBarHtml(score) + enHtml + '</td>';
   }
   function renderAllView(ok, showBB){
-    if (typeof CMP_READY === 'undefined' || !CMP_READY)
+    if (typeof CMP_READY === 'undefined' || !CMP_READY){
+      // Distinguish "grids still decoding" from "this guide has no grids at all"
+      // (older/pre-grid JSON) -- the latter would otherwise spin forever now
+      // that "All cases" is the default Case.
+      if (!document.getElementById('cmp-data'))
+        return '<p class="sub">The &#8220;All cases&#8221; view needs the cross-case '
+          + 'score grids, which this guide does not include. Pick a specific Case above.</p>';
       return '<p class="sub">Computing all cases (decoding score grids)...</p>';
+    }
     var live = ok.map(function(c){
       var iv = CMP_IDX[c.key]; if (iv == null) return null;
       var p = c.key.split('/');
@@ -880,10 +887,13 @@ def style():
   .cmp-scroll-wrap.at-bottom::after { opacity:0; }
   .cmp-scroll { max-height:62vh; overflow-y:auto; border:1px solid var(--border-2);
                 border-radius:2px; }
-  .cmp-scroll thead th { position:sticky; top:0; z-index:1; background:var(--surface-2); }
+  .cmp-scroll thead th { position:sticky; top:0; z-index:2; background:var(--surface-2); }
   .cmp-case { color:var(--text-muted); }
   .cmp-celltext { display:block; margin-bottom:3px; }
-  .tier-row td { position:sticky; top:1.9em; z-index:1; background:var(--callout-bg);
+  /* tier divider pins just below the column header. top is in EM of the td's
+     own .74em font, so the header height (~28px ~= 2.75 of those em) maps to
+     ~2.75em; the header's higher z-index covers any sub-px overlap cleanly. */
+  .tier-row td { position:sticky; top:2.75em; z-index:1; background:var(--callout-bg);
                  color:var(--callout-strong); font-weight:700; font-size:.74em;
                  text-transform:uppercase; letter-spacing:.05em; padding:4px 9px; }
   @media (max-width:820px) {
