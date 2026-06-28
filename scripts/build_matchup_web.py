@@ -78,8 +78,11 @@ def load_pool(pool_path, limit=None):
                 charged_ids = (list(charged_ov) if charged_ov is not None
                                else list(d_charged))
                 # Same IV resolution as the dive opponent side's default
-                # ('pvpoke') mode: gamemaster defaultIVs, shadow-agnostic.
-                _lv, a_iv, d_iv, s_iv = pvpoke_default_ivs(base, league=LEAGUE)
+                # ('pvpoke') mode: gamemaster defaultIVs, shadow-aware (a shadow
+                # opponent uses its OWN PvPoke default IVs, which differ from the
+                # base for ~37 species).
+                _lv, a_iv, d_iv, s_iv = pvpoke_default_ivs(
+                    base, league=LEAGUE, shadow=is_shadow)
             except (KeyError, ValueError) as exc:
                 skipped.append((display, str(exc)))
                 continue

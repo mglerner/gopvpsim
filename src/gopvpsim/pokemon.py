@@ -346,7 +346,7 @@ def iv_rank(species_name: str, *, league: str = 'great', max_level: float = None
 
 
 def pvpoke_default_ivs(species_name: str, league: str = 'great',
-                       level_cap: float = 50.0) -> tuple:
+                       level_cap: float = 50.0, shadow: bool = False) -> tuple:
     """
     Return (level, atk_iv, def_iv, sta_iv) using PvPoke's default IV selection.
 
@@ -354,6 +354,14 @@ def pvpoke_default_ivs(species_name: str, league: str = 'great',
     PvPoke does at runtime.  For league='master' always returns 15/15/15.
     For level_cap=40, uses the l40 variant when available (e.g. Medicham in
     Great League).
+
+    ``shadow=True`` resolves the ``'<name> (Shadow)'`` gamemaster entry: shadow
+    species carry their OWN defaultIVs (the shadow stat multipliers shift which
+    CP-cap-fitting spread maximizes stat product), and they genuinely differ
+    from the base for ~37 species. Falls back to the base entry if the
+    gamemaster has no shadow entry / no shadow defaultIVs block. (You may also
+    pass an already-' (Shadow)'-suffixed name with shadow=False -- both resolve
+    the shadow entry.)
 
     league: 'little' (500 CP), 'great' (1500), 'ultra' (2500), 'master' (10000)
     """
@@ -364,13 +372,23 @@ def pvpoke_default_ivs(species_name: str, league: str = 'great',
     if cap == 10000:
         return (level_cap, 15, 15, 15)
 
-    entry = get_pokemon_entry(species_name)
-    default_ivs = entry.get('defaultIVs', {})
     key = f'cp{cap}'
 
-    combo = default_ivs.get(f'{key}l40') if level_cap == 40 else None
-    if combo is None:
-        combo = default_ivs.get(key)
+    def _combo_for(name):
+        try:
+            div = get_pokemon_entry(name).get('defaultIVs', {})
+        except KeyError:
+            return None
+        c = div.get(f'{key}l40') if level_cap == 40 else None
+        return c if c is not None else div.get(key)
+
+    name = species_name
+    if shadow and not species_name.rstrip().endswith('(Shadow)'):
+        name = f'{species_name} (Shadow)'
+    combo = _combo_for(name)
+    if combo is None and name != species_name:
+        # No shadow entry / no shadow defaultIVs -> fall back to the base.
+        combo = _combo_for(species_name)
     if combo is None:
         raise ValueError(
             f"No defaultIVs[{key!r}] for {species_name!r} in the gamemaster."
