@@ -234,7 +234,8 @@ def _flip_html(fd, has_bait, link_opps):
         from deep_dive_rendering import prose_flip_summary
         prose = prose_flip_summary(fd, max_gains=2, max_losses=1,
                                    has_bait_axis=has_bait,
-                                   name_html=_name_html(link_opps))
+                                   name_html=_name_html(link_opps),
+                                   expandable=True, id_prefix='fcard')
         if not prose or prose == 'no matchup flips':
             return prose
         # The flip is measured against the stat-product #1 (reference) IV; label
@@ -279,14 +280,9 @@ CARD_CSS = """
 .ddcard-spread .cover { font-size:0.74rem; color:var(--energy); margin-top:4px; }
 .ddcard-spread .cover b { color:var(--text); font-weight:700; }
 .ddcard-spread .cover .cover-count { color:var(--text); font-weight:700; }
-.cover-toggle { position:absolute; opacity:0; width:0; height:0; }
-.cover-rest { display:none; }
-.cover-toggle:checked ~ .cover-rest { display:inline; }
-.cover-more { color:var(--accent); cursor:pointer; white-space:nowrap;
-  text-decoration:underline; text-decoration-style:dotted; }
-.cover-more .cm-hide { display:none; }
-.cover-toggle:checked ~ .cover-more .cm-show { display:none; }
-.cover-toggle:checked ~ .cover-more .cm-hide { display:inline; }
+/* The .cover-toggle/.cover-rest/.cover-more rules live in deep_dive_rendering.
+   COVER_TOGGLE_CSS (page-global on the dive page; added to the standalone style
+   below) so they appear exactly once per page. */
 .ddcard-oplink { color:inherit; text-decoration:underline;
   text-decoration-style:dotted; text-decoration-color:var(--accent); }
 .ddcard-oplink:hover { text-decoration-style:solid; }
@@ -403,7 +399,11 @@ def _two_ones_html(t: dict | None) -> str:
     pick = ''
     if gu:
         n = t.get('gives_up_n') or len(gu)
-        more = f' (+{n - len(gu)} more)' if n > len(gu) else ''
+        # Only the top-3 names are carried in the card data (deep_dive truncates
+        # gives_up to [:3]); the remainder items are not available here, so this
+        # cannot become a real expand toggle. Word it "(and N more)" so it does
+        # not mimic the clickable "+N more" toggles used elsewhere.
+        more = f' (and {n - len(gu)} more)' if n > len(gu) else ''
         pick = ', picking up ' + ', '.join(html.escape(o) for o in gu) + more
     if t.get('sp_wins_more'):
         body = (f'The <span class="iv">{sp}</span> (#1 stat product) wins more '
@@ -438,11 +438,8 @@ def _bar_opp_list(opps, link_opps):
     _toggle_seq += 1
     cid = f'sb{_toggle_seq}'
     tail = ', '.join(_nm(o) for o in rest)
-    return (f'{head}<input type="checkbox" class="cover-toggle" id="{cid}">'
-            f'<span class="cover-rest">, {tail}</span>'
-            f'<label class="cover-more" for="{cid}">'
-            f'<span class="cm-show"> +{len(rest)} more</span>'
-            f'<span class="cm-hide"> less</span></label>')
+    from deep_dive_rendering import cover_toggle_html
+    return cover_toggle_html(head, f', {tail}', len(rest), cid)
 
 
 def _sibling_trade_html(trade: dict | None, shadow=False, link_opps=False) -> str:
@@ -562,14 +559,8 @@ def _cover_html(s: Spread, link_opps=False, base_form_display=None,
         _toggle_seq += 1
         cid = f'cm{_toggle_seq}'
         tail = ', '.join(_nm(o) for o in rest)
-        # Checkbox-hack toggle: works with no page JS, in both the embedded and
-        # standalone card variants. Collapsed by default; the label shows
-        # "+N more" collapsed and "less" expanded (CSS swaps the two spans).
-        return (f'{head}<input type="checkbox" class="cover-toggle" id="{cid}">'
-                f'<span class="cover-rest">, {tail}</span>'
-                f'<label class="cover-more" for="{cid}">'
-                f'<span class="cm-show"> +{len(rest)} more</span>'
-                f'<span class="cm-hide"> less</span></label>')
+        from deep_dive_rendering import cover_toggle_html
+        return cover_toggle_html(head, f', {tail}', len(rest), cid)
 
     def _headline(n, label):
         return (f'<span class="cover-count">{n} guaranteed {label}'
@@ -675,6 +666,9 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
 
     if not standalone:
         return section
+    # The cover-toggle CSS is page-global on the full dive page (DEEP_DIVE_CSS);
+    # the standalone card carries no DEEP_DIVE_CSS, so add the shared rules here.
+    from deep_dive_rendering import COVER_TOGGLE_CSS
     return f"""<!DOCTYPE html>
 <html lang="en" {data_theme_attr()}><head><meta charset="utf-8">
 {theme_head_script()}
@@ -682,5 +676,5 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
 <title>{name} - dive card</title>
 <style>{theme_css()}body{{background:var(--bg);margin:0;padding:18px;}}
 .ddcard{{max-width:760px;margin:0 auto;}}
-{CARD_CSS}</style></head>
+{CARD_CSS}{COVER_TOGGLE_CSS}</style></head>
 <body>{theme_picker_html()}{section}</body></html>"""
