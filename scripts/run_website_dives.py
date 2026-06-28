@@ -96,7 +96,11 @@ DIVES = [
         'slug': 'tinkaton-great-league',
         'html_base': 'index.html',
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
-        'reference': 'FAIRY_WIND,BULLDOZE,PLAY_ROUGH',
+        # No 'reference' override: track get_default_moveset (FAIRY_WIND /
+        # GIGATON_HAMMER, BULLDOZE) like the UL dive does, so the dive can't
+        # go stale again. The old 'FAIRY_WIND,BULLDOZE,PLAY_ROUGH' pin was a
+        # pre-CD leftover -- Gigaton Hammer (Tinkaton's CD/Elite-TM signature,
+        # an eliteMoves entry) is now PvPoke's default and the stronger build.
     },
     # Fearow GL -- added 2026-06-26 as a launch dive (a one/two-turn fast-move
     # pick suggested by an HSH Discord member; common in GL, no debuff/boost/
