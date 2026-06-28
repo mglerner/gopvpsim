@@ -97,6 +97,42 @@ the commits below. Remaining open items kept at the bottom.**
   constant would have prevented the session-3 incomplete-unification entirely.
   Deferred (broad, cross-language touch); flagged as the real DRY root-cause.
 
+### Session-4 adversarial round-2 (2026-06-27 PM, fresh-eyes finder fleet)
+
+Three independent adversarial finders run over the under-covered grid cells
+(each self-refuting). Results:
+
+- **[CLEAN] L2 cache-key completeness.** Audited every key in
+  `sweep_cache`/`slayer_cache`/`cache_base`/ML path. ALL complete -- every
+  result-affecting input is in the key, the per-column engine stamp, the
+  `required_planes` gate, or the `mechanics != 'legacy'` cache disable (verified
+  wired + un-bypassable). Bug #4 (slayer focal-level-cap) confirmed fixed.
+  No findings (high confidence).
+- **[CLEAN, doc-only fixes landed] L1 cmp_atk migration.** The shadow-strip
+  CMP migration is COMPLETE in code (all 13 order-deciding sites use
+  `cmp_atk`; the 6 remaining `.atk` are damage/stat/construction). Landed: two
+  stale comments that predated the fix (`deep_dive_signature.py` docstring,
+  `_dp_jit.py` param comments) corrected to `cmp_atk`.
+- **[FIXED] L3 orchestration F1** -- `build_website_index.py` could drop a
+  rendered page (unreachable from nav) and exit 0. Now hard-fails on a dropped
+  page-with-index.html (`--allow-skipped` override); the chain runs it
+  un-overridden. Also dropped the stale `40 dives`/`Twenty`/`36+4` literals in
+  `overnight_redive.sh`.
+
+**Still open from round-2 (orchestration, LOW-MED -- for Michael):**
+- **F2 [low-med]** split-moveset page absence is undetectable by
+  `verify_overnight.py` check [2] (it asserts present-file *freshness*, never a
+  *missing* file). A dive that writes `index.html` but is short a `index_m*.html`
+  split page ships unnoticed. Proposed: in check [2], cross-check each fresh
+  dive dir's `index_m*.html` count against the `top_movesets` declared for that
+  slug in `run_website_dives.DIVES` (import it DRY, the way check [5] imports
+  `run_iv_guides`). Not done: it depends on `deep_dive.py`'s own split-write
+  hard-fail behavior, which I didn't audit (L5, out of the finder's scope).
+- **F3 [low]** narrative auto-gen patch is WARN-not-FAIL + unverified
+  (`run_website_dives.py` ~624). Low severity -- empty narrative blocks are an
+  accepted ship state (human fills them) -- but it's the same WARN-not-FAIL
+  shape. Optional: surface the WARN in a form `verify_overnight` scans.
+
 ### Pre-redive adversarial assessment batch (2026-06-27 PM, session 2)
 
 An ultracode adversarial assessment (8 fresh-eyes finders over the engine +
