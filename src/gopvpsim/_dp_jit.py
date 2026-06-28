@@ -423,8 +423,8 @@ def _make_ttl_jit():
         opp_fast_energy,    # int
         opp_fast_turns,     # int
         atk_fast_turns,     # int
-        wins_cmp,           # bool — attacker.atk >= defender.atk
-        cmp_bonus,          # bool — attacker.atk > defender.atk and
+        wins_cmp,           # bool — attacker.cmp_atk >= defender.cmp_atk
+        cmp_bonus,          # bool — attacker.cmp_atk > defender.cmp_atk and
                             #        opp_fast_cd % atk_fast_cd == 0
         d_cm_dmgs,          # int64[:] — defender charged damage (natural order)
         d_cm_energy,        # int64[:]
