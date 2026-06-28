@@ -2295,7 +2295,7 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
         f'<li><strong>{default_name} Win Rate</strong> / '
         f'<strong>{cd_name} Win Rate</strong>: fraction of simulated '
         f'matchups against that opponent that {species_name} wins '
-        f'(battle rating &ge; 500). What varies per cell: all 4096 '
+        f'(battle rating &gt; 500; 500 = tie). What varies per cell: all 4096 '
         f'{species_name} IV spreads &times; all 9 shield scenarios (0-0, '
         f'0-1, 0-2, 1-0, 1-1, 1-2, 2-0, 2-1, 2-2) = 36,864 simulations. '
         f'The opponent\'s IV spread is held fixed at <em>PvPoke\'s '

@@ -76,7 +76,7 @@ from gopvpsim.data import (
 )
 from gopvpsim.battle import (
     BattlePokemon, simulate,
-    pvpoke_dp, pvpoke_simulate_shield, ENERGY_CAP,
+    pvpoke_dp, pvpoke_simulate_shield, ENERGY_CAP, WIN_RATING,
 )
 from gopvpsim.formchange import attach_form_change
 from gopvpsim.thresholds import (
@@ -415,7 +415,7 @@ def build_iv_categories(data_obj, slayer_categories=None,
         m_scenarios = matchup_data.get('scenarios') or []
         m_opponents = matchup_data.get('opponents') or []
         opp_iv_mode = matchup_data.get('opp_iv_mode', 'pvpoke')
-        win_threshold = matchup_data.get('win_threshold', 500)
+        win_threshold = matchup_data.get('win_threshold', WIN_RATING)
         opp_iv_label = ('PvPoke default'
                         if parse_mode(opp_iv_mode)[0] == 'pvpoke' else 'rank 1')
         if (scores_flat and nS and nO
@@ -430,7 +430,7 @@ def build_iv_categories(data_obj, slayer_categories=None,
                     member_meta: dict = {}
                     for iv in range(n_ivs):
                         score = scores_flat[iv * nS * nO + si * nO + oi]
-                        if score >= win_threshold:
+                        if score > win_threshold:  # 500 = tie, not a win
                             members.append(iv)
                             member_meta[iv] = {
                                 'iv': (iv_a[iv], iv_d[iv], iv_s[iv])

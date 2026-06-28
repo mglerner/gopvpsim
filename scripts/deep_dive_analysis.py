@@ -10,6 +10,7 @@ import re
 import numpy as np
 
 from gopvpsim.moves import BONUS, STAB_MULTIPLIER, type_effectiveness
+from gopvpsim.battle import WIN_RATING
 
 
 # Module-level caches for numpy conversions of per-dive IV/score arrays.
@@ -279,7 +280,7 @@ def narrate_flip(focal_atk, focal_def, focal_hp, ref_atk, ref_def, ref_hp,
 
 def aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
                                resolved_anchors, data_obj, scenarios, opponents,
-                               win_threshold=500,
+                               win_threshold=WIN_RATING,
                                pass_winrate_min=0.75, fail_winrate_max=0.25,
                                debug_stats=None):
     """Find shield scenarios in which a named anchor cleanly partitions
@@ -350,7 +351,7 @@ def aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
             stats['trivial_partition'] += 1
             continue
 
-        wins_for_opp = scores_np[:, :, oi] >= win_threshold  # (nIvs, nS)
+        wins_for_opp = scores_np[:, :, oi] > win_threshold  # (nIvs, nS); 500 = tie
         pw = wins_for_opp[passing_mask].sum(axis=0) / n_pass
         fw = wins_for_opp[~passing_mask].sum(axis=0) / n_fail
         clean = (pw >= pass_winrate_min) & (fw <= fail_winrate_max)
@@ -424,7 +425,7 @@ def aggregate_flips_by_anchor(scores_flat, nIvs, nS, nO,
 def find_matchup_boundaries(scores_flat, nIvs, nS, nO,
                              data_obj, scenarios, opponents,
                              sweep_stat='def',
-                             win_threshold=500,
+                             win_threshold=WIN_RATING,
                              pass_winrate_min=0.75, fail_winrate_max=0.25,
                              min_passing=3):
     """Find the matchup-flipping stat boundary per opponent.
@@ -481,7 +482,7 @@ def find_matchup_boundaries(scores_flat, nIvs, nS, nO,
 
     stat_np  = np.asarray(stat_vals, dtype=np.float64)
     scores3d = np.asarray(scores_flat, dtype=np.float64).reshape(nIvs, nS, nO)
-    wins_all = scores3d >= win_threshold
+    wins_all = scores3d > win_threshold  # 500 = tie, not a win
 
     # Stat-sorted order: "stat >= uniq[k]" is the suffix starting at
     # first_idx[k]. Map float64 values back to the original Python
@@ -863,7 +864,7 @@ def synthesize_mirror_tier(
     species, scores_flat, nIvs, nS, nO,
     data_obj, scenarios, opponents,
     resolved_anchors, existing_tiers,
-    *, min_clean_scenarios=None, win_threshold=500,
+    *, min_clean_scenarios=None, win_threshold=WIN_RATING,
     focal_shadow=False,
 ):
     """Synthesize a "Species Mirror Bulk" or "Species Mirror Atk" tier
@@ -1053,7 +1054,7 @@ def synthesize_mirror_tier(
             passing_mask = stat_vals >= threshold
         passing_indices = np.where(passing_mask)[0]
         # Per-IV winning scenario count vs the mirror.
-        per_iv_wins = (mirror_scores[passing_indices] >= win_threshold).sum(axis=1)
+        per_iv_wins = (mirror_scores[passing_indices] > win_threshold).sum(axis=1)  # 500 = tie
         good_iv_mask = per_iv_wins >= min_clean_scenarios
         if good_iv_mask.any():
             good_hp = iv_hp_np[passing_indices[good_iv_mask]]
