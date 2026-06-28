@@ -138,6 +138,48 @@ Three independent adversarial finders run over the under-covered grid cells
   accepted ship state (human fills them) -- but it's the same WARN-not-FAIL
   shape. Optional: surface the WARN in a form `verify_overnight` scans.
 
+### Session-4 round-3: all-Opus adversarial DRY audit (2026-06-27 PM)
+
+A Workflow (5 finders + 2 refute-by-default skeptics PER finding, every agent
+`model: 'opus'`) over the DRY angles. 17 findings -> 3 live-bugs + 9
+drift-hazards (all skeptic-verified). All 3 live-bugs were the SAME issue and
+are FIXED:
+
+- **[LIVE-BUG, FIXED `bfde6ab`] win/tie boundary `>= win_threshold` survivors.**
+  My OWN `ddb996a` "finish unifying win-classification" commit was incomplete --
+  I grepped the literal `>= 500` and missed six per-cell sites written as
+  `>= win_threshold` (variable, default 500): `deep_dive_rendering._og_win` +
+  bait-diff masks, `deep_dive_analysis` aggregate_flips/find_matchup_boundaries/
+  synthesize_mirror_tier per-IV count, `deep_dive.py` "Beats {opp}". They
+  counted an exact-500 TIE as a win (esp. mirror diagonals). Root-caused to DRY:
+  the boundary lived as a bare literal AND a param, operator hand-copied ~20x.
+  Fixed via single source `battle.WIN_RATING` + `is_win()`, the 6 operator
+  flips, 4 prose strings, and `tests/test_win_boundary.py` (tokenize scan that
+  FAILS on any new `>= win_threshold`). Cohort-MEAN gate left as the one
+  documented `>=`. Render-path only; rides the cold bake.
+
+DRY consolidations also landed this session: opponent-slug -> canonical
+`opp_slug` (`d70bd89`, latent), `ENERGY_CAP` + oracle `LEAGUE_CP` -> canonical
+(`c90a3fd`).
+
+The 9 drift-hazards are all confirmed **currently-consistent (NOT live bugs)**;
+left deliberately, with rationale:
+
+- `LEAGUE_CAPS` vs `LEAGUE_CP` (the `little` split) -- INTENTIONAL: `LEAGUE_CAPS`
+  doubles as the supported-analysis-league set (`choices=list(LEAGUE_CAPS)`); a
+  `little` input fails LOUD (KeyError), not silently. Optional: a 2-line comment
+  at both defs documenting the split. (Would bump engine hash -- pokemon.py.)
+- 9-scenario `SHIELDS`/even-shield literals open-coded at ~14 sites -- consistent;
+  **skeptics explicitly warn DO NOT consolidate before the bake** (engine-hash
+  bump for zero correctness gain). Post-bake cleanup only.
+- score-key `{mi}_{mode}@51` (Python<->JS) -- consistent, loud failure mode,
+  render-only; optional parity test (belt-and-suspenders), not a bug.
+- `engine.js loadCollection` vs `match_mons` -- INTENTIONAL (two consumers: filter
+  -for-export vs show-all-and-flag; shared stat kernel IS verified). Optional:
+  document at engine.js:643.
+- JS shadow mults -- already guarded by `test_js_shadow_constants.py`; the
+  positive-contrast template. No action.
+
 ### Pre-redive adversarial assessment batch (2026-06-27 PM, session 2)
 
 An ultracode adversarial assessment (8 fresh-eyes finders over the engine +
