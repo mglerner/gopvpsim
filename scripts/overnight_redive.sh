@@ -11,9 +11,11 @@
 #
 # 2026-06-25 changes: the Oinkologne CD article + Male-vs-Female comparison
 # steps were removed (both pages archived/deleted from the site -- see
-# TODO.md); the ML IV-guide bake was added as a (long, ~7h cold) tail step;
-# the dives + guides run with all cores (--reserve-cpus 0 / --reserve 0) for
-# the unattended overnight window.
+# TODO.md); the ML IV-guide bake was added as a (long, ~7h cold) tail step.
+# Concurrency (2026-06-27): dives run all-cores serially (--reserve-cpus 0);
+# ML guides run ONE-AT-A-TIME, each fanning across all cores (--jobs 1) --
+# since the cache-rework one guide already saturates the cores, so the old
+# --reserve 0 / N-concurrent-guides model oversubscribed. See run_iv_guides.py.
 #
 # Usage:
 #   nohup scripts/overnight_redive.sh &
@@ -185,5 +187,15 @@ step "Rebuilding website index" \
 step "Running article link verification" \
     python scripts/verify_article_links.py --ship
 
-log "=== overnight chain SUCCESS ==="
-status "SUCCESS overnight chain complete"
+# Surface the ML best-effort tail step in the final status. The chain itself
+# completed (dives + index + verify all passed), so this stays a SUCCESS line,
+# but a partial/failed ML bake must be visible to a human glancing at
+# overnight_status.txt -- and verify_overnight.py check [5] is the authoritative
+# gate that goes red on it.
+if [[ ${ml_rc:-0} -ne 0 ]]; then
+    log "=== overnight chain SUCCESS (dives OK; ML guides had FAILURES -- run verify_overnight.py) ==="
+    status "SUCCESS overnight chain complete -- WARNING ML guides FAILED (run verify_overnight.py)"
+else
+    log "=== overnight chain SUCCESS ==="
+    status "SUCCESS overnight chain complete"
+fi

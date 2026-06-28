@@ -19,6 +19,12 @@ the 2026-06-12 morning where they were done by hand):
    opponent list (proof the intended opponent pool actually loaded).
 4. ship gates — verify_article_links --ship and
    verify_no_unicode_dashes --ship, run as subprocesses.
+5. ML IV guides — every species in the ML pool (run_iv_guides'
+   master_top60) must have a fresh _iv_envelope_all9.json, and the
+   chain log must carry no "[WARN] ML IV guides" line. The ML bake is a
+   best-effort tail step (WARN-not-FAIL by design so one bad guide can't
+   abort index+verify), so without this check a partial/OOM-killed ML
+   bake would pass the chain-status SUCCESS line silently.
 
 Exit 0 when everything is green; 1 otherwise, with a labeled report.
 The judgment work (archive diffs, browser spot-checks, publish notes)
@@ -91,7 +97,7 @@ def main() -> int:
           f'| cutoff {since:%Y-%m-%d %H:%M}\n')
 
     # 1. Chain status -------------------------------------------------
-    print('[1/4] chain status')
+    print('[1/5] chain status')
     if STATUS_FILE.exists():
         last = STATUS_FILE.read_text().strip().splitlines()[-1]
         ok = 'SUCCESS' in last
@@ -111,7 +117,7 @@ def main() -> int:
             print('  OK  no [FAIL] step lines')
 
     # 2. Freshness ----------------------------------------------------
-    print('[2/4] dive-dir freshness')
+    print('[2/5] dive-dir freshness')
     fresh_dirs: list[Path] = []
     skipped = 0
     for d in sorted(WEBSITE.glob('*-league')):
@@ -133,7 +139,7 @@ def main() -> int:
           f'{skipped} not in this chain')
 
     # 3. Pool sanity --------------------------------------------------
-    print('[3/4] pool sanity (markers: ' + ', '.join(args.markers) + ')')
+    print('[3/5] pool sanity (markers: ' + ', '.join(args.markers) + ')')
     counts: dict[str, int] = {}
     for d in fresh_dirs:
         opps = extract_opponents(d / 'index.html')
@@ -156,7 +162,7 @@ def main() -> int:
               f'  OK  all {len(counts)} fresh dives: {lo} opponents')
 
     # 4. Ship gates ---------------------------------------------------
-    print('[4/4] ship gates')
+    print('[4/5] ship gates')
     for gate in ('verify_article_links.py', 'verify_no_unicode_dashes.py'):
         r = subprocess.run(
             [sys.executable, str(REPO / 'scripts' / gate), '--ship'],
@@ -166,6 +172,44 @@ def main() -> int:
         print(f'  {verdict} {gate}: {tail[0] if tail else "(no output)"}')
         if r.returncode != 0:
             errors.append(f'{gate} failed (rc={r.returncode})')
+
+    # 5. ML IV guides -------------------------------------------------
+    # The ML bake is a best-effort tail step (run_iv_guides outside step(),
+    # WARN-not-FAIL), so neither the [FAIL] scan nor the SUCCESS status line
+    # catches a partial/OOM-killed ML run. Check the actual guide outputs
+    # against the pool, and surface the chain's own ML WARN line. Import
+    # run_iv_guides for the pool/slug logic (DRY -- single source).
+    print('[5/5] ML IV guides')
+    try:
+        import run_iv_guides as rig
+        ml_species = rig.read_pool(rig.DEFAULT_POOL)
+    except Exception as e:
+        ml_species = []
+        errors.append(f'ML guide pool unreadable: {e}')
+        print(f'  ERR cannot read ML pool: {e}')
+    if ml_species:
+        dives = REPO / 'userdata' / 'dives'
+        missing, stale = [], []
+        for sp in ml_species:
+            j = dives / f'{rig.json_slug(sp)}_iv_envelope_all9.json'
+            if not j.exists():
+                missing.append(sp)
+            elif j.stat().st_mtime < cutoff:
+                stale.append(sp)
+        if missing:
+            errors.append(f'ML guides never produced ({len(missing)}): {missing}')
+            print(f'  ERR {len(missing)} ML guide(s) missing: {missing}')
+        if stale:
+            errors.append(f'ML guides not refreshed this chain ({len(stale)}): {stale}')
+            print(f'  ERR {len(stale)} ML guide(s) stale: {stale}')
+        if not missing and not stale:
+            print(f'  OK  all {len(ml_species)} ML guides fresh')
+    if log_path:
+        ml_warn = [ln.strip() for ln in log_path.read_text().splitlines()
+                   if 'WARN] ML IV guides' in ln]
+        for ln in ml_warn:
+            errors.append(f'ML guide step warned: {ln}')
+            print(f'  ERR {ln}')
 
     # Verdict ----------------------------------------------------------
     print()
