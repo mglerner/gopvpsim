@@ -1,18 +1,24 @@
 #!/usr/bin/env python
 """Batch-generate XehrFelrose-style ML IV guides for a pool of species.
 
-Each guide is one ``iv_envelope_analysis.py --all-shields`` run (single-process,
-~one core, tens of minutes) followed by a fast ``render_iv_envelope_article.py``
-call. Because each dive uses exactly one core, several can run at once and still
-leave cores free: concurrency defaults to (physical cores - --reserve), honoring
-the project policy of keeping a CPU free for interactive work. This is the
-reserve-aware analogue of deep_dive.py's --reserve-cpus, lifted to the
-cross-species level (the analysis script itself has no internal worker pool).
+Each guide is one ``iv_envelope_analysis.py --all-shields`` run followed by a fast
+``render_iv_envelope_article.py`` call. Since the 2026-06-27 cache-rework the
+analysis runs on the shared ``deep_dive.iv_sweep`` engine, which fans a SINGLE
+guide across all cores (multiprocessing.Pool, min(cpu_count, 16) workers) -- just
+like a GL/UL dive. So the right pattern now is SERIAL guides, each using all cores
+(the default), exactly mirroring run_website_dives.py.
+
+History: pre-cache-rework each guide was single-process (~one core) with no
+internal worker pool, so this script ran several at once (physical cores -
+--reserve). That model now OVERSUBSCRIBES -- N concurrent guides x ~N workers each
+thrash a <=16-core machine. --jobs/--reserve still allow opting back into
+concurrency (useful only on >16-core hosts, where one guide caps at 16 workers and
+leaves cores idle); a warning fires when jobs > 1.
 
 Usage:
-  python scripts/run_iv_guides.py                       # whole master_top60 pool
+  python scripts/run_iv_guides.py                       # whole master_top60 pool (serial)
   python scripts/run_iv_guides.py --species "Metagross" "Kyogre"
-  python scripts/run_iv_guides.py --jobs 4 --reserve 1
+  python scripts/run_iv_guides.py --jobs 2              # opt into concurrency (>16-core hosts)
   python scripts/run_iv_guides.py --skip-existing       # skip already-built guides
 """
 import argparse
@@ -117,10 +123,14 @@ def main():
                     help='opponent-pool file listing the species (default: master_top60)')
     ap.add_argument('--species', nargs='*',
                     help='explicit species list (overrides --pool)')
-    ap.add_argument('--reserve', type=int, default=1,
-                    help='physical cores to leave free (default 1)')
+    ap.add_argument('--reserve', type=int, default=None,
+                    help='LEGACY pre-cache-rework concurrent model: run '
+                         '(cores - reserve) guides at once. Off by default; the '
+                         'default is now SERIAL (one guide, all cores).')
     ap.add_argument('--jobs', type=int, default=None,
-                    help='max concurrent dives (default: physical cores - reserve)')
+                    help='concurrent guides (default 1: serial, each guide fans '
+                         'across all cores via iv_sweep). >1 oversubscribes on '
+                         '<=16-core hosts -- only use on >16-core machines.')
     ap.add_argument('--skip-existing', action='store_true',
                     help='skip species whose article dir already exists')
     ap.add_argument('--no-index-refresh', action='store_true',
@@ -146,9 +156,24 @@ def main():
         species = kept
 
     cores = physical_cores()
-    jobs = a.jobs if a.jobs is not None else max(1, cores - a.reserve)
-    print(f'Detected {cores} physical cores; reserving {a.reserve}; '
-          f'running up to {jobs} concurrent dives.')
+    # Default SERIAL: since the cache-rework each guide already fans across all
+    # cores via iv_sweep, so the GL/UL pattern (one guide at a time, all cores)
+    # is correct. --jobs / --reserve opt back into the legacy concurrent model.
+    if a.jobs is not None:
+        jobs = max(1, a.jobs)
+    elif a.reserve is not None:
+        jobs = max(1, cores - a.reserve)
+    else:
+        jobs = 1
+    if jobs > 1:
+        print(f'WARNING: running {jobs} guides concurrently. Since the cache-rework '
+              f'each guide already fans across all cores (iv_sweep), so on this '
+              f'{cores}-core host that OVERSUBSCRIBES ({jobs}x ~{min(cores, 16)} '
+              f'workers). Use the default (serial) unless you have >16 cores.',
+              flush=True)
+    print(f'Detected {cores} physical cores; running {jobs} guide(s) '
+          f'{"serially" if jobs == 1 else "concurrently"} '
+          f'(each fans across all cores via iv_sweep).')
     print(f'{len(species)} species to generate.', flush=True)
     floor10 = [s for s in species if s in FLOOR_10_SPECIES]
     if floor10:

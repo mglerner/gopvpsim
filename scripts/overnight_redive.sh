@@ -147,22 +147,25 @@ step "Building Great League matchup web" \
     python scripts/build_matchup_web.py
 
 # 7b. Master-league ML IV guides (run_iv_guides.py, whole master_top60 pool).
-#     Independent ~7h COLD job (the fresh 2026-06-25 PvPoke pull changed the
-#     gamemaster hash, orphaning the won-set caches), sequenced AFTER the dives
-#     so the two never oversubscribe the cores. --reserve 0: all cores for the
-#     unattended window. --no-index-refresh: the chain's own index rebuild
-#     (Step 8, next) owns index.html, so the per-guide rebuilds don't race it.
+#     Independent COLD job (the float32 engine fix + fresh PvPoke pull orphaned
+#     the caches), sequenced AFTER the dives so the two never oversubscribe the
+#     cores. --jobs 1: SERIAL guides, each fanning across all cores via iv_sweep
+#     -- the GL/UL pattern. (Post-cache-rework one guide already saturates all
+#     cores, so the old --reserve 0 / N-concurrent-guides model oversubscribed
+#     ~Nx; see run_iv_guides.py docstring.) --no-index-refresh: the chain's own
+#     index rebuild (Step 8, next) owns index.html, so the per-guide rebuilds
+#     don't race it.
 #
 #     Run OUTSIDE step() ON PURPOSE: run_iv_guides.py exits 1 if ANY single
 #     guide fails (sys.exit at its tail), which through step()'s FATAL trap
 #     would abort the final index+verify steps and lose the new Reshiram (Shadow)
 #     guide from the index. A single bad guide must not kill the rest, so this
 #     block only WARNs on a non-zero rc and lets the chain continue.
-log "[STEP] ML IV guides (run_iv_guides.py, master_top60, all cores)"
+log "[STEP] ML IV guides (run_iv_guides.py, master_top60, serial / all cores each)"
 status "[STEP] ML IV guides"
 ml_t0=$(date +%s)
 ml_rc=0
-python scripts/run_iv_guides.py --no-index-refresh --reserve 0 2>&1 | tee -a "$LOG" || ml_rc=$?
+python scripts/run_iv_guides.py --no-index-refresh --jobs 1 2>&1 | tee -a "$LOG" || ml_rc=$?
 ml_elapsed=$(( $(date +%s) - ml_t0 ))
 if [[ $ml_rc -ne 0 ]]; then
     log "[WARN] ML IV guides reported failures (rc=$ml_rc, ${ml_elapsed}s) -- continuing to index+verify; grep the log for 'FAILED' lines"
