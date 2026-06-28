@@ -3,7 +3,7 @@
 The site-index card titles and the grouped Deep Dives section both
 derive from dive directory slugs, so a regression in the slug rewrite
 or the group-by-species collapse would break the public-facing landing
-page silently. Mercuryish flagged the original "Forretress (Shadow)" →
+page silently. An HSH Discord member flagged the original "Forretress (Shadow)" →
 "Shadow Forretress" rewrite (G4); ``_slug_to_pretty_title`` tests pin
 that format. ``_parse_dive_slug`` / ``_group_dives`` tests pin the
 group-by-species layout (one card per base species, variant chips).
@@ -31,7 +31,7 @@ from build_website_index import (  # noqa: E402
     ("lapras-great-league",              "Lapras (Great League)"),
 
     # Regional / shadow: modifier hoists to a leading prefix per the
-    # 2026-05-17 naming rewrite (mercuryish G4).
+    # 2026-05-17 naming rewrite (an HSH Discord member G4).
     ("forretress-shadow-great-league",         "Shadow Forretress (Great League)"),
     ("corsola-galarian-great-league",          "Galarian Corsola (Great League)"),
     ("stunfisk-galarian-great-league",         "Galarian Stunfisk (Great League)"),

@@ -927,13 +927,13 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   item (Color By already reveals banding). Don't build in the
   new-mechanics session.
 
-* **Send acidicArisen a Discord message about the Lurgan 102.9 def floor**
+* **Send an HSH Discord member a Discord message about the Lurgan 102.9 def floor**
   — Our 2026-04-08 bulkpoint Level 3 enumeration against the Annihilape
   mirror found that the historical Lurgan Ape `def ≥ 102.9` floor is
   *unrecoverable* from current sims: the next bulkpoint above 102.9
   (`shadow_ball ≤149` at def 103.34) is unreachable for today's
   converged cohort (max def ~101.30). The 102.9 floor predates Rage Fist,
-  so the threat-move set has shifted. Ask acidicArisen whether the
+  so the threat-move set has shifted. Ask an HSH Discord member whether the
   historical calibration was against a Counter or Close Combat tier
   transition, or against something more niche (Shadow Ball / Night Slash).
   This is the missing context that would let us promote a specific
@@ -1046,7 +1046,7 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   confirmed.
 
 * **Update `docs/validations/2026-04-07_annihilape_mirror_slayer_iteration.md`**
-  to reflect acidicArisen testimony (Discord, 2026-04-08) and the
+  to reflect an HSH Discord member testimony (Discord, 2026-04-08) and the
   bulkpoint Level 3 enumeration finding (2026-04-09): the community
   Lurgan Ape spread is a *historical anchor* calibrated to a Lickitung
   BP near atk 127.23, predating Counter nerf, Rage Fist addition, and
@@ -1472,9 +1472,9 @@ across Post-S5 Sessions S6-S10 (2026-04-17/18). Open polish:
   changes direction, you click on another column to sort by that
   column and the arrow from the first column goes away, etc).
 
-* **Client-side add / remove anchors + thresholds** *(mercuryish
+* **Client-side add / remove anchors + thresholds** *(an HSH Discord member
   request, 2026-04-26)* — Today's TOML-edit flow requires a local
-  clone, a re-dive, and a PR. Mercuryish asked whether a per-species
+  clone, a re-dive, and a PR. An HSH Discord member asked whether a per-species
   in-browser surface could let readers add their own custom anchors
   (or hide existing ones) on a single dive without affecting the
   rest of the site. Use case: cut visual noise by hiding anchors
@@ -1589,7 +1589,7 @@ bottleneck.
   hand-authored file is ~180 lines. Sample size of one species (plus a
   one-line tinkaton stub) is too small to design a simplification
   against — Annihilape is also the *worst* canary because its
-  Lurgan/acidicArisen historical provenance pressure makes it
+  Lurgan/an HSH Discord member historical provenance pressure makes it
   documentation-heavy in ways most species won't be.
   **Action**: when authoring the *next* species TOML (Tinkaton CD prep,
   Goodra, etc.), aim for the smallest file possible — lean on the
@@ -1704,10 +1704,10 @@ Open follow-ups:
 - **Add topics** beyond the five shipped — Michael asked that the
   topic list be a conversation at the start of the task, not a
   fixed scope. Plan a session to (a) add topics surfaced by
-  acidicArisen / new readers, (b) reorder by current reader
+  an HSH Discord member / new readers, (b) reorder by current reader
   confusion, (c) decide whether related topics merge.
 
-The IV Flavor Guide write-up is owed to acidicArisen per
+The IV Flavor Guide write-up is owed to an HSH Discord member per
 `project_acidic_arisen_writeup_commitment.md` — promoting that
 guide from `ai` to `expert` is the closing of that commitment.
 

@@ -1,8 +1,8 @@
-# Mercuryish review — IV Flavor Guide
+# HSH Discord review — IV Flavor Guide
 
 Source: `guides/iv-flavor-guide/body.md`. **This file rewritten 2026-05-16
-with mercuryish's amended IV-Flavor-Guide feedback (5/4/26).** The
-original review file only had a G2 terminology audit because mercuryish
+with an HSH Discord member's amended IV-Flavor-Guide feedback (5/4/26).** The
+original review file only had a G2 terminology audit because an HSH Discord member
 hadn't given specific IV-Flavor-Guide feedback yet; this version
 incorporates his six concrete items.
 
@@ -10,7 +10,7 @@ incorporates his six concrete items.
 
 ## Item 1 [IFG-1]: explain the `%` column under "How to read the zone"
 
-**Mercuryish:** "Under the 'How to read the zone' subheading, the % column
+**An HSH Discord member:** "Under the 'How to read the zone' subheading, the % column
 is not explained."
 
 **Current** (`body.md:98-103`):
@@ -58,7 +58,7 @@ column below).
 
 ## Item 2 [IFG-2]: rephrase "Catches needed" wild-vs-floor framing
 
-**Mercuryish:** "The current wording of the 'Catches needed' explanation
+**An HSH Discord member:** "The current wording of the 'Catches needed' explanation
 fails to acknowledge the change for spawns boosted by weather. Instead of
 saying 'This column works for wild spawns but not for x, y, and z,' I
 would just say 'This column assumes an IV floor of 0 unless stated
@@ -93,7 +93,7 @@ paragraph.
 
 ## Item 3 [IFG-3]: actually state the IV-floor exceptions
 
-**Mercuryish:** "Adding onto the point above, it would be useful to 'state
+**An HSH Discord member:** "Adding onto the point above, it would be useful to 'state
 otherwise' when appropriate. (Some legendary Pokemon have an IV floor of
 1, mythical Pokemon have an IV floor of 10, etc)."
 
@@ -144,7 +144,7 @@ flavor cutoffs within a few catches.
 
 ## Item 4 [IFG-4]: pick a consistent term for "General"
 
-**Mercuryish:** "The explanation refers to the 'General' fairly often. I
+**An HSH Discord member:** "The explanation refers to the 'General' fairly often. I
 would pick a consistent wording choice for it. I like 'General Good' and
 'General/non-General flavors.' Including 'the General cohort' and
 'General' as a proper noun separate from 'General Good' might be
@@ -158,7 +158,7 @@ confusing."
 3. **"the General cohort"** as a noun for "the cohort of IV spreads
    that qualifies for General Good" (lines 52, 124).
 
-Mercuryish wants (1) and "General / non-General" as the only two forms.
+An HSH Discord member wants (1) and "General / non-General" as the only two forms.
 Drop the "General cohort" and proper-noun "General" usage.
 
 **Proposed:** rewrite-pass over the affected lines.
@@ -167,7 +167,7 @@ Drop the "General cohort" and proper-noun "General" usage.
 | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 51-53   | "comparing the flavor cohort's win rate against the General cohort's win rate across every opponent in the dive's pool"                                                                                              | "comparing the flavor cohort's win rate against the General Good flavor's win rate across every opponent in the dive's pool"                                                                             |
 | 116     | "The cards default to the General flavor open and the rest collapsed"                                                                                                                                                | "The cards default to the General Good flavor open and the rest collapsed"                                                                                                                               |
-| 122     | "**Body - losses paragraph** (only shown for non-General flavors)"                                                                                                                                                   | "**Body - losses paragraph** (only shown for non-General-Good flavors)" — or keep as-is if "non-General" reads cleaner per mercuryish's "General / non-General flavors" suggestion (his exact phrasing). |
+| 122     | "**Body - losses paragraph** (only shown for non-General flavors)"                                                                                                                                                   | "**Body - losses paragraph** (only shown for non-General-Good flavors)" — or keep as-is if "non-General" reads cleaner per an HSH Discord member's "General / non-General flavors" suggestion (his exact phrasing). |
 | 125     | "**Body - threshold ladder** (on General)"                                                                                                                                                                           | "**Body - threshold ladder** (on General Good)"                                                                                                                                                          |
 | 195-196 | "Three flavors on the reference dive, in the order they're presented: **General Good** ..."                                                                                                                          | unchanged (uses "General Good" correctly)                                                                                                                                                                |
 | 198-200 | line 198 says "General Good" but the prose after says "Doesn't chase a specific opponent; sits above most of the meta. The threshold-ladder in its card names every opponent and scenario the General floor unlocks" | "...names every opponent and scenario the General Good floor unlocks"                                                                                                                                    |
@@ -175,13 +175,13 @@ Drop the "General cohort" and proper-noun "General" usage.
 | 215-216 | "Loss: Azumarill 1-1 ... Corsola (Galarian) 0-0 drop out (low-def IVs lose the defensive matchups)"                                                                                                                  | unchanged                                                                                                                                                                                                |
 | 217-218 | "Reading the three together: General is the default pick; the two namesakes are the trades to consider"                                                                                                              | "Reading the three together: General Good is the default pick; the two namesakes are the trades to consider"                                                                                             |
 
-**Notes:** mercuryish's suggestion is "General Good" (full name) plus
+**Notes:** an HSH Discord member's suggestion is "General Good" (full name) plus
 "General / non-General" as a binary partition phrase. I read that as: use
 "General Good" when naming the flavor, and "non-General" only as an
 adjective for the partition complement. The proper-noun "General" as a
 standalone reference should go.
 
-If you'd rather adopt mercuryish's literal "General / non-General"
+If you'd rather adopt an HSH Discord member's literal "General / non-General"
 phrasing for the partition (instead of "General Good / non-General-Good"),
 the table's row for line 122 stays as currently written (`non-General`).
 That's the cleaner read; I'd default to it.
@@ -190,7 +190,7 @@ That's the cleaner read; I'd default to it.
 
 ## Item 5 [IFG-5]: "trade" → "tradeoff" in the losses-paragraph description
 
-**Mercuryish:** "In the 'Body - losses paragraph' description, I think it
+**An HSH Discord member:** "In the 'Body - losses paragraph' description, I think it
 should say tradeoff instead of trade."
 
 **Current** (`body.md:122-124`):
@@ -215,7 +215,7 @@ should say tradeoff instead of trade."
 
 ## Item 6 [IFG-6]: stat capitalization consistency (Atk / Def / HP)
 
-**Mercuryish:** "The stats (Atk, Def, HP) have inconsistent capitalization."
+**An HSH Discord member:** "The stats (Atk, Def, HP) have inconsistent capitalization."
 
 **Audit needed.** Quick grep through the file shows:
 

@@ -517,7 +517,7 @@ regression assertion on `test_morpeko_vs_azumarill_form_change` and a
 known-divergence marker in the audit script. Full writeup in
 DEVELOPER_NOTES.md §8.
 
-## 2026-05-17 — Dropped UL Aegislash dives (mercuryish review, S2)
+## 2026-05-17 — Dropped UL Aegislash dives (HSH Discord review, S2)
 
 **What:** Removed every UL-Aegislash surface from the site:
 
@@ -532,7 +532,7 @@ DEVELOPER_NOTES.md §8.
 - UL deep-dive / article comment references in
   `thresholds/aegislash_{shield,blade}.toml`
 
-**Why:** Mercuryish flagged UL Aegislash as non-competitive in his
+**Why:** An HSH Discord member flagged UL Aegislash as non-competitive in his
 2026-04-26 review, with confirmation from his UL-player contacts.
 Per the review: "I asked for second opinions from people who play
 UL, and they agree that UL Aegislash is not real." We agreed —
@@ -917,9 +917,9 @@ reduction. 26 commits. Key design decisions:
 `_auto_derive_tiers` consumes both anchor-flip records (atk-side) and
 matchup boundaries (def-side). Tiers ranked by selectivity (fewest
 qualifying IVs first); General excluded from scatter plot coloring.
-Tinkaton clean dive produces tiers at ~143 def (≈acidicArisen GH Great),
+Tinkaton clean dive produces tiers at ~143 def (≈an HSH Discord member GH Great),
 ~140 def (≈GH Good), ~138 def (intermediate). Validated against 4/6
-acidicArisen findings.
+an HSH Discord member findings.
 
 ### Open threads for next sessions
 - **Atk-side matchup-flipping boundaries**: `_find_matchup_boundaries`
@@ -931,7 +931,7 @@ acidicArisen findings.
   options (`--energy-lead 1` etc.), re-sweep matchup boundaries under
   those conditions. The two-layer display (damage tier + matchup flip)
   is designed for this.
-- **Shadow / atk-weighted opponent IVs**: acidicArisen's Shadow Drapion
+- **Shadow / atk-weighted opponent IVs**: an HSH Discord member's Shadow Drapion
   (140.21 def) uses "attack-weighted" opponent IVs, not rank-1 or
   PvPoke default. Our system doesn't simulate arbitrary opponent IV
   spreads. Possible fix: `--opp-ivs custom:119.80` in the TOML or CLI.
@@ -939,7 +939,7 @@ acidicArisen findings.
   co-conditions. Atk-side anchors theoretically could too (HP affects
   whether a fast-move damage increase translates to a KO), but no
   known case warrants it yet.
-- **CMP anchor schema shorthand**: acidicArisen's CMP thresholds
+- **CMP anchor schema shorthand**: an HSH Discord member's CMP thresholds
   (105.58 Corviknight, 105.79 Lickilicky, etc.) can't be expressed as
   CMP anchors without an IV-list spread. Need a `opponent_species`
   shorthand that resolves the opponent's rank-1 atk automatically.
@@ -993,8 +993,8 @@ converged cohort can reach it (max cohort def ~101.30). The 102.9
 floor predates Rage Fist, so the threat-move set has shifted; today's
 optimization trades def for atk and lands well below the historical
 baseline. Don't promote anything to Level 1 from this enumeration —
-follow up via Discord with acidicArisen to recover historical context
-(see "Send acidicArisen a Discord message" in Analysis goals).
+follow up via Discord with an HSH Discord member to recover historical context
+(see "Send an HSH Discord member a Discord message" in Analysis goals).
 
 ## 2026-04-08 — bp → brkp short-name rename
 
@@ -1041,7 +1041,7 @@ levels for damage_breakpoint anchors (L1 explicit, L2
 reference-anchored, L3 discover-and-tag). Auto-fallback layer
 synthesizes anchors at runtime when the user doesn't provide them
 via TOML, gated per kind so explicit user input always wins. Commits
-`beace47` (main) and `10a693c` (acidicArisen testimony incorporated
+`beace47` (main) and `10a693c` (an HSH Discord member testimony incorporated
 into thresholds/annihilape.toml + anchors tests).
 
 ## 2026-04-07 — Battle simulator perf optimization (round 1 + round 2 + chunking)
@@ -1128,7 +1128,7 @@ policy in Python (`gopvpsim.battle.pvpoke_dp`). Commit `62b9cfb`.
 # Resolved (deeper history)
 
 * **Slayer Ape / Lurgan Ape IV analysis** — Resolved 2026-04-08 by
-  acidicArisen Discord testimony. The community Lurgan Ape spread is a
+  an HSH Discord member Discord testimony. The community Lurgan Ape spread is a
   *historical floor* (`atk ≥ 127.2`, `def ≥ 102.9`) calibrated to a
   Lickitung breakpoint near atk 127.23, predating the Counter nerf,
   Rage Fist addition, and Low Kick buff. Our slayer iteration's

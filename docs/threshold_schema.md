@@ -245,7 +245,7 @@ All anchor kinds accept these optional fields:
 [Species.Great.anchors.example]
 kind = "..."
 description = "..."          # human-readable; appears in HTML output
-source = "acidicArisen"      # expert attribution; controls HTML zone routing
+source = "an HSH Discord member"      # expert attribution; controls HTML zone routing
 display_name = "..."         # short label for HTML badges; auto-derived if absent
 ```
 
@@ -605,7 +605,7 @@ above_atk = 127.23
 description = "Smallest atk > 127.23 at which any focal move's damage to default Lickitung steps up. Reproduces the historical Lurgan-era 'Lickitung BP' calibration."
 
 # Level 3: discover and tag every Cresselia BP in the survivor range.
-# Per acidicArisen, Cresselia was rumored to be one of the original
+# Per an HSH Discord member, Cresselia was rumored to be one of the original
 # calibration points but the exact (move, tier) was never confirmed.
 [Annihilape.Great.anchors.cresselia_brkp_any]
 kind = "damage_breakpoint"

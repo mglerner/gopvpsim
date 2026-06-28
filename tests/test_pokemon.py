@@ -620,7 +620,7 @@ def test_compute_default_ivs_matches_gamemaster_broadly():
 # Our sim was correctly enforcing this in the in-battle transform path
 # (gopvpsim.formchange._aegislash_alt_level) but NOT in the focal-
 # species path. So Aegislash (Blade) as a dive's focal species was
-# computing stats at half levels. Mercuryish caught it in the
+# computing stats at half levels. An HSH Discord member caught it in the
 # 2026-04-26 review. Patched in commit 1b6c075. These tests ensure
 # the patch sticks.
 # ===========================================================================
@@ -628,12 +628,12 @@ def test_compute_default_ivs_matches_gamemaster_broadly():
 class TestAegislashBladeWholeLevels:
     """Lock in whole-level rounding for Aegislash (Blade) as the focal
     species. The ground-truth values are the ones the Prague Regional
-    winner's IVs produce (1/14/11 = L22 / 1454 CP per mercuryish; PvPoke
+    winner's IVs produce (1/14/11 = L22 / 1454 CP per an HSH Discord member; PvPoke
     confirms)."""
 
     @pytest.mark.integration
     @pytest.mark.parametrize("ivs,expected_level,expected_cp", [
-        # mercuryish's reference: tournament winner's 1/14/11 build.
+        # an HSH Discord member's reference: tournament winner's 1/14/11 build.
         # Without the whole-level patch, this would land at L22.5 / 1487.
         ((1, 14, 11), 22.0, 1454),
         # Hundo: already whole-level by chance (the unpatched grid

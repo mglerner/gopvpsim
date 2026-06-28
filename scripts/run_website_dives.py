@@ -166,8 +166,8 @@ DIVES = [
                        '--charged', 'SHADOW_BALL,GYRO_BALL'],
         'reference': 'AEGISLASH_CHARGE_PSYCHO_CUT,SHADOW_BALL,GYRO_BALL',
     },
-    # UL Aegislash entries were dropped 2026-05-17 per mercuryish
-    # review (S2): UL Aegislash is not competitively viable; mercuryish
+    # UL Aegislash entries were dropped 2026-05-17 per an HSH Discord member
+    # review (S2): UL Aegislash is not competitively viable; an HSH Discord member
     # + UL-player contacts confirmed. GL stays.
     # Forretress 4-way: normal vs shadow × Bug Bite vs Volt Switch, same
     # charged moves (Sand Tomb + Rock Tomb — PvPoke default, also the CS

@@ -110,7 +110,7 @@ step "Running website dives via run_website_dives.py" \
 #  from the site. See TODO.md.)
 
 # 4. Aegislash Blade-vs-Shield comparison page (GL only).
-# UL dropped 2026-05-17 per mercuryish review (S2): not competitively
+# UL dropped 2026-05-17 per HSH Discord review (S2): not competitively
 # viable, dropped from the site.
 step "Rendering Aegislash Blade-vs-Shield GL comparison" \
     python scripts/compare_loadouts.py comparisons/aegislash-blade-vs-shield.toml
@@ -138,7 +138,7 @@ step "Rendering Kanto Ninetales regular-vs-Shadow comparison" \
 #    shipped white/chrome-less and was never expert-reviewed. The page is
 #    deleted from the site; if an Aegislash form-change article is ever
 #    wanted, route it through generate_article.py with an expert TOML like
-#    every other article. UL was already dropped 2026-05-17 (mercuryish S2).
+#    every other article. UL was already dropped 2026-05-17 (an HSH Discord member S2).
 # step "Generating Aegislash GL first-draft article" \
 #     python scripts/write_aegislash_narrative.py great
 

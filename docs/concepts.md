@@ -239,7 +239,7 @@ Lickitung." This is the right level for *reproducing community spreads*, because
 community spreads are typically published as atk thresholds without explicitly naming
 which move's breakpoint produced them.
 
-In the Annihilape case, acidicArisen (an IV expert in the community) confirmed that
+In the Annihilape case, an HSH Discord member (an IV expert in the community) confirmed that
 the original Lurgan Ape spread was calibrated to a Lickitung BP near atk 127.23,
 but the original tweet describing exactly which move + tier was the calibration
 point couldn't be found. Level 2 lets us reproduce that reasoning without needing to

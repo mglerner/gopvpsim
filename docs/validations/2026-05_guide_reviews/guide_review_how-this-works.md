@@ -1,4 +1,4 @@
-# Mercuryish review — How This Works
+# HSH Discord review — How This Works
 
 Source: `guides/how-this-works/body.md`. After applying changes, run
 `python scripts/build_guides.py` to regenerate `userdata/website/guides/
@@ -9,7 +9,7 @@ guide.toml` `authorship = "ai"` → `"both"` in the same commit.
 
 ## Item 1 [HTW-1]: rewrite "every IV is inspectable" para 2 — wrong framing
 
-**Mercuryish:** "I am not a fan of the second paragraph under the 'We
+**An HSH Discord member:** "I am not a fan of the second paragraph under the 'We
 render with Plotly so every IV is inspectable' subheading. The plot does
 not say anything about how realistic it is to catch or trade for a
 specific IV spread. The main appeal of the plot (as I understand it) is
@@ -50,7 +50,7 @@ the catch-probability question to the right section. Also bakes in
 
 ## Item 2 [HTW-2]: "Opponent-IVs" → "Opponent IVs" (no hyphen)
 
-**Mercuryish:** "The first paragraph of the 'We render with Plotly so
+**An HSH Discord member:** "The first paragraph of the 'We render with Plotly so
 every IV is inspectable' subheading says 'The dropdowns at the top of
 the plot (Shields / Opponent-IVs / Bait) re-color the plot live - same
 data, different lens.' The actual website has 'Opponent IVs' as a
@@ -80,7 +80,7 @@ different lens.
 
 ## Item 3 [HTW-3]: define or remove "sibling forms"
 
-**Mercuryish:** "Under the 'What you should trust, and what you shouldn't'
+**An HSH Discord member:** "Under the 'What you should trust, and what you shouldn't'
 subheading, what are 'sibling forms'?"
 
 **Current** (`body.md:97-101`):
@@ -111,7 +111,7 @@ Shield and Blade)`).
 
 ## Item 4 [HTW-4 / G2]: "every IV" referring to a triple → "every IV spread"
 
-**Mercuryish (general feedback):** "rewriting every use of 'IV' in
+**An HSH Discord member (general feedback):** "rewriting every use of 'IV' in
 reference to an IV spread to 'IV spread' would reduce confusion."
 
 The guide already says "IV spread" in some places (e.g. "every legal IV
@@ -143,7 +143,7 @@ needed.
 
 ---
 
-## Item 6 [HTW-6]: minor — github link (not in mercuryish's feedback)
+## Item 6 [HTW-6]: minor — github link (not in an HSH Discord member's feedback)
 
 **Current** (`body.md:114-115`):
 

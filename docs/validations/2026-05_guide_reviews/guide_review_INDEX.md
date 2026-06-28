@@ -1,10 +1,10 @@
-# Mercuryish doc review — index
+# HSH Discord doc review — index
 
-Source feedback: Discord, mercuryish.
+Source feedback: Discord, an HSH Discord member.
 
 - Original feedback: 2026-04-26 (5:07 PM, edited)
 - Amended bullets: 2026-05-04 (added 2 General-Feedback items + IV Flavor Guide section)
-- Authorship plan confirmed: 2026-05-08 (mercuryish: "AI + human works fine
+- Authorship plan confirmed: 2026-05-08 (an HSH Discord member: "AI + human works fine
   with me")
 
 Per-guide proposals: `userdata/reviews/guide_review_<slug>.md` (one file per guide).
@@ -24,7 +24,7 @@ guide_review_iv-flavor-guide.md    — 7 items (now has specific feedback, not j
 
 ## How to use this
 
-1. Read each per-guide file. Each item is *Mercuryish quote → current text →
+1. Read each per-guide file. Each item is *An HSH Discord member quote → current text →
    proposed text → notes*. Mark accept / reject / edit on each item.
 2. Read this index for the four bug-report items, the Aegislash whole-level
    finding, the two new naming items (G4/G5), the authorship plan (G6), and
@@ -45,7 +45,7 @@ every renderer that displays shadow species names: tier bullets, opponent
 strings, hover cards, narrative prose, site-index cards, dive banners,
 articles, comparison pages.
 
-**Default recommendation:** **adopt `Shadow X` globally.** Mercuryish's
+**Default recommendation:** **adopt `Shadow X` globally.** An HSH Discord member's
 phrasing reads more naturally and matches in-game convention (the in-game
 nickname tag is "Shadow Pokemon," with the modifier first). Doing this
 globally — rather than just on the card titles — means we only fight one
@@ -70,7 +70,7 @@ These came in mixed with the doc feedback but require code patches, not text edi
 
 ### B1. Anchor-name capitalization in tier-card bullets
 
-**Mercuryish:** "the lefthand side is always lowercase, while the righthand
+**An HSH Discord member:** "the lefthand side is always lowercase, while the righthand
 side is always capitalized. The righthand side also formats the names
 differently when it comes to shadow Pokemon and form changes."
 
@@ -125,7 +125,7 @@ form. Need to grep for `lickilicky bulk`, `mirror bulk`, etc. in tests/.
 
 ### B2. Fortified Greedent tier appends "bulk" to every tier name
 
-**Mercuryish:** "the Fortified Greedent adds 'bulk' to the end of every tier.
+**An HSH Discord member:** "the Fortified Greedent adds 'bulk' to the end of every tier.
 Why?"
 
 **Root cause (intentional, not a bug):** `derive_display_name` (anchors.py:79)
@@ -139,7 +139,7 @@ The disambiguation is needed in the **Bulk Slayer** category card where
 breakpoints and bulkpoints can both appear; without ` bulk`, you'd see
 `lickilicky` for both the breakpoint and the bulkpoint anchor.
 
-**Mercuryish's complaint:** in the **Fortified Greedent** tier card
+**An HSH Discord member's complaint:** in the **Fortified Greedent** tier card
 specifically (a defense-axis tier), every bullet is a bulkpoint by
 construction — the suffix is redundant noise.
 
@@ -152,7 +152,7 @@ flag that strips `bulk` when in a def-axis-only tier.
 **Proposed fix (option B, doc-only):** keep the suffix; add a one-line note
 on the tier card header explaining "every bullet here is a bulkpoint
 because this tier is defined on def." Cheaper but doesn't address the
-redundancy mercuryish flagged.
+redundancy an HSH Discord member flagged.
 
 **Recommendation:** option A (surgical strip). Net win: Fortified Greedent
 reads `for Greedent vs Greedent`, `for Lapras vs Lapras`, etc. Bulk Slayer
@@ -164,7 +164,7 @@ option B might still be worth doing alongside option A.
 
 ### B3. Oinkologne (Female) named, Oinkologne (Male) bare
 
-**Mercuryish:** "Why do you specify Oinkologne (Female) but not Oinkologne
+**An HSH Discord member:** "Why do you specify Oinkologne (Female) but not Oinkologne
 (Male)? The male section does not include the parenthetical I have been
 using."
 
@@ -184,7 +184,7 @@ comparison page uses both forms with their gamemaster names.
 - **(a)** Add `(Male)` qualifier on the Male dive's focal-species banner
   (and any narrative reference to itself) when the species has a
   `(Female)` sibling. Other surfaces keep gamemaster names. Pros: addresses
-  mercuryish's specific complaint; localized to the focal-display path.
+  an HSH Discord member's specific complaint; localized to the focal-display path.
   Cons: requires sibling-form lookup; may interact with the CD article
   generator's expectations.
 - **(b)** Add `(Male)` everywhere — opponent strings, scatter hover,
@@ -202,7 +202,7 @@ bug (separate followup) might actually be caused by this asymmetry too.
 
 ### B4. Threshold-tier guide claims "5 tiers" but Oinkologne dive shows 6
 
-**Mercuryish:** "you say that the Oinkologne deep dive has five tiers. Does
+**An HSH Discord member:** "you say that the Oinkologne deep dive has five tiers. Does
 it not have six?"
 
 **Confirmed:** the rendered guide's worked example reads "Oinkologne (Male)
@@ -240,7 +240,7 @@ synth) sees the General entry consistently.
 
 ### S1. Aegislash whole-level rounding — sim bug in focal-species path
 
-**Mercuryish:** "Aegislash (Blade) always rounds its level down to the
+**An HSH Discord member:** "Aegislash (Blade) always rounds its level down to the
 nearest whole number. ... his Aegislash is 1454cp in Blade form because
 it has to round down to level 22."
 
@@ -254,7 +254,7 @@ subject, so the dive lands on `.5` levels for many IVs.
 
 **Concrete impact:** our shipped Aegislash (Blade) GL dive displays:
 
-| IVs      | Our dive        | mercuryish (real-world)   |
+| IVs      | Our dive        | an HSH Discord member (real-world)   |
 | -------- | --------------- | ------------------------- |
 | 1/14/11  | L22.5 / 1487 CP | L22 / 1454 CP             |
 | 15/14/15 | L21.0 / 1477 CP | unchanged (already whole) |
@@ -285,7 +285,7 @@ naming per G4 plus a "Blade Aegislash" rename, update the string match.)
 The form-change comparison page and the form-change guide article would
 re-render automatically off the new dive data.
 
-**Form-change guide article addition:** mercuryish also asked us to "update
+**Form-change guide article addition:** an HSH Discord member also asked us to "update
 the form change guide to include this." Currently `userdata/website/articles/
 aegislash-form-change-guide-{gl,ul}/index.html` doesn't mention the
 whole-level rule. Add a one-paragraph callout explaining:
@@ -301,12 +301,12 @@ Source: `scripts/write_aegislash_narrative.py`.
 
 ### S2. Aegislash UL is unusable — drop the UL dive?
 
-**Mercuryish:** "I am almost certain that Aegislash is unusable in the
+**An HSH Discord member:** "I am almost certain that Aegislash is unusable in the
 Ultra League ... I asked for second opinions from people who play UL,
 and they agree that UL Aegislash is not real. ... arguing over whether
 trash or garbage is better."
 
-**Status:** opinionated; UL is not your main league. The mercuryish + UL-
+**Status:** opinionated; UL is not your main league. The an HSH Discord member + UL-
 player consensus is the closest thing to expert sign-off we have.
 
 **Options:**
@@ -322,7 +322,7 @@ player consensus is the closest thing to expert sign-off we have.
 - **Keep:** ignore the recommendation; UL data is still data.
 
 **Recommendation:** drop. The cost of stale-data risk on a
-non-competitive page outweighs reference value. mercuryish + UL contacts
+non-competitive page outweighs reference value. an HSH Discord member + UL contacts
 agree it's not real; we have no countervailing data.
 
 **Question for you:** drop, mark obsolete, or keep?
@@ -333,7 +333,7 @@ agree it's not real; we have no countervailing data.
 
 ### Q1. "Sibling forms" definition
 
-**Mercuryish:** "what are 'sibling forms'?"
+**An HSH Discord member:** "what are 'sibling forms'?"
 
 **Where used:** `guides/how-this-works/body.md:99-100` —
 
@@ -352,7 +352,7 @@ agree it's not real; we have no countervailing data.
 
 ### Q2. Why do Anchor IV markers change color?
 
-**Mercuryish:** "(Why does it change colors? I understand why the
+**An HSH Discord member:** "(Why does it change colors? I understand why the
 non-Anchor IVs do, but why these?)"
 
 **Where:** the scatter plot's Anchor IVs band (the "grey triangle band"
@@ -369,7 +369,7 @@ investigation?
 
 ### Q3. Client-side add/remove anchors and thresholds
 
-**Mercuryish:** "Is it possible to add thresholds and anchors? ... Is it
+**An HSH Discord member:** "Is it possible to add thresholds and anchors? ... Is it
 possible to remove thresholds and anchors? ... I could see someone
 wanting to add and remove thresholds and anchors (client-side, not for
 the entire website) for a specific Pokemon in order to focus on what
@@ -391,7 +391,7 @@ build, or strictly out of scope?
 
 ### G1. LLM authorship banner — appreciated
 
-**Mercuryish (5/8):** "AI + human works fine with me haha, but thank you
+**An HSH Discord member (5/8):** "AI + human works fine with me haha, but thank you
 for the offer."
 
 **Action:** none directly. Positive signal worth keeping. Tied to G6
@@ -399,7 +399,7 @@ for the offer."
 
 ### G2. "IV" vs "IV spread" terminology audit
 
-**Mercuryish:** "I think 'IV' refers to one specific IV (say, 2 attack),
+**An HSH Discord member:** "I think 'IV' refers to one specific IV (say, 2 attack),
 so I think rewriting every use of 'IV' in reference to an IV spread to
 'IV spread' would reduce confusion."
 
@@ -408,7 +408,7 @@ lines flagged with a `[G2]` tag.
 
 ### G3. "PvPoke" vs "pvpoke.com" interchangeable use
 
-**Mercuryish:** "I would stick with using 'PvPoke' or 'pvpoke.com' instead
+**An HSH Discord member:** "I would stick with using 'PvPoke' or 'pvpoke.com' instead
 of using these two terms interchangeably."
 
 **Action:** per-guide pass with `[G3]` tags. The guides are already mostly
@@ -418,11 +418,11 @@ unless a specific line trips the audit.
 
 ### G4. (NEW 5/4) Shadow Pokemon naming: "Shadow X" not "X (Shadow)"
 
-**Mercuryish:** "In the list of deep dives, I think the title cards with
+**An HSH Discord member:** "In the list of deep dives, I think the title cards with
 shadow Pokemon should say 'Shadow (Pokemon name)' instead of '(Pokemon
 name) Shadow'"
 
-**Note:** mercuryish wrote `Shadow (Pokemon name)` — i.e. the species
+**Note:** an HSH Discord member wrote `Shadow (Pokemon name)` — i.e. the species
 name is the variable; the literal output should be `Shadow Forretress`,
 not `Shadow (Forretress)`. Likewise `Galarian Corsola`, `Alolan
 Ninetales`, etc.
@@ -432,7 +432,7 @@ inherits that convention. Switching to `Shadow X` is a global rename.
 
 **Scope options:**
 - **(a)** Just the site-index card titles. Minimum-blast-radius — exactly
-  what mercuryish wrote. But every other surface (dive banners, opponent
+  what an HSH Discord member wrote. But every other surface (dive banners, opponent
   strings, narrative, articles) still reads "X (Shadow)" — internal
   inconsistency.
 - **(b)** Site-index cards + dive top banner (addresses G5 simultaneously).
@@ -455,7 +455,7 @@ choice; doing them in one commit avoids a half-renamed site.
 
 ### G5. (NEW 5/4) Dive top-banner should include "shadow" for shadow focal species
 
-**Mercuryish:** "Once a deep dive is selected, the title at the top of the
+**An HSH Discord member:** "Once a deep dive is selected, the title at the top of the
 page should still include the specific details. Example: The Shadow
 Forretress deep dive does not say 'shadow' at the top."
 
@@ -480,7 +480,7 @@ free.
 change the pages to my 'AI + human' tag but not to acknowledge you
 directly, since you've avoided having your name on stuff in the past."
 
-**Mercuryish (5/8):** "AI + human works fine with me."
+**An HSH Discord member (5/8):** "AI + human works fine with me."
 
 **Concretely:** flip `authorship = "ai"` → `authorship = "both"` in each
 reviewed guide's `guide.toml`. Currently `authorship = "ai"` on the four
@@ -488,7 +488,7 @@ unreviewed guides (How This Works, IV Flavor Guide, CD Article, Deep-Dive
 Scatter — per memory `project_user_facing_docs`). Envelope Position and
 Threshold Tiers are already at `"both"`. Under the Hood is at `"ai"`.
 
-**After this review's edits ship,** mercuryish will have effectively
+**After this review's edits ship,** an HSH Discord member will have effectively
 co-reviewed:
 
 - How This Works (HTW items)

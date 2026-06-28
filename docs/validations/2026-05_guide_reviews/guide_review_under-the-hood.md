@@ -1,4 +1,4 @@
-# Mercuryish review — Under the Hood
+# HSH Discord review — Under the Hood
 
 Source: `guides/under-the-hood/body.md`. Per G6, also flip authorship
 `ai` → `both` once edits applied.
@@ -7,7 +7,7 @@ Source: `guides/under-the-hood/body.md`. Per G6, also flip authorship
 
 ## Item 1 [UTH-1]: define `xfail`
 
-**Mercuryish:** "What does xfail mean?"
+**An HSH Discord member:** "What does xfail mean?"
 
 **Current** (`body.md:23-26`):
 
@@ -34,7 +34,7 @@ differ.
 
 ## Item 2 [UTH-2]: clarify "users can add their own thresholds"
 
-**Mercuryish:** "Is it possible to add thresholds and anchors? I see you
+**An HSH Discord member:** "Is it possible to add thresholds and anchors? I see you
 list that it was possible for users to add their own thresholds, but I
 do not understand how to do this. Is it possible to add anchors as well?"
 
@@ -58,7 +58,7 @@ there's a TOML knob for it.
 ```
 
 Reads as if any reader can do it — but "adding a TOML anchor" requires
-a local clone, running the dive locally, and a PR. Mercuryish assumed
+a local clone, running the dive locally, and a PR. An HSH Discord member assumed
 there was a UI.
 
 **Proposed:**
@@ -96,7 +96,7 @@ a TODO.
 
 ## Item 3 [UTH-3]: removing thresholds and anchors
 
-**Mercuryish:** "Is it possible to remove thresholds and anchors?"
+**An HSH Discord member:** "Is it possible to remove thresholds and anchors?"
 
 Future feature, not a doc edit. Logging in INDEX Q3 with the "add"
 version.

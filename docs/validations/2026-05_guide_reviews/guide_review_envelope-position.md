@@ -1,4 +1,4 @@
-# Mercuryish review — Envelope Position
+# HSH Discord review — Envelope Position
 
 Source: `guides/envelope-position/body.md`. Per G6, also flip
 authorship to `both` once edits applied (already at `"both"`; verify).
@@ -7,7 +7,7 @@ authorship to `both` once edits applied (already at `"both"`; verify).
 
 ## Item 1 [EP-1]: rename "grey triangle band" — it's not grey
 
-**Mercuryish:** "The Envelope Position guide describes a 'grey triangle
+**An HSH Discord member:** "The Envelope Position guide describes a 'grey triangle
 band' below the plot of Tinkaton IV spreads. I spent a minute trying to
 find anything grey-colored before seeing that the legend indicated
 something called 'Anchor IVs.' Grey is not the color I would use to

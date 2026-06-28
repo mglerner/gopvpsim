@@ -52,13 +52,13 @@ All survivors have **atk_iv = 15** (max attack). This is the iteration's strong 
 ## Comparison to the community Lurgan Ape spread
 
 The single named community spread for Annihilape is the "Lurgan Ape," popularized
-by lurganrocket on Twitter. Per IV expert acidicArisen (Discord, 2026-04-08), the
+by lurganrocket on Twitter. Per IV expert an HSH Discord member (Discord, 2026-04-08), the
 spread is canonically defined by two cutoffs:
 
 | Cutoff | Value        | Source                                                                     |
 | ------ | ------------ | -------------------------------------------------------------------------- |
-| Atk    | **>= 127.2** | "127.2 attack was the minimum needed for a lurgan ape" — acidicArisen      |
-| Def    | **>= 102.9** | "102.9 defense was the goal" — acidicArisen ("i do not remember what for") |
+| Atk    | **>= 127.2** | "127.2 attack was the minimum needed for a lurgan ape" — an HSH Discord member      |
+| Def    | **>= 102.9** | "102.9 defense was the goal" — an HSH Discord member ("i do not remember what for") |
 
 The 27-IV list popularly screenshotted is the *enumeration* of those two cutoffs at
 GL CP cap. Both forms are now in `thresholds/annihilape.toml` as
@@ -77,7 +77,7 @@ At first glance this looks like a disagreement. It is not.
 
 ### Resolution: Lurgan is a historical floor, not a current target
 
-Per acidicArisen:
+Per an HSH Discord member:
 
 > "the lurgan ape only gets some lickitung. lickitung could keep the bulkpoint with
 > enough defense, so people went for even higher attack iv annihilape to beat lurgan
@@ -87,7 +87,7 @@ Per acidicArisen:
 > consistency against the mirror and lickitung"
 
 The Lurgan spread is the **floor** — the minimum atk to clear a specific Lickitung
-damage breakpoint AND the minimum def to keep some bulkpoint acidicArisen does not
+damage breakpoint AND the minimum def to keep some bulkpoint an HSH Discord member does not
 remember the source of. Current community advice is to push *higher* atk than the
 Lurgan baseline for two reasons:
 
@@ -97,7 +97,7 @@ Lurgan baseline for two reasons:
 2. **BP security against Lickitung**: pushing past the strict 127.2 minimum gives
    margin for breakpoints in any move beyond the originally-targeted one.
 
-Our converged cohort (atk 129.44, the maximum possible) is precisely what acidicArisen
+Our converged cohort (atk 129.44, the maximum possible) is precisely what an HSH Discord member
 describes as the "preferred for consistency" target. The convergence is not in
 disagreement with the community — it is in agreement with the *current* community
 view, which has moved past the Lurgan baseline.
@@ -105,13 +105,13 @@ view, which has moved past the Lurgan baseline.
 The original three hypotheses for the apparent disagreement were:
 
 1. **Move parameters changed since Lurgan was published.** Confirmed by
-   acidicArisen: "i am pretty sure this predates the counter nerf, addition of rage
+   an HSH Discord member: "i am pretty sure this predates the counter nerf, addition of rage
    fist, low kick buff, and annihilape almost never even considered running close
    combat." The Lurgan spread was calibrated to a Counter-era Annihilape that no
    longer exists.
 
 2. **The community optimizes against a broader opponent set.** Partially correct
-   but not the main story — acidicArisen's framing is that Lurgan was always a floor,
+   but not the main story — an HSH Discord member's framing is that Lurgan was always a floor,
    and the broader opponent set just shifted the *recommendation* above that floor
    without retiring the floor itself.
 
@@ -124,14 +124,14 @@ The original three hypotheses for the apparent disagreement were:
   historical calibration is unrecoverable from current data.** The `bulkpoint`
   anchor kind shipped 2026-04-08 with the same Level 1/2/3 precision
   structure, and the Level 3 enumeration against the Annihilape mirror was run
-  to identify which bulkpoint acidicArisen's 102.9 floor targeted. Result:
+  to identify which bulkpoint an HSH Discord member's 102.9 floor targeted. Result:
   the next bulkpoint above 102.9 in today's threat-move set (`shadow_ball
   <= 149` at def 103.34) is unreachable for the converged cohort (max def
   ~101.30), and the floor predates Rage Fist entirely — the threat moves it
   was calibrated against have changed too much to reconstruct the original
   tier transition. The 102.9 value stands as a frozen historical reference
   only; promoting it to a Level 1 anchor with full provenance would require
-  acidicArisen's recollection of the original threat move (asked via the
+  an HSH Discord member's recollection of the original threat move (asked via the
   Discord question tracked in TODO.md "Analysis goals").
 
 - **Re-run with Lurgan as an explicit opponent variant.** Even though the

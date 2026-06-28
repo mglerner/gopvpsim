@@ -441,7 +441,7 @@ def test_check_thresholds_include_empty_returns_unmatched_species():
 # ===========================================================================
 # Gender column parsing + match-time gender filter
 #
-# Mercuryish review 2026-04-26 surfaced a silent bug: the Female
+# HSH Discord review 2026-04-26 surfaced a silent bug: the Female
 # Oinkologne dive's paste-box failed to detect female Oinkologne in a
 # Poke Genie CSV. Two root causes, both fixed in commit 1b59c83:
 #

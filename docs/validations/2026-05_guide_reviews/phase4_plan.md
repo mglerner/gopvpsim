@@ -6,7 +6,7 @@ patched but awaiting a re-dive that's pre-staged for when you're back.
 
 ## What lands together
 
-Four mercuryish items, coordinated into one rename pass:
+Four an HSH Discord member items, coordinated into one rename pass:
 
 - **B1** — anchor-name capitalization in tier-card bullets (left side
   reads `lickilicky bulk`, right reads `Lickilicky`)

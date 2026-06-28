@@ -57,7 +57,7 @@ class ResolvedAnchor:
     strict: bool = True                  # True = strict `>`, False = `>=`
     label: str = ""                      # short human-readable label
     description: str = ""
-    source: str = ""                     # expert attribution (e.g. "acidicArisen")
+    source: str = ""                     # expert attribution (e.g. "an HSH Discord member")
     parent_display_name: str = ""        # short HTML badge label for the parent
 
     # Extra metadata for damage_breakpoint / bulkpoint anchors:

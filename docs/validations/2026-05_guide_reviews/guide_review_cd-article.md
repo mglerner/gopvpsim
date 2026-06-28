@@ -1,4 +1,4 @@
-# Mercuryish review — Reading a CD Article
+# HSH Discord review — Reading a CD Article
 
 Source: `guides/cd-article/body.md`. Per G6, also flip authorship `ai` →
 `both` once edits applied.
@@ -7,7 +7,7 @@ Source: `guides/cd-article/body.md`. Per G6, also flip authorship `ai` →
 
 ## Item 1 [CD-1]: missing authorship category
 
-**Mercuryish:** "The named authorship categories are missing one of the
+**An HSH Discord member:** "The named authorship categories are missing one of the
 listed categories in the 'Under the Hood' section."
 
 **Current** (`body.md:34-45`):
@@ -49,7 +49,7 @@ is currently auto-generated..." paragraph at line 47).
 
 ## Item 2 [CD-2]: explain the obsolescence trigger
 
-**Mercuryish:** "What makes an article outdated enough for the
+**An HSH Discord member:** "What makes an article outdated enough for the
 obsolescence banner to be applied to an article?"
 
 **Current** (`body.md:54-62`):

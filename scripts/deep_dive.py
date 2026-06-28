@@ -3452,7 +3452,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # -- Compute anchor-flip records (used by Threshold Tiers, the flat
     #    Anchor-Driven Matchup Flips section, and Notable IVs below) --
     # Run the aggregator against every opp_iv_mode (pvpoke, rank1, or both)
-    # and union the results. acidicArisen-style thresholds are often against
+    # and union the results. HSH-Discord-style thresholds are often against
     # rank-1 opponent IVs; running only against pvpoke defaults would miss
     # them. Dedup by (anchor.name, opponent, frozenset(scenarios)) so a
     # record that fires in both modes doesn't appear twice.
@@ -3591,7 +3591,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             plot_tiers = [t for t in effective_tiers
                           if t['name'] != 'General']
             data_obj['tiers'] = plot_tiers
-            # B4 (mercuryish review): the guide's "{{dive:tier_count}}"
+            # B4 (HSH Discord review): the guide's "{{dive:tier_count}}"
             # token resolver and any other consumer that wants to count
             # *rendered tier cards* (rather than plot-traced tiers)
             # should use effectiveTierCount, which keeps the General

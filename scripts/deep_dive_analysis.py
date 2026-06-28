@@ -618,7 +618,7 @@ def auto_derive_tiers(anchor_flip_records, data_obj,
     1. Anchor-flip records -> per-opponent atk/def damage-tier boundaries.
     2. Matchup boundaries -> full-battle stat targets on def OR atk, clustered
        by IV-count drop + threshold gap within each stat. The highest-
-       selectivity cluster corresponds to acidicArisen's "GH Great", the
+       selectivity cluster corresponds to an HSH Discord member's "GH Great", the
        next to "GH Good", etc.
 
     Returns a list of tier dicts matching the shape ``data_obj['tiers']``
@@ -740,7 +740,7 @@ def auto_derive_tiers(anchor_flip_records, data_obj,
     # --- Matchup-boundary-driven tiers (def-side + atk-side) ---
     # Sort boundaries by threshold ascending within each stat and pick tier
     # breaks where the number of qualifying IVs drops significantly — these
-    # correspond to acidicArisen-style tiers like "GH Good" (many IVs)
+    # correspond to HSH-Discord-style tiers like "GH Good" (many IVs)
     # vs "GH Great" (few IVs, stricter spec).
     def _mb_candidates(mbs):
         by_thresh: dict = {}
@@ -1095,7 +1095,7 @@ def probe_tier_cutoff_flips(data_obj, score_arrays_all, moveset_idx,
     they meet ALL of the tier's cutoffs and check win-rate cleanliness.
     Returns a list of dicts: {opponent, scenario, opp_iv_mode, pass_wr,
     fail_wr}. This catches matchup flips at the tier boundary that fall
-    between Level 3 sub-anchor thresholds (e.g. acidicArisen's 143.03 def
+    between Level 3 sub-anchor thresholds (e.g. an HSH Discord member's 143.03 def
     vs Azu, which lies between the damage tiers at 142.34 and 144.41).
     """
     nIvs = data_obj.get('nIvs', 0)

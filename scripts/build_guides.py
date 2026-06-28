@@ -285,7 +285,7 @@ def _resolve_dive_token(suffix: str, dive: dict | None) -> str | None:
     tiers = featured.get('tiers') or []
     iv_all = featured.get('iv_all_tiers') or []
     if suffix == 'tier_count':
-        # B4 (mercuryish review): count of *rendered tier cards* on the
+        # B4 (HSH Discord review): count of *rendered tier cards* on the
         # featured moveset. The dive's auto-derive path filters the
         # broad "General" tier out of data['tiers'] (it would dominate
         # the plot legend) but still renders it as a tier card. So

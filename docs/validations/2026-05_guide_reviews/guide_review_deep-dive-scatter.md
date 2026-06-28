@@ -1,4 +1,4 @@
-# Mercuryish review — Reading the Deep-Dive Scatterplot
+# HSH Discord review — Reading the Deep-Dive Scatterplot
 
 Source: `guides/deep-dive-scatter/body.md`. Per G6, also flip authorship
 `ai` → `both` once edits applied.
@@ -7,7 +7,7 @@ Source: `guides/deep-dive-scatter/body.md`. Per G6, also flip authorship
 
 ## Item 1 [DDS-1]: "grey triangle band" rename (same as EP-1) + Opp-IVs hyphen fix
 
-**Mercuryish:** "The point about the grey triangles I brought up earlier
+**An HSH Discord member:** "The point about the grey triangles I brought up earlier
 applies here as well. You mention the grey triangles here under the
 example Tinkaton plot."
 
@@ -43,7 +43,7 @@ actual dropdown label).
 
 ## Item 2 [DDS-2]: explain Filled vs Outline distinction
 
-**Mercuryish:** "I do not understand the distinction between 'Filled' and
+**An HSH Discord member:** "I do not understand the distinction between 'Filled' and
 'Outline' for Anchor IVs mentioned in the guide."
 
 **Current** (`body.md:77-80`):
@@ -57,7 +57,7 @@ actual dropdown label).
 
 **Status:** the prose explains the *visual* difference but not the
 *decision*. The screenshot shows triangles, not a "subdued cyan blob,"
-which adds to mercuryish's confusion.
+which adds to an HSH Discord member's confusion.
 
 **Need to verify:** which mode renders triangles vs the cyan blob.
 Possibly the screenshot is in `Outline` mode and the prose mistakenly

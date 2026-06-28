@@ -1,6 +1,6 @@
-# Mercuryish review — Threshold Tiers
+# HSH Discord review — Threshold Tiers
 
-Source: `guides/threshold-tiers/body.md`. Most of mercuryish's
+Source: `guides/threshold-tiers/body.md`. Most of an HSH Discord member's
 "Threshold Tiers" feedback is actually about the **dive cards
 themselves**, not this guide — those are the four bug-report items B1-B4
 in the INDEX. Items in this file are guide-text only.
@@ -13,7 +13,7 @@ verify no change needed.)
 
 ## Item 1 [TT-1]: "five tiers" should be six (token bug)
 
-**Mercuryish:** "In the guide for how to interpret the threshold tiers,
+**An HSH Discord member:** "In the guide for how to interpret the threshold tiers,
 you say that the Oinkologne deep dive has five tiers. Does it not have
 six?"
 
@@ -59,7 +59,7 @@ without touching this file.
 
 **Followup:** the tier card itself displays "(220 IVs)" as the member
 count label (rendered by `deep_dive_rendering.py:1678`). Per
-mercuryish's strict reading, this should read "(220 IV spreads)" or "(220
+an HSH Discord member's strict reading, this should read "(220 IV spreads)" or "(220
 spreads)". **Card text issue, not a guide issue**, but worth calling out
 — same renderer change would unify the dive's labeling with the guide's
 terminology.

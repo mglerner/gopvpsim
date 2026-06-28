@@ -2118,7 +2118,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
 
         # --- Tier-cutoff probe: matchup flips at the tier's own spec ---
         # Catches flips that fall between Level 3 sub-anchor thresholds
-        # (e.g. acidicArisen's 143.03 def vs Azu lives between damage
+        # (e.g. an HSH Discord member's 143.03 def vs Azu lives between damage
         # tiers at 142.34 and 144.41).
         if score_arrays and (atk_cut > 0 or def_cut > 0):
             probe_results = analysis.probe_tier_cutoff_flips(

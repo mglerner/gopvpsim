@@ -1,6 +1,6 @@
 """Display-name formatting helpers.
 
-Mercuryish-review-driven (2026-05-17): the gamemaster `speciesName`
+HSH-Discord-review-driven (2026-05-17): the gamemaster `speciesName`
 format ("Forretress (Shadow)", "Corsola (Galarian)") reads
 awkwardly in prose; the modifier-first form ("Shadow Forretress",
 "Galarian Corsola") is what readers expect. This module's
@@ -137,7 +137,7 @@ def pretty_species(name: str) -> str:
           ``Oinkologne (Female)`` → ``Oinkologne (Female)`` (unchanged)
 
     - Bare male forms gain a ``(Male)`` suffix when the gamemaster has
-      a Female sibling form. Mirror's mercuryish's symmetry request.
+      a Female sibling form. Mirror's an HSH Discord member's symmetry request.
 
           ``Oinkologne``                → ``Oinkologne (Male)``
           (when ``Oinkologne (Female)`` exists in the gamemaster)

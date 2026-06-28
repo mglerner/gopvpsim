@@ -8,7 +8,7 @@ Writes:
     userdata/website/articles/aegislash-form-change-guide-gl/index.html
     userdata/website/articles/aegislash-form-change-guide-gl/meta.toml
 
-UL was dropped 2026-05-17 per mercuryish review (S2); the ``ultra``
+UL was dropped 2026-05-17 per HSH Discord review (S2); the ``ultra``
 argument no longer resolves.
 
 This is a **first-draft** generator. Unlike the Oinkologne CD article
@@ -55,8 +55,8 @@ LEAGUE_INFO = {
         'shield_fast': 'Psycho Cut (charge-only fast move, 0 power)',
         'shield_charged': 'Shadow Ball, Gyro Ball',
     },
-    # 'ultra' entry dropped 2026-05-17 per mercuryish review (S2):
-    # UL Aegislash is not competitively viable; mercuryish + UL-player
+    # 'ultra' entry dropped 2026-05-17 per HSH Discord review (S2):
+    # UL Aegislash is not competitively viable; an HSH Discord member + UL-player
     # contacts confirmed. Re-add here if that changes.
 }
 
