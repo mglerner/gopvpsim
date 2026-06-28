@@ -286,11 +286,28 @@ IV_CHECK_JS = r"""
     return { raw: sp.raw, status: 'ok', key: key, label: key, data: D.combos[key] };
   }
 
-  // status of one column for one (opp, shield): {kind:'win'|'loss'|'cc'|'na', cc?}
+  // Raw battle score for one column/(opp,shield) from the shared cmp grid, or
+  // null when the grid is absent (pre-grid guides). Lets cell() separate a
+  // dropped TIE from a dropped loss: with no reachable in-sim timeout a battle
+  // always ends in a faint, so score == 500 happens ONLY on a double-KO -- a
+  // genuine tie -- never a win (a live winner scores > 500) or loss (< 500).
+  function cellScore(col, quad, opp, sh){
+    if (typeof CMP_READY === 'undefined' || !CMP_READY) return null;
+    var grid = (typeof SCORES_CMP !== 'undefined') ? SCORES_CMP[quad] : null;
+    if (!grid || col.status !== 'ok') return null;
+    var iv = CMP_IDX[col.key]; if (iv == null) return null;
+    var oi = DATA.opponentsDisplay.indexOf(opp); if (oi < 0) return null;
+    for (var si = 0; si < DATA.nScenarios; si++)
+      if (cmpScenLabel(si) === sh) return cmpVal(grid, iv, si, oi);
+    return null;
+  }
+  // status of one column for one (opp, shield): {kind:'win'|'tie'|'loss'|'cc'|'na', cc?}
   function cell(col, quad, opp, sh){
     if (col.status !== 'ok') return { kind: 'na' };
     var tag = opp + ' ' + sh;
-    if ((col.data.drops[quad] || []).indexOf(tag) !== -1) return { kind: 'loss' };
+    if ((col.data.drops[quad] || []).indexOf(tag) !== -1)
+      // dropped a matchup the hundo wins; score 500 = double-KO tie, else a loss
+      return { kind: cellScore(col, quad, opp, sh) === 500 ? 'tie' : 'loss' };
     var ccs = (col.data.cc || {})[quad] || [];
     for (var i = 0; i < ccs.length; i++)
       if (ccs[i].opp === opp && ccs[i].shield === sh)
@@ -337,9 +354,9 @@ IV_CHECK_JS = r"""
   // CMP_READY, so by the time it runs the shared script is loaded.
   // Version-B cell: win/loss score on top, faded best-buddy flip where a toggle
   // crosses the win line, then the leftover-HP bar (+ energy on wins).
-  function cmpBarHtml(score, outc){
+  function cmpBarHtml(score){
     var hp = cmpHp(score), pct = Math.round(Math.abs(hp) * 100);
-    var win = outc === 'W', tie = outc === 'T', lo = win && Math.abs(hp) < 0.2;
+    var win = score > 500, tie = score === 500, lo = win && Math.abs(hp) < 0.2;
     var cls = 'cmp-bar' + (win ? (lo ? ' lo' : '') : (tie ? '' : ' loss'));
     // A nonzero margin that rounds to 0 shows "<1" so a thin win never reads as
     // dead/zero; an exact tie shows a bare "0% HP". The " HP" disambiguates it
@@ -349,15 +366,15 @@ IV_CHECK_JS = r"""
     return '<span class="' + cls + '"><span style="width:' + Math.min(100, pct)
       + '%"></span></span><span class="cmp-hpv">' + sign + num + '% HP</span>';
   }
-  function allCellHtml(score, outc, altScore, altOutc, altIsBuddy, altCap, en, em, showMark, cc){
-    var win = outc === 'W', tie = outc === 'T';
+  function allCellHtml(score, altScore, altIsBuddy, altCap, en, em, showMark, cc){
+    var win = score > 500, tie = score === 500;
     var txt = '<span class="' + (win ? 'cmp-win' : tie ? 'cmp-tie' : 'cmp-lose')
       + '">' + (win ? 'win ' : tie ? 'tie ' : 'loss ') + score + '</span>';
     if (cc)   // close-call badge (shield spent / near-death / energy banked)
       txt += ' <span class="cc-tag cc-' + cc.kind + '" title="' + esc(cc.margin) + '">'
         + esc(KIND[cc.kind] || cc.kind) + '</span>';
-    if (showMark && altScore != null && outc !== altOutc){
-      var aw = altOutc === 'W', at = altOutc === 'T';
+    if (showMark && altScore != null && (score > 500) !== (altScore > 500)){
+      var aw = altScore > 500, at = altScore === 500;
       var albl = aw ? 'win ' : at ? 'tie ' : 'loss ';
       var ds = altIsBuddy ? 'on' : 'off';
       var dw = (altIsBuddy ? 'turn best-buddy ON' : 'turn best-buddy OFF')
@@ -376,7 +393,7 @@ IV_CHECK_JS = r"""
       enHtml = '<br><span class="cmp-env">+' + Math.round(en) + ' energy</span>'
         + (parts.length ? '<br><span class="cmp-env">' + parts.join(' &middot; ') + '</span>' : '');
     }
-    return '<td><span class="cmp-celltext">' + txt + '</span>' + cmpBarHtml(score, outc) + enHtml + '</td>';
+    return '<td><span class="cmp-celltext">' + txt + '</span>' + cmpBarHtml(score) + enHtml + '</td>';
   }
   function renderAllView(ok, showBB){
     if (typeof CMP_READY === 'undefined' || !CMP_READY){
@@ -401,15 +418,7 @@ IV_CHECK_JS = r"""
     var em = window.CMP_ENERGY_MOVES;
     var rows = [];
     var hiddenBB = 0;   // collapsed view: rows that expanding best-buddy would reveal
-    // Win/loss/tie for a cell. The score grid rounds a razor-thin LOSS up to the
-    // exact 500 tie line; the ivc-data drops list (ground truth, same source the
-    // per-Case table uses) breaks that tie so the All view and per-Case agree.
-    function outcome(score, key, quad, oppN, shL){
-      if (score > 500) return 'W';
-      if (score < 500) return 'L';
-      var dr = ((D.combos[key] && D.combos[key].drops) || {})[quad] || [];
-      return dr.indexOf(oppN + ' ' + shL) !== -1 ? 'L' : 'T';
-    }
+    function sgn(v){ return v > 500 ? 'W' : v < 500 ? 'L' : 'T'; }
     Object.keys(SCORES_CMP).forEach(function(quad){
       var grid = SCORES_CMP[quad]; if (!grid) return;
       var altGrid = SCORES_CMP[CMP_BB_PAIR[quad]] || null;
@@ -417,27 +426,25 @@ IV_CHECK_JS = r"""
       var eg = (window.CMP_ENERGY || {})[quad] || null;
       for (var oi = 0; oi < DATA.nOpponents; oi++){
         for (var si = 0; si < DATA.nScenarios; si++){
-          var oppN = DATA.opponentsDisplay[oi], shL = cmpScenLabel(si);
           var scores = live.map(function(r){ return cmpVal(grid, r.iv, si, oi); });
           var altScores = altGrid ? live.map(function(r){ return cmpVal(altGrid, r.iv, si, oi); }) : null;
           var alts = showBB ? altScores : null;   // only USE the alt for tiering/marking when expanded
-          var outs = live.map(function(r, k){ return outcome(scores[k], r.key, quad, oppN, shL); });
-          var altOuts = altScores ? live.map(function(r, k){
-            return outcome(altScores[k], r.key, CMP_BB_PAIR[quad], oppN, shL); }) : null;
-          var hasW = outs.indexOf('W') !== -1, hasL = outs.indexOf('L') !== -1;
+          var hasW = false, hasL = false;
+          scores.forEach(function(v){ if (v > 500) hasW = true; else if (v < 500) hasL = true; });
           // Per-spread signature: primary outcome, plus the best-buddy-toggled
           // outcome when expanded. The row is an IV decision (a flip) only when
           // these signatures DIFFER across spreads. If every spread behaves the
           // same -- e.g. all win at best-buddy and all drop to the same loss
           // without it -- the IV pick changes nothing, so it is NOT a flip, and
           // the best-buddy marker would be identical noise (suppressed below).
-          var sigs = outs.map(function(o, k){ return o + (alts ? altOuts[k] : ''); });
+          var sigs = scores.map(function(v, k){ return sgn(v) + (alts ? sgn(alts[k]) : ''); });
           var sigDiffer = sigs.some(function(s){ return s !== sigs[0]; });
           // Per-spread close-call (shield spent / near-death / energy banked) for
           // this quad/opp/scenario, from the ivc-data blob -- the same source the
           // per-Case table uses. Orthogonal to leftover HP: a spread can spend a
           // shield with ~0 HP-% difference, which the bar misses. So a close-call
           // that DIFFERS across spreads is its own reason to show the row.
+          var oppN = DATA.opponentsDisplay[oi], shL = cmpScenLabel(si);
           var ccs = live.map(function(r){
             var lst = ((D.combos[r.key] && D.combos[r.key].cc) || {})[quad] || [];
             for (var z = 0; z < lst.length; z++)
@@ -458,14 +465,13 @@ IV_CHECK_JS = r"""
             // collapsed view: would expanding best-buddy reveal this row? Primary
             // sigs are identical here, so a difference can only come from the alt.
             if (!showBB && altScores){
-              var fsig = outs.map(function(o, k){ return o + altOuts[k]; });
+              var fsig = scores.map(function(v, k){ return sgn(v) + sgn(altScores[k]); });
               if (fsig.some(function(s){ return s !== fsig[0]; })) hiddenBB++;
             }
             continue;
           }
           rows.push({ quad:quad, oi:oi, si:si, tier:tier, delta:delta,
-                      scores:scores, outs:outs, alts:alts, altOuts:(alts ? altOuts : null),
-                      ccs:ccs, altIsBuddy:altIsBuddy, altCap:altCap, eg:eg,
+                      scores:scores, alts:alts, ccs:ccs, altIsBuddy:altIsBuddy, altCap:altCap, eg:eg,
                       showMark:(showBB && sigDiffer) });
         }
       }
@@ -500,8 +506,7 @@ IV_CHECK_JS = r"""
         + '<td class="cmp-m">' + esc(DATA.opponentsDisplay[row.oi]) + ' &middot; ' + cmpScenLabel(row.si) + '</td>';
       for (var k = 0; k < row.scores.length; k++){
         var en = row.eg ? cmpVal(row.eg, live[k].iv, row.si, row.oi) : null;
-        h += allCellHtml(row.scores[k], row.outs[k], row.alts ? row.alts[k] : null,
-                         row.altOuts ? row.altOuts[k] : null,
+        h += allCellHtml(row.scores[k], row.alts ? row.alts[k] : null,
                          row.altIsBuddy, row.altCap, en, em, row.showMark, row.ccs[k]);
       }
       h += '</tr>';
@@ -598,6 +603,7 @@ IV_CHECK_JS = r"""
           var st = cell(c, quad, opp, sh);
           if (st.kind === 'na'){ h.push('<td class="ivc-cell none">-</td>'); return; }
           if (st.kind === 'loss'){ h.push('<td class="ivc-cell ivc-loss">loss</td>'); return; }
+          if (st.kind === 'tie'){ h.push('<td class="ivc-cell ivc-tie">tie</td>'); return; }
           if (st.kind === 'cc'){
             h.push('<td class="ivc-cell ivc-win">win <span class="cc-tag cc-'
               + esc(st.cc.kind) + '" title="' + esc(st.cc.margin) + '">'
@@ -866,6 +872,7 @@ def style():
   td.ivc-cell, th.ivc-cell { text-align:center; }
   td.ivc-win { color:var(--accent); }
   td.ivc-loss { color:var(--loss); font-weight:600; }
+  td.ivc-tie { color:var(--tie); font-weight:600; }
   /* near-miss marker in the recommended table */
   .nm-flag { font-size:.7em; color:var(--tie); text-decoration:none;
             vertical-align:super; font-weight:700; }
