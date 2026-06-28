@@ -25,6 +25,30 @@ float32 fix forces it; the legacy cache is all-None-stamped). ONE step remains:
    once the ML step starts). NB the ML bake now runs SERIAL (one guide, all
    cores) -- see `docs/TODO_archive.md` (ML-sweep parallelism note).
 
+### Session-6 (2026-06-28) pre-dive fixes -- ride the cold bake
+
+Two NEW dive-output changes landed this session (both committed + pushed; both
+need the cold re-dive to take effect, both verified + suite-green at 1113p/14xf):
+
+- **[feat, `1a5bf53`] Best-buddy toggle on EVERY Great + Ultra dive** (Michael:
+  consistent UI). `_bb_want` auto now on for great+ultra. No-op species (most GL
+  meta, CP-capped below L50) show the toggle but it's a provable no-op -- L51 is
+  aliased to L50 (zero extra sims), with a "(no change for this mon)" hint.
+  Active species (Carbink/Medicham/Azumarill/...) get the real L51 sweep. After
+  the bake, sanity-check a GL no-op dive (Registeel) shows the toggle + hint and
+  an active one (Carbink) toggles real changes.
+- **[fix, `5221d6f`] Shadow opponents get their OWN PvPoke-default IVs.** The
+  dive 'pvpoke' opponent-IV mode + `build_matchup_web` ignored shadow, giving
+  shadow opponents base IVs (wrong for ~37 species). Flipped a shipped UL winner
+  (Mimikyu vs Shadow Raikou 2-2: 470 loss -> 707 win). `pvpoke_default_ivs` now
+  takes `shadow=`. Affects UL pvpoke-mode opponent stats (Shadow Raikou/
+  Cresselia/Giratina-Altered) + the matchup web -- UL re-bake corrects them.
+  `tests/test_shadow_pvpoke_default_ivs.py` pins it. (pokemon.py engine-hashed,
+  so the bump is automatic; re-dive was already cold.)
+- Also already in main from session-6: `725c184` IV-scanner maxLevel fix (GL/UL
+  owned mons were shown 1 level too high) -- render-only, in the dives via
+  re-render. `786d437` owned_breakdown.py CLI same-class fix (not a dive).
+
 ### Pre-launch open items (ride the cold bake)
 
 Genuinely-open items hoisted out of the completed pre-redive session batches
