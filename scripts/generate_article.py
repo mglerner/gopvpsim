@@ -48,6 +48,7 @@ from render_article import (  # type: ignore[import-not-found]
 
 from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
 from gopvpsim.pokemon import iv_rank, LEAGUE_CP  # type: ignore[import-not-found]
+from deep_dive_rendering import opp_slug  # type: ignore[import-not-found]
 from gopvpsim.theme import (  # type: ignore[import-not-found]
     theme_css,
     data_theme_attr,
@@ -1780,7 +1781,7 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
         # plain text so the article doesn't emit clicks that scroll to
         # the top of an unrelated dive.
         opp_escaped = html.escape(opp)
-        slug = _opp_slug(opp)
+        slug = opp_slug(opp)
         primary_prefix = per_form_dive_prefix[0] if per_form_dive_prefix else None
         primary_has_anchor = (
             primary_prefix is not None
@@ -2370,17 +2371,6 @@ def _tier_slug(name: str) -> str:
         badge = badge[1:-1].strip()
     slug = re.sub(r'[^a-z0-9]+', '-', badge.lower()).strip('-')
     return slug
-
-
-def _opp_slug(name: str) -> str:
-    """Slugify an opponent display name for dive deep-link anchors.
-
-    'Stunfisk (Galarian)' -> 'stunfisk-galarian'. Must stay in lock-step
-    with ``deep_dive_rendering.opp_slug``; drift produces
-    article-side links that don't resolve.
-    """
-    import re
-    return re.sub(r'[^a-z0-9]+', '-', (name or '').lower()).strip('-')
 
 
 def _tier_card_href(tier: dict | str, dive_slug: str,
