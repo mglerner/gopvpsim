@@ -6351,10 +6351,11 @@ def main():
                              "and embed it (parallel to scores) so the 'Compare "
                              "my candidates' widget shows the banked-energy line "
                              "('+N energy', ~N charged moves). Default: ON. "
-                             "NOTE: it bypasses the sweep disk cache (the cache "
-                             "holds only scores), so a re-run pays full sim time "
-                             "instead of cache hits; adds ~4%% to the HTML. Pass "
-                             "--no-compare-energy to drop it (smaller, cacheable).")
+                             "Energy is persisted as a cache plane alongside "
+                             "score (sweep_cache v6), so this serves warm from "
+                             "the disk cache just like a score-only run; adds "
+                             "~4%% to the HTML. Pass --no-compare-energy to drop "
+                             "the energy line (slightly smaller HTML).")
     parser.add_argument('--verbose', action='store_true',
                         help='Route DEBUG-level aggregator diagnostics to the '
                              'log file (stdout unchanged).')
