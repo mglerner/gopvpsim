@@ -217,7 +217,11 @@ MATCHUPS = [
          xfail_cells={(1, 2)}),
 ]
 
-LEAGUE_CP = {'great': '1500', 'ultra': '2500'}
+from gopvpsim.pokemon import LEAGUE_CP as _CANON_LEAGUE_CP  # noqa: E402
+# Stringified CP caps for the JS harness's --cp arg, derived from the single
+# canonical source so the great/ultra (and master/little) values can't drift
+# and a 'master' matchup no longer KeyErrors on a missing local key.
+LEAGUE_CP = {k: str(v) for k, v in _CANON_LEAGUE_CP.items()}
 
 
 def norm_log(entries):

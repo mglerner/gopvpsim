@@ -76,7 +76,7 @@ from gopvpsim.data import (
 )
 from gopvpsim.battle import (
     BattlePokemon, simulate,
-    pvpoke_dp, pvpoke_simulate_shield,
+    pvpoke_dp, pvpoke_simulate_shield, ENERGY_CAP,
 )
 from gopvpsim.formchange import attach_form_change
 from gopvpsim.thresholds import (
@@ -2039,7 +2039,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     focal_energy = 0
     if energy_mult:
         _eg = fm_template.get('energyGain', 0)
-        _cap = 100 - min(cm['energy'] for cm in cms_template)
+        _cap = ENERGY_CAP - min(cm['energy'] for cm in cms_template)
         focal_energy = min(energy_mult * _eg, max(0, _cap))
 
     # Cache opponent stats (BattlePokemon is mutated by simulate, but stats are fixed)
