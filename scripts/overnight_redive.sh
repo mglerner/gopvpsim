@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Overnight re-dive + article regen + comparison + verify pipeline.
 #
-# Runs all 40 website dives serially (the focal list lives in
-# run_website_dives.DIVES -- 36 GL + 4 UL as of the 2026-06-25 refresh),
+# Runs all website dives serially (the focal list lives in
+# run_website_dives.DIVES -- 44 = 38 GL + 6 UL as of the 2026-06-27
+# refresh; DIVES is authoritative, the loop iterates it, so trust that
+# count over any literal here),
 # patches per-opponent anchors, renders the Aegislash form-change comparison
 # page + first-draft narrative article and the Forretress/Jumpluff/Ninetales
 # comparison pages, bakes the Master-league ML IV guides (run_iv_guides.py,
@@ -89,11 +91,11 @@ log "  watch -n 5 -c 'scripts/chain_status.py --chain overnight'              # 
 log "  while true; do clear; scripts/chain_status.py --chain overnight; sleep 5; done   # no deps"
 log ""
 
-# 1. Twenty website dives (serial, per run_website_dives.py). Aegislash GL
+# 1. All website dives (serial, per run_website_dives.DIVES). Aegislash GL
 #    rejoined the chain 2026-04-21 so the 2026-04-21 rename refactor
 #    (drop compound <br> tier names, auto-gen standalone-mode narrative
 #    for non-CD species) reaches every shipped dive.
-step "Running 40 dives via run_website_dives.py" \
+step "Running website dives via run_website_dives.py" \
     python scripts/run_website_dives.py --reserve-cpus 0
 
 # The retrofit-only patch_dive_*.py patchers were deleted in the S7
