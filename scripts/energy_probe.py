@@ -33,7 +33,7 @@ from collections import defaultdict
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.path.insert(0, os.path.dirname(__file__))
 
-from gopvpsim.battle import simulate, pvpoke_dp
+from gopvpsim.battle import simulate, pvpoke_dp, ENERGY_CAP
 from gopvpsim.data import get_default_moveset
 from gopvpsim.moves import get_moves
 from gopvpsim.pokemon import iv_rank, pvpoke_default_ivs
@@ -189,7 +189,7 @@ def energy_values(fast_id, charged_ids):
     """
     fast_db, charged_db = get_moves()
     eg = fast_db[fast_id].get('energyGain', 0)
-    cap = max(0, 100 - min(charged_db[c]['energy'] for c in charged_ids))
+    cap = max(0, ENERGY_CAP - min(charged_db[c]['energy'] for c in charged_ids))
     return [min(m * eg, cap) for m in ENERGY_MULTS]
 
 
