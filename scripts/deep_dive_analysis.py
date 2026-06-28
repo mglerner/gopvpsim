@@ -9,7 +9,7 @@ import re
 
 import numpy as np
 
-from gopvpsim.moves import type_effectiveness
+from gopvpsim.moves import BONUS, STAB_MULTIPLIER, type_effectiveness
 
 
 # Module-level caches for numpy conversions of per-dive IV/score arrays.
@@ -84,8 +84,14 @@ def pretty_moveset(label):
 
 
 def pvp_damage(power, atk, def_, effectiveness, stab_mult):
-    """PvP damage formula: floor(0.5 * 1.3 * power * atk/def * eff * stab) + 1"""
-    return math.floor(0.5 * 1.3 * power * atk / def_ * effectiveness * stab_mult) + 1
+    """PvP damage formula: floor(0.5 * BONUS * power * atk/def * eff * stab) + 1
+
+    Uses the canonical float32-truncated BONUS from moves.py (not a literal
+    1.3) so per-hit damage agrees with the engine bit-for-bit at floor()
+    boundaries. Callers must build stab_mult from moves.STAB_MULTIPLIER and
+    effectiveness from moves.type_effectiveness for the match to hold.
+    """
+    return math.floor(0.5 * BONUS * power * atk / def_ * effectiveness * stab_mult) + 1
 
 
 def build_move_tuples(moveset_label, fast_db, charged_db):
@@ -212,7 +218,7 @@ def narrate_flip(focal_atk, focal_def, focal_hp, ref_atk, ref_def, ref_hp,
     if focal_def != ref_def:
         for move_id, power, mtype in opp_moves:
             eff = type_effectiveness(mtype, focal_types)
-            stab_mult = 1.2 if mtype in opp_types else 1.0
+            stab_mult = STAB_MULTIPLIER if mtype in opp_types else 1.0
             dmg_ref = pvp_damage(power, opp_atk, ref_def, eff, stab_mult)
             dmg_focal = pvp_damage(power, opp_atk, focal_def, eff, stab_mult)
             if dmg_ref != dmg_focal:
@@ -228,7 +234,7 @@ def narrate_flip(focal_atk, focal_def, focal_hp, ref_atk, ref_def, ref_hp,
     if focal_atk != ref_atk:
         for move_id, power, mtype in focal_moves:
             eff = type_effectiveness(mtype, opp_types)
-            stab_mult = 1.2 if mtype in focal_types else 1.0
+            stab_mult = STAB_MULTIPLIER if mtype in focal_types else 1.0
             dmg_ref = pvp_damage(power, ref_atk, opp_def, eff, stab_mult)
             dmg_focal = pvp_damage(power, focal_atk, opp_def, eff, stab_mult)
             if dmg_ref != dmg_focal:

@@ -845,7 +845,7 @@ DEFAULT_CARD_ROBUST_K = 512
 # specific opponent break/bulkpoints the lead reference misses (see the
 # selection block in generate_analysis_sections). On --no-mirror-slayer dives
 # there are no named anchors, so we fall back to DISTINCTNESS over each IV's
-# WON-SET (the (scenario, opponent) matchups it wins, score >= 500): a candidate
+# WON-SET (the (scenario, opponent) matchups it wins, score > 500; 500 = tie): a candidate
 # joins only if its won-set differs from every already-chosen spread by at least
 # REC_DISTINCTNESS_MIN_SYMDIFF cells (symmetric difference). Symmetric
 # difference, not net-new wins, is what collapses near-twins -- twins trade one
@@ -3332,7 +3332,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             base = iv * nS * nO
             w = _won_cache[iv] = frozenset(
                 (si, oi) for si in range(nS) for oi in range(nO)
-                if scores_flat[base + si * nO + oi] >= 500)
+                if scores_flat[base + si * nO + oi] > 500)  # 500=tie (PvPoke)
         return w
 
     chosen_ivs = []
