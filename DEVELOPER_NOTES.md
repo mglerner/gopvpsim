@@ -566,22 +566,25 @@ flips, max margin 273 — small + localized, recurring window-defenders
 Talonflame / Milotic / Guzzlord / Gourgeist / Dusclops. Scope + re-dive
 plan live in TODO.md's cache-rework handoff (warm selective re-dive).
 
-### OPEN 2026-06-27 — engine bug-hunt findings #2–#6 (#3 now FIXED; #2,#4–#6 open)
+### 2026-06-27 — engine bug-hunt findings #2–#6 (#2,#3,#4,#5 now RESOLVED; only #6 open, cosmetic)
 
 The 2026-06-27 adversarial bug-hunt confirmed five more issues beyond the
-`cmp_atk` fix above (#3 was fixed 2026-06-27, see its entry below; #2 and
-#4–#6 remain open). Full report + repros + per-bug recommendations:
-`docs/reviews/2026-06-27_engine_bug_hunt.md`. Left unfixed pending a
-judgment call or broad re-vet (see TODO.md "OVERNIGHT 2026-06-27" + the
-cache-rework handoff). Recorded here so they aren't lost to TODO pruning:
+`cmp_atk` fix above. STATUS (updated 2026-06-27 PM, pre-redive sweep): **#2,
+#3, #4, #5 are all now RESOLVED**; only **#6** (contested, measured cosmetic)
+remains genuinely open. Full report + repros + per-bug recommendations:
+`docs/reviews/2026-06-27_engine_bug_hunt.md`. Recorded here so they aren't
+lost to TODO pruning:
 
-- **#2 [MED] exact damage constants vs the game's float32-truncated ones.**
-  `moves.py` uses exact `1.3/1.2/1.6`; the game (and PvPoke's
-  `DamageCalculator.js`) computes in single precision
-  (`BONUS=1.2999999523…`, etc.). ~0.009% of damage calcs flip by 1, landing
-  exactly on the breakpoint/bulkpoint boundaries that are the core
-  deliverable. Repro: Tinkaton Play Rough vs Gourgeist (Small) — ours 51,
-  PvPoke 52. Fix shifts many fixtures → needs a full oracle re-vet.
+- **#2 [MED] exact damage constants vs the game's float32-truncated ones —
+  RESOLVED 2026-06-27 (`4e57321`).** `moves.py` now sources
+  `STAB_MULTIPLIER`/`BONUS`/`SUPER_EFFECTIVE` from the float32-truncated
+  values the game (and PvPoke's `DamageCalculator.js`) actually use
+  (`BONUS=1.2999999523…`, etc.), not exact `1.3/1.2/1.6`. This was the
+  boundary-scattered fix (no clean migration predicate) that makes the
+  pending re-dive irreducibly COLD, so every other pre-redive fix rides it
+  for free. Was: ~0.009% of damage calcs flipped by 1 on the
+  breakpoint/bulkpoint boundaries that are the core deliverable (repro:
+  Tinkaton Play Rough vs Gourgeist (Small) — old 51, PvPoke 52).
 - **#3 [MED] farm-down never stacks self-debuffing moves — RESOLVED
   2026-06-27.** The farm-down ("many-cycle") early-return threw a self-debuffing
   selected move at first affordability; PvPoke (ActionLogic.js:399-405) holds
@@ -607,11 +610,11 @@ cache-rework handoff). Recorded here so they aren't lost to TODO pruning:
   (they already disagreed under the old engine) — likely the near-KO-DP /
   `_optimize_move_timing` self-debuff-timing cluster, possibly an
   uncharacterized separate issue. Logged in TODO.md; out of scope for this fix.
-- **#4 [MED] slayer disk-cache key omits the focal level cap** →
-  silent-wrong stale hits across `--max-level` in Master mirror-slayer.
-  `scripts/slayer_cache.py` `compute_cache_key`; the sweep cache already
-  keys on `focal_max_level`. Bundled into the cache-rework session (needs a
-  `CACHE_VERSION` bump).
+- **#4 [MED] slayer disk-cache key omits the focal level cap — RESOLVED
+  2026-06-27 (cache-rework, `slayer_cache` v4).** `scripts/slayer_cache.py`
+  `compute_cache_key` now includes `focal_max_level` (mirrors the sweep
+  cache) with the `CACHE_VERSION` bumped to 4, so a `--max-level` change no
+  longer serves stale cross-cap hits in Master mirror-slayer.
 - **#5 [MED/LOW] `bandaid[929]` stack-switch missing its `bait_shields` gate
   -- RESOLVED 2026-06-27: kept ungated, documented as an INTENTIONAL
   divergence.** An A/B (focal no-bait vs bait-on opponent, GL+UL self-debuff
