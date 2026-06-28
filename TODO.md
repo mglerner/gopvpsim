@@ -1713,6 +1713,17 @@ guide from `ai` to `expert` is the closing of that commitment.
 
 ## Low priority
 
+* **ML guide "what do I get by best-buddying these?" view** — the "All
+  cases" IV-compare view (shipped 2026-06-28, `b494b28`) hides
+  best-buddy-conditional flips by default and badges their count
+  ("N best-buddy flips hidden"). A natural follow-up is a dedicated
+  summary that answers, for the user's candidate spreads, *what
+  matchups best-buddying unlocks/loses* — e.g. "best-buddy 15/15/14 to
+  win Solgaleo 2-1 + Kyurem 2-2; 15/14/15 gains nothing." The data is
+  already there (the alt grids / sibling quadrant rows); this is a
+  rendering/summarization feature, not new sim. Deferred 2026-06-28 by
+  Michael ("don't want to engineer that now").
+
 * **Team/multi-mon simulation** — currently only 1v1; real PvP is 3v3 with
   switching. Add team composition and switch-timing support. When this
   lands, honor `reset_on_switch`: Morpeko must re-enter in Full Belly on
