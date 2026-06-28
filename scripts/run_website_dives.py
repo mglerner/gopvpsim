@@ -83,7 +83,12 @@ DIVES = [
         'slug': 'oinkologne-female-great-league',
         'html_base': 'index.html',
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
-        'reference': 'TACKLE,BODY_SLAM,TRAILBLAZE',
+        # 2026-06-27: Mud Slap CD has shipped -- MUD_SLAP is now in both
+        # fastMoves and eliteMoves and is PvPoke's default fast move
+        # (get_default_moveset returns MUD_SLAP). The old TACKLE pin was a
+        # pre-CD leftover from the now-removed CD article; the live dive must
+        # reference the current meta build.
+        'reference': 'MUD_SLAP,BODY_SLAM,TRAILBLAZE',
     },
     {
         'species': 'Tinkaton',
