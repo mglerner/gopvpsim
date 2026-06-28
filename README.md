@@ -15,6 +15,19 @@ gamemaster, move stats, the type chart, and the meta rankings) is fetched from
 PvPoke. Scores are cross-checked against PvPoke's own simulate-mode engine.
 **This project would not exist without PvPoke.** Please support and credit it.
 
+## Credit to the deep-dive community
+
+I'm neither a PvP expert nor a Deep Dive expert! While building this, I crawled
+through as much information as I could get from the community. There are too many
+people, and I'm sure I'm failing to acknowledge some key folks, but I definitely
+read everything I could from [RyanSwag](https://www.youtube.com/@SwagTips) (his
+how-to-do-PvP-deep-dives videos), [JRE47](https://pokemongohub.net/post/author/jre47/),
+and [XehrFelrose](https://www.youtube.com/watch?v=6N3lXp39qtQ) (the deep-dive
+video we linked in the Reddit post). Given the heavy use of AI in this project,
+it's worth stating that I was consistently explicit about NOT using their dives
+to try to reproduce style/tone -- with the exception of Xehr's ML dives, which
+have mechanics that we can reproduce.
+
 ## Built with Claude
 
 This codebase makes heavy use of [Claude](https://www.anthropic.com/claude)
