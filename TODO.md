@@ -46,23 +46,56 @@ the earlier location-oriented passes missed. LANDED before launch:
 FAST-FOLLOW backlog from the sweep (non-gating, render/tooling-only,
 re-renderable via replay -- do NOT block launch; ~17 confirmed findings, top ones):
 
-- **[med, dead affordance]** comparison pages (`compare_loadouts.py`) emit
-  `cursor:pointer` + `data-sort` "sortable" headers with NO sort JS -- clicking
-  does nothing. Either wire up sort or drop the affordance. (The structural
-  affordance-diff hardening in the checklist would auto-catch this class.)
-- **[med, silent-incompleteness]** `build_matchup_web.py` can ship a partial
-  matrix and exit 0 after per-species pool-resolution failures (only aborts if
-  < 2 resolve). Add an expected-count assertion.
-- **[low] Tinkaton GL** reference `PLAY_ROUGH` vs PvPoke default `GIGATON_HAMMER`
-  -- confirm intentional or update (`run_website_dives.py`).
-- **[low] DRY/cleanup:** `gc_cache.py` still iterates the retired `iv_envelope`
-  namespace; `LEAGUE_CAPS`/`LEAGUE_CP` overlap + re-declared in scripts;
-  score-key `{mi}_{mode}@51` format open-coded in Python and JS;
-  `overnight_eta.py` doesn't model the ~7h ML tail.
-- **[low, test-side]** a few tests reimplement won-set with `>= 500`
-  (`test_probe_tier_cutoff_flips.py`, `test_find_losses_vs_general.py`); pass on
-  current fixtures but would diverge from production's `> 500` if an exact-500
-  tie enters. Align if touched.
+**Session-4 (2026-06-27 PM, Claude AFK churn) resolved most of these -- see
+the commits below. Remaining open items kept at the bottom.**
+
+- **[DONE] [med, dead affordance]** comparison pages (`compare_loadouts.py`)
+  sortable-header affordance with no sort JS -- DROPPED the `sortable` class +
+  its cursor/hover CSS so headers no longer signal interactivity (kept the
+  `data-sort` th type-hints as latent metadata). Articles keep their working
+  sorter; only the comparison path lacked the JS.
+  *Enhancement follow-up (low):* articles already ship a generic
+  `table.sortable` click-sorter (`generate_article.py` ~3440-3505) that reads
+  the SAME `th data-sort` type-hint scheme compare_loadouts uses. Wiring it up
+  for the comparison pages is a clean reuse -- ideally extract a shared helper
+  (e.g. into `render_article.py`) and use it from both files rather than
+  duplicating the JS. Needs click-testing of the bool/pct/num cell parsing +
+  the sort-arrow CSS. Render-only.
+- **[DONE] [med, silent-incompleteness]** `build_matchup_web.py` partial-matrix
+  exit-0 -- now HARD-FAILS on any pool-resolution skip on a non-limited run
+  (`--allow-skipped` override, mirrors `run_iv_guides.py --allow-oversubscribe`).
+- **[DONE/n-a] Tinkaton GL** reference -- already handled by commit `1651217`
+  (drop stale PLAY_ROUGH; track get_default_moveset). Full L4 reference-pin
+  freshness re-check this session: all pins fresh or intentional variants
+  (Forretress BUG_BITE variants; Mimikyu-Busted pins == base Mimikyu default;
+  Sableye GL same charged-move SET in a different ORDER -- cosmetic, our sim
+  baits by policy not list order). The Oinkologne/Tinkaton stale-pin class is
+  fully resolved.
+- **[DONE] [low] DRY/cleanup:** `LEAGUE_CP` re-declarations consolidated to the
+  canonical `gopvpsim.pokemon.LEAGUE_CP` (`generate_article.py`,
+  `compare_loadouts.py`). `gc_cache.py`'s `iv_envelope` iteration is
+  INTENTIONAL (report-only surfacing of the legacy dir for manual pruning; the
+  `if d.is_dir()` guard makes it a no-op once deleted) -- closed as not-a-bug.
+- **[DONE] [test-side + broader] win-set `>= 500` -> `> 500`.** Session-3's
+  "unified ALL win-classification sites" claim was FALSE (adversarial skeptic
+  pass): `>= 500` (counts a 500 TIE as a win) was still live in
+  `deep_dive_analysis` (find_flips, probe_tier_cutoff), `deep_dive_narrative`
+  (_flavor_max_winrates, _find_losses_vs_general), `deep_dive_slayer` (4 win
+  counts), `export_owned_breakdown_bundle`, `generate_article`,
+  `compare_loadouts` (+ user-facing title/doc text). All unified to `> 500`;
+  the two desync-prone reimplementation tests fixed in lockstep with their
+  production targets. JS path was already `> 500`, so the whole surface is now
+  consistent. Render/analysis-only, rides the cold pass.
+
+**Still open (low):**
+- score-key `{mi}_{mode}@51` format open-coded in Python and JS (DRY) -- NOT
+  touched this session: it is a cache/render data contract, too risky to
+  refactor unattended. Do it deliberately with a re-render check.
+- `overnight_eta.py` doesn't model the ~7h ML tail (ETA accuracy, enhancement).
+- **No shared win-predicate constant.** The `> 500` / `500 = tie` boundary is
+  open-coded at ~dozens of Python+JS sites. A shared `is_win(score)` / WIN_TIE
+  constant would have prevented the session-3 incomplete-unification entirely.
+  Deferred (broad, cross-language touch); flagged as the real DRY root-cause.
 
 ### Pre-redive adversarial assessment batch (2026-06-27 PM, session 2)
 
