@@ -672,6 +672,7 @@ def style():
   .cmp-lose { color:var(--loss); font-weight:700; }
   .cmp-tie { color:var(--tie); font-weight:700; }
   .cmp-flip { color:var(--flip); }
+  .cmp-altmark { opacity:0.5; font-weight:400; }
   .cmp-more { color:var(--text-muted); font-size:0.76rem; font-style:italic;
     cursor:pointer; text-decoration:underline dotted; }
   .cmp-more:hover { color:var(--text); }
