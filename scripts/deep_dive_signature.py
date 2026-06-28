@@ -9,10 +9,14 @@ ways raw stats enter a battle:
      ``moves.damage(power, atk * stage_mult, def_ * stage_mult, ...)``
      (per-move, per-stat-stage; see _ensure_dmg_cache /
      _ensure_dp_cache);
-  2. CMP:     pairwise attack comparisons between the two combatants
-     (``>``, ``>=``, ``<``, ``!=`` — battle.py lines 227, 358, 422,
-     625, 1005, 2153, 2246, 2273), captured exactly by the 3-way
-     sign of (focal.atk - opp.atk);
+  2. CMP:     pairwise attack-priority comparisons between the two
+     combatants (``>``, ``>=``, ``<``, ``!=`` at the CMP/ordering sites
+     in battle.py), captured exactly by the 3-way sign of
+     (focal.cmp_atk - opp.cmp_atk). NB this is the shadow-STRIPPED
+     attack (``atk / 1.2`` for a shadow mon): the x1.2 boosts damage but
+     not priority, so the dedup column divides each side by its own
+     shadow factor (signature_groups, per the 2026-06-13 cmp_atk fix) —
+     NOT the raw focal.atk/opp.atk an earlier version of this note named;
   3. HP:      the integer max HP.
 
 Everything else (moves, types, energy, cooldowns, buff config, form
