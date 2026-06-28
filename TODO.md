@@ -45,11 +45,31 @@ launch-blocker plus several free ride-alongs; all landed, all ride the cold pass
   all 3 contexts, with the toggle markup DRY'd into one `cover_toggle_html`
   helper + single `COVER_TOGGLE_CSS` (`85e7284`). Output-neutral (re-render
   byte-identical).
+- **Duplicate `id="opp-<slug>"` anchors** -- each opponent's deep-link anchor was
+  emitted by multiple sections (5 open-coded sites + 2 per-fn seen-sets) -> ~57
+  duplicate ids/page (invalid HTML; browser jumps to first only). DRY'd into one
+  render-scoped `opp_anchor_id()` helper + registry (reset per page in
+  `generate_interactive_html`); first mention per opponent emits, rest skip
+  (`fc40c17`). Net 86 ids/86 distinct, 0 dups, all 72 `#opp-` links resolve, slug
+  set preserved. Render-only. "Flavor 1" (de-dup, land on first-rendered mention)
+  -- see the Flavor-2 future fix below.
 - **Cleanup**: deleted the stale `pogo-simulator/` husk (a 16K symlink-to-gopvpsim
   shell; completes the long-deferred `pogo-simulator -> gopvpsim` rename).
 
 Final gate (whole batch): full suite 1100p/14xf, oracle audit clean, benchmark
 3,436 sims/s.
+
+FUTURE FIX (render-only, NOT a launch blocker -- re-renderable via replay
+anytime): **`#opp-` canonical landing ("Flavor 2").** Today (`fc40c17`) a
+`#opp-<slug>` link lands on the *first-rendered* mention of that opponent, which
+is inconsistent across opponents (sometimes a rich `dd-opp-row` detail breakdown,
+sometimes a bare name span in a coverage list, sometimes a flip-list `<li>`).
+Flavor 2 = pick ONE canonical per-opponent target (prefer the `dd-opp-row` detail
+when present, else the breakpoint `<li>`) so every link lands on the most useful
+spot consistently. Deferred because (a) it changes nav behavior and (b) needs a
+canonical-target design decision (not every opponent has a `dd-opp-row`). Links
+were unused so this is low priority; do it as a focused render change + replay
+re-render when convenient.
 
 ### Session-1 pre-redive batch (2026-06-27 PM) -- also rides the cold pass
 
