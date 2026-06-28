@@ -700,6 +700,18 @@ move selection closed 2026-04-15 as not-a-real-issue.)
      tie-break path (no concrete species recorded — "affects enumerated alt-move
      combos", per the commit). Construct + verify revert-fails.
 
+* **Guard for the IV-scanner `maxLevel` single-source (fixed `725c184`).** No
+  test pins `_collection_data['maxLevel']` (deep_dive.py:4602) to
+  `LEAGUE_MAX_LEVEL.get(league)`, so a future re-hardcode could silently
+  re-introduce the GL/UL "owned mons one level too high" bug. The strong pin:
+  render a tiny GL dive with a collection and assert the emitted
+  `DATA.collection.maxLevel == 50.0` (a table-only assertion is too weak — it
+  wouldn't catch line 4602 drifting). Heavy (needs a dive render + a Poke Genie
+  CSV fixture); deferred. Also worth folding in: the latent dead-code `51.0`
+  fallbacks in `deep_dive_user_collection.js:275` (`ivsToStatsAtCap` default,
+  caller always passes maxLevel) and `:344` (`matchMons`, zero live call sites)
+  — single-source these to a league-aware ceiling if matchMons is ever wired up.
+
 * **No-bait oracle tests from iv-tech deep dives** — `pvpoke_dp`
   accepts `bait_shields=False`; sanity tests for the farm-down gate
   landed in `test_battle.py` (see `test_pvpoke_dp_no_bait_*`).
@@ -1272,6 +1284,20 @@ across Post-S5 Sessions S6-S10 (2026-04-17/18). Open polish:
   extra shape-tag line.
 
 ## Deep-dive narrative — open polish
+
+* **Move display-name shown two incompatible ways on one page (DRY, confirmed
+  2026-06-28 round-3, 2/2 skeptics, already-inconsistent).** Two helpers derive
+  a move's label: `auto_gen_narrative._gm_move_display` (scripts/auto_gen_narrative.py:90-107)
+  uses the gamemaster `name` field; `deep_dive_analysis.pretty_name`/`pretty_moveset`
+  (scripts/deep_dive_analysis.py:72-83, also `generate_article.py:1848,1969` and
+  `iv_envelope_analysis.py:226`) always title-case the raw moveId. For ~39 moves
+  the labels already differ on the SAME dive page — e.g. header "Super Power" vs
+  narrative "Superpower"; "Power Up Punch" vs "Power-Up Punch"; "Natures Madness"
+  vs "Nature's Madness"; "Hidden Power Bug" vs "Hidden Power (Bug)". Cosmetic
+  (no number changes), but a real inconsistency. Fix: single-source move display
+  (have `pretty_name` consult the gamemaster name like `_gm_move_display`, or
+  route both through one helper). Broad multi-file touch + ship-narrative-
+  adjacent (auto-gen prose), so do it deliberately, not unattended. Render-only.
 
 * **22-IV catch-phrase edge case** — `_catch_phrase` caps at 500
   catches as "very rare". The 22-IV Altaria Slayer on Goodra moveset
