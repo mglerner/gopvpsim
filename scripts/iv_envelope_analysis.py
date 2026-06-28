@@ -272,8 +272,8 @@ def close_calls(base_metrics, drop_metrics, cheapest_cost):
         if drop['shields'] < base['shields']:
             kind = 'shield'
             n = base['shields'] - drop['shields']
-            margin = (f"keeps the win but spends {n} more "
-                      f"shield{'s' if n != 1 else ''} "
+            margin = (f"keeps the win, but has to spend {n} more "
+                      f"shield{'s' if n != 1 else ''} than a perfect 15/15/15 "
                       f"(now {drop['shields']} left, was {base['shields']})")
         elif (base['hp'] >= NEAR_DEATH_FRAC * base['max_hp']
               and drop['hp'] < NEAR_DEATH_FRAC * drop['max_hp']
@@ -281,12 +281,12 @@ def close_calls(base_metrics, drop_metrics, cheapest_cost):
                   >= NEAR_DEATH_MIN_DELTA_FRAC * base['max_hp']):
             kind = 'neardeath'
             margin = (f"still wins but barely survives, {drop['hp']} HP left of "
-                      f"{drop['max_hp']} (was {base['hp']})")
+                      f"{drop['max_hp']} -- a perfect 15/15/15 keeps {base['hp']}")
         elif base['energy'] - drop['energy'] >= cheapest_cost:
             kind = 'energy'
             margin = (f"still wins but banks {base['energy'] - drop['energy']} "
-                      f"less energy, about one fewer charged move "
-                      f"(now {drop['energy']}, was {base['energy']})")
+                      f"less energy than a perfect 15/15/15, about one fewer "
+                      f"charged move (now {drop['energy']}, was {base['energy']})")
         if kind is not None:
             calls.append({'opp': disp, 'shield': lab,
                           'kind': kind, 'margin': margin})
