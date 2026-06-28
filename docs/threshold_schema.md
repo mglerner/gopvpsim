@@ -148,10 +148,12 @@ Best-buddying a Pokemon adds +1 power-up level (to L51). The dive can compute
 a second focal sweep one level higher and expose an in-page "Allow best-buddy
 (Level 51)" toggle that recomputes the whole view (card + scatter + prose).
 Whether a dive does this is resolved with precedence
-**CLI flag > this TOML table > league policy** (league policy: on for Ultra,
-opt-in for Great; Master/Little already cap at 51 so the toggle is a no-op).
-The toggle is also auto-suppressed when no IV's level can actually move (e.g.
-a species already CP-capped below 50.5), with a short note shown instead.
+**CLI flag > this TOML table > league policy** (league policy: on for Great +
+Ultra; Master/Little already cap at 51 so the toggle is a no-op). For a
+consistent UI the toggle renders on every Great/Ultra dive; when no IV's level
+can actually move (a species already CP-capped below 50.5) the toggle is a
+provable no-op -- it still appears (with a "no change for this mon" hint) but
+runs no extra sims, since the L51 grids are byte-identical to L50.
 
 This is a per-species dive-behavior table read directly by `deep_dive.py`
 (like the un-documented `cd_prep` / `article` raw reads), not a registry
