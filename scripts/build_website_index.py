@@ -20,6 +20,7 @@ Usage:
 """
 from __future__ import annotations
 
+import argparse
 import html
 import sys
 import tomllib
@@ -205,7 +206,8 @@ def _fallback_meta_from_html(sub: Path) -> dict | None:
 
 
 def load_entries(base_dir: Path, *, href_prefix: str = '',
-                 exclude: frozenset[str] = frozenset()) -> list[dict]:
+                 exclude: frozenset[str] = frozenset(),
+                 dropped_pages: list | None = None) -> list[dict]:
     """Return one dict per valid subdir, sorted by title.
 
     Prefers ``meta.toml`` (authored schema) when present; falls back
@@ -214,7 +216,18 @@ def load_entries(base_dir: Path, *, href_prefix: str = '',
     skipped. ``exclude`` holds subdir basenames to skip wholesale
     (used to exclude the ``articles/`` / ``comparisons/`` / ``guides/``
     container subdirs when scanning the site root for dives).
+
+    ``dropped_pages``: if provided, append ``"<base>/<sub>"`` for every
+    dir that gets skipped DESPITE containing a rendered ``index.html`` --
+    i.e. a real page made unreachable from the index nav (malformed/partial
+    meta.toml, unparseable title). A dir with no ``index.html`` is not a
+    page, so its skip is not recorded. main() uses this to hard-fail rather
+    than silently ship an unreachable page (the F1 silent-incompleteness
+    lens, baked into the producer).
     """
+    def _note_dropped(sub: Path) -> None:
+        if dropped_pages is not None and (sub / 'index.html').exists():
+            dropped_pages.append(f'{base_dir.name}/{sub.name}')
     if not base_dir.exists():
         return []
     entries = []
@@ -233,12 +246,14 @@ def load_entries(base_dir: Path, *, href_prefix: str = '',
             if missing:
                 print(f"  skip {sub.name}/: meta.toml missing {missing}",
                       file=sys.stderr)
+                _note_dropped(sub)
                 continue
         else:
             meta = _fallback_meta_from_html(sub)
             if meta is None:
                 print(f"  skip {sub.name}/: no meta.toml and no index.html "
                       f"title to fall back on", file=sys.stderr)
+                _note_dropped(sub)
                 continue
         landing_path = sub / meta['landing']
         if not landing_path.exists():
@@ -760,25 +775,51 @@ SUPPORT_PAGE_HTML = """<!DOCTYPE html>
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(
+        description='Rebuild the top-level website index.')
+    parser.add_argument('--allow-skipped', action='store_true',
+                        help='build the index even if a rendered page dir '
+                             '(has index.html) is dropped for a malformed/'
+                             'missing meta.toml (default: hard-fail so a '
+                             'partial render cannot silently ship a page '
+                             'that is unreachable from the index nav)')
+    args = parser.parse_args()
+
     if not WEBSITE_DIR.exists():
         print(f"error: {WEBSITE_DIR} does not exist", file=sys.stderr)
         return 1
+    dropped_pages: list = []
     dives = load_entries(
         WEBSITE_DIR,
         exclude=frozenset({'articles', 'comparisons', 'guides'}),
+        dropped_pages=dropped_pages,
     )
     # The matchup web lives at the site root (userdata/website/matchups/) with
     # no meta.toml, so load_entries() picks it up as a "dive". It is not a
     # per-species dive, so split it out by slug into its own section.
     matchup_web = [d for d in dives if d['slug'] == 'matchups']
     dives = [d for d in dives if d['slug'] != 'matchups']
-    articles = load_entries(ARTICLES_DIR, href_prefix='articles/')
+    articles = load_entries(ARTICLES_DIR, href_prefix='articles/',
+                            dropped_pages=dropped_pages)
     # Split the ML IV guides (slug "<species>-ml-iv-guide[-even]") out from the
     # editorial articles so they render as a labeled chip-row sub-group under
     # the single "Articles" section (rather than a separate top-level section).
     iv_guides = [a for a in articles if '-ml-iv-guide' in a['slug']]
     articles = [a for a in articles if '-ml-iv-guide' not in a['slug']]
-    comparisons = load_entries(COMPARISONS_DIR, href_prefix='comparisons/')
+    comparisons = load_entries(COMPARISONS_DIR, href_prefix='comparisons/',
+                               dropped_pages=dropped_pages)
+
+    # Completeness guard (F1, 2026-06-27): a rendered page (dir with an
+    # index.html) that gets dropped from the index is unreachable from site
+    # nav but still on disk -- the same WARN-not-FAIL silent-incompleteness
+    # shape as build_matchup_web / the ML tail. Hard-fail rather than ship a
+    # partial index at exit 0; --allow-skipped overrides.
+    if dropped_pages and not args.allow_skipped:
+        print(f"[FAIL] index: {len(dropped_pages)} rendered page(s) dropped "
+              f"(unreachable from nav): {', '.join(sorted(dropped_pages))}. "
+              f"Fix the meta.toml/render or pass --allow-skipped.",
+              file=sys.stderr)
+        return 1
 
     # Guides landing-page entry. build_guides.py writes
     # guides/meta.toml with {title, description, landing}; surface a
