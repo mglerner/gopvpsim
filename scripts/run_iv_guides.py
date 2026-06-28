@@ -135,6 +135,12 @@ def main():
                     help='skip species whose article dir already exists')
     ap.add_argument('--no-index-refresh', action='store_true',
                     help='do not rebuild the website index after each guide')
+    ap.add_argument('--allow-oversubscribe', action='store_true',
+                    help='permit a planned worker footprint exceeding physical '
+                         'cores (jobs x per-guide workers > cores). Off by '
+                         'default: the preflight HARD-FAILS instead, so the '
+                         'cache-rework ML-oversubscription bug cannot recur '
+                         'silently. Only set this if you know what you are doing.')
     ap.add_argument('--iv-floor', type=int, default=DEFAULT_IV_FLOOR,
                     help='default per-stat IV floor for ALL species (default '
                          f'{DEFAULT_IV_FLOOR}). The FLOOR_10_SPECIES set is '
@@ -165,12 +171,25 @@ def main():
         jobs = max(1, cores - a.reserve)
     else:
         jobs = 1
-    if jobs > 1:
-        print(f'WARNING: running {jobs} guides concurrently. Since the cache-rework '
-              f'each guide already fans across all cores (iv_sweep), so on this '
-              f'{cores}-core host that OVERSUBSCRIBES ({jobs}x ~{min(cores, 16)} '
-              f'workers). Use the default (serial) unless you have >16 cores.',
-              flush=True)
+    # Concurrency PREFLIGHT (do not rely on a human multiplying it out).
+    # Each guide's iv_sweep fans across a Pool of min(cpu_count, 16) workers, so
+    # the real footprint is jobs x per_guide_workers. HARD-FAIL if that exceeds
+    # physical cores -- this is the code-level guard that makes the cache-rework
+    # ML-oversubscription bug unable to recur silently (the resource-lens
+    # hardening; see docs/predive_checklist.md).
+    per_guide_workers = min(cores, 16)
+    planned = jobs * per_guide_workers
+    print(f'Concurrency preflight: {jobs} job(s) x {per_guide_workers} '
+          f'workers/guide = {planned} planned workers vs {cores} physical cores.',
+          flush=True)
+    if planned > cores and not a.allow_oversubscribe:
+        sys.exit(
+            f'ABORT: planned worker footprint {planned} > {cores} physical '
+            f'cores ({jobs} concurrent guides x {per_guide_workers} workers '
+            f'each). Since the cache-rework one guide already saturates the '
+            f'cores, so concurrent guides oversubscribe and risk OOM-killed / '
+            f'incomplete guides. Use the default (serial, --jobs 1) on a '
+            f'<=16-core host, or pass --allow-oversubscribe to override.')
     print(f'Detected {cores} physical cores; running {jobs} guide(s) '
           f'{"serially" if jobs == 1 else "concurrently"} '
           f'(each fans across all cores via iv_sweep).')
