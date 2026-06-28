@@ -53,10 +53,10 @@ def _reference_probe(data_obj, score_arrays_all, moveset_idx,
         for si, scen in enumerate(scenarios):
             for oi, opp in enumerate(opponents):
                 pw = sum(1 for iv in passing
-                         if scores_flat[iv * nS * nO + si * nO + oi] >= 500
+                         if scores_flat[iv * nS * nO + si * nO + oi] > 500
                          ) / len(passing)
                 fw = sum(1 for iv in failing
-                         if scores_flat[iv * nS * nO + si * nO + oi] >= 500
+                         if scores_flat[iv * nS * nO + si * nO + oi] > 500
                          ) / len(failing)
                 if pw >= pass_winrate_min and fw <= fail_winrate_max:
                     results.append({

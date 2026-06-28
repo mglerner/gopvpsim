@@ -66,7 +66,7 @@ def breakdown_from_dive(path):
     def winset(iv):
         base = iv * nS * nO
         return {(oi, si) for si in even_idx for oi in range(nO)
-                if scores[base + si * nO + oi] >= 500}
+                if scores[base + si * nO + oi] > 500}  # 500 = tie, not a win
 
     refw = winset(ref)
     drops = {}

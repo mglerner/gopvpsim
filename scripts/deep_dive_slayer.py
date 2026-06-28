@@ -38,7 +38,8 @@ def discover_slayer_thresholds(results, opponent_idx, n_scenarios):
     """
     Discover IV thresholds optimized to beat a specific opponent.
 
-    Ranks each IV by the number of shield scenarios it WINS (score >= 500)
+    Ranks each IV by the number of shield scenarios it WINS (score > 500;
+    500 = tie, not a win)
     against the target opponent, breaking ties by average score. This
     surfaces "slayer" tiers — IVs that flip the most matchups in their
     favor against a specific opponent.
@@ -61,7 +62,7 @@ def discover_slayer_thresholds(results, opponent_idx, n_scenarios):
     for r in results:
         po = r.get('per_opp', {})
         scen_scores = [po.get((si, opponent_idx), 0) for si in range(n_scenarios)]
-        wins = sum(1 for s in scen_scores if s >= 500)
+        wins = sum(1 for s in scen_scores if s > 500)  # 500 = tie
         avg = sum(scen_scores) / n_scenarios if n_scenarios else 0
         scored.append((wins, avg, r))
     scored.sort(key=lambda x: (-x[0], -x[1]))
@@ -458,15 +459,15 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                     continue
 
                 if metric == 'even':
-                    wins = sum(1 for i in even_indices if cached[i] >= 500)
+                    wins = sum(1 for i in even_indices if cached[i] > 500)
                     frac = wins / n_even if n_even else 0.0
                 elif metric == 'even-strict':
                     # Counts only IVs that win ALL even scenarios vs this opponent
-                    won_all_even = all(cached[i] >= 500 for i in even_indices)
+                    won_all_even = all(cached[i] > 500 for i in even_indices)
                     wins = n_even if won_all_even else 0
                     frac = 1.0 if won_all_even else 0.0
                 else:  # 'all' and any unknown metric
-                    wins = sum(1 for s in cached if s >= 500)
+                    wins = sum(1 for s in cached if s > 500)  # 500 = tie
                     frac = wins / len(cached) if cached else 0.0
 
                 avg = sum(cached) / len(cached)

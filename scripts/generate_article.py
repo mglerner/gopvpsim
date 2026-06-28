@@ -235,7 +235,7 @@ def _aggregate_wins(scores: list[int], n_ivs: int, n_s: int, n_o: int
             base = base_iv + si * n_o
             w = 0
             for oi in range(n_o):
-                if scores[base + oi] >= 500:
+                if scores[base + oi] > 500:  # 500 = tie, not a win
                     w += 1
                     per_opponent_wins[oi] += 1
             per_scenario_wins[si] += w
@@ -2334,8 +2334,8 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
         '<table class="matchup-delta sortable" data-default-sort="3" data-default-dir="desc">'
         '<thead><tr>'
         '<th scope="col" data-sort="str">Opponent</th>'
-        f'<th scope="col" data-sort="pct" title="Win rate with {default_name} moveset. Varies all 4096 {species_name} IVs x 9 shield scenarios; opponent fixed at PvPoke-default IVs. Win = battle rating >= 500.">{default_name} Win Rate</th>'
-        f'<th scope="col" data-sort="pct" title="Win rate with {cd_name} moveset. Varies all 4096 {species_name} IVs x 9 shield scenarios; opponent fixed at PvPoke-default IVs. Win = battle rating >= 500.">{cd_name} Win Rate</th>'
+        f'<th scope="col" data-sort="pct" title="Win rate with {default_name} moveset. Varies all 4096 {species_name} IVs x 9 shield scenarios; opponent fixed at PvPoke-default IVs. Win = battle rating > 500 (500 = tie).">{default_name} Win Rate</th>'
+        f'<th scope="col" data-sort="pct" title="Win rate with {cd_name} moveset. Varies all 4096 {species_name} IVs x 9 shield scenarios; opponent fixed at PvPoke-default IVs. Win = battle rating > 500 (500 = tie).">{cd_name} Win Rate</th>'
         '<th scope="col" data-sort="num" title="Change in win rate, in percentage points (CD win rate minus old-default win rate).">&#916; (pp)</th>'
         '<th scope="col" data-sort="bool" title="Aggregate matchup crosses the 50% win line: +Flip = CD wins where old default lost, -Flip = old default wins where CD loses.">Flip?</th>'
         '</tr></thead>'
