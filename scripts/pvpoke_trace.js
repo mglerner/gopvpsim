@@ -3,9 +3,6 @@
 // Battle.simulate() on an arbitrary 1v1 matchup, and emits JSON with the
 // PvPoke score, winner, turn count, and decisionLog. ActionLogic DP-plan
 // probes are wired in a follow-up pass.
-//
-// See /Users/mglerner/.claude/plans/parsed-greeting-river.md for the full
-// plan this is implementing.
 
 'use strict';
 
