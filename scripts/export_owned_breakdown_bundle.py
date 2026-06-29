@@ -52,7 +52,10 @@ def decode(b64):
     return struct.unpack(f'<{len(raw) // 2}H', raw)
 
 
-def breakdown_from_dive(path):
+def _lost_cells(path):
+    """Shared core: per-IV set of even-shield (opp, scenario) cells the rank-1
+    spread wins but this IV loses. Returns (data, opps, scen, even_idx, ref,
+    {iv_idx: {(oi, si), ...}})."""
     data, sgz = parse_dive(path)
     key = (next((k for k in sgz if k.endswith('_pvpoke')), None)
            or next(iter(sgz)))
@@ -69,16 +72,52 @@ def breakdown_from_dive(path):
                 if scores[base + si * nO + oi] > 500}  # 500 = tie, not a win
 
     refw = winset(ref)
-    drops = {}
+    lost_per_iv = {}
     for iv in range(data['nIvs']):
         lost = refw - winset(iv)
-        if not lost:
-            continue
+        if lost:
+            lost_per_iv[iv] = lost
+    return data, opps, scen, even_idx, ref, lost_per_iv
+
+
+def breakdown_from_dive(path):
+    data, opps, scen, even_idx, ref, lost_per_iv = _lost_cells(path)
+    drops = {}
+    for iv, lost in lost_per_iv.items():
         a, d, s = data['ivA'][iv], data['ivD'][iv], data['ivS'][iv]
         drops[f"{a}/{d}/{s}"] = sorted(
             f"{opps[oi]} {scen[si][0]}-{scen[si][1]}" for (oi, si) in lost)
     rank1 = [data['ivA'][ref], data['ivD'][ref], data['ivS'][ref]]
     return data['species'], data['league'], {'rank1': rank1, 'drops': drops}
+
+
+def bitmask_from_dive(path):
+    """Compact variant of breakdown_from_dive: instead of a per-IV list of
+    opponent strings, emit a per-IV bitmask over the dive's even-shield
+    (opponent x scenario) cells plus a one-time `names` header to decode it.
+
+    Bit order: cell index c = local_si * nOpponents + oi, where local_si is the
+    position of the scenario within even_idx and oi is the opponent index. Each
+    IV's mask is little-endian bit-packed bytes, base64-encoded. Only IVs that
+    drop something are stored. Width is per-dive (nCells = len(even_idx) *
+    nOpponents), so `names` must be used to decode."""
+    data, opps, scen, even_idx, ref, lost_per_iv = _lost_cells(path)
+    nO = data['nOpponents']
+    local = {si: i for i, si in enumerate(even_idx)}
+    names = [f"{opps[oi]} {scen[si][0]}-{scen[si][1]}"
+             for si in even_idx for oi in range(nO)]
+    nCells = len(names)
+    masks = {}
+    for iv, lost in lost_per_iv.items():
+        bits = bytearray((nCells + 7) // 8)
+        for (oi, si) in lost:
+            c = local[si] * nO + oi
+            bits[c // 8] |= 1 << (c % 8)
+        a, d, s = data['ivA'][iv], data['ivD'][iv], data['ivS'][iv]
+        masks[f"{a}/{d}/{s}"] = base64.b64encode(bytes(bits)).decode('ascii')
+    rank1 = [data['ivA'][ref], data['ivD'][ref], data['ivS'][ref]]
+    return data['species'], data['league'], {
+        'rank1': rank1, 'names': names, 'masks': masks}
 
 
 def main():
@@ -87,19 +126,24 @@ def main():
     ap.add_argument('dives', nargs='*',
                     help='dive landing HTML files (default: all website landings)')
     ap.add_argument('--out', required=True)
+    ap.add_argument('--bitmask', action='store_true',
+                    help='emit the compact per-IV bitmask variant (with a names '
+                         'header) instead of the full opponent-string list')
     a = ap.parse_args()
 
+    extract = bitmask_from_dive if a.bitmask else breakdown_from_dive
+    count_key = 'masks' if a.bitmask else 'drops'
     dives = a.dives or glob.glob(os.path.join('userdata', 'website', '*', 'index.html'))
     bundle = {}
     for path in sorted(dives):
         try:
-            species, league, entry = breakdown_from_dive(path)
+            species, league, entry = extract(path)
         except (ValueError, KeyError) as e:
             print(f"skip {path}: {type(e).__name__} {e}")
             continue
         section = bundle.setdefault(f"{league.capitalize()} League", {})
         section[species] = entry
-        print(f"{species} ({league}): {len(entry['drops'])} IVs give up something")
+        print(f"{species} ({league}): {len(entry[count_key])} IVs give up something")
 
     os.makedirs(os.path.dirname(a.out) or '.', exist_ok=True)
     with open(a.out, 'w') as f:
