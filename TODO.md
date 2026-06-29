@@ -232,7 +232,7 @@ The S7 dead-code removal pass ran 2026-06-12 (see CHANGELOG). Still open
   is the single source of truth (bestChargedMove per-turn recompute,
   the near-KO plan cluster, the battle-timeout guard). Re-audit
   anytime: `python scripts/audit_oracle_harness.py` (covers GL + UL;
-  current baseline 153 cells = 136 exact + 17 documented).
+  current baseline 207 cells = 170 exact + 37 documented).
 
 * **Speed test** -- compare our speed vs the PvPoke JS code, look for
   ways we can speed ours up. *(Partly addressed 2026-06-10: holistic
