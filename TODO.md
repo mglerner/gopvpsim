@@ -17,16 +17,6 @@ on the trusted engine. Re-dive runbook (for the next time one is needed):
 
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
-- **[tooling] per-slug historical-timing ETA estimator** (Michael greenlit
-  2026-06-28; the just-finished cold bake is the clean per-slug seed dataset).
-  Today `overnight_eta.py` buckets every dive crudely (`gl_full`/`ul_full`/
-  `forretress`) + flat fallback mean, so a heavyweight (sableye/medicham/carbink)
-  and a no-op (registeel) both read `gl_full` but differ ~5x. Agreed build (scope
-  1): keep a per-slug cold-timing table parsed from `[N/M] slug ... Done in X min`
-  pairs in `userdata/logs/20*/overnight_*.log`, key each estimate on species,
-  bucket-mean only for never-seen slugs. All `scripts/` tooling, nothing
-  engine-hashed. (Stopgaps already landed: `37655db` recalibrated baselines,
-  `58dc88d` folded the ~7h ML tail into the whole-script ETA.)
 - **[render DRY] score-key `{mi}_{mode}@51` parity (Python<->JS).** Open-coded in
   `deep_dive.py` + `deep_dive_engine.js`; consistent today, loud failure mode.
   Optional belt-and-suspenders parity test only (it's a cache/render data

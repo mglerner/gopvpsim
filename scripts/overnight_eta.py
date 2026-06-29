@@ -19,18 +19,30 @@ alongside per-dive progress.
 Method:
   * Enumerate all dive slugs in chain order from run_website_dives.py's
     "Found N dive(s) to run:" block at the top of the wrapper log.
-  * Bucket dives by type: gl_full / ul_full / forretress. Different
-    buckets have very different runtimes (GL top-50 vs Forretress with
-    top-movesets=1), so a global average would lie.
+  * Build a per-slug cold-timing table from PRIOR overnight logs (see
+    _build_slug_timing_table): each slug's most-recent cold-chain time.
+    This is the primary estimate for a not-yet-started dive -- a
+    heavyweight (shadow-sableye ~49m) and a lightweight (mimikyu-busted
+    ~4m) share the gl_full bucket but differ ~10x, so a per-species seed
+    beats a bucket mean. Bucket means are used only for slugs the table
+    has never seen.
+  * Bucket dives by type: gl_full / ul_full / forretress -- the
+    never-seen-slug fallback. Different buckets have very different
+    runtimes (GL top-50 vs Forretress with top-movesets=1), so a global
+    average would lie.
   * Parse completed dives from "[N/M] slug" banners paired with the
     following "Done in X.X min" marker.
   * For the currently-running dive, find its start timestamp from the
     next "[HH:MM:SS]" log line after the latest banner, subtract
-    from now to get elapsed, then estimate remaining = bucket_avg -
-    elapsed (clamped >= 0).
-  * For not-yet-started dives, use bucket_avg of the classify() group.
+    from now to get elapsed, then estimate remaining = est - elapsed
+    (clamped >= 0), where est is the per-slug seed if known else bucket_avg.
+  * For not-yet-started dives, use the per-slug seed if known, else
+    bucket_avg of the classify() group.
   * Use fallback baselines when a bucket has no completed dives yet;
     these are loose approximations, sharpen as real completions arrive.
+  * If the CURRENT run is itself a warm re-render (high cache-hit ratio),
+    cold per-slug seeds don't apply -- disable them and lean on this run's
+    own (fast) bucket means instead.
   * Add a fixed ~5 min allowance for the light post-dive steps
     (compare renders, matchup web, site index, link verify), PLUS a
     loose ML-bake allowance (step 7b, run_iv_guides.py, ~7h cold) until
@@ -92,6 +104,85 @@ def classify(slug: str) -> str:
     return 'gl_full'
 
 
+# A run whose aggregate sweep-cache hit ratio exceeds this is a warm
+# re-render, not a cold re-dive. Cold chains land ~0-38% (a fully-cold
+# all-miss sweep prints NO cache line, so the ratio stays low even with
+# some intra-chain sibling warming); warm re-renders land ~63-100%. 0.5
+# sits in the empty gap between the two populations.
+WARM_RUN_HIT_RATIO = 0.5
+
+_CACHE_RE = re.compile(r'sweep cache:\s+(\d+)/(\d+) opponent columns hit')
+_BANNER_RE = re.compile(r'\[(\d+)/(\d+)\]\s+([a-z-]+-(?:great|ultra|master)-league)')
+_DONE_RE = re.compile(r'Done in ([\d.]+) min')
+
+
+def _run_stamp(path: Path) -> str:
+    """Sortable YYYYMMDD_HHMMSS from an overnight_*.log name.
+
+    Sort by the filename stamp, NOT the path: the monthly subdir is
+    unreliable (today's 20260628 log can be filed under 2026-04), so a
+    path sort would order runs wrong across month dirs.
+    """
+    m = re.search(r'overnight_(\d{8}_\d{6})', path.name)
+    return m.group(1) if m else ''
+
+
+def _agg_hit_ratio(text: str) -> float | None:
+    """Aggregate sweep-cache hit fraction across one run's log.
+
+    None when the run emitted no cache lines at all -- either pre-cache-era
+    or a fully-cold all-miss chain; both are 'cold' for our purposes.
+    """
+    hits = total = 0
+    for m in _CACHE_RE.finditer(text):
+        hits += int(m.group(1))
+        total += int(m.group(2))
+    return (hits / total) if total else None
+
+
+def _build_slug_timing_table(current_log: Path) -> dict[str, float]:
+    """Per-slug cold-dive timing (minutes); most-recent COLD-CHAIN run wins.
+
+    Scans sibling overnight_*.log files (across monthly subdirs) and keeps,
+    for each dive slug, its "Done in X min" time from the most recent
+    cold-chain run. Warm re-render runs are skipped entirely (see
+    WARM_RUN_HIT_RATIO) so a warm re-render of the whole pool can't
+    under-seed the next cold chain. Within a cold run each dive's actual
+    in-chain time is kept verbatim -- it already includes the real
+    intra-chain sibling cache warming (e.g. shadow-altaria served partly
+    from altaria's freshly-populated columns) that a future cold chain will
+    also see, so it is the right predictor, not a fully-cold standalone time.
+
+    The current run is excluded: its completed dives are read from its own
+    banners (actual times), and the table only seeds not-yet-completed ones.
+    """
+    logs_root = current_log.parent.parent  # userdata/logs/<month> -> userdata/logs
+    cur_resolved = current_log.resolve()
+    table: dict[str, float] = {}
+    files = sorted(logs_root.glob('20*/overnight_*.log'), key=_run_stamp)
+    for f in files:
+        if f.resolve() == cur_resolved:
+            continue
+        try:
+            text = f.read_text(errors='replace')
+        except OSError:
+            continue
+        ratio = _agg_hit_ratio(text)
+        if ratio is not None and ratio > WARM_RUN_HIT_RATIO:
+            continue  # warm re-render -- not a representative cold-dive time
+        cur = None
+        for line in text.splitlines():
+            m = _BANNER_RE.search(line)
+            if m:
+                cur = m.group(3)
+                continue
+            m = _DONE_RE.search(line)
+            if m and cur:
+                table[cur] = float(m.group(1))
+                cur = None
+    return table
+
+
 def _fmt_minutes(total_min: float) -> str:
     total_min = max(0.0, total_min)
     hours = int(total_min // 60)
@@ -118,10 +209,8 @@ def main(wrapper_log_path: str) -> int:
     # Pair each "[N/M] slug" banner with the next "Done in X min" marker
     # to determine which dives completed and how long each took.
     completed: dict[str, float] = {}
-    banner_re = re.compile(
-        r'\[(\d+)/(\d+)\]\s+([a-z-]+-(?:great|ultra|master)-league)'
-    )
-    done_re = re.compile(r'Done in ([\d.]+) min')
+    banner_re = _BANNER_RE
+    done_re = _DONE_RE
 
     current_slug = None
     for line in text.splitlines():
@@ -173,16 +262,34 @@ def main(wrapper_log_path: str) -> int:
             bucket_avg[b] = FALLBACKS[b]
             bucket_source[b] = 'fallback'
 
-    # Sum remaining dive time: current dive gets (avg - elapsed), other
-    # not-yet-started dives get full bucket_avg. Track current-dive
-    # remaining separately so we can surface it as its own line.
+    # Per-slug cold-timing seeds (most-recent cold-chain run per slug).
+    # Primary estimate for a not-yet-completed dive; the bucket mean is the
+    # fallback only for slugs the table has never seen. Disabled when THIS
+    # run is itself a warm re-render -- cold per-slug times would then
+    # over-estimate, so lean on this run's own (fast) bucket means.
+    cur_ratio = _agg_hit_ratio(text)
+    if cur_ratio is not None and cur_ratio > WARM_RUN_HIT_RATIO:
+        slug_table: dict[str, float] = {}
+    else:
+        slug_table = _build_slug_timing_table(log_path)
+
+    # Sum remaining dive time: current dive gets (est - elapsed), other
+    # not-yet-started dives get full est (per-slug seed, else bucket_avg).
+    # Track current-dive remaining separately so we can surface it as its
+    # own line, and count how many remaining dives are per-slug-seeded.
     total_remaining_min = 0.0
     current_dive_remaining: float | None = None
     current_dive_overshoot: bool = False
+    n_slug_seeded = 0
     for slug in slugs:
         if slug in completed:
             continue
-        est = bucket_avg[classify(slug)]
+        seed = slug_table.get(slug)
+        if seed is not None:
+            est = seed
+            n_slug_seeded += 1
+        else:
+            est = bucket_avg[classify(slug)]
         if slug == current_dive and current_start is not None:
             elapsed_min = (datetime.now() - current_start).total_seconds() / 60
             if elapsed_min >= est:
@@ -218,7 +325,8 @@ def main(wrapper_log_path: str) -> int:
     n_done = len(completed)
     n_total = len(slugs)
 
-    bucket_bits = []
+    n_remaining = n_total - n_done
+    bucket_bits = [f'slug-seed {n_slug_seeded}/{n_remaining} remaining']
     for b in ('gl_full', 'ul_full', 'forretress'):
         bucket_bits.append(f'{b}={bucket_avg[b]:.0f}m ({bucket_source[b]})')
     if ml_tail_min:
