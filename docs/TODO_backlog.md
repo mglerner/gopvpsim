@@ -54,8 +54,9 @@ precedents) is preserved verbatim. Near-term actionable items live in
 bait-axis as a deep-dive sim dimension shipped; DP cycle-timing
 move selection closed 2026-04-15 as not-a-real-issue.)
 
-* **Energy-lead axis (safe-switch / closer matchup flips) —
-  SHIPPED 2026-06-12 (commit 9889555).** The `--energy-lead` axis
+* **Energy-lead axis (safe-switch / closer matchup flips) — CORE
+  AXIS SHIPPED + TESTED 2026-06-12 (commit 9889555); the web-oracle
+  CALIBRATION was never built (see the two caveats below).** The `--energy-lead` axis
   (default `off`) is plumbed through `deep_dive.py`: energy-lead
   values are fast-move multiples `[0, 1, 2]` (cold start + 1/2 fast
   moves of carry-over), converted to raw energy per moveset and
