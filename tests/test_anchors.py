@@ -239,6 +239,9 @@ class TestBuildAutoAnchorsGating:
         assert "auto_lickitung_brkp_any" in anchor_names
         assert "auto_cresselia_brkp_any" in anchor_names
         assert "auto_cmp_vs_cohort" in anchor_names
+        # ...and the bulkpoint path fires too (no kind suppressed → all three)
+        assert "auto_lickitung_blkp_any" in anchor_names
+        assert "auto_cresselia_blkp_any" in anchor_names
         # And the synthetic cohort spread
         assert A.AUTO_COHORT_SPREAD_NAME in lt.spreads
 
@@ -258,9 +261,10 @@ class TestBuildAutoAnchorsGating:
         sp = reg.species("Annihilape")
         lt = sp.leagues["Great"]
         anchor_names = set(lt.anchors.keys())
-        # No auto BPs (suppressed by existing kind), but auto CMP fired
+        # No auto BPs (suppressed by existing kind), but the other two fire
         assert "auto_lickitung_brkp_any" not in anchor_names
         assert "auto_cmp_vs_cohort" in anchor_names
+        assert "auto_lickitung_blkp_any" in anchor_names
 
     def test_build_auto_anchors_passes_focal_shadow_to_cohort(self, monkeypatch):
         # Review finding L1 (focal side): a shadow focal's auto-CMP cohort
@@ -300,6 +304,9 @@ class TestBuildAutoAnchorsGating:
         assert "auto_lickitung_brkp_any" in anchor_names
         assert "auto_quagsire_brkp_any" in anchor_names
         assert "auto_cmp_vs_cohort" not in anchor_names
+        # CMP suppressed, but the other two fire for both opponents
+        assert "auto_lickitung_blkp_any" in anchor_names
+        assert "auto_quagsire_blkp_any" in anchor_names
 
     def test_both_kinds_existing_returns_empty_registry(self):
         # All three auto kinds suppressed: damage_breakpoint + cmp + bulkpoint.
@@ -329,19 +336,28 @@ class TestBuildAutoAnchorsGating:
         assert "auto_lickitung_brkp_any" not in anchor_names
         assert "auto_cmp_vs_cohort" not in anchor_names
 
-    def test_existing_bulkpoint_suppresses_only_bulkpoint_path(self):
+    def test_existing_bulkpoint_suppresses_only_bulkpoint_path(self, monkeypatch):
+        # survivor_ivs + at_best_level mock so the CMP path can fire and be
+        # asserted alongside BP (the "other two fire" check).
+        from gopvpsim import pokemon
+        class FakeMon:
+            atk = 115.0
+        monkeypatch.setattr(pokemon.Pokemon, "at_best_level",
+                             lambda *a, **k: FakeMon())
+
         reg = A.build_auto_anchors(
             species="Annihilape", league="great",
             opponent_species=["Lickitung"],
-            survivor_ivs=None,
+            survivor_ivs=[(15, 0, 0)],
             existing_anchor_kinds={"bulkpoint"},
         )
         sp = reg.species("Annihilape")
         lt = sp.leagues["Great"]
         anchor_names = set(lt.anchors.keys())
-        # BP path still fires; bulkpoint path suppressed
-        assert "auto_lickitung_brkp_any" in anchor_names
+        # bulkpoint path suppressed; the other two fire
         assert "auto_lickitung_blkp_any" not in anchor_names
+        assert "auto_lickitung_brkp_any" in anchor_names
+        assert "auto_cmp_vs_cohort" in anchor_names
 
     def test_bulkpoint_path_dedupes_opponents(self):
         reg = A.build_auto_anchors(
