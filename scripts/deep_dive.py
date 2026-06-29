@@ -7157,7 +7157,13 @@ def main():
                 iv_floor=args.iv_floor,
                 focal_max_level=_slayer_focal_cap,
             )
-            slayer_cache = SlayerCache(cache_key=cache_key, disk=not args.no_cache)
+            # The slayer cache_key (compute_cache_key) does NOT include the
+            # turn-mechanics model, so a 'new'-mechanics run would collide with
+            # legacy-cached columns. Mirror the sweep cache's new-mode disable
+            # (see iv_sweep, mechanics != 'legacy') rather than widen the key.
+            slayer_cache = SlayerCache(
+                cache_key=cache_key,
+                disk=not args.no_cache and args.mechanics == 'legacy')
 
             # Round 0 opponent: PvPoke default
             try:
@@ -7179,6 +7185,7 @@ def main():
                     iv_floor=args.iv_floor,
                     log_path=log_path, verbose=args.verbose,
                     reserve_cpus=args.reserve_cpus,
+                    mechanics=args.mechanics,
                 )
                 # Early-exit shapes from iterative_slayer_discovery return
                 # a dict with only an 'error' key (e.g. when the initial
@@ -7746,6 +7753,7 @@ def main():
                     log_path=log_path, verbose=args.verbose,
                     reserve_cpus=args.reserve_cpus,
                     focal_max_level=_bb_alt_cap,
+                    mechanics=args.mechanics,
                 )
                 logger.info(f"    L{_bb_alt_cap:g} cohort in "
                             f"{time.time() - _t_bb:.1f}s")

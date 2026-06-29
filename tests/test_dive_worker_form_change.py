@@ -178,6 +178,46 @@ def test_sweep_worker_pins_pvpoke_oracle_score():
     assert round(result.pvpoke_score(0)) != 773
 
 
+def test_slayer_worker_forwards_mechanics(monkeypatch):
+    """slayer_iter_worker must forward the worker's ``mechanics`` setting
+    into simulate(). Pins the --mechanics plumbing: with mechanics='new'
+    in worker state, every simulate() call gets mechanics='new'. (A
+    no-op default kwarg would leave this green only by accident, so we
+    assert the captured value is 'new', not just present.)"""
+    gm = load_gamemaster()
+    focal_mon = next(m for m in gm['pokemon']
+                     if m['speciesName'] == AEGI_SPECIES)
+    fast_db, charged_db = get_moves()
+    scenarios = [(1, 1), (0, 0)]
+    deep_dive_slayer.slayer_worker_init(
+        AEGI_SPECIES, parse_types(focal_mon),
+        LEAGUE_CAPS[LEAGUE], False,
+        dict(fast_db[AEGI_FAST]),
+        [dict(charged_db[c]) for c in AEGI_CHARGED],
+        scenarios, focal_mon=focal_mon, mechanics='new')
+
+    seen = []
+
+    class _FakeResult:
+        def pvpoke_score(self, _i):
+            return 500
+
+    def _fake_simulate(p0, p1, **kwargs):
+        seen.append(kwargs.get('mechanics'))
+        return _FakeResult()
+
+    monkeypatch.setattr(deep_dive_slayer, 'simulate', _fake_simulate)
+
+    chunk = [_focal_profile((4, 14, 15))]
+    opp_prof = _focal_profile((0, 15, 15))
+    opponents = [(0, opp_prof[1:])]
+    deep_dive_slayer.slayer_iter_worker((chunk, opponents))
+
+    assert seen, "simulate was never called"
+    assert all(m == 'new' for m in seen), (
+        f"expected every simulate() call to get mechanics='new', got {seen}")
+
+
 def test_slayer_worker_matches_from_pokemon_mirror():
     """Slayer-iteration worker (Aegislash mirror) scores == direct
     from_pokemon mirror sims."""
