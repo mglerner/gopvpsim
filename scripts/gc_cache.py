@@ -26,12 +26,19 @@ Sweep cache has TWO schema eras (cache-rework v7, 2026-06-29):
     gamemaster stamps; unlink older ones — the v7 analog of vintage pruning,
     and the replacement for the dir-drop that v7 removes).
 
-Default is --dry-run (report only). Pass --apply to delete.
+Default is --dry-run (report only). Pass --apply to delete. For a REVERSIBLE
+prune, pass --archive-dir DIR with --apply to MOVE drops to an archive
+(preserving paths relative to the cache root) instead of deleting; undo with
+--restore-archive DIR. This is the safe way to test "delete old cache files"
+without losing them — archive, verify a re-dive is still fully warm, then
+delete the archive for real (or restore it).
 
 Usage:
   python scripts/gc_cache.py                 # report what would be pruned
   python scripts/gc_cache.py --apply         # prune (keep current + 1 prior)
   python scripts/gc_cache.py --keep-vintages 3 --apply
+  python scripts/gc_cache.py --apply --archive-dir ~/.cache/gopvpsim_gc_archive
+  python scripts/gc_cache.py --restore-archive ~/.cache/gopvpsim_gc_archive
 """
 import argparse
 import json
@@ -62,6 +69,89 @@ def _dir_size_mtime(d):
 def _fmt(nbytes):
     g = nbytes / 1e9
     return f'{g:.2f} GB' if g >= 1 else f'{nbytes / 1e6:.1f} MB'
+
+
+def _archive_item(path, root, archive_dir):
+    """Move a file or dir into ``archive_dir`` preserving its path RELATIVE to
+    the cache ``root`` (so a later --restore-archive puts it back byte-for-byte
+    in place). ``shutil.move`` handles a cross-filesystem archive (copy+unlink).
+    Returns the relative path archived.
+
+    REFUSES to move onto an existing destination: ``shutil.move`` would nest a
+    dir inside it (corrupting the archive) or clobber a file. A collision means
+    you are re-archiving into a non-empty archive — use a fresh --archive-dir or
+    --restore-archive first."""
+    rel = Path(path).resolve().relative_to(Path(root).resolve())
+    dest = Path(archive_dir) / rel
+    if dest.exists():
+        raise FileExistsError(
+            f"archive destination already exists: {dest}. Re-archiving into a "
+            f"non-empty archive would corrupt it; use a fresh --archive-dir or "
+            f"--restore-archive first.")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(path), str(dest))
+    return rel
+
+
+def restore_archive(archive_dir, root):
+    """Move every archived file back to ``root`` at its preserved relative path
+    (the inverse of ``--archive-dir``). The MANIFEST.json at the archive root is
+    not restored. Returns the count of files moved back.
+
+    REFUSES to clobber: if any destination already exists (e.g. a re-dive
+    re-created a column at that path), abort BEFORE moving anything and list the
+    collisions — restoring stale archived data over fresh current data would be
+    a silent correctness regression."""
+    archive_dir = Path(archive_dir)
+    root = Path(root)
+    srcs = [p for p in sorted(archive_dir.rglob('*')) if p.is_file()
+            and not (p.parent == archive_dir and p.name == 'MANIFEST.json')]
+    collisions = [str(root / s.relative_to(archive_dir)) for s in srcs
+                  if (root / s.relative_to(archive_dir)).exists()]
+    if collisions:
+        raise FileExistsError(
+            f"refusing to restore: {len(collisions)} destination path(s) "
+            f"already exist in the cache (restoring would clobber current "
+            f"data). First few: {collisions[:5]}")
+    moved = 0
+    for src in srcs:
+        rel = src.relative_to(archive_dir)
+        dest = root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(dest))
+        moved += 1
+    # Prune now-empty archive subdirs (deepest first) so a restored archive is
+    # left clean; keep the archive root + its MANIFEST.json.
+    for d in sorted((p for p in archive_dir.rglob('*') if p.is_dir()),
+                    key=lambda p: len(p.parts), reverse=True):
+        try:
+            d.rmdir()
+        except OSError:
+            pass
+    print(f"restored {moved} file(s) from {archive_dir} -> {root}")
+    return moved
+
+
+def _write_manifest(archive_dir, root, rels, keep_vintages, current_gm):
+    """Record what this archive run moved, for audit + a human-legible undo
+    pointer. Append-merge if a prior manifest exists in the same archive."""
+    import datetime
+    mpath = Path(archive_dir) / 'MANIFEST.json'
+    prior = []
+    if mpath.exists():
+        try:
+            prior = json.loads(mpath.read_text()).get('runs', [])
+        except Exception:
+            prior = []
+    prior.append({
+        'when': datetime.datetime.now().isoformat(timespec='seconds'),
+        'source_root': str(Path(root).resolve()),
+        'keep_vintages': keep_vintages,
+        'current_gamemaster': current_gm,
+        'archived': [str(r) for r in rels],
+        'count': len(rels),
+    })
+    mpath.write_text(json.dumps({'runs': prior}, indent=1))
 
 
 def _vintage_keep_set(vintage_mtime, current, keep_vintages):
@@ -156,10 +246,38 @@ def main():
                          'current one (default 2 = current + 1 prior)')
     ap.add_argument('--cache-root', default=None,
                     help='override ~/.cache/gopvpsim (for tests)')
+    ap.add_argument('--archive-dir', default=None,
+                    help='reversible GC: MOVE dropped dirs/columns here '
+                         '(preserving paths relative to the cache root) instead '
+                         'of deleting them. Restore with --restore-archive. '
+                         'Still requires --apply to mutate.')
+    ap.add_argument('--restore-archive', default=None, metavar='DIR',
+                    help='move everything in this archive dir back to the cache '
+                         'root (the inverse of a prior --archive-dir run) and exit')
     a = ap.parse_args()
     root = Path(a.cache_root) if a.cache_root else GOPVPSIM_CACHE
+
+    def _disjoint(p, q):
+        """True if neither path is inside the other (after resolve)."""
+        p, q = Path(p).resolve(), Path(q).resolve()
+        return not (p == q or p in q.parents or q in p.parents)
+
+    if a.restore_archive:
+        if not _disjoint(a.restore_archive, root):
+            ap.error('--restore-archive dir must be OUTSIDE the cache root')
+        restore_archive(a.restore_archive, root)
+        return
+
+    if a.archive_dir and not _disjoint(a.archive_dir, root):
+        ap.error('--archive-dir must be OUTSIDE the cache root (else GC would '
+                 'archive into the cache it is pruning)')
+
+    archive_dir = a.archive_dir if a.apply else None
     current_gm = sweep_cache.gamemaster_hash()
     print(f"cache root: {root}")
+    if a.archive_dir:
+        print(f"archive dir: {a.archive_dir}  "
+              f"({'MOVING' if a.apply else 'would move'} drops here, not deleting)")
     print(f"current gamemaster: {current_gm}  keep-vintages={a.keep_vintages}")
 
     sweep_dir = root / 'sweep'
@@ -178,11 +296,16 @@ def main():
             print(f"  legacy {tag} {str(gm)[:12]:>12}{cur}: "
                   f"{len(entries)} dirs, {_fmt(size)}")
         drop_bytes = sum(_dir_size_mtime(d)[0] for d in drop_dirs)
-        print(f"  -> {'DELETING' if a.apply else 'would delete'} "
-              f"{len(drop_dirs)} legacy dirs, {_fmt(drop_bytes)}")
+        verb = (('ARCHIVING' if archive_dir else 'DELETING') if a.apply
+                else ('would archive' if a.archive_dir else 'would delete'))
+        print(f"  -> {verb} {len(drop_dirs)} legacy dirs, {_fmt(drop_bytes)}")
+        archived_rels = []
         if a.apply:
             for d in drop_dirs:
-                shutil.rmtree(d, ignore_errors=True)
+                if archive_dir:
+                    archived_rels.append(_archive_item(d, root, archive_dir))
+                else:
+                    shutil.rmtree(d, ignore_errors=True)
 
         # v7 column-level reclaim: drop columns at stale gamemaster stamps
         # (outside the current + N-1 keep window) — the v7 analog of legacy
@@ -202,15 +325,26 @@ def main():
                     col_bytes += npz.stat().st_size
                 except OSError:
                     pass
-            print(f"  -> {'DELETING' if a.apply else 'would delete'} "
-                  f"{len(drop_pairs)} stale columns, ~{_fmt(col_bytes)}")
+            cverb = (('ARCHIVING' if archive_dir else 'DELETING') if a.apply
+                     else ('would archive' if a.archive_dir else 'would delete'))
+            print(f"  -> {cverb} {len(drop_pairs)} stale columns, ~{_fmt(col_bytes)}")
             if a.apply:
                 for npz, jp in drop_pairs:
                     for p in (npz, jp):
-                        try:
-                            p.unlink()
-                        except OSError:
-                            pass
+                        if not p.exists():
+                            continue
+                        if archive_dir:
+                            archived_rels.append(_archive_item(p, root, archive_dir))
+                        else:
+                            try:
+                                p.unlink()
+                            except OSError:
+                                pass
+        if a.apply and archive_dir and archived_rels:
+            _write_manifest(archive_dir, root, archived_rels,
+                            a.keep_vintages, current_gm)
+            print(f"\narchived {len(archived_rels)} item(s) to {archive_dir}; "
+                  f"restore with: gc_cache.py --restore-archive {archive_dir}")
     else:
         print("\nsweep/: (none)")
 

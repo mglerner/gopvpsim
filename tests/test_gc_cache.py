@@ -157,3 +157,149 @@ def test_dry_run_deletes_nothing(tmp_path, monkeypatch):
                          '--keep-vintages', '1'])  # no --apply
     gc_cache.main()
     assert old.exists()  # dry-run is non-destructive
+
+
+# ---- reversible GC: --archive-dir / --restore-archive ----
+
+def test_archive_dir_moves_not_deletes_and_restores(tmp_path, monkeypatch):
+    """--archive-dir moves dropped dirs into the archive (not delete),
+    preserving the path relative to the cache root; --restore-archive puts
+    them back byte-for-byte. The kept current vintage is untouched."""
+    root = tmp_path / 'cache'        # archive must be OUTSIDE the cache root
+    sweep = root / 'sweep'
+    cur = _make_vintage(sweep, 'cur', 'gm_current', mtime=1000)
+    old = _make_vintage(sweep, 'old_oldest', 'gm_old_oldest', mtime=100)
+    old_bytes = (old / 'col.npz').read_bytes()
+    archive = tmp_path / 'archive'
+
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_current')
+    monkeypatch.setattr(sys, 'argv',
+                        ['gc_cache.py', '--cache-root', str(root),
+                         '--keep-vintages', '1', '--apply',
+                         '--archive-dir', str(archive)])
+    gc_cache.main()
+
+    # Dropped dir MOVED, not deleted; current vintage kept; path preserved.
+    assert not old.exists()
+    assert cur.exists()
+    archived = archive / 'sweep' / 'old_oldest'
+    assert archived.is_dir()
+    assert (archived / 'col.npz').read_bytes() == old_bytes  # intact
+    assert (archive / 'MANIFEST.json').exists()
+
+    # Restore round-trips it back in place.
+    monkeypatch.setattr(sys, 'argv',
+                        ['gc_cache.py', '--cache-root', str(root),
+                         '--restore-archive', str(archive)])
+    gc_cache.main()
+    assert old.exists()
+    assert (old / 'col.npz').read_bytes() == old_bytes
+    assert not (archive / 'sweep' / 'old_oldest').exists()  # left the archive
+
+
+def test_archive_dir_requires_apply(tmp_path, monkeypatch):
+    """--archive-dir without --apply is a dry-run: nothing moves."""
+    root = tmp_path / 'cache'
+    sweep = root / 'sweep'
+    old = _make_vintage(sweep, 'old', 'gm_old', mtime=100)
+    _make_vintage(sweep, 'cur', 'gm_current', mtime=1000)
+    archive = tmp_path / 'archive'
+
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_current')
+    monkeypatch.setattr(sys, 'argv',
+                        ['gc_cache.py', '--cache-root', str(root),
+                         '--keep-vintages', '1', '--archive-dir', str(archive)])
+    gc_cache.main()
+    assert old.exists()            # untouched
+    assert not archive.exists()    # nothing written
+
+
+def test_archive_dir_v7_columns_roundtrip(tmp_path, monkeypatch):
+    """The PRIMARY (v7 column-level) reclaim path archives + restores stale
+    columns byte-for-byte; current-stamp columns stay put."""
+    root = tmp_path / 'cache'
+    sweep = root / 'sweep'
+    d, paths = _make_v7_dir(sweep, 'live', {'cur': 'gm_cur', 'old': 'gm_old'})
+    os.utime(paths['cur'], (1000, 1000))
+    os.utime(paths['cur'].with_suffix('.npz'), (1000, 1000))
+    os.utime(paths['old'], (100, 100))
+    os.utime(paths['old'].with_suffix('.npz'), (100, 100))
+    old_npz_bytes = (d / 'old.npz').read_bytes()
+    archive = tmp_path / 'archive'
+
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_cur')
+    monkeypatch.setattr(sys, 'argv',
+                        ['gc_cache.py', '--cache-root', str(root),
+                         '--keep-vintages', '1', '--apply',
+                         '--archive-dir', str(archive)])
+    gc_cache.main()
+    # Stale column (npz+json) moved out; current column stays.
+    assert not (d / 'old.npz').exists() and not (d / 'old.json').exists()
+    assert (d / 'cur.npz').exists() and (d / 'cur.json').exists()
+    assert (archive / 'sweep' / 'live' / 'old.npz').read_bytes() == old_npz_bytes
+
+    monkeypatch.setattr(sys, 'argv',
+                        ['gc_cache.py', '--cache-root', str(root),
+                         '--restore-archive', str(archive)])
+    gc_cache.main()
+    assert (d / 'old.npz').read_bytes() == old_npz_bytes
+    assert (d / 'old.json').exists()
+
+
+def test_rearchive_into_nonempty_archive_refuses(tmp_path, monkeypatch):
+    """Re-archiving a same-named dir into a used archive must RAISE, not nest
+    (the shutil.move-into-existing-dir corruption the red-team found)."""
+    root = tmp_path / 'cache'
+    sweep = root / 'sweep'
+    archive = tmp_path / 'archive'
+    # Pre-seed the archive with a colliding path.
+    (archive / 'sweep' / 'old').mkdir(parents=True)
+    (archive / 'sweep' / 'old' / 'col.npz').write_bytes(b'prior')
+    _make_vintage(sweep, 'old', 'gm_old', mtime=100)
+    _make_vintage(sweep, 'cur', 'gm_current', mtime=1000)
+
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_current')
+    monkeypatch.setattr(sys, 'argv',
+                        ['gc_cache.py', '--cache-root', str(root),
+                         '--keep-vintages', '1', '--apply',
+                         '--archive-dir', str(archive)])
+    with __import__('pytest').raises(FileExistsError):
+        gc_cache.main()
+    # The cache dir was NOT removed (the failed move left it in place).
+    assert (sweep / 'old').exists()
+
+
+def test_restore_refuses_to_clobber(tmp_path, monkeypatch):
+    """Restore must abort (move nothing) if a destination already exists — a
+    re-dive may have re-created that path with current data."""
+    root = tmp_path / 'cache'
+    archive = tmp_path / 'archive'
+    # Archive holds a stale column; the cache already has a fresh one there.
+    (archive / 'sweep' / 'live').mkdir(parents=True)
+    (archive / 'sweep' / 'live' / 'c.npz').write_bytes(b'STALE')
+    (root / 'sweep' / 'live').mkdir(parents=True)
+    (root / 'sweep' / 'live' / 'c.npz').write_bytes(b'FRESH')
+
+    monkeypatch.setattr(sys, 'argv',
+                        ['gc_cache.py', '--cache-root', str(root),
+                         '--restore-archive', str(archive)])
+    with __import__('pytest').raises(FileExistsError):
+        gc_cache.main()
+    # Fresh data untouched; stale copy still in the archive.
+    assert (root / 'sweep' / 'live' / 'c.npz').read_bytes() == b'FRESH'
+    assert (archive / 'sweep' / 'live' / 'c.npz').read_bytes() == b'STALE'
+
+
+def test_archive_dir_inside_root_is_rejected(tmp_path, monkeypatch):
+    """The footgun guard: an archive dir inside the cache root is refused
+    (else GC would archive into the cache it is pruning)."""
+    root = tmp_path / 'cache'
+    sweep = root / 'sweep'
+    _make_vintage(sweep, 'old', 'gm_old', mtime=100)
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_current')
+    monkeypatch.setattr(sys, 'argv',
+                        ['gc_cache.py', '--cache-root', str(root),
+                         '--keep-vintages', '1', '--apply',
+                         '--archive-dir', str(root / 'inside')])
+    with __import__('pytest').raises(SystemExit):
+        gc_cache.main()
