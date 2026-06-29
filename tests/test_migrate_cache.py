@@ -7,6 +7,7 @@ so the re-dive serves them warm, while shadow-XOR columns are deleted to
 re-sim cold.
 """
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -151,6 +152,54 @@ def test_engine_migrate_skips_other_gamemaster(tmp_path, monkeypatch):
                                  apply=True)
     # Untouched: still old engine stamp (its gamemaster stamp isn't current).
     assert _stamp(sc) == 'oldengine000'
+
+
+# ---- slayer engine migration (migrate_slayer_engine) ----
+
+slayer_cache = sys.modules.get("slayer_cache") or _load("slayer_cache")
+
+
+def _put_slayer(slayer_dir, key, engine, gamemaster, charged):
+    """Write a v5 slayer .pkl + .json sidecar for a mirror scenario."""
+    import pickle
+    slayer_dir.mkdir(parents=True, exist_ok=True)
+    with open(slayer_dir / f'{key}.pkl', 'wb') as f:
+        pickle.dump({(0, 0): (500,)}, f)
+    (slayer_dir / f'{key}.json').write_text(json.dumps({
+        'engine': engine, 'gamemaster': gamemaster,
+        'scenario': {'species': key, 'league': 'great', 'shadow': False,
+                     'fast': 'F', 'charged': charged}}))
+    return slayer_dir / f'{key}.json'
+
+
+def test_slayer_engine_migration_blesses_and_deletes(tmp_path, monkeypatch):
+    monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'newengine111')
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_cur')
+    sd = tmp_path / 'slayer'
+    # Pangoro mirror owns CLOSE_COMBAT (self-debuff) -> AFFECTED (mirror).
+    aff = _put_slayer(sd, 'Pangoro', 'oldengine000', 'gm_cur',
+                      ['CLOSE_COMBAT', 'NIGHT_SLASH'])
+    # Azumarill mirror owns no self-debuff CM -> BLESSED.
+    bless = _put_slayer(sd, 'Azumarill', 'oldengine000', 'gm_cur',
+                        ['ICE_BEAM', 'PLAY_ROUGH'])
+
+    migrate_cache.migrate_slayer_engine(sd, 'oldengine000',
+                                        'self_debuff_either_side', apply=True)
+    # Unaffected re-stamped to the new engine (warm); affected deleted.
+    assert slayer_cache.read_stamp(bless)[0] == 'newengine111'
+    assert bless.with_suffix('.pkl').exists()
+    assert not aff.exists() and not aff.with_suffix('.pkl').exists()
+
+
+def test_slayer_engine_migration_skips_other_gamemaster(tmp_path, monkeypatch):
+    monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'newengine111')
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_new')
+    sd = tmp_path / 'slayer'
+    j = _put_slayer(sd, 'Azumarill', 'oldengine000', 'gm_old',
+                    ['ICE_BEAM'])  # unaffected but OLD gamemaster
+    migrate_cache.migrate_slayer_engine(sd, 'oldengine000',
+                                        'self_debuff_either_side', apply=True)
+    assert slayer_cache.read_stamp(j)[0] == 'oldengine000'  # untouched
 
 
 # ---- gamemaster-delta predicate (build_gamemaster_delta) ----

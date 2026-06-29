@@ -75,6 +75,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sweep_cache  # noqa: E402
+import slayer_cache  # noqa: E402
 
 
 _SELF_DEBUFF_CM_IDS = None
@@ -340,6 +341,65 @@ def migrate_engine(cache_dir, from_engine, predicate_name, apply):
     print(f"  {mode}")
 
 
+def _bless_slayer(jp, scenario, engine, gamemaster):
+    """Rewrite a slayer sidecar's stamp in place (the .pkl scores are
+    provably valid, left untouched). Atomic via tmp + replace."""
+    tmp = jp.with_name(jp.name + '.tmp')
+    tmp.write_text(json.dumps(
+        {'engine': engine, 'gamemaster': gamemaster, 'scenario': scenario},
+        sort_keys=True))
+    os.replace(tmp, jp)
+
+
+def migrate_slayer_engine(slayer_dir, from_engine, predicate_name, apply):
+    """Engine-migrate the v5 SLAYER cache (mirror of migrate_engine for sweep).
+
+    Slayer entries are MIRRORS (focal species vs the same species + moveset),
+    so the column-predicate's two sides are the SAME scenario: we evaluate
+    ``affected(scenario, scenario)``. Only v5 sidecars exist (pre-v5 entries had
+    no stored stamp/scenario and cold-rebake); a sidecar with no readable
+    scenario is treated as AFFECTED by the predicate's own fail-safe."""
+    affected = PREDICATES[predicate_name]
+    to_engine = sweep_cache.engine_hash()
+    cur_gm = sweep_cache.gamemaster_hash()
+    slayer_dir = Path(slayer_dir)
+    if from_engine == to_engine:
+        print(f"--from-engine {from_engine} equals the current engine; "
+              "nothing to migrate.")
+        return
+    blessed = deleted = skipped_gm = skipped_other = 0
+    if slayer_dir.exists():
+        for jp in sorted(slayer_dir.glob('*.json')):
+            e_stamp, gm_stamp, scen = slayer_cache.read_stamp(jp)
+            if gm_stamp != cur_gm:
+                skipped_gm += 1
+                continue
+            if e_stamp != from_engine:
+                skipped_other += 1
+                continue
+            pkl = jp.with_suffix('.pkl')
+            if affected(scen, scen):   # mirror: both sides are this scenario
+                deleted += 1
+                if apply:
+                    for p in (pkl, jp):
+                        try:
+                            p.unlink()
+                        except OSError:
+                            pass
+            else:
+                blessed += 1
+                if apply:
+                    _bless_slayer(jp, scen, to_engine, gm_stamp)
+    mode = 'APPLIED' if apply else 'DRY-RUN (use --apply to write)'
+    print(f"SLAYER  predicate={predicate_name}  from={from_engine}  "
+          f"to={to_engine}")
+    print(f"  blessed (unaffected, served warm): {blessed}")
+    print(f"  deleted (affected, will re-sim):   {deleted}")
+    print(f"  skipped (other engine vintage):    {skipped_other}")
+    print(f"  skipped (other gamemaster):        {skipped_gm}")
+    print(f"  {mode}")
+
+
 def migrate_gamemaster(cache_dir, from_gamemaster, old_gm_file, apply):
     to_gamemaster = sweep_cache.gamemaster_hash()
     cur_engine = sweep_cache.engine_hash()
@@ -423,8 +483,13 @@ def main():
                          '(supplies the delta; must narrow to --from-gamemaster)')
     ap.add_argument('--apply', action='store_true',
                     help='actually write changes (default: dry-run)')
+    ap.add_argument('--slayer', action='store_true',
+                    help='engine-mode: migrate the SLAYER cache (v5 sidecars) '
+                         'instead of the sweep cache, using the same predicate')
     ap.add_argument('--cache-dir', default=None,
                     help='override the sweep cache dir (for tests)')
+    ap.add_argument('--slayer-dir', default=None,
+                    help='override the slayer cache dir (for tests)')
     a = ap.parse_args()
     cache_dir = a.cache_dir or sweep_cache.CACHE_DIR
 
@@ -440,7 +505,11 @@ def main():
     if not a.from_engine:
         ap.error('one of --list-stamps / --from-engine / --from-gamemaster '
                  'is required')
-    migrate_engine(cache_dir, a.from_engine, a.predicate, a.apply)
+    if a.slayer:
+        slayer_dir = a.slayer_dir or slayer_cache.CACHE_DIR
+        migrate_slayer_engine(slayer_dir, a.from_engine, a.predicate, a.apply)
+    else:
+        migrate_engine(cache_dir, a.from_engine, a.predicate, a.apply)
 
 
 if __name__ == '__main__':
