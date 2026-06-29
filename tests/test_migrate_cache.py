@@ -66,8 +66,10 @@ def test_shadow_xor_predicate():
 def test_migrate_blesses_unaffected_deletes_affected(tmp_path, monkeypatch):
     monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
     monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'oldengine000')
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_cur')
 
-    # Four columns under two focal dirs, all stamped at the old engine.
+    # Four columns under two focal dirs, all stamped at the old engine and the
+    # CURRENT gamemaster (engine-mode requires the gamemaster already current).
     unaff_nn = _put(focal_shadow=False, opp_shadow=False)  # both non-shadow
     unaff_ss = _put(focal_shadow=True, opp_shadow=True)    # both shadow
     aff_a = _put(focal_shadow=False, opp_shadow=True)      # XOR
@@ -79,23 +81,27 @@ def test_migrate_blesses_unaffected_deletes_affected(tmp_path, monkeypatch):
     monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'newengine111')
 
     # Dry-run touches nothing.
-    migrate_cache.migrate(tmp_path, 'oldengine000', 'shadow_xor', apply=False)
+    migrate_cache.migrate_engine(tmp_path, 'oldengine000', 'shadow_xor',
+                                 apply=False)
     assert _stamp(unaff_nn) == 'oldengine000'
     assert aff_a.exists()
 
     # Apply: unaffected re-stamped to the new engine (warm), affected deleted.
-    migrate_cache.migrate(tmp_path, 'oldengine000', 'shadow_xor', apply=True)
+    migrate_cache.migrate_engine(tmp_path, 'oldengine000', 'shadow_xor',
+                                 apply=True)
     assert _stamp(unaff_nn) == 'newengine111'
     assert _stamp(unaff_ss) == 'newengine111'
+    assert sweep_cache.SweepCache.read_gm_stamp(unaff_nn) == 'gm_cur'  # kept
     assert unaff_nn.with_suffix('.npz').exists()  # .npz untouched by bless
     for aff in (aff_a, aff_b):
         assert not aff.exists()
         assert not aff.with_suffix('.npz').exists()
 
 
-def test_migrate_skips_other_gamemaster(tmp_path, monkeypatch):
-    # A column whose focal dir carries a different gamemaster vintage must be
-    # left alone — the predicate models only the engine delta.
+def test_engine_migrate_skips_other_gamemaster(tmp_path, monkeypatch):
+    # v7: a column whose PER-COLUMN gamemaster stamp differs from the current
+    # gamemaster must be left alone — the engine predicate models only the
+    # engine delta, so the gamemaster must already be current.
     monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
     monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'oldengine000')
     monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'oldgm')
@@ -103,6 +109,111 @@ def test_migrate_skips_other_gamemaster(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'newengine111')
     monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'newgm')
-    migrate_cache.migrate(tmp_path, 'oldengine000', 'shadow_xor', apply=True)
-    # Untouched: still old engine stamp (would never be read under new GM dir).
+    migrate_cache.migrate_engine(tmp_path, 'oldengine000', 'shadow_xor',
+                                 apply=True)
+    # Untouched: still old engine stamp (its gamemaster stamp isn't current).
     assert _stamp(sc) == 'oldengine000'
+
+
+# ---- gamemaster-delta predicate (build_gamemaster_delta) ----
+
+def _gm(pokemon, moves):
+    return {'pokemon': pokemon, 'moves': moves}
+
+
+def _mon(sid, name, atk=100, form_alt=None):
+    e = {'speciesId': sid, 'speciesName': name,
+         'baseStats': {'atk': atk, 'def': 100, 'hp': 100}}
+    if form_alt:
+        e['formChange'] = {'alternativeFormId': form_alt}
+    return e
+
+
+def _mv(mid, power=10):
+    return {'moveId': mid, 'power': power, 'energy': 50}
+
+
+def test_gm_delta_additive_only_blesses_all():
+    # Adding a brand-new species (skarmory_mega scenario): touched sets empty
+    # -> every existing column is unaffected regardless of what it references.
+    old = _gm([_mon('azumarill', 'Azumarill')], [_mv('BUBBLE')])
+    new = _gm([_mon('azumarill', 'Azumarill'), _mon('skarmory_mega', 'Skarmory (Mega)')],
+              [_mv('BUBBLE')])
+    affected, info = migrate_cache.build_gamemaster_delta(old, new)
+    assert info['added_species'] == ['skarmory_mega']
+    assert info['touched_species'] == [] and info['touched_moves'] == []
+    f = {'species': 'Azumarill', 'shadow': False, 'fast': 'BUBBLE', 'charged': []}
+    c = {'species': 'Azumarill', 'shadow': False, 'fast': 'BUBBLE', 'charged': []}
+    assert affected(f, c) is False
+
+
+def test_gm_delta_changed_base_stat_affects_referencing_columns():
+    old = _gm([_mon('medicham', 'Medicham', atk=100),
+               _mon('azumarill', 'Azumarill')], [_mv('COUNTER')])
+    new = _gm([_mon('medicham', 'Medicham', atk=999),  # rebalanced
+               _mon('azumarill', 'Azumarill')], [_mv('COUNTER')])
+    affected, info = migrate_cache.build_gamemaster_delta(old, new)
+    assert info['touched_species'] == ['medicham']
+    azu = {'species': 'Azumarill', 'shadow': False, 'fast': 'X', 'charged': []}
+    med = {'species': 'Medicham', 'shadow': False, 'fast': 'X', 'charged': []}
+    # Column with Medicham on either side -> affected; neither -> not.
+    assert affected(azu, med) is True   # opponent changed
+    assert affected(med, azu) is True   # focal changed
+    assert affected(azu, azu) is False
+
+
+def test_gm_delta_shadow_resolves_to_base_entry():
+    # A base-stat change to 'medicham' must affect a SHADOW Medicham column
+    # (shadow stats derive from the base entry), even if no '_shadow' entry
+    # exists / was regenerated.
+    old = _gm([_mon('medicham', 'Medicham', atk=100)], [_mv('X')])
+    new = _gm([_mon('medicham', 'Medicham', atk=999)], [_mv('X')])
+    affected, _ = migrate_cache.build_gamemaster_delta(old, new)
+    shadow_med = {'species': 'Medicham', 'shadow': True, 'fast': 'X', 'charged': []}
+    other = {'species': 'Medicham', 'shadow': True, 'fast': 'X', 'charged': []}
+    assert affected(shadow_med, other) is True
+
+
+def test_gm_delta_form_change_alt_stats_affect_column():
+    # Editing ONLY the alt form (aegislash_blade) must mark an Aegislash
+    # (Shield) column affected — the battle transforms into Blade and reads
+    # its baseStats.
+    old = _gm([_mon('aegislash_shield', 'Aegislash (Shield)', form_alt='aegislash_blade'),
+               _mon('aegislash_blade', 'Aegislash (Blade)', atk=100),
+               _mon('azumarill', 'Azumarill')], [_mv('X')])
+    new = _gm([_mon('aegislash_shield', 'Aegislash (Shield)', form_alt='aegislash_blade'),
+               _mon('aegislash_blade', 'Aegislash (Blade)', atk=999),  # alt rebalanced
+               _mon('azumarill', 'Azumarill')], [_mv('X')])
+    affected, info = migrate_cache.build_gamemaster_delta(old, new)
+    assert info['touched_species'] == ['aegislash_blade']
+    shield = {'species': 'Aegislash (Shield)', 'shadow': False, 'fast': 'X', 'charged': []}
+    azu = {'species': 'Azumarill', 'shadow': False, 'fast': 'X', 'charged': []}
+    assert affected(shield, azu) is True   # focal transforms to changed Blade
+    assert affected(azu, shield) is True   # opponent transforms to changed Blade
+
+
+def test_gm_delta_changed_move_affects_users():
+    old = _gm([_mon('a', 'A'), _mon('b', 'B')], [_mv('COUNTER', 10), _mv('ICE', 5)])
+    new = _gm([_mon('a', 'A'), _mon('b', 'B')], [_mv('COUNTER', 99), _mv('ICE', 5)])
+    affected, info = migrate_cache.build_gamemaster_delta(old, new)
+    assert info['touched_moves'] == ['COUNTER']
+    uses = {'species': 'A', 'shadow': False, 'fast': 'COUNTER', 'charged': []}
+    not_uses = {'species': 'B', 'shadow': False, 'fast': 'ICE', 'charged': ['ICE']}
+    assert affected(uses, not_uses) is True     # one side uses COUNTER
+    assert affected(not_uses, not_uses) is False
+
+
+def test_gm_delta_unresolvable_species_is_affected():
+    # A removed/renamed species: the column's stored name no longer resolves
+    # in EITHER gm -> can't prove unaffected -> re-sim.
+    old = _gm([_mon('oldmon', 'OldMon'), _mon('a', 'A')], [_mv('X')])
+    new = _gm([_mon('a', 'A')], [_mv('X')])  # OldMon removed
+    affected, info = migrate_cache.build_gamemaster_delta(old, new)
+    assert 'oldmon' in info['touched_species']
+    # A column whose name is gone entirely from both gms:
+    ghost = {'species': 'GhostName', 'shadow': False, 'fast': 'X', 'charged': []}
+    a = {'species': 'A', 'shadow': False, 'fast': 'X', 'charged': []}
+    assert affected(ghost, a) is True
+    # And the removed species itself (still resolvable via the OLD index):
+    oldmon = {'species': 'OldMon', 'shadow': False, 'fast': 'X', 'charged': []}
+    assert affected(oldmon, a) is True

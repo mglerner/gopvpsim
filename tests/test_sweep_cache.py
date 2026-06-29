@@ -118,6 +118,71 @@ def test_stale_engine_stamp_is_miss(tmp_path, monkeypatch):
     assert sweep_cache.SweepCache(_focal_fields()).get_column(col_key, 8, 2) is None
 
 
+def test_stale_gamemaster_stamp_is_miss(tmp_path, monkeypatch):
+    # v7: a column stamped with a different gamemaster hash must miss (and not
+    # even load the .npz), so a stale-gamemaster column is never served.
+    monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_aaaa')
+    cache = sweep_cache.SweepCache(_focal_fields())
+    col_key = _col_fields()
+    cache.put_column(col_key, {'score': np.zeros((8, 2)),
+                               'energy': np.zeros((8, 2))})
+    # Same gamemaster -> hit.
+    assert cache.get_column(col_key, 8, 2) is not None
+    # Gamemaster changes -> the existing column is now stale -> miss.
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_bbbb')
+    assert sweep_cache.SweepCache(_focal_fields()).get_column(col_key, 8, 2) is None
+
+
+def test_gamemaster_not_in_focal_key(tmp_path, monkeypatch):
+    # v7: gamemaster left the focal key, so two gamemaster vintages share ONE
+    # focal dir (the stamp distinguishes their columns, not the dir).
+    monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_aaaa')
+    dir_a = sweep_cache.SweepCache(_focal_fields()).dir
+    monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', 'gm_bbbb')
+    dir_b = sweep_cache.SweepCache(_focal_fields()).dir
+    assert dir_a == dir_b
+    assert 'gamemaster' not in sweep_cache.focal_key_fields(
+        'Azumarill', 'great', False, 'BUBBLE', ['ICE_BEAM'], None,
+        [(0, 0)], 'bait')
+
+
+def test_gamemaster_hash_narrowing(tmp_path, monkeypatch):
+    # The narrowed hash is the scheme's load-bearing claim: it must ignore
+    # non-sim churn (timestamp/cups/formats/rankings) and react to any change
+    # in pokemon or moves. Pin it with a synthetic gamemaster file.
+    import json as _json
+    from gopvpsim import data as gp_data
+
+    base = {'timestamp': '2026-01-01 00:00:00', 'cups': [{'a': 1}],
+            'formats': [{'f': 2}], 'rankingScenarios': ['x'],
+            'pokemon': [{'speciesId': 'azumarill', 'speciesName': 'Azumarill',
+                         'baseStats': {'atk': 100, 'def': 100, 'hp': 100}}],
+            'moves': [{'moveId': 'BUBBLE', 'power': 7}]}
+
+    def _hash_of(gm_dict):
+        p = tmp_path / 'gamemaster.json'
+        p.write_text(_json.dumps(gm_dict))
+        monkeypatch.setattr(gp_data, 'CACHE_DIR', tmp_path)
+        monkeypatch.setattr(sweep_cache, '_GAMEMASTER_HASH', None)  # un-memoize
+        return sweep_cache.gamemaster_hash()
+
+    h0 = _hash_of(base)
+    # Non-sim churn: timestamp/cups/formats/rankings differ -> SAME hash.
+    churn = dict(base, timestamp='2099-12-31 23:59:59', cups=[{'a': 999}],
+                 formats=[], rankingScenarios=['totally', 'different'])
+    assert _hash_of(churn) == h0
+    # A pokemon base-stat change -> DIFFERENT hash.
+    pk = _json.loads(_json.dumps(base))
+    pk['pokemon'][0]['baseStats']['atk'] = 200
+    assert _hash_of(pk) != h0
+    # A move-power change -> DIFFERENT hash.
+    mv = _json.loads(_json.dumps(base))
+    mv['moves'][0]['power'] = 99
+    assert _hash_of(mv) != h0
+
+
 def test_shape_mismatch_is_miss(tmp_path, monkeypatch):
     monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
     cache = sweep_cache.SweepCache(_focal_fields())

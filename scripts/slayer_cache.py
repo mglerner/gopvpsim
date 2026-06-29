@@ -76,6 +76,18 @@ def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_st
     - the gamemaster content hash — covers data the explicit move/stat
       hashes can't see (e.g. a form-change species' ALT-form stats live in
       a different gamemaster entry than the ``base_stats`` passed here).
+      v7 (2026-06-29): ``gamemaster_hash()`` was NARROWED from a whole-file
+      md5 to md5(pokemon + moves) — the only sim-relevant subset (CPM/type-
+      chart/STAB/shadow mults are all hardcoded). The narrowing proof extends
+      to the slayer engine (same battle code, same {pokemon,moves}
+      dependency), so it stays SOUND. One-time cost: every slayer key's
+      gamemaster component changes value, so the whole slayer cache cold-
+      invalidates ONCE (re-sim on demand, never a stale serve). It was already
+      cold across the 687e->75ad gamemaster change anyway; narrowing just
+      stops FUTURE non-sim churn (timestamp/cups/formats/rankings) from cold-
+      invalidating it again. The slayer cache uses opaque filename hashes with
+      no stored inputs, so (unlike the sweep cache) its existing entries can't
+      be warm-migrated — they simply re-bake.
     """
     # Local import: sweep_cache lives in the same scripts/ dir and caches
     # both hashes per-process, so this is cheap after the first call.
