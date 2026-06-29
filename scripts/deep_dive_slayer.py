@@ -434,6 +434,13 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
         else:
             logger.info(f"    Round {round_idx}: {len(opp_data_list)} opponents, all cache hits")
 
+        # Flush the cache to disk at the end of each round. save() is an
+        # atomic, best-effort no-op for in-memory caches (disk=False), and
+        # the Pool has already closed here (main process only), so there's
+        # no worker hazard. A crash now loses at most this one round of sims
+        # instead of the whole discovery run.
+        cache.save()
+
         # Identify even-scenario indices for the metric
         even_indices = [i for i, (s0, s1) in enumerate(shield_scenarios) if s0 == s1]
         n_even = len(even_indices)
