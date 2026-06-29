@@ -63,6 +63,44 @@ def test_shadow_xor_predicate():
     assert p({'shadow': False}, {'shadow': True}) is True    # XOR
 
 
+def test_self_debuff_either_side_predicate():
+    """bandaid[910]: a column is affected iff EITHER side owns a self-debuff
+    charged move (both-sided). Uses the engine's real selfDebuffing flag."""
+    p = migrate_cache.PREDICATES['self_debuff_either_side']
+    # Real moves: CLOSE_COMBAT/SUPER_POWER/BRAVE_BIRD self-debuff; BODY_SLAM/
+    # POWER_WHIP/NIGHT_SLASH/ICE_BEAM do not (verified via moves.get_moves()).
+    lick = {'species': 'Lickitung', 'fast': 'LICK',
+            'charged': ['BODY_SLAM', 'POWER_WHIP']}           # no self-debuff CM
+    pang = {'species': 'Pangoro', 'fast': 'KARATE_CHOP',
+            'charged': ['CLOSE_COMBAT', 'NIGHT_SLASH']}       # CLOSE_COMBAT = SD
+    azu = {'species': 'Azumarill', 'fast': 'BUBBLE',
+           'charged': ['ICE_BEAM', 'PLAY_ROUGH']}             # no self-debuff CM
+
+    # Neither side owns a self-debuff CM -> provably unchanged -> BLESS.
+    assert p(lick, azu) is False
+    assert p(azu, lick) is False
+    # BOTH-SIDED: an opponent-side self-debuff holder DOES change a non-SD
+    # focal's column (the focal-only complement would wrongly bless this —
+    # Lickitung focal vs Pangoro 92->284 in the feasibility A/B).
+    assert p(lick, pang) is True     # opponent owns CLOSE_COMBAT
+    assert p(pang, lick) is True     # focal owns CLOSE_COMBAT
+    assert p(pang, pang) is True
+
+    # Morpeko form-swap soundness: AURA_WHEEL_ELECTRIC<->DARK is the only
+    # battle-time CHARGED-move swap, and NEITHER variant is self-debuffing, so
+    # a Morpeko with no stored self-debuff CM is correctly blessed.
+    morp = {'species': 'Morpeko (Full Belly)', 'fast': 'THUNDER_SHOCK',
+            'charged': ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS']}
+    assert p(morp, azu) is False
+    assert p(azu, morp) is False
+
+    # FAIL-SAFE: missing/empty/None moveset -> AFFECTED (never bless blind).
+    assert p(lick, None) is True
+    assert p(None, lick) is True
+    assert p(lick, {'species': 'X'}) is True            # col lacks 'charged'
+    assert p({'species': 'X', 'charged': []}, azu) is True  # empty charged
+
+
 def test_migrate_blesses_unaffected_deletes_affected(tmp_path, monkeypatch):
     monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
     monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'oldengine000')
