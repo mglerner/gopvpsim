@@ -1,68 +1,34 @@
+<!-- DEVELOPER_NOTES is a session-startup read (see CLAUDE.md) and MUST stay
+small enough to read WHOLE in one shot (~25k-token read cap; this prose
+tokenizes near ~2.36 chars/token, so keep under ~52k chars / ~1050 lines for
+margin). When adding a divergence/bug/invariant entry, pair it with a trim or
+push historical root-cause prose to CHANGELOG — do not let it drift back over
+the cap (the whole point is that a future session can't read half and think it
+read all). Shipped/dated history -> CHANGELOG; live invariants + open
+divergences -> here. -->
+
 # Developer Notes
 
 ## PvPoke re-vetting log
 
-**2026-06-06 — re-vetted against pvpoke `bc532fbda`** (Michael's
-2026-06-05 `git pull`; range `8ed523811..bc532fbda` covers the
-04-26 / 06-02 / 06-05 pulls). Findings:
+**2026-06-06 — re-vetted against pvpoke `bc532fbda`** (range
+`8ed523811..bc532fbda`). Battle engine (`Battle.js` / `ActionLogic.js` /
+`DamageCalculator.js`) byte-identical to the 2026-04-16 vetting — every
+divergence cited in this doc + CLAUDE.md still resolves to the correct line.
+Move data was rebalanced (real June-2026 game patch in `moves.json`); that's
+data not logic, shifts both sims identically, so it is **not a divergence**
+(our `data.py` already runs on it). Only fixture fallout:
+`test_shadow_swampert_vs_registeel` (Earthquake + Flash Cannon) refreshed on
+4/9 cells, re-vetted 9/9 exact vs `pvpoke_trace.js`.
 
-- **Battle engine unchanged.** `Battle.js`, `ActionLogic.js`, and
-  `DamageCalculator.js` are byte-identical to the 2026-04-16 vetting.
-  The only `src/js` changes were non-sim: a `dex` multi-range filter
-  in `GameMaster.js` (before line 873, so the `selfBuffing` citation
-  is unaffected), a whitespace + `&& self.fastMove` null-guard in
-  `Pokemon.js` `replaceMove`, a `startStatBuffs` comparison fix in
-  `TeamRanker.js`, and pure-UI files. **Every divergence cited in
-  this doc and CLAUDE.md still resolves to the correct line and is
-  still valid.**
-- **Move data rebalanced** (real June-2026 game patch PvPoke tracked,
-  in `src/data/gamemaster/moves.json`): Charm 13->12, Dragon Ascent
-  150/70->110/45, Drill Run 80/45->70/40, Earthquake 110->120, Earth
-  Power ->50e, Energy Ball 90/55->80/45, Flash Cannon ->65e, Hurricane
-  ->60e, Silver Wind 60->75, Wrap 60->70, Gust energyGain 12->14,
-  Plasma Fists added. `buffApplyChance` untouched (buff flags
-  unaffected). This is data, not logic — it shifts both sims
-  identically, so it is **not a divergence**. Our sim already runs on
-  it (`data.py` fetches gamemaster from GitHub master, 24h cache).
-- **Fixture fallout:** `test_shadow_swampert_vs_registeel` (uses
-  Earthquake + Flash Cannon) went stale on 4 of 9 cells. Re-vetted all
-  9 via `scripts/pvpoke_trace.js`; our engine matches current PvPoke
-  exactly on score, winner, and chargedLog. Fixtures refreshed
-  (0v0 541->720, 0v1 507->686, 1v2 436->232; 0v2 score held at 216 but
-  log changed). No other battle test affected.
-
-**2026-06-06 — full oracle harness audit.** Ran the new
-`scripts/audit_oracle_harness.py`, which drives **every** hand-typed
-PvPoke-oracle matchup in `tests/test_battle.py` (12 matchups × 9 shield
-combos = 108 cells) through both our sim and `scripts/pvpoke_trace.js`
-and compares score / winner / chargedLog directly. (We compare sim-vs-
-harness rather than re-typing PvPoke's score matrices, since the passing
-test suite already proves sim == fixture; this avoids re-introducing the
-typo class we're auditing for.) Results:
-
-- **98 of 108 cells: exact match** (score + winner + chargedLog) against
-  current PvPoke. Confirms no hand-entry typo ever crept into the
-  Medicham/Azu, Azu/Forr (full + RT), Beedrill/Med, Corv/Med,
-  Mienfoo/Med, Corv/Azu, Shadow Swampert/Registeel, Corviknight-mirror,
-  Aegislash, and Mimikyu fixtures.
-- **6 cells: documented Aegislash bug #3 divergence, all still present**
-  (the `_AEGI_XFAIL_GB_*` cells: 0v1, 0v2, 1v1, 1v2, 2v1, 2v2). Includes
-  the 1v2/2v2 score+winner flip (ours 510/w0 vs PvPoke 376/w1) — intact.
-- **4 cells: NEW PvPoke bug found — Morpeko form-toggle**
-  (`morpeko_vs_azumarill_form_change` 1v1, 1v2, 2v1, 2v2). Score and
-  winner match PvPoke exactly; the chargedLog form prefix on a Morpeko
-  throw differs (we tag "Morpeko (Full Belly)" where PvPoke tags
-  "Morpeko (Hangry)"). Root-caused and resolved 2026-06-06: **our
-  two-way toggle is correct; PvPoke's is a bug** (now documented as
-  PvPoke bug #8 below). Michael verified in-game 2026-06-06 that Morpeko
-  enters every battle in Full Belly (start AND switch-in) and toggles
-  Full Belly <-> Hangry after each charged move. The divergence is
-  score-neutral across this oracle (every label-differing throw is
-  form-independent Psychic Fangs or a shielded Aura Wheel), which is why
-  the score-only Morpeko test never caught it. Now pinned by a chargedLog
-  regression assertion on the Morpeko test (asserts OUR correct log) and
-  marked as a known-divergence cell in `scripts/audit_oracle_harness.py`.
-  Keeping our behavior per the CLAUDE.md divergence policy.
+**2026-06-06 — full oracle harness audit** (`scripts/audit_oracle_harness.py`,
+12 matchups x 9 shields = 108 cells): **98 exact** (score+winner+chargedLog),
+**6** the documented Aegislash bug-#3 cells (incl. the 1v2/2v2 510/w0 vs
+376/w1 flip), **4** the Morpeko form-toggle cells (score+winner match; only the
+form label differs — our two-way toggle is correct, PvPoke's one-way is bug #8
+below; Michael verified in-game that Morpeko enters every battle in Full Belly
+and toggles after each charged move). Pinned by a chargedLog assertion on the
+Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
@@ -513,209 +479,59 @@ combos. Mimi's actual SS timing was correct all along; the
 (also fixed 2026-04-15), not from SS timing. See the 2026-04-15
 "Localization meta-finding" entry below for the broader lesson.
 
-## Open divergences
+## Resolved engine divergences (historical index)
 
-### RESOLVED 2026-06-13 — shadow ×1.2 wrongly folded into CMP attack
+Once-open divergences, now all RESOLVED and test-pinned. Compact index only —
+full root-cause writeups live in CHANGELOG, the linked reviews, and the commit
+messages.
 
-CMP (charged-move priority — who throws first on a simultaneous charged
-turn, plus the CMP turn-bonus/penalty in the shield + DP heuristics) was
-decided on `BattlePokemon.atk`, which folds the shadow ×1.2 attack bonus.
-The shadow bonus boosts *damage* but NOT priority: the live game compares
-the unboosted attack stat (Michael, domain expert, 2026-06-13), and
-PvPoke compares its shadow-free `stats.atk` in every CMP-flavored check.
-Fix: `BattlePokemon` gained a `shadow` flag and a `cmp_atk` property
-(`atk / 1.2` for shadow, else `atk`); the CMP comparison/ordering sites
-in battle.py switched from `.atk` to `.cmp_atk` (250, 381, 406, 468, 686,
-1047, the `use_priority` test, and both the fast-landing and charged
-priority sorts). **This pass was believed complete at 9 sites, but a 10th
-— the `fire_now` double-fire gate — was missed; found and fixed 2026-06-27
-(see the follow-up at the end of this entry).** `shadow` is threaded through `from_pokemon` (→ CLI,
-matchup web, tests) and the deep_dive / slayer dive workers; harness_grid
-is non-shadow by design (filters `_shadow`) and needs none.
+- **shadow x1.2 wrongly folded into CMP attack — RESOLVED 2026-06-13.** CMP
+  (who throws first on a simultaneous charged turn) compares the *unboosted*
+  attack; shadow x1.2 boosts damage, not priority. Added `cmp_atk` (`atk/1.2`
+  for shadow); switched battle.py's CMP sites off `.atk`. Cleared the 204-cell
+  `shadow_cmp` family (all 30 GL top-20 winner flips). Pinned by
+  `test_shadow_quagsire_vs_feraligatr_cmp`, `test_cmp_atk_strips_shadow_bonus`.
+  - **Missed 10th site, the fire_now double-fire gate — RESOLVED 2026-06-27**
+    (`582f7d7`): same `.atk`->`cmp_atk` fix. Shadow-XOR only; oracle-repro
+    Shadow Quagsire vs Gastrodon 2v1 (625/375 -> 459/540). Pinned by
+    `test_fire_now_cmp_shadow`. Impact 35/20,178 cells, 6 flips (window-
+    defenders Talonflame/Milotic/Guzzlord/Gourgeist/Dusclops). Pre-fix dives
+    carried it in shadow-XOR cells -> corrected by the 2026-06-28 cold re-dive.
 
-This resolves the 204-cell `shadow_cmp` family from the 2026-06-12 GL
-top-20 grid (every one of the grid's 30 winner flips). Spot-checked 10/10
-distinct shadow pairs exact vs `pvpoke_trace.js` post-fix, including
-base-vs-shadow mirrors that correctly resolve to 500/500 mutual-KO draws
-(`use_priority` becomes False once the bonus is stripped and equal-IV
-mirrors tie on `cmp_atk` — the simultaneous-charged draw path the live
-game produces, engaged for free by this fix, not a separate port).
-Pinned by `test_shadow_quagsire_vs_feraligatr_cmp` (9 PvPoke-verified
-cells incl. the [0,0] winner flip: pre-fix Quagsire wrongly won 555/444,
-now Feraligatr 464/536) and `test_cmp_atk_strips_shadow_bonus` (unit).
-Caches auto-invalidate (engine_hash covers battle.py/pokemon.py for both
-sweep and slayer caches). Benchmark 3,224 sims/s (baseline 3,160).
+- **Engine bug-hunt #2–#7 (2026-06-27) — all RESOLVED except #6 (open,
+  cosmetic).** Report: `docs/reviews/2026-06-27_engine_bug_hunt.md`; shipped
+  record in CHANGELOG "2026-06-28".
+  - **#2** float32-truncated damage constants (`f1538ff`) + shadow-def
+    `float32(5/6)` (`805cdc3`) — boundary-scattered, forced the cold re-dive.
+  - **#3** farm-down stacks self-debuffing moves (`50e8cd2`,
+    `test_bug3_farm_stack`); 0/2160 default-meta cells changed. Follow-up: ~117
+    pre-existing both-self-debuff PvPoke divergences surfaced (in backlog).
+  - **#4** slayer-cache key includes `focal_max_level` (`slayer_cache` v4).
+  - **#5** bandaid[929] no-bait swap kept ungated as an INTENTIONAL divergence
+    (see below); `test_bandaid929_nobait_divergence`.
+  - **#7** `_cm_debuf_delta` dead str-vs-int branch -> `float(...)==1.0`
+    (matches PvPoke loose-equality); 0/10458 dive cells. `test_cm_debuf_delta`.
+  - **#6** (open, cosmetic) bandaid[910] uses defender max-damage move not
+    `bestChargedMove`; 16/16 oracle match. Low-priority cleanup (in TODO).
 
-**Follow-up 2026-06-27 — the missed 10th site (the `fire_now` double-fire
-gate).** The 2026-06-27 adversarial engine bug-hunt found that the near-KO
-`fire_now` branch's "I win CMP, fire the move twice" gate (battle.py
-~1177-1188) still compared shadow-boosted `.atk`. The shadow ×1.2 boosts
-damage, not priority, so this flipped real winners whenever a defender's
-attack stat sat between a shadow attacker's `cmp_atk` and its boosted
-`atk`. The gate's outcome changes ONLY in shadow-XOR matchups (exactly one
-side shadow): both-non-shadow is unaffected, and both-shadow is provably
-unaffected (dividing both sides by 1.2 preserves the inequality). Fixed to
-`cmp_atk` (commit on branch `overnight/2026-06-26`); independently
-oracle-reproduced (Shadow Quagsire vs Gastrodon 2v1: pre-fix we wrongly had
-Quagsire win 625/375, oracle + fix → Gastrodon 459/540) and pinned by
-`test_fire_now_cmp_shadow.py` (9-cell oracle snapshot). Note: any dive /
-ML guide generated before this fix carries the bug in its shadow-XOR cells.
-Measured impact (2026-06-27 old-vs-new scan, GL pool shadow-XOR matchups,
-2 IV samples x 9 shields = 20,178 cells): 35 changed (0.17%), 6 winner
-flips, max margin 273 — small + localized, recurring window-defenders
-Talonflame / Milotic / Guzzlord / Gourgeist / Dusclops. Scope + re-dive
-plan live in TODO.md's cache-rework handoff (warm selective re-dive).
+- **Incoming selfDefenseDebuffing shield gate — RESOLVED 2026-06-13.** Removed
+  an extra routing condition the reference lacks (a self-def-debuffing nuke is
+  not selfBuffing, so PvPoke always-shields it). Tinkaton vs Malamar GL [1,0]
+  702/297 -> 861/138. Writeup:
+  `docs/validations/2026-06-12_oracle_grid/incoming_gate_writeup.md`.
 
-### 2026-06-27 — engine bug-hunt findings #2–#6 (#2,#3,#4,#5 now RESOLVED; only #6 open, cosmetic)
+- **Bait-wait hold — RESOLVED 2026-06-11.** Ported, but had an extra
+  `not cm_self_debuf[1]` gate the reference lacks; removed. Snorlax vs Obstagoon
+  9/9 exact.
 
-The 2026-06-27 adversarial bug-hunt confirmed five more issues beyond the
-`cmp_atk` fix above. STATUS (updated 2026-06-27 PM, pre-redive sweep): **#2,
-#3, #4, #5 are all now RESOLVED**; only **#6** (contested, measured cosmetic)
-remains genuinely open. Full report + repros + per-bug recommendations:
-`docs/reviews/2026-06-27_engine_bug_hunt.md`. Recorded here so they aren't
-lost to TODO pruning:
+- **Snorlax/Obstagoon OMT KO-override — RESOLVED 2026-06-11.** Our "exclude
+  self-debuffing moves from the can-KO override" deviation was falsified
+  (Snorlax ate one extra Counter per battle); removed, matches
+  ActionLogic.js:317-329.
 
-- **#2 [MED] exact damage constants vs the game's float32-truncated ones —
-  RESOLVED 2026-06-27 (`4e57321`).** `moves.py` now sources
-  `STAB_MULTIPLIER`/`BONUS`/`SUPER_EFFECTIVE` from the float32-truncated
-  values the game (and PvPoke's `DamageCalculator.js`) actually use
-  (`BONUS=1.2999999523…`, etc.), not exact `1.3/1.2/1.6`. This was the
-  boundary-scattered fix (no clean migration predicate) that makes the
-  pending re-dive irreducibly COLD, so every other pre-redive fix rides it
-  for free. Was: ~0.009% of damage calcs flipped by 1 on the
-  breakpoint/bulkpoint boundaries that are the core deliverable (repro:
-  Tinkaton Play Rough vs Gourgeist (Small) — old 51, PvPoke 52).
-- **#3 [MED] farm-down never stacks self-debuffing moves — RESOLVED
-  2026-06-27.** The farm-down ("many-cycle") early-return threw a self-debuffing
-  selected move at first affordability; PvPoke (ActionLogic.js:399-405) holds
-  it via an `energyToReach` gate until energy is within one fast-move-gain of
-  the cap, so the debuffing throws stack back-to-back near the end instead of
-  spending extra turns at -atk. Ported into `pvpoke_dp`'s farm branch
-  (battle.py, after the affordability return); pinned by
-  `tests/test_bug3_farm_stack.py` (Pinsir Close Combat + Super Power vs
-  Cresselia, 9/9 oracle-verified, 0-0 631→656). Verification (adversarial
-  workflow, 3 falsification lenses + independent code re-read): full suite
-  1075p/14xf; **0/2160** default-meta cells changed (every default-meta
-  self-debuff user has a non-debuff alt the farm-swap prefers, so the gate
-  never fires on shipped default movesets — #3 needs no re-dive of default
-  dives); **162/162** two-self-debuff firing configs (Pinsir/Hariyama/
-  Sirfetch'd) match PvPoke; the single-self-debuff-best path (Malamar
-  Super Power + Foul Play vs Umbreon, gate fires because Foul Play is >2x
-  worse DPE) matches PvPoke 18/18 with Super Power firing at energy 99/95
-  (genuine stacking); on a 378-cell both-self-debuff oracle the fix moved 23
-  cells toward PvPoke and broke 0. **NEW FOLLOW-UP surfaced by the review:**
-  that 378-cell scan also exposed ~117 PvPoke divergences (7 winner-flips) on
-  the broader both-self-debuff population (Lurantis LEAF_STORM+SUPER_POWER vs
-  Cresselia, Blaziken BRAVE_BIRD+OVERHEAT vs Registeel, …) that PRE-DATE #3
-  (they already disagreed under the old engine) — likely the near-KO-DP /
-  `_optimize_move_timing` self-debuff-timing cluster, possibly an
-  uncharacterized separate issue. Logged in TODO.md; out of scope for this fix.
-- **#4 [MED] slayer disk-cache key omits the focal level cap — RESOLVED
-  2026-06-27 (cache-rework, `slayer_cache` v4).** `scripts/slayer_cache.py`
-  `compute_cache_key` now includes `focal_max_level` (mirrors the sweep
-  cache) with the `CACHE_VERSION` bumped to 4, so a `--max-level` change no
-  longer serves stale cross-cap hits in Master mirror-slayer.
-- **#5 [MED/LOW] `bandaid[929]` stack-switch missing its `bait_shields` gate
-  -- RESOLVED 2026-06-27: kept ungated, documented as an INTENTIONAL
-  divergence.** An A/B (focal no-bait vs bait-on opponent, GL+UL self-debuff
-  focals x 9 shields) plus a chargedLog trace showed PvPoke's gated line throws
-  a self-debuffing nuke into a guaranteed shield (strictly dominated): gating
-  would flip 284 winners, ALL in our favor, zero against. See the "Known
-  divergences" subsection below + `tests/test_bandaid929_nobait_divergence.py`.
-- **#6 (contested) `bandaid[910]` uses defender max-damage move, not
-  `bestChargedMove`** (battle.py:1682). Code divergence real, but a 360-sim
-  sweep showed it cosmetic (16/16 fire-cases match the oracle on
-  score+winner). Low-priority cleanup, not a shipping bug.
-- **RESOLVED 2026-06-27 (bug #7):** `_cm_debuf_delta`'s guaranteed-self-buff
-  arm was a dead `'1' == 1` string-vs-int branch (raw gamemaster
-  `buffApplyChance` is the string `'1'`). Fixed to `float(...) == 1.0`, which
-  matches PvPoke's JS `"1" == 1` loose-equality coercion at
-  `ActionLogic.js:575,584` ("prefer the path with more buff chances"). This
-  *removes* a divergence (we now match PvPoke), so it is NOT in
-  `docs/pvpoke_divergences.md`. The branch only feeds the DP dedup tie-break
-  `debuf_count` (sole consumer battle.py:998), so the fix is value-neutral
-  inside a DP node. Impact is **empirically + structurally zero, not a
-  theorem**: it changed 0/10458 dive cells (16 self-buff focals x GL+UL pool x
-  9 shields) and 0 of ~900k worst-case DP-returned-index probes. Structural
-  reason it's inert: every ATK-buffing self-buff move bumps `atk_stage`, which
-  is part of the dedup key, so those states never dedup against each other
-  (inert by construction); only PURE-DEF self-buff moves (Drain Punch, Skull
-  Bash, Oblivion Wing, Parabolic Charge) leave `atk_stage` unchanged and could
-  re-rank a tie, which needs a simultaneous energy+floor-damage tie (none
-  observed). Unit behavior pinned by `tests/test_cm_debuf_delta.py`.
-
-### RESOLVED 2026-06-13 — incoming selfDefenseDebuffing shield gate
-(port error: extra routing condition the reference lacks)
-
-`pvpoke_simulate_shield` routed the defender's shield decision
-through `wouldShield` whenever the INCOMING charged move was
-`selfDefenseDebuffing` (`use_heuristic_incoming = sb_subroute or
-self_def_debuffing`, introduced with the policy itself in ead46c1,
-2026-04-15). The reference has no such condition: Battle.js:1090
-overrides the always-shield default only for `move.buffs &&
-move.selfBuffing` (sub-filtered to self-atk-buff / opp-def-debuff),
-and its only selfDefenseDebuffing test (line 1105) is on the
-DEFENDER's own bestChargedMove. A self-def-debuffing nuke
-(Superpower, Brave Bird, Close Combat, HJK, Wild Charge, ...) is not
-selfBuffing (GameMaster.js:873), so PvPoke simply always-shields it;
-our gate let wouldShield decline the shield — but "can survive" is
-not "should tank": the defender burned real HP to save a shield it
-never got better value for. The docstring claimed reference parity
-the reference does not contain. Decisive trace: Tinkaton vs Malamar
-GL [1,0] — ours tanked the Superpower (702/297); PvPoke shields
-(861/138); with the condition removed our cell is 861/138 with a
-byte-identical chargedLog. GL top-20 grid (3420 cells): 3086 → 3098
-exact, +12 fixed (all tinkaton<->malamar cells — Malamar is that
-pool's only reachable carrier), 0 broken, max margin move 159, no
-winner flips in-pool (carrier users elsewhere can plausibly flip
-winners). Third instance of the 2026-06-11 pattern (after the OMT
-KO-override and the bait-wait hold): an extra condition the
-reference lacks, carrying a plausible comment, producing real margin
-errors. Full writeup:
-docs/validations/2026-06-12_oracle_grid/incoming_gate_writeup.md.
-
-### RESOLVED 2026-06-11 (same evening) — bait-wait hold: one extra
-condition, not an unported branch
-
-The decideLog trace first read this as PvPoke's bait-WAIT hold
-(~ActionLogic.js:839-853) being unported. Reading our port against
-the reference showed the truth: the hold WAS ported, but with an
-extra `not cm_self_debuf[1]` gate the reference does not have — so
-it never fired when the pricier active move was
-Superpower/Brave-Bird-class (precisely the observed cells). Removed
-the extra condition; our TTL fire_now path already supplies PvPoke's
-death-pressure escape from the hold. Results:
-
-- Snorlax vs Obstagoon GL: 9/9 cells exact (was 8/9).
-- MG vs Florges UL [1,2]: chargedLog now byte-identical to PvPoke
-  (fixture updated to ground truth; audit pin removed).
-- The three jellicent (2,x) LOG-ONLY cells pinned earlier the same
-  day also vanished — same mechanism family. Audit documented
-  divergences: 21 → 17, all now the single genuine near-KO
-  plan-choice cluster.
-
-Second falsified "intentional deviation" in one day (after the OMT
-KO-override). Both carried plausible comments; both were extra
-conditions the reference lacks; both produced real margin errors.
-Lesson reinforced: deviations need traces and probes, not reasoning.
-
-### RESOLVED 2026-06-11 — Snorlax/Obstagoon margin cluster (OMT
-self-debuffing KO-override deviation falsified)
-
-The cluster (ours −26..−29 at 0v0/1v0/2v0/2v1, logs identical) was
-localized via decideLog tracing to OUR intentional deviation in the
-OMT "can KO with a charged move" override: we excluded self-debuffing
-moves, reasoned to be score-neutral ("the debuff fires after the KO").
-False: while OMT keeps delaying the lethal self-debuffing throw, the
-opponent's fast moves keep landing — Snorlax ate exactly one extra
-Counter per battle waiting to throw a Superpower whose debuff could
-not matter. Removed the exclusion (battle.py `_optimize_move_timing`,
-now matches ActionLogic.js:317-329 exactly); 8/9 Snorlax cells now
-match PvPoke exactly, all other gates unchanged (suite, 153-cell
-audit, benchmark). Lesson for the divergence policy: "score-neutral"
-claims about decision-timing deviations need a trace, not reasoning —
-the deviation cost real HP in every shields-down endgame where the
-closer is self-debuffing (Superpower/HJK/Draco users vs walls).
+(Lesson across the last three: "score-neutral" claims about decision-timing
+deviations need a trace, not reasoning — each was an extra condition the
+reference lacks, with a plausible comment, producing real margin errors.)
 
 ## Known divergences from PvPoke implementation
 
@@ -892,177 +708,22 @@ localization found the mechanism is PvPoke's post-DP bandaid[885],
 not a near-KO plan-selection difference — so porting a near-KO swap
 would diverge from PvPoke, not match it. Issue retired.
 
-### Tie-break semantics on simultaneous-KO (score=500/500) — resolved 2026-04-15
+### Resolved 2026-04 divergences (historical index)
 
-Previously two harness cases showed up as "winner flips" on 500/500
-double-KO ties:
-- GL `wigglytuff vs azumarill [2,2]`
-- UL `corviknight vs moltres_galarian [2,2]`
-
-Root cause was in the harness scripts, not the sim: `pvpoke_trace.js`
-collapsed PvPoke's native tie output (`winner.pokemon = false`) to
-`winner=1` as a shortcut, while our sim correctly returned `None`.
-`harness_grid.py` then mapped `None → -1` for JSON output, producing
-a spurious flip.
-
-Fix: `pvpoke_trace.js` now emits `winner: null` on genuine ties
-(matching PvPoke's native semantics); `harness_grid.py` preserves
-`None` end-to-end. Sim behavior unchanged. GL flips 1 → 0, UL flips
-2 → 1 (the remaining UL flip is the real Lapras [1,2] divergence).
-
-### Closed 2026-04-15: needsBoost — not implementing (PvPoke system is dead code)
-
-Originally flagged as an open port. Full root-cause writeup is in
-"PvPoke bugs found" §7 above. Short version: PvPoke's code looks
-like it picks alternative plans from a `stateList` accumulated over
-chance-<1 buff states, but (a) line 539 unconditionally zeros
-`changeTTKChance` so no chance-<1 states ever reach `stateList`, and
-(b) the `needsBoost` flag is never assigned `true`. Empirically
-verified 0 "needs the BOOST" log hits across 36 sims covering every
-GL-meta species whose default moveset includes a `buffApplyChance<1`
-charged move (Tinkaton, Corviknight, Clefable, Drapion).
-
-**Our single-plan behavior already matches PvPoke's observable
-behavior.** Porting stateList+needsBoost would diverge from the
-reference in the direction of a feature PvPoke has explicitly
-disabled — exactly the anti-pattern the CLAUDE.md "When our sim
-diverges from PvPoke" policy warns against.
-
-Revisit only if PvPoke removes line 539 or fixes the
-`needsBoost = true` assignment upstream.
-
-### Resolved divergences (full writeups in CHANGELOG.md)
-
-* **2026-04-15 — Defender-bestCM-selfDefenseDebuffing shield gate
-  (UL Moltres-G score-margin cluster).** Ported PvPoke Battle.js:1105-
-  1124. Our `pvpoke_simulate_shield` was always-shielding standard
-  charged moves; PvPoke instead routes the shield decision through
-  `wouldShield` whenever the **defender's own** `bestChargedMove` is
-  `selfDefenseDebuffing` — defender saves shields for the post-debuff
-  fragility window. Two sub-branches by attacker shields: if attacker
-  has shields, override directly; if attacker has 0 shields, override
-  only when defender's next charged-cycle would KO the attacker
-  (cycleDamage and CMP-aware turn-comparison gates). Helper
-  `_estimate_best_cm` *(updated 2026-06-13)* now delegates to the
-  pvpoke_dp setup cache's `best_idx` — the energy-sorted,
-  priority-shuffled selectBestChargedMove with the literal
-  SUPER_POWER carve-out (Pokemon.js:799: Superpower needs a DPE edge
-  > .3 to displace, others .03). The original best-actual-DPE
-  approximation wrongly returned Superpower for Malamar-likes and
-  entered this branch when PvPoke (best = Foul Play) always-shields
-  instead — the 38-cell `bestcm_estimate` family in the 2026-06-12
-  oracle grid. `_cheapest_cm` still proxies
-  attacker.activeChargedMoves[0].
-  Probe: MG vs Florges [2,0] previously d1=+230, now d1=0 (same
-  chargedLog as before, but MG correctly skips shielding the second
-  Disarming Voice → 9% HP remaining instead of 55%, matching PvPoke).
-  UL grid: max |Δ| 230→146, |Δ|>20 18→7, winner flips 2→2 (no new
-  flips introduced). GL grid: max |Δ|=0 across 405 pairs unchanged
-  (no top-8 GL species default moveset has a selfDefenseDebuffing
-  charged move). Tests 156p/6xf, oracle 27/27 unchanged.
-  Localization landmark: trace_shields output revealed the gap
-  immediately — `wouldShield(...) → False` followed one turn later
-  by `shield(...): True (always shield)`. The helper text
-  ("[defBestCM=BRAVE_BIRD selfDefDebuff, attShields=0, no cycleKO]")
-  added to trace makes the new gate auditable from log inspection.
-
-* **2026-04-14 — selfBuffing flag scope.** Now matches PvPoke's
-  `GameMaster.js:873` definition (positive self-buffs *and*
-  guaranteed opponent debuffs).
-* **2026-04-14 — activeChargedMoves priority-shuffle.** All
-  `resetMoves` shuffle clauses replicated in `pvpoke_dp`. **Keep in
-  mind** when revisiting bait-wait: PvPoke's
-  `selectBestChargedMove` overwrites `.dpe` to raw `damage/energy`
-  *after* the priority-shuffle, so the 1.5 ratio check
-  (`ActionLogic.js:843`) uses raw DPE, same as our `actual_dpe`.
-  Buff-adjusted DPE only affects the shuffle ordering, not the
-  ratio check.
-* **2026-04-15 — Forretress/Azumarill DP plan-selection.** Near-KO
-  DP now tracks attacker `atk_stage` and recomputes charged/fast
-  damage at every reachable stage so stacked chance-1 opp-def
-  debuffs accelerate plans the way PvPoke does. Azu/Forr
-  (Sand+Rock) now matches PvPoke 9/9 exact. Gotcha preserved for
-  future readers: raw gamemaster `buffApplyChance` is a string;
-  compare via `float(...) != 1.0`.
-* **2026-04-15 — Mimikyu disguise-bust missing log line (meta-lesson).**
-  Pinned via the new chargedLog test assertions: when Azu's "break
-  Mimi's disguise" charged throw lands on a still-disguised Mimikyu,
-  the `simulate()` loop's disguise-bust branch (battle.py:2066-2075)
-  emits `Mimikyu (Busted) disguise busted (1 dmg)` but skipped the
-  standard `Azumarill uses Ice Beam → 1 dmg` line. So
-  `_extract_battle_log` lost one entry, and PvPoke's chargedLog
-  appeared to have one extra Azu IB at the front. Fix: emit the
-  "uses" line in the disguise branch too. All 6 Mimikyu xfails (4
-  AZU_OPENING_IB + 2 SS_DELAY) flipped to clean passes; PvPoke "bug
-  #4" was retracted (see above). **Meta-lesson:** the audit in
-  docs/validations/2026-04-15_harness_code_review.md correctly
-  identified the disguise-handling DP path as implemented, but
-  audited DP/policy features rather than the throw-dispatch logger.
-  Log emission is downstream of the DP and isn't covered by oracle
-  score tests, so divergences there were silent until chargedLog
-  assertions were added. Future feature audits should include a
-  pass over the timeline/log emission paths, not just the
-  decision-making code.
-* **2026-04-15 — Many-cycle non-debuff swap (Moltres-G cluster winner flip).**
-  Ported PvPoke's ActionLogic.js lines 371-393: when bestChargedMove is
-  selfDebuffing AND a cheaper non-debuffing alt exists with DPE ratio
-  < 2x, drop the farm-down threshold from 2.0x to 1.1x cycles AND swap
-  the first-throw to the non-debuffing alt. Without this, our near-KO DP
-  picked the debuffing nuke (BrB) and bandaid [918] stacked, letting
-  Lapras KO first. Concrete case: Lapras vs Moltres-G [0,1] at MG energy
-  49 (Fly affordable, BrB not). PvPoke's MG throws Fly (61 free damage,
-  no atk debuff, Lapras has 0 shields); our MG waited for BrB and died.
-  Fix: compute min_cycle_thr=1.1 when the debuffing-best-with-cheaper-
-  non-debuf-alt condition holds, and swap selected_idx to the non-debuf
-  alt in the farm-down path. UL harness-grid max |Δ| 352→230, winner
-  flips 4→2 (the Lapras[0,1] flip and one other resolved). Remaining
-  MG-cluster deltas are score-margin only (same chargedLog order),
-  investigated separately — see "Open divergences" below. GL grid
-  unchanged (max |Δ|=0 across 405 pairs). Tests 156p/6xf, oracle 27/27.
-  Localization landmark: instrumenting PvPoke ActionLogic.js with
-  `console.error` at the many-cycle entry revealed that PvPoke's
-  bestChargedMove computation uses raw `damage/energy` (post-STAB,
-  post-effectiveness), not `power/energy` — an easy misread when
-  eyeballing DPE.
-* **2026-04-15 — OMT fast-also-KOs gate dropped.** The OMT KO-override
-  had a `defender.hp > _fast_dmg` gate: if the fast move would ALSO KO,
-  prefer fast over charged (rationale: "score identical, saves energy /
-  animation / post-KO state"). Harness localized Forr vs Azu 1-0 (Δ=-15)
-  to T37: Forr has e=64 (ST affordable) and Azu hp=17; fast_dmg=18>=17
-  so the gate fires and Forr delays for fast. But Forr just fired VS at
-  T36 (floating), so its next fast doesn't land until T40 — three extra
-  turns of Azu damage on Forr. The "score identical" claim held only
-  when the fast could fire immediately; under mid-cooldown timing it
-  fails. Dropped the gate, keeping the self-debuffing clause. GL grid
-  max |Δ| 15→0 across all 405 pairs. UL unchanged (Moltres-G is a
-  different root cause). Test suite: 156 pass (one prior xfail converted
-  to pass — Azu's final Ice Beam in Forr/Azu (2,0) chargedLog now
-  matches PvPoke). Investigation landmark: decideLog entry/return
-  tracing in scripts/pvpoke_trace.js (decideAction-level) was the tool
-  that localized the divergence — earlier score/dpPlan-level traces
-  missed it because the divergence was in OMT, upstream of the DP.
-* **2026-04-15 — Farm-down boost-move override + raw_dpe fix.**
-  Two linked DP gaps surfaced when localizing GL Empoleon vs
-  Forretress 2-2 (Δ=-204). (1) When the near-KO DP returns a
-  farm-down plan (no charged moves in the winning path), our code
-  returned `None` and the Pokemon never threw. PvPoke
-  (ActionLogic.js:813-823) instead force-pushes `getBoostMove()`
-  — the LAST charged move in user order with chance≥0.5 buff
-  and not selfDebuffing — so the debuff value lands on the
-  opponent even when the KO is guaranteed by fast moves alone.
-  Ported in `pvpoke_dp`: farm-down plans now substitute the
-  boost move as `first_idx` and fall through the existing
-  bandaid chain. (2) `raw_dpe` was `power/energy`, but PvPoke's
-  `move.dpe` is `move.damage/move.energy` (type-effectiveness-
-  aware, set by `selectBestChargedMove` at Pokemon.js:792 and
-  overwriting the buff-adjusted DPE from `initializeMove`). Fixed
-  to use cached actual damage. Together these close the
-  Forretress cluster: GL grid max |Δ| 204→15, |Δ|>20 count
-  16→0, |Δ|>50 count 6→0. UL grid unchanged (Moltres-G cluster
-  has a different root cause). Side effect: 12 log-order test
-  fixtures updated (scores/winners already matched PvPoke; only
-  throw order was stale); 3 Mimikyu xfails now xpass. Oracle
-  27/27 still green.
+The 2026-04-04/15 correctness arc closed a batch of once-open divergences —
+the `would_shield` buff-reset + CMP cancellation (Mienfoo/Medicham), the
+simultaneous-KO 500/500 tie-break semantics, the `needsBoost`/`stateList`
+dead-code decision (not ported; see "PvPoke bugs found §7"), the selfBuffing
+flag scope, the activeChargedMoves priority-shuffle, the Forretress/Azu
+stage-aware DP, the Mimikyu disguise-bust log line, the many-cycle non-debuff
+swap, the OMT fast-also-KOs gate, the farm-down boost-move override, and the
+defender-bestCM selfDefenseDebuffing shield gate (Moltres-G cluster; its one
+live invariant — the SUPER_POWER DPE-edge >0.3 carve-out — is self-documented
+in `src/gopvpsim/battle.py` `_estimate_best_cm`). All resolved and suite-pinned.
+Full root-cause prose lives in CHANGELOG for the items it covers (Mienfoo/
+Medicham, selfBuffing, priority-shuffle, Forretress/Azu DP); the rest live only
+in git history (pre-2026-06-28 DEVELOPER_NOTES) and their linked commits — do
+NOT assume a named item has a dedicated CHANGELOG section.
 
 ### 3. bestChargedMove computed per-turn, not cached at init (intentional)
 
