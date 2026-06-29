@@ -287,32 +287,6 @@ here 2026-06-12; these are the remaining seams.)*
 
 ## Tests to add
 
-* **Regression tests for the two `68ad233` port-fidelity fixes (confirmed
-  coverage holes, 2026-06-28 round-2 finder fleet).** Both fixes ride the cold
-  bake with NO dedicated test pinning them (both skeptics agreed on the facts;
-  see DEVELOPER_NOTES / the 68ad233 commit). Both are LOW severity (~zero
-  shipped-default impact) but a "simplify" could silently revert them. **A valid
-  test MUST verify the revert-fails property** — temporarily revert the fix and
-  confirm the asserted value changes; a test that passes both ways is worse than
-  none (false confidence). Attempted 2026-06-28: a naive
-  Buzzwole(COUNTER/Power-Up Punch+Super Power) vs Melmetal(default) 0-0 config
-  did NOT fire the guard (718 identical fixed-vs-reverted), so the original
-  assessment's exact Melmetal moveset is needed.
-  1. **bandaid[910] index** (`battle.py:1736`, `not cm_self_buff[0]` =
-     activeChargedMoves[0]/cheapest, per ActionLogic.js:929). Oracle repro from
-     the commit: **Buzzwole (Power-Up Punch + Super Power) vs Melmetal 0-0,
-     687 (old, `cm_self_buff[first_idx]`) -> 812 (fixed) = PvPoke oracle** — find
-     the exact Melmetal moveset that reproduces 812 (default DOUBLE_IRON_BASH +
-     DYNAMIC_PUNCH gives 718 and does not fire the guard). Then mirror the
-     `tests/test_bug3_farm_stack.py` 9-shield oracle pattern.
-  2. **buffApplyChance float coercion** (`battle.py:909` _priority_shuffle +
-     `:2216` bestChargedMove tie-break). The gamemaster mixes `'.5'`/`'0.2'`
-     string formats; `'.5' > '0.2'` is False as strings but True as floats, so
-     the `float()` coercion is load-bearing for ordering. Needs two both-buff
-     charged moves with mixed-format buffApplyChance on one species, hitting the
-     tie-break path (no concrete species recorded — "affects enumerated alt-move
-     combos", per the commit). Construct + verify revert-fails.
-
 * **Guard for the IV-scanner `maxLevel` single-source (fixed `725c184`).** No
   test pins `_collection_data['maxLevel']` (deep_dive.py:4602) to
   `LEAGUE_MAX_LEVEL.get(league)`, so a future re-hardcode could silently

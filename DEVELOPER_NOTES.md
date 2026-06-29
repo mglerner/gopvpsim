@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->1135<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->1162<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
