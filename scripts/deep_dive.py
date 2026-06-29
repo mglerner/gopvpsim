@@ -3963,6 +3963,56 @@ def _remove_stale_split_siblings(base_html_path, written_paths):
                         f"{_os.path.basename(p)}")
 
 
+def rankings_fingerprint(league):
+    """Reproducibility fingerprint for a league's PvPoke rankings cache.
+
+    Two dives with identical CLI args can produce different results when the
+    underlying rankings cache drifts (see TODO.md "Reproducibility"). This
+    returns a dict capturing the drift-sensitive identity of the cache file:
+    its path, mtime, a sha256 content hash, the rankings count, and the top-5
+    species. Returns ``None`` if the cache file is missing/unreadable.
+
+    Pure read-only (no logging, no mutation) so the same fingerprint can feed
+    both the HTML footer and the run-start log.
+    """
+    import datetime
+    import hashlib
+    from gopvpsim import data as _gpdata
+    cache_path = _gpdata.CACHE_DIR / f"{league}.json"
+    if not cache_path.exists():
+        return None
+    raw = cache_path.read_bytes()
+    content_hash = hashlib.sha256(raw).hexdigest()
+    mtime = datetime.datetime.fromtimestamp(cache_path.stat().st_mtime)
+    rk = _gpdata.load_rankings(league)
+    top5 = [r.get('speciesName', r.get('speciesId', '?')) for r in rk[:5]]
+    return {
+        'cache_path': cache_path,
+        'mtime': mtime,
+        'mtime_str': mtime.strftime('%Y-%m-%d %H:%M:%S'),
+        'content_hash': content_hash,
+        'count': len(rk),
+        'top5': top5,
+    }
+
+
+def log_run_start_fingerprint(league):
+    """Emit the run-start rankings-cache reproducibility log line.
+
+    Wraps :func:`rankings_fingerprint` with the ``logger.info`` emission so a
+    dive's log alone pins which rankings vintage it ran against (the HTML
+    footer carries the same fingerprint for the rendered page). Returns the
+    fingerprint dict (or ``None`` when the cache is missing).
+    """
+    fp = rankings_fingerprint(league)
+    if fp is not None:
+        logger.info(
+            f"  rankings cache: {fp['cache_path'].name} "
+            f"mtime={fp['mtime_str']} sha256={fp['content_hash'][:12]} "
+            f"first5={', '.join(fp['top5'])}")
+    return fp
+
+
 def generate_interactive_html(species, league, moveset_data, html_path,
                               thresholds=None, opponent_label=None,
                               shield_scenarios=None, opponent_names=None,
@@ -5777,23 +5827,18 @@ _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
 
     # Rankings fingerprint
     try:
-        import datetime
-        from gopvpsim import data as _gpdata
-        cache_path = _gpdata.CACHE_DIR / f"{league}.json"
-        if cache_path.exists():
-            mtime = datetime.datetime.fromtimestamp(cache_path.stat().st_mtime)
-            mtime_str = mtime.strftime('%Y-%m-%d %H:%M:%S')
-            rk = _gpdata.load_rankings(league)
-            top5 = ', '.join(r.get('speciesName', r.get('speciesId', '?'))
-                             for r in rk[:5])
+        fp = rankings_fingerprint(league)
+        if fp is not None:
+            top5 = ', '.join(fp['top5'])
             html += '<details class="meta" style="margin-top:8px">'
             html += '<summary>Rankings data fingerprint</summary>'
             html += '<pre style="margin:8px 0;background:var(--surface);'
             html += 'padding:10px;border-radius:4px;color:var(--text);font-size:12px;'
             html += 'white-space:pre-wrap;word-break:break-all">'
-            html += f'cache file: {cache_path}\n'
-            html += f'cache mtime: {mtime_str}\n'
-            html += f'rankings count: {len(rk)}\n'
+            html += f'cache file: {fp["cache_path"]}\n'
+            html += f'cache mtime: {fp["mtime_str"]}\n'
+            html += f'content sha256: {fp["content_hash"]}\n'
+            html += f'rankings count: {fp["count"]}\n'
             html += f'top 5 species: {top5}'
             html += '</pre></details>\n'
     except Exception as _e:
@@ -6876,6 +6921,11 @@ def main():
                     + (f" (+{n_variants} moveset variant(s))"
                        if n_variants else ""))
     else:
+        # Run-start reproducibility log: record the rankings-cache identity
+        # (mtime + content hash + first-5 species) at the moment opponents are
+        # resolved, so a dive's log alone pins which rankings vintage it used
+        # (the HTML footer carries the same fingerprint for the rendered page).
+        log_run_start_fingerprint(args.league)
         opponents = get_top_opponents(args.league, args.opponents)
         # Always include focal species for mirror analysis (append if not in
         # top N). Form-matched: a shadow focal's mirror is the shadow entry.
