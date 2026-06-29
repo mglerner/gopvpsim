@@ -15,15 +15,6 @@ on the trusted engine. Re-dive runbook (for the next time one is needed):
 `docs/predive_checklist.md` is the STANDING pre-cold-dive gate; run
 `overnight_redive.sh` and watch with `scripts/chain_status.py --chain overnight`.
 
-### P1 — sanity-check the session-6 fixes in rendered output (verification gate)
-
-The best-buddy-toggle + shadow-default-IV fixes shipped to the **live site**
-via this bake but were never confirmed in rendered HTML. Spot-check:
-Registeel GL (no-op toggle shows + "(no change for this mon)" hint), Carbink
-GL (active L51 sweep actually changes spreads), UL Mimikyu vs Shadow Raikou 2-2
-(should now be a 707 win, was a 470 loss). Cheap; never-ship-unflagged-wrong
-applies since it's public.
-
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
 - **[tooling] per-slug historical-timing ETA estimator** (Michael greenlit
