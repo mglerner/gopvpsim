@@ -1729,8 +1729,13 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             and attacker.shields == 0
             and attacker.energy < 100
             and defender.charged_moves):
-        opp_best = max(defender.charged_moves,
-                       key=lambda m: defender.charged_move_damage(m, attacker))
+        # [910] gate on the defender's bestChargedMove, matching PvPoke
+        # ActionLogic.js:929 (opponent.bestChargedMove). NOT the defender's
+        # max-damage move: bestChargedMove is highest-DPE with the SUPER_POWER
+        # carve-out, and can differ in both energy and would_shield, which
+        # changes the defer decision. (Was max-damage — an accidental port
+        # infidelity; fixed 2026-06-29, see CHANGELOG bandaid[910].)
+        _ob_idx, opp_best = _estimate_best_cm(defender, attacker)
         if (defender.energy >= opp_best['energy']
                 and not would_shield(defender, attacker, opp_best)
                 and not cm_self_buff[0]):   # activeChargedMoves[0] (cheapest), not the selected move (ActionLogic.js:929)
