@@ -325,3 +325,14 @@ def test_opp_iv_robustness_form_change_branch():
     wins, total = res
     assert total == n_ivs * len(scenarios)
     assert 0.0 <= wins <= total
+
+
+def test_species_has_form_change_sibling_form():
+    """A sibling form whose pool name lacks the formChange key is still
+    detected via its base form's formChange.alternativeFormId. 'Morpeko
+    (Hangry)' carries no formChange itself; it is reachable only through
+    'Morpeko (Full Belly)'.formChange.alternativeFormId == 'morpeko_hangry'."""
+    assert deep_dive._species_has_form_change('Morpeko (Hangry)') is True
+    # The directly-keyed form stays True, and a plain fixed-form species False.
+    assert deep_dive._species_has_form_change('Morpeko (Full Belly)') is True
+    assert deep_dive._species_has_form_change('Azumarill') is False
