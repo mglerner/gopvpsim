@@ -34,8 +34,34 @@ pre-cold-dive gate; run `overnight_redive.sh` and watch with
   likely the near-KO-DP / `_optimize_move_timing` self-debuff-timing cluster.
   Investigate, decide keep-vs-fix (CLAUDE.md gate). Repro: DEVELOPER_NOTES
   "#2-#6" + `docs/reviews/2026-06-27_engine_bug_hunt.md`.
-- **[engine, cosmetic] #6 bandaid[910]** uses defender max-damage move not
-  `bestChargedMove` (battle.py); measured cosmetic (16/16 oracle match). Low.
+- **[engine] #6 bandaid[910]** uses defender max-damage move not
+  `bestChargedMove` (battle.py:1732). **NOT cosmetic** (the old "16/16 oracle
+  match" wording was misleading): it is winner-stable but NOT score-stable.
+  Verified A/B 2026-06-29 (default movesets, GL 0-0): Pangoro vs Lickitung
+  907 -> 715 (real turn/HP difference, 0 winner flips). Accidental port
+  infidelity, not a defended divergence; 2-line fix = `_estimate_best_cm`.
+  Migratable via a both-sided "neither side owns a self-debuff CM" predicate
+  (~77% warm-serve GL) but bumps the engine hash -> needs a re-dive; keep-vs-fix
+  is Michael's. Full evidence: `docs/reviews/2026-06-28_bandaid910_migratable_fix_feasibility.md`.
+
+## Cache GC: prune all namespaces + dive-script opt-in prompt
+
+Make `scripts/gc_cache.py` able to prune **every** cache namespace, and wire a
+prune option into the dive scripts wherever caches get created.
+
+- **GC coverage.** Today only `sweep/` has vintage-aware pruning (gamemaster in
+  `meta.json`); `slayer/` and `iv_envelope/` are report-only because they bake
+  gamemaster+engine into opaque filename hashes with no readable vintage. Give
+  those two a readable vintage (sidecar or meta file at write time) so GC can
+  apply the same N-1 retention to them. (`iv_envelope/` may be retired instead
+  once the ML path moves onto the sweep cache — cache-rework Phase 6.)
+- **Dive-script opt-in.** Wherever a cache is created (`deep_dive.py`,
+  `deep_dive_slayer.py`, the IV-envelope/ML path, sweep), add a prune option
+  that **defaults to "don't prune."** When the run is a *full* dive of a whole
+  league (UL / GL / ML), **ask Michael whether to prune** before/after the dive
+  rather than silently keeping or silently deleting.
+- Retention target stays N-1 (current gamemaster + 1 prior), matching the
+  existing `gc_cache.py --keep-vintages 2` default.
 
 ## NEXT SESSION (queued 2026-06-21): gobattlekit owned-mon breakdown screen
 
