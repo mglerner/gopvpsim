@@ -32,7 +32,7 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->1181<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->1196<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
@@ -189,26 +189,51 @@ sims. Pass `--no-sweep-cache` for timing runs.
 Two iteration-speed layers shipped 2026-06-10; full design rationale
 in CHANGELOG ("Sweep disk cache + replay-from-saved-state").
 
-**Sweep cache** (`scripts/sweep_cache.py`, CACHE_VERSION 6 as of the
-2026-06-27 cache-rework, branch `cache-rework`): `iv_sweep` persists
+**Sweep cache** (`scripts/sweep_cache.py`, CACHE_VERSION 7 as of the
+2026-06-29 cache-rework, branch `cache-rework`): `iv_sweep` persists
 each opponent's column to `~/.cache/gopvpsim/sweep/` and skips
 cache-hit opponents entirely. Keys include the moveset, scenarios,
-bait mode, a gamemaster content hash, and `focal_max_level`;
-opponent-side keys carry resolved IVs + moveset, so rankings drift
-produces clean misses rather than stale hits. Columns are **multi-plane
-`.npz`** (`{score:float64, energy:uint8}`, plus `{won,hp,max_hp,shields}`
-when `capture_metrics`) in canonical iv_meta order — hits are
-bit-identical to fresh sims (pinned by tests/test_sweep_cache.py). The
-shared `.npz` read/write foundation lives in `scripts/cache_base.py`.
+bait mode, and `focal_max_level`; opponent-side keys carry resolved
+IVs + moveset, so rankings drift produces clean misses rather than
+stale hits. Columns are **multi-plane `.npz`** (`{score:float64,
+energy:uint8}`, plus `{won,hp,max_hp,shields}` when `capture_metrics`)
+in canonical iv_meta order — hits are bit-identical to fresh sims
+(pinned by tests/test_sweep_cache.py). The shared `.npz` read/write
+foundation lives in `scripts/cache_base.py`.
 
-Two cache-rework changes worth knowing:
+Three cache-rework changes worth knowing:
 
-- **Engine hash is now a per-column STAMP**, not part of the key dir. Each
-  column has a tiny `.json` sidecar `{engine, col}`. A stale stamp is a
-  miss (column ignored), and `scripts/migrate_cache.py` can bless columns a
-  localized fix provably doesn't touch (rewrite sidecar to the new engine)
-  while deleting the rest — `--from-engine X --predicate shadow_xor`. This
-  is what makes a warm bug-#1 (shadow-CMP) re-dive possible.
+- **Engine hash is a per-column STAMP** (v6), not part of the key dir. Each
+  column has a tiny `.json` sidecar `{engine, gamemaster, col}`. A stale
+  stamp is a miss (column ignored), and `scripts/migrate_cache.py` can bless
+  columns a localized fix provably doesn't touch (rewrite sidecar to the new
+  engine) while deleting the rest — `--from-engine X --predicate shadow_xor`.
+  This is what makes a warm bug-#1 (shadow-CMP) re-dive possible.
+- **Gamemaster hash is ALSO a per-column STAMP** (v7, 2026-06-29), and was
+  NARROWED to the only sim-relevant subset `md5(pokemon + moves)` — CPM,
+  type chart, STAB/BONUS, and shadow mults are all hardcoded in the engine,
+  not read from the gamemaster (`sweep_cache.gamemaster_subset`). Two wins:
+  (a) non-sim churn (timestamp / cups / formats / rankingScenarios /
+  pokemonTags / ...) no longer invalidates the cache at all; (b) a real
+  balance patch that touches only a few species/moves no longer orphans the
+  whole cache — `migrate_cache.py --from-gamemaster <stamp>
+  --old-gamemaster-file <blob>` COMPUTES the affected set from the actual
+  pokemon/moves delta and blesses the rest. The delta predicate resolves
+  each column's species to the FULL set of gamemaster entries the battle
+  reads: base entry (shadow stats come from the base x hardcoded mult, so
+  `_shadow` is stripped), transitively-expanded form-change alt forms
+  (Aegislash/Mimikyu/Morpeko), and the move entries both sides use; an
+  unresolvable species is conservatively re-simmed. The 2026-06-29 cold
+  state was purely an over-broad-hash artifact: the bake gamemaster
+  (`687e17`, pvpoke `63dfdaafb`) -> current (`75ad14`, `00f0afe7f`) delta
+  was *only* the addition of `skarmory_mega` (moves byte-identical, 0
+  species changed/removed, 0 columns reference it), so all 48,460 columns
+  were semantically warm and were re-keyed + blessed via
+  `scripts/migrate_v6_to_v7.py` (a COPY-not-move, idempotent, atomic-publish
+  one-shot) then `migrate_cache.py --from-gamemaster`. Note `slayer_cache.py`
+  shares `gamemaster_hash()`, so the narrowing cold-invalidated the slayer
+  cache once (sound — same engine subset; re-bakes on demand; opaque keys
+  can't be warm-migrated).
 - **Energy is always captured + stored**, so the default
   `--compare-energy` dive serves warm (the old `capture_energy ->
   use_sweep_cache=False` bypass is gone).
@@ -251,8 +276,15 @@ Operational notes:
 - Hit log line per sweep: `sweep cache: N/M opponent columns hit`
   (nothing printed on an all-miss sweep).
 - Stale columns accumulate as engine/gamemaster evolve.
-  `scripts/gc_cache.py` (keep current + N-1 gamemaster vintage, `--dry-run`
-  default) prunes them; `rm -r ~/.cache/gopvpsim/sweep` is still always safe.
+  `scripts/gc_cache.py` (`--dry-run` default) prunes them. v7 split:
+  **legacy dirs** (cache version < 7, gamemaster in the focal key) get the
+  original DIR-level pruning — keep current + N-1 gamemaster vintages;
+  **v7 dirs** are always kept (gamemaster is per-column, so a dir holds mixed
+  vintages and dropping it would be a full cold re-sim) and instead get a
+  COLUMN-level reclaim — drop columns whose gamemaster stamp is outside the
+  current + N-1 window. Run `gc_cache.py --keep-vintages 1 --apply` after the
+  v6->v7 transition to fully reclaim the legacy v1-v6 fodder.
+  `rm -r ~/.cache/gopvpsim/sweep` is still always safe.
 - The ML IV-guide path (`iv_envelope_analysis.py`) now rides this same
   cache via `iv_sweep` (Phase 6); the old per-guide `iv_envelope/` boolean
   WonSetCache is retired (that on-disk dir is now legacy, GC-reportable).

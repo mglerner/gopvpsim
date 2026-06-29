@@ -10,14 +10,17 @@ unchanged dive command re-run is all-columns-hit.
 
 Key structure:
   focal side  - species, league, shadow, moveset, iv_floor, shield
-                scenarios, bait mode, gamemaster content hash, engine
-                source hash, CACHE_VERSION
+                scenarios, bait mode, CACHE_VERSION
   column side - opponent species, shadow, resolved IVs, level, moveset
+  per-column stamp (.json sidecar) - engine source hash (v6) AND
+                sim-relevant gamemaster hash (v7)
 
-The gamemaster hash makes rankings/data drift safe: opponent IVs and
-movesets are resolved BEFORE the key is built, so a rankings refresh
-that changes resolution produces a different column key (miss), while
-move-stat/base-stat changes invalidate via the gamemaster hash.
+The gamemaster hash makes data drift safe WITHOUT orphaning the cache:
+opponent IVs and movesets are resolved BEFORE the key is built, so a
+rankings refresh that changes resolution produces a different column key
+(miss), while move-stat/base-stat changes change the per-column gamemaster
+stamp (v7) — a stale-stamp column misses, and migrate_cache can bless the
+columns a balance patch provably doesn't touch.
 
 Columns store raw float64 per-IV scores in canonical iv_meta order,
 shape (n_ivs, n_scenarios) — ~300KB per column at 4096 IVs x 9
@@ -57,7 +60,19 @@ from cache_base import write_planes, read_planes
 # provably doesn't touch (e.g. bug #1's shadow-XOR predicate) so the re-dive
 # is warm. gamemaster stays in the focal key, so a blessed column is
 # guaranteed same-gamemaster (the predicate models only the engine delta).
-CACHE_VERSION = 6
+# v7 (2026-06-29): the gamemaster hash ALSO moved out of the focal key into a
+# PER-COLUMN stamp (mirroring v6's engine move), AND was NARROWED to the only
+# sim-relevant subset gm['pokemon'] + gm['moves'] (CPM/type-chart/STAB/shadow
+# mults are all hardcoded in the engine, not read from the gamemaster — see
+# gamemaster_hash). Two wins: (a) non-sim churn (timestamp/cups/formats/
+# rankingScenarios/pokemonTags/...) no longer invalidates the cache at all;
+# (b) a real balance patch that touches only a few species/moves no longer
+# orphans the whole cache — migrate_cache.py's --from-gamemaster predicate
+# blesses the columns whose focal+opponent species and moves are unchanged
+# (e.g. "add a new species" touches nothing existing). A v7 focal dir can hold
+# columns of mixed engine AND gamemaster vintages, each self-identifying by
+# its sidecar stamp; gc_cache.py keeps v7 dirs (no per-dir vintage).
+CACHE_VERSION = 7
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'sweep'
 
 # Compact on-disk dtype per column plane. score is the float64 PvPoke score;
@@ -103,19 +118,39 @@ def engine_hash():
     return _ENGINE_HASH
 
 
-def gamemaster_hash():
-    """Hash of the cached gamemaster.json content (memoized per process).
+def gamemaster_subset(gm):
+    """The ONLY gamemaster fields the battle engine reads: pokemon + moves.
 
-    load_gamemaster() always round-trips through this file (fresh fetches
-    are written before use), so the file content matches the data every
-    sweep actually ran on.
+    Everything else that affects a score — CPM table, shadow atk/def
+    multipliers, the type-effectiveness chart, STAB/BONUS/SUPER_EFFECTIVE —
+    is HARDCODED in gopvpsim (pokemon.py, moves.py), not read from the
+    gamemaster. A repo-wide grep (2026-06-29) confirms zero reads of
+    settings/cups/formats/rankingScenarios/pokemonTags/shadowPokemon. So a
+    score depends on the gamemaster ONLY through these two keys; hashing them
+    (and nothing else) is the tightest sim-relevant identity. Callers that
+    diff two gamemaster vintages (migrate_cache) use the SAME subset.
+    """
+    return {'pokemon': gm['pokemon'], 'moves': gm['moves']}
+
+
+def gamemaster_hash():
+    """Hash of the SIM-RELEVANT gamemaster subset (memoized per process).
+
+    v7: narrowed from the whole-file md5 to md5(pokemon + moves) — see
+    ``gamemaster_subset``. load_gamemaster() always round-trips through the
+    cached gamemaster.json (fresh fetches are written before use), so the
+    file content matches the data every sweep actually ran on. Parsing the
+    file (vs the old raw-bytes md5) is what drops non-sim churn from the key.
     """
     global _GAMEMASTER_HASH
     if _GAMEMASTER_HASH is None:
         from gopvpsim.data import CACHE_DIR as DATA_CACHE_DIR
         p = DATA_CACHE_DIR / 'gamemaster.json'
         if p.exists():
-            _GAMEMASTER_HASH = hashlib.md5(p.read_bytes()).hexdigest()[:12]
+            gm = json.loads(p.read_text())
+            blob = json.dumps(gamemaster_subset(gm), sort_keys=True,
+                              separators=(',', ':'))
+            _GAMEMASTER_HASH = hashlib.md5(blob.encode()).hexdigest()[:12]
         else:
             _GAMEMASTER_HASH = 'no-gamemaster'
     return _GAMEMASTER_HASH
@@ -157,11 +192,11 @@ def focal_key_fields(species, league, shadow, fast_id, charged_ids,
         'bait': bait_mode,
         'energy_lead': energy_lead,
         'focal_max_level': focal_max_level,
-        # NB: the engine hash is intentionally NOT here (v6) — it is a
-        # per-column stamp in the .json sidecar so an engine change doesn't
-        # orphan the dir. gamemaster stays, so all columns in a focal dir
-        # share one gamemaster vintage.
-        'gamemaster': gamemaster_hash(),
+        # NB: NEITHER the engine hash (v6) NOR the gamemaster hash (v7) is
+        # here — both are per-column stamps in the .json sidecar, so an engine
+        # change or a gamemaster change doesn't orphan the focal dir. A v7
+        # focal dir can therefore hold columns of mixed engine/gamemaster
+        # vintages, each self-identifying by its sidecar stamp.
     }
 
 
@@ -197,12 +232,22 @@ class SweepCache:
     def read_stamp(json_path):
         """Read the per-column engine stamp from its .json sidecar, or None.
 
-        The sidecar holds ``{'engine': <hash>, 'col': <col_fields>}`` (v6).
-        Returns the stored engine hash so a stale-engine column can be
-        rejected (or, via migrate_cache, blessed) without touching the .npz.
+        The sidecar holds ``{'engine': <hash>, 'gamemaster': <hash>,
+        'col': <col_fields>}`` (v7; v6 had no 'gamemaster'). Returns the
+        stored engine hash so a stale-engine column can be rejected (or, via
+        migrate_cache, blessed) without touching the .npz.
         """
         try:
             return json.loads(Path(json_path).read_text()).get('engine')
+        except Exception:
+            return None
+
+    @staticmethod
+    def read_gm_stamp(json_path):
+        """Read the per-column gamemaster stamp from its .json sidecar (v7),
+        or None if absent (v6 columns carry no gamemaster stamp)."""
+        try:
+            return json.loads(Path(json_path).read_text()).get('gamemaster')
         except Exception:
             return None
 
@@ -210,19 +255,24 @@ class SweepCache:
                    required_planes=('score', 'energy')):
         """Return the column's planes as ``{name: ndarray}``, or None on a miss.
 
-        A hit requires the per-column engine stamp to equal the current
-        engine hash (a stale-engine column is a miss — checked from the small
-        sidecar before the big .npz is loaded), and every plane in
-        ``required_planes`` present at shape ``(n_ivs, n_scenarios)``. The ML
-        path requests the metric planes (won/hp/max_hp/shields) too; a column
-        written with only score+energy misses for it. Corrupt/partial writes
-        self-heal as a miss (re-simmed and overwritten).
+        A hit requires the per-column engine stamp AND gamemaster stamp to
+        equal the current hashes (a stale-engine OR stale-gamemaster column is
+        a miss — checked from the small sidecar before the big .npz is
+        loaded), and every plane in ``required_planes`` present at shape
+        ``(n_ivs, n_scenarios)``. The ML path requests the metric planes
+        (won/hp/max_hp/shields) too; a column written with only score+energy
+        misses for it. Corrupt/partial writes self-heal as a miss (re-simmed
+        and overwritten).
         """
         try:
             p = self._col_path(col_fields)
-            # Cheap stale-engine rejection first: skip loading the .npz if the
-            # sidecar stamp doesn't match the current engine.
-            if self.read_stamp(p.with_suffix('.json')) != engine_hash():
+            sidecar = p.with_suffix('.json')
+            # Cheap stale-stamp rejection first: skip loading the .npz if the
+            # sidecar engine OR gamemaster stamp doesn't match the current run.
+            # (v6 columns carry no gamemaster stamp -> read_gm_stamp returns
+            # None != current hash -> correctly a miss until re-simmed/blessed.)
+            if (self.read_stamp(sidecar) != engine_hash()
+                    or self.read_gm_stamp(sidecar) != gamemaster_hash()):
                 self.misses += 1
                 return None
             planes = read_planes(p)
@@ -246,8 +296,8 @@ class SweepCache:
         """Persist a column from a ``{plane_name: ndarray}`` dict, each cast to
         its compact dtype (see ``_PLANE_DTYPES``). ``energy`` is asserted in
         [0,100] so a future out-of-range value fails loud instead of wrapping
-        into uint8. The .json sidecar records the current engine hash as the
-        column's stamp (v6)."""
+        into uint8. The .json sidecar records the current engine AND
+        sim-relevant gamemaster hashes as the column's stamps (v6 + v7)."""
         try:
             self.dir.mkdir(parents=True, exist_ok=True)
             meta_p = self.dir / 'meta.json'
@@ -263,7 +313,8 @@ class SweepCache:
             p = self._col_path(col_fields)
             write_planes(p, out)
             p.with_suffix('.json').write_text(json.dumps(
-                {'engine': engine_hash(), 'col': col_fields},
+                {'engine': engine_hash(), 'gamemaster': gamemaster_hash(),
+                 'col': col_fields},
                 indent=1, sort_keys=True))
         except Exception:
             pass  # cache is best-effort
