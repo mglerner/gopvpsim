@@ -123,14 +123,15 @@ def main() -> int:
         errors.append('overnight_status.txt missing')
         print('  ERR overnight_status.txt missing')
     if log_path:
-        fails = [ln.strip() for ln in log_path.read_text().splitlines()
+        log_text = log_path.read_text()
+        fails = [ln.strip() for ln in log_text.splitlines()
                  if '[FAIL]' in ln]
         for ln in fails:
             errors.append(f'chain step failed: {ln}')
             print(f'  ERR {ln}')
         if not fails:
             print('  OK  no [FAIL] step lines')
-        narr = scan_narrative_warnings(log_path.read_text())
+        narr = scan_narrative_warnings(log_text)
         for ln in narr:
             errors.append(ln)
             print(f'  ERR {ln}')
