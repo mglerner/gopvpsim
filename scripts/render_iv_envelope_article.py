@@ -45,8 +45,11 @@ CREDIT_URL = 'https://www.youtube.com/watch?v=6N3lXp39qtQ'
 # this guide's default 12/12/12 sweep floor -- so a legitimately-owned sub-12
 # spread can fall off the bottom of the grid. The banner is floor-aware: a
 # guide swept at the real 10/10/10 floor (--iv-floor 10) tells the reader they
-# ARE covered; one still at 12/12/12 warns that sub-12 spreads fall off and a
-# re-sweep is planned (see TODO.md "Limited-availability mons"). Match
+# ARE covered; one still at 12/12/12 warns that sub-12 spreads fall off. As of
+# 2026-06-28 every species currently in this set has been reswept at the 10/10/10
+# floor (see run_iv_guides.FLOOR_10_SPECIES), so all shipped guides hit the
+# "covered" branch; the 12/12/12 warning branch stays live as the fallback for
+# any future limited species added before its own re-sweep lands. Match
 # d['species'] verbatim.
 # NOTE (2026-06-27): Eternatus is treated as limited regardless of trade
 # status -- Michael's call that it is rare enough to count as special. It is
