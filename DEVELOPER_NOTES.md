@@ -511,8 +511,14 @@ messages.
     (see below); `test_bandaid929_nobait_divergence`.
   - **#7** `_cm_debuf_delta` dead str-vs-int branch -> `float(...)==1.0`
     (matches PvPoke loose-equality); 0/10458 dive cells. `test_cm_debuf_delta`.
-  - **#6** (open, cosmetic) bandaid[910] uses defender max-damage move not
-    `bestChargedMove`; 16/16 oracle match. Low-priority cleanup (in TODO).
+  - **#6** (open) bandaid[910] uses defender max-damage move not
+    `bestChargedMove` (battle.py:1732). **Winner-stable but NOT score-stable**
+    (the old "cosmetic / 16/16 oracle" wording was misleading): verified A/B
+    2026-06-29 on default movesets, GL 0-0 -- Pangoro vs Lickitung 907 -> 715
+    (real turns/HP diff, 0 winner flips). Accidental port infidelity; 2-line
+    `_estimate_best_cm` fix, migratable via a both-sided self-debuff-CM
+    predicate but engine-hash-bumping. Keep-vs-fix is Michael's. Evidence:
+    `docs/reviews/2026-06-28_bandaid910_migratable_fix_feasibility.md` + TODO.
 
 - **Incoming selfDefenseDebuffing shield gate — RESOLVED 2026-06-13.** Removed
   an extra routing condition the reference lacks (a self-def-debuffing nuke is
