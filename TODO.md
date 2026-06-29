@@ -6,14 +6,12 @@ delete its bullet or move the writeup out -- do not leave a 'DONE/RESOLVED'
 narrative inline. This convention was set 2026-06-27 after the file hit ~1980
 lines of mostly-completed chronological batches. -->
 
-## Post-launch status (2026-06-28)
+## Re-dive runbook
 
-The cold re-dive is **DONE** (bake 2026-06-28 01:55–11:49, `overnight chain
-SUCCESS`; the engine bug-hunt + cache-rework batch + session-6 fixes all rode
-it). Full shipped record: CHANGELOG.md "2026-06-28". The site is published and
-on the trusted engine. Re-dive runbook (for the next time one is needed):
-`docs/predive_checklist.md` is the STANDING pre-cold-dive gate; run
-`overnight_redive.sh` and watch with `scripts/chain_status.py --chain overnight`.
+For the next cold re-dive: `docs/predive_checklist.md` is the STANDING
+pre-cold-dive gate; run `overnight_redive.sh` and watch with
+`scripts/chain_status.py --chain overnight`. (Last bake: CHANGELOG.md
+"2026-06-28".)
 
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
