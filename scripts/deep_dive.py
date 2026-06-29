@@ -936,15 +936,12 @@ def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
     so shadow multipliers are applied exactly once and form-change
     transforms (Aegislash) are wired up like the oracle path.
 
-    Caveat (signature dedup): deep_dive_signature's CMP column uses
-    effective atk, but the engine decides CMP on the unboosted cmp_atk
-    (2026-06-13 fix). For shadow-MISMATCHED focal/opponent pairs the two can
-    disagree in a narrow CMP band, so a rare IV could mis-group. Verified
-    bit-identical to no-dedup on representative shadow + non-shadow cases
-    (test_opp_iv_robustness_signature_dedup_is_exact); for a headline summary
-    a 1-in-k misgroup shifts the % by <0.2% (invisible at integer display).
-    See TODO "deep_dive_signature CMP predates cmp_atk" -- it may also touch
-    the focal sweep.
+    Signature dedup is verified bit-identical to no-dedup on
+    representative shadow + non-shadow cases
+    (test_opp_iv_robustness_signature_dedup_is_exact): deep_dive_signature
+    strips the shadow x1.2 from each side's CMP column, so its grouping
+    matches the engine's unboosted cmp_atk (2026-06-13 fix) even for
+    shadow-mismatched focal/opponent pairs.
     """
     from gopvpsim.pokemon import iv_rank
     ranked = iv_rank(opponent, league=league, shadow=opp_shadow)
@@ -992,8 +989,7 @@ def _opp_robustness_groups(focal_bp, focal_species, focal_fast, focal_charged,
       'signature' - exact damage-signature dedup (deep_dive_signature) for
         fixed-form opponents; collapses the top-512 cohort hard. Form-change
         opponents always fall back to per-IV (their alt-form stats are
-        non-linear in raw IVs+level, and the signature CMP column predates
-        the cmp_atk fix -- see opp_iv_robustness docstring).
+        non-linear in raw IVs+level).
       'profile'   - effective-stat dedup (the conservative original).
       'none'      - one group per IV (the no-dedup reference for tests).
     """
