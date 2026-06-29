@@ -110,6 +110,15 @@ FLAG (never-ship-unflagged-known-wrong rule): until corrected, the limited-mon
 ML guides ship with a floor that is wrong for them -- decide whether to add an
 "assumes a 12/12/12 IV floor" caveat on those pages or ship unflagged.
 
+DONE (2026-06-28) for the known slice: the seven species in
+`run_iv_guides.FLOOR_10_SPECIES` (Marshadow, Meloetta (Aria), Jirachi, Keldeo
+(Ordinary), Keldeo (Resolute), Zygarde (Complete Forme), Eternatus) are reswept
+at the 10/10/10 research floor; their envelope JSONs span iv 15..10 and their
+rendered guides carry the floor-aware "covered" banner (the never-ship-unflagged
+FLAG is resolved for them). STILL OPEN (needs human): enumerating any ADDITIONAL
+limited-availability species and confirming each one's IRL floor before adding
+it to FLOOR_10_SPECIES.
+
 ## Pre-ship arc — residual open polish
 
 The 2026-04/06 pre-ship arc shipped (site published 2026-06-07; see
