@@ -62,6 +62,21 @@ def chain_start(log_path: Path) -> datetime.datetime:
         m.group(1) + m.group(2), '%Y%m%d%H%M%S')
 
 
+def scan_narrative_warnings(log_text: str) -> list[str]:
+    """Return one error string per narrative auto-gen patch WARN line.
+
+    run_website_dives.py runs patch_dive_species_narrative.py per dive
+    WARN-not-FAIL (a bad narrative patch can't abort later dives), emitting
+    "[WARN] narrative patch failed for <slug> ..." to stdout, which
+    overnight_redive.sh tees into the scanned chain log. Like the ML WARN,
+    neither the [FAIL] scan nor the SUCCESS status line catches it, so
+    without this scan a failed patch passes the gate silently.
+    """
+    return [f'narrative patch warned: {ln.strip()}'
+            for ln in log_text.splitlines()
+            if 'WARN] narrative patch failed' in ln]
+
+
 def extract_opponents(html_path: Path) -> list[str] | None:
     content = html_path.read_text(errors='replace')
     i = content.find('"opponents": [')
@@ -115,6 +130,12 @@ def main() -> int:
             print(f'  ERR {ln}')
         if not fails:
             print('  OK  no [FAIL] step lines')
+        narr = scan_narrative_warnings(log_path.read_text())
+        for ln in narr:
+            errors.append(ln)
+            print(f'  ERR {ln}')
+        if not narr:
+            print('  OK  no narrative-patch WARN lines')
 
     # 2. Freshness ----------------------------------------------------
     print('[2/5] dive-dir freshness')
