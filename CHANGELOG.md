@@ -6,6 +6,56 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-06-28 — cold re-dive complete (engine bug-hunt + cache-rework batch shipped)
+
+The pre-launch engine batch plus a full cold re-dive landed. The bake ran
+2026-06-28 01:55–11:49 (`overnight chain SUCCESS`, 153 files / 239k hrefs,
+no broken internal refs) on an engine carrying every fix below; no post-bake
+commit touches an engine file (battle/moves/pokemon/_dp_jit/formchange) — later
+commits are render/JS/docs/orchestration/comment-only — so the published site
+is on the trusted engine. Root-cause writeups for the engine fixes live in
+DEVELOPER_NOTES ("Resolved engine divergences" / "engine bug-hunt #2–#7"); this entry
+is the dated "what shipped" record.
+
+**Engine fixes** (all in main before the bake, each test-pinned):
+
+- **bug #1** fire_now double-fire CMP gate -> `cmp_atk` (`582f7d7`) — the
+  missed 10th shadow-CMP site. Shadow-XOR only; measured 35/20,178 cells,
+  6 winner flips, max margin 273.
+- **bug #2** float32-truncated damage constants (`f1538ff`) + shadow-def
+  `float32(5/6)` (`805cdc3`). Boundary-scattered -> this is what forced the
+  cold bake; every other fix rode it for free.
+- **bug #3** farm-down must stack self-debuffing moves (`50e8cd2`); pinned
+  by `test_bug3_farm_stack`.
+- **bug #4** slayer-cache key includes `focal_max_level` (cache-rework,
+  `slayer_cache` v4).
+- **bug #5** bandaid[929] no-bait swap documented as an INTENTIONAL
+  divergence (`cdcef73`).
+- **bug #7** `_cm_debuf_delta` dead str-vs-int branch (`30fd819`).
+- two port-fidelity micro-fixes: bandaid[910] index + `buffApplyChance`
+  float coercion (`68ad233`).
+- a focal that STARTS in an alt form now gets native form stat buffs
+  (`b52250e`).
+
+**Cache-rework bundle** (merged `fbbc3ad`; design
+`docs/design/2026-06-27_cache_rework_design.md`): energy plane
+(`sweep_cache` v6, `--compare-energy` serves warm); per-column engine STAMP
++ `migrate_cache.py` predicate invalidation; ML/dive merge onto the shared
+`iv_sweep` (`WonSetCache` retired — this also moots the old "WonSetCache
+stores scores" and "ML guide re-bake perf" follow-ups); `gc_cache.py` N-1
+vintage GC. The "warm bug-#1 re-dive" follow-up was MOOTED: #2's float32 fix
+forced the bake cold, so #1 rode the cold bake rather than a warm migration.
+
+**Session-6 dive-output fixes** (rode the bake): best-buddy toggle on every
+GL/UL page, no-op where provable (`7a72394`); shadow opponents get their own
+PvPoke-default IVs (`5b474a3`, flips UL Mimikyu vs Shadow Raikou 2-2 from
+470 loss to 707 win); IV-scanner `maxLevel` single-sourced (`9f55e38`);
+`owned_breakdown.py` same-class fix (`786d437`).
+
+**Open verification gate** (carried to TODO as P1): rendered-output sanity
+checks of the session-6 fixes — Registeel no-op toggle + "(no change)" hint,
+Carbink active L51 sweep, UL Mimikyu vs Shadow Raikou flip.
+
 ## 2026-06-12 (evening) — S7 cleanup pass (arc COMPLETE)
 
 The perf+correctness arc's gated cleanup session (Michael's
