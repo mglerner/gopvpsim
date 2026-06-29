@@ -113,6 +113,19 @@ L5-affordance, change-propagation), not just the engine math.
    - trigger: `python -c "from scripts.sweep_cache import engine_hash; print(engine_hash())"`
      before vs after (must differ). Then apply the CLAUDE.md migration check;
      verify any predicate covers the ENTIRE engine delta since `from_engine`.
+   - **Warm-vs-cold verification (do NOT assume a migration buys you warmth).**
+     A migration only warm-serves columns matching the current engine hash AND
+     the current gamemaster (the focal-dir key includes `gamemaster`), so a
+     gamemaster change since the last bake silently invalidates the ENTIRE sweep
+     cache and the re-dive is cold regardless of any engine predicate.
+     - trigger: `python scripts/migrate_cache.py --list-stamps` for the per-engine
+       split, then confirm those columns' `gamemaster` == `sweep_cache.gamemaster_hash()`
+       (walk the sidecars, or extend `--list-stamps`). If 0 columns match
+       (current engine AND current gamemaster), the "warm" re-dive is fully cold
+       -- decide on that basis, and investigate WHY the gamemaster moved (real
+       PvPoke push vs a TTL re-fetch) per lens 5. (2026-06-29: 0/48460
+       current-engine columns matched the current gamemaster -- a re-dive we
+       assumed would be warm would have been entirely cold.)
 
 7. **Known-issue / backlog triage** (L6). What have we already flagged that this
    dive should resolve or must not regress?
@@ -120,6 +133,18 @@ L5-affordance, change-propagation), not just the engine math.
      `grep -rn 'XXX:\|TODO\|FIXME\|xfail' scripts/ src/gopvpsim/ tests/`; confirm
      each open item is fixed-in-batch or consciously deferred (not silently
      shipped).
+   - **Batch-the-bake economics (ASK MICHAEL before starting).** A re-dive you
+     are already paying for makes any "expensive-standalone" engine fix -- one
+     whose only real cost is that it forces its own re-dive -- effectively FREE to
+     fix in this bake. Before a big re-dive, surface the flagged/suspected engine
+     bugs and **ask Michael whether to co-fix them in this run** rather than defer.
+     (bandaid[910] is the 2026-06-29 example: caught before the 2026-06-28 bake it
+     would have ridden along for nothing; deferred, it now needs its own re-dive.)
+     - trigger: `grep -rn 'cosmetic\|low-priority\|defer\|leave-it' DEVELOPER_NOTES.md TODO.md`
+       for parked ENGINE-behavior items; list them for Michael with their
+       fix-size + whether each is winner-affecting. If the bake is cold anyway,
+       batch freely; if you are relying on a WARM migration, keep one localized
+       fix per hash bump (CLAUDE.md migration rule) or you invalidate the predicate.
 
 ## The reusable prompt
 
