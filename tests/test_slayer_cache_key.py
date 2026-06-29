@@ -6,24 +6,25 @@ Pins the 2026-06-11 review fixes:
   positional iv_meta indices, and the floor changes the index↔IV mapping,
   so floored and floorless runs must not share a file.
 - D3: ``_move_hash`` must include the buff fields (rebalances routinely
-  tweak only buffs/buffApplyChance), and the key embeds the engine-source
-  hash so engine edits invalidate without a manual CACHE_VERSION bump.
+  tweak only buffs/buffApplyChance).
+- v5 (2026-06-29): the engine-source hash and gamemaster hash are NO LONGER in
+  the key — they moved to the per-file sidecar STAMP so entries are migratable
+  (see test_slayer_cache_migratable.py). The key is now scenario-only.
 """
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))  # so sweep_cache's cache_base resolves
 _spec = importlib.util.spec_from_file_location(
     "slayer_cache", REPO_ROOT / "scripts" / "slayer_cache.py")
 slayer_cache = importlib.util.module_from_spec(_spec)
 assert _spec.loader is not None
 _spec.loader.exec_module(slayer_cache)
 
-# slayer_cache's key embeds sweep_cache's engine/gamemaster hashes via a
-# deferred import resolved against sys.modules — make it loadable.
-import sys
 if "sweep_cache" not in sys.modules:
     _sw_spec = importlib.util.spec_from_file_location(
         "sweep_cache", REPO_ROOT / "scripts" / "sweep_cache.py")
@@ -63,14 +64,17 @@ def test_buff_fields_change_key():
     assert _key(charged_moves=[rebuffed]) != _key()
 
 
-def test_engine_hash_is_embedded():
-    # Same inputs, different memoized engine hash -> different key.
+def test_engine_hash_NOT_in_key_v5():
+    # v5: the engine hash is NO LONGER in the filename key (it's a sidecar
+    # stamp). Changing the engine must NOT change the key — same scenario maps
+    # to the same file across engine vintages, so the stamp can be re-blessed
+    # by migrate_cache instead of cold-orphaning the file.
     import sweep_cache as sw
     base = _key()
     orig = sw._ENGINE_HASH
     try:
         sw._ENGINE_HASH = 'deadbeef0000'
-        assert _key() != base
+        assert _key() == base, "v5 key must be engine-independent"
     finally:
         sw._ENGINE_HASH = orig
 

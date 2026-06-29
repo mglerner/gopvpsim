@@ -7163,7 +7163,13 @@ def main():
             # (see iv_sweep, mechanics != 'legacy') rather than widen the key.
             slayer_cache = SlayerCache(
                 cache_key=cache_key,
-                disk=not args.no_cache and args.mechanics == 'legacy')
+                disk=not args.no_cache and args.mechanics == 'legacy',
+                # Scenario fields for the v5 sidecar -> let migrate_cache apply
+                # a predicate (e.g. bandaid[910] self-debuff) without unpickling.
+                # Slayer is a MIRROR, so the focal moveset IS both sides.
+                scenario={'species': args.species, 'league': args.league,
+                          'shadow': bool(args.shadow), 'fast': fast_id,
+                          'charged': list(charged_ids)})
 
             # Round 0 opponent: PvPoke default
             try:

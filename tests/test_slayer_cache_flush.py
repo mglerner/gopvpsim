@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
-# Load slayer_cache standalone (no heavy gopvpsim imports). save()/put()/get()
-# never touch the deferred sweep_cache hash path, so no extra wiring needed.
+# v5: save()/_load() read the current engine+gamemaster stamps from sweep_cache
+# for the sidecar, so scripts/ must be importable (sweep_cache -> cache_base).
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
 _spec = importlib.util.spec_from_file_location(
     "slayer_cache", REPO_ROOT / "scripts" / "slayer_cache.py")
 slayer_cache = importlib.util.module_from_spec(_spec)
