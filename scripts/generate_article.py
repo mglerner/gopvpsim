@@ -13,10 +13,10 @@ from thresholds/<species>.toml under [<Species>.article] slug.
 Design: docs/article_generator_design.md
 Schema: docs/article_schema.md (shared with render_article.py)
 
-S6 scope: skeleton only. Section bodies are labelled TODO placeholders;
-S7 / S8 fill in real content (move table, verdict, matchup delta, IV
-recommendations). See the design doc for the authorship precedence
-rule.
+All canonical sections render real content (move table, verdict,
+matchup delta, IV recommendations, etc.); render_placeholder is only a
+fallback when a section's data is unavailable. See the design doc for
+the authorship precedence rule.
 """
 from __future__ import annotations
 
@@ -90,7 +90,7 @@ CANONICAL_SECTIONS = [
      'Sourced from article TOML [meta_role]. Section is skipped '
      'entirely when the block is absent or all fields are empty.'),
     ('move-comparison', 'Move Comparison',
-     'S7: move-by-move stat table (power, energy, turns, DPT, EPT, type, STAB).'),
+     'move-by-move stat table (power, energy, turns, DPT, EPT, type, STAB).'),
     ('fast-moves', 'Fast Moves',
      'F-fast-moves: full legal fast-move pool with DPT / EPT / cooldown '
      '/ STAB and a tag column (CD / default / other). Includes cd_prep '
@@ -101,15 +101,15 @@ CANONICAL_SECTIONS = [
      '/ STAB / buff-debuff effects and a tag column. Same cd_prep '
      'injection as Fast Moves.'),
     ('meta-coverage', 'Meta Coverage',
-     'S7/S8: per-moveset avg score + win counts by shield scenario.'),
+     'per-moveset avg score + win counts by shield scenario.'),
     ('matchup-delta', 'Matchup Delta',
-     'S8: per-opponent score diff between CD moveset and old default; flip highlights.'),
+     'per-opponent score diff between CD moveset and old default; flip highlights.'),
     ('form-comparison', 'Male vs Female',
-     'S10: pairwise win-rate delta between forms. Source: [form_comparison].spec in the article TOML.'),
+     'pairwise win-rate delta between forms. Source: [form_comparison].spec in the article TOML.'),
     ('iv-recommendations', 'IV Recommendations',
-     'S8: threshold-tier cards from thresholds/<species>.toml; optional envelope annotations.'),
+     'threshold-tier cards from thresholds/<species>.toml; optional envelope annotations.'),
     ('verdict', 'Verdict',
-     'S7: one line picked by avg-score delta magnitude (upgrade / sidegrade / etc.).'),
+     'one line picked by avg-score delta magnitude (upgrade / sidegrade / etc.).'),
 ]
 
 PLACEHOLDER_SENTINEL = 'PLACEHOLDER'
