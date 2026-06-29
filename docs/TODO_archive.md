@@ -243,7 +243,7 @@ stale per-guide log per run / `2d82b51` watch views surface per-worker phase /
 lines, surfaced by `iv_guides_status.py` + `chain_status.py`.)
 
 Session-1 commits (all ride the cold pass for free):
-- **#2 float32 damage constants** -- DONE (`4e57321`). STAB/BONUS/super-effective
+- **#2 float32 damage constants** -- DONE (`f1538ff`). STAB/BONUS/super-effective
   now use float32-truncated doubles matching the game/PvPoke. Boundary-scattered,
   no clean predicate -> this is what makes the re-dive cold (so everything else
   this session rides it for free).
@@ -342,7 +342,7 @@ Master SHADOW guide it produced may carry the #1 behavior -- re-bake the
 shadow ML guides after you accept the #1 fix.
 
 **Bug-hunt follow-ups (open) -- full report `docs/reviews/2026-06-27_engine_bug_hunt.md`:**
-- **#2 [MED] FIXED 2026-06-27 (`4e57321`)** -- damage formula now uses the
+- **#2 [MED] FIXED 2026-06-27 (`f1538ff`)** -- damage formula now uses the
   game's float32-truncated `BONUS/STAB_MULTIPLIER/SUPER_EFFECTIVE` constants
   (was exact `1.3/1.2/1.6` -> off-by-one on breakpoint boundaries). This is
   the boundary-scattered fix that forces the COLD re-dive; everything else
