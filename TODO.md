@@ -476,13 +476,13 @@ shot). All still open — detail preserved verbatim there. Index of what's there
 
 - **Policies to add** — Selective baiting, random buff/debuff modes, EV-based
   baiting, new-mechanics decision-layer re-optimization.
-- **Features to add** — energy-lead axis (safe-switch / closer matchup flips;
-  full sketch + empirical precedent).
+- **Features to add** — energy-lead axis (safe-switch / closer matchup flips) —
+  SHIPPED 2026-06-12.
 - **Analysis goals** — RyanSwag-style matchup-flip annotations + wins y-axis,
   meta-wide slayer reference, SwagTips/reddit/iv-tech reproductions, the
   Tinkaton scatter-cluster + clustering-methodology investigations.
 - **Slayer card UX** — signal-loss systemic audit (saturation of slayer/tier
-  badges); cluster-section gating.
+  badges).
 - **Slayer iteration cleanup** — Max-Wins column, Lurgan-as-opponent re-run,
   validation-doc reframe.
 - **HTML output paths** — orphaned-artifact detector, split-moveset re-render,
