@@ -32,6 +32,19 @@ Engine predicates (PROVEN, not guessed):
                 XOR opp.shadow). Proof pinned by tests/test_migrate_cache.py
                 and the engine test tests/test_fire_now_cmp_shadow.py.
 
+  self_debuff_either_side — bandaid[910] (the [910] defer gate using the
+                defender's MAX-DAMAGE move instead of its bestChargedMove;
+                --from-engine acdb94e0df72). The fix's behavioral delta is
+                reachable ONLY when the ACTING pokemon's selected first charged
+                move is self-debuffing, which requires it to own a
+                self-debuffing charged move. A column simulates both
+                orientations, so affected = (focal OR opponent owns a
+                self-debuffing CM); a column is provably unchanged iff NEITHER
+                does (BOTH-SIDED — an opponent-side self-debuff holder changes a
+                non-self-debuff focal's column). Proof + completeness pinned by
+                tests/test_migrate_cache.py and the engine A/B regression in
+                tests/test_bandaid910_bestcm.py.
+
 Preconditions enforced here:
   - ENGINE mode: only columns whose engine stamp == --from-engine are touched
     (scopes the predicate to the exact characterized delta), AND only columns
@@ -64,10 +77,56 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sweep_cache  # noqa: E402
 
 
+_SELF_DEBUFF_CM_IDS = None
+
+
+def _self_debuff_charged_ids():
+    """The set of charged moveIds flagged selfDebuffing by the ENGINE
+    (moves.get_moves(), which sets the derived flag at moves.py:199).
+
+    Memoized. MUST come from the engine path, not raw gamemaster move dicts —
+    the raw dicts lack the computed ``selfDebuffing`` flag, and reading it off
+    them silently yields all-False (the 2026-06-28 feasibility harness hit this
+    exact trap and produced a false "gate never reached" reading)."""
+    global _SELF_DEBUFF_CM_IDS
+    if _SELF_DEBUFF_CM_IDS is None:
+        from gopvpsim.moves import get_moves
+        _, charged = get_moves()
+        _SELF_DEBUFF_CM_IDS = {mid for mid, m in charged.items()
+                               if m.get('selfDebuffing')}
+    return _SELF_DEBUFF_CM_IDS
+
+
+def _self_debuff_either_side(f, c):
+    """bandaid[910] engine fix (pinned --from-engine acdb94e0df72).
+
+    A column's score changes under the fix ONLY when, in some orientation, the
+    ACTING pokemon's selected first charged move is self-debuffing — which
+    requires that pokemon to OWN a self-debuffing charged move. A column
+    simulates both orientations, so it is provably unchanged iff NEITHER side
+    owns a self-debuffing charged move (BOTH-SIDED). Affected = the complement.
+
+    The triage's earlier focal-only complement was UNSOUND: an opponent-side
+    self-debuff holder changes a non-self-debuff focal's column (Lickitung
+    focal vs Pangoro 92->284). Hence both sides.
+
+    FAIL-SAFE: if either side's moveset is missing/unresolvable, return True
+    (AFFECTED, re-sim) — never bless a column we can't prove unchanged."""
+    if not f or not c:
+        return True
+    fch = f.get('charged')
+    cch = c.get('charged')
+    if not fch or not cch:
+        return True
+    sd = _self_debuff_charged_ids()
+    return bool(set(fch) & sd) or bool(set(cch) & sd)
+
+
 # affected(focal_fields, col_fields) -> True if the engine change changed
 # this column's scores (must be re-simmed); False if provably unchanged.
 PREDICATES = {
     'shadow_xor': lambda f, c: bool(f.get('shadow')) != bool(c.get('shadow')),
+    'self_debuff_either_side': _self_debuff_either_side,
 }
 
 
