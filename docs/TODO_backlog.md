@@ -439,8 +439,9 @@ win-rates — single-IV and a top-512 opponent-IV robustness number. Built
 to reproduce the Dragapult-Sim/Lundberger infographic look. First dive:
 Shadow Corviknight GL pre-release, `userdata/dives/shadow_corviknight*.html`.)*
 
-* **Card "High HP" pole surfaces a strictly-dominated spread (BUG, flagged
-  2026-06-24).** On the UL Mimikyu card the High HP pole highlighted
+* **Card "High HP" pole surfaced a strictly-dominated spread (fix (a)
+  RESOLVED 2026-06-25, 810f53c; design sub-question (b) still open).** On the
+  UL Mimikyu card the High HP pole highlighted
   `0/15/15` (148.7 atk / 179.8 def / 135 hp, **CP 2319** — nowhere near the
   2500 cap — SP #702, NO crown marker). That spread is strictly dominated:
   `1/15/15` has the same def + hp but higher atk. We should never headline a
@@ -464,6 +465,15 @@ Shadow Corviknight GL pre-release, `userdata/dives/shadow_corviknight*.html`.)*
   focused card-pole bugfix first. Concrete repro: UL Mimikyu card,
   Shadow Claw / Play Rough + Shadow Sneak. Do NOT fix in the new-mechanics
   session.
+  **RESOLVED (a) 2026-06-25, 810f53c:** both poles now carry `ivAtk` as the
+  final tie-break (deep_dive.py:3280-3282 attack pole, :3311-3313 bulk pole),
+  so a pure def+hp / hp+def tie can no longer headline the lower-atk,
+  strictly-dominated spread. Regression-pinned by
+  `tests/test_card_pole_tiebreak.py` -- the poles are EXEMPT from the
+  `_eff_mask` strict-dominance filter, so the tie-break key is their only
+  guard, and the test covers both a synthetic efficient-frontier check and a
+  source tripwire on the key. Sub-question (b) (hard-require the crown marker
+  for a spread to headline the card) is the open design call, untouched here.
 
 * **Opponent-IV robustness as a first-class sim axis (plan item 1.8).**
   Today `opp_iv_robustness` is computed ad hoc for the rec IV only, as a
