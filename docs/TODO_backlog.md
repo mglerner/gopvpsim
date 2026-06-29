@@ -54,111 +54,24 @@ precedents) is preserved verbatim. Near-term actionable items live in
 bait-axis as a deep-dive sim dimension shipped; DP cycle-timing
 move selection closed 2026-04-15 as not-a-real-issue.)
 
-* **Energy-lead axis (safe-switch / closer matchup flips)**
-  *(scoped 2026-06-03 during Shadow Sableye build advice
-  conversation; needs its own session)* — Currently the battle sim
-  always starts both Pokemon at energy 0. Real PvP often has the
-  focal species arrive with energy carry-over: a **safe switch**
-  brings the back-line attacker in with some fast moves already
-  generated before the original swap; a **closer** has typically
-  burned several fast moves before the opponent's final mon comes
-  out. The same matchup can flip win/loss depending on whether the
-  attacker enters with 0, 1, or 2 fast moves of accumulated
-  energy.
+* **Energy-lead axis (safe-switch / closer matchup flips) —
+  SHIPPED 2026-06-12 (commit 9889555).** The `--energy-lead` axis
+  (default `off`) is plumbed through `deep_dive.py`: energy-lead
+  values are fast-move multiples `[0, 1, 2]` (cold start + 1/2 fast
+  moves of carry-over), converted to raw energy per moveset and
+  clamped at the reachable bound (focal clamping), then folded into
+  the composite mode string and the column cache key. Pinned by
+  `tests/test_energy_lead.py` (8 passed).
 
-  Implementation sketch (analogous to the shipped bait_shields
-  axis):
-
-  1. **Battle-engine plumbing** — `BattlePokemon.__init__` gains
-     an `energy: int = 0` parameter (it likely already has the
-     field as state; the change is making it an init arg that the
-     sim honors at T0 instead of forcing 0). Symmetric defender
-     energy too, for completeness (defender carry-over scenarios
-     are rarer but exist).
-  2. **Sim axis** — `deep_dive.py` already enumerates
-     `(IV × moveset × opp_iv × bait × scenario)`. Add an
-     `energy_lead` dimension with concrete values keyed off the
-     attacker's fast-move energy generation: `[0, fast_energy,
-     2*fast_energy]` = `[0, 8, 16]` for Shadow Claw, `[0, 10, 20]`
-     for Counter, etc. Three buckets keeps the aggregator
-     tractable.
-  3. **Aggregator surface** — extend `_find_matchup_boundaries`
-     and `_aggregate_flips_by_anchor` to detect when a matchup
-     flips between energy-lead values. Natural display surface:
-     the existing "Matchup-Flipping Boundaries" section, with
-     a new line per matchup like "Flips vs Galarian Corsola
-     1v1 when attacker has 1+ Shadow Claw of stored energy."
-  4. **Cap on realistic values** — energy-lead values above
-     `(max_energy - cheapest_charged_cost)` aren't reachable in
-     practice (you'd have already thrown the charged move). The
-     axis values need to be clamped per attacker; otherwise the
-     analysis surfaces unreachable matchup flips.
-
-  **Use case** — safe-switch / closer mons (Sableye, Quagsire,
-  Drapion, Wigglytuff, Lickilicky, anything that eats a shield
-  then comes back) are exactly the species whose dive
-  recommendations are most miscalibrated against the energy-0
-  assumption. After landing this axis, every shipped dive in the
-  scope-fits category benefits.
-
-  **Estimated scope** — half a day for the battle-engine change +
-  axis plumbing in deep_dive.py; another half-session for the
-  aggregator + matchup-flip narrative integration. Tests:
-  parameterize existing oracle tests with `[0, 8, 16]` starting
-  energy and confirm the deterministic ones still match.
-
-  **Cross-ref**: bundles naturally with the "matchup-flip
-  annotations" arc already in progress (under "Analysis goals"),
-  since both extend the per-matchup flip aggregator.
-
-  **Empirical precedent (2026-06-03):** the one-off script
-  `scripts/check_sableye_energy_lead.py` validates the feature
-  concept end-to-end against a real build decision. It sims 4
-  candidate Sableye IVs × 4 movesets × 66 opponents × 9 shields ×
-  {0, 8, 16} starting energy = 28,512 matchups in under a minute
-  on 1 CPU. Findings that confirm the feature is worth the
+  Two sketch sub-items did NOT ship as written and stay out of
   scope:
-
-  1. Energy lead reshaped **~50 of 594** per-(IV, moveset)
-     matchups in this case (2/11/13 + Drain Punch + Foul Play
-     went 332 → 355 → 383 wins, +15% across the energy axis).
-  2. The IV ranking was stable across energy levels for this
-     pool — 2/11/13 won at energy 0 AND at energy 16 — so the
-     feature doesn't reverse stat-product-based IV choices, it
-     surfaces *additional* matchup data on top.
-  3. The script's hack (mutate `bp.energy` after
-     `make_battle_pokemon` returns; `BattlePokemon.initial_energy`
-     already exists at the engine layer) confirms only the sim
-     axis + aggregator + display surface need building — the
-     battle engine is ready.
-
-  When implementing the feature, fold the script's structure
-  (per-IV, per-moveset, per-energy aggregate table + matchup-flip
-  list) into the deep_dive.py aggregator output. The throwaway
-  script can be deleted at that point — its existence is logged
-  here for the precedent + the mutation-hack pattern that proved
-  the engine-side feasibility.
-
-  **Counter-intuitive cross-check (2026-06-03) — keep as a
-  regression test when the feature ships:** the same one-off
-  script run on 0/15/15 (rank-1 stat product) vs 2/11/13 (the
-  pick that won via stat product alone) across the same energy
-  axis showed 0/15/15 *gains more wins from energy lead than
-  2/11/13 does* (+92 / +231 wins at 1-fast / 2-fast lead vs
-  +80 / +217 for 2/11/13). This contradicts the natural intuition
-  that "energy lead favors high-atk IVs because the first charged
-  move hits harder" — for high-power moves that opponents shield
-  with high probability (Foul Play 65-power in this case), the
-  post-shield chip war is what the fight comes down to, and bulk
-  wins chip wars regardless of the swing-throw dynamics. When the
-  feature lands, Shadow Sableye should be a calibration-test
-  species: if the aggregator surfaces atk-favored IVs as bigger
-  energy-lead gainers for Sableye-class species (high-power
-  shield-bait charged moves + Foul-Play-like primaries), that's a
-  feature bug, not the genuine matchup math. The shape to look
-  for: bulk-leaning IVs should gain MORE matchups as energy lead
-  rises, against opponents whose damage profile rewards
-  longevity over burst.
+  - The calibration test landed on **Azumarill**, not the proposed
+    Shadow Sableye web-oracle calibration. No web-oracle calibration
+    was built (and none is planned here).
+  - The throwaway precedent script
+    `scripts/check_sableye_energy_lead.py` was deliberately **KEPT**
+    (not deleted) as the end-to-end engine-feasibility record from
+    the 2026-06-03 scoping run.
 
 ## Analysis goals
 
@@ -359,14 +272,6 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   as the first test case when the audit happens; if the chosen
   remedy doesn't differentiate the Oinkologne scatter, it's not
   solving the problem.
-
-* **"Show clusters" section is always visible** — it sits above the
-  interactive scatter plot but should be gated behind the "Show
-  experimental analysis (banding, clusters)" checkbox in the Deep Dive
-  Analysis section. The checkbox already toggles `#dd-alpha` and
-  `#dd-alpha-methods`; the cluster-display block needs to either move
-  inside `#dd-alpha` or be hidden by the same JS handler. Discovered
-  2026-04-08.
 
 ## Slayer iteration cleanup
 
