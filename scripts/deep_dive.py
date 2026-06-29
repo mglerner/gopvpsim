@@ -886,27 +886,30 @@ _FORM_CHANGE_SPECIES_CACHE: dict = {}
 
 
 def _species_has_form_change(species_name):
-    """True if the species' gamemaster entry (looked up by EXACT name)
-    declares a formChange, so its effective stats are NOT a safe dedup key
-    (the alt form's stats are non-linear in raw IVs + level). Cached;
-    defaults False on lookup miss.
+    """True if the species participates in a formChange (either directly or
+    as a sibling form), so its effective stats are NOT a safe dedup key (the
+    alt form's stats are non-linear in raw IVs + level). Cached; defaults
+    False on lookup miss.
 
-    Exactness caveat: this keys on the supplied form NAME. It is correct for
-    today's meta only because the sole opponent whose alt-form stats actually
-    diverge (Aegislash) is pool-named by a formChange-bearing form
-    ('Aegislash (Shield)'/'(Blade)' both carry formChange). Morpeko's pool
-    name 'Morpeko (Hangry)' lacks formChange and so returns False here, but
-    that is harmless: its two forms share identical baseStats, so effective-
-    stat dedup is exact for it anyway. A FUTURE stat-divergent toggle/set
-    species whose pool name lacks the formChange key would be silently
-    misgrouped -- resolve to the base speciesId and check both forms if that
-    ever ships."""
+    A form-changing species is detected two ways: its own gamemaster entry
+    declares a formChange, OR its speciesId is the alternativeFormId of some
+    other form's formChange. The second case covers sibling forms whose pool
+    name lacks the formChange key (e.g. 'Morpeko (Hangry)', reachable only via
+    'Morpeko (Full Belly)'.formChange.alternativeFormId) -- they are now
+    detected rather than silently misgrouped. For Morpeko specifically the two
+    forms share identical baseStats so dedup was already exact, but resolving
+    through the sibling link makes this robust to a FUTURE stat-divergent
+    toggle/set species pool-named by a key-lacking form."""
     if species_name in _FORM_CHANGE_SPECIES_CACHE:
         return _FORM_CHANGE_SPECIES_CACHE[species_name]
     gm = load_gamemaster()
     mon = next((m for m in gm['pokemon']
                 if m['speciesName'] == species_name), None)
     has = bool(mon and mon.get('formChange'))
+    if mon and not has:
+        sid = mon['speciesId']
+        has = any((m.get('formChange') or {}).get('alternativeFormId') == sid
+                  for m in gm['pokemon'])
     _FORM_CHANGE_SPECIES_CACHE[species_name] = has
     return has
 
