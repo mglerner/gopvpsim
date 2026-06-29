@@ -130,7 +130,7 @@ _slayer_state = {}
 def slayer_worker_init(species, focal_types,
                          max_cp, shadow, fm_template, cms_template,
                          shield_scenarios, log_path=None, verbose=False,
-                         focal_mon=None):
+                         focal_mon=None, mechanics='legacy'):
     worker_log_setup(log_path, verbose=verbose)
     _slayer_state['species'] = species
     _slayer_state['focal_types'] = focal_types
@@ -140,6 +140,7 @@ def slayer_worker_init(species, focal_types,
     _slayer_state['cms_template'] = cms_template
     _slayer_state['shield_scenarios'] = shield_scenarios
     _slayer_state['focal_mon'] = focal_mon
+    _slayer_state['mechanics'] = mechanics
 
 
 def slayer_iter_worker(args):
@@ -161,6 +162,7 @@ def slayer_iter_worker(args):
     focal_mon = ws['focal_mon']
     league_cp = ws['max_cp']
     shadow = ws['shadow']
+    mechanics = ws.get('mechanics', 'legacy')
 
     results = {}
     for profile_key, atk_stat, def_stat, hp_stat, a_iv, d_iv, s_iv, lv in focal_profile_chunk:
@@ -193,7 +195,8 @@ def slayer_iter_worker(args):
                 bp1.reset_for_battle(s_opp, opponent=bp0)
                 res = simulate(bp0, bp1,
                                charged_policy_0=pvpoke_dp,
-                               charged_policy_1=pvpoke_dp)
+                               charged_policy_1=pvpoke_dp,
+                               mechanics=mechanics)
                 scores.append(round(res.pvpoke_score(0)))
             results[(profile_key, opp_iv_idx)] = tuple(scores)
     return results
@@ -249,7 +252,8 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                                 max_rounds=4, top_per_round=10, cache=None,
                                 metric='all', iv_floor=None,
                                 log_path=None, verbose=False,
-                                reserve_cpus=0, focal_max_level=None):
+                                reserve_cpus=0, focal_max_level=None,
+                                mechanics='legacy'):
     """
     Iterative slayer discovery: find IVs that beat the mirror match through
     Nash-style iteration.
@@ -392,7 +396,8 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
 
             init_args = (species, focal_types,
                          max_cp, shadow, fm_template, cms_template,
-                         shield_scenarios, log_path, verbose, focal_mon)
+                         shield_scenarios, log_path, verbose, focal_mon,
+                         mechanics)
             sim_start = _time.time()
             with multiprocessing.Pool(
                 processes=n_workers,
