@@ -530,9 +530,9 @@ messages.
     defenders Talonflame/Milotic/Guzzlord/Gourgeist/Dusclops). Pre-fix dives
     carried it in shadow-XOR cells -> corrected by the 2026-06-28 cold re-dive.
 
-- **Engine bug-hunt #2–#7 (2026-06-27) — all RESOLVED except #6 (open,
-  cosmetic).** Report: `docs/reviews/2026-06-27_engine_bug_hunt.md`; shipped
-  record in CHANGELOG "2026-06-28".
+- **Engine bug-hunt #2–#7 (2026-06-27) — all RESOLVED.** Report:
+  `docs/reviews/2026-06-27_engine_bug_hunt.md`; shipped record in CHANGELOG
+  "2026-06-28".
   - **#2** float32-truncated damage constants (`f1538ff`) + shadow-def
     `float32(5/6)` (`805cdc3`) — boundary-scattered, forced the cold re-dive.
   - **#3** farm-down stacks self-debuffing moves (`50e8cd2`,
@@ -543,14 +543,21 @@ messages.
     (see below); `test_bandaid929_nobait_divergence`.
   - **#7** `_cm_debuf_delta` dead str-vs-int branch -> `float(...)==1.0`
     (matches PvPoke loose-equality); 0/10458 dive cells. `test_cm_debuf_delta`.
-  - **#6** (open) bandaid[910] uses defender max-damage move not
-    `bestChargedMove` (battle.py:1732). **Winner-stable but NOT score-stable**
-    (the old "cosmetic / 16/16 oracle" wording was misleading): verified A/B
-    2026-06-29 on default movesets, GL 0-0 -- Pangoro vs Lickitung 907 -> 715
-    (real turns/HP diff, 0 winner flips). Accidental port infidelity; 2-line
-    `_estimate_best_cm` fix, migratable via a both-sided self-debuff-CM
-    predicate but engine-hash-bumping. Keep-vs-fix is Michael's. Evidence:
-    `docs/reviews/2026-06-28_bandaid910_migratable_fix_feasibility.md` + TODO.
+  - **#6 bandaid[910] — RESOLVED 2026-06-29** (`ffb582b`). The [910] defer-gate
+    picked the defender's max-damage charged move where PvPoke
+    (`ActionLogic.js:929`) uses `bestChargedMove`; an accidental port infidelity,
+    not a defended divergence. **Winner-stable but NOT score-stable** (the old
+    "cosmetic / 16/16 oracle" wording was misleading): A/B Pangoro vs Lickitung
+    GL 0-0 907 -> 715 (real turns/HP diff, 0 GL winner flips; flips 1 UL winner,
+    Moltres-G vs Dondozo 478 -> 538). 2-line `_estimate_best_cm` fix. Warm-
+    migrated via the both-sided self-debuff-CM predicate (`migrate_cache.py`
+    `self_debuff_either_side`, 39,600/48,464 columns blessed); production re-dive
+    launched 2026-06-29. **NB:** this resolves only the opponent-best-move PICK
+    inside the [910] gate -- the separate [910]/[918] self-debuff *timing*
+    deviation (throw a self-debuffing move only when fast-KO won't suffice)
+    remains an INTENTIONAL divergence (see "Known divergences" below; unchanged).
+    Evidence: `docs/reviews/2026-06-28_bandaid910_migratable_fix_feasibility.md`,
+    CHANGELOG.
 
 - **Incoming selfDefenseDebuffing shield gate — RESOLVED 2026-06-13.** Removed
   an extra routing condition the reference lacks (a self-def-debuffing nuke is
