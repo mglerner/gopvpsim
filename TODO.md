@@ -34,15 +34,6 @@ pre-cold-dive gate; run `overnight_redive.sh` and watch with
   likely the near-KO-DP / `_optimize_move_timing` self-debuff-timing cluster.
   Investigate, decide keep-vs-fix (CLAUDE.md gate). Repro: DEVELOPER_NOTES
   "#2-#6" + `docs/reviews/2026-06-27_engine_bug_hunt.md`.
-- **[engine] #6 bandaid[910]** uses defender max-damage move not
-  `bestChargedMove` (battle.py:1732). **NOT cosmetic** (the old "16/16 oracle
-  match" wording was misleading): it is winner-stable but NOT score-stable.
-  Verified A/B 2026-06-29 (default movesets, GL 0-0): Pangoro vs Lickitung
-  907 -> 715 (real turn/HP difference, 0 winner flips). Accidental port
-  infidelity, not a defended divergence; 2-line fix = `_estimate_best_cm`.
-  Migratable via a both-sided "neither side owns a self-debuff CM" predicate
-  (~77% warm-serve GL) but bumps the engine hash -> needs a re-dive; keep-vs-fix
-  is Michael's. Full evidence: `docs/reviews/2026-06-28_bandaid910_migratable_fix_feasibility.md`.
 
 ## Cache GC: prune all namespaces + dive-script opt-in prompt
 
