@@ -36,6 +36,7 @@ Layout on disk:
 """
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -311,10 +312,23 @@ class SweepCache:
             out = {name: np.asarray(arr, dtype=_PLANE_DTYPES.get(name, np.float64))
                    for name, arr in planes.items()}
             p = self._col_path(col_fields)
+            sidecar = p.with_suffix('.json')
+            # Order: REMOVE old stamp -> write data -> write new stamp (atomic).
+            # The column key is engine/gamemaster-INDEPENDENT, so two vintages
+            # share one .npz; if we wrote the new column while a leftover
+            # OLD-vintage sidecar survived a torn/failed write, a later engine
+            # DOWNGRADE (revert-WIP-and-rerun) would serve the new column's
+            # STALE planes under the old stamp. Removing the sidecar first means
+            # any crash leaves the .npz stamp-less -> a SAFE MISS until the
+            # matching sidecar lands. (Parity with slayer_cache.save, 2026-06-29
+            # red-team finding; both write_planes and the sidecar are atomic.)
+            sidecar.unlink(missing_ok=True)
             write_planes(p, out)
-            p.with_suffix('.json').write_text(json.dumps(
+            sc_tmp = sidecar.with_name(sidecar.name + '.tmp')
+            sc_tmp.write_text(json.dumps(
                 {'engine': engine_hash(), 'gamemaster': gamemaster_hash(),
                  'col': col_fields},
                 indent=1, sort_keys=True))
+            os.replace(sc_tmp, sidecar)
         except Exception:
             pass  # cache is best-effort
