@@ -134,6 +134,39 @@ def test_stale_gamemaster_stamp_is_miss(tmp_path, monkeypatch):
     assert sweep_cache.SweepCache(_focal_fields()).get_column(col_key, 8, 2) is None
 
 
+def test_torn_sidecar_write_leaves_no_stale_stamp(tmp_path, monkeypatch):
+    # Parity with slayer_cache (2026-06-29 red-team): put_column must REMOVE the
+    # old sidecar before writing the new .npz. Otherwise a torn sidecar write
+    # leaves new-planes + OLD-vintage sidecar, and a later engine DOWNGRADE to
+    # that vintage serves stale planes. Simulate the torn write and assert the
+    # column is left stamp-less (a safe miss), never beside a surviving stamp.
+    import os as _os
+    monkeypatch.setattr(sweep_cache, 'CACHE_DIR', tmp_path)
+    col_key = _col_fields()
+    # 1. Complete store at engine A.
+    monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'engine_A')
+    cache = sweep_cache.SweepCache(_focal_fields())
+    cache.put_column(col_key, {'score': np.zeros((8, 2)), 'energy': np.zeros((8, 2))})
+    sidecar = cache._col_path(col_key).with_suffix('.json')
+    assert sidecar.exists()
+    # 2. Store at engine B, but make the sidecar's final os.replace fail (torn).
+    monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'engine_B')
+    real_replace = _os.replace
+    def flaky_replace(src, dst):
+        if str(dst).endswith('.json'):
+            raise OSError('simulated torn sidecar write')
+        return real_replace(src, dst)
+    monkeypatch.setattr(sweep_cache.os, 'replace', flaky_replace)
+    sweep_cache.SweepCache(_focal_fields()).put_column(
+        col_key, {'score': np.ones((8, 2)), 'energy': np.zeros((8, 2))})
+    monkeypatch.setattr(sweep_cache.os, 'replace', real_replace)
+    # The OLD (engine_A) sidecar must be GONE, not surviving beside the B planes.
+    assert not sidecar.exists()
+    # 3. Downgrade back to engine A: must MISS (no sidecar), never serve B planes.
+    monkeypatch.setattr(sweep_cache, '_ENGINE_HASH', 'engine_A')
+    assert sweep_cache.SweepCache(_focal_fields()).get_column(col_key, 8, 2) is None
+
+
 def test_gamemaster_not_in_focal_key(tmp_path, monkeypatch):
     # v7: gamemaster left the focal key, so two gamemaster vintages share ONE
     # focal dir (the stamp distinguishes their columns, not the dir).
