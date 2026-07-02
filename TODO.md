@@ -35,6 +35,19 @@ pre-cold-dive gate; run `overnight_redive.sh` and watch with
   Investigate, decide keep-vs-fix (CLAUDE.md gate). Repro: DEVELOPER_NOTES
   "#2-#6" + `docs/reviews/2026-06-27_engine_bug_hunt.md`.
 
+## Top-N opponent filter + limited-cup dives (planned 2026-07-02)
+
+From Reddit launch-post feedback (u/LeansCenter): (a) evaluate a focal vs
+only the top 10/20/50 meta opponents, (b) limited-cup dives (Sunshine Cup
+etc.), separate/composable. Full plan with recon evidence, phasing, and the
+open decisions (UI shape, cup pilot choice, rollout vehicle):
+`docs/topn_cup_filter_plan.md`. Headlines: top-N is a client-side mask over
+the already-embedded SCORES_GZ grid plus a bake-time `oppMetaRank` field and
+an honesty banner over the full-pool baked sections; cups are a pool+rankings
+feature (PvPoke publishes cup rankings; sweep cache warm-serves overlapping
+columns; ~minutes per focal, not a re-bake). Blocked on Michael's decisions
+listed in the plan doc before any implementation session.
+
 ## Cache GC: prune all namespaces + dive-script opt-in prompt
 
 Make `scripts/gc_cache.py` able to prune **every** cache namespace, and wire a
