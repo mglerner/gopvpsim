@@ -199,10 +199,10 @@ function getActiveScenarioIndices() {
 // deltas, and the paste-box "Gives up vs #1" list -- but NOT the Python-baked
 // sections (infographic card, threshold tiers, Top Picks, narrative), which
 // are computed full-pool at bake time. The honesty banner names that split.
-// The "Comparing builds" widget (cmpSummary) is deliberately left full-pool
-// too: the plan scoped the mask to the scatter/table/histograms, the widget
-// already exposes per-opponent rows, and its avg is compared against a
-// same-pool best, so it stays internally consistent. (Flagged for review.)
+// The "Comparing builds" widget (cmpSummary / cmpBestAvg / cmpFlipPanel /
+// cmpMarginPanel) ALSO follows the filter -- its wins/avg/gives-up and the
+// flip+margin panels recompute over the selected subset (Michael's call
+// 2026-07-03), so every score surface on the page moves together.
 function _oppSelCount() {
   var sel = state.selectedOpps;
   if (!sel) return nO;
@@ -285,6 +285,9 @@ function oppFilterCheckboxChanged() {
   _syncSelectedFromCheckboxes();
   updateOppFilterBanner();
   updateView();
+  // The Comparing-builds widget reads the same grids -> refresh it on filter
+  // change (updateView doesn't, mirroring setBestBuddyLevel's explicit call).
+  if (typeof cmpRender === 'function' && state.compareCandidates.length) cmpRender();
 }
 function _setAllCheckboxes(pred) {
   var boxes = document.querySelectorAll('#opp-filter-list input[type=checkbox]');
@@ -295,6 +298,7 @@ function _setAllCheckboxes(pred) {
   _syncSelectedFromCheckboxes();
   updateOppFilterBanner();
   updateView();
+  if (typeof cmpRender === 'function' && state.compareCandidates.length) cmpRender();
 }
 function oppFilterAll() { _setAllCheckboxes(function() { return true; }); }
 function oppFilterNone() { _setAllCheckboxes(function() { return false; }); }
@@ -324,9 +328,9 @@ function updateOppFilterBanner() {
   if (oppFilterActive()) {
     var snap = DATA.rankSnapshot ? (' Meta ranks as of ' + DATA.rankSnapshot + '.') : '';
     banner.style.display = 'block';
-    banner.innerHTML = '<b>Filtered view.</b> The scatter, Top IVs table, and histograms below '
-      + 'average over the <b>' + sel + ' of ' + nO + '</b> opponents you have checked. '
-      + 'The infographic card, threshold tiers, Top Picks, and narrative above are computed '
+    banner.innerHTML = '<b>Filtered view.</b> The scatter, Top IVs table, histograms, and the '
+      + 'Comparing-builds widget reflect the <b>' + sel + ' of ' + nO + '</b> opponents you have '
+      + 'checked. The infographic card, threshold tiers, Top Picks, and narrative are computed '
       + 'against the full ' + nO + '-opponent pool and do <b>not</b> react to this filter.' + snap;
   } else {
     banner.style.display = 'none';
@@ -3408,21 +3412,28 @@ function cmpEnergyGrids() {
 // cmpVal / cmpHp / cmpScenLabel are defined in the shared scripts/cmp_panels.js.
 
 // Per-candidate summary from the active grid (follows the level toggle).
+// Honors the opponent filter: wins/avg are over the selected subset so the
+// Comparing-builds widget stays consistent with the scatter/table/histograms.
 function cmpSummary(iv) {
   var g = cmpGrids().def, nO = DATA.nOpponents, nS = DATA.nScenarios;
+  var selSet = selectedOppSet();  // null == all opponents
+  var oppDen = selSet ? _oppSelCount() : nO;
   var wins = 0, tot = 0;
   for (var si = 0; si < nS; si++) for (var oi = 0; oi < nO; oi++) {
+    if (selSet && !selSet[oi]) continue;  // opponent filtered out
     var v = cmpVal(g, iv, si, oi); tot += v; if (v > 500) wins++;
   }
-  return { wins: wins, n: nS * nO, avg: tot / (nS * nO) };
+  return { wins: wins, n: nS * oppDen, avg: tot / (nS * oppDen) };
 }
 // "Gives up vs #1": avg-score gap to the best battle-IV in the active grid.
+// Cache key carries the mask signature so a selection change re-finds the best
+// (else it would compare candidates against a full-pool best under a filter).
 function cmpBestAvg() {
-  if (cmpBestAvg._cache && cmpBestAvg._key === (state.movesetIdx+state.oppIvMode+state.levelMode))
-    return cmpBestAvg._cache;
+  var key = state.movesetIdx + state.oppIvMode + state.levelMode + oppMaskSig();
+  if (cmpBestAvg._cache && cmpBestAvg._key === key) return cmpBestAvg._cache;
   var best = -1;
   for (var iv = 0; iv < DATA.nIvs; iv++) { var a = cmpSummary(iv).avg; if (a > best) best = a; }
-  cmpBestAvg._cache = best; cmpBestAvg._key = (state.movesetIdx+state.oppIvMode+state.levelMode);
+  cmpBestAvg._cache = best; cmpBestAvg._key = key;
   return best;
 }
 // Mirror CMP: does this IV's attack reach the converged-cohort attack? (wins the
