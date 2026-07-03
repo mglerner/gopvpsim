@@ -189,6 +189,152 @@ function getActiveScenarioIndices() {
   return [parseInt(state.scenarioMode)];
 }
 
+// ---- Opponent filter (client-side subset) ----
+//
+// state.selectedOpps is a Uint8Array(nO) of 1/0 (1 = shown), or null before
+// init (treated as "all shown"). state.oppMaskVersion bumps on every change so
+// per-render caches keyed on it recompute. The filter masks the AGGREGATE
+// views that sum over opponents -- scatter y-values, the Top-IVs table,
+// histograms, Matchups Kept, the hover matchup-diff lists, the per-shield
+// deltas, and the paste-box "Gives up vs #1" list -- but NOT the Python-baked
+// sections (infographic card, threshold tiers, Top Picks, narrative), which
+// are computed full-pool at bake time. The honesty banner names that split.
+// The "Comparing builds" widget (cmpSummary) is deliberately left full-pool
+// too: the plan scoped the mask to the scatter/table/histograms, the widget
+// already exposes per-opponent rows, and its avg is compared against a
+// same-pool best, so it stays internally consistent. (Flagged for review.)
+function _oppSelCount() {
+  var sel = state.selectedOpps;
+  if (!sel) return nO;
+  var c = 0; for (var i = 0; i < nO; i++) if (sel[i]) c++;
+  return c;
+}
+// A partial selection is "active". Zero-checked is treated as all (avoids
+// divide-by-zero) and therefore reads as inactive.
+function oppFilterActive() {
+  if (!state.selectedOpps) return false;
+  var c = _oppSelCount();
+  return c > 0 && c < nO;
+}
+// Lookup {oi:true} of shown opponents, or null when inactive (== all shown).
+// Callers do `if (selSet && !selSet[oi]) continue;` so null means no filtering.
+function selectedOppSet() {
+  if (!oppFilterActive()) return null;
+  var sel = state.selectedOpps, s = {};
+  for (var i = 0; i < nO; i++) if (sel[i]) s[i] = true;
+  return s;
+}
+// Cache-key fragment; changes whenever the selection changes.
+function oppMaskSig() {
+  return oppFilterActive() ? ('m' + (state.oppMaskVersion || 0)) : 'all';
+}
+
+// ---- Opponent filter: panel init + button handlers ----
+// Display order: meta rank ascending (1 = best); unranked (null rank) sorted
+// to the very end by display name. Built once from DATA on init.
+function _oppFilterOrder() {
+  var order = [];
+  for (var i = 0; i < nO; i++) order.push(i);
+  var ranks = DATA.oppMetaRank || [];
+  var disp = DATA.opponentsDisplay || DATA.opponents;
+  order.sort(function(a, b) {
+    var ra = ranks[a], rb = ranks[b];
+    var na = (ra == null), nb = (rb == null);
+    if (na !== nb) return na ? 1 : -1;        // unranked -> end
+    if (!na && ra !== rb) return ra - rb;      // by rank ascending
+    var da = disp[a], db = disp[b];
+    return da < db ? -1 : (da > db ? 1 : 0);   // then by display name
+  });
+  return order;
+}
+// Populate the checkbox list and seed state.selectedOpps (all checked). Called
+// once at boot before the first updateView(). No-op if the panel isn't present.
+function initOppFilter() {
+  var list = document.getElementById('opp-filter-list');
+  if (!list) return;
+  state.selectedOpps = new Uint8Array(nO);
+  for (var i = 0; i < nO; i++) state.selectedOpps[i] = 1;
+  state.oppMaskVersion = 0;
+  var ranks = DATA.oppMetaRank || [];
+  var disp = DATA.opponentsDisplay || DATA.opponents;
+  var order = _oppFilterOrder();
+  var html = '';
+  for (var k = 0; k < order.length; k++) {
+    var oi = order[k];
+    var r = ranks[oi];
+    var badge = (r == null) ? '--' : ('#' + r);
+    html += '<label style="font-size:12px;display:flex;gap:6px;align-items:center;'
+          + 'white-space:nowrap;overflow:hidden">'
+          + '<input type="checkbox" checked data-oi="' + oi + '" onchange="oppFilterCheckboxChanged()">'
+          + '<span style="color:var(--text-muted);min-width:2.6em;text-align:right">' + badge + '</span>'
+          + '<span style="overflow:hidden;text-overflow:ellipsis">' + disp[oi] + '</span>'
+          + '</label>';
+  }
+  list.innerHTML = html;
+  updateOppFilterBanner();
+}
+function _syncSelectedFromCheckboxes() {
+  var boxes = document.querySelectorAll('#opp-filter-list input[type=checkbox]');
+  for (var i = 0; i < boxes.length; i++) {
+    var oi = parseInt(boxes[i].getAttribute('data-oi'), 10);
+    state.selectedOpps[oi] = boxes[i].checked ? 1 : 0;
+  }
+  state.oppMaskVersion = (state.oppMaskVersion || 0) + 1;
+}
+function oppFilterCheckboxChanged() {
+  _syncSelectedFromCheckboxes();
+  updateOppFilterBanner();
+  updateView();
+}
+function _setAllCheckboxes(pred) {
+  var boxes = document.querySelectorAll('#opp-filter-list input[type=checkbox]');
+  for (var i = 0; i < boxes.length; i++) {
+    var oi = parseInt(boxes[i].getAttribute('data-oi'), 10);
+    boxes[i].checked = pred(oi);
+  }
+  _syncSelectedFromCheckboxes();
+  updateOppFilterBanner();
+  updateView();
+}
+function oppFilterAll() { _setAllCheckboxes(function() { return true; }); }
+function oppFilterNone() { _setAllCheckboxes(function() { return false; }); }
+// Top-N: check only opponents with a non-null meta rank <= n. Unranked never
+// join a top-N cut (they have no rank), matching the "unranked -> end" intent.
+function oppFilterTopN(n) {
+  var ranks = DATA.oppMetaRank || [];
+  _setAllCheckboxes(function(oi) { var r = ranks[oi]; return r != null && r <= n; });
+}
+window.oppFilterAll = oppFilterAll;
+window.oppFilterNone = oppFilterNone;
+window.oppFilterTopN = oppFilterTopN;
+window.oppFilterCheckboxChanged = oppFilterCheckboxChanged;
+
+// Banner + summary text. Banner shows ONLY on a genuine partial selection; it
+// names exactly which surfaces honor the filter and which stay full-pool, so a
+// filtered screenshot can't be mistaken for a full-meta result.
+function updateOppFilterBanner() {
+  var sel = _oppSelCount();
+  var sumEl = document.getElementById('opp-filter-summary');
+  if (sumEl) {
+    sumEl.textContent = oppFilterActive() ? ('(' + sel + ' of ' + nO + ' shown)')
+      : (sel === 0 ? '(none checked -- showing all)' : '(all shown)');
+  }
+  var banner = document.getElementById('opp-filter-banner');
+  if (!banner) return;
+  if (oppFilterActive()) {
+    var snap = DATA.rankSnapshot ? (' Meta ranks as of ' + DATA.rankSnapshot + '.') : '';
+    banner.style.display = 'block';
+    banner.innerHTML = '<b>Filtered view.</b> The scatter, Top IVs table, and histograms below '
+      + 'average over the <b>' + sel + ' of ' + nO + '</b> opponents you have checked. '
+      + 'The infographic card, threshold tiers, Top Picks, and narrative above are computed '
+      + 'against the full ' + nO + '-opponent pool and do <b>not</b> react to this filter.' + snap;
+  } else {
+    banner.style.display = 'none';
+    banner.innerHTML = '';
+  }
+}
+window.updateOppFilterBanner = updateOppFilterBanner;
+
 // ---- Compute view ----
 //
 // computeYValues dispatches on state.yAxisMode to produce the y-axis
@@ -232,6 +378,8 @@ function computeYValues(mi) {
   var scores = getScores(mi, scoreMode);
   if (!scores) return null;
 
+  var selSet = selectedOppSet();  // null == all opponents (no filter)
+
   if (mode === 'winsPvpoke' || mode === 'winsRank1') {
     var winCounts = new Float64Array(nIvs);
     for (var ivW = 0; ivW < nIvs; ivW++) {
@@ -240,6 +388,7 @@ function computeYValues(mi) {
         var siW = sis[kW];
         var baseW = ivW * nS * nO + siW * nO;
         for (var oiW = 0; oiW < nO; oiW++) {
+          if (selSet && !selSet[oiW]) continue;  // opponent filtered out
           if (scores[baseW + oiW] > 500) c++;  // >500=win; 500=tie (PvPoke)
         }
       }
@@ -248,16 +397,21 @@ function computeYValues(mi) {
     return winCounts;
   }
 
-  // 'avgScore' (default)
+  // 'avgScore' (default). Denominator is (selected scenarios) x (selected
+  // opponents), so the mean stays a mean over exactly the shown subset.
+  var oppDen = selSet ? _oppSelCount() : nO;
   var avgs = new Float64Array(nIvs);
   for (var iv2 = 0; iv2 < nIvs; iv2++) {
     var sum = 0;
     for (var k2 = 0; k2 < nSel; k2++) {
       var si2 = sis[k2];
       var base2 = iv2 * nS * nO + si2 * nO;
-      for (var oi2 = 0; oi2 < nO; oi2++) sum += scores[base2 + oi2];
+      for (var oi2 = 0; oi2 < nO; oi2++) {
+        if (selSet && !selSet[oi2]) continue;  // opponent filtered out
+        sum += scores[base2 + oi2];
+      }
     }
-    avgs[iv2] = sum / (nSel * nO);
+    avgs[iv2] = sum / (nSel * oppDen);
   }
   return avgs;
 }
@@ -544,10 +698,12 @@ function appendMatchupDiff(lines, mi1, iv1, mi2, iv2) {
   var s1 = getScores(mi1, state.oppIvMode);
   var s2 = getScores(mi2, state.oppIvMode);
   var sis = getActiveScenarioIndices();
+  var selSetMD = selectedOppSet();  // null == all opponents; honor the filter
   for (var k=0; k<sis.length; k++) {
     var si = sis[k];
     var gained = [], lost = [];
     for (var oi=0; oi<nO; oi++) {
+      if (selSetMD && !selSetMD[oi]) continue;  // opponent filtered out
       var sc1 = s1[iv1*nS*nO + si*nO + oi];
       var sc2 = s2[iv2*nS*nO + si*nO + oi];
       var w1 = sc1 > 500, w2 = sc2 > 500;  // >500=win; 500=tie (PvPoke)
@@ -1207,12 +1363,14 @@ function renderMatchesList() {
     if (_guRefIv < 0 || !_guScores) return '-';
     if (iv === _guRefIv) return '<span style="color:var(--win)">#1</span>';
     var sis = getActiveScenarioIndices();
+    var selSetGU = selectedOppSet();  // null == all opponents; honor the filter
     var lost = [];
     for (var k = 0; k < sis.length; k++) {
       var si = sis[k];
       var sc = DATA.scenarios[si];
       var lab = sc[0] + 'v' + sc[1];
       for (var oi = 0; oi < nO; oi++) {
+        if (selSetGU && !selSetGU[oi]) continue;  // opponent filtered out
         var refW = _guScores[_guRefIv * nS * nO + si * nO + oi] > 500;  // 500=tie (PvPoke)
         var myW = _guScores[iv * nS * nO + si * nO + oi] > 500;
         if (refW && !myW) lost.push(shortName(DATA.opponents[oi]) + ' ' + lab);
@@ -2437,9 +2595,11 @@ function _computeMatchupsKept(iv) {
   if (!scores) return NaN;
   var sis = getActiveScenarioIndices();
   var nSel = sis.length;
+  var selSet = selectedOppSet();  // null == all opponents; honor the filter
   var credit = 0;
   for (var oi = 0; oi < nO; oi++) {
     if (mirrorSet[oi]) continue;
+    if (selSet && !selSet[oi]) continue;  // opponent filtered out
     var sceneWins = 0;
     for (var k = 0; k < nSel; k++) {
       if (scores[iv * nS * nO + sis[k] * nO + oi] > 500) sceneWins++;  // 500=tie (PvPoke)
@@ -2449,11 +2609,21 @@ function _computeMatchupsKept(iv) {
   return credit;
 }
 
-// Denominator for Matchups Kept display ("K/M"). Cached per-render
-// is overkill — just one subtraction.
+// Denominator for Matchups Kept display ("K/M"): non-mirror opponents that
+// are currently shown. Under the opponent filter this shrinks to the selected
+// non-mirror subset so K/M stays a true "of the ones you're looking at".
 function _matchupsKeptDenom() {
-  var n = (DATA.mirrorOppIdxs || []).length;
-  return nO - n;
+  var mirrorIdxs = DATA.mirrorOppIdxs || [];
+  var mirrorSet = {};
+  for (var mi = 0; mi < mirrorIdxs.length; mi++) mirrorSet[mirrorIdxs[mi]] = true;
+  var selSet = selectedOppSet();  // null == all opponents
+  var d = 0;
+  for (var oi = 0; oi < nO; oi++) {
+    if (mirrorSet[oi]) continue;
+    if (selSet && !selSet[oi]) continue;
+    d++;
+  }
+  return d;
 }
 
 // Per-shield Score Δ helpers. Each IV gets one Δ per even-shield
@@ -2499,12 +2669,16 @@ function _ensurePerShieldBaselines(mi) {
   if (mode === 'winsPvpoke') scoreMode = 'pvpoke';
   else if (mode === 'winsRank1') scoreMode = 'rank1';
   else scoreMode = state.oppIvMode;  // 'avgScore' follows the Opp-IV/Bait dropdown
-  var key = mi + '|' + scoreMode;
+  // Cache key includes the opponent-mask signature so a selection change
+  // invalidates the per-shield baselines (they average over opponents).
+  var key = mi + '|' + scoreMode + '|' + oppMaskSig();
   if (key === _perShieldCacheKey) return;
   _perShieldCacheKey = key;
   _perShieldCache = {};
   var scores = getScores(mi, scoreMode);
   if (!scores) return;
+  var selSet = selectedOppSet();  // null == all opponents; honor the filter
+  var oppDen = selSet ? _oppSelCount() : nO;
   var targets = [0, 1, 2];
   for (var t = 0; t < targets.length; t++) {
     var shields = targets[t];
@@ -2515,8 +2689,11 @@ function _ensurePerShieldBaselines(mi) {
     for (var iv = 0; iv < nIvs; iv++) {
       var base = iv * nS * nO + si * nO;
       var sum = 0;
-      for (var oi = 0; oi < nO; oi++) sum += scores[base + oi];
-      var a = sum / nO;
+      for (var oi = 0; oi < nO; oi++) {
+        if (selSet && !selSet[oi]) continue;  // opponent filtered out
+        sum += scores[base + oi];
+      }
+      var a = sum / oppDen;
       avgByIv[iv] = a;
       if (a > bestScore) bestScore = a;
     }
@@ -2772,7 +2949,15 @@ function updateMethodology() {
   h += '<strong>Methodology</strong><br>';
   h += 'Each of the '+nIvs+' valid IV spreads is leveled to the highest level under the ';
   h += '__LEAGUE_TITLE__ League CP cap (__LEAGUE_CP_CAP__). For each IV, a battle is simulated ';
-  h += 'against each of the '+nO+' opponents in the __OPP_DESC_ESCAPED__ pool ';
+  // Under an active opponent filter the scatter / table / histograms aggregate
+  // over just the shown subset, so the methodology must state K of N (not N) to
+  // stay honest about what the numbers on screen actually average over.
+  if (oppFilterActive()) {
+    h += 'against '+_oppSelCount()+' of the '+nO+' opponents in the __OPP_DESC_ESCAPED__ pool ';
+    h += '(you filtered the opponent set; the card, tiers, Top Picks and narrative above still use all '+nO+') ';
+  } else {
+    h += 'against each of the '+nO+' opponents in the __OPP_DESC_ESCAPED__ pool ';
+  }
   h += 'in the '+scenDesc+' shield scenario(s), using the pvpoke_dp policy. ';
   h += 'Opponents use '+modeDesc+' at their best level.<br><br>';
   h += '<strong>Avg Battle Score</strong> = mean PvPoke score across opponents/scenarios. ';
@@ -2834,7 +3019,10 @@ function updateView() {
   var shapes = [];
   var annotations = [];
   var clusterChk = document.getElementById('cluster-chk');
-  if (clusterChk && clusterChk.checked && state.yAxisMode === 'avgScore') {
+  // Cluster gaps are baked from the FULL-pool avg-score distribution, so they
+  // sit at the wrong y-coordinates once the opponent filter reshapes the band.
+  // Hide the overlay whenever a subset is active (the honesty banner says so).
+  if (clusterChk && clusterChk.checked && state.yAxisMode === 'avgScore' && !oppFilterActive()) {
     var gapKey = state.movesetIdx + '_' + state.oppIvMode;
     var gapData = DATA.clusterGaps[gapKey];
     if (gapData) {
@@ -2977,11 +3165,15 @@ function collectMatchScores(mi) {
   }
   if (refIv == null || refIv < 0) return null;
   var sis = getActiveScenarioIndices();
+  var selSet = selectedOppSet();  // null == all opponents; honor the filter
   var out = [];
   for (var k = 0; k < sis.length; k++) {
     var si = sis[k];
     var base = refIv * nS * nO + si * nO;
-    for (var oi = 0; oi < nO; oi++) out.push(scores[base + oi]);
+    for (var oi = 0; oi < nO; oi++) {
+      if (selSet && !selSet[oi]) continue;  // opponent filtered out
+      out.push(scores[base + oi]);
+    }
   }
   return {scores: out, refIv: refIv};
 }
@@ -3366,6 +3558,9 @@ function cmpWireHandlers() {
 window.applyHighlight = applyHighlight;
 window.clearHighlight = clearHighlight;
 applyHistogramHash();
+// Seed the opponent-filter panel (all checked) before the first render so
+// state.selectedOpps exists; harmless no-op when the panel isn't in the page.
+initOppFilter();
 updateView();
 // Capture the best-buddy L50/L51 grids + prose templates and apply the
 // default display level (no-op unless the dive carried an L51 grid).
