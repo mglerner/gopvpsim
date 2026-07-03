@@ -30,6 +30,16 @@ from gopvpsim.user_collection import (  # noqa: E402
 )
 
 
+# The harness league and its level ceiling. Both sides (Python match_mons
+# and the JS payload) must receive the SAME league-derived cap, passed
+# explicitly — relying on the shared 51.0 defaults hid a league-awareness
+# blind spot: with 51.0 hardcoded on both sides the harness passes even if
+# one side stops deriving the cap from the league (GL/UL cap at 50.0; see
+# docs/reviews/2026-06-28_iv_scanner_maxlevel_strong_pin_design.md).
+HARNESS_LEAGUE = 'great'
+HARNESS_MAX_LEVEL = 50.0
+
+
 # Test thresholds — a small but diverse dict that exercises:
 #   * attack/defense/stamina floors
 #   * the ``ivs`` whitelist branch
@@ -149,7 +159,8 @@ def build_pokemon_index_subset(thresholds):
     return out
 
 
-def build_rank_lookup(thresholds, league='great', max_level=51.0):
+def build_rank_lookup(thresholds, league=HARNESS_LEAGUE,
+                      max_level=HARNESS_MAX_LEVEL):
     """Precompute {species: {shadowKey: {ivKey: rank}}} for JS matchMons.
 
     For every species in ``thresholds`` that exists in the gamemaster,
@@ -281,7 +292,8 @@ def main():
 
     # Python side.
     py_mons = parse_csv_text(csv_text)
-    py_results = match_mons(py_mons, TEST_THRESHOLDS, league='great')
+    py_results = match_mons(py_mons, TEST_THRESHOLDS, league=HARNESS_LEAGUE,
+                            max_level=HARNESS_MAX_LEVEL)
     py_canon = canonicalize_results(py_results)
     print(f'Python: parsed {len(py_mons)} mons, '
           f'matched {sum(len(v) for v in py_results.values())} across '
@@ -298,8 +310,8 @@ def main():
         'shadowAtkBonus': SHADOW_ATK_BONUS,
         'shadowDefMult':  SHADOW_DEF_MULT,
         'leagueCaps':     LEAGUE_CAPS,
-        'league':         'great',
-        'maxLevel':       51.0,
+        'league':         HARNESS_LEAGUE,
+        'maxLevel':       HARNESS_MAX_LEVEL,
     }
     js_out = run_js(payload)
     js_results = js_out['results']
