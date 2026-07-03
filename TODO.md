@@ -149,9 +149,16 @@ DONE (2026-06-28) for the known slice: the seven species in
 (Ordinary), Keldeo (Resolute), Zygarde (Complete Forme), Eternatus) are reswept
 at the 10/10/10 research floor; their envelope JSONs span iv 15..10 and their
 rendered guides carry the floor-aware "covered" banner (the never-ship-unflagged
-FLAG is resolved for them). STILL OPEN (needs human): enumerating any ADDITIONAL
-limited-availability species and confirming each one's IRL floor before adding
-it to FLOOR_10_SPECIES.
+FLAG is resolved for them). The enumeration research ran 2026-07-03
+(adversarially-verified deep-research sweep):
+`docs/reviews/2026-07-03_limited_availability_iv_floors.md`. Headlines: all
+seven existing floor-10 assignments CONFIRMED; NO new species verifiably needs
+adding; Melmetal is explicitly NOT limited (Mystery Box is indefinitely
+repeatable). STILL OPEN (needs Michael): (a) ratify the no-change verdict;
+(b) the one real candidate gap the sweep could NOT close -- SHADOW legendaries
+(possible Giovanni 6/6/6 floor, ~1/3 of the ML list, needs its own
+verification pass + a rotation-recurrence-counts-as-grindable judgment call);
+(c) re-run when Eternatus returns (Niantic announced it will).
 
 ## Pre-ship arc — residual open polish
 
