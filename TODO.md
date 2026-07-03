@@ -48,8 +48,9 @@ feature (PvPoke publishes cup rankings; sweep cache warm-serves overlapping
 columns; ~minutes per focal, not a re-bake). Decisions 2026-07-02: UI is a
 per-opponent CHECKBOX panel (unranked at end, top-N as buttons); cup movesets
 from cup rankings w/ fallback; dev fixture = local Azumarill GL dive; pilot
-candidate Equinox Cup. STILL GATING: the cup slug + landing-page taxonomy
-dialog (Michael answers before implementation) + cup pick confirmation --
+= Equinox Cup; slug = `<species>-equinox-cup` (cup implies league); landing
+page gets its own "Cup dives" section. All gates CLEARED except the Equinox
+focal list (Michael's meta judgment). Ready for an implementation session --
 see the plan doc's "Decisions" section.
 
 ## Cache GC: prune all namespaces + dive-script opt-in prompt
