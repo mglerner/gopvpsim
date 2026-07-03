@@ -261,20 +261,44 @@ come from the cup rankings per the decided policy.
 4. **Dive invocation.** Existing `deep_dive.py` flags: `--opponents-file`
    + `--opponent-label "Sunshine Cup (GL) top N"` + normal split-moveset
    config. Card/page labeling must say the cup, not bare "Great League".
-5. **Site surface.** DECIDED (2026-07-02 dialog): slug scheme is
-   `<species>-<cup>-cup` (e.g. `talonflame-equinox-cup`) -- the cup name
-   implies league/CP, and `_parse_dive_slug` learns a cup->league map
-   alongside `_LEAGUE_SUFFIXES`. Landing page gets its OWN "Cup dives"
-   section, grouped by cup, below the league sections (rotating cup
-   content stays out of the evergreen league lists). Extend
-   `verify_overnight` or explicitly exempt cup dives from the
-   completeness guard (silent-incompleteness lens).
-6. **Downstream guard (gobattlekit).** Cup dives write
-   `thresholds/<slug>.toml`; the gobattlekit bundler globs `*_great.toml`
-   (Great-only) -- a cup slug ending in `_great` would be silently bundled
-   into the iOS app's default thresholds. Either name cup thresholds so
-   they cannot match (e.g. `..._sunshine1500.toml`) or put them in
-   `thresholds/cups/`. This is a hard requirement, not polish.
+5. **Site surface.** DECIDED (2026-07-02 dialog; refined 2026-07-03): slug
+   scheme is FLAT `<species>-<cup>-cup` (e.g. `corviknight-equinox-cup`) --
+   the cup name implies league/CP, and `_parse_dive_slug` learns a
+   cup->league map alongside `_LEAGUE_SUFFIXES`. Cup dives surface on a
+   SEPARATE cup-index page (grouped by cup) linked from a "Limited Cups"
+   card on the main pogo-dives index -- NOT a section inside the main index
+   -- so rotating cup content stays fully out of the evergreen league lists
+   and is easy to retire when a cup ends. Extend `verify_overnight` or
+   explicitly exempt cup dives from the completeness guard
+   (silent-incompleteness lens).
+6. **Downstream guard (gobattlekit) -- verified against the code 2026-07-03.**
+   gobattlekit does NOT consume our website slugs or HTML at all; it pulls
+   threshold TOMLs + replay blobs (`bundle_into_app.py` globs export files;
+   `export_thresholds.py` reads blobs). So the slug scheme (item 5) is fully
+   DECOUPLED from gobattlekit -- flat slugs neither help nor hurt it; decide
+   the slug on website grounds only. The real hazard is the THRESHOLD EXPORT:
+   a cup dive is mechanically GL-1500, so `export_thresholds.py` emits
+   `<species>_great.toml` with tables under `[Species.Great.targets.*]`
+   (`export_thresholds.py:328`). That (a) matches the bundler's
+   `export_dir.glob("*_great.toml")` (`bundle_into_app.py:284`) AND (b)
+   collides on the `Species.Great` schema key -- silently OVERWRITING the
+   species' real Great-League thresholds in the iOS app with cup-meta
+   thresholds. HARD REQUIREMENT for the pilot: name/route cup threshold
+   exports so they cannot match `*_great.toml` (e.g. `<species>_equinox.toml`,
+   or a `thresholds/cups/` dir), independent of whether we ever surface cups
+   in the app. Verify with a bundler dry run before any cup thresholds ship.
+
+   Surfacing cup thresholds INSIDE the gobattlekit app (toggle cup tags
+   on/off) is a SEPARATE, DEFERRED piece -- call it **Phase 3**. The bundled
+   `default_thresholds.toml` schema is strictly `[Species.League.Target]`
+   (League = Great/Ultra/Master) with no cup/format axis, so an app toggle
+   needs (a) a new format dimension in that nested-dict schema -- a
+   coordinated change (CLAUDE.md: don't touch the schema without coordinating)
+   -- plus (b) gobattlekit UI work to render/toggle it. None of that is
+   required for the website cup-dive pilot. If we want the eventual toggle to
+   be cheap, we can name cup exports with a cup label now (e.g. tables under
+   `[Species.Equinox.*]`) so the schema hook is pre-positioned -- but that is
+   an optional Phase-2 nicety, not a gate.
 7. **Explicitly out of the pilot:** matchup web, comparisons, ML-style cup
    guides, mega battle support (megas are in the gamemaster but our engine
    has never simmed one -- treat "Mega Cup" as its own later project with
@@ -333,11 +357,16 @@ larger share of the Reddit ask for zero sim cost.
    cup-page distinction), Mantine (#1, cup-only), Mandibuzz (#2, bulky /
    IV-sensitive), Toucannon (#3, cup-only), Clodsire (#22, the cup's
    ground anchor + open-GL staple).
-5. **Cup slug + landing-page taxonomy -- DECIDED** (dialog, 2026-07-02):
-   slug = `<species>-<cup>-cup` (cup implies league/CP; index parser gets
-   a cup->league map); landing page gets its own "Cup dives" section
-   grouped by cup, below the league sections. The implementation gate is
-   CLEARED.
+5. **Cup slug + landing-page taxonomy -- DECIDED** (dialog, 2026-07-02;
+   reconfirmed 2026-07-03): slug = FLAT `<species>-<cup>-cup` (e.g.
+   `corviknight-equinox-cup`), matching the existing flat `<species>-<league>`
+   slugs; the index parser gets a cup->league map. Cup dives surface on a
+   SEPARATE cup-index page linked from a "Limited Cups" card on the main
+   pogo-dives index (Michael's call: keep rotating cup content out of the
+   evergreen league lists). Flat-vs-nested was reconsidered against the
+   gobattlekit integration and confirmed IRRELEVANT to it -- gobattlekit
+   consumes threshold TOMLs + blobs, not slugs (see Design item 6) -- so the
+   slug is a pure website-ergonomics choice. Implementation gate CLEARED.
 6. **Cup moveset policy -- DECIDED: cup-rankings movesets with
    overall-league fallback** for species unranked in the cup.
 
@@ -349,9 +378,13 @@ larger share of the Reddit ask for zero sim cost.
 - **Does-it-act x index layer**: cup slugs currently fall through
   `_parse_dive_slug` -> a published cup dive would silently miss the index.
   Extend parser + add an index-presence check to the publish gate.
-- **Change-propagation x gobattlekit**: the `*_great.toml` glob collision
-  (Design item 6). Verify with a dry run of the bundler before the first
-  cup dive ships thresholds.
+- **Change-propagation x gobattlekit**: a cup dive's threshold export lands
+  as `<species>_great.toml` under `[Species.Great.*]`, which BOTH matches the
+  `*_great.toml` bundler glob AND collides on the `Species.Great` schema key
+  -- silently overwriting the species' real GL thresholds in the iOS app
+  (Design item 6). Not a slug problem (gobattlekit never sees slugs). Verify
+  with a bundler dry run before the first cup dive ships thresholds; the
+  naming/routing guard is a hard pilot gate.
 - **Survive x cache layer**: cup dives are purely additive to the sweep
   cache (new column keys); same `--no-sweep-cache`-during-WIP-engine
   discipline applies. No new invalidation surface (v7 hash ignores cups).
@@ -382,3 +415,18 @@ larger share of the Reddit ask for zero sim cost.
    figure).
 6. Trivial cleanup opportunity noted in passing: stale "61 for GL" comment
    at `deep_dive_engine.js:360`.
+7. **Cup staleness policy -- OPEN (Michael, 2026-07-03).** Cups rotate out of
+   the game on Niantic's schedule; a cup dive is a snapshot for a meta that
+   won't be playable after the cup ends (and cups often return later with a
+   shifted meta). What happens to a cup dive page when its cup rotates out?
+   Three candidates, each a different maintenance/honesty tradeoff:
+   (a) **keep, date-stamped as archive** -- banner "snapshot as of DATE",
+   leave up; zero recurring work, useful when the cup returns, but risks
+   misleading if the date banner is missed;
+   (b) **rebuild each rotation** -- re-dive against the fresh meta when the
+   cup returns (or as its meta settles mid-window); most accurate, recurring
+   bake cost;
+   (c) **remove when the cup ends** -- always-current site, but throws away
+   sim work and breaks shared links.
+   Deferred; doesn't block the pilot bake, but the cup-index design (archive
+   vs live) should be chosen before the index page is built.
