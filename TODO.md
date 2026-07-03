@@ -62,12 +62,6 @@ main.
   ~624). Low; optional: surface the WARN where `verify_overnight` scans.
 - **[render] `#opp-<slug>` canonical landing.** `#opp-` links land on the
   first-rendered mention; pick one canonical per-opponent target. Low; render-only.
-- **[engine, low] #3-followup: both-self-debuff PvPoke divergences — CLOSED
-  2026-07-03 pending Michael's ratification of KEEP.** Investigation
-  (`docs/reviews/2026-06-28_both_self_debuff_divergence_cluster.md`) + fresh
-  post-`ffb582b` re-measurement (its 2026-07-03 addendum) concluded KEEP per
-  the CLAUDE.md gate; pins in `tests/test_both_self_debuff_divergence.py`.
-  Delete this bullet on ratification.
 
 ## Top-N opponent filter + limited-cup dives (planned 2026-07-02)
 
@@ -188,11 +182,13 @@ FLAG is resolved for them). The enumeration research ran 2026-07-03
 `docs/reviews/2026-07-03_limited_availability_iv_floors.md`. Headlines: all
 seven existing floor-10 assignments CONFIRMED; NO new species verifiably needs
 adding; Melmetal is explicitly NOT limited (Mystery Box is indefinitely
-repeatable). STILL OPEN (needs Michael): (a) ratify the no-change verdict;
-(b) the one real candidate gap the sweep could NOT close -- SHADOW legendaries
-(possible Giovanni 6/6/6 floor, ~1/3 of the ML list, needs its own
-verification pass + a rotation-recurrence-counts-as-grindable judgment call);
-(c) re-run when Eternatus returns (Niantic announced it will).
+repeatable). Michael RATIFIED the no-change verdict 2026-07-03. STILL OPEN:
+(a) COMMISSIONED (queued for an Opus session): the SHADOW-legendary
+verification pass -- possible Giovanni 6/6/6 floor, ~1/3 of the ML list;
+focused deep-research sweep on Giovanni/Rocket floors + rotation cadence,
+then Michael's rotation-recurrence-counts-as-grindable judgment call before
+any resweep; (b) re-run the audit when Eternatus returns (Niantic announced
+it will).
 
 ## Pre-ship arc — residual open polish
 
