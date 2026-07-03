@@ -72,8 +72,7 @@ from gopvpsim.theme import (
 )
 from gopvpsim.data import (
     load_gamemaster, load_rankings, get_default_moveset, parse_types,
-    sprite_data_uri, load_group as fetch_group, species_id,
-    CACHE_DIR as _RANKINGS_CACHE_DIR,
+    sprite_data_uri, load_group as fetch_group,
 )
 from gopvpsim.battle import (
     BattlePokemon, simulate,
@@ -1189,61 +1188,6 @@ def parse_opponent_spec(opp_name):
     if is_shadow:
         name = name[:-len(' (Shadow)')]
     return name, variant, is_shadow
-
-
-def build_opp_meta_ranks(opponent_names, league):
-    """Per-opponent PvPoke meta rank (1 = best) parallel to opponent_names.
-
-    Each entry is an int rank or None. Ranks come from the live
-    ``load_rankings(league)`` list (already score-descending, so list
-    position + 1 is the rank), matched by RESOLVED speciesId: a shadow
-    opponent picks up its own '<id>_shadow' ranked position, and a
-    moveset-variant (e.g. 'Forretress (Bug Bite)') inherits the base
-    species' rank (both variants of one species share a rank, which is the
-    intended behavior for the top-N buttons -- the panel lists both, and
-    a top-N cut includes both). Unranked entries (championship-series
-    extras PvPoke doesn't rank, hand-extended focals, anything absent from
-    the rankings) are None; the client-side filter sorts them to the end
-    and excludes them from the top-N convenience buttons.
-
-    Returns [] on the (defensive) chance the league has no rankings; the
-    caller then emits an all-None list of the right length.
-    """
-    try:
-        rankings = load_rankings(league)
-    except Exception:
-        return [None] * len(opponent_names)
-    rank_by_sid = {}
-    for i, r in enumerate(rankings):
-        sid = r.get('speciesId')
-        if sid is not None and sid not in rank_by_sid:
-            rank_by_sid[sid] = i + 1
-    out = []
-    for name in opponent_names:
-        sp, _variant, is_shadow = parse_opponent_spec(name)
-        try:
-            sid = species_id(sp, shadow=is_shadow)
-        except Exception:
-            sid = None
-        out.append(rank_by_sid.get(sid))
-    return out
-
-
-def rankings_snapshot_date(league):
-    """Vintage of the rankings the meta ranks were read from (YYYY-MM-DD).
-
-    The honest 'as of' date for the top-N labels is when the rankings cache
-    was last refreshed, NOT the render date -- overclaiming freshness is the
-    exact never-ship-unflagged trap. Falls back to None (JS then omits the
-    date) if the cache file can't be stat'd.
-    """
-    try:
-        import datetime
-        p = _RANKINGS_CACHE_DIR / f"{league}.json"
-        ts = p.stat().st_mtime
-        return datetime.date.fromtimestamp(ts).isoformat()
-    except Exception:
-        return None
 
 
 def _parse_opponent_pool_line(line):
@@ -4250,15 +4194,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         ],
         'oppIvModes': opp_iv_modes,
         'opponentLabel': opponent_label or 'PvPoke rankings',
-        # Per-opponent PvPoke meta rank (1=best) or null, parallel to
-        # `opponents`. Powers the client-side opponent filter panel: the
-        # checkbox list sorts by this (unranked -> end) and the Top 10/20/50
-        # buttons select entries with a non-null rank <= N. `rankSnapshot` is
-        # the vintage of the rankings these came from, so the UI can label the
-        # cut honestly ("top N per PvPoke rankings as of YYYY-MM-DD") rather
-        # than implying the pool is live-current (it's a curated snapshot).
-        'oppMetaRank': build_opp_meta_ranks(opponent_names, league),
-        'rankSnapshot': rankings_snapshot_date(league),
         'referenceIdx': reference_idx,
         'tiers': tier_info,
         'movesets': [{'label': md['label'], 'prettyLabel': _pretty_moveset(md['label']),
@@ -5193,34 +5128,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     if thresholds:
         html += '  <span style="font-size:11px;color:var(--text-muted);margin-left:8px">Threshold tiers (e.g. GH Great / GH Good) are expert stat-cutoff regions defined in <a href="#dd-threshold-tiers" style="color:var(--accent)">Threshold Tiers</a> below. Hover legend to isolate; click to lock.</span>\n'
     html += '</div>\n'
-
-    # ---- Opponent filter panel (client-side subset selector) ----
-    # A collapsible, scrollable checkbox list of every opponent, populated by
-    # initOppFilter() in the engine JS (ordered by meta rank, unranked last).
-    # All-checked by default, so a shipped page's default view is byte-identical
-    # in behavior to before this feature. Checking a subset recomputes the
-    # scatter / Top-IVs table / histograms over just those opponents; the banner
-    # below appears on any partial selection to keep the full-pool sections
-    # (card, tiers, Top Picks, narrative) honestly labeled. Convenience buttons
-    # select the PvPoke top-10/20/50 by embedded DATA.oppMetaRank.
-    html += '<details id="opp-filter-panel" style="margin:6px 0;border:1px solid var(--border);border-radius:4px;padding:6px 10px">\n'
-    html += '  <summary style="cursor:pointer;font-size:13px"><b>Filter opponents</b> <span id="opp-filter-summary" style="font-size:11px;color:var(--text-muted)">(all shown)</span></summary>\n'
-    html += '  <div style="margin-top:8px">\n'
-    html += '    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">\n'
-    html += '      <button type="button" onclick="oppFilterAll()">All</button>\n'
-    html += '      <button type="button" onclick="oppFilterNone()">None</button>\n'
-    html += '      <button type="button" onclick="oppFilterTopN(10)">Top 10</button>\n'
-    html += '      <button type="button" onclick="oppFilterTopN(20)">Top 20</button>\n'
-    html += '      <button type="button" onclick="oppFilterTopN(50)">Top 50</button>\n'
-    html += '    </div>\n'
-    html += ('    <div id="opp-filter-list" style="max-height:220px;overflow-y:auto;'
-             'display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));'
-             'gap:2px 12px;padding:6px;border:1px solid var(--border);border-radius:4px"></div>\n')
-    html += '  </div>\n'
-    html += '</details>\n'
-    html += ('<div id="opp-filter-banner" style="display:none;margin:8px 0;padding:8px 12px;'
-             'border-radius:4px;background:rgba(210,160,40,0.15);'
-             'border:1px solid rgba(210,160,40,0.6);font-size:13px;line-height:1.4"></div>\n')
 
     # "Your collection" paste-box. Hidden (display:none) until DOMContentLoaded
     # - the engine JS reveals it only if DATA.collection was populated
