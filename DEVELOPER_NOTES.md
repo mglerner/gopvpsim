@@ -536,8 +536,11 @@ messages.
   - **#2** float32-truncated damage constants (`f1538ff`) + shadow-def
     `float32(5/6)` (`805cdc3`) — boundary-scattered, forced the cold re-dive.
   - **#3** farm-down stacks self-debuffing moves (`50e8cd2`,
-    `test_bug3_farm_stack`); 0/2160 default-meta cells changed. Follow-up: ~117
-    pre-existing both-self-debuff PvPoke divergences surfaced (in backlog).
+    `test_bug3_farm_stack`); 0/2160 default-meta cells changed. Follow-up
+    (~117 both-self-debuff divergences) CLOSED 2026-07-03: KEEP, every flip
+    ours-favorable. Pins: `test_both_self_debuff_divergence.py`; writeup +
+    post-`ffb582b` re-measure addendum:
+    `docs/reviews/2026-06-28_both_self_debuff_divergence_cluster.md`.
   - **#4** slayer-cache key includes `focal_max_level` (`slayer_cache` v4).
   - **#5** bandaid[929] no-bait swap kept ungated as an INTENTIONAL divergence
     (see below); `test_bandaid929_nobait_divergence`.

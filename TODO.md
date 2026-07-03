@@ -28,12 +28,12 @@ pre-cold-dive gate; run `overnight_redive.sh` and watch with
   ~624). Low; optional: surface the WARN where `verify_overnight` scans.
 - **[render] `#opp-<slug>` canonical landing.** `#opp-` links land on the
   first-rendered mention; pick one canonical per-opponent target. Low; render-only.
-- **[engine, low] #3-followup: both-self-debuff PvPoke divergences.** The bug-#3
-  oracle exposed ~117 pre-existing PvPoke divergences (7 winner-flips) on the
-  broader both-self-debuff population (Lurantis, Blaziken; non-default movesets) —
-  likely the near-KO-DP / `_optimize_move_timing` self-debuff-timing cluster.
-  Investigate, decide keep-vs-fix (CLAUDE.md gate). Repro: DEVELOPER_NOTES
-  "#2-#6" + `docs/reviews/2026-06-27_engine_bug_hunt.md`.
+- **[engine, low] #3-followup: both-self-debuff PvPoke divergences — CLOSED
+  2026-07-03 pending Michael's ratification of KEEP.** Investigation
+  (`docs/reviews/2026-06-28_both_self_debuff_divergence_cluster.md`) + fresh
+  post-`ffb582b` re-measurement (its 2026-07-03 addendum) concluded KEEP per
+  the CLAUDE.md gate; pins in `tests/test_both_self_debuff_divergence.py`.
+  Delete this bullet on ratification.
 
 ## Top-N opponent filter + limited-cup dives (planned 2026-07-02)
 
