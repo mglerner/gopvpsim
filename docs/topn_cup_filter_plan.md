@@ -261,10 +261,13 @@ come from the cup rankings per the decided policy.
 4. **Dive invocation.** Existing `deep_dive.py` flags: `--opponents-file`
    + `--opponent-label "Sunshine Cup (GL) top N"` + normal split-moveset
    config. Card/page labeling must say the cup, not bare "Great League".
-5. **Site surface.** Slug scheme decision needed (recommend
-   `<species>-sunshine-cup-great`); extend `_parse_dive_slug` /
-   `_LEAGUE_SUFFIXES` and give the landing page a "Cup dives" section.
-   Extend `verify_overnight` or explicitly exempt cup dives from the
+5. **Site surface.** DECIDED (2026-07-02 dialog): slug scheme is
+   `<species>-<cup>-cup` (e.g. `talonflame-equinox-cup`) -- the cup name
+   implies league/CP, and `_parse_dive_slug` learns a cup->league map
+   alongside `_LEAGUE_SUFFIXES`. Landing page gets its OWN "Cup dives"
+   section, grouped by cup, below the league sections (rotating cup
+   content stays out of the evergreen league lists). Extend
+   `verify_overnight` or explicitly exempt cup dives from the
    completeness guard (silent-incompleteness lens).
 6. **Downstream guard (gobattlekit).** Cup dives write
    `thresholds/<slug>.toml`; the gobattlekit bundler globs `*_great.toml`
@@ -309,17 +312,15 @@ larger share of the Reddit ask for zero sim cost.
    production flags, top_movesets=1) was run locally 2026-07-02 to produce
    the page fixture + replay blob. Site-wide rollout vehicle still open
    (bake machine's blobs vs warm chain re-run).
-4. **Cup pilot -- Michael's constraint: an ACTIVE cup with a small meta.**
-   Scan result: Equinox Cup is the candidate (20-species curated meta, GL
-   1500). Final pick + focal list: confirm via the pre-implementation
-   dialog (question already drafted; Michael was AFK on first ask).
-5. **Cup slug + landing-page taxonomy -- OPEN, GATES IMPLEMENTATION.**
-   Michael explicitly wants to answer this via a dialog/choice box before
-   any implementation. The prepared options: slug scheme
-   (`species-equinox-cup` vs `species-great-league-equinox` vs a
-   `cups/equinox/species` subdirectory) x landing-page placement (own "Cup
-   dives" section vs badged entries inside the league sections). DO NOT
-   start Phase 2 without these answers; re-ask at session start.
+4. **Cup pilot -- DECIDED: Equinox Cup** (dialog, 2026-07-02): Devon
+   Equinox Cup, GL 1500, 20-species curated meta. Remaining human input:
+   the FOCAL LIST for the pilot (pure meta judgment -- which 3-5 species
+   are worth an Equinox dive).
+5. **Cup slug + landing-page taxonomy -- DECIDED** (dialog, 2026-07-02):
+   slug = `<species>-<cup>-cup` (cup implies league/CP; index parser gets
+   a cup->league map); landing page gets its own "Cup dives" section
+   grouped by cup, below the league sections. The implementation gate is
+   CLEARED.
 6. **Cup moveset policy -- DECIDED: cup-rankings movesets with
    overall-league fallback** for species unranked in the cup.
 
