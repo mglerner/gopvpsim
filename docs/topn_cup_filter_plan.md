@@ -313,9 +313,12 @@ larger share of the Reddit ask for zero sim cost.
    the page fixture + replay blob. Site-wide rollout vehicle still open
    (bake machine's blobs vs warm chain re-run).
 4. **Cup pilot -- DECIDED: Equinox Cup** (dialog, 2026-07-02): Devon
-   Equinox Cup, GL 1500, 20-species curated meta. Remaining human input:
-   the FOCAL LIST for the pilot (pure meta judgment -- which 3-5 species
-   are worth an Equinox dive).
+   Equinox Cup, GL 1500, 20-species curated meta. **Focal list (Michael
+   picked Corviknight, delegated the rest, 2026-07-02):** Corviknight
+   (cup #15; overlaps the shipped GL dive -- exercises the league-page vs
+   cup-page distinction), Mantine (#1, cup-only), Mandibuzz (#2, bulky /
+   IV-sensitive), Toucannon (#3, cup-only), Clodsire (#22, the cup's
+   ground anchor + open-GL staple).
 5. **Cup slug + landing-page taxonomy -- DECIDED** (dialog, 2026-07-02):
    slug = `<species>-<cup>-cup` (cup implies league/CP; index parser gets
    a cup->league map); landing page gets its own "Cup dives" section
