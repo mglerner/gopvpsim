@@ -144,22 +144,14 @@ def test_group_c10_dontbait_staleness_florges_seismitoad():
 
 # --------------------------------------------------------------------------- #
 # Group D -- OMT turns_planned divisor infidelity (battle.py vs              #
-# ActionLogic.js:306). Separate unintentional port bug; PvPoke strictly       #
-# better. xfail until its own fix lands (that fix forces a cold re-dive).      #
+# ActionLogic.js:305). FIXED 2026-07-03: turns_planned now divides poke.energy #
+# by the frozen priority slot-0 move's energy regardless of affordability,     #
+# matching PvPoke; these cells now equal the oracle.                           #
 # --------------------------------------------------------------------------- #
 
-@pytest.mark.xfail(reason="OMT turns_planned divisor port infidelity "
-                          "(battle.py vs ActionLogic.js:306): we divide "
-                          "poke.energy by the cheapest-affordable charged "
-                          "move and return False when none is affordable; "
-                          "PvPoke divides by activeChargedMoves[0] regardless. "
-                          "PvPoke strictly better in all traced cells; fix "
-                          "deferred (forces cold re-dive; see TODO / sweep "
-                          "doc section 4 Group D).",
-                   strict=True)
 def test_group_d11_omt_divisor_matches_oracle():
     # Oinkologne (Female) L21 vs Forretress (Shadow) L23 GL, 0-1. Deathbed
-    # ttl=4, energy=35: PvPoke divides by promoted slot-0 (45e) -> waits and
-    # banks a floating Mud Slap (+24); ours divides by cheapest-affordable
-    # (35e) -> fires 3 turns early. Ours 280, oracle 304.
+    # ttl=4, energy=35: PvPoke divides by slot-0 (45e) -> waits and banks a
+    # floating Mud Slap (+24); we used to divide by cheapest-affordable (35e)
+    # and fire 3 turns early (ours 280). After the divisor fix: 304 == oracle.
     assert _score0(OINK_F, FORRE_S, 0, 1) == 304

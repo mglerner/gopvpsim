@@ -742,12 +742,20 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon",
     if attacker.energy + attacker.fast_move.get('energyGain', 0) > ENERGY_CAP:
         return False
 
-    # Turns planned vs turns to live
-    affordable_cms = [m for m in attacker.charged_moves if attacker.energy >= m['energy']]
-    if not affordable_cms:
+    # Turns planned vs turns to live. PvPoke (ActionLogic.js:305) divides
+    # poke.energy by activeChargedMoves[0].energy -- the FROZEN priority
+    # slot-0 move -- REGARDLESS of affordability (no early return, no
+    # cheapest-affordable selection, no promotion). We used to filter to
+    # affordable moves, return False when none were affordable, and divide by
+    # the cheapest affordable energy; at a low-energy deathbed state that
+    # inflated turns_planned and fired the charged decision several fast moves
+    # early (the 2026-07-03 OMT divisor port infidelity, sweep doc Group D --
+    # PvPoke strictly better in all traced cells). Match the reference exactly.
+    init = attacker._ensure_dp_init_cache(defender)
+    if not init['cm_energy']:
         return False
-    cheapest_energy = min(m['energy'] for m in affordable_cms)
-    turns_planned = atk_turns + (attacker.energy // cheapest_energy)
+    slot0_energy = init['cm_energy'][0]
+    turns_planned = atk_turns + (attacker.energy // slot0_energy)
     if attacker.cmp_atk < defender.cmp_atk:
         turns_planned += 1
     ttl = _calc_turns_to_live(attacker, defender, mechanics=mechanics)
