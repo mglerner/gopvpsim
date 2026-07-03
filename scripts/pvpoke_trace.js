@@ -20,6 +20,8 @@ const USAGE = `Usage: node scripts/pvpoke_trace.js \\
   --p1-ivs <a/d/s>     --p2-ivs <a/d/s>
   --p1-level <L>       --p2-level <L>
   --p1-shields <N>     --p2-shields <N>
+  [--p1-bait <0|1|2>]  [--p2-bait <0|1|2>]   (default 1; PvPoke baitShields:
+                                              0=no bait, 1=selective, 2=always)
   --cp <1500|2500|10000>
 
 Writes JSON to stdout: {score, winner, turns, decisionLog, dpPlans, decideLog}.
@@ -31,7 +33,8 @@ function parseArgs(argv) {
   const flags = new Set([
     '--pvpoke-root', '--p1', '--p2', '--p1-fast', '--p2-fast',
     '--p1-charged', '--p2-charged', '--p1-ivs', '--p2-ivs',
-    '--p1-level', '--p2-level', '--p1-shields', '--p2-shields', '--cp',
+    '--p1-level', '--p2-level', '--p1-shields', '--p2-shields',
+    '--p1-bait', '--p2-bait', '--cp',
   ]);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -59,6 +62,15 @@ function parseIVs(s) {
 
 function parseCharged(s) {
   return s.split(',').map(x => x.trim()).filter(Boolean);
+}
+
+function parseBait(s) {
+  if (s === undefined) { return 1; }  // Pokemon.js:111 default (selective bait)
+  const n = parseInt(s, 10);
+  if (![0, 1, 2].includes(n)) {
+    throw new Error(`bad bait "${s}", expected 0 (no bait), 1 (selective), or 2 (always)`);
+  }
+  return n;
 }
 
 // ---------- Browser-global shims ----------
@@ -287,6 +299,11 @@ function buildPokemon(battle, spec) {
     poke.selectMove('charged', 'none', poke.chargedMoves.length - 1);
   }
   poke.setShields(spec.shields);
+  // Per-Pokemon shield-bait setting, exactly as PvPoke's UI bait-picker
+  // sets it (PokeSelect.js:1155 assigns the property directly; there is
+  // no setter). Constructor default is 1, and Pokemon.reset() does not
+  // touch it, so assigning here persists through Battle.simulate().
+  poke.baitShields = spec.bait;
   return poke;
 }
 
@@ -316,6 +333,7 @@ function main() {
     ivs:     parseIVs(requireArg(args, 'p1-ivs')),
     level:   args['p1-level'] ? parseFloat(args['p1-level']) : undefined,
     shields: parseInt(requireArg(args, 'p1-shields'), 10),
+    bait:    parseBait(args['p1-bait']),
   };
   const spec2 = {
     species: requireArg(args, 'p2'),
@@ -324,6 +342,7 @@ function main() {
     ivs:     parseIVs(requireArg(args, 'p2-ivs')),
     level:   args['p2-level'] ? parseFloat(args['p2-level']) : undefined,
     shields: parseInt(requireArg(args, 'p2-shields'), 10),
+    bait:    parseBait(args['p2-bait']),
   };
 
   // Route PvPoke's console.log to stderr so stdout stays pure JSON.
