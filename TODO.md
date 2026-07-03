@@ -13,6 +13,40 @@ pre-cold-dive gate; run `overnight_redive.sh` and watch with
 `scripts/chain_status.py --chain overnight`. (Last bake: CHANGELOG.md
 "2026-06-28".)
 
+## Engine bug-hunt round 2 (2026-07-03): 16 confirmed findings need triage
+
+`docs/reviews/2026-07-02_engine_bug_hunt_round2.md` — 1 HIGH, 7 medium,
+8 low; 0 uncertain; all double-skeptic-verified, no shipped winner flips in
+sampled cells. Needs Michael's decisions, in priority order:
+
+- **[HIGH, gates future migrations] F1:** `migrate_cache.py
+  --from-gamemaster` delta misses form-change SWAPPED move entries
+  (Aegislash charge-form moves, Aura Wheel Electric/Dark) -> blesses stale
+  columns. Fix the `used`-set (migrate_cache.py:233-236) BEFORE trusting the
+  next gamemaster migration; audit past ones if a swapped move ever changed.
+- **[medium] F2:** `self_debuff_either_side` predicate unsound for
+  FOCUS_BLAST+ZAP_CANNON movesets (battle.py:912-922 Registeel clause
+  mutates the flag at battle time; Registeel GL default qualifies). Cheap:
+  re-sim that small blessed population.
+- **[medium, divergence-policy decision] NB-1:** per-turn bestChargedMove
+  recompute proven WORSE than PvPoke in a non-Aegislash case (Greedent vs
+  Forretress GL, -84 both 1-1/1-2 cells; Forretress is a shipped focal).
+  The "Aegislash-only, ours-always-better" doc claim is falsified either
+  way: fix (engine-hash bump, likely predicate-able) or re-document + xfail.
+- **[medium] BP-1** power-0 move ZeroDivisionError silently kills anchor
+  resolution; **BP-2** dead `--shadow-atk/--shadow-def` CLI flags;
+  **FC-1** Aegislash mid-flight-revert energy divergence (stale queued
+  move's energy); **js-parity-1/2** shipped-page self-contradictions
+  (tier coloring vs paste-box; mirror-CMP pill missing ba81139 fix).
+- Low items (docs/test hygiene): PROP-1 cmp-tie doc note, JIT-COV-1/2,
+  js-parity-3/4/5, BP-3, FC-2 — details in the report.
+
+The `hunt2` worktree (`~/coding/hunt2/`, engine @ c7f9ba2 + pvpoke @
+00f0afe7f, own venv) is KEPT so the report's repro commands run as written;
+delete with `git worktree remove` (both repos) once triage is done. The
+`--p1-bait/--p2-bait` pvpoke_trace.js flags (first no-bait oracle) are on
+main.
+
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
 - **[render DRY] score-key `{mi}_{mode}@51` parity (Python<->JS).** Open-coded in
