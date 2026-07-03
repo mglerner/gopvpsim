@@ -16,8 +16,10 @@ pre-cold-dive gate; run `overnight_redive.sh` and watch with
 ## Engine bug-hunt round 2 (2026-07-03): 16 confirmed findings need triage
 
 `docs/reviews/2026-07-02_engine_bug_hunt_round2.md` — 1 HIGH, 7 medium,
-8 low; 0 uncertain; all double-skeptic-verified, no shipped winner flips in
-sampled cells. Needs Michael's decisions, in priority order:
+8 low; 0 uncertain; all double-skeptic-verified. ("No shipped winner flips
+in sampled cells" held for the hunt's own samples; the NB-1 bounding sweep
+below later found one on a wider grid.) Needs Michael's decisions, in
+priority order:
 
 - **[HIGH, gates future migrations] F1:** `migrate_cache.py
   --from-gamemaster` delta misses form-change SWAPPED move entries
@@ -28,11 +30,30 @@ sampled cells. Needs Michael's decisions, in priority order:
   FOCUS_BLAST+ZAP_CANNON movesets (battle.py:912-922 Registeel clause
   mutates the flag at battle time; Registeel GL default qualifies). Cheap:
   re-sim that small blessed population.
-- **[medium, divergence-policy decision] NB-1:** per-turn bestChargedMove
-  recompute proven WORSE than PvPoke in a non-Aegislash case (Greedent vs
-  Forretress GL, -84 both 1-1/1-2 cells; Forretress is a shipped focal).
-  The "Aegislash-only, ours-always-better" doc claim is falsified either
-  way: fix (engine-hash bump, likely predicate-able) or re-document + xfail.
+- **[medium, divergence-policy decision] NB-1 — BOUNDING SWEEP DONE
+  2026-07-03, recommendation = FIX; Michael's call pending.** Sweep
+  (140 matchups / 1260 cells vs pinned oracle, 8 mechanism traces):
+  76 diffs, 7 flips, effectively all 36 GL diffs touch the shipped surface,
+  incl. a shipped winner flip (Forretress (Shadow) vs Cradily GL 1-0, ours
+  413 LOSS vs oracle 588 WIN). Recommendation: freeze dpe-derived selection
+  at init stages PvPoke-style across all THREE consumer sites, keep the
+  don't-bait dpeRatio-staleness site as a documented divergence (PvPoke's
+  side is a cache-artifact bug), with a proven `nb1_selection_freeze`
+  migration predicate (dynamic-flag-audited) and FC-1 as a clean co-bump
+  option. Full footprint tables, predicate proof, xfail/fixture specs:
+  `docs/reviews/2026-07-03_nb1_bounding_sweep.md`.
+- **[medium, NEW from the sweep] OMT `turns_planned` divisor port
+  infidelity** (battle.py:749-750 vs ActionLogic.js:306): unintentional,
+  PvPoke strictly better in all traced cells (the -24 Oinkologne family,
+  3 shipped-oriented). Touched set not statically characterizable ->
+  fixing it forces a COLD re-dive; batch with the next cold-forcing change,
+  do NOT ride the NB-1 bump.
+- **[medium, NEW from the sweep, our own bug] would_shield/always-shield
+  internal inconsistency:** the don't-bait override consumes
+  `would_shield=False` while the active shield policy always shields
+  (Florges vs Seismitoad UL 2-1 inflated +201). Independent of PvPoke
+  fidelity; needs its own look. Detail in the sweep doc (carve-out
+  section).
 - **[medium] BP-1** power-0 move ZeroDivisionError silently kills anchor
   resolution; **BP-2** dead `--shadow-atk/--shadow-def` CLI flags;
   **FC-1** Aegislash mid-flight-revert energy divergence (stale queued

@@ -92,6 +92,11 @@ carry the finder's own evidence/repro records.
   not winners at the sampled builds. Caveat: FC-1 (energy divergence)
   and F1/F2 (stale cache columns) can in principle flip cells outside
   the sampled sets; bounding that is part of the follow-up work.
+  **[2026-07-03 correction: the NB-1 bounding sweep's wider grid DID
+  find a shipped winner flip in this class — Forretress (Shadow) vs
+  Cradily GL 1-0, ours 413 LOSS vs oracle 588 WIN. See
+  `docs/reviews/2026-07-03_nb1_bounding_sweep.md`. The claim above
+  remains true of this hunt's own sampled cells only.]**
 
 ---
 
