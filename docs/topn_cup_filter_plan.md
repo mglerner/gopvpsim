@@ -415,18 +415,17 @@ larger share of the Reddit ask for zero sim cost.
    figure).
 6. Trivial cleanup opportunity noted in passing: stale "61 for GL" comment
    at `deep_dive_engine.js:360`.
-7. **Cup staleness policy -- OPEN (Michael, 2026-07-03).** Cups rotate out of
-   the game on Niantic's schedule; a cup dive is a snapshot for a meta that
-   won't be playable after the cup ends (and cups often return later with a
-   shifted meta). What happens to a cup dive page when its cup rotates out?
-   Three candidates, each a different maintenance/honesty tradeoff:
-   (a) **keep, date-stamped as archive** -- banner "snapshot as of DATE",
-   leave up; zero recurring work, useful when the cup returns, but risks
-   misleading if the date banner is missed;
-   (b) **rebuild each rotation** -- re-dive against the fresh meta when the
-   cup returns (or as its meta settles mid-window); most accurate, recurring
-   bake cost;
-   (c) **remove when the cup ends** -- always-current site, but throws away
-   sim work and breaks shared links.
-   Deferred; doesn't block the pilot bake, but the cup-index design (archive
-   vs live) should be chosen before the index page is built.
+7. **Cup staleness policy -- DECIDED 2026-07-03: keep, date-stamped as
+   archive.** Cups rotate out of the game on Niantic's schedule; a cup dive
+   is a snapshot for a meta that won't be playable after the cup ends (and
+   cups often return later with a shifted meta). When a cup rotates out we
+   KEEP its dive pages and rely on a clear "snapshot as of DATE" (+ cup name)
+   banner rather than rebuilding or deleting -- zero recurring bake cost, and
+   the analysis stays useful when the cup returns. Implications for the
+   build: (i) every cup dive card/page must carry the cup name + snapshot
+   date prominently (reuse the `rankSnapshot`/pool-date labeling from
+   Phase 1, extended to say the cup); (ii) the separate cup-index page should
+   be archive-friendly -- e.g. group by cup and optionally mark
+   currently-playable vs past cups -- rather than assuming everything listed
+   is live. Rejected: rebuild-each-rotation (recurring cost) and
+   remove-when-ended (throws away sim work, breaks shared links).
