@@ -2885,8 +2885,12 @@ def simulate(
                 if defender.hp <= 0:
                     continue   # fainted by deferred charged in step 1.5
                 dmg = attacker.fast_move_damage(defender)
+                # Energy from the CURRENT form's fast move, not the queued dict
+                # -- see the legacy floating-fast site below (FC-1). Differs
+                # only after a mid-flight Aegislash Blade->Shield revert
+                # (in step 1.5, before these step-3 landings).
                 _fast_results.append((1 - actor_idx, dmg, actor_idx,
-                                      move['energyGain']))
+                                      attacker.fast_move['energyGain']))
             for defender_idx, dmg, attacker_idx, energy_gain in _fast_results:
                 attacker = pokemon[attacker_idx]
                 defender = pokemon[defender_idx]
@@ -2946,9 +2950,23 @@ def simulate(
                     if p.hp > 0:
                         defender = pokemon[1 - i]
                         if defender.hp > 0:
-                            qmove = p._queued_fast[1]
                             dmg = p.fast_move_damage(defender)
-                            p.energy = min(ENERGY_CAP, p.energy + qmove['energyGain'])
+                            # Credit the CURRENT form's fast move for energy,
+                            # not the stale queued dict. They differ only after
+                            # a mid-flight form change swapped the fast move
+                            # (Aegislash Blade->Shield revert on a shielded
+                            # charged move): the in-flight fast lands as the
+                            # Shield-form charge variant (energyGain 6), not the
+                            # Blade fast that was queued (9). PvPoke uses
+                            # poke.fastMove for both damage and energy here
+                            # (Battle.js processAction) and hard-codes
+                            # energyGain=6 in shield form -- the Shield charge
+                            # variant's gamemaster energyGain is already 6, so
+                            # this matches. (FC-1, 2026-07-03; previously we
+                            # credited the queued move's 9 -- an internally
+                            # inconsistent old-move-energy / new-move-damage mix.)
+                            p.energy = min(ENERGY_CAP,
+                                           p.energy + p.fast_move['energyGain'])
                             defender.hp = max(0, defender.hp - dmg)
                             p._fm_since_charge += 1
                             if log:
