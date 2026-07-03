@@ -13,6 +13,25 @@ pre-cold-dive gate; run `overnight_redive.sh` and watch with
 `scripts/chain_status.py --chain overnight`. (Last bake: CHANGELOG.md
 "2026-06-28".)
 
+## ENGINE BATCH READY FOR REVIEW/MERGE: branch `hunt2` (2026-07-03)
+
+Four engine fixes are implemented, verified, and committed on branch
+`hunt2` (worktree `~/coding/hunt2/gopvpsim`), batched because this new
+machine's cache is test-only (every real dive is cold anyway, so no
+migration predicates were built): `3f7e144` NB-1 selection freeze (final
+verdict on the bounding sweep's FIX recommendation), `e17d868` FC-1
+Aegislash revert energy, `0acdc8e` OMT turns_planned divisor, `a36930e`
+would_shield doc-only (investigated: faithful port, not a bug). Final
+engine hash `51bf823c217a`. Verification: new fixtures oracle-equal (Group
+D flipped to must-pass), suite 1213 passed (2 pre-existing new-machine
+fixture failures), audit harness IMPROVED to 172 exact + 35 documented
+(two Tinkaton-vs-Aegislash cells now exact), perf -2.4% vs machine-local
+baseline. MICHAEL: review + merge `hunt2` -> main before the first real
+production dives. NB merge will likely conflict in DEVELOPER_NOTES.md
+(both branches edited it) — take hunt2's engine-section rewrites AND
+main's F2/self-debuff/IV-floor edits; docs/reviews files are
+identical-content on both sides.
+
 ## Engine bug-hunt round 2 (2026-07-03): 16 confirmed findings need triage
 
 `docs/reviews/2026-07-02_engine_bug_hunt_round2.md` — 1 HIGH, 7 medium,
