@@ -45,8 +45,12 @@ open decisions (UI shape, cup pilot choice, rollout vehicle):
 the already-embedded SCORES_GZ grid plus a bake-time `oppMetaRank` field and
 an honesty banner over the full-pool baked sections; cups are a pool+rankings
 feature (PvPoke publishes cup rankings; sweep cache warm-serves overlapping
-columns; ~minutes per focal, not a re-bake). Blocked on Michael's decisions
-listed in the plan doc before any implementation session.
+columns; ~minutes per focal, not a re-bake). Decisions 2026-07-02: UI is a
+per-opponent CHECKBOX panel (unranked at end, top-N as buttons); cup movesets
+from cup rankings w/ fallback; dev fixture = local Azumarill GL dive; pilot
+candidate Equinox Cup. STILL GATING: the cup slug + landing-page taxonomy
+dialog (Michael answers before implementation) + cup pick confirmation --
+see the plan doc's "Decisions" section.
 
 ## Cache GC: prune all namespaces + dive-script opt-in prompt
 

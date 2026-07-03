@@ -139,13 +139,22 @@ cache all-hits, slayer cache warm), which is hours not days.
 
 ## Design
 
-### Feature 1 -- client-side top-N filter (MVP)
+### Feature 1 -- client-side opponent filter (MVP)
 
-**Control.** One new `<select id="topn-sel">` in the controls strip: `All
-opponents (default) / Top 10 / Top 20 / Top 50`, wired `onchange=
-"updateView()"` like its 8 siblings. No persistence (matches every other
-dropdown; the old/new-mechanics TODO's query-param question can fold this in
-later if wanted).
+*(Updated 2026-07-02 after Michael's decisions: the control is a
+PER-OPPONENT CHECKBOX PANEL, not a fixed top-N select. Motivating use case:
+"looking at Azu, I might want to drill down and say 'How do I beat Medi'" --
+single-opponent selection is a first-class use, not an edge case.)*
+
+**Control.** A collapsible, scrollable checkbox panel in the controls strip
+listing every opponent, one checkbox each, all checked by default. Ordering:
+by meta rank (from `DATA.oppMetaRank`), unranked entries (CS extras, active
+variants, hand-extended focals) at the very end. Convenience buttons above
+the list: `All / None / Top 10 / Top 20 / Top 50` (the top-N buttons check
+exactly the ranked opponents with rank <= N -- so the original Reddit ask is
+two clicks). Changes fire the same `updateView()` path as the 8 existing
+selects. No persistence (matches every other control; the old/new-mechanics
+TODO's query-param question can fold this in later if wanted).
 
 **Data.** Embed at bake time:
 
@@ -158,21 +167,25 @@ later if wanted).
   snapshot -- current GL #1 `Mimikyu (Busted)` isn't even in the pool file,
   so the label must be snapshot-honest).
 
-**Mask semantics.** `topN` selects opponent indices with
-`oppMetaRank != null && oppMetaRank <= N`. Unranked opponents drop out of
-top-N views (they have no defensible rank). The methodology line shows the
-real denominator: "against 18 of 86 opponents (top 20 ...)".
+**Mask semantics.** The mask is simply the checked set of opponent indices.
+Unranked opponents are selectable like any other (they sort to the end of
+the panel rather than being dropped -- Michael's call, 2026-07-02). The
+top-N convenience buttons select `oppMetaRank != null && oppMetaRank <= N`.
+The methodology line shows the real denominator: "against 18 of 86
+opponents (custom selection)". Edge case to handle: zero boxes checked
+(disable Apply / treat as All rather than dividing by zero).
 
 **What recomputes under the mask** (all existing JS loops, threaded with an
 index mask): scatter y-values for every y-mode, Top-IVs summary table,
 histograms, Matchups Kept, paste-box "Gives up vs #1", methodology text.
 
-**What gets flagged/hidden (honesty rule).** When `topN != All`:
+**What gets flagged/hidden (honesty rule).** Whenever any opponent is
+unchecked:
 
-- A prominent banner under the controls: "Filtered view (top N): the
-  scatter, summary table, and histograms reflect only the top-N subset.
-  The infographic card, tiers, Top Picks, Notable IVs, and narrative below
-  are computed against the full pool of M opponents."
+- A prominent banner under the controls: "Filtered view (K of M
+  opponents): the scatter, summary table, and histograms reflect only your
+  selection. The infographic card, tiers, Top Picks, Notable IVs, and
+  narrative below are computed against the full pool of M opponents."
 - Hide the clusterGaps overlay (Python-precomputed full-pool; hiding is
   honest and one line).
 - Leave ivTiers scatter coloring available but covered by the banner text
@@ -184,16 +197,46 @@ of the banner. (Recomputing tiers/narrative/card client-side would mean
 porting large Python analytics to JS; explicitly out of scope.)
 
 **Rollout.** Requires re-rendering shipped pages (new DATA field + JS).
-Order of preference: (1) replay-blob re-render via `replay_analysis.py` if
-the blobs from the 2026-06-28 bake still exist on the bake machine (only the
-card-robustness re-sim runs, minutes/dive); (2) warm chain re-run (sweep +
-slayer caches all-hit). Verify blob retention first.
+RESOLVED 2026-07-02: this machine has NO replay blobs and a nearly-empty
+sweep cache (240 columns of Medicham smoke-test leftovers), so the dev
+fixture comes from a fresh local dive. **Dev dive scoped and launched
+2026-07-02:** Azumarill GL with the exact production flags
+(`run_website_dives.build_command` shape: gl_top50_plus_cs pool,
+`--top-movesets 1 --opp-ivs both --bait both --no-thresholds --interactive
+--standalone --mirror-slayer ... --split-movesets`), output to
+`userdata/dives/azumarill-dev/`, replay blob auto-dumped to
+`userdata/replay/`. ~10 min cold; also warms the sweep cache for every
+later GL dev iteration. Site-wide rollout of the shipped pages still needs
+either the bake machine's replay blobs or a warm chain re-run -- decide at
+implementation time.
 
 ### Feature 2 -- limited-cup dives (pilot one cup, then generalize)
 
 Server-side, per-cup baked pages -- NOT a client-side pool swap (a cup meta
 contains opponents absent from the baked grids, so client-side is
 impossible; recon confirmed).
+
+**Active-cup scan (2026-07-02, `../pvpoke` @ `00f0afe7f`).** Active formats
+(showFormat, rankings published), curated-meta size / ranked-universe size:
+
+| Cup                   | CP    | Meta group | Ranked | Type restriction                 |
+| --------------------- | ----- | ---------- | ------ | -------------------------------- |
+| Equinox Cup (Devon)   | 1500  | 20         | 488    | fire/flying/grass/ground/normal  |
+| Bastille Cup (Devon)  | 1500  | 27         | 225    | bug/dragon/poison/steel/water    |
+| Tsuki Cup (BF)        | 1500  | 34         | 207    | fairy/ghost/ice/normal/rock      |
+| Copa Diluvio (BF)     | 1500  | 38         | 140    | dark/steel/water/dragon          |
+| Summer Cup            | 1500  | 44         | 651    | normal/grass/fire/water/elec/bug |
+| Liga Ultra (BF)       | 2500  | 41         | 885    | (exclusion list only)            |
+| Coupe du Sillage (BF) | 10000 | 34         | 225    | fairy/flying/ice/psychic/water/N |
+
+**Pilot candidate: Equinox Cup** (smallest curated meta at 20 species, GL
+CP 1500 so opponent default IVs share the existing key path) -- pending
+Michael's confirmation in the pre-implementation dialog (alternatives:
+Bastille / Tsuki / Copa Diluvio). Useful discovery: PvPoke's curated cup
+GROUP files (`groups/equinox.json` etc.) are fetchable by the existing
+`deep_dive.py --group` path today, so the pilot pool can start from the
+curated 20-species meta rather than a rankings top-N slice; movesets still
+come from the cup rankings per the decided policy.
 
 1. **Rankings.** Extend `data.py`: `load_rankings(league, cup="overall")`
    (or a sibling `load_cup_rankings(cup, cp)`) using the existing
@@ -244,8 +287,8 @@ ask). No extra work beyond using the right rankings source at bake time.
 
 | Phase | Scope                                                         | Effort                      |
 | ----- | ------------------------------------------------------------- | --------------------------- |
-| 1     | Top-N filter: DATA.oppMetaRank + topn-sel + mask threading    | ~1 session + re-render/     |
-|       | + banner + methodology + tests; re-render shipped pages       | warm re-run                 |
+| 1     | Opponent checkbox panel: DATA.oppMetaRank + panel + top-N     | ~1 session + re-render/     |
+|       | buttons + mask threading + banner + tests; re-render pages    | warm re-run                 |
 | 2     | Cup pilot (one cup, 3-5 focals): cup rankings loader, pool    | ~1-2 sessions + ~1h compute |
 |       | recipe, slug/index, thresholds naming guard, labels           |                             |
 | 3     | Generalize: more cups, legality-filter evaluation, per-cup    | on demand                   |
@@ -254,22 +297,31 @@ ask). No extra work beyond using the right rankings source at bake time.
 Phase 1 and 2 are independent; either can go first. Phase 1 delivers the
 larger share of the Reddit ask for zero sim cost.
 
-## Decisions needed from Michael
+## Decisions (Michael, 2026-07-02)
 
-1. **Top-N UI shape**: fixed select (10/20/50/All, recommended for MVP) vs
-   a per-opponent checklist (more flexible, more UI; can layer on later).
-2. **Unranked opponents under top-N**: drop (recommended; snapshot-honest)
-   vs keep pinned with a marker.
-3. **Rollout vehicle for Phase 1**: replay re-render (verify blob retention
-   on the bake machine first) vs ride the next warm chain re-run.
-4. **Which cup pilots, and which focals** -- pure meta judgment. Also
-   whether the pilot waits for a cup that's actually live/upcoming.
-5. **Cup slug + landing-page taxonomy** (ties into the queued
-   information-architecture plan session in `docs/TODO_backlog.md` -- decide
-   whether cup pages block on that session or use a provisional scheme).
-6. **Cup moveset policy**: cup-rankings movesets with overall fallback
-   (recommended) vs overall movesets everywhere (maximally warm cache,
-   wrong-ish for the cup meta).
+1. **UI shape -- DECIDED: per-opponent checkbox panel.** Rationale: drill
+   down to specific opponents ("looking at Azu... how do I beat Medi").
+   Top-N becomes convenience buttons over the same checkboxes.
+2. **Unranked opponents -- DECIDED: keep, sorted to the very end** of the
+   checkbox list (not dropped).
+3. **Phase-1 dev fixture -- DECIDED: local dive.** No replay blobs / warm
+   cache on this machine, so the smallest reasonable dive (Azumarill GL,
+   production flags, top_movesets=1) was run locally 2026-07-02 to produce
+   the page fixture + replay blob. Site-wide rollout vehicle still open
+   (bake machine's blobs vs warm chain re-run).
+4. **Cup pilot -- Michael's constraint: an ACTIVE cup with a small meta.**
+   Scan result: Equinox Cup is the candidate (20-species curated meta, GL
+   1500). Final pick + focal list: confirm via the pre-implementation
+   dialog (question already drafted; Michael was AFK on first ask).
+5. **Cup slug + landing-page taxonomy -- OPEN, GATES IMPLEMENTATION.**
+   Michael explicitly wants to answer this via a dialog/choice box before
+   any implementation. The prepared options: slug scheme
+   (`species-equinox-cup` vs `species-great-league-equinox` vs a
+   `cups/equinox/species` subdirectory) x landing-page placement (own "Cup
+   dives" section vs badged entries inside the league sections). DO NOT
+   start Phase 2 without these answers; re-ask at session start.
+6. **Cup moveset policy -- DECIDED: cup-rankings movesets with
+   overall-league fallback** for species unranked in the cup.
 
 ## Risks / lens-grid residue
 
@@ -297,8 +349,11 @@ larger share of the Reddit ask for zero sim cost.
 
 1. Where the 2026-06-28 bake's replay blobs live (not on this checkout) and
    whether all 44 dives have one.
-2. Which cup keys have real PvPoke rankings files (only `sunshine` GL was
-   live-verified); enumerate `rankingAlias`/`hideRankings` semantics.
+2. ~~Which cup keys have real PvPoke rankings files~~ RESOLVED 2026-07-02
+   via the local `../pvpoke` clone (@ `00f0afe7f`): all seven active
+   formats have rankings (table above); `championshipseries` hides
+   rankings and aliases `all`. Re-check freshness of the clone before the
+   pilot bake (`git -C ../pvpoke pull`).
 3. Exact semantics of `gm['cups']` filterType values across all 24 cups
    (needed for Phase 3 legality checking, not the pilot).
 4. Whether every shipped page's SCORES matrix covers all oppIvMode keys the
