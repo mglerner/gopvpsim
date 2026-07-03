@@ -48,7 +48,11 @@ window.cmpToggleMore = cmpToggleMore;
 // Close calls where candidates DISAGREE on win/loss, or best-buddy flips one.
 function cmpFlipPanel(live, grids) {
   var nO = DATA.nOpponents, nS = DATA.nScenarios, found = [];
+  // Honor the opponent filter when this file is loaded alongside the dive's
+  // filter panel; guarded so ML-guide pages (no panel, no helper) are unaffected.
+  var selSet = (typeof selectedOppSet === 'function') ? selectedOppSet() : null;
   for (var oi = 0; oi < nO; oi++) for (var si = 0; si < nS; si++) {
+    if (selSet && !selSet[oi]) continue;  // opponent filtered out
     var vals = live.map(function(r) { return cmpVal(grids.def, r.iv, si, oi); });
     // Outcome categories: win (>500), tie (==500), loss (<500). The candidates
     // "disagree" when they span more than one category -- this catches
@@ -124,7 +128,9 @@ function cmpFlipPanel(live, grids) {
 // Same result for all, but leftover-HP margin differs a lot.
 function cmpMarginPanel(live, grids, energyCtx) {
   var nO = DATA.nOpponents, nS = DATA.nScenarios, found = [];
+  var selSet = (typeof selectedOppSet === 'function') ? selectedOppSet() : null;
   for (var oi = 0; oi < nO; oi++) for (var si = 0; si < nS; si++) {
+    if (selSet && !selSet[oi]) continue;  // opponent filtered out
     var vals = live.map(function(r) { return cmpVal(grids.def, r.iv, si, oi); });
     var allWin = vals.every(function(v) { return v > 500; });
     var allLose = vals.every(function(v) { return v < 500; });  // ties (==500) excluded
