@@ -1642,6 +1642,22 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # tests/test_nb1_selection_freeze.py Group C; see docs/reviews/
     # 2026-07-03_nb1_bounding_sweep.md section 2 (carve-out) and
     # DEVELOPER_NOTES.md divergence #3.
+    #
+    # would_shield/always-shield inconsistency (INVESTIGATED 2026-07-03, left
+    # unchanged): the `would_shield(...)` gate below is a FAITHFUL port of
+    # PvPoke's ActionLogic.js:860 (same function, same activeChargedMoves[1]
+    # target). It predicts the opponent WON'T shield and, if so, throws the
+    # expensive move -- but the actual simulate shield policy always-shields
+    # standard moves, so the thrown move can be shielded and wasted. That
+    # predict-vs-policy mismatch is PvPoke's OWN structure (its override
+    # consults wouldShield while Battle.js:1077 always-shields), so it is not a
+    # port infidelity and is NOT changed here. It is why the fresh-dpeRatio
+    # carve-out above can INFLATE our score vs the oracle (Florges vs
+    # Seismitoad UL 2-1: ours 866 vs oracle 665 -- our fresh ratio 1.607 fires
+    # the override and Seismitoad wastes Earth Power into a shield where
+    # PvPoke's mixed-stale ratio baits Icy Wind instead). The +201 is a
+    # downstream consequence of the carve-out + PvPoke's shared structure, not
+    # "better play"; pinned as tests/...Group C test_group_c10 with this caveat.
     if bait_shields and defender.shields > 0 and n_cms > 1:
         fm0_dpe = cm_dmgs[final_first_thrown] / cm_energy[final_first_thrown]
         if fm0_dpe > 0 and attacker.energy >= cm_energy[1]:
