@@ -14,6 +14,13 @@ intentional divergences; in this sub-population PvPoke is demonstrably *worse*
 (it leads a worse-typed self-debuff move and loses fights we win), and the only
 two PvPoke-default movesets affected show zero winner-flips.
 
+> **[2026-07-03 correction]** The "zero default-moveset winner-flips" wording
+> is falsified as literally stated: the re-measurement (Addendum below) found
+> one default-moveset flip on current data (Braviary vs Lugia ML 2-0,
+> ours-WIN/PvPoke-LOSE, same mechanism). The claim survives only re-scoped as
+> "zero PvPoke-FAVORABLE default-moveset flips." KEEP verdict unchanged
+> (strengthened, in fact — see Addendum).
+
 ---
 
 ## What "the cluster" is
@@ -218,3 +225,39 @@ migration is needed.**
 - Mechanism trace: PvPoke `dpPlans` (near-KO DP plan) vs `chargedLog` (executed)
   -- a mismatch is a post-DP bandaid[866]/[885] swap; a match with a worse-typed
   lead is the Divergence-#3 bestChargedMove ordering.
+
+---
+
+## Addendum 2026-07-03 — re-measured on c7f9ba2 (post-bandaid[910] ffb582b)
+
+Everything above was measured one commit BEFORE the bandaid[910] fix
+(`ffb582b`, 2026-06-29 15:29), whose proven touched set
+(`self_debuff_either_side`) contains this entire cluster. Re-measured on
+`c7f9ba2` (our engine) vs pvpoke `00f0afe7f`; only `ffb582b` touched engine
+files in between, so the A/B attribution is complete.
+
+**KEEP verdict: STILL HOLDS, strengthened.**
+
+- **V1 GL scan (same 720 cells): 29 score-diffs (was 30), still exactly 8
+  winner-flips, all 8 rows byte-identical to the table above.** The one
+  changed cell is score-only: Lurantis vs Swampert 0-0, old ours 956 vs
+  PvPoke 769 -> new ours 769 = exact agreement (the fix working as intended).
+- **The fix's total footprint across all 864 re-measured cells: 4 cells
+  (1 GL + 3 UL), every one moved TO exact PvPoke agreement, zero flips
+  created or dissolved.** The V4 pinned example "Zacian vs Swampert UL 1-0
+  ours 519" is DEAD: now 625 = PvPoke 625, exact agreement. Do not reuse
+  any pre-addendum V4 number.
+- **V4 re-scope:** on current data there IS one default-moveset winner-flip —
+  Braviary (AIR_SLASH / CLOSE_COMBAT+BRAVE_BIRD) vs Lugia (DRAGON_TAIL /
+  AEROBLAST+FLY) ML 2-0: ours 695 WIN / PvPoke 417 LOSE. A/B: pre-existing,
+  not fix-caused (0 of 72 Braviary cells changed). Traced: PvPoke throws
+  double-resisted Close Combat into psychic/flying where we lead Brave Bird —
+  the same worse-typed-self-debuff-lead mechanism (Divergence #3 family), and
+  ours-favorable like every other flip. Why the 2026-06-28 scan missed it is
+  unknowable: the V4 opponent sets were never recorded, and default movesets
+  resolve from a live 1-day-TTL rankings cache. Lesson recorded in the pins.
+- **Regression pins: `tests/test_both_self_debuff_divergence.py`** (4 tests:
+  Lurantis/Cresselia GL 1-0 = 691 w0; Blaziken/Bastiodon GL 1-0 = 646 w0;
+  Braviary/Lugia ML 2-0 = 695 w0; Zacian/Swampert UL 1-0 = 625 w0 agreement
+  pin). Movesets hard-coded — default-moveset resolution drifts with the
+  rankings cache and would silently invalidate the pins.
