@@ -374,18 +374,15 @@ intended behavior (functional pruning, `True`).
 
 ### 2. bestChargedMove not recomputed on opponent form change
 
-**File**: `Pokemon.js:791-822` (selectBestChargedMove) and
-`Pokemon.js:2344` (changeForm calls resetMoves on self only)
+**File**: `Pokemon.js:791-822` (selectBestChargedMove); `:2344` (changeForm calls resetMoves on self only)
 
 PvPoke caches `bestChargedMove` at init and does NOT recompute it when
-the **opponent** changes form (e.g. Aegislash Shield->Blade, which
-dramatically changes defense) — only the form-changer's own
-`resetMoves()` runs. Example: Azu's IB (DPE 0.273) stays locked over PR
-(DPE 0.300) vs Shield form (diff 0.027 < 0.03); vs Blade form the diff
-grows to 0.062 and PR is clearly better, but PvPoke keeps IB. UPDATE
-2026-07-03: we now MATCH this (divergence #3 freeze); the NB-1 sweep
-showed our old per-turn recompute was NOT reliably better, so
-reference-consistency wins.
+the **opponent** changes form (e.g. Aegislash Shield->Blade) — only the
+form-changer's own `resetMoves()` runs. Example: Azu's IB (DPE 0.273)
+stays locked over PR (DPE 0.300) vs Shield form (diff 0.027 < 0.03); vs
+Blade form PR is clearly better but PvPoke keeps IB. UPDATE 2026-07-03:
+we now MATCH this (divergence #3 freeze); the NB-1 sweep showed our old
+per-turn recompute was NOT reliably better, so consistency wins.
 
 ### 3. Aegislash selects Gyro Ball over Shadow Ball
 
@@ -840,13 +837,11 @@ Two non-obvious behaviors discovered during form change implementation
 (2026-04-14) that are easy to get wrong:
 
 **1. HP does not scale on form change.** When Aegislash switches between
-Shield form (97 atk, 272 def) and Blade form (272 atk, 97 def), the HP
-and max_hp stay fixed at the starting form's values. PvPoke's
-`Pokemon.js changeForm()` has the HP update explicitly commented out:
-`//this.stats.hp = newStats.hp;` (line ~2365). This means Aegislash
-keeps Shield form's HP even after transforming to Blade. It would be
-natural to assume HP scales proportionally with the new form's stats,
-but it doesn't.
+Shield form (97 atk, 272 def) and Blade form (272 atk, 97 def), HP and
+max_hp stay fixed at the STARTING form's values — PvPoke's
+`Pokemon.js changeForm()` explicitly comments out the HP update
+(`//this.stats.hp = newStats.hp;`, line ~2365). It's natural to assume HP
+scales with the new form's stats, but it doesn't.
 
 **2. Aegislash Blade form uses whole levels only.** When Shield form
 (level 46 in GL) transforms to Blade form, the game rounds DOWN to the
@@ -855,29 +850,35 @@ nearest whole level (not half level). In Pokemon Go you power up in
 (1476 CP, under the 1500 cap), but the game puts it at level 22 (1443
 CP) instead -- losing a half level of stats. PvPoke's `getFormStats()`
 (Pokemon.js line ~2455 as of pvpoke bc532fbda) implements this via
-`newLevel--` (decrementing by 1, not 0.5). This was discovered by cascade1185
-(https://x.com/cascade1185/status/2037456058265075782) and explained by
-Caleb Peng (https://www.youtube.com/watch?v=OdHxOD6FZcg&t=167s). When
-choosing which Aegislash to power up, players need to check that the
-Blade form level lands on a favorable whole number.
+`newLevel--` (decrementing by 1, not 0.5; discovered by cascade1185,
+explained by Caleb Peng). When choosing which Aegislash to power up,
+players need to check that the Blade form level lands on a favorable
+whole number.
 
 **3. The Blade->Shield reverse level formula overflows the CPM table.**
-PvPoke's `getFormStats()` aegislash_shield branch starts the Shield
-level at `blade_level / 0.5 + 2` (GL) as a deliberate overshoot, then
-walks down whole levels until CP fits. A low-IV Blade *focal* caps at
-level 25 in GL (whole-level rule above), putting the raw start at 52 —
-past the end of the CPM table (max 51.0). PvPoke survives because it
-computes form stats lazily at form-change time and JS just yields
-`undefined` (`cpms[index]` out of range — a latent PvPoke bug); our
-dive plumbing builds per-IV `FormChangeConfig`s eagerly at sweep setup,
-so the first post-S1 Aegislash (Blade) GL dive crashed with
-`KeyError: 52.0` (2026-06-11). Fix: `_aegislash_shield_level` clamps
-its start to `max(CPM)` — exact, since levels above 51 don't exist and
-the walk-down from 51 reaches the same fixed point. Pinned by
-`tests/test_pokemon.py::TestAegislashShieldLevelOverflow` (exhaustive
-4096-IV × GL/UL build sweep). Blade really does revert to Shield
-in-battle (gamemaster trigger `activate_shield`), so the reverse
-mapping is load-bearing, not hypothetical-only.
+PvPoke's `getFormStats()` aegislash_shield branch overshoots the Shield
+level (`blade_level / 0.5 + 2` in GL) then walks down until CP fits. A
+low-IV Blade focal caps at level 25 in GL, putting the raw start at 52 —
+past the CPM table end (max 51.0). PvPoke computes form stats lazily and
+JS yields `undefined` there (a latent bug); we build per-IV
+`FormChangeConfig`s eagerly, so the first post-S1 Aegislash (Blade) GL
+dive crashed with `KeyError: 52.0` (2026-06-11). Fix:
+`_aegislash_shield_level` clamps its start to `max(CPM)`. Pinned by
+`tests/test_pokemon.py::TestAegislashShieldLevelOverflow`. Blade really
+reverts to Shield in-battle (`activate_shield`), so this is load-bearing.
+(Our clamp is the defensible choice — levels above 51 don't exist in-game
+— though PvPoke's cpms table actually reaches 55; see round-2 FC-2.)
+
+**4. A fast landing after a mid-flight revert credits the CURRENT form's
+energy (FIXED 2026-07-03, FC-1).** When Aegislash (Blade) shields a
+charged move with its own multi-turn fast in flight, the
+`activate_shield` revert swaps its fast to the Shield charge variant; the
+in-flight fast lands with the new move's damage but used to credit the
+OLD queued move's energyGain (9) not the current move's (6). PvPoke uses
+the current move for both (hard-coding 6 in shield form). Fixed at both
+battle.py landing sites; pinned by
+`tests/test_fc1_aegislash_revert_energy.py` (oracle-equal, incl. a
+corrected winner flip).
 
 ## Active alt-moveset opponent variants
 
