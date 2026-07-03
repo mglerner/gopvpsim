@@ -286,6 +286,20 @@ Cup pages embed `oppMetaRank` from the cup rankings, so the Feature-1
 control works there unchanged ("top 10 in Sunshine Cup" = the exact Reddit
 ask). No extra work beyond using the right rankings source at bake time.
 
+### Session-close verification report (both phases)
+
+Each implementation session (Phase 1 and Phase 2) ends by running the
+`/work-audit` skill to produce a verification-audit HTML report in
+`~/coding/reports` (one row per work item: plain-English description / what
+was done / how it was verified), linked from the reports index. The
+end-to-end browser checks each phase already requires (single-opponent
+drill-down, top-N button semantics, paste-box composition, banner behavior
+for Phase 1; rendered cup pages, index entries, bundler-glob dry run for
+Phase 2) are the EVIDENCE rows for that report -- run them as checks whose
+output can be cited, not as eyeball passes. Per the skill's standard,
+anything not actually verified is marked assumed, not glossed. The report is
+part of each phase's definition of done, before the wrap-up commit.
+
 ## Phasing and rough effort
 
 | Phase | Scope                                                         | Effort                      |
