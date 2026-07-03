@@ -567,7 +567,15 @@ messages.
   (Snorlax ate one extra Counter per battle); removed, matches
   ActionLogic.js:317-329.
 
-(Lesson across the last three: "score-neutral" claims about decision-timing
+- **OMT `turns_planned` divisor — RESOLVED 2026-07-03.** We divided
+  `poke.energy` by the cheapest *affordable* charged move (returning early
+  when none was affordable); PvPoke (ActionLogic.js:305) divides by
+  `activeChargedMoves[0].energy` (the frozen slot-0 move) regardless of
+  affordability. At a low-energy deathbed state ours inflated `turns_planned`
+  and fired several fast moves early (sweep doc Group D; PvPoke strictly
+  better). Now uses the frozen slot-0 energy; pinned by Group D.
+
+(Lesson across the last four: "score-neutral" claims about decision-timing
 deviations need a trace, not reasoning — each was an extra condition the
 reference lacks, with a plausible comment, producing real margin errors.)
 
@@ -653,35 +661,28 @@ the self-debuffing nuke to `activeChargedMoves[0]` (Fly) whenever:
     AND poke.hp / poke.stats.hp > 0.5
     AND finalState.moves[0].damage / opp.hp < 0.8
 
-*(Mechanism paragraph corrected 2026-06-11, review finding E11.)*
 PvPoke's `move.damage` is essentially NEVER undefined: `initializeMove`
-(Pokemon.js:830-839) sets it for every move at battle init (both the
-with-opponent and without-opponent branches assign), `wouldShield`
-refreshes it on every evaluation (ActionLogic.js:1121), and the OMT
-side effect (line 320, fires per-move whenever `opponent.shields == 0`)
-keeps it freshest. So PvPoke's bandaid[885] always evaluates its
-`damage/opp.hp < 0.8` ratio — possibly with a stale value. Our port
+(Pokemon.js:830-839) sets it at battle init, `wouldShield` refreshes it
+(ActionLogic.js:1121), and the OMT side effect (line 320, per-move when
+`opponent.shields == 0`) keeps it freshest. So PvPoke's bandaid[885]
+always evaluates its `damage/opp.hp < 0.8` ratio (possibly stale). Our port
 caches damage at battle.py:652 but subgates the assignment on
 `attacker.energy >= cm['energy']` — so in the Moltres-G cluster
 (energy < BB's 55 at the T20 DP-entry state) our `_cached_damage`
 stays `None`, bandaid[866] skips its ratio test entirely, the DP plan
 is left alone, and bandaid[918] stacks BB until energy reaches 100 →
-single-BB nuke instead of Fly-chain. NOTE the divergence surface is
+single-BB nuke instead of Fly-chain. The divergence surface is
 therefore broader than the MG cluster: our bandaid[866] skips wherever
-`_cached_damage` is None, while PvPoke's always fires — the empirical
+`_cached_damage` is None, while PvPoke's always fires. The empirical
 cluster measurements and the keep-our-behavior decision below stand
-(they were measured from actual traces), but an earlier version of
-this paragraph wrongly claimed the field is "undefined in JS" unless
-OMT fired.
+(measured from actual traces).
 
 **Why we don't fix it:** faithfully mirroring PvPoke's OMT side
 effect (so bandaid[866] fires when PvPoke's bandaid[885] would) swaps
 BB → Fly in **all** MG cluster cases, not just Lapras. The bandaid's
-`damage/opp.hp < 0.8` test doesn't discriminate:
-
-- Lapras [1,2]:   BB 99 / hp 142 = 0.70 → fires (PvPoke's Fly plan wins; ours loses by 1 HP)
-- Jellicent [0,0]: BB 99 / hp ~160 = 0.62 → fires (PvPoke's Fly plan worse by ~47 HP)
-- Corviknight cluster: similar 0.6-0.7 ratios → fires (PvPoke's Fly plan worse by ~38 HP)
+`damage/opp.hp < 0.8` test doesn't discriminate: all cluster cases hit
+0.6-0.7 and fire — Lapras [1,2] (PvPoke's Fly plan wins, ours loses by 1
+HP) but Jellicent/Corviknight (PvPoke's Fly plan worse by ~38-47 HP).
 
 So the fix is all-or-nothing against a 6:1 weighting; matching PvPoke
 inverts the ratio rather than improving it. Per CLAUDE.md "When our
@@ -702,11 +703,10 @@ harness, MG max HP=161, all cases MG wins in both sims):
 | Corviknight [0,1] | 71  ( 44%) | ~33 ( 20%)   | +38 / +24pp |
 | Corviknight [0,2] | 97  ( 60%) | ~59 ( 37%)   | +38 / +23pp |
 
-Consistently +23-30 percentage points (~38-48 raw HP). MG also KOs
+Consistently +23-30 percentage points (~38-48 raw HP); MG also KOs
 6-12 turns earlier in our sim. The magnitude is what makes our
-divergence defensible — if the gap were a few HP, PvPoke's plan
-would be at-or-better than ours and we'd match. At 25-30pp the
-post-KO carry-over difference is material for next-mon analysis.
+divergence defensible — if the gap were a few HP we'd match PvPoke; at
+25-30pp the post-KO carry-over is material for next-mon analysis.
 
 **Caveat — Lapras [1,2] winner flip**: 1 of 7 cluster cases is a real
 edge case where our plan is worse. Same root cause (MG picks BB, PvPoke
