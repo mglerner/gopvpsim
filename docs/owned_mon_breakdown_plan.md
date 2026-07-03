@@ -152,5 +152,7 @@ even-shield (opponent × scenario) cells dropped vs rank-1 — 82 opp × 3 = 246
 header `{opponents:[...], scenarios:[...]}`. The on-device screen decodes the
 mask to render the dropped list. The human-readable JSON the extractor emits now
 is fine for the website-equivalent / debugging, but the iOS bundle needs the
-bitmask form. **Remaining: the bitmask exporter variant + the Toga screen +
-parity vectors.**
+bitmask form. **The bitmask exporter variant shipped 2026-06-29 (`c1ea231`:
+`bitmask_from_dive` + `--bitmask`, roundtrip/size tests in
+`tests/test_export_owned_breakdown.py`). Remaining: the Toga screen + parity
+vectors.**

@@ -84,13 +84,12 @@ app — the same feature already live on the website (the deep-dive paste-box
   (no re-sim) — the dive embeds the full 4096-IV score grid. gobattlekit has NO
   battle engine and must not get one (lean iOS build); it consumes pre-baked
   data + recomputes only the analytic layer on-device.
-- **Two remaining build steps:**
-  1. **Bitmask exporter.** `scripts/export_owned_breakdown_bundle.py` already
-     extracts the breakdown but emits a full-list JSON that is **~25.6 MB for 15
-     species — too big for mobile**. Add a per-IV BITMASK variant: 246 even-shield
-     (opp × scenario) cells -> ~31 bytes/IV + a one-time names header, decoded
-     on-device. (top-K-stat-product bake was a DEAD END — those spreads all give
-     up nothing; owned mons have arbitrary IVs.)
+- **One remaining build step** (step 1, the bitmask exporter, SHIPPED
+  2026-06-29 in `c1ea231`: `bitmask_from_dive` + `--bitmask` on
+  `scripts/export_owned_breakdown_bundle.py`, with roundtrip + size tests in
+  `tests/test_export_owned_breakdown.py`; the top-K-stat-product bake was a
+  DEAD END — those spreads all give up nothing; owned mons have arbitrary
+  IVs):
   2. **Toga screen** modeled on `gobattlekit/src/gobattlekit/screens/user_iv_checker.py`,
      reading the baked artifact (bundle like `default_thresholds.toml` via
      `tools/threshold_export/`); resolve owned mons through their evolution line;
@@ -319,14 +318,18 @@ here 2026-06-12; these are the remaining seams.)*
 
 ## Tests to add
 
-* **Guard for the IV-scanner `maxLevel` single-source (fixed `725c184`).** No
-  test pins `_collection_data['maxLevel']` (deep_dive.py:4602) to
-  `LEAGUE_MAX_LEVEL.get(league)`, so a future re-hardcode could silently
-  re-introduce the GL/UL "owned mons one level too high" bug. The strong pin:
-  render a tiny GL dive with a collection and assert the emitted
-  `DATA.collection.maxLevel == 50.0` (a table-only assertion is too weak — it
-  wouldn't catch line 4602 drifting). Heavy (needs a dive render + a Poke Genie
-  CSV fixture); deferred. Also worth folding in: the latent dead-code `51.0`
+* **Guard for the IV-scanner `maxLevel` single-source (fixed `725c184`).**
+  **A full implementable design now exists:**
+  `docs/reviews/2026-06-28_iv_scanner_maxlevel_strong_pin_design.md` (the
+  cheap Option-1 pin: extract `build_collection_data()` from deep_dive.py +
+  a 4-league unit test; supersedes this entry's "Heavy / needs a dive render
+  + CSV fixture" framing, and refreshes this entry's stale SHA/line numbers).
+  The `verify_js_parser.py` league-blindness half was fixed 2026-07-03
+  (`c20071e`); the deep_dive.py extraction waits for the top-N/cup session
+  to land (file conflict). Original context: no test pins
+  `_collection_data['maxLevel']` to `LEAGUE_MAX_LEVEL.get(league)`, so a
+  future re-hardcode could silently re-introduce the GL/UL "owned mons one
+  level too high" bug. Also worth folding in: the latent dead-code `51.0`
   fallbacks in `deep_dive_user_collection.js:275` (`ivsToStatsAtCap` default,
   caller always passes maxLevel) and `:344` (`matchMons`, zero live call sites)
   — single-source these to a league-aware ceiling if matchMons is ever wired up.
