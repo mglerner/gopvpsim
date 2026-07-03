@@ -377,19 +377,15 @@ intended behavior (functional pruning, `True`).
 **File**: `Pokemon.js:791-822` (selectBestChargedMove) and
 `Pokemon.js:2344` (changeForm calls resetMoves on self only)
 
-PvPoke computes `bestChargedMove` at init time using actual damage
-against the opponent's current stats, then caches it on the Pokemon
-object. When the **opponent** changes form (e.g., Aegislash
-Shield->Blade, dramatically changing defense), the attacker's
-`bestChargedMove` is NOT recomputed. Only the form-changing Pokemon's
-own `resetMoves()` is called.
-
-Concrete example: Azu's IB (15 dmg, 55 energy, DPE 0.273) vs PR
-(18 dmg, 60 energy, DPE 0.300) against Aegislash Shield form. DPE
-diff is 0.027 < 0.03 threshold, so PvPoke picks IB (cheaper, locked
-at init). Against Blade form (low def), DPE diff grows to 0.062 >
-0.03, and PR becomes clearly better - but PvPoke still uses IB. Our
-code recomputes per turn, which we believe is more correct.
+PvPoke caches `bestChargedMove` at init and does NOT recompute it when
+the **opponent** changes form (e.g. Aegislash Shield->Blade, which
+dramatically changes defense) — only the form-changer's own
+`resetMoves()` runs. Example: Azu's IB (DPE 0.273) stays locked over PR
+(DPE 0.300) vs Shield form (diff 0.027 < 0.03); vs Blade form the diff
+grows to 0.062 and PR is clearly better, but PvPoke keeps IB. UPDATE
+2026-07-03: we now MATCH this (divergence #3 freeze); the NB-1 sweep
+showed our old per-turn recompute was NOT reliably better, so
+reference-consistency wins.
 
 ### 3. Aegislash selects Gyro Ball over Shadow Ball
 
@@ -770,26 +766,29 @@ Medicham, selfBuffing, priority-shuffle, Forretress/Azu DP); the rest live only
 in git history (pre-2026-06-28 DEVELOPER_NOTES) and their linked commits — do
 NOT assume a named item has a dedicated CHANGELOG section.
 
-### 3. bestChargedMove computed per-turn, not cached at init (intentional)
+### 3. Move-selection freeze at resetMoves (matches PvPoke; FIXED 2026-07-03)
 
-**PvPoke**: `bestChargedMove` is computed once at init (and on self
-form change via `resetMoves`). Not updated when the opponent changes
-form or when stat stages change.
+**PvPoke** freezes the activeChargedMoves ordering, each move's raw
+`.dpe`, `bestChargedMove`, and the farm-down constants in `resetMoves()`
+— at battle start and again on *self* form change (only `move.damage`
+refreshes per use). We used to recompute `best_idx`/ordering/dpe every
+`pvpoke_dp` call from current-stage damage, documented here as strictly
+better. The NB-1
+bounding sweep (`docs/reviews/2026-07-03_nb1_bounding_sweep.md`)
+FALSIFIED that: the per-stage recompute crosses PvPoke's init-tuned
+0.3/1.5 guards mid-fight for non-strategic reasons, in BOTH directions —
+including a shipped winner flip against us (Forretress (Shadow) vs
+Cradily GL 1-0, ours 413 LOSS vs oracle 588 WIN). `_ensure_dp_init_cache`
+now freezes those quantities once per battle (reset only on self form
+change, so only the changer re-selects — matching PvPoke);
+`_ensure_dp_cache` keeps the per-stage damage tables fresh. Pinned in
+`tests/test_nb1_selection_freeze.py` (Groups A/B).
 
-**Our code**: `best_idx` is recomputed every call to `pvpoke_dp` using
-current damage values. We believe this is more correct: it responds to
-stat stage changes mid-battle and to opponent form changes (e.g.,
-Aegislash Shield->Blade dramatically changes defender's def, shifting
-DPE thresholds). PvPoke's stale cache produces suboptimal move choices
-when opponent stats change, as documented in PvPoke bug #2 above.
-
-**Impact**: +134 delta on Aegislash 1v2/2v2 — our Azu correctly
-switches to Play Rough (higher DPE against Blade form) while PvPoke
-keeps using Ice Beam (cached against Shield form's def).
-
-**Decision**: keep our per-turn recomputation. The only known
-mismatches are in Aegislash scenarios where PvPoke's cached selection
-is demonstrably worse.
+**Remaining intentional divergence**: the post-DP don't-bait dpeRatio
+site (battle.py, "the NB-1 freeze carve-out") stays FRESH and
+internally-consistent; PvPoke's uses `move.damage` with mixed
+refresh-on-use staleness (a cache artifact), so matching it would
+emulate a PvPoke bug. Pinned as Group C.
 
 ## Threshold model: damage tiers vs matchup boundaries
 

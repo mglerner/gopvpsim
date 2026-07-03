@@ -365,5 +365,15 @@ def apply_form_change(bp, opponent):
     opponent._dmg_cache_opp = None
     bp._dp_cache = None
     opponent._dp_cache = None
+    # PvPoke re-runs resetMoves() ONLY for the pokemon that changed form
+    # (Pokemon.js changeForm -> resetMoves), so ONLY the form-changer's frozen
+    # move selection (ordering / raw dpe / best_idx) is recomputed. The
+    # opponent keeps its frozen selection against the pre-change state -- its
+    # _dp_cache above is reset only to refresh the FRESH per-stage damage
+    # tables vs bp's new stats, not the frozen selection. Resetting the
+    # opponent's _dp_init_cache here would wrongly re-select its move against
+    # bp's new form (an NB-1-class staleness divergence). See
+    # BattlePokemon._ensure_dp_init_cache.
+    bp._dp_init_cache = None
 
     bp._form_is_alt = not bp._form_is_alt
