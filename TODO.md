@@ -520,7 +520,7 @@ shot). All still open — detail preserved verbatim there. Index of what's there
   badges).
 - **Slayer iteration cleanup** — Max-Wins column, Lurgan-as-opponent re-run,
   validation-doc reframe.
-- **HTML output paths** — orphaned-artifact detector, split-moveset re-render,
+- **HTML output paths** — orphaned-artifact detector,
   mirror-slayer table size (mechanism removed; demote-vs-optimize).
 - **Dive card** — High-HP strictly-dominated-spread bug, opponent-IV
   robustness axis, signature-dedup notes.

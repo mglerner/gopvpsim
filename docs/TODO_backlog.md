@@ -339,18 +339,6 @@ move selection closed 2026-04-15 as not-a-real-issue.)
   `--execute` gate (dry-run default, like `scripts/clean_logs.py`).
   Don't auto-delete without the gate. Separate session.
 
-* **Re-render published split-moveset dives** *(follow-up to the
-  2026-06-10 split-analysis-cache fix)* — The fixed bug was worse than
-  the original "wrong subheader" report: from 2026-04-12 to 2026-06-10
-  every NON-LANDING split file shipped **moveset 0's entire analysis
-  sections** (Deep Dive Results, tier cards, anchor bullets, matchup
-  boundaries), not just its label. The landing page (moveset 0) of
-  each dive was always correct. Any split dive published in that
-  window needs a re-render (`scripts/run_website_dives.py` →
-  `publish_website.sh`) for its secondary moveset pages to show their
-  own analysis. See DEVELOPER_NOTES "All-in-one vs split-moveset
-  HTML" history note.
-
 * **Mirror-slayer iteration tables blow up HTML size for high-anchor
   species — MECHANISM REMOVED 2026-06-10 (arc S2)** — the redesigned
   Slayer Builds renderer emits at most 100 rows per archetype table,
