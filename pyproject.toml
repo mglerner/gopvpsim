@@ -22,8 +22,15 @@ dev = [
 # `src/gopvpsim/_dp_jit.py` is written to fall back to a pure-Python loop
 # if numba is not importable, so this is genuinely optional.
 # Install with `pip install -e .[perf]`.
+#
+# The cap on x86_64 macOS is a wheel-availability workaround, not a code
+# requirement: numba/llvmlite dropped Intel-Mac (x86_64 darwin) wheels after
+# numba 0.62.1 / llvmlite 0.45.1, so newer versions would try to build llvmlite
+# from source (needs cmake + a matching LLVM). Every other platform (Linux,
+# Apple-Silicon macOS) stays on the newest numba, which still ships wheels.
 perf = [
-    "numba",
+    "numba; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "numba<0.63; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 ]
 
 [tool.hatch.build.targets.wheel]
