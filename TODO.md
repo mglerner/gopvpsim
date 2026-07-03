@@ -26,10 +26,19 @@ priority order:
   (Aegislash charge-form moves, Aura Wheel Electric/Dark) -> blesses stale
   columns. Fix the `used`-set (migrate_cache.py:233-236) BEFORE trusting the
   next gamemaster migration; audit past ones if a swapped move ever changed.
-- **[medium] F2:** `self_debuff_either_side` predicate unsound for
-  FOCUS_BLAST+ZAP_CANNON movesets (battle.py:912-922 Registeel clause
-  mutates the flag at battle time; Registeel GL default qualifies). Cheap:
-  re-sim that small blessed population.
+- **[F2 — MEASURED HARMLESS 2026-07-03, doc-only fix remains]:** the
+  `self_debuff_either_side` predicate proof IS unsound (battle.py:912-922
+  Registeel clause mutates selfDebuffing at battle time), but a full A/B
+  (24,768 cells: every realistic FOCUS_BLAST+ZAP_CANNON carrier x all 172
+  cached opponent variants x 9 shields x both orientations x both bait
+  modes, clause verified firing in 502/688 pairs) found ZERO stored-plane
+  diffs — the [910] delta only ever moves the KO turn for this pair, and
+  `turns` is not a cached plane. Also nothing on disk to un-bless: 0 of
+  1,616 live columns carry the pair (all post-fix re-bakes). REMAINING:
+  fix the falsified proof text in `migrate_cache.py:101-123` docstring +
+  `tests/test_migrate_cache.py:90-92` comment ("AURA_WHEEL is the only
+  battle-time swap" is false) so the trap doesn't bite the next predicate
+  author.
 - **[medium, divergence-policy decision] NB-1 — BOUNDING SWEEP DONE
   2026-07-03, recommendation = FIX; Michael's call pending.** Sweep
   (140 matchups / 1260 cells vs pinned oracle, 8 mechanism traces):
