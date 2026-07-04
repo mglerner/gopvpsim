@@ -150,6 +150,19 @@ def test_breakpoints_empty_when_no_change():
     assert result == []
 
 
+def test_breakpoints_power_zero_returns_empty_not_crash():
+    """BP-1: a power-0 move (K==0) has no breakpoint — it deals a flat 1 damage
+    at every attack. breakpoints() must return [] rather than raise
+    ZeroDivisionError from atk_for_damage's (dmg-1)*def/K. The real trigger is
+    Aegislash Shield's canonical fast move (AEGISLASH_CHARGE_PSYCHO_CUT, power 0);
+    unguarded, the deep-dive pipeline swallowed the crash and dropped every
+    anchor for the whole dive."""
+    move = make_move(power=0)
+    assert breakpoints(move, ['normal'], 100.0, ['normal'], 100.0, 200.0) == []
+    # non-STAB and super-effective/resisted power-0 moves all K==0 -> [] too
+    assert breakpoints(move, ['water'], 120.0, ['fire'], 90.0, 180.0) == []
+
+
 # ---------------------------------------------------------------------------
 # bulkpoints()
 # ---------------------------------------------------------------------------

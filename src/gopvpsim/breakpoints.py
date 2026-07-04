@@ -100,6 +100,14 @@ def breakpoints(
     Returns a list of Breakpoint(atk_threshold, damage) sorted by atk_threshold.
     Each entry is the minimum attack that first achieves `damage` against this defender.
     """
+    # Power-0 moves (SPLASH, YAWN, TRANSFORM, the AEGISLASH_CHARGE_* fast moves)
+    # deal a flat 1 damage at every attack, so there is no breakpoint. Guard the
+    # K==0 case: atk_for_damage would compute (dmg-1)*def/0 -> ZeroDivisionError,
+    # which the deep-dive pipeline swallows into a warning and drops EVERY anchor
+    # for the whole dive (Aegislash Shield's canonical fast move is power 0).
+    if _K(move['power'], move['type'], attacker_types, defender_types) == 0:
+        return []
+
     d_min = calc_damage(move['power'], atk_min, defender_def,
                         move['type'], attacker_types, defender_types)
     d_max = calc_damage(move['power'], atk_max, defender_def,
