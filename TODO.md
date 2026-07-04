@@ -157,13 +157,27 @@ open decisions (UI shape, cup pilot choice, rollout vehicle):
 the already-embedded SCORES_GZ grid plus a bake-time `oppMetaRank` field and
 an honesty banner over the full-pool baked sections; cups are a pool+rankings
 feature (PvPoke publishes cup rankings; sweep cache warm-serves overlapping
-columns; ~minutes per focal, not a re-bake). Decisions 2026-07-02: UI is a
-per-opponent CHECKBOX panel (unranked at end, top-N as buttons); cup movesets
-from cup rankings w/ fallback; dev fixture = local Azumarill GL dive; pilot
-= Equinox Cup; slug = `<species>-equinox-cup` (cup implies league); landing
-page gets its own "Cup dives" section. All gates CLEARED except the Equinox
-focal list (Michael's meta judgment). Ready for an implementation session --
-see the plan doc's "Decisions" section.
+columns; ~minutes per focal, not a re-bake).
+
+**Phase 1 (client-side opponent filter) SHIPPED** (`b8b561e`, `f5741a3`).
+
+**Phase 2 (Equinox Cup pilot) IMPLEMENTED + VERIFIED 2026-07-03, awaiting
+Michael's review before publish** (gopvpsim `aa8dac8..3c153fb`; gobattlekit
+`0c1bd5c`). Done: cup rankings loader (`data.py`); `recipe_equinox_great` +
+committed `opponent_pools/equinox_great.txt`; `--cup` labeling overlay
+(cup-sourced oppMetaRank/rankSnapshot, cup-named title/card + archive banner,
+replay-blob `cup` marker); flat `<species>-equinox-cup` slugs + separate
+archive-friendly `cups/index.html` + "Limited Cups" card; gobattlekit
+threshold-export collision guard (cup blobs -> `<species>_<cup>.toml`);
+`verify_overnight` `*-cup` coverage. Five pilot dives run locally cache-ON
+(Corviknight/Mantine/Mandibuzz/Toucannon/Clodsire); page-render 67/67,
+index-presence + bundler dry-run green, suite 1245 passed. NOT pushed / NOT
+published -- pending review. Audit report:
+`~/coding/reports/gopvpsim-equinox-cup-pilot-2026-07-03.html`. Note: the
+cup-index `_CUP_STATUS['equinox']['playable']` is left neutral (live
+availability not verified); hand-mark it when known. Phase 3 (more cups,
+legality-filter eval, app-side cup toggles, mega engine) remains -- see the
+plan doc.
 
 ## Cache GC: prune all namespaces + dive-script opt-in prompt
 
