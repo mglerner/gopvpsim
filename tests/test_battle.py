@@ -1855,6 +1855,19 @@ _JIT_PARITY_MATCHUPS = [
     pytest.param(('Obstagoon', 'COUNTER', ['OBSTRUCT', 'NIGHT_SLASH'], (5, 15, 12), False,
                   'Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), False),
                  id='obstagoon-azumarill'),
+    # JIT-COV-1: the three matchups above hit none of the TTL-cmp-bonus,
+    # dedup-same-energy-keep, or near-KO atk-stage-clamp kernel branches. These
+    # two default-moveset GL meta battles do (settrace-verified against the
+    # pure-Python mirror, kernels-off): Azumarill vs Bastiodon fires
+    # ttl_cmp_bonus + dedup_keep at (1,1); Azumarill vs Annihilape fires
+    # atk-stage clamp +4 at (2,2). Without them a future edit to either side of
+    # those hand-mirrored kernel/Python pairs desyncs silently.
+    pytest.param(('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (0, 15, 15), False,
+                  'Bastiodon', 'SMACK_DOWN', ['STONE_EDGE', 'FLAMETHROWER'], (15, 15, 15), False),
+                 id='azumarill-bastiodon'),
+    pytest.param(('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (0, 15, 15), False,
+                  'Annihilape', 'LOW_KICK', ['RAGE_FIST', 'ICE_PUNCH'], (0, 15, 15), False),
+                 id='azumarill-annihilape'),
 ]
 
 
