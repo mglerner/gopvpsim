@@ -111,6 +111,19 @@ def _self_debuff_either_side(f, c):
     self-debuff holder changes a non-self-debuff focal's column (Lickitung
     focal vs Pangoro 92->284). Hence both sides.
 
+    CAVEAT — the "owns a self-debuffing CM" test reads STATIC gamemaster flags,
+    but battle.py's Registeel/Zap-Cannon clause (Pokemon.js:734-744 port)
+    MUTATES selfDebuffing=True onto FOCUS_BLAST at battle time when it is paired
+    with ZAP_CANNON within the buff-adjusted-DPE window — neither move is
+    statically flagged, so this predicate can technically bless a
+    FOCUS_BLAST+ZAP_CANNON column the [910] gate reaches (F2, 2026-07-02). That
+    was MEASURED HARMLESS 2026-07-03: across every realistic FB+ZC carrier x all
+    cached opponent variants (24,768 cells, clause firing in 502/688 pairs) the
+    fix moved only the KO turn, never a stored cache plane, and 0/1616 live
+    columns even carry the pair. But a future battle-time flag mutation is a
+    trap: a sound predicate over MUTATING flags must union in the mutation's
+    triggers, not read only the static gamemaster dict.
+
     FAIL-SAFE: if either side's moveset is missing/unresolvable, return True
     (AFFECTED, re-sim) — never bless a column we can't prove unchanged."""
     if not f or not c:
@@ -170,10 +183,14 @@ def build_gamemaster_delta(old_gm, new_gm):
       - A column reads the BASE pokemon entry for its species (shadow stats =
         base x hardcoded mult, NOT the redundant gm '_shadow' entry), PLUS any
         form-change alternative-form entry read at battle time
-        (formchange.py), PLUS the move entries both sides use.
+        (formchange.py), PLUS the move entries both sides use — including
+        form-change SWAPPED-IN moves that the stored moveset does not list
+        (Aegislash's plain<->AEGISLASH_CHARGE_* fast move, Morpeko's Aura Wheel
+        toggle; see form_change_swapped_moves).
       - If a column's stored display name can't be resolved to any id in either
         gm, we can't prove it unaffected -> AFFECTED (re-sim).
     """
+    from gopvpsim.formchange import form_change_swapped_moves
     old_pk = _id_map(old_gm, 'pokemon', 'speciesId')
     new_pk = _id_map(new_gm, 'pokemon', 'speciesId')
     old_mv = _id_map(old_gm, 'moves', 'moveId')
@@ -233,6 +250,12 @@ def build_gamemaster_delta(old_gm, new_gm):
         used = {focal_fields.get('fast'), col_fields.get('fast')}
         used |= set(focal_fields.get('charged') or [])
         used |= set(col_fields.get('charged') or [])
+        # Form-change species read gamemaster move entries NOT in the stored
+        # moveset (Aegislash reverts its fast move to/from the plain variant;
+        # Morpeko toggles Aura Wheel Electric/Dark). A patch touching only a
+        # swapped-in counterpart changes such a column's scores, so union the
+        # counterparts in or those columns would be wrongly blessed (F1).
+        used |= form_change_swapped_moves(m for m in used if m)
         return bool(used & touched_moves)
 
     info = {

@@ -65,6 +65,27 @@ _MORPEKO_CHARGED_MOVE_MAP = {
     'AURA_WHEEL_DARK': 'AURA_WHEEL_ELECTRIC',
 }
 
+# Every move id a form change can swap in at battle time, keyed by the id a
+# stored moveset might actually list. A form change reads the mapped-to move
+# from the gamemaster (_swap_fast_move / _swap_charged_move) even though it is
+# NOT in the stored moveset. Cache migration uses this to expand the "moves the
+# battle reads" set (see form_change_swapped_moves).
+_FORM_CHANGE_MOVE_SWAPS = {**_AEGISLASH_FAST_MOVE_MAP, **_MORPEKO_CHARGED_MOVE_MAP}
+
+
+def form_change_swapped_moves(move_ids):
+    """Return the ADDITIONAL move ids a form change could swap in for ``move_ids``.
+
+    A stored moveset lists only one side of each swap (e.g. Aegislash's default
+    GL fast move is the AEGISLASH_CHARGE_* variant, never the plain counterpart
+    it reverts to; Morpeko stores one Aura Wheel). Battle code reads the mapped
+    counterpart at form-change time, so a consumer reasoning about "which move
+    entries this battle reads" (e.g. gamemaster-delta cache invalidation) must
+    union in these. Returns an empty set when nothing is swappable.
+    """
+    return {_FORM_CHANGE_MOVE_SWAPS[m] for m in move_ids
+            if m in _FORM_CHANGE_MOVE_SWAPS}
+
 
 # ---------------------------------------------------------------------------
 # Builder
