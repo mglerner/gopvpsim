@@ -90,6 +90,7 @@ def main():
             args.attacker, args.move, args.defender,
             defender_atk_iv=da, defender_def_iv=dd, defender_sta_iv=ds,
             league=args.league,
+            attacker_shadow=args.shadow_atk, defender_shadow=args.shadow_def,
         )
     except (KeyError, ValueError) as e:
         sys.exit(f"Error: {e}")
@@ -143,6 +144,7 @@ def main():
             args.defender, args.move, args.attacker,
             attacker_atk_iv=aa, attacker_def_iv=ad, attacker_sta_iv=as_,
             league=args.league,
+            attacker_shadow=args.shadow_atk, defender_shadow=args.shadow_def,
         )
     except (KeyError, ValueError) as e:
         sys.exit(f"Error: {e}")
