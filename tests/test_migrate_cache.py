@@ -87,19 +87,90 @@ def test_self_debuff_either_side_predicate():
     assert p(pang, lick) is True     # focal owns CLOSE_COMBAT
     assert p(pang, pang) is True
 
-    # Morpeko form-swap soundness: AURA_WHEEL_ELECTRIC<->DARK is the only
-    # battle-time CHARGED-move swap, and NEITHER variant is self-debuffing, so
-    # a Morpeko with no stored self-debuff CM is correctly blessed.
+    # Morpeko form-swap soundness: AURA_WHEEL_ELECTRIC<->DARK is a battle-time
+    # CHARGED-move swap, and NEITHER variant is self-debuffing, so a Morpeko with
+    # no stored self-debuff CM is correctly blessed.
     morp = {'species': 'Morpeko (Full Belly)', 'fast': 'THUNDER_SHOCK',
             'charged': ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS']}
     assert p(morp, azu) is False
     assert p(azu, morp) is False
+
+    # KNOWN-INCOMPLETE (F2, measured harmless): battle.py dynamically marks
+    # FOCUS_BLAST selfDebuffing when paired with ZAP_CANNON, so this static-flag
+    # predicate blesses such a column even though the [910] gate can reach it.
+    # Harmless in practice (the mutation only shifts KO turn, not cached planes;
+    # see the predicate docstring), but the static read is why FB+ZC blesses:
+    regi = {'species': 'Registeel', 'fast': 'LOCK_ON',
+            'charged': ['FOCUS_BLAST', 'ZAP_CANNON']}   # neither statically SD
+    assert p(regi, azu) is False   # blessed on static flags (measured harmless)
 
     # FAIL-SAFE: missing/empty/None moveset -> AFFECTED (never bless blind).
     assert p(lick, None) is True
     assert p(None, lick) is True
     assert p(lick, {'species': 'X'}) is True            # col lacks 'charged'
     assert p({'species': 'X', 'charged': []}, azu) is True  # empty charged
+
+
+def _delta_gm(**move_powers):
+    """Minimal gamemaster for the form-change-swap delta test. Overriding a move
+    power lets a caller build an old/new pair differing in exactly one move.
+    Aegislash (Shield/Blade) + Morpeko (Full Belly/Hangry) carry the formChange
+    links the delta expands through; only speciesId/speciesName/formChange and
+    moveId/power are read by build_gamemaster_delta."""
+    powers = {'PSYCHO_CUT': 30, 'AEGISLASH_CHARGE_PSYCHO_CUT': 0,
+              'SHADOW_BALL': 100, 'AURA_WHEEL_ELECTRIC': 45,
+              'AURA_WHEEL_DARK': 45, 'PSYCHIC_FANGS': 40,
+              'THUNDER_SHOCK': 3, 'BUBBLE': 7, 'ICE_BEAM': 90}
+    powers.update(move_powers)
+    return {
+        'pokemon': [
+            {'speciesId': 'aegislash_shield', 'speciesName': 'Aegislash (Shield)',
+             'formChange': {'alternativeFormId': 'aegislash_blade'}},
+            {'speciesId': 'aegislash_blade', 'speciesName': 'Aegislash (Blade)',
+             'formChange': {'alternativeFormId': 'aegislash_shield'}},
+            {'speciesId': 'morpeko_full_belly', 'speciesName': 'Morpeko (Full Belly)',
+             'formChange': {'alternativeFormId': 'morpeko_hangry'}},
+            {'speciesId': 'morpeko_hangry', 'speciesName': 'Morpeko (Hangry)'},
+            {'speciesId': 'azumarill', 'speciesName': 'Azumarill'},
+            {'speciesId': 'medicham', 'speciesName': 'Medicham'},
+        ],
+        'moves': [{'moveId': mid, 'power': p} for mid, p in powers.items()],
+    }
+
+
+def test_gamemaster_delta_form_change_swapped_moves():
+    """F1 regression: a gamemaster patch touching ONLY a form-change swapped-in
+    move changes a column's scores though that move is not in the stored key
+    (Aegislash's default fast move AEGISLASH_CHARGE_PSYCHO_CUT reverts to the
+    plain PSYCHO_CUT; Morpeko's stored AURA_WHEEL_ELECTRIC toggles to
+    AURA_WHEEL_DARK). affected() must mark such columns AFFECTED, not bless
+    them. Pre-F1 the used-set held only stored moves, so all of these blessed."""
+    azu = {'species': 'Azumarill', 'shadow': False,
+           'fast': 'BUBBLE', 'charged': ['ICE_BEAM']}
+
+    # Aegislash: only PSYCHO_CUT changes; Aegislash stores AEGISLASH_CHARGE_PSYCHO_CUT.
+    affected, info = migrate_cache.build_gamemaster_delta(
+        _delta_gm(PSYCHO_CUT=30), _delta_gm(PSYCHO_CUT=90))
+    assert info['touched_moves'] == ['PSYCHO_CUT']
+    assert info['touched_species'] == []
+    aegis = {'species': 'Aegislash (Shield)', 'shadow': False,
+             'fast': 'AEGISLASH_CHARGE_PSYCHO_CUT', 'charged': ['SHADOW_BALL']}
+    assert affected(aegis, azu) is True   # focal reads PSYCHO_CUT after revert
+    assert affected(azu, aegis) is True   # Aegislash as opponent column, same
+    # Control: a column with no form-changer and no PSYCHO_CUT stays BLESSED.
+    med = {'species': 'Medicham', 'shadow': False,
+           'fast': 'COUNTER', 'charged': ['PSYCHIC']}
+    assert affected(azu, med) is False
+
+    # Morpeko: only AURA_WHEEL_DARK changes; Morpeko stores AURA_WHEEL_ELECTRIC.
+    affected, info = migrate_cache.build_gamemaster_delta(
+        _delta_gm(AURA_WHEEL_DARK=45), _delta_gm(AURA_WHEEL_DARK=20))
+    assert info['touched_moves'] == ['AURA_WHEEL_DARK']
+    morp = {'species': 'Morpeko (Full Belly)', 'shadow': False,
+            'fast': 'THUNDER_SHOCK',
+            'charged': ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS']}
+    assert affected(morp, azu) is True    # reads AURA_WHEEL_DARK after toggle
+    assert affected(azu, morp) is True
 
 
 def test_migrate_blesses_unaffected_deletes_affected(tmp_path, monkeypatch):
