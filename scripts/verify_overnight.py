@@ -139,10 +139,15 @@ def main() -> int:
             print('  OK  no narrative-patch WARN lines')
 
     # 2. Freshness ----------------------------------------------------
+    # Cover league dives (`*-league`) AND limited-cup dives (`*-cup`) so a cup
+    # dive neither trips the guard nor is silently missed (mixed-vintage is an
+    # error for both). The GL-only marker/pool-sanity check below is gated on
+    # 'great-league' in the dir name, so cup dirs skip it -- cup pools
+    # legitimately lack the GL markers.
     print('[2/5] dive-dir freshness')
     fresh_dirs: list[Path] = []
     skipped = 0
-    for d in sorted(WEBSITE.glob('*-league')):
+    for d in sorted(WEBSITE.glob('*-league')) + sorted(WEBSITE.glob('*-cup')):
         pages = sorted(d.glob('index*.html'))
         if not pages:
             continue
