@@ -52,6 +52,49 @@ def test_load_rankings_invalid_league_raises():
 
 
 # ---------------------------------------------------------------------------
+# load_cup_rankings + cup-aware get_default_moveset (Phase 2 top-N/cup plan)
+# ---------------------------------------------------------------------------
+
+def test_load_cup_rankings_unknown_cup_raises_and_lists_valid():
+    """Fails LOUDLY for a cup with no rankings, naming the valid cups."""
+    from gopvpsim.data import load_cup_rankings
+    with pytest.raises(ValueError) as ei:
+        load_cup_rankings('nonesuch', 1500)
+    msg = str(ei.value)
+    assert 'nonesuch' in msg
+    assert 'equinox' in msg          # the valid-cup list is included
+
+
+@pytest.mark.integration
+def test_load_cup_rankings_equinox():
+    from gopvpsim.data import load_cup_rankings
+    r = load_cup_rankings('equinox', 1500)
+    assert isinstance(r, list) and len(r) > 0
+    assert r[0]['speciesName'] == 'Mantine'   # cup #1
+    assert 'moveset' in r[0]
+
+
+@pytest.mark.integration
+def test_default_moveset_cup_uses_cup_build():
+    """cup=... sources the cup moveset for a species ranked in the cup."""
+    fast, charged = get_default_moveset('Mantine', league='great', cup='equinox')
+    assert fast == 'WING_ATTACK'
+    assert charged == ['TWISTER', 'WATER_PULSE']
+
+
+@pytest.mark.integration
+def test_default_moveset_cup_falls_back_to_overall_league():
+    """A species not legal/ranked in the cup falls back to the overall-league
+    moveset rather than raising (decided policy)."""
+    # Azumarill (Water/Fairy) is not an Equinox type, so it's unranked in the
+    # cup; the fallback returns its open-GL build.
+    cup_fast, cup_charged = get_default_moveset('Azumarill', league='great',
+                                                cup='equinox')
+    gl_fast, gl_charged = get_default_moveset('Azumarill', league='great')
+    assert (cup_fast, cup_charged) == (gl_fast, gl_charged)
+
+
+# ---------------------------------------------------------------------------
 # get_default_moveset
 # ---------------------------------------------------------------------------
 
