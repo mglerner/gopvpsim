@@ -25,6 +25,29 @@ URLS = {
 # Key pattern: "group_<name>" in the cache.
 GROUP_URL_TEMPLATE = f"{BASE_URL}/groups/{{}}.json"
 
+# League display name -> CP cap used in PvPoke's rankings-<cp>.json filenames.
+_LEAGUE_CP = {"great": 1500, "ultra": 2500, "master": 10000}
+
+# Limited-cup rankings live under rankings/<cup>/overall/rankings-<cp>.json
+# (the same schema as the "all" overall rankings). Key pattern in the cache:
+# "rankings_<cup>_<cp>".
+CUP_RANKINGS_URL_TEMPLATE = (
+    f"{BASE_URL}/rankings/{{cup}}/overall/rankings-{{cp}}.json")
+
+# Cups PvPoke publishes overall rankings for (dir has overall/rankings-*.json).
+# Hand-maintained pilot allow-list: it only gates load_cup_rankings' loud
+# failure message (an unknown cup names the valid set instead of a bare 404).
+# A cup here but without a file for the requested CP still fails loudly via
+# _fetch_json's NoDataError. Cups that alias/hide rankings
+# (e.g. 'championshipseries' aliases 'all') are intentionally absent.
+# Refresh against ../pvpoke/src/data/rankings/*/overall/ when adding cups.
+_CUPS_WITH_RANKINGS = frozenset({
+    "bastille", "bayou", "bfretro", "battlefrontiermaster", "catch",
+    "classic", "copadiluvio", "cosy", "coupedusillage", "equinox",
+    "ligaultra", "little", "mega", "naic2026", "premier", "remix",
+    "retro", "spellcraft", "summer", "sunshine", "tsuki",
+})
+
 
 class NoDataError(Exception):
     """Raised when data cannot be fetched and no cache is available."""
@@ -164,19 +187,49 @@ def load_rankings(league):
     return _fetch_json(league)
 
 
+def load_cup_rankings(cup, cp):
+    """Load PvPoke overall rankings for a limited cup at a CP cap.
+
+    Same JSON schema as ``load_rankings`` (a list of entries carrying
+    ``speciesId`` / ``speciesName`` / ``moveset``), fetched from
+    ``rankings/<cup>/overall/rankings-<cp>.json`` and cached under
+    ``rankings_<cup>_<cp>`` (shares ``_fetch_json``'s TTL / atomic-write /
+    stale-fallback behavior). ``load_group`` is the sibling precedent.
+
+    Fails LOUDLY for a cup with no published rankings: an unknown cup name
+    raises ValueError listing the known cups; a known cup with no file for
+    the requested CP raises NoDataError from the fetch.
+    """
+    if cup not in _CUPS_WITH_RANKINGS:
+        raise ValueError(
+            f"No published rankings for cup {cup!r}. "
+            f"Known cups: {', '.join(sorted(_CUPS_WITH_RANKINGS))}.")
+    return _fetch_json(
+        f"rankings_{cup}_{cp}",
+        url=CUP_RANKINGS_URL_TEMPLATE.format(cup=cup, cp=cp))
+
+
 # ---------------------------------------------------------------------------
 # Rankings index (cached)
 # ---------------------------------------------------------------------------
 
-_rankings_index = {}  # league -> {speciesId -> ranking entry}
+_rankings_index = {}  # (league, cup) -> {speciesId -> ranking entry}
 
 
-def _get_rankings_index(league):
-    """Return a dict of speciesId -> ranking entry for a league. Cached."""
-    if league not in _rankings_index:
-        rankings = load_rankings(league)
-        _rankings_index[league] = {r['speciesId']: r for r in rankings}
-    return _rankings_index[league]
+def _get_rankings_index(league, cup=None):
+    """Return a dict of speciesId -> ranking entry. Cached per (league, cup).
+
+    ``cup=None`` uses the league's overall ("all") rankings; a cup name uses
+    that cup's rankings at the league's CP cap.
+    """
+    key = (league, cup)
+    if key not in _rankings_index:
+        if cup is None:
+            rankings = load_rankings(league)
+        else:
+            rankings = load_cup_rankings(cup, _LEAGUE_CP[league])
+        _rankings_index[key] = {r['speciesId']: r for r in rankings}
+    return _rankings_index[key]
 
 
 def load_group(group_name):
@@ -244,7 +297,7 @@ def species_id(species_name, *, shadow=False):
     return sid
 
 
-def get_default_moveset(species_name, league='great', shadow=False):
+def get_default_moveset(species_name, league='great', shadow=False, cup=None):
     """Return (fast_move_id, [charged_move_ids]) from PvPoke's rankings.
 
     PvPoke's rankings files contain a 'moveset' field for each species:
@@ -255,6 +308,12 @@ def get_default_moveset(species_name, league='great', shadow=False):
         species_name: e.g. 'Medicham', 'Azumarill'
         league: 'great', 'ultra', or 'master'
         shadow: if True, look up the shadow variant (e.g. 'medicham_shadow')
+        cup: limited-cup name (e.g. 'equinox'); when set, the cup's moveset
+            wins and the overall-league moveset is the fallback for a species
+            unranked in the cup (cup rankings cover fewer species than the
+            overall meta). The ``_DEFAULT_MOVESET_FALLBACK`` escape hatch is
+            keyed by league only and ignores the cup dimension (cup dives
+            don't need form-orphan overrides).
 
     Returns:
         (fast_move_id, [charged_move_id, ...])
@@ -263,13 +322,20 @@ def get_default_moveset(species_name, league='great', shadow=False):
         KeyError: if species not found in rankings for this league and
             not present in the _DEFAULT_MOVESET_FALLBACK escape hatch.
     """
-    index = _get_rankings_index(league)
-
     # Resolve the speciesId via the gamemaster mapping (handles
     # apostrophes/periods/hyphens the old naive slug mangled — those
     # species raised KeyError despite being ranked).
     sid = species_id(species_name, shadow=shadow)
 
+    # Cup moveset wins; fall through to the overall-league moveset when the
+    # species is unranked in the cup (decided policy, plan Decision 6).
+    if cup is not None:
+        cup_index = _get_rankings_index(league, cup=cup)
+        if sid in cup_index:
+            moveset = cup_index[sid]['moveset']
+            return moveset[0], moveset[1:]
+
+    index = _get_rankings_index(league)
     if sid in index:
         moveset = index[sid]['moveset']
         return moveset[0], moveset[1:]
