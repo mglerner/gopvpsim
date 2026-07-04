@@ -71,9 +71,9 @@ from gopvpsim.theme import (
     theme_picker_html,
 )
 from gopvpsim.data import (
-    load_gamemaster, load_rankings, get_default_moveset, parse_types,
-    sprite_data_uri, load_group as fetch_group, species_id,
-    CACHE_DIR as _RANKINGS_CACHE_DIR,
+    load_gamemaster, load_rankings, load_cup_rankings, get_default_moveset,
+    parse_types, sprite_data_uri, load_group as fetch_group, species_id,
+    CACHE_DIR as _RANKINGS_CACHE_DIR, _LEAGUE_CP,
 )
 from gopvpsim.battle import (
     BattlePokemon, simulate,
@@ -1191,7 +1191,17 @@ def parse_opponent_spec(opp_name):
     return name, variant, is_shadow
 
 
-def build_opp_meta_ranks(opponent_names, league):
+_CUP_PRETTY = {'equinox': 'Equinox Cup'}
+
+
+def _cup_pretty_name(cup):
+    """Human display name for a cup slug ('equinox' -> 'Equinox Cup')."""
+    if not cup:
+        return None
+    return _CUP_PRETTY.get(cup, f"{cup.capitalize()} Cup")
+
+
+def build_opp_meta_ranks(opponent_names, league, cup=None):
     """Per-opponent PvPoke meta rank (1 = best) parallel to opponent_names.
 
     Each entry is an int rank or None. Ranks come from the live
@@ -1206,11 +1216,18 @@ def build_opp_meta_ranks(opponent_names, league):
     the rankings) are None; the client-side filter sorts them to the end
     and excludes them from the top-N convenience buttons.
 
+    ``cup`` (e.g. 'equinox') sources ranks from that cup's rankings instead
+    of the league's overall meta -- so a cup dive's top-N buttons mean "top
+    N in the cup", the exact composition the plan intends.
+
     Returns [] on the (defensive) chance the league has no rankings; the
     caller then emits an all-None list of the right length.
     """
     try:
-        rankings = load_rankings(league)
+        if cup is not None:
+            rankings = load_cup_rankings(cup, _LEAGUE_CP[league])
+        else:
+            rankings = load_rankings(league)
     except Exception:
         return [None] * len(opponent_names)
     rank_by_sid = {}
@@ -1229,17 +1246,22 @@ def build_opp_meta_ranks(opponent_names, league):
     return out
 
 
-def rankings_snapshot_date(league):
+def rankings_snapshot_date(league, cup=None):
     """Vintage of the rankings the meta ranks were read from (YYYY-MM-DD).
 
     The honest 'as of' date for the top-N labels is when the rankings cache
     was last refreshed, NOT the render date -- overclaiming freshness is the
     exact never-ship-unflagged trap. Falls back to None (JS then omits the
-    date) if the cache file can't be stat'd.
+    date) if the cache file can't be stat'd. For a cup dive, the vintage is
+    the cup rankings cache file (``rankings_<cup>_<cp>.json``) -- this is the
+    "snapshot as of DATE" the archive policy displays.
     """
     try:
         import datetime
-        p = _RANKINGS_CACHE_DIR / f"{league}.json"
+        if cup is not None:
+            p = _RANKINGS_CACHE_DIR / f"rankings_{cup}_{_LEAGUE_CP[league]}.json"
+        else:
+            p = _RANKINGS_CACHE_DIR / f"{league}.json"
         ts = p.stat().st_mtime
         return datetime.date.fromtimestamp(ts).isoformat()
     except Exception:
@@ -4083,7 +4105,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
                               card_out_path=None,
                               card_robust_k=DEFAULT_CARD_ROBUST_K,
                               opp_movesets=None, mechanics='legacy',
-                              best_buddy=None, slayer_iter_result_l51=None):
+                              best_buddy=None, slayer_iter_result_l51=None,
+                              cup=None, cup_label=None):
     """Generate a single-page interactive HTML with JS-driven dropdowns.
 
     moveset_data: list of dicts, each with:
@@ -4257,8 +4280,16 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         # the vintage of the rankings these came from, so the UI can label the
         # cut honestly ("top N per PvPoke rankings as of YYYY-MM-DD") rather
         # than implying the pool is live-current (it's a curated snapshot).
-        'oppMetaRank': build_opp_meta_ranks(opponent_names, league),
-        'rankSnapshot': rankings_snapshot_date(league),
+        # For a cup dive, meta ranks + snapshot come from the cup rankings, so
+        # the top-N buttons mean "top N in the cup" and the banner date is the
+        # cup rankings vintage.
+        'oppMetaRank': build_opp_meta_ranks(opponent_names, league, cup=cup),
+        'rankSnapshot': rankings_snapshot_date(league, cup=cup),
+        # Cup identity for a limited-cup dive (None for a normal league dive).
+        # `cupLabel` is the human name ("Equinox Cup") the card/page/banner show
+        # alongside the snapshot date (keep-as-archive policy).
+        'cup': cup,
+        'cupLabel': cup_label,
         'referenceIdx': reference_idx,
         'tiers': tier_info,
         'movesets': [{'label': md['label'], 'prettyLabel': _pretty_moveset(md['label']),
@@ -4772,12 +4803,38 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     _species_for_display = f'{species} (Shadow)' if shadow else species
     species_pretty = apply_dive_title_override(pretty_species(_species_for_display))
 
+    # Cup dives are mechanically the given league but labeled with the cup name
+    # (keep-as-archive policy): the title/H1 read "<Cup> (<League> League)" so
+    # no page silently presents as a bare open-league dive.
+    _league_title = (f'{cup_label} ({league.title()} League)'
+                     if cup_label else f'{league.title()} League')
+
+    # Prominent cup banner (archive policy): the cup name + the rankings
+    # snapshot date, and an explicit "kept as a dated archive" note so a reader
+    # landing on an ended cup's page isn't misled into thinking it's live. Empty
+    # string for a normal league dive.
+    _cup_banner_html = ''
+    if cup_label:
+        _cup_snapshot = rankings_snapshot_date(league, cup=cup)
+        _snap_txt = (f'snapshot as of {_cup_snapshot}' if _cup_snapshot
+                     else 'dated snapshot')
+        _cup_banner_html = (
+            '<div style="background: var(--surface); '
+            'border-left: 3px solid var(--accent); padding: 8px 12px; '
+            'margin: 0 0 15px; border-radius: 2px; font-size: 13px; '
+            'color: var(--text);">'
+            f'<b>{cup_label}</b> &middot; {_snap_txt}. '
+            'Limited-time cup meta - this dive is kept as a dated '
+            'archive and the cup may not be currently playable. Opponents '
+            'use their cup movesets; meta ranks and the Top-N opponent '
+            'filter reflect the cup rankings.</div>\n')
+
     html = f"""<!DOCTYPE html>
 {cli_comment}<html {data_theme_attr()}>
 <head>
 <meta charset="utf-8">
 {theme_head_script()}
-<title>{species_pretty} {league.title()} League IV Dive</title>
+<title>{species_pretty} {_league_title} IV Dive</title>
 {plotly_tag}
 <style>{theme_css()}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -4982,8 +5039,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 </head>
 <body>
 {theme_picker_html()}
-<h1>{species_pretty} - {league.title()} League IV Dive</h1>
-<p class="meta">Opponents: {opp_desc}
+<h1>{species_pretty} - {_league_title} IV Dive</h1>
+{_cup_banner_html}<p class="meta">Opponents: {opp_desc}
 | Shield scenario(s): {shield_desc} | Policy: pvpoke_dp{_bait_meta}</p>
 <!-- DIVE_CARD_SLOT -->
 <!-- DD_LAYOUT_OPEN -->
@@ -6229,6 +6286,8 @@ def render_dive_html(state):
                 mechanics=state.get('mechanics', 'legacy'),
                 best_buddy=state.get('best_buddy'),
                 slayer_iter_result_l51=state.get('slayer_iter_result_l51'),
+                cup=state.get('cup'),
+                cup_label=state.get('cup_label'),
             )
         _remove_stale_split_siblings(
             state['html_path'], [f['path'] for f in split_files])
@@ -6260,6 +6319,8 @@ def render_dive_html(state):
             mechanics=state.get('mechanics', 'legacy'),
             best_buddy=state.get('best_buddy'),
             slayer_iter_result_l51=state.get('slayer_iter_result_l51'),
+            cup=state.get('cup'),
+            cup_label=state.get('cup_label'),
         )
 
 
@@ -6277,6 +6338,16 @@ def main():
                              'Moves not yet in the species pool (CD moves) are allowed.')
     parser.add_argument('--league', default='great',
                         choices=['great', 'ultra', 'master'])
+    parser.add_argument('--cup', default=None, metavar='NAME',
+                        help='Limited-cup dive (e.g. equinox). A cup dive is '
+                             'mechanically the given --league (CP cap, opponent '
+                             'IVs, cache keys all stay league-native); --cup is '
+                             'a labeling + rankings-source overlay: meta ranks '
+                             'and the top-N filter buttons come from the cup '
+                             'rankings, and the card/page/replay are labeled '
+                             'with the cup name + rankings snapshot date. Pair '
+                             'with --opponents-file <cup pool> and '
+                             '--no-active-variants.')
     parser.add_argument('--max-level', type=float, default=None, metavar='LVL',
                         help='Override the league max level for BOTH focal and '
                         'opponents (e.g. 50 for "regular" vs the default 51 '
@@ -7887,6 +7958,11 @@ def main():
             'opp_movesets': opp_movesets_full,
             'mechanics': args.mechanics,
             'best_buddy': best_buddy,
+            # Limited-cup labeling (None for a normal league dive). Carried in
+            # the replay blob so a cup dive is self-identifying downstream
+            # (threshold export routes cup blobs to a non-*_great.toml name).
+            'cup': args.cup,
+            'cup_label': _cup_pretty_name(args.cup),
         }
         if not args.no_replay_dump:
             _replay_path = dump_replay_state(state)

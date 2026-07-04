@@ -95,6 +95,8 @@ class CardModel:
     base_form_display: str | None = None  # item 5: "vs non-shadow X" base label
     sibling_trade: dict | None = None  # form-level break/bulkpoint trade vs sibling
     has_author_notes: bool = False  # dive carries human-written narrative (badge)
+    cup_label: str | None = None  # limited-cup name (e.g. "Equinox Cup"); None for league dives
+    cup_snapshot: str | None = None  # cup rankings snapshot date (YYYY-MM-DD)
 
 
 # Type -> accent color (matches common PvP type palettes; used for chips and
@@ -212,6 +214,8 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         base_form_display=base_form_display,
         sibling_trade=card_ctx.get('sibling_trade'),
         has_author_notes=bool(has_author_notes),
+        cup_label=data_obj.get('cupLabel'),
+        cup_snapshot=data_obj.get('rankSnapshot') if data_obj.get('cupLabel') else None,
     )
 
 
@@ -645,13 +649,27 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
     cols = (f'<div class="ddcard-matchups">{wins}{losses}</div>'
             if (wins or losses) else '')
 
+    # A cup dive is mechanically its league, but the card leads with the cup
+    # name so it never reads as a bare open-league dive; the snapshot date
+    # (keep-as-archive policy) rides on a second muted line.
+    if m.cup_label:
+        _league_txt = f'{html.escape(m.cup_label)} ({html.escape(m.league_display)})'
+        _snap_html = (f'<div class="ddcard-move" style="opacity:0.75;">'
+                      f'Snapshot as of {html.escape(m.cup_snapshot)} '
+                      f'- archived cup meta</div>'
+                      if m.cup_snapshot else '')
+    else:
+        _league_txt = html.escape(m.league_display)
+        _snap_html = ''
+
     section = f"""<section class="ddcard">
   <div class="ddcard-head">
     {_sprite_html(m)}
     <div class="ddcard-title">
       <h2>{name}</h2>
       <div class="ddcard-chips">{chips}</div>
-      <div class="ddcard-move">{html.escape(m.league_display)} (CP {m.cp_cap}) &middot; <b>{html.escape(m.moveset)}</b></div>
+      <div class="ddcard-move">{_league_txt} (CP {m.cp_cap}) &middot; <b>{html.escape(m.moveset)}</b></div>
+      {_snap_html}
     </div>
     {prov}
   </div>
