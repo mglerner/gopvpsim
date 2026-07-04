@@ -63,6 +63,24 @@ _FORM_PAREN = {'blade', 'shield', 'busted', 'disguised',
                'super', 'large', 'small', 'average', 'hangry'}
 _LEAGUE_ORDER = {'great': 0, 'ultra': 1, 'master': 2}
 
+# Limited-cup slug suffixes. A cup slug is FLAT `<species>-<cup>-cup` (the cup
+# implies league/CP). Value = (league_key, cup_key, cup_pretty). Cup dives are
+# routed OUT of the evergreen league lists onto a separate cup-index page, so
+# `league_key` here is only the mechanical league (for CP/opponent-IV parity);
+# it never groups the dive into the main league lists.
+_CUP_SUFFIXES = {
+    'equinox-cup': ('great', 'equinox', 'Equinox Cup'),
+}
+_CUP_PRETTY_BY_KEY = {ck: cp for _lk, ck, cp in _CUP_SUFFIXES.values()}
+
+# Archive status per cup for the cup-index page. Cups rotate on Niantic's
+# schedule, so `playable` is hand-maintained: True (currently in rotation),
+# False (ended), or absent/None (rotates - not tracked here). Exact rankings
+# snapshot dates live on each dive's own banner, not here.
+_CUP_STATUS = {
+    'equinox': {'playable': None},
+}
+
 _KNOWN_SPECIES_SLUGS: set[str] | None = None
 
 
@@ -109,9 +127,14 @@ def _slug_to_pretty_title(slug: str) -> str:
     _sys.path.insert(0, str(REPO_ROOT / 'src'))
     from gopvpsim.display import pretty_species_from_slug  # type: ignore[import-not-found]
 
-    for suffix, pretty in _LEAGUE_SUFFIXES.items():
+    # League suffixes plus cup suffixes (cup pretty is its own name, e.g.
+    # "Equinox Cup"), so a cup dive's HTML-fallback title reads
+    # "Corviknight (Equinox Cup)" instead of dropping to the raw <title>.
+    _suffix_map = {**_LEAGUE_SUFFIXES,
+                   **{s: cp for s, (_lk, _ck, cp) in _CUP_SUFFIXES.items()}}
+    for suffix, pretty in _suffix_map.items():
         if slug.endswith('-' + suffix):
-            core = slug[:-(len(suffix) + 1)]  # strip "-great-league" etc.
+            core = slug[:-(len(suffix) + 1)]  # strip "-great-league" / "-equinox-cup"
             tokens = core.split('-')
             # Identify the boundary between the species-name slug
             # tokens (which feed pretty_species_from_slug) and any
@@ -338,12 +361,24 @@ def _parse_dive_slug(slug: str) -> dict | None:
     from gopvpsim.display import pretty_species_from_slug  # type: ignore[import-not-found]
 
     core = league_key = league_pretty = None
-    for suffix, pretty in _LEAGUE_SUFFIXES.items():
+    cup = cup_pretty = None
+    # Cup suffixes first (a cup slug never matches a `-league` suffix). For a
+    # cup dive `league_pretty` is the cup name, so any incidental league-style
+    # rendering still reads as the cup, not a bare "Great League".
+    for suffix, (lk, ck, cp) in _CUP_SUFFIXES.items():
         if slug.endswith('-' + suffix):
             core = slug[:-(len(suffix) + 1)]
-            league_key = suffix.split('-')[0]
-            league_pretty = pretty
+            league_key = lk
+            league_pretty = cp
+            cup, cup_pretty = ck, cp
             break
+    if core is None:
+        for suffix, pretty in _LEAGUE_SUFFIXES.items():
+            if slug.endswith('-' + suffix):
+                core = slug[:-(len(suffix) + 1)]
+                league_key = suffix.split('-')[0]
+                league_pretty = pretty
+                break
     if core is None:
         return None
 
@@ -405,6 +440,8 @@ def _parse_dive_slug(slug: str) -> dict | None:
         'variant_tokens': variant_tokens,
         'league_key': league_key,
         'league_pretty': league_pretty,
+        'cup': cup,              # cup key (e.g. 'equinox') or None for a league dive
+        'cup_pretty': cup_pretty,
     }
 
 
@@ -533,7 +570,8 @@ def render_index(dives: list[dict],
                  *,
                  matchup_web: list[dict] | None = None,
                  iv_guides: list[dict] | None = None,
-                 guides_landing: dict | None = None) -> str:
+                 guides_landing: dict | None = None,
+                 cups: list[dict] | None = None) -> str:
     dives_html = _render_dives_grouped(dives)
     articles_html = _render_entry_list(articles)
     comparisons_html = _render_entry_list(comparisons)
@@ -586,6 +624,24 @@ def render_index(dives: list[dict],
         f'{comparisons_html}\n'
         '</ul>\n'
     )
+
+    # "Limited Cups" card: a single link to the separate cup-index page. Kept
+    # out of the evergreen "Dives" list so rotating cup content is easy to find
+    # and easy to retire when a cup ends.
+    cups_section = ''
+    if cups:
+        n_cups = len({_parse_dive_slug(d['slug']).get('cup')
+                      for d in cups
+                      if _parse_dive_slug(d['slug'])})
+        cups_section = (
+            '\n<h2>Limited Cups</h2>\n'
+            '<p class="section-intro">Deep dives for rotating limited cups '
+            '(restricted-type formats) - scored against the cup meta on cup '
+            'movesets. Dated archives kept when a cup ends.</p>\n'
+            '<ul>\n'
+            '  <li class="dive"><a href="cups/index.html">'
+            f'Cup dives ({len(cups)} dive(s) across {n_cups} cup(s))</a></li>\n'
+            '</ul>\n')
 
     guides_section = ''
     if guides_landing:
@@ -666,10 +722,93 @@ open it.</p>
 </ul>
 </div>
 </div>
-{matchup_web_section}{articles_section}{comparisons_section}{guides_section}
+{matchup_web_section}{cups_section}{articles_section}{comparisons_section}{guides_section}
 <p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
 <p class="about">If you find something broken or surprising, reach out on Discord: <a href="https://discord.com/users/460510521112920105">TitanTrainers15</a>.</p>
 {support_footer_html("")}</body>
+</html>
+"""
+
+
+def _cup_status_line(cup_key: str) -> str:
+    """Human archive-status line for a cup on the cup-index page."""
+    playable = (_CUP_STATUS.get(cup_key) or {}).get('playable')
+    if playable is True:
+        avail = 'Currently in rotation.'
+    elif playable is False:
+        avail = 'Past cup - not currently in rotation.'
+    else:
+        avail = "Availability rotates on Niantic's schedule - check in-game."
+    return (f'{avail} Dated snapshots kept as an archive; open a dive for its '
+            f'exact rankings snapshot date and cup movesets.')
+
+
+def render_cup_index(cup_dives: list[dict]) -> str:
+    """Standalone cup-index page (userdata/website/cups/index.html).
+
+    Grouped by cup, archive-friendly (each cup carries a playable/past status
+    line). Kept separate from the main index so rotating cup content stays out
+    of the evergreen league lists. Dive hrefs are re-based with '../' because
+    this page lives one directory below the cup dive dirs.
+    """
+    by_cup: dict[str, list[dict]] = {}
+    for d in cup_dives:
+        p = _parse_dive_slug(d['slug'])
+        if p and p.get('cup'):
+            by_cup.setdefault(p['cup'], []).append(d)
+
+    sections: list[str] = []
+    for cup_key in sorted(by_cup):
+        pretty = html.escape(_CUP_PRETTY_BY_KEY.get(cup_key, cup_key.title()))
+        # Re-base hrefs one level up for the cups/ subdirectory.
+        rebased = [{**d, 'href': '../' + d['href']} for d in by_cup[cup_key]]
+        listing = _render_dives_grouped(rebased)
+        sections.append(
+            f'\n<h2>{pretty}</h2>\n'
+            f'<p class="section-intro">{_cup_status_line(cup_key)}</p>\n'
+            f'<ul>\n{listing}\n</ul>\n')
+    body = ''.join(sections) or (
+        '<p class="section-intro">No cup dives are currently published.</p>')
+
+    return f"""<!DOCTYPE html>
+<html {data_theme_attr()}>
+<head>
+<meta charset="utf-8">
+{theme_head_script()}
+<title>Limited Cup Dives</title>
+<style>{theme_css()}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+         sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px;
+         background: var(--bg); color: var(--text); line-height: 1.5; }}
+  h1 {{ color: var(--title); }}
+  h2 {{ color: var(--heading); border-bottom: 1px solid var(--border);
+        padding-bottom: 6px; font-size: 1.15em; font-weight: 700;
+        letter-spacing: .02em; }}
+  a {{ color: var(--accent); text-decoration: none; }}
+  a:hover {{ text-decoration: underline; }}
+  ul {{ list-style: none; padding: 0; }}
+  li.dive {{ background: var(--surface); padding: 14px 18px; border-radius: 2px;
+             margin-bottom: 14px; }}
+  li.dive p {{ margin: 6px 0 0 0; color: var(--text-muted); font-size: 14px; }}
+  .section-intro {{ color: var(--text-muted); font-size: 14px; margin: 0 0 14px 0; }}
+  .species {{ font-weight: bold; color: var(--text); margin-right: 10px; }}
+  a.chip {{ display: inline-block; background: var(--surface-2); color: var(--accent);
+            padding: 2px 10px; border-radius: 4px; margin: 3px 6px 3px 0;
+            font-size: 13px; }}
+  a.chip:hover {{ background: var(--border-2); text-decoration: none; }}
+  .about {{ color: var(--text-muted); font-size: 13px; margin-top: 30px;
+            border-top: 1px solid var(--border); padding-top: 12px; }}
+</style>
+</head>
+<body>
+{theme_picker_html()}
+<h1>Limited Cup Dives</h1>
+<p>Deep dives for rotating limited cups (restricted-type formats). A cup dive
+is mechanically its base league but scored against the cup meta, with each
+opponent on its cup moveset. <a href="../index.html">Back to all dives</a>.</p>
+{body}
+<p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
+{support_footer_html("../")}</body>
 </html>
 """
 
@@ -791,7 +930,7 @@ def main() -> int:
     dropped_pages: list = []
     dives = load_entries(
         WEBSITE_DIR,
-        exclude=frozenset({'articles', 'comparisons', 'guides'}),
+        exclude=frozenset({'articles', 'comparisons', 'guides', 'cups'}),
         dropped_pages=dropped_pages,
     )
     # The matchup web lives at the site root (userdata/website/matchups/) with
@@ -799,6 +938,15 @@ def main() -> int:
     # per-species dive, so split it out by slug into its own section.
     matchup_web = [d for d in dives if d['slug'] == 'matchups']
     dives = [d for d in dives if d['slug'] != 'matchups']
+    # Limited-cup dives (`<species>-<cup>-cup`) route onto a SEPARATE cup-index
+    # page, not the evergreen league lists. Split them out by slug so they
+    # neither pollute the main "Dives" list nor silently fall through as
+    # ungrouped leftovers.
+    def _dive_cup(slug):
+        p = _parse_dive_slug(slug)
+        return p.get('cup') if p else None
+    cup_dives = [d for d in dives if _dive_cup(d['slug'])]
+    dives = [d for d in dives if not _dive_cup(d['slug'])]
     articles = load_entries(ARTICLES_DIR, href_prefix='articles/',
                             dropped_pages=dropped_pages)
     # Split the ML IV guides (slug "<species>-ml-iv-guide[-even]") out from the
@@ -841,8 +989,19 @@ def main() -> int:
     index_html = render_index(dives, articles, comparisons,
                               matchup_web=matchup_web,
                               iv_guides=iv_guides,
-                              guides_landing=guides_landing)
+                              guides_landing=guides_landing,
+                              cups=cup_dives)
     INDEX_PATH.write_text(index_html)
+
+    # Separate cup-index page (only when cup dives exist). Written under
+    # userdata/website/cups/index.html; linked from the "Limited Cups" card.
+    if cup_dives:
+        cups_dir = WEBSITE_DIR / 'cups'
+        cups_dir.mkdir(parents=True, exist_ok=True)
+        (cups_dir / 'index.html').write_text(render_cup_index(cup_dives))
+        print(f"Wrote {cups_dir / 'index.html'} ({len(cup_dives)} cup dive(s))")
+        for d in cup_dives:
+            print(f"  - [cup-dive] {d['title']} -> {d['href']}")
     # SUPPORT_PAGE_HTML is a plain (non-f) string with literal CSS braces,
     # so theme output is spliced in via inert HTML-comment sentinels rather
     # than f-string / .format() (which would require escaping every brace).
