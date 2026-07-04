@@ -95,8 +95,12 @@ log ""
 #    rejoined the chain 2026-04-21 so the 2026-04-21 rename refactor
 #    (drop compound <br> tier names, auto-gen standalone-mode narrative
 #    for non-CD species) reaches every shipped dive.
+# Reserve count is env-overridable: default 0 (unattended overnight = all
+# cores). Set DIVE_RESERVE_CPUS=1 for an attended run that leaves a core free
+# (e.g. `DIVE_RESERVE_CPUS=1 scripts/overnight_redive.sh`). Only the dive step
+# is affected; the ML guides (step 7b) still fan across all cores per guide.
 step "Running website dives via run_website_dives.py" \
-    python scripts/run_website_dives.py --reserve-cpus 0
+    python scripts/run_website_dives.py --reserve-cpus "${DIVE_RESERVE_CPUS:-0}"
 
 # The retrofit-only patch_dive_*.py patchers were deleted in the S7
 # cleanup (2026-06-12): everything they carried is baked into the
