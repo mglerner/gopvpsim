@@ -12,12 +12,17 @@ the handful of intentional differences below each have a reason and a pinned
 test or documented guard, and the full root-cause writeups live in
 `DEVELOPER_NOTES.md`. These all apply to the default (legacy) turn mechanics.
 
-1. **Best charged move is recomputed every turn, not cached at battle start.**
-   PvPoke picks each Pokemon's best charged move once at init and reuses it. We
-   recompute it each decision, so it tracks mid-battle changes in the
-   opponent's defense (stat-stage drops, or a form change like Aegislash
-   Shield -> Blade). PvPoke's cached pick is a worse choice in the
-   Aegislash matchups.
+1. **The one dpe site kept fresh: the don't-bait dpeRatio carve-out.** We now
+   FREEZE move selection exactly like PvPoke (ordering, each move's raw dpe,
+   best charged move, and the farm-down constants are fixed at battle start and
+   re-fixed only on a self form change) -- the old "we recompute every turn and
+   it's strictly better" claim was falsified by the 2026-07-03 NB-1 bounding
+   sweep and is gone. The single deliberate exception is PvPoke's post-DP
+   "don't bait if the opponent won't shield" check: PvPoke forms its dpe ratio
+   from `move.damage`, which it refreshes only on use, so one move is current
+   and the other init-stale -- an internally inconsistent cache bug. We evaluate
+   both moves fresh at the current stage instead. Pinned in
+   `tests/test_nb1_selection_freeze.py` Group C.
 2. **Morpeko toggles form on every charged move.** The game, and Morpeko's own
    gamemaster entry, toggles Full Belly <-> Hangry after each charged move.
    PvPoke changes it one way and then sticks in Hangry. Ours matches verified

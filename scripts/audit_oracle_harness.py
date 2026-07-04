@@ -172,15 +172,15 @@ MATCHUPS = [
     # xfails, traced 2026-06-12: every cell agrees on winner; (1,0)/
     # (1,1) are bug #3 (PvPoke's Aegislash burns Tinkaton's shield with
     # Gyro Ball and never lands a real charged hit — ours lands a
-    # Shadow Ball, hence the ~280-pt margin gap); the small-margin
-    # cells are Tinkaton-side shield-bait/plan-timing choices (e.g.
-    # PvPoke's Tinkaton throws a third Bulldoze into the shield at
-    # (0,1); ours holds) — the near-KO/plan-choice family. (0,0) is
-    # exact.
+    # Shadow Ball, hence the ~280-pt margin gap); the remaining cells
+    # are Tinkaton-side shield-bait/plan-timing choices. (0,0)/(0,1)/(0,2)
+    # are EXACT: the 2026-07-03 NB-1 selection-freeze made ours throw the
+    # third Bulldoze into the shield exactly as PvPoke does (previously
+    # (0,1)/(0,2) diverged, "ours holds"), so they were un-xfailed.
     dict(label='tinkaton_vs_aegislash_shield_form_change', league='ultra',
          p1=P('Tinkaton', 'FAIRY_WIND', ['GIGATON_HAMMER', 'BULLDOZE'], (12, 15, 15), 'tinkaton', level=50),
          p2=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (15, 15, 15), 'aegislash_shield', level=50),
-         xfail_cells={(0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)}),
+         xfail_cells={(1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)}),
     # buffTarget='both' (Obstruct) fixture, added 2026-06-11 with the E1 fix.
     dict(label='obstagoon_obstruct_vs_azumarill',
          p1=P('Obstagoon', 'COUNTER', ['OBSTRUCT', 'NIGHT_SLASH'], (5, 15, 12), 'obstagoon'),

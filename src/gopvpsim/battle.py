@@ -742,12 +742,20 @@ def _optimize_move_timing(attacker: "BattlePokemon", defender: "BattlePokemon",
     if attacker.energy + attacker.fast_move.get('energyGain', 0) > ENERGY_CAP:
         return False
 
-    # Turns planned vs turns to live
-    affordable_cms = [m for m in attacker.charged_moves if attacker.energy >= m['energy']]
-    if not affordable_cms:
+    # Turns planned vs turns to live. PvPoke (ActionLogic.js:305) divides
+    # poke.energy by activeChargedMoves[0].energy -- the FROZEN priority
+    # slot-0 move -- REGARDLESS of affordability (no early return, no
+    # cheapest-affordable selection, no promotion). We used to filter to
+    # affordable moves, return False when none were affordable, and divide by
+    # the cheapest affordable energy; at a low-energy deathbed state that
+    # inflated turns_planned and fired the charged decision several fast moves
+    # early (the 2026-07-03 OMT divisor port infidelity, sweep doc Group D --
+    # PvPoke strictly better in all traced cells). Match the reference exactly.
+    init = attacker._ensure_dp_init_cache(defender)
+    if not init['cm_energy']:
         return False
-    cheapest_energy = min(m['energy'] for m in affordable_cms)
-    turns_planned = atk_turns + (attacker.energy // cheapest_energy)
+    slot0_energy = init['cm_energy'][0]
+    turns_planned = atk_turns + (attacker.energy // slot0_energy)
     if attacker.cmp_atk < defender.cmp_atk:
         turns_planned += 1
     ttl = _calc_turns_to_live(attacker, defender, mechanics=mechanics)
@@ -867,10 +875,12 @@ def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict) -> None:
     """PvPoke's activeChargedMoves priority-shuffle (Pokemon.js lines 711-787).
 
     Reorders the energy-sorted ``cms`` list in place based on buff/debuff
-    properties. PvPoke runs this once at init; we re-run it whenever the
-    cached damage values change (see _ensure_dp_cache). Uses buff-adjusted
-    DPE for the selfBuffing-promotion clause (line 758). Verified
-    2026-04-15 to affect 153/378 matchups in a 7x6x9 differential grid.
+    properties. PvPoke runs this once at init (stage (0,0)); we mirror that,
+    running it once per battle in _ensure_dp_init_cache from the stage-(0,0)
+    damages (before 2026-07-03 we re-ran it per stat stage from current-stage
+    damage -- the NB-1 selection-freeze fix). Uses buff-adjusted DPE for the
+    selfBuffing-promotion clause (line 758). Verified 2026-04-15 to affect
+    153/378 matchups in a 7x6x9 differential grid.
 
     ``cm_dmgs`` is indexed by original charged_moves position via
     ``idx_map`` (id(move) -> original index).
@@ -1278,18 +1288,24 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                     f"(energy={attacker.energy}, threshold={100 - fast_energy // 2})")
             return None
 
-    # PvPoke's bestChargedMove selection (Pokemon.js lines 791-822) and
-    # the farm-down constants (bestCycleDamage, cycle threshold, debuf
-    # swap) are precomputed in _ensure_dp_cache -- they depend only on
-    # cache-key-stable inputs.
+    # PvPoke's bestChargedMove selection (Pokemon.js lines 790-822), the
+    # activeChargedMoves ordering, the per-move raw dpe, and the farm-down
+    # constants (cycle threshold, debuf swap) are FROZEN at stage (0,0) in
+    # _ensure_dp_init_cache -- mirroring PvPoke's resetMoves(), which runs
+    # once at battle start and never re-selects (only move.damage is
+    # refreshed per use). bestCycleDamage uses that frozen best_idx with
+    # FRESH per-stage damage (ActionLogic.js:367-368), so it is rebuilt in
+    # _ensure_dp_cache.
     #
-    # INTENTIONAL DIVERGENCE (Divergence 3 in DEVELOPER_NOTES.md):
-    # PvPoke computes bestChargedMove once at init (and on self form change).
-    # We recompute per (opponent, stat stages) using current damage values,
-    # which responds to stat stage changes and opponent form changes.  This
-    # is more correct: PvPoke's stale cache uses Ice Beam against Aegislash
-    # Blade form even when Play Rough has higher DPE after the form change.
-    # Known impact: +134 delta on Aegislash 1v2/2v2 scenarios.
+    # (Until 2026-07-03 we recomputed the whole selection per (opponent, stat
+    # stages) from current-stage damage, documented then as strictly better
+    # than PvPoke's init cache. The NB-1 bounding sweep falsified that in both
+    # directions -- re-evaluating PvPoke's init-tuned 0.3/1.5 guards per stage
+    # crosses them for non-strategic reasons, including a shipped winner flip
+    # against us -- so we now match PvPoke's freeze. See docs/reviews/
+    # 2026-07-03_nb1_bounding_sweep.md and DEVELOPER_NOTES.md divergence #3.
+    # The one dpe site kept fresh -- the don't-bait dpeRatio carve-out below --
+    # is the remaining intentional divergence.)
     best_idx       = dp_cache['best_idx']
     best_cycle_dmg = dp_cache['best_cycle_dmg']
 
@@ -1605,17 +1621,47 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     else:
         first_idx = final_first_thrown
 
-    # Don't-bait-if-won't-shield (ActionLogic.js lines 838-847):
-    # This one uses actual damage (move.damage / move.energy).  PvPoke reads
+    # Don't-bait-if-won't-shield (ActionLogic.js lines 856-865):
+    # This one uses actual damage (move.damage / move.energy). PvPoke reads
     # final_state.moves[0] (= first thrown) for fm0_dpe, then mutates
     # moves[0] = 1 -- only takes effect when shields > 0 (so the sort branch
     # above does NOT fire), so we override `first_idx` directly here.
     # Skipped in no-bait mode: the plan-sort branch above already forced
     # max_dmg_idx, and no-bait never rewrites the first throw for bait reasons.
+    #
+    # INTENTIONAL DIVERGENCE (the NB-1 freeze carve-out, 2026-07-03): unlike
+    # every other dpe consumer in pvpoke_dp -- all of which read the frozen
+    # stage-(0,0) cm_dpe to mirror PvPoke's init-frozen move.dpe -- this site
+    # deliberately recomputes dpe FRESH from the current-stage damage
+    # (cm_dmgs). PvPoke's line 857 uses move.DAMAGE (not move.dpe), and
+    # move.damage is refreshed only on use, so PvPoke's ratio here is
+    # internally INCONSISTENT (one move's damage current, the other's stale) --
+    # a PvPoke cache bug, not a policy. We evaluate both moves at the same
+    # (current) stage, which is the internally-consistent version of PvPoke's
+    # intent. Pinned as an intentional divergence in
+    # tests/test_nb1_selection_freeze.py Group C; see docs/reviews/
+    # 2026-07-03_nb1_bounding_sweep.md section 2 (carve-out) and
+    # DEVELOPER_NOTES.md divergence #3.
+    #
+    # would_shield/always-shield inconsistency (INVESTIGATED 2026-07-03, left
+    # unchanged): the `would_shield(...)` gate below is a FAITHFUL port of
+    # PvPoke's ActionLogic.js:860 (same function, same activeChargedMoves[1]
+    # target). It predicts the opponent WON'T shield and, if so, throws the
+    # expensive move -- but the actual simulate shield policy always-shields
+    # standard moves, so the thrown move can be shielded and wasted. That
+    # predict-vs-policy mismatch is PvPoke's OWN structure (its override
+    # consults wouldShield while Battle.js:1077 always-shields), so it is not a
+    # port infidelity and is NOT changed here. It is why the fresh-dpeRatio
+    # carve-out above can INFLATE our score vs the oracle (Florges vs
+    # Seismitoad UL 2-1: ours 866 vs oracle 665 -- our fresh ratio 1.607 fires
+    # the override and Seismitoad wastes Earth Power into a shield where
+    # PvPoke's mixed-stale ratio baits Icy Wind instead). The +201 is a
+    # downstream consequence of the carve-out + PvPoke's shared structure, not
+    # "better play"; pinned as tests/...Group C test_group_c10 with this caveat.
     if bait_shields and defender.shields > 0 and n_cms > 1:
-        fm0_dpe = cm_dpe[final_first_thrown]
+        fm0_dpe = cm_dmgs[final_first_thrown] / cm_energy[final_first_thrown]
         if fm0_dpe > 0 and attacker.energy >= cm_energy[1]:
-            dpe_ratio = cm_dpe[1] / fm0_dpe
+            dpe_ratio = (cm_dmgs[1] / cm_energy[1]) / fm0_dpe
             if dpe_ratio > 1.5 and not would_shield(attacker, defender, cms[1],
                                                      mechanics=mechanics):
                 first_idx = 1
@@ -1921,6 +1967,18 @@ class BattlePokemon:
     # the dominant cost of the 2026-04-15 stage-aware DP fix.
     _dp_cache: "dict | None" = field(init=False, repr=False)
 
+    # pvpoke_dp INIT cache (vs current opponent, frozen at stage (0,0)).
+    # PvPoke runs resetMoves() once at battle start (Battle.js:112) with both
+    # mons at stat stage 0; that call FREEZES the activeChargedMoves ordering,
+    # bestChargedMove, each move's raw .dpe, and the farm-down selection
+    # constants for the whole battle (only .damage is later refreshed per use).
+    # We mirror that: the ordering/dpe/best-idx quantities are computed ONCE
+    # here from stage-(0,0) damages and reused across every stat stage, while
+    # _dp_cache still rebuilds the per-stage damage tables fresh. Keyed on the
+    # held opponent reference only (shields/stat-stage independent); reset to
+    # None on form change, exactly like _dp_cache. See _ensure_dp_init_cache.
+    _dp_init_cache: "dict | None" = field(init=False, repr=False)
+
     # Form change state (None for Pokemon without form changes)
     _form_change:          "FormChangeConfig | None" = field(init=False, repr=False)
     _form_is_alt:          bool = field(init=False, repr=False)
@@ -1949,6 +2007,7 @@ class BattlePokemon:
         # of self.charged_moves (same dict objects, different order).
         self._cm_id_to_idx = {id(cm): i for i, cm in enumerate(self.charged_moves)}
         self._dp_cache = None
+        self._dp_init_cache = None
         # Form change state
         self._form_change = None
         self._form_is_alt = False
@@ -2083,31 +2142,171 @@ class BattlePokemon:
         self._dmg_cache_atk_stage = self.atk_stage
         self._dmg_cache_def_stage = defender.def_stage
 
+    def _ensure_dp_init_cache(self, defender: "BattlePokemon") -> dict:
+        """Return the FROZEN move-selection quantities vs `defender`.
+
+        PvPoke's resetMoves() runs at battle start (Battle.js:112, both mons at
+        stat stage 0) and AGAIN inside changeForm() for the pokemon that just
+        changed form (Pokemon.js changeForm -> resetMoves, at that moment's
+        stat stage). Each call FREEZES, until the next resetMoves for that
+        pokemon:
+          * the activeChargedMoves ordering (energy sort + priority shuffle,
+            Pokemon.js:711-787, using the current-stage move.damage), including
+            the Registeel/Zap-Cannon dict mutation on FOCUS_BLAST;
+          * each active move's raw ``move.dpe = move.damage / move.energy``
+            (Pokemon.js:792/796 -- overwrites initializeMove's buff-adjusted
+            dpe with the RAW value, never recomputed until the next resetMoves);
+          * bestChargedMove (selectBestChargedMove, Pokemon.js:790-822);
+          * the farm-down constants derived from those (minimumCycleThreshold,
+            the self-debuff farm swap; ActionLogic.js:370-393).
+        Only ``move.damage`` is refreshed per use in between -- ordering and
+        .dpe stay frozen. We mirror that: these values are computed once (keyed
+        on the held opponent reference), captured at the stat stages prevailing
+        at computation time, and reused across every later stat stage. The
+        first computation lands at battle start (stage 0 both sides); a SELF
+        form change resets THIS cache (see formchange.apply_form_change) so it
+        recomputes at the post-form-change stat stage -- exactly PvPoke's
+        changeForm->resetMoves. Crucially, the OPPONENT'S frozen selection is
+        NOT reset when this pokemon changes form (PvPoke re-runs resetMoves for
+        the form-changer only), so the opponent keeps evaluating against the
+        pre-change ordering/dpe; only its FRESH per-stage damage tables refresh.
+
+        Before 2026-07-03 we recomputed all of these per stat stage from
+        current-stage damage, which crossed PvPoke's init-tuned 0.3/1.5
+        thresholds for non-strategic reasons (the NB-1 bounding sweep,
+        docs/reviews/2026-07-03_nb1_bounding_sweep.md).
+
+        The per-stage damage tables the near-KO DP actually runs on stay fresh
+        -- see _ensure_dp_cache. Only ordering/.dpe/selection are frozen here.
+        """
+        init = self._dp_init_cache
+        if init is not None and init['opp'] is defender:
+            return init
+        idx_map = self._cm_id_to_idx
+
+        # Damages at the CURRENT stat stages -- matching PvPoke's resetMoves,
+        # which runs at battle start (both mons stage 0 -> this is (0,0)) and
+        # again at each self form change (that moment's stat stage).
+        my_types  = self.types
+        opp_types = defender.types
+        atk_init = self.atk * _stat_stage_mult(self.atk_stage)
+        def_init = defender.def_ * _stat_stage_mult(defender.def_stage)
+        dmg_init = [calc_damage(cm['power'], atk_init, def_init,
+                                cm['type'], my_types, opp_types)
+                    for cm in self.charged_moves]   # original charged order
+
+        # PvPoke's activeChargedMoves is sorted by energy (cheapest first),
+        # then reordered by the priority-shuffle (Pokemon.js lines 711-787)
+        # using the init-stage damage.
+        cms = sorted(self.charged_moves, key=lambda m: m['energy'])
+        if len(cms) > 1:
+            _priority_shuffle(cms, dmg_init, idx_map)
+
+        order = [idx_map[id(m)] for m in cms]
+        n = len(cms)
+        cm_energy_l   = [m['energy'] for m in cms]
+        cm_self_debuf = [1 if m.get('selfDebuffing', False) else 0
+                         for m in cms]
+        cm_self_buff  = [1 if m.get('selfBuffing', False) else 0
+                         for m in cms]
+        cm_debuf_delta = [_cm_debuf_delta(m) for m in cms]
+        cm_buff_delta  = [_cm_buff_delta(m) for m in cms]
+        # FROZEN raw dpe (Pokemon.js:796 move.damage/energy at init stage).
+        root_init = [dmg_init[order[i]] for i in range(n)]
+        cm_dpe = [root_init[i] / cm_energy_l[i] for i in range(n)]
+
+        if cms:
+            # PvPoke's bestChargedMove selection (Pokemon.js lines 790-822)
+            # on the init-frozen dpe.
+            best_idx = 0
+            for _i in range(n):
+                _m = cms[_i]
+                _dpe_diff = cm_dpe[_i] - cm_dpe[best_idx]
+                if ((_dpe_diff > 0.03 and _m.get('moveId') != 'SUPER_POWER')
+                        or _dpe_diff > 0.3):
+                    if (not cms[best_idx].get('selfBuffing', False)
+                            or _dpe_diff > 0.3):
+                        best_idx = _i
+                if (abs(cm_dpe[_i] - cm_dpe[best_idx]) < 0.03
+                        and cms[best_idx].get('buffs')
+                        and _m.get('buffs')
+                        and float(_m.get('buffApplyChance', 0) or 0) > float(cms[best_idx].get('buffApplyChance', 0) or 0)
+                        and not _m.get('selfDebuffing', False)):
+                    best_idx = _i
+                if _m.get('moveId') == 'OBSTRUCT':
+                    best_idx = _i
+            if (cms[0].get('moveId') == 'OBSTRUCT'
+                    and cm_energy_l[0] - cm_energy_l[best_idx] <= 5
+                    and cm_dpe[best_idx] > 0
+                    and cm_dpe[0] / cm_dpe[best_idx] > 0.2):
+                best_idx = 0
+
+            # The farm-down threshold + self-debuff swap (ActionLogic.js
+            # lines 370-393) -- pure functions of the frozen dpe/best_idx.
+            min_cycle_thr = 2.0
+            if (n > 1
+                    and cm_self_debuf[best_idx]
+                    and cm_energy_l[best_idx] > cm_energy_l[0]
+                    and cm_dpe[0] > 0
+                    and cm_dpe[best_idx] / cm_dpe[0] < 2.0):
+                min_cycle_thr = 1.1
+
+            # Swap selfDebuffing best to a non-debuffing alt whose DPE is
+            # within 2x (PvPoke lines 387-393). Last qualifying alt wins;
+            # the ratio is re-evaluated against the updated selection,
+            # mirroring PvPoke's loop.
+            farm_swap_idx = best_idx
+            if cm_self_debuf[farm_swap_idx]:
+                for _i in range(n):
+                    if (not cm_self_debuf[_i]
+                            and cm_dpe[_i] > 0
+                            and cm_dpe[farm_swap_idx] / cm_dpe[_i] < 2.0):
+                        farm_swap_idx = _i
+        else:                            # no charged moves (unsupported,
+            best_idx = 0                 # but don't crash at build time)
+            min_cycle_thr = 2.0
+            farm_swap_idx = 0
+
+        init = {
+            'opp':            defender,
+            'cms':            cms,
+            'order':          order,
+            'cm_energy':      cm_energy_l,
+            'cm_self_debuf':  cm_self_debuf,
+            'cm_self_buff':   cm_self_buff,
+            'cm_debuf_delta': cm_debuf_delta,
+            'cm_buff_delta':  cm_buff_delta,
+            'cm_dpe':         cm_dpe,
+            'best_idx':       best_idx,
+            'min_cycle_thr':  min_cycle_thr,
+            'farm_swap_idx':  farm_swap_idx,
+        }
+        self._dp_init_cache = init
+        return init
+
     def _ensure_dp_cache(self, defender: "BattlePokemon") -> dict:
         """Return the pvpoke_dp setup cache vs `defender` at the current
         stat stages, rebuilding it if the key no longer matches.
 
-        Contents (all in priority-shuffled order, cheapest-energy-first
-        before the shuffle):
-          order              original charged_moves index per sorted slot
-          cms                the sorted/shuffled move-dict list itself
+        The ordering, per-move raw ``cm_dpe``, ``best_idx`` and the farm-down
+        selection constants are FROZEN at stage (0,0) by _ensure_dp_init_cache
+        (PvPoke's resetMoves timing); this method only rebuilds the FRESH,
+        per-stat-stage quantities on top of them:
+
           cm_dmgs_root       charged damage per slot at the current stages
-          cm_dpe             PvPoke move.dpe per slot (damage / energy)
-          cm_energy          energy cost per slot
-          cm_self_debuf      1/0 selfDebuffing flag per slot
-          cm_self_buff       1/0 selfBuffing flag per slot
-          cm_debuf_delta     dedup tie-break delta per slot
-          cm_buff_delta      chance-1 attacker atk-stage delta per slot
           cm_dmgs_by_stage   9 rows (atk stage -4..+4) of charged damage
           fast_dmg_by_stage  9 entries of fast-move damage
           fast_root          fast-move damage at the current stages
-          fast_turns / fast_energy / atk_fast_cd
-                             own fast-move scalars (saves dict.get churn)
-          best_idx           PvPoke bestChargedMove selection
-          best_cycle_dmg / min_cycle_thr / farm_swap_idx
-                             farm-down path constants (ActionLogic 365-415)
-          *_np               numpy views for the JIT
-                             (present only when numba is available)
+          best_cycle_dmg     fast_root*ceil(E[best]/gain)+dmg[best] (fresh
+                             damage, frozen best_idx -- ActionLogic.js:367-368
+                             computes bestChargedDamage/fastDamage fresh too)
+
+        plus the frozen fields copied through from the init cache (order, cms,
+        cm_dpe, cm_energy, cm_self_debuf, cm_self_buff, cm_debuf_delta,
+        cm_buff_delta, best_idx, min_cycle_thr, farm_swap_idx) and the own
+        fast-move scalars.  ``cm_dpe`` here is the frozen raw dpe; the one
+        site that must read a FRESH dpe (the don't-bait dpeRatio carve-out) is
+        documented in pvpoke_dp and recomputes it inline.
 
         Same staleness caveats as the damage cache: keyed on the held
         defender reference plus both stat stages, explicitly invalidated
@@ -2119,17 +2318,24 @@ class BattlePokemon:
                 and dp['atk_stage'] == self.atk_stage
                 and dp['def_stage'] == defender.def_stage):
             return dp
+        init = self._ensure_dp_init_cache(defender)
         self._ensure_dmg_cache(defender)
-        idx_map = self._cm_id_to_idx
         cm_dmgs_root = self._cached_charged_dmgs
 
-        # PvPoke's activeChargedMoves is sorted by energy (cheapest first),
-        # then reordered by the priority-shuffle (Pokemon.js lines 711-787).
-        cms = sorted(self.charged_moves, key=lambda m: m['energy'])
-        if len(cms) > 1:
-            _priority_shuffle(cms, cm_dmgs_root, idx_map)
+        cms            = init['cms']
+        order          = init['order']
+        cm_energy_l    = init['cm_energy']
+        cm_self_debuf  = init['cm_self_debuf']
+        cm_self_buff   = init['cm_self_buff']
+        cm_debuf_delta = init['cm_debuf_delta']
+        cm_buff_delta  = init['cm_buff_delta']
+        cm_dpe         = init['cm_dpe']
+        best_idx       = init['best_idx']
+        min_cycle_thr  = init['min_cycle_thr']
+        farm_swap_idx  = init['farm_swap_idx']
+        n = len(cms)
 
-        # Per-atk-stage damage tables for the near-KO DP.
+        # Per-atk-stage damage tables for the near-KO DP -- FRESH per stage.
         # atk_stage runs over [-4, +4]; index as stage + 4 → [0..8].
         # Each entry recomputes damage from raw power/atk/def via
         # calc_damage (floor semantics) rather than multiplicatively
@@ -2147,8 +2353,7 @@ class BattlePokemon:
         # filled with references to the root row instead of
         # 8 x (n_cms + 1) calc_damage calls -- this rebuild was ~97% of
         # all damage computations in the 2026-06-10 profile.
-        cm_buff_delta = [_cm_buff_delta(m) for m in cms]
-        root_row  = [cm_dmgs_root[idx_map[id(m)]] for m in cms]
+        root_row  = [cm_dmgs_root[oi] for oi in order]
         fast_root = self._cached_fast_dmg
         root_off  = self.atk_stage + 4
         if not any(cm_buff_delta):
@@ -2188,90 +2393,27 @@ class BattlePokemon:
                                 fm_type, atk_types, def_types)
                 )
 
-        # Per-slot scalar arrays + the pvpoke_dp selections that are fully
-        # determined by them. Everything below depends only on cache-key-
-        # stable inputs (root damages, energies, static move flags), so
-        # precomputing here moves work from every pvpoke_dp call (~6 per
-        # decision turn) to the rebuild (~6 per sim).
-        cm_energy_l   = [m['energy'] for m in cms]
-        cm_self_debuf = [1 if m.get('selfDebuffing', False) else 0
-                         for m in cms]
-        cm_self_buff  = [1 if m.get('selfBuffing', False) else 0
-                         for m in cms]
-        n = len(cms)
-        cm_dpe = [root_row[i] / cm_energy_l[i] for i in range(n)]
-
+        # bestCycleDamage (ActionLogic.js:367-368): FRESH bestChargedDamage +
+        # FRESH fastDamage, on the FROZEN best_idx / bestChargedMove.energy.
         if cms:
-            # PvPoke's bestChargedMove selection (Pokemon.js lines
-            # 791-822) -- verbatim move of the per-call loop that lived in
-            # pvpoke_dp; see the INTENTIONAL DIVERGENCE note there for
-            # why this recomputes per (opponent, stages) at all.
-            best_idx = 0
-            for _i in range(n):
-                _m = cms[_i]
-                _dpe_diff = cm_dpe[_i] - cm_dpe[best_idx]
-                if ((_dpe_diff > 0.03 and _m.get('moveId') != 'SUPER_POWER')
-                        or _dpe_diff > 0.3):
-                    if (not cms[best_idx].get('selfBuffing', False)
-                            or _dpe_diff > 0.3):
-                        best_idx = _i
-                if (abs(cm_dpe[_i] - cm_dpe[best_idx]) < 0.03
-                        and cms[best_idx].get('buffs')
-                        and _m.get('buffs')
-                        and float(_m.get('buffApplyChance', 0) or 0) > float(cms[best_idx].get('buffApplyChance', 0) or 0)
-                        and not _m.get('selfDebuffing', False)):
-                    best_idx = _i
-                if _m.get('moveId') == 'OBSTRUCT':
-                    best_idx = _i
-            if (cms[0].get('moveId') == 'OBSTRUCT'
-                    and cm_energy_l[0] - cm_energy_l[best_idx] <= 5
-                    and cm_dpe[best_idx] > 0
-                    and cm_dpe[0] / cm_dpe[best_idx] > 0.2):
-                best_idx = 0
-
-            # bestCycleDamage + the farm-down threshold/swap selections
-            # (ActionLogic.js lines 365-415) -- also key-stable.
             fast_energy = self.fast_move.get('energyGain', 5)
             fm_to_charge = math.ceil(cm_energy_l[best_idx] / fast_energy)
             best_cycle_dmg = fast_root * fm_to_charge + root_row[best_idx]
-
-            min_cycle_thr = 2.0
-            if (n > 1
-                    and cm_self_debuf[best_idx]
-                    and cm_energy_l[best_idx] > cm_energy_l[0]
-                    and cm_dpe[0] > 0
-                    and cm_dpe[best_idx] / cm_dpe[0] < 2.0):
-                min_cycle_thr = 1.1
-
-            # Swap selfDebuffing best to a non-debuffing alt whose DPE is
-            # within 2x (PvPoke lines 387-393). Last qualifying alt wins;
-            # the ratio is re-evaluated against the updated selection,
-            # mirroring PvPoke's loop.
-            farm_swap_idx = best_idx
-            if cm_self_debuf[farm_swap_idx]:
-                for _i in range(n):
-                    if (not cm_self_debuf[_i]
-                            and cm_dpe[_i] > 0
-                            and cm_dpe[farm_swap_idx] / cm_dpe[_i] < 2.0):
-                        farm_swap_idx = _i
-        else:                            # no charged moves (unsupported,
-            best_idx = 0                 # but don't crash at build time)
+        else:
             best_cycle_dmg = 0
-            min_cycle_thr = 2.0
-            farm_swap_idx = 0
 
         dp = {
             'opp':       defender,
             'atk_stage': self.atk_stage,
             'def_stage': defender.def_stage,
-            'order':          [idx_map[id(m)] for m in cms],
+            'order':          order,
             'cms':            cms,
             'cm_dmgs_root':   root_row,
             'cm_dpe':         cm_dpe,
             'cm_energy':      cm_energy_l,
             'cm_self_debuf':  cm_self_debuf,
             'cm_self_buff':   cm_self_buff,
-            'cm_debuf_delta': [_cm_debuf_delta(m) for m in cms],
+            'cm_debuf_delta': cm_debuf_delta,
             'cm_buff_delta':  cm_buff_delta,
             'cm_dmgs_by_stage':  cm_dmgs_by_stage,
             'fast_dmg_by_stage': fast_dmg_by_stage,
@@ -2767,8 +2909,12 @@ def simulate(
                 if defender.hp <= 0:
                     continue   # fainted by deferred charged in step 1.5
                 dmg = attacker.fast_move_damage(defender)
+                # Energy from the CURRENT form's fast move, not the queued dict
+                # -- see the legacy floating-fast site below (FC-1). Differs
+                # only after a mid-flight Aegislash Blade->Shield revert
+                # (in step 1.5, before these step-3 landings).
                 _fast_results.append((1 - actor_idx, dmg, actor_idx,
-                                      move['energyGain']))
+                                      attacker.fast_move['energyGain']))
             for defender_idx, dmg, attacker_idx, energy_gain in _fast_results:
                 attacker = pokemon[attacker_idx]
                 defender = pokemon[defender_idx]
@@ -2828,9 +2974,23 @@ def simulate(
                     if p.hp > 0:
                         defender = pokemon[1 - i]
                         if defender.hp > 0:
-                            qmove = p._queued_fast[1]
                             dmg = p.fast_move_damage(defender)
-                            p.energy = min(ENERGY_CAP, p.energy + qmove['energyGain'])
+                            # Credit the CURRENT form's fast move for energy,
+                            # not the stale queued dict. They differ only after
+                            # a mid-flight form change swapped the fast move
+                            # (Aegislash Blade->Shield revert on a shielded
+                            # charged move): the in-flight fast lands as the
+                            # Shield-form charge variant (energyGain 6), not the
+                            # Blade fast that was queued (9). PvPoke uses
+                            # poke.fastMove for both damage and energy here
+                            # (Battle.js processAction) and hard-codes
+                            # energyGain=6 in shield form -- the Shield charge
+                            # variant's gamemaster energyGain is already 6, so
+                            # this matches. (FC-1, 2026-07-03; previously we
+                            # credited the queued move's 9 -- an internally
+                            # inconsistent old-move-energy / new-move-damage mix.)
+                            p.energy = min(ENERGY_CAP,
+                                           p.energy + p.fast_move['energyGain'])
                             defender.hp = max(0, defender.hp - dmg)
                             p._fm_since_charge += 1
                             if log:
