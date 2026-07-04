@@ -68,14 +68,29 @@ below later found one on a wider grid.)
   engine-hash-coverage question (anchors feed breakpoint analysis, not the
   cached 1v1 column scores), worth a look but not a delta hole.
 
-**DEFERRED to AFTER the hunt2 merge (their natural homes are contested):**
-- **JIT-COV-2** (LOW, inert): one-line comment at `battle.py:1415-1416`
-  (JIT-path `final_state` zeroes `energy`/`atk_stage`; no live reader). battle.py
-  is heavily rewritten on hunt2 — do this comment post-merge to avoid a needless
-  conflict.
-- **PROP-1** (LOW, doc): exact-`cmp_atk` ties resolve by player index
-  (PvPoke-faithful; a "Known engine properties" note). Home is DEVELOPER_NOTES,
-  which hunt2 rewrote 172 lines of and top-N also edits — add post-merge.
+**hunt2 engine batch MERGED to main (`2a63b65`, 2026-07-03, Michael-approved):**
+NB-1 (selection freeze) + FC-1 (Aegislash revert energy) + OMT (turns_planned
+divisor) + would_shield-as-documented. Fast-forward from `a86b0fd`; full suite on
+the merged tree 1234 passed / 14 xfailed / 2 pre-existing fixture failures.
+battle.py byte-identical to the audit-passed hunt2 engine. OMT is the cold-forcing
+change (touched set not statically characterizable), so the merged engine needs a
+cold re-dive — everything else in this batch rides it for free.
+
+**DONE post-merge (Opus, 2026-07-03):**
+- **JIT-COV-2** (`02627fe`): inline comment at the JIT `final_state = _DPState(0,
+  ...)` site — `energy=0` is inert (no consumer reads `.energy`). Comment-only on an
+  engine-hash file; rides the OMT-forced cold re-dive.
+- **PROP-1** (`fe2c443`): DEVELOPER_NOTES "Key implementation details" now documents
+  the exact-`cmp_atk`-tie -> player-index (p0-first) resolution as a PvPoke-faithful
+  known property.
+- **anchors.py `_ENGINE_FILES` question** (was the F1 out-of-scope note): checked —
+  **BENIGN**. Engine-hash caches store only sim column scores; anchors.py feeds
+  breakpoint analysis and is strictly downstream (no engine file imports it, anchors
+  recompute fresh each dive), so it needs no engine-hash coverage. Caveat: replay
+  blobs / gobattlekit thresholds exported before BP-1 carry old anchors by design —
+  re-export any shipped ones that matter.
+
+**Still DEFERRED:**
 - **js-parity-1..5** (LOW): shipped-page JS contradictions; the top-N session
   owns `deep_dive_engine.js` / `deep_dive.py`. Leave until it lands.
 
