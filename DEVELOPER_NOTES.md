@@ -374,22 +374,15 @@ intended behavior (functional pruning, `True`).
 
 ### 2. bestChargedMove not recomputed on opponent form change
 
-**File**: `Pokemon.js:791-822` (selectBestChargedMove) and
-`Pokemon.js:2344` (changeForm calls resetMoves on self only)
+**File**: `Pokemon.js:791-822` (selectBestChargedMove); `:2344` (changeForm calls resetMoves on self only)
 
-PvPoke computes `bestChargedMove` at init time using actual damage
-against the opponent's current stats, then caches it on the Pokemon
-object. When the **opponent** changes form (e.g., Aegislash
-Shield->Blade, dramatically changing defense), the attacker's
-`bestChargedMove` is NOT recomputed. Only the form-changing Pokemon's
-own `resetMoves()` is called.
-
-Concrete example: Azu's IB (15 dmg, 55 energy, DPE 0.273) vs PR
-(18 dmg, 60 energy, DPE 0.300) against Aegislash Shield form. DPE
-diff is 0.027 < 0.03 threshold, so PvPoke picks IB (cheaper, locked
-at init). Against Blade form (low def), DPE diff grows to 0.062 >
-0.03, and PR becomes clearly better - but PvPoke still uses IB. Our
-code recomputes per turn, which we believe is more correct.
+PvPoke caches `bestChargedMove` at init and does NOT recompute it when
+the **opponent** changes form (e.g. Aegislash Shield->Blade) — only the
+form-changer's own `resetMoves()` runs. Example: Azu's IB (DPE 0.273)
+stays locked over PR (DPE 0.300) vs Shield form (diff 0.027 < 0.03); vs
+Blade form PR is clearly better but PvPoke keeps IB. UPDATE 2026-07-03:
+we now MATCH this (divergence #3 freeze); the NB-1 sweep showed our old
+per-turn recompute was NOT reliably better, so consistency wins.
 
 ### 3. Aegislash selects Gyro Ball over Shadow Ball
 
@@ -577,7 +570,15 @@ messages.
   (Snorlax ate one extra Counter per battle); removed, matches
   ActionLogic.js:317-329.
 
-(Lesson across the last three: "score-neutral" claims about decision-timing
+- **OMT `turns_planned` divisor — RESOLVED 2026-07-03.** We divided
+  `poke.energy` by the cheapest *affordable* charged move (returning early
+  when none was affordable); PvPoke (ActionLogic.js:305) divides by
+  `activeChargedMoves[0].energy` (the frozen slot-0 move) regardless of
+  affordability. At a low-energy deathbed state ours inflated `turns_planned`
+  and fired several fast moves early (sweep doc Group D; PvPoke strictly
+  better). Now uses the frozen slot-0 energy; pinned by Group D.
+
+(Lesson across the last four: "score-neutral" claims about decision-timing
 deviations need a trace, not reasoning — each was an extra condition the
 reference lacks, with a plausible comment, producing real margin errors.)
 
@@ -663,35 +664,28 @@ the self-debuffing nuke to `activeChargedMoves[0]` (Fly) whenever:
     AND poke.hp / poke.stats.hp > 0.5
     AND finalState.moves[0].damage / opp.hp < 0.8
 
-*(Mechanism paragraph corrected 2026-06-11, review finding E11.)*
 PvPoke's `move.damage` is essentially NEVER undefined: `initializeMove`
-(Pokemon.js:830-839) sets it for every move at battle init (both the
-with-opponent and without-opponent branches assign), `wouldShield`
-refreshes it on every evaluation (ActionLogic.js:1121), and the OMT
-side effect (line 320, fires per-move whenever `opponent.shields == 0`)
-keeps it freshest. So PvPoke's bandaid[885] always evaluates its
-`damage/opp.hp < 0.8` ratio — possibly with a stale value. Our port
+(Pokemon.js:830-839) sets it at battle init, `wouldShield` refreshes it
+(ActionLogic.js:1121), and the OMT side effect (line 320, per-move when
+`opponent.shields == 0`) keeps it freshest. So PvPoke's bandaid[885]
+always evaluates its `damage/opp.hp < 0.8` ratio (possibly stale). Our port
 caches damage at battle.py:652 but subgates the assignment on
 `attacker.energy >= cm['energy']` — so in the Moltres-G cluster
 (energy < BB's 55 at the T20 DP-entry state) our `_cached_damage`
 stays `None`, bandaid[866] skips its ratio test entirely, the DP plan
 is left alone, and bandaid[918] stacks BB until energy reaches 100 →
-single-BB nuke instead of Fly-chain. NOTE the divergence surface is
+single-BB nuke instead of Fly-chain. The divergence surface is
 therefore broader than the MG cluster: our bandaid[866] skips wherever
-`_cached_damage` is None, while PvPoke's always fires — the empirical
+`_cached_damage` is None, while PvPoke's always fires. The empirical
 cluster measurements and the keep-our-behavior decision below stand
-(they were measured from actual traces), but an earlier version of
-this paragraph wrongly claimed the field is "undefined in JS" unless
-OMT fired.
+(measured from actual traces).
 
 **Why we don't fix it:** faithfully mirroring PvPoke's OMT side
 effect (so bandaid[866] fires when PvPoke's bandaid[885] would) swaps
 BB → Fly in **all** MG cluster cases, not just Lapras. The bandaid's
-`damage/opp.hp < 0.8` test doesn't discriminate:
-
-- Lapras [1,2]:   BB 99 / hp 142 = 0.70 → fires (PvPoke's Fly plan wins; ours loses by 1 HP)
-- Jellicent [0,0]: BB 99 / hp ~160 = 0.62 → fires (PvPoke's Fly plan worse by ~47 HP)
-- Corviknight cluster: similar 0.6-0.7 ratios → fires (PvPoke's Fly plan worse by ~38 HP)
+`damage/opp.hp < 0.8` test doesn't discriminate: all cluster cases hit
+0.6-0.7 and fire — Lapras [1,2] (PvPoke's Fly plan wins, ours loses by 1
+HP) but Jellicent/Corviknight (PvPoke's Fly plan worse by ~38-47 HP).
 
 So the fix is all-or-nothing against a 6:1 weighting; matching PvPoke
 inverts the ratio rather than improving it. Per CLAUDE.md "When our
@@ -712,11 +706,10 @@ harness, MG max HP=161, all cases MG wins in both sims):
 | Corviknight [0,1] | 71  ( 44%) | ~33 ( 20%)   | +38 / +24pp |
 | Corviknight [0,2] | 97  ( 60%) | ~59 ( 37%)   | +38 / +23pp |
 
-Consistently +23-30 percentage points (~38-48 raw HP). MG also KOs
+Consistently +23-30 percentage points (~38-48 raw HP); MG also KOs
 6-12 turns earlier in our sim. The magnitude is what makes our
-divergence defensible — if the gap were a few HP, PvPoke's plan
-would be at-or-better than ours and we'd match. At 25-30pp the
-post-KO carry-over difference is material for next-mon analysis.
+divergence defensible — if the gap were a few HP we'd match PvPoke; at
+25-30pp the post-KO carry-over is material for next-mon analysis.
 
 **Caveat — Lapras [1,2] winner flip**: 1 of 7 cluster cases is a real
 edge case where our plan is worse. Same root cause (MG picks BB, PvPoke
@@ -773,26 +766,29 @@ Medicham, selfBuffing, priority-shuffle, Forretress/Azu DP); the rest live only
 in git history (pre-2026-06-28 DEVELOPER_NOTES) and their linked commits — do
 NOT assume a named item has a dedicated CHANGELOG section.
 
-### 3. bestChargedMove computed per-turn, not cached at init (intentional)
+### 3. Move-selection freeze at resetMoves (matches PvPoke; FIXED 2026-07-03)
 
-**PvPoke**: `bestChargedMove` is computed once at init (and on self
-form change via `resetMoves`). Not updated when the opponent changes
-form or when stat stages change.
+**PvPoke** freezes the activeChargedMoves ordering, each move's raw
+`.dpe`, `bestChargedMove`, and the farm-down constants in `resetMoves()`
+— at battle start and again on *self* form change (only `move.damage`
+refreshes per use). We used to recompute `best_idx`/ordering/dpe every
+`pvpoke_dp` call from current-stage damage, documented here as strictly
+better. The NB-1
+bounding sweep (`docs/reviews/2026-07-03_nb1_bounding_sweep.md`)
+FALSIFIED that: the per-stage recompute crosses PvPoke's init-tuned
+0.3/1.5 guards mid-fight for non-strategic reasons, in BOTH directions —
+including a shipped winner flip against us (Forretress (Shadow) vs
+Cradily GL 1-0, ours 413 LOSS vs oracle 588 WIN). `_ensure_dp_init_cache`
+now freezes those quantities once per battle (reset only on self form
+change, so only the changer re-selects — matching PvPoke);
+`_ensure_dp_cache` keeps the per-stage damage tables fresh. Pinned in
+`tests/test_nb1_selection_freeze.py` (Groups A/B).
 
-**Our code**: `best_idx` is recomputed every call to `pvpoke_dp` using
-current damage values. We believe this is more correct: it responds to
-stat stage changes mid-battle and to opponent form changes (e.g.,
-Aegislash Shield->Blade dramatically changes defender's def, shifting
-DPE thresholds). PvPoke's stale cache produces suboptimal move choices
-when opponent stats change, as documented in PvPoke bug #2 above.
-
-**Impact**: +134 delta on Aegislash 1v2/2v2 — our Azu correctly
-switches to Play Rough (higher DPE against Blade form) while PvPoke
-keeps using Ice Beam (cached against Shield form's def).
-
-**Decision**: keep our per-turn recomputation. The only known
-mismatches are in Aegislash scenarios where PvPoke's cached selection
-is demonstrably worse.
+**Remaining intentional divergence**: the post-DP don't-bait dpeRatio
+site (battle.py, "the NB-1 freeze carve-out") stays FRESH and
+internally-consistent; PvPoke's uses `move.damage` with mixed
+refresh-on-use staleness (a cache artifact), so matching it would
+emulate a PvPoke bug. Pinned as Group C.
 
 ## Threshold model: damage tiers vs matchup boundaries
 
@@ -844,13 +840,11 @@ Two non-obvious behaviors discovered during form change implementation
 (2026-04-14) that are easy to get wrong:
 
 **1. HP does not scale on form change.** When Aegislash switches between
-Shield form (97 atk, 272 def) and Blade form (272 atk, 97 def), the HP
-and max_hp stay fixed at the starting form's values. PvPoke's
-`Pokemon.js changeForm()` has the HP update explicitly commented out:
-`//this.stats.hp = newStats.hp;` (line ~2365). This means Aegislash
-keeps Shield form's HP even after transforming to Blade. It would be
-natural to assume HP scales proportionally with the new form's stats,
-but it doesn't.
+Shield form (97 atk, 272 def) and Blade form (272 atk, 97 def), HP and
+max_hp stay fixed at the STARTING form's values — PvPoke's
+`Pokemon.js changeForm()` explicitly comments out the HP update
+(`//this.stats.hp = newStats.hp;`, line ~2365). It's natural to assume HP
+scales with the new form's stats, but it doesn't.
 
 **2. Aegislash Blade form uses whole levels only.** When Shield form
 (level 46 in GL) transforms to Blade form, the game rounds DOWN to the
@@ -859,29 +853,35 @@ nearest whole level (not half level). In Pokemon Go you power up in
 (1476 CP, under the 1500 cap), but the game puts it at level 22 (1443
 CP) instead -- losing a half level of stats. PvPoke's `getFormStats()`
 (Pokemon.js line ~2455 as of pvpoke bc532fbda) implements this via
-`newLevel--` (decrementing by 1, not 0.5). This was discovered by cascade1185
-(https://x.com/cascade1185/status/2037456058265075782) and explained by
-Caleb Peng (https://www.youtube.com/watch?v=OdHxOD6FZcg&t=167s). When
-choosing which Aegislash to power up, players need to check that the
-Blade form level lands on a favorable whole number.
+`newLevel--` (decrementing by 1, not 0.5; discovered by cascade1185,
+explained by Caleb Peng). When choosing which Aegislash to power up,
+players need to check that the Blade form level lands on a favorable
+whole number.
 
 **3. The Blade->Shield reverse level formula overflows the CPM table.**
-PvPoke's `getFormStats()` aegislash_shield branch starts the Shield
-level at `blade_level / 0.5 + 2` (GL) as a deliberate overshoot, then
-walks down whole levels until CP fits. A low-IV Blade *focal* caps at
-level 25 in GL (whole-level rule above), putting the raw start at 52 —
-past the end of the CPM table (max 51.0). PvPoke survives because it
-computes form stats lazily at form-change time and JS just yields
-`undefined` (`cpms[index]` out of range — a latent PvPoke bug); our
-dive plumbing builds per-IV `FormChangeConfig`s eagerly at sweep setup,
-so the first post-S1 Aegislash (Blade) GL dive crashed with
-`KeyError: 52.0` (2026-06-11). Fix: `_aegislash_shield_level` clamps
-its start to `max(CPM)` — exact, since levels above 51 don't exist and
-the walk-down from 51 reaches the same fixed point. Pinned by
-`tests/test_pokemon.py::TestAegislashShieldLevelOverflow` (exhaustive
-4096-IV × GL/UL build sweep). Blade really does revert to Shield
-in-battle (gamemaster trigger `activate_shield`), so the reverse
-mapping is load-bearing, not hypothetical-only.
+PvPoke's `getFormStats()` aegislash_shield branch overshoots the Shield
+level (`blade_level / 0.5 + 2` in GL) then walks down until CP fits. A
+low-IV Blade focal caps at level 25 in GL, putting the raw start at 52 —
+past the CPM table end (max 51.0). PvPoke computes form stats lazily and
+JS yields `undefined` there (a latent bug); we build per-IV
+`FormChangeConfig`s eagerly, so the first post-S1 Aegislash (Blade) GL
+dive crashed with `KeyError: 52.0` (2026-06-11). Fix:
+`_aegislash_shield_level` clamps its start to `max(CPM)`. Pinned by
+`tests/test_pokemon.py::TestAegislashShieldLevelOverflow`. Blade really
+reverts to Shield in-battle (`activate_shield`), so this is load-bearing.
+(Our clamp is the defensible choice — levels above 51 don't exist in-game
+— though PvPoke's cpms table actually reaches 55; see round-2 FC-2.)
+
+**4. A fast landing after a mid-flight revert credits the CURRENT form's
+energy (FIXED 2026-07-03, FC-1).** When Aegislash (Blade) shields a
+charged move with its own multi-turn fast in flight, the
+`activate_shield` revert swaps its fast to the Shield charge variant; the
+in-flight fast lands with the new move's damage but used to credit the
+OLD queued move's energyGain (9) not the current move's (6). PvPoke uses
+the current move for both (hard-coding 6 in shield form). Fixed at both
+battle.py landing sites; pinned by
+`tests/test_fc1_aegislash_revert_energy.py` (oracle-equal, incl. a
+corrected winner flip).
 
 ## Active alt-moveset opponent variants
 

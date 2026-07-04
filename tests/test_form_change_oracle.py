@@ -153,14 +153,17 @@ def test_morpeko_vs_gfisk_aura_wheel_type_flip(s1, s2, score0, score1,
 
 @pytest.mark.parametrize("s1,s2,score0,score1,winner,log", [
     (0, 0, 316, 683, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    (0, 1, 316, 683, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
-    (0, 2, 316, 683, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
+    # (0,1)/(0,2): after the NB-1 selection-freeze (2026-07-03) these now match
+    # the PvPoke oracle EXACTLY (score [306,693] winner 1 and chargedLog); the
+    # divergence annotation was removed.
+    (0, 1, 306, 693, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (0, 2, 306, 693, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
     (1, 0, 671, 328, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (see audit harness)
-    (1, 1, 654, 345, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze (shielded)', 'Tinkaton: Gigaton Hammer']),  # PvPoke-divergent cell (see audit harness)
-    (1, 2, 387, 612, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
+    (1, 1, 637, 362, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (bug #3 Gyro-Ball; shifted by 2026-07-03 NB-1 freeze, oracle winner 0 still matches)
+    (1, 2, 408, 591, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (shifted by 2026-07-03 NB-1 freeze; oracle winner 1 still matches)
     (2, 0, 946, 53, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (see audit harness)
-    (2, 1, 929, 70, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Tinkaton: Gigaton Hammer']),  # PvPoke-divergent cell (see audit harness)
-    (2, 2, 643, 356, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (see audit harness)
+    (2, 1, 912, 87, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (bug #3; shifted by 2026-07-03 NB-1 freeze, oracle winner 0 still matches)
+    (2, 2, 620, 379, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (shifted by 2026-07-03 NB-1 freeze; oracle winner 0 still matches)
 ])
 def test_tinkaton_ul_vs_aegislash_shield(s1, s2, score0, score1,
                                          winner, log):
