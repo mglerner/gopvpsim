@@ -824,6 +824,24 @@ PvPoke uses three different insertion strategies in the DP queue:
 The `<` for not-ready states is critical — it produced 2 exact PvPoke
 matches and several closer scores for Azu vs Forretress.
 
+### CMP tie resolution: exact ties fall to player index (PROP-1)
+
+Charge-move priority (CMP) orders two same-turn charged moves by
+effective attack (`cmp_atk`), higher first. On an **exact** `cmp_atk`
+tie the engine applies **no** priority at all — `use_priority =
+(p0.cmp_atk != p1.cmp_atk)` is False (battle.py `simulate`), so the
+`charged_actions` list is never sorted and keeps its build order,
+which is player index: **player 0's charged move resolves before
+player 1's, and neither cancels the other** (the CMP-cancel guard is
+also gated on `use_priority`). This is PvPoke-faithful — Battle.js
+likewise skips the attack-sort when the two attacks are equal and
+resolves in array (player-index) order. It's a stable, documented
+property, not a divergence: whichever Pokemon is passed as `p0` wins
+an exact CMP tie. (The asymmetric `>=` at the `wins_cmp` sites and the
+strict `>` at the `cmp_bonus`/turns sites are the per-perspective
+shadows of this same rule: the evaluated side takes the tie, but earns
+no turn *bonus* from a tie.)
+
 ### selfBuffing / selfDebuffing thresholds
 
 PvPoke gates these flags on `buffApplyChance`:
