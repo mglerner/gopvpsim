@@ -1,0 +1,24 @@
+# Equinox Cup (Great League CP 1500) curated meta (20 species), ordered by cup rank; movesets baked from the equinox cup rankings. Lines carry inline "| fast= | charged=" overrides (one opponent per line); active_variants intentionally NOT merged (dive with --no-active-variants).
+# Generated 2026-07-03 by scripts/build_opponent_pool.py
+# Format: one PvPoke speciesName per line; blank lines and # comments ignored.
+
+Mantine | fast=WING_ATTACK | charged=TWISTER,WATER_PULSE
+Mandibuzz | fast=SNARL | charged=FOUL_PLAY,SHADOW_BALL
+Toucannon | fast=PECK | charged=BEAK_BLAST,DRILL_PECK
+Pelipper | fast=WING_ATTACK | charged=WEATHER_BALL_WATER,HURRICANE
+Pidgeot | fast=WING_ATTACK | charged=AIR_CUTTER,BRAVE_BIRD
+Moltres (Galarian) | fast=SUCKER_PUNCH | charged=FLY,BRAVE_BIRD
+Murkrow | fast=PECK | charged=DRILL_PECK,FOUL_PLAY
+Togekiss | fast=PECK | charged=PSYSHOCK,AURA_SPHERE
+Corviknight | fast=SAND_ATTACK | charged=AIR_CUTTER,PAYBACK
+Drampa | fast=DRAGON_BREATH | charged=SWIFT,DRAGON_PULSE
+Turtonator | fast=INCINERATE | charged=BRUTAL_SWING,DRAGON_CLAW
+Gyarados (Shadow) | fast=DRAGON_BREATH | charged=AQUA_TAIL,TWISTER
+Clodsire | fast=POISON_STING | charged=EARTHQUAKE,STONE_EDGE
+Articuno | fast=POWDER_SNOW | charged=ICY_WIND,HURRICANE
+Ninetales | fast=EMBER | charged=WEATHER_BALL_FIRE,ENERGY_BALL
+Lugia | fast=DRAGON_TAIL | charged=FLY,AEROBLAST
+Golbat | fast=WING_ATTACK | charged=POISON_FANG,SHADOW_BALL
+Gliscor | fast=WING_ATTACK | charged=SAND_TOMB,ACROBATICS
+Moltres | fast=WING_ATTACK | charged=FLY,HEAT_WAVE
+Wailmer | fast=ROLLOUT | charged=SCALD,BODY_SLAM
