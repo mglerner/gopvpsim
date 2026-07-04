@@ -1428,6 +1428,10 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
             final_state = None
             iters = 0
         elif found:
+            # energy=0 placeholder is inert: the reconstruction below (and every
+            # consumer of final_state) reads first_idx/max_dmg_idx/has_debuf/turn/
+            # hp/shields/atk_stage but never .energy, so the JIT kernel doesn't
+            # bother threading a real end-energy back out. (JIT-COV-2)
             final_state = _DPState(0, _f_hp, _f_turn, _f_sh,
                                    _first, _max_idx, _has_deb, _deb_cnt)
         # else: final_state stays None → fall through to greedy fallback
