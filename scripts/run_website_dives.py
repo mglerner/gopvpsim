@@ -492,6 +492,36 @@ DIVES = [
     {'species': 'Zygarde (Complete Forme)', 'league': 'ultra', 'slug': 'zygarde-complete-ultra-league',
      'html_base': 'index.html', 'opponents_file': 'opponent_pools/ul_top60.txt',
      'top_movesets': 1, 'no_thresholds': True},
+
+    # ---- Equinox Cup pilot (GL 1500, Phase 2 of the top-N/cup plan) ----
+    # A cup dive is mechanically Great League; `cup: 'equinox'` adds the
+    # labeling + cup-rankings overlay (build_command also passes
+    # --no-active-variants automatically for cup dives). Opponents come from
+    # opponent_pools/equinox_great.txt (the curated 20-species meta on cup
+    # movesets). Each focal is pinned to its OWN cup-recommended build via
+    # --fast/--charged so the page shows the cup meta build, not the open-GL
+    # default. no_thresholds: cup thresholds are Phase 3 (see the
+    # threshold-export cup guard); we do not export them here.
+    {'species': 'Corviknight', 'league': 'great', 'slug': 'corviknight-equinox-cup',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/equinox_great.txt',
+     'cup': 'equinox', 'top_movesets': 1, 'no_thresholds': True,
+     'extra_args': ['--fast', 'SAND_ATTACK', '--charged', 'AIR_CUTTER,PAYBACK']},
+    {'species': 'Mantine', 'league': 'great', 'slug': 'mantine-equinox-cup',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/equinox_great.txt',
+     'cup': 'equinox', 'top_movesets': 1, 'no_thresholds': True,
+     'extra_args': ['--fast', 'WING_ATTACK', '--charged', 'TWISTER,WATER_PULSE']},
+    {'species': 'Mandibuzz', 'league': 'great', 'slug': 'mandibuzz-equinox-cup',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/equinox_great.txt',
+     'cup': 'equinox', 'top_movesets': 1, 'no_thresholds': True,
+     'extra_args': ['--fast', 'SNARL', '--charged', 'FOUL_PLAY,SHADOW_BALL']},
+    {'species': 'Toucannon', 'league': 'great', 'slug': 'toucannon-equinox-cup',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/equinox_great.txt',
+     'cup': 'equinox', 'top_movesets': 1, 'no_thresholds': True,
+     'extra_args': ['--fast', 'PECK', '--charged', 'BEAK_BLAST,DRILL_PECK']},
+    {'species': 'Clodsire', 'league': 'great', 'slug': 'clodsire-equinox-cup',
+     'html_base': 'index.html', 'opponents_file': 'opponent_pools/equinox_great.txt',
+     'cup': 'equinox', 'top_movesets': 1, 'no_thresholds': True,
+     'extra_args': ['--fast', 'POISON_STING', '--charged', 'EARTHQUAKE,STONE_EDGE']},
 ]
 
 
@@ -522,6 +552,12 @@ def build_command(dive):
         cmd += ['--no-thresholds']
     if dive.get('shadow'):
         cmd += ['--shadow']
+    # Limited-cup dive: labeling + cup-rankings overlay on top of --league.
+    # The cup pool bakes each opponent's cup moveset inline, so the active-
+    # variants auto-merge must be skipped (it would re-append base-species
+    # variants alongside the cup-moveset opponents).
+    if dive.get('cup'):
+        cmd += ['--cup', dive['cup'], '--no-active-variants']
 
     cmd += [
         '--html', html_path,
