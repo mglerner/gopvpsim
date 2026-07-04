@@ -412,6 +412,50 @@ def _moveset_fast_move(label: str) -> str:
     return label.split('/', 1)[0].strip()
 
 
+def _moveset_charged_moves(label: str) -> list[str]:
+    """Charged move ids from a label 'FAST / CM1, CM2' -> ['CM1', 'CM2']."""
+    _, _, charged = label.partition('/')
+    return [c.strip() for c in charged.split(',') if c.strip()]
+
+
+def _cd_move_is_fast(cd_entry: dict) -> bool:
+    """Whether the CD move is a fast move (charged moves cost energy).
+
+    PvPoke gamemaster moves carry both ``energy`` (charged-move cost) and
+    ``energyGain`` (fast-move gain); a fast move has no energy cost. This
+    is what lets the article generator support CD moves that are charged
+    (starter nukes: Hydro Cannon / Blast Burn / Frenzy Plant) as well as
+    the fast-move CDs (Mud Slap) it was originally written for.
+    """
+    return (cd_entry.get('energy') or 0) <= 0
+
+
+def _moveset_matches_cd(label: str, cd_id: str, cd_is_fast: bool) -> bool:
+    """Whether a moveset is a "CD build" (features the CD move).
+
+    Fast CD move: the moveset's fast move is the CD move (legacy behavior,
+    byte-identical to the old ``_moveset_fast_move(label) == cd_id`` test).
+    Charged CD move: the CD move is one of the moveset's charged moves.
+    """
+    if cd_is_fast:
+        return _moveset_fast_move(label) == cd_id
+    return cd_id in _moveset_charged_moves(label)
+
+
+def _moveset_is_default(label: str, cd_id: str, cd_is_fast: bool,
+                        default_fast_id: str) -> bool:
+    """Whether a moveset is a "pre-CD default build" (lacks the CD move).
+
+    Fast CD move: the moveset uses the pre-CD default fast move (legacy
+    behavior, identical to ``_moveset_fast_move(label) == default_fast_id``).
+    Charged CD move: the moveset does NOT feature the CD charged move -- its
+    charged pool is the pre-CD one we compare the CD move against.
+    """
+    if cd_is_fast:
+        return _moveset_fast_move(label) == default_fast_id
+    return cd_id not in _moveset_charged_moves(label)
+
+
 def _lookup_move(gm: dict, move_id_or_name: str) -> dict | None:
     """Case-insensitive lookup by moveId or display name in gamemaster moves."""
     target = move_id_or_name.strip().lower()
@@ -956,8 +1000,9 @@ def _render_meta_coverage_section(cd_move: str, species: str,
             'meta-coverage', 'Meta Coverage',
             f'Move {cd_move!r} not found in gamemaster.')
 
+    cd_is_fast = _cd_move_is_fast(cd_entry)
     cd_movesets = [m for m in dive['movesets']
-                   if _moveset_fast_move(m['label']) == cd_id]
+                   if _moveset_matches_cd(m['label'], cd_id, cd_is_fast)]
     if not cd_movesets:
         return render_placeholder(
             'meta-coverage', 'Meta Coverage',
@@ -1062,10 +1107,12 @@ def _render_verdict_section(cd_move: str, species: str, league: str,
         return render_placeholder('verdict', 'Verdict',
                                   f'No default moveset: {exc}')
 
+    cd_is_fast = _cd_move_is_fast(cd_move_entry)
     cd_movesets = [m for m in dive['movesets']
-                   if _moveset_fast_move(m['label']) == cd_move_id]
+                   if _moveset_matches_cd(m['label'], cd_move_id, cd_is_fast)]
     default_movesets = [m for m in dive['movesets']
-                        if _moveset_fast_move(m['label']) == default_fast_id]
+                        if _moveset_is_default(m['label'], cd_move_id,
+                                               cd_is_fast, default_fast_id)]
 
     if not cd_movesets:
         return render_placeholder(
@@ -1343,6 +1390,7 @@ def _collect_per_form_best_movesets(form_spec: dict, cd_move: str,
     if cd_entry is None:
         return None
     cd_id = cd_entry['moveId']
+    cd_is_fast = _cd_move_is_fast(cd_entry)
     league = form_spec['league']
     forms: list[dict] = []
     for lo_spec in form_spec['loadout_specs']:
@@ -1358,9 +1406,10 @@ def _collect_per_form_best_movesets(form_spec: dict, cd_move: str,
         except KeyError:
             return None
         cd_ms = [m for m in dive_data['movesets']
-                 if _moveset_fast_move(m['label']) == cd_id]
+                 if _moveset_matches_cd(m['label'], cd_id, cd_is_fast)]
         df_ms = [m for m in dive_data['movesets']
-                 if _moveset_fast_move(m['label']) == default_fast_id]
+                 if _moveset_is_default(m['label'], cd_id, cd_is_fast,
+                                        default_fast_id)]
         if not cd_ms or not df_ms:
             return None
         best_cd = max(cd_ms, key=lambda m: m['win_rate'])
@@ -2115,10 +2164,12 @@ def _render_matchup_delta_section(cd_move: str, species: str, league: str,
         return render_placeholder('matchup-delta', 'Matchup Delta',
                                   f'No default moveset: {exc}')
 
+    cd_is_fast = _cd_move_is_fast(cd_entry)
     cd_movesets = [m for m in dive['movesets']
-                   if _moveset_fast_move(m['label']) == cd_id]
+                   if _moveset_matches_cd(m['label'], cd_id, cd_is_fast)]
     default_movesets = [m for m in dive['movesets']
-                        if _moveset_fast_move(m['label']) == default_fast_id]
+                        if _moveset_is_default(m['label'], cd_id, cd_is_fast,
+                                               default_fast_id)]
     if not cd_movesets or not default_movesets:
         return render_placeholder(
             'matchup-delta', 'Matchup Delta',
@@ -2536,8 +2587,9 @@ def _render_iv_recommendations_section(cd_move: str, species: str,
             f'Move {cd_move!r} not found in gamemaster; cannot pick best CD moveset.')
     cd_id = cd_entry['moveId']
 
+    cd_is_fast = _cd_move_is_fast(cd_entry)
     cd_movesets = [m for m in dive['movesets']
-                   if _moveset_fast_move(m['label']) == cd_id]
+                   if _moveset_matches_cd(m['label'], cd_id, cd_is_fast)]
     if not cd_movesets:
         return render_placeholder(
             'iv-recommendations', 'IV Recommendations',
@@ -2614,10 +2666,12 @@ def _derive_framing(species: str, league: str, cd_move: str,
         default_fast_id, _ = get_default_moveset(species, league)
     except KeyError:
         return None
+    cd_is_fast = _cd_move_is_fast(cd_entry)
     cd_ms = [m for m in dive['movesets']
-             if _moveset_fast_move(m['label']) == cd_id]
+             if _moveset_matches_cd(m['label'], cd_id, cd_is_fast)]
     df_ms = [m for m in dive['movesets']
-             if _moveset_fast_move(m['label']) == default_fast_id]
+             if _moveset_is_default(m['label'], cd_id, cd_is_fast,
+                                    default_fast_id)]
     if not cd_ms or not df_ms:
         return None
     best_cd = max(cd_ms, key=lambda m: m['win_rate'])
