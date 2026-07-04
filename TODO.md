@@ -173,9 +173,10 @@ threshold-export collision guard (cup blobs -> `<species>_<cup>.toml`);
 (Corviknight/Mantine/Mandibuzz/Toucannon/Clodsire); page-render 67/67,
 index-presence + bundler dry-run green, suite 1245 passed. NOT pushed / NOT
 published -- pending review. Audit report:
-`~/coding/reports/gopvpsim-equinox-cup-pilot-2026-07-03.html`. Note: the
-cup-index `_CUP_STATUS['equinox']['playable']` is left neutral (live
-availability not verified); hand-mark it when known. Phase 3 (more cups,
+`~/coding/reports/gopvpsim-equinox-cup-pilot-2026-07-03.html`. The cup-index
+live/archived status is auto-derived from PvPoke's `formats[].showFormat` on
+each build (no hand-maintained rotation list); a rotated-out cup auto-flips to
+"archived snapshot". Phase 3 (more cups,
 legality-filter eval, app-side cup toggles, mega engine) remains -- see the
 plan doc.
 
