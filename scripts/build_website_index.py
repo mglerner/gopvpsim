@@ -631,7 +631,7 @@ def render_index(dives: list[dict],
             '(restricted-type formats) - scored against the cup meta on cup '
             'movesets. Dated archives kept when a cup ends.</p>\n'
             '<ul>\n'
-            '  <li class="dive"><a href="cups/index.html">'
+            '  <li class="dive"><a href="cups.html">'
             f'Cup dives ({len(cups)} dive(s) across {n_cups} cup(s))</a></li>\n'
             '</ul>\n')
 
@@ -772,12 +772,15 @@ def _cup_status_line(cup_key: str, active_formats: dict) -> str:
 
 
 def render_cup_index(cup_dives: list[dict]) -> str:
-    """Standalone cup-index page (userdata/website/cups/index.html).
+    """Standalone cup-index page, published at the site ROOT as cups.html.
 
-    Grouped by cup, archive-friendly (each cup carries a playable/past status
+    Grouped by cup, archive-friendly (each cup carries a live/archived status
     line). Kept separate from the main index so rotating cup content stays out
-    of the evergreen league lists. Dive hrefs are re-based with '../' because
-    this page lives one directory below the cup dive dirs.
+    of the evergreen league lists. Published as a root-level FILE (not a
+    cups/ subdir) so every dive link is a same-directory `<slug>/index.html`
+    path -- the exact navigation the main index uses. A cups/ subdirectory
+    forced cross-directory `../` links, which browsers block for
+    file:// navigation (the local-review path), so those links dead-ended.
     """
     by_cup: dict[str, list[dict]] = {}
     for d in cup_dives:
@@ -793,9 +796,9 @@ def render_cup_index(cup_dives: list[dict]) -> str:
         # Stable heading name (matches the cup name baked into the dive pages);
         # the LIVE/archived status below is what's auto-derived from PvPoke.
         pretty = html.escape(_CUP_PRETTY_BY_KEY.get(cup_key, cup_key.title()))
-        # Re-base hrefs one level up for the cups/ subdirectory.
-        rebased = [{**d, 'href': '../' + d['href']} for d in by_cup[cup_key]]
-        listing = _render_dives_grouped(rebased)
+        # Same-directory hrefs (`<slug>/index.html`), as load_entries produced
+        # them for a root page -- no cross-directory `../` (see docstring).
+        listing = _render_dives_grouped(by_cup[cup_key])
         sections.append(
             f'\n<h2>{pretty}</h2>\n'
             f'<p class="section-intro">{_cup_status_line(cup_key, active_formats)}</p>\n'
@@ -838,10 +841,10 @@ def render_cup_index(cup_dives: list[dict]) -> str:
 <h1>Limited Cup Dives</h1>
 <p>Deep dives for rotating limited cups (restricted-type formats). A cup dive
 is mechanically its base league but scored against the cup meta, with each
-opponent on its cup moveset. <a href="../index.html">Back to all dives</a>.</p>
+opponent on its cup moveset. <a href="index.html">Back to all dives</a>.</p>
 {body}
 <p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
-{support_footer_html("../")}</body>
+{support_footer_html("")}</body>
 </html>
 """
 
@@ -1026,13 +1029,20 @@ def main() -> int:
                               cups=cup_dives)
     INDEX_PATH.write_text(index_html)
 
-    # Separate cup-index page (only when cup dives exist). Written under
-    # userdata/website/cups/index.html; linked from the "Limited Cups" card.
+    # Separate cup-index page (only when cup dives exist). Written as a
+    # root-level FILE (cups.html), NOT a cups/ subdir, so its dive links are
+    # same-directory `<slug>/index.html` paths (no cross-directory `../`,
+    # which browsers block for file:// navigation). Linked from the "Limited
+    # Cups" card. A stale cups/ subdir from an older build is removed so it
+    # can't be mis-scanned as a dropped dive.
+    stale_cups_dir = WEBSITE_DIR / 'cups'
+    if stale_cups_dir.is_dir():
+        import shutil
+        shutil.rmtree(stale_cups_dir)
     if cup_dives:
-        cups_dir = WEBSITE_DIR / 'cups'
-        cups_dir.mkdir(parents=True, exist_ok=True)
-        (cups_dir / 'index.html').write_text(render_cup_index(cup_dives))
-        print(f"Wrote {cups_dir / 'index.html'} ({len(cup_dives)} cup dive(s))")
+        cups_path = WEBSITE_DIR / 'cups.html'
+        cups_path.write_text(render_cup_index(cup_dives))
+        print(f"Wrote {cups_path} ({len(cup_dives)} cup dive(s))")
         for d in cup_dives:
             print(f"  - [cup-dive] {d['title']} -> {d['href']}")
     # SUPPORT_PAGE_HTML is a plain (non-f) string with literal CSS braces,

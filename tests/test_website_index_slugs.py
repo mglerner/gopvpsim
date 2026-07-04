@@ -83,9 +83,11 @@ def test_cup_pretty_title_names_the_cup():
 
 
 @pytest.mark.integration
-def test_render_cup_index_lists_dive_and_rebases_href():
-    """render_cup_index groups by cup and links each dive with a '../' prefix
-    (the cup index lives one dir below the flat cup-dive dirs)."""
+def test_render_cup_index_uses_same_directory_links():
+    """render_cup_index groups by cup and links each dive with a SAME-directory
+    href (no cross-directory '../'): the cup index is published as a root-level
+    cups.html, so its links must resolve like the main index's -- browsers
+    block '../' file:// navigation, which dead-ended the cup dive links."""
     cup_dives = [{
         'slug': 'corviknight-equinox-cup',
         'title': 'Corviknight (Equinox Cup)',
@@ -94,6 +96,6 @@ def test_render_cup_index_lists_dive_and_rebases_href():
     }]
     html = bwi.render_cup_index(cup_dives)
     assert 'Equinox Cup' in html
-    assert '../corviknight-equinox-cup/index.html' in html
-    # The main-index back-link is present.
-    assert '../index.html' in html
+    assert 'href="corviknight-equinox-cup/index.html"' in html
+    assert 'href="index.html"' in html          # same-dir back-link
+    assert '../' not in html                      # NO cross-directory links
