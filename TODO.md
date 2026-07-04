@@ -37,27 +37,49 @@ identical-content on both sides.
 `docs/reviews/2026-07-02_engine_bug_hunt_round2.md` — 1 HIGH, 7 medium,
 8 low; 0 uncertain; all double-skeptic-verified. ("No shipped winner flips
 in sampled cells" held for the hunt's own samples; the NB-1 bounding sweep
-below later found one on a wider grid.) Needs Michael's decisions, in
-priority order:
+below later found one on a wider grid.)
 
-- **[HIGH, gates future migrations] F1:** `migrate_cache.py
-  --from-gamemaster` delta misses form-change SWAPPED move entries
-  (Aegislash charge-form moves, Aura Wheel Electric/Dark) -> blesses stale
-  columns. Fix the `used`-set (migrate_cache.py:233-236) BEFORE trusting the
-  next gamemaster migration; audit past ones if a swapped move ever changed.
-- **[F2 — MEASURED HARMLESS 2026-07-03, doc-only fix remains]:** the
-  `self_debuff_either_side` predicate proof IS unsound (battle.py:912-922
-  Registeel clause mutates selfDebuffing at battle time), but a full A/B
-  (24,768 cells: every realistic FOCUS_BLAST+ZAP_CANNON carrier x all 172
-  cached opponent variants x 9 shields x both orientations x both bait
-  modes, clause verified firing in 502/688 pairs) found ZERO stored-plane
-  diffs — the [910] delta only ever moves the KO turn for this pair, and
-  `turns` is not a cached plane. Also nothing on disk to un-bless: 0 of
-  1,616 live columns carry the pair (all post-fix re-bakes). REMAINING:
-  fix the falsified proof text in `migrate_cache.py:101-123` docstring +
-  `tests/test_migrate_cache.py:90-92` comment ("AURA_WHEEL is the only
-  battle-time swap" is false) so the trap doesn't bite the next predicate
-  author.
+**FIXED on main (Opus, 2026-07-03) — the non-engine-batch, non-contested slice:**
+- **F1** (`57137e4`): `migrate_cache.py` `used`-set now unions form-change
+  swapped-in moves via new single-sourced `formchange.form_change_swapped_moves`;
+  regression test builds a minimal one-move gm delta. **Adversarially verified
+  COMPLETE**: the only battle-time move swaps are Aegislash (fast) + Morpeko
+  (charged); Mimikyu swaps none; no other foreign move-read exists in the four
+  engine files; no wrongly-blessing scenario remains. NB: the helper lives in
+  `formchange.py` (engine-hash file) -> F1 bumps the engine hash on main by a
+  behavior-neutral function; harmless on the cold machine, flagged for the
+  hunt2 merge (fresh final hash; different regions, should merge clean). No past
+  migration was tainted (the one prior `--from-gamemaster` run, skarmory_mega,
+  was purely additive).
+- **F2 doc** (`57137e4`): the `self_debuff_either_side` static-flag caveat is
+  now documented in the predicate docstring + a Registeel FB+ZC test assertion
+  (measured harmless in `69876ee`; the "AURA_WHEEL is the only swap" line is
+  corrected). Trap for the next predicate author recorded, not silently false.
+- **BP-1** (`2931d1d`): `breakpoints()` returns `[]` for power-0 moves instead
+  of ZeroDivisionError (was silently dropping every anchor for the whole
+  Aegislash-Shield GL dive). **BP-2** (`cc70593`): CLI now forwards
+  `--shadow-atk/--shadow-def` into the damage math (was header-only).
+- **JIT-COV-1** (`22c0a0b`): 2 settrace-verified parity matchups now cover the
+  ttl-cmp-bonus / dedup-keep / atk-stage-clamp+4 kernel branches (were unpinned).
+- Full suite after: 1216 passed / 14 xfailed / 2 pre-existing new-machine
+  fixture failures (`test_export_owned_breakdown`, missing `userdata/website`).
+- **Out-of-scope note surfaced by the F1 verification:** `anchors.py` calls
+  `get_moves()` but is NOT in `sweep_cache._ENGINE_FILES` — a separate
+  engine-hash-coverage question (anchors feed breakpoint analysis, not the
+  cached 1v1 column scores), worth a look but not a delta hole.
+
+**DEFERRED to AFTER the hunt2 merge (their natural homes are contested):**
+- **JIT-COV-2** (LOW, inert): one-line comment at `battle.py:1415-1416`
+  (JIT-path `final_state` zeroes `energy`/`atk_stage`; no live reader). battle.py
+  is heavily rewritten on hunt2 — do this comment post-merge to avoid a needless
+  conflict.
+- **PROP-1** (LOW, doc): exact-`cmp_atk` ties resolve by player index
+  (PvPoke-faithful; a "Known engine properties" note). Home is DEVELOPER_NOTES,
+  which hunt2 rewrote 172 lines of and top-N also edits — add post-merge.
+- **js-parity-1..5** (LOW): shipped-page JS contradictions; the top-N session
+  owns `deep_dive_engine.js` / `deep_dive.py`. Leave until it lands.
+
+**Still needs Michael / on branch hunt2:**
 - **[medium, divergence-policy decision] NB-1 — BOUNDING SWEEP DONE
   2026-07-03, recommendation = FIX; Michael's call pending.** Sweep
   (140 matchups / 1260 cells vs pinned oracle, 8 mechanism traces):
@@ -82,19 +104,17 @@ priority order:
   (Florges vs Seismitoad UL 2-1 inflated +201). Independent of PvPoke
   fidelity; needs its own look. Detail in the sweep doc (carve-out
   section).
-- **[medium] BP-1** power-0 move ZeroDivisionError silently kills anchor
-  resolution; **BP-2** dead `--shadow-atk/--shadow-def` CLI flags;
-  **FC-1** Aegislash mid-flight-revert energy divergence (stale queued
-  move's energy); **js-parity-1/2** shipped-page self-contradictions
-  (tier coloring vs paste-box; mirror-CMP pill missing ba81139 fix).
-- Low items (docs/test hygiene): PROP-1 cmp-tie doc note, JIT-COV-1/2,
-  js-parity-3/4/5, BP-3, FC-2 — details in the report.
+- **FC-1** Aegislash mid-flight-revert energy divergence — FIXED on branch
+  hunt2 (`e17d868`); merges to main with the engine batch.
+- Remaining report lows not yet actioned: **BP-3/BP-4** (Aegislash whole-level
+  rounding gaps in iv_breakpoints/iv_bulkpoints), **FC-2** (Blade->Shield revert
+  clamp rationale stale vs oracle) — details in the report; low, unscheduled.
 
 The `hunt2` worktree (`~/coding/hunt2/`, engine @ c7f9ba2 + pvpoke @
 00f0afe7f, own venv) is KEPT so the report's repro commands run as written;
-delete with `git worktree remove` (both repos) once triage is done. The
-`--p1-bait/--p2-bait` pvpoke_trace.js flags (first no-bait oracle) are on
-main.
+delete with `git worktree remove` (both repos) once the batch is merged and
+repros are no longer needed. The `--p1-bait/--p2-bait` pvpoke_trace.js flags
+(first no-bait oracle) are on main.
 
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
@@ -231,13 +251,15 @@ FLAG is resolved for them). The enumeration research ran 2026-07-03
 `docs/reviews/2026-07-03_limited_availability_iv_floors.md`. Headlines: all
 seven existing floor-10 assignments CONFIRMED; NO new species verifiably needs
 adding; Melmetal is explicitly NOT limited (Mystery Box is indefinitely
-repeatable). Michael RATIFIED the no-change verdict 2026-07-03. STILL OPEN:
-(a) COMMISSIONED (queued for an Opus session): the SHADOW-legendary
-verification pass -- possible Giovanni 6/6/6 floor, ~1/3 of the ML list;
-focused deep-research sweep on Giovanni/Rocket floors + rotation cadence,
-then Michael's rotation-recurrence-counts-as-grindable judgment call before
-any resweep; (b) re-run the audit when Eternatus returns (Niantic announced
-it will).
+repeatable). Michael RATIFIED the no-change verdict 2026-07-03. The
+SHADOW-legendary gap was CLOSED 2026-07-03 (Opus, deep-research pass, appended
+to the same doc): 12/12/12 safe for all 17; "1/1/1 shadow floor" is folklore
+(real floors 6/6/6 Giovanni / 6/6/6 Shadow Raid); none genuinely one-shot.
+STILL OPEN (both need Michael, both optional/low): (a) OPTIONAL belt-and-
+suspenders -- evaluate Dialga/Latias/Lugia/Reshiram (Shadow) down to 6/6/6 in
+their ML guides (the four Giovanni-primary legendaries whose grindability is
+only medium-confidence; worst-case floor is a bounded 6/6/6); (b) re-run the
+audit when Eternatus returns (Niantic announced it will).
 
 ## Pre-ship arc — residual open polish
 
