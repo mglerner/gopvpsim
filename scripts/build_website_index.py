@@ -73,14 +73,6 @@ _CUP_SUFFIXES = {
 }
 _CUP_PRETTY_BY_KEY = {ck: cp for _lk, ck, cp in _CUP_SUFFIXES.values()}
 
-# Archive status per cup for the cup-index page. Cups rotate on Niantic's
-# schedule, so `playable` is hand-maintained: True (currently in rotation),
-# False (ended), or absent/None (rotates - not tracked here). Exact rankings
-# snapshot dates live on each dive's own banner, not here.
-_CUP_STATUS = {
-    'equinox': {'playable': None},
-}
-
 _KNOWN_SPECIES_SLUGS: set[str] | None = None
 
 
@@ -730,15 +722,51 @@ open it.</p>
 """
 
 
-def _cup_status_line(cup_key: str) -> str:
-    """Human archive-status line for a cup on the cup-index page."""
-    playable = (_CUP_STATUS.get(cup_key) or {}).get('playable')
-    if playable is True:
-        avail = 'Currently in rotation.'
-    elif playable is False:
-        avail = 'Past cup - not currently in rotation.'
+def _cup_active_formats() -> dict:
+    """Cups PvPoke currently DISPLAYS, from the gamemaster `formats` array.
+
+    Returns {cup_key: title} for every format whose `showFormat` is truthy on
+    the current gamemaster pull -- i.e. exactly the cups in PvPoke's live
+    Rankings dropdown. This is the auto-derived, zero-maintenance signal for
+    "is this cup live right now": when a cup rotates out PvPoke clears
+    showFormat (or drops the entry), so the next index build flips it to
+    archived with no hand-edited rotation list. Returns {} if the gamemaster
+    can't be loaded (offline, no cache) so the index still builds -- callers
+    then fall back to a neutral archive label.
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(REPO_ROOT / 'src'))
+    try:
+        from gopvpsim.data import load_gamemaster
+    except Exception:
+        return {}
+    try:
+        out = {}
+        for f in load_gamemaster().get('formats', []):
+            cup = f.get('cup')
+            if cup and f.get('showFormat'):
+                out[cup] = f.get('title') or cup
+        return out
+    except Exception:
+        return {}
+
+
+def _cup_status_line(cup_key: str, active_formats: dict) -> str:
+    """Archive-status line for a cup on the cup-index page.
+
+    'Currently live' vs 'archived' is DERIVED from PvPoke's active formats
+    (``_cup_active_formats``) -- not a hand-maintained rotation list. When the
+    gamemaster is unavailable, ``active_formats`` is empty and we fall back to a
+    neutral, non-overclaiming archive label rather than asserting "past".
+    """
+    if not active_formats:
+        avail = ('Availability tracks PvPoke\'s active formats (could not be '
+                 'checked at build time).')
+    elif cup_key in active_formats:
+        avail = ("Currently active in PvPoke's Rankings (as of this build's "
+                 "gamemaster pull).")
     else:
-        avail = "Availability rotates on Niantic's schedule - check in-game."
+        avail = "Not in PvPoke's current active formats - archived snapshot."
     return (f'{avail} Dated snapshots kept as an archive; open a dive for its '
             f'exact rankings snapshot date and cup movesets.')
 
@@ -757,15 +785,20 @@ def render_cup_index(cup_dives: list[dict]) -> str:
         if p and p.get('cup'):
             by_cup.setdefault(p['cup'], []).append(d)
 
+    # PvPoke's live "which formats are displayed" set, derived once per build.
+    active_formats = _cup_active_formats()
+
     sections: list[str] = []
     for cup_key in sorted(by_cup):
+        # Stable heading name (matches the cup name baked into the dive pages);
+        # the LIVE/archived status below is what's auto-derived from PvPoke.
         pretty = html.escape(_CUP_PRETTY_BY_KEY.get(cup_key, cup_key.title()))
         # Re-base hrefs one level up for the cups/ subdirectory.
         rebased = [{**d, 'href': '../' + d['href']} for d in by_cup[cup_key]]
         listing = _render_dives_grouped(rebased)
         sections.append(
             f'\n<h2>{pretty}</h2>\n'
-            f'<p class="section-intro">{_cup_status_line(cup_key)}</p>\n'
+            f'<p class="section-intro">{_cup_status_line(cup_key, active_formats)}</p>\n'
             f'<ul>\n{listing}\n</ul>\n')
     body = ''.join(sections) or (
         '<p class="section-intro">No cup dives are currently published.</p>')
