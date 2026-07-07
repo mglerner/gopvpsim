@@ -339,7 +339,11 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
     last_focal_scores = []
 
     import time as _time
-    n_workers = min(max(1, multiprocessing.cpu_count() - reserve_cpus), 16)
+    # (cores - reserve); the per-round Pool below further caps this by the
+    # actual chunk count (~100, capped by len(profile_list)) so we never spawn
+    # idle workers. --reserve-cpus leaves cores free. Was a literal 16 (a
+    # vestigial cap that needlessly limited >16-core hosts).
+    n_workers = max(1, multiprocessing.cpu_count() - reserve_cpus)
     total_round_sims = 0  # accumulated across rounds for an estimate
 
     for round_idx in range(max_rounds):
@@ -400,7 +404,7 @@ def iterative_slayer_discovery(species, league, shadow, fast_id, charged_ids,
                          mechanics)
             sim_start = _time.time()
             with multiprocessing.Pool(
-                processes=n_workers,
+                processes=min(n_workers, len(chunks)),
                 initializer=slayer_worker_init,
                 initargs=init_args,
             ) as pool:
