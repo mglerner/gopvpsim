@@ -172,12 +172,14 @@ def main():
     else:
         jobs = 1
     # Concurrency PREFLIGHT (do not rely on a human multiplying it out).
-    # Each guide's iv_sweep fans across a Pool of min(cpu_count, 16) workers, so
+    # Each guide's iv_sweep fans across a Pool of (cores - reserve) workers
+    # (capped by chunk count, ~100), so a single guide can use up to all cores;
     # the real footprint is jobs x per_guide_workers. HARD-FAIL if that exceeds
     # physical cores -- this is the code-level guard that makes the cache-rework
     # ML-oversubscription bug unable to recur silently (the resource-lens
-    # hardening; see docs/predive_checklist.md).
-    per_guide_workers = min(cores, 16)
+    # hardening; see docs/predive_checklist.md). (Was min(cores, 16); the 16
+    # cap was lifted in iv_sweep, so a guide now fans across all cores.)
+    per_guide_workers = cores
     planned = jobs * per_guide_workers
     print(f'Concurrency preflight: {jobs} job(s) x {per_guide_workers} '
           f'workers/guide = {planned} planned workers vs {cores} physical cores.',

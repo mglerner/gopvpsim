@@ -2250,10 +2250,16 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     # Parallel sim: ~100 chunks across the worker pool. imap_unordered
     # hands chunks out as workers free up - finer granularity gives more
     # frequent progress reports and better load balancing.
-    n_workers = min(max(1, multiprocessing.cpu_count() - reserve_cpus), 16)
     n_chunks_target = 100
     chunk_size = max(1, (len(pair_list) + n_chunks_target - 1) // n_chunks_target)
     chunks = [pair_list[i:i+chunk_size] for i in range(0, len(pair_list), chunk_size)]
+    # Worker count is (cores - reserve), capped by the number of chunks so we
+    # never spawn idle workers (each would only cost an extra opp_cache copy).
+    # --reserve-cpus is the knob for leaving cores free. (The old ceiling was a
+    # literal 16, a vestigial holdover from the original 16-atk_iv-chunk
+    # partitioning; the sweep is now ~100 chunks, so 16 needlessly capped
+    # >16-core hosts.) Only used when `chunks` is non-empty (guarded below).
+    n_workers = min(max(1, multiprocessing.cpu_count() - reserve_cpus), len(chunks))
 
     import time as _time
     sim_start = _time.time()
@@ -6583,9 +6589,10 @@ def main():
                              '--log-file is given. Default: userdata/logs/.')
     parser.add_argument('--reserve-cpus', type=int, default=0, metavar='N',
                         help='Leave N CPUs idle so other local work stays '
-                             'responsive. Default 0 (use up to min(cpu_count, 16)). '
-                             'Applies to both the per-moveset sim sweep and the '
-                             'slayer iteration pool.')
+                             'responsive. Default 0 (use cpu_count - N workers, '
+                             'capped by the sweep chunk count). Applies to both '
+                             'the per-moveset sim sweep and the slayer iteration '
+                             'pool.')
     parser.add_argument('--no-signature-dedup', action='store_true',
                         help='Disable per-opponent damage-signature dedup in '
                              'the IV sweep (sim every stat profile vs every '
