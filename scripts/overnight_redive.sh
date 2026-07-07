@@ -182,6 +182,15 @@ else
     log "[DONE] ML IV guides (${ml_elapsed}s)"
 fi
 
+# 7c. Build the Reader's Guides (guides/ -> userdata/website/guides/). Dive
+#     pages hardcode ~5 links each into these; without this step a fresh
+#     machine has no guides/ dir and every dive page dangles those links
+#     (1580 link-verify errors on the 2026-07-06 fresh-laptop bake). Runs after
+#     the dives so its {{dive:...}} reference tokens resolve, before index +
+#     link-verify.
+step "Building Reader's Guides" \
+    python scripts/build_guides.py
+
 # 8. Rebuild site index so the new pages (incl. the new Reshiram (Shadow) ML
 #    guide) show up in the top-level link page.
 step "Rebuilding website index" \
