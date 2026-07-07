@@ -636,6 +636,14 @@ def _build_landing(index_meta: dict, guides: list[dict],
 # --------------------------------------------------------------------
 
 def main() -> int:
+    import argparse
+    argparse.ArgumentParser(
+        description="Regenerate userdata/website/guides/ from the guides/ "
+                    "source templates (Reader's Guide pipeline). Takes no "
+                    "arguments; idempotent (re-running without source changes "
+                    "produces the same bytes).",
+    ).parse_args()
+
     if not GUIDES_SRC.is_dir():
         print(f'error: {GUIDES_SRC} does not exist', file=sys.stderr)
         return 1
