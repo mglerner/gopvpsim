@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Publish userdata/website/ to mglerner.com/pogo-dives/.
+# Publish userdata/website/ to pogodives.com (the primary home; the old
+# mglerner.com/pogo-dives path 301-redirects here via a hand-placed .htaccess).
 #
 # Flow on every run:
 #   1. Regenerate userdata/website/index.html from per-dive meta.toml files
@@ -11,7 +12,7 @@
 #      publish before anything hits the server. Pass --skip-verify to
 #      bypass (e.g. publishing an in-progress page where you know a
 #      link will dangle temporarily).
-#   3. rsync to mglerner.com:mglerner.com/pogo-dives/ with --delete
+#   3. rsync to mglerner.com:/home/mglerner/pogodives.com/ with --delete
 #      --delete-excluded, so anything removed locally -- or matching an
 #      exclude pattern -- is also removed on the server.
 #
@@ -30,7 +31,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="${REPO_ROOT}/userdata/website/"
-DEST="mglerner.com:mglerner.com/pogo-dives/"
+DEST="mglerner.com:/home/mglerner/pogodives.com/"
 
 PUSH=false
 SKIP_VERIFY=false
@@ -94,7 +95,7 @@ if [ "$PUSH" = true ]; then
   echo "Pushing ${SRC} -> ${DEST}"
   rsync -avzh --delete --delete-excluded "${RSYNC_EXCLUDES[@]}" "$SRC" "$DEST"
   echo
-  echo "Done. Site should be live at https://mglerner.com/pogo-dives/"
+  echo "Done. Site should be live at https://pogodives.com/"
 else
   echo "Dry run (pass --push to actually push)"
   echo "Source: ${SRC}"
