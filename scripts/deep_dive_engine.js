@@ -995,6 +995,7 @@ function loadCollection(csvText) {
   renderMatchesList();
   annotateAnchorBullets();
   updateView();
+  mcRefreshAll();
 }
 
 // For each anchor-flip bullet in the analysis layer, look up which of
@@ -1583,6 +1584,7 @@ function clearCollection() {
   annotateAnchorBullets();
   renderManualList();
   updateView();
+  mcRefreshAll();
 }
 
 // ---- Manual one-at-a-time IV entry ----
@@ -1924,6 +1926,26 @@ function _buildHighlightTrace() {
   };
 }
 
+// Wrap long legend names at word boundaries (Plotly can't wrap natively;
+// anchor/spec-card tier names like "Fortified Gyarados (Shadow) (Dragon
+// Breath / Aqua Tail+Twister) (151.27+ Def)" otherwise push the legend far
+// off-plot). Display-only: nothing compares trace.name programmatically.
+function wrapLegendName(name, width) {
+  width = width || 26;
+  if (!name || name.length <= width) return name;
+  var words = String(name).split(' ');
+  var lines = [], cur = '';
+  for (var i = 0; i < words.length; i++) {
+    if (cur && (cur + ' ' + words[i]).length > width) {
+      lines.push(cur); cur = words[i];
+    } else {
+      cur = cur ? cur + ' ' + words[i] : words[i];
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines.join('<br>');
+}
+
 // ---- Build Plotly traces ----
 function buildTraces() {
   computeView();
@@ -2023,7 +2045,7 @@ function buildTraces() {
         var _markerSize = _isTiny ? 9 : 7;
         var _markerOpacity = _isDom ? 0.35 : 0.9;
         _tierTraces.push({
-          name:tierNames[ti],
+          name:wrapLegendName(tierNames[ti]),
           x:tx, y:ty, text:tt,
           mode:'markers', type:'scattergl', hoverinfo:'text',
           marker:{size:_markerSize, color:tierColors[ti],
@@ -2032,6 +2054,73 @@ function buildTraces() {
           hoverlabel:{bordercolor:tierColors[ti]}
         });
       }
+    }
+  } else if (cm === 'cluster') {
+    // --- Matchup-fingerprint cluster coloring ---
+    // Labels come from the live Matchup clusters section's inline JSON
+    // payload (baked for moveset 0 + the default opp-IV mode at this
+    // page's displayed level; the best-buddy swap keeps the live section
+    // and DATA arrays level-consistent). On any other moveset/mode the
+    // labels would not describe the displayed grid, so render neutral
+    // points and say so in the legend instead of mis-coloring.
+    var mcRoot0 = document.querySelector('.dd-mc-root');
+    var mcPay = mcRoot0 ? _mcPayload(mcRoot0) : null;
+    var mcOk = !!(mcPay && mcPay.scens) &&
+               state.movesetIdx === 0 &&
+               (!DATA.oppIvModes || state.oppIvMode === DATA.oppIvModes[0]);
+    var mcScen = null;
+    if (mcOk) {
+      var sis0 = getActiveScenarioIndices();
+      if (sis0.length === 1) {
+        var st0 = DATA.scenarios[sis0[0]];
+        var lbl0 = st0[0] + 'v' + st0[1];
+        if (mcPay.scens[lbl0]) mcScen = lbl0;
+      }
+      if (!mcScen && mcPay.scens[mcPay['default']]) mcScen = mcPay['default'];
+      if (!mcScen) mcOk = false;
+    }
+    if (mcOk) {
+      var msc = mcPay.scens[mcScen];
+      var ctr = [];
+      for (var c0 = 0; c0 < msc.k; c0++) {
+        ctr.push({
+          name: 'C' + c0 + ' - ' + mcScen + ' (n=' + msc.sizes[c0] + ')',
+          x: [], y: [], text: [],
+          mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+          marker: {size: 4, color: mcPay.palette[c0 % mcPay.palette.length],
+                   opacity: 0.75},
+          hoverlabel: {bordercolor: mcPay.palette[c0 % mcPay.palette.length]}
+        });
+      }
+      for (var civ = 0; civ < nIvs; civ++) {
+        if (currentYIsSparse && !isFinite(yValues[civ])) continue;
+        if (!isOwnedFilter(civ)) continue;
+        var clab = msc.labels[civ];
+        if (clab == null || !ctr[clab]) continue;
+        ctr[clab].x.push(DATA.spRanks[civ]);
+        ctr[clab].y.push(yValues[civ]);
+        ctr[clab].text.push(buildHoverText(civ) +
+                            '<br>Matchup cluster: C' + clab + ' (' + mcScen + ')');
+      }
+      for (var c1 = 0; c1 < ctr.length; c1++) {
+        if (ctr[c1].x.length) traces.push(ctr[c1]);
+      }
+    } else {
+      var ncx = [], ncy = [], nct = [];
+      for (var niv = 0; niv < nIvs; niv++) {
+        if (currentYIsSparse && !isFinite(yValues[niv])) continue;
+        if (!isOwnedFilter(niv)) continue;
+        ncx.push(DATA.spRanks[niv]);
+        ncy.push(yValues[niv]);
+        nct.push(buildHoverText(niv));
+      }
+      traces.push({
+        name: wrapLegendName('Matchup clusters: available for the featured moveset with default opponent IVs only'),
+        x: ncx, y: ncy, text: nct,
+        mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+        marker: {size: 2.5, color: '#8899aa', opacity: 0.45},
+        hoverlabel: {bordercolor: '#888'}
+      });
     }
   } else {
     // --- Stat or score coloring (single trace) ---
@@ -2212,7 +2301,7 @@ function buildTraces() {
       markerSize = 11;
     }
     return {
-      name: name,
+      name: wrapLegendName(name),
       x: ox, y: oy, text: ot,
       // scattergl (not svg scatter) so hover hit detection stays
       // consistent when slayer/anchor points overlap tier + user
@@ -3601,6 +3690,34 @@ function _mcRenderRoot(root) {
                   ' def ' + Number(DATA.ivDef[i]).toFixed(1) +
                   ' hp ' + DATA.ivHp[i] + ' - C' + sc.labels[i]);
     }
+    // Owned-mon overlay: your pasted collection's on-grid spreads as gold
+    // stars, hover naming the mon(s) + which cluster the spread sits in.
+    // SVG scatter (not gl) for the star symbol - the owned set is small.
+    // Off-grid spreads are skipped, same as the main scatter overlay.
+    if (state.ownedByIv) {
+      var ox = [], oy = [], otxt = [];
+      for (var okey in state.ownedByIv) {
+        var oidx = parseInt(okey, 10);
+        if (!(oidx >= 0 && oidx < n)) continue;
+        var recs = state.ownedByIv[oidx];
+        var onames = recs.map(function(rr) {
+          var cp = (rr.mon && rr.mon.cp) || (rr.stats && rr.stats.cp) || '?';
+          return ((rr.mon && rr.mon.name) || 'mon') + ' CP' + cp;
+        }).join(', ');
+        ox.push(xs[oidx]);
+        oy.push(ys[oidx]);
+        otxt.push('Yours: ' + onames + ' - ' +
+                  DATA.ivA[oidx] + '/' + DATA.ivD[oidx] + '/' + DATA.ivS[oidx] +
+                  ' - cluster C' + sc.labels[oidx]);
+      }
+      if (ox.length) {
+        traces.push({type: 'scatter', mode: 'markers', x: ox, y: oy,
+                     text: otxt, hoverinfo: 'text',
+                     name: 'Yours (' + ox.length + ')',
+                     marker: {size: 11, symbol: 'star', color: '#ffd700',
+                              opacity: 1, line: {width: 1.5, color: '#000'}}});
+      }
+    }
     var layout = {
       xaxis: {title: titles[proj[0]], showgrid: false, zeroline: false},
       yaxis: {title: titles[proj[1]], showgrid: false, zeroline: false},
@@ -3613,6 +3730,15 @@ function _mcRenderRoot(root) {
     Plotly.react(p, traces, layout, {responsive: true, displayModeBar: false});
   });
   root.setAttribute('data-mc-rendered', '1');
+}
+
+// Re-render every already-drawn panel set (collection load/clear changes
+// the owned-mon overlay). Unrendered roots are left alone - they pick up
+// the overlay on their first lazy render.
+function mcRefreshAll() {
+  document.querySelectorAll('.dd-mc-root[data-mc-rendered]').forEach(function(root) {
+    if (root.offsetParent !== null) _mcRenderRoot(root);
+  });
 }
 
 function mcSelectScenario(sel) {
