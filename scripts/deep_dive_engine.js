@@ -3017,51 +3017,11 @@ function updateView() {
   var yMin = Math.min.apply(null, allY), yMax = Math.max.apply(null, allY);
   var xPad = Math.max(1, (xMax-xMin)*0.02), yPad = Math.max(0.5, (yMax-yMin)*0.03);
 
-  // Cluster overlay shapes. Hidden in non-avgScore y-modes because the
-  // cluster gaps are derived from the avg-score distribution and would
-  // be plotted at the wrong y-coordinates against any other metric.
+  // Layout shape/annotation collectors (the retired score-gap cluster
+  // overlay used to populate these; the arrays stay because the layout
+  // consumes them and future overlays may too).
   var shapes = [];
   var annotations = [];
-  var clusterChk = document.getElementById('cluster-chk');
-  // Cluster gaps are baked from the FULL-pool avg-score distribution, so they
-  // sit at the wrong y-coordinates once the opponent filter reshapes the band.
-  // Hide the overlay whenever a subset is active (the honesty banner says so).
-  if (clusterChk && clusterChk.checked && state.yAxisMode === 'avgScore' && !oppFilterActive()) {
-    var gapKey = state.movesetIdx + '_' + state.oppIvMode;
-    var gapData = DATA.clusterGaps[gapKey];
-    if (gapData) {
-      var sis = getActiveScenarioIndices();
-      // For "avg" mode, take the union of gaps across all scenarios (deduplicated)
-      var gapYs = [];
-      if (sis.length === nS) {
-        // Average mode: use the gaps from each scenario, pick the most common
-        var allGaps = [];
-        for (var k=0; k<nS; k++) { allGaps = allGaps.concat(gapData[k] || []); }
-        // Deduplicate within ±2 points
-        allGaps.sort(function(a,b){ return b-a; });
-        for (var g=0; g<allGaps.length; g++) {
-          var dup = false;
-          for (var h=0; h<gapYs.length; h++) { if (Math.abs(allGaps[g]-gapYs[h]) < 2) dup = true; }
-          if (!dup) gapYs.push(allGaps[g]);
-        }
-      } else {
-        gapYs = gapData[sis[0]] || [];
-      }
-      var clusterColors = ['rgba(233,69,96,0.5)', 'rgba(88,166,255,0.4)', 'rgba(63,185,80,0.3)'];
-      for (var gi=0; gi<gapYs.length && gi<3; gi++) {
-        shapes.push({
-          type:'line', xref:'paper', x0:0, x1:1,
-          y0:gapYs[gi], y1:gapYs[gi],
-          line:{ color:clusterColors[gi], width:2, dash:'dash' }
-        });
-        annotations.push({
-          xref:'paper', x:1.0, y:gapYs[gi], xanchor:'left',
-          text:' Cluster ' + (gi+1) + ' boundary',
-          showarrow:false, font:{size:10, color:clusterColors[gi]}
-        });
-      }
-    }
-  }
 
   var layout = {
     title: DATA.movesets[state.movesetIdx].prettyLabel,
@@ -3582,3 +3542,96 @@ _initBestBuddy();
 wireCollectionHandlers();
 // "Compare candidates" widget (renders empty until you add a spread).
 cmpWireHandlers();
+// ---------------------------------------------------------------------------
+// Matchup-fingerprint cluster panels (Dive Analysis > Matchup clusters).
+// The section HTML + per-IV cluster labels are baked server-side by
+// scripts/deep_dive_matchup_clusters.py; this code only draws the three
+// stat-plane scattergl panels (atk/def, atk/hp, def/hp) colored by cluster.
+// Panels render lazily on the first open of the enclosing <details> --
+// Plotly sizes to zero inside a closed/hidden container -- and re-render
+// after a best-buddy prose swap (the swap replaces the section's DOM, which
+// clears the data-mc-rendered flag; DATA.ivAtk/ivDef/ivHp are already
+// swapped to the matching level by setBestBuddyLevel, so coordinates and
+// labels stay consistent).
+function _mcPayload(root) {
+  var s = root.querySelector('script.dd-mc-data');
+  if (!s) return null;
+  try { return JSON.parse(s.textContent); } catch (e) { return null; }
+}
+
+function _mcRenderRoot(root) {
+  var payload = _mcPayload(root);
+  if (!payload) return;
+  var sel = root.querySelector('select.dd-mc-scen');
+  var scen = sel ? sel.value : payload['default'];
+  var sc = payload.scens[scen];
+  var panels = root.querySelectorAll('.dd-mc-panel');
+  if (!sc) {
+    // scenario with no robust clusters: clear any stale panels
+    panels.forEach(function(p) { Plotly.purge(p); p.innerHTML = ''; });
+    root.setAttribute('data-mc-rendered', '1');
+    return;
+  }
+  var axes = {atk: DATA.ivAtk, def: DATA.ivDef, hp: DATA.ivHp};
+  var titles = {atk: 'Attack', def: 'Defense', hp: 'HP'};
+  var n = sc.labels.length;
+  panels.forEach(function(p) {
+    var proj = (p.getAttribute('data-proj') || 'atk,def').split(',');
+    var xs = axes[proj[0]], ys = axes[proj[1]];
+    if (!xs || !ys) return;
+    var traces = [];
+    for (var c = 0; c < sc.k; c++) {
+      traces.push({type: 'scattergl', mode: 'markers', x: [], y: [],
+                   text: [], hoverinfo: 'text',
+                   name: 'C' + c + ' (n=' + sc.sizes[c] + ')',
+                   marker: {size: 4, color: payload.palette[c % payload.palette.length],
+                            opacity: 0.75}});
+    }
+    for (var i = 0; i < n; i++) {
+      var t = traces[sc.labels[i]];
+      t.x.push(xs[i]);
+      t.y.push(ys[i]);
+      t.text.push(DATA.ivA[i] + '/' + DATA.ivD[i] + '/' + DATA.ivS[i] +
+                  ' - atk ' + Number(DATA.ivAtk[i]).toFixed(1) +
+                  ' def ' + Number(DATA.ivDef[i]).toFixed(1) +
+                  ' hp ' + DATA.ivHp[i] + ' - C' + sc.labels[i]);
+    }
+    var layout = {
+      xaxis: {title: titles[proj[0]], showgrid: false, zeroline: false},
+      yaxis: {title: titles[proj[1]], showgrid: false, zeroline: false},
+      paper_bgcolor: '#1a1a2e', plot_bgcolor: '#16213e',
+      font: {color: '#e0e0e0', size: 11},
+      margin: {t: 8, b: 40, l: 48, r: 8},
+      showlegend: true,
+      legend: {orientation: 'h', y: -0.25},
+    };
+    Plotly.react(p, traces, layout, {responsive: true, displayModeBar: false});
+  });
+  root.setAttribute('data-mc-rendered', '1');
+}
+
+function mcSelectScenario(sel) {
+  var root = sel.closest('.dd-mc-root');
+  if (!root) return;
+  root.querySelectorAll('.dd-mc-scen-block').forEach(function(b) {
+    b.style.display = (b.getAttribute('data-scen') === sel.value) ? 'block' : 'none';
+  });
+  _mcRenderRoot(root);
+}
+window.mcSelectScenario = mcSelectScenario;
+
+// Lazy render: <details> toggle events don't bubble but are observable with
+// a capturing listener, which also survives best-buddy innerHTML swaps.
+document.addEventListener('toggle', function(ev) {
+  var det = ev.target;
+  if (!det || !det.open || !det.querySelectorAll) return;
+  det.querySelectorAll('.dd-mc-root:not([data-mc-rendered])').forEach(function(root) {
+    if (root.offsetParent !== null) _mcRenderRoot(root);
+  });
+}, true);
+
+// Immediate pass for the edge case where the user opened the Dive Analysis
+// details while the page was still loading (before this listener existed).
+document.querySelectorAll('.dd-mc-root:not([data-mc-rendered])').forEach(function(root) {
+  if (root.offsetParent !== null) _mcRenderRoot(root);
+});
