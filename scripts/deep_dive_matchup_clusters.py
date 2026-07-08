@@ -849,6 +849,31 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         'style="flex:1 1 300px;min-width:280px;height:320px"></div>'
         '</div>')
 
+    # Level-capped ("lattice") note. When this species can't reach the
+    # league CP cap, almost every spread pins at the max power-up level, so
+    # each battle stat becomes a function of a single IV and the panels
+    # collapse onto a 16x16x16 IV lattice -- a sparse grid, not missing data.
+    # Fires only when >90% of spreads share the ceiling level (measured
+    # separation: Mimikyu UL ~100% vs Registeel UL ~31% and CP-capped GL
+    # dives <1%); when it doesn't fire the section is byte-identical to before.
+    levels = data_obj.get('ivLv')
+    if levels:
+        ceiling = max(levels)
+        frac = sum(1 for lv in levels if lv == ceiling) / len(levels)
+        if frac >= 0.90:
+            parts.append(
+                '<p style="font-size:12px;color:var(--text-muted)">'
+                f'<b>Lattice view:</b> {frac * 100:.0f}% of this dive\'s IV '
+                f'spreads sit at the same level (L{ceiling:g}) -- this species '
+                'does not reach the league CP cap, so it is pinned at the max '
+                'power-up level. At a fixed level each battle stat tracks a '
+                'single IV, so attack / defense / HP each take only ~16 values '
+                'and the panels look like a sparse grid: each visible point '
+                'stacks the spreads that share a stat pair (up to 16, one per '
+                'remaining IV). This is expected, not missing data -- the '
+                'clustering still runs on the full set of win/loss '
+                'fingerprints.</p>')
+
     # per-scenario server-side blocks
     for lbl, entry in computed.items():
         vis = "block" if lbl == default_scen else "none"
