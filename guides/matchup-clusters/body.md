@@ -34,6 +34,15 @@ holds a meaningful number of spreads). Clusters are ordered weakest
 to strongest by how many marginal fights their members win on
 average.
 
+The number of clusters isn't fixed: the method scores each candidate
+count (2 through 6) by **silhouette** - how cleanly the fingerprints
+separate - and keeps only counts where every cluster clears a minimum
+size. Among those, it deliberately picks the **fewest** clusters that
+come within a hair (0.03) of the best silhouette, so a coarser, more
+readable grouping wins whenever it's essentially as good as a finer
+one. If no split clears the minimum-size floor, the section says so
+outright rather than inventing clusters.
+
 The key honesty note baked into the layout: **win-sets cross rather
 than nest.** A "stronger" cluster usually gains matchups *and trades
 some away*. The cluster summary table says both - on the reference
