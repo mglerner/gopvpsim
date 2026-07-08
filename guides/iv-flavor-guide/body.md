@@ -9,33 +9,30 @@ right place to start if you're deciding which IV spread to chase.
 
 <figure>
 <img src="screenshots/flavor-example.png"
-     alt="The teal-bordered IV Flavor Guide zone on a dive
-          page, showing four flavors with a summary table and an
-          expanded 'General Good' flavor below.">
+     alt="The teal IV Flavor Guide zone on a dive page, showing
+          five flavors in a summary table and the expanded
+          'General Good' flavor with its threshold ladder below.">
 <figcaption>
 The IV Flavor Guide zone on the Tinkaton UL dive. The summary table
-lists the four flavors the simulation derived, each with how many
+lists the five flavors the simulation derived, each with how many
 IVs qualify and how many catches it takes to land one. Below the
 table, each flavor expands (the "General Good" one is open here)
 with its stat signature, a safe-baseline description, and the
-opponent-by-opponent matchups that flavor's stat cutoffs buy you.
+def/HP threshold ladder naming the opponent-by-opponent matchups
+each step of the cut buys you.
 </figcaption>
 </figure>
 
 ## What a flavor is
 
 A flavor is a **named cluster of IV spreads with a shared stat
-signature and a shared strategic intent**. The screenshot above shows the Tinkaton
-UL dive's four flavors:
-<span style="color:#3fb950;font-weight:600">General Good</span> is a
-broad "safe baseline" cut covering 82.4% of the IV space;
-<span style="color:#bc8cff;font-weight:600">Fortified Walrein</span>
-is a much narrower cut that trades attack range for a defensive
-threshold against Walrein;
-<span style="color:#58a6ff;font-weight:600">Dusknoir Slayer</span>
-and <span style="color:#f0883e;font-weight:600">Steelix (Shadow) Slayer</span>
-each give up bulk to clear a specific damage breakpoint against
-their namesake opponent.
+signature and a shared strategic intent**. The screenshot above shows
+the Tinkaton UL dive's five flavors: **General Good** is a broad
+"safe baseline" cut covering 82.4% of the IV space; **Dusknoir
+Slayer**, **Ninetales Slayer**, and **Gyarados Slayer** each give up
+bulk to clear a specific damage breakpoint against their namesake
+opponent; **Tinkaton Mirror Atk** is the mirror-matchup attack cut
+(12% of the space clears it).
 
 A flavor is **not** an arbitrary PvPoke preset. It's derived by:
 

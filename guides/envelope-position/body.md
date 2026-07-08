@@ -31,17 +31,20 @@ below, or on the band?**
 
 <figure>
 <img src="screenshots/envelope-example.png"
-     alt="Tinkaton UL scatter plot showing named categories riding or
-          spreading across the Anchor IVs band.">
+     alt="Tinkaton UL scatter plot showing named categories sitting
+          above, below, and across the Anchor IVs band.">
 <figcaption>
 Scatter plot from the Tinkaton UL dive. The triangle markers labelled
-<strong>Anchor IVs</strong> in the legend trace the reference band.
-Orange <strong>Steelix (Shadow) Slayer</strong>
-tightly rides the top edge (envelope-rider-top). Red
-<strong>Annihilape Bulk</strong> tightly rides the bottom
-(envelope-rider-bottom). Green <strong>Ampharos Atk</strong> sits
-elevated above the band but spreads across it (elevated-band-crosser).
-Three of the four shape classes in one frame.
+<strong>Anchor IVs</strong> in the legend trace the reference band;
+the coloured category traces (Ampharos Atk, Annihilape Bulk, the
+Slayer cuts, Tinkaton Mirror Atk) sit above, below, and across it -
+that vertical position vs the band is exactly what the envelope
+metric measures. On this dive's current data every legend category
+classifies as a straddler; the clean riders are composite categories
+(e.g. CMP-First Slayer with 171+ bulk rides the top of the band,
+Anchors-First Slayer with Annihilape Bulk rides the bottom), whose
+tags appear on their cards in the Per-matchup IV finder rather than
+as scatter traces.
 </figcaption>
 </figure>
 
