@@ -6,6 +6,53 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-07-08 -- matchup-fingerprint clusters shipped site-wide (render-only)
+
+The dive "experimental analysis" block (banding stats + 1-D score-gap
+clusters) is retired, replaced by a **Matchup clusters** section as the
+first block of every dive's Dive Analysis collapsible. Methodology from the
+2026-07-04..06 cluster re-evaluation (reports repo,
+`gopvpsim-cluster-methodology-2026-07-05.html`): per even-shield scenario,
+IVs are fingerprinted by which sharp-marginal matchups they win (win-rate
+2%-98% opponents), clustered bottom-up (Hamming/average linkage, silhouette
+K under a parsimony floor), and explained via three stat-plane panels
+(atk/def, atk/hp, def/hp), a gains/trades-away cluster summary, per-cluster
+win-rate grids, in-sample depth-3 stat rules, and a matchup-flip-threshold
+table with named/UNNAMED authored-anchor flags. Zero re-sim: two full
+95-blob replay re-renders (131.8 + 129.2 min, 95/95 OK each).
+
+Key commits: `477b8fb` pure-numpy pipeline (`scripts/
+deep_dive_matchup_clusters.py` -- deliberately no sklearn/scipy; unique-
+pattern weighted linkage + exact full-population silhouette for byte-stable
+re-renders; cross-checked against the sklearn reference, incl. a reference
+bug found: its single-stat flip accuracies are inflated on tied stat
+values); `58bbd8f` section wiring + retirement of all five old surfaces
+(alpha-chk block, clusterGaps DATA, cluster-chk checkbox, engine.js
+overlay, orphaned renderers); `bcb47f3` 24 adversarial-review fixes (31
+agents; e.g. degenerate constant flip rules no longer render as candidate
+anchors); `cec8070` pass 2: owned-mon gold-star overlay in the panels
+(collection paste + best-buddy aware), legend-name word-wrap (closes the
+TODO legend-overflow item), and a "Matchup cluster" main-scatter color mode
+(featured-moveset/default-IVs only, honest fallback note otherwise);
+`8df0ba1` pass-2 review fixes (headline: a skeptic agent CDP-hover-tested
+the panels live and caught svg-on-gl star hovers resolving to the wrong
+spread -- now scattergl + y-nudge per the c0e782d precedent).
+
+Also shipped: a 43-finding staleness audit + fixes across all 7 Reader's
+Guides (most rot predated this work: the 2026-06-25 Male->Female reference
+repoint broke both worked examples), a new **Matchup Clusters** guide
+(`guides/matchup-clusters/`, promoted to authorship=both), two screenshot
+retakes, and a new `pvpoke_cells_exact` sync sentinel so the how-this-works
+guide's 170-exact/37-divergence claim can't drift. JS entry points for the
+new section: `_mcRenderRoot` / `mcSelectScenario` / `mcRefreshAll` in
+`deep_dive_engine.js`.
+
+Known non-blockers at publish: `overnight_status.txt` still ends with the
+2026-07-07 17:01 chain FAIL (guides dir did not exist when that chain
+verified links -- ordering fixed in `73747e6`; the live tree passes the
+same gate), and verify_overnight's ML-guide freshness check flags the
+render-only batch window by design (ML guide articles were not touched).
+
 ## 2026-06-28 — cold re-dive complete (engine bug-hunt + cache-rework batch shipped)
 
 The pre-launch engine batch plus a full cold re-dive landed. The bake ran
