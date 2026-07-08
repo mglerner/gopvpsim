@@ -94,9 +94,10 @@ the full opponent pool. It does **not** follow the scatter's moveset /
 opponent-IV / bait dropdowns or the opponent filter - the caption at
 the top of the section says exactly what it was computed with.
 
-If you've pasted your collection into the paste-box, the scatter and
-tier cards react - the cluster panels don't yet mark your spreads
-(planned).
+If you've pasted your collection into the paste-box, the cluster
+panels mark your on-grid spreads as gold stars - hover one to see
+which of your mons sits there and which cluster it lands in. (The
+tables stay collection-agnostic.)
 
 ## Where this came from
 
