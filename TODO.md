@@ -146,15 +146,6 @@ repros are no longer needed. The `--p1-bait/--p2-bait` pvpoke_trace.js flags
   ~624). Low; optional: surface the WARN where `verify_overnight` scans.
 - **[render] `#opp-<slug>` canonical landing.** `#opp-` links land on the
   first-rendered mention; pick one canonical per-opponent target. Low; render-only.
-- **[render] wrap long Plotly legend entries.** Anchor/spec-card spread labels
-  (e.g. `Fortified Gyarados (Shadow) (Dragon Breath / Aqua Tail+Twister) (151.27+
-  Def)`) overflow the legend far to the right (seen on Mandibuzz GL, 2026-07-04).
-  Plotly doesn't wrap legend text natively -- insert `<br>` into the trace
-  `name` at a word-boundary target width when building the scatter legend in
-  `scripts/deep_dive_rendering.py` (trace `name=` construction). Render-only, not
-  an engine file (no cache invalidation). Apply AFTER the current bake, then batch
-  re-render all dives from their `userdata/replay/*.replay.pkl.gz` blobs (no
-  re-sim) + rebuild the index for a consistent legend across the site.
 
 ## Top-N opponent filter + limited-cup dives (planned 2026-07-02)
 
