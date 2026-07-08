@@ -29,9 +29,11 @@ tell you what a whole fight does.
 
 Three things to read off the tier card header in the screenshot:
 
-1. **The tier name.** It's always "(opponent) Atk" or "(opponent) Def"
-   or "Fortified (opponent)" - a shorthand for "this tier is defined
-   by a specific breakpoint or bulkpoint against that opponent." In
+1. **The tier name.** It's usually "(opponent) Atk" or "(opponent)
+   Bulk" or "Fortified (opponent)" - a shorthand for "this tier is
+   defined by a specific breakpoint or bulkpoint against that
+   opponent." Expert-authored tiers keep their authored names instead
+   (e.g. "GH Great" / "GH Good" on the Tinkaton dives). In
    the screenshot, the
    <span style="color:#58a6ff;font-weight:600">Dusknoir Atk</span>
    badge means this cutoff was derived from a damage breakpoint
@@ -66,11 +68,12 @@ These three words show up near each other and it's worth being precise:
   backed by one anchor (the one the tier is named after) but with
   every other anchor it clears listed in the bullets below. Tiers are
   what the dive shows you.
-- A **category** is a higher-level grouping used in the Notable IVs
-  section. Slayer categories (Atk Slayer / Bulk Slayer / CMP Slayer)
-  sort IVs by strategy; composite categories are intersections like
-  "Atk Slayer AND Top 5% by stat product" that call out the rarer
-  IVs. Categories are read laterally across many tiers at once.
+- A **category** is a higher-level grouping used in the Per-matchup
+  IV finder (collapsed inside IV Recommendations). Slayer categories
+  (Anchors-First Slayer / CMP-First Slayer) sort IVs by strategy;
+  composite categories are intersections like "Anchors-First Slayer
+  AND Top 5% by stat product" that call out the rarer IVs. Categories
+  are read laterally across many tiers at once.
 
 If you're reading a dive for the first time, start with tiers. Go to
 categories once you've picked out one or two tier cards that look
@@ -80,23 +83,21 @@ relevant.
 
 Two things make tiers overlap, and both are intentional.
 
-**Stricter cutoffs contain looser ones.** If {{dive:top_tier_name}}
-requires `atk >= {{dive:top_tier_atk_cutoff}}` and a second tier
-requires `atk >= 123.19` (the Tinkaton breakpoint, lower), any IV
-spread that meets the stricter cutoff automatically meets the looser
-one. So the
-stricter tier's bullet list is a **superset** of the looser tier's
-bullets. The dive surfaces this deliberately rather than de-duplicating:
-a card telling you "this tier buys you Tinkaton AND Wigglytuff AND
-Altaria AND Lapras" is more informative than one that only says
-"Lapras."
+**Stricter cutoffs contain looser ones.** When one tier's atk cutoff
+sits above another's (on the reference dive, Grumpig Slayer's
+`atk >= 116.44` vs Oinkologne Atk's `atk >= 116.03`), any IV spread
+that meets the stricter cutoff automatically meets the looser one. So
+the stricter tier's bullet list is a **superset** of the looser
+tier's bullets. The dive surfaces this deliberately rather than
+de-duplicating: a card telling you everything a cutoff buys at once
+is more informative than one that only lists the namesake matchup.
 
 **Crossed-axis tiers don't contain each other.** A tier that only
 cares about attack (say, "Lapras Slayer") and a tier that only cares
 about defense (say, "Fortified Greedent") don't sit on the same axis
 at all. Atk anchors show up on one card, def anchors on the other,
 and the IVs that clear both are a separate rare intersection that the
-Notable IVs section usually calls out.
+Per-matchup IV finder usually calls out.
 
 When two tiers share the same primary anchor but different member
 counts - one says `atk >= 123.74, def >= 100` and the other just
@@ -124,21 +125,21 @@ the single most actionable number on a tier card.
 
 Those ranges are rules of thumb, not hard lines. What matters is the
 **relative ordering**: a tier with 46 members is an order of magnitude
-rarer than one with 460, and the dive's Notable IVs section will flag
+rarer than one with 460, and the paste-box overlay will show
 which of your catchable IV spreads fall inside each.
 
 ## One worked example, quickly
 
 {{dive:species_display}} {{dive:league_display}} has
 {{dive:tier_count}} threshold-tier cards on its featured moveset.
-The top card - {{dive:top_tier_name}} - has `atk &ge;
-{{dive:top_tier_atk_cutoff}}` and {{dive:top_tier_clear_count}} of the
-{{dive:iv_space_size}} IV spreads meet it. That means clearing that
-tier isn't free; it rules out most low-attack IV spreads. But every
-IV spread that does meet it also flips the matchups listed as primary
-bullets below (the Lapras scenario flip plus everything below the
-same atk cutoff - Tinkaton, Wigglytuff, Altaria, and so on for this
-moveset).
+The top card - {{dive:top_tier_name}} - cuts on bulk: `def &ge;
+{{dive:top_tier_def_cutoff}}` with an HP floor of
+`{{dive:top_tier_sta_cutoff}}`, and {{dive:top_tier_clear_count}} of
+the {{dive:iv_space_size}} IV spreads meet it. That means clearing
+that tier isn't free; it rules out nearly every attack-weighted IV
+spread. But every IV spread that does meet it also flips the matchups
+listed as primary bullets below - the namesake bulkpoint plus every
+looser cutoff on the same axis for this moveset.
 
 Read the card top-down: tier name tells you what opponent drives the
 cutoff; the cutoff tells you what stat you need; the member count
@@ -149,7 +150,7 @@ whole surface.
 
 ## Where to go next
 
-- **[IV Flavor Guide](../iv-flavor-guide/)** - covers the purple IV
+- **[IV Flavor Guide](../iv-flavor-guide/)** - covers the teal IV
   Flavor Guide zone that sits next to Threshold Tiers on the dive
   page and explains how the Plotly legend's names (like "Lapras
   Slayer") relate to the tier cards' auto-derived names (like

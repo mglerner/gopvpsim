@@ -14,8 +14,9 @@ extra effort.
 ## What the Anchor IVs band is
 
 Every dive has an **Anchor IVs** overlay on the scatter plot - a set
-of reference IVs (usually rank-1-by-stat-product or a small neighborhood
-around it) that serve as the "what you'd naturally build" baseline. For
+of reference IVs (every IV spread that clears at least one named
+anchor - a breakpoint, bulkpoint, or CMP test - against the meta)
+that serve as the "what you'd naturally build" baseline. For
 every stat-product rank, there's a set of anchor IVs at that rank and
 an average battle score for that set. Stacked across every rank, those
 averages trace out a **band**: a smooth curve of "what score do you
@@ -23,7 +24,8 @@ get at rank N if you don't go out of your way to pick a specific
 flavor?"
 
 The envelope metric asks, for each named category (each row on the IV
-Flavor Guide, each card in Notable IVs, each tier in Threshold Tiers):
+Flavor Guide, each composite card in the Per-matchup IV finder, each
+tier in Threshold Tiers):
 **at matching stat-product rank, does this category's score sit above,
 below, or on the band?**
 
@@ -44,15 +46,15 @@ Three of the four shape classes in one frame.
 </figure>
 
 **Why the Anchor IVs markers change color across the rank axis.** Each
-triangle carries a cyan border ring (the "I'm in the Anchor IVs
-cohort" signal) and an inner fill that matches what that IV spread
-would look like in the base scatter underneath. So in the default
-**Color: Threshold tiers** mode, anchor IVs that clear a named tier
-take that tier's color; untiered anchor IVs take a Viridis-by-score
-gradient. Switch the **Color** dropdown to a stat axis like "HP" or
-"Attack" and every anchor fill flips to a fixed gold - the per-tier
-mapping doesn't apply outside threshold mode. The cyan border stays
-constant; only the fill responds to the Color setting.
+triangle's inner fill matches what that IV spread would look like in
+the base scatter underneath. So in the default **Color: Threshold
+tiers** mode, anchor IVs that clear a named tier take that tier's
+color; untiered anchor IVs take a Viridis-by-score gradient. Switch
+the **Color** dropdown to a stat axis like "HP" or "Attack" and every
+anchor fill flips to a fixed gold - the per-tier mapping doesn't
+apply outside threshold mode. Switch the **Anchors** dropdown to
+Outline and the fill drops out entirely, leaving a cyan ring per
+anchor IV so the band reads as an envelope edge.
 
 ## The four shapes
 
@@ -107,8 +109,9 @@ skips sparse categories entirely rather than showing a misleading tag.
 
 Two places:
 
-1. **Per-category, on the Notable IVs cards** and on tier cards in
-   Threshold Tiers. The tag line reads like:
+1. **Per-category, on the composite (slayer + tier) cards in the
+   Per-matchup IV finder** (the section formerly called Notable IVs).
+   The tag line reads like:
 
    > **Envelope:** Straddles band (net -) (avg -0.3, spread 0.9)
 
@@ -165,8 +168,9 @@ band is a strong predictor of outcome. The handful of riders are the
 interesting ones - either ship-quality picks (rider-top) or explicit
 traps (rider-bottom) where the mean is persistently off the band.
 
-On the Notable IVs cards you can see the per-category tags: the
-composite Slayer-plus-Bulk cards that cover a defensive trade carry
+On the Per-matchup IV finder's composite cards you can see the
+per-category tags: the composite Slayer-plus-Bulk cards that cover a
+defensive trade carry
 `Straddles band (net -)` tags, which matches the intuition that
 trading def-sacrifice for atk gains is a wash on average.
 
@@ -193,14 +197,15 @@ catchable IV spreads land inside a rider-top band vs a straddle.
 
 ## Where to go next
 
-- **[IV Flavor Guide](../iv-flavor-guide/)** - the purple narrative
+- **[IV Flavor Guide](../iv-flavor-guide/)** - the teal narrative
   zone that names each flavor and gives you the per-flavor trade-off
-  list. Envelope tags sit next to the flavor cards; the two are
-  meant to be read together.
-- **[Threshold Tiers](../threshold-tiers/)** - tier cards carry the
-  same envelope tag as Notable IVs. If a Threshold Tier card says
-  "Straddles band," the tier's cutoff is mechanically sound but
-  doesn't move the score needle on average.
+  list. Envelope shapes and flavor cards describe the same named
+  categories; the two are meant to be read together.
+- **[Threshold Tiers](../threshold-tiers/)** - tier categories are
+  classified by the same envelope metric (they feed the envelope-shape
+  count in the Overview). If a tier's category straddles the band,
+  the tier's cutoff is mechanically sound but doesn't move the score
+  needle on average.
 - **[Deep-Dive Scatter](../deep-dive-scatter/)** - the Anchor IVs
   band is an overlay on the scatter plot; the scatter guide covers
   the Filled / Outline dropdown and how to read the overlay against

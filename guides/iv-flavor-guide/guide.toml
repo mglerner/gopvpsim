@@ -5,7 +5,7 @@ order = 3
 coming_soon = false
 authorship = "both"
 
-# Reference dive defaults to Oinkologne Male GL (inherited from
+# Reference dive defaults to Oinkologne Female GL (inherited from
 # build_guides.DEFAULT_REFERENCE). Flavor examples cite the reference
 # dive's three flavors (General Good / Fortified Greedent / Lapras
 # Slayer); update when the reference species changes.

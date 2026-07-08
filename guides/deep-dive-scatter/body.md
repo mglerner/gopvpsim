@@ -25,14 +25,15 @@ cohort's score band; the coloured overlays
 <span style="color:#f0883e;font-weight:600">Steelix (Shadow) Slayer</span>,
 <span style="color:#bc8cff;font-weight:600">Fortified Walrein</span>)
 are the named categories the IV Flavor Guide and Threshold Tiers
-reference by name. Click any legend entry to toggle its visibility.
+reference by name. Hover any legend entry to isolate its trace; click
+to lock the isolation (click again to release).
 </figcaption>
 </figure>
 
 ## Axes, at a glance
 
-- **x-axis: stat-product rank.** Lower rank is to the left (rank 1 at
-  the leftmost edge, rank {{dive:iv_space_size}} at the rightmost).
+- **x-axis: stat-product rank.** Better ranks are to the right (rank 1
+  at the rightmost edge, rank {{dive:iv_space_size}} at the leftmost).
   Two IV spreads with identical stat products get tied ranks, which
   is why the x-axis can look slightly discrete in places.
 - **y-axis: the selected outcome mode.** Defaults to average battle
@@ -40,22 +41,28 @@ reference by name. Click any legend entry to toggle its visibility.
   is better.
 
 The y-axis responds to the **Y-axis** dropdown in the control strip
-above the plot: average score, win count (out of {{dive:opponent_count}}
-opponents), scenario wins (out of {{dive:opponent_count}} &times;
-{{dive:scenario_count}} = per-scenario totals), and a couple of mode-
-specific variants. When the y-axis is a wins count, the hover card
-shows "won / total" rather than an averaged score.
+above the plot: average score plus three wins counts (vs PvPoke-default
+opponents, vs rank-1 opponents, vs the mirror cohort). Wins are tallied
+across whichever Shields selection is active - out of
+{{dive:opponent_count}} &times; {{dive:scenario_count}} on `All (avg)`,
+out of {{dive:opponent_count}} for a single scenario. When the y-axis
+is a wins count, the hover card shows "won / total" rather than an
+averaged score.
 
 ## The control strip above the plot
 
 The strip of dropdowns above the plot is what makes the scatter
-interactive. Each dropdown is non-destructive: changing one re-renders
-the colours or y-values without rebuilding the underlying data, so
-flipping between views is instant.
+interactive. Each dropdown (bar Moveset on split dives - see below) is
+non-destructive: changing one re-renders the colours or y-values
+without rebuilding the underlying data, so flipping between views is
+instant.
 
 - **Moveset** (only shown when the dive covers multiple movesets) -
   switches the plot to a different fast/charged move combination.
-  Re-runs the per-opponent score map for the new moveset.
+  Re-runs the per-opponent score map for the new moveset. On dives big
+  enough to split one page per moveset, this dropdown instead loads
+  the sibling page for that moveset - a full reload, so a pasted
+  collection CSV needs re-loading.
 - **Shields** - {{dive:scenario_count}} per-scenario options (`0v0`,
   `0v1`, ..., `2v2`) plus `All (avg)`. The per-scenario views narrow
   the score down to one shield configuration; `All (avg)` is the
@@ -97,8 +104,10 @@ the dive you're currently looking at.
 ## The Anchor IVs band
 
 Every dive overlays a band of **Anchor IVs** on the plot - a reference
-set of IVs (usually rank-1-by-stat-product or a narrow ring around it)
-that represents "what you'd naturally build if you stopped optimizing."
+set of IVs (the anchor-clear set: every spread that passes at least
+one selective named anchor - the same set the hover card's `Clears:`
+line reads) that represents "what you'd naturally build if you
+stopped optimizing."
 The band traces what score the anchor set produces across every
 stat-product rank, so any point above the band is doing something the
 rank alone doesn't buy you.
@@ -126,20 +135,23 @@ Hover any point and you get a compact summary:
   ("Score: 539.3") or a "won / total" count.
 - **Tier** - which tier card, if any, this IV belongs to. Also
   doubles as the legend colour.
-- **Slayer** - which of the Atk/Bulk/CMP slayer categories the IV
-  falls into (if any), pulled from the iterative slayer-discovery
-  output.
-- **&Delta; vs #1** - signed battle-score delta from rank-1 under the
-  current y-axis. Negative means you give up that many points for the
-  trade. Hidden on rank-1 itself (always zero).
-- **Mirror CMP** - what fraction of the same-species top-50 IV cohort
-  on this dive your IV at-least-ties on attack. Dropdown-independent;
+- **Slayer** - which of the slayer categories (Anchors-First /
+  CMP-First) the IV falls into (if any), pulled from the iterative
+  slayer-discovery output.
+- **&Delta; vs best** - three signed avg-score deltas, one per shield
+  count (`0v0 | 1v1 | 2v2`), each vs the best IV in that scenario.
+  Negative means you give up that many points for the trade. All
+  three show regardless of the Shields dropdown.
+- **Mirror CMP** - what fraction of the Nash-converged mirror-slayer
+  cohort your IV at-least-ties on attack (the top-50 variant lives in
+  the Top IVs table as `Top-Mirror CMP %`). Dropdown-independent;
   purely atk-based.
 - **Clears** - the named anchors this IV passes. Compact abbreviated
   list so the tooltip doesn't blow up.
-- **Yours** (if you've pasted a collection - see below) - the IV
-  nicknames and hatch dates of any of your own Pokemon sitting at
-  this exact IV triple.
+- **Yours** (if you've pasted a collection - see below) - the CP and
+  level of any of your own Pokemon sitting at this exact IV triple
+  (a single mon gets its qualifying tiers too; several collapse to a
+  CP list).
 
 ## "Check my collection": the paste-box
 
@@ -151,8 +163,7 @@ plot gets circled. Everything runs client-side - nothing is uploaded.
 Two useful follow-ups once your collection is on the plot:
 
 - The per-tier card's **"of yours"** section lights up, showing which
-  of your mons (by nickname and hatch date) clear each tier's
-  cutoffs.
+  of your mons (by CP and IV) clear each tier's cutoffs.
 - Ticking **"Show only my mons"** dims everything except your circled
   IVs, which is the fastest way to spot whether you already own
   something in a rider-top band.
@@ -226,7 +237,7 @@ breakpoint become visible as a discontinuity.
 - **[Threshold Tiers](../threshold-tiers/)** - the legend colours on
   the scatter are tier memberships; the tier cards below the plot
   are where the cutoffs live.
-- **[IV Flavor Guide](../iv-flavor-guide/)** - the purple narrative
+- **[IV Flavor Guide](../iv-flavor-guide/)** - the teal narrative
   zone that names each cluster on the plot in play-style terms.
 - **[Envelope Position](../envelope-position/)** - explains the
   Anchor IVs band overlay and how rider/straddler tags are derived

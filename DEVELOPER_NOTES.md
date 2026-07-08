@@ -37,7 +37,7 @@ core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
 against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->23<!-- /sync --> matchups
-(<!-- sync:pvpoke_cells_verified -->207<!-- /sync --> cells: 170 exact on score+winner+chargedLog, 37 cells =
+(<!-- sync:pvpoke_cells_verified -->207<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->170<!-- /sync --> exact on score+winner+chargedLog, 37 cells =
 documented divergences, each traced to a mechanism: the near-KO
 plan-choice cluster, PvPoke bug #3 Gyro-Ball-over-Shadow-Ball — both
 sides of it, and bug #8 Hangry stickiness; per-cell reasons live on

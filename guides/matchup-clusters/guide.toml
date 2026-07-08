@@ -1,0 +1,13 @@
+title = "Matchup Clusters"
+slug = "matchup-clusters"
+description = "The Dive Analysis section that groups IVs by which marginal matchups they win, with the three stat-plane panels and the flip-threshold table."
+# Sits between the scatter guide and the CD article guide: it documents a
+# dive-page section, like the scatter guide, and readers will usually hit
+# it right after the scatter.
+order = 4.5
+coming_soon = false
+# Drafted 2026-07-07 alongside the matchup-clusters section itself
+# (replacing the retired experimental banding/gap block). "ai" until
+# Michael reviews -- promote to "both" after the human pass, like the
+# other guides.
+authorship = "ai"

@@ -124,10 +124,9 @@ consequence of this table.
 
 ### Fast Moves / Charged Moves
 
-Tables listing every move the species can learn, legal or legacy.
-Grayed rows are legacy; unshaded rows are currently accessible without
-ETM. Useful for deciding whether a **Legacy** tag on a preferred
-moveset is a dealbreaker or not.
+Tables listing every move the species can learn. A **Tag** column
+marks the incoming CD move and the current default moveset; rows
+sort by damage-per-turn (fast) or power (charged), descending.
 
 ### Meta Coverage
 
@@ -241,7 +240,7 @@ A card grid, one card per tier cut-off per form. Each card shows:
 Cards link directly into the corresponding tier card on the paired
 deep dive, so clicking through gives you the full threshold ladder
 with per-scenario bullets. Female cards are tagged with a female
-glyph and blue tint; Male cards use a male glyph and pink tint. New
+glyph and pink tint; Male cards use a male glyph and blue tint. New
 to threshold tiers? The
 [Threshold Tiers guide](../threshold-tiers/) walks through what the
 cut-offs and member counts mean.
@@ -251,7 +250,7 @@ cut-offs and member counts mean.
 One green callout box at the bottom - the article's headline
 conclusion. For Oinkologne: "Clear upgrade: Mud Slap wins every shield
 scenario." Above the Verdict, the top-of-article `upgrade` / `sidegrade`
-/ `skip` badge on the meta line is the one-word version of the same
+/ `downgrade` badge on the meta line is the one-word version of the same
 judgment.
 
 ## What's in the CD article but NOT in the dive pages
