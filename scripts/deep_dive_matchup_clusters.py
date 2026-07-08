@@ -20,8 +20,20 @@ matrix of UNIQUE win patterns (typically a few hundred distinct patterns
 from <= 4096 IVs), where weighted average-linkage and a full-population
 silhouette are exact and fast.  Determinism is load-bearing: replay
 re-renders must be byte-identical (arc S4 invariant), so every tie-break
-below is explicit and there is no RNG anywhere.  Two deliberate
-improvements over the offline reference pipeline
+below is explicit and there is no RNG anywhere.
+
+Fidelity note (adversarially verified 2026-07-07): Hamming distances on
+short fingerprints tie constantly, and under ties this linkage's merge
+order legitimately differs from sklearn's/scipy's (which use their own
+tie resolution).  Cross-checked on 4 real dives x 3 scenarios: sharp
+marginals identical everywhere; at matching K the partitions agree at
+ARI 0.76-1.00; on tie-heavy scenarios the dendrogram can differ enough
+that a reference partition is unreachable (worst case Sableye-Shadow GL
+2v2: shipped K=2 at silhouette 0.42 vs the reference K=3 at 0.44 -- the
+shipped partition is a valid average-linkage clustering, its silhouette
+is displayed honestly in the section, and its stat-rule agreement was
+HIGHER than the reference's there).  Two deliberate improvements over
+the offline reference pipeline
 (~/coding/reports/gopvpsim-cluster-analysis/cluster_pipeline.py):
 
   * silhouette is computed exactly over the full population via unique
@@ -100,13 +112,20 @@ def _unique_patterns(F):
 def _linkage_labels(patterns, counts, ks):
     """Weighted average-linkage (Hamming) labels for each requested K.
 
-    Average linkage over the full duplicated population is exactly weighted
-    average linkage over unique patterns (identical points merge at distance
-    zero first, which is the unique-collapse).  Lance-Williams update for
-    average linkage: d(i+j, k) = (n_i d(i,k) + n_j d(j,k)) / (n_i + n_j).
+    Average linkage over the full duplicated population equals weighted
+    average linkage over unique patterns for merge heights, and for
+    partitions whenever merge distances are distinct (identical points
+    merge at distance zero first, which is the unique-collapse).  Under
+    TIED merge distances -- routine for Hamming on short fingerprints --
+    the result is one valid average-linkage clustering chosen
+    deterministically, which may differ from other implementations'
+    equally-valid choices (see the module docstring fidelity note).
+    Lance-Williams update for average linkage:
+    d(i+j, k) = (n_i d(i,k) + n_j d(j,k)) / (n_i + n_j).
 
-    Tie-break on equal merge distances: lowest first index, then lowest
-    second index (indices in the current active ordering, which is stable).
+    Tie-break on equal merge distances: first occurrence in the active
+    ordering (argmin scan order), i.e. lowest (i, j) up to float64
+    accumulation in the Lance-Williams updates.
 
     Returns {k: labels(u,)} with arbitrary (but deterministic) label ids.
     """
@@ -282,7 +301,9 @@ def cluster_scenario(W, sharp, atk, def_, hp, sp_rank):
 
 
 def defining_matchups(res, opponent_names, top=4, min_delta=DEFINING_MIN_DELTA):
-    """Marginal matchups gained between adjacent (weak -> strong) clusters."""
+    """Marginal matchups gained AND lost between adjacent (weak -> strong)
+    clusters. Win-sets can cross rather than nest, so naming only the gains
+    would misread the ordering as strict upgrades."""
     sharp = res["sharp"]
     clusters = res["clusters"]
     out = []
@@ -291,10 +312,14 @@ def defining_matchups(res, opponent_names, top=4, min_delta=DEFINING_MIN_DELTA):
         cur = clusters[i]["winrate_per_sharp"]
         delta = cur - prev
         gained_idx = np.argsort(-delta, kind="stable")[:top]
-        names = [(opponent_names[sharp[g]], float(delta[g]),
-                  float(cur[g]), float(prev[g]))
-                 for g in gained_idx if delta[g] > min_delta]
-        out.append({"from": i - 1, "to": i, "gained": names})
+        gained = [(opponent_names[sharp[g]], float(delta[g]),
+                   float(cur[g]), float(prev[g]))
+                  for g in gained_idx if delta[g] > min_delta]
+        lost_idx = np.argsort(delta, kind="stable")[:top]
+        lost = [(opponent_names[sharp[g]], float(delta[g]),
+                 float(cur[g]), float(prev[g]))
+                for g in lost_idx if delta[g] < -min_delta]
+        out.append({"from": i - 1, "to": i, "gained": gained, "lost": lost})
     return out
 
 
@@ -419,8 +444,12 @@ def single_stat_flip(stats, y):
     distinct sorted values (stable sort).  Returns (acc, stat, threshold,
     direction) with direction in {'>=', '<'}; threshold is the attained
     stat value at the boundary.  Deterministic tie-breaks: higher acc wins;
-    ties -> earlier stat in insertion order, then '>=' before '<', then
-    lower threshold (first boundary scanned).
+    ties -> earlier stat in insertion order, then lower threshold (the
+    boundary scan is outside the direction loop), then '>=' before '<' at
+    the same boundary.  NB the k=0 boundary yields the CONSTANT rules
+    (always-win for '>=', always-lose for '<') at the base rate -- callers
+    presenting the result must check it beats max(p, 1-p) (see flip_table's
+    'informative' flag).
     """
     y = np.asarray(y, dtype=np.int64)
     n = len(y)
@@ -455,6 +484,7 @@ def flip_table(W, sharp, wr, stats, is_named):
     rows = []
     for o in sharp:
         acc, sname, thr, dirn = single_stat_flip(stats, W[:, o])
+        baseline = max(float(wr[o]), 1.0 - float(wr[o]))
         rows.append({
             "opp_idx": int(o),
             "winrate": float(wr[o]),
@@ -462,6 +492,10 @@ def flip_table(W, sharp, wr, stats, is_named):
             "threshold": thr,
             "direction": dirn,
             "accuracy": acc,
+            # A constant rule (always-win / always-lose) scores the base
+            # rate; only a rule that BEATS it carries information. Rows
+            # failing this are rendered without a threshold claim.
+            "informative": acc > baseline + 1e-9,
             "named": is_named(int(o), sname),
         })
     return rows
@@ -578,23 +612,32 @@ def _scen_headline(label, entry, nO):
     wr = entry["wr"]
     n_win = int((wr == 1.0).sum())
     n_loss = int((wr == 0.0).sum())
+    sil = res["silhouette"]
+    sil_txt = f'silhouette {sil:.2f}'
+    if sil < 0.30:
+        sil_txt += ' - weak separation'
     return (f'<p style="font-size:13px">'
             f'<b>{label}</b>: {len(res["sharp"])} sharp marginal opponents '
             f'of {nO} ({n_win} always-win / {n_loss} always-lose at every '
             f'IV); {res["n_patterns"]} distinct win patterns; '
-            f'K={res["k"]} clusters (silhouette {res["silhouette"]:.2f}).</p>')
+            f'K={res["k"]} clusters ({sil_txt}).</p>')
 
 
 def _cluster_table(entry, opp_names):
     res = entry["res"]
     rows = []
     defining = defining_matchups(res, opp_names)
-    gains_by_to = {d["to"]: d["gained"] for d in defining}
+    steps_by_to = {d["to"]: d for d in defining}
     for c in res["clusters"]:
         cid = c["id"]
-        gained = gains_by_to.get(cid, [])
+        step = steps_by_to.get(cid, {})
         gtxt = ", ".join(f"{_esc(n)} (+{d * 100:.0f}pp)"
-                         for n, d, cur, prev in gained) or "-"
+                         for n, d, cur, prev in step.get("gained", [])) or "-"
+        lost = step.get("lost", [])
+        if lost:
+            gtxt += ('; trades away ' +
+                     ", ".join(f"{_esc(n)} ({d * 100:.0f}pp)"
+                               for n, d, cur, prev in lost))
         rows.append(
             f'<tr><td>{_swatch(cid)}C{cid}</td>'
             f'<td style="text-align:right">{c["size"]}</td>'
@@ -655,7 +698,14 @@ def _rules_block(entry):
 def _flip_table_html(entry, opp_names, has_anchors):
     rows = []
     for r in entry["flips"]:
-        rule = f'{r["stat"]} {r["direction"]} {_fmt_thr(r["stat"], r["threshold"])}'
+        if r.get("informative", True):
+            rule = _esc(f'wins iff {r["stat"]} {r["direction"]} '
+                        f'{_fmt_thr(r["stat"], r["threshold"])}')
+            acc_cell = f'{r["accuracy"] * 100:.0f}%'
+        else:
+            rule = ('<span style="color:var(--text-muted)">no single-stat '
+                    'rule beats the base rate</span>')
+            acc_cell = '-'
         if r["named"] is True:
             named = '<td style="color:var(--text-muted)">named</td>'
         elif r["named"] is False:
@@ -665,15 +715,17 @@ def _flip_table_html(entry, opp_names, has_anchors):
         rows.append(
             f'<tr><td>{_esc(opp_names[r["opp_idx"]])}</td>'
             f'<td style="text-align:right">{r["winrate"] * 100:.0f}%</td>'
-            f'<td>wins iff {rule}</td>'
-            f'<td style="text-align:right">{r["accuracy"] * 100:.0f}%</td>'
+            f'<td>{rule}</td>'
+            f'<td style="text-align:right">{acc_cell}</td>'
             f'{named}</tr>')
     foot = ('Rows are ordered by discriminating power (win rate closest to '
             '50%). "Rule accuracy" is how well that single stat threshold '
-            'predicts the win/loss across all IVs; high-accuracy UNNAMED '
-            'rows are candidate new anchors. "Named" means an authored '
-            'anchor names that opponent (alt-moveset / IV-variant rows '
-            'inherit their base opponent\'s anchor).')
+            'predicts the win/loss across all IVs, and is only shown when '
+            'it beats always-predicting the majority outcome; '
+            'high-accuracy UNNAMED rows are candidate new anchors. '
+            '"Named" means an authored anchor names that opponent '
+            '(alt-moveset / IV-variant rows inherit their base opponent\'s '
+            'anchor).')
     if not has_anchors:
         foot += (' This dive has no authored anchors, so no row can be '
                  'marked named.')
@@ -690,7 +742,8 @@ def _flip_table_html(entry, opp_names, has_anchors):
 
 
 def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
-                   data_obj, opp_label, moveset_label, resolved_anchors):
+                   data_obj, opp_label, moveset_label, resolved_anchors,
+                   bait_label='bait-selective'):
     """Render the Matchup clusters section (HTML string).
 
     Replaces the retired experimental banding/gap-cluster block as the first
@@ -762,15 +815,18 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         '<p style="font-size:13px">IVs grouped by <b>which marginal '
         'matchups they win</b> (their win/loss fingerprint over the '
         'opponents that some IVs beat and others don\'t), instead of by '
-        'average score. Clusters correspond to stat-threshold regions: '
-        'crossing a breakpoint or bulkpoint moves an IV to the next '
-        'cluster and flips a specific, named set of matchups.</p>')
+        'average score. Clusters largely correspond to stat-threshold '
+        'regions (see each scenario\'s stat-rules accuracy below): '
+        'crossing a breakpoint or bulkpoint typically moves an IV to the '
+        'next cluster, gaining a named set of matchups and sometimes '
+        'trading others away.</p>')
     parts.append(
         f'<p style="font-size:12px;color:var(--text-muted)">Computed at '
         f'bake time for moveset <b>{_esc(moveset_label)}</b> with '
-        f'{_esc(opp_label)} opponent IVs over the full opponent pool; this '
-        f'section does not follow the scatter\'s moveset / opponent-IV '
-        f'dropdowns or the opponent filter.</p>')
+        f'{_esc(opp_label)} opponent IVs and {_esc(bait_label)} shield '
+        f'play, over the full opponent pool; this section does not follow '
+        f'the scatter\'s moveset / opponent-IV / bait dropdowns or the '
+        f'opponent filter.</p>')
 
     # scenario selector (server-side blocks + client panels both follow it)
     opts = "".join(
@@ -821,10 +877,11 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         'of the best silhouette wins). Clusters are ordered weakest to '
         'strongest by mean marginal wins. The scatter panels project the '
         f'same {nIvs:,} IV spreads onto each pair of battle stats; clusters '
-        'that overlap completely in score separate cleanly there. Replaces the '
-        'retired score-gap cluster heuristic (2026-07), which fired on '
-        'float-level jitter in the opponent-averaged score and could not '
-        'name what a cluster wins.</p></details>')
+        'that overlap completely in score separate cleanly there. Replaces '
+        'the retired score-gap cluster heuristic (2026-07), which usually '
+        '(~77% of sampled runs) fired on float-level jitter in the '
+        'opponent-averaged score, and even when it did catch a real tier '
+        'could not name which matchups defined it.</p></details>')
 
     parts.append('<script type="application/json" class="dd-mc-data">'
                  + json.dumps(payload, separators=(",", ":"))
