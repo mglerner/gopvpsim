@@ -32,7 +32,7 @@ from gopvpsim.battle import simulate, pvpoke_dp, BattlePokemon
 from gopvpsim.data import get_default_moveset
 from gopvpsim.user_collection import parse_csv_text, get_species_name
 from gopvpsim.evolution_lines import get_final_forms
-from deep_dive import _parse_opponent_pool_line, parse_opponent_spec
+from deep_dive import _parse_opponent_pool_line
 
 _FAST, _CHARGED = get_moves()
 EVEN_SHIELDS = [(0, 0), (1, 1), (2, 2)]
@@ -52,13 +52,17 @@ def load_pool(path, league):
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
+            # base / is_shadow from _parse_opponent_pool_line are authoritative
+            # (keeps forms like '(Female)', strips only ' (Shadow)'). Re-parsing
+            # the auto-generated display string instead mangles the '|'-override
+            # syntax used by the UL/ML pools, e.g. 'Cradily | fast=ACID ...' ->
+            # display 'Cradily (Acid / ...)' -> a non-existent species key.
             display, base, is_shadow, fast_ov, charged_ov = _parse_opponent_pool_line(line)
-            base_clean, _v, sh = parse_opponent_spec(display)
             if fast_ov is None or charged_ov is None:
-                d_fast, d_charged = get_default_moveset(base_clean, league=league, shadow=sh)
+                d_fast, d_charged = get_default_moveset(base, league=league, shadow=is_shadow)
             fast = fast_ov if fast_ov is not None else d_fast
             charged = list(charged_ov) if charged_ov is not None else list(d_charged)
-            opps.append({'display': display, 'base': base_clean, 'shadow': sh,
+            opps.append({'display': display, 'base': base, 'shadow': is_shadow,
                          'fast': fast, 'charged': charged})
     return opps
 
