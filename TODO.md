@@ -13,25 +13,6 @@ pre-cold-dive gate; run `overnight_redive.sh` and watch with
 `scripts/chain_status.py --chain overnight`. (Last bake: CHANGELOG.md
 "2026-06-28".)
 
-## ENGINE BATCH READY FOR REVIEW/MERGE: branch `hunt2` (2026-07-03)
-
-Four engine fixes are implemented, verified, and committed on branch
-`hunt2` (worktree `~/coding/hunt2/gopvpsim`), batched because this new
-machine's cache is test-only (every real dive is cold anyway, so no
-migration predicates were built): `3f7e144` NB-1 selection freeze (final
-verdict on the bounding sweep's FIX recommendation), `e17d868` FC-1
-Aegislash revert energy, `0acdc8e` OMT turns_planned divisor, `a36930e`
-would_shield doc-only (investigated: faithful port, not a bug). Final
-engine hash `51bf823c217a`. Verification: new fixtures oracle-equal (Group
-D flipped to must-pass), suite 1213 passed (2 pre-existing new-machine
-fixture failures), audit harness IMPROVED to 172 exact + 35 documented
-(two Tinkaton-vs-Aegislash cells now exact), perf -2.4% vs machine-local
-baseline. MICHAEL: review + merge `hunt2` -> main before the first real
-production dives. NB merge will likely conflict in DEVELOPER_NOTES.md
-(both branches edited it) — take hunt2's engine-section rewrites AND
-main's F2/self-debuff/IV-floor edits; docs/reviews files are
-identical-content on both sides.
-
 ## Engine bug-hunt round 2 (2026-07-03): 16 confirmed findings need triage
 
 `docs/reviews/2026-07-02_engine_bug_hunt_round2.md` — 1 HIGH, 7 medium,
@@ -94,42 +75,16 @@ cold re-dive — everything else in this batch rides it for free.
 - **js-parity-1..5** (LOW): shipped-page JS contradictions; the top-N session
   owns `deep_dive_engine.js` / `deep_dive.py`. Leave until it lands.
 
-**Still needs Michael / on branch hunt2:**
-- **[medium, divergence-policy decision] NB-1 — BOUNDING SWEEP DONE
-  2026-07-03, recommendation = FIX; Michael's call pending.** Sweep
-  (140 matchups / 1260 cells vs pinned oracle, 8 mechanism traces):
-  76 diffs, 7 flips, effectively all 36 GL diffs touch the shipped surface,
-  incl. a shipped winner flip (Forretress (Shadow) vs Cradily GL 1-0, ours
-  413 LOSS vs oracle 588 WIN). Recommendation: freeze dpe-derived selection
-  at init stages PvPoke-style across all THREE consumer sites, keep the
-  don't-bait dpeRatio-staleness site as a documented divergence (PvPoke's
-  side is a cache-artifact bug), with a proven `nb1_selection_freeze`
-  migration predicate (dynamic-flag-audited) and FC-1 as a clean co-bump
-  option. Full footprint tables, predicate proof, xfail/fixture specs:
-  `docs/reviews/2026-07-03_nb1_bounding_sweep.md`.
-- **[medium, NEW from the sweep] OMT `turns_planned` divisor port
-  infidelity** (battle.py:749-750 vs ActionLogic.js:306): unintentional,
-  PvPoke strictly better in all traced cells (the -24 Oinkologne family,
-  3 shipped-oriented). Touched set not statically characterizable ->
-  fixing it forces a COLD re-dive; batch with the next cold-forcing change,
-  do NOT ride the NB-1 bump.
+**Round-2 engine items still open (hunt2 batch merged `2a63b65` — NB-1 / OMT / FC-1 landed with it):**
 - **[medium, NEW from the sweep, our own bug] would_shield/always-shield
   internal inconsistency:** the don't-bait override consumes
   `would_shield=False` while the active shield policy always shields
   (Florges vs Seismitoad UL 2-1 inflated +201). Independent of PvPoke
   fidelity; needs its own look. Detail in the sweep doc (carve-out
   section).
-- **FC-1** Aegislash mid-flight-revert energy divergence — FIXED on branch
-  hunt2 (`e17d868`); merges to main with the engine batch.
 - Remaining report lows not yet actioned: **BP-3/BP-4** (Aegislash whole-level
   rounding gaps in iv_breakpoints/iv_bulkpoints), **FC-2** (Blade->Shield revert
   clamp rationale stale vs oracle) — details in the report; low, unscheduled.
-
-The `hunt2` worktree (`~/coding/hunt2/`, engine @ c7f9ba2 + pvpoke @
-00f0afe7f, own venv) is KEPT so the report's repro commands run as written;
-delete with `git worktree remove` (both repos) once the batch is merged and
-repros are no longer needed. The `--p1-bait/--p2-bait` pvpoke_trace.js flags
-(first no-bait oracle) are on main.
 
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
