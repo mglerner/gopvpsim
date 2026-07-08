@@ -1687,6 +1687,7 @@ function removeManualMon(idx) {
     renderMatchesList();
     annotateAnchorBullets();
     updateView();
+    mcRefreshAll();
     return;
   }
   loadCollection(null);
@@ -2065,9 +2066,11 @@ function buildTraces() {
     // points and say so in the legend instead of mis-coloring.
     var mcRoot0 = document.querySelector('.dd-mc-root');
     var mcPay = mcRoot0 ? _mcPayload(mcRoot0) : null;
-    var mcOk = !!(mcPay && mcPay.scens) &&
-               state.movesetIdx === 0 &&
-               (!DATA.oppIvModes || state.oppIvMode === DATA.oppIvModes[0]);
+    var mcHasScens = !!(mcPay && mcPay.scens &&
+                        Object.keys(mcPay.scens).length > 0);
+    var mcModeOk = state.movesetIdx === 0 &&
+                   (!DATA.oppIvModes || state.oppIvMode === DATA.oppIvModes[0]);
+    var mcOk = mcHasScens && mcModeOk;
     var mcScen = null;
     if (mcOk) {
       var sis0 = getActiveScenarioIndices();
@@ -2115,7 +2118,9 @@ function buildTraces() {
         nct.push(buildHoverText(niv));
       }
       traces.push({
-        name: wrapLegendName('Matchup clusters: available for the featured moveset with default opponent IVs only'),
+        name: wrapLegendName(mcHasScens
+          ? 'Matchup clusters: available for the featured moveset with default opponent IVs only'
+          : 'Matchup clusters: no robust cluster structure on this dive (see Dive Analysis)'),
         x: ncx, y: ncy, text: nct,
         mode: 'markers', type: 'scattergl', hoverinfo: 'text',
         marker: {size: 2.5, color: '#8899aa', opacity: 0.45},
@@ -2140,7 +2145,7 @@ function buildTraces() {
     // Use a colorscale that's bright against dark background
     var cscale = (cm === 'hp') ? 'YlOrRd' : (cm === 'def') ? 'Blues' : (cm === 'atk') ? 'RdYlGn' : 'Viridis';
     traces.push({
-      name:'All IVs (colored by '+cLabel+')', x:ax, y:ay, text:at,
+      name:wrapLegendName('All IVs (colored by '+cLabel+')'), x:ax, y:ay, text:at,
       mode:'markers', type:'scattergl', hoverinfo:'text',
       marker:{size:3.5, color:ac, colorscale:cscale, opacity:0.6,
                colorbar:{title:cLabel, len:0.6},
@@ -3701,7 +3706,9 @@ function _mcRenderRoot(root) {
         if (!(oidx >= 0 && oidx < n)) continue;
         var recs = state.ownedByIv[oidx];
         var onames = recs.map(function(rr) {
-          var cp = (rr.mon && rr.mon.cp) || (rr.stats && rr.stats.cp) || '?';
+          // fitted-at-cap CP uniformly: the panels plot at-cap stats, and
+          // CSV current-CP vs manual fitted-CP would silently mix meanings
+          var cp = (rr.stats && rr.stats.cp) || '?';
           return ((rr.mon && rr.mon.name) || 'mon') + ' CP' + cp;
         }).join(', ');
         ox.push(xs[oidx]);
@@ -3711,7 +3718,19 @@ function _mcRenderRoot(root) {
                   ' - cluster C' + sc.labels[oidx]);
       }
       if (ox.length) {
-        traces.push({type: 'scatter', mode: 'markers', x: ox, y: oy,
+        // scattergl (not svg scatter) + a tiny y-nudge: an svg star at the
+        // exact coordinates of a gl cluster point loses the hover contest
+        // (verified live during review: 3/24 stars hovered as the wrong
+        // spread) - same mechanism as the main plot's user overlay, same
+        // fix (c0e782d precedent).
+        var ymin = Infinity, ymax = -Infinity;
+        for (var yi = 0; yi < n; yi++) {
+          if (ys[yi] < ymin) ymin = ys[yi];
+          if (ys[yi] > ymax) ymax = ys[yi];
+        }
+        var ynudge = (ymax - ymin) * 0.0005 || 0.001;
+        for (var oyi = 0; oyi < oy.length; oyi++) oy[oyi] += ynudge;
+        traces.push({type: 'scattergl', mode: 'markers', x: ox, y: oy,
                      text: otxt, hoverinfo: 'text',
                      name: 'Yours (' + ox.length + ')',
                      marker: {size: 11, symbol: 'star', color: '#ffd700',
@@ -3737,7 +3756,13 @@ function _mcRenderRoot(root) {
 // the overlay on their first lazy render.
 function mcRefreshAll() {
   document.querySelectorAll('.dd-mc-root[data-mc-rendered]').forEach(function(root) {
-    if (root.offsetParent !== null) _mcRenderRoot(root);
+    if (root.offsetParent !== null) {
+      _mcRenderRoot(root);
+    } else {
+      // hidden (e.g. inside a closed details): drop the rendered flag so
+      // the next toggle-open re-renders with fresh collection state
+      root.removeAttribute('data-mc-rendered');
+    }
   });
 }
 
@@ -3758,6 +3783,13 @@ document.addEventListener('toggle', function(ev) {
   if (!det || !det.open || !det.querySelectorAll) return;
   det.querySelectorAll('.dd-mc-root:not([data-mc-rendered])').forEach(function(root) {
     if (root.offsetParent !== null) _mcRenderRoot(root);
+  });
+  // Panels rendered while hidden can carry a zero-size layout; a resize on
+  // open is a cheap no-op when sizing is already right.
+  det.querySelectorAll('.dd-mc-root[data-mc-rendered] .dd-mc-panel').forEach(function(p) {
+    if (p.children.length && window.Plotly && Plotly.Plots) {
+      try { Plotly.Plots.resize(p); } catch (e) {}
+    }
   });
 }, true);
 
