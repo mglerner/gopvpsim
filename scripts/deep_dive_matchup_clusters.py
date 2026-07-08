@@ -671,8 +671,9 @@ def _flip_table_html(entry, opp_names, has_anchors):
     foot = ('Rows are ordered by discriminating power (win rate closest to '
             '50%). "Rule accuracy" is how well that single stat threshold '
             'predicts the win/loss across all IVs; high-accuracy UNNAMED '
-            'rows are candidate new anchors. Anchor matching is by exact '
-            'opponent name against this dive\'s authored anchors.')
+            'rows are candidate new anchors. "Named" means an authored '
+            'anchor names that opponent (alt-moveset / IV-variant rows '
+            'inherit their base opponent\'s anchor).')
     if not has_anchors:
         foot += (' This dive has no authored anchors, so no row can be '
                  'marked named.')
@@ -819,8 +820,8 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         'cluster above a minimum size, and the smallest K within epsilon '
         'of the best silhouette wins). Clusters are ordered weakest to '
         'strongest by mean marginal wins. The scatter panels project the '
-        'same 4,096 IVs onto each pair of battle stats; clusters that '
-        'overlap completely in score separate cleanly there. Replaces the '
+        f'same {nIvs:,} IV spreads onto each pair of battle stats; clusters '
+        'that overlap completely in score separate cleanly there. Replaces the '
         'retired score-gap cluster heuristic (2026-07), which fired on '
         'float-level jitter in the opponent-averaged score and could not '
         'name what a cluster wins.</p></details>')
