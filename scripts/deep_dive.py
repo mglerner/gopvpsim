@@ -3780,9 +3780,12 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 
     # -- Matchup-fingerprint clusters (replaced the experimental banding /
     # score-gap cluster block, 2026-07; see deep_dive_matchup_clusters.py) --
+    _mc_bait = ('no-bait' if parse_mode(opp_iv_mode)[1] == 'nobait'
+                else 'bait-selective')
     analysis_parts.append(matchup_clusters.render_section(
         scores_flat, nIvs, nS, nO, scenarios, opponents, data_obj,
-        opp_label, moveset_label, resolved_anchors_top))
+        opp_label, moveset_label, resolved_anchors_top,
+        bait_label=_mc_bait))
 
     analysis_parts.append(rendering.render_analysis_volatility_html(
         data_obj, nIvs, nS, scenarios, scene_ranks, avg_ranks, ranked,

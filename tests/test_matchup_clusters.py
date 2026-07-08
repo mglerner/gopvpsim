@@ -215,6 +215,37 @@ def test_single_stat_flip_lt_direction():
     assert acc == 1.0 and sname == "atk" and dirn == "<"
 
 
+def test_flip_table_flags_uninformative_constant_rules():
+    # opponent whose wins have NO single-stat structure: the best "rule" is
+    # the constant predictor at the base rate, which must be flagged
+    # uninformative (review finding: it rendered as a fake threshold).
+    rng = np.random.default_rng(11)
+    n = 200
+    W = np.zeros((n, 1), dtype=bool)
+    W[rng.choice(n, size=120, replace=False), 0] = True   # 60% win, no signal
+    stats = {"atk": np.full(n, 5.0), "def": np.full(n, 6.0),
+             "hp": np.full(n, 7.0), "sp": np.full(n, 8.0)}
+    sharp, wr = mc.sharp_marginals(W)
+    rows = mc.flip_table(W, sharp, wr, stats, lambda o, s: None)
+    assert rows[0]["informative"] is False
+    assert rows[0]["accuracy"] == pytest.approx(0.6)
+
+
+def test_defining_matchups_reports_losses():
+    # stronger cluster gains opp1+opp2 but TRADES AWAY opp0 (win-sets cross)
+    W = np.zeros((200, 3), dtype=bool)
+    W[:100, 0] = True            # weak block wins opp0
+    W[100:, 1] = True            # strong block wins opp1, opp2
+    W[100:, 2] = True
+    sharp, wr = mc.sharp_marginals(W)
+    atk = np.linspace(100, 110, 200)
+    res = mc.cluster_scenario(W, sharp, atk, atk, atk,
+                              np.arange(1, 201, dtype=np.int32))
+    dm = mc.defining_matchups(res, ["OppA", "OppB", "OppC"])
+    lost = {n for step in dm for (n, d, c, p) in step["lost"]}
+    assert "OppA" in lost
+
+
 def test_flip_table_named_flags():
     W = np.zeros((100, 2), dtype=bool)
     atk = np.linspace(100, 110, 100)

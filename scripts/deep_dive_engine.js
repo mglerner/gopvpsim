@@ -3566,12 +3566,17 @@ function _mcRenderRoot(root) {
   var scen = sel ? sel.value : payload['default'];
   var sc = payload.scens[scen];
   var panels = root.querySelectorAll('.dd-mc-panel');
+  var panelBox = root.querySelector('.dd-mc-panels');
   if (!sc) {
-    // scenario with no robust clusters: clear any stale panels
+    // scenario with no robust clusters: clear stale panels and collapse
+    // the container so three blank 320px boxes don't sit above the
+    // "no cluster view" headline.
     panels.forEach(function(p) { Plotly.purge(p); p.innerHTML = ''; });
+    if (panelBox) panelBox.style.display = 'none';
     root.setAttribute('data-mc-rendered', '1');
     return;
   }
+  if (panelBox) panelBox.style.display = 'flex';
   var axes = {atk: DATA.ivAtk, def: DATA.ivDef, hp: DATA.ivHp};
   var titles = {atk: 'Attack', def: 'Defense', hp: 'HP'};
   var n = sc.labels.length;
