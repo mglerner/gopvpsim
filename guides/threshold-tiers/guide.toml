@@ -5,6 +5,9 @@ order = 1
 coming_soon = false
 authorship = "both"
 
-# Reference dive defaults to Oinkologne Male GL (inherited from
+# Reference dive defaults to Oinkologne Female GL (inherited from
 # build_guides.DEFAULT_REFERENCE). Numeric citations resolve via
 # dive:* tokens so the worked example auto-updates on every publish.
+# NB the worked example + the containment example assume the reference
+# dive's TOP tier is a def/hp (bulk) cut and name Grumpig Slayer /
+# Oinkologne Atk cutoffs -- re-check both if the reference repoints.

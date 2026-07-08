@@ -107,8 +107,10 @@ gated so that species with rich hand-authored TOMLs don't get noisy
 auto-additions on the same axis.
 
 Concretely: if the TOML already has a Level-3 breakpoint anchor
-against Medicham, the auto-fallback doesn't also synthesize one; but
-if there's nothing against Sealeo, it adds `auto_sealeo_brkp_any`.
+against Medicham, the auto-fallback doesn't synthesize breakpoint
+anchors against anyone - the whole breakpoint axis is treated as
+hand-covered. A TOML with only bulkpoint anchors still gets
+`auto_sealeo_brkp_any` and friends on the breakpoint axis.
 
 ### 3. Notable IVs (the category layer)
 
@@ -221,7 +223,8 @@ Every narrative block carries one of four attribution colors:
   register choices a template can't. Used sparingly, with the orange
   border as a scrutiny flag.
 
-The Reader's Guides (including this one) use "ai." The Species
+The Reader's Guides (including this one) use "both" - LLM-drafted,
+then human-reviewed and edited. The Species
 narrative blocks on dives default to "auto" now, replacing earlier
 ai-drafted prose, so there's no unreviewed LLM prose on the main
 dives.
@@ -244,10 +247,11 @@ contributions flow through the project repo.
 - Adding a named spread with `source = "..."` routes the anchor into
   the gold Expert zone so readers can tell it's your judgment call.
 
-For removal: the auto-fallback layer is gated, so a TOML that hand-
-authors anchors against (say) Annihilape will not get auto-fallback
-Annihilape additions stacked on top - only auto-anchors against
-opponents the TOML doesn't already cover. If a tier card has too
+For removal: the auto-fallback layer is gated per axis, so a TOML
+that hand-authors a breakpoint anchor against (say) Annihilape
+suppresses all auto-fallback breakpoint anchors - auto-anchors only
+appear on axes (breakpoint / bulkpoint / CMP) the TOML doesn't
+already cover. If a tier card has too
 many bullets, the right move is usually adding a hand-authored
 narrower anchor against that opponent rather than trying to remove
 the auto one.

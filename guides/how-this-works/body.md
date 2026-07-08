@@ -23,14 +23,15 @@ that, and also gets us a test suite.
 PvPoke is the reference. To make sure the Python rewrite matches, we
 keep a suite of cross-checks:
 
-- **{{dev:test_count}} passing tests** covering damage, type matchups,
+- **{{dev:test_count}} tests** covering damage, type matchups,
   buffs and debuffs, shield policies, shadow multipliers, and the
   dynamic-programming logic PvPoke uses to pick which charge move to
   throw.
 - **{{dev:pvpoke_matchups_verified}} matchups verified cell-for-cell**
   against PvPoke's simulate-mode score table, across all nine shield
-  scenarios - {{dev:pvpoke_cells_verified}} per-scenario scores that
-  match exactly, not just "close."
+  scenarios - {{dev:pvpoke_cells_verified}} per-scenario scores checked
+  one by one: {{dev:pvpoke_cells_exact}} match exactly, and every
+  mismatch traces to a documented divergence in our developer notes.
 - **{{dev:type_chart_cells_verified}} type-effectiveness cells**
   matching PvPoke exactly.
 

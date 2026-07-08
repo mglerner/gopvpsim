@@ -5,6 +5,6 @@ order = 2
 coming_soon = false
 authorship = "both"
 
-# Reference dive defaults to Oinkologne Male GL (inherited from
+# Reference dive defaults to Oinkologne Female GL (inherited from
 # build_guides.DEFAULT_REFERENCE). Envelope-count tokens resolve via
 # dive:envelope_* against that dive's envelopePositions map.

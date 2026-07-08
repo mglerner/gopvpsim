@@ -608,16 +608,24 @@ here 2026-06-12; these are the remaining seams.)*
 ## User-facing documentation (post-arc)
 
 The Reader's Guide arc shipped 2026-04-23/24 — infrastructure
-(`build_guides.py`, landing page, dev-count sentinels), plus five
-guide bodies: How This Works / Under the Hood, Envelope Position,
-Threshold Tiers, IV Flavor Guide, CD Article, Deep-Dive Scatter.
-Envelope Position + Threshold Tiers are at `authorship=both`; the
-others are still `authorship=ai` pending Michael review.
+(`build_guides.py`, landing page, dev-count sentinels), plus seven
+guide bodies, ALL at `authorship=both` as of 2026-07 (the old
+"pending review" note here was stale). A 56-agent staleness audit ran
+2026-07-07 (43 confirmed findings applied — reference-dive drift from
+the 2026-06-25 Male->Female repoint, renamed sections, swapped-tint /
+inverted-axis errors, the per-kind auto-anchor gating description; all
+factual, voice-preserving). An eighth guide, **Matchup Clusters**
+(`guides/matchup-clusters/`), was drafted at `authorship=ai` for the
+new dive section — MICHAEL: review + promote to `both`.
 
 Open follow-ups:
 
-- **Promote remaining guides from `ai` to `both` / `expert`** as
-  Michael reviews and edits each one.
+- **Review the Matchup Clusters guide** (`authorship=ai` -> `both`).
+- **Two stale screenshots** (low): `envelope-position/screenshots/
+  envelope-example.png` (pre-rename "Top Picks" legend) and
+  `iv-flavor-guide/screenshots/flavor-example.png` (pre-2026-06-25
+  purple theme; zone is teal now) — retake from HEAD-rendered dives
+  when convenient.
 - **Round-3 screenshots** if/when reader confusion surfaces a
   specific gap (round-1 + round-2 screenshots shipped via `32fae84`
   and `e449b38`).

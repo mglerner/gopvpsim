@@ -1,5 +1,5 @@
-The **IV Flavor Guide** is the purple-bordered zone that sits directly
-below the Dive Results header on every dive page. It groups the
+The **IV Flavor Guide** is the teal-bordered zone at the top of the
+IV Recommendations section on every dive page. It groups the
 IV space into a short list of named play-style archetypes - a
 "flavor" - each one paired with the specific matchups that flavor
 buys you and the specific matchups it costs.
@@ -9,7 +9,7 @@ right place to start if you're deciding which IV spread to chase.
 
 <figure>
 <img src="screenshots/flavor-example.png"
-     alt="The purple-bordered IV Flavor Guide zone on a dive
+     alt="The teal-bordered IV Flavor Guide zone on a dive
           page, showing four flavors with a summary table and an
           expanded 'General Good' flavor below.">
 <figcaption>
@@ -88,7 +88,9 @@ combination) plus whether the cut is tied to a specific opponent:
 A seventh family, **TOML-defined**, covers cases where a human has
 given the flavor a specific name in `thresholds/<species>.toml`
 (e.g. "GL-General Good", "Slight Atk Weight"). The renderer passes
-those through unchanged.
+those through unchanged. An eighth, **{Species} Mirror Atk / Mirror
+Bulk**, is synthesized automatically when the mirror matchup needs
+its own cut; like TOML names, it passes through unchanged.
 
 ## How to read the zone
 
@@ -96,24 +98,26 @@ Top of the zone: a one-sentence species-level summary ("In Great
 League, {{dive:species_display}} has N flavors: A, B, C") plus an
 overview table with one row per flavor:
 
-| Flavor                     |  IVs |     % | Catches needed     |
-| -------------------------- | ---: | ----: | ------------------ |
-| General Good [Recommended] | 4027 | 98.3% | almost any will do |
-| Fortified Greedent         |   38 |  0.9% | ~75-149 for 50-75% |
-| Lapras Slayer              |   46 |  1.1% | ~62-123 for 50-75% |
+| Flavor                         |  IVs |     % | Catches needed     |
+| ------------------------------ | ---: | ----: | ------------------ |
+| General Good [Recommended]     | 4081 | 99.6% | almost any will do |
+| Fortified Diggersby            |    2 |  0.0% | very rare          |
+| Wigglytuff Slayer              |    3 |  0.1% | very rare          |
+| Grumpig Slayer                 |    3 |  0.1% | very rare          |
+| Oinkologne (Female) Mirror Atk | 3842 | 93.8% | almost any will do |
 
-(Numbers above are from the reference {{dive:species_display}}
-{{dive:league_display}} dive; the actual table on your dive shows
-its own values.)
+(Numbers above are a snapshot of the reference
+{{dive:species_display}} {{dive:league_display}} dive; the actual
+table on your dive shows its own live values.)
 
 The **IVs** column is the count of IV spreads out of
 {{dive:iv_space_size}} that meet this flavor's stat cuts. The **%**
 column is that count expressed as a fraction of the IV space - the
 same number as the IVs column, just in percent form for quick
-scanning. In the example table above, General Good covers ~98% of
+scanning. In the example table above, General Good covers ~99.6% of
 the IV space (almost any wild catch clears its cutoffs), while
-Fortified Greedent and Lapras Slayer each cover ~1% of the IV space
-(most catches miss them). Use **%** for "how often does this flavor
+Fortified Diggersby and the two Slayer cuts each cover a handful of
+spreads (almost every catch misses them). Use **%** for "how often does this flavor
 come up at random"; use **Catches needed** (described next) to turn
 the same information into a tangible catch count.
 
@@ -187,7 +191,7 @@ cut. But you read them for different reasons. Start with the flavor
 card if you haven't picked a direction; drop into the tier card
 once you want the full anchor list.
 
-A note the dive itself carries above the zone: *"This IV Flavor
+A note the zone itself carries at its top: *"This IV Flavor
 Guide and the Threshold Tiers answer different questions and may
 not line up 1:1."* The places they don't line up are usually:
 
@@ -202,38 +206,44 @@ not line up 1:1."* The places they don't line up are usually:
 
 ## Worked example: {{dive:species_display}} in {{dive:league_display}}
 
-Three flavors on the reference dive, in the order they're presented:
+Five flavors on the reference dive (a 2026-07 snapshot; your dive's
+zone carries the live values), in the order they're presented:
 
-**General Good** (~98% of the IV space) - the broad cut. 93.67 Def
-and 148 HP as a bulk baseline, 115.50 Atk as a coverage floor.
+**General Good** (4081 IV spreads, ~99.6%) - the broad cut. 100.97
+Def and 156 HP as a bulk baseline, 107.21 Atk as a coverage floor.
 Doesn't chase a specific opponent; sits above most of the meta. The
-threshold-ladder in its card names every opponent and scenario the
-General Good floor unlocks (Azumarill 1-1, Clodsire 1-1, Empoleon
-incl. Shadow, and so on). Recommended for most players.
+threshold-ladder in its card names every def/HP step and what it
+unlocks (101.50 Def with 156+ HP for the Lapras and Kingdra sets,
+103.38 Def with 164+ HP for Florges and Feraligatr 0-0, and so on).
+Recommended for most players.
 
-**Fortified Greedent** (~38 IV spreads) - defensive namesake. Trades
-attack range (no Atk floor) for a 104.18 Def cut with 153 HP.
-Gain: Greedent 0-0, Charjabug 1-1, Cradily 1-0 flip into wins.
-Loss: Forretress 2-0, Furret 2-1, Lickilicky 2-2 drop out (the
-higher Def cut excludes Def-sacrificing IV spreads that clear other
-matchups via the attack side). Genuinely rare cut - the catch
-count needed for a 50% chance of hitting one is in the 70s.
+**Fortified Diggersby** (2 IV spreads) - defensive namesake. Trades
+attack range (no Atk floor) for a 114.62 Def cut with 163 HP. Gain:
+Diggersby 1-1 / 1-2 / 2-2, Corsola (Galarian) 1-2, Dondozo 1-1 flip
+into wins. Loss: Cradily (Acid) 1-0, Dragonair 2-1, Dusclops
+(Shadow) 1-2 drop out (the higher Def cut excludes Def-sacrificing
+IV spreads that clear other matchups via the attack side).
+Vanishingly rare - 2 of the 4096 spreads.
 
-**Lapras Slayer** ({{dive:top_tier_clear_count}} IV spreads) -
-offensive namesake. Trades bulk (no Def floor) for a
-{{dive:top_tier_atk_cutoff}} Atk cut, the smallest attack that flips
-Lapras's breakpoint with the featured moveset. Gain: Lapras 2-1,
-Altaria 2-0, Charjabug 0-0. Loss: Azumarill 1-1, Clodsire 1-1,
-Corsola (Galarian) 0-0 drop out (low-Def IV spreads lose the defensive
-matchups). Similar rarity to Fortified Greedent.
+**Wigglytuff Slayer / Grumpig Slayer** (3 IV spreads each) -
+offensive namesakes sharing a shape. Trade bulk for a 116.21 /
+116.44 Atk cut while holding 160 HP. Gain: the namesake matchup
+plus Azumarill 1-2 and Clodsire 1-2. Loss: Annihilape (Close
+Combat+Rage Fist) 2-1, Charjabug 1-1, Corsola (Galarian) 0-1 drop
+out (low-Def IV spreads lose the defensive matchups).
 
-Reading the three together: General Good is the default pick; the
-two namesakes are the tradeoffs to consider if you care about the
-Greedent-family defensive matchup or the Lapras 2-1 flip
-specifically. The envelope tag next to each (see the
-[Envelope Position](../envelope-position/) guide) tells you whether
-the flavor's members reliably beat the anchor band or just tilt in
-the right direction on average.
+**Oinkologne (Female) Mirror Atk** (3842 IV spreads, ~93.8%) - the
+mirror-synth family: 109.18 Atk with 155 HP, the attack cut the
+mirror matchup needs. Broad, because most spreads already clear it.
+
+Reading them together: General Good is the default pick; the rare
+namesakes are the tradeoffs to consider if you care about the
+Diggersby-family defensive matchups or the Wigglytuff / Grumpig
+flips specifically. Each flavor's category also carries an envelope
+shape (see the [Envelope Position](../envelope-position/) guide) -
+rendered on the matching composite card in the Per-matchup IV finder
+- telling you whether its members reliably beat the anchor band or
+just tilt in the right direction on average.
 
 ## Where to go next
 
@@ -241,10 +251,11 @@ the right direction on average.
   cards that drive the flavor-naming. When a flavor says "Lapras
   Slayer," the Threshold Tier with the same name is where the
   cutoff came from.
-- **[Envelope Position](../envelope-position/)** - each flavor
-  carries an envelope tag (rider-top, straddles band, etc.). The
-  tag tells you whether the flavor's win-rate lift is consistent
-  across members or only shows up on a specific sub-cluster.
+- **[Envelope Position](../envelope-position/)** - each flavor's
+  category carries an envelope shape (rider-top, straddles band,
+  etc.), shown on the matching composite card in the Per-matchup IV
+  finder. The shape tells you whether the flavor's win-rate lift is
+  consistent across members or only shows up on a sub-cluster.
 - **[Reading a CD Article](../cd-article/)** - the CD article's IV
   Recommendations card grid is a compact distillation of the flavor
   cuts, one card per form.
