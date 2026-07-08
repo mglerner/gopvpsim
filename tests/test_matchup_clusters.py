@@ -272,3 +272,38 @@ def test_all_settled_scenario_reports_reason():
         flat, nIvs, 9, nO, SCENARIOS9, atk, atk, atk, no_anchors)
     assert out["1v1"]["n_sharp"] == 0
     assert "reason" in out["1v1"]
+
+
+# ---------------------------------------------------------------------------
+# real-blob render smoke test (slow; skipped when no replay blobs exist)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.slow
+def test_render_smoke_from_real_blob(tmp_path):
+    """Full render_dive_html pass on the smallest local replay blob: the
+    section must be present, and the verify_overnight '"opponents": ['
+    extraction contract must survive."""
+    blobs = sorted((REPO_ROOT / "userdata" / "replay").glob("*.replay.pkl.gz"),
+                   key=lambda p: p.stat().st_size)
+    if not blobs:
+        pytest.skip("no replay blobs on this machine")
+    dd_spec = importlib.util.spec_from_file_location(
+        "deep_dive", REPO_ROOT / "scripts" / "deep_dive.py")
+    dd = importlib.util.module_from_spec(dd_spec)
+    import sys
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    try:
+        dd_spec.loader.exec_module(dd)
+        state = dd.load_replay_state(str(blobs[0]))
+        state["html_path"] = str(tmp_path / "index.html")
+        state["card_path"] = None
+        dd.render_dive_html(state)
+    finally:
+        sys.path.remove(str(REPO_ROOT / "scripts"))
+    html = (tmp_path / "index.html").read_text()
+    assert "matchup-clusters:v1" in html
+    assert 'id="dd-matchup-clusters"' in html
+    assert html.count('"opponents": [') == 1   # verify_overnight extraction
+    # retired surfaces must not resurface
+    for dead in ("alpha-chk", "dd-alpha", "clusterGaps", "cluster-chk"):
+        assert dead not in html, dead

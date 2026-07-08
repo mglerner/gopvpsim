@@ -625,18 +625,6 @@ def threshold_desc(thresh):
 
 
 
-def opp_importance(scores_flat, nIvs, nS, nO, si, top_set, opponents):
-    """Rank opponents by how much they differentiate top_set from population."""
-    results = []
-    for oi in range(nO):
-        top_avg = sum(scores_flat[iv * nS * nO + si * nO + oi] for iv in top_set) / len(top_set)
-        all_avg = sum(scores_flat[iv * nS * nO + si * nO + oi] for iv in range(nIvs)) / nIvs
-        results.append({'opponent': opponents[oi], 'top_avg': top_avg, 'all_avg': all_avg, 'gap': top_avg - all_avg})
-    results.sort(key=lambda x: abs(x['gap']), reverse=True)
-    return results
-
-
-
 def iv_label(data, iv):
     return f"{data['ivA'][iv]}/{data['ivD'][iv]}/{data['ivS'][iv]}"
 
@@ -2451,77 +2439,6 @@ def scenario_ranks(scores_flat, nIvs, nS, nO):
 
 
 
-def detect_banding(stat_values, scores, stat_name):
-    """Detect banding: group IVs by discrete stat value, compute F-ratio and eta^2."""
-    groups = {}
-    for sv, sc in zip(stat_values, scores):
-        key = int(sv) if stat_name == 'hp' else round(sv, 2)
-        groups.setdefault(key, []).append(sc)
-    if len(groups) < 3:
-        return None
-    grand_mean = sum(scores) / len(scores)
-    n_total = len(scores)
-    gmeans = {k: sum(v)/len(v) for k, v in groups.items()}
-    ssb = sum(len(v) * (gmeans[k] - grand_mean)**2 for k, v in groups.items())
-    ssw = sum(sum((x - gmeans[k])**2 for x in v) for k, v in groups.items())
-    df_b, df_w = len(groups) - 1, n_total - len(groups)
-    f_ratio = (ssb / df_b) / (ssw / df_w) if df_w and ssw else float('inf')
-    eta_sq = ssb / (ssb + ssw) if (ssb + ssw) else 0
-    sorted_keys = sorted(gmeans)
-    jumps = []
-    for i in range(len(sorted_keys) - 1):
-        k1, k2 = sorted_keys[i], sorted_keys[i + 1]
-        jumps.append((k1, k2, gmeans[k2] - gmeans[k1], len(groups[k1]), len(groups[k2])))
-    jumps.sort(key=lambda x: abs(x[2]), reverse=True)
-    return {'stat_name': stat_name, 'n_groups': len(groups), 'f_ratio': f_ratio,
-            'eta_squared': eta_sq, 'correlation': pearson_r(stat_values, scores),
-            'top_jumps': jumps[:5], 'group_means': gmeans}
-
-
-def detect_clusters(scores, data):
-    """Gap analysis: find natural breakpoints in sorted score distribution."""
-    si = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
-    ss = [scores[i] for i in si]
-    gaps = [(i, ss[i-1] - ss[i]) for i in range(1, len(ss))]
-    gap_vals = sorted(g[1] for g in gaps)
-    med = gap_vals[len(gap_vals) // 2]
-    sig = [(i, g) for i, g in gaps if g > 3 * med and i <= len(scores) // 4]
-    sig.sort(key=lambda x: x[1], reverse=True)
-    boundaries = sorted(set([0] + [g[0] for g in sig[:5]] + [len(scores)]))
-    clusters = []
-    for j in range(len(boundaries) - 1):
-        s, e = boundaries[j], boundaries[j + 1]
-        idx = si[s:e]
-        scs = ss[s:e]
-        if not scs:
-            continue
-        clusters.append({
-            'rank_range': (s + 1, e), 'size': e - s,
-            'score_range': (min(scs), max(scs)),
-            'atk': (min(data['ivAtk'][i] for i in idx), sum(data['ivAtk'][i] for i in idx)/len(idx), max(data['ivAtk'][i] for i in idx)),
-            'def': (min(data['ivDef'][i] for i in idx), sum(data['ivDef'][i] for i in idx)/len(idx), max(data['ivDef'][i] for i in idx)),
-            'hp': (min(data['ivHp'][i] for i in idx), sum(data['ivHp'][i] for i in idx)/len(idx), max(data['ivHp'][i] for i in idx)),
-            'indices': idx,
-        })
-    return clusters, sig[:5]
-
-
-
-
-
-
-def pearson_r(xs, ys):
-    """Pearson correlation coefficient."""
-    n = len(xs)
-    if n < 3:
-        return 0.0
-    mx, my = sum(xs) / n, sum(ys) / n
-    num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-    dx = math.sqrt(sum((x - mx)**2 for x in xs))
-    dy = math.sqrt(sum((y - my)**2 for y in ys))
-    return num / (dx * dy) if dx and dy else 0.0
-
-
 # ---------------------------------------------------------------------------
 # Mirror slayer iteration HTML
 # ---------------------------------------------------------------------------
@@ -3074,154 +2991,6 @@ function ddToggleTagsCompactCell(event) {
 # Analysis section renderers (behind the toggle)
 # ---------------------------------------------------------------------------
 
-def render_analysis_alpha_html(scores_flat, nIvs, nS, nO, scenarios,
-                               opponents, avg_scores, hp_list, data_obj,
-                               opp_label):
-    """Render the experimental alpha analysis (banding + clusters).
-
-    Returns an HTML string for the content inside the alpha-features div.
-    """
-    parts = []
-
-    # -- Banding (#3: sort by eta-squared, label opp IV mode) --
-    parts.append('<div class="dd-section" id="dd-banding">\n')
-    parts.append('<h2 class="dd-h2">Banding &amp; Stat Correlations</h2>\n')
-    parts.append(f'<p>Which stats create visible bands in the scatter plot? '
-                 f'Sorted by &eta;&sup2; (variance explained). '
-                 f'Computed vs <b>{opp_label}</b> opponent IVs.</p>\n')
-
-    # Compute all banding data first, then sort by avg eta-squared
-    banding_rows = []
-    for si_or_avg in list(range(nS)) + ['avg']:
-        if si_or_avg == 'avg':
-            sc = avg_scores
-            label = '<strong>Average</strong>'
-            is_avg = True
-        else:
-            si = si_or_avg
-            sc = [sum(scores_flat[iv * nS * nO + si * nO + oi] for oi in range(nO)) / nO for iv in range(nIvs)]
-            s0, s1 = scenarios[si]
-            label = f'{s0}v{s1}'
-            is_avg = False
-        bands = [('Atk', detect_banding(data_obj['ivAtk'], sc, 'atk')),
-                 ('Def', detect_banding(data_obj['ivDef'], sc, 'def')),
-                 ('HP', detect_banding(hp_list, sc, 'hp'))]
-        dominant = max(bands, key=lambda x: x[1]['eta_squared'] if x[1] else 0)
-        max_eta = dominant[1]['eta_squared'] if dominant[1] else 0
-        banding_rows.append({'label': label, 'bands': bands, 'dominant': dominant,
-                             'max_eta': max_eta, 'is_avg': is_avg})
-
-    # Sort non-avg rows by max eta-squared descending (#3)
-    non_avg = [r for r in banding_rows if not r['is_avg']]
-    avg_row = [r for r in banding_rows if r['is_avg']]
-    non_avg.sort(key=lambda r: r['max_eta'], reverse=True)
-    sorted_rows = non_avg + avg_row
-
-    parts.append('<table class="dd-table"><tr><th>Scenario</th><th>Atk <em>r</em></th><th>Atk &eta;&sup2;</th><th>Def <em>r</em></th><th>Def &eta;&sup2;</th><th>HP <em>r</em></th><th>HP &eta;&sup2;</th><th>Dominant</th></tr>\n')
-    for row in sorted_rows:
-        style = ' style="border-top:2px solid var(--title)"' if row['is_avg'] else ''
-        line = f'<tr{style}><td>{row["label"]}</td>'
-        for name, b in row['bands']:
-            if b:
-                rc = ' class="dd-strong"' if abs(b['correlation']) > 0.3 else ''
-                ec = ' class="dd-strong"' if b['eta_squared'] > 0.3 else ''
-                line += f'<td{rc}>{b["correlation"]:+.3f}</td><td{ec}>{b["eta_squared"]:.3f}</td>'
-            else:
-                line += '<td>-</td><td>-</td>'
-        d = row['dominant']
-        if d[1] is not None:
-            line += f'<td><strong>{d[0]}</strong> ({d[1]["eta_squared"]:.3f})</td></tr>\n'
-        else:
-            # All three stats had <3 distinct values (heavily floored or
-            # tiny IV pools) — detect_banding returned None for every
-            # band, and max() handed back a None entry. Render a dash
-            # instead of crashing the whole dive render.
-            line += '<td>-</td></tr>\n'
-        parts.append(line)
-    parts.append('</table>\n')
-
-    # HP banding detail (#4: add narrative column)
-    avg_hp_band = detect_banding(hp_list, avg_scores, 'hp')
-    if avg_hp_band and avg_hp_band['top_jumps']:
-        parts.append('<h3 class="dd-h3">Largest HP band jumps (average score)</h3>\n')
-        parts.append('<table class="dd-table dd-narrow"><tr><th>HP below</th><th>HP above</th><th>Score jump</th><th>Likely cause</th></tr>\n')
-        for k1, k2, diff, n1, n2 in avg_hp_band['top_jumps'][:5]:
-            cls = 'dd-gain' if diff > 0 else 'dd-loss'
-            hp_below_ivs = [i for i in range(nIvs) if data_obj['ivHp'][i] == int(k1)]
-            hp_above_ivs = [i for i in range(nIvs) if data_obj['ivHp'][i] == int(k2)]
-            cause = ''
-            if hp_below_ivs and hp_above_ivs:
-                opp_diffs = []
-                for oi in range(nO):
-                    below_avg = sum(sum(scores_flat[iv * nS * nO + si * nO + oi] for si in range(nS)) / nS for iv in hp_below_ivs) / len(hp_below_ivs)
-                    above_avg = sum(sum(scores_flat[iv * nS * nO + si * nO + oi] for si in range(nS)) / nS for iv in hp_above_ivs) / len(hp_above_ivs)
-                    opp_diffs.append((opponents[oi], above_avg - below_avg))
-                opp_diffs.sort(key=lambda x: abs(x[1]), reverse=True)
-                top_causes = [f'{o} ({d:+.0f})' for o, d in opp_diffs[:2] if abs(d) > 1]
-                cause = ', '.join(top_causes) if top_causes else 'distributed across opponents'
-            parts.append(f'<tr><td>{int(k1)}</td><td>{int(k2)}</td><td class="{cls}">{diff:+.1f}</td><td class="dd-small">{cause}</td></tr>\n')
-        parts.append('</table>\n')
-    parts.append('</div>\n')
-
-    # -- Clusters per scenario --
-    parts.append(f'<div class="dd-section" id="dd-clusters">\n<h2 class="dd-h2">Cluster Analysis (Per-Scenario)</h2>\n')
-    parts.append(f'<p>Computed vs <b>{opp_label}</b> opponent IVs. '
-                 f'Clusters are detected by sorting all {nIvs} IVs by their average score '
-                 f'for a given scenario and scanning for score gaps that exceed 3&times; '
-                 f'the median gap between consecutive IVs. Unlike k-means, this does not '
-                 f'assume a fixed number of clusters - it finds natural breakpoints '
-                 f'where performance drops sharply. '
-                 f'The top-5 IVs listed below can be located on the graph above by hovering '
-                 f'to find the matching stat product and score.</p>\n')
-    for si in range(nS):
-        s0, s1 = scenarios[si]
-        sc = [sum(scores_flat[iv * nS * nO + si * nO + oi] for oi in range(nO)) / nO for iv in range(nIvs)]
-        clusters, sig_gaps = detect_clusters(sc, data_obj)
-        top50 = set(sorted(range(nIvs), key=lambda i: sc[i], reverse=True)[:50])
-        opp_imp = opp_importance(scores_flat, nIvs, nS, nO, si, top50, opponents)
-        scene_label = f'{s0}v{s1}'
-        if s0 == s1:
-            scene_label += {0: ' (no shields)', 1: ' (even)', 2: ' (double shield)'}.get(s0, '')
-        elif s0 > s1:
-            scene_label += ' (shield adv.)'
-        else:
-            scene_label += ' (shield disadv.)'
-        parts.append(f'<h3 class="dd-h3">{scene_label}</h3>\n')
-        scene_ranked = sorted(range(nIvs), key=lambda i: sc[i], reverse=True)
-        if sig_gaps:
-            top_cluster_size = sig_gaps[0][0]
-            top_cluster_ivs = scene_ranked[:top_cluster_size]
-            tc_sp_min = min(data_obj['spRanks'][iv] for iv in top_cluster_ivs)
-            tc_sp_max = max(data_obj['spRanks'][iv] for iv in top_cluster_ivs)
-            tc_score_min = sc[scene_ranked[top_cluster_size - 1]]
-            tc_score_max = sc[scene_ranked[0]]
-            parts.append(f'<p>{len(sig_gaps)} significant gap(s). '
-                         f'Top cluster: {top_cluster_size} IVs, '
-                         f'scores {tc_score_min:.0f}-{tc_score_max:.0f} '
-                         f'(SP ranks {tc_sp_min}-{tc_sp_max}). '
-                         f'<b>On graph:</b> look for Y &ge; {tc_score_min:.0f} '
-                         f'with SP rank {tc_sp_min}-{tc_sp_max} on X axis.</p>\n')
-        else:
-            parts.append('<p>Smooth gradient (no gaps &gt; 3&times; median).</p>\n')
-        parts.append('<table class="dd-table dd-narrow"><tr><th>#</th><th>IVs</th><th>Atk</th><th>Def</th><th>HP</th><th>SP</th><th>Score</th><th>Tier</th></tr>\n')
-        for rank in range(5):
-            iv = scene_ranked[rank]
-            sp = data_obj['ivSp'][iv]
-            parts.append(f'<tr><td>{rank+1}</td><td>{iv_label(data_obj, iv)}</td><td>{data_obj["ivAtk"][iv]:.2f}</td><td>{data_obj["ivDef"][iv]:.2f}</td><td>{data_obj["ivHp"][iv]}</td><td>{sp:.0f}</td><td>{sc[iv]:.1f}</td><td>{tier_badge_html(data_obj, iv)}</td></tr>\n')
-        parts.append('</table>\n')
-        pos = [d for d in opp_imp if d['gap'] > 0][:3]
-        neg = [d for d in opp_imp if d['gap'] < 0][:2]
-        pos_str = ', '.join(f'{d["opponent"]} ({d["gap"]:+.0f})' for d in pos)
-        neg_str = ', '.join(f'{d["opponent"]} ({d["gap"]:+.0f})' for d in neg)
-        line = f'<p class="dd-small"><b>Top differentiators:</b> {pos_str}'
-        if neg:
-            line += f' | <b>Sacrifices:</b> {neg_str}'
-        parts.append(line + '</p>\n')
-    parts.append('</div>\n')
-
-    return ''.join(parts)
-
-
 def render_analysis_volatility_html(data_obj, nIvs, nS, scenarios,
                                     scene_ranks, avg_ranks, ranked,
                                     opp_label):
@@ -3353,25 +3122,6 @@ def render_analysis_methods_html(nIvs, nS, nO, data_obj, moveset_label,
   stats. Damage changes are reported as breakpoints (your moves do more damage), bulkpoints
   (opponent moves do less damage), or their losses. HP differences are also shown.</dd>
 </dl>
-<div id="dd-alpha-methods" style="display:none">
-<h3 class="dd-h3">Experimental methods</h3>
-<dl class="dd-methods-dl">
-  <dt>Banding detection</dt>
-  <dd>IVs grouped by discrete stat value. F-ratio and &eta;&sup2; (fraction of total score
-  variance explained by stat grouping, 0-1 scale) measure how much each stat creates
-  visible bands. Pearson <em>r</em> shows correlation direction (positive = higher stat &rarr; higher score).</dd>
-  <dt>Cluster detection (gap analysis)</dt>
-  <dd>All {nIvs} IVs are sorted by their average score for a given scenario. We compute the
-  score difference between each consecutive pair. The median of these differences is the
-  &ldquo;typical&rdquo; gap. Gaps exceeding 3&times; the median indicate a natural break between
-  performance tiers. This is <em>not</em> k-means or similar - it assumes no fixed cluster
-  count and finds breakpoints where performance drops sharply.</dd>
-  <dt>Opponent importance</dt>
-  <dd>For each scenario, the average score of the top 50 IVs against each opponent is compared
-  to the population average. Large positive gaps show which opponents the top cluster dominates;
-  negative gaps show where it sacrifices performance.</dd>
-</dl>
-</div>
 </div>
 """
 

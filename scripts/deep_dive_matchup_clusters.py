@@ -34,9 +34,20 @@ Tree accuracy is IN-SAMPLE (regularized by min_samples_leaf), matching
 what the reference code actually computed; do not label it cross-validated.
 """
 
+import html as _html
+import json
+
 import numpy as np
 
 WIN_RATING = 500  # strict >; matches src/gopvpsim/battle.py and all consumers
+
+# Categorical cluster colors (dark-surface steps of the validated reference
+# palette; checked against the dive's hard-coded Plotly surface #16213e with
+# the dataviz six-checks validator: lightness band, chroma floor, CVD
+# separation, contrast all pass). Identity is never color-alone: the legend,
+# table swatches, and hover text all carry the cluster id.
+CLUSTER_PALETTE = ["#3987e5", "#199e70", "#c98500",
+                   "#008300", "#9085e9", "#e66767"]
 
 # K-selection knobs (parsimony floor — see module docstring).
 KMIN = 2
@@ -510,3 +521,312 @@ def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
             "wr": wr,
         }
     return out
+
+
+# ---------------------------------------------------------------------------
+# HTML section renderer ("Matchup clusters", first block in Dive Analysis)
+# ---------------------------------------------------------------------------
+# Emits server-side tables (cluster summary, win-rate grid, stat rules, flip
+# thresholds) plus three EMPTY panel divs (atk/def, atk/hp, def/hp) and one
+# inline <script type="application/json"> payload. The panels are drawn
+# client-side by initMatchupClusters() in deep_dive_engine.js from the
+# payload's per-IV cluster labels + the stat arrays already embedded in DATA
+# (ivAtk/ivDef/ivHp) -- so the section adds only ~10-60 KB to a ~25 MB page.
+# The inline-JSON-in-section pattern (rather than a DATA key) is deliberate:
+# the best-buddy L51 pass renders this section into an inert <template>, and
+# carrying the payload inside the section keeps the L50/L51 variants
+# self-contained across the innerHTML swap.
+
+def _esc(s):
+    return _html.escape(str(s), quote=True)
+
+
+def _fmt_thr(stat, value):
+    """Threshold formatting: hp is integral, sp is huge, atk/def are 2dp."""
+    if stat == "hp":
+        return f"{value:.0f}"
+    if stat == "sp":
+        return f"{value:,.0f}"
+    return f"{value:.2f}"
+
+
+def _wr_cell(wr):
+    """Win-rate table cell with a diverging blue(win)/red(loss) tint.
+
+    The tint alpha scales with |wr - 0.5| and the number is always printed,
+    so the information never rides on color alone (and the rgba tint stays
+    legible over both light and dark page themes).
+    """
+    alpha = round(abs(wr - 0.5) * 1.1, 2)
+    color = "57,135,229" if wr >= 0.5 else "230,103,103"
+    return (f'<td style="text-align:right;'
+            f'background:rgba({color},{alpha})">{wr * 100:.0f}%</td>')
+
+
+def _swatch(c):
+    return (f'<span style="display:inline-block;width:10px;height:10px;'
+            f'border-radius:2px;background:{CLUSTER_PALETTE[c]};'
+            f'margin-right:4px"></span>')
+
+
+def _scen_headline(label, entry, nO):
+    if "reason" in entry:
+        return (f'<p style="font-size:13px;color:var(--text-muted)">'
+                f'<b>{label}</b>: no cluster view -- {_esc(entry["reason"])} '
+                f'({entry["n_sharp"]} sharp marginal opponents of {nO}).</p>')
+    res = entry["res"]
+    wr = entry["wr"]
+    n_win = int((wr == 1.0).sum())
+    n_loss = int((wr == 0.0).sum())
+    return (f'<p style="font-size:13px">'
+            f'<b>{label}</b>: {len(res["sharp"])} sharp marginal opponents '
+            f'of {nO} ({n_win} always-win / {n_loss} always-lose at every '
+            f'IV); {res["n_patterns"]} distinct win patterns; '
+            f'K={res["k"]} clusters (silhouette {res["silhouette"]:.2f}).</p>')
+
+
+def _cluster_table(entry, opp_names):
+    res = entry["res"]
+    rows = []
+    defining = defining_matchups(res, opp_names)
+    gains_by_to = {d["to"]: d["gained"] for d in defining}
+    for c in res["clusters"]:
+        cid = c["id"]
+        gained = gains_by_to.get(cid, [])
+        gtxt = ", ".join(f"{_esc(n)} (+{d * 100:.0f}pp)"
+                         for n, d, cur, prev in gained) or "-"
+        rows.append(
+            f'<tr><td>{_swatch(cid)}C{cid}</td>'
+            f'<td style="text-align:right">{c["size"]}</td>'
+            f'<td style="text-align:right">{c["atk"][1]:.1f}</td>'
+            f'<td style="text-align:right">{c["def"][1]:.1f}</td>'
+            f'<td style="text-align:right">{c["hp"][1]:.0f}</td>'
+            f'<td style="text-align:right">#{c["sp_rank"][0]}-'
+            f'#{c["sp_rank"][1]}</td>'
+            f'<td style="text-align:right">{c["mean_marginal_wins"]:.1f}</td>'
+            f'<td>{gtxt}</td></tr>')
+    return (
+        '<table class="dd-table dd-narrow"><thead><tr>'
+        '<th>Cluster</th><th>IVs</th><th>atk (mean)</th><th>def (mean)</th>'
+        '<th>hp (mean)</th><th>SP rank</th><th>marginal wins (mean)</th>'
+        '<th>gains vs previous cluster</th>'
+        '</tr></thead><tbody>' + "".join(rows) + "</tbody></table>")
+
+
+def _winrate_grid(entry, opp_names):
+    res = entry["res"]
+    sharp = res["sharp"]
+    k = res["k"]
+    head = "".join(f"<th>{_swatch(c)}C{c}</th>" for c in range(k))
+    rows = []
+    for j, o in enumerate(sharp):
+        cells = "".join(
+            _wr_cell(float(res["clusters"][c]["winrate_per_sharp"][j]))
+            for c in range(k))
+        rows.append(f"<tr><td>{_esc(opp_names[o])}</td>{cells}</tr>")
+    return (
+        '<details style="margin:6px 0"><summary style="cursor:pointer;'
+        'font-size:13px">Per-cluster win rates vs each marginal opponent'
+        '</summary>'
+        '<table class="dd-table dd-narrow"><thead>'
+        f'<tr><th>Marginal opponent</th>{head}</tr></thead><tbody>'
+        + "".join(rows) +
+        '</tbody></table>'
+        '<p style="font-size:12px;color:var(--text-muted)">Blue tint = the '
+        'cluster mostly wins that matchup, red tint = mostly loses; the '
+        'percentage is the share of the cluster\'s IVs that win.</p>'
+        '</details>')
+
+
+def _rules_block(entry):
+    lines = "\n".join(_esc(ln) for ln in entry["tree_rules"])
+    return (
+        '<details style="margin:6px 0"><summary style="cursor:pointer;'
+        'font-size:13px">Stat rules that reproduce the clusters '
+        f'(in-sample accuracy {entry["tree_acc"] * 100:.1f}%)</summary>'
+        f'<pre style="font-size:12px;line-height:1.5">{lines}</pre>'
+        '<p style="font-size:12px;color:var(--text-muted)">Depth-3 decision '
+        'tree over (atk, def, hp). Accuracy is in-sample (regularized by a '
+        'minimum leaf size), not cross-validated -- read it as "how well '
+        'the clusters reduce to stat regions", not a prediction claim.</p>'
+        '</details>')
+
+
+def _flip_table_html(entry, opp_names, has_anchors):
+    rows = []
+    for r in entry["flips"]:
+        rule = f'{r["stat"]} {r["direction"]} {_fmt_thr(r["stat"], r["threshold"])}'
+        if r["named"] is True:
+            named = '<td style="color:var(--text-muted)">named</td>'
+        elif r["named"] is False:
+            named = '<td><b>UNNAMED</b></td>'
+        else:
+            named = '<td style="color:var(--text-muted)">-</td>'
+        rows.append(
+            f'<tr><td>{_esc(opp_names[r["opp_idx"]])}</td>'
+            f'<td style="text-align:right">{r["winrate"] * 100:.0f}%</td>'
+            f'<td>wins iff {rule}</td>'
+            f'<td style="text-align:right">{r["accuracy"] * 100:.0f}%</td>'
+            f'{named}</tr>')
+    foot = ('Rows are ordered by discriminating power (win rate closest to '
+            '50%). "Rule accuracy" is how well that single stat threshold '
+            'predicts the win/loss across all IVs; high-accuracy UNNAMED '
+            'rows are candidate new anchors. Anchor matching is by exact '
+            'opponent name against this dive\'s authored anchors.')
+    if not has_anchors:
+        foot += (' This dive has no authored anchors, so no row can be '
+                 'marked named.')
+    return (
+        '<details style="margin:6px 0"><summary style="cursor:pointer;'
+        'font-size:13px">Matchup flip thresholds (candidate anchors)'
+        '</summary>'
+        '<table class="dd-table dd-narrow"><thead><tr>'
+        '<th>Marginal opponent</th><th>Win rate</th><th>Flips at</th>'
+        '<th>Rule accuracy</th><th>Named anchor?</th>'
+        '</tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
+        f'<p style="font-size:12px;color:var(--text-muted)">{foot}</p>'
+        '</details>')
+
+
+def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
+                   data_obj, opp_label, moveset_label, resolved_anchors):
+    """Render the Matchup clusters section (HTML string).
+
+    Replaces the retired experimental banding/gap-cluster block as the first
+    block inside the "Dive Analysis" collapsible. All heavy computation
+    happens here at render time from the score grid; the client only draws
+    the three stat-plane scatter panels from the embedded labels.
+    """
+    disp = data_obj.get('opponentsDisplay') or list(opponents)
+    anchor_opps = {getattr(a, 'opponent', None)
+                   for a in (resolved_anchors or [])} - {None}
+    pool_names = set(opponents)
+
+    def is_named(opp_idx, stat):
+        if not anchor_opps:
+            return None
+        name = opponents[opp_idx]
+        if name in anchor_opps:
+            return True
+        # Alt-moveset / IV-variant rows ("Medicham (atk-weighted)",
+        # "Forretress (Shadow) (Bug Bite)") count as named when an anchor
+        # names their base opponent. Strip one trailing parenthetical, but
+        # ONLY when the stripped base is itself in this pool -- variant rows
+        # always ride alongside their base by construction, while true
+        # form species ("Corsola (Galarian)") have no bare base in the pool,
+        # so they can never false-match a different species' anchor.
+        if name.endswith(')') and ' (' in name:
+            base = name[:name.rindex(' (')]
+            if base in pool_names and base in anchor_opps:
+                return True
+        return False
+
+    computed = compute_matchup_clusters(
+        scores_flat, nIvs, nS, nO, scenarios,
+        data_obj['ivAtk'], data_obj['ivDef'], data_obj['ivHp'], is_named)
+    if not computed:
+        return ('<div class="dd-section" id="dd-matchup-clusters">'
+                '<!-- matchup-clusters:v1 -->'
+                '<h2 class="dd-h2">Matchup clusters</h2>'
+                '<p style="font-size:13px;color:var(--text-muted)">Not '
+                'available: this dive ran without the even-shield scenarios '
+                '(0v0 / 1v1 / 2v2).</p></div>\n')
+
+    scen_labels = list(computed.keys())
+    default_scen = "1v1" if "1v1" in computed else scen_labels[0]
+    # prefer a scenario that actually clustered for the default view
+    if "res" not in computed[default_scen]:
+        for lbl in scen_labels:
+            if "res" in computed[lbl]:
+                default_scen = lbl
+                break
+
+    # ---- client payload: per-IV labels + legend meta per scenario ----
+    payload = {"palette": CLUSTER_PALETTE, "default": default_scen,
+               "scens": {}}
+    for lbl, entry in computed.items():
+        if "res" not in entry:
+            continue
+        res = entry["res"]
+        payload["scens"][lbl] = {
+            "k": res["k"],
+            "labels": [int(x) for x in res["labels"]],
+            "sizes": [c["size"] for c in res["clusters"]],
+        }
+
+    parts = ['<div class="dd-section dd-mc-root" id="dd-matchup-clusters">',
+             '<!-- matchup-clusters:v1 -->',
+             '<h2 class="dd-h2">Matchup clusters</h2>']
+    parts.append(
+        '<p style="font-size:13px">IVs grouped by <b>which marginal '
+        'matchups they win</b> (their win/loss fingerprint over the '
+        'opponents that some IVs beat and others don\'t), instead of by '
+        'average score. Clusters correspond to stat-threshold regions: '
+        'crossing a breakpoint or bulkpoint moves an IV to the next '
+        'cluster and flips a specific, named set of matchups.</p>')
+    parts.append(
+        f'<p style="font-size:12px;color:var(--text-muted)">Computed at '
+        f'bake time for moveset <b>{_esc(moveset_label)}</b> with '
+        f'{_esc(opp_label)} opponent IVs over the full opponent pool; this '
+        f'section does not follow the scatter\'s moveset / opponent-IV '
+        f'dropdowns or the opponent filter.</p>')
+
+    # scenario selector (server-side blocks + client panels both follow it)
+    opts = "".join(
+        f'<option value="{lbl}"{" selected" if lbl == default_scen else ""}>'
+        f'{lbl} shields</option>' for lbl in scen_labels)
+    parts.append(
+        '<label style="font-size:13px">Shield scenario: '
+        '<select class="dd-mc-scen" onchange="if(window.mcSelectScenario)'
+        'mcSelectScenario(this)">' + opts + '</select></label>')
+
+    # three stat-plane panels (client-rendered)
+    parts.append(
+        '<div class="dd-mc-panels" style="display:flex;flex-wrap:wrap;'
+        'gap:8px;margin:8px 0">'
+        '<div class="dd-mc-panel" data-proj="atk,def" '
+        'style="flex:1 1 300px;min-width:280px;height:320px"></div>'
+        '<div class="dd-mc-panel" data-proj="atk,hp" '
+        'style="flex:1 1 300px;min-width:280px;height:320px"></div>'
+        '<div class="dd-mc-panel" data-proj="def,hp" '
+        'style="flex:1 1 300px;min-width:280px;height:320px"></div>'
+        '</div>')
+
+    # per-scenario server-side blocks
+    for lbl, entry in computed.items():
+        vis = "block" if lbl == default_scen else "none"
+        parts.append(f'<div class="dd-mc-scen-block" data-scen="{lbl}" '
+                     f'style="display:{vis}">')
+        parts.append(_scen_headline(lbl, entry, nO))
+        if "res" in entry:
+            parts.append(_cluster_table(entry, disp))
+            parts.append(_winrate_grid(entry, disp))
+            parts.append(_rules_block(entry))
+            parts.append(_flip_table_html(entry, disp, bool(anchor_opps)))
+        parts.append('</div>')
+
+    parts.append(
+        '<details style="margin:6px 0"><summary style="cursor:pointer;'
+        'font-size:13px">How this works</summary>'
+        '<p style="font-size:12px;color:var(--text-muted)">'
+        'Per shield scenario: an opponent is a <b>sharp marginal</b> when '
+        'between 2% and 98% of this dive\'s IV spreads beat it (everyone '
+        'else is settled and can\'t distinguish IVs). Each IV\'s '
+        'fingerprint is its win/loss vector over those opponents; '
+        'fingerprints are clustered bottom-up (agglomerative, Hamming '
+        'distance, average linkage), with the cluster count chosen by '
+        'silhouette under a parsimony floor (a split must keep every '
+        'cluster above a minimum size, and the smallest K within epsilon '
+        'of the best silhouette wins). Clusters are ordered weakest to '
+        'strongest by mean marginal wins. The scatter panels project the '
+        'same 4,096 IVs onto each pair of battle stats; clusters that '
+        'overlap completely in score separate cleanly there. Replaces the '
+        'retired score-gap cluster heuristic (2026-07), which fired on '
+        'float-level jitter in the opponent-averaged score and could not '
+        'name what a cluster wins.</p></details>')
+
+    parts.append('<script type="application/json" class="dd-mc-data">'
+                 + json.dumps(payload, separators=(",", ":"))
+                 + '</script>')
+    parts.append('</div>\n')
+    return "\n".join(parts)

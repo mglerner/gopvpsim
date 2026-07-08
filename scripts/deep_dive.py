@@ -91,6 +91,7 @@ from gopvpsim.display import apply_dive_title_override, pretty_species
 from gopvpsim.efficiency import efficient_frontier
 sys.path.insert(0, os.path.dirname(__file__))
 import deep_dive_analysis as analysis
+import deep_dive_matchup_clusters as matchup_clusters
 import deep_dive_rendering as rendering
 import deep_dive_slayer as slayer
 from deep_dive_logging import (
@@ -3777,20 +3778,11 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 <summary class="dd-h3" style="cursor:pointer">Dive Analysis</summary>
 """)
 
-    # -- Alpha features (banding + clusters) -- hidden by default --
-    analysis_parts.append("""
-<div style="margin: 8px 0;">
-  <label style="font-size:12px;color:var(--text-muted)"><input type="checkbox" id="alpha-chk"
-    onchange="var on=this.checked;var d=on?'block':'none';document.getElementById('dd-alpha').style.display=d;var m=document.getElementById('dd-alpha-methods');if(m)m.style.display=d;var cw=document.getElementById('cluster-toggle-wrapper');if(cw)cw.style.display=on?'inline':'none';if(!on){var cc=document.getElementById('cluster-chk');if(cc&&cc.checked){cc.checked=false;if(typeof updateView==='function')updateView();}}"
-  > Show experimental analysis (banding, clusters)</label>
-</div>
-<div id="dd-alpha" style="display:none">
-""")
-    analysis_parts.append(rendering.render_analysis_alpha_html(
-        scores_flat, nIvs, nS, nO, scenarios, opponents, avg_scores,
-        hp_list, data_obj, opp_label))
-    # -- Close alpha features div --
-    analysis_parts.append('</div>\n')
+    # -- Matchup-fingerprint clusters (replaced the experimental banding /
+    # score-gap cluster block, 2026-07; see deep_dive_matchup_clusters.py) --
+    analysis_parts.append(matchup_clusters.render_section(
+        scores_flat, nIvs, nS, nO, scenarios, opponents, data_obj,
+        opp_label, moveset_label, resolved_anchors_top))
 
     analysis_parts.append(rendering.render_analysis_volatility_html(
         data_obj, nIvs, nS, scenarios, scene_ranks, avg_ranks, ranked,
@@ -4410,38 +4402,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             if mode in sb:
                 scores_base_arrays[f'{mi}_{mode}'] = sb[mode]
 
-    # Compute cluster gap Y-values per (moveset, opp_iv_mode, scenario)
-    # These are the score thresholds where significant gaps appear in the
-    # sorted score distribution. Used by JS to draw horizontal lines on the plot.
-    cluster_gaps = {}  # key: "mi_mode" -> list of lists (one per scenario)
-    for mi, md in enumerate(moveset_data):
-        for mode in opp_iv_modes:
-            key = f'{mi}_{mode}'
-            sf = score_arrays[key]
-            per_scenario = []
-            for si in range(n_scenarios):
-                # Compute per-IV average score for this scenario
-                scene_scores = []
-                for iv in range(n_ivs):
-                    base = iv * n_scenarios * n_opponents + si * n_opponents
-                    total = sum(sf[base + oi] for oi in range(n_opponents))
-                    scene_scores.append(total / n_opponents)
-                # Sort descending, find gaps
-                sorted_sc = sorted(scene_scores, reverse=True)
-                gaps = [sorted_sc[i-1] - sorted_sc[i] for i in range(1, len(sorted_sc))]
-                if gaps:
-                    gap_sorted = sorted(gaps)
-                    median_gap = gap_sorted[len(gap_sorted) // 2]
-                    # Gap Y-values: the score BELOW the gap (i.e. the top of the lower cluster)
-                    sig = []
-                    for i, g in enumerate(gaps):
-                        if g > 3 * median_gap and i < n_ivs // 4:
-                            sig.append(round(sorted_sc[i+1], 1))  # score just below the gap
-                    per_scenario.append(sig[:5])  # max 5 gaps per scenario
-                else:
-                    per_scenario.append([])
-            cluster_gaps[key] = per_scenario
-    data_obj['clusterGaps'] = cluster_gaps
+    # (The clusterGaps computation + dashed scatter overlay were retired
+    # 2026-07 with the experimental banding/gap-cluster section, replaced by
+    # the matchup-fingerprint clusters section in the Dive Analysis block.)
 
     # Slayer IV overlay: extract canonical IV indices that landed in any
     # slayer archetype (Anchors-First / CMP-First) from
@@ -5247,12 +5210,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # back up to the control strip to pin a specific IV.)
     # (Top-IVs table controls live next to the table itself - see the
     # control strip rendered just before <div id="summary"> below.)
-    # "Show clusters" is gated behind the experimental-analysis toggle
-    # in the Deep Dive Analysis section - hidden by default, revealed
-    # when the user opts into experimental output. The wrapper span is
-    # toggled by the alpha-chk onchange handler below (in the analysis
-    # sections block).
-    html += '  <span id="cluster-toggle-wrapper" style="display:none"><label style="font-size:12px;color:var(--text-muted)"><input type="checkbox" id="cluster-chk" onchange="updateView()" style="margin-left:12px"> Show clusters</label></span>\n'
     if thresholds:
         html += '  <span style="font-size:11px;color:var(--text-muted);margin-left:8px">Threshold tiers (e.g. GH Great / GH Good) are expert stat-cutoff regions defined in <a href="#dd-threshold-tiers" style="color:var(--accent)">Threshold Tiers</a> below. Hover legend to isolate; click to lock.</span>\n'
     html += '</div>\n'
