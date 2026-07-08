@@ -78,11 +78,15 @@ instant.
   is leaning on bait sequences.
 - **Y-axis** - see above.
 - **Color** - re-colours every point by one of: Threshold tiers (the
-  default), HP, Defense, Attack, or Score. "Threshold tiers" colours
-  by which named tier card the IV belongs to and is what the legend
-  shows. The other four modes turn the plot into a raw heatmap across
-  that stat axis, useful for spotting a stat band you couldn't see
-  with the tier colouring on.
+  default), HP, Defense, Attack, Score, or Matchup cluster. "Threshold
+  tiers" colours by which named tier card the IV belongs to and is
+  what the legend shows. The stat/score modes turn the plot into a raw
+  heatmap across that axis, useful for spotting a stat band you
+  couldn't see with the tier colouring on. "Matchup cluster" colours
+  by the fingerprint clusters from the Matchup clusters section in
+  Dive Analysis (computed for the featured moveset with default
+  opponent IVs; on other movesets/modes the points render neutral
+  with a legend note saying so).
 - **Anchors** - switches the Anchor IVs overlay between two display
   modes:
     - **Filled** (default) - the Anchor IVs cohort renders as a soft

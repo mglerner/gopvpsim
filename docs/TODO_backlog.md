@@ -159,27 +159,25 @@ move selection closed 2026-04-15 as not-a-real-issue.)
 
 * **Reproduce iv-tech channel analysis** from HSH's Discord.
 
-* When I look at our interactive plots of Fairy Wind/Bulldoze,Gigaton
-  Hammer Tinkaton, against the PvPoke default IVs, the 1v1 sheilds has
-  a clear cluster at the top right, and I'd liek to know what's
-  distinguishing about it. Especially since none of our pre-programmed
-  thresholds show up in it. The 2v2 shows a similar cluster, though
-  some of our pre-programmed thresholds do show up there. And the 2v2
-  has some clear mostly horizontal banding structure. That would be
-  interesting to dig into. The 0v0 has a big chunk in the bottom right
-  that does include several of our GH Good mons ... but those have far
-  worse battle scores here than lots of other mons. What are they
-  missing? It's weird that a lot of that structure (almost all of it,
-  actually) washes out when we look at the average battle score across
-  all scenarios. Well. Across all even shield scenarios. We should
-  check against all scenarios when we fix that bug.
-
-* **Reinvestigate clustering methodology** — Current gap analysis (>3× median
-  gap in sorted scores) is a rough heuristic. Consider better approaches:
-  density-based methods, stat-space clustering instead of score-space, or
-  matchup-aware clustering (group IVs that win/lose the same matchups).
-  The Color By dropdown (HP/Def/Atk) already reveals banding structure
-  visually; the automated analysis should match what users see.
+* ~~Tinkaton scatter-cluster questions~~ + ~~**Reinvestigate clustering
+  methodology**~~ — **DONE 2026-07-07** (CHANGELOG "2026-07-07 — matchup-
+  fingerprint clusters"). The methodology re-evaluation ran on a loaner
+  machine 2026-07-04..06 (report:
+  `~/coding/reports/gopvpsim-cluster-methodology-2026-07-05.html`, incl.
+  per-question answers to the Tinkaton scatter items: the 1v1 top-right
+  cluster is the Lickilicky/Mimikyu/Mantine/Lapras/Dondozo bulkpoint
+  region, all unnamed; 2v2 bands are win-count tiers; the 0v0 GH-Good
+  anomaly no longer reproduces post-engine-fixes; the average washes out
+  because scenarios reward opposite stat axes). The shipped replacement
+  is the matchup-fingerprint clusters section in every dive's Dive
+  Analysis block (`scripts/deep_dive_matchup_clusters.py`); the old
+  gap/banding experimental block is retired. Still-open follow-ups from
+  the report, deliberately not built: a "Color By: matchup cluster" mode
+  on the MAIN scatter (labels are already embedded per-section; the
+  wrinkle is that main-scatter color modes follow the moveset/mode
+  dropdowns while cluster labels are per-moveset-0/default-mode), and
+  polygon/hull overlays (mockup:
+  `gopvpsim-cluster-polygons-mockup-2026-07-06.html`).
 
 * **Visualize where stat product misleads (stat-product as a Color By
   option + battle-score y-axis)** *(requested 2026-06-24)* — Make it easy to

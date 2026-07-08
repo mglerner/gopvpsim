@@ -5199,6 +5199,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     html += '    <option value="def">Defense</option>\n'
     html += '    <option value="atk">Attack</option>\n'
     html += '    <option value="score">Score</option>\n'
+    # Cluster labels are baked per-section (moveset 0, default opp-IV
+    # mode) by deep_dive_matchup_clusters; the engine falls back to a
+    # neutral trace with a legend note on any other moveset/mode.
+    html += '    <option value="cluster">Matchup cluster</option>\n'
     html += '  </select></label>\n'
     # Anchor IVs overlay mode: 'filled' is the shipped subdued cyan blob;
     # 'outline' swaps fill for ring markers so the envelope edge reads
