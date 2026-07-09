@@ -917,6 +917,34 @@ DIVES = [
         'opponents_file': 'opponent_pools/ul_top60.txt',
         'no_thresholds': True,
     },
+    # Melmetal GL + UL -- added 2026-07-09 as FOCAL dives only. Deliberately
+    # NOT added to any opponent_pools/*.txt: Melmetal is off-meta as an
+    # opponent, but uniquely worth a per-IV dive because it's the one species
+    # you can farm for arbitrary IVs in practice (Mystery Box is indefinitely
+    # repeatable), so the breakpoint/IV-envelope analysis is directly
+    # actionable. Legal in both leagues (GL best build L14.5/CP1491, UL
+    # L24/CP2468). No 'reference' pin: get_default_moveset returns Thunder
+    # Shock / Double Iron Bash, Dynamic Punch, which screens #1 in BOTH pools,
+    # so top_movesets=4 renders the recommended moveset plus the next three.
+    # (DOUBLE_IRON_BASH is an Elite-TM/CD signature -> no thresholds TOML.)
+    {
+        'species': 'Melmetal',
+        'league': 'great',
+        'slug': 'melmetal-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 4,
+        'no_thresholds': True,
+    },
+    {
+        'species': 'Melmetal',
+        'league': 'ultra',
+        'slug': 'melmetal-ultra-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/ul_top60.txt',
+        'top_movesets': 4,
+        'no_thresholds': True,
+    },
 ]
 
 
