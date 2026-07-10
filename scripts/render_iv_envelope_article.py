@@ -369,7 +369,7 @@ IV_CHECK_JS = r"""
     return '<span class="' + cls + '"><span style="width:' + Math.min(100, pct)
       + '%"></span></span><span class="cmp-hpv">' + sign + num + '% HP</span>';
   }
-  function allCellHtml(score, altScore, altIsBuddy, altCap, en, em, showMark, cc){
+  function allCellHtml(oi, si, build, quad, score, altScore, altIsBuddy, altCap, en, em, showMark, cc){
     var win = score > 500, tie = score === 500;
     var txt = '<span class="' + (win ? 'cmp-win' : tie ? 'cmp-tie' : 'cmp-lose')
       + '">' + (win ? 'win ' : tie ? 'tie ' : 'loss ') + score + '</span>';
@@ -396,7 +396,8 @@ IV_CHECK_JS = r"""
       enHtml = '<br><span class="cmp-env">+' + Math.round(en) + ' energy</span>'
         + (parts.length ? '<br><span class="cmp-env">' + parts.join(' &middot; ') + '</span>' : '');
     }
-    return '<td><span class="cmp-celltext">' + txt + '</span>' + cmpBarHtml(score) + enHtml + '</td>';
+    var inner = '<span class="cmp-celltext">' + txt + '</span>' + cmpBarHtml(score);
+    return '<td>' + cmpCellLink(oi, si, build, inner, quad) + enHtml + '</td>';
   }
   function renderAllView(ok, showBB){
     if (typeof CMP_READY === 'undefined' || !CMP_READY){
@@ -509,7 +510,8 @@ IV_CHECK_JS = r"""
         + '<td class="cmp-m">' + esc(DATA.opponentsDisplay[row.oi]) + ' &middot; ' + cmpScenLabel(row.si) + '</td>';
       for (var k = 0; k < row.scores.length; k++){
         var en = row.eg ? cmpVal(row.eg, live[k].iv, row.si, row.oi) : null;
-        h += allCellHtml(row.scores[k], row.alts ? row.alts[k] : null,
+        h += allCellHtml(row.oi, row.si, live[k], row.quad,
+                         row.scores[k], row.alts ? row.alts[k] : null,
                          row.altIsBuddy, row.altCap, en, em, row.showMark, row.ccs[k]);
       }
       h += '</tr>';
@@ -643,6 +645,7 @@ IV_CHECK_JS = r"""
         return { c: { a: +p[0], d: +p[1], s: +p[2] }, iv: iv };
       }).filter(function(x){ return x; });
       if (liveRows.length >= 2) {
+        window.CMP_CUR_QUAD = quad;   // cmpCellLink links resolve to this Case
         var altQ = CMP_BB_PAIR[quad];
         var grids = { def: SCORES_CMP[quad], alt: SCORES_CMP[altQ] || null,
                       altCap: CMP_ALTCAP[quad],
@@ -696,6 +699,21 @@ CMP_SETUP_JS = r"""
     window.CMP_ALTCAP[q] = (alt && CMPDATA.quadrant_levels[alt])
       ? Math.round(CMPDATA.quadrant_levels[alt][0]) : 51;
   }
+  // Battle-link builder for the compare cells. The hard parts (speciesId,
+  // movesets) are resolved server-side in scripts/pvpoke_links.py and embedded
+  // in CMPDATA.focalLink / CMPDATA.oppLinks; this only fills the per-build IVs,
+  // per-quadrant levels, and shields into the URL. The skeleton MUST mirror
+  // pvpoke_links.battle_url (that docstring is the source of truth for the
+  // format). Returns null (-> plain text) whenever a piece is missing.
+  window.cmpBattleUrl = function(oi, si, build, quad) {
+    var fl = CMPDATA.focalLink, ol = (CMPDATA.oppLinks || [])[oi];
+    var lv = (CMPDATA.quadrant_levels || {})[quad], sc = CMPDATA.scenarios[si];
+    if (!fl || !ol || !lv || !sc || !build) return null;
+    var p1 = fl.id + '-' + lv[0] + '-' + build.a + '-' + build.d + '-' + build.s + '-4-4-1-1';
+    var p2 = ol.id + '-' + lv[1] + '-15-15-15-4-4-1-1';
+    return 'https://pvpoke.com/battle/10000/' + p1 + '/' + p2 + '/'
+      + sc[0] + '' + sc[1] + '/' + fl.moves + '/' + ol.moves + '/';
+  };
   window.SCORES_CMP = {};
   window.CMP_ENERGY = {};                       // quadrant -> flat leftover-energy
   window.CMP_ENERGY_MOVES = CMPDATA.energy_moves || null;
@@ -736,6 +754,16 @@ def _cmp_embed(d):
     cmp = d.get('cmp_scores')
     if not cmp:
         return ''
+    # Battle-link pieces (render-time, no re-sim): the focal's speciesId+moves
+    # and each opponent's speciesId+moves, so the client-side compare panels can
+    # link every per-build result cell to that exact pvpoke.com battle. Resolved
+    # via the same helpers battle_url uses, so the two link paths can't drift.
+    b = d['build']
+    cmp = dict(cmp)  # don't mutate d's cached blob
+    cmp['focalLink'] = pvpoke_links.focal_link_data(
+        d['species'], d.get('shadow', False), b['fast'], b['charged'])
+    cmp['oppLinks'] = [pvpoke_links.opponent_link_data(o)
+                       for o in cmp['opponentsDisplay']]
     blob = json.dumps(cmp, separators=(',', ':'))
     return (f'<script type="application/json" id="cmp-data">{blob}</script>\n'
             f'<script>{_cmp_panels_js()}</script>\n'
@@ -894,6 +922,11 @@ def style():
   .cmp-tbl th { color:var(--text-muted); font-weight:600; font-size:.8em; background:none; }
   .cmp-tbl td { background:none; }
   .cmp-m { color:var(--text); }
+  /* Per-build result cells link to their pvpoke battle; inherit the win/loss
+     color instead of the default link accent so the cell still reads as a
+     result, with a subtle hover underline as the affordance. */
+  a.cmp-cell-a { color:inherit; text-decoration:none; }
+  a.cmp-cell-a:hover { text-decoration:underline; }
   .cmp-win { color:var(--win); font-weight:700; }
   .cmp-lose { color:var(--loss); font-weight:700; }
   .cmp-tie { color:var(--tie); font-weight:700; }
