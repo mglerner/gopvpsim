@@ -603,18 +603,30 @@ IV_CHECK_JS = r"""
     } else {
       rows.forEach(function(cs){
         var opp = cs[0], sh = cs[1];
+        // Row-level battle-link keys: opponent index + scenario index, so each
+        // per-build win/loss cell links to that exact pvpoke battle (no-op when
+        // window.cmpBattleUrl / the score-grid embed is absent -> plain text).
+        var oi = DATA.opponentsDisplay.indexOf(opp), si = -1;
+        for (var _s = 0; _s < DATA.nScenarios; _s++)
+          if (cmpScenLabel(_s) === sh) { si = _s; break; }
         h.push('<tr><td>' + esc(opp) + '</td><td class="num">' + esc(sh) + '</td>');
         cols.forEach(function(c){
           var st = cell(c, quad, opp, sh);
+          function lk(inner){
+            if (typeof cmpCellLink !== 'function' || oi < 0 || si < 0 || c.status !== 'ok')
+              return inner;
+            var p = c.key.split('/');
+            return cmpCellLink(oi, si, { a:+p[0], d:+p[1], s:+p[2] }, inner, quad);
+          }
           if (st.kind === 'na'){ h.push('<td class="ivc-cell none">-</td>'); return; }
-          if (st.kind === 'loss'){ h.push('<td class="ivc-cell ivc-loss">loss</td>'); return; }
-          if (st.kind === 'tie'){ h.push('<td class="ivc-cell ivc-tie">tie</td>'); return; }
+          if (st.kind === 'loss'){ h.push('<td class="ivc-cell ivc-loss">' + lk('loss') + '</td>'); return; }
+          if (st.kind === 'tie'){ h.push('<td class="ivc-cell ivc-tie">' + lk('tie') + '</td>'); return; }
           if (st.kind === 'cc'){
-            h.push('<td class="ivc-cell ivc-win">win <span class="cc-tag cc-'
+            h.push('<td class="ivc-cell ivc-win">' + lk('win') + ' <span class="cc-tag cc-'
               + esc(st.cc.kind) + '" title="' + esc(st.cc.margin) + '">'
               + esc(KIND[st.cc.kind] || st.cc.kind) + '</span></td>'); return;
           }
-          h.push('<td class="ivc-cell ivc-win">win</td>');
+          h.push('<td class="ivc-cell ivc-win">' + lk('win') + '</td>');
         });
         h.push('</tr>');
       });
