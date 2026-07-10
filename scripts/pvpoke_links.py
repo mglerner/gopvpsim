@@ -71,11 +71,35 @@ def _lv(level):
     return int(level) if level.is_integer() else level
 
 
-def _poke_str(display, shadow, ivs, level):
-    sid = species_id(display, shadow)
-    if not sid:
+def _moveset_segment(fast, charged):
+    """'FAST-CHARGED1-CHARGED2' move-id segment, or None if under-specified."""
+    if not fast or len(charged) < 2:
         return None
-    return f"{sid}-{_lv(level)}-{ivs[0]}-{ivs[1]}-{ivs[2]}-4-4-1-1"
+    return f"{fast}-{charged[0]}-{charged[1]}"
+
+
+def focal_link_data(display, shadow, fast, charged):
+    """The build-invariant pieces of a focal poke's battle link: its speciesId
+    and move segment. IVs/level are per-candidate and filled by the caller (the
+    client-side ML-guide compare panels vary them). None if unresolvable."""
+    sid = species_id(display, shadow)
+    seg = _moveset_segment(fast, charged)
+    if not sid or not seg:
+        return None
+    return {'id': sid, 'moves': seg}
+
+
+def opponent_link_data(opp_display):
+    """The pieces of a meta opponent's battle link: its speciesId and default
+    master move segment (opponents are always shown at 15/15/15). Level is filled
+    by the caller (it varies by quadrant). None if unresolvable."""
+    opp_shadow = '(Shadow)' in opp_display
+    opp_base = opp_display.replace(' (Shadow)', '').strip()
+    sid = species_id(opp_display, opp_shadow)
+    moves = _opp_moveset(opp_base, opp_shadow)
+    if not sid or not moves or len(moves[1]) < 2:
+        return None
+    return {'id': sid, 'moves': f"{moves[0]}-{moves[1][0]}-{moves[1][1]}"}
 
 
 def battle_url(focal_display, focal_shadow, focal_ivs, focal_level,
@@ -83,17 +107,14 @@ def battle_url(focal_display, focal_shadow, focal_ivs, focal_level,
                focal_shields, opp_shields):
     """A pvpoke.com battle URL for the focal (custom IVs/level/build) vs the
     opponent (15/15/15, default master moveset), at the given shields. None if
-    anything can't be resolved."""
-    if len(focal_charged) < 2:
+    anything can't be resolved. Composed from the same id/moveset pieces the
+    client-side compare-panel links use (focal_link_data/opponent_link_data), so
+    the two link paths can't drift on species/moveset resolution."""
+    fd = focal_link_data(focal_display, focal_shadow, focal_fast, focal_charged)
+    od = opponent_link_data(opp_display)
+    if not fd or not od:
         return None
-    p1 = _poke_str(focal_display, focal_shadow, focal_ivs, focal_level)
-    opp_shadow = '(Shadow)' in opp_display
-    opp_base = opp_display.replace(' (Shadow)', '').strip()
-    p2 = _poke_str(opp_display, opp_shadow, (15, 15, 15), opp_level)
-    moves = _opp_moveset(opp_base, opp_shadow)
-    if not p1 or not p2 or not moves or len(moves[1]) < 2:
-        return None
-    m1 = f"{focal_fast}-{focal_charged[0]}-{focal_charged[1]}"
-    m2 = f"{moves[0]}-{moves[1][0]}-{moves[1][1]}"
+    p1 = f"{fd['id']}-{_lv(focal_level)}-{focal_ivs[0]}-{focal_ivs[1]}-{focal_ivs[2]}-4-4-1-1"
+    p2 = f"{od['id']}-{_lv(opp_level)}-15-15-15-4-4-1-1"
     return (f"https://pvpoke.com/battle/10000/{p1}/{p2}/"
-            f"{focal_shields}{opp_shields}/{m1}/{m2}/")
+            f"{focal_shields}{opp_shields}/{fd['moves']}/{od['moves']}/")

@@ -24,6 +24,20 @@ var CMP_MARGIN_MIN = 0.15;  // leftover-HP spread (max-min) to count as a swing
 function cmpVal(grid, iv, si, oi) {
   return grid[iv * DATA.nScenarios * DATA.nOpponents + si * DATA.nOpponents + oi];
 }
+// Wrap a per-build result cell's inner HTML in a link to that exact pvpoke
+// battle, when the host page supplies window.cmpBattleUrl(oi, si, build, quad).
+// build = {a,d,s}; quad defaults to window.CMP_CUR_QUAD (the panels only render
+// one Case at a time). No-op when the host provides no builder -- the deep dive
+// currently doesn't, so its cells stay plain text (unchanged). Best-effort: any
+// failure falls back to the bare inner HTML, so a bad link never breaks a cell.
+function cmpCellLink(oi, si, build, inner, quad) {
+  if (typeof window.cmpBattleUrl !== 'function') return inner;
+  var url;
+  try { url = window.cmpBattleUrl(oi, si, build, quad || window.CMP_CUR_QUAD); }
+  catch (e) { url = null; }
+  return url ? '<a class="cmp-cell-a" href="' + url + '" target="_blank" rel="noopener">'
+             + inner + '</a>' : inner;
+}
 // leftover-HP% proxy: exact for a clean KO win (score-500)/500; |.| for losses.
 function cmpHp(score) { return Math.max(-1, Math.min(1, (score - 500) / 500)); }
 function cmpScenLabel(si) { var s = DATA.scenarios[si]; return s[0] + '-' + s[1]; }
@@ -117,7 +131,7 @@ function cmpFlipPanel(live, grids) {
             + '<span class="' + acls + '">' + albl + a + '</span></span>';
         }
       }
-      h += '<td class="' + cls + '">' + lbl + d + mark + '</td>';
+      h += '<td class="' + cls + '">' + cmpCellLink(f.oi, f.si, r.c, lbl + d) + mark + '</td>';
     });
     h += '</tr>';
   });
@@ -181,9 +195,10 @@ function cmpMarginPanel(live, grids, energyCtx) {
       // (Metric is clamped to +-100% by cmpHp, so the bar never overflows.)
       var barCls = 'cmp-bar' + (f.win ? (lo ? ' lo' : '') : ' loss');
       var hpNum = (pct === 0) ? '&lt;1' : pct;   // thin margin never reads as 0
-      h += '<td><span class="' + barCls + '"><span style="width:' +
+      var barInner = '<span class="' + barCls + '"><span style="width:' +
            Math.min(100, pct) + '%"></span></span><span class="cmp-hpv">' +
-           (f.win ? '+' : '−') + hpNum + '% HP</span>' + enHtml + '</td>';
+           (f.win ? '+' : '−') + hpNum + '% HP</span>';
+      h += '<td>' + cmpCellLink(f.oi, f.si, live[k].c, barInner) + enHtml + '</td>';
     });
     h += '</tr>';
   });
