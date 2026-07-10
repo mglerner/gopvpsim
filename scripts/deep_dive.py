@@ -4969,6 +4969,22 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .cmp-win {{ color:var(--win); font-weight:700; }}
   .cmp-lose {{ color:var(--loss); font-weight:700; }}
   .cmp-tie {{ color:var(--tie); font-weight:700; }}
+  /* Unified compare table (shared scripts/cmp_panels.js): scrolling box, sticky
+     header, tier dividers. No bottom-fade gradient here (the deep dive has no
+     scroll-fade wiring), just a plain scroll region. */
+  .cmp-count {{ font-size:.72em; font-weight:600; color:var(--text-muted);
+               text-transform:none; letter-spacing:0; }}
+  .cmp-bbhint {{ font-size:.72em; font-weight:600; color:var(--flip);
+                text-transform:none; letter-spacing:0; cursor:help; }}
+  .cmp-scroll-wrap {{ position:relative; }}
+  .cmp-scroll {{ max-height:62vh; overflow-y:auto; border:1px solid var(--border-2);
+                border-radius:2px; }}
+  .cmp-scroll thead th {{ position:sticky; top:0; z-index:2; background:var(--surface-2); }}
+  .cmp-case {{ color:var(--text-muted); }}
+  .cmp-celltext {{ display:block; margin-bottom:3px; }}
+  .tier-row td {{ position:sticky; top:2.75em; z-index:1; background:var(--callout-bg);
+                 color:var(--callout-strong); font-weight:700; font-size:.74em;
+                 text-transform:uppercase; letter-spacing:.05em; padding:4px 9px; }}
   .cmp-flip {{ color:var(--flip); }}
   .cmp-altmark {{ opacity:0.5; font-weight:400; }}
   .cmp-more {{ color:var(--text-muted); font-size:0.76rem; font-style:italic;
@@ -5896,10 +5912,10 @@ _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
     except FileNotFoundError:
         pass
 
-    # Shared compare-panel functions (cmpVal/cmpHp/cmpScenLabel/cmpFlipPanel/
-    # cmpMarginPanel). Injected as a plain <script> BEFORE the engine so its
-    # globals exist when the compare widget renders; the ML IV-guide pages load
-    # the same file, keeping the panels single-sourced. If the file is missing
+    # Shared compare-table functions (cmpVal/cmpHp/cmpScenLabel/cmpCellLink/
+    # cmpBarHtml/cmpCellHtml/cmpUnifiedTable). Injected as a plain <script>
+    # BEFORE the engine so its globals exist when the compare widget renders; the
+    # ML IV-guide pages load the same file, keeping the table single-sourced. If the file is missing
     # the engine falls back gracefully only insofar as the compare widget errors
     # on use -- but it is committed alongside the engine, so this is belt-and-braces.
     _cmp_js_path = os.path.join(os.path.dirname(__file__), 'cmp_panels.js')

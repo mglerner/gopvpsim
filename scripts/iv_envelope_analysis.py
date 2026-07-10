@@ -230,7 +230,7 @@ def _move_abbr(mid):
 
 def energy_moves_blob(fast_id, charged_ids):
     """{fast:{abbr,gain}, charged:[{abbr,cost}]} -- the move energetics the
-    shared cmpMarginPanel uses to render leftover energy as fast-move-equivalents
+    shared cmpCellHtml uses to render leftover energy as fast-move-equivalents
     and fractions of each charged move."""
     return {
         'fast': {'abbr': _move_abbr(fast_id),
@@ -546,7 +546,7 @@ def main():
     # derives `won` from these scores instead of a separate won_set call).
     cmp_score_grid = {q: [] for q in REC_QUADRANTS}
     # Parallel leftover-energy grids (same shape/order) for the banked-energy
-    # line under the HP-margin bars (shared cmpMarginPanel energy annotation).
+    # line under the HP bars (shared unified table's energy annotation).
     cmp_energy_grid = {q: [] for q in REC_QUADRANTS}
     for ci, (av, dv, sv) in enumerate(combos, 1):
         row = {'ivs': [av, dv, sv]}

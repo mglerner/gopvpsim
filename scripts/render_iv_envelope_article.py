@@ -357,48 +357,30 @@ IV_CHECK_JS = r"""
   // CMP_READY, so by the time it runs the shared script is loaded.
   // Version-B cell: win/loss score on top, faded best-buddy flip where a toggle
   // crosses the win line, then the leftover-HP bar (+ energy on wins).
-  function cmpBarHtml(score){
-    var hp = cmpHp(score), pct = Math.round(Math.abs(hp) * 100);
-    var win = score > 500, tie = score === 500, lo = win && Math.abs(hp) < 0.2;
-    var cls = 'cmp-bar' + (win ? (lo ? ' lo' : '') : (tie ? '' : ' loss'));
-    // A nonzero margin that rounds to 0 shows "<1" so a thin win never reads as
-    // dead/zero; an exact tie shows a bare "0% HP". The " HP" disambiguates it
-    // from the adjacent "+N energy" line.
-    var sign = tie ? '' : (win ? '+' : '&minus;');
-    var num = (!tie && pct === 0) ? '&lt;1' : pct;
-    return '<span class="' + cls + '"><span style="width:' + Math.min(100, pct)
-      + '%"></span></span><span class="cmp-hpv">' + sign + num + '% HP</span>';
+  // Close-call lookup for the shared cmpUnifiedTable: (case, build, opp, shields)
+  // -> {kind, margin, label} from the ivc-data blob (D.combos[key].cc[quad]).
+  function cmpCcLookup(caseKey, buildKey, oppN, shL){
+    var lst = ((D.combos[buildKey] && D.combos[buildKey].cc) || {})[caseKey] || [];
+    for (var z = 0; z < lst.length; z++)
+      if (lst[z].opp === oppN && lst[z].shield === shL)
+        return { kind: lst[z].kind, margin: lst[z].margin, label: KIND[lst[z].kind] || lst[z].kind };
+    return null;
   }
-  function allCellHtml(oi, si, build, quad, score, altScore, altIsBuddy, altCap, en, em, showMark, cc){
-    var win = score > 500, tie = score === 500;
-    var txt = '<span class="' + (win ? 'cmp-win' : tie ? 'cmp-tie' : 'cmp-lose')
-      + '">' + (win ? 'win ' : tie ? 'tie ' : 'loss ') + score + '</span>';
-    if (cc)   // close-call badge (shield spent / near-death / energy banked)
-      txt += ' <span class="cc-tag cc-' + cc.kind + '" title="' + esc(cc.margin) + '">'
-        + esc(KIND[cc.kind] || cc.kind) + '</span>';
-    if (showMark && altScore != null && (score > 500) !== (altScore > 500)){
-      var aw = altScore > 500, at = altScore === 500;
-      var albl = aw ? 'win ' : at ? 'tie ' : 'loss ';
-      var ds = altIsBuddy ? 'on' : 'off';
-      var dw = (altIsBuddy ? 'turn best-buddy ON' : 'turn best-buddy OFF')
-        + ' (to L' + altCap + ')';
-      txt += ' <span class="cmp-altmark" title="' + dw + ': ' + albl + altScore + '">'
-        + '<span class="cmp-flip">&#10022;' + ds + '&rarr;</span>'
-        + '<span class="' + (aw ? 'cmp-win' : at ? 'cmp-tie' : 'cmp-lose') + '">'
-        + albl + altScore + '</span></span>';
-    }
-    var enHtml = '';
-    if (en != null && em && win){
-      var parts = [];
-      if (em.fast && em.fast.gain > 0) parts.push((en / em.fast.gain).toFixed(1) + em.fast.abbr);
-      (em.charged || []).forEach(function(cm){
-        if (cm.cost > 0) parts.push((en / cm.cost).toFixed(1) + cm.abbr); });
-      enHtml = '<br><span class="cmp-env">+' + Math.round(en) + ' energy</span>'
-        + (parts.length ? '<br><span class="cmp-env">' + parts.join(' &middot; ') + '</span>' : '');
-    }
-    var inner = '<span class="cmp-celltext">' + txt + '</span>' + cmpBarHtml(score);
-    return '<td>' + cmpCellLink(oi, si, build, inner, quad) + enHtml + '</td>';
+  function cmpAllLegend(showBB){
+    return '<b>What appears here:</b> a matchup is shown only when your spreads '
+      + 'actually differ - they disagree on the win (a flip), '
+      + (showBB ? 'or respond to best-buddy differently, ' : '')
+      + 'or they all win / all lose but their leftover HP differs by '
+      + Math.round(CMP_MARGIN_MIN * 100) + '%+, or one spends a shield / barely '
+      + 'survives / banks less energy (a close call) where another does not. '
+      + 'Rows where every spread behaves identically are hidden. Bars = leftover '
+      + 'HP% at battle end (from the score); energy = leftover charge on a win.'
+      + (showBB ? ' Faded &#10022;on/off marks the spread(s) whose result flips '
+          + 'when you toggle your best-buddy.' : ' Best-buddy flip cases are merged '
+          + 'in; check "Expand best-buddy flips" to break out the ones where the '
+          + 'flip differs between your spreads.');
   }
+  // "All cases": every quadrant merged into the shared unified table (Case column).
   function renderAllView(ok, showBB){
     if (typeof CMP_READY === 'undefined' || !CMP_READY){
       // Distinguish "grids still decoding" from "this guide has no grids at all"
@@ -419,119 +401,21 @@ IV_CHECK_JS = r"""
     var QLABEL = {};
     for (var qi = 0; qi < qEl.options.length; qi++)
       QLABEL[qEl.options[qi].value] = qEl.options[qi].text;
-    var em = window.CMP_ENERGY_MOVES;
-    var rows = [];
-    var hiddenBB = 0;   // collapsed view: rows that expanding best-buddy would reveal
-    function sgn(v){ return v > 500 ? 'W' : v < 500 ? 'L' : 'T'; }
-    Object.keys(SCORES_CMP).forEach(function(quad){
-      var grid = SCORES_CMP[quad]; if (!grid) return;
-      var altGrid = SCORES_CMP[CMP_BB_PAIR[quad]] || null;
-      var altCap = CMP_ALTCAP[quad], altIsBuddy = CMP_ALTCAP[quad] > CMP_MYCAP[quad];
-      var eg = (window.CMP_ENERGY || {})[quad] || null;
-      for (var oi = 0; oi < DATA.nOpponents; oi++){
-        for (var si = 0; si < DATA.nScenarios; si++){
-          var scores = live.map(function(r){ return cmpVal(grid, r.iv, si, oi); });
-          var altScores = altGrid ? live.map(function(r){ return cmpVal(altGrid, r.iv, si, oi); }) : null;
-          var alts = showBB ? altScores : null;   // only USE the alt for tiering/marking when expanded
-          var hasW = false, hasL = false;
-          scores.forEach(function(v){ if (v > 500) hasW = true; else if (v < 500) hasL = true; });
-          // Per-spread signature: primary outcome, plus the best-buddy-toggled
-          // outcome when expanded. The row is an IV decision (a flip) only when
-          // these signatures DIFFER across spreads. If every spread behaves the
-          // same -- e.g. all win at best-buddy and all drop to the same loss
-          // without it -- the IV pick changes nothing, so it is NOT a flip, and
-          // the best-buddy marker would be identical noise (suppressed below).
-          var sigs = scores.map(function(v, k){ return sgn(v) + (alts ? sgn(alts[k]) : ''); });
-          var sigDiffer = sigs.some(function(s){ return s !== sigs[0]; });
-          // Per-spread close-call (shield spent / near-death / energy banked) for
-          // this quad/opp/scenario, from the ivc-data blob -- the same source the
-          // per-Case table uses. Orthogonal to leftover HP: a spread can spend a
-          // shield with ~0 HP-% difference, which the bar misses. So a close-call
-          // that DIFFERS across spreads is its own reason to show the row.
-          var oppN = DATA.opponentsDisplay[oi], shL = cmpScenLabel(si);
-          var ccs = live.map(function(r){
-            var lst = ((D.combos[r.key] && D.combos[r.key].cc) || {})[quad] || [];
-            for (var z = 0; z < lst.length; z++)
-              if (lst[z].opp === oppN && lst[z].shield === shL) return lst[z];
-            return null;
-          });
-          var ccSig = ccs.map(function(c){ return c ? (c.kind + ':' + c.margin) : ''; });
-          var ccDiffer = ccSig.some(function(s){ return s !== ccSig[0]; });
-          var hps = scores.map(cmpHp);
-          var hpSpread = Math.max.apply(null, hps) - Math.min.apply(null, hps);
-          var delta = Math.max.apply(null, scores) - Math.min.apply(null, scores);
-          var tier, include;
-          if (sigDiffer){ tier = 0; include = true; }                  // flip: the pick changes the result
-          else if (hasW){ tier = 1; include = hpSpread >= CMP_MARGIN_MIN || ccDiffer; } // win-both: margin swing or close-call
-          else if (hasL){ tier = 2; include = hpSpread >= CMP_MARGIN_MIN || ccDiffer; } // lose-both: margin swing or close-call
-          else { include = false; }                                    // all-tie
-          if (!include){
-            // collapsed view: would expanding best-buddy reveal this row? Primary
-            // sigs are identical here, so a difference can only come from the alt.
-            if (!showBB && altScores){
-              var fsig = scores.map(function(v, k){ return sgn(v) + sgn(altScores[k]); });
-              if (fsig.some(function(s){ return s !== fsig[0]; })) hiddenBB++;
-            }
-            continue;
-          }
-          rows.push({ quad:quad, oi:oi, si:si, tier:tier, delta:delta,
-                      scores:scores, alts:alts, ccs:ccs, altIsBuddy:altIsBuddy, altCap:altCap, eg:eg,
-                      showMark:(showBB && sigDiffer) });
-        }
-      }
+    var cases = Object.keys(SCORES_CMP).map(function(quad){
+      return { key:quad, label:QLABEL[quad] || quad, def:SCORES_CMP[quad],
+        alt:SCORES_CMP[CMP_BB_PAIR[quad]] || null, altCap:CMP_ALTCAP[quad],
+        altIsBuddy:CMP_ALTCAP[quad] > CMP_MYCAP[quad],
+        energy:(window.CMP_ENERGY || {})[quad] || null };
+    }).filter(function(cs){ return cs.def; });
+    return cmpUnifiedTable(live, cases, {
+      em: window.CMP_ENERGY_MOVES, showBB: showBB, ccLookup: cmpCcLookup,
+      title: 'All cases',
+      subtitle: 'Every case, merged. Flips first (your pick changes the result), '
+        + 'then matchups you win in both, then lose in both - each ordered by score '
+        + 'gap, biggest first.',
+      legend: cmpAllLegend(showBB),
+      emptyHtml: '<p class="sub">No matchups differ enough across these spreads in any case.</p>'
     });
-    if (!rows.length)
-      return '<p class="sub">No matchups differ enough across these spreads in any case.</p>';
-    rows.sort(function(a, b){ return a.tier - b.tier || b.delta - a.delta; });
-    var nFlip = rows.filter(function(r){ return r.tier === 0; }).length;
-    var TIERNAME = ['Flips - your IV pick changes the result', 'Win in both', 'Lose in both'];
-    var h = '<div class="cmp-panel"><h4 class="cmp-marg-h">All cases'
-      + ' <span class="cmp-count">' + rows.length + ' matchup' + (rows.length === 1 ? '' : 's')
-      + (nFlip ? ', ' + nFlip + ' flip' + (nFlip === 1 ? '' : 's') : '')
-      + ' &middot; scroll for all</span>'
-      + (hiddenBB ? ' <span class="cmp-bbhint" title="Check &quot;Expand best-buddy '
-          + 'flips&quot; above to break these out">' + hiddenBB + ' best-buddy flip'
-          + (hiddenBB === 1 ? '' : 's') + ' hidden until you Expand above</span>' : '')
-      + '</h4>'
-      + '<p class="cmp-psub">Every case, merged. Flips first (your pick changes the '
-      + 'result), then matchups you win in both, then lose in both - each ordered by '
-      + 'score gap, biggest first.</p>'
-      + '<div class="cmp-scroll-wrap"><div class="cmp-scroll"><table class="cmp-tbl"><thead><tr><th>Case</th><th>Matchup</th>'
-      + live.map(function(r){ return '<th>' + r.a + '/' + r.d + '/' + r.s + '</th>'; }).join('')
-      + '</tr></thead><tbody>';
-    var lastTier = -1;
-    rows.forEach(function(row){
-      if (row.tier !== lastTier){
-        h += '<tr class="tier-row"><td colspan="' + (2 + live.length) + '">'
-          + TIERNAME[row.tier] + '</td></tr>';
-        lastTier = row.tier;
-      }
-      h += '<tr><td class="cmp-case">' + esc(QLABEL[row.quad] || row.quad) + '</td>'
-        + '<td class="cmp-m">' + esc(DATA.opponentsDisplay[row.oi]) + ' &middot; ' + cmpScenLabel(row.si) + '</td>';
-      for (var k = 0; k < row.scores.length; k++){
-        var en = row.eg ? cmpVal(row.eg, live[k].iv, row.si, row.oi) : null;
-        h += allCellHtml(row.oi, row.si, live[k], row.quad,
-                         row.scores[k], row.alts ? row.alts[k] : null,
-                         row.altIsBuddy, row.altCap, en, em, row.showMark, row.ccs[k]);
-      }
-      h += '</tr>';
-    });
-    h += '</tbody></table></div></div>'
-      + '<div class="cmp-leg"><b>What appears here:</b> a matchup is shown only '
-      + 'when your spreads actually differ - they disagree on the win (a flip), '
-      + (showBB ? 'or respond to best-buddy differently, ' : '')
-      + 'or they all win / all lose but their leftover HP differs by '
-      + Math.round(CMP_MARGIN_MIN * 100) + '%+, or one spends a shield / barely '
-      + 'survives / banks less energy (a close call) where another does not. '
-      + 'Rows where every spread behaves identically are hidden. Bars = leftover '
-      + 'HP% at battle end (from the '
-      + 'score); energy = leftover charge on a win.'
-      + (showBB ? ' Faded &#10022;on/off marks the spread(s) whose result flips '
-          + 'when you toggle your best-buddy.' : ' Best-buddy flip cases are merged '
-          + 'in; check "Expand best-buddy flips" to break out the ones where the '
-          + 'flip differs between your spreads.')
-      + '</div></div>';
-    return h;
   }
 
   // Scroll-aware bottom fade: hide it once the box is scrolled to the bottom (or
@@ -643,34 +527,36 @@ IV_CHECK_JS = r"""
         + 'only computed for spreads that drop a single stat (such as 15/15/14). '
         + 'Multi-stat spreads show win, loss, and close calls only.</p>';
 
-    // Shared HP-margin + best-buddy-flip panels (scripts/cmp_panels.js). They
-    // need the raw per-matchup score, so they appear only when the packed score
-    // grids have decoded (CMP_READY) and 2+ in-range spreads are entered. The
-    // decoder calls window._cmpBoxRerender on ready, so a fast typist sees the
-    // panels fill in a moment later rather than never.
+    // Shared unified compare table (scripts/cmp_panels.js), single Case. Needs
+    // the raw per-matchup score, so it appears only when the packed score grids
+    // have decoded (CMP_READY) and 2+ in-range spreads are entered. The decoder
+    // calls window._cmpBoxRerender on ready, so a fast typist sees it fill in a
+    // moment later rather than never.
     if (ok.length >= 2 && typeof CMP_READY !== 'undefined' && CMP_READY
-        && typeof cmpFlipPanel === 'function') {
+        && typeof cmpUnifiedTable === 'function') {
       var liveRows = ok.map(function(c){
         var iv = CMP_IDX[c.key];
         if (iv == null) return null;
         var p = c.key.split('/');
-        return { c: { a: +p[0], d: +p[1], s: +p[2] }, iv: iv };
+        return { key: c.key, iv: iv, a: +p[0], d: +p[1], s: +p[2] };
       }).filter(function(x){ return x; });
       if (liveRows.length >= 2) {
-        window.CMP_CUR_QUAD = quad;   // cmpCellLink links resolve to this Case
         var altQ = CMP_BB_PAIR[quad];
-        var grids = { def: SCORES_CMP[quad], alt: SCORES_CMP[altQ] || null,
-                      altCap: CMP_ALTCAP[quad],
-                      // alt is the powered-UP (best-buddy) level only when the
-                      // alt quadrant's my-level exceeds the selected Case's.
-                      altIsBuddy: CMP_ALTCAP[quad] > CMP_MYCAP[quad] };
-        // Banked-energy line under the HP bars: the margin panel shows it when
-        // the energy grid for this Case AND the move energetics are present
-        // (absent on pre-energy JSON -> HP bars only, graceful).
-        var energyCtx = { eg: { def: (window.CMP_ENERGY || {})[quad] || null, alt: null },
-                          em: window.CMP_ENERGY_MOVES };
-        out.innerHTML += cmpFlipPanel(liveRows, grids)
-                       + cmpMarginPanel(liveRows, grids, energyCtx);
+        // Single Case (no Case column). showBB:true keeps the best-buddy ✦ marks
+        // the old flip panel always showed; alt is the powered-UP level only when
+        // the alt quadrant's my-level exceeds the selected Case's.
+        var cases = [{ key: quad, label: null, def: SCORES_CMP[quad],
+          alt: SCORES_CMP[altQ] || null, altCap: CMP_ALTCAP[quad],
+          altIsBuddy: CMP_ALTCAP[quad] > CMP_MYCAP[quad],
+          energy: (window.CMP_ENERGY || {})[quad] || null }];
+        out.innerHTML += cmpUnifiedTable(liveRows, cases, {
+          em: window.CMP_ENERGY_MOVES, showBB: true, ccLookup: cmpCcLookup,
+          title: 'Matchups your picks decide differently',
+          subtitle: 'Where the spread choice - or toggling best-buddy '
+            + '(&#10022;) - changes the outcome, plus same-result fights where the '
+            + 'leftover-HP margin moves. Flips first, closest calls first.',
+          legend: cmpAllLegend(true)
+        });
       }
     }
   }
