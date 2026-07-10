@@ -3536,6 +3536,34 @@ function cmpStatus(t, c) {
   var el = document.getElementById('cmp-status'); if (el) { el.textContent = t; el.style.color = c; }
 }
 
+// Battle link for a compare-panel cell -> the exact pvpoke.com fight for this
+// candidate build vs this opponent, at the selected shields, opp-IV mode, and
+// best-buddy level. Mirrors pvpoke_links.battle_url's URL skeleton (that
+// docstring is the source of truth for the format). The opponent (level, IVs)
+// + moveset come from DATA.oppLinks (resolved server-side to match the sim);
+// focal level from DATA.ivLv / ivL51 (best-buddy toggle), focal moves from the
+// active moveset, focal IVs from the candidate. Returns null (cmpCellLink then
+// renders plain text) when any piece is missing. build = {a,d,s,iv}.
+window.cmpBattleUrl = function(oi, si, build) {
+  var fl = DATA.focalLink, ol = (DATA.oppLinks || [])[oi], sc = DATA.scenarios[si];
+  if (!fl || !ol || !sc || !build || build.iv == null) return null;
+  var lab = ((DATA.movesets || [])[state.movesetIdx] || {}).label || '';
+  var seg = lab.split(' / ');
+  if (seg.length < 2) return null;
+  var fast = seg[0].trim(), chg = seg[1].split(',').map(function(x) { return x.trim(); });
+  if (chg.length < 2 || !chg[0] || !chg[1]) return null;
+  var lvArr = (state.levelMode === '51' && DATA.ivL51) ? DATA.ivL51.ivLv : DATA.ivLv;
+  var flv = (lvArr || [])[build.iv];
+  if (flv == null) return null;
+  var om = ol.byMode[state.oppIvMode] || ol.byMode.pvpoke
+        || ol.byMode[Object.keys(ol.byMode)[0]];
+  if (!om) return null;
+  var p1 = fl.id + '-' + flv + '-' + build.a + '-' + build.d + '-' + build.s + '-4-4-1-1';
+  var p2 = ol.id + '-' + om.lvl + '-' + om.ivs[0] + '-' + om.ivs[1] + '-' + om.ivs[2] + '-4-4-1-1';
+  return 'https://pvpoke.com/battle/' + DATA.cpCap + '/' + p1 + '/' + p2 + '/'
+    + sc[0] + '' + sc[1] + '/' + fast + '-' + chg[0] + '-' + chg[1] + '/' + ol.moves + '/';
+};
+
 function cmpRender() {
   var host = document.getElementById('cmp-body');
   var sec = document.getElementById('cmp-section');

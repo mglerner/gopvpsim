@@ -26,10 +26,12 @@ function cmpVal(grid, iv, si, oi) {
 }
 // Wrap a per-build result cell's inner HTML in a link to that exact pvpoke
 // battle, when the host page supplies window.cmpBattleUrl(oi, si, build, quad).
-// build = {a,d,s}; quad defaults to window.CMP_CUR_QUAD (the panels only render
-// one Case at a time). No-op when the host provides no builder -- the deep dive
-// currently doesn't, so its cells stay plain text (unchanged). Best-effort: any
-// failure falls back to the bare inner HTML, so a bad link never breaks a cell.
+// build = {a,d,s,iv} (iv = grid index, for hosts whose focal level varies per
+// candidate, e.g. the deep dive; the ML guide reads level from quad instead and
+// ignores it). quad defaults to window.CMP_CUR_QUAD (the panels only render one
+// Case at a time). No-op when the host provides no builder, so a consumer that
+// hasn't wired one keeps plain-text cells. Best-effort: any failure falls back
+// to the bare inner HTML, so a bad link never breaks a cell.
 function cmpCellLink(oi, si, build, inner, quad) {
   if (typeof window.cmpBattleUrl !== 'function') return inner;
   var url;
@@ -131,7 +133,9 @@ function cmpFlipPanel(live, grids) {
             + '<span class="' + acls + '">' + albl + a + '</span></span>';
         }
       }
-      h += '<td class="' + cls + '">' + cmpCellLink(f.oi, f.si, r.c, lbl + d) + mark + '</td>';
+      h += '<td class="' + cls + '">'
+        + cmpCellLink(f.oi, f.si, { a: r.c.a, d: r.c.d, s: r.c.s, iv: r.iv }, lbl + d)
+        + mark + '</td>';
     });
     h += '</tr>';
   });
@@ -198,7 +202,9 @@ function cmpMarginPanel(live, grids, energyCtx) {
       var barInner = '<span class="' + barCls + '"><span style="width:' +
            Math.min(100, pct) + '%"></span></span><span class="cmp-hpv">' +
            (f.win ? '+' : '−') + hpNum + '% HP</span>';
-      h += '<td>' + cmpCellLink(f.oi, f.si, live[k].c, barInner) + enHtml + '</td>';
+      h += '<td>' + cmpCellLink(f.oi, f.si,
+        { a: live[k].c.a, d: live[k].c.d, s: live[k].c.s, iv: live[k].iv }, barInner)
+        + enHtml + '</td>';
     });
     h += '</tr>';
   });

@@ -94,6 +94,7 @@ import deep_dive_analysis as analysis
 import deep_dive_matchup_clusters as matchup_clusters
 import deep_dive_rendering as rendering
 import deep_dive_slayer as slayer
+import pvpoke_links
 from deep_dive_logging import (
     init_logger, worker_log_setup, get_logger,
 )
@@ -4240,10 +4241,43 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     if n_ivs > 0:
         rank1_ref_iv_idx = min(range(n_ivs), key=lambda i: sp_ranks[i])
 
+    # Battle-link data for the "Comparing builds" compare panels: enough for the
+    # client to rebuild each per-build-vs-opponent pvpoke.com battle. Faithful to
+    # the sim -- opponent (level, IVs) are resolved with the SAME functions
+    # iv_sweep uses (variant_ivs / resolve_opp_ivs + Pokemon.at_best_level), once
+    # per available opp-IV mode, and the opponent moveset is the sim's resolved
+    # one (opp_movesets). Focal speciesId encodes shadow; the client fills focal
+    # level (DATA.ivLv / ivL51 by best-buddy toggle) + candidate IVs + active
+    # moveset. None -> that piece renders unlinked (best-effort, never fatal).
+    # NB: opponent level uses the default league cap (opp_max_level=None); the
+    # rare ML opponent-over-level seam is not plumbed into this renderer.
+    def _opp_link_data(oi):
+        opp_clean, variant, opp_is_shadow = parse_opponent_spec(opponent_names[oi])
+        sid = pvpoke_links.species_id(opp_clean, opp_is_shadow)
+        ms = opp_movesets[oi] if opp_movesets and oi < len(opp_movesets) else None
+        if not sid or not ms or len(ms[1]) < 2:
+            return None
+        moves = f"{ms[0]}-{ms[1][0]}-{ms[1][1]}"
+        vi = variant_ivs(opp_clean, variant, league, threshold_registry)
+        by_mode = {}
+        for mode in opp_iv_modes:
+            oa, od, os_ = vi if vi is not None else resolve_opp_ivs(
+                opp_clean, league, opp_is_shadow, mode)
+            op = Pokemon.at_best_level(opp_clean, oa, od, os_, league=league,
+                                       shadow=opp_is_shadow)
+            by_mode[mode] = {'lvl': op.level, 'ivs': [oa, od, os_]}
+        return {'id': sid, 'moves': moves, 'byMode': by_mode}
+
+    _fsid = pvpoke_links.species_id(species, shadow)
+    focal_link = {'id': _fsid} if _fsid else None
+    opp_links = [_opp_link_data(_oi) for _oi in range(n_opponents)]
+
     data_obj = {
         'species': species,
         'league': league,
         'cpCap': LEAGUE_CAPS[league],
+        'focalLink': focal_link,
+        'oppLinks': opp_links,
         'nIvs': n_ivs,
         'nScenarios': n_scenarios,
         'nOpponents': n_opponents,
@@ -4928,6 +4962,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     border-bottom:1px solid var(--bar-track); white-space:nowrap; }}
   .cmp-tbl th {{ color:var(--text-muted); font-weight:600; font-size:0.74rem; }}
   .cmp-m {{ color:var(--text); }}
+  /* Per-build result cells link to their pvpoke battle; inherit the win/loss
+     color so the cell still reads as a result, with a hover underline cue. */
+  a.cmp-cell-a {{ color:inherit; text-decoration:none; }}
+  a.cmp-cell-a:hover {{ text-decoration:underline; }}
   .cmp-win {{ color:var(--win); font-weight:700; }}
   .cmp-lose {{ color:var(--loss); font-weight:700; }}
   .cmp-tie {{ color:var(--tie); font-weight:700; }}
