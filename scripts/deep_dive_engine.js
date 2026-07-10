@@ -199,10 +199,10 @@ function getActiveScenarioIndices() {
 // deltas, and the paste-box "Gives up vs #1" list -- but NOT the Python-baked
 // sections (infographic card, threshold tiers, Top Picks, narrative), which
 // are computed full-pool at bake time. The honesty banner names that split.
-// The "Comparing builds" widget (cmpSummary / cmpBestAvg / cmpFlipPanel /
-// cmpMarginPanel) ALSO follows the filter -- its wins/avg/gives-up and the
-// flip+margin panels recompute over the selected subset (Michael's call
-// 2026-07-03), so every score surface on the page moves together.
+// The "Comparing builds" widget (cmpSummary / cmpBestAvg / cmpUnifiedTable)
+// ALSO follows the filter -- its wins/avg/gives-up and the unified compare
+// table recompute over the selected subset (Michael's call 2026-07-03), so
+// every score surface on the page moves together.
 function _oppSelCount() {
   var sel = state.selectedOpps;
   if (!sel) return nO;
@@ -3423,10 +3423,11 @@ window.copyScannerJson = copyScannerJson;
 // spreads YOU enter, read entirely from the embedded grid (no new sims).
 // ============================================================
 var CMP_MAX = 7;            // hard cap on candidate spreads
-// CMP_ROWS / CMP_MARGIN_MIN and the cmpVal/cmpHp/cmpScenLabel/cmpFlipPanel/
-// cmpMarginPanel functions now live in the shared scripts/cmp_panels.js
-// (loaded as a <script> before this engine), so the ML IV-guide pages can
-// reuse the exact same panels. They read grid sizing from the global DATA.
+// CMP_MARGIN_MIN and the cmpVal/cmpHp/cmpScenLabel/cmpCellLink/cmpBarHtml/
+// cmpCellHtml/cmpUnifiedTable functions now live in the shared
+// scripts/cmp_panels.js (loaded as a <script> before this engine), so the ML
+// IV-guide pages can reuse the exact same unified compare table. They read grid
+// sizing from the global DATA.
 
 function cmpFindIv(a, d, s) {
   for (var i = 0; i < DATA.nIvs; i++) {
@@ -3622,11 +3623,27 @@ function cmpRender() {
 
   var live = rows.filter(function(r) { return r.iv >= 0; });
   if (live.length >= 2) {
-    h += cmpFlipPanel(live, grids);
-    // Energy context is read from the engine's state here; cmp_panels.js takes
-    // it as a parameter so the guide can supply its own packed energy grids.
-    h += cmpMarginPanel(live, grids,
-      { eg: cmpEnergyGrids(), em: (DATA.movesets[state.movesetIdx] || {}).energyMoves });
+    // Shared unified compare table (scripts/cmp_panels.js), single Case for the
+    // current view. Best-buddy ✦ marks show only when this dive carries the L51
+    // grid (grids.alt); energy from the current state's grid. Battle links track
+    // the live moveset / opp-IV mode / level via window.cmpBattleUrl.
+    var eg = cmpEnergyGrids();
+    var liveU = live.map(function(r) {
+      return { a: r.c.a, d: r.c.d, s: r.c.s, iv: r.iv, key: r.c.a + '/' + r.c.d + '/' + r.c.s };
+    });
+    var cmpCases = [{ key: '_cur', label: null, def: grids.def, alt: grids.alt,
+      altCap: grids.altCap, altIsBuddy: grids.altIsBuddy, energy: eg ? eg.def : null }];
+    h += cmpUnifiedTable(liveU, cmpCases, {
+      em: (DATA.movesets[state.movesetIdx] || {}).energyMoves,
+      showBB: !!grids.alt,
+      title: 'Comparing your builds',
+      subtitle: 'Matchups these spreads decide differently, or win/lose with a '
+        + 'different margin. Flips first, then win in both, then lose in both.',
+      legend: 'Bars = leftover HP% at battle end (from the score); energy = leftover '
+        + 'charge on a win. Rows where every spread behaves identically are hidden.'
+        + (grids.alt ? ' Faded &#10022;on/off marks a spread whose result flips at '
+            + 'the other best-buddy level.' : '')
+    });
   }
   host.innerHTML = h;
 }
