@@ -1,25 +1,88 @@
-# PvPoke bug-report drafts (paste-ready)
+# PvPoke bug reports: filing guide + paste-ready drafts
 
-Drafted 2026-06-11 for the TODO "File PvPoke bug reports" item. Each
-section below is a self-contained GitHub-issue draft against
-github.com/pvpoke/pvpoke. Line numbers reference commit `bc532fbda`
-(our last vetted clone state; re-check before filing).
+Drafted 2026-06-11; **re-verified 2026-07-16** against pvpoke master
+`10fd1a6e43260e59b625d1cf96bbea496672880d` (engine JS byte-identical to
+our vetted `bc532fbda`; gamemaster checked live). Every factual claim
+below was re-checked by an adversarial verification workflow (7
+verifiers + 7 skeptics + 7 duplicate-hunters, all independent): each
+line number was re-derived from the current tree, the behavioral
+numbers for Report 3 were re-run live against PvPoke's own engine, and
+PvPoke's issue tracker was searched for duplicates (none found; the
+"related issues" cross-references below came out of that search).
 
-**Curation notes (why this is 7 reports, not the TODO's 8):**
+Two changes from the 2026-06-11 draft set:
 
-- TODO's "Mimikyu delays Shadow Sneak" was RETRACTED 2026-04-15
-  (DEVELOPER_NOTES §4): the divergence was in OUR battle-log output,
-  not PvPoke's behavior. Do not file.
-- TODO's "bestChargedMove using move.damage (undefined at init)" has a
-  debunked premise: `initializeMove` (Pokemon.js:830-839) sets
-  `move.damage` for every move at battle init, both with and without
-  an opponent (re-verified 2026-06-11 during the E11 doc correction;
-  also memory `project_bestchargedmove.md`). The real, fileable issue
-  in that area is the buff-adjusted-DPE overwrite (report 4 below).
-- The Blade→Shield CPM-table overflow (report 6) was found 2026-06-11
-  and is new since the TODO list was written.
+- **Report 6 (Blade->Shield CPM-table overflow) is RETRACTED** — see
+  its section. PvPoke's cpms table covers levels 1..55; the overflow
+  was ours alone. Do not file.
+- **Report 2 is reframed** from "clear bug" to "is this asymmetry
+  intended?" — our own NB-1 sweep (2026-07-03) falsified the draft's
+  original claim that per-turn recompute is better.
 
-ASCII hyphens only below (these are public-facing drafts).
+That leaves **6 reports to file.**
+
+---
+
+## How to file (the mechanics)
+
+1. Go to <https://github.com/pvpoke/pvpoke/issues/new> (signed in to
+   GitHub). There is no issue template — you get a blank title + body.
+2. Copy a **Title** line below into the title field, and everything
+   from **Body** to the next `---` into the body (it's GitHub-flavored
+   markdown; the Preview tab shows how it renders).
+3. Submit. That's it — labels/assignees are maintainer-side.
+
+Notes:
+
+- The code permalinks in the drafts pin the exact commit
+  (`10fd1a6e4...`), so they stay correct even after master moves.
+  (To make one yourself: open the file on GitHub, press `y` to pin the
+  URL to the current commit, click a line number, copy the URL.)
+- If you file much later than 2026-07: re-check that
+  `git log 10fd1a6e4..master -- src/js/` is still quiet before
+  pasting; the line numbers are only guaranteed at that commit.
+- Matt (Empoleon_Dynamite) is a volunteer on ~two-week dev cycles and
+  says so in the README — expect latency, don't re-ping.
+
+## Etiquette: AI, and how many at once
+
+**AI.** Matt has said (Discord DMs) he doesn't want AI-generated code
+in his hobby projects — he uses plenty of AI at work; this one's for
+him. So:
+
+- **File issues, not PRs.** These drafts deliberately describe fixes
+  in prose instead of providing patches. Don't attach code diffs.
+- **Read and personalize each body before pasting.** These were
+  drafted and verified with heavy AI assistance. The facts are
+  checked, but the words should be yours before they go out under
+  your name — trim anything that doesn't sound like you.
+- **The provenance is honest and worth one line.** All of these were
+  found by cross-checking the Python port against PvPoke — Matt knows
+  the port (it's linked in PvPoke's README) and gave the site/repo
+  his blessing pre-launch. Suggested opener for the first issue you
+  file (adapt freely):
+
+  > Hi Matt — I maintain the Python port of your sim (gopvpsim, the
+  > one in your README). While cross-checking my scores against
+  > PvPoke's I ran into a handful of engine issues; filing them
+  > separately so they're easy to triage. Happy to provide traces or
+  > more repro detail on any of them. (Fair warning: I found these
+  > with a lot of AI assistance on my side, but each one has been
+  > hand-verified against your current master, and I'm not sending
+  > code.)
+
+**Batching.** Don't dump all six the same afternoon. Suggested order,
+highest user-visible impact first:
+
+| Wave | Reports | Why first/later                                                       |
+| ---- | ------- | --------------------------------------------------------------------- |
+| 1    | 3, 7    | Published scores are wrong (winner flips); concrete, repro'd live     |
+| 2    | 1, 5    | Dead-code reports; zero output impact, but easy to confirm by reading |
+| 3    | 4, 2    | Subtler: a value that never reaches its consumer; an intent question  |
+
+Wave 1 now, wave 2 after any response (or ~a cycle later), wave 3
+last. Report 2 especially benefits from going last — it reads best
+once there's already a conversation.
 
 ---
 
@@ -28,13 +91,32 @@ ASCII hyphens only below (these are public-facing drafts).
 **Title:** ActionLogic: BattleState dominance checks read `.hp`/`.shields`
 which don't exist (always-false, dead pruning)
 
-**Where:** `src/js/battle/actions/ActionLogic.js` — the `BattleState`
-class stores `.oppHealth` and `.oppShields` (line ~1187), but the
-dominance checks at lines ~479, ~600, and ~697 compare `.hp` and
-`.shields`. Those properties are never set on BattleState instances,
-so the comparisons evaluate against `undefined` and the prune branch
-never fires. (The dedup check at line ~545 correctly uses
-`.oppHealth`, which is how the mismatch is visible.)
+**Body:**
+
+The `BattleState` class in
+[`src/js/battle/actions/ActionLogic.js`](https://github.com/pvpoke/pvpoke/blob/10fd1a6e43260e59b625d1cf96bbea496672880d/src/js/battle/actions/ActionLogic.js#L1205)
+(line 1205) stores `.oppHealth` (1208) and `.oppShields` (1210), but
+five pruning checks compare `.hp` and `.shields`, which are never set
+on any BattleState:
+
+- line 497: `if (DPQueue[i].hp < 0)` (farm-down insertion prune)
+- lines 618, 666, 715, 761: four identical dominance checks of the form
+  `DPQueue[i].hp <= newOppHealth && ... && DPQueue[i].shields <= newShields`
+
+Since those properties are `undefined`, `undefined < 0` and
+`undefined <= x` are always false, so every prune branch is
+unreachable. (The dedup check at line 563 correctly uses `.oppHealth`,
+which is how the mismatch is visible.) This isn't a refactor artifact:
+the same dead checks exist in the pre-refactor `Battle.js`, so the
+pruning has never fired.
+
+Related: lines 494 and 507 pass `currState.opponentShields` into the
+`new BattleState(...)` constructor — also a nonexistent field (the
+real one is `oppShields`), so farm-down states carry undefined
+shields. Latent today (those states are terminal, so their shields are
+never read), but if the dominance checks are ever renamed to
+`.oppShields`, this must be fixed in the same pass or the "fixed"
+comparisons will still see undefined.
 
 **Impact:** the DP queue's dominance pruning is silently inert.
 Results are still correct (pruning is an optimization), but the DP
@@ -42,161 +124,225 @@ explores states the code clearly intends to discard, and anyone
 reading the code will assume the pruning works.
 
 **Suggested fix:** rename the fields in the checks to
-`.oppHealth`/`.oppShields` — but note that ENABLING the pruning
-changes which plans win ties, so it changes some battle outputs;
-treat as a behavior change, not a cleanup. (We maintain a Python port
-and keep a flag for both behaviors; the "intended" variant also needs
-a buffs term in the comparison to be safe — see report 5's
-relationship to state fields.)
+`.oppHealth`/`.oppShields` and fix the two constructor calls together.
+But note that ENABLING the pruning changes which plans win ties, so it
+changes some battle outputs — treat as a behavior change, not a
+cleanup. (I maintain a Python port and keep a flag for both
+behaviors; the "intended" variant also needs a buffs term in the
+comparison to be safe.)
+
+Possibly related existing issue: #88 (a wrong charged-move decision in
+the same DP area — different bug, since dead pruning can only cost
+work, not decisions).
 
 ---
 
-## Report 2 — bestChargedMove not recomputed when the OPPONENT changes form
+## Report 2 — opponent's bestChargedMove stays pinned to init-time form stats
 
-**Title:** Stale bestChargedMove after opponent form change (Aegislash):
-attacker keeps using the move selected against Shield-form defense
+*(File LAST, and as a question, not a bug claim — see etiquette
+section. Our own experiments could not show either behavior is
+better.)*
 
-**Where:** `src/js/pokemon/Pokemon.js` — `selectBestChargedMove`
-(~line 791) runs at init and caches `bestChargedMove`;
-`changeForm` (~line 2344) calls `resetMoves()` on the form-changer
-itself only. The opponent's cached selection is never refreshed.
+**Title:** bestChargedMove selection asymmetry on form change: the
+form-changer re-selects, the opponent stays pinned to init-time stats
+— intended?
 
-**Repro (simulate mode, Ultra League):** Azumarill
-(Bubble / Ice Beam + Play Rough) vs Aegislash (Shield). At init,
-against Shield form's 272 defense, Ice Beam (DPE 0.273) and Play
-Rough (DPE 0.300) differ by less than the 0.03 threshold, so the
-cheaper Ice Beam is selected. After Aegislash transforms to Blade
-(97 defense), the DPE gap grows to ~0.062 — Play Rough is now clearly
-better — but Azumarill keeps throwing Ice Beam for the rest of the
-battle because the selection was cached against the old form.
+**Body:**
 
-**Impact:** scores in Aegislash (and Mimikyu-class) matchups are
-computed with demonstrably suboptimal move choices for the
-non-form-changing side. In our cross-check the 1v2/2v2 cells shift by
-~134 rating points when the selection is refreshed per-turn.
+`bestChargedMove` is selected in the block at the end of
+[`resetMoves()`](https://github.com/pvpoke/pvpoke/blob/10fd1a6e43260e59b625d1cf96bbea496672880d/src/js/pokemon/Pokemon.js#L791)
+(`Pokemon.js`, selection at lines 791-826, the 0.03 DPE threshold at
+799). In simulate mode that runs once per Pokemon at battle init
+(`Battle.start()` -> `reset()` -> `resetMoves()`). When a form-changer
+transforms, `changeForm` (Pokemon.js:2344) calls `self.resetMoves()`
+(2397) on the form-changer only — so the changer re-selects against
+the opponent's current stats, but the OPPONENT's selection stays
+pinned to the pre-change form's stats for the rest of the battle. No
+in-battle path refreshes it.
 
-**Suggested fix:** on `changeForm`, also invalidate/recompute the
-OPPONENT's `bestChargedMove` (or recompute lazily per decision).
+**Concrete case (Ultra League, IVs pinned because the DPE gap depends
+on them):** Azumarill 4/15/13 at L50 (Bubble / Ice Beam + Play Rough)
+vs Aegislash (Shield). At init, against Shield form's 272 base
+defense, Ice Beam (DPE 0.273) vs Play Rough (DPE 0.300) differ by
+0.027 < 0.03, so the cheaper Ice Beam is selected. After Aegislash
+transforms to Blade (97 base defense) the gap grows to ~0.088 — Play
+Rough is now clearly better — but Azumarill keeps throwing Ice Beam
+because the selection was cached against the old form. (With PvPoke's
+default 15/15/15 Azumarill the same mechanism applies with slightly
+different numbers: 0.309/0.333 at init, gap ~0.082 after the change.)
+
+**Why I'm filing this as a question rather than a bug:** scores in
+these matchups are sensitive to the choice (~134 rating points in the
+1v2/2v2 cells I measured), but when I tried "recompute per decision"
+in my port, a bounding sweep showed it was NOT reliably better — the
+recompute crosses the init-tuned 0.03/0.3 thresholds mid-fight for
+non-strategic reasons, in both directions, including at least one
+winner flip against the recompute. I reverted my port to match your
+freeze. So: is the asymmetry (changer refreshes, opponent doesn't)
+deliberate, or just where the code landed? If deliberate, it might
+deserve a comment; if not, be warned that "fixing" it moves a lot of
+published Aegislash-matchup scores and the selection thresholds would
+probably need retuning.
+
+Possibly related existing issue: #134 (Azumarill locking Ice Beam over
+Play Rough vs Bastiodon — no form change involved, so that one is
+about the init-time selection thresholds themselves).
 
 ---
 
 ## Report 3 — Aegislash selects Gyro Ball over Shadow Ball (same cost, strictly less damage)
 
-**Title:** Aegislash prefers Gyro Ball over Shadow Ball vs Azumarill
-despite identical energy and strictly lower damage
+**Title:** Aegislash throws Gyro Ball over Shadow Ball vs Azumarill
+(identical energy, strictly lower damage) — flips the published winner
 
-**Where:** move selection feeding the charged-move decision
-(`ActionLogic.js` near-KO DP / bestChargedMove area; exact root cause
-unclear from the outside).
+**Body:**
 
-**Repro (simulate mode, Ultra League):** Aegislash (Shield)
-(Psycho Cut / Shadow Ball + Gyro Ball) vs Azumarill, shields 1v2 or
-2v2. Both charged moves cost 50 energy; against Water/Fairy both are
-neutral with STAB, and Shadow Ball does strictly more damage (49 vs
-39 in Shield form, 101 vs 81 in Blade form). PvPoke throws Gyro Ball.
-Removing Gyro Ball from the moveset RAISES Aegislash's 1v2 score from
-376 to 429 — having the strictly-worse move available actively hurts.
+**Repro (simulate mode, Great League, reproduced against master
+10fd1a6e4 on 2026-07-16):** Aegislash (Shield) 4/14/15 (Psycho Cut /
+Shadow Ball + Gyro Ball) vs Azumarill 4/15/13 (Bubble / Ice Beam +
+Play Rough), shields 2v1 or 2v2 (Azumarill's shields first). Both
+charged moves cost 50 energy; against Water/Fairy both are neutral,
+both get STAB, and Shadow Ball does strictly more damage (49 vs 39 in
+Shield form, 101 vs 81 in Blade form). PvPoke throws exactly three
+Gyro Balls and zero Shadow Balls: Aegislash burns both of Azumarill's
+shields on Gyro Ball and lands a third, losing 376-623. Remove Gyro
+Ball from the moveset (Shadow Ball only) and Aegislash WINS the same
+matchup 510-489. Having the strictly-worse move available flips the
+published winner. (Also reproduces in Ultra League at the same IVs:
+442-557 with Gyro Ball, 566-433 without.)
+
+**Root-cause candidate:** `Pokemon.js` ~746-752 blanket-flags ALL of
+`aegislash_shield`'s charged moves as `selfDebuffing` (buffs [0,0]).
+Because BOTH moves carry the flag, ActionLogic's same-energy /
+higher-DPE swap corrections (~905-925) never fire, and the decision
+routes through the self-debuff stacking branch — the decision log
+shows "doesn't use Gyro Ball because it wants to minimize time
+debuffed and it can stack the move 2 times". With shields up, every
+charged move does 1 damage, so the DP plans tie and move ordering
+picks Gyro Ball, with no guard left to prefer the strictly-stronger
+Shadow Ball.
 
 **Impact:** published Aegislash matchup numbers are measurably below
-what its own moveset supports; "more moves can only help" intuition
-is violated.
+what its own moveset supports, including outright winner flips;
+"more moves can only help" is violated.
 
-**Winner-flip evidence (found 2026-06-12, Great League):** Azumarill
-(Bubble / Ice Beam + Play Rough, 4/15/13) vs Aegislash (Shield)
-(4/14/15), shields 2v1 and 2v2: the simulator reports Azumarill
-WINNING 623-376 because Aegislash burns both of Azumarill's shields
-on Gyro Ball and then lands a third Gyro Ball instead of Shadow
-Balls. With Shadow Ball selected (identical 50 energy, strictly more
-damage), Aegislash wins the same matchup 510-489. The bug does not
-just shave score margins - it flips published matchup outcomes.
+Possibly related existing issues: #47 (adding a third move worsens
+rankings — maintainer-acknowledged umbrella) and #149 (same-energy
+charged-move order affects results).
 
 ---
 
 ## Report 4 — initializeMove's buff-adjusted DPE is immediately overwritten
 
 **Title:** Buff-adjusted move.dpe computed in initializeMove never
-reaches the bait/ratio logic (overwritten by selectBestChargedMove)
+reaches the bait/ratio logic (reset at the end of resetMoves)
 
-**Where:** `src/js/pokemon/Pokemon.js`. `initializeMove`
-(~lines 849-864) computes a buff multiplier that inflates `move.dpe`
-for self-attack-buffing and opponent-defense-debuffing moves. But
-`selectBestChargedMove` (~lines 791-796), called inside the same
-`resetMoves()` flow, immediately resets `move.dpe = move.damage /
-move.energy` for every active charged move. The buff-adjusted value
-therefore only influences the activeChargedMoves priority shuffle
-(lines ~711-787); it never reaches the bait-wait ratio check
-(`ActionLogic.js:843`) or any later consumer, although the code reads
-as if it should.
+**Body:**
 
-**Impact:** baiting decisions treat e.g. Power-Up Punch and a plain
-move of equal raw DPE identically, even though the init code clearly
-intends the buff move to look more valuable.
+In
+[`src/js/pokemon/Pokemon.js`](https://github.com/pvpoke/pvpoke/blob/10fd1a6e43260e59b625d1cf96bbea496672880d/src/js/pokemon/Pokemon.js#L849),
+`initializeMove` (function at 831-871) computes a buff multiplier
+(lines 849-865, using the gamemaster's `buffDivisor`) that inflates
+`move.dpe` for self-attack-buffing and opponent-defense-debuffing
+moves, e.g. Power-Up Punch. But later in the same `resetMoves()` body,
+lines 791-796 reset `move.dpe = move.damage / move.energy` for
+`bestChargedMove` and every active charged move.
 
-**Suggested fix:** either reorder so the buff adjustment is applied
-after the reset, or apply the multiplier inside
-`selectBestChargedMove` itself.
+So the buff-adjusted value influences exactly one thing: the
+activeChargedMoves priority shuffle (711-789, which reads it at 735
+and 758). It never reaches the bait-wait ratio check
+(`src/js/battle/actions/ActionLogic.js:844`) or any other
+battle-simulation consumer — those all read the post-reset raw value.
+And since `Battle.start()` calls `poke.reset()` -> `resetMoves()` for
+every battle, there's no path where a battle sees the adjusted value.
+
+One inconsistency worth noting: moves in the charged-move POOL that
+aren't currently selected keep their buff-adjusted dpe (the reset only
+touches active moves), and `generateMoveUsage` (1052, 1097) reads
+pool-wide dpe — so that code sees adjusted values for unselected moves
+and raw values for selected ones.
+
+**Impact:** the DPE comparisons in baiting decisions treat e.g.
+Power-Up Punch and a plain move of equal raw DPE identically — buff
+awareness only enters via the coarse boolean `selfBuffing` flags,
+although the init code reads as if the adjusted DPE should matter.
+
+**Suggested fix:** either apply the buff adjustment after (or inside)
+the reset loop at 791-796, or drop the adjustment in initializeMove if
+the reset is the intended behavior. One caution: the reset feeds the
+bestChargedMove selection thresholds right below it (798-822), so a
+fix needs to decide which consumers are meant to see buff-adjusted
+DPE.
+
+Possibly related existing issues: #34 (Acid Spray's debuff not valued
+in move selection — the user-visible symptom of exactly this) and
+#149.
 
 ---
 
 ## Report 5 — needsBoost / non-guaranteed-buff plan selection is dead code
 
 **Title:** ActionLogic: the chance-buff plan-selection system
-(changeTTKChance / stateList / needsBoost) is fully inert in simulate mode
+(changeTTKChance / stateList / needsBoost) is fully inert
 
-**Where:** `src/js/battle/actions/ActionLogic.js`, decideAction DP:
+**Body:**
 
-1. Line ~539: `changeTTKChance = 0;` runs unconditionally (comment:
-   "DISABLE THE NON-GUARANTEED BUFF EVALUATION SYSTEM") AFTER lines
-   ~519-536 set it from the move's buffApplyChance. Every chance-<1
-   DPQueue push (lines ~613, 631, 661, 680, 710, 728, 756, 774) is
-   gated on `changeTTKChance != 0`, which is now always false — so
-   `stateList` only ever accumulates chance-1 plans.
-2. `needsBoost` is declared `false` (line ~793) and never assigned
-   `true` anywhere in the file, so the plan-reorder gate at line ~868
-   (`if (!needsBoost)`) is inert.
+In
+[`src/js/battle/actions/ActionLogic.js`](https://github.com/pvpoke/pvpoke/blob/10fd1a6e43260e59b625d1cf96bbea496672880d/src/js/battle/actions/ActionLogic.js#L539),
+decideAction's DP:
 
-**Empirical confirmation:** across all 9 shield scenarios for the
-four GL meta species whose default moveset carries a
-0 < buffApplyChance < 1 charged move (Tinkaton + Bulldoze,
-Corviknight + Air Cutter, Clefable + Moonblast, Drapion + Crunch),
-the "needs the BOOST" decision-log message fires 0 times in 36 sims.
+1. Line 539: `changeTTKChance = 0;` runs unconditionally (comment at
+   538: "DISABLE THE NON-GUARANTEED BUFF EVALUATION SYSTEM") AFTER
+   lines 519-536 set it from the move's `buffApplyChance`. Every
+   chance-<1 DPQueue push (gates at 613, 631, 661, 679, 710, 728, 756,
+   774) requires `changeTTKChance != 0`, which is now always false —
+   so every DP state stays at chance 1.
+2. That makes the "needs the BOOST" branch statically unreachable, not
+   just empirically rare: `stateList` is pushed only at 448 and the
+   loop breaks on the first chance-1 KO state (450-451), so it can
+   never hold two plans, and the else-if at 796 (log line 804) needs
+   at least two. Consistent with that, `needsBoost` is declared
+   `false` (793) and never assigned `true` anywhere, so the
+   plan-reorder gate at 868 (`if (!needsBoost)`) always passes.
+3. Small tell that the branch has never run: line 800 compares
+   `stateList[i].chance > bestPlan` — a number against a BattleState
+   object (presumably meant to be `bestPlan.chance`). It can't throw
+   because it can't execute.
+
+**Empirical cross-check:** across all 9 shield scenarios for the four
+GL meta species whose default moveset carries a
+0 < buffApplyChance < 1 charged move (Tinkaton + Bulldoze, Corviknight
++ Air Cutter, Clefable + Moonblast, Drapion + Crunch), the "needs the
+BOOST" decision-log message fires 0 times in 36 sims.
 
 **Impact:** none on outputs today (the system is disabled), but the
 ~100 lines of accumulation/reorder machinery read as live logic and
 the disabling line is easy to miss. Either the disable is intentional
-(then the machinery could be removed) or line 539 is a leftover
-debugging kill-switch (then re-enabling changes plan selection for
-chance-buff movesets).
+(then the machinery could be removed, including the line-800 latent
+bug) or line 539 is a leftover kill-switch (then re-enabling changes
+plan selection for chance-buff movesets). This also affects the
+TrainingAI path, which calls decideAction too.
 
 ---
 
-## Report 6 — Blade-to-Shield reverse level computation can index past the CPM table
+## Report 6 — RETRACTED 2026-07-16: do not file
 
-**Title:** getFormStats (aegislash_shield branch): level overshoot
-can read past the end of the CPM array (undefined CPM)
-
-**Where:** `src/js/pokemon/Pokemon.js`, `getFormStats` (~line 2455).
-The aegislash_shield branch starts the Shield-form level at
-`blade_level / 0.5 + 2` (Great League) as a deliberate overshoot,
-then walks down whole levels until the CP fits.
-
-**Problem:** a low-IV Blade-form focal caps at level 25 in Great
-League (whole-level rule), so the raw start is 25 / 0.5 + 2 = 52 —
-past the end of the CPM table (max 51). `cpms[index]` then yields
-`undefined`, the computed CP is NaN, and the walk-down loop's behavior
-depends on NaN comparisons rather than real values. JS happens to
-survive this (NaN fails the fits-check so the loop keeps stepping
-down), but the first iterations operate on garbage and the code only
-works by accident.
-
-**Repro:** any Aegislash (Blade) build whose Blade level lands at 25
-in GL (e.g. low-attack IV spreads), then inspect getFormStats'
-intermediate values for the shield form.
-
-**Suggested fix:** clamp the starting level to the CPM table maximum
-(the walk-down from 51 reaches the same fixed point). Found
-2026-06-11 when the same overshoot crashed our (eagerly-validating)
-Python port with `KeyError: 52.0`.
+The 2026-06-11 draft claimed PvPoke's Blade->Shield reverse-level
+overshoot (`blade_level / 0.5 + 2` in GL -> level 52 for a low-IV
+Blade) reads past the CPM table. **False:** PvPoke's `cpms` array
+(Pokemon.js:24) has 109 entries covering levels 1..55 via
+`index = (level - 1) * 2`; level 52 -> `cpms[102]` = 0.8503..., a
+defined value. Genuinely overshooting PvPoke's table would need a
+Blade level > 26.5, unreachable under 1500 CP. The 2026-06-11
+`KeyError: 52.0` was OUR bug — gopvpsim's CPM table stops at 51 — and
+our clamp fix (`_aegislash_shield_level`, pinned by
+`tests/test_pokemon.py::TestAegislashShieldLevelOverflow`) remains
+correct for us. The draft's fallback claim (NaN comparisons in the
+walk-down) was also wrong: an out-of-range level would give
+`cpms.indexOf(undefined) = -1`, the `cpmIndex >= 0` guard skips the
+loop, and `changeForm` would throw a TypeError — no NaN path exists.
+DEVELOPER_NOTES "Known divergences" item 3 has been corrected to
+match.
 
 ---
 
@@ -205,26 +351,48 @@ Python port with `KeyError: 52.0`.
 **Title:** Morpeko sticks in Hangry form after the first charged move
 (gamemaster says type "toggle"; in-game it toggles every charged move)
 
-**Where:** `src/js/battle/Battle.js` line ~1536: the post-attack
-charged-move form trigger is gated on
-`attacker.activeFormId != attacker.formChange.alternativeFormId`, and
-the `morpeko_hangry` gamemaster entry carries no `formChange` of its
-own. The first charged move flips Full Belly -> Hangry; once in
-Hangry, the guard fails and no reverse trigger exists, so Morpeko
-never toggles back (it only resets on switch via `resetOnSwitch`).
+**Body:**
 
-**Ground truth:** the gamemaster's own entry says
+[`src/js/battle/Battle.js:1536`](https://github.com/pvpoke/pvpoke/blob/10fd1a6e43260e59b625d1cf96bbea496672880d/src/js/battle/Battle.js#L1536):
+the post-attack charged-move form trigger is gated on
+`attacker.activeFormId != attacker.formChange.alternativeFormId`, and
+`changeForm` (Pokemon.js:2344) only overwrites `this.formChange` when
+the target form has its own (`if(form?.formChange)`, 2355) — which
+`morpeko_hangry` doesn't (no `formChange` in the gamemaster). So the
+first charged move flips Full Belly -> Hangry; after that,
+`activeFormId == alternativeFormId` and the guard is false forever.
+Morpeko never toggles back (it only resets on switch via
+`resetOnSwitch`). Grep confirms nothing in `src/js` consumes
+`formChange.type == "toggle"` at all.
+
+**Ground truth:** the gamemaster's own `morpeko_full_belly` entry says
 `type: "toggle", trigger: "charged_move", moveId: "ANY"`, and in-game
-verification (2026-06-06) confirms Morpeko enters every battle in
-Full Belly and toggles after EVERY charged move (Aura Wheel swaps
+verification (2026-06-06) confirms Morpeko enters every battle in Full
+Belly and toggles after EVERY charged move (Aura Wheel swaps
 Electric/Dark accordingly).
 
-**Impact:** score-relevant whenever Morpeko throws an unshielded
-2nd-or-later Aura Wheel against an opponent where Electric vs Dark
-effectiveness differs (e.g. Electric is super-effective on Water,
-Dark is not). Published Morpeko numbers are wrong in those matchups.
+**History (why this looks like a regression, not a decision):**
+f0eac2fca (2024-10-02, "Reworked Morpeko form change") implemented a
+working toggle — `changeForm()` computed the target from
+`defaultFormId`/`alternativeFormId` when `type == "toggle"`. The
+Aegislash form-change rework later broke it, and df75572b7
+(2025-07-25, "Fixed Morpeko": "Morpeko's form is now explicitly set
+rather than toggled") removed the toggle branch and restored only the
+first flip — while the gamemaster still declares the toggle.
 
-**Suggested fix:** the line-1536 guard was evidently written for
-genuinely one-way changers (Aegislash, Mimikyu); for
-`type: "toggle"` form changes, allow the trigger to fire from either
-form (or give the alternate-form entry the reverse formChange).
+**Impact:** score-relevant whenever Morpeko throws an unshielded Aura
+Wheel as its 3rd-or-later charged move on an odd slot (i.e. after an
+even number of prior charged moves since entry) against an opponent
+where Electric vs Dark effectiveness differs — in-game that Aura Wheel
+is Electric (toggled back to Full Belly); in PvPoke it stays Dark
+(stuck Hangry). Published Morpeko numbers are wrong in those
+matchups. (The 2nd consecutive charged move doesn't diverge — both
+sims are in Hangry for that one.)
+
+**Suggested fix:** for `type: "toggle"` form changes, let the trigger
+fire from either form (compute the target as "the form I'm not in", as
+the 2024 implementation did) — the current guard was evidently written
+for genuinely one-way changers like Aegislash and Mimikyu.
+
+(Not related to #330, which is a sandbox/timeline input bug that
+happens to involve Morpeko.)

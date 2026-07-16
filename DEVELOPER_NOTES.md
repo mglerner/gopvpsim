@@ -354,10 +354,13 @@ Where the constants live (single source of truth per language):
 <!-- sync:pvpoke_bugs_documented -->5<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8 —
 numbering reflects discovery order; section 4 was retracted 2026-04-15
 and is excluded from the count). **Paste-ready GitHub-issue drafts for
-filing upstream live in `docs/pvpoke_bug_reports.md`** (7 reports:
-these five plus the initializeMove DPE-overwrite and the
-Blade→Shield CPM-table overflow, both 2026-06-11; filing is
-Michael's action, no urgency).
+filing upstream live in `docs/pvpoke_bug_reports.md`** (6 fileable
+reports: these five plus the initializeMove DPE-overwrite; the
+Blade→Shield CPM-table overflow draft was RETRACTED 2026-07-16 —
+PvPoke's cpms table reaches level 55, the overflow was ours alone. All
+6 re-verified 2026-07-16 against pvpoke master `10fd1a6e4` by an
+adversarial verify/refute/dedup workflow; the doc now carries a filing
+guide. Filing is Michael's action, no urgency).
 
 ### 1. BattleState .hp/.oppHealth naming inconsistency
 
@@ -876,19 +879,22 @@ explained by Caleb Peng). When choosing which Aegislash to power up,
 players need to check that the Blade form level lands on a favorable
 whole number.
 
-**3. The Blade->Shield reverse level formula overflows the CPM table.**
+**3. The Blade->Shield reverse level formula overflows OUR CPM table
+(not PvPoke's).**
 PvPoke's `getFormStats()` aegislash_shield branch overshoots the Shield
 level (`blade_level / 0.5 + 2` in GL) then walks down until CP fits. A
 low-IV Blade focal caps at level 25 in GL, putting the raw start at 52 —
-past the CPM table end (max 51.0). PvPoke computes form stats lazily and
-JS yields `undefined` there (a latent bug); we build per-IV
-`FormChangeConfig`s eagerly, so the first post-S1 Aegislash (Blade) GL
-dive crashed with `KeyError: 52.0` (2026-06-11). Fix:
+past OUR CPM table end (max 51.0), so the first post-S1 Aegislash
+(Blade) GL dive crashed with `KeyError: 52.0` (2026-06-11) when building
+per-IV `FormChangeConfig`s eagerly. PvPoke is unaffected: its cpms array
+covers levels 1..55, so 52 is a defined entry (verified 2026-07-16; the
+earlier "latent PvPoke bug" reading here was wrong, and bug-report draft
+6 was retracted accordingly — see `docs/pvpoke_bug_reports.md`). Fix:
 `_aegislash_shield_level` clamps its start to `max(CPM)`. Pinned by
 `tests/test_pokemon.py::TestAegislashShieldLevelOverflow`. Blade really
 reverts to Shield in-battle (`activate_shield`), so this is load-bearing.
-(Our clamp is the defensible choice — levels above 51 don't exist in-game
-— though PvPoke's cpms table actually reaches 55; see round-2 FC-2.)
+(Our clamp is the defensible choice — levels above 51 don't exist in-game;
+see round-2 FC-2.)
 
 **4. A fast landing after a mid-flight revert credits the CURRENT form's
 energy (FIXED 2026-07-03, FC-1).** When Aegislash (Blade) shields a
