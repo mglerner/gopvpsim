@@ -243,10 +243,6 @@ changes some battle outputs. (My Python port keeps a flag for both
 behaviors; the "intended" variant also needs a buffs term in the
 comparison to be safe.)
 
-Possibly related existing issue: #88 (a wrong charged-move decision in
-the same DP area - different bug, since dead pruning can only cost
-work, not decisions).
-
 ---
 
 ## 4th to file - Report 5 - needsBoost / non-guaranteed-buff plan selection is dead code
