@@ -185,14 +185,21 @@ Aegislash form-change rework later broke it, and df75572b7
 rather than toggled") removed the toggle branch and restored only the
 first flip — while the gamemaster still declares the toggle.
 
-**Impact:** score-relevant whenever Morpeko throws an unshielded Aura
-Wheel as its 3rd-or-later charged move on an odd slot (i.e. after an
-even number of prior charged moves since entry) against an opponent
-where Electric vs Dark effectiveness differs — in-game that Aura Wheel
-is Electric (toggled back to Full Belly); in PvPoke it stays Dark
-(stuck Hangry). Published Morpeko numbers are wrong in those
-matchups. (The 2nd consecutive charged move doesn't diverge — both
-sims are in Hangry for that one.)
+**Impact:** the game and the sim agree on Morpeko's first two charged
+moves — the first is thrown from Full Belly, the second from Hangry,
+either way. They come apart starting with the third:
+
+- In-game, the form flips after every charged move, so (counting from
+  when Morpeko enters the field) odd-numbered charged moves come from
+  Full Belly and Aura Wheel is Electric; even-numbered ones come from
+  Hangry and it's Dark.
+- In PvPoke, Morpeko flips to Hangry once and stays there, so the
+  3rd, 5th, ... Aura Wheels are Dark when they should be Electric.
+
+Whenever one of those should-be-Electric Aura Wheels lands unshielded
+against an opponent where Electric and Dark effectiveness differ
+(e.g. a Water type: weak to Electric, neutral to Dark), the published
+Morpeko numbers are wrong.
 
 **Suggested fix:** for `type: "toggle"` form changes, let the trigger
 fire from either form (compute the target as "the form I'm not in", as
@@ -406,16 +413,26 @@ the opponent's current stats, but the OPPONENT's selection stays
 pinned to the pre-change form's stats for the rest of the battle. No
 in-battle path refreshes it.
 
-**Concrete case (Ultra League, IVs pinned because the DPE gap depends
-on them):** Azumarill 4/15/13 at L50 (Bubble / Ice Beam + Play Rough)
-vs Aegislash (Shield). At init, against Shield form's 272 base
-defense, Ice Beam (DPE 0.273) vs Play Rough (DPE 0.300) differ by
-0.027 < 0.03, so the cheaper Ice Beam is selected. After Aegislash
-transforms to Blade (97 base defense) the gap grows to ~0.088 — Play
-Rough is now clearly better — but Azumarill keeps throwing Ice Beam
-because the selection was cached against the old form. (With PvPoke's
-default 15/15/15 Azumarill the same mechanism applies with slightly
-different numbers: 0.309/0.333 at init, gap ~0.082 after the change.)
+**Concrete case (Ultra League):**
+
+- The matchup: Azumarill, IVs 4/15/13 at level 50, running Bubble
+  with Ice Beam + Play Rough, against Aegislash (Shield form). (The
+  specific IVs matter because the damage-per-energy numbers below
+  depend on Azumarill's attack stat.)
+- At battle start, Azumarill picks its best charged move against
+  Shield form's 272 base defense: Ice Beam gives 0.273 damage per
+  energy, Play Rough gives 0.300. The gap (0.027) is under the 0.03
+  threshold, so the sim takes the cheaper Ice Beam.
+- Then Aegislash transforms to Blade form, whose base defense is only
+  97. Against that, the gap grows to about 0.088 — Play Rough is now
+  clearly the better move.
+- But Azumarill keeps throwing Ice Beam for the rest of the battle,
+  because its selection was cached against the old form and nothing
+  refreshes it.
+
+(With PvPoke's default 15/15/15 Azumarill the same thing happens with
+slightly different numbers: 0.309 vs 0.333 at the start, a gap of
+about 0.082 after the transform.)
 
 **Why I'm filing this as a question rather than a bug:** scores in
 these matchups are sensitive to the choice (~134 rating points in the
