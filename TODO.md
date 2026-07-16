@@ -342,18 +342,18 @@ The S7 dead-code removal pass ran 2026-06-12 (see CHANGELOG). Still open
 
 ## Battle simulator
 
-* **File PvPoke bug reports** *(NO URGENCY — Michael's explicit call
-  2026-06-11: he'll file when he has time to engage with any upstream
-  responses; do not nag)* — paste-ready GitHub-issue drafts live in
-  `docs/pvpoke_bug_reports.md` (2026-06-11): 7 curated reports
-  — the list below minus the retracted Mimikyu timing item (#5, our
-  own logging artifact) and the debunked-premise bestChargedMove item
-  (#2, initializeMove DOES set move.damage at init; the real issue
-  there is the DPE-overwrite, drafted as report 4) — plus the new
-  Blade→Shield CPM-table overflow found 2026-06-11. Filing them
-  upstream is Michael's action. (The discovery list formerly
-  enumerated here duplicated DEVELOPER_NOTES "PvPoke bugs found"
-  and the drafts doc — those two are the sources of truth.)
+* **File PvPoke bug reports** *(ready to file as of 2026-07-16;
+  Michael's action, no nagging)* — `docs/pvpoke_bug_reports.md` now
+  carries a filing guide (mechanics, AI etiquette per Matt's stance,
+  suggested 3-wave order) plus 6 paste-ready drafts, all re-verified
+  2026-07-16 against pvpoke master `10fd1a6e4` by an adversarial
+  verify/refute/dedup workflow (line numbers re-derived, Report 3
+  re-run live against PvPoke's engine, tracker searched — no
+  duplicates). The Blade→Shield CPM-table overflow draft (report 6)
+  was RETRACTED — PvPoke's cpms table reaches 55; the overflow was
+  ours alone (DEVELOPER_NOTES divergence item 3 corrected to match).
+  If filing long after 2026-07, re-check `git log 10fd1a6e4..master
+  -- src/js/` first.
 
 * **Known PvPoke divergences** — DEVELOPER_NOTES "Known divergences"
   is the single source of truth (bestChargedMove per-turn recompute,
