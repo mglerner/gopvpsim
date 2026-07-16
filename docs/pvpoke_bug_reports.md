@@ -26,11 +26,16 @@ Changes from the 2026-06-11 draft set:
   the knife-edge cells ("3 turns of difference can flip this
   scenario") are where site and harness disagree, so the report
   describes behavior, not scores.
+- **Report 5 is reframed as a question** (2026-07-16): the caps-lock
+  disable comment at ActionLogic.js:538 is clearly deliberate, so the
+  report now asks whether the system is retired or coming back, and
+  carries the two faults that would keep it inert even if re-enabled.
+  Michael is probably holding it out of the initial batch.
 
-That leaves **6 reports, all being filed 2026-07-16**, presented below
-in filing order. (Report numbers are our internal names, kept stable
-because DEVELOPER_NOTES references them; the section order is the
-order to file.)
+That leaves **5 reports being filed 2026-07-16**, presented below in
+filing order, plus the held-back Report 5 question at the end. (Report
+numbers are our internal names, kept stable because DEVELOPER_NOTES
+references them; the section order is the order to file.)
 
 ---
 
@@ -76,7 +81,7 @@ read as yours.
 > Python port/etc). While I was building that, I ran into a handful of
 > issues. I found them with a lot of AI assistance, so I'm filing them
 > as bug reports but not sending along any AI-generated code. I'm
-> happy to provide more detail/etc. I'm filing 6 reports today, but I
+> happy to provide more detail/etc. I'm filing 5 reports today, but I
 > know you batch things up, so I'm including this as a header for each
 > of them in case it's useful.
 
@@ -86,9 +91,9 @@ so the first issue Matt opens motivates the rest):
 1. Report 3 - Gyro Ball over Shadow Ball (behavior reproduced on pvpoke.com)
 2. Report 7 - Morpeko one-way form change (behavior reproduced on pvpoke.com)
 3. Report 1 - dead dominance pruning (easy to confirm by reading)
-4. Report 5 - inert needsBoost system (easy to confirm by reading)
-5. Report 4 - buff-adjusted DPE overwritten (subtler code-flow issue)
-6. Report 2 - bestChargedMove asymmetry (a question, reads best last)
+4. Report 4 - buff-adjusted DPE overwritten (subtler code-flow issue)
+5. Report 2 - bestChargedMove asymmetry (a question, reads best last)
+6. Report 5 - retired-or-returning question (probably NOT filing today)
 
 ---
 
@@ -103,7 +108,7 @@ Hey, this is Michael/TitanTrainers15, the guy who does gopvpsim (the
 Python port/etc). While I was building that, I ran into a handful of
 issues. I found them with a lot of AI assistance, so I'm filing them
 as bug reports but not sending along any AI-generated code. I'm happy
-to provide more detail/etc. I'm filing 6 reports today, but I know you
+to provide more detail/etc. I'm filing 5 reports today, but I know you
 batch things up, so I'm including this as a header for each of them in
 case it's useful.
 
@@ -154,7 +159,7 @@ Hey, this is Michael/TitanTrainers15, the guy who does gopvpsim (the
 Python port/etc). While I was building that, I ran into a handful of
 issues. I found them with a lot of AI assistance, so I'm filing them
 as bug reports but not sending along any AI-generated code. I'm happy
-to provide more detail/etc. I'm filing 6 reports today, but I know you
+to provide more detail/etc. I'm filing 5 reports today, but I know you
 batch things up, so I'm including this as a header for each of them in
 case it's useful.
 
@@ -202,7 +207,7 @@ Hey, this is Michael/TitanTrainers15, the guy who does gopvpsim (the
 Python port/etc). While I was building that, I ran into a handful of
 issues. I found them with a lot of AI assistance, so I'm filing them
 as bug reports but not sending along any AI-generated code. I'm happy
-to provide more detail/etc. I'm filing 6 reports today, but I know you
+to provide more detail/etc. I'm filing 5 reports today, but I know you
 batch things up, so I'm including this as a header for each of them in
 case it's useful.
 
@@ -245,58 +250,7 @@ comparison to be safe.)
 
 ---
 
-## 4th to file - Report 5 - needsBoost / non-guaranteed-buff plan selection is dead code
-
-**Title:** ActionLogic: the chance-buff plan-selection system
-(changeTTKChance / stateList / needsBoost) is inert
-
-**Body:**
-
-Hey, this is Michael/TitanTrainers15, the guy who does gopvpsim (the
-Python port/etc). While I was building that, I ran into a handful of
-issues. I found them with a lot of AI assistance, so I'm filing them
-as bug reports but not sending along any AI-generated code. I'm happy
-to provide more detail/etc. I'm filing 6 reports today, but I know you
-batch things up, so I'm including this as a header for each of them in
-case it's useful.
-
-In
-[`src/js/battle/actions/ActionLogic.js`](https://github.com/pvpoke/pvpoke/blob/10fd1a6e43260e59b625d1cf96bbea496672880d/src/js/battle/actions/ActionLogic.js#L539),
-decideAction's DP:
-
-1. Line 539: `changeTTKChance = 0;` runs unconditionally (comment at
-   538: "DISABLE THE NON-GUARANTEED BUFF EVALUATION SYSTEM") AFTER
-   lines 519-536 set it from the move's `buffApplyChance`. Every
-   chance-<1 DPQueue push (gates at 613, 631, 661, 679, 710, 728, 756,
-   774) requires `changeTTKChance != 0`, which is now always false -
-   so every DP state stays at chance 1.
-2. That makes the "needs the BOOST" branch statically unreachable, not
-   just empirically rare: `stateList` is pushed only at 448 and the
-   loop breaks on the first chance-1 KO state (450-451), so it can
-   never hold two plans, and the else-if at 796 (log line 804) needs
-   at least two. Consistent with that, `needsBoost` is declared
-   `false` (793) and never assigned `true` anywhere, so the
-   plan-reorder gate at 868 (`if (!needsBoost)`) always passes.
-3. Small tell that the branch has never run: line 800 compares
-   `stateList[i].chance > bestPlan` - a number against a BattleState
-   object (presumably meant to be `bestPlan.chance`). It can't throw
-   because it can't execute.
-
-**Empirical cross-check:** across all 9 shield scenarios for the four
-GL meta species whose default moveset carries a
-0 < buffApplyChance < 1 charged move (Tinkaton + Bulldoze, Corviknight
-+ Air Cutter, Clefable + Moonblast, Drapion + Crunch), the "needs the
-BOOST" decision-log message fires 0 times in 36 sims.
-
-**Impact:** none on outputs today (the system is disabled), but the
-~100 lines of accumulation/reorder machinery read as live logic and
-the disabling line is easy to miss. If line 539 is ever removed, plan
-selection changes for chance-buff movesets. This also affects the
-TrainingAI path, which calls decideAction too.
-
----
-
-## 5th to file - Report 4 - initializeMove's buff-adjusted DPE is immediately overwritten
+## 4th to file - Report 4 - initializeMove's buff-adjusted DPE is immediately overwritten
 
 **Title:** Buff-adjusted move.dpe computed in initializeMove never
 reaches the bait/ratio logic (reset at the end of resetMoves)
@@ -307,7 +261,7 @@ Hey, this is Michael/TitanTrainers15, the guy who does gopvpsim (the
 Python port/etc). While I was building that, I ran into a handful of
 issues. I found them with a lot of AI assistance, so I'm filing them
 as bug reports but not sending along any AI-generated code. I'm happy
-to provide more detail/etc. I'm filing 6 reports today, but I know you
+to provide more detail/etc. I'm filing 5 reports today, but I know you
 batch things up, so I'm including this as a header for each of them in
 case it's useful.
 
@@ -351,11 +305,11 @@ in move selection - the user-visible symptom of exactly this) and
 
 ---
 
-## 6th to file - Report 2 - opponent's bestChargedMove stays pinned to init-time form stats
+## 5th to file - Report 2 - opponent's bestChargedMove stays pinned to init-time form stats
 
-*(Last on purpose: it's a question, not a bug claim - our own
-experiments could not show either behavior is better, and it reads
-best once the other five have set the context.)*
+*(Last of today's batch on purpose: it's a question, not a bug claim -
+our own experiments could not show either behavior is better, and it
+reads best once the other four have set the context.)*
 
 **Title:** bestChargedMove selection asymmetry on form change: the
 form-changer re-selects, the opponent stays pinned to init-time stats
@@ -367,11 +321,11 @@ Hey, this is Michael/TitanTrainers15, the guy who does gopvpsim (the
 Python port/etc). While I was building that, I ran into a handful of
 issues. I found them with a lot of AI assistance, so I'm filing them
 as bug reports but not sending along any AI-generated code. I'm happy
-to provide more detail/etc. I'm filing 6 reports today, but I know you
+to provide more detail/etc. I'm filing 5 reports today, but I know you
 batch things up, so I'm including this as a header for each of them in
 case it's useful.
 
-Unlike the other five, this one is a question about intent rather than
+Unlike the other four, this one is a question about intent rather than
 a bug claim.
 
 `bestChargedMove` is selected in the block at the end of
@@ -420,6 +374,58 @@ change here would move a lot of published Aegislash matchup scores.
 Possibly related existing issue: #134 (Azumarill locking Ice Beam over
 Play Rough vs Bastiodon - no form change involved, so that one is
 about the init-time selection thresholds themselves).
+
+---
+
+## Holding back for now - Report 5 - is the chance-buff plan-selection system retired?
+
+*(Reframed 2026-07-16: the caps-lock disable comment at
+ActionLogic.js:538 is clearly deliberate, so this is a question, not a
+bug claim. Michael is probably NOT filing it in the initial batch. If
+filed on a later day, adjust the opener paragraph - its "5 reports
+today" line belongs to the 2026-07-16 batch.)*
+
+**Title:** Question: is the chance-buff plan-selection system
+(changeTTKChance / stateList / needsBoost) retired for good?
+
+**Body:**
+
+Hey, this is Michael/TitanTrainers15, the guy who does gopvpsim (the
+Python port/etc). While I was building that, I ran into a handful of
+issues. I found them with a lot of AI assistance, so I'm filing them
+as bug reports but not sending along any AI-generated code. I'm happy
+to provide more detail/etc. I'm filing 5 reports today, but I know you
+batch things up, so I'm including this as a header for each of them in
+case it's useful.
+
+In
+[`src/js/battle/actions/ActionLogic.js`](https://github.com/pvpoke/pvpoke/blob/10fd1a6e43260e59b625d1cf96bbea496672880d/src/js/battle/actions/ActionLogic.js#L539),
+line 539 sets `changeTTKChance = 0;` unconditionally, right under the
+comment "DISABLE THE NON-GUARANTEED BUFF EVALUATION SYSTEM" (538) and
+right after lines 519-536 set it from the move's `buffApplyChance`.
+That reads like a deliberate off-switch, so this is a question rather
+than a bug report: is the system permanently retired, or meant to come
+back someday?
+
+The reason I ask: while porting the code I found that the kill line
+isn't the only thing keeping the system off. If line 539 were removed,
+two more faults would still keep it inert:
+
+1. `needsBoost` is declared `false` (793) and never assigned `true`
+   anywhere in the file, so the plan-reorder gate at 868
+   (`if (!needsBoost)`) always passes; the branch that picks
+   `bestPlan` (796) never sets the flag.
+2. Line 800 compares `stateList[i].chance > bestPlan` - a number
+   against a BattleState object (presumably meant to be
+   `bestPlan.chance`). It can't throw today because it can't execute:
+   `stateList` is pushed only at 448 and the loop breaks on the first
+   chance-1 KO state (450-451), so it never holds the two plans the
+   else-if at 796 needs.
+
+If the system is retired for good, the ~100 lines of accumulation and
+reorder machinery now read as live logic with an off-switch that's
+easy to miss. If it's coming back, the two items above are the actual
+bug report.
 
 ---
 
