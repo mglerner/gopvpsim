@@ -345,7 +345,8 @@ The S7 dead-code removal pass ran 2026-06-12 (see CHANGELOG). Still open
 * **File PvPoke bug reports** *(ready to file as of 2026-07-16;
   Michael's action, no nagging)* — `docs/pvpoke_bug_reports.md` now
   carries a filing guide (mechanics, AI etiquette per Matt's stance,
-  suggested 3-wave order) plus 6 paste-ready drafts, all re-verified
+  same-day filing order with Michael's opener embedded in each body)
+  plus 6 paste-ready drafts, all re-verified
   2026-07-16 against pvpoke master `10fd1a6e4` by an adversarial
   verify/refute/dedup workflow (line numbers re-derived, Report 3
   re-run live against PvPoke's engine, tracker searched — no
