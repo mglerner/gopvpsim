@@ -342,19 +342,25 @@ The S7 dead-code removal pass ran 2026-06-12 (see CHANGELOG). Still open
 
 ## Battle simulator
 
-* **File PvPoke bug reports** *(ready to file as of 2026-07-16;
-  Michael's action, no nagging)* — `docs/pvpoke_bug_reports.md` now
-  carries a filing guide (mechanics, AI etiquette per Matt's stance,
-  same-day filing order with Michael's opener embedded in each body)
-  plus 6 paste-ready drafts, all re-verified
-  2026-07-16 against pvpoke master `10fd1a6e4` by an adversarial
-  verify/refute/dedup workflow (line numbers re-derived, Report 3
-  re-run live against PvPoke's engine, tracker searched — no
-  duplicates). The Blade→Shield CPM-table overflow draft (report 6)
-  was RETRACTED — PvPoke's cpms table reaches 55; the overflow was
-  ours alone (DEVELOPER_NOTES divergence item 3 corrected to match).
-  If filing long after 2026-07, re-check `git log 10fd1a6e4..master
-  -- src/js/` first.
+* **PvPoke bug reports: FILED 2026-07-16** (CHANGELOG has the full
+  writeup): pvpoke/pvpoke #378 Gyro Ball, #379 Morpeko, #380 dead
+  pruning, #381 DPE overwrite, #382 bestChargedMove question. Residual
+  opens:
+  - **Report 5 (needsBoost retired-or-returning question) held back** —
+    paste-ready in `docs/pvpoke_bug_reports.md`; if filed later, adjust
+    the opener's "5 reports today" line and re-check
+    `git log 10fd1a6e4..master -- src/js/` first.
+  - **Engage with Matt's responses** as they come (volunteer,
+    ~two-week cycles; don't re-ping).
+  - **[investigation, unexplained] site-vs-headless 429/510
+    discrepancy:** pvpoke.com single-battle UI gives 429 where headless
+    runs of the byte-identical engine + gamemaster + inputs give 510
+    (Aegislash SB-only vs Azumarill, the knife-edge "3 turns can flip"
+    cells; reproduces at both April and July vintages, robust to
+    bait/OMT/levels/IVs sweeps). Some UI-side battle setup input we
+    haven't identified. Detail in `docs/pvpoke_bug_reports.md` header.
+    Low priority, but don't cite harness battle ratings as
+    site-reproducible in razor-thin cells until resolved.
 
 * **Known PvPoke divergences** — DEVELOPER_NOTES "Known divergences"
   is the single source of truth (bestChargedMove per-turn recompute,
