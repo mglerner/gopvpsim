@@ -76,7 +76,7 @@ read as yours.
 **Order** (same-day; lead with the reports whose value is most obvious
 so the first issue Matt opens motivates the rest):
 
-1. Report 3 — Gyro Ball over Shadow Ball (winner flip, repro'd live)
+1. Report 3 — Gyro Ball over Shadow Ball (winner flip, reproduced live)
 2. Report 7 — Morpeko one-way form change (published numbers wrong)
 3. Report 1 — dead dominance pruning (easy to confirm by reading)
 4. Report 5 — inert needsBoost system (easy to confirm by reading)
@@ -100,8 +100,8 @@ to provide more detail/etc. I'm filing 6 reports today, but I know you
 batch things up, so I'm including this as a header for each of them in
 case it's useful.
 
-**Repro (simulate mode, Great League; reproduced against master
-10fd1a6e4 on 2026-07-16):**
+**Steps to reproduce (simulate mode, Great League; verified against
+master 10fd1a6e4 on 2026-07-16):**
 
 - The matchup: Aegislash (Shield form), IVs 4/14/15, running Psycho
   Cut with Shadow Ball + Gyro Ball, against Azumarill, IVs 4/15/13,
