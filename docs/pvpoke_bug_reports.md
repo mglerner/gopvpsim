@@ -66,7 +66,7 @@ Notes:
 - Matt (Empoleon_Dynamite) is a volunteer on ~two-week dev cycles and
   says so in the README - expect latency, don't re-ping.
 
-## Filing plan (all six today) and the AI question
+## Filing plan (five today, one held back) and the AI question
 
 **AI.** Matt has said (Discord DMs) he doesn't want AI-generated code
 in his hobby projects - he uses plenty of AI at work; this one's for
