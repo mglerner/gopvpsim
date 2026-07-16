@@ -371,9 +371,10 @@ match your freeze. So: is the asymmetry (changer refreshes, opponent
 doesn't) deliberate, or just where the code landed? If it's not, a
 change here would move a lot of published Aegislash matchup scores.
 
-Possibly related existing issue: #134 (Azumarill locking Ice Beam over
-Play Rough vs Bastiodon - no form change involved, so that one is
-about the init-time selection thresholds themselves).
+Related existing issue: #134 - the same Azumarill Ice-Beam-over-Play-
+Rough lock-in from the same selection block, but vs Bastiodon with no
+form change. That one questions the init-time threshold itself; this
+one is about the selection never being revisited.
 
 ---
 
