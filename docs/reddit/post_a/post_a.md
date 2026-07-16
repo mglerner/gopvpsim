@@ -102,4 +102,4 @@ I don't love it when people pass off AI work as their own, so I tried to make su
 
 - Site: https://mglerner.com/pogo-dives
 - Code (repo): https://github.com/mglerner/gopvpsim
-- GoBattleKit (companion iOS app): a separate post is coming, likely tomorrow. If I can still edit, I'll add the link here.
+- GoBattleKit (companion iOS app) post: https://www.reddit.com/r/TheSilphArena/comments/1uxhljl/i_made_a_free_opensource_ios_app_for_pvp_it/
