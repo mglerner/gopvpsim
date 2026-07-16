@@ -100,19 +100,28 @@ to provide more detail/etc. I'm filing 6 reports today, but I know you
 batch things up, so I'm including this as a header for each of them in
 case it's useful.
 
-**Repro (simulate mode, Great League, reproduced against master
-10fd1a6e4 on 2026-07-16):** Aegislash (Shield) 4/14/15 (Psycho Cut /
-Shadow Ball + Gyro Ball) vs Azumarill 4/15/13 (Bubble / Ice Beam +
-Play Rough), shields 2v1 or 2v2 (Azumarill's shields first). Both
-charged moves cost 50 energy; against Water/Fairy both are neutral,
-both get STAB, and Shadow Ball does strictly more damage (49 vs 39 in
-Shield form, 101 vs 81 in Blade form). PvPoke throws exactly three
-Gyro Balls and zero Shadow Balls: Aegislash burns both of Azumarill's
-shields on Gyro Ball and lands a third, losing 376-623. Remove Gyro
-Ball from the moveset (Shadow Ball only) and Aegislash WINS the same
-matchup 510-489. Having the strictly-worse move available flips the
-published winner. (Also reproduces in Ultra League at the same IVs:
-442-557 with Gyro Ball, 566-433 without.)
+**Repro (simulate mode, Great League; reproduced against master
+10fd1a6e4 on 2026-07-16):**
+
+- The matchup: Aegislash (Shield form), IVs 4/14/15, running Psycho
+  Cut with Shadow Ball + Gyro Ball, against Azumarill, IVs 4/15/13,
+  running Bubble with Ice Beam + Play Rough.
+- Shields: Azumarill has 2, Aegislash has 1. (The 2v2 case behaves
+  the same way.)
+- Both of Aegislash's charged moves cost 50 energy, and both hit
+  Azumarill's Water/Fairy typing neutrally with STAB. The only
+  difference is that Shadow Ball simply hits harder: 49 vs 39 in
+  Shield form, 101 vs 81 in Blade form.
+- What the sim does: Aegislash throws three Gyro Balls and never
+  throws Shadow Ball. Azumarill shields the first two, the third
+  lands, and Aegislash loses 376-623.
+- Now take Gyro Ball off the moveset, so Shadow Ball is the only
+  charged move: Aegislash wins the same matchup, 510-489.
+
+So having the strictly-worse move *available* flips the published
+winner — "more moves can't hurt" doesn't hold here. (The same thing
+happens in Ultra League with the same IVs: 442-557 with Gyro Ball,
+566-433 without.)
 
 **Root-cause candidate:** `Pokemon.js` ~746-752 blanket-flags ALL of
 `aegislash_shield`'s charged moves as `selfDebuffing` (buffs [0,0]).
@@ -126,8 +135,7 @@ picks Gyro Ball, with no guard left to prefer the strictly-stronger
 Shadow Ball.
 
 **Impact:** published Aegislash matchup numbers are measurably below
-what its own moveset supports, including outright winner flips;
-"more moves can only help" is violated.
+what its own moveset supports, including outright winner flips.
 
 Possibly related existing issues: #47 (adding a third move worsens
 rankings — maintainer-acknowledged umbrella) and #149 (same-energy
