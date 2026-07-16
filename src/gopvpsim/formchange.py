@@ -150,15 +150,18 @@ def _aegislash_shield_level(blade_level, league_cp):
 
     Mirrors PvPoke getFormStats() aegislash_shield branch. The formula
     deliberately overshoots; the caller walks down whole levels until CP
-    fits. Clamp the start to the real level cap (max CPM table key, 51.0):
-    a low-IV Blade caps at level ~25 in GL, putting the raw formula at 52+,
-    which is off the end of the CPM table. PvPoke has the same latent
-    overflow (cpms[index] -> undefined) but computes form stats lazily at
-    form-change time so it rarely fires; we build per-IV configs eagerly at
-    sweep setup, so every overflowing IV hit it (KeyError: 52.0, found on
-    the first Aegislash (Blade) GL dive after arc S1). Clamping is exact:
-    levels above 51 don't exist in the game, and the walk-down from 51
-    reaches the same fixed point the bigger-table walk would.
+    fits. We clamp the start to our level cap (max CPM table key, 51.0):
+    a low-IV Blade caps at level ~25 in GL, putting the raw formula at
+    52+, past the end of OUR CPM table -- the eager per-IV config build
+    crashed on it (KeyError: 52.0, first Aegislash (Blade) GL dive after
+    arc S1). PvPoke does NOT overflow there: its cpms table reaches level
+    55, so it walks down from 52 using above-cap CPM values that don't
+    exist in-game (a genuine overflow needs a start past 55). The clamp
+    is therefore a deliberate divergence, not a mirror -- PvPoke's
+    shield-revert stats can sit above ours (up to CPM(55) vs our
+    CPM(51)). See DEVELOPER_NOTES "Known divergences" item 3 and
+    bug-hunt round-2 FC-2; the upstream bug-report draft claiming this
+    overflow was PvPoke's was retracted 2026-07-16 (our bug only).
     """
     if league_cp <= 1500:
         start = (blade_level / 0.5) + 2

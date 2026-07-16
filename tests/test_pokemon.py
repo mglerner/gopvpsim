@@ -727,13 +727,17 @@ class TestAegislashBladeWholeLevels:
 # is blade_level * 2 + 2, deliberately overshooting so the caller can
 # walk down whole levels until CP fits. A low-IV Blade focal caps at
 # level 25 in GL (whole-level rule above), putting the raw start at
-# 52.0 — off the end of the CPM table (max 51.0) — so
+# 52.0 — off the end of OUR CPM table (max 51.0) — so
 # build_form_change_state raised KeyError before the walk-down could
-# run. PvPoke has the same latent overflow (cpms[index] -> undefined)
-# but computes form stats lazily at form-change time; our S1 dive
-# plumbing builds per-IV configs eagerly at sweep setup, so the first
-# Aegislash (Blade) GL dive after S1 crashed on it. Fix: clamp the
-# start to max(CPM) in _aegislash_shield_level.
+# run. This was OUR bug only: PvPoke's cpms table reaches level 55, so
+# 52 is a defined entry there (verified 2026-07-16; the old "PvPoke has
+# the same latent overflow" note here was wrong, and the upstream
+# bug-report draft was retracted). Our S1 dive plumbing builds per-IV
+# configs eagerly at sweep setup, so the first Aegislash (Blade) GL
+# dive after S1 crashed on it. Fix: clamp the start to max(CPM) in
+# _aegislash_shield_level — a deliberate divergence (PvPoke walks down
+# using above-cap CPMs 52-55; see DEVELOPER_NOTES divergence item 3 and
+# round-2 FC-2).
 # ===========================================================================
 
 class TestAegislashShieldLevelOverflow:

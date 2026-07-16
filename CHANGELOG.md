@@ -6,6 +6,31 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-07-16 -- 5 PvPoke bug reports filed upstream (TODO item closed)
+
+Michael filed the long-pending PvPoke bug reports (drafted 2026-06-11,
+`docs/pvpoke_bug_reports.md`): pvpoke/pvpoke issues **#378** (Aegislash
+Gyro Ball over Shadow Ball; selfDebuffing blanket-flag root-cause
+candidate), **#379** (Morpeko one-way form change; Chansey 2v2 repro),
+**#380** (BattleState dead dominance pruning + opponentShields
+constructor typo), **#381** (initializeMove buff-adjusted DPE
+overwritten in resetMoves), **#382** (opponent bestChargedMove pinned
+to init-time form stats -- filed as an intent question). Every draft was
+re-verified same day against pvpoke master `10fd1a6e4` by an
+adversarial verify/refute/dedup workflow (21 agents), then rewritten in
+Michael's voice per his style pass (no em dashes, no directive prose,
+Impact only where non-obvious, battle-rating numbers dropped where the
+site couldn't reproduce them). Two drafts did NOT go: the CPM-table
+overflow was RETRACTED (PvPoke's cpms covers L1..55; the KeyError 52.0
+was our table, DEVELOPER_NOTES divergence item 3 corrected), and the
+needsBoost dead-code report was reframed to a retired-or-returning
+question and held back. Open loose end: pvpoke.com's single-battle UI
+showed 429 where headless engine runs show 510 for the SB-only
+knife-edge cells (same code, data, inputs; both vintages) -- recorded in
+the drafts doc header, unexplained. Key commits: `9943862` (re-verify +
+filing guide), `8eb0360` (same-day order + opener), `19aef45` (MGL
+style pass + number drop), `51a638c` (Report 5 reframe/hold).
+
 ## 2026-07-08 -- matchup-fingerprint clusters shipped site-wide (render-only)
 
 The dive "experimental analysis" block (banding stats + 1-D score-gap

@@ -353,14 +353,16 @@ Where the constants live (single source of truth per language):
 
 <!-- sync:pvpoke_bugs_documented -->5<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8 —
 numbering reflects discovery order; section 4 was retracted 2026-04-15
-and is excluded from the count). **Paste-ready GitHub-issue drafts for
-filing upstream live in `docs/pvpoke_bug_reports.md`** (6 fileable
-reports: these five plus the initializeMove DPE-overwrite; the
-Blade→Shield CPM-table overflow draft was RETRACTED 2026-07-16 —
-PvPoke's cpms table reaches level 55, the overflow was ours alone. All
-6 re-verified 2026-07-16 against pvpoke master `10fd1a6e4` by an
-adversarial verify/refute/dedup workflow; the doc now carries a filing
-guide. Filing is Michael's action, no urgency).
+and is excluded from the count). **FILED UPSTREAM 2026-07-16** as pvpoke/pvpoke issues: #378 (our §3
+Gyro Ball), #379 (§8 Morpeko), #380 (§1 dead pruning), #381 (the
+initializeMove DPE-overwrite), #382 (§2 bestChargedMove staleness,
+filed as an intent question). The §7 needsBoost report was reframed to
+a retired-or-returning question and HELD BACK (draft still in
+`docs/pvpoke_bug_reports.md`); the Blade→Shield CPM-table overflow
+draft was RETRACTED 2026-07-16 — PvPoke's cpms table reaches level 55,
+the overflow was ours alone. All drafts were re-verified 2026-07-16
+against pvpoke master `10fd1a6e4` by an adversarial verify/refute/dedup
+workflow before filing.
 
 ### 1. BattleState .hp/.oppHealth naming inconsistency
 

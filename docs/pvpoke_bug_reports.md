@@ -99,8 +99,7 @@ so the first issue Matt opens motivates the rest):
 
 ## 1st to file - Report 3 - Aegislash selects Gyro Ball over Shadow Ball (same cost, strictly less damage)
 
-**Title:** Aegislash throws Gyro Ball over Shadow Ball vs Azumarill
-(identical energy, strictly lower damage)
+**Title:** Aegislash throws Gyro Ball over Shadow Ball vs Azumarill (identical energy, strictly lower damage)
 
 **Body:**
 
@@ -150,8 +149,7 @@ rankings) and #149 (same-energy charged-move order affects results).
 
 ## 2nd to file - Report 7 - Morpeko form change is one-way instead of a toggle
 
-**Title:** Morpeko sticks in Hangry form after the first charged move
-(gamemaster formChange says type "toggle")
+**Title:** Morpeko sticks in Hangry form after the first charged move (gamemaster formChange says type "toggle")
 
 **Body:**
 
@@ -198,8 +196,7 @@ as the 2024 implementation did.
 
 ## 3rd to file - Report 1 - BattleState dominance checks reference nonexistent fields (dead code)
 
-**Title:** ActionLogic: BattleState dominance checks read `.hp`/`.shields`
-which don't exist (always-false, dead pruning)
+**Title:** ActionLogic: BattleState dominance checks read `.hp`/`.shields` which don't exist (always-false, dead pruning)
 
 **Body:**
 
@@ -239,7 +236,7 @@ or the renamed comparisons will still see undefined.
 **Impact:** the DP queue's dominance pruning is silently inert.
 Results are still correct (pruning is an optimization), but the DP
 explores states the code clearly intends to discard, and anyone
-reading the code will assume the pruning works.
+reading the code may assume the pruning works.
 
 **Suggested fix:** rename the fields in the checks to
 `.oppHealth`/`.oppShields` and fix the two constructor calls together.
@@ -252,8 +249,7 @@ comparison to be safe.)
 
 ## 4th to file - Report 4 - initializeMove's buff-adjusted DPE is immediately overwritten
 
-**Title:** Buff-adjusted move.dpe computed in initializeMove never
-reaches the bait/ratio logic (reset at the end of resetMoves)
+**Title:** Buff-adjusted move.dpe computed in initializeMove never reaches the bait/ratio logic (reset at the end of resetMoves)
 
 **Body:**
 
@@ -311,9 +307,7 @@ in move selection - the user-visible symptom of exactly this) and
 our own experiments could not show either behavior is better, and it
 reads best once the other four have set the context.)*
 
-**Title:** bestChargedMove selection asymmetry on form change: the
-form-changer re-selects, the opponent stays pinned to init-time stats
-- intended?
+**Title:** bestChargedMove selection asymmetry on form change: the form-changer re-selects, the opponent stays pinned to init-time stats - intended?
 
 **Body:**
 
