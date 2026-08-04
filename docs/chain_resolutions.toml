@@ -1,0 +1,46 @@
+# Resolved overnight-chain failures.
+#
+# Read by scripts/verify_overnight.py check [1/5]. A chain step can fail for
+# a reason that is fully diagnosed and already fixed in a later commit -- but
+# the chain log and userdata/logs/overnight_status.txt are historical records,
+# so the gate keeps re-reporting the same dead failure on every later run.
+# Editing those two files to force green would falsify the gate; leaving the
+# gate permanently red is how a REAL failure later gets waved off. Recording
+# the resolution here is the honest third option: the failure still prints
+# (as RSLV, with its evidence), it just stops counting as an error.
+#
+# Rules that keep this from becoming a blanket suppressor:
+#   - `chain_log` pins an entry to ONE log file. The next chain run writes a
+#     new filename, so no entry can suppress a future failure.
+#   - `step` must match a substring of the actual [FAIL] line. An entry that
+#     names the current log but matches nothing is reported as a STALE
+#     resolution and fails the gate.
+#   - `fix_commit` and `verified` are mandatory: a resolution without a fix
+#     and an independent re-run is just an excuse.
+#
+# Entries stay after they expire -- they are the incident record.
+
+[[resolution]]
+chain_log = "overnight_20260706_204813.log"
+step = "Running article link verification"
+fix_commit = "73747e6"
+resolved_on = "2026-08-04"
+reason = """\
+The bake ran on a fresh laptop, where userdata/website/guides/ did not exist \
+yet -- the Reader's Guides are a build product and userdata/ is gitignored. \
+Every dive page hardcodes ~5 links into that tree, so link-verify reported \
+1580 dangling hrefs, all of the form '../guides/...'. No dive output was \
+wrong; the link target was simply absent. 73747e6 added chain step 7c \
+(build_guides.py), which builds the tree after the dives and before \
+index+link-verify, so the chain is now self-sufficient on a fresh machine. \
+The guides were built by hand at 22:28 the same evening, but the gate was \
+never re-run, which is why the FAIL sat in the status file.\
+"""
+verified = """\
+2026-08-04: verify_article_links.py --ship re-run clean (400 files, 392,534 \
+hrefs, no broken internal refs); verify_no_unicode_dashes.py --ship clean; \
+checks [2/5]-[5/5] green independently (97/97 dive dirs fresh, opponent \
+counts 21..89, 61/61 ML guides fresh). Live site confirmed serving the guide \
+URLs (pogodives.com/guides/{,iv-flavor-guide,threshold-tiers,matchup-clusters} \
+all HTTP 200).\
+"""

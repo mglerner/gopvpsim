@@ -10,7 +10,10 @@ Aggregates the mechanical morning checks into one command (born from
 the 2026-06-12 morning where they were done by hand):
 
 1. chain status — last line of userdata/logs/overnight_status.txt,
-   plus any [FAIL] step lines in the newest overnight_*.log.
+   plus any [FAIL] step lines in the newest overnight_*.log. A failure
+   that was diagnosed, fixed and re-verified by hand can be recorded in
+   docs/chain_resolutions.toml (see load_resolutions) so it reports as
+   RSLV rather than staying red forever.
 2. freshness — every dive dir under userdata/website/ must have its
    index*.html either all newer than the chain start (re-dived) or all
    older (not in this chain). Mixed vintages mean stale split-file
@@ -39,12 +42,14 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 WEBSITE = REPO / 'userdata' / 'website'
 LOGS = REPO / 'userdata' / 'logs'
 STATUS_FILE = LOGS / 'overnight_status.txt'
+RESOLUTIONS_FILE = REPO / 'docs' / 'chain_resolutions.toml'
 
 # Species that entered the GL pool in the most recent refresh; their
 # presence in a dive's opponent list proves the new pool loaded.
@@ -75,6 +80,36 @@ def scan_narrative_warnings(log_text: str) -> list[str]:
     return [f'narrative patch warned: {ln.strip()}'
             for ln in log_text.splitlines()
             if 'WARN] narrative patch failed' in ln]
+
+
+def load_resolutions() -> list[dict]:
+    """Chain failures that were diagnosed, fixed, and re-verified by hand.
+
+    A step can fail for a reason that is fully understood and already fixed
+    in a later commit. But the chain log and overnight_status.txt are
+    historical records, so every later run of this gate re-reports the same
+    resolved failure. Editing either file to force green would falsify the
+    gate; leaving it permanently red is how a *real* failure later gets
+    waved off. So the resolution is recorded separately instead.
+
+    Each entry is pinned to ONE chain log plus a step label, carries the
+    fix commit and the re-verification evidence, and is PRINTED when it
+    matches (as RSLV) rather than silently suppressing. It expires on its
+    own: the next chain run writes a new log filename, which no existing
+    entry names, so nothing is suppressed going forward.
+    """
+    if not RESOLUTIONS_FILE.exists():
+        return []
+    with RESOLUTIONS_FILE.open('rb') as fh:
+        return tomllib.load(fh).get('resolution', [])
+
+
+def match_resolution(resolutions: list[dict], log_name: str,
+                     line: str) -> dict | None:
+    for res in resolutions:
+        if res['chain_log'] == log_name and res['step'] in line:
+            return res
+    return None
 
 
 def extract_opponents(html_path: Path) -> list[str] | None:
@@ -113,12 +148,31 @@ def main() -> int:
 
     # 1. Chain status -------------------------------------------------
     print('[1/5] chain status')
+    resolutions = load_resolutions()
+    log_name = log_path.name if log_path else ''
+    matched: list[int] = []
+
+    def report(line: str, err_label: str) -> None:
+        """Print one failing line as RSLV (recorded resolution) or ERR."""
+        res = match_resolution(resolutions, log_name, line)
+        if res is None:
+            errors.append(f'{err_label}: {line}')
+            print(f'  ERR {line}')
+            return
+        matched.append(id(res))
+        print(f'  RSLV {line}')
+        print(f'       fixed in {res["fix_commit"]}: {res["reason"]}')
+        print(f'       re-verified: {res["verified"]}')
+
     if STATUS_FILE.exists():
+        # overnight_status.txt is a single scratch file rewritten by every
+        # chain run, so its last line belongs to the newest chain log --
+        # which is what lets one resolution entry cover both.
         last = STATUS_FILE.read_text().strip().splitlines()[-1]
-        ok = 'SUCCESS' in last
-        print(f'  {"OK " if ok else "ERR"} status: {last}')
-        if not ok:
-            errors.append(f'chain status: {last}')
+        if 'SUCCESS' in last:
+            print(f'  OK  status: {last}')
+        else:
+            report(last, 'chain status')
     else:
         errors.append('overnight_status.txt missing')
         print('  ERR overnight_status.txt missing')
@@ -127,10 +181,18 @@ def main() -> int:
         fails = [ln.strip() for ln in log_text.splitlines()
                  if '[FAIL]' in ln]
         for ln in fails:
-            errors.append(f'chain step failed: {ln}')
-            print(f'  ERR {ln}')
+            report(ln, 'chain step failed')
         if not fails:
             print('  OK  no [FAIL] step lines')
+        # An entry naming THIS log that matched nothing is a suppression
+        # rule nobody is checking (typo'd step label, or a step renamed
+        # out from under it). Entries naming other logs are simply spent.
+        for res in resolutions:
+            if res['chain_log'] == log_name and id(res) not in matched:
+                msg = (f'stale resolution for {log_name}: step '
+                       f'{res["step"]!r} matched no [FAIL] line')
+                errors.append(msg)
+                print(f'  ERR {msg}')
         narr = scan_narrative_warnings(log_text)
         for ln in narr:
             errors.append(ln)
