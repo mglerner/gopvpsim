@@ -10,8 +10,13 @@ lines of mostly-completed chronological batches. -->
 
 For the next cold re-dive: `docs/predive_checklist.md` is the STANDING
 pre-cold-dive gate; run `overnight_redive.sh` and watch with
-`scripts/chain_status.py --chain overnight`. (Last bake: CHANGELOG.md
-"2026-06-28".)
+`scripts/chain_status.py --chain overnight`. (Last bake: **2026-07-06/07**,
+the post-hunt2 engine; closed out 2026-08-04 -- see CHANGELOG.md
+"2026-08-04".)
+
+A failed chain step that has since been diagnosed and fixed goes in
+`docs/chain_resolutions.toml` (read by `verify_overnight.py` check [1/5]) --
+do NOT edit `overnight_status.txt` or the chain log to force the gate green.
 
 ## Engine bug-hunt round 2 (2026-07-03): 16 confirmed findings need triage
 
@@ -116,9 +121,13 @@ columns; ~minutes per focal, not a re-bake).
 
 **Phase 1 (client-side opponent filter) SHIPPED** (`b8b561e`, `f5741a3`).
 
-**Phase 2 (Equinox Cup pilot) IMPLEMENTED + VERIFIED 2026-07-03, awaiting
-Michael's review before publish** (gopvpsim `aa8dac8..3c153fb`; gobattlekit
-`0c1bd5c`). Done: cup rankings loader (`data.py`); `recipe_equinox_great` +
+**Phase 2 (Equinox Cup pilot) SHIPPED** (gopvpsim `aa8dac8..3c153fb`;
+gobattlekit `0c1bd5c`). Implemented + verified 2026-07-03; confirmed
+2026-08-04 as pushed (`3c153fb` is an ancestor of `origin/main`) and live
+(`pogodives.com/cups.html`, `/corviknight-equinox-cup/`,
+`/clodsire-equinox-cup/` all HTTP 200) -- this block previously read "NOT
+pushed / NOT published, pending review" and was stale. Done: cup rankings
+loader (`data.py`); `recipe_equinox_great` +
 committed `opponent_pools/equinox_great.txt`; `--cup` labeling overlay
 (cup-sourced oppMetaRank/rankSnapshot, cup-named title/card + archive banner,
 replay-blob `cup` marker); flat `<species>-equinox-cup` slugs + separate
@@ -126,8 +135,7 @@ archive-friendly `cups/index.html` + "Limited Cups" card; gobattlekit
 threshold-export collision guard (cup blobs -> `<species>_<cup>.toml`);
 `verify_overnight` `*-cup` coverage. Five pilot dives run locally cache-ON
 (Corviknight/Mantine/Mandibuzz/Toucannon/Clodsire); page-render 67/67,
-index-presence + bundler dry-run green, suite 1245 passed. NOT pushed / NOT
-published -- pending review. Audit report:
+index-presence + bundler dry-run green, suite 1245 passed. Audit report:
 `~/coding/reports/gopvpsim-equinox-cup-pilot-2026-07-03.html`. The cup-index
 live/archived status is auto-derived from PvPoke's `formats[].showFormat` on
 each build (no hand-maintained rotation list); a rotated-out cup auto-flips to
