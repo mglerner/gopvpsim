@@ -39,7 +39,13 @@ cd "$REPO_ROOT"
 export PYTHONUNBUFFERED=1
 
 TS="$(date +%Y%m%d_%H%M%S)"
-LOG_DIR="userdata/logs/2026-04"
+# Derive the month dir from the clock, not a literal. The old hardcoded
+# "2026-04" sent every later chain's log into an April directory (the
+# 2026-07-06 bake's log landed there), which also mis-sorts
+# verify_overnight.py's newest_chain_log() -- it globs */overnight_*.log
+# and sorts by path, so a July log filed under 2026-04/ ranks below a
+# May log filed correctly.
+LOG_DIR="userdata/logs/$(date +%Y-%m)"
 mkdir -p "$LOG_DIR"
 LOG="${LOG_DIR}/overnight_${TS}.log"
 STATUS="userdata/logs/overnight_status.txt"
