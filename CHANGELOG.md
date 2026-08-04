@@ -6,6 +6,55 @@ for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
 invariants and PvPoke bugs live in `DEVELOPER_NOTES.md`.
 
+## 2026-08-04 -- 2026-07-06/07 bake closed out (was left red on a fixed failure)
+
+The 2026-07-06/07 cold re-dive (chain `overnight_20260706_204813.log`, the
+first bake of the post-hunt2 engine merged in `2a63b65`) finished its work but
+was never formally closed: `overnight_status.txt` still read `[FAIL]`, no
+CHANGELOG entry existed, and TODO's re-dive runbook still named 2026-06-28 as
+the last bake. Reconstructed and verified today.
+
+**The bake itself was always sound.** The single failing step was the final
+`verify_article_links.py --ship`, which reported 1580 dangling hrefs, every one
+of the form `../guides/...`. Root cause: the run was on a fresh laptop, where
+`userdata/website/guides/` did not exist yet -- the Reader's Guides are a build
+product and `userdata/` is gitignored, while every dive page hardcodes ~5 links
+into that tree. No dive output was wrong; the link target was absent. This was
+diagnosed and fixed the same evening in **`73747e6`**, which added chain step
+**7c** (`build_guides.py`, after the dives so `{{dive:...}}` tokens resolve,
+before index + link-verify) so the chain is self-sufficient on a fresh machine.
+The guides were then built by hand at 22:28 -- but the gate was never re-run,
+which is the only reason the failure outlived its fix.
+
+Post-hoc verification (2026-08-04): `verify_article_links.py --ship` clean (400
+files, 392,534 hrefs, no broken internal refs); `verify_no_unicode_dashes.py
+--ship` clean; `verify_overnight.py` checks [2/5]-[5/5] green independently
+(97/97 dive dirs fully fresh, opponent counts 21..89, 61/61 ML guides fresh).
+The bake had been published; the live site was confirmed serving the guide
+URLs (HTTP 200). A residual 18-path publish delta -- the guides tree rebuilt
+*after* that publish, plus `index.html` / `cups.html` / `support.html` -- was
+pushed today.
+
+Two tooling fixes fell out of the reconstruction:
+
+- **`overnight_redive.sh` `LOG_DIR` hardcoded `userdata/logs/2026-04`**, so
+  every chain since April filed its log under an April directory (the July bake
+  included). That also mis-sorts `verify_overnight.newest_chain_log()`, which
+  globs `*/overnight_*.log` and sorts by path -- a July log filed under
+  `2026-04/` ranks below a May log filed correctly. Now derived from the clock.
+- **`verify_overnight.py` had no way to record a resolved failure.** Check
+  [1/5] reads the historical status line and greps the chain log, so a fixed
+  failure stays red forever; doctoring either file to force green would falsify
+  the gate, and a permanently-red gate is how a real failure later gets waved
+  off. New `docs/chain_resolutions.toml` records the resolution instead: pinned
+  to ONE chain log plus a step label, carrying `fix_commit` + `verified`, and
+  **printed** as `RSLV` rather than silently suppressed. It expires on its own
+  (the next chain writes a new log filename that no entry names), and an entry
+  naming the current log that matches no `[FAIL]` line is reported as a *stale
+  resolution* and fails the gate -- so a typo'd label can't ship as a live
+  suppression rule. Tests in `tests/test_verify_overnight_resolutions.py` pin
+  the expiry and evidence-required properties; gate now ALL GREEN, rc=0.
+
 ## 2026-07-16 -- 5 PvPoke bug reports filed upstream (TODO item closed)
 
 Michael filed the long-pending PvPoke bug reports (drafted 2026-06-11,
