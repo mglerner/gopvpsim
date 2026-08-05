@@ -7777,12 +7777,12 @@ def main():
                 # into fast-move-equivalents + fractions of each charged move.
                 _fm_db, _cm_db = get_moves()
                 _md['energy'] = energy_by_mode
-                # Multi-word -> initials (Shadow Sneak -> SS); single word ->
-                # first 3 letters (Crunch -> CRU) so it's never a lone letter.
+                # ONE abbreviation rule (deep_dive_analysis.move_abbr):
+                # id-derived, never label-derived -- gamemaster labels
+                # truncate ('Weather Ball (Fire)' -> 'WB(') and collide
+                # (both AURA_WHEELs read 'Aura Wheel').
                 def _mv_abbr(mid):
-                    _w = _pretty_name(mid).split()
-                    return (''.join(x[0] for x in _w).upper() if len(_w) > 1
-                            else (_w[0][:3].upper() if _w else '?'))
+                    return analysis.move_abbr(mid)
                 _md['energy_moves'] = {
                     'fast': {'abbr': _mv_abbr(fast_id),
                              'gain': _fm_db[fast_id].get('energyGain', 0)},

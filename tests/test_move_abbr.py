@@ -161,13 +161,6 @@ def test_iv_envelope_mirror_agrees_with_shared_helper():
     assert bad == []
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "DEFERRED: deep_dive.py's nested _mv_abbr abbreviates _pretty_name(mid), "
-    "so gamemaster labels with a parenthetical truncate (WBF -> 'WB(') and "
-    "the two Weather Ball variants collide. The one-line fix is to call "
-    "deep_dive_analysis.move_abbr, but scripts/deep_dive.py is outside the "
-    "file set of the lane that added the helper. Flip this to a plain "
-    "assertion when that call site lands."))
 def test_deep_dive_energy_tag_uses_shared_helper():
     src = (SCRIPTS / "deep_dive.py").read_text()
     m = re.search(r"def _mv_abbr\(mid\):(?:\n.*){0,6}", src)
