@@ -980,7 +980,10 @@ def _opp_colored(name):
     # palette --opp-1..--opp-12, mod 12, matching deep_dive_rendering._opp_color
     # so the same opponent gets the same hue across renderers.
     colors = [f'var(--opp-{i})' for i in range(1, 13)]
-    idx = int(hashlib.md5(name.encode()).hexdigest(), 16) % len(colors)
+    # .lower() to match deep_dive_rendering._opp_color's case-insensitive
+    # hash — without it the same opponent got two different hues on one
+    # page (narrative vs tables; caught by the 2026-08-05 DRY review).
+    idx = int(hashlib.md5(name.lower().encode()).hexdigest(), 16) % len(colors)
     return f'<span style="color:{colors[idx]};font-weight:600">{name}</span>'
 
 
