@@ -419,7 +419,8 @@ def main():
     fast_move = _FAST_DB[fast_id]
     cheapest_cost = min(_CHARGED_DB[cid]['energy'] for cid in charged_ids)
     opponents = load_opponents()
-    slug = species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+    from ml_guide_slugs import json_slug  # single source (entry 3d)
+    slug = json_slug(species)
     suffix = '_all9' if a.all_shields else ''
     out_path = f"userdata/dives/{slug}_iv_envelope{suffix}.json"
 

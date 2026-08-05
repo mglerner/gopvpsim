@@ -687,8 +687,9 @@ def _ml_species_from_cmd(cmd: str) -> str:
 
 
 def _ml_slug(species: str) -> str:
-    """iv_envelope_analysis's per-guide log slug (same formula it uses)."""
-    return species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+    """iv_envelope_analysis's per-guide log slug (shared formula, entry 3d)."""
+    from ml_guide_slugs import json_slug
+    return json_slug(species)
 
 
 def _ml_worker_phase(species: str) -> str:

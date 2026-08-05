@@ -52,8 +52,9 @@ def _species_from_cmd(cmd):
 
 
 def _slug(species):
-    """iv_envelope_analysis's per-guide log slug (same formula it uses)."""
-    return species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+    """iv_envelope_analysis's per-guide log slug (shared formula, entry 3d)."""
+    from ml_guide_slugs import json_slug
+    return json_slug(species)
 
 
 _PREFIX_RE = re.compile(r'^\[[^\]]+\] +[A-Z]+ +[a-z_]+: *')
