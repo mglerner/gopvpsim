@@ -5,12 +5,23 @@ Pure-analysis functions that partition IV cohorts by stat thresholds
 rendering — that stays in deep_dive.py.
 """
 import math
+import os
 import re
+import sys
 
 import numpy as np
 
 from gopvpsim.moves import BONUS, STAB_MULTIPLIER, type_effectiveness
 from gopvpsim.battle import WIN_RATING
+
+# Sibling scripts/ modules are imported by bare name (deep_dive.py does the
+# same insert). Done here too so this module keeps working when a test
+# loads it straight from its path with scripts/ off sys.path.
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+from auto_gen_narrative import move_display  # noqa: E402
 
 
 # Module-level caches for numpy conversions of per-dive IV/score arrays.
@@ -70,8 +81,15 @@ def _invalidate_np_caches():
 # ---- Utility helpers ----
 
 def pretty_name(raw_id):
-    """Convert GIGATON_HAMMER to Gigaton Hammer, FAIRY_WIND to Fairy Wind, etc."""
-    return raw_id.replace('_', ' ').title()
+    """Convert GIGATON_HAMMER to Gigaton Hammer, FAIRY_WIND to Fairy Wind, etc.
+
+    Delegates to ``auto_gen_narrative.move_display`` so the gamemaster's own
+    ``name`` wins where it disagrees with naive Title Case (SUPER_POWER ->
+    'Superpower', X_SCISSOR -> 'X-Scissor', HIDDEN_POWER_BUG -> 'Hidden
+    Power (Bug)'): 39 of 334 moves used to render one way here and another
+    way in the article headers on the same page.
+    """
+    return move_display(raw_id)
 
 
 def pretty_moveset(label):
