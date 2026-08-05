@@ -48,6 +48,11 @@ HARNESS_MAX_LEVEL = 50.0
 #   * shadow and non-shadow species
 #   * a branching evolution walkup (Eevee → Sylveon)
 #   * a pre-evo walkup (Tinkatink → Tinkaton)
+#   * a gender-differentiated pair (Lechonk -> Oinkologne / Oinkologne
+#     (Female)), which is the ONLY way this harness can see the
+#     per-target gender rule; without both keys present the JS could
+#     skip gender entirely and still pass (DRY review 2026-08-05
+#     entry 10).
 TEST_THRESHOLDS = {
     'Tinkaton': {
         'Great': {
@@ -83,7 +88,25 @@ TEST_THRESHOLDS = {
             'Any':       {'attack':   0, 'defense':   0, 'stamina':   0},
         },
     },
+    # Gender-differentiated pair. Both keys are needed: the male form is
+    # the BARE name, recognized only by the presence of its '(Female)'
+    # sibling in the pokemon index.
+    'Oinkologne': {
+        'Great': {
+            'Any':       {'attack':   0, 'defense':   0, 'stamina':   0},
+        },
+    },
+    'Oinkologne (Female)': {
+        'Great': {
+            'Any':       {'attack':   0, 'defense':   0, 'stamina':   0},
+        },
+    },
 }
+
+# The gender the requireGender cross-check pins (see main()). Any value
+# the fixture actually carries works; 'female' is the case the 2026-04-26
+# paste-box bug report was filed against.
+HARNESS_REQUIRE_GENDER = 'female'
 
 
 def canonicalize(obj):
@@ -149,13 +172,27 @@ def build_pokemon_index_subset(thresholds):
     We only need base stats for species that appear as threshold keys —
     walkup targets are always threshold keys by construction. Keeping
     the subset minimal also keeps the node stdin payload small.
+
+    One exception: the ``'X (Female)'`` sibling of every key is included
+    when the gamemaster has one, even if it is not a threshold key. The
+    gender rule (Python ``gender_allows`` / JS ``genderAllows``) decides
+    that a bare ``'X'`` target is the MALE form by looking that sibling
+    up in the index, and Python looks it up in the FULL index -- so a
+    subset without the siblings would make the JS permissive where
+    Python is not.
     """
     idx = get_pokemon_index()
     out = {}
-    for sp in thresholds:
-        if sp in idx:
+
+    def add(sp):
+        if sp in idx and sp not in out:
             entry = idx[sp]
             out[sp] = {'atk': entry['atk'], 'def': entry['def'], 'hp': entry['hp']}
+
+    for sp in thresholds:
+        add(sp)
+        if not sp.endswith(' (Female)'):
+            add(f'{sp} (Female)')
     return out
 
 
@@ -231,6 +268,7 @@ process.stdin.on('end', () => {{
     preToFinals:   payload.preToFinals,
     leagueCaps:    payload.leagueCaps,
     rankLookup:    payload.rankLookup,
+    requireGender: payload.requireGender || null,
   }});
   // Report row counts too so we can catch the parse step diverging
   // independently from the match step.
@@ -278,6 +316,44 @@ def diff_first(py, js, path=''):
     return None
 
 
+def build_payload(csv_text, require_gender=None, thresholds=None,
+                  max_level=HARNESS_MAX_LEVEL):
+    """Assemble the node stdin payload for one comparison run.
+
+    ``thresholds`` / ``max_level`` are parameters (rather than always
+    the harness constants) so tests can reuse this for a synthetic
+    fixture, and so ``max_level=None`` can exercise the JS side's own
+    league-derived default -- see tests/test_js_match_mons_parity.py.
+    """
+    thresholds = TEST_THRESHOLDS if thresholds is None else thresholds
+    return {
+        'csvText':        csv_text,
+        'thresholds':     thresholds,
+        'pokemonIndex':   build_pokemon_index_subset(thresholds),
+        'preToFinals':    build_pre_to_finals_subset(thresholds),
+        'rankLookup':     build_rank_lookup(thresholds),
+        'cpm':            {str(k): v for k, v in CPM.items()},
+        'shadowAtkBonus': SHADOW_ATK_BONUS,
+        'shadowDefMult':  SHADOW_DEF_MULT,
+        'leagueCaps':     LEAGUE_CAPS,
+        'league':         HARNESS_LEAGUE,
+        'maxLevel':       max_level,
+        'requireGender':  require_gender,
+    }
+
+
+def gender_prefiltered(mons, require_gender):
+    """Python equivalent of the JS ``opts.requireGender`` pre-filter.
+
+    ``requireGender`` is a JS-only caller-global narrowing (the dive page
+    pins its focal species' gender once). Python ``match_mons`` has no
+    such parameter, so the Python side of that comparison filters the mon
+    list first -- blank-gender rows pass, exactly as the JS does.
+    """
+    return [m for m in mons
+            if not m.get('gender') or m['gender'] == require_gender]
+
+
 def main():
     fixture = REPO / 'tests' / 'fixtures' / 'poke_genie_export.csv'
     if not fixture.exists():
@@ -300,20 +376,7 @@ def main():
           f'{len(py_results)} species')
 
     # JS side.
-    payload = {
-        'csvText':        csv_text,
-        'thresholds':     TEST_THRESHOLDS,
-        'pokemonIndex':   build_pokemon_index_subset(TEST_THRESHOLDS),
-        'preToFinals':    build_pre_to_finals_subset(TEST_THRESHOLDS),
-        'rankLookup':     build_rank_lookup(TEST_THRESHOLDS),
-        'cpm':            {str(k): v for k, v in CPM.items()},
-        'shadowAtkBonus': SHADOW_ATK_BONUS,
-        'shadowDefMult':  SHADOW_DEF_MULT,
-        'leagueCaps':     LEAGUE_CAPS,
-        'league':         HARNESS_LEAGUE,
-        'maxLevel':       HARNESS_MAX_LEVEL,
-    }
-    js_out = run_js(payload)
+    js_out = run_js(build_payload(csv_text))
     js_results = js_out['results']
     js_canon = canonicalize_results(js_results)
     print(f'JS:     parsed {js_out["parsedCount"]} mons, '
@@ -330,17 +393,35 @@ def main():
 
     # Deep-diff the canonicalized results.
     diff = diff_first(py_canon, js_canon)
-    if diff is None:
-        total = sum(len(v) for v in py_canon.values())
-        print(f'\nPASS: Python and JS agree on all {total} matched records '
-              f'across {len(py_canon)} species.')
-        return 0
+    if diff is not None:
+        path, py_val, js_val = diff
+        print(f'\nFAIL at {path}', file=sys.stderr)
+        print(f'  python: {py_val!r}', file=sys.stderr)
+        print(f'  js:     {js_val!r}', file=sys.stderr)
+        return 1
 
-    path, py_val, js_val = diff
-    print(f'\nFAIL at {path}', file=sys.stderr)
-    print(f'  python: {py_val!r}', file=sys.stderr)
-    print(f'  js:     {js_val!r}', file=sys.stderr)
-    return 1
+    total = sum(len(v) for v in py_canon.values())
+    print(f'\nPASS: Python and JS agree on all {total} matched records '
+          f'across {len(py_canon)} species.')
+
+    # Second run: the JS-only requireGender narrowing. Python has no such
+    # parameter, so its side pre-filters the mon list instead. Without this
+    # the option is invisible to the harness (DRY review 2026-08-05 entry 10).
+    g = HARNESS_REQUIRE_GENDER
+    py_g = match_mons(gender_prefiltered(py_mons, g), TEST_THRESHOLDS,
+                      league=HARNESS_LEAGUE, max_level=HARNESS_MAX_LEVEL)
+    js_g = run_js(build_payload(csv_text, require_gender=g))['results']
+    diff_g = diff_first(canonicalize_results(py_g), canonicalize_results(js_g))
+    if diff_g is not None:
+        path, py_val, js_val = diff_g
+        print(f'\nFAIL (requireGender={g!r}) at {path}', file=sys.stderr)
+        print(f'  python: {py_val!r}', file=sys.stderr)
+        print(f'  js:     {js_val!r}', file=sys.stderr)
+        return 1
+    total_g = sum(len(v) for v in py_g.values())
+    print(f'PASS: requireGender={g!r} agrees on all {total_g} matched records '
+          f'across {len(py_g)} species.')
+    return 0
 
 
 if __name__ == '__main__':

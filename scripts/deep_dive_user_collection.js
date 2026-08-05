@@ -21,6 +21,11 @@
 // The dive UI constructs a single-species thresholds dict on the fly
 // from DATA.tiers and calls matchMons with it — that keeps the library
 // general-purpose while still serving the interactive page cleanly.
+//
+// The row-for-row claim holds with default opts. `opts.requireGender` is
+// the one deliberate JS-only extension (a caller-global narrowing Python
+// has no parameter for); the gender rule Python DOES have is mirrored
+// per-target-species by `genderAllows` (DRY review 2026-08-05 entry 10).
 
 (function (global) {
   'use strict';
@@ -206,6 +211,49 @@
   var SHADOW_ATK_BONUS = 6 / 5;               // x1.2 (game; bit-identical to PvPoke 1.2)
   var SHADOW_DEF_MULT  = 0.8333333134651184;  // float32(5/6); NOT 5/6, NOT PvPoke's 0.83333331
 
+  // League CP caps and power-up ceilings. CANONICAL SOURCE: gopvpsim.pokemon
+  // (LEAGUE_CAPS / LEAGUE_MAX_LEVEL / MAX_CPM_LEVEL). Production always
+  // injects the Python values (deep_dive.py bakes DATA.collection.leagueCap /
+  // .maxLevel and matchMons takes opts.leagueCaps / opts.maxLevel), so these
+  // are fallback defaults only -- the same "nothing in production reads it"
+  // condition under which SHADOW_DEF_MULT silently rotted. They MUST stay
+  // equal to the Python tables; tests/test_js_shadow_constants.py enforces it.
+  //
+  // The level table is league-aware on purpose: best buddy is +1 level and
+  // only one mon can hold it, so GL/UL top out at 50. A bare 51.0 default
+  // here is the "owned mons one level too high" bug (DRY review 2026-08-05
+  // entry 9; mirrors user_collection.league_max_level / max_level_for_cap).
+  var LEAGUE_CAPS      = { great: 1500, ultra: 2500, master: 10000 };
+  var LEAGUE_MAX_LEVEL = { little: 51.0, great: 50.0, ultra: 50.0, master: 51.0 };
+  var MAX_CPM_LEVEL    = 51.0;
+
+  // Reverse of LEAGUE_CAPS: ivsToStatsAtCap takes a CP cap and no league, so
+  // its ceiling has to come back from the cap (1500 -> great -> 50.0).
+  var CAP_TO_LEAGUE = {};
+  (function () {
+    for (var lg in LEAGUE_CAPS) {
+      if (Object.prototype.hasOwnProperty.call(LEAGUE_CAPS, lg)) {
+        CAP_TO_LEAGUE[LEAGUE_CAPS[lg]] = lg;
+      }
+    }
+  })();
+
+  function leagueMaxLevel(league) {
+    if (league != null &&
+        Object.prototype.hasOwnProperty.call(LEAGUE_MAX_LEVEL, league)) {
+      return LEAGUE_MAX_LEVEL[league];
+    }
+    return MAX_CPM_LEVEL;
+  }
+
+  function maxLevelForCap(maxCp) {
+    if (maxCp != null &&
+        Object.prototype.hasOwnProperty.call(CAP_TO_LEAGUE, maxCp)) {
+      return leagueMaxLevel(CAP_TO_LEAGUE[maxCp]);
+    }
+    return MAX_CPM_LEVEL;
+  }
+
   function setConstants(opts) {
     if (!opts || !opts.cpm) {
       throw new Error('POGOCollection.setConstants: opts.cpm is required');
@@ -272,8 +320,10 @@
   function ivsToStatsAtCap(baseAtk, baseDef, baseSta, a, d, s, opts) {
     opts = opts || {};
     var shadow = !!opts.shadow;
-    var maxLevel = (opts.maxLevel != null) ? opts.maxLevel : 51.0;
-    var maxCp = (opts.maxCp != null) ? opts.maxCp : 1500;
+    var maxCp = (opts.maxCp != null) ? opts.maxCp : LEAGUE_CAPS.great;
+    // No league here, so the ceiling comes from the cap -- mirrors Python
+    // ivs_to_stats_at_cap's `max_level=None -> max_level_for_cap(max_cp)`.
+    var maxLevel = (opts.maxLevel != null) ? opts.maxLevel : maxLevelForCap(maxCp);
     var minLevel = (opts.minLevel != null) ? opts.minLevel : 1.0;
     var lv = bestLevel(baseAtk, baseDef, baseSta, a, d, s, maxCp, maxLevel, minLevel);
     if (lv == null) return null;
@@ -336,23 +386,48 @@
 
   function capitalize(s) { return s.charAt(0).toUpperCase() + s.substring(1); }
 
+  // Gender rule for gender-differentiated species (Oinkologne / Meowstic /
+  // Indeedee). EXACT mirror of user_collection.gender_allows, and applied
+  // the same way: PER TARGET SPECIES, not once per mon. A "X (Female)"
+  // target needs a female row; a bare "X" target that has an "X (Female)"
+  // sibling in the index is the male form and needs a male row; blank
+  // gender is permissive (older Poke Genie exports have no Gender column).
+  //
+  // NOTE: `pokemonIndex` must carry the "(Female)" sibling entries or the
+  // male branch cannot fire -- verify_js_parser.py builds its subset that
+  // way, and any other caller must too.
+  function genderAllows(monGender, finalSpecies, pokemonIndex) {
+    if (!monGender) return true;
+    var FEM = ' (Female)';
+    if (finalSpecies.length > FEM.length &&
+        finalSpecies.substring(finalSpecies.length - FEM.length) === FEM) {
+      return monGender === 'female';
+    }
+    if (pokemonIndex &&
+        Object.prototype.hasOwnProperty.call(pokemonIndex, finalSpecies + FEM)) {
+      return monGender === 'male';
+    }
+    return true;
+  }
+
   function matchMons(mons, thresholds, opts) {
     // opts: {league, maxLevel, includeEmpty, pokemonIndex, preToFinals,
     //        rankLookup, requireGender}
     opts = opts || {};
     var league = opts.league || 'great';
-    var maxLevel = (opts.maxLevel != null) ? opts.maxLevel : 51.0;
+    // Mirrors Python match_mons' `max_level=None -> league_max_level(league)`.
+    var maxLevel = (opts.maxLevel != null) ? opts.maxLevel : leagueMaxLevel(league);
     var includeEmpty = !!opts.includeEmpty;
     var pokemonIndex = opts.pokemonIndex || {};
     var preToFinals = opts.preToFinals || null;
     var rankLookup = opts.rankLookup || null;
-    var leagueCaps = opts.leagueCaps || { great: 1500, ultra: 2500, master: 10000 };
+    var leagueCaps = opts.leagueCaps || LEAGUE_CAPS;
     var maxCp = leagueCaps[league];
-    // Gender filter for gender-differentiated species (Oinkologne /
-    // Meowstic / Indeedee). When set to 'female' or 'male', CSV mons
-    // whose gender doesn't match are skipped. Unknown / blank
-    // gender is permissive (older Poke Genie exports may not have
-    // a Gender column).
+    // OPTIONAL extra narrowing, JS-only: the dive page resolves its focal
+    // species' gender once (deep_dive.py `_require_gender`) and passes it
+    // here. It is applied ON TOP of the per-target genderAllows rule below,
+    // which is the actual Python mirror. Python match_mons has no such
+    // parameter, so leave this null for row-for-row parity.
     var requireGender = opts.requireGender || null;
     // NOTE: thresholds keys are the *capitalized* league label
     // ('Great'/'Ultra'/'Master') for compat with gobattlekit's historical
@@ -375,10 +450,9 @@
 
     for (var mi = 0; mi < mons.length; mi++) {
       var mon = mons[mi];
-      // Gender filter: if the focal species is gender-specific and
-      // this CSV row carries a gender, skip on mismatch. Blank
-      // gender on the row passes through (Poke Genie versions
-      // without a Gender column).
+      // Caller-global narrowing (see requireGender above): if the caller
+      // pinned a gender and this CSV row carries a different one, skip.
+      // Blank gender on the row passes through.
       if (requireGender && mon.gender && mon.gender !== requireGender) {
         continue;
       }
@@ -404,6 +478,10 @@
         if (!speciesBlock || !speciesBlock[leagueLabel]) continue;
         var speciesThresholds = speciesBlock[leagueLabel];
         if (!pokemonIndex.hasOwnProperty(finalSpecies)) continue;
+
+        // Per-target gender filter -- same rule, same position in the loop
+        // as Python match_mons (after the index check, before the stats).
+        if (!genderAllows(mon.gender, finalSpecies, pokemonIndex)) continue;
 
         var base = pokemonIndex[finalSpecies];
         // minLevel: power-ups are one-way — an over-leveled row must
@@ -459,6 +537,9 @@
     getSpeciesName:   getSpeciesName,
     parseCsvText:     parseCsvText,
     setConstants:     setConstants,
+    leagueMaxLevel:   leagueMaxLevel,
+    maxLevelForCap:   maxLevelForCap,
+    genderAllows:     genderAllows,
     bestLevel:        bestLevel,
     battleStats:      battleStats,
     computeCp:        computeCp,
