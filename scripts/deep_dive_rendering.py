@@ -572,6 +572,67 @@ def mode_pretty_label(composite_mode):
     return opp_label
 
 
+# ---------------------------------------------------------------------------
+# Python <-> JS wire contract: the strings the bake emits and the shipped JS
+# reads back. Each of these had 2-4 hand-typed copies before the 2026-08-05
+# DRY review (entry 5); they are now written once here, baked into the page's
+# DATA blob by deep_dive.py, and read (never recomputed) by the JS.
+# ---------------------------------------------------------------------------
+
+# Separator + best-buddy suffix of the SCORES/ENERGY grid keys ('{mi}_{mode}'
+# and its '{mi}_{mode}@51' L51 twin). Pinned against the JS by
+# tests/test_js_score_key_parity.py.
+SCORE_KEY_SEP = '_'
+SCORE_KEY_L51_SUFFIX = '@51'
+
+
+def score_key(moveset_idx, composite_mode, l51=False):
+    """Key of one embedded score/energy grid.
+
+    ``l51`` selects the parallel best-buddy grid the dive embeds alongside
+    the league-default one. Mirrored in JS by ``getScoreKeyAt``.
+    """
+    return (f'{moveset_idx}{SCORE_KEY_SEP}{composite_mode}'
+            f'{SCORE_KEY_L51_SUFFIX if l51 else ""}')
+
+
+def scenario_label(scenario):
+    """Canonical shield-scenario label: ``(1, 1)`` -> ``'1v1'``.
+
+    Load-bearing, not cosmetic: it is the key of the matchup-cluster
+    payload's ``scens`` map, so the JS overlay silently renders neutral
+    points if the two sides ever disagree on the form. Baked into
+    ``DATA.scenarioLabels`` for the JS to read.
+    """
+    return f'{scenario[0]}v{scenario[1]}'
+
+
+def parse_moveset_label(label):
+    """Split a raw moveset label ``'FAST / CM1, CM2'`` into
+    ``(fast_id, [charged_ids])``. A label with no ``/`` is all-fast.
+
+    The dive bakes the split result into ``DATA.movesets[i].fast/.charged``
+    so the page's pvpoke-link builder never re-parses the display string.
+    """
+    if '/' not in label:
+        return label.strip(), []
+    fast, rest = label.split('/', 1)
+    charged = [c.strip() for c in rest.split(',') if c.strip()]
+    return fast.strip(), charged
+
+
+def tier_slug(name):
+    """Slug for a tier's ``tier-card-<slug>`` anchor id.
+
+    One rule for three consumers: the dive's tier-card renderer (below),
+    the baked ``DATA.tiers[i].slug`` the paste-box JS reads, and
+    ``generate_article._tier_card_href``'s deep links into the dive. A
+    divergence here is a silent no-op (dead anchor / missing count), not
+    an error, so it is pinned by tests rather than caught at runtime.
+    """
+    return re.sub(r'[^a-z0-9]+', '-', (name or '').lower()).strip('-')
+
+
 @dataclass
 class IVCategory:
     """A named IV grouping with explicit provenance.
@@ -1884,17 +1945,15 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             )
 
         color = t.get('color', 'var(--text-muted)')
-        # Slug for the "N of yours qualify" placeholder. Must match the
-        # JS computation in deep_dive_engine.js updateTierCardCounts.
-        # Slug off ``original_name`` when present so the anchor id stays
-        # stable across the 2026-04-23 tier-name unify, where the badge
-        # text (t['name']) flips from "Lapras Atk" to "Lapras Slayer" but
-        # the deep-link slug "tier-card-lapras-atk" needs to keep
-        # matching the article-side ``_tier_card_href`` computation.
-        import re as _re
-        _slug_source = (t.get('original_name') or t.get('name') or '').lower()
-        _tier_slug = _re.sub(r'^-|-$', '',
-                             _re.sub(r'[^a-z0-9]+', '-', _slug_source))
+        # Slug for the "N of yours qualify" placeholder. One rule
+        # (``tier_slug``) shared with the baked ``DATA.tiers[i].slug`` the
+        # JS reads and with generate_article's deep links -- see that
+        # helper. Slug off ``original_name`` when present so the anchor id
+        # stays stable across the 2026-04-23 tier-name unify, where the
+        # badge text (t['name']) flips from "Lapras Atk" to "Lapras
+        # Slayer" but the deep-link slug "tier-card-lapras-atk" needs to
+        # keep matching the article-side ``_tier_card_href`` computation.
+        _tier_slug = tier_slug(t.get('original_name') or t.get('name') or '')
         # Anchor id on the visible card container so external pages (e.g.
         # the CD article) can deep-link directly to a tier card. The
         # ``tier-card-yours-`` span below is paste-box machinery and is

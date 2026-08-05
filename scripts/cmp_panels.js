@@ -30,7 +30,18 @@ function cmpVal(grid, iv, si, oi) {
 }
 // leftover-HP% proxy: exact for a clean KO win (score-500)/500; |.| for losses.
 function cmpHp(score) { return Math.max(-1, Math.min(1, (score - 500) / 500)); }
-function cmpScenLabel(si) { var s = DATA.scenarios[si]; return s[0] + '-' + s[1]; }
+// Shield-scenario label. Hosts that BAKE the label (the deep dive emits
+// DATA.scenarioLabels from deep_dive_rendering.scenario_label, '1v1' form) get
+// their own wording; the ML IV-guide host bakes none, so it keeps the '1-1'
+// form its close-call records are keyed by (iv_envelope_analysis.shield_label)
+// -- ccLookup matches on this exact string, so the fallback is load-bearing
+// there and must not change.
+function cmpScenLabel(si) {
+  var labels = DATA.scenarioLabels;
+  if (labels && labels[si] != null) return labels[si];
+  var s = DATA.scenarios[si];
+  return s[0] + '-' + s[1];
+}
 function cmpEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
