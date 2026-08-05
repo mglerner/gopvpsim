@@ -24,6 +24,36 @@ it then compares by mtime; it always reports a ~18-path delta even when the
 content is identical. Compare content instead (md5 vs the live URLs, or
 `rsync --checksum`). Detail in CHANGELOG "2026-08-04".
 
+## DRY review 2026-08-05: 56 distinct defects ranked, awaiting triage
+
+`docs/reviews/2026-08-05_dry_review.md` -- Fable-orchestrated fan-out (9 Opus
+finders over the June S7 register + post-June surface, 3 adversarial Opus
+verifiers, Fable synthesis). 61 confirmed / 1 intentional / 0 refuted; 56
+distinct after merging duplicate pairs; 3 [ENGINE-HASH], 4 [CROSS-REPO].
+The report IS the work plan (15 ranked entries) -- do not re-derive it here:
+
+- **Entries 1-3 are the quick wins**: live wrong-output fixes (five S fixes,
+  re-render only -- two-hue opponent colors, tier-precision contradiction,
+  mirror-CMP inconsistency, owned_breakdown rank-1 tie-break, honest-claim
+  fix), the gender-blind evolution walk (WRONG Gold-Bottle-Cap advice today;
+  cross-repo-adjacent, do attended), and the ops/gate hardening bundle
+  (ungated cups.html/support.html, ship-gate roster, newest_chain_log sort,
+  ML-slug single-source, cache-sidecar schema).
+- **Entry 13 is the engine DRY batch** (L6/L11/L15): one hash bump, one cold
+  re-dive, scheduled against the next natural bake -- NOT item-by-item.
+  Entry 12 (deep_dive.py split; D10 forces a CACHE_VERSION bump, no migrate
+  predicate) wants the same bake window.
+- The report's "Do NOT do" section lists the intentional duplicates and
+  refuted sub-claims -- check it before re-reporting any DRY finding.
+- Supersedes the scattered DRY bullets below where they overlap (the S7 §I
+  register, move-display single-source, score-key parity, js-parity-1..5,
+  the 51.0 cluster); those entries stay until their fixes land, but the
+  ranked list is the scheduling authority.
+- Cache note: only bundles 12/13 invalidate the sweep cache (hash /
+  CACHE_VERSION bumps; both behavior-neutral consolidations, not score
+  changes); everything else is render/tooling and ships piecemeal with the
+  cache ON.
+
 ## Engine bug-hunt round 2 (2026-07-03): 16 confirmed findings need triage
 
 `docs/reviews/2026-07-02_engine_bug_hunt_round2.md` — 1 HIGH, 7 medium,
