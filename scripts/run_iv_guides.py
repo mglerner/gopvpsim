@@ -68,12 +68,9 @@ def physical_cores():
     return os.cpu_count() or 2
 
 
-def json_slug(species):
-    return species.lower().replace(' ', '_').replace('(', '').replace(')', '')
-
-
-def article_slug(species):
-    return species.lower().replace(' ', '-').replace('(', '').replace(')', '')
+# Slug formulas are single-sourced in ml_guide_slugs (entry 3d); re-
+# exported here because verify_overnight historically reads rig.json_slug.
+from ml_guide_slugs import article_slug, json_slug  # noqa: E402, F401
 
 
 def read_pool(path):
