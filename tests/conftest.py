@@ -2,8 +2,8 @@
 Shared fixtures for gopvpsim tests.
 """
 import pytest
+import gopvpsim
 import gopvpsim.data as data_module
-import gopvpsim.pokemon as pokemon_module
 
 
 @pytest.fixture(autouse=True, scope='session')
@@ -47,12 +47,18 @@ MOCK_GAMEMASTER = {
 
 @pytest.fixture
 def mock_gm(monkeypatch):
-    """Patch load_gamemaster with fake data and clear the module-level cache."""
+    """Patch load_gamemaster with fake data and clear the library caches.
+
+    Uses the package-level ``gopvpsim.invalidate_caches()`` (DRY review
+    2026-08-05 entry 11) rather than reaching into one module's private
+    global: the fake gamemaster must not be visible through a stale
+    index, and the real data must not stay visible through one either.
+    """
     monkeypatch.setattr('gopvpsim.pokemon.load_gamemaster',
                         lambda: MOCK_GAMEMASTER)
-    pokemon_module._pokemon_index = None
+    gopvpsim.invalidate_caches()
     yield
-    pokemon_module._pokemon_index = None
+    gopvpsim.invalidate_caches()
 
 
 @pytest.fixture(autouse=True, scope='session')
