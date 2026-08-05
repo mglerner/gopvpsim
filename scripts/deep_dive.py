@@ -3697,27 +3697,9 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             # fallback. Visible cards = len(effective_tiers); plot
             # legend entries = len(data['tiers']).
             data_obj['effectiveTierCount'] = len(effective_tiers)
-            _n = data_obj['nIvs']
-            _iv_tiers = [-1] * _n
-            _iv_all_tiers = [[] for _ in range(_n)]
-            for _ti, _t in enumerate(plot_tiers):
-                _ac = _t.get('attack', 0) or 0
-                _dc = _t.get('defense', 0) or 0
-                _hc = _t.get('stamina', 0) or 0
-                for _iv in range(_n):
-                    meets = True
-                    if _ac > 0 and data_obj['ivAtk'][_iv] < _ac:
-                        meets = False
-                    if _dc > 0 and data_obj['ivDef'][_iv] < _dc:
-                        meets = False
-                    if _hc > 0 and data_obj['ivHp'][_iv] < _hc:
-                        meets = False
-                    if meets:
-                        _iv_all_tiers[_iv].append(_ti)
-                        if _iv_tiers[_iv] < 0:
-                            _iv_tiers[_iv] = _ti
-            data_obj['ivTiers'] = _iv_tiers
-            data_obj['ivAllTiers'] = _iv_all_tiers
+            # D14 (DRY review 2026-08-05): this used to be an inline clone
+            # of _recompute_tier_assignments. Same computation, one copy.
+            _recompute_tier_assignments(data_obj, plot_tiers)
 
     # Tier-name unify (2026-04-23): rename data_obj['tiers'] to match
     # narrative flavor names so the tier-card badges and the Plotly
@@ -4105,6 +4087,26 @@ def log_run_start_fingerprint(league):
             f"mtime={fp['mtime_str']} sha256={fp['content_hash'][:12]} "
             f"first5={', '.join(fp['top5'])}")
     return fp
+
+
+def _pack_u16(arr):
+    """Pack a numeric sequence as gzip'd little-endian uint16, base64'd.
+
+    The inverse of the inline JS decoder documented next to SCORES_GZ:
+    values are clamped into [0, 65535], packed little-endian, gzip'd
+    with ``mtime=0`` (the gzip header's default timestamp made
+    byte-identical data produce different HTML run-to-run -- caught by
+    replay-vs-original diffing, arc S4), then base64'd for inline
+    embedding. Shared by the score grid and the (--compare-energy)
+    energy grid so the two encodings cannot drift apart.
+    """
+    import base64
+    import gzip
+    import struct
+    clamped = [max(0, min(65535, int(v))) for v in arr]
+    raw = struct.pack(f'<{len(clamped)}H', *clamped)
+    gz = gzip.compress(raw, compresslevel=9, mtime=0)
+    return base64.b64encode(gz).decode('ascii')
 
 
 def generate_interactive_html(species, league, moveset_data, html_path,
@@ -5786,27 +5788,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # compressed, then base64-encoded for inline embedding. The JS
     # decoder inflates via DecompressionStream and reads the result
     # as a Uint16Array.
-    import base64
-    import gzip
-    import struct
-    packed_scores = {}
-    for key, arr in score_arrays.items():
-        clamped = [max(0, min(65535, int(v))) for v in arr]
-        raw = struct.pack(f'<{len(clamped)}H', *clamped)
-        # mtime=0: the gzip header embeds a timestamp by default, which
-        # made byte-identical data produce different HTML run-to-run
-        # (caught by replay-vs-original diffing, arc S4).
-        gz = gzip.compress(raw, compresslevel=9, mtime=0)
-        packed_scores[key] = base64.b64encode(gz).decode('ascii')
+    packed_scores = {key: _pack_u16(arr) for key, arr in score_arrays.items()}
     # Energy grid: same uint16/gzip/base64 pipeline as scores, keyed identically
     # (incl. @51). Empty unless --compare-energy populated energy_arrays, in
     # which case ZERO new bytes are emitted below (byte-identical when off).
-    packed_energy = {}
-    for key, arr in energy_arrays.items():
-        clamped = [max(0, min(65535, int(v))) for v in arr]
-        raw = struct.pack(f'<{len(clamped)}H', *clamped)
-        gz = gzip.compress(raw, compresslevel=9, mtime=0)
-        packed_energy[key] = base64.b64encode(gz).decode('ascii')
+    packed_energy = {key: _pack_u16(arr) for key, arr in energy_arrays.items()}
     # Dedup'd tooltip table: renderers register tooltip text as they
     # emit data-t="<sid>" attrs; we dump {sid: text} here and a
     # DOMContentLoaded pass (below) populates el.title from the
