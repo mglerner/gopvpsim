@@ -10,8 +10,13 @@ product -- which in GL/UL is usually NOT the hundo, because lower IVs reach a
 higher level under the CP cap).
 
 League-aware via Pokemon.at_best_level (the CP cap binds in GL/UL; Master runs
-to level 51). This is the Python REFERENCE implementation; the website-JS and
-gobattlekit versions must reproduce its numbers.
+to level 51). Surface relationships (each measures something slightly
+different -- do NOT expect byte-identical numbers): the website's "Gives up
+vs #1" column replays the dive's baked grids, which use the dive's opponent
+IVs; this CLI sims fresh against 15/15/15 opponents; gobattlekit consumes
+the exported bundle (tools/threshold_export) rather than reimplementing the
+sim. The rank-1 reference spread itself IS shared -- all three surfaces get
+it from gopvpsim.pokemon.iv_rank or artifacts derived from it.
 
 MVP CLI takes IV spreads directly; PokeGenie-CSV input (via gopvpsim
 user_collection) is the next wiring step.
@@ -24,8 +29,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from gopvpsim.pokemon import (
-    Pokemon, LEAGUE_CAPS, LEAGUE_MAX_LEVEL, battle_stats, best_level, get_species,
-    cp as calc_cp,
+    Pokemon, LEAGUE_CAPS, LEAGUE_MAX_LEVEL, battle_stats, get_species,
+    cp as calc_cp, iv_rank,
 )
 from gopvpsim.moves import get_moves
 from gopvpsim.battle import simulate, pvpoke_dp, BattlePokemon
@@ -93,22 +98,17 @@ def won_set(species, fast, charged, ivs, shadow, opponents, league,
 
 
 def rank1_spread(species, league, max_level):
-    """IV spread (a, d, h) with the highest stat product at the league cap."""
-    base = get_species(species)
-    ba, bd, bh = base['atk'], base['def'], base['hp']
-    best, best_sp = None, -1.0
-    for a in range(16):
-        for d in range(16):
-            for h in range(16):
-                lvl = best_level(ba, bd, bh, a, d, h,
-                                 max_cp=LEAGUE_CAPS[league], max_level=max_level)
-                if lvl is None:
-                    continue
-                s = battle_stats(ba, bd, bh, a, d, h, lvl)
-                sp = s['atk'] * s['def'] * s['hp']
-                if sp > best_sp:
-                    best_sp, best = sp, (a, d, h)
-    return best
+    """IV spread (a, d, h) with the highest stat product at the league cap.
+
+    Thin wrapper over gopvpsim.pokemon.iv_rank -- the canonical ranking.
+    The previous hand-rolled loop diverged from it two ways (DRY review
+    2026-08-05): ties kept the FIRST-enumerated (lowest-IV) spread where
+    iv_rank prefers the higher IV sum (PvPoke's tie-break), and it
+    missed the Aegislash (Blade) whole-level rounding -- 9 of the
+    top-80 meta species disagreed with the website/bundle reference.
+    """
+    top = iv_rank(species, league=league, max_level=max_level)[0]
+    return (top['atk_iv'], top['def_iv'], top['sta_iv'])
 
 
 def describe(species, league, ivs, shadow, max_level):
