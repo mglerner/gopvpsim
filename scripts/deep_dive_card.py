@@ -44,6 +44,27 @@ from deep_dive_analysis import pretty_moveset  # noqa: E402
 REC_MAX_SPREADS = 6
 
 
+def cup_label_and_snapshot(cup_label, league_display, snapshot):
+    """Header strings for a dive/card league line: (league_text, snapshot_phrase).
+
+    A cup dive is mechanically its league but must never read as a bare
+    open-league dive, so the league line leads with the cup name and a second
+    line carries the rankings-snapshot vintage (keep-as-archive policy).
+
+    ``snapshot_phrase`` is lowercase so a caller can drop it mid-sentence;
+    capitalize the first character for a standalone line. It is '' for a
+    non-cup dive, and 'dated snapshot' -- never '' -- when the cup's rankings
+    cache could not be stat'd: the archive claim still has to appear, just
+    without a date it can't honestly name. (The card used to emit nothing at
+    all on that path, and the card is the artifact that ships standalone.)
+    """
+    if not cup_label:
+        return league_display, ''
+    snapshot_phrase = (f'snapshot as of {snapshot}' if snapshot
+                       else 'dated snapshot')
+    return f'{cup_label} ({league_display})', snapshot_phrase
+
+
 @dataclass
 class Spread:
     """One recommended IV spread shown as a mini-card."""
@@ -650,17 +671,17 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
             if (wins or losses) else '')
 
     # A cup dive is mechanically its league, but the card leads with the cup
-    # name so it never reads as a bare open-league dive; the snapshot date
-    # (keep-as-archive policy) rides on a second muted line.
-    if m.cup_label:
-        _league_txt = f'{html.escape(m.cup_label)} ({html.escape(m.league_display)})'
+    # name so it never reads as a bare open-league dive; the snapshot vintage
+    # (keep-as-archive policy) rides on a second muted line. Shared with the
+    # full dive page's banner via cup_label_and_snapshot.
+    _league_txt, _snap_phrase = cup_label_and_snapshot(
+        m.cup_label, m.league_display, m.cup_snapshot)
+    _league_txt = html.escape(_league_txt)
+    _snap_html = ''
+    if _snap_phrase:
+        _snap_txt = _snap_phrase[:1].upper() + _snap_phrase[1:]
         _snap_html = (f'<div class="ddcard-move" style="opacity:0.75;">'
-                      f'Snapshot as of {html.escape(m.cup_snapshot)} '
-                      f'- archived cup meta</div>'
-                      if m.cup_snapshot else '')
-    else:
-        _league_txt = html.escape(m.league_display)
-        _snap_html = ''
+                      f'{html.escape(_snap_txt)} - archived cup meta</div>')
 
     section = f"""<section class="ddcard">
   <div class="ddcard-head">

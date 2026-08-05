@@ -72,9 +72,9 @@ from gopvpsim.theme import (
     theme_picker_html,
 )
 from gopvpsim.data import (
-    load_gamemaster, load_rankings, load_cup_rankings, get_default_moveset,
+    load_gamemaster, load_rankings, get_default_moveset,
     parse_types, sprite_data_uri, load_group as fetch_group, species_id,
-    CACHE_DIR as _RANKINGS_CACHE_DIR, _LEAGUE_CP,
+    cup_pretty_name, get_rankings_for, rankings_cache_path,
 )
 from gopvpsim.battle import (
     BattlePokemon, simulate,
@@ -1222,16 +1222,6 @@ def parse_opponent_spec(opp_name):
     return name, variant, is_shadow
 
 
-_CUP_PRETTY = {'equinox': 'Equinox Cup'}
-
-
-def _cup_pretty_name(cup):
-    """Human display name for a cup slug ('equinox' -> 'Equinox Cup')."""
-    if not cup:
-        return None
-    return _CUP_PRETTY.get(cup, f"{cup.capitalize()} Cup")
-
-
 def build_opp_meta_ranks(opponent_names, league, cup=None):
     """Per-opponent PvPoke meta rank (1 = best) parallel to opponent_names.
 
@@ -1255,10 +1245,7 @@ def build_opp_meta_ranks(opponent_names, league, cup=None):
     caller then emits an all-None list of the right length.
     """
     try:
-        if cup is not None:
-            rankings = load_cup_rankings(cup, _LEAGUE_CP[league])
-        else:
-            rankings = load_rankings(league)
+        rankings = get_rankings_for(league, cup=cup)
     except Exception:
         return [None] * len(opponent_names)
     rank_by_sid = {}
@@ -1287,16 +1274,15 @@ def rankings_snapshot_date(league, cup=None):
     the cup rankings cache file (``rankings_<cup>_<cp>.json``) -- this is the
     "snapshot as of DATE" the archive policy displays.
     """
+    import datetime
     try:
-        import datetime
-        if cup is not None:
-            p = _RANKINGS_CACHE_DIR / f"rankings_{cup}_{_LEAGUE_CP[league]}.json"
-        else:
-            p = _RANKINGS_CACHE_DIR / f"{league}.json"
-        ts = p.stat().st_mtime
-        return datetime.date.fromtimestamp(ts).isoformat()
-    except Exception:
+        ts = rankings_cache_path(league, cup=cup).stat().st_mtime
+    except OSError:
+        # Narrow on purpose: a MISSING/unreadable cache file is the only
+        # excusable miss here. A renamed cache key or an unknown league now
+        # raises instead of silently blanking the archive-vintage banner.
         return None
+    return datetime.date.fromtimestamp(ts).isoformat()
 
 
 def _parse_opponent_pool_line(line):
@@ -4086,7 +4072,7 @@ def rankings_fingerprint(league):
     import datetime
     import hashlib
     from gopvpsim import data as _gpdata
-    cache_path = _gpdata.CACHE_DIR / f"{league}.json"
+    cache_path = rankings_cache_path(league)
     if not cache_path.exists():
         return None
     raw = cache_path.read_bytes()
@@ -4857,8 +4843,12 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # Cup dives are mechanically the given league but labeled with the cup name
     # (keep-as-archive policy): the title/H1 read "<Cup> (<League> League)" so
     # no page silently presents as a bare open-league dive.
-    _league_title = (f'{cup_label} ({league.title()} League)'
-                     if cup_label else f'{league.title()} League')
+    # Shared with the dive card's header line (deep_dive_card) so the two
+    # renderings of the same fact can't drift.
+    from deep_dive_card import cup_label_and_snapshot as _cup_hdr
+    _league_title, _snap_txt = _cup_hdr(
+        cup_label, f'{league.title()} League',
+        rankings_snapshot_date(league, cup=cup) if cup_label else None)
 
     # Prominent cup banner (archive policy): the cup name + the rankings
     # snapshot date, and an explicit "kept as a dated archive" note so a reader
@@ -4866,9 +4856,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # string for a normal league dive.
     _cup_banner_html = ''
     if cup_label:
-        _cup_snapshot = rankings_snapshot_date(league, cup=cup)
-        _snap_txt = (f'snapshot as of {_cup_snapshot}' if _cup_snapshot
-                     else 'dated snapshot')
         _cup_banner_html = (
             '<div style="background: var(--surface); '
             'border-left: 3px solid var(--accent); padding: 8px 12px; '
@@ -8041,7 +8028,7 @@ def main():
             # the replay blob so a cup dive is self-identifying downstream
             # (threshold export routes cup blobs to a non-*_great.toml name).
             'cup': args.cup,
-            'cup_label': _cup_pretty_name(args.cup),
+            'cup_label': cup_pretty_name(args.cup),
         }
         if not args.no_replay_dump:
             _replay_path = dump_replay_state(state)

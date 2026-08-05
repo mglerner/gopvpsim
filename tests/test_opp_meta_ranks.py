@@ -10,7 +10,7 @@ Tests for the client-side opponent-filter bake support in ``deep_dive.py``:
   (same spirit as tests/test_js_score_key_parity.py).
 
 Pure-Python only; nothing here spins up a sim. The synthetic-rankings tests are
-hermetic (monkeypatched ``load_rankings`` + ``species_id``); a separate live
+hermetic (monkeypatched ``get_rankings_for`` + ``species_id``); a separate live
 smoke test exercises the real wiring and skips if the rankings cache/network is
 unavailable.
 """
@@ -61,7 +61,11 @@ def _fake_species_id(name, *, shadow=False):
 
 @pytest.fixture
 def _synthetic_rankings(monkeypatch):
-    monkeypatch.setattr(deep_dive, "load_rankings", lambda league: _FAKE_RANKINGS)
+    # build_opp_meta_ranks goes through the public data accessor
+    # get_rankings_for(league, cup=...) -- one call for both the open-league
+    # and the cup branch -- so that is what the hermetic tests stub.
+    monkeypatch.setattr(deep_dive, "get_rankings_for",
+                        lambda league, cup=None: _FAKE_RANKINGS)
     monkeypatch.setattr(deep_dive, "species_id", _fake_species_id)
 
 
@@ -103,9 +107,9 @@ def test_empty_pool_returns_empty(_synthetic_rankings):
 
 
 def test_rankings_unavailable_yields_all_none(monkeypatch):
-    def _boom(league):
+    def _boom(league, cup=None):
         raise RuntimeError("no network, no cache")
-    monkeypatch.setattr(deep_dive, "load_rankings", _boom)
+    monkeypatch.setattr(deep_dive, "get_rankings_for", _boom)
     ranks = deep_dive.build_opp_meta_ranks(["Azumarill", "Medicham"], "great")
     assert ranks == [None, None]  # defensive: never crash the dive
 
@@ -122,17 +126,18 @@ def test_snapshot_date_is_iso_or_none():
 
 
 def test_snapshot_date_none_when_cache_missing(monkeypatch, tmp_path):
-    monkeypatch.setattr(deep_dive, "_RANKINGS_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(deep_dive, "rankings_cache_path",
+                        lambda league, cup=None: tmp_path / f"{league}.json")
     assert deep_dive.rankings_snapshot_date("great") is None
 
 
 # ---- live smoke test (real rankings + real species_id) ----------------------
 
 def test_live_wiring_resolves_real_ranks():
-    """Exercise the real load_rankings + species_id path end-to-end. Skips if
+    """Exercise the real get_rankings_for + species_id path end-to-end. Skips if
     the rankings can't be loaded (offline with a cold cache)."""
     try:
-        rankings = deep_dive.load_rankings("great")
+        rankings = deep_dive.get_rankings_for("great")
     except Exception:
         pytest.skip("great-league rankings unavailable (offline, cold cache)")
     if not rankings:

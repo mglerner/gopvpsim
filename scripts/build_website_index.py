@@ -38,6 +38,11 @@ from gopvpsim.theme import (  # noqa: E402
     theme_head_script,
     theme_picker_html,
 )
+from gopvpsim.data import (  # noqa: E402
+    CUP_REGISTRY,
+    cup_pretty_name,
+    cup_slug_suffix,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WEBSITE_DIR = REPO_ROOT / 'userdata' / 'website'
@@ -63,15 +68,18 @@ _FORM_PAREN = {'blade', 'shield', 'busted', 'disguised',
                'super', 'large', 'small', 'average', 'hangry'}
 _LEAGUE_ORDER = {'great': 0, 'ultra': 1, 'master': 2}
 
-# Limited-cup slug suffixes. A cup slug is FLAT `<species>-<cup>-cup` (the cup
-# implies league/CP). Value = (league_key, cup_key, cup_pretty). Cup dives are
-# routed OUT of the evergreen league lists onto a separate cup-index page, so
-# `league_key` here is only the mechanical league (for CP/opponent-IV parity);
-# it never groups the dive into the main league lists.
+# Limited-cup slug suffixes, DERIVED from the one cup registry in
+# gopvpsim.data (cup key, mechanical league, display name all live there).
+# A cup slug is FLAT `<species>-<cup>-cup` (the cup implies league/CP).
+# Value = (league_key, cup_key, cup_pretty). Cup dives are routed OUT of the
+# evergreen league lists onto a separate cup-index page, so `league_key` here
+# is only the mechanical league (for CP/opponent-IV parity); it never groups
+# the dive into the main league lists. Only cups with dive plumbing (a
+# registry `dive_league`) get a slug suffix.
 _CUP_SUFFIXES = {
-    'equinox-cup': ('great', 'equinox', 'Equinox Cup'),
+    cup_slug_suffix(key): (info.dive_league, key, cup_pretty_name(key))
+    for key, info in CUP_REGISTRY.items() if info.dive_league
 }
-_CUP_PRETTY_BY_KEY = {ck: cp for _lk, ck, cp in _CUP_SUFFIXES.values()}
 
 _KNOWN_SPECIES_SLUGS: set[str] | None = None
 
@@ -98,83 +106,51 @@ def _known_species_slugs() -> set[str]:
 def _slug_to_pretty_title(slug: str) -> str:
     """Convert a dive dir slug to a human-readable title.
 
-    Pattern: ``{species}-[{variant}-]*{league}-league``. Splits off the
-    trailing ``-great-league`` / ``-ultra-league`` / ``-master-league``
-    as the league suffix; everything before that is the species +
-    variant tokens (shadow flag, moveset id, form name, etc.).
+    Pure FORMATTING of ``_parse_dive_slug``'s output -- there is one slug
+    parser on this page, not two. (The retired second parser had its own
+    copies of the league/cup suffix map and the regional/form token sets, it
+    never got the longest-known-species-prefix fix, and its
+    "always take the first token as the species" rule rendered
+    ``shadow-sableye-great-league`` as "Shadow  Sableye" with a doubled space.)
 
-    Example inputs → outputs:
-      ``oinkologne-great-league`` → ``"Oinkologne (Great League)"``
-      ``oinkologne-female-great-league`` → ``"Oinkologne (Female) (Great League)"``
-      ``forretress-shadow-bug-bite-great-league`` →
-          ``"Forretress Shadow Bug Bite (Great League)"``
-      ``aegislash-blade-ultra-league`` → ``"Aegislash Blade (Ultra League)"``
+    Example inputs -> outputs:
+      ``oinkologne-great-league`` -> ``"Oinkologne (Male) (Great League)"``
+      ``oinkologne-female-great-league`` -> ``"Oinkologne (Female) (Great League)"``
+      ``forretress-shadow-bug-bite-great-league`` ->
+          ``"Shadow Forretress Bug Bite (Great League)"``
+      ``aegislash-blade-ultra-league`` -> ``"Aegislash (Blade) (Ultra League)"``
+      ``corviknight-equinox-cup`` -> ``"Corviknight (Equinox Cup)"``
 
-    Returns empty string when the slug doesn't match the pattern (no
-    league suffix) — caller falls back to the HTML title.
+    Returns empty string when the slug doesn't parse (no league/cup suffix,
+    or no species token) -- caller falls back to the HTML title.
     """
-    # Lazy import — display module needs gamemaster data; calling at
-    # module-import time bloats fast paths that don't need this.
-    import sys as _sys
-    _sys.path.insert(0, str(REPO_ROOT / 'src'))
-    from gopvpsim.display import pretty_species_from_slug  # type: ignore[import-not-found]
-
-    # League suffixes plus cup suffixes (cup pretty is its own name, e.g.
-    # "Equinox Cup"), so a cup dive's HTML-fallback title reads
-    # "Corviknight (Equinox Cup)" instead of dropping to the raw <title>.
-    _suffix_map = {**_LEAGUE_SUFFIXES,
-                   **{s: cp for s, (_lk, _ck, cp) in _CUP_SUFFIXES.items()}}
-    for suffix, pretty in _suffix_map.items():
-        if slug.endswith('-' + suffix):
-            core = slug[:-(len(suffix) + 1)]  # strip "-great-league" / "-equinox-cup"
-            tokens = core.split('-')
-            # Identify the boundary between the species-name slug
-            # tokens (which feed pretty_species_from_slug) and any
-            # variant-descriptor tokens (moveset names, etc.) that
-            # follow. We consume tokens greedily into the species
-            # portion as long as each consumed token is either part
-            # of the bare species name or one of the known
-            # regional/shadow/form tags. Once we hit a token that
-            # isn't, the rest are variant descriptors.
-            #
-            # Tokens we consume into the species slug:
-            #   * Regional / shadow tags: shadow, galarian, alolan,
-            #     hisuian, paldean
-            #   * Form tags: female, male, blade, shield, busted,
-            #     disguised, super, large, small, average, hangry
-            #
-            # pretty_species_from_slug handles regional + female
-            # promotion; other form tags get re-parenthesised inline.
-            REGIONAL = {'shadow', 'galarian', 'alolan', 'hisuian',
-                        'paldean'}
-            FORM_PAREN = {'blade', 'shield', 'busted', 'disguised',
-                          'super', 'large', 'small', 'average',
-                          'hangry'}
-            # Always take the first token (it's the bare species).
-            species_tokens = [tokens[0]] if tokens else []
-            extra_form_parens: list[str] = []
-            i = 1
-            while i < len(tokens):
-                t = tokens[i]
-                if t in REGIONAL or t == 'female':
-                    species_tokens.append(t)
-                    i += 1
-                elif t in FORM_PAREN:
-                    extra_form_parens.append(t.capitalize())
-                    i += 1
-                else:
-                    break
-            species_slug = '_'.join(species_tokens)
-            species_display = pretty_species_from_slug(species_slug)
-            for fp in extra_form_parens:
-                species_display = f'{species_display} ({fp})'
-            # Remaining tokens are variant descriptors (moveset names,
-            # etc.). Capitalize each.
-            variant_parts = [t.capitalize() for t in tokens[i:]]
-            species_plus_variant = ' '.join(
-                [species_display] + variant_parts).strip()
-            return f'{species_plus_variant} ({pretty})'
-    return ''
+    p = _parse_dive_slug(slug)
+    if p is None:
+        return ''
+    # Split the variant axes by how each RENDERS: shadow is a leading
+    # prefix, form/gender tags are parentheticals, moveset descriptors
+    # trail the name.
+    form_parens: list[str] = []
+    trailing: list[str] = []
+    for t in p['variant_tokens']:
+        low = t.lower()
+        if low == 'shadow':
+            continue
+        elif low in _FORM_PAREN or low in ('male', 'female'):
+            form_parens.append(t)
+        else:
+            trailing.append(t)
+    # The group heading drops the gender parenthetical (the group spans both
+    # genders); a title keeps it -- from the parsed gender when the slug names
+    # one, else from the species name itself ("Oinkologne (Male)").
+    name = p['species_display'] if p['gender'] else p['species_display_full']
+    if p['shadow']:
+        name = f'Shadow {name}'
+    for fp in form_parens:
+        name = f'{name} ({fp})'
+    if trailing:
+        name = ' '.join([name] + trailing)
+    return f'{name} ({p["league_pretty"]})'
 
 
 def _fallback_meta_from_html(sub: Path) -> dict | None:
@@ -408,9 +384,12 @@ def _parse_dive_slug(slug: str) -> dict | None:
     bare = '_'.join(name_tokens[:bare_k])
     moveset_tokens = name_tokens[bare_k:]
     group_slug = '_'.join([bare] + regional)
-    species_display = pretty_species_from_slug(group_slug)
+    species_display_full = pretty_species_from_slug(group_slug)
     # Drop the gender parenthetical for the group heading — the group
     # spans both genders; the per-variant chip carries Male/Female.
+    # `species_display_full` keeps it for callers that title a single dive
+    # (_slug_to_pretty_title).
+    species_display = species_display_full
     for g in (' (Male)', ' (Female)'):
         if species_display.endswith(g):
             species_display = species_display[: -len(g)]
@@ -427,6 +406,7 @@ def _parse_dive_slug(slug: str) -> dict | None:
     return {
         'group_key': group_slug,
         'species_display': species_display,
+        'species_display_full': species_display_full,  # gender parenthetical kept
         'shadow': shadow,
         'gender': gender,
         'variant_tokens': variant_tokens,
@@ -556,6 +536,80 @@ def _render_iv_guides(guides: list[dict]) -> str:
     return ' '.join(chips)
 
 
+def _index_css() -> str:
+    """Stylesheet for the landing pages (main index + cup index).
+
+    ONE rule set, not two hand-kept copies: both pages render their dive
+    listings through the same ``_render_dives_grouped`` output, so the cup
+    index needs the same ``.dives-box`` / ``.dives-scroll`` / ``.scroll-hint``
+    / ``li.dive.empty`` rules -- its copied-down stylesheet omitted them, so
+    that markup would have rendered unstyled there.
+    """
+    return theme_css() + """
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+         sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px;
+         background: var(--bg); color: var(--text); line-height: 1.5; }
+  h1 { color: var(--title); }
+  h2 { color: var(--heading); border-bottom: 1px solid var(--border);
+        padding-bottom: 6px; font-size: 1.15em; font-weight: 700;
+        letter-spacing: .02em; }
+  h3 { color: var(--heading); margin: 20px 0 6px; font-size: 1.08rem;
+        font-weight: 700; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ul { list-style: none; padding: 0; }
+  li.dive { background: var(--surface); padding: 14px 18px; border-radius: 2px;
+             margin-bottom: 14px; }
+  li.dive p { margin: 6px 0 0 0; color: var(--text-muted); font-size: 14px; }
+  li.dive.empty { color: var(--text-muted); }
+  .dives-box { position: relative; }
+  .dives-scroll { max-height: 395px; overflow-y: auto; border: 1px solid var(--border);
+                   border-radius: 4px; padding: 10px 14px 2px; background: var(--bg); }
+  .dives-scroll ul { margin: 0; }
+  .dives-scroll li.dive:last-child { margin-bottom: 12px; }
+  .dives-box::after { content: ""; position: absolute; left: 1px; right: 1px; bottom: 1px;
+                       height: 30px; pointer-events: none; border-radius: 0 0 4px 4px;
+                       background: linear-gradient(transparent, var(--bg)); }
+  .scroll-hint { color: var(--text-muted); font-size: 13px; margin: 4px 0 14px 0;
+                  font-style: italic; }
+  .section-intro { color: var(--text-muted); font-size: 14px; margin: 0 0 14px 0; }
+  .species { font-weight: bold; color: var(--text); margin-right: 10px; }
+  a.chip { display: inline-block; background: var(--surface-2); color: var(--accent);
+            padding: 2px 10px; border-radius: 4px; margin: 3px 6px 3px 0;
+            font-size: 13px; }
+  a.chip:hover { background: var(--border-2); text-decoration: none; }
+  .about { color: var(--text-muted); font-size: 13px; margin-top: 30px;
+            border-top: 1px solid var(--border); padding-top: 12px; }
+"""
+
+
+def _page_shell(*, title: str, heading: str, intro_html: str, body_html: str,
+                extra_about_html: str = '') -> str:
+    """Wrap a landing page's body in the shared document chrome.
+
+    Theme head script + picker, the shared stylesheet, the PvPoke attribution
+    footer and the support footer, in one place -- the main index and the cup
+    index carried near-identical copies of all of it.
+    """
+    return f"""<!DOCTYPE html>
+<html {data_theme_attr()}>
+<head>
+<meta charset="utf-8">
+{theme_head_script()}
+<title>{title}</title>
+<style>{_index_css()}</style>
+</head>
+<body>
+{theme_picker_html()}
+<h1>{heading}</h1>
+{intro_html}
+{body_html}
+<p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
+{extra_about_html}{support_footer_html("")}</body>
+</html>
+"""
+
+
 def render_index(dives: list[dict],
                  articles: list[dict],
                  comparisons: list[dict],
@@ -652,56 +706,13 @@ def render_index(dives: list[dict],
             '</ul>\n'
         )
 
-    return f"""<!DOCTYPE html>
-<html {data_theme_attr()}>
-<head>
-<meta charset="utf-8">
-{theme_head_script()}
-<title>Pokemon Go PvP Dives</title>
-<style>{theme_css()}
-  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-         sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px;
-         background: var(--bg); color: var(--text); line-height: 1.5; }}
-  h1 {{ color: var(--title); }}
-  h2 {{ color: var(--heading); border-bottom: 1px solid var(--border);
-        padding-bottom: 6px; font-size: 1.15em; font-weight: 700;
-        letter-spacing: .02em; }}
-  h3 {{ color: var(--heading); margin: 20px 0 6px; font-size: 1.08rem;
-        font-weight: 700; }}
-  a {{ color: var(--accent); text-decoration: none; }}
-  a:hover {{ text-decoration: underline; }}
-  ul {{ list-style: none; padding: 0; }}
-  li.dive {{ background: var(--surface); padding: 14px 18px; border-radius: 2px;
-             margin-bottom: 14px; }}
-  li.dive p {{ margin: 6px 0 0 0; color: var(--text-muted); font-size: 14px; }}
-  li.dive.empty {{ color: var(--text-muted); }}
-  .dives-box {{ position: relative; }}
-  .dives-scroll {{ max-height: 395px; overflow-y: auto; border: 1px solid var(--border);
-                   border-radius: 4px; padding: 10px 14px 2px; background: var(--bg); }}
-  .dives-scroll ul {{ margin: 0; }}
-  .dives-scroll li.dive:last-child {{ margin-bottom: 12px; }}
-  .dives-box::after {{ content: ""; position: absolute; left: 1px; right: 1px; bottom: 1px;
-                       height: 30px; pointer-events: none; border-radius: 0 0 4px 4px;
-                       background: linear-gradient(transparent, var(--bg)); }}
-  .scroll-hint {{ color: var(--text-muted); font-size: 13px; margin: 4px 0 14px 0;
-                  font-style: italic; }}
-  .section-intro {{ color: var(--text-muted); font-size: 14px; margin: 0 0 14px 0; }}
-  .species {{ font-weight: bold; color: var(--text); margin-right: 10px; }}
-  a.chip {{ display: inline-block; background: var(--surface-2); color: var(--accent);
-            padding: 2px 10px; border-radius: 4px; margin: 3px 6px 3px 0;
-            font-size: 13px; }}
-  a.chip:hover {{ background: var(--border-2); text-decoration: none; }}
-  .about {{ color: var(--text-muted); font-size: 13px; margin-top: 30px;
-            border-top: 1px solid var(--border); padding-top: 12px; }}
-</style>
-</head>
-<body>
-{theme_picker_html()}
-<h1>Pokemon Go PvP Dives</h1>
-<p>Interactive IV / moveset dives generated from a homebrew battle
+    return _page_shell(
+        title='Pokemon Go PvP Dives',
+        heading='Pokemon Go PvP Dives',
+        intro_html="""<p>Interactive IV / moveset dives generated from a homebrew battle
 simulator that matches PvPoke's simulate-mode scores. Click a title to
-open the dive. Each page is self-contained and runs in your browser.</p>
-<h2>Dives</h2>
+open the dive. Each page is self-contained and runs in your browser.</p>""",
+        body_html=f"""<h2>Dives</h2>
 <p class="section-intro">Each dive simulates all 4,096 IVs against the meta
 across all 9 shield scenarios, with per-opponent matchup data, IV-tier
 recommendations, and an interactive stat-product scatter. Pick a variant to
@@ -714,12 +725,12 @@ open it.</p>
 </ul>
 </div>
 </div>
-{matchup_web_section}{cups_section}{articles_section}{comparisons_section}{guides_section}
-<p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
-<p class="about">If you find something broken or surprising, reach out on Discord: <a href="https://discord.com/users/460510521112920105">TitanTrainers15</a>.</p>
-{support_footer_html("")}</body>
-</html>
-"""
+{matchup_web_section}{cups_section}{articles_section}{comparisons_section}{guides_section}""",
+        extra_about_html='<p class="about">If you find something broken or '
+                         'surprising, reach out on Discord: '
+                         '<a href="https://discord.com/users/460510521112920105">'
+                         'TitanTrainers15</a>.</p>\n',
+    )
 
 
 def _cup_active_formats() -> dict:
@@ -795,7 +806,7 @@ def render_cup_index(cup_dives: list[dict]) -> str:
     for cup_key in sorted(by_cup):
         # Stable heading name (matches the cup name baked into the dive pages);
         # the LIVE/archived status below is what's auto-derived from PvPoke.
-        pretty = html.escape(_CUP_PRETTY_BY_KEY.get(cup_key, cup_key.title()))
+        pretty = html.escape(cup_pretty_name(cup_key))
         # Same-directory hrefs (`<slug>/index.html`), as load_entries produced
         # them for a root page -- no cross-directory `../` (see docstring).
         listing = _render_dives_grouped(by_cup[cup_key])
@@ -806,47 +817,14 @@ def render_cup_index(cup_dives: list[dict]) -> str:
     body = ''.join(sections) or (
         '<p class="section-intro">No cup dives are currently published.</p>')
 
-    return f"""<!DOCTYPE html>
-<html {data_theme_attr()}>
-<head>
-<meta charset="utf-8">
-{theme_head_script()}
-<title>Limited Cup Dives</title>
-<style>{theme_css()}
-  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-         sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px;
-         background: var(--bg); color: var(--text); line-height: 1.5; }}
-  h1 {{ color: var(--title); }}
-  h2 {{ color: var(--heading); border-bottom: 1px solid var(--border);
-        padding-bottom: 6px; font-size: 1.15em; font-weight: 700;
-        letter-spacing: .02em; }}
-  a {{ color: var(--accent); text-decoration: none; }}
-  a:hover {{ text-decoration: underline; }}
-  ul {{ list-style: none; padding: 0; }}
-  li.dive {{ background: var(--surface); padding: 14px 18px; border-radius: 2px;
-             margin-bottom: 14px; }}
-  li.dive p {{ margin: 6px 0 0 0; color: var(--text-muted); font-size: 14px; }}
-  .section-intro {{ color: var(--text-muted); font-size: 14px; margin: 0 0 14px 0; }}
-  .species {{ font-weight: bold; color: var(--text); margin-right: 10px; }}
-  a.chip {{ display: inline-block; background: var(--surface-2); color: var(--accent);
-            padding: 2px 10px; border-radius: 4px; margin: 3px 6px 3px 0;
-            font-size: 13px; }}
-  a.chip:hover {{ background: var(--border-2); text-decoration: none; }}
-  .about {{ color: var(--text-muted); font-size: 13px; margin-top: 30px;
-            border-top: 1px solid var(--border); padding-top: 12px; }}
-</style>
-</head>
-<body>
-{theme_picker_html()}
-<h1>Limited Cup Dives</h1>
-<p>Deep dives for rotating limited cups (restricted-type formats). A cup dive
+    return _page_shell(
+        title='Limited Cup Dives',
+        heading='Limited Cup Dives',
+        intro_html="""<p>Deep dives for rotating limited cups (restricted-type formats). A cup dive
 is mechanically its base league but scored against the cup meta, with each
-opponent on its cup moveset. <a href="index.html">Back to all dives</a>.</p>
-{body}
-<p class="about">{PVPOKE_ATTRIBUTION_HTML}</p>
-{support_footer_html("")}</body>
-</html>
-"""
+opponent on its cup moveset. <a href="index.html">Back to all dives</a>.</p>""",
+        body_html=body,
+    )
 
 
 # Static support / credits page, published at the website root as

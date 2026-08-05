@@ -23,6 +23,11 @@ REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 WEBSITE_DIR = os.path.join(REPO_ROOT, 'userdata', 'website')
 DEEP_DIVE = os.path.join(SCRIPT_DIR, 'deep_dive.py')
 
+sys.path.insert(0, os.path.join(REPO_ROOT, 'src'))
+from gopvpsim.data import (  # noqa: E402
+    cup_dive_league, cup_slug_suffix,
+)
+
 # ---- Dive configurations ----
 # Each dict must have: species, league, slug, html_base
 # Optional overrides (defaults shown):
@@ -1012,7 +1017,50 @@ def build_command(dive):
     return cmd
 
 
+def check_cup_slugs(dives):
+    """Preflight: every cup dive's slug must be `<species>-<cup>-cup`.
+
+    THREE layers key on this one convention and none of them can see the
+    others: this script PRODUCES the slug, build_website_index ROUTES on the
+    `-<cup>-cup` suffix (a mismatch silently files the dive in the evergreen
+    league lists instead of the cup index, or drops it entirely), and
+    verify_overnight globs it. A typo would still render a perfectly good
+    dive -- hours of sim -- and only show up as a missing cup-index entry, so
+    fail loudly BEFORE the dives run.
+
+    Also checks the cup is registered with a dive league (gopvpsim.data
+    CUP_REGISTRY) matching the entry's league: an unregistered cup gets no
+    slug suffix in the index, so its dives could never be routed.
+
+    Raises ValueError listing every offending entry.
+    """
+    problems = []
+    for d in dives:
+        cup = d.get('cup')
+        if not cup:
+            continue
+        slug = d['slug']
+        suffix = '-' + cup_slug_suffix(cup)
+        if not slug.endswith(suffix):
+            problems.append(
+                f"{slug!r}: cup {cup!r} dive slug must end with {suffix!r}")
+        league = cup_dive_league(cup)
+        if league is None:
+            problems.append(
+                f"{slug!r}: cup {cup!r} is not in gopvpsim.data.CUP_REGISTRY "
+                f"with a dive_league; the website index cannot route it")
+        elif league != d['league']:
+            problems.append(
+                f"{slug!r}: cup {cup!r} is registered as a {league!r} league "
+                f"cup but this dive says {d['league']!r}")
+    if problems:
+        raise ValueError("Cup dive slug preflight failed:\n  "
+                         + "\n  ".join(problems))
+
+
 def main():
+    check_cup_slugs(DIVES)
+
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
