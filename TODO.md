@@ -18,6 +18,12 @@ A failed chain step that has since been diagnosed and fixed goes in
 `docs/chain_resolutions.toml` (read by `verify_overnight.py` check [1/5]) --
 do NOT edit `overnight_status.txt` or the chain log to force the gate green.
 
+**Don't use `publish_website.sh` (dry run) to ask "is the site current?"** It
+regenerates guides + `index.html` on every invocation, so it rewrites the files
+it then compares by mtime; it always reports a ~18-path delta even when the
+content is identical. Compare content instead (md5 vs the live URLs, or
+`rsync --checksum`). Detail in CHANGELOG "2026-08-04".
+
 ## Engine bug-hunt round 2 (2026-07-03): 16 confirmed findings need triage
 
 `docs/reviews/2026-07-02_engine_bug_hunt_round2.md` — 1 HIGH, 7 medium,
