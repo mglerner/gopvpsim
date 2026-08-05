@@ -7,6 +7,7 @@ import pathlib
 import ssl
 import time
 import urllib.request
+from typing import NamedTuple
 
 import certifi
 
@@ -34,19 +35,90 @@ _LEAGUE_CP = {"great": 1500, "ultra": 2500, "master": 10000}
 CUP_RANKINGS_URL_TEMPLATE = (
     f"{BASE_URL}/rankings/{{cup}}/overall/rankings-{{cp}}.json")
 
-# Cups PvPoke publishes overall rankings for (dir has overall/rankings-*.json).
-# Hand-maintained pilot allow-list: it only gates load_cup_rankings' loud
-# failure message (an unknown cup names the valid set instead of a bare 404).
-# A cup here but without a file for the requested CP still fails loudly via
-# _fetch_json's NoDataError. Cups that alias/hide rankings
-# (e.g. 'championshipseries' aliases 'all') are intentionally absent.
+# ---------------------------------------------------------------------------
+# Limited-cup registry
+# ---------------------------------------------------------------------------
+# ONE table for every limited cup this project knows about, so the cup facts
+# stop being re-typed per layer. Consumers:
+#   * load_cup_rankings' known-cup check (below)
+#   * the cup label baked into dive pages / dive cards (scripts/deep_dive.py)
+#   * the `<species>-<cup>-cup` website slug suffixes the index routes on
+#     (scripts/build_website_index.py, scripts/run_website_dives.py)
+#
+# ``dive_league`` is the cup's mechanical CP league, and is set ONLY for cups
+# this project actually publishes dives for -- the website slug map is derived
+# from exactly those. None means "we know PvPoke ranks this cup, but this
+# project has no dive plumbing for it"; naming a league would be a guess.
+#
+# ``display_name`` is the human-facing cup name. None means "no verified
+# official name here", and cup_pretty_name() derives "<Key> Cup" instead --
+# the point being that the derivation lives in ONE place. Before this table
+# the same missing name rendered as "Bastille Cup" on a dive page and
+# "Bastille" on the cup index.
+#
+# Membership doubles as the rankings allow-list: it only gates
+# load_cup_rankings' loud failure message (an unknown cup names the valid set
+# instead of a bare 404). A cup here but without a file for the requested CP
+# still fails loudly via _fetch_json's NoDataError. Cups that alias/hide
+# rankings (e.g. 'championshipseries' aliases 'all') are intentionally absent.
 # Refresh against ../pvpoke/src/data/rankings/*/overall/ when adding cups.
-_CUPS_WITH_RANKINGS = frozenset({
-    "bastille", "bayou", "bfretro", "battlefrontiermaster", "catch",
-    "classic", "copadiluvio", "cosy", "coupedusillage", "equinox",
-    "ligaultra", "little", "mega", "naic2026", "premier", "remix",
-    "retro", "spellcraft", "summer", "sunshine", "tsuki",
-})
+class CupInfo(NamedTuple):
+    dive_league: str | None
+    display_name: str | None
+
+
+CUP_REGISTRY = {
+    # Cups with dive plumbing (league + verified display name).
+    "equinox": CupInfo("great", "Equinox Cup"),
+    # Cups PvPoke publishes rankings for, with no dive plumbing here.
+    **{c: CupInfo(None, None) for c in (
+        "bastille", "bayou", "bfretro", "battlefrontiermaster", "catch",
+        "classic", "copadiluvio", "cosy", "coupedusillage",
+        "ligaultra", "little", "mega", "naic2026", "premier", "remix",
+        "retro", "spellcraft", "summer", "sunshine", "tsuki",
+    )},
+}
+
+# Backwards-compatible alias: the set of cups with published rankings is
+# exactly the registry's keys.
+_CUPS_WITH_RANKINGS = frozenset(CUP_REGISTRY)
+
+
+def cup_pretty_name(cup):
+    """Human display name for a cup key ('equinox' -> 'Equinox Cup').
+
+    Returns None for a falsy cup (the "this is not a cup dive" case, so
+    callers can pass an optional cup straight through). Unregistered cups and
+    registered ones with no verified name derive "<Key> Cup" -- one derivation
+    for every layer, instead of each renderer inventing its own fallback.
+    """
+    if not cup:
+        return None
+    info = CUP_REGISTRY.get(cup)
+    if info is not None and info.display_name:
+        return info.display_name
+    return f"{cup.capitalize()} Cup"
+
+
+def cup_dive_league(cup):
+    """Mechanical CP league for a cup this project publishes dives for.
+
+    None for an unregistered cup or one with no dive plumbing -- callers that
+    route dives (website index, dive runner) treat None as "not routable".
+    """
+    info = CUP_REGISTRY.get(cup)
+    return info.dive_league if info is not None else None
+
+
+def cup_slug_suffix(cup):
+    """Website dive-slug suffix for a cup: 'equinox' -> 'equinox-cup'.
+
+    A cup dive's directory slug is FLAT ``<species>-<cup>-cup`` (the cup
+    implies league/CP). The slug PRODUCER (scripts/run_website_dives.py), the
+    index ROUTER (scripts/build_website_index.py) and the overnight verifier's
+    glob all key on this one shape, so it is spelled out here once.
+    """
+    return f"{cup}-cup"
 
 
 class NoDataError(Exception):
@@ -207,6 +279,33 @@ def load_cup_rankings(cup, cp):
     return _fetch_json(
         f"rankings_{cup}_{cp}",
         url=CUP_RANKINGS_URL_TEMPLATE.format(cup=cup, cp=cp))
+
+
+def get_rankings_for(league, cup=None):
+    """Rankings list for a league, or for a limited cup at that league's CP cap.
+
+    The public one-call form of the "cup wins, else the open league" branch
+    every caller used to re-type (each one importing the private ``_LEAGUE_CP``
+    to build the cup's CP argument). ``cup=None`` is the open-league meta.
+    Raises KeyError for an unknown league, and load_cup_rankings' loud
+    ValueError / NoDataError for an unknown or unpublished cup.
+    """
+    if cup is not None:
+        return load_cup_rankings(cup, _LEAGUE_CP[league])
+    return load_rankings(league)
+
+
+def rankings_cache_path(league, cup=None):
+    """Local cache file backing ``get_rankings_for(league, cup)``.
+
+    The file's mtime is the honest "rankings as of" vintage a renderer can
+    stat; it exists only after the first successful fetch. Pure path
+    construction (no I/O), so a missing file is the caller's OSError to
+    handle. Raises KeyError for an unknown league.
+    """
+    if cup is not None:
+        return CACHE_DIR / f"rankings_{cup}_{_LEAGUE_CP[league]}.json"
+    return CACHE_DIR / f"{league}.json"
 
 
 # ---------------------------------------------------------------------------
