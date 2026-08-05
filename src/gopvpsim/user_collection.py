@@ -276,6 +276,49 @@ def compute_rank_lookup(
 
 
 # ---------------------------------------------------------------------------
+# Evolution-walk eligibility (single-sourced; scripts import these)
+# ---------------------------------------------------------------------------
+
+def gender_allows(mon_gender: str, final_species: str,
+                  pokemon_index: dict) -> bool:
+    """Gender rule for gender-differentiated species (Oinkologne /
+    Meowstic / Indeedee): a ``"X (Female)"`` target needs a
+    female-gendered row; a bare ``"X"`` target that has an
+    ``"X (Female)"`` sibling in the gamemaster is the male form and
+    needs a male row. Unknown / blank gender is permissive (older Poke
+    Genie exports may not populate the Gender column).
+
+    This is THE rule — :func:`match_mons` and the collection scripts
+    (bottle_cap_advisor, owned_breakdown) all route through it. Two
+    scripts once hand-rolled the walk without it and counted male
+    Lechonks as owned Oinkologne (Female) (DRY review 2026-08-05).
+    """
+    if not mon_gender:
+        return True
+    if final_species.endswith(' (Female)'):
+        return mon_gender == 'female'
+    if f'{final_species} (Female)' in pokemon_index:
+        return mon_gender == 'male'
+    return True
+
+
+def eligible_final_forms(mon: dict, pokemon_index: dict = None) -> list:
+    """Final forms this parsed Genie row can actually become.
+
+    Walks :func:`gopvpsim.evolution_lines.get_final_forms` on the row's
+    non-shadow species name (IVs, level, and shadow status carry through
+    evolution unchanged — and so does gender, which is why the walk must
+    be gender-filtered). ``mon`` is a dict in the
+    :func:`parse_csv` / :func:`parse_csv_text` row shape.
+    """
+    if pokemon_index is None:
+        pokemon_index = get_pokemon_index()
+    base = get_species_name(mon['name'], mon['form'], False)
+    return [f for f in get_final_forms(base)
+            if gender_allows(mon.get('gender', ''), f, pokemon_index)]
+
+
+# ---------------------------------------------------------------------------
 # Threshold matcher (dict schema — gobattlekit compatibility)
 # ---------------------------------------------------------------------------
 
@@ -356,21 +399,12 @@ def match_mons(
             if final_species not in pokemon_index:
                 continue
 
-            # Gender filter for gender-differentiated species
-            # (Oinkologne / Meowstic / Indeedee). When the target
-            # species is "X (Female)", only female-gendered mons
-            # match. When target is the bare "X" AND a "X (Female)"
-            # sibling exists in the gamemaster, only male-gendered
-            # mons match. Unknown / blank gender is permissive (older
-            # Poke Genie exports may not populate the Gender column).
-            mon_gender = mon.get('gender', '')
-            if mon_gender:
-                if final_species.endswith(' (Female)'):
-                    if mon_gender != 'female':
-                        continue
-                elif f'{final_species} (Female)' in pokemon_index:
-                    if mon_gender != 'male':
-                        continue
+            # Gender filter for gender-differentiated species — the
+            # rule lives in gender_allows (shared with the collection
+            # scripts); see its docstring for the semantics.
+            if not gender_allows(mon.get('gender', ''), final_species,
+                                 pokemon_index):
+                continue
 
             base = pokemon_index[final_species]
             # min_level: evolution preserves level and power-ups are

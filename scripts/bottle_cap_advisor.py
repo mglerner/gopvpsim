@@ -40,10 +40,9 @@ from multiprocessing import Pool
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gopvpsim.pokemon import iv_rank, LEAGUE_MAX_LEVEL, LEAGUE_CAPS
+from gopvpsim.pokemon import iv_rank, get_pokemon_index, LEAGUE_MAX_LEVEL, LEAGUE_CAPS
 from gopvpsim.data import load_rankings, get_default_moveset
-from gopvpsim.user_collection import parse_csv, get_species_name
-from gopvpsim.evolution_lines import get_final_forms
+from gopvpsim.user_collection import parse_csv, eligible_final_forms
 
 from owned_breakdown import load_pool, won_set, EVEN_SHIELDS, DEFAULT_POOLS
 
@@ -64,10 +63,12 @@ class IvTable:
         self.entries = iv_rank(species, league=league, shadow=shadow)
         self.rank_of = {}
         self.sp_of = {}
+        self.level_of = {}
         for e in self.entries:
             key = (e['atk_iv'], e['def_iv'], e['sta_iv'])
             self.rank_of[key] = e['rank']
             self.sp_of[key] = e['stat_product']
+            self.level_of[key] = e['level']
 
     def reachable_best(self, iv):
         """Best (lowest-rank) spread with every IV >= iv. entries are sorted by
@@ -83,15 +84,29 @@ class IvTable:
 
 
 def collect_owned(csv_path):
-    """{(final_species, shadow): set(iv tuples)} over the whole box, walking
-    evolutions (IVs carry through) and every possible final form."""
-    owned = defaultdict(set)
+    """{(final_species, shadow): {iv tuple: min owned level}} over the whole
+    box, walking evolutions to every GENDER-ELIGIBLE final form (IVs, level,
+    shadow status, and gender all carry through evolution — a male Lechonk
+    is not an Oinkologne (Female)-to-be; DRY review 2026-08-05 entry 2).
+    The value is the LOWEST owned level per spread: power-ups are one-way,
+    so the lowest copy is the most league-flexible one."""
+    owned = defaultdict(dict)
+    idx = get_pokemon_index()
     for m in parse_csv(csv_path):
-        base = get_species_name(m['name'], m['form'], False)
         iv = (m['atk_iv'], m['def_iv'], m['sta_iv'])
-        for final in get_final_forms(base):
-            owned[(final, m['is_shadow'])].add(iv)
+        lvl = m.get('level') or 1.0
+        for final in eligible_final_forms(m, idx):
+            bucket = owned[(final, m['is_shadow'])]
+            bucket[iv] = min(bucket.get(iv, 99.0), lvl)
     return owned
+
+
+def usable(tbl, owned_levels, iv):
+    """An owned copy of ``iv`` can actually exist in this league: the spread
+    must be legal under the cap AND its capped level must be >= the copy's
+    current level (power-ups are one-way — an L40 mon cannot become an L23
+    Great-League build)."""
+    return iv in tbl.rank_of and tbl.level_of[iv] >= owned_levels[iv]
 
 
 def analyze(csv_path, meta_top):
@@ -106,17 +121,23 @@ def analyze(csv_path, meta_top):
             if species not in top:
                 continue
             tbl = IvTable(species, league, shadow)
-            valid = [iv for iv in ivs if iv in tbl.rank_of]
+            # ivs maps spread -> min owned level; a spread only counts if
+            # some owned copy fits under this league's capped level.
+            valid = [iv for iv in ivs if usable(tbl, ivs, iv)]
             if not valid:
                 continue
             # best current copy (lowest rank as-is)
             best_now = min(valid, key=lambda iv: tbl.rank_of[iv])
-            # best copy reachable by capping some owned copy
+            # best copy reachable by capping some owned copy — the capped
+            # mon is the SAME physical mon, so the target spread's capped
+            # level must also clear that copy's current level.
             capped = []
             for iv in valid:
                 tgt = tbl.reachable_best(iv)
-                if tgt is not None:
+                if tgt is not None and tbl.level_of[tgt] >= ivs[iv]:
                     capped.append((iv, tgt))
+            if not capped:
+                continue
             src, target = min(capped, key=lambda st: tbl.rank_of[st[1]])
             sp_now = tbl.sp_of[best_now]
             sp_cap = tbl.sp_of[target]
