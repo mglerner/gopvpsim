@@ -675,6 +675,28 @@ def classify_iv(result, thresholds):
     return None
 
 
+def classify_tier_indices(atk, dfn, hp, thresholds):
+    """Return positional indices of ALL thresholds this spread meets, in order.
+
+    Same meets-rule as classify_iv (each non-zero requirement is a >=
+    check), returning indices for the DATA build's iv_all_tiers /
+    iv_tiers arrays. Callers MUST pass the UNROUNDED effective stats:
+    classifying on the 2dp display-rounded arrays colored spreads the
+    page's own paste-box scanner rejects (Annihilape 0/9/14, def
+    102.9982 rounded up to the 103.0 threshold; DRY review 2026-08-05).
+    """
+    matches = []
+    for ti, thresh in enumerate(thresholds.values()):
+        if thresh['attack'] > 0 and atk < thresh['attack']:
+            continue
+        if thresh['defense'] > 0 and dfn < thresh['defense']:
+            continue
+        if thresh['stamina'] > 0 and hp < thresh['stamina']:
+            continue
+        matches.append(ti)
+    return matches
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -4212,18 +4234,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     iv_all_tiers = [[] for _ in range(n_ivs)]
     if thresholds:
         for i in range(n_ivs):
-            for ti, (tname, thresh) in enumerate(thresholds.items()):
-                meets = True
-                if thresh['attack'] > 0 and iv_atk[i] < thresh['attack']:
-                    meets = False
-                if thresh['defense'] > 0 and iv_def[i] < thresh['defense']:
-                    meets = False
-                if thresh['stamina'] > 0 and iv_hp[i] < thresh['stamina']:
-                    meets = False
-                if meets:
-                    iv_all_tiers[i].append(ti)
-                    if iv_tiers[i] == -1:
-                        iv_tiers[i] = ti  # first (most restrictive) match for coloring
+            # Classify on the UNROUNDED meta stats; iv_atk/iv_def are the
+            # 2dp display arrays and rounding here colored spreads the
+            # page's own paste-box scanner rejects (see helper docstring).
+            iv_all_tiers[i] = classify_tier_indices(
+                meta[i][5], meta[i][6], iv_hp[i], thresholds)
+            if iv_all_tiers[i]:
+                iv_tiers[i] = iv_all_tiers[i][0]  # most restrictive, for coloring
 
     # Find canonical IV indices for the reference IV spreads
     # PvPoke default IVs for this species
