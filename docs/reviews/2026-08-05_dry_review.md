@@ -5,8 +5,18 @@
 > gender+min-level evolution walk; entry 3: all five ops/gate items),
 > each with regression tests -- suite 1322 passed. Entry-1 render fixes
 > live in the generators; shipped HTML updates on the next re-render.
-> Entries 4-15 remain open; the TODO.md "DRY review 2026-08-05" block
-> tracks scheduling. Read the rest as a point-in-time snapshot.
+>
+> **Status update (2026-08-05, evening): entries 4-11 + 14 + the two
+> entry-12 "safe-any-time" cherries SHIPPED**, commits
+> `caeded9..7e66ba2` (12 commits; 30-agent lane-partitioned workflow,
+> 2 adversarial verifiers per entry, 3 must-fix findings caught and
+> fixed in-flight). Suite 1514 passed / 14 xfailed (+192 tests today);
+> ship gates green; engine-hash files verified untouched. STILL OPEN:
+> entry 12 proper (deep_dive.py split; CACHE_VERSION cold) and entry 13
+> (engine DRY batch) -- both scheduled against the next bake window --
+> plus entry 15's fold-in-when-touching items and the per-entry
+> deferrals recorded in the implementing commits. Read the rest as a
+> point-in-time snapshot.
 >
 > **Corrections from the same-day human re-audit** (two agent claims
 > below did not survive re-verification; the findings and fixes stand):

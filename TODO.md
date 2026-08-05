@@ -32,6 +32,20 @@ verifiers, Fable synthesis). 61 confirmed / 1 intentional / 0 refuted; 56
 distinct after merging duplicate pairs; 3 [ENGINE-HASH], 4 [CROSS-REPO].
 The report IS the work plan (15 ranked entries) -- do not re-derive it here:
 
+- **Entries 4-11 + 14 + entry-12 cherries DONE (2026-08-05 evening,
+  commits `caeded9..7e66ba2`)**: constant pins (WIN_RATING JS scan, league
+  caps), Py<->JS wire contracts (score key / mode grammar / scenario label /
+  moveset label / tier slug baked from Python), cup plumbing consolidation,
+  move display names via the gamemaster rule (incl. the id-derived
+  move_abbr), pvpoke link-builder consolidation + URL parity test,
+  league-derived level ceilings (user_collection defaults None-means-derive;
+  gobattlekit PORTS this module -- its own copy still defaults 51, noted in
+  the module docstring), per-target JS gender mirror + Oinkologne harness
+  coverage, gopvpsim.invalidate_caches(), matchup-clusters cleanup, D14
+  drop-in + _pack_u16. Suite 1514 passed / 14 xfailed; per-entry deferrals
+  live in the commit messages. **REMAINING from the review: entries 12
+  (deep_dive.py split; CACHE_VERSION cold) + 13 (engine DRY batch) --
+  both against the next bake window -- and entry 15 fold-ins.**
 - **Entries 1-3 DONE (2026-08-05, commits `d81c4ad..1db4f65`)**: the five
   live wrong-output fixes, the gender+min-level-aware evolution walk
   (shared helpers in user_collection; additive, no gobattlekit
@@ -137,10 +151,9 @@ including JIT-COV-2 below.
 
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
-- **[render DRY] score-key `{mi}_{mode}@51` parity (Python<->JS).** Open-coded in
-  `deep_dive.py` + `deep_dive_engine.js`; consistent today, loud failure mode.
-  Optional belt-and-suspenders parity test only (it's a cache/render data
-  contract, not a refactor target).
+- **[render DRY] score-key `{mi}_{mode}@51` parity (Python<->JS): DONE
+  2026-08-05** (DRY review entry 5, `ffc3b35` -- the three inline JS
+  reconstructions route through getScoreKey and the parity tests pin it).
 - **[tooling, silent-incompleteness] verify_overnight UL opponent-count
   assertion.** The completeness guard is GL-only; a UL opponent silently
   deranked by a fresh gamemaster would drop from every UL dive and still pass the
@@ -483,22 +496,17 @@ here 2026-06-12; these are the remaining seams.)*
   Original context: no test pins
   `_collection_data['maxLevel']` to `LEAGUE_MAX_LEVEL.get(league)`, so a
   future re-hardcode could silently re-introduce the GL/UL "owned mons one
-  level too high" bug. Also worth folding in: the latent dead-code `51.0`
-  fallbacks in `deep_dive_user_collection.js:275` (`ivsToStatsAtCap` default,
-  caller always passes maxLevel) and `:344` (`matchMons`, zero live call sites)
-  — single-source these to a league-aware ceiling if matchMons is ever wired up.
-  **Round-4 (2026-06-28) found the same-class `51.0` latent default in the
-  shared library `src/gopvpsim/user_collection.py:209` (`ivs_to_stats_at_cap`)
-  and `:263` (`compute_rank_lookup`).** NOT currently wrong (every shipped
-  deep_dive bake site overrides it), but it's a league-unaware default that a
-  future caller could hit. **This module is consumed by gobattlekit** (CLAUDE.md
-  "gobattlekit" / shared `user_collection`), so changing the default signature
-  needs cross-repo coordination — do NOT change unattended; either make the
-  default `None` + derive from `league` (like `owned_breakdown.py` `786d437`),
-  or require an explicit cap, after checking gobattlekit's call sites. The JS
-  regression guard `verify_js_parser.py:152,302` ALSO hardcodes `51.0` with
-  `league='great'`, so it can't catch a league-awareness regression — fix the
-  fixture to the league-derived ceiling when adding the strong pin above.
+  level too high" bug. **The whole 51.0 cluster half of this entry was
+  FIXED 2026-08-05** (DRY review entries 9+10, `c956ed7`):
+  `user_collection.py`'s four defaults are None-means-derive via
+  `league_max_level`/`max_level_for_cap`, the
+  `deep_dive_user_collection.js` mirrors derive from the league, and the
+  `verify_js_parser.py` fixture is league-aware with Oinkologne +
+  requireGender coverage. gobattlekit PORTS the module (its own copy still
+  defaults 51 -- noted in the module docstring; pass caps explicitly when
+  comparing). STILL OPEN here: only the `build_collection_data()`
+  extraction + 4-league unit test (the strong pin), which bundles with the
+  deep_dive.py split session.
 
 * **No-bait oracle tests from iv-tech deep dives** — `pvpoke_dp`
   accepts `bait_shields=False`; sanity tests for the farm-down gate
@@ -548,14 +556,11 @@ here 2026-06-12; these are the remaining seams.)*
   read this *before* starting the deep_dive.py split below so the
   cuts address actual pain rather than aesthetic ones.
 
-* **Move display-name single-source (DRY, confirmed 2026-06-28).** Two helpers
-  derive a move's label two incompatible ways on the same dive page — header
-  "Super Power" vs narrative "Superpower" (~39 moves): `auto_gen_narrative._gm_move_display`
-  uses the gamemaster `name`; `deep_dive_analysis.pretty_name`/`pretty_moveset`
-  title-cases the raw moveId. Route both through one helper (have `pretty_name`
-  consult the gamemaster name). Cosmetic, render-only, but broad multi-file +
-  ship-narrative-adjacent — do deliberately. Full detail: backlog "Deep-dive
-  narrative — open polish".
+* **Move display-name single-source: DONE 2026-08-05** (DRY review entry 7,
+  `844e80f` + `291b17f` + `7e66ba2` -- one gamemaster-backed move_display
+  rule for dive + article renderers, and the id-derived move_abbr for
+  energy tags; ships with the next re-render, which changes ~39 labels
+  per page by design).
 
 * **Split `scripts/deep_dive.py`** *(deferred from 2026-04-09; not
   blocking, but file is now ~6100 lines as of 2026-04-10)* — After the structured IV
