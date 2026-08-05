@@ -79,14 +79,78 @@ var HELP_MATCHUPS_KEPT = 'Expected non-mirror matchups won, sampling scenarios u
 var HELP_PER_SHIELD_DELTA = 'Signed avg-score delta vs the best IV in this scenario: +ve beats the best IV here, 0 is the best IV, -ve trades score for something else (atk / HP / bulk). Frozen on the Shields axis so all three show regardless of dropdown; reacts to Opp-IVs + Bait.';
 
 // ---- Helpers ----
-// Score key is level-aware: in best-buddy (L51) view it reads the parallel
-// '{mi}_{mode}@51' grid the dive embedded. The '@51' suffix is only added
-// when an L51 grid is actually present (DATA.ivL51), so non-best-buddy dives
-// are unaffected.
-function getScoreKey(mi, mode) {
-  return mi + '_' + mode + ((state.levelMode === '51' && DATA.ivL51) ? '@51' : '');
+// SCORES / ENERGY grid keys. The separator and the best-buddy suffix are the
+// Python bake's wire contract (deep_dive_rendering.score_key); they live here
+// ONCE and every reader goes through these two functions -- pinned by
+// tests/test_js_score_key_parity.py.
+var SCORE_KEY_SEP = '_';
+var SCORE_KEY_L51 = '@51';
+// Key of a specific level's grid: atL51 picks the parallel best-buddy grid the
+// dive embedded. Callers that need BOTH levels (the compare widget's
+// current/alt pair) pass the flag explicitly.
+function getScoreKeyAt(mi, mode, atL51) {
+  return mi + SCORE_KEY_SEP + mode + (atL51 ? SCORE_KEY_L51 : '');
 }
+// True when the page is currently showing the best-buddy (L51) grid. The
+// suffix is only ever used when an L51 grid is actually present (DATA.ivL51),
+// so non-best-buddy dives are unaffected.
+function atL51View() { return state.levelMode === '51' && !!DATA.ivL51; }
+// Score key for the CURRENT level view.
+function getScoreKey(mi, mode) { return getScoreKeyAt(mi, mode, atL51View()); }
 function getScores(mi, mode) { return SCORES[getScoreKey(mi, mode)]; }
+
+// ---- Composite mode grammar: base[:nobait][:eN] ----
+// Mirrors deep_dive_rendering.parse_mode / parse_energy / compose_mode. These
+// strings are the score-lookup keys, so a divergence lands in the silent
+// fallback path and renders a different mode than the dropdowns show; the
+// round trip is pinned by tests/test_js_score_key_parity.py.
+function parseModeBase(mode) {
+  if (!mode) return 'pvpoke';
+  var i = mode.indexOf(':');
+  return i >= 0 ? mode.substring(0, i) : mode;
+}
+function parseModeBait(mode) {
+  return (String(mode || '').split(':').slice(1).indexOf('nobait') >= 0)
+    ? 'nobait' : 'bait';
+}
+function parseModeEnergy(mode) {
+  var parts = String(mode || '').split(':').slice(1);
+  for (var i = 0; i < parts.length; i++) {
+    if (/^e\d+$/.test(parts[i])) return parseInt(parts[i].substring(1), 10);
+  }
+  return 0;
+}
+function composeMode(base, bait, energyLead) {
+  var mode = base;
+  if (bait === 'nobait') mode += ':nobait';
+  if (energyLead) mode += ':e' + energyLead;
+  return mode;
+}
+
+// ---- Shield-scenario label ----
+// Baked by Python (DATA.scenarioLabels, deep_dive_rendering.scenario_label);
+// never re-formed here. The '{a}v{b}' form is load-bearing -- it keys the
+// matchup-cluster payload -- so the fallback exists only for a DATA blob
+// predating the field.
+function scenLabel(si) {
+  var labels = DATA.scenarioLabels;
+  if (labels && labels[si] != null) return labels[si];
+  var s = DATA.scenarios[si];
+  return s[0] + 'v' + s[1];
+}
+
+// ---- Level ceilings ----
+// Baked from pokemon.bestbuddy_caps / MAX_CPM_LEVEL into DATA.levelCaps
+// (league default cap, best-buddy alt cap, hard CPM-table ceiling). The table
+// below is a fallback for a DATA blob that predates the field and is pinned to
+// the Python constants by tests/test_js_wire_contract.py -- the same
+// deliberate-fallback pattern as deep_dive_user_collection.js's shadow/league
+// constants.
+var LEVEL_CAP_FALLBACK = { default: 50.0, alt: 51.0, maxCpm: 51.0 };
+function levelCap(which) {
+  var caps = DATA.levelCaps || {};
+  return caps[which] != null ? caps[which] : LEVEL_CAP_FALLBACK[which];
+}
 
 // ---- Best-buddy / Level-51 toggle ----
 // When DATA.ivL51 is present the dive carries a second (best-buddy L51) grid.
@@ -470,25 +534,30 @@ function computeView() {
     // in computeRanks and freeze the page mid-state (2026-06-11
     // review, W3). Fall back to the first mode that exists for this
     // moveset and resync the dropdowns to what is actually shown.
-    var _prefix = state.movesetIdx + '_';
+    var _prefix = state.movesetIdx + SCORE_KEY_SEP;
     var _fallback = null;
     for (var _sk in SCORES) {
       if (_sk.indexOf(_prefix) === 0 && SCORES[_sk]) {
         _fallback = _sk.substring(_prefix.length);
+        // Strip the best-buddy suffix: the remainder is a MODE string that
+        // goes into state.oppIvMode + the dropdowns, and getScoreKey re-adds
+        // '@51' from the level toggle. Leaving it on made every subsequent
+        // lookup miss (and put '@51' in the dropdown value).
+        if (_fallback.length > SCORE_KEY_L51.length &&
+            _fallback.indexOf(SCORE_KEY_L51, _fallback.length - SCORE_KEY_L51.length) >= 0) {
+          _fallback = _fallback.substring(0, _fallback.length - SCORE_KEY_L51.length);
+        }
         break;
       }
     }
     if (_fallback) {
       state.oppIvMode = _fallback;
       var _osel = document.getElementById('oppiv-sel');
-      if (_osel) _osel.value = _fallback.split(':')[0];
+      if (_osel) _osel.value = parseModeBase(_fallback);
       var _bsel = document.getElementById('bait-sel');
-      if (_bsel) _bsel.value = (_fallback.indexOf(':nobait') >= 0) ? 'nobait' : 'bait';
+      if (_bsel) _bsel.value = parseModeBait(_fallback);
       var _esel = document.getElementById('energy-sel');
-      if (_esel) {
-        var _em = _fallback.match(/:e(\d+)/);
-        _esel.value = _em ? _em[1] : '0';
-      }
+      if (_esel) _esel.value = String(parseModeEnergy(_fallback));
       yValues = computeYValues(state.movesetIdx);
     }
     if (!yValues) {
@@ -714,8 +783,7 @@ function appendMatchupDiff(lines, mi1, iv1, mi2, iv2) {
       if (w1 && !w2) gained.push(shortName(DATA.opponents[oi]));
       else if (!w1 && w2) lost.push(shortName(DATA.opponents[oi]));
     }
-    var sc = DATA.scenarios[si];
-    var lab = sc[0]+'v'+sc[1];
+    var lab = scenLabel(si);
     // Cap per direction so the tooltip stays a reasonable size on
     // dives with large opponent pools (61 for GL top50+CS dives ×
     // 9 scenarios × 2 moveset comparisons = massive tooltip
@@ -822,7 +890,7 @@ function loadCollection(csvText) {
   if (DATA.bestBuddy) {
     maxLevel = (state.levelMode === '51')
       ? (DATA.bestBuddy.altCap || coll.maxLevel)
-      : (DATA.bestBuddy.defaultCap || 50.0);
+      : (DATA.bestBuddy.defaultCap || levelCap('default'));
   }
   // Gender filter for gender-differentiated species (Oinkologne /
   // Meowstic / Indeedee). When the focal species is "X (Female)",
@@ -1372,8 +1440,7 @@ function renderMatchesList() {
     var lost = [];
     for (var k = 0; k < sis.length; k++) {
       var si = sis[k];
-      var sc = DATA.scenarios[si];
-      var lab = sc[0] + 'v' + sc[1];
+      var lab = scenLabel(si);
       for (var oi = 0; oi < nO; oi++) {
         if (selSetGU && !selSetGU[oi]) continue;  // opponent filtered out
         var refW = _guScores[_guRefIv * nS * nO + si * nO + oi] > 500;  // 500=tie (PvPoke)
@@ -1639,7 +1706,9 @@ function readManualForm() {
   if (!isFinite(atkIv) || atkIv < 0 || atkIv > 15) return null;
   if (!isFinite(defIv) || defIv < 0 || defIv > 15) return null;
   if (!isFinite(staIv) || staIv < 0 || staIv > 15) return null;
-  if (!isFinite(level) || level < 1 || level > 51) return null;
+  // Hard ceiling is the CPM table's top level (DATA.levelCaps.maxCpm), not the
+  // league cap: a pasted/typed mon may legitimately be above the league cap.
+  if (!isFinite(level) || level < 1 || level > levelCap('maxCpm')) return null;
   // Dropdown values are full species keys ("Tinkaton", "Tinkatink",
   // "Corsola (Galarian)"). Split back into name + form for the mon
   // object; is_shadow comes from the checkbox, not the species string.
@@ -1749,8 +1818,12 @@ function updateTierCardCounts(tierCounts) {
     var t = liveTiers[i];
     if (!t || !t.name) continue;
     var n = t.name;
-    var slugSource = t.original_name || t.name;
-    var slug = slugSource.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    // Slug baked by Python (deep_dive_rendering.tier_slug -> DATA.tiers[i]
+    // .slug), the same helper that emitted the card's anchor id. The
+    // fallback covers a DATA blob predating the field; a mismatch here is a
+    // silent no-op (the count never appears), which is why it is baked.
+    var slug = t.slug || (t.original_name || t.name).toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     var el = document.getElementById('tier-card-yours-' + slug);
     if (!el) continue;
     var c = tierCounts[n];
@@ -2075,8 +2148,7 @@ function buildTraces() {
     if (mcOk) {
       var sis0 = getActiveScenarioIndices();
       if (sis0.length === 1) {
-        var st0 = DATA.scenarios[sis0[0]];
-        var lbl0 = st0[0] + 'v' + st0[1];
+        var lbl0 = scenLabel(sis0[0]);
         if (mcPay.scens[lbl0]) mcScen = lbl0;
       }
       if (!mcScen && mcPay.scens[mcPay['default']]) mcScen = mcPay['default'];
@@ -3083,12 +3155,10 @@ function updateView() {
   var bsel = document.getElementById('bait-sel');
   var esel = document.getElementById('energy-sel');
   if (osel || bsel || esel) {
-    var base = osel ? osel.value : (DATA.oppIvModes[0] || 'pvpoke').split(':')[0];
+    var base = osel ? osel.value : parseModeBase(DATA.oppIvModes[0] || 'pvpoke');
     var bait = bsel ? bsel.value : 'bait';
     var elead = esel ? parseInt(esel.value) : 0;
-    var mode = (bait === 'nobait') ? (base + ':nobait') : base;
-    if (elead > 0) mode += ':e' + elead;
-    state.oppIvMode = mode;
+    state.oppIvMode = composeMode(base, bait, elead > 0 ? elead : 0);
   }
   var csel = document.getElementById('color-sel');
   if (csel) state.colorMode = csel.value;
@@ -3242,11 +3312,9 @@ function collectMatchScores(mi) {
   return {scores: out, refIv: refIv};
 }
 
-function parse_oppiv_base(mode) {
-  if (!mode) return 'pvpoke';
-  var i = mode.indexOf(':');
-  return i >= 0 ? mode.substring(0, i) : mode;
-}
+// Back-compat alias for the two call sites below; the grammar itself lives in
+// parseModeBase (see "Composite mode grammar" up top).
+function parse_oppiv_base(mode) { return parseModeBase(mode); }
 
 function updateHistograms() {
   var blocks = document.querySelectorAll('.dd-histogram-moveset');
@@ -3447,13 +3515,14 @@ function cmpFindIv(a, d, s) {
 // viewing L50 = "powering up flips this"; L50 when viewing L51 = "without
 // best-buddy"). altCap names the alt level for the marker.
 function cmpGrids() {
-  var base = state.movesetIdx + '_' + state.oppIvMode;
+  var mi = state.movesetIdx, mode = state.oppIvMode;
   var bb = DATA.bestBuddy || {};
-  var atL51 = !!DATA.ivL51 && state.levelMode === '51';
+  var atL51 = atL51View();
   return {
-    def: SCORES[base + (atL51 ? '@51' : '')],
-    alt: DATA.ivL51 ? SCORES[base + (atL51 ? '' : '@51')] : null,
-    altCap: atL51 ? (bb.defaultCap || 50) : (bb.altCap || 51),
+    def: SCORES[getScoreKeyAt(mi, mode, atL51)],
+    alt: DATA.ivL51 ? SCORES[getScoreKeyAt(mi, mode, !atL51)] : null,
+    altCap: atL51 ? (bb.defaultCap || levelCap('default'))
+                  : (bb.altCap || levelCap('alt')),
     // The alt grid is the best-buddy (powered-up) level only when we are
     // currently viewing the non-best-buddy (L50) grid; viewing L51 makes the
     // alt the powered-DOWN level. Drives the ✦ tooltip wording in cmp_panels.js.
@@ -3465,10 +3534,9 @@ function cmpGrids() {
 // the energy annotation is silently skipped (graceful degrade).
 function cmpEnergyGrids() {
   if (typeof ENERGY === 'undefined') return { def: null, alt: null };
-  var base = state.movesetIdx + '_' + state.oppIvMode;
-  var atL51 = !!DATA.ivL51 && state.levelMode === '51';
-  return { def: ENERGY[base + (atL51 ? '@51' : '')] || null,
-           alt: DATA.ivL51 ? (ENERGY[base + (atL51 ? '' : '@51')] || null) : null };
+  var mi = state.movesetIdx, mode = state.oppIvMode, atL51 = atL51View();
+  return { def: ENERGY[getScoreKeyAt(mi, mode, atL51)] || null,
+           alt: DATA.ivL51 ? (ENERGY[getScoreKeyAt(mi, mode, !atL51)] || null) : null };
 }
 // cmpVal / cmpHp / cmpScenLabel are defined in the shared scripts/cmp_panels.js.
 
@@ -3487,10 +3555,11 @@ function cmpSummary(iv) {
   return { wins: wins, n: nS * oppDen, avg: tot / (nS * oppDen) };
 }
 // "Gives up vs #1": avg-score gap to the best battle-IV in the active grid.
-// Cache key carries the mask signature so a selection change re-finds the best
-// (else it would compare candidates against a full-pool best under a filter).
+// Cache key is the active grid's score key (moveset + mode + level) plus the
+// mask signature, so a selection change re-finds the best (else it would
+// compare candidates against a full-pool best under a filter).
 function cmpBestAvg() {
-  var key = state.movesetIdx + state.oppIvMode + state.levelMode + oppMaskSig();
+  var key = getScoreKey(state.movesetIdx, state.oppIvMode) + oppMaskSig();
   if (cmpBestAvg._cache && cmpBestAvg._key === key) return cmpBestAvg._cache;
   var best = -1;
   for (var iv = 0; iv < DATA.nIvs; iv++) { var a = cmpSummary(iv).avg; if (a > best) best = a; }
@@ -3556,12 +3625,14 @@ function cmpStatus(t, c) {
 window.cmpBattleUrl = function(oi, si, build) {
   var fl = DATA.focalLink, ol = (DATA.oppLinks || [])[oi], sc = DATA.scenarios[si];
   if (!fl || !ol || !sc || !build || build.iv == null) return null;
-  var lab = ((DATA.movesets || [])[state.movesetIdx] || {}).label || '';
-  var seg = lab.split(' / ');
-  if (seg.length < 2) return null;
-  var fast = seg[0].trim(), chg = seg[1].split(',').map(function(x) { return x.trim(); });
-  if (chg.length < 2 || !chg[0] || !chg[1]) return null;
-  var lvArr = (state.levelMode === '51' && DATA.ivL51) ? DATA.ivL51.ivLv : DATA.ivLv;
+  // Structured move ids, split ONCE by Python (deep_dive_rendering
+  // .parse_moveset_label -> DATA.movesets[i].fast/.charged). Never re-split
+  // the display label here: the label is a display string, and a parser drift
+  // yields a wrong-but-200 pvpoke URL that no link checker can see.
+  var ms = (DATA.movesets || [])[state.movesetIdx] || {};
+  var fast = ms.fast, chg = ms.charged || [];
+  if (!fast || chg.length < 2 || !chg[0] || !chg[1]) return null;
+  var lvArr = atL51View() ? DATA.ivL51.ivLv : DATA.ivLv;
   var flv = (lvArr || [])[build.iv];
   if (flv == null) return null;
   var om = ol.byMode[state.oppIvMode] || ol.byMode.pvpoke

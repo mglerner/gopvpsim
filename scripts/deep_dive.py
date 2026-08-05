@@ -56,7 +56,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from gopvpsim.pokemon import (
     Pokemon, get_pokemon_entry, get_species, iv_rank, CPM, best_level,
-    LEAGUE_CAPS, LEAGUE_MAX_LEVEL, cp as calc_cp, pvpoke_default_ivs,
+    LEAGUE_CAPS, LEAGUE_MAX_LEVEL, MAX_CPM_LEVEL, bestbuddy_caps,
+    cp as calc_cp, pvpoke_default_ivs,
 )
 from gopvpsim.moves import get_moves, type_effectiveness, stab
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML, support_footer_html
@@ -228,6 +229,12 @@ parse_mode = rendering.parse_mode
 parse_energy = rendering.parse_energy
 compose_mode = rendering.compose_mode
 mode_pretty_label = rendering.mode_pretty_label
+# Py<->JS wire strings (DRY review 2026-08-05 entry 5): written once in
+# deep_dive_rendering, baked into DATA below, read back by the page JS.
+score_key = rendering.score_key
+scenario_label = rendering.scenario_label
+parse_moveset_label = rendering.parse_moveset_label
+tier_slug = rendering.tier_slug
 
 
 def build_iv_categories(data_obj, slayer_categories=None,
@@ -2995,8 +3002,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     nO = data_obj['nOpponents']
     scenarios = [tuple(s) for s in data_obj['scenarios']]
     opponents = opponent_names or data_obj.get('opponents', [])
-    score_key = f'{moveset_idx}_{opp_iv_mode}'
-    scores_flat = score_arrays.get(score_key, [])
+    scores_flat = score_arrays.get(score_key(moveset_idx, opp_iv_mode), [])
     if not scores_flat:
         return '', '', '<!-- analysis: no scores available -->'
     moveset_label = data_obj['movesets'][moveset_idx]['label']
@@ -4299,6 +4305,18 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'nScenarios': n_scenarios,
         'nOpponents': n_opponents,
         'scenarios': [[s0, s1] for s0, s1 in shield_scenarios],
+        # Canonical '{a}v{b}' label per scenario, baked alongside the tuple
+        # so no JS site re-forms it (DRY review 2026-08-05 entry 5). It is
+        # the matchup-cluster payload's scenario key, where a divergent
+        # form silently disables the cluster overlay.
+        'scenarioLabels': [scenario_label(s) for s in shield_scenarios],
+        # Level ceilings for this league, from pokemon.bestbuddy_caps /
+        # MAX_CPM_LEVEL, so the page JS never hardcodes 50/51 (entry 9).
+        # `maxCpm` is the hard CPM-table ceiling used to validate
+        # hand-entered levels; `default`/`alt` are the league's
+        # non-best-buddy / best-buddy caps.
+        'levelCaps': dict(zip(('default', 'alt'), bestbuddy_caps(league)),
+                          maxCpm=MAX_CPM_LEVEL),
         'opponents': opponent_names,
         # Parallel-aligned display strings: same order as `opponents`,
         # each name rewritten via `pretty_species` so shadow/regional
@@ -4344,7 +4362,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'cupLabel': cup_label,
         'referenceIdx': reference_idx,
         'tiers': tier_info,
+        # `label` stays the raw 'FAST / CM1, CM2' display string; `fast` +
+        # `charged` are the SAME split done once here (parse_moveset_label)
+        # so the page's pvpoke-link builder reads move ids straight out of
+        # DATA instead of re-splitting the label (entry 5).
         'movesets': [{'label': md['label'], 'prettyLabel': _pretty_moveset(md['label']),
+                      'fast': parse_moveset_label(md['label'])[0],
+                      'charged': parse_moveset_label(md['label'])[1],
                       **({'energyMoves': md['energy_moves']}
                          if md.get('energy_moves') is not None else {})}
                      for md in moveset_data],
@@ -4430,15 +4454,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     energy_arrays = {}
     for mi, md in enumerate(moveset_data):
         for mode in opp_iv_modes:
-            key = f'{mi}_{mode}'
+            key = score_key(mi, mode)
             score_arrays[key] = md['scores'][mode]
             if _bb_active and md.get('scores_l51') and mode in md['scores_l51']:
-                score_arrays[f'{key}@51'] = md['scores_l51'][mode]
+                score_arrays[score_key(mi, mode, l51=True)] = md['scores_l51'][mode]
             if md.get('energy') and mode in md['energy']:
                 energy_arrays[key] = md['energy'][mode]
                 if (_bb_active and md.get('energy_l51')
                         and mode in md['energy_l51']):
-                    energy_arrays[f'{key}@51'] = md['energy_l51'][mode]
+                    energy_arrays[score_key(mi, mode, l51=True)] = md['energy_l51'][mode]
 
     # Item 5: base-form score arrays (only the movesets that carry a
     # 'scores_base' -- currently moveset 0 on shadow/Female-sex focals).
@@ -4454,7 +4478,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             base_form_info = md.get('base_form')
         for mode in opp_iv_modes:
             if mode in sb:
-                scores_base_arrays[f'{mi}_{mode}'] = sb[mode]
+                scores_base_arrays[score_key(mi, mode)] = sb[mode]
 
     # (The clusterGaps computation + dashed scatter overlay were retired
     # 2026-07 with the experimental banding/gap-cluster section, replaced by
@@ -4556,7 +4580,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     if slayer_iter_result:
         ra = slayer_iter_result.get('resolved_anchors', []) or []
         if ra:
-            mset_key = f'0_{opp_iv_modes[0]}'
+            mset_key = score_key(0, opp_iv_modes[0])
             sf = score_arrays.get(mset_key, [])
             if sf:
                 # Build a stub data_obj-shaped dict the aggregator can read.
@@ -5680,7 +5704,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         _dobj51 = _copy.deepcopy(data_obj)
         _dobj51.update(_dobj51.pop('ivL51'))   # override level-dependent arrays
         _dobj51.pop('bestBuddy', None)
-        _sarr51 = {f'{mi}_{mode}': md['scores_l51'][mode]
+        # Keyed WITHOUT the '@51' suffix on purpose: this dict feeds the
+        # L51 render pass, where the best-buddy grids ARE the base grids.
+        _sarr51 = {score_key(mi, mode): md['scores_l51'][mode]
                    for mi, md in enumerate(moveset_data)
                    if md.get('scores_l51')
                    for mode in opp_iv_modes if mode in md['scores_l51']}
@@ -5796,6 +5822,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # lookup. Saves ~18 MB on an Oinkologne-shape dive by collapsing
     # 87k repeated title= values to 1.6k unique strings.
     data_obj['tooltips'] = rendering.dump_tooltip_registry()
+    # Tier-card anchor slugs, stamped LAST so they reflect the final tier
+    # names (the analysis pass renames tiers and stashes the pre-rename name
+    # in `original_name`, which is what the card anchor slugs off). The JS
+    # paste-box reads these instead of re-deriving the slug (entry 5).
+    for _tiers_key in ('tiers', 'pasteTiers'):
+        for _t in (data_obj.get(_tiers_key) or []):
+            _t['slug'] = tier_slug(_t.get('original_name') or _t.get('name') or '')
     html += f'<script>var DATA = {json.dumps(data_obj)};\n'
     html += f'var SCORES_GZ = {json.dumps(packed_scores)};\n'
     if packed_energy:

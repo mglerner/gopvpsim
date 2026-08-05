@@ -48,7 +48,11 @@ from render_article import (  # type: ignore[import-not-found]
 
 from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
 from gopvpsim.pokemon import iv_rank, LEAGUE_CP  # type: ignore[import-not-found]
-from deep_dive_rendering import opp_slug  # type: ignore[import-not-found]
+from deep_dive_rendering import (  # type: ignore[import-not-found]
+    opp_slug,
+    parse_moveset_label,
+    tier_slug,
+)
 from gopvpsim.theme import (  # type: ignore[import-not-found]
     theme_css,
     data_theme_attr,
@@ -1369,12 +1373,12 @@ def pvpoke_single_battle_url(gm: dict, league: str, shields: tuple[int, int],
 
 
 def _parse_moveset_label(label: str) -> tuple[str, list[str]]:
-    """Split 'FAST / CM1, CM2' into (fast_id, [cm1_id, cm2_id])."""
-    if '/' not in label:
-        return label.strip(), []
-    fast, rest = label.split('/', 1)
-    charged = [c.strip() for c in rest.split(',') if c.strip()]
-    return fast.strip(), charged
+    """Split 'FAST / CM1, CM2' into (fast_id, [cm1_id, cm2_id]).
+
+    Thin alias: the grammar lives in ``deep_dive_rendering`` alongside the
+    dive bake that writes these labels (DRY review 2026-08-05 entry 5).
+    """
+    return parse_moveset_label(label)
 
 
 def _collect_per_form_best_movesets(form_spec: dict, cd_move: str,
@@ -2418,14 +2422,16 @@ def _tier_slug(name: str) -> str:
     Slayer<br>  (Wigglytuff Slayer<br>  (Wigglytuff Atk))`` ->
     ``wigglytuff-atk``. Deepest parenthesised segment after splitting by
     ``<br>`` wins; plain leaf names (``Talonflame Atk``) slug directly.
+
+    Only the label EXTRACTION is article-side; the slugify rule itself is
+    ``deep_dive_rendering.tier_slug``, the same helper that emits the dive's
+    anchor ids (DRY review 2026-08-05 entry 5).
     """
-    import re
     parts = (name or '').split('<br>')
     badge = parts[-1].strip()
     while badge.startswith('(') and badge.endswith(')'):
         badge = badge[1:-1].strip()
-    slug = re.sub(r'[^a-z0-9]+', '-', badge.lower()).strip('-')
-    return slug
+    return tier_slug(badge)
 
 
 def _tier_card_href(tier: dict | str, dive_slug: str,
