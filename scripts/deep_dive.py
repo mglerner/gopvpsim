@@ -4278,9 +4278,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         opp_clean, variant, opp_is_shadow = parse_opponent_spec(opponent_names[oi])
         sid = pvpoke_links.species_id(opp_clean, opp_is_shadow)
         ms = opp_movesets[oi] if opp_movesets and oi < len(opp_movesets) else None
-        if not sid or not ms or len(ms[1]) < 2:
+        # One move-segment grammar (and one "needs 2 charged moves" guard) for
+        # every battle-link builder (DRY review 2026-08-05 entry 8). We pass the
+        # sim's resolved moveset rather than calling opponent_link_data, which
+        # would re-derive the default master moveset instead.
+        moves = pvpoke_links.moveset_segment(ms[0], ms[1]) if ms else None
+        if not sid or not moves:
             return None
-        moves = f"{ms[0]}-{ms[1][0]}-{ms[1][1]}"
         vi = variant_ivs(opp_clean, variant, league, threshold_registry)
         by_mode = {}
         for mode in opp_iv_modes:

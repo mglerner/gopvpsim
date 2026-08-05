@@ -71,8 +71,15 @@ def _lv(level):
     return int(level) if level.is_integer() else level
 
 
-def _moveset_segment(fast, charged):
-    """'FAST-CHARGED1-CHARGED2' move-id segment, or None if under-specified."""
+def moveset_segment(fast, charged):
+    """'FAST-CHARGED1-CHARGED2' move-id segment, or None if under-specified.
+
+    Public on purpose: every builder of a hard-moveset battle link (the focal
+    and opponent blobs here, and deep_dive's sim-resolved opponent blob, which
+    cannot call opponent_link_data wholesale) must form this segment the same
+    way, including the "needs a fast move and two charged moves" guard
+    (DRY review 2026-08-05 entry 8).
+    """
     if not fast or len(charged) < 2:
         return None
     return f"{fast}-{charged[0]}-{charged[1]}"
@@ -83,7 +90,7 @@ def focal_link_data(display, shadow, fast, charged):
     and move segment. IVs/level are per-candidate and filled by the caller (the
     client-side ML-guide compare panels vary them). None if unresolvable."""
     sid = species_id(display, shadow)
-    seg = _moveset_segment(fast, charged)
+    seg = moveset_segment(fast, charged)
     if not sid or not seg:
         return None
     return {'id': sid, 'moves': seg}
@@ -97,9 +104,10 @@ def opponent_link_data(opp_display):
     opp_base = opp_display.replace(' (Shadow)', '').strip()
     sid = species_id(opp_display, opp_shadow)
     moves = _opp_moveset(opp_base, opp_shadow)
-    if not sid or not moves or len(moves[1]) < 2:
+    seg = moveset_segment(*moves) if moves else None
+    if not sid or not seg:
         return None
-    return {'id': sid, 'moves': f"{moves[0]}-{moves[1][0]}-{moves[1][1]}"}
+    return {'id': sid, 'moves': seg}
 
 
 def battle_url(focal_display, focal_shadow, focal_ivs, focal_level,
