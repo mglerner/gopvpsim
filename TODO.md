@@ -32,13 +32,16 @@ verifiers, Fable synthesis). 61 confirmed / 1 intentional / 0 refuted; 56
 distinct after merging duplicate pairs; 3 [ENGINE-HASH], 4 [CROSS-REPO].
 The report IS the work plan (15 ranked entries) -- do not re-derive it here:
 
-- **Entries 1-3 are the quick wins**: live wrong-output fixes (five S fixes,
-  re-render only -- two-hue opponent colors, tier-precision contradiction,
-  mirror-CMP inconsistency, owned_breakdown rank-1 tie-break, honest-claim
-  fix), the gender-blind evolution walk (WRONG Gold-Bottle-Cap advice today;
-  cross-repo-adjacent, do attended), and the ops/gate hardening bundle
-  (ungated cups.html/support.html, ship-gate roster, newest_chain_log sort,
-  ML-slug single-source, cache-sidecar schema).
+- **Entries 1-3 DONE (2026-08-05, commits `d81c4ad..1db4f65`)**: the five
+  live wrong-output fixes, the gender+min-level-aware evolution walk
+  (shared helpers in user_collection; additive, no gobattlekit
+  coordination needed), and all five ops/gate hardening items (shared
+  ship-surface module + root-page gating, single ship-gate roster,
+  filename-stamp chain-log rule, ML-slug single-source, cache-sidecar
+  read-modify-write primitives). Each with regression tests; suite 1322
+  passed. NOTE: the entry-1 render fixes are in the GENERATORS -- the
+  shipped HTML still carries the old behavior until the next re-render
+  from replay + publish (render-only, no re-sim needed).
 - **Entry 13 is the engine DRY batch** (L6/L11/L15): one hash bump, one cold
   re-dive, scheduled against the next natural bake -- NOT item-by-item.
   Entry 12 (deep_dive.py split; D10 forces a CACHE_VERSION bump, no migrate
