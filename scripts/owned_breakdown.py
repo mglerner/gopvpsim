@@ -35,8 +35,11 @@ from gopvpsim.pokemon import (
 from gopvpsim.moves import get_moves
 from gopvpsim.battle import simulate, pvpoke_dp, BattlePokemon
 from gopvpsim.data import get_default_moveset
-from gopvpsim.user_collection import parse_csv_text, get_species_name
+from gopvpsim.user_collection import (
+    parse_csv_text, get_species_name, eligible_final_forms,
+)
 from gopvpsim.evolution_lines import get_final_forms
+from gopvpsim.pokemon import get_pokemon_index
 from deep_dive import _parse_opponent_pool_line
 
 _FAST, _CHARGED = get_moves()
@@ -169,6 +172,38 @@ def _fmt(res):
     return '\n'.join(out)
 
 
+def collect_owned_spreads(mons, species, shadow, league, max_level):
+    """(spreads, n_gender_skipped, n_overlevel_skipped) of rows that can
+    actually BE ``species`` in ``league``.
+
+    A row counts iff its shadow flag matches, ``species`` is one of its
+    GENDER-ELIGIBLE final forms (eligible_final_forms — a male Lechonk is
+    not an Oinkologne (Female)-to-be), and its current level does not
+    exceed the league-capped level for its spread (power-ups are one-way;
+    CP4 parity with user_collection's min_level guard). Spreads are
+    deduped and sorted. DRY review 2026-08-05 entry 2.
+    """
+    idx = get_pokemon_index()
+    keep, gender_skipped, over_skipped = [], 0, 0
+    for m in mons:
+        if m['is_shadow'] != shadow:
+            continue
+        base = get_species_name(m['name'], m['form'], False)
+        if species not in get_final_forms(base):
+            continue
+        if species not in eligible_final_forms(m, idx):
+            gender_skipped += 1
+            continue
+        p = Pokemon.at_best_level(species, m['atk_iv'], m['def_iv'],
+                                  m['sta_iv'], league=league,
+                                  max_level=max_level, shadow=shadow)
+        if (m.get('level') or 1.0) > p.level:
+            over_skipped += 1
+            continue
+        keep.append((m['atk_iv'], m['def_iv'], m['sta_iv']))
+    return sorted(set(keep)), gender_skipped, over_skipped
+
+
 def main():
     ap = argparse.ArgumentParser(description='Owned-mon IV breakdown.')
     ap.add_argument('species', help='PvPoke speciesName, base form (form OK, no '
@@ -196,18 +231,24 @@ def main():
         target = a.species + (' (Shadow)' if a.shadow else '')
         mons = parse_csv_text(open(a.csv, encoding='utf-8-sig').read())
         # Include pre-evolutions: IVs carry through evolution unchanged, so a
-        # Tinkatink counts as an owned Tinkaton-to-be. Shadow status also
-        # carries through, so it must match.
-        spreads = [(m['atk_iv'], m['def_iv'], m['sta_iv']) for m in mons
-                   if m['is_shadow'] == a.shadow
-                   and a.species in get_final_forms(
-                       get_species_name(m['name'], m['form'], False))]
-        if not spreads:
+        # Tinkatink counts as an owned Tinkaton-to-be. Shadow status, gender,
+        # and level carry through too — see collect_owned_spreads.
+        ceiling = LEAGUE_MAX_LEVEL.get(a.league, 51.0)
+        owned, gskip, oskip = collect_owned_spreads(
+            mons, a.species, a.shadow, a.league, ceiling)
+        if not owned:
             print(f"No owned {target} (or its pre-evos) found in {a.csv}.")
             return
-        owned = sorted(set(spreads))
-        print(f"Found {len(spreads)} owned {target} (incl. pre-evos); "
-              f"{len(owned)} distinct IV spreads.\n")
+        note = ''
+        if gskip or oskip:
+            parts = []
+            if gskip:
+                parts.append(f"{gskip} wrong-gender row(s)")
+            if oskip:
+                parts.append(f"{oskip} over-leveled-for-{a.league} row(s)")
+            note = f" (skipped {', '.join(parts)})"
+        print(f"Found {len(owned)} distinct owned {target} IV spreads "
+              f"(incl. pre-evos){note}.\n")
     elif a.ivs:
         owned = [tuple(int(x) for x in s.split('/')) for s in a.ivs]
     else:
