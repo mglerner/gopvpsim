@@ -15,6 +15,9 @@ Surface:
   - Mirror for opponents flipped out of wins.
 * ``classify_atk_weight(iv, rank1)``
   - Label a Notable IV spread as rank-1 / no-atk / slight / heavy / bulk-max.
+* ``move_display(move_id, gm=None)``
+  - The one move-id-to-label rule (gamemaster ``name``, else Title Case);
+    shared with ``deep_dive_analysis.pretty_name`` and ``generate_article``.
 
 **Honesty gate.** For flip-claiming language (``render_good_at`` /
 ``render_bad_at``) an opponent only appears when its aggregate win-rate
@@ -87,24 +90,121 @@ def _gm_move_type(gm: Optional[dict], move_id_or_name: str) -> Optional[str]:
     return None
 
 
-def _gm_move_display(gm: Optional[dict], move_id_or_name: str) -> str:
-    """Return a human display name for a move id, falling back to ``Title_Case``.
+def _title_case_move(move_id_or_name: str) -> str:
+    """Fallback display name: 'MUD_SLAP' -> 'Mud Slap'. '' for empty input.
 
-    'MUD_SLAP' -> 'Mud Slap' when the move is missing from gm or gm is None.
+    Only used when the gamemaster has no entry for the move (or no
+    gamemaster is available). 39 of the gamemaster's 334 moves disagree
+    with this rule ('SUPER_POWER' -> 'Superpower', 'X_SCISSOR' ->
+    'X-Scissor', the whole Hidden Power family), which is why the
+    gamemaster is consulted first -- see ``move_display``.
     """
-    if gm:
-        target = (move_id_or_name or '').strip().lower()
-        for m in gm.get('moves') or []:
-            if (m.get('moveId') or '').lower() == target:
-                name = m.get('name')
-                if name:
-                    return name
-            if (m.get('name') or '').lower() == target:
-                return m.get('name')
     raw = (move_id_or_name or '').strip()
     if not raw:
         return ''
     return ' '.join(w.capitalize() for w in raw.replace('_', ' ').split())
+
+
+def _build_move_name_index(gm: Optional[dict]) -> dict:
+    """Build {lowercase moveId or name -> gamemaster display name}.
+
+    ``setdefault`` in gamemaster order, moveId before name within each
+    entry, so a lookup resolves to the same move the original linear
+    scan would have found.
+    """
+    index: dict = {}
+    for m in (gm or {}).get('moves') or []:
+        name = m.get('name')
+        if not name:
+            continue
+        move_id = (m.get('moveId') or '').lower()
+        if move_id:
+            index.setdefault(move_id, name)
+        index.setdefault(name.lower(), name)
+    return index
+
+
+# id(gm) -> (gm, index). The gm dict is pinned in the entry so its id()
+# can never be recycled by a different dict while the entry lives (same
+# pattern and rationale as deep_dive_analysis._np_stats).
+_MOVE_NAME_INDEX_CACHE: dict = {}
+
+# Index built from the process-wide gamemaster, for callers that have no
+# gm blob in hand. Holds only the index (~700 short strings), never the
+# multi-MB gamemaster itself, so dive workers pay nothing to keep it.
+_DEFAULT_MOVE_NAMES: Optional[dict] = None
+
+
+def _move_name_index(gm: dict) -> dict:
+    """Return the move-name index for ``gm``, cached per gm object."""
+    key = id(gm)
+    cached = _MOVE_NAME_INDEX_CACHE.get(key)
+    if cached is not None and cached[0] is gm:
+        return cached[1]
+    index = _build_move_name_index(gm)
+    _MOVE_NAME_INDEX_CACHE[key] = (gm, index)
+    return index
+
+
+def _default_move_names() -> dict:
+    """Move-name index built from ``load_gamemaster()``, loaded once.
+
+    Imported lazily so this module stays dependency-free at import time
+    (it is imported by renderers that never touch the gamemaster).
+    """
+    global _DEFAULT_MOVE_NAMES
+    if _DEFAULT_MOVE_NAMES is None:
+        from gopvpsim.data import load_gamemaster
+        _DEFAULT_MOVE_NAMES = _build_move_name_index(load_gamemaster())
+    return _DEFAULT_MOVE_NAMES
+
+
+def _reset_move_display_caches() -> None:
+    """Drop both display-name caches. Tests call this between fixtures."""
+    global _DEFAULT_MOVE_NAMES
+    _MOVE_NAME_INDEX_CACHE.clear()
+    _DEFAULT_MOVE_NAMES = None
+
+
+def move_display(move_id_or_name: str, gm: Optional[dict] = None) -> str:
+    """Canonical human display name for a move id (or display name).
+
+    The gamemaster's ``name`` field wins when the move is known;
+    otherwise falls back to ``_title_case_move``. This is the ONE rule
+    for turning a move id into a label -- ``deep_dive_analysis.
+    pretty_name`` and ``generate_article``'s per-form headers both route
+    through it so a page can't print 'Super Power' in one table and
+    'Superpower' in the next.
+
+    ``gm`` defaults to the process-wide gamemaster (loaded and indexed
+    once). Pass a pre-loaded blob to reuse it; pass a falsy blob (``{}``)
+    to force the Title-Case fallback.
+
+    Note the gamemaster deliberately collapses some ids onto one label
+    ('AURA_WHEEL_DARK' and 'AURA_WHEEL_ELECTRIC' are both 'Aura Wheel',
+    'AEGISLASH_CHARGE_AIR_SLASH' is 'Air Slash'), matching PvPoke's UI:
+    the display name is not a round-trippable key.
+    """
+    if gm is None:
+        index = _default_move_names()
+    elif gm:
+        index = _move_name_index(gm)
+    else:
+        index = {}
+    hit = index.get((move_id_or_name or '').strip().lower())
+    if hit:
+        return hit
+    return _title_case_move(move_id_or_name)
+
+
+def _gm_move_display(gm: Optional[dict], move_id_or_name: str) -> str:
+    """Display name for a move, using only the caller-supplied ``gm``.
+
+    Thin wrapper over ``move_display`` that keeps the "no gamemaster
+    means Title Case, never load one" contract of the narrative
+    renderers (which are called with an explicit, possibly-None blob).
+    """
+    return move_display(move_id_or_name, gm=gm or {})
 
 
 def _gm_species_primary_type(gm: Optional[dict], species_name: str) -> Optional[str]:

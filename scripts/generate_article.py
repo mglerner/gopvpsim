@@ -1894,7 +1894,10 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
     for fi, f in enumerate(forms):
         flabel = html.escape(f['label'])
         fshort = _short(f['label'])
-        default_name = f['default_fast_id'].replace('_', ' ').title()
+        # Escaped like cd_name below: the label now comes from the
+        # gamemaster's `name` field rather than from a [A-Z_] move id.
+        default_name = html.escape(
+            auto_gen_narrative.move_display(f['default_fast_id'], gm=gm))
         col = _col_class(f['label'])
         col_suffix = f' {col}' if col else ''
         diag_cls = ' diag-start' if fi == 0 else ''
@@ -2015,7 +2018,8 @@ def _render_matchup_delta_per_form_section(cd_move: str, forms: list[dict],
 
     payload = _build_variants_payload(forms)
     default_fast_id = forms[0].get('default_fast_id') or ''
-    default_name = default_fast_id.replace('_', ' ').title() if default_fast_id else 'old default'
+    default_name = (auto_gen_narrative.move_display(default_fast_id, gm=gm)
+                    if default_fast_id else 'old default')
     form_labels = [f['label'] for f in forms]
     toggle_script = _article_toggle_script(
         payload=payload,
