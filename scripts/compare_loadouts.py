@@ -241,41 +241,105 @@ def _species_id(gm: dict, species_name: str) -> str | None:
     return None
 
 
+# ---- pvpoke.com link builders -------------------------------------------
+# These live here (not in generate_article.py) because generate_article
+# already imports from this module; the pair used to carry byte-equivalent
+# copies of all of them (DRY review 2026-08-05 entry 8).
+
+
 def _species_move_pools(gm: dict, species_id: str) -> tuple[list[str], list[str]]:
+    """Return (fastMovePool, chargedMovePool) sorted by moveId ascending.
+
+    Mirrors PvPoke's Pokemon.js sort at the bottom of the pool setup, which
+    determines the moveset indices used in battle/multi URLs.
+    """
     for p in gm['pokemon']:
         if p.get('speciesId') == species_id:
-            return sorted(p.get('fastMoves') or []), sorted(p.get('chargedMoves') or [])
+            fm = sorted(p.get('fastMoves') or [])
+            cm = sorted(p.get('chargedMoves') or [])
+            return fm, cm
     return [], []
 
 
-def _pvpoke_move_segment(gm: dict, species_id: str, fast: str,
-                         charged: list[str]) -> str | None:
+def _pvpoke_move_segment(gm: dict, species_id: str,
+                         fast_move_id: str,
+                         charged_move_ids: list[str]) -> str | None:
+    """Build the '<fm>-<cm1>-<cm2>' segment PvPoke uses in battle URLs.
+
+    Default encoding: fast index is 0-based into the sorted
+    fastMovePool; charged indices are 1-based into the sorted
+    chargedMovePool (PvPoke reserves 0 as the empty slot). Whenever a
+    move isn't in the species' pool - typical for unreleased CD moves
+    that haven't been added to the gamemaster upstream - PvPoke falls
+    back to embedding the moveId string directly (Pokemon.js:2102-2117,
+    the ``isCustom || hardMovesetLinks`` branch). The rendered CD-move
+    segment looks like ``MUD_SLAP-1-3`` instead of ``0-1-3``; the
+    server-side router accepts both forms. Returns None only when the
+    species pool itself can't be resolved.
+
+    NB: this is the *index* encoding, keyed to a species' gamemaster pool.
+    ``pvpoke_links.moveset_segment`` builds the hard-moveset (move-id)
+    form used by the client-side compare panels; both are valid PvPoke
+    grammars and they intentionally differ.
+    """
     fm_pool, cm_pool = _species_move_pools(gm, species_id)
     if not fm_pool or not cm_pool:
         return None
-    fm_part = str(fm_pool.index(fast)) if fast in fm_pool else fast
+    if fast_move_id in fm_pool:
+        fm_part = str(fm_pool.index(fast_move_id))
+    else:
+        fm_part = fast_move_id  # custom / unreleased: moveId string
     cm_parts: list[str] = []
-    for cm in charged:
-        cm_parts.append(str(cm_pool.index(cm) + 1) if cm in cm_pool else cm)
+    for cm in charged_move_ids:
+        if cm in cm_pool:
+            cm_parts.append(str(cm_pool.index(cm) + 1))
+        else:
+            cm_parts.append(cm)
     while len(cm_parts) < 2:
         cm_parts.append('0')
     return f'{fm_part}-{cm_parts[0]}-{cm_parts[1]}'
 
 
-def _pvpoke_multi_url(gm: dict, species_id: str, league: str,
-                      shields: tuple[int, int], fast: str,
-                      charged: list[str]) -> str | None:
+def pvpoke_multi_battle_url(gm: dict, species_id: str, league: str,
+                            shields: tuple[int, int],
+                            fast_move_id: str,
+                            charged_move_ids: list[str]) -> str | None:
+    """Build a pvpoke.com battle/multi URL for this species + moveset.
+
+    URL shape follows PvPoke's own RankingInterface.js construction:
+        battle/multi/<cp>/all/<species>/<shields>/<fm>-<cm1>-<cm2>/2-1/
+    where:
+        - cp is league-capped (1500 / 2500 / 10000)
+        - shields concatenates both starting shield counts (e.g. "11")
+        - moveset segment is built by ``_pvpoke_move_segment``, which
+          embeds moveIds directly for unreleased/custom moves
+        - "2-1" = chargedMoveCount=2, shieldBaiting=1 (copied from
+          PvPoke's own rankings link, so the landed page matches what
+          users see from the rankings UI)
+
+    Returns None only when the species' move pool can't be resolved.
+    """
     cp = LEAGUE_CP.get(league)
     if cp is None:
         return None
-    seg = _pvpoke_move_segment(gm, species_id, fast, charged)
-    if seg is None:
+    move_str = _pvpoke_move_segment(gm, species_id, fast_move_id, charged_move_ids)
+    if move_str is None:
         return None
+    shields_str = f'{shields[0]}{shields[1]}'
     return (f'https://pvpoke.com/battle/multi/{cp}/all/'
-            f'{species_id}/{shields[0]}{shields[1]}/{seg}/2-1/')
+            f'{species_id}/{shields_str}/{move_str}/2-1/')
 
 
 def _resolve_opponent(name: str) -> tuple[str, str, bool]:
+    """Split an opponent row label into (url_species_id, base_species_name, is_shadow).
+
+    - "Steelix"                  -> ("steelix", "Steelix", False)
+    - "Steelix (Shadow)"         -> ("steelix_shadow", "Steelix", True)
+    - "Medicham (atk-weighted)"  -> ("medicham", "Medicham", False)
+    The URL species id matches PvPoke's aliasId for the battle page. The
+    base species name is the one we feed to ``get_default_moveset`` to
+    look up the reference moveset.
+    """
     base = name
     if base.endswith(' (atk-weighted)'):
         base = base[:-len(' (atk-weighted)')]
@@ -288,15 +352,28 @@ def _resolve_opponent(name: str) -> tuple[str, str, bool]:
     return slug, base, is_shadow
 
 
-def _pvpoke_single_url(gm: dict, league: str, shields: tuple[int, int],
-                       focal_species_id: str, focal_fast: str,
-                       focal_charged: list[str], opp_species_id: str,
-                       opp_fast: str, opp_charged: list[str]) -> str | None:
+def pvpoke_single_battle_url(gm: dict, league: str, shields: tuple[int, int],
+                             focal_species_id: str,
+                             focal_fast_id: str,
+                             focal_charged_ids: list[str],
+                             opp_species_id: str,
+                             opp_fast_id: str,
+                             opp_charged_ids: list[str]) -> str | None:
+    """Build a pvpoke.com single-battle URL for a specific 1v1 at default IVs.
+
+    Shape mirrors PvPoke's RankingInterface.js:1090:
+        battle/<cp>/<focal>/<opp>/<shields>/<fm1-cm1-cm2>/<fm2-cm1-cm2>/
+    Both move index triples follow the same encoding as multi-battle
+    URLs (fast 0-based, charged 1-based) but sourced from each species'
+    own sorted move pool. Returns None if any pool lookup fails.
+    """
     cp = LEAGUE_CP.get(league)
     if cp is None:
         return None
-    focal_seg = _pvpoke_move_segment(gm, focal_species_id, focal_fast, focal_charged)
-    opp_seg = _pvpoke_move_segment(gm, opp_species_id, opp_fast, opp_charged)
+    focal_seg = _pvpoke_move_segment(
+        gm, focal_species_id, focal_fast_id, focal_charged_ids)
+    opp_seg = _pvpoke_move_segment(
+        gm, opp_species_id, opp_fast_id, opp_charged_ids)
     if focal_seg is None or opp_seg is None:
         return None
     return (f'https://pvpoke.com/battle/{cp}/{focal_species_id}/'
@@ -685,14 +762,14 @@ def _render_pairwise_table(a: dict, b: dict, shared_opponents: list[str],
             except KeyError:
                 opp_fast_id, opp_charged_ids = None, None
             if opp_fast_id:
-                opp_url = _pvpoke_single_url(
+                opp_url = pvpoke_single_battle_url(
                     gm, league, shields,
                     focal_species_id=a_sid,
-                    focal_fast=a_spec.fast_move,
-                    focal_charged=list(a_spec.charged_moves),
+                    focal_fast_id=a_spec.fast_move,
+                    focal_charged_ids=list(a_spec.charged_moves),
                     opp_species_id=opp_slug,
-                    opp_fast=opp_fast_id,
-                    opp_charged=list(opp_charged_ids or []),
+                    opp_fast_id=opp_fast_id,
+                    opp_charged_ids=list(opp_charged_ids or []),
                 )
 
         if opp_url:
