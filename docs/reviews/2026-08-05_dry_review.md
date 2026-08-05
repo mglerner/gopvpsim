@@ -7,6 +7,22 @@
 > live in the generators; shipped HTML updates on the next re-render.
 > Entries 4-15 remain open; the TODO.md "DRY review 2026-08-05" block
 > tracks scheduling. Read the rest as a point-in-time snapshot.
+>
+> **Corrections from the same-day human re-audit** (two agent claims
+> below did not survive re-verification; the findings and fixes stand):
+> (1) The entry-1 Annihilape 0/9/14 "reproduced" example is WRONG as an
+> end-to-end tier flip -- its def arithmetic is exact (102.998235 vs
+> 103.0), but every Annihilape tier also carries an atk requirement
+> that 0/9/14 fails at either precision, and no Annihilape dive page
+> was ever shipped. The verifier reproduced the def comparison only.
+> The mechanism is nonetheless MORE live than the review claimed: a
+> full replay-blob sweep found 48 of 94 shipped dives with real
+> rounded-vs-unrounded tier flips, 2328 spreads total (e.g. Fearow GL
+> 0/11/14, Tinkaton UL with 256 flipped spreads).
+> (2) The entry-1 "9 of the top-80 meta species" rank-1 count measures
+> 7 on a full re-run (Corsola (Galarian), Umbreon, Medicham,
+> Talonflame, Mantine, Talonflame (Shadow), Aegislash (Blade)); every
+> species the review NAMED is confirmed divergent.
 
 **Date:** 2026-08-05
 **Method:** 9 Opus finder agents swept the June S7 DRY register plus the post-June surface (July cup work, matchup-cluster section, the Python<->JS render boundary, ops/cache tooling). 3 adversarial Opus verifiers re-read every cited site at HEAD, re-ran the live reproductions, and issued verdicts with corrections. This document is the Fable synthesis pass over the verified set.
