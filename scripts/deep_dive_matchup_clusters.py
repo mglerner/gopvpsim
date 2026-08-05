@@ -684,21 +684,47 @@ def _fmt_thr(stat, value):
     return f"{value:.2f}"
 
 
+# Alpha-ramp bounds for the win-rate tint, shared with the matchup-web
+# heatmap (build_matchup_web.py cellStyle uses the same 12%..67% ramp over
+# the same tokens). Keep the two in step: the --matrix-*-fg text values are
+# AA-solved against their own -bg fill ACROSS THIS RAMP, so widening it is
+# a palette-governance change, not a cosmetic one.
+WR_RAMP_MIN_PCT = 12
+WR_RAMP_MAX_PCT = 67
+
+
 def _wr_cell(wr):
     """Win-rate table cell with a diverging win/loss tint.
 
-    The fill is the shared outcome tokens (var(--win) / var(--loss)),
-    alpha-ramped with |wr - 0.5| via color-mix -- the same technique the
-    matchup-web heatmap uses. It replaces a pair of hard-coded rgba triples
-    (the categorical CLUSTER_PALETTE's blue and red), which were dark-theme
-    values baked into a light-default site and which overloaded the
-    cluster-identity palette with outcome meaning. The number is always
-    printed, so nothing rides on color alone.
+    Uses the matchup-web heatmap lane wholesale: the fill-role tokens
+    (--matrix-win-bg / --matrix-loss-bg) alpha-ramped with |wr - 0.5| via
+    color-mix, ALWAYS paired with that token's text color
+    (--matrix-*-fg); an exact 50% gets the flat, un-ramped tie pair.
+    This replaces a pair of hard-coded rgba triples (the categorical
+    CLUSTER_PALETTE's blue and red), which were dark-theme values baked
+    into a light-default site and which overloaded the cluster-identity
+    palette with outcome meaning.
+
+    The fill/text pairing is not optional. docs/palette_governance.md
+    section 3 classifies --win/--loss as outcome TEXT tokens, solved
+    against the page bg and the --cell-*-bg tints -- NOT as fills. Using
+    them as a saturated fill under the inherited var(--text) drops the
+    printed percentage to 3.5:1 (--loss) / 4.1:1 (--win) over --surface
+    in gruvbox-light, the default theme, i.e. below the AA floor at the
+    common 0%/100% endpoint. The --matrix-* pairs clear 4.5:1 at both
+    ramp endpoints in all four themes; test_winrate_tint_* pins that.
+
+    The number is always printed, so nothing rides on color alone.
     """
-    pct = round(abs(wr - 0.5) * 110)
-    token = "--win" if wr >= 0.5 else "--loss"
-    return (f'<td style="text-align:right;background:color-mix(in srgb,'
-            f'var({token}) {pct}%, transparent)">{wr * 100:.0f}%</td>')
+    if wr == 0.5:
+        style = "background:var(--matrix-tie-bg);color:var(--matrix-tie-fg)"
+    else:
+        side = "win" if wr > 0.5 else "loss"
+        t = min(abs(wr - 0.5) * 2.0, 1.0)
+        pct = round(WR_RAMP_MIN_PCT + (WR_RAMP_MAX_PCT - WR_RAMP_MIN_PCT) * t)
+        style = (f'background:color-mix(in srgb,var(--matrix-{side}-bg) '
+                 f'{pct}%, transparent);color:var(--matrix-{side}-fg)')
+    return f'<td style="text-align:right;{style}">{wr * 100:.0f}%</td>'
 
 
 def _swatch(c):

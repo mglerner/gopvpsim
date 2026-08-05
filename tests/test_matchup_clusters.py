@@ -4,6 +4,7 @@ Synthetic-data tests: planted cluster structure, determinism, the parsimony
 floor, single-stat flip directions, tree rule extraction, degenerate inputs.
 """
 import importlib.util
+import re
 from pathlib import Path
 
 import numpy as np
@@ -421,14 +422,109 @@ def test_named_anchor_does_not_leak_across_a_shadow_variant():
     assert "<b>UNNAMED</b>" in _flip_row(html, "Sableye (Shadow)")
 
 
-def test_winrate_tint_uses_theme_outcome_tokens():
+def test_winrate_tint_uses_theme_matrix_tokens():
     html = _render(["Sableye"])
-    assert "color-mix(in srgb,var(--win)" in html
-    assert "color-mix(in srgb,var(--loss)" in html
+    # the matchup-web heatmap lane: fill-role token + its PAIRED text color
+    assert "color-mix(in srgb,var(--matrix-win-bg)" in html
+    assert "color-mix(in srgb,var(--matrix-loss-bg)" in html
+    assert "color:var(--matrix-win-fg)" in html
+    assert "color:var(--matrix-loss-fg)" in html
     # the old dark-only rgba triples must not come back
     assert "rgba(" not in html
     assert "57,135,229" not in html and "230,103,103" not in html
+    # nor the outcome TEXT tokens used as a fill (fails AA, see governance s3)
+    assert "var(--win)" not in html and "var(--loss)" not in html
     assert "Green tint" in html
+
+
+def test_wr_cell_pairs_every_fill_with_its_text_color():
+    """No tinted cell may inherit var(--text) over a saturated fill."""
+    for wr in (0.0, 0.25, 0.5, 0.5001, 0.75, 1.0):
+        cell = mc._wr_cell(wr)
+        assert "color:var(--matrix-" in cell, (wr, cell)
+        pct = re.search(r"var\(--matrix-\w+-bg\) (\d+)%", cell)
+        if wr == 0.5:
+            # exact tie: flat, un-ramped tie pair (matchup-web contract)
+            assert "var(--matrix-tie-bg)" in cell and pct is None
+        else:
+            assert mc.WR_RAMP_MIN_PCT <= int(pct.group(1)) <= mc.WR_RAMP_MAX_PCT
+    assert "--matrix-win-bg" in mc._wr_cell(1.0)
+    assert "--matrix-loss-bg" in mc._wr_cell(0.0)
+
+
+# --- WCAG AA at the ramp endpoints (docs/palette_governance.md section 3) ---
+
+def _srgb(hexstr):
+    h = hexstr.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def _luminance(rgb):
+    def chan(v):
+        v /= 255.0
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = (chan(v) for v in rgb)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _contrast(fg, bg):
+    lo, hi = sorted((_luminance(fg), _luminance(bg)))
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _over(fill, base, alpha):
+    return tuple(round(f * alpha + b * (1 - alpha))
+                 for f, b in zip(fill, base))
+
+
+def _cell_paint(wr):
+    """(fill token, alpha, text token) as the emitted cell actually paints.
+
+    Unset ``color:`` means the cell inherits the page's var(--text) -- which
+    is exactly the failure mode this guards, so it is modelled, not assumed
+    away.
+    """
+    cell = mc._wr_cell(wr)
+    ramp = re.search(r"background:color-mix\(in srgb,var\((--[\w-]+)\) "
+                     r"(\d+)%, transparent\)", cell)
+    flat = re.search(r"background:var\((--[\w-]+)\)", cell)
+    txt = re.search(r"color:var\((--[\w-]+)\)", cell)
+    fill, alpha = ((ramp.group(1), int(ramp.group(2)) / 100.0) if ramp
+                   else (flat.group(1), 1.0))
+    return fill, alpha, (txt.group(1) if txt else "--text")
+
+
+def test_winrate_tint_clears_AA_at_both_ramp_endpoints():
+    """The printed percentage must clear 4.5:1 in ALL FOUR themes, at both
+    ends of the alpha ramp, over the .dd-section surface it composites on.
+
+    Tokens are read back out of the emitted cell, so this fails if the
+    renderer switches lanes -- which is what the first cut of the tint did:
+    var(--win) / var(--loss) are outcome TEXT values, and using them as a
+    55% fill under the inherited var(--text) gave 4.14 (win) / 3.53 (loss)
+    in gruvbox-light, the DEFAULT theme.
+    """
+    from gopvpsim.theme import _THEME_ORDER, _TOKENS
+
+    # ramp endpoints on both sides, plus the exact-tie cell
+    for wr in (0.0, 0.4999, 0.5, 0.5001, 1.0):
+        fill_tok, alpha, text_tok = _cell_paint(wr)
+        for col, theme in enumerate(_THEME_ORDER):
+            surface = _srgb(_TOKENS["--surface"][col])
+            painted = _over(_srgb(_TOKENS[fill_tok][col]), surface, alpha)
+            ratio = _contrast(_srgb(_TOKENS[text_tok][col]), painted)
+            assert ratio >= 4.5, (theme, wr, fill_tok, text_tok,
+                                  round(ratio, 2))
+
+
+def test_winrate_ramp_matches_the_matchup_web_heatmap():
+    """The ramp bounds are shared with build_matchup_web.py's cellStyle --
+    the --matrix-*-fg values are AA-solved against exactly that ramp."""
+    js = (REPO_ROOT / "scripts" / "build_matchup_web.py").read_text()
+    m = re.search(r"const pct = \((\d+) \+ (\d+) \* t\)", js)
+    assert m, "matchup-web cellStyle ramp not found"
+    assert int(m.group(1)) == mc.WR_RAMP_MIN_PCT
+    assert int(m.group(1)) + int(m.group(2)) == mc.WR_RAMP_MAX_PCT
 
 
 def test_in_page_note_quotes_the_module_constants(monkeypatch):
