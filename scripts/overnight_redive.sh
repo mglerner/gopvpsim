@@ -202,11 +202,12 @@ step "Building Reader's Guides" \
 step "Rebuilding website index" \
     python scripts/build_website_index.py
 
-# 9. Final link-verification sweep. --ship runs the Oinkologne pre-ship
-#    surface; links from Aegislash/Tinkaton pages aren't covered by the
-#    default ship set but will surface any broken hrefs if present.
-step "Running article link verification" \
-    python scripts/verify_article_links.py --ship
+# 9. Final ship-gate sweep -- ALL gates from the shared roster
+#    (scripts/run_ship_gates.py: link verification + unicode-dash check).
+#    This chain used to run only the link gate and could print SUCCESS
+#    with dash violations present (DRY review 2026-08-05 entry 3b).
+step "Running ship gates (link + dash)" \
+    python scripts/run_ship_gates.py
 
 # Surface the ML best-effort tail step in the final status. The chain itself
 # completed (dives + index + verify all passed), so this stays a SUCCESS line,

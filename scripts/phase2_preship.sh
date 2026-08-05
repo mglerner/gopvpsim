@@ -108,7 +108,9 @@ run "Rebuild reader guides (TitanTrainers15 attribution banner)" $PY scripts/bui
 
 # --- 5. Rebuild index + run the ship gate (informational) --------------
 run "Rebuild website index" $PY scripts/build_website_index.py
-run "Ship link verification (--ship)" $PY scripts/verify_article_links.py --ship
+# All gates from the shared roster (run_ship_gates.py) -- this script
+# used to run only the link gate (DRY review 2026-08-05 entry 3b).
+run "Ship gates (link + dash)" $PY scripts/run_ship_gates.py
 
 # --- 6. Ready marker -- do NOT publish (push is manual) ----------------
 {

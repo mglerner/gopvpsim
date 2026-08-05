@@ -251,8 +251,10 @@ def main() -> int:
               f'  OK  all {len(counts)} fresh dives: {lo} opponents')
 
     # 4. Ship gates ---------------------------------------------------
+    # Roster imported from run_ship_gates (single source; entry 3b).
     print('[4/5] ship gates')
-    for gate in ('verify_article_links.py', 'verify_no_unicode_dashes.py'):
+    from run_ship_gates import SHIP_GATES
+    for gate, _extra in SHIP_GATES:
         r = subprocess.run(
             [sys.executable, str(REPO / 'scripts' / gate), '--ship'],
             capture_output=True, text=True)

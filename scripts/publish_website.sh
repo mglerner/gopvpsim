@@ -70,20 +70,12 @@ python "${REPO_ROOT}/scripts/build_website_index.py"
 echo
 
 if [ "$SKIP_VERIFY" = true ]; then
-  echo "Skipping link + dash verification (--skip-verify)."
+  echo "Skipping ship gates (--skip-verify)."
 else
-  echo "Verifying article links..."
-  if ! python "${REPO_ROOT}/scripts/verify_article_links.py" --ship; then
+  echo "Running ship gates (roster: scripts/run_ship_gates.py)..."
+  if ! python "${REPO_ROOT}/scripts/run_ship_gates.py"; then
     echo
-    echo "error: link verification failed -- fix broken links or re-run with --skip-verify" >&2
-    exit 1
-  fi
-  echo
-
-  echo "Verifying no em/en-dashes in user-facing text..."
-  if ! python "${REPO_ROOT}/scripts/verify_no_unicode_dashes.py" --ship -q; then
-    echo
-    echo "error: em/en-dash check failed -- replace with ASCII hyphens or re-run with --skip-verify" >&2
+    echo "error: a ship gate failed -- fix the violations or re-run with --skip-verify" >&2
     exit 1
   fi
   echo
