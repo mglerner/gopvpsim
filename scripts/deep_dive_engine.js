@@ -2594,22 +2594,29 @@ function _summaryColumns() {
 // when no cohort is available so the sort comparator keeps those IVs at
 // the end.
 //
-// Both sides are rounded to 2dp (the dive's display precision) before the
-// compare so float drift doesn't lie. Without this, Tinkaton UL's cohort
-// atk of 142.8509983 would beat the max-atk IV's display atk of 142.85 by
-// 0.001 and return 0% for every IV in the grid -- a numeric, not semantic,
-// difference. Ties count as beating since PvP CMP at exactly-equal atk
-// resolves on move priority or a coin flip, not a guaranteed loss.
+// THE one rule for "does atk a CMP-beat atk b", shared by every mirror-CMP
+// surface (_computeMirrorCmpPct, _computeTopMirrorCmpPct, cmpMirror). Both
+// sides are rounded to 2dp (the dive's display precision) before the compare
+// so float drift doesn't lie: Tinkaton UL's cohort atk of 142.8509983 would
+// otherwise beat the max-atk IV's display atk of 142.85 by 0.001 and return
+// 0% for every IV in the grid -- a numeric, not semantic, difference. Ties
+// count as beating since PvP CMP at exactly-equal atk resolves on move
+// priority or a coin flip, not a guaranteed loss. cmpMirror once used raw
+// values with a 1e-6 epsilon instead, so one page could show "100% mirror
+// CMP" and "Loses mirror CMP" for the same IV (DRY review 2026-08-05).
+function _atkBeats(a, b) {
+  return Math.round(a * 100) / 100 >= Math.round(b * 100) / 100;
+}
+
+// Fraction of the cohort whose atk this IV at least TIES, per _atkBeats.
 function _computeMirrorCmpPct(iv) {
   var cohort = DATA.mirrorCohortAtk;
   if (!cohort || cohort.length === 0) return NaN;
   var myAtk = DATA.ivAtk[iv];
   if (!isFinite(myAtk)) return NaN;
-  var myAtkR = Math.round(myAtk * 100) / 100;
   var beaten = 0;
   for (var i = 0; i < cohort.length; i++) {
-    var cR = Math.round(cohort[i] * 100) / 100;
-    if (cR <= myAtkR) beaten++;
+    if (_atkBeats(myAtk, cohort[i])) beaten++;
     else break;  // sorted ascending; stop at first strictly greater
   }
   return (beaten / cohort.length) * 100;
@@ -2655,10 +2662,9 @@ function _computeTopMirrorCmpPct(iv) {
   if (_topMirrorCohortAtks === null) _topMirrorCohortAtks = _buildTopMirrorCohort();
   var cohort = _topMirrorCohortAtks;
   if (cohort.length === 0) return NaN;
-  var myAtkR = Math.round(myAtk * 100) / 100;
   var beaten = 0;
   for (var j = 0; j < cohort.length; j++) {
-    if (cohort[j] <= myAtkR) beaten++;
+    if (_atkBeats(myAtk, cohort[j])) beaten++;
     else break;  // sorted ascending
   }
   return (beaten / cohort.length) * 100;
@@ -3502,7 +3508,9 @@ function cmpMirror(iv) {
   var atL51 = !!DATA.ivL51 && state.levelMode === '51';
   var cohort = atL51 ? DATA.mirrorCohortAtk51 : DATA.mirrorCohortAtk;
   if (!cohort || !cohort.length) return null;
-  return DATA.ivAtk[iv] >= cohort[0] - 1e-6;
+  // Same 2dp/ties-beat rule as the CMP % columns -- the old raw-value
+  // 1e-6 epsilon disagreed with them at display-precision boundaries.
+  return _atkBeats(DATA.ivAtk[iv], cohort[0]);
 }
 function cmpAnchors(iv) {
   var v = DATA.anchorClearByIv && DATA.anchorClearByIv[String(iv)];
