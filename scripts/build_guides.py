@@ -31,7 +31,10 @@ placeholders. Tokens declared in ``[tokens]`` of the guide's TOML
 ``dive:`` are resolved against the reference-dive data object (see
 ``_resolve_dive_token``); the reference dive is chosen via
 ``reference_species`` / ``reference_league`` keys in the guide's TOML,
-or falls back to ``DEFAULT_REFERENCE`` below.
+or falls back to ``DEFAULT_REFERENCE`` below. Tokens prefixed ``mc:``
+are resolved from the matchup-cluster pipeline's own module constants
+(see ``_cluster_params``), so guide prose can quote a tunable knob
+without hand-typing its value.
 
 Idempotent: re-running without source changes produces the same bytes
 on disk.
@@ -160,6 +163,31 @@ def _load_verification_counts() -> dict:
     return out
 
 
+_CLUSTER_PARAMS_CACHE: dict | None = None
+
+
+def _cluster_params() -> dict:
+    """Matchup-cluster knobs, straight from the pipeline module.
+
+    ``scripts/deep_dive_matchup_clusters.py`` declares the sharp-marginal
+    window, the K range, the silhouette epsilon and the weak-separation
+    cutoff once, and renders its own in-page note from
+    ``cluster_params()``; the guide reads the SAME dict through ``mc:``
+    tokens so a knob change can't leave the guide quoting a dead number.
+    Loaded by path (scripts/ is not a package) and cached for the run.
+    """
+    global _CLUSTER_PARAMS_CACHE
+    if _CLUSTER_PARAMS_CACHE is None:
+        import importlib.util
+        path = REPO_ROOT / 'scripts' / 'deep_dive_matchup_clusters.py'
+        spec = importlib.util.spec_from_file_location(
+            '_guides_matchup_clusters', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _CLUSTER_PARAMS_CACHE = dict(mod.cluster_params())
+    return _CLUSTER_PARAMS_CACHE
+
+
 def _resolve_tokens(
     body: str,
     guide_tokens: dict,
@@ -175,7 +203,9 @@ def _resolve_tokens(
       2. ``dive:`` prefixed tokens resolved via ``_resolve_dive_token``.
       3. ``dev:`` prefixed tokens resolved via sync sentinels in
          ``DEVELOPER_NOTES.md``.
-      4. Otherwise the placeholder is left intact and its name is
+      4. ``mc:`` prefixed tokens resolved from the matchup-cluster
+         module constants (see ``_cluster_params``).
+      5. Otherwise the placeholder is left intact and its name is
          appended to the unresolved list for the caller to warn on.
     """
     import re as _re
@@ -193,6 +223,11 @@ def _resolve_tokens(
             key = name[len('dev:'):]
             if key in dev_counts:
                 return str(dev_counts[key])
+        if name.startswith('mc:'):
+            params = _cluster_params()
+            key = name[len('mc:'):]
+            if key in params:
+                return str(params[key])
         unresolved.append(f'{guide_slug}:{name}')
         return match.group(0)
 
@@ -689,8 +724,9 @@ def main() -> int:
         for t in total_unresolved:
             print(f'  {t}', file=sys.stderr)
         print('Fix the token (check `_resolve_dive_token` vocabulary, '
-              'DEVELOPER_NOTES.md sentinels, or guide [tokens] TOML '
-              'entries) and rebuild.', file=sys.stderr)
+              'DEVELOPER_NOTES.md sentinels, `cluster_params()` keys for '
+              '`mc:`, or guide [tokens] TOML entries) and rebuild.',
+              file=sys.stderr)
         return 1
 
     return 0

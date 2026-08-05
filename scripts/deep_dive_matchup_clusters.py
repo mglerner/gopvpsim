@@ -48,6 +48,7 @@ what the reference code actually computed; do not label it cross-validated.
 
 import html as _html
 import json
+import re
 
 import numpy as np
 
@@ -73,6 +74,68 @@ SHARP_LO, SHARP_HI = 0.02, 0.98
 DEFINING_MIN_DELTA = 0.15
 TREE_MAX_DEPTH = 3
 TREE_MIN_LEAF = 40
+WEAK_SIL = 0.30             # headlines below this say "weak separation"
+
+
+def cluster_params():
+    """Display strings for the knobs above, for prose that quotes them.
+
+    Every reader-facing surface that names one of these numbers renders it
+    from HERE: the in-page "How this works" note below, and
+    ``guides/matchup-clusters/body.md`` via the ``{{mc:...}}`` tokens
+    resolved in ``scripts/build_guides.py``.  Hand-typing the numbers into
+    prose is the drift this closes -- a knob change must not leave two
+    documents claiming the old value.
+    """
+    return {
+        "sharp_lo_pct": f"{SHARP_LO * 100:g}",
+        "sharp_hi_pct": f"{SHARP_HI * 100:g}",
+        "sil_epsilon": f"{SIL_EPSILON:g}",
+        "weak_sil": f"{WEAK_SIL:.2f}",
+        "kmin": str(KMIN),
+        "kmax": str(KMAX),
+    }
+
+
+# Form/shadow parentheticals that mark a genuinely distinct opponent and must
+# NEVER be folded into a base species. Anything else in a trailing
+# parenthetical (Bug Bite, Close Combat+Rage Fist, atk-weighted, ...) is an
+# alt-moveset / weighting variant and IS foldable -- but only when stripping
+# it yields a name that another opponent in the same pool actually uses.
+_FORM_SHADOW_TAGS = frozenset({
+    'Shadow', 'Blade', 'Shield', 'Galarian', 'Female', 'Male', 'Super',
+    'Alolan', 'Hisuian', 'Origin', 'Altered', 'Incarnate', 'Therian',
+    'Standard', 'Zen',
+})
+_VARIANT_TAG_RE = re.compile(r'^(.*) \(([^()]+)\)$')
+
+
+def base_opponent(opp, all_opps):
+    """Fold trailing alt-moveset/weighting parentheticals off an opponent
+    name, but only when the stripped stem is itself a present opponent.
+
+    ``Medicham (atk-weighted)`` -> ``Medicham`` (when plain ``Medicham`` is in
+    the pool); ``Aegislash (Blade)`` stays put (form tag); ``Quagsire (Shadow)
+    (Aqua Tail+Stone Edge)`` -> ``Quagsire (Shadow)`` (keeps the Shadow form,
+    drops the moveset tag).
+
+    Lives here rather than in deep_dive.py because deep_dive.py imports THIS
+    module (a backwards import would be circular); deep_dive.py still carries
+    an identical private copy that should be retired in favour of this one.
+    """
+    cur = opp
+    while True:
+        m = _VARIANT_TAG_RE.match(cur)
+        if not m:
+            break
+        stem, tag = m.group(1), m.group(2)
+        if tag in _FORM_SHADOW_TAGS:
+            break
+        if stem in all_opps:
+            cur = stem
+            continue
+        break
+    return cur
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +164,29 @@ def sharp_marginals(W, lo=SHARP_LO, hi=SHARP_HI):
 # Weighted average-linkage agglomeration on unique fingerprints
 # ---------------------------------------------------------------------------
 
+def _hamming(patterns):
+    """Pairwise Hamming distance (fraction of differing bits) between rows.
+
+    The distance definition lives in exactly one place on purpose: the
+    linkage and the silhouette must score the SAME geometry, or the K choice
+    would be measuring a different space than the merges it is judging.
+    Returns a fresh (u, u) float array; callers that mutate it in place
+    (the Lance-Williams update) must copy first.
+    """
+    return (patterns[:, None, :] != patterns[None, :, :]).mean(axis=2)
+
+
+def _small_pop_floor(cap, n):
+    """Scale a minimum-size floor down for small populations.
+
+    Both floors in this module (the anti-speck minimum cluster size and the
+    tree's minimum leaf) want ``cap`` at a full 4096-IV dive but must not
+    lock out tiny floor dives, so they fall back to n/8 with a hard floor
+    of 2. One definition, so the two can't drift apart.
+    """
+    return max(2, min(cap, n // 8))
+
+
 def _unique_patterns(F):
     """Collapse fingerprint rows to unique patterns.
 
@@ -112,7 +198,7 @@ def _unique_patterns(F):
     return patterns, inverse.ravel(), counts
 
 
-def _linkage_labels(patterns, counts, ks):
+def _linkage_labels(patterns, counts, ks, diff=None):
     """Weighted average-linkage (Hamming) labels for each requested K.
 
     Average linkage over the full duplicated population equals weighted
@@ -130,6 +216,10 @@ def _linkage_labels(patterns, counts, ks):
     ordering (argmin scan order), i.e. lowest (i, j) up to float64
     accumulation in the Lance-Williams updates.
 
+    ``diff`` is an optional precomputed ``_hamming(patterns)`` matrix (the
+    caller shares one with the silhouette); it is never mutated -- the
+    Lance-Williams update runs on a copy.
+
     Returns {k: labels(u,)} with arbitrary (but deterministic) label ids.
     """
     u, d = patterns.shape
@@ -138,8 +228,9 @@ def _linkage_labels(patterns, counts, ks):
     if u == 1:
         return {1: np.zeros(1, dtype=np.int32)} if 1 in ks else out
     # Pairwise Hamming distances between unique patterns.
-    diff = (patterns[:, None, :] != patterns[None, :, :]).mean(axis=2)
-    dist = diff.astype(np.float64)
+    if diff is None:
+        diff = _hamming(patterns)
+    dist = diff.astype(np.float64)   # copy: the update below is in-place
     np.fill_diagonal(dist, np.inf)
     size = counts.astype(np.float64).copy()
     active = np.ones(u, dtype=bool)
@@ -180,7 +271,7 @@ def _linkage_labels(patterns, counts, ks):
     return out
 
 
-def _weighted_silhouette(patterns, counts, labels):
+def _weighted_silhouette(patterns, counts, labels, diff=None):
     """Exact full-population mean silhouette (Hamming), via unique patterns.
 
     For a point with pattern p in cluster A:
@@ -188,11 +279,16 @@ def _weighted_silhouette(patterns, counts, labels):
       b(p) = min_{B != A} sum_{q in B} c_q d(p,q) / n_B
       s(p) = (b - a) / max(a, b); s = 0 when n_A == 1.
     Overall silhouette = count-weighted mean of s over patterns.
+
+    ``diff`` is an optional precomputed ``_hamming(patterns)`` matrix, shared
+    with the linkage so both score the same geometry (and so it is built
+    once per choose_k instead of once per candidate K).
     """
     k = int(labels.max()) + 1
     if k < 2:
         return 0.0
-    diff = (patterns[:, None, :] != patterns[None, :, :]).mean(axis=2)
+    if diff is None:
+        diff = _hamming(patterns)
     n_total = counts.sum()
     cluster_sizes = np.array(
         [counts[labels == c].sum() for c in range(k)], dtype=np.float64)
@@ -232,13 +328,14 @@ def choose_k(F, kmin=KMIN, kmax=KMAX, min_cluster_ivs=None,
     """
     n = F.shape[0]
     if min_cluster_ivs is None:
-        min_cluster_ivs = max(2, min(MIN_CLUSTER_IVS, n // 8))
+        min_cluster_ivs = _small_pop_floor(MIN_CLUSTER_IVS, n)
     patterns, inverse, counts = _unique_patterns(F)
     u = len(counts)
     if u < 2:
         return None, None, None, {}
     ks = list(range(kmin, min(kmax, u) + 1))
-    lab_by_k = _linkage_labels(patterns, counts, ks)
+    diff = _hamming(patterns)        # one geometry for linkage + silhouette
+    lab_by_k = _linkage_labels(patterns, counts, ks, diff)
     sil_by_k = {}
     ok = []
     for k in ks:
@@ -248,7 +345,7 @@ def choose_k(F, kmin=KMIN, kmax=KMAX, min_cluster_ivs=None,
         sizes = np.array([counts[lab == c].sum() for c in range(k)])
         if sizes.min() < min_cluster_ivs:
             continue
-        sil_by_k[k] = _weighted_silhouette(patterns, counts, lab)
+        sil_by_k[k] = _weighted_silhouette(patterns, counts, lab, diff)
         ok.append(k)
     if not ok:
         return None, None, None, sil_by_k
@@ -428,7 +525,7 @@ def stat_rules(res, atk, def_, hp, max_depth=TREE_MAX_DEPTH,
     """
     y = res["labels"].astype(np.int64)
     X = np.column_stack([atk, def_, hp]).astype(np.float64)
-    min_leaf = max(2, min(min_leaf, len(y) // 8))
+    min_leaf = _small_pop_floor(min_leaf, len(y))
     tree = _build_tree(X, y, int(y.max()) + 1, 0, max_depth, min_leaf)
     acc = float((_tree_predict(tree, X) == y).mean())
     return acc, _tree_rules(tree, ["atk", "def", "hp"])
@@ -588,16 +685,20 @@ def _fmt_thr(stat, value):
 
 
 def _wr_cell(wr):
-    """Win-rate table cell with a diverging blue(win)/red(loss) tint.
+    """Win-rate table cell with a diverging win/loss tint.
 
-    The tint alpha scales with |wr - 0.5| and the number is always printed,
-    so the information never rides on color alone (and the rgba tint stays
-    legible over both light and dark page themes).
+    The fill is the shared outcome tokens (var(--win) / var(--loss)),
+    alpha-ramped with |wr - 0.5| via color-mix -- the same technique the
+    matchup-web heatmap uses. It replaces a pair of hard-coded rgba triples
+    (the categorical CLUSTER_PALETTE's blue and red), which were dark-theme
+    values baked into a light-default site and which overloaded the
+    cluster-identity palette with outcome meaning. The number is always
+    printed, so nothing rides on color alone.
     """
-    alpha = round(abs(wr - 0.5) * 1.1, 2)
-    color = "57,135,229" if wr >= 0.5 else "230,103,103"
-    return (f'<td style="text-align:right;'
-            f'background:rgba({color},{alpha})">{wr * 100:.0f}%</td>')
+    pct = round(abs(wr - 0.5) * 110)
+    token = "--win" if wr >= 0.5 else "--loss"
+    return (f'<td style="text-align:right;background:color-mix(in srgb,'
+            f'var({token}) {pct}%, transparent)">{wr * 100:.0f}%</td>')
 
 
 def _swatch(c):
@@ -617,7 +718,7 @@ def _scen_headline(label, entry, nO):
     n_loss = int((wr == 0.0).sum())
     sil = res["silhouette"]
     sil_txt = f'silhouette {sil:.2f}'
-    if sil < 0.30:
+    if sil < WEAK_SIL:
         sil_txt += ' - weak separation'
     return (f'<p style="font-size:13px">'
             f'<b>{label}</b>: {len(res["sharp"])} sharp marginal opponents '
@@ -678,7 +779,7 @@ def _winrate_grid(entry, opp_names):
         f'<tr><th>Marginal opponent</th>{head}</tr></thead><tbody>'
         + "".join(rows) +
         '</tbody></table>'
-        '<p style="font-size:12px;color:var(--text-muted)">Blue tint = the '
+        '<p style="font-size:12px;color:var(--text-muted)">Green tint = the '
         'cluster mostly wins that matchup, red tint = mostly loses; the '
         'percentage is the share of the cluster\'s IVs that win.</p>'
         '</details>')
@@ -767,15 +868,13 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
             return True
         # Alt-moveset / IV-variant rows ("Medicham (atk-weighted)",
         # "Forretress (Shadow) (Bug Bite)") count as named when an anchor
-        # names their base opponent. Strip one trailing parenthetical, but
-        # ONLY when the stripped base is itself in this pool -- variant rows
-        # always ride alongside their base by construction, while true
-        # form species ("Corsola (Galarian)") have no bare base in the pool,
-        # so they can never false-match a different species' anchor.
-        if name.endswith(')') and ' (' in name:
-            base = name[:name.rindex(' (')]
-            if base in pool_names and base in anchor_opps:
-                return True
+        # names their base opponent. base_opponent() strips only foldable
+        # tags, and only when the stem is itself in this pool: a form/shadow
+        # tag ("Sableye (Shadow)", "Corsola (Galarian)") is a genuinely
+        # different opponent and must NOT inherit the base species' anchor,
+        # which the old single-level strip here got wrong.
+        if base_opponent(name, pool_names) in anchor_opps:
+            return True
         return False
 
     computed = compute_matchup_clusters(
@@ -890,18 +989,21 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
             parts.append(_flip_table_html(entry, disp, bool(anchor_opps)))
         parts.append('</div>')
 
+    knobs = cluster_params()   # every number quoted below comes from them
     parts.append(
         '<details style="margin:6px 0"><summary style="cursor:pointer;'
         'font-size:13px">How this works</summary>'
         '<p style="font-size:12px;color:var(--text-muted)">'
         'Per shield scenario: an opponent is a <b>sharp marginal</b> when '
-        'between 2% and 98% of this dive\'s IV spreads beat it (everyone '
+        f'between {knobs["sharp_lo_pct"]}% and {knobs["sharp_hi_pct"]}% of '
+        'this dive\'s IV spreads beat it (everyone '
         'else is settled and can\'t distinguish IVs). Each IV\'s '
         'fingerprint is its win/loss vector over those opponents; '
         'fingerprints are clustered bottom-up (agglomerative, Hamming '
         'distance, average linkage), with the cluster count chosen by '
         'silhouette under a parsimony floor (a split must keep every '
-        'cluster above a minimum size, and the smallest K within epsilon '
+        'cluster above a minimum size, and the smallest K in '
+        f'{knobs["kmin"]}-{knobs["kmax"]} within {knobs["sil_epsilon"]} '
         'of the best silhouette wins). Clusters are ordered weakest to '
         'strongest by mean marginal wins. The scatter panels project the '
         f'same {nIvs:,} IV spreads onto each pair of battle stats; clusters '
