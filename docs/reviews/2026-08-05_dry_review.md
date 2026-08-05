@@ -1,5 +1,13 @@
 # DRY / Single-Sourcing Review -- 2026-08-05
 
+> **Status (2026-08-05, same day):** entries 1-3 SHIPPED, commits
+> `d81c4ad..1db4f65` (entry 1: all five wrong-output fixes; entry 2: the
+> gender+min-level evolution walk; entry 3: all five ops/gate items),
+> each with regression tests -- suite 1322 passed. Entry-1 render fixes
+> live in the generators; shipped HTML updates on the next re-render.
+> Entries 4-15 remain open; the TODO.md "DRY review 2026-08-05" block
+> tracks scheduling. Read the rest as a point-in-time snapshot.
+
 **Date:** 2026-08-05
 **Method:** 9 Opus finder agents swept the June S7 DRY register plus the post-June surface (July cup work, matchup-cluster section, the Python<->JS render boundary, ops/cache tooling). 3 adversarial Opus verifiers re-read every cited site at HEAD, re-ran the live reproductions, and issued verdicts with corrections. This document is the Fable synthesis pass over the verified set.
 **How to read:** Section "Ranked do-this list" is the deliverable -- a prioritized work plan, not a register. Entries are ranked by (drift-damage risk x fix cheapness) and grouped into bundles where the fixes share a session. Scope: S = under ~1h / one-or-two files; M = multi-file, one session; L = dedicated session. Two tags are rendered loudly where true: **[ENGINE-HASH]** (fix touches an `_ENGINE_FILES` member -> hash bump -> sweep-cache cold unless migrated) and **[CROSS-REPO: gobattlekit]** (touches the surface `../gobattlekit` consumes).
