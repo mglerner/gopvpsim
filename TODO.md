@@ -85,9 +85,11 @@ including JIT-COV-2 below.
   blobs / gobattlekit thresholds exported before BP-1 carry old anchors by design —
   re-export any shipped ones that matter.
 
-**Still DEFERRED:**
-- **js-parity-1..5** (LOW): shipped-page JS contradictions; the top-N session
-  owns `deep_dive_engine.js` / `deep_dive.py`. Leave until it lands.
+**Still open (UNBLOCKED 2026-08-05 -- the deferral condition is gone):**
+- **js-parity-1..5** (LOW): shipped-page JS contradictions. Was "leave until
+  the top-N session lands"; that session landed (Phase 1 `b8b561e`/`f5741a3`,
+  Equinox Phase 2 `aa8dac8..3c153fb` -- both shipped), so nothing owns
+  `deep_dive_engine.js` / `deep_dive.py` anymore. Still low, now schedulable.
 
 **Round-2 engine items still open (hunt2 batch merged `2a63b65` — NB-1 / OMT / FC-1 landed with it):**
 - **[medium, NEW from the sweep, our own bug] would_shield/always-shield
@@ -442,8 +444,10 @@ here 2026-06-12; these are the remaining seams.)*
   a 4-league unit test; supersedes this entry's "Heavy / needs a dive render
   + CSV fixture" framing, and refreshes this entry's stale SHA/line numbers).
   The `verify_js_parser.py` league-blindness half was fixed 2026-07-03
-  (`c20071e`); the deep_dive.py extraction waits for the top-N/cup session
-  to land (file conflict). Original context: no test pins
+  (`c20071e`); the deep_dive.py extraction was waiting on the top-N/cup
+  session (file conflict) -- that session LANDED (Phase 1 + Equinox Phase 2
+  shipped; unblocked 2026-08-05), so the extraction is now schedulable.
+  Original context: no test pins
   `_collection_data['maxLevel']` to `LEAGUE_MAX_LEVEL.get(league)`, so a
   future re-hardcode could silently re-introduce the GL/UL "owned mons one
   level too high" bug. Also worth folding in: the latent dead-code `51.0`
