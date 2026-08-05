@@ -162,10 +162,19 @@ def pid_etime(pid: int) -> str | None:
 
 
 def latest_file(pattern: str) -> Path | None:
-    """Return the most-recently-modified file matching ``pattern``, or None."""
+    """Return the newest file matching ``pattern``, or None.
+
+    When every match carries an overnight run stamp in its name, sort
+    by that stamp (the shared chain_logs rule -- month dirs and mtimes
+    both lie; DRY review 2026-08-05 entry 3c). Otherwise fall back to
+    mtime, which is the only signal for unstamped logs.
+    """
+    from chain_logs import run_stamp
     matches = [Path(p) for p in glob(pattern)]
     if not matches:
         return None
+    if all(run_stamp(p) for p in matches):
+        return max(matches, key=run_stamp)
     return max(matches, key=lambda p: p.stat().st_mtime)
 
 
