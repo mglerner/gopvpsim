@@ -92,6 +92,35 @@ def pretty_name(raw_id):
     return move_display(raw_id)
 
 
+def move_abbr(raw_id):
+    """Short tag for a move id: SHADOW_SNEAK -> 'SS', CRUNCH -> 'CRU'.
+
+    Multi-word ids become word initials; a single-word id becomes its first
+    three letters so the tag is never a lone letter. This is the ONE rule for
+    the compare widget's energy line (leftover energy rendered as fast-move
+    equivalents + fractions of each charged move); the dive and the ML
+    IV-envelope guide must print the same tag for the same move.
+
+    Deliberately derived from the move ID, NOT from ``pretty_name``. The
+    gamemaster's display label is a human label, and abbreviating it fails
+    two ways:
+
+      * punctuation leaks into the initials -- 'Weather Ball (Fire)' would
+        give 'WB(' instead of 'WBF', 'X-Scissor' would give 'X-S';
+      * the label is not one-to-one with the id -- AURA_WHEEL_DARK and
+        AURA_WHEEL_ELECTRIC both read 'Aura Wheel', so both would collapse
+        to 'AW' and the widget could not tell the two moves apart.
+
+    So ``pretty_name`` reads the gamemaster (entry 7 of the 2026-08-05 DRY
+    review) and this stays on the id. Output is byte-identical to the tags
+    already baked into shipped pages (Ninetales: EMB / EB / WBF).
+    """
+    words = raw_id.replace('_', ' ').split()
+    if len(words) > 1:
+        return ''.join(w[0] for w in words).upper()
+    return words[0][:3].upper() if words else '?'
+
+
 def pretty_moveset(label):
     """Convert 'FAIRY_WIND / BULLDOZE, GIGATON_HAMMER' to pretty names."""
     parts = label.split(' / ')
