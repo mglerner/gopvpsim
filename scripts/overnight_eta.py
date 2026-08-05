@@ -116,15 +116,9 @@ _BANNER_RE = re.compile(r'\[(\d+)/(\d+)\]\s+([a-z-]+-(?:great|ultra|master)-leag
 _DONE_RE = re.compile(r'Done in ([\d.]+) min')
 
 
-def _run_stamp(path: Path) -> str:
-    """Sortable YYYYMMDD_HHMMSS from an overnight_*.log name.
-
-    Sort by the filename stamp, NOT the path: the monthly subdir is
-    unreliable (today's 20260628 log can be filed under 2026-04), so a
-    path sort would order runs wrong across month dirs.
-    """
-    m = re.search(r'overnight_(\d{8}_\d{6})', path.name)
-    return m.group(1) if m else ''
+# _run_stamp moved to chain_logs.run_stamp (shared with verify_overnight
+# and chain_status; DRY review 2026-08-05 entry 3c).
+from chain_logs import run_stamp as _run_stamp  # noqa: E402
 
 
 def _agg_hit_ratio(text: str) -> float | None:

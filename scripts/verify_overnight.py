@@ -57,8 +57,10 @@ DEFAULT_MARKERS = ['Sylveon', 'Primeape', 'Umbreon']
 
 
 def newest_chain_log() -> Path | None:
-    logs = sorted(LOGS.glob('*/overnight_*.log'))
-    return logs[-1] if logs else None
+    # Filename-stamp sort via the shared rule (chain_logs) -- the old
+    # path sort ordered runs wrong across month dirs (entry 3c).
+    from chain_logs import newest_chain_log as _newest
+    return _newest(LOGS)
 
 
 def chain_start(log_path: Path) -> datetime.datetime:
