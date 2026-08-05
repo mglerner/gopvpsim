@@ -31,9 +31,22 @@ files, 392,534 hrefs, no broken internal refs); `verify_no_unicode_dashes.py
 --ship` clean; `verify_overnight.py` checks [2/5]-[5/5] green independently
 (97/97 dive dirs fully fresh, opponent counts 21..89, 61/61 ML guides fresh).
 The bake had been published; the live site was confirmed serving the guide
-URLs (HTTP 200). A residual 18-path publish delta -- the guides tree rebuilt
-*after* that publish, plus `index.html` / `cups.html` / `support.html` -- was
-pushed today.
+URLs (HTTP 200).
+
+**`publish_website.sh --dry-run` is not a drift detector** (found while
+closing this out). It regenerates the guides and `index.html` at the top of
+*every* invocation, dry runs included -- so the run that measures the delta
+first rewrites the files it is about to compare. `rsync -a` keys on size+mtime,
+not content, so those rewrites always re-send. A dry run therefore reports a
+standing ~18-path "delta" that can never reach zero: `index.html` /
+`cups.html` / `support.html` were verified byte-identical to the live copies
+(md5), and the guide pages differed only in an embedded `Last regenerated
+<date>` stamp that the rebuild itself had just bumped. Nothing had drifted;
+the push done today was a no-op re-send. To actually check drift, compare
+content (md5 against the live URLs, or `rsync --checksum`), not a dry run.
+Side effect of the same design: the public `Last regenerated` date on the
+guides tracks when someone last ran publish, not when the methodology
+changed.
 
 Two tooling fixes fell out of the reconstruction:
 
