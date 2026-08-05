@@ -58,10 +58,49 @@ import math
 
 from .evolution_lines import get_final_forms
 from .pokemon import (
-    CPM, LEAGUE_CAPS, SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
+    CPM, LEAGUE_CAPS, LEAGUE_MAX_LEVEL, MAX_CPM_LEVEL,
+    SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
     battle_stats, best_level, cp as compute_cp, get_pokemon_index,
     iv_rank,
 )
+
+
+# ---------------------------------------------------------------------------
+# Level ceilings -- single-sourced from gopvpsim.pokemon
+#
+# Every ``max_level`` default in this module derives from the league
+# (great/ultra cap at 50.0, master/little at 51.0) instead of the bare
+# 51.0 they used to carry. A league-blind 51.0 is the "owned mons one
+# level too high" bug: best buddy is +1 level and only one mon can hold
+# it, so GL/UL builds top out at 50. (DRY review 2026-08-05 entry 9;
+# the same fix already landed at the deep-dive bake site.)
+#
+# NOTE (cross-repo): gobattlekit ports this module rather than importing
+# it, and its ``iv_checker.check_thresholds`` still defaults to
+# ``max_level=51``. Pass the cap explicitly when comparing the two.
+# ---------------------------------------------------------------------------
+
+# Reverse of LEAGUE_CAPS, for the cap-taking entry points that get no league.
+_CAP_TO_LEAGUE = {cap: league for league, cap in LEAGUE_CAPS.items()}
+
+
+def league_max_level(league: str) -> float:
+    """Highest power-up level for ``league`` (``pokemon.LEAGUE_MAX_LEVEL``).
+
+    Unknown leagues fall back to the CPM table's ceiling, matching
+    :func:`gopvpsim.pokemon.iv_rank`'s own default resolution.
+    """
+    return LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL)
+
+
+def max_level_for_cap(max_cp: int) -> float:
+    """Highest power-up level for a CP cap, via the league that owns it.
+
+    :func:`ivs_to_stats_at_cap` takes a CP cap and no league, so its
+    level ceiling has to come back from the cap: 1500 -> great -> 50.0.
+    A cap that belongs to no league falls back to the CPM ceiling.
+    """
+    return league_max_level(_CAP_TO_LEAGUE.get(max_cp, ''))
 
 
 # ---------------------------------------------------------------------------
@@ -206,8 +245,8 @@ def parse_csv(csv_path: str) -> list:
 def ivs_to_stats_at_cap(
     base_atk: float, base_def: float, base_sta: float,
     atk_iv: int, def_iv: int, sta_iv: int,
-    *, shadow: bool = False, max_level: float = 51.0, max_cp: int = 1500,
-    min_level: float = 1.0,
+    *, shadow: bool = False, max_level: "float | None" = None,
+    max_cp: int = 1500, min_level: float = 1.0,
 ) -> "dict | None":
     """Return max-achievable battle stats under a CP cap.
 
@@ -215,6 +254,10 @@ def ivs_to_stats_at_cap(
     level whose CP is ``<= max_cp``. For shadow pokemon, applies
     PvPoke's ×1.2 atk / ×5/6 def multipliers on the returned
     ``attack`` and ``defense`` (CP itself is unaffected by shadow).
+
+    ``max_level=None`` (the default) derives the power-up ceiling from
+    ``max_cp`` via :func:`max_level_for_cap` -- 1500 -> great -> 50.0.
+    Pass an explicit value for a best-buddy (+1 level) build.
 
     ``min_level`` is the mon's current level: power-ups are one-way,
     so a mon already above the league-optimal level for these IVs has
@@ -235,6 +278,8 @@ def ivs_to_stats_at_cap(
     The ``stat_prod`` and ``bulk_prod`` values are floored after the
     multiplication, matching gobattlekit's historical convention.
     """
+    if max_level is None:
+        max_level = max_level_for_cap(max_cp)
     lv = best_level(base_atk, base_def, base_sta, atk_iv, def_iv, sta_iv,
                     max_cp=max_cp, max_level=max_level, min_level=min_level)
     if lv is None:
@@ -260,7 +305,7 @@ def ivs_to_stats_at_cap(
 
 def compute_rank_lookup(
     species: str, *, league: str = 'great',
-    max_level: float = 51.0, shadow: bool = False,
+    max_level: "float | None" = None, shadow: bool = False,
 ) -> dict:
     """Return a ``{(atk_iv, def_iv, sta_iv): rank}`` dict for a species.
 
@@ -268,6 +313,9 @@ def compute_rank_lookup(
     combinations by stat product) and flattens the result to a flat
     lookup table. Rank 1 is the highest stat product, matching
     PvPoke's rank convention with IV-sum tiebreaking.
+
+    ``max_level=None`` (the default) hands the league straight to
+    ``iv_rank``, which resolves the ceiling from ``LEAGUE_MAX_LEVEL``.
     """
     ranked = iv_rank(species, league=league,
                      max_level=max_level, shadow=shadow)
@@ -338,7 +386,7 @@ def _match_target(stats: dict, iv_tuple: tuple, target: dict) -> bool:
 
 def match_mons(
     mons: list, thresholds: dict, *,
-    league: str = 'great', max_level: float = 51.0,
+    league: str = 'great', max_level: "float | None" = None,
     include_empty: bool = False,
 ) -> dict:
     """Match a pre-parsed list of mons against an IV target dict.
@@ -352,8 +400,13 @@ def match_mons(
 
     The ``mons`` argument must be a list of dicts matching the shape
     produced by :func:`parse_csv` / :func:`parse_csv_text`.
+
+    ``max_level=None`` (the default) derives the power-up ceiling from
+    ``league`` via :func:`league_max_level`.
     """
     max_cp = LEAGUE_CAPS[league]
+    if max_level is None:
+        max_level = league_max_level(league)
     pokemon_index = get_pokemon_index()
     # NOTE: ``thresholds`` keys are the *capitalized* league label
     # ('Great'/'Ultra'/'Master') for compatibility with gobattlekit's
@@ -448,7 +501,7 @@ def match_mons(
 
 def check_thresholds(
     csv_path: str, thresholds: dict, *,
-    league: str = 'great', max_level: float = 51.0,
+    league: str = 'great', max_level: "float | None" = None,
     include_empty: bool = False,
 ) -> dict:
     """Parse a Poke Genie CSV and match each mon against an IV target dict.
@@ -457,7 +510,8 @@ def check_thresholds(
     :func:`match_mons`. The matching logic (and all semantics below)
     lives in :func:`match_mons` — callers that already have parsed
     mons (e.g. a JS-agreement verification harness, a live UI state,
-    an in-memory test) should call that directly.
+    an in-memory test) should call that directly. ``max_level=None``
+    (the default) derives the power-up ceiling from ``league``.
 
     For each row in the CSV:
 
