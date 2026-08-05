@@ -10,10 +10,11 @@ default. This test makes that class of drift impossible to reintroduce.
 
 See DEVELOPER_NOTES "Engine constant sourcing".
 """
+import json
 import re
 from pathlib import Path
 
-from gopvpsim.pokemon import SHADOW_ATK_BONUS, SHADOW_DEF_MULT
+from gopvpsim.pokemon import LEAGUE_CAPS, SHADOW_ATK_BONUS, SHADOW_DEF_MULT
 
 _JS = Path(__file__).resolve().parents[1] / "scripts" / "deep_dive_user_collection.js"
 
@@ -34,3 +35,20 @@ def test_js_shadow_atk_matches_python():
 
 def test_js_shadow_def_matches_python():
     assert _js_const("SHADOW_DEF_MULT") == SHADOW_DEF_MULT
+
+
+def test_js_league_caps_fallback_matches_python():
+    """Same shape, same hazard: the league CP caps.
+
+    ``matchMons`` takes ``opts.leagueCaps`` (production injects the Python
+    dict) and falls back to an inline object literal that nothing in
+    production reads -- the exact condition under which SHADOW_DEF_MULT rotted.
+    Pin it to ``pokemon.LEAGUE_CAPS`` so a cap change cannot leave a wrong
+    fallback behind.
+    """
+    text = _JS.read_text()
+    m = re.search(r"opts\.leagueCaps\s*\|\|\s*(\{[^}]*\})", text)
+    assert m, f"leagueCaps fallback literal not found in {_JS.name}"
+    # Bare JS identifier keys -> JSON keys, then parse (no eval needed).
+    as_json = re.sub(r"([A-Za-z_][A-Za-z0-9_]*)\s*:", r'"\1":', m.group(1))
+    assert json.loads(as_json) == LEAGUE_CAPS

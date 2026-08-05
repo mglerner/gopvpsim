@@ -35,8 +35,7 @@ sys.path.insert(0, os.path.join(REPO, 'src'))
 
 from gopvpsim.data import (load_gamemaster, load_group, load_rankings,  # noqa: E402
                            load_cup_rankings)
-
-_CP_BY_LEAGUE = {'great': 1500, 'ultra': 2500, 'master': 10000}
+from gopvpsim.pokemon import LEAGUE_CAPS  # noqa: E402  (canonical CP caps)
 
 
 def _id_to_name_map():
@@ -218,7 +217,7 @@ def recipe_cs_2026_orlando_top8():
 
 def recipe_cup_meta(cup, league, cup_pretty):
     """Curated cup meta as an opponent pool, movesets baked from cup rankings."""
-    cp = _CP_BY_LEAGUE[league]
+    cp = LEAGUE_CAPS[league]
     id_to_name = _id_to_name_map()
     rankings = load_cup_rankings(cup, cp)
     rank = {r['speciesId']: i + 1 for i, r in enumerate(rankings)}

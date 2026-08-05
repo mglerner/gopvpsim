@@ -51,7 +51,10 @@ import json
 
 import numpy as np
 
-WIN_RATING = 500  # strict >; matches src/gopvpsim/battle.py and all consumers
+# Single source of truth for the win/tie boundary (strict >; 500 = tie).
+# Imported, not re-declared: the boundary drifted three times when copies of
+# the literal lived in more than one place. See tests/test_win_boundary.py.
+from gopvpsim.battle import WIN_RATING
 
 # Categorical cluster colors (dark-surface steps of the validated reference
 # palette; checked against the dive's hard-coded Plotly surface #16213e with

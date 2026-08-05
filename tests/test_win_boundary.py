@@ -19,6 +19,8 @@ silently again. (The cohort-MEAN break-even gate in synthesize_mirror_tier is
 the one documented, allow-listed ``>=`` -- a float mean where exact-500 is
 measure-zero, a deliberately different "wins on average" semantic.)
 """
+import importlib.util
+import re
 import tokenize
 from pathlib import Path
 
@@ -85,3 +87,143 @@ def test_no_ge_against_win_boundary_variable_in_scripts():
     assert not offenders, (
         'win boundary drifted back to ">=" (500 must be a TIE -> use "> '
         'win_threshold" or is_win()):\n  ' + '\n  '.join(offenders))
+
+
+# ---------------------------------------------------------------------------
+# The Python half above cannot see the JS half of the engine, which is where
+# the boundary last regressed (session-3 shipped ``>= 500`` in
+# deep_dive_engine.js). The shipped JS open-codes the boundary at ~13 sites --
+# the constant is NOT injected from Python today -- so the cheap guard is a
+# literal scan for the wrong operator. Comments and strings are stripped by a
+# real JS scanner (below), not by regex over raw text: several legitimate
+# comments discuss ">= 500" in prose, and several regex literals contain quote
+# characters that a naive stripper would swallow.
+# ---------------------------------------------------------------------------
+
+_JS_GE_RE = re.compile(r'>=\s*(?:500(?![0-9.])|WIN_RATING\b)')
+
+# Characters after which a `/` starts a regex literal rather than a division.
+_RE_PRECEDERS = set('(,=:[!&|?{};+-*%~^<>\n')
+
+
+def strip_js(text):
+    """Blank out JS comments, string literals and regex literals.
+
+    Removed regions are replaced by spaces so line numbers and columns are
+    preserved for reporting. Handles ``//`` line comments, ``/* */`` block
+    comments, ``'``/``"``/`` ` `` strings with backslash escapes, and regex
+    literals (disambiguated from division by the previous significant char).
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    prev_sig = '\n'   # last significant (non-space) code character
+
+    def blank(a, b):
+        for k in range(a, b):
+            if out[k] != '\n':
+                out[k] = ' '
+
+    while i < n:
+        c = text[i]
+        if c == '/' and i + 1 < n and text[i + 1] == '/':
+            j = text.find('\n', i)
+            j = n if j < 0 else j
+            blank(i, j)
+            i = j
+            continue
+        if c == '/' and i + 1 < n and text[i + 1] == '*':
+            j = text.find('*/', i + 2)
+            j = n if j < 0 else j + 2
+            blank(i, j)
+            i = j
+            continue
+        if c in '\'"`':
+            j = i + 1
+            while j < n:
+                if text[j] == '\\':
+                    j += 2
+                    continue
+                if text[j] == c:
+                    j += 1
+                    break
+                j += 1
+            blank(i, j)
+            prev_sig = 'x'   # a string is a value, like an identifier
+            i = j
+            continue
+        if c == '/' and prev_sig in _RE_PRECEDERS:
+            j, in_class = i + 1, False
+            while j < n:
+                ch = text[j]
+                if ch == '\\':
+                    j += 2
+                    continue
+                if ch == '\n':
+                    break            # not a regex after all; bail
+                if ch == '[':
+                    in_class = True
+                elif ch == ']':
+                    in_class = False
+                elif ch == '/' and not in_class:
+                    j += 1
+                    break
+                j += 1
+            blank(i, j)
+            prev_sig = 'x'
+            i = j
+            continue
+        if not c.isspace():
+            prev_sig = c
+        i += 1
+    return ''.join(out)
+
+
+def test_strip_js_detects_only_real_code():
+    """The JS scanner itself: code hits found, comment/string/regex hits not.
+
+    Without this, a stripper bug would silently turn the scan below into a
+    test that can never fail.
+    """
+    src = (
+        "var a = x >= 500;\n"                       # 1: real offender
+        "// historical note: avg >= 500 was wrong\n"  # 2: comment
+        "/* block\n   b >= 500 inside\n*/\n"          # 3-5: block comment
+        "var s = 'text >= 500 in a string';\n"        # 6: string
+        "t.replace(/\">= 500\"/g, '');\n"             # 7: regex with a quote
+        "if (score >= WIN_RATING) {}\n"               # 8: variable form
+    )
+    hits = sorted(
+        i + 1 for i, ln in enumerate(strip_js(src).splitlines())
+        if _JS_GE_RE.search(ln))
+    assert hits == [1, 8]
+
+
+def test_no_ge_against_win_boundary_in_shipped_js():
+    """No ``>= 500`` / ``>= WIN_RATING`` in the shipped JS (500 is a TIE)."""
+    offenders = []
+    for js in sorted(SCRIPTS.glob('*.js')):
+        raw = js.read_text().splitlines()
+        for i, line in enumerate(strip_js(js.read_text()).splitlines()):
+            if _JS_GE_RE.search(line):
+                offenders.append(f'{js.name}:{i + 1}: {raw[i].strip()}')
+    assert not offenders, (
+        'win boundary drifted back to ">=" in JS (500 must be a TIE -> use '
+        '"> 500"):\n  ' + '\n  '.join(offenders))
+
+
+def test_matchup_clusters_imports_win_rating():
+    """scripts/deep_dive_matchup_clusters.py must not re-declare the boundary.
+
+    It used to carry its own ``WIN_RATING = 500`` with a comment promising it
+    matched battle.py -- exactly the copy that let the boundary drift before.
+    """
+    spec = importlib.util.spec_from_file_location(
+        'deep_dive_matchup_clusters_winpin',
+        SCRIPTS / 'deep_dive_matchup_clusters.py')
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.WIN_RATING is WIN_RATING
+    src = (SCRIPTS / 'deep_dive_matchup_clusters.py').read_text()
+    assert not re.search(r'^WIN_RATING\s*=', src, re.M), (
+        'deep_dive_matchup_clusters.py re-declares WIN_RATING; import it from '
+        'gopvpsim.battle instead')
