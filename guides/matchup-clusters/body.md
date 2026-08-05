@@ -18,7 +18,8 @@ those fights, so they carry no information about which spread to
 build.
 
 The action is in the **sharp marginal** opponents - the ones between
-2% and 98% of the IV spreads beat. On the reference
+{{mc:sharp_lo_pct}}% and {{mc:sharp_hi_pct}}% of the IV spreads beat.
+On the reference
 {{dive:species_display}} {{dive:league_display}} dive's 1v1 scenario
 (a 2026-07 snapshot; your dive shows live values), that's 15 of 87
 opponents: 28 are always-win, 37 are always-lose, and 15 actually
@@ -35,13 +36,14 @@ to strongest by how many marginal fights their members win on
 average.
 
 The number of clusters isn't fixed: the method scores each candidate
-count (2 through 6) by **silhouette** - how cleanly the fingerprints
-separate - and keeps only counts where every cluster clears a minimum
-size. Among those, it deliberately picks the **fewest** clusters that
-come within a hair (0.03) of the best silhouette, so a coarser, more
-readable grouping wins whenever it's essentially as good as a finer
-one. If no split clears the minimum-size floor, the section says so
-outright rather than inventing clusters.
+count ({{mc:kmin}} through {{mc:kmax}}) by **silhouette** - how cleanly
+the fingerprints separate - and keeps only counts where every cluster
+clears a minimum size. Among those, it deliberately picks the **fewest**
+clusters that come within a hair ({{mc:sil_epsilon}}) of the best
+silhouette, so a coarser, more readable grouping wins whenever it's
+essentially as good as a finer one. If no split clears the
+minimum-size floor, the section says so outright rather than inventing
+clusters.
 
 The key honesty note baked into the layout: **win-sets cross rather
 than nest.** A "stronger" cluster usually gains matchups *and trades
@@ -53,9 +55,9 @@ tells you the two groups of spreads are built for different jobs, not
 that one strictly beats the other.
 
 Each headline also carries a **silhouette** score - a 0-to-1 measure
-of how cleanly the fingerprints separate. When it's below 0.30 the
-headline says "weak separation" outright; read weakly-separated
-clusters as tendencies, not tiers.
+of how cleanly the fingerprints separate. When it's below
+{{mc:weak_sil}} the headline says "weak separation" outright; read
+weakly-separated clusters as tendencies, not tiers.
 
 ## The three stat-plane panels
 
@@ -79,7 +81,7 @@ the structure this section exists to show.
   gains / trades-away vs the previous cluster.
 - **Per-cluster win rates** (collapsed) - the full grid: one row per
   sharp marginal opponent, one column per cluster, each cell the
-  share of that cluster's spreads that win the fight. Blue tint =
+  share of that cluster's spreads that win the fight. Green tint =
   mostly wins, red = mostly loses; the percentage is always printed,
   so nothing rides on color alone.
 - **Stat rules** (collapsed) - a short decision tree over (atk, def,
