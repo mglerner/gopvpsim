@@ -285,9 +285,8 @@ def _iter_columns(cache_dir):
         for jp in sorted(focal_dir.glob('*.json')):
             if jp.name == 'meta.json':
                 continue
-            try:
-                side = json.loads(jp.read_text())
-            except Exception:
+            side = sweep_cache.read_sidecar(jp)
+            if side is None:
                 continue
             yield (focal_dir, meta, jp, side.get('engine'),
                    side.get('gamemaster'), side.get('col'))
@@ -313,14 +312,14 @@ def list_stamps(cache_dir):
             print(f"  {n:>8}  {stamp}{tag}")
 
 
-def _bless(jp, col, engine, gamemaster):
-    """Rewrite only the tiny sidecar stamp; the .npz (provably-valid scores) is
-    left untouched. Atomic via tmp + replace."""
-    tmp = jp.with_name(jp.name + '.tmp')
-    tmp.write_text(json.dumps(
-        {'engine': engine, 'gamemaster': gamemaster, 'col': col},
-        indent=1, sort_keys=True))
-    os.replace(tmp, jp)
+def _bless(jp, engine, gamemaster):
+    """Update only the sidecar's stamps; the .npz (provably-valid scores) is
+    left untouched. Routes through sweep_cache.bless_sidecar (read-modify-
+    write) so every OTHER sidecar field -- including any a future
+    put_column adds -- survives the migration verbatim (entry 3e; the old
+    rewrite re-serialized a hardcoded field list)."""
+    if not sweep_cache.bless_sidecar(jp, engine=engine, gamemaster=gamemaster):
+        print(f"  WARN: unreadable sidecar, NOT blessed: {jp}")
 
 
 def migrate_engine(cache_dir, from_engine, predicate_name, apply):
@@ -353,7 +352,7 @@ def migrate_engine(cache_dir, from_engine, predicate_name, apply):
         else:
             blessed += 1
             if apply:
-                _bless(jp, col, to_engine, gm_stamp)
+                _bless(jp, to_engine, gm_stamp)
     mode = 'APPLIED' if apply else 'DRY-RUN (use --apply to write)'
     print(f"ENGINE  predicate={predicate_name}  from={from_engine}  "
           f"to={to_engine}")
@@ -364,14 +363,12 @@ def migrate_engine(cache_dir, from_engine, predicate_name, apply):
     print(f"  {mode}")
 
 
-def _bless_slayer(jp, scenario, engine, gamemaster):
-    """Rewrite a slayer sidecar's stamp in place (the .pkl scores are
-    provably valid, left untouched). Atomic via tmp + replace."""
-    tmp = jp.with_name(jp.name + '.tmp')
-    tmp.write_text(json.dumps(
-        {'engine': engine, 'gamemaster': gamemaster, 'scenario': scenario},
-        sort_keys=True))
-    os.replace(tmp, jp)
+def _bless_slayer(jp, engine, gamemaster):
+    """Update a slayer sidecar's stamps in place (the .pkl scores are
+    provably valid, left untouched). Same read-modify-write primitive as
+    _bless, so 'scenario' and any future field survive verbatim."""
+    if not sweep_cache.bless_sidecar(jp, engine=engine, gamemaster=gamemaster):
+        print(f"  WARN: unreadable sidecar, NOT blessed: {jp}")
 
 
 def migrate_slayer_engine(slayer_dir, from_engine, predicate_name, apply):
@@ -412,7 +409,7 @@ def migrate_slayer_engine(slayer_dir, from_engine, predicate_name, apply):
             else:
                 blessed += 1
                 if apply:
-                    _bless_slayer(jp, scen, to_engine, gm_stamp)
+                    _bless_slayer(jp, to_engine, gm_stamp)
     mode = 'APPLIED' if apply else 'DRY-RUN (use --apply to write)'
     print(f"SLAYER  predicate={predicate_name}  from={from_engine}  "
           f"to={to_engine}")
@@ -477,7 +474,7 @@ def migrate_gamemaster(cache_dir, from_gamemaster, old_gm_file, apply):
         else:
             blessed += 1
             if apply:
-                _bless(jp, col, e_stamp, to_gamemaster)
+                _bless(jp, e_stamp, to_gamemaster)
     mode = 'APPLIED' if apply else 'DRY-RUN (use --apply to write)'
     print(f"  blessed (unaffected, served warm): {blessed}")
     print(f"  deleted (affected, will re-sim):   {deleted}")

@@ -163,6 +163,53 @@ def _key_hash(fields, n=16):
     return hashlib.md5(blob.encode()).hexdigest()[:n]
 
 
+# ---------------------------------------------------------------------------
+# Sidecar primitives (single-sourced; slayer_cache / migrate_cache / gc_cache
+# route through these -- DRY review 2026-08-05 entry 3e)
+# ---------------------------------------------------------------------------
+
+def read_sidecar(json_path):
+    """Full sidecar dict, or None on any failure (an unreadable sidecar is
+    always a SAFE MISS -- never guess at its stamps)."""
+    try:
+        return json.loads(Path(json_path).read_text())
+    except Exception:
+        return None
+
+
+def write_sidecar(json_path, fields):
+    """Atomically write a sidecar containing EXACTLY ``fields`` (tmp +
+    os.replace). NOTE this is only the atomic final write: producers
+    (put_column / SlayerCache.save) own the REMOVE-old-stamp -> write-data
+    -> write-new-stamp ordering around it (2026-06-29 red-team invariant;
+    see put_column's comment)."""
+    json_path = Path(json_path)
+    tmp = json_path.with_name(json_path.name + '.tmp')
+    tmp.write_text(json.dumps(fields, indent=1, sort_keys=True))
+    os.replace(tmp, json_path)
+
+
+def bless_sidecar(json_path, *, engine=None, gamemaster=None):
+    """Update ONLY the given stamp fields in an existing sidecar,
+    preserving every other field (read-modify-write, atomic). Returns
+    False when the sidecar is unreadable (caller must NOT bless blind).
+
+    The warm-migration path (migrate_cache) must go through THIS: its old
+    rewrite re-serialized a hardcoded field list, so any field a future
+    put_column adds would have been silently dropped by the next
+    migration -- on the artifact whose only recovery is a multi-hour
+    cold re-dive."""
+    d = read_sidecar(json_path)
+    if d is None:
+        return False
+    if engine is not None:
+        d['engine'] = engine
+    if gamemaster is not None:
+        d['gamemaster'] = gamemaster
+    write_sidecar(json_path, d)
+    return True
+
+
 def focal_key_fields(species, league, shadow, fast_id, charged_ids,
                      iv_floor, shield_scenarios, bait_mode,
                      energy_lead=0, focal_max_level=None):
@@ -238,19 +285,15 @@ class SweepCache:
         stored engine hash so a stale-engine column can be rejected (or, via
         migrate_cache, blessed) without touching the .npz.
         """
-        try:
-            return json.loads(Path(json_path).read_text()).get('engine')
-        except Exception:
-            return None
+        d = read_sidecar(json_path)
+        return d.get('engine') if d else None
 
     @staticmethod
     def read_gm_stamp(json_path):
         """Read the per-column gamemaster stamp from its .json sidecar (v7),
         or None if absent (v6 columns carry no gamemaster stamp)."""
-        try:
-            return json.loads(Path(json_path).read_text()).get('gamemaster')
-        except Exception:
-            return None
+        d = read_sidecar(json_path)
+        return d.get('gamemaster') if d else None
 
     def get_column(self, col_fields, n_ivs, n_scenarios,
                    required_planes=('score', 'energy')):
@@ -324,11 +367,8 @@ class SweepCache:
             # red-team finding; both write_planes and the sidecar are atomic.)
             sidecar.unlink(missing_ok=True)
             write_planes(p, out)
-            sc_tmp = sidecar.with_name(sidecar.name + '.tmp')
-            sc_tmp.write_text(json.dumps(
-                {'engine': engine_hash(), 'gamemaster': gamemaster_hash(),
-                 'col': col_fields},
-                indent=1, sort_keys=True))
-            os.replace(sc_tmp, sidecar)
+            write_sidecar(sidecar, {
+                'engine': engine_hash(), 'gamemaster': gamemaster_hash(),
+                'col': col_fields})
         except Exception:
             pass  # cache is best-effort

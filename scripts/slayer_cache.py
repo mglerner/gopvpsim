@@ -120,12 +120,13 @@ def _current_stamps():
 def read_stamp(sidecar_path):
     """Read a v5 sidecar -> (engine, gamemaster, scenario) or (None, None, None)
     on any failure. Used by migrate_cache / gc_cache to inspect a slayer file's
-    vintage without unpickling the (large) .pkl."""
-    try:
-        d = json.loads(Path(sidecar_path).read_text())
-        return d.get('engine'), d.get('gamemaster'), d.get('scenario')
-    except Exception:
+    vintage without unpickling the (large) .pkl. Routes through the shared
+    sidecar primitives in sweep_cache (DRY review 2026-08-05 entry 3e)."""
+    from sweep_cache import read_sidecar
+    d = read_sidecar(sidecar_path)
+    if d is None:
         return None, None, None
+    return d.get('engine'), d.get('gamemaster'), d.get('scenario')
 
 
 class SlayerCache:
@@ -202,13 +203,11 @@ class SlayerCache:
                 pickle.dump(self.data, f, protocol=pickle.HIGHEST_PROTOCOL)
             os.replace(tmp, p)
             # Sidecar stamp (engine+gamemaster+scenario), written LAST and
-            # atomically via tmp+replace, so the pkl only becomes servable once
-            # a current-vintage stamp is fully in place.
-            sc_tmp = sc.with_name(sc.name + '.tmp')
-            sc_tmp.write_text(json.dumps(
-                {'engine': eng, 'gamemaster': gm, 'scenario': self.scenario},
-                sort_keys=True))
-            os.replace(sc_tmp, sc)
+            # atomically (shared write_sidecar primitive), so the pkl only
+            # becomes servable once a current-vintage stamp is fully in place.
+            from sweep_cache import write_sidecar
+            write_sidecar(sc, {'engine': eng, 'gamemaster': gm,
+                               'scenario': self.scenario})
         except Exception:
             pass  # cache is best-effort
 
