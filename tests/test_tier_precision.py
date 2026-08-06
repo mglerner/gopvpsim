@@ -10,17 +10,9 @@ Annihilape 0/9/14, def 102.9982 vs the 103.0 threshold.
 classify_tier_indices is the extracted, unrounded classifier; these
 tests pin the boundary behavior and its agreement with classify_iv.
 """
-import importlib.util
-import os
-import sys
+from tests.conftest import load_deep_dive
 
-_HERE = os.path.dirname(__file__)
-sys.path.insert(0, os.path.join(_HERE, '..', 'scripts'))
-
-DEEP_DIVE_PATH = os.path.join(_HERE, '..', 'scripts', 'deep_dive.py')
-_spec = importlib.util.spec_from_file_location("deep_dive", DEEP_DIVE_PATH)
-deep_dive = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(deep_dive)
+deep_dive = load_deep_dive()
 
 THRESHOLDS = {
     'squag_def': {'attack': 0, 'defense': 103.0, 'stamina': 0},

@@ -9,18 +9,11 @@ These tests exercise pure-Python pieces only; nothing here spins up a sim.
 """
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
+from tests.conftest import load_deep_dive
 
-_spec = importlib.util.spec_from_file_location("deep_dive", DEEP_DIVE_PATH)
-deep_dive = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-_spec.loader.exec_module(deep_dive)
+deep_dive = load_deep_dive()
 
 
 @pytest.fixture(autouse=True)

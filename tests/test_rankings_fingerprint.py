@@ -11,22 +11,20 @@ The caplog test asserts the LOG LINE actually fires (the wiring), not just
 that the pure helper returns a dict; a source assertion confirms main's
 resolution path calls the emitter.
 """
-import importlib.util
 import logging
 import sys
 from pathlib import Path
 
 import pytest
 
+from tests.conftest import load_deep_dive
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
-_spec = importlib.util.spec_from_file_location("deep_dive", DEEP_DIVE_PATH)
-deep_dive = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-_spec.loader.exec_module(deep_dive)
+deep_dive = load_deep_dive()
 
 _FAKE_FP = {
     'cache_path': Path("/tmp/great.json"),

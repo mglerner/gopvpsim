@@ -10,6 +10,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tests.conftest import load_deep_dive
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location(
     "deep_dive_matchup_clusters",
@@ -558,19 +560,11 @@ def test_render_smoke_from_real_blob(tmp_path):
                    key=lambda p: p.stat().st_size)
     if not blobs:
         pytest.skip("no replay blobs on this machine")
-    dd_spec = importlib.util.spec_from_file_location(
-        "deep_dive", REPO_ROOT / "scripts" / "deep_dive.py")
-    dd = importlib.util.module_from_spec(dd_spec)
-    import sys
-    sys.path.insert(0, str(REPO_ROOT / "scripts"))
-    try:
-        dd_spec.loader.exec_module(dd)
-        state = dd.load_replay_state(str(blobs[0]))
-        state["html_path"] = str(tmp_path / "index.html")
-        state["card_path"] = None
-        dd.render_dive_html(state)
-    finally:
-        sys.path.remove(str(REPO_ROOT / "scripts"))
+    dd = load_deep_dive()
+    state = dd.load_replay_state(str(blobs[0]))
+    state["html_path"] = str(tmp_path / "index.html")
+    state["card_path"] = None
+    dd.render_dive_html(state)
     html = (tmp_path / "index.html").read_text()
     assert "matchup-clusters:v1" in html
     assert 'id="dd-matchup-clusters"' in html

@@ -10,35 +10,22 @@ x (opponent species/shadow/resolved IVs/moveset). These tests pin:
   match a no-cache run exactly.
 - dump_replay_state / load_replay_state roundtrip.
 """
-import importlib.util
 import multiprocessing
 import sys
 from pathlib import Path
 
 import numpy as np
 
+from tests.conftest import load_deep_dive
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-# Load deep_dive.py as a module (it's a script, not a package); this
-# puts scripts/ on sys.path so `import sweep_cache` resolves to the
-# same module object iv_sweep imports lazily. Registering in
-# sys.modules BEFORE exec is required here (unlike the other dive
-# tests): iv_sweep's pool pickles _sweep_worker by module name, and
-# pickle must find this exact module object under "deep_dive".
-# Get-or-create (shared contract with test_energy_lead.py): a second
-# exec would rebind the name and break worker pickling for whichever
-# test file bound it first.
-if "deep_dive" in sys.modules:
-    deep_dive = sys.modules["deep_dive"]
-else:
-    DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
-    _spec = importlib.util.spec_from_file_location("deep_dive",
-                                                   DEEP_DIVE_PATH)
-    deep_dive = importlib.util.module_from_spec(_spec)
-    assert _spec.loader is not None
-    sys.modules["deep_dive"] = deep_dive
-    _spec.loader.exec_module(deep_dive)
+# The shared loader puts scripts/ on sys.path (so `import sweep_cache`
+# resolves to the same module object iv_sweep imports lazily) and
+# registers the module under "deep_dive" BEFORE exec, which iv_sweep's
+# pool depends on: it pickles _sweep_worker by module name.
+deep_dive = load_deep_dive()
 
 import sweep_cache  # noqa: E402
 

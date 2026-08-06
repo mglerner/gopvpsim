@@ -5,9 +5,10 @@ Pins (a) the grid structure won_set/score_set/result_metrics read, and (b)
 that a grid cell matches a direct from_pokemon + simulate of the same matchup
 (engine ground truth) — gamemaster-robust, recomputed from current data.
 """
-import importlib.util
 import sys
 from pathlib import Path
+
+from tests.conftest import load_deep_dive
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -15,12 +16,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 # deep_dive must be importable under its own name (iv_envelope_analysis does
 # `from deep_dive import ...`, and iv_sweep pickles its worker by module name).
-if "deep_dive" not in sys.modules:
-    _dd = importlib.util.spec_from_file_location(
-        "deep_dive", REPO_ROOT / "scripts" / "deep_dive.py")
-    _m = importlib.util.module_from_spec(_dd)
-    sys.modules["deep_dive"] = _m
-    _dd.loader.exec_module(_m)
+load_deep_dive()
 
 import iv_envelope_analysis as iva  # noqa: E402
 

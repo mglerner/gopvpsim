@@ -14,21 +14,18 @@ Pins the two claims deep_dive_signature.py rests on:
 The full-sweep equality check (signature-dedup vs per-profile across a
 real opponent pool) lives in scripts/verify_signature_dedup.py.
 """
-import importlib.util
 import math
 import sys
 from pathlib import Path
 
 import numpy as np
 
+from tests.conftest import load_deep_dive
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
-_spec = importlib.util.spec_from_file_location("deep_dive", DEEP_DIVE_PATH)
-deep_dive = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-_spec.loader.exec_module(deep_dive)
+deep_dive = load_deep_dive()
 
 import deep_dive_signature as sig  # noqa: E402
 

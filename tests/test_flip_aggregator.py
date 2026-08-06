@@ -7,25 +7,18 @@ bullets from a deep-dive's score grid plus the resolved-anchor list. The
 tests use synthetic score arrays and hand-built ``ResolvedAnchor`` objects
 so they have no dependency on the gamemaster or on a real deep-dive run.
 
-The script lives in ``scripts/`` (not the gopvpsim package), so we import
-it via ``importlib`` — same pattern as ``test_format_md.py``.
+The script lives in ``scripts/`` (not the gopvpsim package), so we load it
+through the shared ``tests.conftest.load_deep_dive`` helper.
 """
 from __future__ import annotations
-
-import importlib.util
-from pathlib import Path
 
 import pytest
 
 from gopvpsim.anchors import ResolvedAnchor
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
+from tests.conftest import load_deep_dive
 
-_spec = importlib.util.spec_from_file_location("deep_dive", DEEP_DIVE_PATH)
-deep_dive = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-_spec.loader.exec_module(deep_dive)
+deep_dive = load_deep_dive()
 
 
 # ---------------------------------------------------------------------------

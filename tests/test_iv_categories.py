@@ -7,21 +7,15 @@ SwagTips-style structured IV deep dives). The tests use a synthetic
 ``data_obj`` and a synthetic slayer-categories dict so they have no
 dependency on the gamemaster or on a real deep-dive run.
 
-Like ``test_flip_aggregator.py``, the script is imported via ``importlib``
-because it lives in ``scripts/`` rather than the gopvpsim package.
+Like ``test_flip_aggregator.py``, the script is loaded through the shared
+``tests.conftest.load_deep_dive`` helper because it lives in ``scripts/``
+rather than the gopvpsim package.
 """
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
+from tests.conftest import load_deep_dive
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
-
-_spec = importlib.util.spec_from_file_location("deep_dive", DEEP_DIVE_PATH)
-deep_dive = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-_spec.loader.exec_module(deep_dive)
+deep_dive = load_deep_dive()
 
 IVCategory = deep_dive.IVCategory
 build_iv_categories = deep_dive.build_iv_categories

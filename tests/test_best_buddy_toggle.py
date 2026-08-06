@@ -9,25 +9,16 @@ Pins the load-bearing invariants of the best-buddy feature:
 - The opponent over-level seam (opp_max_level).
 - The per-species [Species.best_buddy] TOML read.
 """
-import importlib.util
 import multiprocessing
 import sys
 from pathlib import Path
 
+from tests.conftest import load_deep_dive
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-# Load deep_dive.py as a module under the canonical name (shared contract with
-# test_sweep_cache.py / test_energy_lead.py: a single shared module object so
-# multiprocessing worker pickling resolves).
-if "deep_dive" in sys.modules:
-    deep_dive = sys.modules["deep_dive"]
-else:
-    _spec = importlib.util.spec_from_file_location(
-        "deep_dive", REPO_ROOT / "scripts" / "deep_dive.py")
-    deep_dive = importlib.util.module_from_spec(_spec)
-    sys.modules["deep_dive"] = deep_dive
-    _spec.loader.exec_module(deep_dive)
+deep_dive = load_deep_dive()
 
 import sweep_cache  # noqa: E402
 
