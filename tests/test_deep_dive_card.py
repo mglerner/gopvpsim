@@ -6,9 +6,10 @@ this needs no simulation. opp_iv_robustness does sim, but on a tiny top-k
 cohort it is fast and we assert its weighting structure rather than a
 specific (gamemaster-dependent) win count.
 """
-import importlib.util
 import sys
 from pathlib import Path
+
+from tests.conftest import load_deep_dive
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -16,11 +17,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import deep_dive_card as dc  # noqa: E402
 
-DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
-_spec = importlib.util.spec_from_file_location("deep_dive", DEEP_DIVE_PATH)
-deep_dive = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-_spec.loader.exec_module(deep_dive)
+deep_dive = load_deep_dive()
 
 from gopvpsim.pokemon import iv_rank  # noqa: E402
 

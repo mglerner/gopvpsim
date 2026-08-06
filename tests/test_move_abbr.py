@@ -46,6 +46,8 @@ sys.path.insert(0, str(SCRIPTS))
 
 from gopvpsim.data import load_gamemaster  # noqa: E402
 
+from tests.conftest import load_deep_dive  # noqa: E402
+
 _spec = importlib.util.spec_from_file_location(
     "deep_dive_analysis", SCRIPTS / "deep_dive_analysis.py")
 deep_dive_analysis = importlib.util.module_from_spec(_spec)
@@ -148,12 +150,7 @@ def test_iv_envelope_mirror_agrees_with_shared_helper():
     It still open-codes the id rule, so it agrees with the helper by value
     today; this pins that agreement until it is routed through move_abbr.
     """
-    if "deep_dive" not in sys.modules:
-        _dd = importlib.util.spec_from_file_location(
-            "deep_dive", SCRIPTS / "deep_dive.py")
-        _m = importlib.util.module_from_spec(_dd)
-        sys.modules["deep_dive"] = _m
-        _dd.loader.exec_module(_m)
+    load_deep_dive()      # iv_envelope_analysis does `from deep_dive import ...`
     import iv_envelope_analysis as iva
 
     bad = [(mid, iva._move_abbr(mid), move_abbr(mid))

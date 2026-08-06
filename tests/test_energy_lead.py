@@ -12,31 +12,19 @@ converts N x the moveset's energyGain to raw starting energy, capped at
   makes over-the-cap multiples equivalent, and the worker's applied
   energy matches a direct single-sim with initial_energy set.
 """
-import importlib.util
 import multiprocessing
 import sys
 from pathlib import Path
 
+from tests.conftest import load_deep_dive
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-# Same loading pattern as test_sweep_cache.py: register under
-# "deep_dive" BEFORE exec so the pool can pickle _sweep_worker by
-# module name. Get-or-create: if another test module already
-# registered "deep_dive", REUSE its module object — a second exec
-# would rebind sys.modules["deep_dive"] to a different object and
-# break pickle's identity check on _sweep_worker for whichever file
-# bound first (the pool pickles workers by qualified name).
-if "deep_dive" in sys.modules:
-    deep_dive = sys.modules["deep_dive"]
-else:
-    DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
-    _spec = importlib.util.spec_from_file_location("deep_dive",
-                                                   DEEP_DIVE_PATH)
-    deep_dive = importlib.util.module_from_spec(_spec)
-    assert _spec.loader is not None
-    sys.modules["deep_dive"] = deep_dive
-    _spec.loader.exec_module(deep_dive)
+# The shared loader registers the module under "deep_dive" BEFORE exec
+# so the pool can pickle _sweep_worker by module name, and hands back
+# the one shared object (see tests/conftest.load_deep_dive).
+deep_dive = load_deep_dive()
 
 import sweep_cache  # noqa: E402
 

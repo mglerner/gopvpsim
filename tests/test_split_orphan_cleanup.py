@@ -5,23 +5,7 @@ A re-dive whose moveset enumeration changed writes differently-named
 consumers (article freshness gate, compare_loadouts) see mixed data
 vintages. This killed the 2026-06-11 overnight chain.
 """
-import importlib.util
-import sys
-from pathlib import Path
-
-_SCRIPTS = Path(__file__).resolve().parent.parent / 'scripts'
-
-
-def _load_deep_dive():
-    if 'deep_dive' in sys.modules:
-        return sys.modules['deep_dive']
-    sys.path.insert(0, str(_SCRIPTS))
-    spec = importlib.util.spec_from_file_location(
-        'deep_dive', _SCRIPTS / 'deep_dive.py')
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules['deep_dive'] = mod
-    spec.loader.exec_module(mod)
-    return mod
+from tests.conftest import load_deep_dive as _load_deep_dive
 
 
 def test_stale_siblings_removed_fresh_kept(tmp_path):

@@ -1,9 +1,63 @@
 """
 Shared fixtures for gopvpsim tests.
 """
+import importlib.util
+import sys
+from pathlib import Path
+
 import pytest
 import gopvpsim
 import gopvpsim.data as data_module
+
+# ---------------------------------------------------------------------------
+# Shared scripts/deep_dive.py loader (DRY review 2026-08-05 entry 12, T8)
+# ---------------------------------------------------------------------------
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_DIR = REPO_ROOT / 'scripts'
+DEEP_DIVE_PATH = SCRIPTS_DIR / 'deep_dive.py'
+
+
+def load_deep_dive():
+    """Return THE shared ``deep_dive`` module object, loading it once.
+
+    ``scripts/deep_dive.py`` is a script, not a package member, so tests
+    load it by path.  Two properties are load-bearing and were easy to
+    get wrong while every test file open-coded the load:
+
+    * The module must be registered in ``sys.modules['deep_dive']``
+      BEFORE ``exec_module`` runs.  ``iv_sweep``'s process pool pickles
+      ``_sweep_worker`` / ``_sweep_worker_init`` by qualified name, so
+      the name has to resolve to this object on the parent side and to
+      an importable ``deep_dive`` on the child side (spawn hands the
+      child the parent's ``sys.path``, which is why ``scripts/`` goes on
+      it here).
+    * Exactly one object may ever be bound to that name.  A second
+      ``exec_module`` rebinds ``sys.modules['deep_dive']`` and breaks
+      pickle's identity check for whichever test file bound first --
+      i.e. worker behavior would depend on collection order.
+
+    Get-or-create preserves both.  Safe to call at test-module import
+    time and from inside a test; every call returns the same object.
+    """
+    mod = sys.modules.get('deep_dive')
+    if mod is not None:
+        return mod
+    for p in (REPO_ROOT / 'src', SCRIPTS_DIR):
+        if str(p) not in sys.path:
+            sys.path.insert(0, str(p))
+    spec = importlib.util.spec_from_file_location('deep_dive', DEEP_DIVE_PATH)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules['deep_dive'] = mod      # BEFORE exec: worker pickling needs it
+    try:
+        spec.loader.exec_module(mod)
+    except BaseException:
+        # Don't leave a half-built module registered; the next caller
+        # would get it back and fail somewhere far from the real cause.
+        sys.modules.pop('deep_dive', None)
+        raise
+    return mod
 
 
 @pytest.fixture(autouse=True, scope='session')

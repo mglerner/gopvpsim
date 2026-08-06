@@ -5,23 +5,19 @@ pool of 5) to verify the extracted module loads correctly and produces
 the expected output structure.  Catches missing imports and broken
 cross-module references.  Runs in ~10-15 seconds.
 """
-import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
 
+from tests.conftest import load_deep_dive
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-# Load deep_dive.py as a module (it's a script, not a package).
-# This also triggers the slayer/analysis/rendering module imports
-# and the compute_iv_metadata injection.
-DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
-_spec = importlib.util.spec_from_file_location("deep_dive", DEEP_DIVE_PATH)
-deep_dive = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-_spec.loader.exec_module(deep_dive)
+# Loading deep_dive also triggers the slayer/analysis/rendering module
+# imports and the compute_iv_metadata injection.
+deep_dive = load_deep_dive()
 
 from gopvpsim.data import get_default_moveset
 from gopvpsim.pokemon import pvpoke_default_ivs
