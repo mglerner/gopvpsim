@@ -1,6 +1,63 @@
 # Changelog
 
-Completed/shipped work, reverse chronological. **Not** part of the
+Completed/shipped work, reverse chronological.
+
+## 2026-08-05 -- DRY review executed end-to-end; site re-rendered + published
+
+Two-day arc, one day: the Fable-orchestrated DRY/single-sourcing review
+(13 agents, `docs/reviews/2026-08-05_dry_review.md`, 56 distinct defects
+ranked into 15 entries) was run in the morning, and by evening entries
+1-11 + 14 + the two entry-12 "safe-any-time" cherries were implemented,
+adversarially verified, re-rendered, and published. Only entries 12
+(deep_dive.py split, CACHE_VERSION cold) and 13 (engine DRY batch) remain,
+both scheduled against the next bake window, plus entry 15's fold-ins.
+
+**Entries 1-3** (commits `d81c4ad..1db4f65`, hand-implemented): five live
+wrong-output fixes (case-insensitive opponent-color hash; unrounded tier
+classification via `classify_tier_indices`; one `_atkBeats` mirror-CMP rule;
+`rank1_spread` -> `iv_rank` wrapper; honest surface docstring), the
+gender+min-level-aware evolution walk (`gender_allows` /
+`eligible_final_forms` in user_collection; on the fixture the Oinkologne
+(Female) GL breakdown now skips 34 wrong-gender + 6 over-leveled rows), and
+five ops/gate items (shared ship-surface enumeration gating cups.html/
+support.html; single SHIP_GATES roster -- two chains had silently skipped the
+dash gate; filename-stamp chain-log rule; ML-slug single-sourcing;
+read-modify-write cache-sidecar primitives).
+
+**Entries 4-11 + 14 + cherries** (commits `caeded9..7e66ba2`, 30-agent
+lane-partitioned workflow, 2 adversarial verifiers per entry, 3 must-fix
+findings caught and fixed in-flight): WIN_RATING JS tripwire + league-cap
+pins; the five Py<->JS wire strings baked from Python (score key, mode
+grammar, scenario label, moveset label, tier slug); July cup plumbing
+consolidated (public data accessors, one cup registry, W8 slug-parser
+merge); gamemaster-backed move display names (~39 labels corrected/page)
+with the id-derived `move_abbr` energy tags; pvpoke link-builder
+consolidation + Python<->JS URL parity test; league-derived level ceilings
+in user_collection (None-means-derive; gobattlekit PORTS the module -- its
+copy noted in the docstring); per-target JS gender mirror + Oinkologne
+harness coverage; `gopvpsim.invalidate_caches()`; matchup-clusters cleanup.
+Suite 1322 -> **1514 passed / 14 xfailed** (+192 tests in the day);
+engine-hash files verified untouched in every commit, so the sweep cache
+survived the whole arc warm.
+
+**Verification-report discipline** (reports repo,
+`gopvpsim-dry-fixes-verification-2026-08-05.html` + the rendered review):
+every agent-verified claim was re-verified by hand; THREE claims fell and
+are corrected visibly -- the Annihilape 0/9/14 "shipped page" example
+(refuted: atk gates block it, no such page), the "9 of top-80" rank-1 count
+(measured 7), and the first re-audit's own "48/94 dives, 2328 flipped
+spreads" tier estimate (superseded by a direct DATA.ivTiers diff of all 97
+pages, old live vs new: ZERO tier changes -- the sweep had classified
+against `blob['thresholds']`, which the anchor-derived page tier system
+does not use). Lesson recorded: model-level sweeps against blob structures
+are not page-level evidence; diff the rendered artifact.
+
+**Re-render + publish**: render-only chain
+(`userdata/logs/2026-08/rerender_20260805.{sh,log}`) -- 97 dives from
+replay blobs, 61 ML guides from JSONs, 4 comparisons, matchup web, guides,
+index, ship gates -- then `publish_website.sh --push` (396 files by
+checksum). Live-site spot checks green: Altaria one hue (96 spans),
+zero "Super Power", `_atkBeats` shipped. No re-sim anywhere. **Not** part of the
 session-startup read (see `CLAUDE.md`). Purely historical reference
 for "when did we ship X" and "what was the root cause of that old
 bug." Active pending work lives in `TODO.md`; still-relevant
