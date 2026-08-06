@@ -18,18 +18,25 @@
 > deferrals recorded in the implementing commits. Read the rest as a
 > point-in-time snapshot.
 >
-> **Corrections from the same-day human re-audit** (two agent claims
-> below did not survive re-verification; the findings and fixes stand):
+> **Corrections from the same-day human re-audits** (three claims did
+> not survive re-verification -- two from the review's agents, one from
+> the first re-audit round itself; the fixes stand in all cases):
 > (1) The entry-1 Annihilape 0/9/14 "reproduced" example is WRONG as an
 > end-to-end tier flip -- its def arithmetic is exact (102.998235 vs
 > 103.0), but every Annihilape tier also carries an atk requirement
 > that 0/9/14 fails at either precision, and no Annihilape dive page
 > was ever shipped. The verifier reproduced the def comparison only.
-> The mechanism is nonetheless MORE live than the review claimed: a
-> full replay-blob sweep found 48 of 94 shipped dives with real
-> rounded-vs-unrounded tier flips, 2328 spreads total (e.g. Fearow GL
-> 0/11/14, Tinkaton UL with 256 flipped spreads).
-> (2) The entry-1 "9 of the top-80 meta species" rank-1 count measures
+> (2) The first re-audit round then estimated "48 of 94 shipped dives,
+> 2328 flipped spreads" from a replay-blob sweep -- ALSO WRONG: the
+> sweep classified against blob['thresholds'], a legacy rounded-cutoff
+> structure the page tier system does not use (pages tier on
+> anchor-derived FULL-PRECISION cutoffs). The superseding measurement,
+> taken after the 2026-08-05 re-render: a direct DATA.ivTiers diff of
+> all 97 shipped pages, old live vs new local -- ZERO tier-assignment
+> changes. The tier-precision fix is consistency hardening (bake now
+> matches the paste-box scanner's semantics; boundary tests pin it),
+> with no visible effect on any currently-shipped page.
+> (3) The entry-1 "9 of the top-80 meta species" rank-1 count measures
 > 7 on a full re-run (Corsola (Galarian), Umbreon, Medicham,
 > Talonflame, Mantine, Talonflame (Shadow), Aegislash (Blade)); every
 > species the review NAMED is confirmed divergent.
