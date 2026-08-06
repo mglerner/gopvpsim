@@ -65,7 +65,9 @@ def test_no_ge_against_win_boundary_variable_in_scripts():
     """
     _GE_NAMES = {'win_threshold', 'WIN_RATING'}
     offenders = []
-    for py in sorted(SCRIPTS.glob('*.py')):
+    # rglob, not glob: the entry-12 split put ~2900 lines of scripts/ code
+    # under scripts/deep_dive_lib/, which a flat glob would stop scanning.
+    for py in sorted(SCRIPTS.rglob('*.py')):
         lines = py.read_text().splitlines()
         prev = None  # previous significant token
         with open(py, 'rb') as fh:

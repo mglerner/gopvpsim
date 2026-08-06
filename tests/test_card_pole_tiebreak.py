@@ -32,7 +32,9 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from gopvpsim.efficiency import efficient_frontier  # noqa: E402
 
-_DEEP_DIVE = REPO_ROOT / "scripts" / "deep_dive.py"
+# generate_analysis_sections moved to deep_dive_lib/render.py in the
+# entry-12 split; the source tripwires below read it there.
+_DEEP_DIVE = REPO_ROOT / "scripts" / "deep_dive_lib" / "render.py"
 
 # Synthetic below-cap layout mirroring the UL Mimikyu repro: index 0 is
 # `0/15/15` (lower atk), index 1 is `1/15/15` (same def + hp, higher atk), so 1

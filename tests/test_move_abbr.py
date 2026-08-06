@@ -175,7 +175,8 @@ def test_no_new_open_coded_move_abbreviators():
     canonical = "deep_dive_analysis.py"          # move_abbr itself lives here
     known = {"deep_dive.py", "iv_envelope_analysis.py"}
     found = set()
-    for path in sorted(SCRIPTS.glob("*.py")):
+    # rglob: scripts/deep_dive_lib/ (entry-12 split) is still "in scripts/".
+    for path in sorted(SCRIPTS.rglob("*.py")):
         name = os.path.basename(str(path))
         if name == canonical:
             continue

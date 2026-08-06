@@ -62,9 +62,12 @@ def _synthetic_rankings(monkeypatch):
     # build_opp_meta_ranks goes through the public data accessor
     # get_rankings_for(league, cup=...) -- one call for both the open-league
     # and the cup branch -- so that is what the hermetic tests stub.
-    monkeypatch.setattr(deep_dive, "get_rankings_for",
+    # Patched on deep_dive.opponents (where build_opp_meta_ranks now lives
+    # after the entry-12 split); deep_dive's re-export is a separate binding
+    # a rebinding patch would not reach.
+    monkeypatch.setattr(deep_dive.opponents, "get_rankings_for",
                         lambda league, cup=None: _FAKE_RANKINGS)
-    monkeypatch.setattr(deep_dive, "species_id", _fake_species_id)
+    monkeypatch.setattr(deep_dive.opponents, "species_id", _fake_species_id)
 
 
 def test_rank_is_one_indexed_list_position(_synthetic_rankings):
@@ -107,7 +110,7 @@ def test_empty_pool_returns_empty(_synthetic_rankings):
 def test_rankings_unavailable_yields_all_none(monkeypatch):
     def _boom(league, cup=None):
         raise RuntimeError("no network, no cache")
-    monkeypatch.setattr(deep_dive, "get_rankings_for", _boom)
+    monkeypatch.setattr(deep_dive.opponents, "get_rankings_for", _boom)
     ranks = deep_dive.build_opp_meta_ranks(["Azumarill", "Medicham"], "great")
     assert ranks == [None, None]  # defensive: never crash the dive
 
@@ -124,7 +127,7 @@ def test_snapshot_date_is_iso_or_none():
 
 
 def test_snapshot_date_none_when_cache_missing(monkeypatch, tmp_path):
-    monkeypatch.setattr(deep_dive, "rankings_cache_path",
+    monkeypatch.setattr(deep_dive.opponents, "rankings_cache_path",
                         lambda league, cup=None: tmp_path / f"{league}.json")
     assert deep_dive.rankings_snapshot_date("great") is None
 

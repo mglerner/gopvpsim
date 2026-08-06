@@ -24,6 +24,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 DEEP_DIVE_PATH = REPO_ROOT / "scripts" / "deep_dive.py"
+RENDER_PATH = REPO_ROOT / "scripts" / "deep_dive_lib" / "render.py"
 deep_dive = load_deep_dive()
 
 
@@ -162,7 +163,11 @@ def test_recompute_matches_frozen_inline_clone():
 
 
 def test_narrative_no_longer_carries_an_inline_clone():
-    """DRY tripwire for D14: one tier-assignment loop, in the helper."""
-    src = DEEP_DIVE_PATH.read_text()
+    """DRY tripwire for D14: one tier-assignment loop, in the helper.
+
+    Scans deep_dive.py AND the render module the helper moved to (entry-12
+    split), so a clone reappearing in either file still trips it.
+    """
+    src = DEEP_DIVE_PATH.read_text() + RENDER_PATH.read_text()
     assert src.count("_iv_all_tiers[") == 0
     assert src.count("iv_all_tiers[iv].append(ti)") == 1
