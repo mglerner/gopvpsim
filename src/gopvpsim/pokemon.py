@@ -13,6 +13,7 @@ Validate all stat calculations against PvPoke before using battle logic.
 """
 import math
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from .data import load_gamemaster
 
@@ -46,29 +47,54 @@ CPM = {
     51.0: 0.84529999,
 }
 
-LEAGUE_CAPS = {
-    'great':  1500,
-    'ultra':  2500,
-    'master': 10000,
+# ---------------------------------------------------------------------------
+# League descriptor -- ONE row per league
+# ---------------------------------------------------------------------------
+# Four hand-maintained dicts used to carry overlapping league facts and had
+# drifted apart: LEAGUE_CAPS (no 'little', so every LEAGUE_CAPS[league] path
+# raised KeyError on it -- Pokemon.at_best_level and iv_rank, among others),
+# LEAGUE_CP (with 'little'), LEAGUE_MAX_LEVEL (with 'little'), and data.py's
+# private _LEAGUE_CP (no 'little'). One row per league now; the dicts below
+# are derived views kept only because ~30 call sites read them as dicts.
+#
+# This table MUST live in pokemon.py: it is an engine-hash file (see
+# scripts/sweep_cache._ENGINE_FILES), and a CP cap / level ceiling changes
+# simulated stats. The same constants in an unhashed module would let the
+# sweep cache serve columns computed under the old values. data.py reads it
+# through a FUNCTION-level import (pokemon imports data at module scope, so
+# the import back has to be deferred).
+# (DRY review 2026-08-05 entry 13 / L6.)
+
+
+class League(NamedTuple):
+    """Everything that varies per battle league, in one row.
+
+    ``max_level`` is the default max power-up level. Best-buddy adds +1 level
+    but only one mon can be best-buddied at a time, so the default excludes it
+    for GL/UL; Master keeps 51 because best-buddy matters more in an uncapped
+    format, and Little's 500 CP cap binds long before any level ceiling does.
+
+    ``open_rankings`` is whether PvPoke publishes an open (non-cup) rankings
+    file for the league -- ``data.load_rankings`` gates on it. Little League
+    only ever runs as a limited cup, so it has none.
+    """
+    cp: int
+    max_level: float
+    open_rankings: bool
+
+
+LEAGUES = {
+    'little': League(cp=500,   max_level=51.0, open_rankings=False),
+    'great':  League(cp=1500,  max_level=50.0, open_rankings=True),
+    'ultra':  League(cp=2500,  max_level=50.0, open_rankings=True),
+    'master': League(cp=10000, max_level=51.0, open_rankings=True),
 }
 
-LEAGUE_CP = {
-    'little': 500,
-    'great':  1500,
-    'ultra':  2500,
-    'master': 10000,
-}
-
-# Max power-up level per league.  Best-buddy adds +1 level but only
-# one mon can be best-buddied at a time, so the default excludes it
-# for GL/UL.  Master League keeps 51 because best-buddy matters more
-# in an uncapped format.
-LEAGUE_MAX_LEVEL = {
-    'little': 51.0,
-    'great':  50.0,
-    'ultra':  50.0,
-    'master': 51.0,
-}
+# Derived views. LEAGUE_CP is the SAME object as LEAGUE_CAPS -- those two
+# names were the drifting pair, and there is only one set of CP caps.
+LEAGUE_CAPS = {name: lg.cp for name, lg in LEAGUES.items()}
+LEAGUE_CP = LEAGUE_CAPS
+LEAGUE_MAX_LEVEL = {name: lg.max_level for name, lg in LEAGUES.items()}
 
 # Highest level that exists in the CPM table (the hard ceiling — best-buddy
 # can never push past this).
@@ -159,13 +185,35 @@ def get_pokemon_index():
     return _pokemon_index
 
 
-def get_pokemon_entry(name: str) -> dict:
-    """Return the full gamemaster entry for a species by speciesName."""
+def get_entry_index() -> dict:
+    """Return the cached speciesName -> full gamemaster entry index."""
     global _gm_entry_index
     if _gm_entry_index is None:
         gm = load_gamemaster()
         _gm_entry_index = {mon['speciesName']: mon for mon in gm['pokemon']}
-    return _gm_entry_index[name]
+    return _gm_entry_index
+
+
+def get_pokemon_entry(name: str) -> dict:
+    """Return the full gamemaster entry for a species by speciesName.
+
+    Raises KeyError for an unknown species; see :func:`find_pokemon_entry`
+    for the None-on-miss form.
+    """
+    return get_entry_index()[name]
+
+
+def find_pokemon_entry(name: str):
+    """Return the gamemaster entry for ``name``, or None if there is none.
+
+    The ``.get()``-style sibling of :func:`get_pokemon_entry`. The linear
+    ``next((m for m in gm['pokemon'] if ...), None)`` scans scattered through
+    scripts/ and the non-engine library modules depend on None-on-miss, so
+    swapping them onto the KeyError-raising accessor would change their
+    failure mode; this is the accessor they can move to unchanged.
+    (DRY review 2026-08-05 entry 13 / L11.)
+    """
+    return get_entry_index().get(name)
 
 
 def get_pokemon_entry_by_id(species_id: str) -> dict:
@@ -213,6 +261,28 @@ SHADOW_ATK_BONUS = 6 / 5  # x1.2. The game stores 1.2; float64 6/5 is bit-identi
 SHADOW_DEF_MULT  = 0.8333333134651184
 
 
+def effective_stats(atk: float, def_: float, shadow: bool) -> tuple[float, float]:
+    """Apply the shadow combat multipliers to an (atk, def) stat pair.
+
+    THE one place the multipliers get multiplied in. They used to be applied
+    six-plus separate ways across pokemon / user_collection / breakpoints /
+    formchange -- the exact shape that let SHADOW_DEF_MULT sit at the wrong
+    5/6 for months, and that produced the shadow-anchor bug.
+    (DRY review 2026-08-05 entry 13 / L15.)
+
+    Callers pass the RAW (unshadowed) stats and get the effective pair back.
+    HP is untouched by shadow, and so is CP.
+
+    The arithmetic is deliberately ``raw * MULT`` in that order, and the
+    non-shadow branch returns the inputs unchanged (the ``* 1.0`` the call
+    sites used to write is an exact identity for every finite float, so this
+    is bit-for-bit the previous result -- scores must not move).
+    """
+    if not shadow:
+        return atk, def_
+    return atk * SHADOW_ATK_BONUS, def_ * SHADOW_DEF_MULT
+
+
 @dataclass
 class Pokemon:
     """A Pokemon ready for battle: species + IVs + level."""
@@ -226,15 +296,20 @@ class Pokemon:
     level:    float
     shadow:   bool = False
 
+    def _effective_stats(self):
+        """Shadow-adjusted (atk, def) -- both properties share one application."""
+        cpm = CPM[self.level]
+        return effective_stats((self.base_atk + self.atk_iv) * cpm,
+                               (self.base_def + self.def_iv) * cpm,
+                               self.shadow)
+
     @property
     def atk(self):
-        base = (self.base_atk + self.atk_iv) * CPM[self.level]
-        return base * SHADOW_ATK_BONUS if self.shadow else base
+        return self._effective_stats()[0]
 
     @property
     def def_(self):
-        base = (self.base_def + self.def_iv) * CPM[self.level]
-        return base * SHADOW_DEF_MULT if self.shadow else base
+        return self._effective_stats()[1]
 
     @property
     def hp(self):
@@ -252,14 +327,18 @@ class Pokemon:
     @classmethod
     def at_best_level(cls, species_name, atk_iv, def_iv, sta_iv,
                       *, league='great', max_level=None, shadow=False):
-        """Create a Pokemon at the highest level that fits under the league CP cap."""
+        """Create a Pokemon at the highest level that fits under the league CP cap.
+
+        ``league`` is any key of :data:`LEAGUES` ('little', 'great', 'ultra',
+        'master') and raises KeyError otherwise.
+        """
         base = get_species(species_name)
         base_atk = base['atk']
         base_def = base['def']
         base_sta = base['hp']
         max_cp = LEAGUE_CAPS[league]
         if max_level is None:
-            max_level = LEAGUE_MAX_LEVEL.get(league, 51.0)
+            max_level = LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL)
         level = best_level(base_atk, base_def, base_sta,
                            atk_iv, def_iv, sta_iv,
                            max_cp=max_cp, max_level=max_level)
@@ -295,6 +374,9 @@ def iv_rank(species_name: str, *, league: str = 'great', max_level: float = None
     Each entry is a dict:
         rank, atk_iv, def_iv, sta_iv, level, atk, def_, hp, stat_product, cp
     Rank 1 is the highest stat product.
+
+    ``league`` is any key of :data:`LEAGUES` ('little', 'great', 'ultra',
+    'master') and raises KeyError otherwise.
     """
     base = get_species(species_name)
     base_atk = base['atk']
@@ -302,10 +384,7 @@ def iv_rank(species_name: str, *, league: str = 'great', max_level: float = None
     base_sta = base['hp']
     max_cp   = LEAGUE_CAPS[league]
     if max_level is None:
-        max_level = LEAGUE_MAX_LEVEL.get(league, 51.0)
-
-    shadow_atk_mult = SHADOW_ATK_BONUS if shadow else 1.0
-    shadow_def_mult = SHADOW_DEF_MULT  if shadow else 1.0
+        max_level = LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL)
 
     # Aegislash (Blade) powers up in whole-level increments only;
     # mirror the rounding from Pokemon.at_best_level.
@@ -322,8 +401,8 @@ def iv_rank(species_name: str, *, league: str = 'great', max_level: float = None
                 if _blade_round_down and lv % 1.0 != 0:
                     lv -= 0.5
                 cpm = CPM[lv]
-                atk  = (base_atk + a) * cpm * shadow_atk_mult
-                def_ = (base_def + d) * cpm * shadow_def_mult
+                atk, def_ = effective_stats((base_atk + a) * cpm,
+                                            (base_def + d) * cpm, shadow)
                 hp   = math.floor((base_sta + s) * cpm)
                 entries.append({
                     'atk_iv': a, 'def_iv': d, 'sta_iv': s,

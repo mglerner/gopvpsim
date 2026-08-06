@@ -41,5 +41,11 @@ def test_build_opponent_pool_has_no_local_cap_dict():
 
 
 def test_canonical_caps_values():
-    """Guard the values themselves so an import-only refactor can't drift."""
-    assert LEAGUE_CAPS == {'great': 1500, 'ultra': 2500, 'master': 10000}
+    """Guard the values themselves so an import-only refactor can't drift.
+
+    'little' joined the table with the league descriptor (DRY review
+    2026-08-05 entry 13 / L6); the per-league facts are pinned in
+    tests/test_league_descriptor.py.
+    """
+    assert LEAGUE_CAPS == {'little': 500, 'great': 1500,
+                           'ultra': 2500, 'master': 10000}

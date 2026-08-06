@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 from .data import parse_types
 from .moves import get_moves
-from .pokemon import CPM, SHADOW_ATK_BONUS, SHADOW_DEF_MULT, cp, get_pokemon_entry_by_id
+from .pokemon import CPM, cp, effective_stats, get_pokemon_entry_by_id
 
 
 # ---------------------------------------------------------------------------
@@ -222,9 +222,6 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
     if raw_alt_buffs and any(b != 0 for b in raw_alt_buffs):
         alt_native_buffs = tuple(raw_alt_buffs)
 
-    shadow_atk = SHADOW_ATK_BONUS if shadow else 1.0
-    shadow_def = SHADOW_DEF_MULT if shadow else 1.0
-
     # Compute alt form stats
     alt_base = alt_entry['baseStats']
     alt_level = level  # same level by default
@@ -249,8 +246,9 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         alt_level = max(1.0, alt_level)
 
     alt_cpm = CPM[alt_level]
-    alt_atk = (alt_base['atk'] + atk_iv) * alt_cpm * shadow_atk
-    alt_def = (alt_base['def'] + def_iv) * alt_cpm * shadow_def
+    alt_atk, alt_def = effective_stats((alt_base['atk'] + atk_iv) * alt_cpm,
+                                       (alt_base['def'] + def_iv) * alt_cpm,
+                                       shadow)
 
     # Compute alt form moves
     alt_fast_move = fast_move
@@ -265,12 +263,16 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         alt_charged_moves = _swap_charged_move(charged_moves, _MORPEKO_CHARGED_MOVE_MAP)
 
     # Build FormData for both forms
+    default_atk, default_def = effective_stats(
+        (mon_entry['baseStats']['atk'] + atk_iv) * CPM[level],
+        (mon_entry['baseStats']['def'] + def_iv) * CPM[level],
+        shadow)
     default_fd = FormData(
         species=mon_entry['speciesName'],
         species_id=species_id,
         types=default_types,
-        atk=(mon_entry['baseStats']['atk'] + atk_iv) * CPM[level] * shadow_atk,
-        def_=(mon_entry['baseStats']['def'] + def_iv) * CPM[level] * shadow_def,
+        atk=default_atk,
+        def_=default_def,
         fast_move=fast_move,
         charged_moves=tuple(charged_moves),
         trigger=trigger,

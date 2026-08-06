@@ -26,8 +26,34 @@ URLS = {
 # Key pattern: "group_<name>" in the cache.
 GROUP_URL_TEMPLATE = f"{BASE_URL}/groups/{{}}.json"
 
-# League display name -> CP cap used in PvPoke's rankings-<cp>.json filenames.
-_LEAGUE_CP = {"great": 1500, "ultra": 2500, "master": 10000}
+
+def _league(league):
+    """The ``pokemon.League`` row for ``league``, or None if unknown.
+
+    Function-level import on purpose: ``gopvpsim.pokemon`` imports this module
+    at module scope, so importing it back at module scope would be circular.
+    The league facts have to live in pokemon.py anyway -- it is an engine-hash
+    file, and a CP cap change must invalidate cached sweep columns.
+    (DRY review 2026-08-05 entry 13 / L6: this used to be a private
+    ``_LEAGUE_CP`` dict here that had silently drifted from pokemon's -- it
+    was missing 'little'.)
+    """
+    from .pokemon import LEAGUES
+    return LEAGUES.get(league)
+
+
+def _league_cp(league):
+    """CP cap for a league, as used in PvPoke's rankings-<cp>.json filenames.
+
+    Raises KeyError for an unknown league, the historical failure mode of the
+    ``_LEAGUE_CP[league]`` lookup this replaced (the callers' docstrings
+    advertise it).
+    """
+    row = _league(league)
+    if row is None:
+        raise KeyError(league)
+    return row.cp
+
 
 # Limited-cup rankings live under rankings/<cup>/overall/rankings-<cp>.json
 # (the same schema as the "all" overall rankings). Key pattern in the cache:
@@ -253,9 +279,20 @@ def sprite_data_uri(species_name, shadow=False):
 
 
 def load_rankings(league):
-    """Load rankings for a given league: 'great', 'ultra', or 'master'."""
-    if league not in ("great", "ultra", "master"):
+    """Load open (non-cup) rankings for a league: 'great', 'ultra', 'master'.
+
+    'little' is a known league (it has a CP cap and a level ceiling like any
+    other, see ``pokemon.LEAGUES``) but PvPoke publishes no open Little League
+    rankings -- Little only runs as a limited cup. That case fails LOUDLY here
+    rather than 404ing later; use ``load_cup_rankings`` for a little cup.
+    """
+    row = _league(league)
+    if row is None:
         raise ValueError(f"Unknown league: {league!r}")
+    if not row.open_rankings:
+        raise ValueError(
+            f"No open rankings for the {league!r} league: PvPoke publishes it "
+            f"only as a limited cup. Use load_cup_rankings(cup, {row.cp}).")
     return _fetch_json(league)
 
 
@@ -285,13 +322,13 @@ def get_rankings_for(league, cup=None):
     """Rankings list for a league, or for a limited cup at that league's CP cap.
 
     The public one-call form of the "cup wins, else the open league" branch
-    every caller used to re-type (each one importing the private ``_LEAGUE_CP``
-    to build the cup's CP argument). ``cup=None`` is the open-league meta.
+    every caller used to re-type (each one importing the private league->CP
+    table to build the cup's CP argument). ``cup=None`` is the open-league meta.
     Raises KeyError for an unknown league, and load_cup_rankings' loud
     ValueError / NoDataError for an unknown or unpublished cup.
     """
     if cup is not None:
-        return load_cup_rankings(cup, _LEAGUE_CP[league])
+        return load_cup_rankings(cup, _league_cp(league))
     return load_rankings(league)
 
 
@@ -304,7 +341,7 @@ def rankings_cache_path(league, cup=None):
     handle. Raises KeyError for an unknown league.
     """
     if cup is not None:
-        return CACHE_DIR / f"rankings_{cup}_{_LEAGUE_CP[league]}.json"
+        return CACHE_DIR / f"rankings_{cup}_{_league_cp(league)}.json"
     return CACHE_DIR / f"{league}.json"
 
 
@@ -326,7 +363,7 @@ def _get_rankings_index(league, cup=None):
         if cup is None:
             rankings = load_rankings(league)
         else:
-            rankings = load_cup_rankings(cup, _LEAGUE_CP[league])
+            rankings = load_cup_rankings(cup, _league_cp(league))
         _rankings_index[key] = {r['speciesId']: r for r in rankings}
     return _rankings_index[key]
 
