@@ -603,8 +603,12 @@ def scenario_label(scenario):
     12, register item R11): every renderer that prints a scenario calls
     this instead of re-forming the label from the tuple, so the page
     cannot show two spellings of one scenario.
-    ``tests/test_scenario_vocabulary.py`` pins that no inline copy of the
-    format comes back.
+    ``tests/test_scenario_vocabulary.py`` pins that no inline f-string copy
+    of the format comes back, in either spelling the old code used (indexing
+    the tuple, or destructuring it in the loop header first). Bare '0v0'
+    literals are out of scope there, as is slayer_cache.py's copy -- that one
+    is a cache-key ingredient, not page text. That test file deliberately
+    spells the format out, which is why it scans only the four renderers.
 
     Load-bearing, not cosmetic: it is the key of the matchup-cluster
     payload's ``scens`` map, so the JS overlay silently renders neutral

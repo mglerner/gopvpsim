@@ -10,6 +10,13 @@ inline copies do not come back, in the four Python renderers that print
 scenarios (deep_dive.py, deep_dive_rendering.py, deep_dive_lib/categories.py,
 deep_dive_matchup_clusters.py).
 
+Scope of that guard, stated exactly: it catches an *interpolated* re-forming
+in either historical spelling -- subscripted ``f'{s[0]}v{s[1]}'`` and
+destructured ``f'{s0}v{s1}'``. It does not catch bare literals ('0v0'), which
+are fine as fixed keys, and it does not cover scripts/slayer_cache.py, whose
+copy of the form is a cache-key ingredient rather than page text. See the
+comments on ``_REFORMED`` below.
+
 Cross-label half -- the page prints TWO different flip numbers for the same
 opponent, from two engines that deliberately stay separate:
 
@@ -58,9 +65,24 @@ LABEL_RENDERERS = [
     'scripts/deep_dive_matchup_clusters.py',
 ]
 
-# An inline re-forming of the label from the tuple, e.g. f'{s[0]}v{s[1]}',
-# f'{scen[0]}v{scen[1]}', f'{shield_scenarios[0][0]}v{shield_scenarios[0][1]}'.
-_REFORMED = re.compile(r'\{[^{}]*\[0\]\}v\{[^{}]*\[1\]\}')
+# An inline re-forming of the label from the tuple. BOTH historical spellings
+# have to match, because the pre-entry-12 code used both:
+#   subscripted  -- f'{s[0]}v{s[1]}', f'{shield_scenarios[0][0]}v{...[1]}'
+#   destructured -- f'{s0}v{s1}' (after `for s0, s1 in shield_scenarios`)
+# A pattern pinned to the subscripted form only is blind to a literal revert of
+# the destructured sites, which is how this guard first shipped toothless.
+_REFORMED = re.compile(r'\{[^{}]*\}v\{[^{}]*\}')
+
+# What this pattern does NOT cover, on purpose: bare string literals ('0v0',
+# "1v1"). Those are legitimate as fixed lookup keys / defaults and are also
+# quoted in prose and docstrings, so pinning them is noise. The drift R11
+# actually fixed was the interpolated form, and that is what is pinned here.
+#
+# Also deliberately out of LABEL_RENDERERS: scripts/slayer_cache.py:113 still
+# builds f'{s0}v{s1}' -- but that string is md5'd into a cache key, not
+# rendered onto the page. Its text is frozen by the cache, not by the page
+# vocabulary; rewriting it through the helper would silently invalidate every
+# cached slayer entry for no rendered benefit.
 
 
 # ---------------------------------------------------------------------------
@@ -73,12 +95,50 @@ def test_scenario_label_is_the_0v0_family():
     assert rendering.scenario_label([2, 1]) == '2v1'
 
 
+# The historical inline constructions entry 12 removed, verbatim from the
+# commit's deleted lines -- both spellings. The scan pattern must catch every
+# one of them, or a straight revert of that hunk lands green.
+_REMOVED_INLINE_SITES = [
+    "    shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in shield_scenarios)",
+    '''            html += f'    <option value="{si}"{sel}>{s0}v{s1}</option>' ''',
+    "    shield_desc_default = f'{shield_scenarios[0][0]}v"
+    "{shield_scenarios[0][1]}'",
+    "                    scen_label = f'{scen[0]}v{scen[1]}'",
+    '        label = f"{pair[0]}v{pair[1]}"',
+    '''        parts.append(f'<th title="Rank out of {nIvs} IVs in the '''
+    '''{s0}v{s1} shield scenario (1 = best)">{s0}v{s1}</th>')''',
+    "        return [f'{scenarios[si][0]}v{scenarios[si][1]}'",
+    """        cells = [f'<td class="dd-sg-row">{scen[0]}v{scen[1]}</td>']""",
+    "            f'{s[0]}v{s[1]}' for s in sorted(b['scenarios']))",
+]
+
+
+def test_scan_pattern_catches_both_historical_spellings():
+    """Guard the guard: the scan below is only worth anything if it matches
+    the destructured f'{s0}v{s1}' form as well as the subscripted one. Three
+    of the sites entry 12 removed used the destructured spelling."""
+    missed = [s for s in _REMOVED_INLINE_SITES if not _REFORMED.search(s)]
+    assert missed == [], missed
+    # both spellings, minimally
+    assert _REFORMED.search("f'{s0}v{s1}'")
+    assert _REFORMED.search("f'{s[0]}v{s[1]}'")
+    # and it does not fire on unrelated adjacent interpolation
+    assert not _REFORMED.search("f'{a}-{b}'")
+    assert not _REFORMED.search("f'{shields} vs {opp}'")
+
+
 def test_no_renderer_re_forms_the_label_inline():
-    """The helper itself is the only place the '{a}v{b}' form is written."""
+    """The helper itself is the only place the '{a}v{b}' form is written.
+
+    Comment lines are skipped -- a comment quoting the format (deep_dive.py
+    documents what it bakes into DATA.scenarioLabels) renders nothing.
+    """
     offenders = []
     for rel in LABEL_RENDERERS:
         src = (REPO_ROOT / rel).read_text()
         for i, line in enumerate(src.splitlines(), 1):
+            if line.strip().startswith('#'):
+                continue
             if _REFORMED.search(line):
                 offenders.append(f'{rel}:{i}: {line.strip()}')
     # deep_dive_rendering.scenario_label's own body is the single exception.
