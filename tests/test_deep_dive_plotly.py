@@ -166,13 +166,20 @@ def test_shared_dir_sources_from_warm_cache_without_network(tmp_path,
 # Replay state round-trips the opponent-variant registry (review finding D4)
 # ---------------------------------------------------------------------------
 
-def test_replay_state_roundtrips_variant_registry(tmp_path, monkeypatch):
+def test_replay_state_roundtrips_variant_registry(tmp_path, request):
     """The variant registry is process-local state populated by pool
     loading in main(); a replay process never runs that, so the blob
     must carry it — otherwise parse_opponent_spec mis-reads variant
     display names in the replayed render."""
-    monkeypatch.setattr(deep_dive, '_OPPONENT_VARIANT_REGISTRY', {},
-                        raising=True)
+    # Clear-and-restore, not a rebinding setattr: the registry is ONE dict
+    # shared by deep_dive's re-export and deep_dive_lib.opponents (entry-12
+    # split), and rebinding one name would leave register/parse writing to
+    # the other -- the test would pass without isolating anything.
+    saved = dict(deep_dive._OPPONENT_VARIANT_REGISTRY)
+    deep_dive._OPPONENT_VARIANT_REGISTRY.clear()
+    request.addfinalizer(
+        lambda: (deep_dive._OPPONENT_VARIANT_REGISTRY.clear(),
+                 deep_dive._OPPONENT_VARIANT_REGISTRY.update(saved)))
     deep_dive.register_opponent_variant(
         'Forretress (Bug Bite)', 'Forretress', False)
     deep_dive.register_opponent_variant(

@@ -18,6 +18,15 @@ BY QUALIFIED NAME, so
 file got -- and therefore whether worker pickling worked -- depended on
 collection order.  These tests pin both halves plus a monotone guard
 against a new open-coded load reappearing.
+
+Since the entry-12 SPLIT the two pool entry points live in
+``deep_dive_lib.sweep``, so pickle records THAT name and the identity
+check above no longer runs against ``sys.modules['deep_dive']`` -- the
+tests below assert the new name.  One-object-per-run still matters:
+``deep_dive_rendering`` imports ``build_iv_categories`` back off
+``deep_dive`` by name, and every test that pokes module-level state
+(the opponent-variant registry, the sweep worker state) has to be
+poking the same object the shims bind.
 """
 import multiprocessing
 import pickle
@@ -58,26 +67,30 @@ def test_no_open_coded_deep_dive_loads_remain():
 def test_pool_entry_points_pickle_by_qualified_name():
     """The pool's two entry points round-trip to the SAME function object.
 
-    Verified negative control: exec'ing deep_dive.py WITHOUT registering
-    it raises ``PicklingError: ... it's not the same object as
-    deep_dive._sweep_worker``.  That is the failure the shared loader
-    prevents.
+    Since the entry-12 split they live in ``deep_dive_lib.sweep`` and
+    ``deep_dive`` re-exports them, so the qualified name pickle records is
+    the LIB one -- an ordinary package import on the child side, which is
+    strictly more robust than the by-path ``deep_dive`` load.  What still
+    has to hold is that the re-exported object is the same object the
+    qualified name resolves to; a copy would raise ``PicklingError: it's
+    not the same object``.
     """
     dd = load_deep_dive()
     for fn in (dd._sweep_worker, dd._sweep_worker_init):
-        assert fn.__module__ == 'deep_dive'
+        assert fn.__module__ == 'deep_dive_lib.sweep'
         payload = pickle.dumps(fn)
-        assert b'deep_dive' in payload
+        assert b'deep_dive_lib.sweep' in payload
         assert pickle.loads(payload) is fn
 
 
 def test_spawned_worker_resolves_qualified_name():
-    """A real spawn child imports `deep_dive` and resolves the attribute.
+    """A real spawn child imports the owning module and resolves the attr.
 
     Uses a pure parser function rather than _sweep_worker so the test
     needs no worker-init state; the mechanism under test (pickle by
-    qualified name -> child-side `import deep_dive` off the inherited
-    sys.path) is identical.
+    qualified name -> child-side import off the inherited sys.path) is
+    identical.  ``tests/test_deep_dive_lib_workers.py`` runs the real
+    ``_sweep_worker`` through a spawn pool.
     """
     dd = load_deep_dive()
     ctx = multiprocessing.get_context('spawn')
