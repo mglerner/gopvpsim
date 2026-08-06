@@ -32,7 +32,7 @@ from .moves import (
 )
 from .pokemon import (
     get_species, best_level, CPM, LEAGUE_CAPS,
-    battle_stats, effective_stats,
+    battle_stats, effective_stats, find_pokemon_entry,
 )
 
 
@@ -154,9 +154,11 @@ def bulkpoints(
 
 def _get_types(species_name: str) -> list[str]:
     """Return the type list for a species from the gamemaster."""
-    from .data import load_gamemaster, parse_types
-    gm  = load_gamemaster()
-    mon = next((m for m in gm['pokemon'] if m['speciesName'] == species_name), None)
+    from .data import parse_types
+    # find_pokemon_entry, not get_pokemon_entry: the cached index's own
+    # KeyError carries only the bare name, and callers key off THIS message
+    # (DRY review 2026-08-05 entry 12 / L11).
+    mon = find_pokemon_entry(species_name)
     if mon is None:
         raise KeyError(f"Species not found: {species_name!r}")
     return parse_types(mon)

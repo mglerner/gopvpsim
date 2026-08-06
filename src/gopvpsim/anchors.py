@@ -20,11 +20,12 @@ from .breakpoints import (
     atk_for_damage, breakpoints as scan_breakpoints,
     def_for_damage, bulkpoints as scan_bulkpoints,
 )
-from .data import load_gamemaster, parse_types
+from .data import parse_types
 from .moves import damage as calc_damage, get_moves
 from .pokemon import (
     LEAGUE_CAPS, SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
-    Pokemon, best_level, battle_stats, get_species, pvpoke_default_ivs,
+    Pokemon, best_level, battle_stats, find_pokemon_entry, get_species,
+    pvpoke_default_ivs,
 )
 from .thresholds import (
     BulkpointAnchor, CmpAnchor, DamageBreakpointAnchor, IvListSpread,
@@ -303,9 +304,12 @@ def _opponent_ref(
     except (KeyError, ValueError):
         return None
 
-    gm = load_gamemaster()
-    entry = next((m for m in gm['pokemon']
-                  if m['speciesName'] == opponent_species), None)
+    # None-on-miss accessor over the cached speciesName index. All three
+    # gamemaster lookups in this module used to be linear scans of
+    # gm['pokemon']; each one returns None/[] for an unresolvable species
+    # rather than raising, so the .get()-style accessor is the drop-in and
+    # get_pokemon_entry is not (DRY review 2026-08-05 entry 12 / L11).
+    entry = find_pokemon_entry(opponent_species)
     if entry is None:
         return None
     types = parse_types(entry)
@@ -347,9 +351,7 @@ def _opponent_atk_ref(
     except (KeyError, ValueError):
         return None
 
-    gm = load_gamemaster()
-    entry = next((m for m in gm['pokemon']
-                  if m['speciesName'] == opponent_species), None)
+    entry = find_pokemon_entry(opponent_species)
     if entry is None:
         return None
     types = parse_types(entry)
@@ -567,9 +569,7 @@ def _opponent_threat_moves(opponent_species: str) -> list[dict]:
     Used by the bulkpoint resolver as the set of incoming threat moves to scan.
     Returns an empty list if the species or any move can't be resolved.
     """
-    gm = load_gamemaster()
-    entry = next((m for m in gm['pokemon']
-                  if m['speciesName'] == opponent_species), None)
+    entry = find_pokemon_entry(opponent_species)
     if entry is None:
         return []
     fast_db, charged_db = get_moves()
