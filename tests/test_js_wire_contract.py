@@ -94,13 +94,14 @@ def test_js_reads_the_baked_scenario_label():
 
 
 def test_cluster_payload_uses_the_same_label_form():
-    """The clusters module keys its payload with its own f-string (it is not
-    part of this lane's file set); pin that it still agrees with
-    ``scenario_label`` so the JS overlay keeps finding its scenario."""
-    m = re.search(r'label = f"\{pair\[0\]\}(\w*)\{pair\[1\]\}"',
-                  _CLUSTERS.read_text())
-    assert m, "cluster scenario-label construction not found"
-    assert f"1{m.group(1)}1" == rendering.scenario_label((1, 1))
+    """The clusters module keys its payload with the SHARED helper (entry 12
+    routed its last hand-typed f-string through it), so the JS overlay can
+    never stop finding its scenario in DATA.scenarioLabels."""
+    text = _CLUSTERS.read_text()
+    assert "from deep_dive_rendering import BEST_RULE_TIP, scenario_label" in text
+    assert "label = scenario_label(pair)" in text
+    assert not re.search(r'f"\{pair\[0\]\}\w*\{pair\[1\]\}"', text), (
+        "the clusters payload key is being re-formed from the tuple again")
 
 
 def test_cmp_panels_prefers_the_baked_label_and_keeps_the_dash_fallback():

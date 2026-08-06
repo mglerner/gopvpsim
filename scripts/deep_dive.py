@@ -1794,7 +1794,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     data_obj['yAxisModes'] = y_axis_modes
 
     opp_desc = opponent_label or 'PvPoke rankings'
-    shield_desc = ', '.join(f'{s0}v{s1}' for s0, s1 in shield_scenarios)
+    shield_desc = ', '.join(scenario_label(s) for s in shield_scenarios)
 
     # Bait-mode meta annotation for the page header. Three cases:
     #  - all bait-on        → empty string, header unchanged
@@ -2359,9 +2359,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     if n_scenarios > 1:
         html += '  <label>Shields: <select id="scenario-sel" onchange="updateView()">\n'
         html += '    <option value="avg">All (avg)</option>\n'
-        for si, (s0, s1) in enumerate(shield_scenarios):
+        for si, scen in enumerate(shield_scenarios):
             sel = ' selected' if n_scenarios == 1 else ''
-            html += f'    <option value="{si}"{sel}>{s0}v{s1}</option>\n'
+            html += (f'    <option value="{si}"{sel}>'
+                     f'{scenario_label(scen)}</option>\n')
         html += '  </select></label>\n'
 
     if len(opp_iv_modes) > 1:
@@ -3223,7 +3224,7 @@ def _interactive_js_engine(n_scenarios, n_opponents, opp_iv_modes, reference_idx
     tier_vars_js = json.dumps([t['color'] for t in tier_info])
     tier_names_js = json.dumps([t['name'] for t in tier_info])
     scenario_mode_default = '"avg"' if n_scenarios > 1 else '"0"'
-    shield_desc_default = f'{shield_scenarios[0][0]}v{shield_scenarios[0][1]}'
+    shield_desc_default = scenario_label(shield_scenarios[0])
     opp_desc_escaped = opp_desc.replace("'", "\\'")
 
     with open(_JS_ENGINE_PATH) as _f:

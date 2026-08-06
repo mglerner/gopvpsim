@@ -233,7 +233,7 @@ def build_iv_categories(data_obj, slayer_categories=None,
                     n_win = len(members)
                     if n_win == 0 or n_win == n_ivs:
                         continue  # degenerate partition - skip
-                    scen_label = f'{scen[0]}v{scen[1]}'
+                    scen_label = rendering.scenario_label(scen)
                     name = f'Beats {opp_iv_label} {opp_name} in the {scen_label}'
                     categories.append(IVCategory(
                         name=name,
@@ -346,7 +346,7 @@ def _merge_matchup_variant_dupes(categories):
         variants = [g.matchup_conditions[0]['opponent'] for g in group]
         conds = [dict(g.matchup_conditions[0]) for g in group]
         scen = first.matchup_conditions[0]['scenario']
-        scen_label = f'{scen[0]}v{scen[1]}'
+        scen_label = rendering.scenario_label(scen)
         opp_iv_label = ('rank 1'
                         if first.matchup_conditions[0].get('opponent_ivs')
                         == 'rank1' else 'PvPoke default')

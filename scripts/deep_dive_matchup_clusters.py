@@ -48,7 +48,9 @@ what the reference code actually computed; do not label it cross-validated.
 
 import html as _html
 import json
+import os
 import re
+import sys
 
 import numpy as np
 
@@ -57,6 +59,25 @@ import numpy as np
 # the literal lived in more than one place. See tests/test_win_boundary.py.
 from gopvpsim.battle import WIN_RATING
 
+# Sibling scripts/ modules are imported by bare name (deep_dive_analysis.py
+# does the same). Done here too so this module keeps working when a test or
+# build_guides.py loads it straight from its path with scripts/ off sys.path.
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+
+# One shield-scenario vocabulary for the whole page: the '0v0' family
+# (DRY review 2026-08-05 entry 12, register item R11). Imported, not
+# re-formed: these labels key this section's payload `scens` map, and the
+# JS overlay looks them up in DATA.scenarioLabels -- a divergent form does
+# not error, it just renders neutral points.
+#
+# BEST_RULE_TIP is the other half of the cross-label the same review asked
+# for: this section's flip table and the "flips at" boundary bullets print
+# two different numbers for one opponent, and the wording that tells them
+# apart is defined once, next to its BOUNDARY_RULE_TIP twin.
+from deep_dive_rendering import BEST_RULE_TIP, scenario_label  # noqa: E402
+
 # Categorical cluster colors (dark-surface steps of the validated reference
 # palette; checked against the dive's hard-coded Plotly surface #16213e with
 # the dataviz six-checks validator: lightness band, chroma floor, CVD
@@ -64,6 +85,10 @@ from gopvpsim.battle import WIN_RATING
 # table swatches, and hover text all carry the cluster id.
 CLUSTER_PALETTE = ["#3987e5", "#199e70", "#c98500",
                    "#008300", "#9085e9", "#e66767"]
+
+# The even-shield scenarios this section clusters. Named once so the
+# "not available" prose spells the same three labels the driver iterates.
+EVEN_SHIELD_PAIRS = ((0, 0), (1, 1), (2, 2))
 
 # K-selection knobs (parsimony floor — see module docstring).
 KMIN = 2
@@ -607,7 +632,7 @@ def flip_table(W, sharp, wr, stats, is_named):
 
 def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
                              atk, def_, hp, is_named,
-                             scen_pairs=((0, 0), (1, 1), (2, 2))):
+                             scen_pairs=EVEN_SHIELD_PAIRS):
     """Run the full pipeline for the even-shield scenarios present.
 
     scenarios: list of (my_shields, opp_shields) tuples in grid order.
@@ -631,7 +656,7 @@ def compute_matchup_clusters(scores_flat, nIvs, nS, nO, scenarios,
         if pair not in scen_list:
             continue
         si = scen_list.index(pair)
-        label = f"{pair[0]}v{pair[1]}"
+        label = scenario_label(pair)
         W = win_matrix(scores_flat, nIvs, nS, nO, si)
         sharp, wr = sharp_marginals(W)
         if len(sharp) < 2:
@@ -860,11 +885,17 @@ def _flip_table_html(entry, opp_names, has_anchors):
         foot += (' This dive has no authored anchors, so no row can be '
                  'marked named.')
     return (
+        # Summary text is quoted by name in guides/matchup-clusters/body.md;
+        # the cross-label lives in the note + column header below so the
+        # guide's section list stays accurate.
         '<details style="margin:6px 0"><summary style="cursor:pointer;'
         'font-size:13px">Matchup flip thresholds (candidate anchors)'
         '</summary>'
+        '<p style="font-size:12px;color:var(--text-muted)">'
+        f'{_esc(BEST_RULE_TIP)}</p>'
         '<table class="dd-table dd-narrow"><thead><tr>'
-        '<th>Marginal opponent</th><th>Win rate</th><th>Flips at</th>'
+        '<th>Marginal opponent</th><th>Win rate</th>'
+        f'<th title="{_esc(BEST_RULE_TIP)}">Best single-stat rule</th>'
         '<th>Rule accuracy</th><th>Named anchor?</th>'
         '</tr></thead><tbody>' + "".join(rows) + "</tbody></table>"
         f'<p style="font-size:12px;color:var(--text-muted)">{foot}</p>'
@@ -907,15 +938,17 @@ def render_section(scores_flat, nIvs, nS, nO, scenarios, opponents,
         scores_flat, nIvs, nS, nO, scenarios,
         data_obj['ivAtk'], data_obj['ivDef'], data_obj['ivHp'], is_named)
     if not computed:
+        _even = ' / '.join(scenario_label(p) for p in EVEN_SHIELD_PAIRS)
         return ('<div class="dd-section" id="dd-matchup-clusters">'
                 '<!-- matchup-clusters:v1 -->'
                 '<h2 class="dd-h2">Matchup clusters</h2>'
                 '<p style="font-size:13px;color:var(--text-muted)">Not '
                 'available: this dive ran without the even-shield scenarios '
-                '(0v0 / 1v1 / 2v2).</p></div>\n')
+                f'({_even}).</p></div>\n')
 
     scen_labels = list(computed.keys())
-    default_scen = "1v1" if "1v1" in computed else scen_labels[0]
+    _one_one = scenario_label((1, 1))
+    default_scen = _one_one if _one_one in computed else scen_labels[0]
     # prefer a scenario that actually clustered for the default view
     if "res" not in computed[default_scen]:
         for lbl in scen_labels:
