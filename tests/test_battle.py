@@ -2153,3 +2153,25 @@ def test_disguise_break_uses_only_pre_shuffle_cheapest_move():
     finally:
         B._policy_debug = orig_debug
         B._policy_log.clear()
+
+
+# ---------------------------------------------------------------------------
+# from_pokemon's gamemaster lookup (DRY review 2026-08-05 entry 13 / L11)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+def test_from_pokemon_uses_the_cached_entry_index():
+    """The species lookup is the cached speciesName index, not a linear scan
+    of gm['pokemon'] -- a sweep builds millions of BattlePokemon."""
+    from gopvpsim.data import parse_types
+    from gopvpsim.pokemon import Pokemon, get_pokemon_entry, get_entry_index
+
+    bp = _make_battle_pokemon_default('Azumarill', 'great', shields=1)
+    entry = get_pokemon_entry('Azumarill')
+    assert bp.types == parse_types(entry)
+    assert get_entry_index()['Azumarill'] is entry
+
+    pokemon = Pokemon.at_best_level('Azumarill', 15, 15, 15, league='great')
+    pokemon.species = 'NotARealMon'
+    with pytest.raises(KeyError):
+        BattlePokemon.from_pokemon(pokemon, bp.fast_move, list(bp.charged_moves))

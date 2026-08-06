@@ -15,7 +15,7 @@ REPO_ROOT_FOR_SCRIPTS = Path(__file__).resolve().parent.parent / 'scripts'
 from gopvpsim.pokemon import (
     CPM, LEAGUE_CAPS, _LEVELS, MAX_CPM_LEVEL,
     cp, battle_stats, stat_product, best_level, bestbuddy_caps,
-    get_species, Pokemon, iv_rank,
+    find_pokemon_entry, get_pokemon_entry, get_species, Pokemon, iv_rank,
     pvpoke_default_ivs, compute_default_ivs,
     SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
 )
@@ -321,6 +321,27 @@ def test_gamemaster_has_azumarill():
     assert 'atk' in base
     assert 'def' in base
     assert 'hp' in base
+
+
+# ---------------------------------------------------------------------------
+# Cached gamemaster-entry accessors (DRY review 2026-08-05 entry 13 / L11)
+# ---------------------------------------------------------------------------
+
+def test_get_pokemon_entry_raises_on_miss(mock_gm):
+    assert get_pokemon_entry('Testmon')['speciesName'] == 'Testmon'
+    with pytest.raises(KeyError):
+        get_pokemon_entry('NotARealMon')
+
+
+def test_find_pokemon_entry_returns_none_on_miss(mock_gm):
+    """The ``.get()``-style form the linear ``next(..., None)`` scans need:
+    swapping them onto the KeyError-raising accessor would change their
+    failure mode, so this is the one they can move to unchanged."""
+    assert find_pokemon_entry('NotARealMon') is None
+
+
+def test_find_and_get_return_the_same_cached_object(mock_gm):
+    assert find_pokemon_entry('Testmon') is get_pokemon_entry('Testmon')
 
 
 # ===========================================================================

@@ -32,8 +32,7 @@ from .moves import (
 )
 from .pokemon import (
     get_species, best_level, CPM, LEAGUE_CAPS,
-    battle_stats,
-    SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
+    battle_stats, effective_stats,
 )
 
 
@@ -224,7 +223,8 @@ def iv_breakpoints(
     d_stats     = battle_stats(d_base['atk'], d_base['def'], d_base['hp'],
                                defender_atk_iv, defender_def_iv, defender_sta_iv,
                                d_level)
-    defender_def = d_stats['def'] * (SHADOW_DEF_MULT if defender_shadow else 1.0)
+    _, defender_def = effective_stats(d_stats['atk'], d_stats['def'],
+                                      defender_shadow)
 
     results = []
     for atk_iv in range(16):
@@ -241,7 +241,10 @@ def iv_breakpoints(
                     a_base['atk'], a_base['def'], a_base['hp'],
                     atk_iv, def_iv, sta_iv, level,
                 )
-                atk_stat = stats['atk'] * (SHADOW_ATK_BONUS if attacker_shadow else 1.0)
+                # Attack side only: the stat product below keeps the RAW def,
+                # unchanged from before this routed through effective_stats.
+                atk_stat, _ = effective_stats(stats['atk'], stats['def'],
+                                              attacker_shadow)
                 dmg      = calc_damage(
                     move['power'], atk_stat, defender_def,
                     move['type'], attacker_types, defender_types,
@@ -303,7 +306,8 @@ def iv_bulkpoints(
     a_stats     = battle_stats(a_base['atk'], a_base['def'], a_base['hp'],
                                attacker_atk_iv, attacker_def_iv, attacker_sta_iv,
                                a_level)
-    attacker_atk = a_stats['atk'] * (SHADOW_ATK_BONUS if attacker_shadow else 1.0)
+    attacker_atk, _ = effective_stats(a_stats['atk'], a_stats['def'],
+                                      attacker_shadow)
 
     results = []
     for atk_iv in range(16):
@@ -320,7 +324,10 @@ def iv_bulkpoints(
                     d_base['atk'], d_base['def'], d_base['hp'],
                     atk_iv, def_iv, sta_iv, level,
                 )
-                def_stat = stats['def'] * (SHADOW_DEF_MULT if defender_shadow else 1.0)
+                # Defense side only: the stat product below keeps the RAW atk,
+                # unchanged from before this routed through effective_stats.
+                _, def_stat = effective_stats(stats['atk'], stats['def'],
+                                              defender_shadow)
                 dmg = calc_damage(
                     move['power'], attacker_atk, def_stat,
                     move['type'], attacker_types, defender_types,

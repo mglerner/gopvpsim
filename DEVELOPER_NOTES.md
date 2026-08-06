@@ -349,6 +349,44 @@ Where the constants live (single source of truth per language):
   does NOT compute raw damage, so the float32 damage constants are not duplicated
   there -- only the shadow multipliers are.
 
+### Applying the constants: `pokemon.effective_stats` (2026-08-06)
+
+Holding ONE constant is only half the job -- the multiplication was written out
+six-plus separate ways (`pokemon.Pokemon.atk/def_`, `pokemon.iv_rank`,
+`user_collection.ivs_to_stats_at_cap`, `breakpoints` x4, `formchange` x2,
+`battle.cmp_atk`'s inverse `/ 1.2`), which is the same "unforced copy" shape
+that let the constant itself rot. `pokemon.effective_stats(atk, def_, shadow)`
+is now the single application: pass the RAW pair, get the effective pair back.
+
+- The arithmetic is `raw * MULT`, in that order, and non-shadow returns its
+  inputs untouched (the old `* 1.0` is an exact identity). Float multiplication
+  is NOT associative, so folding a multiplier into the CPM would change scores;
+  `tests/test_shadow_stats.py` pins the order and every routed call site.
+- HP and CP are never shadow-adjusted, so the primitive takes only the pair.
+- The JS port keeps its own multiply (constants injected from Python) -- that
+  duplication is intentional, pinned by `tests/test_js_shadow_constants.py`.
+
+### League facts: `pokemon.LEAGUES` (2026-08-06)
+
+`pokemon.LEAGUES` is one `League(cp, max_level, open_rankings)` row per league;
+`LEAGUE_CAPS`, `LEAGUE_CP` (the same object) and `LEAGUE_MAX_LEVEL` are derived
+views kept for the ~30 dict-shaped call sites. Before it, four hand-maintained
+dicts disagreed: `LEAGUE_CAPS` and `data._LEAGUE_CP` had no `'little'` row while
+`LEAGUE_CP` / `LEAGUE_MAX_LEVEL` did, so `Pokemon.at_best_level(league='little')`
+and `iv_rank(league='little')` raised KeyError on a league the docstrings
+advertised. Both work now (`tests/test_league_descriptor.py`).
+
+**The table has to stay in `pokemon.py`**: it is an engine-hash file
+(`sweep_cache._ENGINE_FILES`), and a CP cap / level ceiling changes simulated
+stats -- the same constants in an unhashed module would let the sweep cache
+serve columns computed under the old values. `data.py` reads it through a
+FUNCTION-level import (`data._league_cp`), since `pokemon` imports `data` at
+module scope. Little League has no open PvPoke rankings (it only runs as a
+limited cup), so `data.load_rankings('little')` fails loudly and says so;
+`load_cup_rankings` is the way in. The JS user-collection port has no Little
+surface yet and its fallback cap table still omits the row -- that gap is
+pinned exactly in `tests/test_js_shadow_constants.py`.
+
 ## PvPoke bugs found
 
 <!-- sync:pvpoke_bugs_documented -->5<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8 —

@@ -61,8 +61,17 @@ def test_js_league_caps_fallback_matches_python():
     (DRY review 2026-08-05 entry 9 hoisted this literal out of ``matchMons``
     so ``CAP_TO_LEAGUE`` could be derived from it instead of hand-typed; the
     second assertion keeps ``matchMons`` wired to the hoisted table.)
+
+    KNOWN GAP: entry 13 (L6) gave Python a 'little' row; the JS table still
+    has none, because the JS port has no Little-League surface (no little
+    dives are baked). That gap is pinned EXACTLY -- every league the JS does
+    carry must match Python, and 'little' must be the only one it lacks -- so
+    adding little to the JS, or dropping any other league, fails here.
+    Syncing the JS literal belongs to the scripts/ lane.
     """
-    assert _js_table("LEAGUE_CAPS") == LEAGUE_CAPS
+    js_caps = _js_table("LEAGUE_CAPS")
+    assert set(LEAGUE_CAPS) - set(js_caps) == {"little"}
+    assert js_caps == {k: v for k, v in LEAGUE_CAPS.items() if k != "little"}
     assert re.search(r"opts\.leagueCaps\s*\|\|\s*LEAGUE_CAPS", _JS.read_text()), (
         f"matchMons no longer falls back to the LEAGUE_CAPS table in {_JS.name}"
     )

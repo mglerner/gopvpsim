@@ -59,9 +59,8 @@ import math
 from .evolution_lines import get_final_forms
 from .pokemon import (
     CPM, LEAGUE_CAPS, LEAGUE_MAX_LEVEL, MAX_CPM_LEVEL,
-    SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
-    battle_stats, best_level, cp as compute_cp, get_pokemon_index,
-    iv_rank,
+    battle_stats, best_level, cp as compute_cp, effective_stats,
+    get_pokemon_index, iv_rank,
 )
 
 
@@ -286,10 +285,7 @@ def ivs_to_stats_at_cap(
         return None
     stats = battle_stats(base_atk, base_def, base_sta,
                          atk_iv, def_iv, sta_iv, lv)
-    shadow_atk = SHADOW_ATK_BONUS if shadow else 1.0
-    shadow_def = SHADOW_DEF_MULT if shadow else 1.0
-    attack  = stats['atk'] * shadow_atk
-    defense = stats['def'] * shadow_def
+    attack, defense = effective_stats(stats['atk'], stats['def'], shadow)
     stamina = stats['hp']
     return {
         'level':     lv,

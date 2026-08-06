@@ -25,6 +25,7 @@ from typing import Callable
 
 from .moves import damage as calc_damage, type_effectiveness, stab
 from .data import parse_types
+from .pokemon import SHADOW_ATK_BONUS
 
 # Optional numba JIT for the near-KO DP loop and the turnsToLive sub-DP.
 # If unavailable (numba not installed, LLVM mismatch, etc.), pvpoke_dp and
@@ -2021,18 +2022,30 @@ class BattlePokemon:
     def cmp_atk(self) -> float:
         """Attack used for CMP / charge-move priority. Shadow's x1.2
         boosts damage but NOT priority (live-game behavior; PvPoke
-        compares shadow-free stats.atk), so strip it here"""
-        return self.atk / 1.2 if self.shadow else self.atk
+        compares shadow-free stats.atk), so strip it here.
+
+        This is the inverse of the atk half of ``pokemon.effective_stats``,
+        so it divides by that same constant instead of a re-typed 1.2 --
+        SHADOW_ATK_BONUS is 6/5, bit-identical to the literal it replaced
+        (DRY review 2026-08-05 entry 13 / L15)."""
+        return self.atk / SHADOW_ATK_BONUS if self.shadow else self.atk
 
     @classmethod
     def from_pokemon(cls, pokemon, fast_move: dict, charged_moves: list[dict],
                      shields: int = 2, initial_energy: int = 0,
                      league_cp: int | None = None) -> "BattlePokemon":
-        """Build a BattlePokemon from a Pokemon dataclass + move dicts."""
-        from .data import load_gamemaster
+        """Build a BattlePokemon from a Pokemon dataclass + move dicts.
+
+        Raises KeyError if the species is not in the gamemaster.
+        """
         from .formchange import attach_form_change
-        gm  = load_gamemaster()
-        mon = next(m for m in gm['pokemon'] if m['speciesName'] == pokemon.species)
+        from .pokemon import get_pokemon_entry
+        # Cached speciesName index, not a linear scan of gm['pokemon']: this
+        # runs once per BattlePokemon, i.e. once or twice per battle, and a
+        # sweep builds millions of them. (DRY review 2026-08-05 entry 13 / L11.
+        # The scan raised StopIteration on an unknown species; the accessor
+        # raises KeyError, which is what every other species lookup raises.)
+        mon = get_pokemon_entry(pokemon.species)
         types = parse_types(mon)
         bp = cls(
             species        = pokemon.species,
