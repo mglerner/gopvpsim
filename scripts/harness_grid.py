@@ -31,8 +31,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / 'src'))
 
-from gopvpsim.data import load_rankings, load_gamemaster, parse_types
-from gopvpsim.pokemon import Pokemon, iv_rank, LEAGUE_CP
+from gopvpsim.data import load_rankings, parse_types
+from gopvpsim.pokemon import Pokemon, iv_rank, LEAGUE_CP, find_pokemon_entry
 from gopvpsim.moves import get_moves
 from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp
 
@@ -117,11 +117,13 @@ def run_harness(spec1: Spec, spec2: Spec, shields: tuple,
 
 
 def make_bp(spec: Spec, league: str, shields: int,
-            fast_moves, charged_moves, gm) -> BattlePokemon:
+            fast_moves, charged_moves) -> BattlePokemon:
     poke = Pokemon.at_best_level(spec.species_name, spec.atk_iv, spec.def_iv,
                                  spec.sta_iv, league=league)
-    mon = next((m for m in gm['pokemon']
-                if m['speciesName'] == spec.species_name), None)
+    # Cached None-on-miss accessor instead of a linear gm['pokemon'] scan;
+    # the explicit raise below keeps this site's own error message
+    # (DRY review 2026-08-05 entry 12 / L11).
+    mon = find_pokemon_entry(spec.species_name)
     if mon is None:
         raise KeyError(f'species not found in gamemaster: {spec.species_name}')
     types = parse_types(mon)
@@ -136,9 +138,9 @@ def make_bp(spec: Spec, league: str, shields: int,
 
 def run_ours(spec1: Spec, spec2: Spec, shields: tuple,
              league: str, ctx) -> dict:
-    fast_moves, charged_moves, gm = ctx
-    bp1 = make_bp(spec1, league, shields[0], fast_moves, charged_moves, gm)
-    bp2 = make_bp(spec2, league, shields[1], fast_moves, charged_moves, gm)
+    fast_moves, charged_moves = ctx
+    bp1 = make_bp(spec1, league, shields[0], fast_moves, charged_moves)
+    bp2 = make_bp(spec2, league, shields[1], fast_moves, charged_moves)
     res = simulate(bp1, bp2,
                    charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp)
     # Preserve None for genuine ties so the winner_flip comparison treats
@@ -185,8 +187,7 @@ def main():
         shield_pairs = [(0, 0), (1, 1), (2, 2)]
 
     fast_moves, charged_moves = get_moves()
-    gm = load_gamemaster()
-    ctx = (fast_moves, charged_moves, gm)
+    ctx = (fast_moves, charged_moves)
 
     n_sims = len(pairs) * len(shield_pairs)
     print(f'== Running {len(pairs)} pairs × {len(shield_pairs)} shields = {n_sims} sims ==',

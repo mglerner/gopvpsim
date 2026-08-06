@@ -47,9 +47,9 @@ import os
 # Make sure the src layout is importable when run directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from gopvpsim.pokemon import Pokemon
+from gopvpsim.pokemon import Pokemon, find_pokemon_entry, get_pokemon_entry
 from gopvpsim.moves import get_moves
-from gopvpsim.data import load_gamemaster, get_default_moveset
+from gopvpsim.data import get_default_moveset
 from gopvpsim.battle import (
     BattlePokemon, simulate,
     pvpoke_ai, pvpoke_dp, bait_with_cheapest, no_bait, optimal_timing,
@@ -89,8 +89,10 @@ def make_battle_pokemon(species, fast_id, charged_ids, league, shields,
     fm  = dict(fast_moves[fast_id])
     cms = [dict(charged_moves[cid]) for cid in charged_ids]
 
-    gm  = load_gamemaster()
-    mon = next((m for m in gm['pokemon'] if m['speciesName'] == species), None)
+    # None-on-miss accessor, not the linear gm['pokemon'] scan this used to
+    # run: same semantics, one cached index (DRY review 2026-08-05 entry 12
+    # / L11). get_pokemon_entry would raise KeyError and skip the sys.exit.
+    mon = find_pokemon_entry(species)
     if mon is None:
         sys.exit(f"Unknown species: {species!r}")
 
@@ -230,9 +232,11 @@ def main():
             p = Pokemon.at_best_level(species, a, d, s, league=args.league, shadow=shadow)
             fast_moves, charged_moves = get_moves()
             fm = fast_moves[fast_id]
-            gm = load_gamemaster()
-            mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
-            types = parse_types(mon)
+            # Raise-on-miss site: the species already resolved above, so the
+            # bare next() this replaces could only ever raise. KeyError from
+            # the cached accessor beats StopIteration (DRY review 2026-08-05
+            # entry 12 / L11).
+            types = parse_types(get_pokemon_entry(species))
             print(f'  {label} {species}: CP={p.cp} L{p.level} | '
                   f'atk={p.atk:.2f} def={p.def_:.2f} hp={p.hp} | '
                   f'types={types}')

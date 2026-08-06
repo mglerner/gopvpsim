@@ -15,9 +15,9 @@ against the pre-split output.
 import os
 import sys
 
-from gopvpsim.pokemon import Pokemon, get_species
+from gopvpsim.pokemon import Pokemon, get_species, find_pokemon_entry
 from gopvpsim.moves import get_moves
-from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types
+from gopvpsim.data import get_default_moveset, parse_types
 from gopvpsim.display import pretty_species
 from gopvpsim.efficiency import efficient_frontier
 
@@ -553,9 +553,11 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
 
     # Set up breakpoint narration: load move data, species types, opponent info
     fast_db, charged_db = get_moves()
-    gm = load_gamemaster()
-    focal_entry = next((m for m in gm['pokemon']
-                        if m['speciesName'] == data_obj.get('species', '')), None)
+    # None-on-miss accessor (cached index) in place of the linear
+    # gm['pokemon'] scans this used to run -- the ``if entry else []``
+    # fallbacks below depend on the miss staying None, not raising
+    # (DRY review 2026-08-05 entry 12 / L11).
+    focal_entry = find_pokemon_entry(data_obj.get('species', ''))
     focal_types = parse_types(focal_entry) if focal_entry else []
     focal_moves = _build_move_tuples(moveset_label, fast_db, charged_db)
 
@@ -572,8 +574,7 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
                 oa, od, os_ = resolve_opp_ivs(opp_clean, league, opp_is_shadow, opp_iv_mode)
             opp_pokemon = Pokemon.at_best_level(opp_clean, oa, od, os_,
                                                 league=league, shadow=opp_is_shadow)
-            opp_entry = next((m for m in gm['pokemon']
-                              if m['speciesName'] == opp_clean), None)
+            opp_entry = find_pokemon_entry(opp_clean)
             opp_types = parse_types(opp_entry) if opp_entry else []
             # Get opponent's default moveset moves
             try:
