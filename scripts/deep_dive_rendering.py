@@ -599,6 +599,13 @@ def score_key(moveset_idx, composite_mode, l51=False):
 def scenario_label(scenario):
     """Canonical shield-scenario label: ``(1, 1)`` -> ``'1v1'``.
 
+    THE shield vocabulary for the dive page (DRY review 2026-08-05 entry
+    12, register item R11): every renderer that prints a scenario calls
+    this instead of re-forming the label from the tuple, so the page
+    cannot show two spellings of one scenario.
+    ``tests/test_scenario_vocabulary.py`` pins that no inline copy of the
+    format comes back.
+
     Load-bearing, not cosmetic: it is the key of the matchup-cluster
     payload's ``scens`` map, so the JS overlay silently renders neutral
     points if the two sides ever disagree on the form. Baked into
@@ -914,7 +921,7 @@ def matchup_subtitle(cat):
         scen = c.get('scenario', (0, 0))
         bait = c.get('bait')
         outcome = c.get('outcome', 'win')
-        b = f'{oppiv_label} {opp} · {scen[0]}v{scen[1]} · {outcome}'
+        b = f'{oppiv_label} {opp} · {scenario_label(scen)} · {outcome}'
         if bait == 'nobait':
             b += ' · no bait'
         elif bait == 'bait' and 'only' in cat.name:
@@ -922,6 +929,40 @@ def matchup_subtitle(cat):
         bits.append(b)
     return ' | '.join(bits)
 
+
+
+# ---------------------------------------------------------------------------
+# The dive page prints TWO different flip numbers for the SAME opponent, from
+# two engines that deliberately stay separate because they answer different
+# questions (DRY review 2026-08-05 entry 12, mc-single-stat-flip -- "do NOT
+# merge the rules"). Both surfaces label themselves from the pair below, so
+# the cross-reference cannot drift apart:
+#
+#   BOUNDARY  analysis.find_matchup_boundaries -> the "flips at" bullets and
+#             cutoff lines rendered in this module. The LOWEST stat target
+#             whose split is clean (>=75% of IVs at or above it win the
+#             matchup, <=25% below it do). A build target.
+#   BEST RULE matchup_clusters.single_stat_flip -> the Matchup clusters
+#             section's flip table. The single stat + threshold that most
+#             ACCURATELY predicts win/loss across all IVs, misclassifications
+#             allowed. A diagnostic / candidate anchor, not a target.
+#
+# The boundary number is the stricter of the two, so it is normally the
+# higher one; a reader who sees them disagree is not looking at a bug.
+BOUNDARY_RULE_TIP = (
+    'Lowest stat target whose split is clean: at least 75% of the IVs at or '
+    'above it win this matchup and at most 25% of the IVs below it do. This '
+    'is a build target. The Matchup clusters section lists a "best '
+    'single-stat rule" for the same opponents, which answers a different '
+    'question (which stat best predicts the matchup) and is usually a lower '
+    'number.')
+BEST_RULE_TIP = (
+    'The single stat and threshold that most accurately predicts win/loss '
+    'across all IVs -- misclassifications allowed, so it is a diagnostic and '
+    'a candidate anchor, not a build target. The "flips at" cutoffs under '
+    '"Threats where your build choice matters" answer the other question '
+    '(the lowest cutoff whose 75/25 split is clean) and are usually higher '
+    'for the same opponent.')
 
 
 def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
@@ -955,7 +996,7 @@ def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
     lines = []
     for i, b in enumerate(boundaries):
         scen_str = ', '.join(
-            f'{s[0]}v{s[1]}' for s in sorted(b['scenarios']))
+            scenario_label(s) for s in sorted(b['scenarios']))
         bait_modes = b.get('bait_modes', set())
         if has_bait_axis and len(bait_modes) == 1:
             bait_tag = 'no bait' if 'nobait' in bait_modes else 'with bait'
@@ -1322,7 +1363,7 @@ def render_anchor_flip_bullets(records, anchor_passing_sink=None,
             for r in recs:
                 for s in r['scenarios']:
                     scen_set.add(tuple(s))
-            scen_strs = ', '.join(f'{s[0]}v{s[1]}' for s in sorted(scen_set))
+            scen_strs = ', '.join(scenario_label(s) for s in sorted(scen_set))
 
             # Bait modes: union across sub-anchors (same pattern).
             bait_union = set()
@@ -2193,7 +2234,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
                     parts.append('<ul class="dd-threshold-list">\n')
                     for opp in sorted(_new_opps):
                         scens = sorted(_probe_opps[opp])
-                        scen_str = ', '.join(f'{s[0]}v{s[1]}' for s in scens)
+                        scen_str = ', '.join(scenario_label(s) for s in scens)
                         parts.append(
                             f'<li>vs {_opp_b(opp)} '
                             f'(<span class="dd-gain">{scen_str}</span>)'
@@ -2214,7 +2255,7 @@ def render_threshold_tier_cards(data_obj, anchor_flip_records,
             # (see TODO.md "Pre-ship: XL-candy-decision tool" + the
             # JS-populated Mirror CMP % / Score Δ plan).
             _target_scens = [(0, 0), (1, 1), (2, 2)]
-            _target_scen_labels = ['0v0', '1v1', '2v2']
+            _target_scen_labels = [scenario_label(s) for s in _target_scens]
             _scen_list = [tuple(s) for s in data_obj.get('scenarios', [])]
             _target_scen_idx = []
             for pair in _target_scens:
@@ -3062,8 +3103,9 @@ def render_analysis_volatility_html(data_obj, nIvs, nS, scenarios,
                  f'for each scenario. '
                  f'High range = scenario specialist; low range = generalist.</p>\n')
     parts.append('<table class="dd-table"><tr><th>IVs</th>')
-    for s0, s1 in scenarios:
-        parts.append(f'<th title="Rank out of {nIvs} IVs in the {s0}v{s1} shield scenario (1 = best)">{s0}v{s1}</th>')
+    for s in scenarios:
+        _lbl = scenario_label(s)
+        parts.append(f'<th title="Rank out of {nIvs} IVs in the {_lbl} shield scenario (1 = best)">{_lbl}</th>')
     parts.append(f'<th title="Overall rank when averaging across all scenarios">Avg</th>'
                  f'<th title="Difference between best and worst scenario rank (lower = more consistent)">Range</th>'
                  f'<th>Tier</th></tr>\n')
@@ -3275,7 +3317,7 @@ def _render_opp_spread_grid(spread_ivs, oi, scenarios, scores_flat, nS, nO,
     head.append('</tr>')
     rows = [''.join(head)]
     for si, scen in enumerate(scenarios):
-        cells = [f'<td class="dd-sg-row">{scen[0]}v{scen[1]}</td>']
+        cells = [f'<td class="dd-sg-row">{scenario_label(scen)}</td>']
         for iv in spread_ivs:
             if _og_win(scores_flat, iv, si, oi, nS, nO, win_threshold):
                 cells.append('<td class="dd-sg-win">&#10003;</td>')
@@ -3291,7 +3333,7 @@ def _render_boundary_cutoff_line(b, has_bait_axis):
     boundary-bullet vocabulary (HP co-condition, bait, energy lead).
     e.g. '1v1, 2v1 flips at Def >= 141.66 + 138 HP [85 IVs clear it]'.
     """
-    scen_str = ', '.join(f'{s[0]}v{s[1]}' for s in sorted(b['scenarios']))
+    scen_str = ', '.join(scenario_label(s) for s in sorted(b['scenarios']))
     bait_modes = b.get('bait_modes', set())
     if has_bait_axis and len(bait_modes) == 1:
         scen_str += ' no bait' if 'nobait' in bait_modes else ' with bait'
@@ -3374,7 +3416,7 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
     # the section is about where the choice matters.
     def _shield_wins(siv, oi):
         # The shields (as 'AvB' labels) this spread wins vs opponent oi.
-        return [f'{scenarios[si][0]}v{scenarios[si][1]}'
+        return [scenario_label(scenarios[si])
                 for si in range(nS)
                 if _og_win(scores_flat, siv, si, oi, nS, nO, win_threshold)]
 
@@ -3420,6 +3462,9 @@ def render_opponent_threats_section(all_matchup_boundaries, scores_flat,
         'chips show which recommended build wins the matchup overall (a majority '
         f'of the {nS} shields); expand a row for the per-shield grid and the '
         'exact stat cutoffs.</p>\n')
+    parts.append(
+        '<p class="dd-small" style="color:var(--text-muted)">'
+        f'<b>Flips at</b>: {_html.escape(BOUNDARY_RULE_TIP)}</p>\n')
 
     def _hoist(label_html, names):
         if not names:
@@ -3617,6 +3662,8 @@ def render_results_section(data_obj, moveset_label, opp_label,
             '<li><b>Matchup-flipping boundary</b> - a full-battle stat target: the smallest '
             'stat increase that turns a simulated loss into a win against a specific opponent and '
             'shield scenario (not just a damage-tier change).</li>\n'
+            '<li><b>Best single-stat rule</b> (Matchup clusters section) - '
+            f'{_html.escape(BEST_RULE_TIP)}</li>\n'
             '</ul>\n'
             '<p style="margin:6px 0 0 0;font-size:0.82rem;color:var(--text-muted)">'
             'Full definitions in <code>docs/concepts.md</code>.</p>\n'
@@ -3749,7 +3796,7 @@ def render_results_section(data_obj, moveset_label, opp_label,
                     only_bait = sorted(bait_wins - nobait_wins)
                     # "Only wins without bait" = nobait_wins - bait_wins
                     only_nobait = sorted(nobait_wins - bait_wins)
-                    scen_label = f'{scen[0]}v{scen[1]}'
+                    scen_label = scenario_label(scen)
                     for members, bait_tag, bait_val in [
                         (only_bait, 'with bait', 'bait'),
                         (only_nobait, 'no bait', 'nobait'),
