@@ -25,6 +25,7 @@ from gopvpsim.theme import (  # noqa: E402
     theme_picker_html,
 )
 import pvpoke_links
+from deep_dive_lib import score_pack  # noqa: E402  (stdlib-only, no deep_dive)
 
 QUAD_LABEL = {
     'nobb_vs_nonbb': 'No best buddy, vs a non-best-buddy meta',
@@ -573,7 +574,10 @@ IV_CHECK_JS = r"""
 # Sets up the globals the shared cmp_panels.js + the box's panel block read:
 # a minimal DATA (grid sizing), the combo->grid-index map, the same-meta
 # opposite-your-BB pairing for the ✦ flip overlay, and an async decode of the
-# packed score grids (DecompressionStream, identical pipeline to the deep dive).
+# packed score grids. ``decodeGrid`` is spliced in from deep_dive_lib.score_pack
+# (DRY review 2026-08-05 entry 12, js-py-score-pack) so the guide's decoder and
+# the dive's are the same source, not two literals that merely looked alike --
+# iv_envelope_analysis.pack_scores writes these grids with that module's packer.
 CMP_SETUP_JS = r"""
 (function(){
   var el = document.getElementById('cmp-data');
@@ -616,18 +620,7 @@ CMP_SETUP_JS = r"""
   window.CMP_ENERGY = {};                       // quadrant -> flat leftover-energy
   window.CMP_ENERGY_MOVES = CMPDATA.energy_moves || null;
   window.CMP_READY = false;
-  async function decodeGrid(b64) {
-    var bin = Uint8Array.from(atob(b64), function(c){ return c.charCodeAt(0); });
-    var ds = new DecompressionStream('gzip');
-    var w = ds.writable.getWriter(); w.write(bin); w.close();
-    var chunks = [], reader = ds.readable.getReader();
-    while (true) { var r = await reader.read(); if (r.done) break; chunks.push(r.value); }
-    var total = chunks.reduce(function(s, c){ return s + c.byteLength; }, 0);
-    var merged = new Uint8Array(total), off = 0;
-    for (var i = 0; i < chunks.length; i++) { merged.set(chunks[i], off); off += chunks[i].byteLength; }
-    return Array.from(new Uint16Array(merged.buffer));
-  }
-  (async function(){
+""" + score_pack.decoder_js('decodeGrid', indent='  ') + r"""  (async function(){
     for (var qq in CMPDATA.grids) window.SCORES_CMP[qq] = await decodeGrid(CMPDATA.grids[qq]);
     var eg = CMPDATA.energy_grids || {};        // absent on pre-energy JSON
     for (var qe in eg) window.CMP_ENERGY[qe] = await decodeGrid(eg[qe]);

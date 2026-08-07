@@ -108,7 +108,7 @@ from deep_dive_logging import (
 # this file: `deep_dive.<name>` is a read surface for tests and the analysis /
 # patch scripts (deep_dive.get_moves, deep_dive.get_rankings_for, ...), so
 # pruning them is a deliberate follow-up, not a side effect of moving code.
-from deep_dive_lib import categories, opponents, render, sweep
+from deep_dive_lib import categories, opponents, render, score_pack, sweep
 
 logger = get_logger()
 
@@ -1210,24 +1210,11 @@ def log_run_start_fingerprint(league):
     return fp
 
 
-def _pack_u16(arr):
-    """Pack a numeric sequence as gzip'd little-endian uint16, base64'd.
-
-    The inverse of the inline JS decoder documented next to SCORES_GZ:
-    values are clamped into [0, 65535], packed little-endian, gzip'd
-    with ``mtime=0`` (the gzip header's default timestamp made
-    byte-identical data produce different HTML run-to-run -- caught by
-    replay-vs-original diffing, arc S4), then base64'd for inline
-    embedding. Shared by the score grid and the (--compare-energy)
-    energy grid so the two encodings cannot drift apart.
-    """
-    import base64
-    import gzip
-    import struct
-    clamped = [max(0, min(65535, int(v))) for v in arr]
-    raw = struct.pack(f'<{len(clamped)}H', *clamped)
-    gz = gzip.compress(raw, compresslevel=9, mtime=0)
-    return base64.b64encode(gz).decode('ascii')
+# Moved to deep_dive_lib/score_pack.py (DRY review 2026-08-05 entry 12,
+# js-py-score-pack), which also owns the JS decoder this is the inverse of --
+# encoder and decoder now change together, and the ML IV-guide chain packs
+# with the same function. Re-exported here for the existing importers.
+_pack_u16 = score_pack.pack_u16
 
 
 def generate_interactive_html(species, league, moveset_data, html_path,
@@ -2961,61 +2948,20 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 // comparing the output.
 // -------------------------------------------------------------------
 
-var SCORES = {};
-var _scoresReady = (async function() {
-  for (var key in SCORES_GZ) {
-    var bin = Uint8Array.from(atob(SCORES_GZ[key]), function(c) { return c.charCodeAt(0); });
-    var ds = new DecompressionStream('gzip');
-    var writer = ds.writable.getWriter();
-    writer.write(bin);
-    writer.close();
-    var chunks = [];
-    var reader = ds.readable.getReader();
-    while (true) {
-      var r = await reader.read();
-      if (r.done) break;
-      chunks.push(r.value);
-    }
-    var total = chunks.reduce(function(s, c) { return s + c.byteLength; }, 0);
-    var merged = new Uint8Array(total);
-    var offset = 0;
-    for (var i = 0; i < chunks.length; i++) {
-      merged.set(chunks[i], offset);
-      offset += chunks[i].byteLength;
-    }
-    SCORES[key] = Array.from(new Uint16Array(merged.buffer));
-  }
-})();
 """
-    # Parallel ENERGY decoder -- emitted ONLY when --compare-energy embedded a
-    # grid (keeps an energy-off dive byte-identical: no var, no decoder).
+    # ONE decoder, emitted from deep_dive_lib/score_pack.py -- the module that
+    # also owns _pack_u16, so the page's decode and the bake's encode cannot
+    # drift (DRY review 2026-08-05 entry 12, js-py-score-pack). The scores and
+    # energy blocks were two hand-maintained literals of the same 20 lines.
+    html += score_pack.decoder_js('_unpackU16')
+    html += score_pack.decode_map_js('SCORES_GZ', 'SCORES', '_scoresReady',
+                                     '_unpackU16')
+    # Parallel ENERGY decode -- emitted ONLY when --compare-energy embedded a
+    # grid (an energy-off dive gets no ENERGY var and no second loop).
     if packed_energy:
-        html += """
-var ENERGY = {};
-var _energyReady = (async function() {
-  for (var key in ENERGY_GZ) {
-    var bin = Uint8Array.from(atob(ENERGY_GZ[key]), function(c) { return c.charCodeAt(0); });
-    var ds = new DecompressionStream('gzip');
-    var writer = ds.writable.getWriter();
-    writer.write(bin);
-    writer.close();
-    var chunks = [];
-    var reader = ds.readable.getReader();
-    while (true) {
-      var r = await reader.read();
-      if (r.done) break;
-      chunks.push(r.value);
-    }
-    var total = chunks.reduce(function(s, c) { return s + c.byteLength; }, 0);
-    var merged = new Uint8Array(total);
-    var offset = 0;
-    for (var i = 0; i < chunks.length; i++) {
-      merged.set(chunks[i], offset);
-      offset += chunks[i].byteLength;
-    }
-    ENERGY[key] = Array.from(new Uint16Array(merged.buffer));
-  }
-})();
+        html += score_pack.decode_map_js('ENERGY_GZ', 'ENERGY', '_energyReady',
+                                         '_unpackU16')
+        html += """\
 // Re-render the compare widget once energy is decoded, so the margin panel
 // picks up the "+N energy" detail even if candidates were added during decode.
 _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
