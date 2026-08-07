@@ -79,11 +79,21 @@ def test_pack_u16_is_deterministic():
     assert header[4:8] == b'\x00\x00\x00\x00'
 
 
-def test_only_one_u16_encoder_left_in_deep_dive():
-    """DRY tripwire: the score grid and the energy grid share one encoder."""
-    src = DEEP_DIVE_PATH.read_text()
-    packs = re.findall(r"struct\.pack\(f?'<\{[^']*\}H'", src)
-    assert len(packs) == 1, f"expected one u16 encoder, found {len(packs)}"
+def test_only_one_u16_encoder_left_in_scripts():
+    """DRY tripwire: ONE encoder for every packed grid the site ships.
+
+    Widened from "one encoder left in deep_dive.py" when the second half
+    of js-py-score-pack moved it to deep_dive_lib/score_pack.py and
+    retired iv_envelope_analysis.pack_scores' hand-copied twin -- the
+    scan now covers the ML-guide chain too. The decoder side is pinned
+    by tests/test_score_pack_round_trip.py.
+    """
+    owners = {}
+    for path in sorted((REPO_ROOT / "scripts").rglob("*.py")):
+        n = len(re.findall(r"struct\.pack\(f?'<\{[^']*\}H'", path.read_text()))
+        if n:
+            owners[path.relative_to(REPO_ROOT).as_posix()] = n
+    assert owners == {"scripts/deep_dive_lib/score_pack.py": 1}, owners
 
 
 # --------------------------------------------------------------------

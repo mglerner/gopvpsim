@@ -60,6 +60,60 @@ def load_deep_dive():
     return mod
 
 
+# Flags for the smallest dive that still renders EVERY conditional piece of
+# page chrome. Each entry that is not just "make it small" is load-bearing for
+# the DOM-id guard -- drop one and the guard silently stops covering the ids
+# that block emits, so keep the reason attached (DRY review 2026-08-05 entry
+# 12, js-py-dom-id-registry):
+#
+#   --top-movesets 2   -> >1 moveset, so the 'moveset-sel' dropdown renders
+#   --opp-ivs both     -> >1 opponent-IV mode, so 'oppiv-sel' renders
+#   --energy-lead on   -> >1 energy value, so 'energy-sel' renders
+#   (--bait both, the default) -> both bait modes, so 'bait-sel' renders
+#   (best-buddy auto on Great) -> the sidenav's 'dd-bb-toggle' renders
+#   (shield scenarios) -> --html implies --interactive, which expands 1,1 to
+#                         all nine, so 'scenario-sel' renders
+#
+# The rest keep it cheap and side-effect free: 8 IVs x 2 opponents, no slayer
+# iteration, and -- important while the engine is under edit -- NO sweep-cache
+# writes, no replay blob, no log file under userdata/ (CLAUDE.md "use
+# --no-sweep-cache while changing the engine": a WIP-engine run with the cache
+# on overwrites trusted columns in place).
+SMALL_DIVE_ARGS = [
+    'Bastiodon', '--league', 'great',
+    '--opponents', '2', '--species-iv-floor', '14,14,14',
+    '--top-movesets', '2', '--opp-ivs', 'both', '--energy-lead', 'on',
+    '--no-thresholds', '--no-mirror-slayer',
+    '--no-cache', '--no-sweep-cache', '--no-replay-dump',
+    '--quiet', '--log-file', '/dev/null',
+]
+
+
+@pytest.fixture(scope='session')
+def small_dive_html(tmp_path_factory):
+    """Render ONE tiny but REAL deep-dive page; return its HTML text.
+
+    Runs ``deep_dive.main()`` in-process (~10-15s, once per session) via
+    the shared loader above -- the loader's ``sys.modules['deep_dive']``
+    registration is what lets the sweep's spawn-mode workers resolve
+    their pickled entry points from inside pytest.
+
+    Session-scoped and shared: tests that need "what the shipped page
+    actually contains" (DOM ids, the emitted score decoder) must not each
+    pay for a render. Returns text, not a path, so no test can mutate
+    what the next one reads.
+    """
+    dd = load_deep_dive()
+    out = tmp_path_factory.mktemp('small_dive') / 'small_dive.html'
+    old_argv = sys.argv
+    sys.argv = ['deep_dive.py'] + SMALL_DIVE_ARGS + ['--html', str(out)]
+    try:
+        dd.main()
+    finally:
+        sys.argv = old_argv
+    return out.read_text()
+
+
 @pytest.fixture(autouse=True, scope='session')
 def _pin_data_cache_ttl():
     """Pin the gamemaster/rankings disk cache for the whole test run.

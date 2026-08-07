@@ -37,6 +37,7 @@ from gopvpsim.moves import get_moves, damage as calc_damage
 from gopvpsim.breakpoints import _get_types
 from gopvpsim.data import get_default_moveset
 from deep_dive import _parse_opponent_pool_line, parse_opponent_spec
+from deep_dive_lib import score_pack
 from deep_dive_logging import init_logger, get_logger
 
 logger = get_logger()
@@ -240,16 +241,12 @@ def energy_moves_blob(fast_id, charged_ids):
     }
 
 
-def pack_scores(flat):
-    """Pack a flat int list as little-endian uint16 -> gzip(level9, mtime=0) ->
-    base64 ascii, the exact pipeline the deep-dive uses (deep_dive.py) so the
-    guide's DecompressionStream decoder is identical. mtime=0 keeps the output
-    byte-stable run-to-run."""
-    import base64, gzip, struct
-    clamped = [max(0, min(65535, int(v))) for v in flat]
-    raw = struct.pack(f'<{len(clamped)}H', *clamped)
-    gz = gzip.compress(raw, compresslevel=9, mtime=0)
-    return base64.b64encode(gz).decode('ascii')
+# Guide-side alias for THE packer (DRY review 2026-08-05 entry 12,
+# js-py-score-pack). This was a hand-copied second encoder whose docstring
+# claimed to be "the exact pipeline the deep-dive uses" -- a claim nothing
+# checked. It is now literally that function, and the decoder emitted into
+# the guide comes from the same module.
+pack_scores = score_pack.pack_u16
 
 
 def close_calls(base_metrics, drop_metrics, cheapest_cost):
