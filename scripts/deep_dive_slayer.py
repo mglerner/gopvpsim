@@ -17,12 +17,15 @@ from gopvpsim.pokemon import (
 )
 from gopvpsim.moves import get_moves, type_effectiveness
 from gopvpsim.data import load_gamemaster, load_rankings, get_default_moveset, parse_types
-from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp, pvpoke_simulate_shield
-from gopvpsim.formchange import attach_form_change
+from gopvpsim.battle import simulate, pvpoke_dp, pvpoke_simulate_shield
 from gopvpsim.anchors import resolve_anchors, tag_iv, ResolvedAnchor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from deep_dive_logging import get_logger, worker_log_setup
+# The (focal, opponent) pair construction is shared with the sweep worker
+# (D10) -- see build_battle_pair. The two workers stay separate: they
+# iterate different grids.
+from deep_dive_lib.sweep import BattleSide, build_battle_pair
 
 logger = get_logger()
 
@@ -172,24 +175,16 @@ def slayer_iter_worker(args):
             # One BattlePokemon pair per (profile, opponent), reset between
             # scenarios — keeps the damage/DP caches warm across the
             # shield-scenario axis instead of rebuilding them per sim.
-            bp0 = BattlePokemon(
-                species=species, types=focal_types,
-                atk=atk_stat, def_=def_stat, max_hp=hp_stat,
-                shadow=shadow,
-                fast_move=dict(fm_template),
-                charged_moves=[dict(cm) for cm in cms_template],
-            )
-            attach_form_change(bp0, focal_mon, a_iv, d_iv, s_iv, lv,
-                               league_cp, shadow)
-            bp1 = BattlePokemon(
-                species=species, types=focal_types,
-                atk=opp_atk, def_=opp_def, max_hp=opp_hp,
-                shadow=shadow,
-                fast_move=dict(fm_template),
-                charged_moves=[dict(cm) for cm in cms_template],
-            )
-            attach_form_change(bp1, focal_mon, opp_a, opp_d, opp_s, opp_lv,
-                               league_cp, shadow)
+            # It is a MIRROR: both sides are the focal species/moveset, so
+            # the two BattleSides differ only in stats/IVs/level.
+            bp0, bp1 = build_battle_pair(
+                BattleSide(species, focal_types, atk_stat, def_stat, hp_stat,
+                           shadow, fm_template, cms_template,
+                           focal_mon, (a_iv, d_iv, s_iv), lv),
+                BattleSide(species, focal_types, opp_atk, opp_def, opp_hp,
+                           shadow, fm_template, cms_template,
+                           focal_mon, (opp_a, opp_d, opp_s), opp_lv),
+                league_cp)
             for s_focal, s_opp in shield_scenarios:
                 bp0.reset_for_battle(s_focal, opponent=bp1)
                 bp1.reset_for_battle(s_opp, opponent=bp0)

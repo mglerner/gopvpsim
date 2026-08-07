@@ -46,3 +46,72 @@ def test_agrees_with_classify_iv_naming_rule():
     indices = deep_dive.classify_tier_indices(
         result['atk'], result['def_'], result['hp'], THRESHOLDS)
     assert list(THRESHOLDS)[indices[0]] == name
+
+
+# ---------------------------------------------------------------------------
+# D14 (DRY review 2026-08-05 entry 12): ONE meets-rule, two thin wrappers.
+# The two classifiers used to carry hand-copied >= chains; these pin that
+# they cannot drift apart again.
+# ---------------------------------------------------------------------------
+
+D14_THRESHOLDS = {
+    'sharp': {'attack': 120.0, 'defense': 103.0, 'stamina': 140},
+    'atk_only': {'attack': 118.5, 'defense': 0, 'stamina': 0},
+    'hp_only': {'attack': 0, 'defense': 0, 'stamina': 145},
+}
+
+
+def _grid():
+    """Spreads straddling every cutoff, including exact-equality rows."""
+    for atk in (118.4999, 118.5, 120.0, 121.0):
+        for dfn in (102.9982, 103.0, 104.0):
+            for hp in (139, 140, 145, 146):
+                yield atk, dfn, hp
+
+
+def test_two_classifiers_agree_across_a_boundary_grid():
+    for atk, dfn, hp in _grid():
+        indices = deep_dive.classify_tier_indices(atk, dfn, hp,
+                                                  D14_THRESHOLDS)
+        name = deep_dive.classify_iv({'atk': atk, 'def_': dfn, 'hp': hp},
+                                     D14_THRESHOLDS)
+        expected = list(D14_THRESHOLDS)[indices[0]] if indices else None
+        assert name == expected, (atk, dfn, hp, indices, name)
+
+
+def test_both_wrappers_route_through_the_one_rule(monkeypatch):
+    """Swap the rule; BOTH classifiers must change. A wrapper that kept its
+    own inline >= chain would keep answering the old way."""
+    monkeypatch.setattr(deep_dive, 'meets_threshold',
+                        lambda thresh, atk, dfn, hp: False)
+    assert deep_dive.classify_tier_indices(999, 999, 999, D14_THRESHOLDS) == []
+    assert deep_dive.classify_iv({'atk': 999, 'def_': 999, 'hp': 999},
+                                 D14_THRESHOLDS) is None
+
+
+def test_zero_requirements_always_pass():
+    # A zero cutoff means "unset", not "must be >= 0" -- pin it on the rule
+    # itself, since both wrappers now inherit the behavior from one place.
+    thresh = {'attack': 0, 'defense': 0, 'stamina': 0}
+    assert deep_dive.meets_threshold(thresh, 0, 0, 0) is True
+
+
+def test_no_hand_rolled_meets_chains_survive():
+    """Anti-re-fork guard (D14 adversarial verify, 2026-08-06): the
+    threshold meets-idiom may exist exactly once -- inside
+    meets_threshold itself. A third hand-copied chain survived the
+    first unification (the L51 _level_meta_arrays path, still on
+    rounded stats); this scan fails if any copy ever comes back."""
+    import re
+    from pathlib import Path
+    scripts = Path(__file__).resolve().parents[1] / 'scripts'
+    idiom = re.compile(r"\['attack'\]\s*>\s*0\s+and")
+    hits = []
+    for path in sorted(list(scripts.glob('*.py')) +
+                       list((scripts / 'deep_dive_lib').glob('*.py'))):
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            if idiom.search(line):
+                hits.append(f'{path.name}:{n}')
+    # Exactly ONE instance, inside meets_threshold's own body (line
+    # number left unpinned -- edits above it move the line).
+    assert len(hits) == 1 and hits[0].startswith('deep_dive.py:'), hits

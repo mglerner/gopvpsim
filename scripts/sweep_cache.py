@@ -73,7 +73,23 @@ from cache_base import write_planes, read_planes
 # (e.g. "add a new species" touches nothing existing). A v7 focal dir can hold
 # columns of mixed engine AND gamemaster vintages, each self-identifying by
 # its sidecar stamp; gc_cache.py keeps v7 dirs (no per-dir vintage).
-CACHE_VERSION = 7
+# v8 (2026-08-06): DRY review 2026-08-05 entry 12, D10 -- the (focal, opponent)
+# BattlePokemon pair construction inside ``_sweep_worker`` moved to the shared
+# ``deep_dive_lib.sweep.build_battle_pair`` core (also used by the slayer
+# worker and profile_slayer). Worker code lives in scripts/, OUTSIDE the engine
+# source hash, so the standing rule applies: bump on any worker-code change
+# even when the outputs are expected identical (same rule as v2/v3). Schema is
+# UNCHANGED from v7 -- only the version integer moves; migrate_cache keeps
+# working as-is, and the bump re-keys every focal dir, which is the intended
+# cold bake this batch rides. Do NOT add a migrate predicate for it.
+# gc_cache CAVEAT (adversarial verify, 2026-08-06): plan_sweep classifies
+# dirs by meta 'v' >= CACHE_VERSION, so the 982 v7 dirs (42G) drop out of
+# the always-keep bucket into a single gamemaster-keyless legacy vintage.
+# They survive the default --keep-vintages 2 but a --keep-vintages 1 run
+# deletes all of them at once. Do NOT run gc_cache until the v8 bake has
+# been verified (N-1 retention convention); after that, reclaiming the v7
+# set is the point.
+CACHE_VERSION = 8
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'sweep'
 
 # Compact on-disk dtype per column plane. score is the float64 PvPoke score;

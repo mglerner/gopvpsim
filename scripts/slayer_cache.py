@@ -42,7 +42,14 @@ from pathlib import Path
 # is a one-time cold rebake (old opaque-filename entries can't be mapped to the
 # new scenario-only filenames — no stored inputs), after which future bumps are
 # warm.
-CACHE_VERSION = 5
+# v6 (2026-08-06): DRY review 2026-08-05 entry 12, D10 -- ``slayer_iter_worker``
+# now builds its mirror pair through the shared
+# ``deep_dive_lib.sweep.build_battle_pair`` core instead of its own inline
+# copy. The slayer's sims flow through EXACTLY the construction this change
+# touched, so the standing worker-code rule that produced v3 applies here too:
+# bump even though the outputs are expected identical. (Schema is unchanged
+# from v5; the version only re-keys the filename hash.)
+CACHE_VERSION = 6
 CACHE_DIR = Path.home() / '.cache' / 'gopvpsim' / 'slayer'
 
 
