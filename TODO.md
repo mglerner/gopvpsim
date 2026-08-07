@@ -151,6 +151,16 @@ including JIT-COV-2 below.
 
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
+- **[render] duplicate DOM ids on dive pages** (predive gate 2026-08-06,
+  pre-existing): `af-<hash>` anchor-group ids emitted x3 per page
+  (deep_dive_rendering.py anchor_group_id sites, ~:1049-1057) plus
+  `dd-recommendations`/`dd-threshold-tiers` x2. getElementById consumers
+  bind the first instance so behavior is stable, but it is invalid HTML
+  and a fragility. De-dupe the emissions; render-only.
+- **[ops] overnight_redive.sh step-9 label still says "(link + dash)"** --
+  the roster now carries three gates. One-word edit; do it when the
+  chain is NOT running (editing a mid-execution bash script corrupts it).
+
 - **[render DRY] score-key `{mi}_{mode}@51` parity (Python<->JS): DONE
   2026-08-05** (DRY review entry 5, `ffc3b35` -- the three inline JS
   reconstructions route through getScoreKey and the parity tests pin it).

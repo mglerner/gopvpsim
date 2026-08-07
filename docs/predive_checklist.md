@@ -199,3 +199,24 @@ The red-team caution that produced these: the lenses above were authored *after*
 the two misses, so they risk being hindsight-fitted (a grep curated to the exact
 bug). The code-level guards are the antidote -- they hold regardless of who is
 auditing or whether anyone remembers the lens.
+
+## Drift recorded by the 2026-08-06 pre-dive run (Fable gate)
+
+- Lens 3 (worker/concurrency grep): the pool sizing moved to
+  `scripts/deep_dive_lib/sweep.py` in the entry-12 split -- greps over
+  `scripts/deep_dive.py` alone no longer see it. Include
+  `scripts/deep_dive_lib/` in every code-location trigger.
+- Lens 4 (duplicate DOM ids): strip `<script>` bodies before the
+  dup-id uniq or the score-pack decoder template drowns the signal in
+  false positives. Known pre-existing dup shape: `af-<hash>`
+  anchor-group ids x3 per page (deep_dive_rendering.py
+  anchor_group_id emissions) + `dd-recommendations`/
+  `dd-threshold-tiers` x2 -- shipped that way since at least the July
+  bake; TODO carries the de-dupe item.
+- Step-9 roster: `run_ship_gates.py` now includes verify_dev_counts,
+  a gate that goes RED on docs drift (sentinel vs live counts). Add
+  "sentinels green NOW" as an explicit pre-launch trigger -- on
+  2026-08-06 a 1-count drift would have killed the chain at hour ~20;
+  the gate caught it pre-launch. NB overnight_redive.sh's step-9 label
+  still says "(link + dash)" -- update it when the chain is NOT
+  running (editing a mid-execution bash script corrupts it).
