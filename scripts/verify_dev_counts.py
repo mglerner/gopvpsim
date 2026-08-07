@@ -62,6 +62,12 @@ PLAUSIBILITY_KEYS = {
     'pvpoke_matchups_verified',
     'pvpoke_cells_verified',
     'pvpoke_bugs_documented',
+    # Renders publicly via guides/how-this-works {{dev:pvpoke_cells_exact}}.
+    # Not derivable here (needs the full oracle-harness run, minutes);
+    # re-derive with scripts/audit_oracle_harness.py when it drifts.
+    # Registered 2026-08-06 after it sat as an unknown key while the
+    # published guide showed a 2-cell-stale value (170 vs 172).
+    'pvpoke_cells_exact',
 }
 ALL_KEYS = DERIVABLE_KEYS | PLAUSIBILITY_KEYS
 

@@ -32,13 +32,16 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->1290<!-- /sync --> tests collected. The original PvPoke battle-correctness
+<!-- sync:test_count -->1619<!-- /sync --> tests collected. The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
 against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->23<!-- /sync --> matchups
-(<!-- sync:pvpoke_cells_verified -->207<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->170<!-- /sync --> exact on score+winner+chargedLog, 37 cells =
-documented divergences, each traced to a mechanism: the near-KO
+(<!-- sync:pvpoke_cells_verified -->207<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->172<!-- /sync --> exact on score+winner+chargedLog, 35 cells =
+documented divergences (172+35 re-audited 2026-08-06 at BOTH origin/main
+and the entry-13 engine batch -- identical counts, so the batch moved
+nothing; the old 170+37 had been stale since the hunt2 merge), each
+traced to a mechanism: the near-KO
 plan-choice cluster, PvPoke bug #3 Gyro-Ball-over-Shadow-Ball — both
 sides of it, and bug #8 Hangry stickiness; per-cell reasons live on
 the MATCHUPS entries in the audit script). Historical

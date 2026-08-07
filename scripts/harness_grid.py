@@ -36,7 +36,7 @@ from gopvpsim.pokemon import Pokemon, iv_rank, LEAGUE_CP, find_pokemon_entry
 from gopvpsim.moves import get_moves
 from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp
 
-DEFAULT_PVPOKE_ROOT = Path.home() / 'coding' / 'MGLPoGo' / 'pvpoke'
+DEFAULT_PVPOKE_ROOT = Path.home() / 'coding' / 'pvpoke'
 HARNESS = REPO / 'scripts' / 'pvpoke_trace.js'
 
 

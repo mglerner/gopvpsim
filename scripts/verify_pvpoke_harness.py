@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-DEFAULT_PVPOKE_ROOT = Path.home() / 'coding' / 'MGLPoGo' / 'pvpoke'
+DEFAULT_PVPOKE_ROOT = Path.home() / 'coding' / 'pvpoke'
 HARNESS = REPO / 'scripts' / 'pvpoke_trace.js'
 
 
