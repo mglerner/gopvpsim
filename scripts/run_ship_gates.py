@@ -21,18 +21,25 @@ SCRIPTS = Path(__file__).resolve().parent
 # (script name, extra args). Every gate takes --ship and exits nonzero
 # on violations. Keep output quiet where the gate supports it -- the
 # callers surface tails, not transcripts.
+# (script name, FULL argument tuple). Not every gate takes --ship, so each
+# entry carries its complete argv.
 SHIP_GATES = (
-    ('verify_article_links.py', ()),
-    ('verify_no_unicode_dashes.py', ('-q',)),
+    ('verify_article_links.py', ('--ship',)),
+    ('verify_no_unicode_dashes.py', ('--ship', '-q')),
+    # Dev-count sentinels render into the published guides
+    # ({{dev:test_count}}, {{dev:pvpoke_cells_exact}}, ...) -- a stale
+    # sentinel is a public wrong number. Wired in 2026-08-06 after the
+    # final gate found it uncalled anywhere and a month stale.
+    ('verify_dev_counts.py', ('--quiet',)),
 )
 
 
 def run_gates(verbose=True):
     """Run every gate; return list of (gate, returncode) failures."""
     failures = []
-    for gate, extra in SHIP_GATES:
+    for gate, argv in SHIP_GATES:
         r = subprocess.run(
-            [sys.executable, str(SCRIPTS / gate), '--ship', *extra],
+            [sys.executable, str(SCRIPTS / gate), *argv],
             capture_output=not verbose, text=True)
         if r.returncode != 0:
             failures.append((gate, r.returncode))

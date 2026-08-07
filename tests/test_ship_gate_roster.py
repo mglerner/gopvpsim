@@ -17,10 +17,23 @@ from run_ship_gates import SHIP_GATES  # noqa: E402
 _SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 
 
-def test_roster_has_both_gates():
+def test_roster_has_all_gates():
     names = [g for g, _ in SHIP_GATES]
     assert 'verify_article_links.py' in names
     assert 'verify_no_unicode_dashes.py' in names
+    # Wired 2026-08-06: dev-count sentinels render into the published
+    # guides, so their drift check ships with everything else.
+    assert 'verify_dev_counts.py' in names
+
+
+def test_roster_entries_carry_full_argv():
+    # Entries are (script, FULL argv) -- not every gate takes --ship, so
+    # nothing may inject it globally (that regression breaks
+    # verify_dev_counts). The two site gates must still carry it.
+    argv = dict(SHIP_GATES)
+    assert '--ship' in argv['verify_article_links.py']
+    assert '--ship' in argv['verify_no_unicode_dashes.py']
+    assert '--ship' not in argv['verify_dev_counts.py']
 
 
 def test_roster_gates_exist_on_disk():

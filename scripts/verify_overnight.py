@@ -256,9 +256,9 @@ def main() -> int:
     # Roster imported from run_ship_gates (single source; entry 3b).
     print('[4/5] ship gates')
     from run_ship_gates import SHIP_GATES
-    for gate, _extra in SHIP_GATES:
+    for gate, argv in SHIP_GATES:
         r = subprocess.run(
-            [sys.executable, str(REPO / 'scripts' / gate), '--ship'],
+            [sys.executable, str(REPO / 'scripts' / gate), *argv],
             capture_output=True, text=True)
         tail = (r.stdout or r.stderr).strip().splitlines()[-1:]
         verdict = 'OK ' if r.returncode == 0 else 'ERR'

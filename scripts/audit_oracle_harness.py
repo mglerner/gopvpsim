@@ -30,7 +30,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / 'tests'))
-DEFAULT_PVPOKE_ROOT = Path.home() / 'coding' / 'MGLPoGo' / 'pvpoke'
+DEFAULT_PVPOKE_ROOT = Path.home() / 'coding' / 'pvpoke'
 HARNESS = REPO / 'scripts' / 'pvpoke_trace.js'
 
 from test_battle import _make_battle_pokemon, _extract_battle_log  # noqa: E402
