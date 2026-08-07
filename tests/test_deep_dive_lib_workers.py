@@ -133,6 +133,21 @@ def test_sweep_module_imports_without_deep_dive():
     assert out.stdout.strip() == 'deep_dive_lib.sweep'
 
 
+def test_slayer_module_imports_without_deep_dive():
+    """D10 added an import edge: deep_dive_slayer -> deep_dive_lib.sweep (the
+    shared build_battle_pair). A spawn child resolves the slayer worker by
+    importing deep_dive_slayer, so that module must still come up on its own,
+    without the by-path deep_dive script."""
+    code = ('import sys; import deep_dive_slayer as s; '
+            'assert "deep_dive" not in sys.modules, sorted(sys.modules); '
+            'print(s.build_battle_pair.__module__)')
+    out = subprocess.run(
+        [sys.executable, '-c', code], capture_output=True, text=True,
+        cwd=str(REPO_ROOT / 'scripts'))
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == 'deep_dive_lib.sweep'
+
+
 def test_slayer_worker_name_is_unchanged_and_injection_still_lands():
     """The slayer worker did NOT move (it already lived in
     deep_dive_slayer), but its parent-side compute_iv_metadata injection

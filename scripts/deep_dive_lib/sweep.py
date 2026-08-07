@@ -18,6 +18,9 @@ import os
 import sys
 import time
 
+from dataclasses import dataclass
+from typing import NamedTuple
+
 from gopvpsim.pokemon import (
     Pokemon, get_species, iv_rank, CPM, best_level,
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL, cp as calc_cp,
@@ -323,6 +326,72 @@ def group_ivs_by_stat_profile(iv_meta_list, per_iv=False):
     return profile_to_indices, profile_data
 
 
+# ---------------------------------------------------------------------------
+# Shared battle-pair construction (D10)
+# ---------------------------------------------------------------------------
+
+class BattleSide(NamedTuple):
+    """One side's ingredients for ``build_battle_pair``.
+
+    Exactly what a worker carries per (focal profile, opponent) cell: the
+    effective stats it sims at, plus the raw IVs / level / gamemaster entry
+    that ``attach_form_change`` needs to build the alt-form state.
+    """
+    species: str
+    types: tuple
+    atk: float
+    def_: float
+    hp: int
+    shadow: bool
+    fm_template: dict
+    cms_template: list
+    mon: dict               # gamemaster entry (form-change ingredients)
+    ivs: tuple              # (atk_iv, def_iv, sta_iv)
+    level: float
+    initial_energy: int = 0
+
+
+def _build_side(side, league_cp):
+    bp = BattlePokemon(
+        species=side.species, types=side.types,
+        atk=side.atk, def_=side.def_, max_hp=side.hp,
+        shadow=side.shadow,
+        # Move dicts are PRIVATE per BattlePokemon (review section G,
+        # invariant 1) -- copy the templates, never share them.
+        fast_move=dict(side.fm_template),
+        charged_moves=[dict(cm) for cm in side.cms_template],
+    )
+    # Energy-lead axis: reset_for_battle re-applies initial_energy before
+    # every scenario, so setting it once here covers the caller's whole
+    # shield-scenario loop.
+    bp.initial_energy = side.initial_energy
+    # Form-change state must be attached AFTER the move dicts are in place
+    # (the FormData references bp's own dicts); no-op for species without a
+    # formChange entry.
+    attach_form_change(bp, side.mon, *side.ivs, side.level,
+                       league_cp, side.shadow)
+    return bp
+
+
+def build_battle_pair(focal, opp, league_cp):
+    """Build the (focal, opponent) BattlePokemon pair for one sim cell.
+
+    ONE construction path for both process pools: ``_sweep_worker`` (focal
+    vs a meta opponent) and ``deep_dive_slayer.slayer_iter_worker`` (focal
+    vs a mirror of itself), plus ``scripts/profile_slayer.py``'s benchmark.
+    They iterate DIFFERENT grids and stay separate workers on purpose (June
+    review D10 / the 2026-08-05 DRY review's do-not-merge list); only this
+    ~20-line core is shared, so a change to how a dive mon is built (shadow
+    flags, form-change wiring, energy lead) can no longer land on one worker
+    and miss the other.
+
+    The pair is built ONCE per (profile, opponent) and the caller
+    ``reset_for_battle()``s it between shield scenarios, which keeps the
+    damage/DP caches warm across the scenario axis.
+    """
+    return _build_side(focal, league_cp), _build_side(opp, league_cp)
+
+
 # Order MUST match the metric tuple the worker appends (won, hp, max_hp,
 # shields). These are the extra per-cell fields the ML guide path needs
 # beyond score/energy; they become cache planes of the same names.
@@ -400,28 +469,14 @@ def _sweep_worker(pair_chunk):
         # One BattlePokemon pair per (profile, opponent), reset between
         # scenarios — keeps the damage/DP caches warm across the
         # shield-scenario axis instead of rebuilding them per sim.
-        bp0 = BattlePokemon(
-            species=species, types=focal_types,
-            atk=atk_stat, def_=def_stat, max_hp=hp_stat,
-            shadow=focal_shadow,
-            fast_move=dict(fm_template),
-            charged_moves=[dict(cm) for cm in cms_template],
-        )
-        # Energy-lead axis: reset_for_battle re-applies initial_energy
-        # before every scenario, so setting it once here covers the
-        # whole shield-scenario loop below.
-        bp0.initial_energy = focal_energy
-        attach_form_change(bp0, focal_mon, a_iv, d_iv, s_iv, lv,
-                           league_cp, focal_shadow)
-        bp1 = BattlePokemon(
-            species=opp['species'], types=opp['types'],
-            atk=opp['atk'], def_=opp['def_'], max_hp=opp['hp'],
-            shadow=opp['shadow'],
-            fast_move=dict(opp['fm']),
-            charged_moves=[dict(cm) for cm in opp['cms']],
-        )
-        attach_form_change(bp1, opp['mon'], *opp['ivs'], opp['level'],
-                           league_cp, opp['shadow'])
+        bp0, bp1 = build_battle_pair(
+            BattleSide(species, focal_types, atk_stat, def_stat, hp_stat,
+                       focal_shadow, fm_template, cms_template,
+                       focal_mon, (a_iv, d_iv, s_iv), lv, focal_energy),
+            BattleSide(opp['species'], opp['types'], opp['atk'], opp['def_'],
+                       opp['hp'], opp['shadow'], opp['fm'], opp['cms'],
+                       opp['mon'], opp['ivs'], opp['level']),
+            league_cp)
         scores = []
         energies = []
         metrics = [] if capture_metrics else None
@@ -450,6 +505,56 @@ def _sweep_worker(pair_chunk):
         if capture_metrics:
             metrics_results[(profile_key, oi)] = metrics
     return results, energy_results, metrics_results, n_sims
+
+
+@dataclass
+class SweepConfig:
+    """The run-wide ``iv_sweep`` knobs, resolved once per dive (D9).
+
+    Everything here is CONSTANT across a dive's sweeps -- only the focal
+    moveset, the composite opp-IV mode, and the two opt-in axes
+    (``capture_energy`` / ``focal_max_level``) vary between the calls
+    ``deep_dive.main`` makes. Before this, the same eight lines were
+    hand-typed at five call sites (Phase 2, the extra composite modes, the
+    reference sweep, the base-form census, the best-buddy pass), so adding a
+    knob meant editing five argument lists and any miss was silent (commit
+    06bedca is the worked example).
+
+    Defaults MIRROR ``iv_sweep``'s own defaults, so an omitted field passes
+    through unchanged.
+    """
+    iv_floor: tuple = None
+    log_path: str = None
+    verbose: bool = False
+    threshold_registry: object = None
+    reserve_cpus: int = 0
+    signature_dedup: bool = True
+    use_sweep_cache: bool = False
+    mechanics: str = 'legacy'
+
+    @classmethod
+    def from_args(cls, args, log_path=None, threshold_registry=None):
+        """Build from the deep_dive CLI namespace. The two negated flags
+        (``--no-signature-dedup`` / ``--no-sweep-cache``) are inverted HERE,
+        once, instead of at every call site."""
+        return cls(
+            iv_floor=args.iv_floor,
+            log_path=log_path,
+            verbose=args.verbose,
+            threshold_registry=threshold_registry,
+            reserve_cpus=args.reserve_cpus,
+            signature_dedup=not args.no_signature_dedup,
+            use_sweep_cache=not args.no_sweep_cache,
+            mechanics=args.mechanics,
+        )
+
+    def as_kwargs(self):
+        """Pass-through kwargs for ``iv_sweep``: ``iv_sweep(..., **cfg.as_kwargs())``.
+
+        NOT ``dataclasses.asdict`` -- that deep-copies, and
+        ``threshold_registry`` must reach the sweep as the SAME object.
+        """
+        return dict(self.__dict__)
 
 
 def iv_sweep(species, fast_id, charged_ids, league, shadow,

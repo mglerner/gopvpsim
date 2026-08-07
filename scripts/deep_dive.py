@@ -318,26 +318,42 @@ def auto_discover_thresholds(results, n_tiers=2):
     return thresholds
 
 
+def meets_threshold(thresh, atk, dfn, hp):
+    """THE tier meets-rule (D14, DRY review 2026-08-05 entry 12).
+
+    A threshold is met when every NON-ZERO stat requirement is satisfied as
+    a ``>=`` comparison; a zero requirement is "unset" and always passes:
+      - attack  >= thresh['attack']  (if > 0)
+      - defense >= thresh['defense'] (if > 0)
+      - stamina >= thresh['stamina'] (if > 0)
+
+    Callers MUST pass the UNROUNDED effective stats. Classifying on the 2dp
+    display-rounded arrays colors spreads the page's own paste-box scanner
+    then rejects (Annihilape 0/9/14, def 102.9982 rounded up to the 103.0
+    threshold; DRY review 2026-08-05 entry 1).
+
+    ``classify_iv`` and ``classify_tier_indices`` are thin wrappers over
+    this -- they differ only in what they return (first NAME vs ALL
+    positional indices), never in the rule.
+    """
+    if thresh['attack'] > 0 and atk < thresh['attack']:
+        return False
+    if thresh['defense'] > 0 and dfn < thresh['defense']:
+        return False
+    if thresh['stamina'] > 0 and hp < thresh['stamina']:
+        return False
+    return True
+
+
 def classify_iv(result, thresholds):
     """
     Return the name of the most restrictive threshold this IV spread meets,
-    or None if it doesn't meet any.
-
-    Thresholds are checked in order (most restrictive first).
-    A threshold is met if all non-zero stat requirements are satisfied:
-      - attack >= threshold attack (if > 0)
-      - defense >= threshold defense (if > 0)
-      - stamina >= threshold stamina (if > 0)
+    or None if it doesn't meet any. Thresholds are checked in order (most
+    restrictive first); membership is ``meets_threshold``.
     """
     for name, thresh in thresholds.items():
-        meets = True
-        if thresh['attack'] > 0 and result['atk'] < thresh['attack']:
-            meets = False
-        if thresh['defense'] > 0 and result['def_'] < thresh['defense']:
-            meets = False
-        if thresh['stamina'] > 0 and result['hp'] < thresh['stamina']:
-            meets = False
-        if meets:
+        if meets_threshold(thresh, result['atk'], result['def_'],
+                           result['hp']):
             return name
     return None
 
@@ -345,23 +361,11 @@ def classify_iv(result, thresholds):
 def classify_tier_indices(atk, dfn, hp, thresholds):
     """Return positional indices of ALL thresholds this spread meets, in order.
 
-    Same meets-rule as classify_iv (each non-zero requirement is a >=
-    check), returning indices for the DATA build's iv_all_tiers /
-    iv_tiers arrays. Callers MUST pass the UNROUNDED effective stats:
-    classifying on the 2dp display-rounded arrays colored spreads the
-    page's own paste-box scanner rejects (Annihilape 0/9/14, def
-    102.9982 rounded up to the 103.0 threshold; DRY review 2026-08-05).
+    Same ``meets_threshold`` rule as classify_iv, returning indices for the
+    DATA build's iv_all_tiers / iv_tiers arrays.
     """
-    matches = []
-    for ti, thresh in enumerate(thresholds.values()):
-        if thresh['attack'] > 0 and atk < thresh['attack']:
-            continue
-        if thresh['defense'] > 0 and dfn < thresh['defense']:
-            continue
-        if thresh['stamina'] > 0 and hp < thresh['stamina']:
-            continue
-        matches.append(ti)
-    return matches
+    return [ti for ti, thresh in enumerate(thresholds.values())
+            if meets_threshold(thresh, atk, dfn, hp)]
 
 
 # ---------------------------------------------------------------------------
@@ -853,9 +857,15 @@ group_ivs_by_stat_profile = sweep.group_ivs_by_stat_profile
 
 # Moved to deep_dive_lib/sweep.py (DRY review 2026-08-05 entry 12
 # split); re-exported here so existing importers keep working.
+# BattleSide/build_battle_pair are the D10 core the sweep worker, the
+# slayer worker and profile_slayer all construct their pair through;
+# SweepConfig (D9) is the run-wide knob block main() passes to iv_sweep.
+BattleSide = sweep.BattleSide
+build_battle_pair = sweep.build_battle_pair
 _METRIC_NAMES = sweep._METRIC_NAMES
 _sweep_worker_init = sweep._sweep_worker_init
 _sweep_worker = sweep._sweep_worker
+SweepConfig = sweep.SweepConfig
 iv_sweep = sweep.iv_sweep
 
 
@@ -1506,18 +1516,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         all_tiers_lv = [[] for _ in range(len(meta_lvl))]
         if thresholds:
             for i in range(len(meta_lvl)):
-                for ti, (_tn, th) in enumerate(thresholds.items()):
-                    ok = True
-                    if th['attack'] > 0 and atk_lv[i] < th['attack']:
-                        ok = False
-                    if th['defense'] > 0 and def_lv[i] < th['defense']:
-                        ok = False
-                    if th['stamina'] > 0 and hp_lv[i] < th['stamina']:
-                        ok = False
-                    if ok:
-                        all_tiers_lv[i].append(ti)
-                        if tiers_lv[i] == -1:
-                            tiers_lv[i] = ti
+                # THE meets-rule, on UNROUNDED stats -- this was the third
+                # (and last) hand-copied chain, and the only one still
+                # classifying on the 2dp display arrays, so the L51 view
+                # could tier-color a spread the L50 view rejects (found by
+                # the D14 adversarial verify, 2026-08-06).
+                all_tiers_lv[i] = classify_tier_indices(
+                    meta_lvl[i][5], meta_lvl[i][6], hp_lv[i], thresholds)
+                if all_tiers_lv[i]:
+                    tiers_lv[i] = all_tiers_lv[i][0]
         rank1_lv = min(range(len(meta_lvl)), key=lambda i: sp_ranks_lv[i]) if meta_lvl else -1
         return {
             'ivLv': a_lv, 'ivCp': c_lv,
@@ -4319,6 +4326,17 @@ def main():
         reference_moveset=_ref_for_screen,
     )
 
+    # D9 (DRY review 2026-08-05 entry 12): ONE resolved knob block for every
+    # iv_sweep call below (Phase 2, the extra composite modes, the reference
+    # sweep, the base-form census, the best-buddy pass). Everything in it is
+    # constant for the whole dive; only the moveset, the composite mode, and
+    # the two opt-in axes (capture_energy / focal_max_level) vary per call.
+    # Both inputs are final by here: log_path is set once at init_logger, and
+    # threshold_registry took its last merge in the threshold-loading block.
+    sweep_kwargs = SweepConfig.from_args(
+        args, log_path=log_path,
+        threshold_registry=threshold_registry).as_kwargs()
+
     # Phase 2: Full IV sweep for each surviving moveset
     all_moveset_results = []
     main_slayer_iter_result = None  # populated by first moveset's --mirror-slayer pass
@@ -4333,14 +4351,8 @@ def main():
             args.species, fast_id, charged_ids, args.league, args.shadow,
             opponents, opp_movesets_full, shield_scenarios,
             opp_iv_mode=opp_iv_mode,
-            iv_floor=args.iv_floor,
-            log_path=log_path, verbose=args.verbose,
-            threshold_registry=threshold_registry,
-            reserve_cpus=args.reserve_cpus,
-            signature_dedup=not args.no_signature_dedup,
-            use_sweep_cache=not args.no_sweep_cache,
-            mechanics=args.mechanics,
             capture_energy=args.compare_energy,
+            **sweep_kwargs,
         )
 
         elapsed = time.time() - t0
@@ -4755,14 +4767,8 @@ def main():
                     args.species, fast_id, charged_ids, args.league, args.shadow,
                     opponents, opp_movesets_full, shield_scenarios,
                     opp_iv_mode=mode,
-                    iv_floor=args.iv_floor,
-                    log_path=log_path, verbose=args.verbose,
-                    threshold_registry=threshold_registry,
-                    reserve_cpus=args.reserve_cpus,
-                    signature_dedup=not args.no_signature_dedup,
-                    use_sweep_cache=not args.no_sweep_cache,
-                    mechanics=args.mechanics,
                     capture_energy=args.compare_energy,
+                    **sweep_kwargs,
                 )
                 elapsed = time.time() - t0
                 logger.info(f"    {n2:,} sims in {elapsed:.1f}s")
@@ -4805,14 +4811,8 @@ def main():
                         args.species, ref_fast, ref_charged, args.league, args.shadow,
                         opponents, opp_movesets_full, shield_scenarios,
                         opp_iv_mode=mode,
-                        iv_floor=args.iv_floor,
-                        log_path=log_path, verbose=args.verbose,
-                        threshold_registry=threshold_registry,
-                        reserve_cpus=args.reserve_cpus,
-                        signature_dedup=not args.no_signature_dedup,
-                        use_sweep_cache=not args.no_sweep_cache,
-                        mechanics=args.mechanics,
                         capture_energy=args.compare_energy,
+                        **sweep_kwargs,
                     )
                     elapsed = time.time() - t0
                     rate = ref_n / elapsed if elapsed > 0 else 0
@@ -4876,17 +4876,13 @@ def main():
             _base_scores_by_mode = {}
             for mode in opp_iv_modes_to_run:
                 t0 = time.time()
+                # No capture_energy here on purpose: the census discards
+                # everything but the score array.
                 _, _bn, _bcs, _, _ = iv_sweep(
                     _base_species, _b_fast, _b_charged, args.league, _base_shadow,
                     opponents, opp_movesets_full, shield_scenarios,
                     opp_iv_mode=mode,
-                    iv_floor=args.iv_floor,
-                    log_path=log_path, verbose=args.verbose,
-                    threshold_registry=threshold_registry,
-                    reserve_cpus=args.reserve_cpus,
-                    signature_dedup=not args.no_signature_dedup,
-                    use_sweep_cache=not args.no_sweep_cache,
-                    mechanics=args.mechanics,
+                    **sweep_kwargs,
                 )
                 logger.info(f"    base {_bn:,} sims in {time.time() - t0:.1f}s "
                             f"({mode_pretty_label(mode)})")
@@ -4955,15 +4951,9 @@ def main():
                         args.species, _bb_f, _bb_c, args.league, args.shadow,
                         opponents, opp_movesets_full, shield_scenarios,
                         opp_iv_mode=mode,
-                        iv_floor=args.iv_floor,
-                        log_path=log_path, verbose=args.verbose,
-                        threshold_registry=threshold_registry,
-                        reserve_cpus=args.reserve_cpus,
-                        signature_dedup=not args.no_signature_dedup,
-                        use_sweep_cache=not args.no_sweep_cache,
-                        mechanics=args.mechanics,
                         focal_max_level=_bb_alt_cap,
                         capture_energy=args.compare_energy,
+                        **sweep_kwargs,
                     )
                     logger.info(f"    L{_bb_alt_cap:g} {_bn51:,} sims in "
                                 f"{time.time() - t0:.1f}s ({mode_pretty_label(mode)})")
