@@ -133,10 +133,8 @@ function plotChrome() {
     legendBorder: themeColor('--border-2'),
     hoverBg: themeColor('--surface-2'),
     hoverBorder: themeColor('--text-muted'),
-    rule: themeColor('--text-muted'),      // reference lines (tie centerline)
-    ink: themeColor('--text'),             // high-contrast neutral marks
-    inkFaint: themeColor('--text-muted'),  // recessive neutral marks
-    ring: themeColor('--surface-2'),       // surface separation ring on marks
+    rule: themeColor('--text-muted'),  // reference lines (tie centerline)
+    ink: themeColor('--text'),         // high-contrast neutral marks
   };
 }
 
