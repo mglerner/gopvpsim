@@ -45,6 +45,11 @@ from gopvpsim.theme import (
     theme_picker_html,
 )
 from deep_dive import make_battle_pokemon, _parse_opponent_pool_line
+# The alpha ramp for the win/loss tint is OWNED by the dive's matchup-cluster
+# section (its _wr_cell solves the --matrix-*-fg text colors for AA contrast
+# across exactly this range). Imported, not re-typed: widening the ramp on one
+# side only would push the other side's text below the AA floor.
+from deep_dive_matchup_clusters import WR_RAMP_MIN_PCT, WR_RAMP_MAX_PCT
 
 LEAGUE = 'great'
 SHIELD_SCENARIOS = [(a, b) for a in (0, 1, 2) for b in (0, 1, 2)]
@@ -305,9 +310,10 @@ function colOrder() {{
 function cellStyle(s) {{
   if (s === null) return "";
   const t = Math.min(Math.abs(s - 500) / 350, 1);
-  // Margin gradient: ramp the fill's alpha 12%->67% with the margin, over
-  // the themed fill color (the strong-vs-marginal contrast lives here).
-  const pct = (12 + 55 * t).toFixed(0);
+  // Margin gradient: ramp the fill's alpha {wr_min}%->{wr_max}% with the
+  // margin, over the themed fill color (the strong-vs-marginal contrast lives
+  // here). Bounds injected from deep_dive_matchup_clusters.WR_RAMP_*.
+  const pct = ({wr_min} + {wr_span} * t).toFixed(0);
   if (s > 500) {{
     return "background: color-mix(in srgb, var(--matrix-win-bg) " + pct +
            "%, transparent); color: var(--matrix-win-fg);";
@@ -451,6 +457,8 @@ render();
         movesets_json=json.dumps(movesets),
         ivs_json=json.dumps(ivs),
         data_json=json.dumps(scores, separators=(',', ':')),
+        wr_min=WR_RAMP_MIN_PCT, wr_max=WR_RAMP_MAX_PCT,
+        wr_span=WR_RAMP_MAX_PCT - WR_RAMP_MIN_PCT,
         PVPOKE_ATTRIBUTION_SHORT=PVPOKE_ATTRIBUTION_SHORT,
         # matchups/index.html -> root is one up
         SUPPORT_FOOTER=support_footer_html('../'),

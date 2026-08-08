@@ -87,8 +87,10 @@ CLUSTER_PALETTE = ["#3987e5", "#199e70", "#c98500",
                    "#008300", "#9085e9", "#e66767"]
 
 # The even-shield scenarios this section clusters. Named once so the
-# "not available" prose spells the same three labels the driver iterates.
-EVEN_SHIELD_PAIRS = ((0, 0), (1, 1), (2, 2))
+# "not available" prose spells the same three labels the driver iterates,
+# and imported (not re-declared) so the guide/owned-breakdown surfaces that
+# follow the same XehrFelrose convention cannot drift from it.
+from deep_dive_lib.shields import EVEN_SHIELDS as EVEN_SHIELD_PAIRS  # noqa: E402
 
 # K-selection knobs (parsimony floor — see module docstring).
 KMIN = 2
