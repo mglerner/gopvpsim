@@ -41,9 +41,11 @@ from gopvpsim.user_collection import (
 from gopvpsim.evolution_lines import get_final_forms
 from gopvpsim.pokemon import get_pokemon_index
 from deep_dive import _parse_opponent_pool_line
+# Re-exported on purpose: bottle_cap_advisor.py imports EVEN_SHIELDS from
+# here, and this module is its shieldset-shaped entry point.
+from deep_dive_lib.shields import EVEN_SHIELDS
 
 _FAST, _CHARGED = get_moves()
-EVEN_SHIELDS = [(0, 0), (1, 1), (2, 2)]
 
 # Default meta pools per league (the same pools the dives/guides use).
 DEFAULT_POOLS = {
@@ -128,7 +130,10 @@ def breakdown(species, league, fast, charged, owned, shadow=False,
               pool_path=None, max_level=None, opp_level=None,
               shieldset=EVEN_SHIELDS):
     """Per owned spread: stats + wins + matchups dropped vs the rank-1 spread."""
-    # League-aware level ceiling (great/ultra cap at L50, master/little at L51).
+    # League-aware level ceiling: the per-league value comes from
+    # pokemon.LEAGUE_MAX_LEVEL (itself derived from the LEAGUES descriptor), so
+    # this comment deliberately does NOT restate the numbers -- a copy here
+    # would just be a second table to keep in sync.
     # A bare 51.0 here showed GL/UL mons one level too high -- e.g. Carbink
     # 0/0/0 at L51.0/CP1341 instead of L50.0 -- whenever the CP cap doesn't bind
     # before L50. Same class as the deep_dive.py:4602 IV-scanner fix.

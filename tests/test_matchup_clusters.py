@@ -521,12 +521,25 @@ def test_winrate_tint_clears_AA_at_both_ramp_endpoints():
 
 def test_winrate_ramp_matches_the_matchup_web_heatmap():
     """The ramp bounds are shared with build_matchup_web.py's cellStyle --
-    the --matrix-*-fg values are AA-solved against exactly that ramp."""
+    the --matrix-*-fg values are AA-solved against exactly that ramp.
+
+    They used to be hand-typed there as a JS literal and merely CHECKED for
+    agreement here; build_matchup_web now imports them and injects them into
+    the generated JS, so this guards the injection instead. The rendered
+    bytes are unchanged: the template still formats to `(12 + 55 * t)`.
+    """
     js = (REPO_ROOT / "scripts" / "build_matchup_web.py").read_text()
-    m = re.search(r"const pct = \((\d+) \+ (\d+) \* t\)", js)
-    assert m, "matchup-web cellStyle ramp not found"
-    assert int(m.group(1)) == mc.WR_RAMP_MIN_PCT
-    assert int(m.group(1)) + int(m.group(2)) == mc.WR_RAMP_MAX_PCT
+    assert re.search(r"from deep_dive_matchup_clusters import "
+                     r"WR_RAMP_MIN_PCT,\s*WR_RAMP_MAX_PCT", js), \
+        "matchup-web no longer imports the ramp bounds"
+    assert "const pct = ({wr_min} + {wr_span} * t).toFixed(0);" in js
+    assert not re.search(r"const pct = \(\d+ \+ \d+ \* t\)", js), \
+        "ramp bounds re-typed as a JS literal"
+
+    rendered = ("const pct = ({wr_min} + {wr_span} * t).toFixed(0);"
+                .format(wr_min=mc.WR_RAMP_MIN_PCT,
+                        wr_span=mc.WR_RAMP_MAX_PCT - mc.WR_RAMP_MIN_PCT))
+    assert rendered == "const pct = (12 + 55 * t).toFixed(0);"
 
 
 def test_in_page_note_quotes_the_module_constants(monkeypatch):

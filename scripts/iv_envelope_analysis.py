@@ -37,7 +37,9 @@ from gopvpsim.moves import get_moves, damage as calc_damage
 from gopvpsim.breakpoints import _get_types
 from gopvpsim.data import get_default_moveset
 from deep_dive import _parse_opponent_pool_line, parse_opponent_spec
+from deep_dive_analysis import move_abbr
 from deep_dive_lib import score_pack
+from deep_dive_lib.shields import EVEN_SHIELDS
 from deep_dive_logging import init_logger, get_logger
 
 logger = get_logger()
@@ -52,7 +54,6 @@ BUILDS = {
 }
 
 IVS = [15, 14, 13, 12]            # per-stat detail range
-EVEN_SHIELDS = [(0, 0), (1, 1), (2, 2)]
 ALL9_SHIELDS = [(a, b) for a in (0, 1, 2) for b in (0, 1, 2)]
 SHIELDS = EVEN_SHIELDS             # reassigned in main() per --all-shields
 FOCAL_SHADOW = False               # reassigned in main() once focal is resolved
@@ -220,23 +221,20 @@ def score_set(ivs, my_lvl, opp_lvl):
     return scores, won, energy
 
 
-def _move_abbr(mid):
-    """Short move tag for the energy line: multi-word -> initials (Roar Of Time
-    -> ROT), single word -> first 3 letters (Crunch -> CRU). Mirrors the
-    deep-dive's _mv_abbr so the guide's energy breakdown reads the same."""
-    w = mid.replace('_', ' ').title().split()
-    return (''.join(x[0] for x in w).upper() if len(w) > 1
-            else (w[0][:3].upper() if w else '?'))
-
-
 def energy_moves_blob(fast_id, charged_ids):
     """{fast:{abbr,gain}, charged:[{abbr,cost}]} -- the move energetics the
     shared cmpCellHtml uses to render leftover energy as fast-move-equivalents
-    and fractions of each charged move."""
+    and fractions of each charged move.
+
+    Tags come from ``deep_dive_analysis.move_abbr``, THE abbreviation rule
+    (DRY review 2026-08-05 entry 7). This file used to open-code a copy whose
+    docstring claimed to "mirror the deep-dive's _mv_abbr" -- true by value,
+    checked by nothing; the guide and the dive now print the same tag for the
+    same move by construction. See tests/test_move_abbr.py."""
     return {
-        'fast': {'abbr': _move_abbr(fast_id),
+        'fast': {'abbr': move_abbr(fast_id),
                  'gain': _FAST_DB[fast_id].get('energyGain', 0)},
-        'charged': [{'abbr': _move_abbr(cid), 'cost': _CHARGED_DB[cid]['energy']}
+        'charged': [{'abbr': move_abbr(cid), 'cost': _CHARGED_DB[cid]['energy']}
                     for cid in charged_ids],
     }
 

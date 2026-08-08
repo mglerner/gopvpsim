@@ -26,10 +26,9 @@ These tests pin:
   same-family variants stay distinct;
 * the concrete label-derived regression, so nobody "simplifies"
   ``move_abbr`` into ``pretty_name`` later;
-* both open-coded copies of the rule -- ``iv_envelope_analysis._move_abbr``
-  (agrees today) and ``deep_dive.py``'s nested ``_mv_abbr`` (does NOT; the
-  call-site swap is out of this lane's file set, so it is an xfail with the
-  deferral spelled out).
+* that ``iv_envelope_analysis`` uses the shared helper by IDENTITY (its
+  open-coded copy is gone), and that ``deep_dive.py``'s nested ``_mv_abbr``
+  delegates to it rather than to ``pretty_name``.
 """
 import importlib.util
 import os
@@ -144,17 +143,27 @@ def test_move_abbr_edge_cases():
 
 # ---- the two open-coded copies ----
 
-def test_iv_envelope_mirror_agrees_with_shared_helper():
-    """iv_envelope_analysis._move_abbr claims to mirror the dive's tags.
+def test_iv_envelope_uses_shared_helper():
+    """The ML guide's energy tags ARE the shared rule, not a mirror of it.
 
-    It still open-codes the id rule, so it agrees with the helper by value
-    today; this pins that agreement until it is routed through move_abbr.
+    ``iv_envelope_analysis`` used to open-code the id rule under a docstring
+    claiming it "mirrors the deep-dive's _mv_abbr" -- true by value, checked
+    by nothing. It now imports ``move_abbr``, so identity is the assertion.
     """
     load_deep_dive()      # iv_envelope_analysis does `from deep_dive import ...`
     import iv_envelope_analysis as iva
 
-    bad = [(mid, iva._move_abbr(mid), move_abbr(mid))
-           for mid in _all_move_ids() if iva._move_abbr(mid) != move_abbr(mid)]
+    # Source-level, not `is`: whichever test loads deep_dive_analysis first
+    # wins sys.modules, so two runs of this suite can legitimately hold two
+    # module instances. The import edge is what must not regress.
+    src = (SCRIPTS / "iv_envelope_analysis.py").read_text()
+    assert re.search(r"^from deep_dive_analysis import move_abbr$", src,
+                     re.M), "the guide no longer imports THE rule"
+    assert not hasattr(iva, '_move_abbr'), \
+        "the open-coded copy is back -- route it through move_abbr"
+    assert iva.move_abbr.__module__ == 'deep_dive_analysis'
+    bad = [mid for mid in _all_move_ids()
+           if iva.move_abbr(mid) != move_abbr(mid)]
     assert bad == []
 
 
@@ -173,7 +182,7 @@ def test_no_new_open_coded_move_abbreviators():
     adding a fourth copy trips it.
     """
     canonical = "deep_dive_analysis.py"          # move_abbr itself lives here
-    known = {"deep_dive.py", "iv_envelope_analysis.py"}
+    known = {"deep_dive.py"}                     # iv_envelope copy removed
     found = set()
     # rglob: scripts/deep_dive_lib/ (entry-12 split) is still "in scripts/".
     for path in sorted(SCRIPTS.rglob("*.py")):
