@@ -168,16 +168,44 @@ The palette has TWO live consumers, and both must move together:
 
 1. CSS tokens: `var(--token)` resolved by the browser from the
    `theme_css()` blocks. This is the primary surface.
-2. A deferred Plotly `getComputedStyle` shim: Plotly markers cannot
-   read CSS variables directly. The plan is a small JS shim that calls
-   `getComputedStyle(document.documentElement).getPropertyValue('--tier-1')`
-   (etc.) at chart-build time and feeds the resolved hex into Plotly's
-   `marker.color`. Until that shim lands, Plotly marker colors are
-   injected as resolved hex through a Python placeholder
-   (`__TIER_COLORS_JS__`), which means the tier hues exist in TWO forms
-   at once -- CSS var and Python-resolved literal. Keep them sourced
-   from the same `_TOKENS` values so the badges and the scatter markers
-   never diverge.
+2. The Plotly `getComputedStyle` shim (LANDED, commit 8da55c4 --
+   this paragraph described it as a plan until then): Plotly markers
+   cannot read CSS variables directly, so `deep_dive_engine.js`
+   resolves them itself. `themeColor('--tier-1')` calls
+   `getComputedStyle(document.documentElement).getPropertyValue(...)`
+   against the ACTIVE `[data-theme]` block at chart-build time and
+   feeds the resolved hex into Plotly's `marker.color` / layout chrome;
+   resolutions are memoized, and a `MutationObserver` on `data-theme`
+   drops the memo and re-renders so a theme switch repaints the
+   canvases. `resolveThemeColor()` wraps the same lookup for colors the
+   Python side baked as a `var(--token)` string (that is how
+   `tierColor()` makes badge == card == marker in every theme).
+
+   The Python-injected hex is now a FALLBACK, not the painted value:
+   `__THEME_FALLBACK_JS__` (from `deep_dive._THEME_FALLBACK_HEX`) and
+   `__TIER_COLORS_JS__` carry the DEFAULT_THEME resolution for the case
+   where `getComputedStyle` yields nothing, so no path can paint a
+   color that is not a `_TOKENS` value. The tier hues still exist in
+   TWO forms at once -- CSS var and Python-resolved literal -- so keep
+   them sourced from the same `_TOKENS` values or the badges and the
+   scatter markers diverge the moment the fallback is used.
+   `tests/test_plotly_theme_shim.py` guards the wiring: every token the
+   JS asks for is injected (and vice versa), the fallbacks equal the
+   DEFAULT_THEME column, and every mark clears 3:1 against the plot
+   fill (`--surface-2`).
+
+   Known-open, disclosed at the call sites in `deep_dive_engine.js`
+   ("DISCLOSED HUE COLLISION") and awaiting a `_TOKENS` decision: two
+   overlay identity hues alias a hue drawn on the SAME canvas in the
+   default threshold color mode -- `--cat-anchors` is byte-identical to
+   `--tier-1` (1.00:1) and `--notable` sits 1.03-1.12:1 from `--tier-8`.
+   The aliases are section-6 intentional as CHIP context; a canvas that
+   renders both families as separate legend series is the case that
+   decision did not cover. Separation there is carried by marker symbol
+   and size, not hue. **Before aliasing a token, check whether the two
+   roles can ever be co-rendered as distinct series** -- section 6's
+   alias-equality lint keeps aliases equal, which is exactly the wrong
+   guarantee when they land on one canvas.
 
 Separately, the guide and CD-article PROSE hand-quotes hex values in
 running text (so a reader can match "the gold chip (`#a68405`)" to what
