@@ -220,3 +220,22 @@ auditing or whether anyone remembers the lens.
   the gate caught it pre-launch. NB overnight_redive.sh's step-9 label
   still says "(link + dash)" -- update it when the chain is NOT
   running (editing a mid-execution bash script corrupts it).
+
+## Added after the 2026-08-06/08 bake (the 18h sleep stall)
+
+Pre-launch triggers, run at the launch keyboard:
+
+- **Lid stays open for the whole bake.** `pmset sleep 0` + `caffeinate`
+  (now built into overnight_redive.sh) cover idle/timer sleep, but
+  NOTHING prevents lid-close clamshell sleep without an external
+  display. The 2026-08-06 bake lost 18h to a lid-close; the sleep ran
+  the chain past the pinned cache TTL and produced a mixed-gamemaster
+  bake. Recovery existed (additive delta + migrate_cache bless) but was
+  luck-dependent.
+- **TTL vs realistic wall-clock:** pin the data caches (`touch
+  ~/Documents/gopvpsim_cache/*.json`) at launch AND check that
+  24h-TTL > (expected duration + a sleep-stall buffer). If the bake can
+  plausibly exceed the TTL, plan the mixed-vintage recovery BEFORE
+  launch: keep a copy of the pinned gamemaster.json somewhere the run
+  can't overwrite (the cache file itself gets clobbered on refetch;
+  2026-08-08 had to recover the old blob from pvpoke git history).

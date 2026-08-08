@@ -10,9 +10,16 @@ lines of mostly-completed chronological batches. -->
 
 For the next cold re-dive: `docs/predive_checklist.md` is the STANDING
 pre-cold-dive gate; run `overnight_redive.sh` and watch with
-`scripts/chain_status.py --chain overnight`. (Last bake: **2026-07-06/07**,
-the post-hunt2 engine; closed out 2026-08-04 -- see CHANGELOG.md
-"2026-08-04".)
+`scripts/chain_status.py --chain overnight`. (Last bake: **2026-08-06/08**,
+the v8 entries-12+13 engine -- ALL GREEN, mixed-vintage recovery proven;
+see CHANGELOG "2026-08-06/08". LID STAYS OPEN for the whole bake.)
+
+Post-v8-bake unblocked items:
+- **Publish the v8 bake** -- verified green + vintage-consistent, NOT yet
+  pushed to pogodives.com (Michael's call).
+- **gc_cache the 42G v7 leftovers** -- bake verified, reclaim is now safe
+  (`gc_cache.py` dry-run first; the v7 dirs sit in a keyless legacy
+  vintage, see sweep_cache.py's v8 comment).
 
 A failed chain step that has since been diagnosed and fixed goes in
 `docs/chain_resolutions.toml` (read by `verify_overnight.py` check [1/5]) --
