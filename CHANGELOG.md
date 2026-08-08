@@ -42,7 +42,10 @@ post-stall focals. Hardening shipped: caffeinate in the chain script
 the predive checklist, keep-a-vintage-copy recovery note. ML-guide phase
 was 245s -- the guides are 64-IV sweeps, so the cold-ML fear was
 unfounded. gc of the 42G v7 leftovers is now UNBLOCKED (bake verified).
-Site NOT yet published from this bake.
+Published to pogodives.com 2026-08-08 (gates green; live spot checks
+200 incl. post-stall dives and ML guides). v7 cache reclaimed same day:
+~44 GB sweep legacy dirs + 1 GB pre-bake slayer files; cache now 43G at
+a single current vintage.
 
 ## 2026-08-05 -- DRY review executed end-to-end; site re-rendered + published
 
