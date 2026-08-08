@@ -2,6 +2,41 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-08 -- AFK deferral churn: the review's recorded ledger cleared (28 commits)
+
+41-agent workflow while Michael was AFK: a scout re-verified all 26
+harvested deferral-ledger items at HEAD (4 already done -- nothing
+re-implemented), then four file-disjoint lanes + a final plotly step
+cleared the rest with 2 adversarial verifiers per step (7 must-fix
+findings caught and fixed in-flight). Landed: remaining L11 scans in
+deep_dive/deep_dive_lib; DOM-id de-dupe (af-/dd- dupes from the predive
+gate); one moveset-label + one scenario-label rule everywhere on the py
+side (Flavor Guide moves to the 0v0 vocabulary -- deliberate visible
+change); .cmp-* stylesheet hoisted across both renderers; iv_envelope
+_move_abbr retired; shared EVEN_SHIELDS home; WR-ramp constants emitted
+from the module; verify_overnight cup glob derives from
+data.cup_slug_suffix; invalidate_caches gained a registration seam for
+the scripts-side move-display cache; emitted-JS WIN_RATING scan
+coverage; JS league-caps little:500 + maxCp fallback pinned; WIN_RATING
+baked into DATA with ~15 JS boundary sites routed through one helper +
+a staleness guard on patch_dive_gives_up_column; theme.py _THEME_KEY;
+and the two iv-tech NO-BAIT ORACLES -- both reference claims REPRODUCE
+(Tinkaton 0-1 vs Shadow Altaria via the def=143.04 Flamethrower
+bulkpoint, surviving on exactly 1 HP; Spidops 1s vs Altaria), with the
+old "more forgiving threshold" question resolved (bait-on wins are
+real; the reference claim is specifically no-bait). Auto-anchor gating
+tests were found already covered (test_anchors, 585a136) -- TODO was
+stale.
+
+Suite 1620 -> 1719 passed / 14 xfailed. Engine-hash inputs verified
+byte-identical (incl. deep_dive_signature.py beyond the brief). Gate
+caught one real red: the test_count sentinel raced across lanes (six
+bump commits; recorded as a TODO tooling item). PENDING RE-RENDER
+ledger: 15 render-changing commits await the next re-render+publish,
+GATED on Michael's visual sign-off of the plotly theme shim (8da55c4:
+theme-aware chart chrome, previews rendered for both themes; known
+limitation disclosed in 048bb3e -- two overlay hues alias a tier hue).
+
 ## 2026-08-06/08 -- entries 12+13 shipped; v8 cold bake complete (18h sleep stall, recovered)
 
 **Entries 12+13** (commits `d95e9d0..6cfe512`, 30-agent workflow + independent

@@ -6,6 +6,15 @@
 > each with regression tests -- suite 1322 passed. Entry-1 render fixes
 > live in the generators; shipped HTML updates on the next re-render.
 >
+> **Final status (2026-08-08): THE REVIEW IS FULLY EXECUTED.** Entries
+> 12+13 shipped with the v8 cold bake 2026-08-06/08 (CHANGELOG); the
+> entry-15 fold-ins and every recorded per-entry deferral were cleared
+> by the 2026-08-08 AFK churn (28 commits, 41-agent workflow, CHANGELOG
+> "AFK deferral churn"), except the plotly theme shim -- implemented
+> but publish-BLOCKED pending Michael's visual sign-off. Suite over the
+> full arc: 1290 -> 1719 tests. Nothing in this document remains
+> unactioned or undispositioned.
+>
 > **Status update (2026-08-05, evening): entries 4-11 + 14 + the two
 > entry-12 "safe-any-time" cherries SHIPPED**, commits
 > `caeded9..7e66ba2` (12 commits; 30-agent lane-partitioned workflow,

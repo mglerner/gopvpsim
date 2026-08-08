@@ -49,9 +49,14 @@ The report IS the work plan (15 ranked entries) -- do not re-derive it here:
   the module docstring), per-target JS gender mirror + Oinkologne harness
   coverage, gopvpsim.invalidate_caches(), matchup-clusters cleanup, D14
   drop-in + _pack_u16. Suite 1514 passed / 14 xfailed; per-entry deferrals
-  live in the commit messages. **REMAINING from the review: entries 12
-  (deep_dive.py split; CACHE_VERSION cold) + 13 (engine DRY batch) --
-  both against the next bake window -- and entry 15 fold-ins.**
+  live in the commit messages. Entries 12+13 SHIPPED with the v8 bake
+  2026-08-06/08 (CHANGELOG); entry-15 fold-ins + the recorded deferrals
+  CLEARED by the 2026-08-08 AFK churn (28 commits, CHANGELOG) except the
+  plotly theme shim, which is implemented but **publish-BLOCKED pending
+  Michael's visual sign-off** (previews in the session scratchpad
+  plotly_preview/; commits 8da55c4/bf58ee2/048bb3e; known limitation:
+  two overlay hues alias a tier hue, disclosed in 048bb3e).
+  **The review is fully executed.**
 - **Entries 1-3 DONE (2026-08-05, commits `d81c4ad..1db4f65`)**: the five
   live wrong-output fixes, the gender+min-level-aware evolution walk
   (shared helpers in user_collection; additive, no gobattlekit
@@ -62,10 +67,6 @@ The report IS the work plan (15 ranked entries) -- do not re-derive it here:
   passed. NOTE: the entry-1 render fixes are in the GENERATORS -- the
   shipped HTML still carries the old behavior until the next re-render
   from replay + publish (render-only, no re-sim needed).
-- **Entry 13 is the engine DRY batch** (L6/L11/L15): one hash bump, one cold
-  re-dive, scheduled against the next natural bake -- NOT item-by-item.
-  Entry 12 (deep_dive.py split; D10 forces a CACHE_VERSION bump, no migrate
-  predicate) wants the same bake window.
 - The report's "Do NOT do" section lists the intentional duplicates and
   refuted sub-claims -- check it before re-reporting any DRY finding.
 - Supersedes the scattered DRY bullets below where they overlap (the S7 §I
@@ -157,15 +158,14 @@ including JIT-COV-2 below.
 
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
-- **[render] duplicate DOM ids on dive pages** (predive gate 2026-08-06,
-  pre-existing): `af-<hash>` anchor-group ids emitted x3 per page
-  (deep_dive_rendering.py anchor_group_id sites, ~:1049-1057) plus
-  `dd-recommendations`/`dd-threshold-tiers` x2. getElementById consumers
-  bind the first instance so behavior is stable, but it is invalid HTML
-  and a fragility. De-dupe the emissions; render-only.
-- **[ops] overnight_redive.sh step-9 label still says "(link + dash)"** --
-  the roster now carries three gates. One-word edit; do it when the
-  chain is NOT running (editing a mid-execution bash script corrupts it).
+- **[render] duplicate DOM ids: DONE 2026-08-08** (AFK churn `dd6b7a3`,
+  pending re-render). **[ops] step-9 label: DONE 2026-08-08** (bake
+  closeout commit).
+- **[tooling] dev-count `test_count` sentinel is a serialization point**
+  (AFK-churn gate finding): six sentinel-bump commits raced across
+  concurrent lanes in one 28-commit churn. Consider deriving the live
+  count at gate time with the sentinel as a floor, or an auto-update
+  mode -- small, low priority.
 
 - **[render DRY] score-key `{mi}_{mode}@51` parity (Python<->JS): DONE
   2026-08-05** (DRY review entry 5, `ffc3b35` -- the three inline JS
@@ -526,41 +526,15 @@ here 2026-06-12; these are the remaining seams.)*
   extraction + 4-league unit test (the strong pin), which bundles with the
   deep_dive.py split session.
 
-* **No-bait oracle tests from iv-tech deep dives** — `pvpoke_dp`
-  accepts `bait_shields=False`; sanity tests for the farm-down gate
-  landed in `test_battle.py` (see `test_pvpoke_dp_no_bait_*`).
-  Real-world oracle cases from the HSH #iv-tech deep dives still
-  open:
-
-  1. **Tinkaton vs rank #1 shadow Altaria 0-1** —
-     `docs/tinkaton_deep_dive_reference.md:31`. "143.04 defense with
-     141 hp … win the 0-1s *without baiting*." Reference also flags
-     inconsistency due to shadow IV variance.
-  2. **Spidops vs rank #1 Altaria 1s** —
-     `docs/spidops_deep_dive_reference.md:35`. "140.67 defense with
-     132+ hp flips the 1s vs the rank #1 altaria *without baits* by
-     reducing sky attack damage."
-
-  (Tinkaton vs Medicham 1-1, Tinkaton vs rank #1 Azumarill 1-2, and
-  Corviknight vs default-IV Shadow Sableye all shipped 2026-04-12.)
-
-  Open followup from case 1: our sim has a more forgiving win
-  threshold than the reference (many Tinkaton spreads below
-  def=141.66 win the 1v1, e.g. 0/10/15 at def=138.96). Reference may
-  be overly conservative, or our sim is missing a nuance. Worth
-  round-tripping at pvpoke.com/battle.
-
-  Each remaining test should parametrize over `bait_shields=[True,
-  False]` when the reference makes a directional claim. Priority:
-  low-to-medium — integration oracles, not correctness-blocking.
-
-* **Auto-anchor fallback gating tests** — `build_auto_anchors()` and
-  the per-kind gating logic are currently only verified by smoke runs
-  against real Annihilape data. Add explicit unit tests for the
-  gating cases (no kinds existing → all three fire; one kind existing
-  → other two fire; all three existing → empty registry).
-  *Note: bulkpoint gating tests landed in 2026-04-08; this entry now
-  covers the broader BP/CMP gating coverage gap.*
+* **pvpoke.com/battle browser round-trip for the iv-tech oracles**
+  (the one human step left from the old "No-bait oracle tests" entry;
+  everything else DONE 2026-08-08, AFK churn `000ea87`+`cc64923`, both
+  reference claims REPRODUCE with mechanisms read off battle timelines
+  -- Tinkaton 0-1 vs Shadow Altaria bulkpoint at def=143.04, Spidops 1s
+  vs Altaria Sky-Attack reduction -- and the "more forgiving win
+  threshold" follow-up resolved: bait-ON wins for every spread are real,
+  the reference's claim is specifically no-bait). Round-trip the key
+  cells at pvpoke.com/battle when convenient.
 
 ## Refactoring
 
