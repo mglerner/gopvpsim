@@ -514,6 +514,85 @@ DEEP_DIVE_CSS = """
 }
 """ + COVER_TOGGLE_CSS
 
+# Shared compare-panel stylesheet (DRY review 2026-08-05 entry 15,
+# js-py-cmp-css). ONE source for the .cmp-* classes that the shared
+# scripts/cmp_panels.js emits, spliced verbatim into BOTH hosts:
+#
+#   * the deep dive        -- scripts/deep_dive.py (page <style>)
+#   * the ML / IV guide    -- scripts/render_iv_envelope_article.py style()
+#
+# It used to be two hand-maintained copies ("ported from the deep-dive's
+# .cmp-* rules"), which is exactly the arrangement that lets one page's
+# panels drift after a JS change lands. Edit HERE, never per host.
+#
+# Hosts may append their OWN overrides after this block (same specificity,
+# later wins) for genuinely page-local concerns -- the guide re-sizes in em
+# and cancels its article stylesheet's generic table borders/backgrounds.
+# tests/test_cmp_panel_css.py pins that every class cmp_panels.js emits is
+# styled here, that both hosts emit this text verbatim and keep no second
+# copy, and that the guide's overrides only restyle classes defined here.
+# Leading brace-free (no f-string): the dive splices it as {rendering
+# .CMP_PANEL_CSS} inside an f-string, so it must carry single braces. ASCII
+# only.
+CMP_PANEL_CSS = """\
+  /* Shared compare panels (scripts/cmp_panels.js), single-sourced from
+     CMP_PANEL_CSS in scripts/deep_dive_rendering.py -- the deep dive and the
+     ML IV guide emit this same block, so edit it there, not per page. */
+  .cmp-panel { background:var(--surface-2); border:1px solid var(--border-2); border-radius:2px;
+    padding:11px 14px; margin:0 0 14px; }
+  .cmp-panel h4 { margin:0 0 3px; font-size:0.86rem; }
+  .cmp-flip-h { color:var(--flip); } .cmp-marg-h { color:var(--accent-2); }
+  .cmp-psub { font-size:0.74rem; color:var(--text-muted); margin:0 0 9px; }
+  .cmp-tbl { border-collapse:collapse; width:100%; font-size:0.82rem; }
+  .cmp-tbl th, .cmp-tbl td { text-align:left; padding:5px 9px;
+    border-bottom:1px solid var(--bar-track); white-space:nowrap; }
+  .cmp-tbl th { color:var(--text-muted); font-weight:600; font-size:0.74rem; }
+  .cmp-m { color:var(--text); }
+  /* Per-build result cells link to their pvpoke battle; inherit the win/loss
+     color so the cell still reads as a result, with a hover underline cue. */
+  a.cmp-cell-a { color:inherit; text-decoration:none; }
+  a.cmp-cell-a:hover { text-decoration:underline; }
+  .cmp-win { color:var(--win); font-weight:700; }
+  .cmp-lose { color:var(--loss); font-weight:700; }
+  .cmp-tie { color:var(--tie); font-weight:700; }
+  /* Unified compare table: scrolling box, sticky header, tier dividers. The
+     bottom-fade gradient is host-specific and NOT part of this block -- the
+     guide wires .at-bottom and adds it locally; the dive has no scroll-fade
+     wiring, so its scroll region stays plain. */
+  .cmp-count { font-size:.72em; font-weight:600; color:var(--text-muted);
+               text-transform:none; letter-spacing:0; }
+  .cmp-bbhint { font-size:.72em; font-weight:600; color:var(--flip);
+                text-transform:none; letter-spacing:0; cursor:help; }
+  .cmp-scroll-wrap { position:relative; }
+  .cmp-scroll { max-height:62vh; overflow-y:auto; border:1px solid var(--border-2);
+                border-radius:2px; }
+  .cmp-scroll thead th { position:sticky; top:0; z-index:2; background:var(--surface-2); }
+  .cmp-case { color:var(--text-muted); }
+  .cmp-celltext { display:block; margin-bottom:3px; }
+  /* tier divider pins just below the column header. top is in EM of the td's
+     own .74em font, so the header height (~28px ~= 2.75 of those em) maps to
+     ~2.75em; the header's higher z-index covers any sub-px overlap cleanly. */
+  .tier-row td { position:sticky; top:2.75em; z-index:1; background:var(--callout-bg);
+                 color:var(--callout-strong); font-weight:700; font-size:.74em;
+                 text-transform:uppercase; letter-spacing:.05em; padding:4px 9px; }
+  .cmp-flip { color:var(--flip); }
+  .cmp-altmark { opacity:0.5; font-weight:400; }
+  .cmp-more { color:var(--text-muted); font-size:0.76rem; font-style:italic;
+    cursor:pointer; text-decoration:underline dotted; }
+  .cmp-more:hover { color:var(--text); }
+  .cmp-tbl tr.cmp-xtra { display:none; }
+  .cmp-tbl.cmp-all tr.cmp-xtra { display:table-row; }
+  .cmp-bar { display:inline-block; vertical-align:middle; width:64px; height:9px;
+    background:var(--bar-track); border-radius:2px; overflow:hidden; margin-right:6px; }
+  .cmp-bar > span { display:block; height:100%; background:var(--win); }
+  .cmp-bar.lo > span { background:var(--tie); }
+  .cmp-bar.loss { display:flex; justify-content:flex-end; }
+  .cmp-bar.loss > span { flex:none; background:var(--loss); }
+  .cmp-hpv { font-size:0.76rem; color:var(--text-muted); }
+  .cmp-env { font-size:0.72rem; color:var(--energy); }
+  .cmp-leg { font-size:0.72rem; color:var(--text-muted); margin-top:5px; }"""
+
+
 def parse_mode(composite_mode):
     """Decompose a composite mode string into (opp_iv_mode, bait_mode).
 

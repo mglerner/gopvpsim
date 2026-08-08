@@ -26,6 +26,10 @@ from gopvpsim.theme import (  # noqa: E402
 )
 import pvpoke_links
 from deep_dive_lib import score_pack  # noqa: E402  (stdlib-only, no deep_dive)
+# The compare panels' stylesheet is shared with the deep-dive page; see
+# CMP_PANEL_CSS's own comment for why it lives there and what may be
+# overridden locally (DRY review 2026-08-05 entry 15, js-py-cmp-css).
+from deep_dive_rendering import CMP_PANEL_CSS  # noqa: E402
 
 QUAD_LABEL = {
     'nobb_vs_nonbb': 'No best buddy, vs a non-best-buddy meta',
@@ -799,50 +803,26 @@ def style():
   .nm-flag { font-size:.7em; color:var(--tie); text-decoration:none;
             vertical-align:super; font-weight:700; }
   .nm-flag:hover { color:var(--title); }
-  /* shared compare panels (scripts/cmp_panels.js): HP-margin bars + ✦ flip.
-     Ported from the deep-dive's .cmp-* rules so the panels render identically
-     in the guide. */
-  .cmp-panel { background:var(--surface-2); border:1px solid var(--border-2); border-radius:2px;
-            padding:11px 14px; margin:12px 0 14px; }
-  .cmp-panel h4 { margin:0 0 3px; font-size:.92em; }
-  .cmp-flip-h { color:var(--flip); } .cmp-marg-h { color:var(--accent-2); }
-  .cmp-psub { font-size:.8em; color:var(--text-muted); margin:0 0 9px; }
-  .cmp-tbl { border-collapse:collapse; width:100%; font-size:.86em; margin:0; }
-  .cmp-tbl th, .cmp-tbl td { text-align:left; padding:5px 9px;
-            border:none; border-bottom:1px solid var(--bar-track); white-space:nowrap; }
-  .cmp-tbl th { color:var(--text-muted); font-weight:600; font-size:.8em; background:none; }
+""" + CMP_PANEL_CSS + """
+  /* ---- guide-local overrides on top of CMP_PANEL_CSS ----------------------
+     Same specificity, later in the sheet, so these win. Keep this list SHORT
+     and page-specific; anything that should look the same on both pages
+     belongs in the shared block, not here. Two reasons a rule is here:
+       1. this article sizes type in em (the dive uses rem), and
+       2. this article's generic table styling paints borders/backgrounds the
+          compare table has to cancel.
+     Plus the scroll fade, which only exists here because only this page wires
+     the .at-bottom class (see the guide JS). */
+  .cmp-panel { margin:12px 0 14px; }
+  .cmp-panel h4 { font-size:.92em; }
+  .cmp-psub { font-size:.8em; }
+  .cmp-tbl { font-size:.86em; margin:0; }
+  .cmp-tbl th, .cmp-tbl td { border:none; border-bottom:1px solid var(--bar-track); }
+  .cmp-tbl th { font-size:.8em; background:none; }
   .cmp-tbl td { background:none; }
-  .cmp-m { color:var(--text); }
-  /* Per-build result cells link to their pvpoke battle; inherit the win/loss
-     color instead of the default link accent so the cell still reads as a
-     result, with a subtle hover underline as the affordance. */
-  a.cmp-cell-a { color:inherit; text-decoration:none; }
-  a.cmp-cell-a:hover { text-decoration:underline; }
-  .cmp-win { color:var(--win); font-weight:700; }
-  .cmp-lose { color:var(--loss); font-weight:700; }
-  .cmp-tie { color:var(--tie); font-weight:700; }
-  .cmp-flip { color:var(--flip); }
-  .cmp-altmark { opacity:0.5; font-weight:400; }
-  .cmp-more { color:var(--text-muted); font-size:0.76rem; font-style:italic;
-    cursor:pointer; text-decoration:underline dotted; }
-  .cmp-more:hover { color:var(--text); }
-  .cmp-tbl tr.cmp-xtra { display:none; }
-  .cmp-tbl.cmp-all tr.cmp-xtra { display:table-row; }
-  .cmp-bar { display:inline-block; vertical-align:middle; width:64px; height:9px;
-            background:var(--bar-track); border-radius:2px; overflow:hidden; margin-right:6px; }
-  .cmp-bar > span { display:block; height:100%; background:var(--win); }
-  .cmp-bar.lo > span { background:var(--tie); }
-  .cmp-bar.loss { display:flex; justify-content:flex-end; }
-  .cmp-bar.loss > span { flex:none; background:var(--loss); }
-  .cmp-hpv { font-size:.82em; color:var(--text-muted); }
-  .cmp-env { font-size:.78em; color:var(--energy); }
-  .cmp-leg { font-size:.78em; color:var(--text-muted); margin-top:5px; }
-  /* "All cases" merged view: scrolling box, sticky header, tier dividers */
-  .cmp-count { font-size:.72em; font-weight:600; color:var(--text-muted);
-               text-transform:none; letter-spacing:0; }
-  .cmp-bbhint { font-size:.72em; font-weight:600; color:var(--flip);
-                text-transform:none; letter-spacing:0; cursor:help; }
-  .cmp-scroll-wrap { position:relative; }
+  .cmp-hpv { font-size:.82em; }
+  .cmp-env { font-size:.78em; }
+  .cmp-leg { font-size:.78em; }
   /* tall, aggressive bottom fade so "there is more below" is unmistakable even
      on a short view -- reaches fully solid well before the bottom edge */
   .cmp-scroll-wrap::after { content:''; position:absolute; left:1px; right:1px; bottom:1px;
@@ -850,17 +830,6 @@ def style():
                 opacity:1; transition:opacity .12s ease;
                 background:linear-gradient(rgba(0,0,0,0), var(--surface-2) 58%); }
   .cmp-scroll-wrap.at-bottom::after { opacity:0; }
-  .cmp-scroll { max-height:62vh; overflow-y:auto; border:1px solid var(--border-2);
-                border-radius:2px; }
-  .cmp-scroll thead th { position:sticky; top:0; z-index:2; background:var(--surface-2); }
-  .cmp-case { color:var(--text-muted); }
-  .cmp-celltext { display:block; margin-bottom:3px; }
-  /* tier divider pins just below the column header. top is in EM of the td's
-     own .74em font, so the header height (~28px ~= 2.75 of those em) maps to
-     ~2.75em; the header's higher z-index covers any sub-px overlap cleanly. */
-  .tier-row td { position:sticky; top:2.75em; z-index:1; background:var(--callout-bg);
-                 color:var(--callout-strong); font-weight:700; font-size:.74em;
-                 text-transform:uppercase; letter-spacing:.05em; padding:4px 9px; }
   @media (max-width:820px) {
     .layout { flex-direction:column; align-items:stretch; }
     /* Collapsed into the column: a full-width sticky bar (mirrors the deep-dive
