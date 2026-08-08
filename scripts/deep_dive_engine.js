@@ -13,10 +13,11 @@ var state = {
   // "Compare candidates" widget: up to 7 user-entered focal IV spreads
   // ({a,d,s,level}), compared side by side from the embedded grid.
   compareCandidates: [],
-  // Anchor IVs overlay rendering mode:
-  //   'filled'  - cyan fill, opacity 0.65 (current default; context
+  // Anchor IVs overlay rendering mode (the ring/identity hue is
+  // --cat-anchors; it was a fixed cyan before the theme shim):
+  //   'filled'  - per-point fill, opacity 0.65 (current default; context
   //               layer that doesn't overwhelm slayer / top-picks)
-  //   'outline' - transparent fill with a cyan border ring; the band
+  //   'outline' - transparent fill with a --cat-anchors border ring; the band
   //               stays visible as an envelope rather than a blob, so
   //               named-category traces riding the top/bottom edge
   //               (e.g. Annihilape Bulk in a Tinkaton dive) read
@@ -2200,7 +2201,13 @@ function buildTraces() {
           // The 1px ring is a SEPARATION ring (keeps adjacent tier dots from
           // fusing), so it wears the plot fill, not a fixed black that only
           // separates against a dark canvas.
-          marker:{size:_markerSize, color:tierColor(ti),
+          // symbol is pinned to Plotly's own default ('circle') on purpose, not
+          // for looks: it is the channel that tells a tier dot apart from the
+          // overlay traces whose identity hue ALIASES a tier hue
+          // (--cat-anchors == --tier-1, --notable ~= --tier-8; see the two
+          // DISCLOSED HUE COLLISION notes at the overlay sites). Emitting it
+          // explicitly is behavior-identical and lets a test hold the channel.
+          marker:{size:_markerSize, color:tierColor(ti), symbol:'circle',
                    opacity:_markerOpacity,
                    line:{width:1, color:themeColor('--surface-2')}},
           hoverlabel:{bordercolor:tierColor(ti)}
@@ -2502,6 +2509,24 @@ function buildTraces() {
   // In outline mode this hue IS the only ink on the marker, so a fixed cyan
   // (1.14:1 on a light fill) would erase the whole anchor envelope. --cat-anchors
   // is the anchors-category hue the dive's own slayer cards already use.
+  //
+  // DISCLOSED HUE COLLISION (sign-off item; see docs/theme_rollout_status.md,
+  // "Plotly canvas/marker recoloring"): --cat-anchors is a byte-identical alias
+  // of --tier-1 in all four themes (1.00:1) -- theme.py aliases them on purpose
+  // as CHIP context, a decision made when the two families were never drawn on
+  // one canvas. In the default threshold color mode they now are. The retired
+  // cyan was 2.83-4.08:1 from tier-1, so this IS a measurable loss of hue
+  // separation, traded for a hue that survives a light fill at all. What
+  // carries the separation instead:
+  //   filled (default) - subdued => markerLineWidth 0, so this hue reaches only
+  //                      the hover-label border; the fill is the point's OWN
+  //                      tier color, same as the tier trace's.
+  //   outline          - ring-vs-fill (transparent center; tier dots are solid)
+  //                      plus size 6 vs the tier trace's 7/9.
+  //   both             - symbol (overlaySymbol: triangle-up / star /
+  //                      triangle-down) vs the tier trace's pinned 'circle'.
+  // Re-encoding the hue needs a NON-ALIASED _TOKENS entry, i.e. theme.py --
+  // out of this change's file set, so it is disclosed rather than fixed.
   var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs,
                                       themeColor('--cat-anchors'), true, anchorOutline);
   if (anchorTrace) traces.push(anchorTrace);
@@ -2513,6 +2538,16 @@ function buildTraces() {
   var effTrace = buildOverlayTrace('Efficient (Pareto)', effIvs, '#a020f0', true, false, false, 'cross',
     '<br>Efficient IV: no other spread beats it on all of atk/def/hp.');
   if (effTrace) traces.push(effTrace);
+  // DISCLOSED HUE COLLISION (same sign-off item as the anchor hue above):
+  // --notable sits 1.03-1.12:1 from --tier-8 in all four themes (theme.py
+  // aliases tier-8 == catw-rank1 and values --notable a hair off it), so on a
+  // tier-8-colored fill this borderColor ring effectively vanishes; the retired
+  // #FFD700 was 2.53-3.64:1 from tier-8. Against every OTHER tier fill the ring
+  // still separates, and in stat/score color mode no tier trace exists at all.
+  // Non-color separation from the tier traces: symbol (triangle-down / star /
+  // diamond via overlaySymbol vs the tier trace's pinned 'circle') and size
+  // (6 vs 7/9). A non-aliased gold would need a new theme.py token -> out of
+  // this change's file set.
   var slayerTrace = buildOverlayTrace('Slayer IVs', DATA.slayerIvs,
                                       themeColor('--notable'));
   if (slayerTrace) traces.push(slayerTrace);
