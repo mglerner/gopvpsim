@@ -1488,9 +1488,15 @@ def test_tinkaton_0v1_vs_rank1_shadow_altaria_bulk_gate_no_bait(
     reference number is a sufficient condition on a def/hp pair, not a
     hard defense floor -- the same "more defense/less hp or vice versa"
     trade the Spidops reference states outright
-    (`docs/spidops_deep_dive_reference.md:23`).  That, rather than a
-    loose win threshold in our sim, also explains the older open note
-    on the Tinkaton-vs-Medicham oracle above; see
+    (`docs/spidops_deep_dive_reference.md:23`).
+
+    This cell is tight: a full 4096-spread sweep finds only 44 winners
+    and *none* strictly under reference spread A on both def and hp.
+    That does NOT carry over to the Tinkaton-vs-Medicham oracle above,
+    whose "more forgiving win threshold" caveat remains OPEN -- the
+    same sweep there finds 1127 winners, 508 of them strictly under the
+    reference pair, winning through a Gigaton Hammer attack breakpoint
+    rather than a def/hp trade.  See
     `docs/validations/2026-08-08_no_bait_altaria_oracles.md`.
     """
     from gopvpsim.pokemon import Pokemon

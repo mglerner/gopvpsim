@@ -1,9 +1,10 @@
 # No-bait Altaria oracles: Tinkaton 0-1 and Spidops 1s (2026-08-08)
 
 Closes the two remaining "no-bait oracle tests from iv-tech deep dives"
-cases in TODO.md. Both reference claims reproduce in our sim, and one of
-them turns out to explain a standing open question about our win
-threshold.
+cases in TODO.md. Both reference claims reproduce in our sim. It does
+**not** close the standing "more forgiving win threshold" follow-up --
+an earlier revision of this note claimed to, on a bulk-product argument
+that a full IV sweep falsifies; see the retraction at the end.
 
 Tests landed in `tests/test_battle.py`:
 
@@ -104,15 +105,23 @@ either winner against default-IV Altaria and still loses on 132 hp. The
 reference's "133+ hp" is therefore an independent constraint, not a
 paraphrase of the defense number.
 
-## Partial resolution of the "more forgiving win threshold" note
+## The "more forgiving win threshold" note -- STILL OPEN
 
-TODO.md carried an open follow-up on the shipped Tinkaton-vs-Medicham
+TODO.md carries an open follow-up on the shipped Tinkaton-vs-Medicham
 oracle: "our sim has a more forgiving win threshold than the reference
 (many Tinkaton spreads below def=141.66 win the 1v1, e.g. 0/10/15 at
 def=138.96)."
 
-Re-measured here, both bait modes, Tinkaton vs rank #1 non-best-buddy
-Medicham 1-1:
+**This section originally claimed to resolve that follow-up. The
+argument was wrong and is retracted here; the follow-up stays open.**
+The retracted claim was that sub-reference winners are explained by a
+def x hp bulk product ("0/10/15 is the bulkier Pokemon, so it winning is
+expected") with "genuinely thinner spreads (0/0/0, 15/15/15) do lose" as
+the control. A full sweep falsifies the mechanism, and the two cited
+losers are not representative.
+
+Six-spread sample as originally measured (both bait modes agree),
+Tinkaton vs rank #1 non-best-buddy Medicham 1-1:
 
 | Tinkaton IVs | def    | hp  | atk    | result   |
 | ------------ | ------ | --- | ------ | -------- |
@@ -123,22 +132,74 @@ Medicham 1-1:
 | 0/0/0        | 137.31 | 138 | 108.58 | LOSS 492 |
 | 15/15/15     | 135.18 | 136 | 108.91 | LOSS 492 |
 
-The threshold is not actually loose. 0/10/15 has def 138.96 but hp 143,
-for a def x hp product of 19871 against the reference spread's 141.66 x
-138 = 19549 -- it is the *bulkier* Pokemon, so it winning is expected.
-Genuinely thinner spreads (0/0/0, 15/15/15) do lose. The same pattern
-shows up in both cases above (Tinkaton 1/14/14 and Spidops 1/11/15 both
-clear their gates from under the quoted defense, on extra HP), and the
-Spidops reference states the trade explicitly at line 23: "anything here
-can work with more defense/less hp or vice versa".
+### What the full sweep says
 
-So the reference numbers are sufficient conditions on a (def, hp) pair,
-not defense floors, and our sim agrees with them. The residual worry
-about a systematically loose win threshold is not supported by this data.
+All 16^3 = 4096 Tinkaton spreads, same cell and same construction as
+`tests/test_battle.py:_tinkaton_vs_medicham` (1-1 shields, PvPoke
+default movesets, rank #1 Medicham 5/15/15 @ L50, `pvpoke_dp` with
+`bait_shields=False`, `pvpoke_simulate_shield` both sides):
+
+* **1127 / 4096 spreads win.**
+* **508 of those winners are strictly below the reference pair
+  (def=141.66, hp=138) on BOTH defense and hp** -- so they are not
+  buying the win with a def/hp trade.
+* 799 winners have a def x hp product below the reference's 19549. The
+  thinnest is 15/2/0 at def=130.92 / hp=130 / product 17020.
+
+Direct non-monotonic counterexample -- a *less* bulky spread wins the
+cell that a bulkier one loses, which the product framing cannot
+produce:
+
+| Tinkaton IVs | atk    | def    | hp  | def x hp | result   |
+| ------------ | ------ | ------ | --- | -------- | -------- |
+| 0/0/0        | 108.58 | 137.31 | 138 | 18948    | LOSS 492 |
+| 6/0/0        | 110.72 | 134.79 | 136 | 18331    | win 680  |
+| 15/2/0       | 112.41 | 130.92 | 130 | 17020    | win 661  |
+
+### The actual mechanism: an attack breakpoint, not a bulk trade
+
+Read off the logged timelines, bait OFF. Medicham (5/15/15 @ L50) has
+142 hp. Fairy Wind lands for **4 at every one of these attack values**,
+so the whole delta is the charged move:
+
+* 0/0/0 (atk 108.58): T14 Gigaton Hammer SHIELDED, T21 Dynamic Punch 55,
+  T28 Gigaton Hammer **79** -- Medicham survives on **2 hp** -- T31
+  Dynamic Punch 55 kills Tinkaton. LOSS.
+* 6/0/0 (atk 110.72): identical script until T28 Gigaton Hammer **81**,
+  which KOs Medicham before its third Dynamic Punch. WIN, 49 hp left.
+* 15/2/0 (atk 112.41): T28 Gigaton Hammer **82**. WIN, 42 hp left.
+
+So there is a second, *offensive* win route through this cell -- a
+Gigaton Hammer 79 -> 81 breakpoint against Medicham's 2 hp survival
+margin -- and it is wide (hundreds of spreads). The two spreads the
+original note sampled as losers, 0/0/0 and 15/15/15, sit in the dead
+zone between the bulk route and the attack route; they read as
+representative and are not.
+
+### What is and is not established
+
+Still true, and independently supported by the Case 1 sweep below: **the
+reference numbers are sufficient conditions on a (def, hp) pair, not
+defense floors.** Tinkaton 1/14/14 and Spidops 1/11/15 both clear their
+gates from under the quoted defense on extra HP, and the Spidops
+reference states the trade outright at line 23 ("anything here can work
+with more defense/less hp or vice versa").
+
+The Case 1 cell is genuinely tight, so the oracle tests this note
+accompanies are not affected: sweeping all 4096 spreads against rank #1
+Shadow Altaria (0-1, bait OFF) gives **44 winners, of which 0 are
+strictly under reference spread A on both def and hp** (lowest-def
+winner 0/6/15 at def=137.60 / hp=145, i.e. it pays in HP).
+
+**Open, not resolved:** whether the 508-spread attack region in the
+Medicham cell is a legitimate second win route that the reference simply
+did not mention, or evidence that our sim's win threshold is loose. This
+sweep does not distinguish those. TODO.md's follow-up stays open.
 
 **Not verified here:** no round-trip against pvpoke.com/battle. That was
 the other half of the original follow-up and still has not been done --
 these numbers are our sim against the written references, not against
-PvPoke's own simulator. Treat the resolution above as "the loose-threshold
-hypothesis has no support in our data", not as "our sim matches PvPoke
-on these cells".
+PvPoke's own simulator. The round-trip is what would settle the open
+question above: run 6/0/0 and 0/0/0 Tinkaton vs 5/15/15 L50 Medicham
+1-1 with baiting off at pvpoke.com/battle and check whether PvPoke also
+flips on the Gigaton Hammer 79 -> 81 breakpoint.
