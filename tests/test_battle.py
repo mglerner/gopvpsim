@@ -1405,6 +1405,294 @@ def test_corviknight_2v2_vs_default_shadow_sableye_flips_with_bait():
     assert result_nobait.pvpoke_score(0) < 500
 
 
+def _tinkaton_vs_rank1_shadow_altaria(tink_ivs, bait_shields):
+    """Tinkaton (0 shields) vs rank #1 Shadow Altaria (1 shield).
+
+    "The 0-1s" in the reference's shield vocabulary is focal-first,
+    opponent-second (docs/concepts.md), so Tinkaton runs 0 shields and
+    Altaria 1.  Both sides use PvPoke's default Great League movesets
+    via ``get_default_moveset`` (never hardcode move ids -- CLAUDE.md
+    "Testing"); rank #1 is the top stat-product spread from
+    ``iv_rank(shadow=True)``, which is 0/14/15 @ level 29.
+    """
+    from functools import partial
+    from gopvpsim.pokemon import iv_rank
+
+    tink_fast, tink_charged = get_default_moveset('Tinkaton', 'great')
+    alt_fast, alt_charged = get_default_moveset('Altaria', 'great', shadow=True)
+    r1 = iv_rank('Altaria', league='great', shadow=True)[0]
+
+    bp_tink = _make_battle_pokemon(
+        'Tinkaton', tink_fast, tink_charged, 'great', shields=0,
+        atk_iv=tink_ivs[0], def_iv=tink_ivs[1], sta_iv=tink_ivs[2])
+    bp_alt = _make_battle_pokemon(
+        'Altaria', alt_fast, alt_charged, 'great', shields=1,
+        atk_iv=r1['atk_iv'], def_iv=r1['def_iv'], sta_iv=r1['sta_iv'],
+        max_level=r1['level'], shadow=True)
+
+    pol = (pvpoke_dp if bait_shields
+           else partial(pvpoke_dp, bait_shields=False))
+    return simulate(bp_tink, bp_alt,
+                    charged_policy_0=pol,
+                    charged_policy_1=pvpoke_dp,
+                    shield_policy_0=pvpoke_simulate_shield,
+                    shield_policy_1=pvpoke_simulate_shield)
+
+
+# (tink_ivs, def, hp, wins_without_baiting, why)
+#
+# Stats are asserted alongside the outcome so a CPM/gamemaster shift that
+# moves a spread off its reference stat line fails loudly here instead of
+# silently re-pointing the oracle at a different Pokemon.
+TINKATON_VS_SHADOW_ALTARIA_0_1 = [
+    ((0, 14,  9), 143.04, 141, True,
+     'reference spread A: "143.04 defense with 141 hp"'),
+    ((0, 15,  8), 143.73, 140, True,
+     'reference spread B: "143.72 defense with 140 hp" (we read 143.73)'),
+    ((1, 14, 14), 141.66, 143, True,
+     'below the def line but +3 hp -- the def/hp trade still clears'),
+    ((0, 14, 10), 141.66, 140, False,
+     'same def as the row above, 3 fewer hp'),
+    ((0, 13, 10), 142.36, 141, False,
+     'reference hp, def short of the 143.04 line'),
+    ((0, 10, 15), 138.96, 143, False,
+     'max hp alone does not clear it'),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("tink_ivs,exp_def,exp_hp,wins,why",
+                         TINKATON_VS_SHADOW_ALTARIA_0_1)
+def test_tinkaton_0v1_vs_rank1_shadow_altaria_bulk_gate_no_bait(
+        tink_ivs, exp_def, exp_hp, wins, why):
+    """Oracle from `docs/tinkaton_deep_dive_reference.md:31`:
+
+        "143.04 defense with 141 hp (or 143.72 defense with 140 hp)
+         lets you win the 0-1s against the rank #1 shadow altaria
+         without baiting"
+
+    **Directional bulk-gate test, bait OFF.**  Both reference spreads
+    win; three spreads short of the line lose.  Measured 2026-08-08
+    (bait-off pvpoke scores): 0/14/9 -> 503, 0/15/8 -> 503,
+    1/14/14 -> 506, 0/14/10 -> 269, 0/13/10 -> 251, 0/10/15 -> 251.
+
+    Mechanism (from the logged timeline, so this is a checked claim and
+    not a restatement of the reference): the gate is a Flamethrower
+    bulkpoint.  At def=143.04 Shadow Altaria's Flamethrower lands for
+    80 and Tinkaton survives on 1 HP long enough to fire its second
+    Gigaton Hammer; at def=141.66/140 hp it lands for 81 and Tinkaton
+    dies one Gigaton Hammer short.
+
+    The 1/14/14 row is deliberate: it sits *below* the reference's
+    143.04 defense but carries 3 more HP, and still wins.  So the
+    reference number is a sufficient condition on a def/hp pair, not a
+    hard defense floor -- the same "more defense/less hp or vice versa"
+    trade the Spidops reference states outright
+    (`docs/spidops_deep_dive_reference.md:23`).  That, rather than a
+    loose win threshold in our sim, also explains the older open note
+    on the Tinkaton-vs-Medicham oracle above; see
+    `docs/validations/2026-08-08_no_bait_altaria_oracles.md`.
+    """
+    from gopvpsim.pokemon import Pokemon
+
+    tink = Pokemon.at_best_level('Tinkaton', *tink_ivs, league='great')
+    assert tink.def_ == pytest.approx(exp_def, abs=0.01), (
+        f"{tink_ivs} no longer sits at def={exp_def} ({why})")
+    assert tink.hp == exp_hp, f"{tink_ivs} no longer sits at hp={exp_hp} ({why})"
+
+    result = _tinkaton_vs_rank1_shadow_altaria(tink_ivs, bait_shields=False)
+    expected_winner = 0 if wins else 1
+    assert result.winner == expected_winner, (
+        f"{tink_ivs} (def={exp_def}, hp={exp_hp}, {why}): expected "
+        f"{'Tinkaton' if wins else 'Shadow Altaria'} to win the 0-1s with "
+        f"baiting off, got winner={result.winner}, "
+        f"HP={result.hp_remaining}, score={result.pvpoke_score(0):.0f}")
+    if wins:
+        assert result.pvpoke_score(0) >= 500
+    else:
+        assert result.pvpoke_score(0) < 500
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("tink_ivs", [
+    ivs for ivs, _d, _h, wins, _w in TINKATON_VS_SHADOW_ALTARIA_0_1 if not wins
+])
+def test_tinkaton_0v1_vs_rank1_shadow_altaria_baiting_rescues_low_bulk(tink_ivs):
+    """The "without baiting" qualifier in the same reference line is
+    load-bearing here -- this is the directional half.
+
+    Every spread that LOSES the 0-1s with baiting off WINS it with
+    baiting on, because pvpoke_dp then opens with Bulldoze, eats
+    Altaria's only shield with the cheap move, and lands Gigaton Hammer
+    unshielded (logged T15 Bulldoze SHIELDED -> T26 Gigaton Hammer 83).
+    With baiting off, Gigaton Hammer goes into the shield instead.
+
+    So the reference's bulk requirement is a requirement *only* in the
+    no-bait branch; with baiting on, even 15/15/15 wins this cell.  A
+    regression that quietly ignores ``bait_shields`` would make the
+    no-bait gate test above pass for the wrong reason -- this test is
+    what catches that.
+    """
+    result = _tinkaton_vs_rank1_shadow_altaria(tink_ivs, bait_shields=True)
+    assert result.winner == 0, (
+        f"{tink_ivs} with baiting ON: expected Tinkaton to win the 0-1s, "
+        f"got winner={result.winner}, HP={result.hp_remaining}")
+    assert result.pvpoke_score(0) >= 500
+
+
+def _spidops_vs_altaria(spid_ivs, alt_scenario, bait_shields):
+    """Spidops vs Altaria, 1 shield each, PvPoke default movesets.
+
+    alt_scenario: 'rank1' (top stat product, 0/14/15 @ 29) or 'default'
+    (PvPoke's default IVs + level, 4/12/13 @ 28.5).
+    """
+    from functools import partial
+    from gopvpsim.pokemon import iv_rank, pvpoke_default_ivs
+
+    spid_fast, spid_charged = get_default_moveset('Spidops', 'great')
+    alt_fast, alt_charged = get_default_moveset('Altaria', 'great')
+
+    bp_spid = _make_battle_pokemon(
+        'Spidops', spid_fast, spid_charged, 'great', shields=1,
+        atk_iv=spid_ivs[0], def_iv=spid_ivs[1], sta_iv=spid_ivs[2])
+
+    if alt_scenario == 'rank1':
+        r1 = iv_rank('Altaria', league='great')[0]
+        lv, a, d, s = r1['level'], r1['atk_iv'], r1['def_iv'], r1['sta_iv']
+    else:
+        lv, a, d, s = pvpoke_default_ivs('Altaria', league='great')
+    bp_alt = _make_battle_pokemon(
+        'Altaria', alt_fast, alt_charged, 'great', shields=1,
+        atk_iv=a, def_iv=d, sta_iv=s, max_level=lv)
+
+    pol = (pvpoke_dp if bait_shields
+           else partial(pvpoke_dp, bait_shields=False))
+    return simulate(bp_spid, bp_alt,
+                    charged_policy_0=pol,
+                    charged_policy_1=pvpoke_dp,
+                    shield_policy_0=pvpoke_simulate_shield,
+                    shield_policy_1=pvpoke_simulate_shield)
+
+
+# (spid_ivs, def, hp, wins_the_1s, why)
+SPIDOPS_VS_RANK1_ALTARIA_1_1 = [
+    ((1, 14, 14), 140.72, 132, True,
+     'minimal spread meeting "140.67 defense with 132+ hp"'),
+    ((2, 15, 15), 140.99, 132, True,
+     'the spread the reference summary recommends'),
+    ((1, 13, 15), 139.94, 132, False,
+     'hp met, def short of the line'),
+    ((0, 12, 12), 140.67, 131, False,
+     'def exactly on the line, hp one short'),
+    ((1, 11, 15), 138.88, 133, True,
+     'def short of the line but +1 hp -- the def/hp trade clears it'),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("bait_shields", [True, False])
+@pytest.mark.parametrize("spid_ivs,exp_def,exp_hp,wins,why",
+                         SPIDOPS_VS_RANK1_ALTARIA_1_1)
+def test_spidops_1v1_vs_rank1_altaria_bulk_gate(
+        spid_ivs, exp_def, exp_hp, wins, why, bait_shields):
+    """Oracle from `docs/spidops_deep_dive_reference.md:35`:
+
+        "140.67 defense with 132+ hp flips the 1s vs the rank #1
+         altaria without baits by reducing sky attack damage"
+
+    **Directional bulk-gate test.**  The reference's minimal spread and
+    its recommended 2/15/15 both win; a spread one def-step below and a
+    spread one HP below both lose.  Measured 2026-08-08 (identical in
+    both bait modes): winners 503, 503, 404, 404, 503.
+
+    The reference's stated mechanism checks out in our logs.  Spidops'
+    Rock Tomb debuffs Altaria's attack first, so the decisive Sky Attack
+    lands post-debuff for 54 at def=140.72 and 55 at def=139.94 -- and
+    the winner survives on exactly 1 HP.  One point of Sky Attack
+    damage is the whole margin.
+
+    Parametrized over both bait modes to record that, unlike the
+    Tinkaton/Shadow-Altaria cell above, ``bait_shields`` makes no
+    difference here: pvpoke_dp reaches the same throws either way, so
+    the reference's "without baits" qualifier is satisfied but not
+    directional.  The 1/11/15 row is the reference's own
+    "anything here can work with more defense/less hp or vice versa"
+    (`docs/spidops_deep_dive_reference.md:23`) showing up in the sim.
+    """
+    from gopvpsim.pokemon import Pokemon
+
+    spid = Pokemon.at_best_level('Spidops', *spid_ivs, league='great')
+    assert spid.def_ == pytest.approx(exp_def, abs=0.01), (
+        f"{spid_ivs} no longer sits at def={exp_def} ({why})")
+    assert spid.hp == exp_hp, f"{spid_ivs} no longer sits at hp={exp_hp} ({why})"
+
+    result = _spidops_vs_altaria(spid_ivs, 'rank1', bait_shields)
+    expected_winner = 0 if wins else 1
+    assert result.winner == expected_winner, (
+        f"{spid_ivs} (def={exp_def}, hp={exp_hp}, {why}) "
+        f"bait_shields={bait_shields}: expected "
+        f"{'Spidops' if wins else 'Altaria'} to win the 1s, got "
+        f"winner={result.winner}, HP={result.hp_remaining}, "
+        f"score={result.pvpoke_score(0):.0f}")
+    if wins:
+        assert result.pvpoke_score(0) >= 500
+    else:
+        assert result.pvpoke_score(0) < 500
+
+
+# (spid_ivs, def, hp, wins_the_1s, why)
+SPIDOPS_VS_DEFAULT_ALTARIA_1_1 = [
+    ((0, 13, 14), 140.96, 133, True,
+     'minimal spread meeting "140.85 defense with 133+ hp"'),
+    ((0, 14, 15), 141.23, 133, True,
+     'more defense, same 133 hp'),
+    ((0, 14, 13), 141.75, 132, False,
+     'MORE defense than the winners, but 132 hp -- hp is the gate here'),
+    ((1, 11, 15), 138.88, 133, False,
+     '133 hp met, def well short -- so def is a gate too'),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("bait_shields", [True, False])
+@pytest.mark.parametrize("spid_ivs,exp_def,exp_hp,wins,why",
+                         SPIDOPS_VS_DEFAULT_ALTARIA_1_1)
+def test_spidops_1v1_vs_default_iv_altaria_needs_133_hp(
+        spid_ivs, exp_def, exp_hp, wins, why, bait_shields):
+    """Second sentence of `docs/spidops_deep_dive_reference.md:35`:
+
+        "140.85 defense with 133+ hp covers the default IV altaria
+         (4/12/13)"
+
+    The harder half of the same matchup: default-IV Altaria hits harder
+    than the (0-attack, def-weighted) rank #1, so the spreads that beat
+    rank #1 at 132 hp lose here.  The 0/14/13 row is the point -- it has
+    *more* defense than either winner and still loses on 132 hp, so the
+    "133+ hp" half of the reference is doing real work and is not just
+    a restatement of the defense number.  Measured 2026-08-08, both bait
+    modes: 503, 503, 416, 416.
+    """
+    from gopvpsim.pokemon import Pokemon
+
+    spid = Pokemon.at_best_level('Spidops', *spid_ivs, league='great')
+    assert spid.def_ == pytest.approx(exp_def, abs=0.01), (
+        f"{spid_ivs} no longer sits at def={exp_def} ({why})")
+    assert spid.hp == exp_hp, f"{spid_ivs} no longer sits at hp={exp_hp} ({why})"
+
+    result = _spidops_vs_altaria(spid_ivs, 'default', bait_shields)
+    expected_winner = 0 if wins else 1
+    assert result.winner == expected_winner, (
+        f"{spid_ivs} (def={exp_def}, hp={exp_hp}, {why}) "
+        f"bait_shields={bait_shields}: expected "
+        f"{'Spidops' if wins else 'Altaria'} to win the 1s vs default-IV "
+        f"Altaria, got winner={result.winner}, HP={result.hp_remaining}, "
+        f"score={result.pvpoke_score(0):.0f}")
+    if wins:
+        assert result.pvpoke_score(0) >= 500
+    else:
+        assert result.pvpoke_score(0) < 500
+
+
 # ---------------------------------------------------------------------------
 # Form change oracle tests
 # ---------------------------------------------------------------------------
