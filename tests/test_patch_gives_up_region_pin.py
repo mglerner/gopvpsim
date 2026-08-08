@@ -7,11 +7,16 @@ engine may be months older than the source, and anything the region calls that
 is defined OUTSIDE it must already exist on that page or the patched column
 throws and takes the whole collection table with it.
 
-That is not hypothetical: the region grew a ``scenLabel(si)`` call (defined at
-deep_dive_engine.js top level, added by DRY review 2026-08-05 entry 5) and then
-an ``isWin(score)`` call (cmp_panels.js, the WIN_RATING single-sourcing), while
+The region really does grow such calls: it gained ``scenLabel(si)`` (defined at
+deep_dive_engine.js top level, DRY review 2026-08-05 entry 5) and then an
+``isWin(score)`` call (cmp_panels.js, the WIN_RATING single-sourcing), while
 the script's only skip conditions were "``_guMode`` present" and "the
 placeholder strings are missing" -- neither of which can see a missing helper.
+
+No page in userdata/website was ever exposed, though. Every rendered dive
+carries ``_guMode`` and returns at the "already current" branch, which sits
+ahead of the dep check, so the isWin the corpus lacks can never reach a splice.
+The guard is forward-looking, and the last test below pins that ordering.
 
 Two guards now sit in the script, and this file keeps both honest:
 
@@ -145,3 +150,27 @@ def test_page_missing_a_dep_is_skipped_not_patched(tmp_path, monkeypatch,
     assert 'skip (page predates isWin' in out
     assert '0 upgraded' in out
     assert page.read_text() == stale
+
+
+def test_gu_mode_short_circuits_before_the_dep_check(tmp_path, monkeypatch,
+                                                     capsys):
+    """A ``_guMode`` page is "already current", never dep-checked.
+
+    This ordering is why the published corpus is not a patch candidate at all:
+    every rendered dive carries ``_guMode``, so the isWin none of them define
+    cannot reach the splice. Reversing the two branches would report the whole
+    corpus as SKIPPED and misdescribe the sync path.
+    """
+    mod = _patch_mod()
+    # Bears _guMode and NONE of the required helper definitions -- the shape
+    # the dep check would reject if it were reached.
+    page = tmp_path / 'index.html'
+    page.write_text('<script>var _guMode = 0;\n'
+                    '  // "Gives up vs #1" body\n'
+                    "  var html = '';\n"
+                    '</script>\n')
+    monkeypatch.setattr(mod, 'targets', lambda argv: [str(page)])
+    assert mod.main() == 0
+    out = capsys.readouterr().out
+    assert '1 already current' in out
+    assert 'skip (page predates' not in out

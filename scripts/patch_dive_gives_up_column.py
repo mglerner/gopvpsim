@@ -14,8 +14,16 @@ placeholder-free regions to match the current source:
 
 These regions contain none of the engine's per-dive placeholders, so the
 per-dive substitutions elsewhere are untouched. Idempotent (skips dives whose
-column already matches, detected via `_guMode`), apply-all-or-skip, and reports
-files whose column predates this scheme (re-render those).
+column already uses this scheme, detected via `_guMode`), apply-all-or-skip, and
+reports files whose column predates this scheme (re-render those).
+
+`_guMode` marks the SCHEME, not a match against the current source region: a
+page bearing it is left alone even when its inlined region has since drifted
+from deep_dive_engine.js. As of the 2026-08-08 census that is every rendered
+dive in userdata/website, so this script reports the whole corpus "already
+current" and patches nothing -- syncing the column to a newer engine.js is a
+re-render, not a patch. The guards below are what protect the next page that
+does reach the patch path.
 
 TWO staleness guards, because the region is copied VERBATIM into HTML this
 script never re-renders:
@@ -46,10 +54,16 @@ COMMENT = '// "Gives up vs #1"'
 # Every helper the copied region calls but does NOT define, keyed by the
 # DEFINITION text that must already be present in the target HTML (both
 # deep_dive_engine.js and cmp_panels.js are inlined verbatim into a dive, so a
-# plain substring test is exact). Two of these landed AFTER dives were
-# published -- scenLabel (engine.js, DRY review 2026-08-05 entry 5) and isWin
-# (cmp_panels.js, the WIN_RATING single-sourcing) -- which is precisely the
-# hazard this list exists to catch. Re-derive it whenever REGION_SHA256 trips.
+# plain substring test is exact). Re-derive it whenever REGION_SHA256 trips.
+#
+# Census 2026-08-08 over the default glob (326 pages: 324 dives, plus the
+# guides/ and matchups/ index pages, which carry no region at all). scenLabel
+# (engine.js, DRY review 2026-08-05 entry 5) predates the current bake and is
+# defined on all 324; isWin (cmp_panels.js, the WIN_RATING single-sourcing)
+# postdates it and is on none. Neither exposes a published page: all 324 carry
+# `_guMode` and return at the `current` branch in main(), which runs BEFORE
+# this manifest is consulted. So the guard is forward-looking -- it protects
+# the next page to reach the dep check, not anything shipped today.
 REGION_DEPS = {
     'scenLabel': 'function scenLabel(',
     'shortName': 'function shortName(',
