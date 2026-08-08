@@ -10,6 +10,7 @@ default. This test makes that class of drift impossible to reintroduce.
 
 See DEVELOPER_NOTES "Engine constant sourcing".
 """
+import inspect
 import json
 import re
 from pathlib import Path
@@ -18,6 +19,7 @@ from gopvpsim.pokemon import (
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL, MAX_CPM_LEVEL,
     SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
 )
+from gopvpsim.user_collection import ivs_to_stats_at_cap
 
 _JS = Path(__file__).resolve().parents[1] / "scripts" / "deep_dive_user_collection.js"
 
@@ -62,16 +64,17 @@ def test_js_league_caps_fallback_matches_python():
     so ``CAP_TO_LEAGUE`` could be derived from it instead of hand-typed; the
     second assertion keeps ``matchMons`` wired to the hoisted table.)
 
-    KNOWN GAP: entry 13 (L6) gave Python a 'little' row; the JS table still
-    has none, because the JS port has no Little-League surface (no little
-    dives are baked). That gap is pinned EXACTLY -- every league the JS does
-    carry must match Python, and 'little' must be the only one it lacks -- so
-    adding little to the JS, or dropping any other league, fails here.
-    Syncing the JS literal belongs to the scripts/ lane.
+    The 'little' row entry 13 (L6) gave Python is now in the JS too, so this
+    is plain whole-table equality. It used to be a pinned GAP ("every league
+    the JS carries must match, and little must be the only one it lacks"),
+    which is a strictly weaker guard: an exception clause in a rot tripwire
+    is the thing that lets a second missing row look like the first. No
+    little dive is baked, so the row is inert -- ``matchMons`` looks the
+    league up rather than iterating -- but it costs nothing and it lets the
+    assertion be stated without a carve-out.
     """
     js_caps = _js_table("LEAGUE_CAPS")
-    assert set(LEAGUE_CAPS) - set(js_caps) == {"little"}
-    assert js_caps == {k: v for k, v in LEAGUE_CAPS.items() if k != "little"}
+    assert js_caps == LEAGUE_CAPS
     assert re.search(r"opts\.leagueCaps\s*\|\|\s*LEAGUE_CAPS", _JS.read_text()), (
         f"matchMons no longer falls back to the LEAGUE_CAPS table in {_JS.name}"
     )
@@ -92,3 +95,42 @@ def test_js_league_max_level_fallback_matches_python():
 def test_js_max_cpm_level_matches_python():
     """The unknown-league / unknown-cap fallback is the CPM table ceiling."""
     assert _js_const("MAX_CPM_LEVEL") == MAX_CPM_LEVEL
+
+
+def test_js_ivs_to_stats_at_cap_default_cap_matches_python():
+    """``ivsToStatsAtCap``'s no-``maxCp`` default must be Python's default.
+
+    Same hazard one level down, and the one place the caps table is READ as a
+    default rather than injected: ``ivs_to_stats_at_cap(max_cp=1500)`` in
+    Python, ``opts.maxCp != null ? opts.maxCp : LEAGUE_CAPS.great`` in the JS.
+    Nothing in production exercises the JS branch, so a Python default change
+    (or someone re-typing 1500 into the JS) would drift unnoticed -- and a
+    wrong CP cap silently returns stats for the wrong level.
+
+    Pinned via the SPELLING (must go through the table, not a literal) plus
+    the VALUE (that table entry must equal Python's declared default).
+    """
+    default_cap = inspect.signature(ivs_to_stats_at_cap).parameters["max_cp"].default
+    assert default_cap == LEAGUE_CAPS["great"], (
+        "user_collection.ivs_to_stats_at_cap's default max_cp is no longer the "
+        "great-league cap; the JS fallback LEAGUE_CAPS.great now disagrees"
+    )
+    assert re.search(
+        r"opts\.maxCp\s*!=\s*null\)\s*\?\s*opts\.maxCp\s*:\s*LEAGUE_CAPS\.great",
+        _JS.read_text()), (
+        f"ivsToStatsAtCap in {_JS.name} no longer defaults maxCp to "
+        f"LEAGUE_CAPS.great (a re-typed literal is how the table gets bypassed)"
+    )
+
+
+def test_js_cap_to_league_reverse_covers_every_league():
+    """``maxLevelForCap`` derives its ceiling from CAP_TO_LEAGUE, so the
+    reverse map has to be total -- which it is only if the caps are distinct.
+
+    Mirrors ``user_collection._CAP_TO_LEAGUE``. This is what the new 'little'
+    row buys concretely: ``maxLevelForCap(500)`` now resolves through
+    little -> 51.0 instead of falling through to the MAX_CPM_LEVEL default.
+    """
+    js_caps = _js_table("LEAGUE_CAPS")
+    assert len(set(js_caps.values())) == len(js_caps), "cap collision"
+    assert set(js_caps.values()) == set(LEAGUE_CAPS.values())
