@@ -2,10 +2,11 @@
 
 Beyond the submodules, this package exposes one process-wide utility:
 ``invalidate_caches()``, which drops every gamemaster/rankings-derived
-lazy cache in the library at once.
+lazy cache in the library at once, plus ``register_cache_invalidator()``
+for out-of-package caches to join it.
 """
 
-__all__ = ['invalidate_caches']
+__all__ = ['invalidate_caches', 'register_cache_invalidator']
 
 
 def _none():
@@ -44,6 +45,43 @@ _CACHE_CLEARS = (
     ('gopvpsim.display', '_female_sibling_bases'),
 )
 
+# Gamemaster-derived caches that live OUTSIDE the package -- today,
+# scripts/auto_gen_narrative.py's move-display-name index. They cannot be
+# table rows: the tables above are resolved with importlib, and the library
+# must not import scripts/ (it is not a package, it is not installed, and
+# nothing in the library may depend on the dive tooling). So instead of the
+# library reaching out, the out-of-package module reaches IN and registers
+# its own reset -- the seam runs one way, which keeps the dependency arrow
+# pointing the same direction it already does.
+#
+# Populated by register_cache_invalidator(); intentionally a plain list so an
+# unregistered caller simply never participates.
+_EXTRA_INVALIDATORS: list = []
+
+
+def register_cache_invalidator(fn):
+    """Register ``fn`` to be called by ``invalidate_caches()``.
+
+    For gamemaster/rankings-derived caches that live outside this package
+    (scripts/, downstream tooling) and therefore cannot appear in the
+    ``_CACHE_GLOBALS`` / ``_CACHE_CLEARS`` tables, which resolve names via
+    importlib and only reach installed modules.
+
+    ``fn`` takes no arguments and drops the caller's caches; it is invoked
+    AFTER the library's own caches are dropped, so a hook that re-derives
+    from library state sees the fresh state. Registration is idempotent
+    (re-registering the same callable is a no-op), so it is safe to call
+    from a lazy code path that runs more than once. Returns ``fn``, so it
+    also works as a decorator.
+
+    Register from the point where the cache is first built rather than at
+    module import, so a module that is importable without this package stays
+    that way.
+    """
+    if fn not in _EXTRA_INVALIDATORS:
+        _EXTRA_INVALIDATORS.append(fn)
+    return fn
+
 
 def invalidate_caches() -> None:
     """Drop every gamemaster/rankings-derived cache in the library.
@@ -56,6 +94,10 @@ def invalidate_caches() -> None:
 
     Rebuilding is lazy: each cache is only re-derived the next time
     something asks for it.
+
+    Anything registered via ``register_cache_invalidator()`` runs last --
+    that is how out-of-package caches (scripts/auto_gen_narrative.py's
+    move-display index) join in without the library importing them.
 
     Raises AttributeError if a cache named in ``_CACHE_GLOBALS`` /
     ``_CACHE_CLEARS`` no longer exists, so a rename can't turn this
@@ -78,3 +120,6 @@ def invalidate_caches() -> None:
                 f"{mod_name}.{attr} no longer exists; update "
                 f"gopvpsim.__init__._CACHE_CLEARS")
         getattr(mod, attr).cache_clear()
+
+    for fn in _EXTRA_INVALIDATORS:
+        fn()
