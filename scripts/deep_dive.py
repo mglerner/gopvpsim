@@ -2108,55 +2108,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
   .cmp-pill {{ display:inline-block; font-size:0.68rem; padding:1px 7px; border-radius:4px;
     background:var(--surface-2); color:var(--energy); margin-top:6px; }}
   .cmp-pill-lose {{ color:var(--tie); }}
-  .cmp-panel {{ background:var(--surface-2); border:1px solid var(--border-2); border-radius:2px;
-    padding:11px 14px; margin:0 0 14px; }}
-  .cmp-panel h4 {{ margin:0 0 3px; font-size:0.86rem; }}
-  .cmp-flip-h {{ color:var(--flip); }} .cmp-marg-h {{ color:var(--accent-2); }}
-  .cmp-psub {{ font-size:0.74rem; color:var(--text-muted); margin:0 0 9px; }}
-  .cmp-tbl {{ border-collapse:collapse; width:100%; font-size:0.82rem; }}
-  .cmp-tbl th, .cmp-tbl td {{ text-align:left; padding:5px 9px;
-    border-bottom:1px solid var(--bar-track); white-space:nowrap; }}
-  .cmp-tbl th {{ color:var(--text-muted); font-weight:600; font-size:0.74rem; }}
-  .cmp-m {{ color:var(--text); }}
-  /* Per-build result cells link to their pvpoke battle; inherit the win/loss
-     color so the cell still reads as a result, with a hover underline cue. */
-  a.cmp-cell-a {{ color:inherit; text-decoration:none; }}
-  a.cmp-cell-a:hover {{ text-decoration:underline; }}
-  .cmp-win {{ color:var(--win); font-weight:700; }}
-  .cmp-lose {{ color:var(--loss); font-weight:700; }}
-  .cmp-tie {{ color:var(--tie); font-weight:700; }}
-  /* Unified compare table (shared scripts/cmp_panels.js): scrolling box, sticky
-     header, tier dividers. No bottom-fade gradient here (the deep dive has no
-     scroll-fade wiring), just a plain scroll region. */
-  .cmp-count {{ font-size:.72em; font-weight:600; color:var(--text-muted);
-               text-transform:none; letter-spacing:0; }}
-  .cmp-bbhint {{ font-size:.72em; font-weight:600; color:var(--flip);
-                text-transform:none; letter-spacing:0; cursor:help; }}
-  .cmp-scroll-wrap {{ position:relative; }}
-  .cmp-scroll {{ max-height:62vh; overflow-y:auto; border:1px solid var(--border-2);
-                border-radius:2px; }}
-  .cmp-scroll thead th {{ position:sticky; top:0; z-index:2; background:var(--surface-2); }}
-  .cmp-case {{ color:var(--text-muted); }}
-  .cmp-celltext {{ display:block; margin-bottom:3px; }}
-  .tier-row td {{ position:sticky; top:2.75em; z-index:1; background:var(--callout-bg);
-                 color:var(--callout-strong); font-weight:700; font-size:.74em;
-                 text-transform:uppercase; letter-spacing:.05em; padding:4px 9px; }}
-  .cmp-flip {{ color:var(--flip); }}
-  .cmp-altmark {{ opacity:0.5; font-weight:400; }}
-  .cmp-more {{ color:var(--text-muted); font-size:0.76rem; font-style:italic;
-    cursor:pointer; text-decoration:underline dotted; }}
-  .cmp-more:hover {{ color:var(--text); }}
-  .cmp-tbl tr.cmp-xtra {{ display:none; }}
-  .cmp-tbl.cmp-all tr.cmp-xtra {{ display:table-row; }}
-  .cmp-bar {{ display:inline-block; vertical-align:middle; width:64px; height:9px;
-    background:var(--bar-track); border-radius:2px; overflow:hidden; margin-right:6px; }}
-  .cmp-bar > span {{ display:block; height:100%; background:var(--win); }}
-  .cmp-bar.lo > span {{ background:var(--tie); }}
-  .cmp-bar.loss {{ display:flex; justify-content:flex-end; }}
-  .cmp-bar.loss > span {{ flex:none; background:var(--loss); }}
-  .cmp-hpv {{ font-size:0.76rem; color:var(--text-muted); }}
-  .cmp-env {{ font-size:0.72rem; color:var(--energy); }}
-  .cmp-leg {{ font-size:0.72rem; color:var(--text-muted); margin-top:5px; }}
+  /* Panels/table below are single-sourced (they are also emitted by the ML IV
+     guide): rendering.CMP_PANEL_CSS, scripts/deep_dive_rendering.py. The dive
+     adds no overrides -- its values ARE the shared ones. */
+{rendering.CMP_PANEL_CSS}
   /* Section sidenav. Mirrors the ML IV-guide pages
      (scripts/render_iv_envelope_article.py): sticky side column at wide
      widths, horizontal bar at the top of the content below the 820px
