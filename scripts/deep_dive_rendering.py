@@ -608,7 +608,10 @@ def scenario_label(scenario):
     the tuple, or destructuring it in the loop header first). Bare '0v0'
     literals are out of scope there, as is slayer_cache.py's copy -- that one
     is a cache-key ingredient, not page text. That test file deliberately
-    spells the format out, which is why it scans only the four renderers.
+    spells the format out, which is why it scans an explicit file list
+    (``LABEL_RENDERERS``) rather than all of ``scripts/``. The IV Flavor
+    Guide joined that list on 2026-08-08, when its own third spelling
+    ('1-1') was converted; the article's ``_scenario_short`` joined too.
 
     Load-bearing, not cosmetic: it is the key of the matchup-cluster
     payload's ``scens`` map, so the JS overlay silently renders neutral
@@ -618,18 +621,15 @@ def scenario_label(scenario):
     return f'{scenario[0]}v{scenario[1]}'
 
 
-def parse_moveset_label(label):
-    """Split a raw moveset label ``'FAST / CM1, CM2'`` into
-    ``(fast_id, [charged_ids])``. A label with no ``/`` is all-fast.
-
-    The dive bakes the split result into ``DATA.movesets[i].fast/.charged``
-    so the page's pvpoke-link builder never re-parses the display string.
-    """
-    if '/' not in label:
-        return label.strip(), []
-    fast, rest = label.split('/', 1)
-    charged = [c.strip() for c in rest.split(',') if c.strip()]
-    return fast.strip(), charged
+# Split a raw moveset label 'FAST / CM1, CM2' into (fast_id, [charged_ids]).
+# The grammar itself lives in deep_dive_analysis -- that module needs it too
+# (pretty_moveset / build_move_tuples) and it sits BELOW this one in the
+# import graph, so it cannot import back up. Re-exported here because this is
+# the name the dive bake and generate_article already import, and because the
+# label is a rendering concern: the dive bakes the split result into
+# DATA.movesets[i].fast/.charged so the page's pvpoke-link builder never
+# re-parses the display string.
+parse_moveset_label = analysis.parse_moveset_label
 
 
 def tier_slug(name):

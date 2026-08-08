@@ -6,9 +6,14 @@ R11 half -- the dive page used to spell one shield scenario two ways
 because ~a dozen renderers each re-formed ``f'{s[0]}v{s[1]}'`` inline.
 Entry 5 landed the canonical helper (``deep_dive_rendering.scenario_label``)
 and baked its output as ``DATA.scenarioLabels``; this file pins that the
-inline copies do not come back, in the four Python renderers that print
-scenarios (deep_dive.py, deep_dive_rendering.py, deep_dive_lib/categories.py,
-deep_dive_matchup_clusters.py).
+inline copies do not come back, in every Python renderer that prints
+scenarios (see ``LABEL_RENDERERS``).
+
+The AFK deferral churn 2026-08-08 added the last three files to that list:
+``deep_dive_narrative.py`` (the IV Flavor Guide, which spoke a THIRD
+spelling -- '1-1' -- until it was converted; a visible render change),
+``generate_article.py`` and ``deep_dive_analysis.py`` (each carried one
+more inline ``f'{a}v{b}'``).
 
 Scope of that guard, stated exactly: it catches an *interpolated* re-forming
 in either historical spelling -- subscripted ``f'{s[0]}v{s[1]}'`` and
@@ -57,12 +62,18 @@ rendering = _load('deep_dive_rendering_vocab',
 mc = _load('deep_dive_matchup_clusters_vocab',
            'scripts/deep_dive_matchup_clusters.py')
 
-# Every Python file that renders a shield scenario onto the dive page.
+# Every Python file that renders a shield scenario onto the dive page or the
+# CD article. deep_dive_analysis.py is in the list because find_flips' entry
+# 'scenario' string is printed verbatim by the renderers -- it is page text,
+# not an internal key.
 LABEL_RENDERERS = [
     'scripts/deep_dive.py',
     'scripts/deep_dive_rendering.py',
     'scripts/deep_dive_lib/categories.py',
     'scripts/deep_dive_matchup_clusters.py',
+    'scripts/deep_dive_analysis.py',
+    'scripts/deep_dive_narrative.py',
+    'scripts/generate_article.py',
 ]
 
 # An inline re-forming of the label from the tuple. BOTH historical spellings
@@ -169,6 +180,56 @@ def test_clusters_module_imports_the_helper():
     assert mc.scenario_label is rendering.scenario_label or (
         mc.scenario_label((1, 1)) == rendering.scenario_label((1, 1)))
     assert mc.EVEN_SHIELD_PAIRS == ((0, 0), (1, 1), (2, 2))
+
+
+# ---------------------------------------------------------------------------
+# The Flavor Guide's third spelling (AFK deferral churn 2026-08-08)
+# ---------------------------------------------------------------------------
+#
+# deep_dive_narrative.py printed '1-1' where the rest of the page printed
+# '1v1' -- a VISIBLE difference, so converting it is a render change, not a
+# refactor. The dash form is pinned dead here in its exact old spelling; the
+# generic _REFORMED scan above cannot do it (it only knows the 'v' form) and
+# a generic dash regex would false-positive on the legitimate '{k50}-{k75}'
+# catch-count range a few lines away.
+
+_DASH_FORM = re.compile(r"\{s\[0\]\}-\{s\[1\]\}")
+
+
+def test_flavor_guide_dash_spelling_is_gone():
+    src = (SCRIPTS / 'deep_dive_narrative.py').read_text()
+    offenders = [f'{i}: {line.strip()}'
+                 for i, line in enumerate(src.splitlines(), 1)
+                 if not line.strip().startswith('#') and _DASH_FORM.search(line)]
+    assert offenders == [], offenders
+    # Guard the guard: the pattern really did match the removed sites.
+    assert _DASH_FORM.search("scen_str = ', '.join(f'{s[0]}-{s[1]}' for s in x)")
+
+
+def test_flavor_guide_prose_speaks_the_shared_vocabulary():
+    import deep_dive_narrative as narrative
+
+    assert narrative._scenario_str([(1, 1), (0, 2)]) == '0v2, 1v1'
+    assert narrative._scenario_str([(1, 1)]) == rendering.scenario_label((1, 1))
+    prose = narrative._gain_prose([{'opponent': 'Azumarill',
+                                    'scenarios': [(1, 1)]}])
+    assert prose == 'pick up the Azumarill 1v1'
+
+
+def test_flip_entries_carry_the_shared_label():
+    """analysis.find_flips' 'scenario' string is printed verbatim by the
+    renderers (opponent-threats table, flip lists), so it is page text."""
+    import deep_dive_analysis as analysis
+
+    scenarios = [(0, 0), (1, 1)]
+    nIvs, nS, nO = 2, len(scenarios), 1
+    # IV 0 loses 1v1, IV 1 wins it; 0v0 is a win for both (no flip).
+    scores = [800, 200,      # ref IV: 0v0 win, 1v1 loss
+              800, 800]      # test IV: both wins
+    flips = analysis.find_flips(scores, nIvs, nS, nO, 0, [1], scenarios,
+                                ['Azumarill'])
+    assert [g['scenario'] for g in flips[1]['gains']] == ['1v1']
+    assert flips[1]['losses'] == []
 
 
 # ---------------------------------------------------------------------------
