@@ -2,6 +2,48 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-06/08 -- entries 12+13 shipped; v8 cold bake complete (18h sleep stall, recovered)
+
+**Entries 12+13** (commits `d95e9d0..6cfe512`, 30-agent workflow + independent
+re-verify): the engine DRY batch landed as ONE hash bump
+(`9ac2f4ed -> 1415857072`) -- league descriptor (little-league KeyErrors
+fixed), cached `from_pokemon` accessor hop (10.27s -> 0.003s per 2000
+constructions), shadow-stats primitive -- with behavior neutrality proven
+twice (bytecode-identity harness at implementation; oracle-harness A/B at
+gate: 172 exact + 35 documented on BOTH sides). The deep_dive.py split
+extracted five `deep_dive_lib` modules with import shims and Pool-round-trip
+worker proof; D9 SweepConfig / D10 shared `build_battle_pair`
+(CACHE_VERSION sweep v8 + slayer v6, deliberate whole-cache cold) / D14
+one-meets-rule (the adversarial re-verify found and fixed a THIRD
+hand-copied chain in the L51 path -- the last rounded-stats classifier).
+Gate fallout fixed: oracle baseline was publicly 2 cells stale since hunt2
+(A/B-proven; sentinels corrected), verify_dev_counts joined the ship-gate
+roster (it was called by nothing and a month stale), three pvpoke-root
+defaults pointed at the pre-Smith path. Suite 1290 -> 1620 tests across
+the 3-day arc.
+
+**The v8 cold bake** (`overnight_20260806_211020.log`): launched Aug 6
+21:10 after a Fable predive gate that caught two would-be killers
+pre-launch (a step-9 sentinel drift that would have failed the chain at
+hour ~20, and the data-cache TTL expiring mid-bake -> vintage pinned at
+launch). SUCCESS Aug 8 13:01; verify_overnight ALL GREEN (97/97 dives,
+61/61 ML guides, three-gate roster clean). Wall-clock ~40h, of which
+**18h was a machine-sleep stall** (Aug 7 16:48 -> Aug 8 10:54, lid-close;
+sim pace when awake beat July: 9.4 vs 12.5 min/dive mean on one fewer
+core). The stall pushed the run past the pinned TTL: a worker refetched
+the gamemaster at Aug 7 21:11, making the bake mixed-vintage (121,292
+columns on Jul-30 `e97cb2f0`, 25,676 on Aug-7 `d0506c89`). **Recovered
+and proven consistent**: the vintage delta was purely additive (13 moves
+added, nothing changed/removed) -> `migrate_cache --from-gamemaster`
+blessed all 121,292 columns to current with 0 affected; rankings-level
+check found 0 default-moveset flips across the GL + UL pools and all
+post-stall focals. Hardening shipped: caffeinate in the chain script
+(idle/timer sleep), lid-open + TTL-vs-wall-clock pre-launch triggers on
+the predive checklist, keep-a-vintage-copy recovery note. ML-guide phase
+was 245s -- the guides are 64-IV sweeps, so the cold-ML fear was
+unfounded. gc of the 42G v7 leftovers is now UNBLOCKED (bake verified).
+Site NOT yet published from this bake.
+
 ## 2026-08-05 -- DRY review executed end-to-end; site re-rendered + published
 
 Two-day arc, one day: the Fable-orchestrated DRY/single-sourcing review

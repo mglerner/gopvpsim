@@ -52,6 +52,18 @@ STATUS="userdata/logs/overnight_status.txt"
 
 echo "overnight chain PID $$ starting at $(date)" > "$STATUS"
 
+# Keep the machine awake for the whole chain -- for the cases software can
+# control. The 2026-08-06 bake lost 18h to a mid-run sleep (dives paused
+# Aug 7 16:48 -> Aug 8 10:54, only DarkWake slivers ran), which pushed the
+# run past the pinned data-cache TTL and produced a mixed-gamemaster bake
+# (recovered: the vintage delta happened to be purely additive, verified
+# via migrate_cache -- but that was luck). caffeinate -is prevents idle
+# and timer/battery system sleep for this script's lifetime (assertion
+# dies with the PID). It CANNOT prevent lid-close clamshell sleep -- no
+# process can, absent an external display -- so "leave the lid open" is a
+# pre-launch trigger on docs/predive_checklist.md, not a software fix.
+caffeinate -is -w $$ &
+
 log() {
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" | tee -a "$LOG"
 }
@@ -206,7 +218,7 @@ step "Rebuilding website index" \
 #    (scripts/run_ship_gates.py: link verification + unicode-dash check).
 #    This chain used to run only the link gate and could print SUCCESS
 #    with dash violations present (DRY review 2026-08-05 entry 3b).
-step "Running ship gates (link + dash)" \
+step "Running ship gates (roster: run_ship_gates.py)" \
     python scripts/run_ship_gates.py
 
 # Surface the ML best-effort tail step in the final status. The chain itself
