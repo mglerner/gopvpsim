@@ -14,12 +14,11 @@ pre-cold-dive gate; run `overnight_redive.sh` and watch with
 the v8 entries-12+13 engine -- ALL GREEN, mixed-vintage recovery proven;
 see CHANGELOG "2026-08-06/08". LID STAYS OPEN for the whole bake.)
 
-Post-v8-bake unblocked items:
-- **Publish the v8 bake** -- verified green + vintage-consistent, NOT yet
-  pushed to pogodives.com (Michael's call).
-- **gc_cache the 42G v7 leftovers** -- bake verified, reclaim is now safe
-  (`gc_cache.py` dry-run first; the v7 dirs sit in a keyless legacy
-  vintage, see sweep_cache.py's v8 comment).
+Post-v8-bake items: **both DONE 2026-08-08** -- published to pogodives.com
+(gates green inside publish; live spot checks 200 incl. a post-stall dive
+and an ML guide) and reclaimed ~44 GB of v7 sweep dirs + 1 GB of pre-bake
+slayer files via `gc_cache --keep-vintages 1 --apply` + mtime prune
+(dry-run matched apply exactly; cache now 43G, single current vintage).
 
 A failed chain step that has since been diagnosed and fixed goes in
 `docs/chain_resolutions.toml` (read by `verify_overnight.py` check [1/5]) --
