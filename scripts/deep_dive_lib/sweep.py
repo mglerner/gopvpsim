@@ -22,11 +22,11 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from gopvpsim.pokemon import (
-    Pokemon, get_species, iv_rank, CPM, best_level,
+    Pokemon, get_pokemon_entry, get_species, iv_rank, CPM, best_level,
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL, cp as calc_cp,
 )
 from gopvpsim.moves import get_moves
-from gopvpsim.data import load_gamemaster, parse_types
+from gopvpsim.data import parse_types
 from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp, ENERGY_CAP
 from gopvpsim.formchange import attach_form_change
 
@@ -627,8 +627,9 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
 
     fast_moves_db, charged_moves_db = get_moves()
 
-    gm = load_gamemaster()
-    focal_mon = next(m for m in gm['pokemon'] if m['speciesName'] == species)
+    # Raise-on-miss, as the bare next() here always did -- an unknown focal
+    # is a caller bug, not something this sweep should paper over.
+    focal_mon = get_pokemon_entry(species)
     focal_types = parse_types(focal_mon)
     fm_template = dict(fast_moves_db[fast_id])
     cms_template = [dict(charged_moves_db[cid]) for cid in charged_ids]
@@ -655,7 +656,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         opp_pokemon = Pokemon.at_best_level(opp_clean, oa, od, os_,
                                             league=league, shadow=opp_is_shadow,
                                             max_level=opp_max_level)
-        opp_mon = next(m for m in gm['pokemon'] if m['speciesName'] == opp_clean)
+        opp_mon = get_pokemon_entry(opp_clean)
         opp_types = parse_types(opp_mon)
         opp_fm = dict(fast_moves_db[opp_fast])
         opp_cms = [dict(charged_moves_db[cid]) for cid in opp_charged]
