@@ -51,6 +51,7 @@ from gopvpsim.pokemon import iv_rank, LEAGUE_CP  # type: ignore[import-not-found
 from deep_dive_rendering import (  # type: ignore[import-not-found]
     opp_slug,
     parse_moveset_label,
+    scenario_label,
     tier_slug,
 )
 from gopvpsim.theme import (  # type: ignore[import-not-found]
@@ -415,14 +416,18 @@ def _load_dive_data(dive_dir: Path) -> dict:
 
 
 def _moveset_fast_move(label: str) -> str:
-    """Extract the fast move id from a moveset label like 'FAST / CM1, CM2'."""
-    return label.split('/', 1)[0].strip()
+    """Fast move id of a moveset label like 'FAST / CM1, CM2'.
+
+    Thin alias, like ``_parse_moveset_label`` below: the grammar lives in
+    one place (DRY review 2026-08-05 entry 5) so the article and the dive
+    take a label apart the same way.
+    """
+    return parse_moveset_label(label)[0]
 
 
 def _moveset_charged_moves(label: str) -> list[str]:
     """Charged move ids from a label 'FAST / CM1, CM2' -> ['CM1', 'CM2']."""
-    _, _, charged = label.partition('/')
-    return [c.strip() for c in charged.split(',') if c.strip()]
+    return parse_moveset_label(label)[1]
 
 
 def _cd_move_is_fast(cd_entry: dict) -> bool:
@@ -849,8 +854,16 @@ def _scenario_label(scenario: list[int]) -> str:
 
 
 def _scenario_short(scenario: list[int]) -> str:
-    """Tight column header for a shield scenario: ``0v0``, ``0v1``, etc."""
-    return f'{scenario[0]}v{scenario[1]}'
+    """Tight column header for a shield scenario: ``0v0``, ``0v1``, etc.
+
+    Thin alias, same shape as ``_parse_moveset_label`` above: the spelling
+    is the dive's one shield vocabulary (DRY review 2026-08-05 entry 12 /
+    register item R11), so the article's column headers and the dive's
+    scenario labels cannot drift apart. ``_scenario_label`` right above is
+    a DIFFERENT vocabulary on purpose -- the verbose '0 shields vs 2
+    shields' tooltip form -- not a second copy of this rule.
+    """
+    return scenario_label(scenario)
 
 
 def _wr_cell(wr: float) -> str:

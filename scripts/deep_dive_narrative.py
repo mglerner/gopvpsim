@@ -14,8 +14,10 @@ import numpy as np
 from deep_dive_analysis import (
     _np_scores,
     _np_stats,
+    parse_moveset_label,
     probe_tier_cutoff_flips,
 )
+from deep_dive_rendering import scenario_label
 from fast_move_class import charmer_context_line, is_charmer_fast_move
 
 
@@ -965,8 +967,15 @@ def merge_identical_stat_flavors(flavors, tradeoffs):
 # ---------------------------------------------------------------------------
 
 def _scenario_str(scenarios):
-    """Format scenario list as '0-0, 1-1, 2-2'."""
-    return ', '.join(f'{s[0]}-{s[1]}' for s in sorted(scenarios))
+    """Format scenario list as '0v0, 1v1, 2v2'.
+
+    The Flavor Guide used to print its own dash spelling ('1-1') while the
+    rest of the dive said '1v1'; it now speaks the one shield vocabulary
+    (``deep_dive_rendering.scenario_label``, DRY review 2026-08-05 entry 12
+    / register item R11). The three inline copies of the dash form in the
+    boundary-bullet renderers below route through here as well.
+    """
+    return ', '.join(scenario_label(s) for s in sorted(scenarios))
 
 
 def _opp_colored(name):
@@ -1126,7 +1135,7 @@ def _boundary_bullets_for_flavor(flavor, tradeoffs, has_bait_axis=False,
             bait_sets.update(b.get('bait_modes', set()))
 
         for opp_base, info in opp_info.items():
-            scen_str = ', '.join(f'{s[0]}-{s[1]}' for s in sorted(info['scens']))
+            scen_str = _scenario_str(info['scens'])
             if has_bait_axis and len(bait_sets) == 1:
                 bait_tag = ' no bait' if 'nobait' in bait_sets else ' with bait'
                 scen_str += bait_tag
@@ -1193,7 +1202,7 @@ def _general_boundary_bullets(all_matchup_boundaries, flavor, has_bait_axis=Fals
         if len(opp_items) > 1:
             opp_parts = []
             for opp_base, info in opp_items:
-                scen_str = ', '.join(f'{s[0]}-{s[1]}' for s in sorted(info['scens']))
+                scen_str = _scenario_str(info['scens'])
                 shadow_note = ' (incl. Shadow)' if info['shadow'] else ''
                 opp_parts.append(f'{_opp_colored(opp_base)}{shadow_note} ({scen_str})')
             lines.append(
@@ -1202,7 +1211,7 @@ def _general_boundary_bullets(all_matchup_boundaries, flavor, has_bait_axis=Fals
             )
         else:
             opp_base, info = opp_items[0]
-            scen_str = ', '.join(f'{s[0]}-{s[1]}' for s in sorted(info['scens']))
+            scen_str = _scenario_str(info['scens'])
             if has_bait_axis and len(bait_sets) == 1:
                 bait_tag = ' no bait' if 'nobait' in bait_sets else ' with bait'
                 scen_str += bait_tag
@@ -1262,8 +1271,11 @@ def render_narrative_zone(flavors, tradeoffs, all_matchup_boundaries,
     # weight on a species that wants bulk.
     ms_list = data_obj.get('movesets') or []
     if 0 <= moveset_idx < len(ms_list):
-        label = ms_list[moveset_idx].get('label', '')
-        fast_part = label.split(' / ')[0] if ' / ' in label else label
+        ms = ms_list[moveset_idx]
+        # Prefer the id the dive already baked as a field (entry 5); the
+        # label split is the fallback for a pre-entry-5 DATA blob, and it
+        # goes through the shared grammar rather than splitting by hand.
+        fast_part = ms.get('fast') or parse_moveset_label(ms.get('label', ''))[0]
         if is_charmer_fast_move(fast_part):
             parts.append(
                 f'<p class="dd-narrative-prose" '

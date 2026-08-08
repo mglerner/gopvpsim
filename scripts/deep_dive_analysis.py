@@ -121,14 +121,40 @@ def move_abbr(raw_id):
     return words[0][:3].upper() if words else '?'
 
 
+def parse_moveset_label(label):
+    """Split a raw moveset label ``'FAST / CM1, CM2'`` into
+    ``(fast_id, [charged_ids])``. A label with no ``/`` is all-fast.
+
+    THE moveset-label grammar (DRY review 2026-08-05 entry 5): every reader
+    of a raw label goes through this instead of hand-splitting on ``' / '``
+    and ``','``, so the label the dive bakes and the label the renderers
+    take apart can never drift.
+
+    It lives in this module rather than ``deep_dive_rendering`` -- which
+    re-exports it and is still the name the dive bake and
+    ``generate_article`` import -- purely because of the import graph:
+    ``deep_dive_rendering`` imports THIS module at module scope, so a
+    grammar defined up there is unreachable from down here without a
+    circular import. Nothing else about the split moved.
+
+    The dive bakes the result into ``DATA.movesets[i].fast/.charged``, so
+    page-side consumers read the ids as fields and never re-parse the
+    display string at all.
+    """
+    if '/' not in label:
+        return label.strip(), []
+    fast, rest = label.split('/', 1)
+    charged = [c.strip() for c in rest.split(',') if c.strip()]
+    return fast.strip(), charged
+
+
 def pretty_moveset(label):
     """Convert 'FAIRY_WIND / BULLDOZE, GIGATON_HAMMER' to pretty names."""
-    parts = label.split(' / ')
-    if len(parts) == 2:
-        fast = pretty_name(parts[0].strip())
-        charged = ', '.join(pretty_name(c.strip()) for c in parts[1].split(','))
-        return f'{fast} / {charged}'
-    return label
+    fast_id, charged_ids = parse_moveset_label(label)
+    if not charged_ids:
+        return label
+    charged = ', '.join(pretty_name(c) for c in charged_ids)
+    return f'{pretty_name(fast_id)} / {charged}'
 
 
 def pvp_damage(power, atk, def_, effectiveness, stab_mult):
@@ -143,13 +169,14 @@ def pvp_damage(power, atk, def_, effectiveness, stab_mult):
 
 
 def build_move_tuples(moveset_label, fast_db, charged_db):
-    """Parse moveset label into list of (move_id, power, type) tuples."""
-    # Label format: "FAIRY_WIND / BULLDOZE, GIGATON_HAMMER"
-    parts = moveset_label.split(' / ')
-    if len(parts) != 2:
+    """Parse moveset label into list of (move_id, power, type) tuples.
+
+    An all-fast label (no charged moves) yields no tuples, same as before
+    the split was routed through ``parse_moveset_label``.
+    """
+    fast_id, charged_ids = parse_moveset_label(moveset_label)
+    if not charged_ids:
         return []
-    fast_id = parts[0].strip()
-    charged_ids = [c.strip() for c in parts[1].split(',')]
     moves = []
     if fast_id in fast_db:
         m = fast_db[fast_id]
@@ -195,6 +222,14 @@ def find_flips(scores_flat, nIvs, nS, nO, ref_iv, test_ivs, scenarios, opponents
     Each gain/loss entry includes a ``bait_modes`` set so callers can tell
     which bait policy produced the flip after merging across modes.
     """
+    # Local import, on purpose: ``deep_dive_rendering`` imports this module at
+    # module scope, so a top-level `from deep_dive_rendering import
+    # scenario_label` here blows up whenever rendering is imported first (its
+    # own import of us runs before the helper is defined). The entry's
+    # 'scenario' string IS page text -- renderers print it verbatim -- so it
+    # has to speak the one shield vocabulary (DRY review 2026-08-05 entry 12,
+    # register item R11) rather than re-form '0v0' inline.
+    from deep_dive_rendering import scenario_label
     flips = {}
     for iv in test_ivs:
         if iv == ref_iv:
@@ -207,7 +242,7 @@ def find_flips(scores_flat, nIvs, nS, nO, ref_iv, test_ivs, scenarios, opponents
                 # > 500: a rating of exactly 500 is a TIE, not a win (PvPoke
                 # BattleHistogram.js/Interface.js); matches canonical _won_set.
                 if (rs > 500) != (ts > 500):
-                    entry = {'scenario': f'{scenarios[si][0]}v{scenarios[si][1]}',
+                    entry = {'scenario': scenario_label(scenarios[si]),
                              'opponent': opponents[oi], 'ref_score': rs, 'iv_score': ts,
                              'bait_modes': {bait_mode}}
                     (gains if ts > 500 else losses).append(entry)
