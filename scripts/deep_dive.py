@@ -876,10 +876,12 @@ iv_sweep = sweep.iv_sweep
 # Colors for threshold tiers - the ordered --tier-1..--tier-8 palette, indexed
 # mod 8 (most restrictive first). These flow as theme-aware 'var(--tier-N)'
 # STRINGS everywhere (CSS badge renders them as tier-color TEXT on
-# var(--surface-2)); only the Plotly-marker injection boundary resolves them to
-# DEFAULT_THEME hex via _TIER_VAR_TO_HEX (Plotly canvas can't read CSS vars; the
-# deferred JS shim will make that theme-aware later). "Other" (no threshold) uses
-# the Viridis colorscale.
+# var(--surface-2)); the Plotly-marker injection boundary also resolves them to
+# DEFAULT_THEME hex via _TIER_VAR_TO_HEX, which since the theme shim landed is
+# the FALLBACK rather than the live value: deep_dive_engine.js re-resolves each
+# 'var(--tier-N)' against the ACTIVE theme with getComputedStyle at chart-build
+# time (see __THEME_FALLBACK_JS__ below). "Other" (no threshold) uses the
+# Viridis colorscale.
 THRESHOLD_COLORS = [f'var(--tier-{i})' for i in range(1, 9)]
 
 # var->hex resolver for the single Plotly-marker injection boundary. Built from
@@ -894,6 +896,28 @@ _TIER_VAR_TO_HEX = {
 # the Plotly-marker injection (__TIER_COLORS_JS__).
 _TIER_VAR_TO_HEX['var(--tier-mirror)'] = (
     _THEME_TOKENS['--tier-mirror'][_DEFAULT_THEME_IDX])
+
+# Non-tier theme tokens the Plotly chrome shim reads (deep_dive_engine.js
+# themeColor()). The LIVE value comes from getComputedStyle on the active
+# [data-theme] block; this map is the DEFAULT_THEME fallback injected as
+# __THEME_FALLBACK_JS__, so a canvas can never fall back to a literal that is
+# not a theme.py value (palette_governance.md section 1: _TOKENS is the only
+# sanctioned home for palette hex).
+#
+# Keep this list in sync with the themeColor('--x') call sites in the JS --
+# tests/test_plotly_theme_shim.py asserts the two agree in both directions.
+_PLOT_THEME_TOKENS = (
+    '--surface',       # legend panel fill
+    '--surface-2',     # plotting-area fill, hover panel, marker separation ring
+    '--border-2',      # grid / zero line / legend border
+    '--text',          # global chart font, high-contrast neutral marks
+    '--text-muted',    # recessive neutral marks, reference lines, hover border
+    '--notable',       # slayer-overlay gold (theme.py names this exact role)
+    '--cat-anchors',   # anchor-overlay ring (the anchors category hue)
+)
+_THEME_FALLBACK_HEX = {
+    tok: _THEME_TOKENS[tok][_DEFAULT_THEME_IDX] for tok in _PLOT_THEME_TOKENS
+}
 
 
 PLOTLY_CDN = "https://cdn.plot.ly/plotly-2.35.2.min.js"
@@ -3107,12 +3131,14 @@ def _interactive_js_engine(n_scenarios, n_opponents, opp_iv_modes, reference_idx
 
     The JS body lives in ``scripts/deep_dive_engine.js`` so it can be
     edited as plain JavaScript (with syntax highlighting, no Python
-    f-string brace escaping). Nine placeholders inside that file get
+    f-string brace escaping). Ten placeholders inside that file get
     replaced at runtime with the per-dive values below.
     """
-    # __TIER_COLORS_JS__ feeds Plotly markers, which can't read CSS vars; resolve
+    # __TIER_COLORS_JS__ is the Plotly markers' DEFAULT_THEME FALLBACK: resolve
     # each 'var(--tier-N)' to its DEFAULT_THEME hex here (the single injection
-    # boundary). t['color'] itself stays 'var(--tier-N)' for the theme-aware
+    # boundary), and the JS shim re-resolves the parallel __TIER_VARS_JS__
+    # entry against the active theme when getComputedStyle is available.
+    # t['color'] itself stays 'var(--tier-N)' for the theme-aware
     # badges. Non-var literals (e.g. the mirror-tier hex) pass through unchanged.
     # Guard the injection boundary: every tier color must resolve, either via
     # _TIER_VAR_TO_HEX or as a literal '#hex'. An unmapped tier color would
@@ -3148,6 +3174,7 @@ def _interactive_js_engine(n_scenarios, n_opponents, opp_iv_modes, reference_idx
         '__TIER_COLORS_JS__': tier_colors_js,
         '__TIER_VARS_JS__': tier_vars_js,
         '__TIER_NAMES_JS__': tier_names_js,
+        '__THEME_FALLBACK_JS__': json.dumps(_THEME_FALLBACK_HEX, sort_keys=True),
         '__SHIELD_DESC_DEFAULT__': shield_desc_default,
         '__LEAGUE_TITLE__': league.title(),
         '__LEAGUE_CP_CAP__': str(LEAGUE_CAPS[league]),
