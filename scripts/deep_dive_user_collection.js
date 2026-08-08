@@ -223,7 +223,14 @@
   // only one mon can hold it, so GL/UL top out at 50. A bare 51.0 default
   // here is the "owned mons one level too high" bug (DRY review 2026-08-05
   // entry 9; mirrors user_collection.league_max_level / max_level_for_cap).
-  var LEAGUE_CAPS      = { great: 1500, ultra: 2500, master: 10000 };
+  // Both tables carry 'little' even though no little dive is baked today: a
+  // fallback table only rots when it is allowed to differ from Python, and
+  // "the JS is missing a row" is indistinguishable at a glance from "the JS
+  // is wrong". Whole-table equality is the pin test_js_shadow_constants.py
+  // can state without an exception clause. leagueCaps[league] is a LOOKUP
+  // (matchMons never iterates the table), so the extra row is inert until a
+  // caller actually asks for little.
+  var LEAGUE_CAPS      = { little: 500, great: 1500, ultra: 2500, master: 10000 };
   var LEAGUE_MAX_LEVEL = { little: 51.0, great: 50.0, ultra: 50.0, master: 51.0 };
   var MAX_CPM_LEVEL    = 51.0;
 
