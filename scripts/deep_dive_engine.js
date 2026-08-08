@@ -3777,6 +3777,18 @@ function _mcPayload(root) {
   try { return JSON.parse(s.textContent); } catch (e) { return null; }
 }
 
+// One scattergl trace spec for the cluster panels. The per-cluster traces and
+// the owned-mon overlay differ ONLY in name + marker (and whether their arrays
+// arrive prebuilt), so the shared plumbing -- type/mode/hoverinfo -- is named
+// once here rather than typed twice (DRY review 2026-08-05 entry 14
+// ride-along). Purely cosmetic: both call sites produce the same objects they
+// did as literals.
+function _mcTrace(name, marker, x, y, text) {
+  return {type: 'scattergl', mode: 'markers',
+          x: x || [], y: y || [], text: text || [],
+          hoverinfo: 'text', name: name, marker: marker};
+}
+
 function _mcRenderRoot(root) {
   var payload = _mcPayload(root);
   if (!payload) return;
@@ -3804,11 +3816,10 @@ function _mcRenderRoot(root) {
     if (!xs || !ys) return;
     var traces = [];
     for (var c = 0; c < sc.k; c++) {
-      traces.push({type: 'scattergl', mode: 'markers', x: [], y: [],
-                   text: [], hoverinfo: 'text',
-                   name: 'C' + c + ' (n=' + sc.sizes[c] + ')',
-                   marker: {size: 4, color: payload.palette[c % payload.palette.length],
-                            opacity: 0.75}});
+      traces.push(_mcTrace('C' + c + ' (n=' + sc.sizes[c] + ')',
+                           {size: 4,
+                            color: payload.palette[c % payload.palette.length],
+                            opacity: 0.75}));
     }
     for (var i = 0; i < n; i++) {
       var t = traces[sc.labels[i]];
@@ -3854,11 +3865,10 @@ function _mcRenderRoot(root) {
         }
         var ynudge = (ymax - ymin) * 0.0005 || 0.001;
         for (var oyi = 0; oyi < oy.length; oyi++) oy[oyi] += ynudge;
-        traces.push({type: 'scattergl', mode: 'markers', x: ox, y: oy,
-                     text: otxt, hoverinfo: 'text',
-                     name: 'Yours (' + ox.length + ')',
-                     marker: {size: 11, symbol: 'star', color: '#ffd700',
-                              opacity: 1, line: {width: 1.5, color: '#000'}}});
+        traces.push(_mcTrace('Yours (' + ox.length + ')',
+                             {size: 11, symbol: 'star', color: '#ffd700',
+                              opacity: 1, line: {width: 1.5, color: '#000'}},
+                             ox, oy, otxt));
       }
     }
     var layout = {
