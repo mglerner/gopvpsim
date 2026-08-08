@@ -188,3 +188,104 @@ def test_the_grid_token_stays_recessive_but_visible():
         ratio = _contrast(theme._TOKENS['--border-2'][col],
                           theme._TOKENS['--surface-2'][col])
         assert 1.1 <= ratio <= 3.0, (name, round(ratio, 2))
+
+
+# --------------------------------------------------------------------------
+# 4. Overlay hues that ALIAS a tier hue: disclosed, and separated by a
+#    channel that is not color
+# --------------------------------------------------------------------------
+#
+# theme.py aliases several tokens on purpose ("tier-1 == rarity-rare /
+# cat-anchors / catw-bulk", "tier-8 == catw-rank1") -- a CHIP-context decision
+# taken when the two families were never drawn on one canvas.  The shim puts
+# them on one: in the default threshold color mode the scatter carries tier
+# traces AND the anchor/slayer overlays as separate legend series.  So an
+# overlay identity hue that aliases a tier hue is a real loss of categorical
+# separation, and these tests hold the two things that make that survivable:
+# the loss is stated at the call site, and a non-color channel still tells the
+# families apart.
+#
+# (token, tier token, buildOverlayTrace name) -- both pairs measure ~1:1 today.
+_OVERLAY_TIER_ALIAS_PAIRS = [
+    ('--cat-anchors', '--tier-1', 'Anchor IVs'),
+    ('--notable', '--tier-8', 'Slayer IVs'),
+]
+
+_DISCLOSURE_MARKER = 'DISCLOSED HUE COLLISION'
+
+
+def _site_preamble(trace_name: str, n_lines: int = 30) -> str:
+    """The comment block immediately above a buildOverlayTrace call."""
+    lines = JS.splitlines()
+    for i, line in enumerate(lines):
+        if f"buildOverlayTrace('{trace_name}'" in line:
+            return '\n'.join(lines[max(0, i - n_lines):i])
+    raise AssertionError(f"no buildOverlayTrace call for {trace_name!r}")
+
+
+def test_overlay_hues_that_alias_a_tier_hue_are_disclosed_at_their_site():
+    """A hue collision with a co-rendered series is stated, not silent.
+
+    Self-cleaning in both directions: re-value the tokens apart in every theme
+    and the test demands the now-stale note be deleted.
+    """
+    for tok, tier_tok, trace_name in _OVERLAY_TIER_ALIAS_PAIRS:
+        ratios = [_contrast(theme._TOKENS[tok][col], theme._TOKENS[tier_tok][col])
+                  for col in range(len(theme._THEME_ORDER))]
+        preamble = _site_preamble(trace_name)
+        collides = min(ratios) < MARK_CONTRAST_MIN
+        if collides:
+            assert _DISCLOSURE_MARKER in preamble, (
+                f"{tok} is {min(ratios):.2f}:1 from {tier_tok}, which draws on "
+                f"the same canvas in threshold mode -- say so above the "
+                f"{trace_name!r} trace or re-encode the hue")
+            assert tier_tok in preamble, (
+                f"the {trace_name!r} disclosure must name {tier_tok}")
+        else:
+            assert _DISCLOSURE_MARKER not in preamble, (
+                f"{tok} now clears {MARK_CONTRAST_MIN}:1 against {tier_tok} in "
+                f"every theme ({min(ratios):.2f}:1 worst); the collision note "
+                f"above {trace_name!r} is stale, delete it")
+
+
+def _build_overlay_trace_body() -> str:
+    start = JS.index('function buildOverlayTrace(')
+    return JS[start:JS.index('\n  }\n', start)]
+
+
+def test_tier_dots_keep_a_symbol_channel_the_overlays_never_use():
+    """Tier markers are pinned circles; overlay symbols are never circles.
+
+    Pinned rather than left to Plotly's default so the separation channel is
+    explicit and testable: with the identity hues aliased, symbol is what is
+    left.
+    """
+    tier_marker = re.search(r'marker:\{size:_markerSize,[^}]*\}', JS)
+    assert tier_marker, "tier trace marker spec not found"
+    assert "symbol:'circle'" in tier_marker.group(0), (
+        "the tier trace must pin symbol:'circle' -- it is the non-color "
+        "channel separating tier dots from the alias-hued overlays")
+
+    sym_fn = JS[JS.index('function overlaySymbol('):]
+    sym_fn = sym_fn[:sym_fn.index('\n  }\n')]
+    overlay_symbols = set(re.findall(r"return '([a-z-]+)'", sym_fn))
+    assert overlay_symbols, "overlaySymbol returns nothing parseable"
+    assert 'circle' not in overlay_symbols, overlay_symbols
+
+
+def test_tier_dots_and_overlay_marks_never_share_a_marker_size():
+    """Size is the second non-color channel; keep the two families disjoint."""
+    tier_stmt = re.search(r'var _markerSize = [^;]+;', JS)
+    assert tier_stmt, "tier marker size statement not found"
+    tier_sizes = {int(n) for n in re.findall(r'\b\d+\b', tier_stmt.group(0))}
+    assert tier_sizes, "tier marker sizes not found"
+
+    overlay_sizes = set()
+    for stmt in re.findall(r'markerSize\s*=\s*([^;]+);',
+                           _build_overlay_trace_body()):
+        overlay_sizes.update(int(n) for n in re.findall(r'\b\d+\b', stmt))
+    assert overlay_sizes, "overlay marker sizes not found"
+    assert tier_sizes.isdisjoint(overlay_sizes), (
+        f"tier sizes {sorted(tier_sizes)} collide with overlay sizes "
+        f"{sorted(overlay_sizes)}; with the hues aliased, size and symbol are "
+        f"the only channels left")
