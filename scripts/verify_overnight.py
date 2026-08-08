@@ -45,11 +45,22 @@ import sys
 import tomllib
 from pathlib import Path
 
+from gopvpsim.data import cup_slug_suffix
+
 REPO = Path(__file__).resolve().parent.parent
 WEBSITE = REPO / 'userdata' / 'website'
 LOGS = REPO / 'userdata' / 'logs'
 STATUS_FILE = LOGS / 'overnight_status.txt'
 RESOLUTIONS_FILE = REPO / 'docs' / 'chain_resolutions.toml'
+
+# Glob for cup dive dirs. A cup dive slug is FLAT `<species>-<cup>-cup`, and
+# data.cup_slug_suffix owns the `<cup>-cup` half -- its docstring names THIS
+# glob as one of its three consumers, so derive the pattern from the helper
+# instead of re-spelling '-cup' here (the whole point of the helper is that
+# the shape is written down once). The cup name stays a wildcard on purpose:
+# keying off CUP_REGISTRY would silently skip a dive dir for an unregistered
+# cup, and "silently missed" is the failure mode this check exists to prevent.
+CUP_DIR_GLOB = f'*-{cup_slug_suffix("*")}'
 
 # Species that entered the GL pool in the most recent refresh; their
 # presence in a dive's opponent list proves the new pool loaded.
@@ -211,7 +222,7 @@ def main() -> int:
     print('[2/5] dive-dir freshness')
     fresh_dirs: list[Path] = []
     skipped = 0
-    for d in sorted(WEBSITE.glob('*-league')) + sorted(WEBSITE.glob('*-cup')):
+    for d in sorted(WEBSITE.glob('*-league')) + sorted(WEBSITE.glob(CUP_DIR_GLOB)):
         pages = sorted(d.glob('index*.html'))
         if not pages:
             continue
