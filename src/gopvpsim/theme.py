@@ -20,6 +20,11 @@ Palette adapted from Gruvbox by Pavel "morhetz" Pertsev
 
 DEFAULT_THEME = "gruvbox-light"
 
+# localStorage key holding the visitor's chosen theme. Read pre-paint in
+# theme_head_script() and read/written by theme_picker_html(); changing it
+# here changes every emitted script at once (and orphans stored choices).
+_THEME_KEY = "pogo-theme"
+
 # Display order + labels for the picker.
 THEMES = [
     ("gruvbox-light", "Gruvbox Light"),
@@ -195,7 +200,7 @@ def theme_head_script() -> str:
     overrides it with the user's stored choice, so there is no theme flash.
     """
     return (
-        "<script>(function(){try{var t=localStorage.getItem('pogo-theme');"
+        "<script>(function(){try{var t=localStorage.getItem('" + _THEME_KEY + "');"
         "if(t)document.documentElement.setAttribute('data-theme',t);}"
         "catch(e){}})();</script>"
     )
@@ -214,9 +219,9 @@ def theme_picker_html() -> str:
     return (
         '<div class="theme-picker"><select aria-label="Theme" '
         "onchange=\"document.documentElement.setAttribute('data-theme',this.value);"
-        "try{localStorage.setItem('pogo-theme',this.value);}catch(e){}\">"
+        "try{localStorage.setItem('" + _THEME_KEY + "',this.value);}catch(e){}\">"
         f"{opts}</select></div>"
-        "<script>(function(){try{var t=localStorage.getItem('pogo-theme');"
+        "<script>(function(){try{var t=localStorage.getItem('" + _THEME_KEY + "');"
         "if(t){var s=document.querySelector('.theme-picker select');"
         "if(s)s.value=t;}}catch(e){}})();</script>"
     )
