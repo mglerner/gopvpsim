@@ -67,6 +67,79 @@ var tierVars = __TIER_VARS_JS__;
 var tierNames = __TIER_NAMES_JS__;
 var nIvs = DATA.nIvs, nS = DATA.nScenarios, nO = DATA.nOpponents;
 
+// ---- Theme-aware Plotly chrome (the getComputedStyle shim) ----
+//
+// Plotly draws into its own SVG/WebGL canvas and cannot resolve CSS custom
+// properties, so every color handed to it has to be a literal. Before this
+// shim the three canvases (main scatter, rating histogram, cluster panels)
+// carried a hardcoded dark-navy palette -- #1a1a2e paper / #16213e plot /
+// #e0e0e0 font -- that belongs to no theme in theme.py. On a light-default
+// site that is three permanently dark charts, and it is a
+// palette_governance.md section-1 violation (literal palette hex outside
+// _TOKENS).
+//
+// The fix is the shim palette_governance.md section 8 specifies: resolve the
+// tokens at chart-build time off the ACTIVE [data-theme] block. THEME_FALLBACK
+// is the DEFAULT_THEME resolution injected from the same theme.py _TOKENS
+// values (deep_dive._THEME_FALLBACK_HEX), used only when getComputedStyle
+// yields nothing -- so no code path can paint a color that is not a theme.py
+// value. Resolutions are memoized; the observer at the bottom of this file
+// drops the memo and re-renders whenever data-theme changes.
+var THEME_FALLBACK = __THEME_FALLBACK_JS__;
+var _themeVarCache = {};
+function themeColor(name) {
+  if (Object.prototype.hasOwnProperty.call(_themeVarCache, name)) {
+    return _themeVarCache[name];
+  }
+  var v = '';
+  try {
+    v = getComputedStyle(document.documentElement)
+          .getPropertyValue(name).trim();
+  } catch (e) { v = ''; }
+  if (!v) v = THEME_FALLBACK[name] || '';
+  _themeVarCache[name] = v;
+  return v;
+}
+// Resolve a 'var(--token)' string to the active theme's literal. Anything that
+// is not a bare var() reference (a '#hex', an 'rgba(...)') passes through, so
+// this is safe to wrap around any color the Python side may have baked.
+var _CSS_VAR_RE = /^var\(\s*(--[A-Za-z0-9-]+)\s*\)$/;
+function resolveThemeColor(c, fallback) {
+  var m = (typeof c === 'string') ? c.match(_CSS_VAR_RE) : null;
+  if (!m) return c;
+  return themeColor(m[1]) || fallback;
+}
+// Tier marker color for tier index ti. tierVars[ti] is the raw 'var(--tier-N)'
+// the badge uses, so resolving it here makes badge == card == marker in EVERY
+// theme (before the shim, markers were pinned to the DEFAULT_THEME column).
+// tierColors[ti] stays the fallback.
+function tierColor(ti) { return resolveThemeColor(tierVars[ti], tierColors[ti]); }
+// One chrome spec for all three canvases. Roles, not raw tokens, so a canvas
+// asks for "the recessive neutral" rather than picking a token itself.
+//
+//   paper transparent  -- the chart's margin area inherits whatever card holds
+//                         it (page --bg for #plot, --surface for the cluster
+//                         panels inside .dd-section); one spec, three correct
+//                         backgrounds, in all four themes.
+//   plot   --surface-2 -- a plotting rectangle that reads as slightly distinct
+//                         from its container in both light and dark themes.
+function plotChrome() {
+  return {
+    paper: 'rgba(0,0,0,0)',
+    plot: themeColor('--surface-2'),
+    font: themeColor('--text'),
+    grid: themeColor('--border-2'),
+    legendBg: themeColor('--surface'),
+    legendBorder: themeColor('--border-2'),
+    hoverBg: themeColor('--surface-2'),
+    hoverBorder: themeColor('--text-muted'),
+    rule: themeColor('--text-muted'),      // reference lines (tie centerline)
+    ink: themeColor('--text'),             // high-contrast neutral marks
+    inkFaint: themeColor('--text-muted'),  // recessive neutral marks
+    ring: themeColor('--surface-2'),       // surface separation ring on marks
+  };
+}
+
 // Column-header tooltip strings for the three mirror-adjacent metrics.
 // Declared once so the Top IVs table (_summaryColumns) and the Slayer IVs
 // "of yours" table (renderSection extras) share a single source of truth.
@@ -1993,8 +2066,12 @@ function _buildHighlightTrace() {
     x: hx, y: hy, text: ht,
     mode: 'markers', type: 'scattergl', hoverinfo: 'text',
     marker: {
+      // #e94560 is a categorical identity hue (shared with the Spec Card
+      // Spreads overlay below) and clears 3:1 on every themed plot fill, so
+      // it rides through unchanged; the RING is what needed theming -- a
+      // white ring vanishes on a light fill.
       size: 14, color: '#e94560', symbol: 'diamond',
-      opacity: 1.0, line: { width: 2, color: '#ffffff' }
+      opacity: 1.0, line: { width: 2, color: themeColor('--text') }
     },
     hoverlabel: { bordercolor: '#e94560' }
   };
@@ -2068,7 +2145,7 @@ function buildTraces() {
         name:'Other', x:otherX, y:otherY, text:otherText,
         mode:'markers', type:'scattergl', hoverinfo:'text',
         marker:{size:2, color:otherColor, colorscale:'Viridis', opacity:0.4},
-        hoverlabel:{bordercolor:'#888'}
+        hoverlabel:{bordercolor:themeColor('--text-muted')}
       });
     }
     // Tier traces are collected separately and appended AFTER the
@@ -2122,10 +2199,13 @@ function buildTraces() {
           name:wrapLegendName(tierNames[ti]),
           x:tx, y:ty, text:tt,
           mode:'markers', type:'scattergl', hoverinfo:'text',
-          marker:{size:_markerSize, color:tierColors[ti],
+          // The 1px ring is a SEPARATION ring (keeps adjacent tier dots from
+          // fusing), so it wears the plot fill, not a fixed black that only
+          // separates against a dark canvas.
+          marker:{size:_markerSize, color:tierColor(ti),
                    opacity:_markerOpacity,
-                   line:{width:1, color:'#000'}},
-          hoverlabel:{bordercolor:tierColors[ti]}
+                   line:{width:1, color:themeColor('--surface-2')}},
+          hoverlabel:{bordercolor:tierColor(ti)}
         });
       }
     }
@@ -2195,8 +2275,8 @@ function buildTraces() {
           : 'Matchup clusters: no robust cluster structure on this dive (see Dive Analysis)'),
         x: ncx, y: ncy, text: nct,
         mode: 'markers', type: 'scattergl', hoverinfo: 'text',
-        marker: {size: 2.5, color: '#8899aa', opacity: 0.45},
-        hoverlabel: {bordercolor: '#888'}
+        marker: {size: 2.5, color: themeColor('--text-muted'), opacity: 0.45},
+        hoverlabel: {bordercolor: themeColor('--text-muted')}
       });
     }
   } else {
@@ -2214,7 +2294,12 @@ function buildTraces() {
       else if (cm === 'atk') { ac.push(DATA.ivAtk[iv]); cLabel = 'Attack'; }
       else { ac.push(yValues[iv]); }
     }
-    // Use a colorscale that's bright against dark background
+    // Sequential/diverging magnitude ramps (Plotly built-ins). These are NOT
+    // theme-stepped: each ramp has one end that washes out against one of the
+    // themed plot fills (YlOrRd's pale end on a light fill, Blues' dark end on
+    // a dark fill). Authoring per-theme ramps needs new theme.py tokens --
+    // deferred with the rest of the categorical-identity slice; see the
+    // "Deferred, not themed" note above plotChrome's call sites.
     var cscale = (cm === 'hp') ? 'YlOrRd' : (cm === 'def') ? 'Blues' : (cm === 'atk') ? 'RdYlGn' : 'Viridis';
     traces.push({
       name:wrapLegendName('All IVs (colored by '+cLabel+')'), x:ax, y:ay, text:at,
@@ -2222,7 +2307,7 @@ function buildTraces() {
       marker:{size:3.5, color:ac, colorscale:cscale, opacity:0.6,
                colorbar:{title:cLabel, len:0.6},
                reversescale: (cm === 'atk')},
-      hoverlabel:{bordercolor:'#888'}
+      hoverlabel:{bordercolor:themeColor('--text-muted')}
     });
   }
 
@@ -2294,16 +2379,19 @@ function buildTraces() {
   // trace." In threshold mode, tier color if tiered or per-point Viridis
   // matched against the Other trace's range if untiered. In stat/score
   // modes, a fixed gold fill so the overlay stays distinct from the
-  // colorscale gradient.
+  // colorscale gradient -- that gold is --notable, whose theme.py comment
+  // names this exact role ("slayer-overlay gold"). No tier markers are on
+  // screen in stat/score modes, so sharing a hue family with --tier-8 gold
+  // cannot collide here.
   function overlayFill(iv) {
     if (cm === 'threshold' && hasTiers) {
       var t = DATA.ivTiers[iv];
-      if (t >= 0) return tierColors[t];
+      if (t >= 0) return tierColor(t);
       var range = otherMax - otherMin;
       var t01 = (range > 0) ? (yValues[iv] - otherMin) / range : 0.5;
       return viridisColor(t01);
     }
-    return '#FFD700';
+    return themeColor('--notable');
   }
 
   function overlaySymbol(iv) {
@@ -2402,8 +2490,22 @@ function buildTraces() {
   // and with full-size/full-opacity markers they visually dominate
   // the plot; subdued styling keeps them visible as context without
   // overwhelming the rarer slayer + recommended sets.
+  //
+  // Overlay identity hues. Two of the four are theme tokens whose theme.py
+  // comment names this exact role; the other two are literal hex that clears
+  // 3:1 on EVERY themed plot fill (measured: #a020f0 3.09 dark / 4.82 light,
+  // #e94560 4.28 dark / 3.48 light), so they survive the themed canvas
+  // unchanged and re-valuing them would need new theme.py tokens.
+  //
+  // Deferred, not themed (needs new _TOKENS entries -- out of this change's
+  // file set): #a020f0, #e94560, the cluster "Yours" gold, and the built-in
+  // magnitude colorscales. Each is called out at its site.
   var anchorOutline = (state.anchorDisplayMode === 'outline');
-  var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs, '#00ffff', true, anchorOutline);
+  // In outline mode this hue IS the only ink on the marker, so a fixed cyan
+  // (1.14:1 on a light fill) would erase the whole anchor envelope. --cat-anchors
+  // is the anchors-category hue the dive's own slayer cards already use.
+  var anchorTrace = buildOverlayTrace('Anchor IVs', DATA.anchorClearIvs,
+                                      themeColor('--cat-anchors'), true, anchorOutline);
   if (anchorTrace) traces.push(anchorTrace);
   // Efficient (Pareto) overlay: the globally Pareto-optimal IV spreads
   // ("efficient" - no other spread for this species/league
@@ -2413,7 +2515,8 @@ function buildTraces() {
   var effTrace = buildOverlayTrace('Efficient (Pareto)', effIvs, '#a020f0', true, false, false, 'cross',
     '<br>Efficient IV: no other spread beats it on all of atk/def/hp.');
   if (effTrace) traces.push(effTrace);
-  var slayerTrace = buildOverlayTrace('Slayer IVs', DATA.slayerIvs, '#FFD700');
+  var slayerTrace = buildOverlayTrace('Slayer IVs', DATA.slayerIvs,
+                                      themeColor('--notable'));
   if (slayerTrace) traces.push(slayerTrace);
   // Spec Card Spreads draws last (after tier traces, below) would be
   // ideal, but tier traces must own the top z-order for hover. Pushing
@@ -2553,11 +2656,14 @@ function buildTraces() {
       traces.push({
         name: 'Yours - other', x: ownX, y: ownY, text: ownText,
         mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+        // circle-open: the color IS the ring, so this is a NEUTRAL, not an
+        // identity hue. --text-muted keeps it recessive-but-present in both
+        // directions; the old #cccccc was 1.46:1 on a light plot fill.
         marker: {
-          size: 6, color: '#cccccc', symbol: 'circle-open',
-          opacity: 0.7, line: { width: 1, color: '#cccccc' }
+          size: 6, color: themeColor('--text-muted'), symbol: 'circle-open',
+          opacity: 0.7, line: { width: 1, color: themeColor('--text-muted') }
         },
-        hoverlabel: { bordercolor: '#cccccc' }
+        hoverlabel: { bordercolor: themeColor('--text-muted') }
       });
     }
     if (qualX.length > 0) {
@@ -2567,11 +2673,14 @@ function buildTraces() {
       traces.push({
         name: 'Yours - notable', x: qualX, y: qualY, text: qualText,
         mode: 'markers', type: 'scattergl', hoverinfo: 'text',
+        // Same neutral-ring reasoning as "Yours - other", one step louder:
+        // --text is the page's highest-contrast ink in every theme (#ffffff
+        // was 1.00:1 against the pokemon-light plot fill -- literally erased).
         marker: {
-          size: 9, color: '#ffffff', symbol: 'circle-open',
-          opacity: 1.0, line: { width: 1.5, color: '#ffffff' }
+          size: 9, color: themeColor('--text'), symbol: 'circle-open',
+          opacity: 1.0, line: { width: 1.5, color: themeColor('--text') }
         },
-        hoverlabel: { bordercolor: '#ffffff' }
+        hoverlabel: { bordercolor: themeColor('--text') }
       });
     }
     // Dev log: one line per render so if the overlay stays invisible
@@ -3193,22 +3302,28 @@ function updateView() {
   var shapes = [];
   var annotations = [];
 
+  var chrome = plotChrome();
   var layout = {
     title: DATA.movesets[state.movesetIdx].prettyLabel,
     // fixedrange:false enables Plotly's native drag-to-zoom and
     // double-click-to-reset on both axes. Useful for drilling into
     // dense clusters without click-to-pin from the matches list.
-    xaxis: {title:'Stat Product Rank (1=best)', range:[xMax+xPad, xMin-xPad]},
-    yaxis: {title:currentYLabel, range:[yMin-yPad, yMax+yPad]},
-    paper_bgcolor:'#1a1a2e', plot_bgcolor:'#16213e',
-    font:{color:'#e0e0e0'}, hovermode:'closest',
+    // gridcolor/zerolinecolor are set explicitly: Plotly's defaults are
+    // tuned for a white paper and disappear against a themed plot fill.
+    xaxis: {title:'Stat Product Rank (1=best)', range:[xMax+xPad, xMin-xPad],
+            gridcolor: chrome.grid, zerolinecolor: chrome.grid},
+    yaxis: {title:currentYLabel, range:[yMin-yPad, yMax+yPad],
+            gridcolor: chrome.grid, zerolinecolor: chrome.grid},
+    paper_bgcolor: chrome.paper, plot_bgcolor: chrome.plot,
+    font:{color: chrome.font}, hovermode:'closest',
     // Legend pinned explicitly OUTSIDE the plot area so it never
     // covers top-right hover tooltips (the rank-1 points on the
     // inverted x-axis are in the corner that Plotly's default
     // top-right legend position sits on, and tooltips there were
-    // rendering under the legend box).
+    // rendering under the legend box). It sits over transparent paper,
+    // so it needs an opaque themed fill of its own.
     legend: {
-      bgcolor:'rgba(22,33,62,0.8)', bordercolor:'#0f3460', borderwidth:1,
+      bgcolor: chrome.legendBg, bordercolor: chrome.legendBorder, borderwidth:1,
       x: 1.02, xanchor: 'left', y: 1, yanchor: 'top',
     },
     // Explicit hoverlabel so tooltip sizing and font are deterministic
@@ -3217,12 +3332,12 @@ function updateView() {
     // traces, but the BORDER color is set per-trace (via
     // trace.hoverlabel.bordercolor) so each trace's tooltip picks up
     // a color matching its marker — tier color for tier traces,
-    // gold for slayer, cyan for anchor, gray for Other, white for
+    // gold for slayer, anchor hue for anchor, muted for Other, ink for
     // user overlay. The layout-level bordercolor here is just a
     // fallback for traces that forget to set one.
     hoverlabel: {
-      bgcolor: '#2a2a4a', bordercolor: '#888',
-      font: { size: 11, color: '#e0e0e0', family: 'monospace' },
+      bgcolor: chrome.hoverBg, bordercolor: chrome.hoverBorder,
+      font: { size: 11, color: chrome.font, family: 'monospace' },
       namelength: -1, align: 'left',
     },
     margin: { r: 180 },  // reserve room for the outside legend
@@ -3364,20 +3479,21 @@ function updateHistograms() {
       marker: {color: colors, line: {width: 0}},
       width: new Array(HISTO_N_BINS).fill(HISTO_BIN_SIZE * 0.92),
     };
+    var hChrome = plotChrome();
     var layout = {
       xaxis: {title: 'Battle Rating (Avg: ' + avg + ')',
               range: [0, 1000], tickvals: [0, 250, 500, 750, 1000],
               fixedrange: true, showgrid: false, zeroline: false},
       yaxis: {title: 'Matches', rangemode: 'tozero',
               fixedrange: true, showgrid: false, zeroline: false},
-      paper_bgcolor: '#1a1a2e', plot_bgcolor: '#16213e',
-      font: {color: '#e0e0e0', size: 11},
+      paper_bgcolor: hChrome.paper, plot_bgcolor: hChrome.plot,
+      font: {color: hChrome.font, size: 11},
       margin: {t: 10, b: 48, l: 56, r: 16},
       bargap: 0.04,
       shapes: [{
         type: 'line', x0: winRating(), x1: winRating(),  // tie centerline
         yref: 'paper', y0: 0, y1: 1,
-        line: {color: '#e0e0e0', width: 1, dash: 'dash'},
+        line: {color: hChrome.rule, width: 1, dash: 'dash'},
       }],
     };
     Plotly.react(plotDiv, [trace], layout,
@@ -3810,6 +3926,7 @@ function _mcRenderRoot(root) {
   var axes = {atk: DATA.ivAtk, def: DATA.ivDef, hp: DATA.ivHp};
   var titles = {atk: 'Attack', def: 'Defense', hp: 'HP'};
   var n = sc.labels.length;
+  var mcChrome = plotChrome();
   panels.forEach(function(p) {
     var proj = (p.getAttribute('data-proj') || 'atk,def').split(',');
     var xs = axes[proj[0]], ys = axes[proj[1]];
@@ -3865,17 +3982,22 @@ function _mcRenderRoot(root) {
         }
         var ynudge = (ymax - ymin) * 0.0005 || 0.001;
         for (var oyi = 0; oyi < oy.length; oyi++) oy[oyi] += ynudge;
+        // Gold fill + an --text ring: the ring, not the fill, is what makes
+        // the star locatable, so it stays visible on a light plot fill where
+        // gold alone is ~1.3:1. The fill keeps the star distinguishable from
+        // CLUSTER_PALETTE's own gold; symbol + legend carry identity anyway.
         traces.push(_mcTrace('Yours (' + ox.length + ')',
                              {size: 11, symbol: 'star', color: '#ffd700',
-                              opacity: 1, line: {width: 1.5, color: '#000'}},
+                              opacity: 1,
+                              line: {width: 1.5, color: mcChrome.ink}},
                              ox, oy, otxt));
       }
     }
     var layout = {
       xaxis: {title: titles[proj[0]], showgrid: false, zeroline: false},
       yaxis: {title: titles[proj[1]], showgrid: false, zeroline: false},
-      paper_bgcolor: '#1a1a2e', plot_bgcolor: '#16213e',
-      font: {color: '#e0e0e0', size: 11},
+      paper_bgcolor: mcChrome.paper, plot_bgcolor: mcChrome.plot,
+      font: {color: mcChrome.font, size: 11},
       margin: {t: 8, b: 40, l: 48, r: 8},
       showlegend: true,
       legend: {orientation: 'h', y: -0.25},
@@ -3932,3 +4054,24 @@ document.addEventListener('toggle', function(ev) {
 document.querySelectorAll('.dd-mc-root:not([data-mc-rendered])').forEach(function(root) {
   if (root.offsetParent !== null) _mcRenderRoot(root);
 });
+
+// ---- Re-theme the canvases when the theme picker flips data-theme ----
+//
+// theme.py's picker sets data-theme on <html>. CSS re-themes instantly, but
+// Plotly is holding literals resolved at its last build, so the charts would
+// keep the OLD theme's chrome until some other interaction happened to
+// re-render them. Drop the memo and re-run the render entry points:
+// updateView() redraws the scatter and calls updateHistograms() itself;
+// mcRefreshAll() redraws the cluster panels.
+//
+// Guarded on MutationObserver and wrapped per call so a page that renders no
+// scatter (or an environment without the API) simply keeps its initial
+// resolution instead of throwing during a theme switch.
+if (typeof MutationObserver !== 'undefined' && document.documentElement) {
+  new MutationObserver(function() {
+    _themeVarCache = {};
+    try { updateView(); } catch (e) {}
+    try { mcRefreshAll(); } catch (e) {}
+  }).observe(document.documentElement,
+             {attributes: true, attributeFilter: ['data-theme']});
+}
