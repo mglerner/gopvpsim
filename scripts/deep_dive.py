@@ -55,7 +55,8 @@ from dataclasses import dataclass, field
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from gopvpsim.pokemon import (
-    Pokemon, get_pokemon_entry, get_species, iv_rank, CPM, best_level,
+    Pokemon, find_pokemon_entry, get_pokemon_entry, get_species, iv_rank,
+    CPM, best_level,
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL, MAX_CPM_LEVEL, bestbuddy_caps,
     cp as calc_cp, pvpoke_default_ivs,
 )
@@ -546,14 +547,14 @@ def _species_has_form_change(species_name):
     toggle/set species pool-named by a key-lacking form."""
     if species_name in _FORM_CHANGE_SPECIES_CACHE:
         return _FORM_CHANGE_SPECIES_CACHE[species_name]
-    gm = load_gamemaster()
-    mon = next((m for m in gm['pokemon']
-                if m['speciesName'] == species_name), None)
+    mon = find_pokemon_entry(species_name)
     has = bool(mon and mon.get('formChange'))
     if mon and not has:
         sid = mon['speciesId']
+        # The REVERSE direction (which entry points AT sid) is not a
+        # speciesName lookup, so it stays a scan over gm['pokemon'].
         has = any((m.get('formChange') or {}).get('alternativeFormId') == sid
-                  for m in gm['pokemon'])
+                  for m in load_gamemaster()['pokemon'])
     _FORM_CHANGE_SPECIES_CACHE[species_name] = has
     return has
 
@@ -650,11 +651,10 @@ def _opp_robustness_groups(focal_bp, focal_species, focal_fast, focal_charged,
     import deep_dive_signature as _sig
     league_cp = LEAGUE_CAPS[league]
     fast_db, charged_db = get_moves()
-    gm = load_gamemaster()
-    opp_mon = next((m for m in gm['pokemon']
-                    if m['speciesName'] == opponent), None)
-    focal_mon = next((m for m in gm['pokemon']
-                      if m['speciesName'] == focal_species), None)
+    # None-on-miss on purpose: a species absent from the gamemaster falls
+    # back to the no-dedup grouping below instead of raising.
+    opp_mon = find_pokemon_entry(opponent)
+    focal_mon = find_pokemon_entry(focal_species)
     if opp_mon is None or focal_mon is None:
         return [[i] for i in range(n)]
     profile_list = [(None, r['atk'], r['def_'], r['hp'],
@@ -1909,12 +1909,12 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             'leagueLabel':     _league_label,
             'leagueCap':       LEAGUE_CAPS[league],
             # Single-source the scanner's level ceiling from the canonical
-            # table (great/ultra=50.0, master/little=51.0) -- matches the
-            # focal grid (line ~1594) and the baked rank table (line ~4562).
-            # A bare 51.0 here showed GL/UL owned mons one level too high in
-            # the IV scanner (best-buddy override only uses this as a fallback,
-            # so that path is unaffected).
-            'maxLevel':        LEAGUE_MAX_LEVEL.get(league, 51.0),
+            # per-league table -- gopvpsim.pokemon.LEAGUES is the one place
+            # the numbers live (LEAGUE_MAX_LEVEL is its derived view), so
+            # don't restate them here. A bare 51.0 showed GL/UL owned mons
+            # one level too high in the IV scanner (best-buddy override only
+            # uses this as a fallback, so that path is unaffected).
+            'maxLevel':        LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL),
             'shadowAtkBonus':  _SAB,
             'shadowDefMult':   _SDM,
             # CPM table: keys are stringified floats so json.dumps emits
@@ -2761,9 +2761,7 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         card_section = ''
         if cctx is not None:
             try:
-                _gm = load_gamemaster()
-                _mon = next((m for m in _gm['pokemon']
-                             if m['speciesName'] == species), None)
+                _mon = find_pokemon_entry(species)
                 _types = parse_types(_mon) if _mon else []
                 _sprite = sprite_data_uri(species, shadow=shadow)
             except Exception as _e:  # noqa: BLE001
@@ -4537,10 +4535,10 @@ def main():
                 resolved = []
                 if survivors:
                     try:
-                        focal_entry_for_anchors = next(
-                            m for m in load_gamemaster()['pokemon']
-                            if m['speciesName'] == args.species
-                        )
+                        # Raises on miss exactly like the bare next() this
+                        # replaced; the enclosing except turns either into
+                        # the "anchor resolution failed" warning.
+                        focal_entry_for_anchors = get_pokemon_entry(args.species)
                         focal_types_for_anchors = parse_types(focal_entry_for_anchors)
                         fm_dict = fast_moves_db.get(fast_id) or {}
                         cm_dicts = [charged_moves_db[c] for c in charged_ids
