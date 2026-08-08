@@ -1427,6 +1427,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         # non-best-buddy / best-buddy caps.
         'levelCaps': dict(zip(('default', 'alt'), bestbuddy_caps(league)),
                           maxCpm=MAX_CPM_LEVEL),
+        # Win/tie boundary, from gopvpsim.battle.WIN_RATING. A rating of
+        # EXACTLY this value is a TIE, not a win, so every page-side win test
+        # is strictly `>`. The page reads it through winRating()/isWin() in
+        # cmp_panels.js; that file's WIN_RATING_FALLBACK literal covers hosts
+        # whose blob predates this field, and tests/test_win_boundary.py pins
+        # the two together.
+        'winRating': WIN_RATING,
         'opponents': opponent_names,
         # Parallel-aligned display strings: same order as `opponents`,
         # each name rewritten via `pretty_species` so shadow/regional
