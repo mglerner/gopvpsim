@@ -25,11 +25,39 @@
 // ============================================================
 var CMP_MARGIN_MIN = 0.15;  // leftover-HP spread (max-min) to count as a swing
 
+// ---- Win/tie boundary ----
+// Single source: gopvpsim.battle.WIN_RATING, baked into DATA.winRating by the
+// dive bake. A rating of EXACTLY the boundary is a TIE, not a win (PvPoke
+// semantics), so every win test is strictly `>`; this trio exists so no page
+// site re-types the operator (the boundary drifted three times when it was
+// open-coded, most recently in the JS half). Defined HERE rather than in
+// deep_dive_engine.js because cmp_panels.js is the one JS file every consumer
+// page loads, and it always loads first.
+//
+// The literal is the deliberate fallback for a host whose blob predates the
+// field -- the ML IV-guide (render_iv_envelope_article.py) builds a minimal
+// window.DATA and carries none -- and is pinned to the Python constant by
+// tests/test_win_boundary.py, the same pattern as LEVEL_CAP_FALLBACK. The
+// `typeof` guard is load-bearing on that host too: it injects this file BEFORE
+// its setup script defines DATA, so a top-level read would throw.
+var WIN_RATING_FALLBACK = 500;
+function winRating() {
+  return (typeof DATA !== 'undefined' && DATA && DATA.winRating != null)
+    ? DATA.winRating : WIN_RATING_FALLBACK;
+}
+function isWin(score)  { return score > winRating(); }
+function isLoss(score) { return score < winRating(); }
+function isTie(score)  { return score === winRating(); }
+
 function cmpVal(grid, iv, si, oi) {
   return grid[iv * DATA.nScenarios * DATA.nOpponents + si * DATA.nOpponents + oi];
 }
-// leftover-HP% proxy: exact for a clean KO win (score-500)/500; |.| for losses.
-function cmpHp(score) { return Math.max(-1, Math.min(1, (score - 500) / 500)); }
+// leftover-HP% proxy: exact for a clean KO win (score-WR)/WR; |.| for losses.
+// Both terms are the win boundary: the rating range is [0, 2*WR] centered on it.
+function cmpHp(score) {
+  var wr = winRating();
+  return Math.max(-1, Math.min(1, (score - wr) / wr));
+}
 // Shield-scenario label. Hosts that BAKE the label (the deep dive emits
 // DATA.scenarioLabels from deep_dive_rendering.scenario_label, '1v1' form) get
 // their own wording; the ML IV-guide host bakes none, so it keeps the '1-1'
@@ -65,11 +93,11 @@ function cmpCellLink(oi, si, build, inner, quad) {
 }
 
 // leftover-HP bar for one score: wins fill green from the left, losses fill red
-// from the right (mirror across the 500 centerline). Metric is clamped to
-// +-100% by cmpHp so the bar never overflows.
+// from the right (mirror across the win-boundary centerline). Metric is clamped
+// to +-100% by cmpHp so the bar never overflows.
 function cmpBarHtml(score) {
   var hp = cmpHp(score), pct = Math.round(Math.abs(hp) * 100);
-  var win = score > 500, tie = score === 500, lo = win && Math.abs(hp) < 0.2;
+  var win = isWin(score), tie = isTie(score), lo = win && Math.abs(hp) < 0.2;
   var cls = 'cmp-bar' + (win ? (lo ? ' lo' : '') : (tie ? '' : ' loss'));
   // A nonzero margin that rounds to 0 shows "<1" so a thin win never reads as
   // dead/zero; an exact tie shows a bare "0% HP". The " HP" disambiguates it
@@ -84,17 +112,17 @@ function cmpBarHtml(score) {
 // faded best-buddy flip mark, the HP bar, and (on wins) the leftover-energy
 // breakdown; wrapped in its pvpoke battle link when the host provides one.
 function cmpCellHtml(oi, si, build, caseKey, score, altScore, altIsBuddy, altCap, en, em, showMark, cc) {
-  var win = score > 500, tie = score === 500;
+  var win = isWin(score), tie = isTie(score);
   var txt = '<span class="' + (win ? 'cmp-win' : tie ? 'cmp-tie' : 'cmp-lose')
     + '">' + (win ? 'win ' : tie ? 'tie ' : 'loss ') + score + '</span>';
   if (cc)   // close-call badge (shield spent / near-death / energy banked)
     txt += ' <span class="cc-tag cc-' + cc.kind + '" title="' + cmpEsc(cc.margin) + '">'
       + cmpEsc(cc.label || cc.kind) + '</span>';
-  if (showMark && altScore != null && (score > 500) !== (altScore > 500)) {
+  if (showMark && altScore != null && isWin(score) !== isWin(altScore)) {
     // Toggling best-buddy crosses the win line: show the alt-level outcome with
     // its score, faded (cmp-altmark) as the secondary result. Direction-aware:
     // altIsBuddy true means the alt grid is the powered-UP (best-buddy) level.
-    var aw = altScore > 500, at = altScore === 500;
+    var aw = isWin(altScore), at = isTie(altScore);
     var albl = aw ? 'win ' : at ? 'tie ' : 'loss ';
     var ds = altIsBuddy ? 'on' : 'off';
     var dw = (altIsBuddy ? 'turn best-buddy ON' : 'turn best-buddy OFF') + ' (to L' + altCap + ')';
@@ -130,7 +158,7 @@ function cmpUnifiedTable(live, cases, opts) {
   var nO = DATA.nOpponents, nS = DATA.nScenarios;
   var selSet = (typeof selectedOppSet === 'function') ? selectedOppSet() : null;
   var rows = [], hiddenBB = 0;   // hiddenBB: rows that expanding best-buddy would reveal
-  function sgn(v) { return v > 500 ? 'W' : v < 500 ? 'L' : 'T'; }
+  function sgn(v) { return isWin(v) ? 'W' : isLoss(v) ? 'L' : 'T'; }
   cases.forEach(function(cs) {
     var grid = cs.def; if (!grid) return;
     var altGrid = cs.alt || null, altCap = cs.altCap, altIsBuddy = !!cs.altIsBuddy;
@@ -142,7 +170,7 @@ function cmpUnifiedTable(live, cases, opts) {
         var altScores = altGrid ? live.map(function(r) { return cmpVal(altGrid, r.iv, si, oi); }) : null;
         var alts = showBB ? altScores : null;   // only USE the alt for tiering/marking when expanded
         var hasW = false, hasL = false;
-        scores.forEach(function(v) { if (v > 500) hasW = true; else if (v < 500) hasL = true; });
+        scores.forEach(function(v) { if (isWin(v)) hasW = true; else if (isLoss(v)) hasL = true; });
         // Per-spread signature: primary outcome, plus the best-buddy-toggled
         // outcome when expanded. The row is an IV decision (a flip) only when
         // these signatures DIFFER across spreads -- an all-same row (incl. all

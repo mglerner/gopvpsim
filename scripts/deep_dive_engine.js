@@ -457,7 +457,7 @@ function computeYValues(mi) {
         var baseW = ivW * nS * nO + siW * nO;
         for (var oiW = 0; oiW < nO; oiW++) {
           if (selSet && !selSet[oiW]) continue;  // opponent filtered out
-          if (scores[baseW + oiW] > 500) c++;  // >500=win; 500=tie (PvPoke)
+          if (isWin(scores[baseW + oiW])) c++;  // exactly 500 is a tie (PvPoke)
         }
       }
       winCounts[ivW] = c;
@@ -779,7 +779,7 @@ function appendMatchupDiff(lines, mi1, iv1, mi2, iv2) {
       if (selSetMD && !selSetMD[oi]) continue;  // opponent filtered out
       var sc1 = s1[iv1*nS*nO + si*nO + oi];
       var sc2 = s2[iv2*nS*nO + si*nO + oi];
-      var w1 = sc1 > 500, w2 = sc2 > 500;  // >500=win; 500=tie (PvPoke)
+      var w1 = isWin(sc1), w2 = isWin(sc2);  // exactly 500 is a tie (PvPoke)
       if (w1 && !w2) gained.push(shortName(DATA.opponents[oi]));
       else if (!w1 && w2) lost.push(shortName(DATA.opponents[oi]));
     }
@@ -1443,8 +1443,8 @@ function renderMatchesList() {
       var lab = scenLabel(si);
       for (var oi = 0; oi < nO; oi++) {
         if (selSetGU && !selSetGU[oi]) continue;  // opponent filtered out
-        var refW = _guScores[_guRefIv * nS * nO + si * nO + oi] > 500;  // 500=tie (PvPoke)
-        var myW = _guScores[iv * nS * nO + si * nO + oi] > 500;
+        var refW = isWin(_guScores[_guRefIv * nS * nO + si * nO + oi]);  // 500=tie
+        var myW = isWin(_guScores[iv * nS * nO + si * nO + oi]);
         if (refW && !myW) lost.push(shortName(DATA.opponents[oi]) + ' ' + lab);
       }
     }
@@ -2778,7 +2778,7 @@ function _computeMatchupsKept(iv) {
     if (selSet && !selSet[oi]) continue;  // opponent filtered out
     var sceneWins = 0;
     for (var k = 0; k < nSel; k++) {
-      if (scores[iv * nS * nO + sis[k] * nO + oi] > 500) sceneWins++;  // 500=tie (PvPoke)
+      if (isWin(scores[iv * nS * nO + sis[k] * nO + oi])) sceneWins++;  // 500=tie
     }
     credit += sceneWins / nSel;
   }
@@ -3343,8 +3343,8 @@ function updateHistograms() {
       counts[bi]++;
       nMatches++;
       sum += v;
-      if (v > 500) wins++;
-      else if (v < 500) losses++;
+      if (isWin(v)) wins++;
+      else if (isLoss(v)) losses++;
       else draws++;
     }
     var x = [], colors = [], hov = [];
@@ -3375,7 +3375,7 @@ function updateHistograms() {
       margin: {t: 10, b: 48, l: 56, r: 16},
       bargap: 0.04,
       shapes: [{
-        type: 'line', x0: 500, x1: 500,
+        type: 'line', x0: winRating(), x1: winRating(),  // tie centerline
         yref: 'paper', y0: 0, y1: 1,
         line: {color: '#e0e0e0', width: 1, dash: 'dash'},
       }],
@@ -3550,7 +3550,7 @@ function cmpSummary(iv) {
   var wins = 0, tot = 0;
   for (var si = 0; si < nS; si++) for (var oi = 0; oi < nO; oi++) {
     if (selSet && !selSet[oi]) continue;  // opponent filtered out
-    var v = cmpVal(g, iv, si, oi); tot += v; if (v > 500) wins++;
+    var v = cmpVal(g, iv, si, oi); tot += v; if (isWin(v)) wins++;
   }
   return { wins: wins, n: nS * oppDen, avg: tot / (nS * oppDen) };
 }

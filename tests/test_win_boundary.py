@@ -20,11 +20,15 @@ the one documented, allow-listed ``>=`` -- a float mean where exact-500 is
 measure-zero, a deliberately different "wins on average" semantic.)
 """
 import importlib.util
+import json
 import re
+import shutil
+import subprocess
 import tokenize
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from gopvpsim.battle import is_win, WIN_RATING
 
@@ -94,15 +98,35 @@ def test_no_ge_against_win_boundary_variable_in_scripts():
 # ---------------------------------------------------------------------------
 # The Python half above cannot see the JS half of the engine, which is where
 # the boundary last regressed (session-3 shipped ``>= 500`` in
-# deep_dive_engine.js). The shipped JS open-codes the boundary at ~13 sites --
-# the constant is NOT injected from Python today -- so the cheap guard is a
-# literal scan for the wrong operator. Comments and strings are stripped by a
-# real JS scanner (below), not by regex over raw text: several legitimate
-# comments discuss ">= 500" in prose, and several regex literals contain quote
-# characters that a naive stripper would swallow.
+# deep_dive_engine.js). The JS used to open-code the boundary at ~13 sites with
+# no constant injected from Python; it now reads ``DATA.winRating`` (baked by
+# deep_dive.py from ``battle.WIN_RATING``) through the
+# ``winRating``/``isWin``/``isLoss``/``isTie`` helpers in cmp_panels.js, so
+# BOTH guards below apply: no ``>=`` against the boundary, and no bare ``500``
+# comparison outside the one fallback declaration.
+#
+# Comments and strings are stripped by a real JS scanner (below), not by regex
+# over raw text: several legitimate comments discuss ">= 500" in prose, several
+# display strings spell the number for the reader, and several regex literals
+# contain quote characters that a naive stripper would swallow.
 # ---------------------------------------------------------------------------
 
 _JS_GE_RE = re.compile(r'>=\s*(?:500(?![0-9.])|WIN_RATING\b)')
+
+# Any comparison operator adjacent to a bare 500 -- ``> 500``, ``500 <``,
+# ``=== 500``, ``!== 500``. The lookarounds keep 1500 / 500.5 / [0, 250, 500]
+# out. Only the fallback DECLARATION may name the literal (allow-list below);
+# every comparison must go through the helpers.
+_JS_OP = r'(?:[<>]=?|[!=]==?)'
+_JS_500_CMP_RE = re.compile(
+    r'%s\s*(?<![0-9.])500(?![0-9.])|(?<![0-9.])500(?![0-9.])\s*%s'
+    % (_JS_OP, _JS_OP))
+
+# The single site allowed to name the literal: cmp_panels.js's
+# ``var WIN_RATING_FALLBACK = 500;`` (a plain assignment, so it does not even
+# match the regex above -- the allow-list is belt-and-braces against a
+# reformat).
+_JS_ALLOWED_500 = ('WIN_RATING_FALLBACK',)
 
 # Characters after which a `/` starts a regex literal rather than a division.
 _RE_PRECEDERS = set('(,=:[!&|?{};+-*%~^<>\n')
@@ -411,6 +435,152 @@ def test_emitters_are_actually_covered_by_the_emitted_scan():
         assert found, (
             f'{name} no longer has a win check inside a string literal; the '
             f'emitted-JS scan may be scanning nothing')
+
+
+def test_js_500_scanner_detects_only_real_comparisons():
+    """The bare-500 scanner itself: comparisons hit, non-comparisons don't.
+
+    Same reason as the ``>=`` scanner self-test -- a too-narrow regex would
+    turn the tripwire below into a test that can never fail, and a too-broad
+    one would flag the histogram's tick values.
+    """
+    src = (
+        "if (v > 500) wins++;\n"                      # 1: offender
+        "if (500 < v) wins++;\n"                      # 2: offender (reversed)
+        "var tie = v === 500;\n"                      # 3: offender
+        "if (v !== 500) {}\n"                         # 4: offender
+        "var WIN_RATING_FALLBACK = 500;\n"            # 5: plain assignment
+        "tickvals: [0, 250, 500, 750, 1000],\n"       # 6: chart ticks
+        "setTimeout(fn, 1500);\n"                     # 7: 1500, not 500
+        "var f = x / 500.5;\n"                        # 8: 500.5, not 500
+        "// prose: score > 500 means a win\n"         # 9: comment
+        "var s = 'v > 500 in a string';\n"            # 10: string
+        "if (v > winRating()) wins++;\n"              # 11: the correct form
+    )
+    hits = sorted(
+        i + 1 for i, ln in enumerate(strip_js(src).splitlines())
+        if _JS_500_CMP_RE.search(ln))
+    assert hits == [1, 2, 3, 4]
+
+
+def test_no_bare_500_comparison_in_shipped_js():
+    """The boundary must be read from DATA.winRating, never re-typed as 500.
+
+    ``>= 500`` was the operator half of the drift; this is the literal half.
+    A new ``score > 500`` is not wrong TODAY, but it is a copy of the constant
+    that the next boundary change would miss -- which is exactly how the
+    boundary drifted three times before.
+    """
+    offenders = []
+    for js in sorted(SCRIPTS.glob('*.js')):
+        raw = js.read_text().splitlines()
+        for i, line in enumerate(strip_js(js.read_text()).splitlines()):
+            if not _JS_500_CMP_RE.search(line):
+                continue
+            if any(a in raw[i] for a in _JS_ALLOWED_500):
+                continue
+            offenders.append(f'{js.name}:{i + 1}: {raw[i].strip()}')
+    assert not offenders, (
+        'win boundary re-typed as a bare 500 in JS; use isWin()/isLoss()/'
+        'isTie()/winRating() from cmp_panels.js instead:\n  '
+        + '\n  '.join(offenders))
+
+
+def test_js_win_helpers_live_in_cmp_panels_only():
+    """One definition site, in the file every consumer page loads first.
+
+    cmp_panels.js is injected before deep_dive_engine.js by deep_dive.py and is
+    the only shared JS the ML IV-guide loads, so the helpers must live there
+    and the engine must not shadow them with a second copy.
+    """
+    cmp_src = (SCRIPTS / 'cmp_panels.js').read_text()
+    eng_src = (SCRIPTS / 'deep_dive_engine.js').read_text()
+    for name in ('winRating', 'isWin', 'isLoss', 'isTie'):
+        assert f'function {name}(' in cmp_src, f'{name} missing from cmp_panels.js'
+        assert f'function {name}(' not in eng_src, (
+            f'deep_dive_engine.js redefines {name}; it must use the shared '
+            'cmp_panels.js copy')
+
+
+def test_js_fallback_pinned_to_python_constant():
+    """cmp_panels.js's WIN_RATING_FALLBACK == battle.WIN_RATING.
+
+    The fallback only fires on a host whose DATA blob predates ``winRating``
+    (the ML IV-guide builds a minimal DATA and carries none), so nothing on a
+    current dive page would reveal a wrong value -- same rot risk as
+    LEVEL_CAP_FALLBACK.
+    """
+    src = (SCRIPTS / 'cmp_panels.js').read_text()
+    m = re.search(r'var WIN_RATING_FALLBACK = (\d+);', src)
+    assert m, 'WIN_RATING_FALLBACK not found in cmp_panels.js'
+    assert int(m.group(1)) == WIN_RATING
+
+
+def test_dive_bakes_win_rating_into_data():
+    """deep_dive.py emits DATA.winRating from the Python constant."""
+    src = (SCRIPTS / 'deep_dive.py').read_text()
+    assert "'winRating': WIN_RATING," in src, (
+        "deep_dive.py must bake 'winRating': WIN_RATING into data_obj so the "
+        'page JS reads the boundary instead of hardcoding it')
+
+
+def test_js_helpers_agree_with_python_is_win():
+    """Run the shipped JS helpers under node and compare to is_win().
+
+    The source scans above cannot tell ``>`` from ``>=`` INSIDE the helpers --
+    one wrong operator there would now silently move every site at once. Skips
+    when node is unavailable (same pattern as tests/test_js_wire_contract.py).
+    """
+    node = shutil.which('node')
+    if node is None:
+        pytest.skip('node not installed')
+    src = (SCRIPTS / 'cmp_panels.js').read_text()
+    block = re.search(
+        r'var WIN_RATING_FALLBACK = \d+;.*?function isTie\(score\)\s*\{[^}]*\}',
+        src, re.S)
+    assert block, 'win-boundary helper block not found in cmp_panels.js'
+    probe = (
+        block.group(0) + '\n'
+        'var DATA = { winRating: %d };\n'
+        'var scores = [0, %d, %d, %d, 1000];\n'
+        'console.log(JSON.stringify({'
+        ' wr: winRating(),'
+        ' win: scores.map(isWin),'
+        ' loss: scores.map(isLoss),'
+        ' tie: scores.map(isTie) }));\n'
+        % (WIN_RATING, WIN_RATING - 1, WIN_RATING, WIN_RATING + 1))
+    out = json.loads(subprocess.run(
+        [node, '-e', probe], capture_output=True, text=True,
+        check=True).stdout)
+    scores = [0, WIN_RATING - 1, WIN_RATING, WIN_RATING + 1, 1000]
+    assert out['wr'] == WIN_RATING
+    assert out['win'] == [bool(is_win(s)) for s in scores]
+    assert out['loss'] == [s < WIN_RATING for s in scores]
+    assert out['tie'] == [s == WIN_RATING for s in scores]
+
+
+def test_js_helpers_fall_back_without_data():
+    """No DATA (or a blob predating winRating) -> the pinned fallback, no throw.
+
+    cmp_panels.js is injected BEFORE the ML IV-guide's setup script defines
+    window.DATA, so a top-level or unguarded read would throw a ReferenceError
+    and take the whole compare box down.
+    """
+    node = shutil.which('node')
+    if node is None:
+        pytest.skip('node not installed')
+    src = (SCRIPTS / 'cmp_panels.js').read_text()
+    block = re.search(
+        r'var WIN_RATING_FALLBACK = \d+;.*?function isTie\(score\)\s*\{[^}]*\}',
+        src, re.S)
+    assert block
+    probe = (block.group(0) + '\nvar a = winRating();\n'
+             'var DATA = {};\nvar b = winRating();\n'
+             'console.log(JSON.stringify([a, b]));\n')
+    got = json.loads(subprocess.run(
+        [node, '-e', probe], capture_output=True, text=True,
+        check=True).stdout)
+    assert got == [WIN_RATING, WIN_RATING]
 
 
 def test_matchup_clusters_imports_win_rating():
