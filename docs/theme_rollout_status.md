@@ -211,6 +211,34 @@ STILL OUT (deferred, OK'd): Plotly canvas/marker recoloring -- needs a
 DEFAULT_THEME (gruvbox-light) resolved hex. `_TYPE_COLORS` (type-brand) stays
 out of the contract.
 
+CLOSED 2026-08-08 by 8da55c4 (+ bf58ee2, 048bb3e): the Plotly deferral above
+is no longer current. `deep_dive_engine.js` resolves chart chrome and markers
+from the active `[data-theme]` with `getComputedStyle` (memoized; a
+`data-theme` MutationObserver drops the memo and re-renders), and the
+Python-injected hex became a DEFAULT_THEME fallback rather than the painted
+value. See `docs/palette_governance.md` section 8 for the current contract.
+`_TYPE_COLORS` is still out, permanently (section 7).
+
+STILL AWAITING SIGN-OFF (visual change; do NOT re-render/publish on the
+strength of those commits alone -- previews in `scratchpad/plotly_preview/`,
+flip the theme picker on each). One judgment call in that change is NOT
+mechanical and is the thing to look at:
+
+- The two overlay identity hues that had to move (they were unreadable on a
+  light fill) each landed on a token theme.py deliberately ALIASES to a tier
+  hue -- and in the default threshold color mode the tier series draws on the
+  same canvas. Measured: `--cat-anchors` is byte-identical to `--tier-1`
+  (1.00:1 in all four themes; the retired `#00ffff` was 2.83-4.08:1) and
+  `--notable` is 1.03-1.12:1 from `--tier-8` (the retired `#FFD700` was
+  2.53-3.64:1). So anchor rings vs tier-1 dots, and the slayer ring vs a
+  tier-8 fill, no longer separate by hue; they separate by marker symbol
+  (overlay triangles/stars/diamonds vs the tier trace's pinned `circle`) and
+  size (5/6/11 vs 7/9), plus ring-vs-fill in anchor outline mode. Disclosed
+  inline at both call sites (`DISCLOSED HUE COLLISION`) and held by tests in
+  `tests/test_plotly_theme_shim.py`. Fixing it properly means a NEW
+  non-aliased `_TOKENS` entry (a second blue, a second gold) -- a theme.py
+  decision, deliberately not taken by an AFK agent.
+
 GREEN-LIGHT STATUS (2026-06-25, post-adversarial-pass):
 
 Independent adversarial verification (other session, 7 agents, refute-by-default,
