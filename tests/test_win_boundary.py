@@ -213,6 +213,206 @@ def test_no_ge_against_win_boundary_in_shipped_js():
         '"> 500"):\n  ' + '\n  '.join(offenders))
 
 
+# ---------------------------------------------------------------------------
+# Third scan surface: JS that Python EMITS.
+#
+# Neither scan above can see it. The JS scan globs ``scripts/*.js``, and the
+# self-contained pages don't ship a .js file -- build_matchup_web.py and
+# render_iv_envelope_article.py inline their whole engine as a Python string
+# template. The Python scan tokenizes, so string literals are structurally
+# excluded by design. So the ~5 emitted win checks in those templates sat in
+# the one blind spot between the two guards, which is exactly where this
+# boundary has drifted before (a .js file, three times).
+#
+# The emitted content is a whole HTML document (HTML + CSS + JS), NOT pure JS,
+# so ``strip_js`` cannot be reused on it: run over that blob it inverts -- one
+# unbalanced apostrophe in prose flips its string state and it keeps ~23% of
+# the characters, precisely the JS *string contents*, blanking the code. What
+# survives contact with mixed HTML/CSS/JS is a comment-only strip, which is
+# all this scan needs: comments are where the documented false positive lives
+# (prose discussing ">= 500"), and comment delimiters are unambiguous.
+#
+# Two accepted limitations, both fail-loud rather than fail-silent:
+#   * prose in a non-comment string ("scores >= 500 were counted") flags; the
+#     scan runs over ALL scripts/**/*.py string literals, not just the two
+#     emitters, so a docstring or a log message can hit it. The only such
+#     sites today are the two that describe the documented cohort-MEAN gate,
+#     carried in _EMITTED_ALLOWED below on the same "name the left-hand
+#     operand" principle as _ALLOWED_GE.
+#   * a ``//`` inside a quoted string (a URL) blanks the rest of THAT line, so
+#     a second win check later on the same line would be missed.
+# ---------------------------------------------------------------------------
+
+# Prose/log strings that describe the one allow-listed ``>=``: the cohort-MEAN
+# break-even gate in synthesize_mirror_tier (a float mean where exact-500 is
+# measure-zero -- a deliberately different "wins on average" semantic). Matched
+# against the flagged line PLUS the line before it, because both sites wrap the
+# phrase across the ``>=``.
+_EMITTED_ALLOWED = ('cohort mean',)
+
+# Same idiom as _JS_GE_RE plus the interpolated forms, since emitted JS can
+# inject the constant: ``>= {WIN_RATING}`` / ``>= {win_threshold}``.
+_EMITTED_GE_RE = re.compile(
+    r'>=\s*(?:500(?![0-9.])|\{?\s*(?:WIN_RATING|win_threshold)\b)')
+
+
+def strip_embedded_comments(text):
+    """Blank ``//`` , ``/* */`` and ``<!-- -->`` comments, preserving length.
+
+    Deliberately does NOT track string or regex literals -- see the block
+    comment above for why a full JS scanner is the wrong tool for an emitted
+    HTML document.
+    """
+    out = list(text)
+    i, n = 0, len(text)
+
+    def blank(a, b):
+        for k in range(a, b):
+            if out[k] != '\n':
+                out[k] = ' '
+
+    while i < n:
+        if text.startswith('//', i):
+            j = text.find('\n', i)
+            j = n if j < 0 else j
+        elif text.startswith('/*', i):
+            j = text.find('*/', i + 2)
+            j = n if j < 0 else j + 2
+        elif text.startswith('<!--', i):
+            j = text.find('-->', i + 4)
+            j = n if j < 0 else j + 3
+        else:
+            i += 1
+            continue
+        blank(i, j)
+        i = j
+    return ''.join(out)
+
+
+def _string_literal_regions(path):
+    """Absolute (start, end) offsets of every Python string literal's CONTENT.
+
+    Plain/byte/raw strings contribute the text between their quotes. An
+    f-string contributes its whole interior INCLUDING the ``{...}`` fields, so
+    an emitted ``>= {WIN_RATING}`` is visible as text (the tokenizer hands the
+    replacement field back as real Python tokens, which puts a ``{`` rather
+    than the ``>=`` before the name and so slips past the tokenize scan).
+    """
+    text = path.read_text()
+    starts = [0]
+    for line in text.splitlines(keepends=True):
+        starts.append(starts[-1] + len(line))
+
+    def offset(rowcol):
+        row, col = rowcol
+        return starts[row - 1] + col
+
+    regions = []
+    depth = 0
+    fstring_open = None
+    with open(path, 'rb') as fh:
+        for tok in tokenize.tokenize(fh.readline):
+            if tok.type == tokenize.FSTRING_START:
+                if depth == 0:                   # outermost only; f-strings nest
+                    fstring_open = offset(tok.end)
+                depth += 1
+            elif tok.type == tokenize.FSTRING_END:
+                depth -= 1
+                if depth == 0 and fstring_open is not None:
+                    regions.append((fstring_open, offset(tok.start)))
+                    fstring_open = None
+            elif tok.type == tokenize.STRING and depth == 0:
+                start, end = offset(tok.start), offset(tok.end)
+                literal = text[start:end]
+                k = 0
+                while k < len(literal) and literal[k] not in '\'"':
+                    k += 1               # skip the r/b/u prefix
+                quote = literal[k]
+                width = 3 if literal[k:k + 3] == quote * 3 else 1
+                regions.append((start + k + width, end - width))
+    return text, regions
+
+
+def emitted_offenders(path):
+    """``>= 500`` sites inside Python string literals, as report lines."""
+    text, regions = _string_literal_regions(path)
+    masked = [('\n' if ch == '\n' else ' ') for ch in text]
+    for start, end in regions:
+        if end <= start:
+            continue
+        masked[start:end] = list(strip_embedded_comments(text[start:end]))
+    raw = text.splitlines()
+    offenders = []
+    for i, line in enumerate(''.join(masked).splitlines()):
+        if not _EMITTED_GE_RE.search(line):
+            continue
+        window = (raw[i - 1] if i else '') + ' ' + raw[i]
+        if any(a in window for a in _EMITTED_ALLOWED):
+            continue
+        offenders.append(f'{path.name}:{i + 1}: {raw[i].strip()}')
+    return offenders
+
+
+def test_emitted_scan_finds_code_but_not_comments(tmp_path):
+    """The emitted scanner itself, so a stripper bug can't neuter the scan."""
+    src = (
+        'HEAD = "<style>a{color:red}</style>"\n'                # 1
+        'PAGE = """\n'                                          # 2
+        'if (s >= 500) win();\n'                                # 3: offender
+        '// historical: s >= 500 was wrong\n'                   # 4: comment
+        '/* block\n'                                            # 5
+        '   s >= 500 inside\n'                                  # 6
+        '*/\n'                                                  # 7
+        '<!-- html comment: s >= 500 -->\n'                     # 8
+        'if (s >= 5000) huge();\n'                              # 9: not 500
+        '"""\n'                                                 # 10
+        'x = s >= 500  # real python, not a string\n'           # 11
+    )
+    path = tmp_path / 'emitter.py'
+    path.write_text(src)
+    assert [o.split(':')[1] for o in emitted_offenders(path)] == ['3']
+
+
+def test_emitted_scan_sees_fstring_interpolated_boundary(tmp_path):
+    """``f"... >= {WIN_RATING} ..."`` is the form the tokenize scan misses."""
+    path = tmp_path / 'emitter_f.py'
+    path.write_text('W = 500\nPAGE = f"if (s >= {W}) win();"\n'
+                    'P2 = f"if (s >= {WIN_RATING}) win();"\n')
+    assert [o.split(':')[1] for o in emitted_offenders(path)] == ['3']
+
+
+def test_no_ge_against_win_boundary_in_emitted_js():
+    """No ``>= 500`` in JS/HTML that scripts/ emits as a Python string.
+
+    Scans every ``scripts/**/*.py``, not just today's two emitters, so a new
+    page generator is covered the day it lands.
+    """
+    offenders = []
+    for py in sorted(SCRIPTS.rglob('*.py')):
+        offenders.extend(emitted_offenders(py))
+    assert not offenders, (
+        'win boundary drifted back to ">=" in EMITTED JS (500 must be a TIE '
+        '-> use "> 500"):\n  ' + '\n  '.join(offenders))
+
+
+def test_emitters_are_actually_covered_by_the_emitted_scan():
+    """Guard the guard: the two known emitters must really carry win checks
+    inside string literals, or the scan above is vacuous.
+
+    If this fails because a page stopped inlining its engine, delete the entry
+    -- do not delete the scan.
+    """
+    known = ('build_matchup_web.py', 'render_iv_envelope_article.py')
+    probe = re.compile(r'[<>]\s*(?:500(?![0-9.])|\{?\s*WIN_RATING\b)')
+    for name in known:
+        path = SCRIPTS / name
+        text, regions = _string_literal_regions(path)
+        found = any(probe.search(text[a:b]) for a, b in regions if b > a)
+        assert found, (
+            f'{name} no longer has a win check inside a string literal; the '
+            f'emitted-JS scan may be scanning nothing')
+
+
 def test_matchup_clusters_imports_win_rating():
     """scripts/deep_dive_matchup_clusters.py must not re-declare the boundary.
 
