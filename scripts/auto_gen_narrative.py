@@ -151,10 +151,21 @@ def _default_move_names() -> dict:
 
     Imported lazily so this module stays dependency-free at import time
     (it is imported by renderers that never touch the gamemaster).
+
+    The same lazy block enrolls this module's caches in
+    ``gopvpsim.invalidate_caches()``. Registering HERE rather than at import
+    is what keeps both properties: the module still imports without the sim
+    package, and the cache cannot exist unregistered -- this is the only
+    place ``_DEFAULT_MOVE_NAMES`` is ever built, so a mid-process gamemaster
+    swap can no longer leave stale move labels behind while every library
+    index is fresh. (``register_cache_invalidator`` is idempotent, so the
+    re-build path re-registering is a no-op.)
     """
     global _DEFAULT_MOVE_NAMES
     if _DEFAULT_MOVE_NAMES is None:
+        from gopvpsim import register_cache_invalidator
         from gopvpsim.data import load_gamemaster
+        register_cache_invalidator(_reset_move_display_caches)
         _DEFAULT_MOVE_NAMES = _build_move_name_index(load_gamemaster())
     return _DEFAULT_MOVE_NAMES
 

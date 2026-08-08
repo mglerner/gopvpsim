@@ -5,8 +5,16 @@ module caches had no single invalidator, so a mid-run gamemaster refresh
 left modules disagreeing with no error. These tests pin (a) that every
 name the invalidator reaches for still exists, (b) that each one is
 actually reset, and (c) that state really is re-derived afterwards.
+
+They also pin (d) the ``register_cache_invalidator()`` seam, which is how a
+gamemaster-derived cache that lives OUTSIDE the package joins in -- the
+library must not import scripts/, so the out-of-package module registers
+itself instead of appearing as a table row.
 """
+import ast
 import importlib
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +23,9 @@ import gopvpsim.data as data_module
 import gopvpsim.evolution_lines as evo_module
 import gopvpsim.moves as moves_module
 import gopvpsim.pokemon as pokemon_module
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 
 def test_cache_table_names_all_exist():
@@ -150,3 +161,107 @@ def test_swapped_gamemaster_is_picked_up_by_every_module(monkeypatch):
         gopvpsim.invalidate_caches()
 
     assert 'Azumarill' in pokemon_module.get_pokemon_index()
+
+
+# ---------------------------------------------------------------------------
+# The out-of-package seam.
+#
+# scripts/auto_gen_narrative.py caches a gamemaster-derived move-display-name
+# index (`_DEFAULT_MOVE_NAMES`), and only its own unit test ever reset it -- so
+# a mid-process gamemaster swap left every library index fresh and that one
+# index stale, printing old move labels on a freshly re-derived page. It cannot
+# be a table row: those are resolved with importlib and the library must not
+# import scripts/. Hence register_cache_invalidator().
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def clean_registry(monkeypatch):
+    """Run with a private extras registry so a test hook can't leak."""
+    monkeypatch.setattr(gopvpsim, '_EXTRA_INVALIDATORS', [])
+    return gopvpsim._EXTRA_INVALIDATORS
+
+
+def test_registered_hook_is_called(clean_registry):
+    calls = []
+    gopvpsim.register_cache_invalidator(lambda: calls.append(1))
+    gopvpsim.invalidate_caches()
+    assert calls == [1]
+
+
+def test_register_is_idempotent_and_returns_the_callable(clean_registry):
+    """The lazy registration site runs on every rebuild, so re-registering
+    the same callable must not stack up duplicate calls."""
+    calls = []
+
+    def hook():
+        calls.append(1)
+
+    assert gopvpsim.register_cache_invalidator(hook) is hook
+    gopvpsim.register_cache_invalidator(hook)
+    gopvpsim.register_cache_invalidator(hook)
+    assert clean_registry == [hook]
+    gopvpsim.invalidate_caches()
+    assert calls == [1]
+
+
+def test_extras_run_after_the_library_tables(clean_registry):
+    """A hook that re-derives from library state must see the FRESH state."""
+    seen = {}
+
+    def hook():
+        seen['pokemon_index'] = pokemon_module._pokemon_index
+
+    gopvpsim.register_cache_invalidator(hook)
+    pokemon_module.get_pokemon_index()
+    assert pokemon_module._pokemon_index is not None
+    gopvpsim.invalidate_caches()
+    assert seen['pokemon_index'] is None
+
+
+def test_library_does_not_import_scripts():
+    """The seam exists because the arrow only points one way."""
+    src = (REPO_ROOT / 'src' / 'gopvpsim' / '__init__.py').read_text()
+    tree = ast.parse(src)
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+    for name in imported:
+        root = name.split('.')[0]
+        assert root in ('importlib', 'gopvpsim'), (
+            f'gopvpsim/__init__.py imports {name!r}; the extras registry '
+            f'exists so it never has to reach outside the package')
+    # And the tables, which are the tempting place to put it, name only
+    # installed gopvpsim modules.
+    for mod_name, _attr, _factory in gopvpsim._CACHE_GLOBALS:
+        assert mod_name.startswith('gopvpsim.'), mod_name
+    for mod_name, _attr in gopvpsim._CACHE_CLEARS:
+        assert mod_name.startswith('gopvpsim.'), mod_name
+
+
+def test_auto_gen_narrative_move_cache_joins_invalidate_caches():
+    """End-to-end: build the out-of-package cache, swap nothing, invalidate,
+    and assert it was actually dropped (not just that a hook exists)."""
+    import auto_gen_narrative as agn
+
+    agn._reset_move_display_caches()
+    assert agn._DEFAULT_MOVE_NAMES is None
+
+    # Building it is ALSO what registers the reset hook.
+    names = agn._default_move_names()
+    assert names, 'move-name index came back empty'
+    assert agn._DEFAULT_MOVE_NAMES is not None
+    assert agn._reset_move_display_caches in gopvpsim._EXTRA_INVALIDATORS
+
+    # The per-gm cache is only touched on the explicit-gm path.
+    agn.move_display('POWER_WHIP', gm=data_module.load_gamemaster())
+    assert agn._MOVE_NAME_INDEX_CACHE
+
+    gopvpsim.invalidate_caches()
+
+    assert agn._DEFAULT_MOVE_NAMES is None, \
+        'auto_gen_narrative kept a stale gamemaster-derived move index'
+    assert agn._MOVE_NAME_INDEX_CACHE == {}
