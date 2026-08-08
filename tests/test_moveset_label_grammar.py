@@ -62,9 +62,42 @@ def test_grammar_has_exactly_one_definition():
 
 def test_rendering_re_exports_the_same_function():
     """``deep_dive_rendering.parse_moveset_label`` is the name the dive bake
-    and generate_article import; it must not become a second copy."""
-    assert rendering.parse_moveset_label is analysis.parse_moveset_label
-    assert narrative.parse_moveset_label is analysis.parse_moveset_label
+    and generate_article import; it must not become a second copy.
+
+    Import-edge and behaviour, NOT ``is`` -- same reason as
+    ``test_move_abbr.test_iv_envelope_uses_shared_helper``: sibling test
+    modules (``test_move_abbr``, ``test_envelope_positions``) load
+    ``deep_dive_analysis`` through ``spec_from_file_location`` and replace
+    the ``sys.modules`` entry, so whichever runs first wins and a full-suite
+    run can legitimately hold two instances of the module. ``rendering``'s
+    re-export is a module-import-time snapshot, so under one collection
+    order it snapshots the other instance's function and an identity
+    comparison fails on a codebase that is perfectly correct. Production
+    imports the module once, so the thing worth pinning is the EDGE -- no
+    second definition (see the test above), both names sourced from
+    ``deep_dive_analysis``, identical answers.
+    """
+    rendering_src = open(
+        os.path.join(SCRIPTS_DIR, 'deep_dive_rendering.py')).read()
+    assert re.search(r'^parse_moveset_label = analysis\.parse_moveset_label$',
+                     rendering_src, re.M), \
+        'deep_dive_rendering no longer re-exports THE grammar'
+
+    narrative_src = open(
+        os.path.join(SCRIPTS_DIR, 'deep_dive_narrative.py')).read()
+    imported = re.search(r'^from deep_dive_analysis import \(([^)]*)\)',
+                         narrative_src, re.M)
+    assert imported and 'parse_moveset_label' in [
+        n.strip() for n in imported.group(1).split(',')], \
+        'deep_dive_narrative no longer imports THE grammar'
+
+    for mod in (rendering, narrative):
+        assert mod.parse_moveset_label.__module__ == 'deep_dive_analysis'
+        assert mod.parse_moveset_label.__qualname__ == 'parse_moveset_label'
+        for label in ('FAIRY_WIND / BULLDOZE, GIGATON_HAMMER',
+                      'COUNTER / DYNAMIC_PUNCH', 'COUNTER', ''):
+            assert (mod.parse_moveset_label(label)
+                    == analysis.parse_moveset_label(label))
 
 
 def _grammar_line():
