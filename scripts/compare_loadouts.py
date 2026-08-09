@@ -899,13 +899,23 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
     shared = _align_opponents(loadouts_data)
 
     bits: list[str] = []
-    lead = (f'{len(shared)} opponents are common to all loadouts')
+    # Derive the sweep dimensions from the parsed dives rather than
+    # hardcoding them: a dive with a different IV sweep or scenario set
+    # would otherwise be described by a stale constant. The win boundary
+    # is battle rating > 500 (500 = tie), matching the aggregation at
+    # load_loadout_data and src/gopvpsim/battle.py WIN_RATING.
+    n_ivs = loadouts_data[0].get('n_ivs', 0)
+    n_scenarios = len(loadouts_data[0].get('scenarios') or [])
     bits.append(
         f'<details class="methodology-details compare-lead-details">'
         f'<summary>About these numbers</summary>'
-        f'<p>{lead}. Win rate = fraction of simulations (4096 focal IVs '
-        f'x 9 shield scenarios) where the focal species scores at '
-        f'least 500.</p>'
+        f'<p>{n_ivs:,} focal IVs x {n_scenarios} shield scenarios per '
+        f'loadout; {len(shared)} opponents are common to all loadouts. '
+        f'Win rate = fraction of those simulations with a battle rating '
+        f'above 500 (500 is a tie). Methodology: '
+        f'<a href="../../guides/how-this-works/'
+        f'#we-sweep-every-iv-spread-not-just-the-top-ones">'
+        f'How This Works guide</a>.</p>'
         f'</details>'
     )
 
