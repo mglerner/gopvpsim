@@ -24,6 +24,18 @@ it then compares by mtime; it always reports a ~18-path delta even when the
 content is identical. Compare content instead (md5 vs the live URLs, or
 `rsync --checksum`). Detail in CHANGELOG "2026-08-04".
 
+## Pending publish (2026-08-09 overnight lanes): needs Michael's sign-off
+
+The overnight lanes deliberately changed shipped-page content: the SP
+Rank column re-ranked to the PvPoke convention on every dive page
+(`8c1f98e`; 25-81% of rows shift, the rank-1 marker moves for true-tie
+species, prose diffs in the narrative rank-1 self-check), the
+compare-card row "Gives up vs #1" -> "Avg score behind best"
+(`c911eff`), the comparison-page methodology wording (`95fcf74`), and
+`#opp-` anchor placement (`b43bd2d`). A local re-render ran overnight to
+stage these; review, then `direnv exec . scripts/publish_website.sh
+--push`, then delete this section.
+
 ## DRY review 2026-08-05: fully executed -- open residue only
 
 The review (`docs/reviews/2026-08-05_dry_review.md`) is fully executed
@@ -43,40 +55,64 @@ in sampled cells" held for the hunt's own samples; the NB-1 bounding sweep
 below later found one on a wider grid.)
 
 **Still open:**
-- **js-parity residue** (LOW): js-parity-1 (tier precision, `c149f52`),
-  -2 (mirror CMP, `82f0365`), -4 (gender mirror, `c956ed7`) and -5's
-  minimal honest-claim half (`639ef1e`) were FIXED in the 2026-08-05 DRY
-  arc. Remaining: **js-parity-3** (not re-checked during the DRY arc --
-  verify against the round2 doc before scheduling) and **js-parity-5's M
-  follow-on** (reconcile the three "Gives up vs #1" metrics / dedupe the
-  two identical column labels).
-- **[medium, NEW from the sweep, our own bug] would_shield/always-shield
-  internal inconsistency:** the don't-bait override consumes
-  `would_shield=False` while the active shield policy always shields
-  (Florges vs Seismitoad UL 2-1 inflated +201). Independent of PvPoke
-  fidelity; needs its own look. Detail in the sweep doc (carve-out
-  section).
-- Remaining report lows not yet actioned: **BP-3/BP-4** (Aegislash whole-level
-  rounding gaps in iv_breakpoints/iv_bulkpoints), **FC-2** (Blade->Shield revert
-  clamp rationale stale vs oracle) — details in the report; low, unscheduled.
+- **[comment-only, rides the next engine-hash bump window]** three stale
+  in-code rationales, batched because each is in a hashed file or
+  meaningless alone: `battle.py:1659-1665` would_shield attribution (+
+  the `tests/test_nb1_selection_freeze.py:134-142` docstring that
+  propagates it), and `formchange.py:127-148`'s "same fixed point"
+  claim (round-2 FC-2; the DEVELOPER_NOTES half was corrected
+  2026-07-16). Exact wording is spelled out in
+  `docs/reviews/2026-08-09_would_shield_diagnosis.md` -- which also
+  RESOLVES the old would_shield/always-shield medium: shared-structure
+  divergence, the +201 is PvPoke's stale damage cache, and the suggested
+  policy-consult fix measurably worsens oracle agreement (201 -> 730).
+  Do not reopen it as a behavior change without that doc's gates.
+- **js-parity residue** (LOW): only the winsMirror branch inside the
+  SHA-pinned `deep_dive_engine.js` region (~:1497-1511) still uses the
+  literal "Gives up vs #1" header for a fourth metric (a mirror-cohort
+  win-shortfall COUNT). Renaming costs a REGION_SHA256 re-stamp
+  (`patch_dive_gives_up_column.py` + its pin test) -- fold into whatever
+  next pays that re-stamp. (History: -1/-2/-4 + -5's honest-claim half
+  fixed in the DRY arc; -3 fixed `8c1f98e`; -5's follow-on closed
+  `c911eff`; BP-3 fixed `fa1bd1d`, and "BP-4" was a typo -- the round2
+  report has no such finding.)
 
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
-- **[tooling] dev-count `test_count` sentinel is a serialization point**
-  (AFK-churn gate finding): six sentinel-bump commits raced across
-  concurrent lanes in one 28-commit churn. Consider deriving the live
-  count at gate time with the sentinel as a floor, or an auto-update
-  mode -- small, low priority.
-
-- **[tooling, silent-incompleteness] verify_overnight UL opponent-count
-  assertion.** The completeness guard is GL-only; a UL opponent silently
-  deranked by a fresh gamemaster would drop from every UL dive and still pass the
-  gate GREEN. LATENT (UL 68/68 resolve on the current gamemaster). Needs a
-  marker/expected-count design decision before asserting.
-- **[tooling] F3: narrative auto-gen patch is WARN-not-FAIL** (`run_website_dives.py`
-  ~624). Low; optional: surface the WARN where `verify_overnight` scans.
-- **[render] `#opp-<slug>` canonical landing.** `#opp-` links land on the
-  first-rendered mention; pick one canonical per-opponent target. Low; render-only.
+- **[cli] breakpoints max-level default divergence:**
+  `iv_breakpoints`/`iv_bulkpoints` default attacker/defender max level
+  to 51.0 while `iv_rank`/`at_best_level` default to LEAGUE_MAX_LEVEL
+  (50.0 in GL/UL), so `scripts/breakpoints.py`'s rank column and damage
+  table can disagree on level for EVERY species. Changing the default
+  moves every CLI number -- needs its own scoped decision. (Surfaced by
+  the BP-3 fix `fa1bd1d`, which strictly reduced the mismatch.)
+- **[render, product decision] js-parity-3 scale half:** on a
+  `--species-iv-floor` dive, `spRanks` is dense 1..n over the pruned
+  subset while `rankLookup` stays global 1..4096, and the JS column
+  interleaves both scales. Fix = bake spRanks from
+  `compute_rank_lookup` (rank table needed before the DATA block,
+  alt-cap for the L51 twin, "(Shadow)" key path) -- and it changes what
+  IV-floor pages display (rank 1 may not appear at all). Caveat
+  documented at `deep_dive_engine.js:~1270` + `sp_rank_array`'s
+  docstring.
+- **[render] matchup_clusters' own SP rank**
+  (`deep_dive_matchup_clusters.py:649-652`) is a FOURTH convention
+  (argsort over the 2dp display arrays); it now diverges from the
+  unified three post-`8c1f98e`. Fixing changes rendered cluster
+  "SP #a-#b" labels.
+- **[render] compare_loadouts hardcoded sweep dims:** `:562`/`:804`/
+  `:808` still say "4096 focal IVs x 9 shield scenarios" (their
+  500-boundary wording is already correct); a non-4096 dive would
+  render contradictory counts on one page. Follow-on to `95fcf74`.
+- **[render, unchecked] L51 tooltip registry:**
+  `reset_tooltip_registry()` runs once per file (`deep_dive.py:~1336`)
+  -- the same bug class as the L51 opp-anchor registry fixed in
+  `b43bd2d`. Nobody has checked whether the best-buddy template loses
+  tooltip entries.
+- **[tooling] verify_overnight step-[3/5] except-widening:** ValueError
+  -> (ValueError, OSError) + the helper's Raises line, so a renamed
+  pool file reports ERR instead of aborting the gate mid-step
+  (latent-only; own small commit).
 
 ## Top-N opponent filter + limited-cup dives (planned 2026-07-02)
 
@@ -117,7 +153,9 @@ prune option into the dive scripts wherever caches get created.
 
 Build the "which of my mons should I build?" breakdown in the gobattlekit iOS
 app — the same feature already live on the website (the deep-dive paste-box
-"Gives up vs #1" column) and as a Python reference (`scripts/owned_breakdown.py`).
+"Gives up vs #1" column) and as a Python CLI (`scripts/owned_breakdown.py` —
+one of three sibling metrics that deliberately do NOT match each other; see
+its header, corrected in `c911eff`).
 
 - **Scope (decided):** GL + UL, the species we've already dived (zero new sims,
   smallest mobile bundle).
@@ -194,10 +232,18 @@ audit when Eternatus returns (Niantic announced it will).
 The 2026-04/06 pre-ship arc shipped (site published 2026-06-07; see
 CHANGELOG.md). The minor polish residue:
 
-- **G16 — methodology-details guide pointer.** Replace the
-  in-article hidden-but-present methodology prose with a one-line
-  guide pointer (the hide layer is already in place; G16 is the
-  last-mile substitution). ~30 min.
+- **G16 — methodology-details guide pointers (remaining half).** The
+  comparison-page block shipped `95fcf74` (wrong win-rate boundary
+  fixed + derived counts + guide pointer) and the Meta Coverage half
+  shipped earlier (`e6d431c`). Remaining, both in
+  `generate_article.py` and both currently regeneration-unverifiable
+  (the male-Oinkologne article was retired in `7df5165`, so no article
+  renders from HEAD): (a) `:1835-1848` Opponent-IVs/Bait recap ->
+  pointer at `guides/cd-article/body.md#dropdown-control` (anchor
+  confirmed present); (b) `:2461-2469` "About these tiers" --
+  move-THEN-point: the no-1:1-mapping fact must first be ADDED to the
+  guide's IV Recommendations section, else a bare pointer deletes
+  information.
 
 - **G1 + G2 + G7 — richer auto-gen prose template** [post-ship,
   recommended]. F1 Meta Role, F2 key-flips callout, and
@@ -385,8 +431,23 @@ here 2026-06-12; these are the remaining seams.)*
   requireGender coverage. gobattlekit PORTS the module (its own copy still
   defaults 51 -- noted in the module docstring; pass caps explicitly when
   comparing). STILL OPEN here: only the `build_collection_data()`
-  extraction + 4-league unit test (the strong pin), which bundles with the
-  deep_dive.py split session.
+  extraction + the 4-league unit test (the strong pin). The split
+  session LANDED 2026-08-06/08 without touching this block, so it is
+  unblocked and schedulable on its own. The design doc's Option 1 still
+  applies but **every line number in it has drifted** — current anchors:
+  dict built at `deep_dive.py:1937-1968` inside
+  `generate_interactive_html`, target line `:1948` (`'maxLevel':
+  LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL)`), attached `:1969`,
+  guarded at `:1875`, emitted `:2909`, consumed by
+  `deep_dive_engine.js:961`. Two of the doc's three side-fixes already
+  shipped (`verify_js_parser.py` league-aware `c20071e`;
+  `user_collection.py` None-means-derive `c956ed7`). Traps: preserve
+  the emitted dict's literal key order exactly (replay-vs-original
+  diffing is byte-for-byte), and the helper must read `LEAGUE_MAX_LEVEL`
+  at call time (main() MUTATES it for `--max-level`, `deep_dive.py:
+  ~3796`). Fold in while there: `:1896` and `:4433` still pass a
+  literal `LEAGUE_MAX_LEVEL.get(league, 51.0)` into
+  `compute_rank_lookup`, restating the single source inconsistently.
 
 * **pvpoke.com/battle browser round-trip for the iv-tech oracles**
   (the one human step left from the old "No-bait oracle tests" entry;
@@ -410,46 +471,36 @@ here 2026-06-12; these are the remaining seams.)*
   read this *before* starting the deep_dive.py split below so the
   cuts address actual pain rather than aesthetic ones.
 
-* **Split `scripts/deep_dive.py`** *(deferred from 2026-04-09; not
-  blocking, but file is now ~6100 lines as of 2026-04-10)* — After the structured IV
-  categories shipped, the file is approaching the size where edits
-  start fighting the line-cap. Concrete extraction targets, in rough
-  order of independence:
-  1. **`scripts/deep_dive_lib/categories.py`** — `IVCategory` dataclass,
-     `build_iv_categories()`, `_stat_cutoffs_from_anchors()`,
-     `_format_stat_cutoffs()`, `_composite_tradeoff_prose()`,
-     `_matchup_subtitle()`. Pure-Python, already isolated, already has
-     unit tests in `tests/test_iv_categories.py`. Easiest move.
-  2. **`scripts/deep_dive_lib/anchor_flips.py`** — `_aggregate_flips_by_anchor()`,
-     `_render_anchor_flip_bullets()`. Pure-Python, already isolated,
-     already has tests in `tests/test_flip_aggregator.py`.
-  3. **`scripts/deep_dive_lib/slayer.py`** — `iterative_slayer_discovery()`,
-     `categorize_slayers()`, `_slayer_iter_worker()`, related helpers.
-     The multiprocessing entry points complicate this — workers are
-     resolved by qualified name, so the move requires careful import
-     plumbing.
-  4. **`scripts/deep_dive_lib/render.py`** — `generate_analysis_sections()`,
-     the per-section helpers (`_render_notable_ivs_section`,
-     `_iv_label`, `_tier_badge_html`, `_threshold_desc`,
-     `_hover_text`, etc.), the CSS string. This is the actual monster
-     (~1500 lines and growing). Needs a small "renderer context"
-     dataclass first to avoid passing a 15-arg tuple around.
-  5. **`scripts/deep_dive_lib/sweep.py`** — `iv_sweep()`, the worker
-     init/run pair, `screen_movesets()`, `compute_iv_metadata()`,
-     `group_ivs_by_stat_profile()`. Numba-touching code; same
-     multiprocessing import-plumbing concern as slayer.
-  Remaining in `scripts/deep_dive.py` after all five steps: argument
-  parsing, the top-level orchestration in `main()`, and the legacy
-  non-interactive `generate_html()` (already on the chopping block —
-  see "Non-interactive `generate_html` is now strictly worse" above).
-  Test split: each module gets its own `tests/test_<module>.py`; the
-  existing tests already prove the importlib pattern works for
-  modules that can't import from `gopvpsim` directly.
-  **Recommendation**: do this in a dedicated session, not interleaved
-  with feature work — refactor diffs and feature diffs shouldn't ride
-  the same commit. Mechanical (file moves + import fixes) so it
-  shouldn't take long once started; the risk is multiprocessing
-  worker resolution and CSS-string fragment positioning.
+* **Split `scripts/deep_dive.py` — steps 1-5 DONE (2026-08-06/08, DRY
+  review entry 12; `7b665ac` + follow-ons).** 8032 -> **5077** lines. The
+  landed layout differs from the original plan in *naming*, not in
+  substance: the anchor-flip and slayer code went to the pre-existing
+  2026-04-12 modules (`deep_dive_analysis.py`, `deep_dive_rendering.py`,
+  `deep_dive_slayer.py`) rather than to new `deep_dive_lib/anchor_flips
+  .py` / `deep_dive_lib/slayer.py`, and three modules nobody planned
+  fell out of the cut (`opponents.py`, `score_pack.py`, `shields.py`).
+  Landed homes: `build_iv_categories` deep_dive_lib/categories.py:23;
+  `aggregate_flips_by_anchor` deep_dive_analysis.py:363 +
+  `render_anchor_flip_bullets` deep_dive_rendering.py:1358 (deep_dive.py
+  keeps alias shims for the tests); `iterative_slayer_discovery`
+  deep_dive_slayer.py:245 with the spawn worker `slayer_iter_worker`
+  :149 pinned by `tests/test_deep_dive_lib_workers.py:155` — do NOT
+  "finish" targets 2-3 by creating the originally-planned filenames,
+  that would churn working test-pinned code and break spawn-mode worker
+  resolution; `categorize_slayers` was superseded, not moved (see
+  `src/gopvpsim/anchors.py:858`); `generate_analysis_sections`
+  deep_dive_lib/render.py:504; sweep foursome deep_dive_lib/sweep.py.
+  **What's actually left (open):** two functions are ~69% of the
+  remaining 5077 lines — `generate_interactive_html` (:1254, ~1874:
+  page assembly, the `var DATA` emit, the collection panel) and `main`
+  (:3440, ~1637: arg parsing + orchestration, fine where it is). A
+  step 6 would be "extract the page-assembly half into
+  `deep_dive_lib/page.py`", with `build_collection_data()` (see "Tests
+  to add") as its natural first, smallest slice. Not scheduled.
+  **Doc gap:** DEVELOPER_NOTES has no `deep_dive_lib` entry — the only
+  layout description is `deep_dive_lib/__init__.py`'s docstring; worth
+  a paragraph next time that file is touched. No dedicated
+  `test_render.py`/`test_sweep.py` yet.
 
 ## Moveset / variant comparison tool
 

@@ -2,6 +2,83 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-09 (overnight) -- scouted-backlog churn: 7 lanes, 5 fixes, 2 tools, 1 refuted engine change
+
+Fable-orchestrated overnight run (Michael AFK): a 9-agent read-only
+scout re-derived every candidate TODO finding at HEAD, then 7
+file-disjoint lanes (28 agents, 2 adversarial verifiers each) landed:
+
+- **fix(breakpoints) `fa1bd1d`:** Aegislash (Blade)'s whole-level rule
+  was honored at only 1 of 4 level sites in iv_breakpoints/
+  iv_bulkpoints (2053/4096 rows sat at half levels while the same
+  output's rank column used whole levels). CLI + tests only; no dive
+  HTML, TOML, or export is affected. Surfaced a separate pre-existing
+  51.0-vs-league max-level default divergence -> TODO.
+- **fix(dive SP Rank) `8c1f98e` (js-parity-3):** DATA.spRanks was baked
+  from the 0.1-rounded display array with enumeration-order ties while
+  the same column's off-grid path used iv_rank (unrounded SP, IV-sum
+  tiebreak, PvPoke convention); Medicham GL disagreed on 1354/4096
+  spreads and the rank-1 marker itself flipped (5/15/14 vs the famous
+  5/15/15). New `sp_rank_array` helper routes the L50 grid, the L51
+  best-buddy twin, and the CLI sweep variant through one convention;
+  8-test pin file. RE-RENDER ONLY (no engine hash, no cache impact);
+  25-81% of SP Rank cells change per page.
+- **verify_overnight pool containment `48d37c7`:** step [3/5] now
+  asserts name-set containment of each dive's own opponents_file
+  against its rendered DATA.opponents -- the first completeness guard
+  for UL/ML/cup dives (GL had only a 3-marker check; a deranked
+  opponent silently dropping from every UL dive previously passed
+  GREEN). The old "needs a count-marker design decision" framing
+  dissolved: counts can't work (mirror/anchor/variant entries APPEND),
+  containment can. Same commit: run_website_dives' narrative patch no
+  longer skips silently when the dive dir is absent (F3 tail; F3
+  proper had already shipped in `278bc44` -- the TODO was stale).
+- **verify_dev_counts --update `5b6aec9`:** opt-in flag rewrites the
+  DERIVABLE sentinels (test_count, type_chart_cells_verified) in
+  DEVELOPER_NOTES.md in place -- ends the six-racing-sentinel-bumps
+  serialization pain from the 2026-08-08 churn. Adversarial review
+  caught a real pre-commit defect: a lost `<!-- /sync -->` marker made
+  the DOTALL rewrite swallow prose up to the NEXT sentinel; fixed +
+  tested before landing.
+- **fix(compare methodology) `95fcf74` (G16, narrowed):** the
+  comparison-page "About these numbers" block said win rate counts sims
+  "scoring at least 500" -- the code counts strictly > 500 and an exact
+  500 is a tie. Corrected wording (user-visible on 4 published pages at
+  next publish), sweep dims now derived instead of hardcoded, block
+  links the How This Works guide.
+- **"Gives up vs #1" disambiguation `c911eff` (js-parity-5 follow-on):**
+  the dive column, owned_breakdown.py, and the compare-card each
+  measure something different; docstrings now say so (the false "must
+  reproduce" claim was already deleted in `639ef1e`) and the
+  compare-card row is relabeled "Avg score behind best" so one label no
+  longer covers two units. Bundle-export staleness caveat added
+  (shipped dives predate `8c1f98e`, so their rank1RefIvIdx is
+  pre-convention).
+- **fix(#opp- landing) `b43bd2d`:** `#opp-<slug>` deep links now land
+  on the opponent's matchup detail in the Threats section instead of a
+  collapsed anchor-flip bullet (first-mention-wins registry claimed at
+  compute time, and the bullets computed first); the best-buddy L51
+  template also gets its own opponent-id set instead of inheriting an
+  exhausted registry (its `#opp-` hrefs all dangled after the L51
+  swap).
+
+**Refuted, no code shipped:** the TODO's would_shield/always-shield
+"our own bug" medium. The scout's oracle-traced diagnosis
+(`docs/reviews/2026-08-09_would_shield_diagnosis.md`): the mismatch is
+shared PvPoke structure, the traced +201 is PvPoke's own stale damage
+cache, and the suggested fix worsens total oracle error 201 -> 730
+while blessing only 27% of a migration. Comment-only reattributions
+ride the next engine-hash bump window.
+
+Suite 1719 -> 1762 passed (+43); full suite + ship gates green; engine
+hash untouched (verified per lane against sweep_cache._ENGINE_FILES).
+Docs groomed same night: stale TODO sections (deep_dive split DONE with
+landed-home map, F3, UL-guard, dev-count, #opp-, BP-3/would_shield) and
+the last surviving "bundle matches the website column" falsehood in
+docs/owned_mon_breakdown_plan.md. Rendered-page changes staged by an
+overnight re-render; PUBLISH HELD for Michael's sign-off (TODO "Pending
+publish").
+
 ## 2026-08-08 (evening) -- re-render + publish: the DRY render ledger reaches the live site
 
 The render-only chain (`rerender_20260808b.sh`, replay blobs ->

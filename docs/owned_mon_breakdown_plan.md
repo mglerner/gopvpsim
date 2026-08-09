@@ -137,9 +137,15 @@ evolution line, looks up its IV in the artifact, and renders the breakdown.
 embedded `SCORES_GZ` (decode base64+gzip uint16, index `iv*nS*nO + si*nO + oi`,
 win = score>=500), diffs every IV's even-shield win set against
 `DATA.rank1RefIvIdx`, and emits `{rank1, drops:{"a/d/h":[...]}}`. It uses key
-`0_pvpoke` (moveset 0, dive's default opponents), so it **matches the website
-"Gives up vs #1" column** (same SCORES, same convention — the dive's PvPoke-default
-opponents, NOT the CLI's 15/15/15).
+`0_pvpoke` (moveset 0, dive's default opponents) — the dive's PvPoke-default
+opponents, NOT the CLI's 15/15/15. **It does NOT match the website
+"Gives up vs #1" column**: the JS column references the #1 IV on the
+CURRENT y-axis metric over the user-selected shields, not
+`rank1RefIvIdx` over even shields (see `c911eff` and
+`scripts/owned_breakdown.py`'s header — the three surfaces are siblings,
+not ports). Also: dives rendered before `8c1f98e` carry a
+pre-convention `rank1RefIvIdx` (rounded-SP ranking), so bundles from
+the old corpus differ in their reference spread too.
 
 **The size finding:** the full per-IV dropped-list JSON is **~25.6 MB for 15
 species** — almost every IV gives up at least one marginal (opponent, scenario)

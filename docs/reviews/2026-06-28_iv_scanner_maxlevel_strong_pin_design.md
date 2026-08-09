@@ -1,5 +1,14 @@
 # IV-scanner `maxLevel` single-source: strong-pin design + league-aware plan
 
+> **Drift warning (2026-08-09):** every line number below predates the
+> deep_dive.py split (2026-08-06/08) and is WRONG at HEAD; two of the
+> three side-fixes have since shipped (`verify_js_parser.py`
+> league-aware `c20071e`; `user_collection.py` None-means-derive
+> `c956ed7`). The Option-1 extraction itself is still open and still
+> applies -- but take current anchors and the two implementation traps
+> (emitted-key order, `LEAGUE_MAX_LEVEL` mutated at call time) from
+> TODO.md "Tests to add", not from this doc.
+
 Build-ready spec for a later attended session. READ-ONLY review: no
 production code changed, no test committed. Source TODO: `TODO.md`
 "Tests to add" -> "Guard for the IV-scanner `maxLevel` single-source".
