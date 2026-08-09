@@ -81,7 +81,10 @@ class Spread:
     n_breakpoint_opps: int = 0  # census count of distinct BP opponents cleared
     n_bulkpoint_opps: int = 0   # census count of distinct bulk opponents cleared
     n_breakpoint_newly: int = 0  # BP opps the boost newly guarantees (vs base form)
-    flip_fd: dict | None = None  # raw flip data; rendered + linked at render time
+    flip_fd: dict | None = None  # raw flip data vs PvPoke default; rendered at render time
+    flip_fd_sp: dict | None = None  # raw flip data vs stat-product #1 (None = no flips)
+    is_sp1: bool = False        # this spread IS the stat-product #1
+    is_pvpoke: bool = False     # this spread IS the PvPoke default
     flip_has_bait: bool = False
 
 
@@ -118,6 +121,10 @@ class CardModel:
     has_author_notes: bool = False  # dive carries human-written narrative (badge)
     cup_label: str | None = None  # limited-cup name (e.g. "Equinox Cup"); None for league dives
     cup_snapshot: str | None = None  # cup rankings snapshot date (YYYY-MM-DD)
+    # Flip-reference labels ("a/d/s" strings). Both None -> legacy single-line
+    # flip rendering (old ctxs / synthetic tests without flips_sp).
+    flip_ref_sp1: str | None = None      # stat-product #1 spread
+    flip_ref_pvpoke: str | None = None   # PvPoke default spread
 
 
 # Type -> accent color (matches common PvP type palettes; used for chips and
@@ -177,6 +184,24 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
     has_bait = card_ctx.get('has_bait_axis', False)
     iv_efficient = data_obj.get('ivEfficient') or []
     spreads = []
+    # Second flip reference (the stat-product #1) + label strings for both
+    # references, so each rendered line names the spread it compares against
+    # (the old single line was computed vs the PvPoke default but labeled
+    # "vs stat-product #1" -- caught on Umbreon GL 2026-08-09).
+    flips_sp = card_ctx.get('flips_sp') or {}
+    sp1_idx = card_ctx.get('sp1_idx')
+    pvp_idx = data_obj.get('pvpokeRefIvIdx')
+
+    def _ivstr_at(i):
+        try:
+            return f"{data_obj['ivA'][i]}/{data_obj['ivD'][i]}/{data_obj['ivS'][i]}"
+        except Exception:  # noqa: BLE001 - old blobs / synthetic ctxs
+            return None
+    flip_ref_sp1 = _ivstr_at(sp1_idx) if sp1_idx is not None else None
+    flip_ref_pvpoke = (_ivstr_at(pvp_idx)
+                       if 'sp1_idx' in card_ctx and pvp_idx is not None
+                       and pvp_idx >= 0 else None)
+
     for rc in rec_candidates[:REC_MAX_SPREADS]:
         iv = rc['iv']
         spreads.append(Spread(
@@ -189,7 +214,10 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
             n_breakpoint_opps=rc.get('n_breakpoint_opps') or 0,
             n_bulkpoint_opps=rc.get('n_bulkpoint_opps') or 0,
             n_breakpoint_newly=rc.get('n_breakpoint_newly') or 0,
-            flip_fd=flips.get(iv), flip_has_bait=has_bait,
+            flip_fd=flips.get(iv), flip_fd_sp=flips_sp.get(iv),
+            is_sp1=(sp1_idx is not None and iv == sp1_idx),
+            is_pvpoke=(pvp_idx is not None and pvp_idx >= 0 and iv == pvp_idx),
+            flip_has_bait=has_bait,
             is_efficient=bool(iv_efficient[iv]) if iv < len(iv_efficient) else False,
         ))
 
@@ -226,6 +254,7 @@ def build_card_model(data_obj, card_ctx, *, types, shadow=None,
         league_display=_league_display(data_obj['league']),
         cp_cap=data_obj.get('cpCap', 0),
         moveset=moveset, spreads=spreads,
+        flip_ref_sp1=flip_ref_sp1, flip_ref_pvpoke=flip_ref_pvpoke,
         single_iv=_wr(card_ctx.get('single_iv_winrate')),
         robust=_wr(robust_winrate, is_robust=True),
         key_wins=[(_pretty_opp(n), s) for n, s in card_ctx.get('key_wins', [])],
@@ -252,22 +281,54 @@ def _name_html(link_opps):
     return html.escape
 
 
-def _flip_html(fd, has_bait, link_opps):
+def _flip_prose(fd, has_bait, link_opps, id_prefix):
+    """Flip prose for one reference, or None. Distinct id_prefix per reference
+    line keeps the "+N more" toggle ids page-unique (dup-id guard)."""
     if not fd:
-        return ''
+        return None
     try:
         from deep_dive_rendering import prose_flip_summary
-        prose = prose_flip_summary(fd, max_gains=2, max_losses=1,
-                                   has_bait_axis=has_bait,
-                                   name_html=_name_html(link_opps),
-                                   expandable=True, id_prefix='fcard')
-        if not prose or prose == 'no matchup flips':
-            return prose
-        # The flip is measured against the stat-product #1 (reference) IV; label
-        # it so the lead spread's gains/loses line is not read as absolute.
-        return f'vs stat-product #1: {prose}'
+        return prose_flip_summary(fd, max_gains=2, max_losses=1,
+                                  has_bait_axis=has_bait,
+                                  name_html=_name_html(link_opps),
+                                  expandable=True, id_prefix=id_prefix) or None
     except Exception:  # noqa: BLE001
+        return None
+
+
+def _flip_html(s, link_opps, ref_sp1=None, ref_pvpoke=None):
+    """Flip lines vs BOTH references (stat-product #1 and PvPoke default),
+    each labeled with the spread it compares against. With no reference
+    labels, falls back to the unlabeled legacy line (synthetic-test ctxs
+    only -- production always rebuilds _cardCtx fresh, so every real
+    render carries the labels). The old "vs stat-product #1:" prefix is
+    gone for good; it misattributed the reference (flips were always vs
+    the PvPoke default)."""
+    if ref_sp1 is None and ref_pvpoke is None:
+        return _flip_prose(s.flip_fd, s.flip_has_bait, link_opps, 'fcard') or ''
+    if (s.flip_fd is None and s.flip_fd_sp is None
+            and not s.is_sp1 and not s.is_pvpoke):
         return ''
+    same = ref_sp1 is not None and ref_sp1 == ref_pvpoke
+    lines = []
+    if ref_sp1 is not None:
+        label = (f'vs stat-product #1 = PvPoke default ({ref_sp1})' if same
+                 else f'vs stat-product #1 ({ref_sp1})')
+        if s.is_sp1:
+            body = 'this spread IS the stat-product #1'
+        else:
+            fd = s.flip_fd if same else s.flip_fd_sp
+            body = (_flip_prose(fd, s.flip_has_bait, link_opps, 'fcardsp')
+                    or 'no matchup flips')
+        lines.append(f'{label}: {body}')
+    if ref_pvpoke is not None and not same:
+        if s.is_pvpoke:
+            body = 'this spread IS the PvPoke default'
+        else:
+            body = (_flip_prose(s.flip_fd, s.flip_has_bait, link_opps, 'fcard')
+                    or 'no matchup flips')
+        lines.append(f'vs PvPoke default ({ref_pvpoke}): {body}')
+    return '<br>'.join(lines)
 
 
 CARD_CSS = """
@@ -610,10 +671,10 @@ def _cover_html(s: Spread, link_opps=False, base_form_display=None,
 
 
 def _spread_html(s: Spread, link_opps=False, base_form_display=None,
-                 shadow=False):
+                 shadow=False, ref_sp1=None, ref_pvpoke=None):
     role = f'<div class="role">{html.escape(s.style)}</div>' if s.style else ''
     cover = _cover_html(s, link_opps, base_form_display, shadow)
-    _fh = _flip_html(s.flip_fd, s.flip_has_bait, link_opps)
+    _fh = _flip_html(s, link_opps, ref_sp1=ref_sp1, ref_pvpoke=ref_pvpoke)
     flips = f'<div class="flips">{_fh}</div>' if _fh else ''
     # Crown ("efficient" = globally Pareto-optimal IV).
     crown = (' <span class="ddcard-crown" title="Efficient IV (Pareto-optimal): '
@@ -661,7 +722,9 @@ def render_card_html(model: CardModel, *, standalone: bool) -> str:
                                   link_opps=not standalone)
     spreads = ''.join(_spread_html(s, link_opps=not standalone,
                                    base_form_display=m.base_form_display,
-                                   shadow=m.shadow)
+                                   shadow=m.shadow,
+                                   ref_sp1=m.flip_ref_sp1,
+                                   ref_pvpoke=m.flip_ref_pvpoke)
                       for s in m.spreads)
     # One full-width panel (wins | losses), spanning all the spread columns so
     # it reads as a card-level summary rather than aligning to any one spread.
