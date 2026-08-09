@@ -1070,11 +1070,18 @@ def render_matchup_boundary_bullets(boundaries, has_bait_axis=False,
     When *emit_opponent_ids* is True, the first <li> emitted for each
     opponent carries ``id="opp-<slug>"`` so external pages (e.g. the CD
     article's Matchup Delta table) can deep-link directly to that
-    opponent's first boundary bullet. Only enable at the standalone
-    (section-level) call site -- the tier-card-nested call also renders
-    these bullets but enabling ids in both contexts produces duplicate
-    DOM ids and the browser lands in a tier card rather than the
-    standalone section.
+    opponent's boundary bullet. Duplicate ids are impossible -- the id
+    comes from ``opp_anchor_id()``, which is first-mention-wins per
+    output file -- but that also means whichever caller runs FIRST
+    claims the landing spot, so enabling the flag here would steal
+    ``#opp-<slug>`` from the per-opponent rows in
+    ``render_opponent_threats_section``.
+
+    No call site currently passes True: the standalone
+    "Matchup-Flipping Boundaries" section this flag was written for was
+    subsumed by the opponent-threats section, and the only remaining
+    call site is the tier-card-nested one, which must not claim the
+    anchors. Leave it False unless a new section-level caller needs it.
     """
     lines = []
     for i, b in enumerate(boundaries):
@@ -3955,12 +3962,6 @@ def render_results_section(data_obj, moveset_label, opp_label,
     # Anchor-Driven Matchup Flips are preserved alongside it.
     threshold_descs = generate_threshold_descriptions(flips, data_obj, avg_scores, ranked, opp_iv_mode,
                                                       has_bait_axis=has_bait_axis)
-    anchor_bullets = []
-    if anchor_flip_records:
-        anchor_bullets = render_anchor_flip_bullets(
-            anchor_flip_records, anchor_passing_sink=anchor_passing_sink,
-            has_bait_axis=has_bait_axis,
-            emit_opponent_ids=True)
 
     # Key Matchup Thresholds - high-level overview (kept).
     if threshold_descs:
@@ -3982,6 +3983,24 @@ def render_results_section(data_obj, moveset_label, opp_label,
 
     # Anchor-Driven Matchup Flips - nested collapsible (a separate dataset:
     # damage-tier boundaries from named anchors, not all_matchup_boundaries).
+    #
+    # ORDERING IS LOAD-BEARING: opp_anchor_id() is first-mention-wins at
+    # *compute* time, so these bullets must be built AFTER
+    # render_opponent_threats_section() above. That way the threats section's
+    # per-opponent decision rows / hoists / stealable lines claim
+    # id="opp-<slug>" and a #opp-<slug> deep link lands on the opponent's
+    # matchup detail instead of a damage-tier bullet in this collapsed list.
+    # emit_opponent_ids stays True here so these bullets remain the FALLBACK
+    # claimer on dives where the threats section renders nothing (see the
+    # early return in render_opponent_threats_section) -- dropping the flag
+    # would shrink the anchored-opponent set that generate_article.py scrapes.
+    anchor_bullets = []
+    if anchor_flip_records:
+        anchor_bullets = render_anchor_flip_bullets(
+            anchor_flip_records, anchor_passing_sink=anchor_passing_sink,
+            has_bait_axis=has_bait_axis,
+            emit_opponent_ids=True)
+
     if anchor_bullets:
         parts.append(
             f'<details class="dd-collapsible">'
