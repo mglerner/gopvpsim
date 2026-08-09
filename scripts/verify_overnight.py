@@ -13,13 +13,19 @@ the 2026-06-12 morning where they were done by hand):
    plus any [FAIL] step lines in the newest overnight_*.log. A failure
    that was diagnosed, fixed and re-verified by hand can be recorded in
    docs/chain_resolutions.toml (see load_resolutions) so it reports as
-   RSLV rather than staying red forever.
+   RSLV rather than staying red forever. Also scans the same log for
+   "[WARN] narrative patch failed" lines (see scan_narrative_warnings):
+   run_website_dives patches the species narrative WARN-not-FAIL, so a
+   failed patch would otherwise pass the gate silently.
 2. freshness — every dive dir under userdata/website/ must have its
    index*.html either all newer than the chain start (re-dived) or all
    older (not in this chain). Mixed vintages mean stale split-file
    orphans that downstream consumers would read as current data.
-3. pool sanity — marker species must appear in every fresh GL dive's
-   opponent list (proof the intended opponent pool actually loaded).
+3. pool sanity — every entry a dive's own opponents_file declares must
+   appear in that dive's opponent list (see missing_pool_entries), plus
+   the older marker-species check on fresh GL dives. Proof the intended
+   opponent pool actually loaded, and that no entry was silently dropped
+   by a get_default_moveset failure.
 4. ship gates — verify_article_links --ship and
    verify_no_unicode_dashes --ship, run as subprocesses.
 5. ML IV guides — every species in the ML pool (run_iv_guides'
@@ -135,6 +141,60 @@ def extract_opponents(html_path: Path) -> list[str] | None:
     return arr
 
 
+def missing_pool_entries(opponents: list[str], pool_path: Path) -> list[str]:
+    """Declared pool entries whose display name never reached the dive.
+
+    deep_dive.py resolves each pool line's default moveset through
+    get_default_moveset() and, on KeyError/ValueError, logs
+    "skipping <name>: ..." and drops the entry (deep_dive.py:4145-4153).
+    A species deranked out of a league's rankings file therefore vanishes
+    from that league's opponent list with only a WARNING -- and no count
+    check can catch it, because the mirror entry, TOML anchor opponents,
+    atk-weighted variants and active_variants.toml all APPEND, absorbing
+    several silent drops before any floor would trip.
+
+    So the assertion is name-set containment, not a count: every display
+    name the pool file declares must appear in DATA.opponents. Containment
+    is rankings-free -- _parse_opponent_pool_line is pure string parsing
+    plus analysis.pretty_name for move-ID overrides -- so it cannot
+    self-drop the way a recomputed expected count would.
+
+    Coverage caveat: this proves every DECLARED entry rendered; it does
+    NOT prove the pool file is current. A species deranked out of PvPoke's
+    rankings AND hand-removed from the pool file still passes. Keeping the
+    pool file fresh is the pool-refresh workflow's job (see the header of
+    opponent_pools/ul_top60.txt), not this gate's.
+
+    Raises ValueError (from the parser) on a malformed pool line; the
+    caller reports that as its own error rather than swallowing it.
+    """
+    from deep_dive_lib.opponents import _parse_opponent_pool_line
+    have = set(opponents)
+    missing = []
+    for raw in pool_path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith('#'):
+            continue
+        display = _parse_opponent_pool_line(line)[0]
+        if display not in have:
+            missing.append(display)
+    return missing
+
+
+def dive_pool_map() -> dict[str, Path]:
+    """slug -> opponents-file path, from run_website_dives' DIVES list.
+
+    Every dive declares its own pool, so the completeness check is
+    per-dive rather than per-league (all 97 DIVES entries carry an
+    explicit `opponents_file` today; the `opponents: N` rankings-top-N
+    branch is unused). Importing DIVES keeps this single-sourced, the
+    way step 4 imports SHIP_GATES and step 5 imports run_iv_guides.
+    """
+    from run_website_dives import DIVES
+    return {d['slug']: REPO / d['opponents_file']
+            for d in DIVES if d.get('opponents_file')}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description='Morning-after overnight-chain verification')
@@ -243,6 +303,14 @@ def main() -> int:
     # 3. Pool sanity --------------------------------------------------
     print('[3/5] pool sanity (markers: ' + ', '.join(args.markers) + ')')
     counts: dict[str, int] = {}
+    try:
+        pools = dive_pool_map()
+    except Exception as e:
+        pools = {}
+        errors.append(f'DIVES pool map unreadable: {e}')
+        print(f'  ERR cannot build DIVES pool map: {e}')
+    contained = 0
+    unmapped = 0
     for d in fresh_dirs:
         opps = extract_opponents(d / 'index.html')
         if opps is None:
@@ -250,6 +318,32 @@ def main() -> int:
             print(f'  ERR {d.name}: no DATA.opponents found')
             continue
         counts[d.name] = len(opps)
+        # Completeness: every entry the dive's own pool file declares must
+        # have survived into DATA.opponents. Subsumes the GL marker check
+        # below (all three markers are ordinary pool entries) and extends
+        # it to UL/ML/cup, which had no pool guard at all.
+        pool = pools.get(d.name)
+        if pool is None:
+            # Dead today (every dive dir maps to a DIVES slug with an
+            # opponents_file), but stated out loud so an unmapped dive
+            # -- e.g. one switched to the `opponents: N` top-N branch --
+            # can never look covered when it is not.
+            unmapped += 1
+            print(f'  NOTE {d.name}: no DIVES pool mapping, '
+                  f'completeness unchecked')
+        else:
+            try:
+                gone = missing_pool_entries(opps, pool)
+            except ValueError as e:
+                errors.append(f'{d.name}: malformed line in {pool.name}: {e}')
+                print(f'  ERR {d.name}: malformed line in {pool.name}: {e}')
+            else:
+                if gone:
+                    msg = f'{d.name}: pool entries missing from dive: {gone}'
+                    errors.append(msg)
+                    print(f'  ERR {msg}')
+                else:
+                    contained += 1
         if 'great-league' in d.name:
             missing = [m for m in args.markers
                        if not any(o.split(' (')[0] == m for o in opps)]
@@ -257,6 +351,11 @@ def main() -> int:
                 errors.append(f'{d.name}: markers missing: {missing}')
                 print(f'  ERR {d.name}: {len(opps)} opponents, '
                       f'missing {missing}')
+    if contained:
+        print(f'  OK  {contained} fresh dives contain every declared '
+              f'pool entry')
+    if unmapped:
+        print(f'  NOTE {unmapped} fresh dives had no DIVES pool mapping')
     if counts:
         lo, hi = min(counts.values()), max(counts.values())
         print(f'  OK  opponent counts across {len(counts)} fresh dives: '
