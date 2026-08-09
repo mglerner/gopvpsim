@@ -194,7 +194,10 @@ def truncate(text: str, max_width: int) -> str:
 def print_status(status_file: Path, width: int) -> None:
     if not status_file.exists():
         return
-    line = status_file.read_text().strip()
+    try:
+        line = status_file.read_text().strip()
+    except OSError:
+        return
     if not line:
         return
     if 'SUCCESS' in line:
@@ -425,7 +428,7 @@ def print_eta(wrapper_log: Path | None,
               per_dive_log: Path | None = None) -> None:
     """Surface a runtime ETA.
 
-    Wrapper-driven chains (overnight, retrofit) shell out to
+    Wrapper-driven chains (overnight) shell out to
     overnight_eta.py for SCRIPT/DIVE/BUCKETS lines (bucket-mean
     averaging across past runs needs the wrapper log's per-dive
     START/DONE banners).
@@ -440,8 +443,10 @@ def print_eta(wrapper_log: Path | None,
     """
     if wrapper_log is not None:
         try:
+            # sys.executable, not bare 'python': this script may run from a
+            # shell without direnv (where 'python' resolves to nothing).
             r = subprocess.run(
-                ['python', str(REPO_ROOT / 'scripts' / 'overnight_eta.py'),
+                [sys.executable, str(REPO_ROOT / 'scripts' / 'overnight_eta.py'),
                  str(wrapper_log)],
                 capture_output=True, text=True, check=False,
             )
@@ -534,31 +539,60 @@ def print_latest_log(per_dive_log: Path | None, width: int,
         print(f'  {truncate(clean, width - 4)}')
 
 
-def print_step_transitions(wrapper_log: Path | None, width: int) -> None:
+# Wrapper-log step lines: 'YYYY-MM-DD HH:MM:SS [KIND] label ...'
+_WRAPPER_STEP_RE = re.compile(
+    r'^[0-9-]+ (\d\d:\d\d:\d\d) \[(STEP|DONE|FAIL|FATAL)\] (.*)$')
+
+
+def print_step_checklist(wrapper_log: Path | None, width: int) -> None:
+    """Full-run step checklist, built dynamically from the wrapper log's
+    [STEP]/[DONE]/[FAIL]/[FATAL] lines — no hardcoded step list, so it
+    can't go stale when overnight_redive.sh gains or loses steps.
+
+    Green ``+`` done (with elapsed), cyan ``>`` running, red ``x``
+    failed. A [DONE]/[FAIL] label is prefix-matched against the open
+    [STEP]: the ML step logs a longer STEP label ('ML IV guides
+    (run_iv_guides.py, ...)') than its DONE line ('ML IV guides')."""
     if wrapper_log is None:
         return
     try:
-        text = wrapper_log.read_text()
+        lines = wrapper_log.read_text().splitlines()
     except OSError:
         return
-    relevant = [
-        ln for ln in text.splitlines()
-        if re.search(r'\[(STEP|DONE|FAIL|FATAL)\]', ln)
-    ]
-    if not relevant:
+    steps: list[list] = []  # [start_hms, label, state, elapsed_s | None]
+    for ln in lines:
+        m = _WRAPPER_STEP_RE.match(ln)
+        if not m:
+            continue
+        hms, kind, rest = m.groups()
+        if kind == 'STEP':
+            steps.append([hms, rest, 'running', None])
+            continue
+        if kind == 'FATAL':
+            steps.append([hms, rest, 'fatal', None])
+            continue
+        # [DONE] label (123s)  /  [FAIL] label (rc=1, 123s)
+        m2 = re.match(r'(.*?) \((?:rc=\d+, )?(\d+(?:\.\d+)?)s\)$', rest)
+        label, secs = (m2.group(1), float(m2.group(2))) if m2 else (rest, None)
+        for st in reversed(steps):
+            if st[2] == 'running' and (st[1].startswith(label)
+                                       or label.startswith(st[1])):
+                st[2] = 'done' if kind == 'DONE' else 'fail'
+                st[3] = secs
+                break
+    if not steps:
         return
-    print(f'  {bold("Recent step transitions:")}')
-    for line in relevant[-3:]:
-        # Drop the leading date; keep the HH:MM:SS timestamp for context.
-        clean = re.sub(r'^[0-9-]+ ', '', line)
-        if 'FAIL' in clean or 'FATAL' in clean:
-            print(f'  {red(truncate(clean, width - 4))}')
-        elif 'DONE' in clean:
-            print(f'  {green(truncate(clean, width - 4))}')
-        elif 'STEP' in clean:
-            print(f'  {yellow(truncate(clean, width - 4))}')
+    print(f'  {bold("Steps:")}')
+    for hms, label, state, secs in steps:
+        el = dim(f' ({fmt_elapsed(int(secs))})') if secs is not None else ''
+        label = truncate(label, width - 22)
+        if state == 'done':
+            print(f'  {green("+")} {label}{el} {dim("(" + hms + ")")}')
+        elif state in ('fail', 'fatal'):
+            print(f'  {red("x")} {red(label)}{el} {dim("(" + hms + ")")}')
         else:
-            print(f'  {truncate(clean, width - 4)}')
+            print(f'  {cyan(">")} {bold(label)} {dim("(" + hms + ")")}'
+                  f'  {cyan("<- running")}')
 
 
 def chain_start_epoch(wrapper_log: Path | None) -> int | None:
@@ -818,7 +852,7 @@ def main() -> int:
 
     p = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     p.add_argument('--chain', choices=list(CHAINS),
-                   help='Preset chain (overnight, retrofit, single). '
+                   help='Preset chain (overnight, single). '
                         '`single` tracks the most recent ad-hoc '
                         '`python scripts/deep_dive.py ...` run.')
     p.add_argument('--status-file', type=Path,
@@ -846,23 +880,28 @@ def main() -> int:
         preset = CHAINS[args.chain]
     else:
         preset = {}
-    status_file = Path(args.status_file or preset.get('status_file') or '')
+    # Validate the raw values BEFORE Path-wrapping: Path('') is Path('.')
+    # and truthy, so a missing --status-file used to slip past this guard
+    # and crash later on read_text() of a directory.
+    status_arg = args.status_file or preset.get('status_file')
     pgrep_pattern = args.pgrep or preset.get('pgrep')
     wrapper_log_glob = args.wrapper_log_glob or preset.get('wrapper_log_glob')
 
-    if not status_file or not pgrep_pattern or not wrapper_log_glob:
+    if not status_arg or not pgrep_pattern or not wrapper_log_glob:
         p.error('--chain or all of --status-file/--pgrep/--wrapper-log-glob required')
 
-    status_file = (REPO_ROOT / status_file if not status_file.is_absolute()
-                   else status_file)
+    status_file = Path(status_arg)
+    if not status_file.is_absolute():
+        status_file = REPO_ROOT / status_file
     width = terminal_width()
     height = terminal_height()
     # Lines the rest of the display consumes (header, pid/status/dive/eta,
-    # section headers + rules, step transitions, recent products, refresh
-    # hint, plus a couple for watch's own header). Conservative so we
-    # under-fill by a few rows rather than overflow -- watch truncates the
-    # BOTTOM when content exceeds the pane.
-    _FIXED_OVERHEAD = 34
+    # section headers + rules, step checklist [~11 rows for a full
+    # overnight run], recent products, refresh hint, plus a couple for
+    # watch's own header). Conservative so we under-fill by a few rows
+    # rather than overflow -- watch truncates the BOTTOM when content
+    # exceeds the pane.
+    _FIXED_OVERHEAD = 40
     fill_budget = max(6, height - _FIXED_OVERHEAD)
 
     # Header + PID liveness.
@@ -871,8 +910,17 @@ def main() -> int:
     rule(width)
 
     pid = args.pid or find_pid(pgrep_pattern)
+    try:
+        status_text = status_file.read_text()
+    except OSError:
+        status_text = ''
     if pid and (etime := pid_etime(pid)):
         print(f'  PID {pid}  {green(bold("ALIVE"))}  (elapsed {etime.strip()})')
+    elif 'SUCCESS' in status_text:
+        # A finished chain has no PID; that's completion, not death.
+        print(f'  {green(bold("COMPLETE"))}  {dim("(chain exited cleanly)")}')
+    elif 'FAIL' in status_text or 'FATAL' in status_text:
+        print(f'  {red(bold("FAILED"))}  {dim("(see step line below)")}')
     else:
         print(f'  PID {pid or "?"}  {red(bold("DEAD / NOT FOUND"))}')
 
@@ -914,12 +962,15 @@ def main() -> int:
         per_dive_log = per_dive_candidates[0] if per_dive_candidates else None
 
         print_dive_info(wrapper_log, per_dive_log, width)
-        print_eta(wrapper_log, per_dive_log)
+        if pid:
+            # ETA only for a live chain: overnight_eta happily extrapolates
+            # a finished/dead log into a fabricated "~5m remaining".
+            print_eta(wrapper_log, per_dive_log)
         rule(width)
         print_latest_log(per_dive_log, width, max_tail=min(fill_budget, 45))
         rule(width)
 
-    print_step_transitions(wrapper_log, width)
+    print_step_checklist(wrapper_log, width)
     rule(width)
     print_recent_products(wrapper_log, width)
     rule(width)
