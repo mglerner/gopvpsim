@@ -43,7 +43,8 @@ STEP_ORDER = [
 ]
 
 _STEP_RE = re.compile(r'^\[(\d\d:\d\d:\d\d)\] \[STEP\] (.+)$', re.M)
-_ROW_RE = re.compile(r'^\[(\d+)/(\d+)\] (OK|FAIL) (\S+) \(([\d.]+)s\)', re.M)
+# \s+ after OK|FAIL: the chain pads the status column ('OK  '/'FAIL')
+_ROW_RE = re.compile(r'^\[(\d+)/(\d+)\] (OK|FAIL)\s+(\S+) \(([\d.]+)s\)', re.M)
 _TOTAL_RE = re.compile(r'(\d+) blob\(s\) within')
 _ML_RE = re.compile(r'ML guides: (\d+) ok, (\d+) failed')
 _FAILMARK_RE = re.compile(r'^FAIL-\S+', re.M)
