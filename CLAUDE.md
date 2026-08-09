@@ -316,7 +316,9 @@ Script shebangs all use `#!/usr/bin/env python`, which lands on
 were needed for the uv switch).
 
 **Install / fresh-machine setup:** `uv venv` → `uv pip install -e
-".[dev,perf]"` → `direnv allow`. Runtime deps are declared in
+".[dev,perf]"` → `direnv allow` → `git config core.hooksPath .githooks`
+(activates the pre-commit gates; the 2026-08-09 test-suite review found
+this documented-but-never-run in the working clone). Runtime deps are declared in
 `pyproject.toml` (currently `certifi`, `markdown`, `numpy`); `[dev]`
 adds `pytest`; `[perf]` adds `numba`. **Do not skip `[perf]`:**
 `_dp_jit.py` falls back to a pure-Python inner loop without numba, and

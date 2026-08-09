@@ -24,6 +24,36 @@ def test_roster_has_all_gates():
     # Wired 2026-08-06: dev-count sentinels render into the published
     # guides, so their drift check ships with everything else.
     assert 'verify_dev_counts.py' in names
+    # Wired 2026-08-09 (test-suite review Phase 1): the fast test tier
+    # runs on every publish path; no gate ran pytest before this.
+    assert 'verify_tests.py' in names
+
+
+def test_verify_tests_gate_is_loud_without_node(monkeypatch):
+    import verify_tests
+    monkeypatch.setattr(verify_tests.shutil, 'which', lambda _: None)
+    assert verify_tests.main() == 1
+
+
+def test_verify_tests_gate_runs_the_fast_tier(monkeypatch):
+    """With node present, the gate execs pytest -m 'not slow' and
+    propagates its return code (subprocess faked -- running the real
+    suite from inside itself would recurse)."""
+    import verify_tests
+    monkeypatch.setattr(verify_tests.shutil, 'which',
+                        lambda _: '/usr/bin/node')
+    calls = []
+
+    class _R:
+        returncode = 0
+
+    def fake_run(argv, **kw):
+        calls.append(argv)
+        return _R()
+    monkeypatch.setattr(verify_tests.subprocess, 'run', fake_run)
+    assert verify_tests.main() == 0
+    (argv,) = calls
+    assert '-m' in argv and 'not slow' in argv and 'pytest' in argv
 
 
 def test_roster_entries_carry_full_argv():
