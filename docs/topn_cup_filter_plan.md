@@ -48,7 +48,8 @@ embedded rank metadata just comes from the cup rankings).
 - Avg battle score is NOT pre-averaged in Python: `computeYValues` sums over
   all `nO` opponents in JS (`deep_dive_engine.js:211-263`, avg at
   `:256-260`); wins modes, Matchups Kept (`:2445`), and the paste-box
-  "Gives up vs #1" column (`:1216-1218`) likewise loop `oi` over `0..nO-1`.
+  "Gives up vs #1" column (now in the SHA-pinned region
+  `deep_dive_engine.js:~1465-1534`) likewise loop `oi` over `0..nO-1`.
 - All primary dropdowns are true client-side recomputes via `updateView()`
   (`deep_dive_engine.js:2787-2916`); the controls strip is ~8 `<select>`s
   with `onchange="updateView()"` (`deep_dive.py:5029-5116`) -- clean
@@ -71,17 +72,17 @@ Everything below is computed at bake time over the FULL pool and will not
 respond to a client-side mask. Under a filtered view these are wrong-or-
 misleading unless flagged (never-present-unflagged-known-wrong rule):
 
-| Section                             | Full-pool claim                            | Evidence                             |
-| ----------------------------------- | ------------------------------------------ | ------------------------------------ |
-| Infographic card                    | win rate "% of N opponents", key wins/     | `deep_dive.py:3728-3853` (_cardCtx), |
-|                                     | losses, robustness %, two-#1s counts       | `deep_dive_card.py:379`              |
-| Methodology line (JS)               | "against {nO} opponents" hard-quotes nO    | `deep_dive_engine.js:2773-2775`      |
-| Auto-derived tiers + ivTiers colors | thresholds from full-grid flips/boundaries | `deep_dive.py:3518-3620`             |
-| Top Picks / recIvs                  | avg rank over all opponents                | `deep_dive.py:2995-3037, 3446-3449`  |
-| IV Flavor Guide narrative           | derives from full-pool tiers/boundaries    | `deep_dive.py:2721-2859`             |
-| Notable-IVs census counts           | sweeps damage boundaries over whole pool   | `deep_dive.py:3136-3138`             |
-| ~~clusterGaps overlay~~ (RETIRED 2026-07, 58bbd8f -- replaced by the matchup-clusters section, itself full-pool + bannered) | Python-precomputed full-pool averages | n/a |
-| Slayer "anchors N/M" checklist      | denominator from pool-derived auto anchors | `deep_dive.py:7287-7295, 7373-7375`  |
+| Section                                                                                                                     | Full-pool claim                            | Evidence                             |
+| --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------ |
+| Infographic card                                                                                                            | win rate "% of N opponents", key wins/     | `deep_dive.py:3728-3853` (_cardCtx), |
+|                                                                                                                             | losses, robustness %, two-#1s counts       | `deep_dive_card.py:379`              |
+| Methodology line (JS)                                                                                                       | "against {nO} opponents" hard-quotes nO    | `deep_dive_engine.js:2773-2775`      |
+| Auto-derived tiers + ivTiers colors                                                                                         | thresholds from full-grid flips/boundaries | `deep_dive.py:3518-3620`             |
+| Top Picks / recIvs                                                                                                          | avg rank over all opponents                | `deep_dive.py:2995-3037, 3446-3449`  |
+| IV Flavor Guide narrative                                                                                                   | derives from full-pool tiers/boundaries    | `deep_dive.py:2721-2859`             |
+| Notable-IVs census counts                                                                                                   | sweeps damage boundaries over whole pool   | `deep_dive.py:3136-3138`             |
+| ~~clusterGaps overlay~~ (RETIRED 2026-07, 58bbd8f -- replaced by the matchup-clusters section, itself full-pool + bannered) | Python-precomputed full-pool averages      | n/a                                  |
+| Slayer "anchors N/M" checklist                                                                                              | denominator from pool-derived auto anchors | `deep_dive.py:7287-7295, 7373-7375`  |
 
 Subset-SAFE: the mirror-slayer categories themselves (focal-vs-focal
 iteration, pool-independent, `deep_dive_slayer.py:250-282`); per-opponent
