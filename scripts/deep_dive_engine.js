@@ -3707,7 +3707,11 @@ function cmpSummary(iv) {
   }
   return { wins: wins, n: nS * oppDen, avg: tot / (nS * oppDen) };
 }
-// "Gives up vs #1": avg-score gap to the best battle-IV in the active grid.
+// "Avg score behind best": avg-score gap to the best battle-IV in the active
+// grid. Deliberately NOT called "Gives up vs #1" -- the collection table's
+// column of that name counts DROPPED MATCHUPS against the current y-axis #1,
+// while this is a score-point gap against the best-average IV, so one name for
+// both would put two different units under one label.
 // Cache key is the active grid's score key (moveset + mode + level) plus the
 // mask signature, so a selection change re-finds the best (else it would
 // compare candidates against a full-pool best under a filter).
@@ -3844,7 +3848,10 @@ function cmpRender() {
     h += xrow('Wins (all shields)', r.sum.wins + ' / ' + r.sum.n);
     var gu = Math.round(bestAvg - r.sum.avg);
     var guc = gu <= 5 ? 'cmp-good' : (gu <= 20 ? 'cmp-mid' : 'cmp-bad');
-    h += '<div class="cmp-row"><span>Gives up vs #1</span><b class="' + guc + '">' + gu + '</b></div>';
+    h += '<div class="cmp-row" title="Average battle-score points behind the ' +
+      'best-average IV in this dive, over all shield scenarios and the selected ' +
+      'opponents. Score points, not matchups."><span>Avg score behind best</span>' +
+      '<b class="' + guc + '">' + gu + '</b></div>';
     h += xrow('Anchors cleared', cmpAnchors(iv) + ' opp');
     var mir = cmpMirror(iv);
     if (mir !== null) h += '<div class="cmp-pill ' + (mir ? '' : 'cmp-pill-lose') + '">' +

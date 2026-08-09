@@ -5,12 +5,23 @@ dropped-vs-rank-1 matchups from already-rendered deep-dive HTML -- no re-sim.
 Each dive embeds the full 4096-IV x scenario x opponent score grid (SCORES_GZ).
 For every IV we emit the matchups the rank-1 spread wins but this IV loses (even
 shields), against the dive's default opponents (moveset 0, oppIvMode 'pvpoke',
-baiting on) -- the same view the website "Gives up vs #1" column uses, so the
-two agree. The on-device screen looks up an owned mon's IV in this artifact.
+baiting on). The on-device screen looks up an owned mon's IV in this artifact.
 
-Convention note: this uses the DIVE's opponents (their PvPoke-default IVs), so
-it matches the website column. The Python CLI (owned_breakdown.py) uses
-opponents at 15/15/15 (the iv_envelope convention) and will differ slightly.
+Convention note: this is a THIRD "Gives up vs #1" surface, not a copy of either
+other one. It matches the Python CLI's (owned_breakdown.py) reference spread
+(stat-product rank-1, DATA.rank1RefIvIdx) and even-shield convention, but uses
+the DIVE's opponents at their PvPoke-default IVs where the CLI sims fresh
+against 15/15/15 -- so CLI numbers will differ slightly. It does NOT match the
+dive page's collection-table column, whose "#1" is the top IV on the current
+y-axis metric over the shields the user has selected, not the stat-product
+rank-1 over even shields.
+
+Staleness caveat: DATA.rank1RefIvIdx is only the CLI's stat-product rank-1 for
+dives rendered at or after 8c1f98e ("Rank the dive's SP column with PvPoke's
+convention everywhere"). Older pages carry the pre-fix marker -- e.g. the
+currently-shipped Umbreon GL dive marks 0/15/14 where iv_rank says 0/15/15 --
+so a bundle built from them differs from the CLI in its REFERENCE SPREAD too,
+not just in opponent IVs. Re-render before trusting bundle/CLI parity.
 
 Compact: only IVs that actually drop something are stored; an IV absent from
 `drops` gives up nothing vs rank-1.
