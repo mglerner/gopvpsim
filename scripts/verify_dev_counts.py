@@ -38,8 +38,22 @@ Usage
 
     python scripts/verify_dev_counts.py
     python scripts/verify_dev_counts.py --quiet   # only emit mismatches
+    python scripts/verify_dev_counts.py --update  # rewrite derivable sentinels
 
 Exit code is 0 on full agreement, 1 on any mismatch or missing sentinel.
+
+``--update`` (opt-in) turns the derivable-key check from a gate into a
+fix: each derivable sentinel whose value disagrees with the live
+derivation is rewritten in place in DEVELOPER_NOTES.md (old -> new is
+printed) instead of being reported as drift.  Non-derivable keys are
+never rewritten, and missing/implausible sentinels still fail.  Without
+``--update`` behavior is unchanged: nothing is written and any drift
+exits 1.
+
+The flag exists because ``test_count`` is a serialization point --
+parallel work lanes that each add tests otherwise race to hand-edit the
+same sentinel line.  One explicit ``--update`` at the end of a batch
+replaces N conflicting hand edits.
 """
 from __future__ import annotations
 
@@ -89,6 +103,40 @@ def _parse_sentinels(text: str) -> dict[str, int]:
     return out
 
 
+def _rewrite_sentinel(text: str, key: str, value: int) -> tuple[str, int]:
+    """Return ``(new_text, n_rewritten)`` with ``sync:key``'s value replaced.
+
+    Only the text *between* the sentinel comments changes; the comment
+    markers and any whitespace padding around the value are preserved
+    verbatim, so the result still matches ``_parse_sentinels``.
+
+    The value group is ``[^<]*?`` rather than ``.+?``: a match must never
+    be able to cross a ``<!--``.  If a closing ``<!-- /sync -->`` is ever
+    lost to a hand-edit, a ``.+?`` match would run on to the *next* key's
+    closing marker and the rewrite would silently delete the intervening
+    prose and that whole sentinel.  With ``[^<]*?`` a malformed span
+    simply doesn't match, so nothing is rewritten and the caller reports
+    it.
+    """
+    pattern = re.compile(
+        r'(<!--\s*sync:' + re.escape(key) + r'\s*-->)'
+        r'([^<]*?)(<!--\s*/sync\s*-->)'
+    )
+
+    def _sub(m: re.Match) -> str:
+        inner = m.group(2)
+        if inner.strip():
+            lead = inner[:len(inner) - len(inner.lstrip())]
+            trail = inner[len(inner.rstrip()):]
+        else:
+            # All-whitespace body: lstrip() and rstrip() would each claim
+            # the whole run, doubling the padding.
+            lead, trail = inner, ''
+        return f'{m.group(1)}{lead}{value}{trail}{m.group(3)}'
+
+    return pattern.subn(_sub, text)
+
+
 def _derive_test_count() -> int:
     """Run pytest --collect-only and parse the tests-collected total."""
     result = subprocess.run(
@@ -122,13 +170,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('--quiet', action='store_true',
                         help='Only print mismatches; stay silent on agreement.')
+    parser.add_argument('--update', action='store_true',
+                        help='Rewrite drifted DERIVABLE sentinels in '
+                             'DEVELOPER_NOTES.md instead of failing on them. '
+                             'Non-derivable keys are never touched.')
     args = parser.parse_args()
 
     if not DEV_NOTES_PATH.is_file():
         print(f'error: {DEV_NOTES_PATH} missing', file=sys.stderr)
         return 1
 
-    sentinels = _parse_sentinels(DEV_NOTES_PATH.read_text())
+    text = DEV_NOTES_PATH.read_text()
+    sentinels = _parse_sentinels(text)
 
     problems: list[str] = []
 
@@ -147,35 +200,43 @@ def main() -> int:
         elif not args.quiet:
             print(f'  {key}: {val} (trusted)')
 
-    # 3. Derivable keys: recompute and compare.
-    if 'test_count' in sentinels:
-        val = sentinels['test_count']
+    # 3. Derivable keys: recompute and compare (and rewrite under --update).
+    # Names are resolved here rather than at import time so tests can
+    # monkeypatch the derivations.
+    derivers = (
+        ('test_count', _derive_test_count),
+        ('type_chart_cells_verified', _derive_type_chart_cells),
+    )
+    dirty = False
+    for key, derive in derivers:
+        if key not in sentinels:
+            continue
+        val = sentinels[key]
         try:
-            live = _derive_test_count()
+            live = derive()
         except Exception as exc:  # pragma: no cover - environmental
-            problems.append(f'test_count: derivation failed ({exc})')
+            problems.append(f'{key}: derivation failed ({exc})')
+            continue
+        if val == live:
+            if not args.quiet:
+                print(f'  {key}: {val} (matches live)')
+        elif args.update:
+            text, n = _rewrite_sentinel(text, key, live)
+            if n:
+                dirty = True
+                print(f'  {key}: {val} -> {live} (updated DEVELOPER_NOTES.md)')
+            else:
+                # Reachable when the sentinel pair is malformed (e.g. a
+                # lost closing marker): the narrow rewrite pattern refuses
+                # to match, so we fail loudly instead of eating prose.
+                problems.append(f'{key}: could not rewrite sentinel')
         else:
-            if val != live:
-                problems.append(
-                    f'test_count: sentinel {val} != live {live} '
-                    f'(update DEVELOPER_NOTES.md)')
-            elif not args.quiet:
-                print(f'  test_count: {val} (matches live)')
-
-    if 'type_chart_cells_verified' in sentinels:
-        val = sentinels['type_chart_cells_verified']
-        try:
-            live = _derive_type_chart_cells()
-        except Exception as exc:  # pragma: no cover - environmental
             problems.append(
-                f'type_chart_cells_verified: derivation failed ({exc})')
-        else:
-            if val != live:
-                problems.append(
-                    f'type_chart_cells_verified: sentinel {val} != '
-                    f'live {live} (update DEVELOPER_NOTES.md)')
-            elif not args.quiet:
-                print(f'  type_chart_cells_verified: {val} (matches live)')
+                f'{key}: sentinel {val} != live {live} '
+                f'(update DEVELOPER_NOTES.md)')
+
+    if dirty:
+        DEV_NOTES_PATH.write_text(text)
 
     # 4. Unknown sentinel keys are informational - print but don't fail.
     unknown = sentinels.keys() - ALL_KEYS
