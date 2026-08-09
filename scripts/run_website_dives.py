@@ -1133,6 +1133,15 @@ def main():
             if patch_result.returncode != 0:
                 print(f"  [WARN] narrative patch failed for {dive['slug']} "
                       f"(rc={patch_result.returncode}); continuing.")
+        else:
+            # Near-unreachable (a nonzero dive already sys.exit(1)s above),
+            # but skipping the patch silently is the one path that emits no
+            # line for verify_overnight to scan. Same WARN wording so the
+            # existing scan catches it -- the literal substring
+            # "WARN] narrative patch failed" is the contract with
+            # verify_overnight.scan_narrative_warnings.
+            print(f"  [WARN] narrative patch failed for {dive['slug']} "
+                  f"(no dive dir at {dive_dir}); continuing.")
 
     if not args.dry_run:
         print(f"\nAll {len(dives)} dive(s) complete.")
