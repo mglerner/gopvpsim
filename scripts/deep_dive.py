@@ -1419,7 +1419,12 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     pvpoke_ref_iv_idx = -1
     rank1_ref_iv_idx = -1
     try:
-        _lv, da, dd, ds = pvpoke_default_ivs(species, league=league)
+        # shadow= matters: ~37 species have divergent shadow defaultIVs
+        # (pokemon.py pvpoke_default_ivs); without it a shadow dive's
+        # "PvPoke default" reference is the non-shadow spread (review F3
+        # 2026-08-09 -- latent, 0 shipped shadow dives diverge today).
+        _lv, da, dd, ds = pvpoke_default_ivs(species, league=league,
+                                             shadow=shadow)
         for i in range(n_ivs):
             if iv_a[i] == da and iv_d[i] == dd and iv_s[i] == ds:
                 pvpoke_ref_iv_idx = i

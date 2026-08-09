@@ -632,6 +632,41 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     flip_summary = [(iv, len(f['gains']), len(f['losses']), len(f['gains']) - len(f['losses'])) for iv, f in flips.items()]
     flip_summary.sort(key=lambda x: (-x[3], -x[1]))
     flip_map = {iv: (g, l, net) for iv, g, l, net in flip_summary}
+
+    # Second flip reference, card-only: the stat-product #1 (rank1RefIvIdx).
+    # The recommendation card shows BOTH "vs stat-product #1" and "vs PvPoke
+    # default" lines (Michael, 2026-08-09 -- the old single line was computed
+    # vs pvpokeRefIvIdx but mislabeled "vs stat-product #1"). `flips` /
+    # `flip_map` above stay pvpoke-ref-only: candidate selection and the
+    # results-section consumers are unchanged.
+    _sp1_idx = data_obj.get('rank1RefIvIdx')
+    if _sp1_idx is None or _sp1_idx < 0:
+        _sp1_idx = None
+    flips_sp = {}
+    if _sp1_idx is not None:
+        if _sp1_idx == ref_iv:
+            # The primary flips ARE vs the SP-1 spread. This happens when
+            # pvpokeRefIvIdx < 0 (IV-floor dive pruned the default; ref_iv
+            # fell back to grid index 0) and grid index 0 is the SP #1 --
+            # leaving flips_sp empty here made the card print a false
+            # "no matchup flips" (adversarial review F1, 2026-08-09,
+            # proven reachable via Umbreon --species-iv-floor 0,15,15).
+            flips_sp = flips
+        else:
+            # Include ref_iv itself so the PvPoke-default spread, when it
+            # is a card candidate, still gets a "vs stat-product #1" line
+            # (review F2 -- the old code left that spread with no flip
+            # line at all; live on the two Mimikyu UL pages).
+            _sp_test = sorted(set(_sorted_test) | {ref_iv})
+            for _mode in all_modes:
+                _sf = score_arrays.get(f'{moveset_idx}_{_mode}', [])
+                if not _sf:
+                    continue
+                _, _bm = parse_mode(_mode)
+                flips_sp = _merge_flip_dicts(
+                    flips_sp,
+                    _find_flips(_sf, nIvs, nS, nO, _sp1_idx, _sp_test,
+                                scenarios, opponents, bait_mode=_bm))
     hp_list = [data_obj['ivHp'][i] for i in range(nIvs)]
 
     # ======== Build recommendation candidates ========
@@ -1457,6 +1492,8 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
         'rec_candidates': chosen_recs,
         'rec_idx': _rec_idx,
         'flips': flips,
+        'flips_sp': flips_sp,
+        'sp1_idx': _sp1_idx,
         'flip_map': flip_map,
         'has_bait_axis': has_bait_axis,
         'opp_label': opp_label,

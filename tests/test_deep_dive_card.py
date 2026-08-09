@@ -333,3 +333,111 @@ def test_species_has_form_change_sibling_form():
     # The directly-keyed form stays True, and a plain fixed-form species False.
     assert deep_dive._species_has_form_change('Morpeko (Full Belly)') is True
     assert deep_dive._species_has_form_change('Azumarill') is False
+
+
+# --------------------------------------------------------------------------
+# Flip-line references (2026-08-09): the card labels each gains/loses line
+# with the spread it compares against. History: the old single line was
+# computed vs pvpokeRefIvIdx but hardcoded the prefix "vs stat-product #1",
+# caught on Umbreon GL where the true SP #1 (0/15/15) is battle-identical
+# to the card spread yet the line claimed 66 flips.
+# --------------------------------------------------------------------------
+
+def _synthetic_with_refs():
+    data_obj, ctx = _synthetic()
+    data_obj['ivA'] = [0, 1, 4]
+    data_obj['ivD'] = [15, 13, 15]
+    data_obj['ivS'] = [14, 11, 9]
+    data_obj['ivAtk'] += [118.0]
+    data_obj['ivDef'] += [125.0]
+    data_obj['ivHp'] += [131]
+    data_obj['ivCp'] += [1500]
+    data_obj['spRanks'] = [2, 57, 40]
+    data_obj['pvpokeRefIvIdx'] = 2          # 4/15/9
+    ctx['sp1_idx'] = 1                      # 1/13/11 stands in as SP #1
+    _gain = {'scenario': '2v2', 'opponent': 'Kingdra', 'ref_score': 480,
+             'iv_score': 520, 'bait_modes': {'bait'}}
+    ctx['flips'] = {0: {'gains': [_gain], 'losses': []}}
+    ctx['flips_sp'] = {}                    # candidate 0: no flips vs SP #1
+    return data_obj, ctx
+
+
+def test_flip_lines_label_both_references():
+    """Both lines render, each naming its actual reference spread."""
+    data_obj, ctx = _synthetic_with_refs()
+    m = dc.build_card_model(data_obj, ctx, types=['steel'], shadow=False)
+    assert m.flip_ref_sp1 == '1/13/11'
+    assert m.flip_ref_pvpoke == '4/15/9'
+    html_out = dc.render_card_html(m, standalone=True)
+    assert 'vs stat-product #1 (1/13/11): no matchup flips' in html_out
+    assert 'vs PvPoke default (4/15/9): gains Kingdra 2v2' in html_out
+
+
+def test_flip_line_sp1_candidate_says_so():
+    """The SP-#1 spread itself gets prose, not an empty self-comparison."""
+    data_obj, ctx = _synthetic_with_refs()
+    m = dc.build_card_model(data_obj, ctx, types=['steel'], shadow=False)
+    sp1_spread = [s for s in m.spreads if s.iv_str == '1/13/11'][0]
+    assert sp1_spread.is_sp1
+    html_out = dc.render_card_html(m, standalone=True)
+    assert 'this spread IS the stat-product #1' in html_out
+
+
+def test_flip_lines_collapse_when_refs_identical():
+    """SP #1 == PvPoke default -> one combined line, not two duplicates."""
+    data_obj, ctx = _synthetic_with_refs()
+    ctx['sp1_idx'] = 2                      # same spread as pvpokeRefIvIdx
+    m = dc.build_card_model(data_obj, ctx, types=['steel'], shadow=False)
+    html_out = dc.render_card_html(m, standalone=True)
+    assert 'vs stat-product #1 = PvPoke default (4/15/9): gains Kingdra 2v2' in html_out
+    assert 'vs PvPoke default (' not in html_out  # no separate second line
+
+
+def test_flip_line_legacy_ctx_has_no_reference_claim():
+    """Old ctxs (no sp1_idx) render unlabeled prose -- and must NOT claim
+    'vs stat-product #1', the exact misattribution this replaced."""
+    data_obj, ctx = _synthetic()
+    _gain = {'scenario': '1v1', 'opponent': 'Azumarill', 'ref_score': 470,
+             'iv_score': 530, 'bait_modes': {'bait'}}
+    ctx['flips'] = {0: {'gains': [_gain], 'losses': []}}
+    m = dc.build_card_model(data_obj, ctx, types=['steel'], shadow=False)
+    assert m.flip_ref_sp1 is None and m.flip_ref_pvpoke is None
+    html_out = dc.render_card_html(m, standalone=True)
+    assert 'gains Azumarill 1v1' in html_out
+    assert 'vs stat-product #1' not in html_out
+    assert 'vs PvPoke default' not in html_out
+
+
+def test_flip_expander_ids_distinct_per_reference():
+    """Both lines can carry '+N more' toggles; their checkbox ids must not
+    collide (page-level dup-id guard is the backstop, this is the unit pin)."""
+    data_obj, ctx = _synthetic_with_refs()
+    gains = [{'scenario': f'{i}v{i}', 'opponent': f'Opp{i}', 'ref_score': 480,
+              'iv_score': 520, 'bait_modes': {'bait'}} for i in range(5)]
+    ctx['flips'] = {0: {'gains': list(gains), 'losses': []}}
+    ctx['flips_sp'] = {0: {'gains': list(gains), 'losses': []}}
+    m = dc.build_card_model(data_obj, ctx, types=['steel'], shadow=False)
+    html_out = dc.render_card_html(m, standalone=True)
+    import re as _re
+    ids = _re.findall(r'id="((?:fcard|fcardsp)\d+)"', html_out)
+    assert ids, 'expected expander toggles on both flip lines'
+    assert len(ids) == len(set(ids)), f'duplicate toggle ids: {ids}'
+    assert any(i.startswith('fcardsp') for i in ids)
+
+
+def test_flip_line_pvpoke_default_candidate_gets_sp_line():
+    """Review F2 (2026-08-09): when the PvPoke-default spread is itself a
+    card candidate it must still get a real 'vs stat-product #1' line (the
+    producer includes ref_iv in the SP-pass test set), and its own PvPoke
+    line says so instead of a misleading 'no matchup flips'."""
+    data_obj, ctx = _synthetic_with_refs()
+    ctx['rec_candidates'].append({'iv': 2, 'style': 'PvPoke Pick'})
+    _gain = {'scenario': '0v1', 'opponent': 'Lickitung', 'ref_score': 480,
+             'iv_score': 520, 'bait_modes': {'bait'}}
+    ctx['flips_sp'] = {2: {'gains': [_gain], 'losses': []}}
+    m = dc.build_card_model(data_obj, ctx, types=['steel'], shadow=False)
+    pv = [s for s in m.spreads if s.iv_str == '4/15/9'][0]
+    assert pv.is_pvpoke and not pv.is_sp1
+    html_out = dc.render_card_html(m, standalone=True)
+    assert 'vs stat-product #1 (1/13/11): gains Lickitung 0v1' in html_out
+    assert 'vs PvPoke default (4/15/9): this spread IS the PvPoke default' in html_out
