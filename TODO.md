@@ -26,20 +26,14 @@ content is identical. Compare content instead (md5 vs the live URLs, or
 
 ## DRY review 2026-08-05: fully executed -- open residue only
 
-The review (`docs/reviews/2026-08-05_dry_review.md`) is fully executed;
-the record lives in CHANGELOG (2026-08-05, 2026-08-06/08, 2026-08-08)
-and the report's own status header. Still open:
+The review (`docs/reviews/2026-08-05_dry_review.md`) is fully executed
+and signed off (plotly shim accepted as-is 2026-08-08, overlay-hue
+aliasing recorded as a decision in docs/palette_governance.md section
+6); the record lives in CHANGELOG and the report's status header.
 
-- **Plotly theme shim sign-off (Michael)**: implemented + committed
-  (`8da55c4`/`bf58ee2`/`048bb3e`) but publish-BLOCKED pending visual
-  review -- previews for both themes in the session scratchpad
-  `plotly_preview/`; known limitation: two overlay hues alias a tier
-  hue (disclosed in 048bb3e). Sign-off drains the 15-commit pending
-  re-render ledger; parking it means reverting the three commits
-  before the next publish.
-- Standing reference: the report's "Do NOT do" section lists the
-  intentional duplicates and refuted claims -- check it before
-  re-reporting any DRY finding.
+Standing reference: the report's "Do NOT do" section lists the
+intentional duplicates and refuted claims -- check it before
+re-reporting any DRY finding.
 
 ## Engine bug-hunt round 2 (2026-07-03): 16 confirmed findings need triage
 

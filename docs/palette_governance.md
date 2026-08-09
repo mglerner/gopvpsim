@@ -150,6 +150,16 @@ When you revalue one of an alias group, revalue ALL of it, or the
 "one hue per concept" guarantee breaks silently. (A lint that asserts
 alias-equal tokens stay equal is a good guard; see section 8.)
 
+**Accepted same-canvas aliasing (Michael, 2026-08-08, plotly sign-off):**
+the plotly shim (8da55c4) moved the anchor-overlay ring to
+`--cat-anchors` (== `--tier-1`, byte-identical all four themes) and the
+slayer-overlay gold to `--notable` (~1.1:1 from `--tier-8`). In the
+scatter's default threshold color mode both overlays can therefore draw
+in (near-)tier hues on the same canvas; the ring-vs-fill SHAPE carries
+the distinction. Reviewed on the rendered previews and accepted as-is --
+this is a decision, not an oversight. Revisit (two new distinct hues,
+AA-validated) only if reader confusion actually surfaces.
+
 ## 7. What is intentionally OUT of the contract
 
 - Pokemon type-brand palette: `_TYPE_COLORS` in `deep_dive_card.py`.
