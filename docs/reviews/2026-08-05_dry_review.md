@@ -10,8 +10,11 @@
 > 12+13 shipped with the v8 cold bake 2026-08-06/08 (CHANGELOG); the
 > entry-15 fold-ins and every recorded per-entry deferral were cleared
 > by the 2026-08-08 AFK churn (28 commits, 41-agent workflow, CHANGELOG
-> "AFK deferral churn"), except the plotly theme shim -- implemented
-> but publish-BLOCKED pending Michael's visual sign-off. Suite over the
+> "AFK deferral churn"), including the plotly theme shim -- Michael
+> reviewed the rendered previews and signed it off as-is 2026-08-08
+> (aliasing recorded as an accepted decision, palette_governance.md
+> section 6). Every render-side change reached pogodives.com via the
+> 2026-08-08 evening re-render + publish (CHANGELOG). Suite over the
 > full arc: 1290 -> 1719 tests. Nothing in this document remains
 > unactioned or undispositioned.
 >
