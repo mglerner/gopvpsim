@@ -2852,6 +2852,15 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # ---- Best-buddy (L51) pass: rendered into <template>s for the toggle ----
     _results51 = _analysis51 = _card51_html = ''
     if _bb_active:
+        # The L51 body is a second, independent copy of the prose, so it needs
+        # its own id="opp-<slug>" set: without this reset the first-mention-wins
+        # registry (already fully claimed by the L50 pass) suppresses every
+        # opponent id in the <template>, and each of its #opp- links dangles
+        # once the toggle swaps the template into the host. Legal against the
+        # dup-id guard because opponent ids only ever live inside
+        # #dd-bb-prose-host / #dd-bb-prose-tmpl, never at document level, so
+        # each guard view still sees exactly one copy per slug.
+        rendering.reset_opp_anchor_registry()
         _results51, _analysis51, _card51_html, _, _ = _render_level_body(
             _dobj51, _sarr51, write_card_out=False,
             robust_max_level=best_buddy.get('alt_cap'),
