@@ -277,6 +277,32 @@ verified links -- ordering fixed in `73747e6`; the live tree passes the
 same gate), and verify_overnight's ML-guide freshness check flags the
 render-only batch window by design (ML guide articles were not touched).
 
+## 2026-07-03 -- bug-hunt round-2 fixes + hunt2 merge + Equinox Cup pilot
+*(entry added retroactively 2026-08-08 when the completed narratives were
+groomed out of TODO.md; verbatim writeups in docs/TODO_archive.md)*
+
+Round-2 non-engine fixes landed on main: **F1** (`57137e4`,
+migrate_cache used-set unions form-change swapped-in moves, adversarially
+verified complete), **F2 doc** (predicate-caveat recorded), **BP-1**
+(`2931d1d`, power-0 breakpoints return [] instead of ZeroDivisionError --
+was silently dropping every Aegislash-Shield GL anchor), **BP-2**
+(`cc70593`, CLI forwards shadow multipliers into damage math),
+**JIT-COV-1** (`22c0a0b`). The **hunt2 engine batch merged** (`2a63b65`:
+NB-1 selection freeze, FC-1 Aegislash revert energy, OMT turns_planned
+divisor, would_shield-as-documented; battle.py byte-identical to the
+audit-passed engine), plus post-merge **JIT-COV-2** (`02627fe`) and
+**PROP-1** (`fe2c443`); the OMT-forced cold re-dive was the 2026-07-06/07
+bake (closed out 2026-08-04). The anchors.py engine-hash question was
+ruled BENIGN. Same day: **top-N Phase 1** (`b8b561e`/`f5741a3`,
+client-side opponent filter) and the **Equinox Cup pilot Phase 2**
+(gopvpsim `aa8dac8..3c153fb`, gobattlekit `0c1bd5c`: cup rankings
+loader, recipe + committed pool, --cup labeling overlay, flat
+<species>-equinox-cup slugs + cups index, threshold-export collision
+guard; five pilot dives; audit report in the reports repo). Also the
+limited-availability enumeration research confirmed all seven floor-10
+assignments with no additions (Michael ratified; shadow-legendary gap
+closed same week).
+
 ## 2026-06-28 — cold re-dive complete (engine bug-hunt + cache-rework batch shipped)
 
 The pre-launch engine batch plus a full cold re-dive landed. The bake ran
