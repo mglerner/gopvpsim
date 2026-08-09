@@ -24,18 +24,6 @@ it then compares by mtime; it always reports a ~18-path delta even when the
 content is identical. Compare content instead (md5 vs the live URLs, or
 `rsync --checksum`). Detail in CHANGELOG "2026-08-04".
 
-## Pending publish (2026-08-09 overnight lanes): needs Michael's sign-off
-
-The overnight lanes deliberately changed shipped-page content: the SP
-Rank column re-ranked to the PvPoke convention on every dive page
-(`8c1f98e`; 25-81% of rows shift, the rank-1 marker moves for true-tie
-species, prose diffs in the narrative rank-1 self-check), the
-compare-card row "Gives up vs #1" -> "Avg score behind best"
-(`c911eff`), the comparison-page methodology wording (`95fcf74`), and
-`#opp-` anchor placement (`b43bd2d`). A local re-render ran overnight to
-stage these; review, then `direnv exec . scripts/publish_website.sh
---push`, then delete this section.
-
 ## DRY review 2026-08-05: fully executed -- open residue only
 
 The review (`docs/reviews/2026-08-05_dry_review.md`) is fully executed

@@ -2,6 +2,45 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-09 (day) -- both-reference card lines, publish, test-suite review + Phase 1
+
+**Card flip lines (Michael feature request):** the recommendation
+card's per-spread gains/loses prose -- computed vs pvpokeRefIvIdx but
+mislabeled "vs stat-product #1" since b595071, caught live on the
+Umbreon GL Bait Robust card -- now renders BOTH labeled lines ("vs
+stat-product #1 (a/d/s)" from a new flips_sp pass, "vs PvPoke default
+(a/d/s)"), collapsing when the references coincide, with "this spread
+IS the ..." for the reference spreads themselves. Adversarial review
+caught 4 findings pre-commit, incl. a must-fix false-"no flips" on
+IV-floor dives and the latent shadow= omission in the pvpoke-default
+lookup. 6 new tests.
+
+**Published to pogodives.com:** the overnight-lane visible changes (SP
+Rank PvPoke convention, "Avg score behind best" relabel, methodology
+wording, #opp- landings) + the card feature, after Michael's review of
+the staged Umbreon page. Live spot-checks green. The re-render's only
+FAIL was the dev-count gate racing the card commit's own tests --
+resolved via verify_dev_counts --update, the tool built the night
+before for exactly this.
+
+**Test-suite review** (docs/reviews/2026-08-09_test_suite_review.md +
+HTML on the reports pogo subpage): inventory + 5 lenses + adversarial
+verify pass, every load-bearing claim executed. Verdict: right shape
+(A-grade boundary contracts, 13/14 strict xfails), three structural
+problems -- no mechanical trigger, ~90 dead/vacuous tests (13 proven
+stub-survivors, the 34s permanent xfail = 45% of wall time), and
+negative source pins that miss re-spelled antipatterns. Bonus verified
+find: data.py:parse_types is damage-affecting but outside every cache
+hash (low probability / high blast radius; relocation queued for the
+next bump window). Phases 2-4 + the CLAUDE.md testing-policy block
+await sign-off.
+
+**Phase 1 (mechanize) SHIPPED same day:** new verify_tests.py ship
+gate (pytest -m 'not slow', ~44s, first in the roster; loud
+node-presence check closing the 19-silently-skipped-JS-tests hole) on
+every publish path; core.hooksPath actually activated in this clone +
+added to the fresh-machine setup steps. Suite 1784; full roster green.
+
 ## 2026-08-09 (overnight) -- scouted-backlog churn: 7 lanes, 5 fixes, 2 tools, 1 refuted engine change
 
 Fable-orchestrated overnight run (Michael AFK): a 9-agent read-only
