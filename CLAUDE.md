@@ -324,7 +324,8 @@ deep dives run several × slower (the 2026-06-15 uv switch initially
 missed `[perf]`, which is the kind of regression to watch for).
 
 ## Testing
-- `python -m pytest tests/test_battle.py -q` — run all battle tests (99/102 passing)
+- `python -m pytest tests/test_battle.py -q` — run all battle tests (243 passed
+  + 13 strict xfails as of 2026-08-09; the old "99/102" note here was stale)
 - Tests verify scores against PvPoke ground truth from pvpoke.com/battle/
 - **Default movesets** — when a test or sim needs "the default moveset" for a
   species in a given league, ALWAYS call `gopvpsim.data.get_default_moveset(
