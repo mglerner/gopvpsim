@@ -179,6 +179,25 @@ def _get_move(move_id: str) -> dict:
 # High-level IV analysis
 # ---------------------------------------------------------------------------
 
+def _blade_round_down(species_name: str, level: float) -> float:
+    """Round a half-level down to the whole level below for Aegislash (Blade).
+
+    Blade powers up in whole-level increments only, so the standard
+    half-level grid is wrong for it as the focal species. Canonical rule:
+    ``Pokemon.at_best_level`` (pokemon.py:350-357) and ``iv_rank``
+    (pokemon.py:389-402); ``scripts/deep_dive_lib/sweep.py`` repeats it too.
+
+    This is a deliberate local copy, not a shared helper: ``pokemon.py`` is
+    one of ``scripts/sweep_cache.py``'s ``_ENGINE_FILES``, so hoisting this
+    there (even as a pure addition) would bump the engine hash and stale the
+    whole sweep cache. See the DRY review's architecture note about the rule
+    being duplicated in four places.
+    """
+    if species_name == 'Aegislash (Blade)' and level % 1.0 != 0:
+        return level - 0.5
+    return level
+
+
 def iv_breakpoints(
     attacker_species: str,
     move_id: str,
@@ -218,10 +237,7 @@ def iv_breakpoints(
     )
     if d_level is None:
         raise ValueError(f"{defender_species} can't fit in {league} league at those IVs")
-    # Aegislash (Blade) powers up in whole levels only; round down.
-    # Mirrors Pokemon.at_best_level + iv_rank (commit 1b6c075).
-    if defender_species == 'Aegislash (Blade)' and d_level % 1.0 != 0:
-        d_level -= 0.5
+    d_level     = _blade_round_down(defender_species, d_level)
     d_stats     = battle_stats(d_base['atk'], d_base['def'], d_base['hp'],
                                defender_atk_iv, defender_def_iv, defender_sta_iv,
                                d_level)
@@ -239,6 +255,7 @@ def iv_breakpoints(
                 )
                 if level is None:
                     continue
+                level = _blade_round_down(attacker_species, level)
                 stats = battle_stats(
                     a_base['atk'], a_base['def'], a_base['hp'],
                     atk_iv, def_iv, sta_iv, level,
@@ -305,6 +322,7 @@ def iv_bulkpoints(
     )
     if a_level is None:
         raise ValueError(f"{attacker_species} can't fit in {league} league at those IVs")
+    a_level     = _blade_round_down(attacker_species, a_level)
     a_stats     = battle_stats(a_base['atk'], a_base['def'], a_base['hp'],
                                attacker_atk_iv, attacker_def_iv, attacker_sta_iv,
                                a_level)
@@ -322,6 +340,7 @@ def iv_bulkpoints(
                 )
                 if level is None:
                     continue
+                level = _blade_round_down(defender_species, level)
                 stats = battle_stats(
                     d_base['atk'], d_base['def'], d_base['hp'],
                     atk_iv, def_iv, sta_iv, level,

@@ -344,3 +344,79 @@ def test_annihilape_bubble_bulkpoint_def_threshold():
             assert r['def'] > thresh, f"def={r['def']:.4f} should be > thresh={thresh:.4f}"
         else:
             assert r['def'] <= thresh, f"def={r['def']:.4f} should be <= thresh={thresh:.4f}"
+
+
+# ---------------------------------------------------------------------------
+# Aegislash (Blade) whole-level rounding (BP-3)
+#
+# Blade powers up in whole-level increments only. Pokemon.at_best_level and
+# iv_rank round half-levels down; iv_breakpoints/iv_bulkpoints originally
+# applied the rule only to iv_breakpoints' fixed defender, so the other three
+# level computations sat Blade on the half-level grid (2053 of 4096 IV combos).
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+def test_iv_breakpoints_blade_whole_levels():
+    """Blade as the swept attacker never lands on a half level."""
+    results = iv_breakpoints('Aegislash (Blade)', 'PSYCHO_CUT', 'Azumarill',
+                             league='great')
+    assert len(results) == 4096
+    half = [r for r in results if r['level'] % 1.0 != 0]
+    assert half == [], f"{len(half)} half-level rows, e.g. {half[:3]}"
+
+@pytest.mark.integration
+def test_iv_breakpoints_non_blade_still_has_half_levels():
+    """Control: the round-down is keyed on Blade, not applied to everyone."""
+    results = iv_breakpoints('Medicham', 'COUNTER', 'Azumarill', league='great')
+    assert any(r['level'] % 1.0 != 0 for r in results)
+
+@pytest.mark.integration
+def test_iv_bulkpoints_blade_whole_levels():
+    """Blade as the swept defender never lands on a half level."""
+    results = iv_bulkpoints('Aegislash (Blade)', 'COUNTER', 'Medicham',
+                            league='great')
+    assert len(results) == 4096
+    half = [r for r in results if r['level'] % 1.0 != 0]
+    assert half == [], f"{len(half)} half-level rows, e.g. {half[:3]}"
+
+@pytest.mark.integration
+def test_iv_bulkpoints_non_blade_still_has_half_levels():
+    """Control: the round-down is keyed on Blade, not applied to everyone."""
+    results = iv_bulkpoints('Azumarill', 'COUNTER', 'Medicham', league='great')
+    assert any(r['level'] % 1.0 != 0 for r in results)
+
+@pytest.mark.integration
+def test_iv_bulkpoints_blade_fixed_attacker_matches_at_best_level():
+    """The fixed *attacker* side rounds Blade down too.
+
+    Blade 0/0/3 GL sits at L24.5 on the raw grid, L24.0 after the round-down.
+    scripts/breakpoints.py prints the Pokemon.at_best_level attack in its
+    header, so if iv_bulkpoints computes the damage column from the unrounded
+    attack the header contradicts its own table. PSYCHO_CUT vs Annihilape is
+    sensitive: 131 of the 4096 rows change damage tier between the two levels.
+    """
+    from gopvpsim.breakpoints import _get_move, _get_types
+    from gopvpsim.pokemon import Pokemon
+
+    # max_level=51.0 matches iv_bulkpoints' default; at_best_level otherwise
+    # defaults to LEAGUE_MAX_LEVEL (50.0 for great). Irrelevant at L24, but
+    # spelled out so this test doesn't quietly depend on that divergence.
+    attacker = Pokemon.at_best_level('Aegislash (Blade)', 0, 0, 3,
+                                     league='great', max_level=51.0)
+    assert attacker.level == 24.0
+
+    move = _get_move('PSYCHO_CUT')
+    atk_types = _get_types('Aegislash (Blade)')
+    def_types = _get_types('Annihilape')
+    results = iv_bulkpoints('Annihilape', 'PSYCHO_CUT', 'Aegislash (Blade)',
+                            attacker_atk_iv=0, attacker_def_iv=0, attacker_sta_iv=3,
+                            league='great')
+    assert len(results) == 4096
+    for r in results:
+        expected = calc_damage(move['power'], attacker.atk, r['def'],
+                               move['type'], atk_types, def_types)
+        assert r['damage'] == expected, (
+            f"def_iv row {r['atk_iv']}/{r['def_iv']}/{r['sta_iv']}: "
+            f"table {r['damage']} != {expected} recomputed from "
+            f"at_best_level atk={attacker.atk:.4f}"
+        )
