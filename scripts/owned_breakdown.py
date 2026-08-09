@@ -10,13 +10,25 @@ product -- which in GL/UL is usually NOT the hundo, because lower IVs reach a
 higher level under the CP cap).
 
 League-aware via Pokemon.at_best_level (the CP cap binds in GL/UL; Master runs
-to level 51). Surface relationships (each measures something slightly
-different -- do NOT expect byte-identical numbers): the website's "Gives up
-vs #1" column replays the dive's baked grids, which use the dive's opponent
-IVs; this CLI sims fresh against 15/15/15 opponents; gobattlekit consumes
-the exported bundle (tools/threshold_export) rather than reimplementing the
-sim. The rank-1 reference spread itself IS shared -- all three surfaces get
-it from gopvpsim.pokemon.iv_rank or artifacts derived from it.
+to level 51). Three shipped surfaces carry a "Gives up vs #1" number and none
+is a port of another -- each answers a different question, so do NOT expect
+matching numbers:
+
+* THIS CLI -- matchups the STAT-PRODUCT rank-1 spread (from
+  gopvpsim.pokemon.iv_rank) wins but this IV loses, over EVEN shields
+  ((0,0)/(1,1)/(2,2)), sim'd fresh against 15/15/15 opponents.
+* The dive page's collection-table column (scripts/deep_dive_engine.js,
+  the "Gives up vs #1" block) -- reference is the #1 IV on the CURRENT
+  y-axis metric (default "Avg Battle Score"), over the shields and opponent
+  filter the USER has selected, replayed off the dive's baked grid (dive
+  opponent IVs). Its "#1" is NOT the stat-product rank-1: on the shipped
+  Azumarill GL dive the default view ranks 0/13/14 first while stat-product
+  rank 1 is 0/15/15. (Exception: under the mirror-wins y-axis the same
+  column shows a baked mirror-cohort win SHORTFALL count, which honors
+  neither the shield nor the opponent selection.)
+* The gobattlekit bundle (scripts/export_owned_breakdown_bundle.py) --
+  stat-product rank-1 + even shields like this CLI, but the dive's
+  opponents/IVs like the website; gobattlekit consumes it and has no sim.
 
 MVP CLI takes IV spreads directly; PokeGenie-CSV input (via gopvpsim
 user_collection) is the next wiring step.
