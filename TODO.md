@@ -14,12 +14,6 @@ pre-cold-dive gate; run `overnight_redive.sh` and watch with
 the v8 entries-12+13 engine -- ALL GREEN, mixed-vintage recovery proven;
 see CHANGELOG "2026-08-06/08". LID STAYS OPEN for the whole bake.)
 
-Post-v8-bake items: **both DONE 2026-08-08** -- published to pogodives.com
-(gates green inside publish; live spot checks 200 incl. a post-stall dive
-and an ML guide) and reclaimed ~44 GB of v7 sweep dirs + 1 GB of pre-bake
-slayer files via `gc_cache --keep-vintages 1 --apply` + mtime prune
-(dry-run matched apply exactly; cache now 43G, single current vintage).
-
 A failed chain step that has since been diagnosed and fixed goes in
 `docs/chain_resolutions.toml` (read by `verify_overnight.py` check [1/5]) --
 do NOT edit `overnight_status.txt` or the chain log to force the gate green.
@@ -30,53 +24,22 @@ it then compares by mtime; it always reports a ~18-path delta even when the
 content is identical. Compare content instead (md5 vs the live URLs, or
 `rsync --checksum`). Detail in CHANGELOG "2026-08-04".
 
-## DRY review 2026-08-05: 56 distinct defects ranked, awaiting triage
+## DRY review 2026-08-05: fully executed -- open residue only
 
-`docs/reviews/2026-08-05_dry_review.md` -- Fable-orchestrated fan-out (9 Opus
-finders over the June S7 register + post-June surface, 3 adversarial Opus
-verifiers, Fable synthesis). 61 confirmed / 1 intentional / 0 refuted; 56
-distinct after merging duplicate pairs; 3 [ENGINE-HASH], 4 [CROSS-REPO].
-The report IS the work plan (15 ranked entries) -- do not re-derive it here:
+The review (`docs/reviews/2026-08-05_dry_review.md`) is fully executed;
+the record lives in CHANGELOG (2026-08-05, 2026-08-06/08, 2026-08-08)
+and the report's own status header. Still open:
 
-- **Entries 4-11 + 14 + entry-12 cherries DONE (2026-08-05 evening,
-  commits `caeded9..7e66ba2`)**: constant pins (WIN_RATING JS scan, league
-  caps), Py<->JS wire contracts (score key / mode grammar / scenario label /
-  moveset label / tier slug baked from Python), cup plumbing consolidation,
-  move display names via the gamemaster rule (incl. the id-derived
-  move_abbr), pvpoke link-builder consolidation + URL parity test,
-  league-derived level ceilings (user_collection defaults None-means-derive;
-  gobattlekit PORTS this module -- its own copy still defaults 51, noted in
-  the module docstring), per-target JS gender mirror + Oinkologne harness
-  coverage, gopvpsim.invalidate_caches(), matchup-clusters cleanup, D14
-  drop-in + _pack_u16. Suite 1514 passed / 14 xfailed; per-entry deferrals
-  live in the commit messages. Entries 12+13 SHIPPED with the v8 bake
-  2026-08-06/08 (CHANGELOG); entry-15 fold-ins + the recorded deferrals
-  CLEARED by the 2026-08-08 AFK churn (28 commits, CHANGELOG) except the
-  plotly theme shim, which is implemented but **publish-BLOCKED pending
-  Michael's visual sign-off** (previews in the session scratchpad
-  plotly_preview/; commits 8da55c4/bf58ee2/048bb3e; known limitation:
-  two overlay hues alias a tier hue, disclosed in 048bb3e).
-  **The review is fully executed.**
-- **Entries 1-3 DONE (2026-08-05, commits `d81c4ad..1db4f65`)**: the five
-  live wrong-output fixes, the gender+min-level-aware evolution walk
-  (shared helpers in user_collection; additive, no gobattlekit
-  coordination needed), and all five ops/gate hardening items (shared
-  ship-surface module + root-page gating, single ship-gate roster,
-  filename-stamp chain-log rule, ML-slug single-source, cache-sidecar
-  read-modify-write primitives). Each with regression tests; suite 1322
-  passed. NOTE: the entry-1 render fixes are in the GENERATORS -- the
-  shipped HTML still carries the old behavior until the next re-render
-  from replay + publish (render-only, no re-sim needed).
-- The report's "Do NOT do" section lists the intentional duplicates and
-  refuted sub-claims -- check it before re-reporting any DRY finding.
-- Supersedes the scattered DRY bullets below where they overlap (the S7 §I
-  register, move-display single-source, score-key parity, js-parity-1..5,
-  the 51.0 cluster); those entries stay until their fixes land, but the
-  ranked list is the scheduling authority.
-- Cache note: only bundles 12/13 invalidate the sweep cache (hash /
-  CACHE_VERSION bumps; both behavior-neutral consolidations, not score
-  changes); everything else is render/tooling and ships piecemeal with the
-  cache ON.
+- **Plotly theme shim sign-off (Michael)**: implemented + committed
+  (`8da55c4`/`bf58ee2`/`048bb3e`) but publish-BLOCKED pending visual
+  review -- previews for both themes in the session scratchpad
+  `plotly_preview/`; known limitation: two overlay hues alias a tier
+  hue (disclosed in 048bb3e). Sign-off drains the 15-commit pending
+  re-render ledger; parking it means reverting the three commits
+  before the next publish.
+- Standing reference: the report's "Do NOT do" section lists the
+  intentional duplicates and refuted claims -- check it before
+  re-reporting any DRY finding.
 
 ## Engine bug-hunt round 2 (2026-07-03): 16 confirmed findings need triage
 
@@ -158,18 +121,12 @@ including JIT-COV-2 below.
 
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
-- **[render] duplicate DOM ids: DONE 2026-08-08** (AFK churn `dd6b7a3`,
-  pending re-render). **[ops] step-9 label: DONE 2026-08-08** (bake
-  closeout commit).
 - **[tooling] dev-count `test_count` sentinel is a serialization point**
   (AFK-churn gate finding): six sentinel-bump commits raced across
   concurrent lanes in one 28-commit churn. Consider deriving the live
   count at gate time with the sentinel as a floor, or an auto-update
   mode -- small, low priority.
 
-- **[render DRY] score-key `{mi}_{mode}@51` parity (Python<->JS): DONE
-  2026-08-05** (DRY review entry 5, `ffc3b35` -- the three inline JS
-  reconstructions route through getScoreKey and the parity tests pin it).
 - **[tooling, silent-incompleteness] verify_overnight UL opponent-count
   assertion.** The completeness guard is GL-only; a UL opponent silently
   deranked by a fresh gamemaster would drop from every UL dive and still pass the
@@ -547,12 +504,6 @@ here 2026-06-12; these are the remaining seams.)*
   diagnosing the 2026-04-25 mirror-tier-synthesis no-fire bug;
   read this *before* starting the deep_dive.py split below so the
   cuts address actual pain rather than aesthetic ones.
-
-* **Move display-name single-source: DONE 2026-08-05** (DRY review entry 7,
-  `844e80f` + `291b17f` + `7e66ba2` -- one gamemaster-backed move_display
-  rule for dive + article renderers, and the id-derived move_abbr for
-  energy tags; ships with the next re-render, which changes ~39 labels
-  per page by design).
 
 * **Split `scripts/deep_dive.py`** *(deferred from 2026-04-09; not
   blocking, but file is now ~6100 lines as of 2026-04-10)* — After the structured IV
