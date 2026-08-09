@@ -2,6 +2,34 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-08 (evening) -- re-render + publish: the DRY render ledger reaches the live site
+
+The render-only chain (`rerender_20260808b.sh`, replay blobs ->
+HTML, no sims) drained the 15 pending render-side commits from the
+DRY arc into shipped HTML: 97/97 dive pages OK (0 failures, ~15 min/
+blob x 8 workers), 61/61 ML guides from saved JSONs, comparisons /
+matchup web / reader guides / index rebuilt, ship gates green (402
+files, 0 broken internal refs across 392,555 hrefs, no unicode
+dashes, dev counts). Ledger spot-checks verified on the rebuilt pages
+AND on the live site after `publish_website.sh --push`: plotly theme
+shim chrome (`themeColor()` + `--cat-anchors` fallback), the 0v0
+Flavor Guide vocabulary, WIN_RATING in DATA, and zero live-DOM
+duplicate ids (context-aware scan; a naive grep re-reports the
+dd6b7a3 scan artifacts). First chain launch was caught re-rendering
+the 97 superseded July blobs alongside the v8 set (double render, ~1h
+waste) and restarted at `--since-hours 60`; July-blob retirement is
+TODO'd (bulk mv is permission-gated).
+
+Watch-script pair shipped alongside: new `scripts/rerender_status.py`
+(colored status box for render chains; its first live render exposed
+both the July-blob double-render above and, later, its own padded
+OK/FAIL regex bug -- fixed) and `scripts/chain_status.py` upgrades
+(dynamic full-run step checklist from [STEP]/[DONE]/[FAIL] lines,
+COMPLETE/FAILED liveness instead of a red DEAD after success,
+fabricated post-completion ETA suppressed, phantom `retrofit` preset
+removed, `sys.executable` for the overnight_eta subprocess, and the
+Path('')-is-truthy validation hole closed).
+
 ## 2026-08-08 -- AFK deferral churn: the review's recorded ledger cleared (28 commits)
 
 41-agent workflow while Michael was AFK: a scout re-verified all 26
