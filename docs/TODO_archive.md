@@ -428,3 +428,122 @@ output in 3 ways). What the prep session actually did to fix each gotcha:
    FOLLOW-UP (not done, low risk now that UL resolves 69/69): extend
    `verify_overnight.py` to assert UL opponent counts so a future silent pool
    shrink is caught the morning after, not shipped.
+
+----
+
+# Groomed out of TODO.md 2026-08-08 (completed 2026-06/07 narratives)
+
+Moved verbatim per the live-backlog convention; open residues stay in
+TODO.md. CHANGELOG '2026-07-03' carries the summary entry.
+
+## hunt2 round-2 fixes + engine-batch merge + post-merge (2026-07-03)
+
+**FIXED on main (Opus, 2026-07-03) — the non-engine-batch, non-contested slice:**
+- **F1** (`57137e4`): `migrate_cache.py` `used`-set now unions form-change
+  swapped-in moves via new single-sourced `formchange.form_change_swapped_moves`;
+  regression test builds a minimal one-move gm delta. **Adversarially verified
+  COMPLETE**: the only battle-time move swaps are Aegislash (fast) + Morpeko
+  (charged); Mimikyu swaps none; no other foreign move-read exists in the four
+  engine files; no wrongly-blessing scenario remains. NB: the helper lives in
+  `formchange.py` (engine-hash file) -> F1 bumps the engine hash on main by a
+  behavior-neutral function; harmless on the cold machine, flagged for the
+  hunt2 merge (fresh final hash; different regions, should merge clean). No past
+  migration was tainted (the one prior `--from-gamemaster` run, skarmory_mega,
+  was purely additive).
+- **F2 doc** (`57137e4`): the `self_debuff_either_side` static-flag caveat is
+  now documented in the predicate docstring + a Registeel FB+ZC test assertion
+  (measured harmless in `69876ee`; the "AURA_WHEEL is the only swap" line is
+  corrected). Trap for the next predicate author recorded, not silently false.
+- **BP-1** (`2931d1d`): `breakpoints()` returns `[]` for power-0 moves instead
+  of ZeroDivisionError (was silently dropping every anchor for the whole
+  Aegislash-Shield GL dive). **BP-2** (`cc70593`): CLI now forwards
+  `--shadow-atk/--shadow-def` into the damage math (was header-only).
+- **JIT-COV-1** (`22c0a0b`): 2 settrace-verified parity matchups now cover the
+  ttl-cmp-bonus / dedup-keep / atk-stage-clamp+4 kernel branches (were unpinned).
+- Full suite after: 1216 passed / 14 xfailed / 2 pre-existing new-machine
+  fixture failures (`test_export_owned_breakdown`, missing `userdata/website`).
+- **Out-of-scope note surfaced by the F1 verification:** `anchors.py` calls
+  `get_moves()` but is NOT in `sweep_cache._ENGINE_FILES` — a separate
+  engine-hash-coverage question (anchors feed breakpoint analysis, not the
+  cached 1v1 column scores), worth a look but not a delta hole.
+
+**hunt2 engine batch MERGED to main (`2a63b65`, 2026-07-03, Michael-approved):**
+NB-1 (selection freeze) + FC-1 (Aegislash revert energy) + OMT (turns_planned
+divisor) + would_shield-as-documented. Fast-forward from `a86b0fd`; full suite on
+the merged tree 1234 passed / 14 xfailed / 2 pre-existing fixture failures.
+battle.py byte-identical to the audit-passed hunt2 engine. OMT was the
+cold-forcing change (touched set not statically characterizable), so the merged
+engine needed a cold re-dive — **DONE: the 2026-07-06/07 bake was that re-dive**
+(bake tree `753d3ba` contains `2a63b65` + `02627fe`; verified + closed out
+2026-08-04, CHANGELOG). Everything else in the batch rode it for free,
+including JIT-COV-2 below.
+
+**DONE post-merge (Opus, 2026-07-03):**
+- **JIT-COV-2** (`02627fe`): inline comment at the JIT `final_state = _DPState(0,
+  ...)` site — `energy=0` is inert (no consumer reads `.energy`). Comment-only on an
+  engine-hash file; rides the OMT-forced cold re-dive.
+- **PROP-1** (`fe2c443`): DEVELOPER_NOTES "Key implementation details" now documents
+  the exact-`cmp_atk`-tie -> player-index (p0-first) resolution as a PvPoke-faithful
+  known property.
+- **anchors.py `_ENGINE_FILES` question** (was the F1 out-of-scope note): checked —
+  **BENIGN**. Engine-hash caches store only sim column scores; anchors.py feeds
+  breakpoint analysis and is strictly downstream (no engine file imports it, anchors
+  recompute fresh each dive), so it needs no engine-hash coverage. Caveat: replay
+  blobs / gobattlekit thresholds exported before BP-1 carry old anchors by design —
+  re-export any shipped ones that matter.
+
+## Top-N Phase 1 + Equinox Cup pilot Phase 2 (shipped 2026-07)
+
+**Phase 1 (client-side opponent filter) SHIPPED** (`b8b561e`, `f5741a3`).
+
+**Phase 2 (Equinox Cup pilot) SHIPPED** (gopvpsim `aa8dac8..3c153fb`;
+gobattlekit `0c1bd5c`). Implemented + verified 2026-07-03; confirmed
+2026-08-04 as pushed (`3c153fb` is an ancestor of `origin/main`) and live
+(`pogodives.com/cups.html`, `/corviknight-equinox-cup/`,
+`/clodsire-equinox-cup/` all HTTP 200) -- this block previously read "NOT
+pushed / NOT published, pending review" and was stale. Done: cup rankings
+loader (`data.py`); `recipe_equinox_great` +
+committed `opponent_pools/equinox_great.txt`; `--cup` labeling overlay
+(cup-sourced oppMetaRank/rankSnapshot, cup-named title/card + archive banner,
+replay-blob `cup` marker); flat `<species>-equinox-cup` slugs + separate
+archive-friendly `cups/index.html` + "Limited Cups" card; gobattlekit
+threshold-export collision guard (cup blobs -> `<species>_<cup>.toml`);
+`verify_overnight` `*-cup` coverage. Five pilot dives run locally cache-ON
+(Corviknight/Mantine/Mandibuzz/Toucannon/Clodsire); page-render 67/67,
+index-presence + bundler dry-run green, suite 1245 passed. Audit report:
+`~/coding/reports/gopvpsim-equinox-cup-pilot-2026-07-03.html`. The cup-index
+live/archived status is auto-derived from PvPoke's `formats[].showFormat` on
+each build (no hand-maintained rotation list); a rotated-out cup auto-flips to
+"archived snapshot". Phase 3 (more cups,
+legality-filter eval, app-side cup toggles, mega engine) remains -- see the
+plan doc.
+
+## gobattlekit bitmask exporter shipped detail (2026-06-29)
+
+step 1, the bitmask exporter, SHIPPED
+  2026-06-29 in `c1ea231`: `bitmask_from_dive` + `--bitmask` on
+  `scripts/export_owned_breakdown_bundle.py`, with roundtrip + size tests in
+  `tests/test_export_owned_breakdown.py`; the top-K-stat-product bake was a
+  DEAD END — those spreads all give up nothing; owned mons have arbitrary
+  IVs)
+
+## limited-availability IV floors: resolved slice (2026-06-28/07-03)
+
+DONE (2026-06-28) for the known slice: the seven species in
+`run_iv_guides.FLOOR_10_SPECIES` (Marshadow, Meloetta (Aria), Jirachi, Keldeo
+(Ordinary), Keldeo (Resolute), Zygarde (Complete Forme), Eternatus) are reswept
+at the 10/10/10 research floor; their envelope JSONs span iv 15..10 and their
+rendered guides carry the floor-aware "covered" banner (the never-ship-unflagged
+FLAG is resolved for them). The enumeration research ran 2026-07-03
+(adversarially-verified deep-research sweep):
+`docs/reviews/2026-07-03_limited_availability_iv_floors.md`. Headlines: all
+seven existing floor-10 assignments CONFIRMED; NO new species verifiably needs
+adding; Melmetal is explicitly NOT limited (Mystery Box is indefinitely
+repeatable). Michael RATIFIED the no-change verdict 2026-07-03. The
+SHADOW-legendary gap was CLOSED 2026-07-03 (Opus, deep-research pass, appended
+to the same doc): 12/12/12 safe for all 17; "1/1/1 shadow floor" is folklore
+(real floors 6/6/6 Giovanni / 6/6/6 Shadow Raid); none genuinely one-shot.
+
+## guides staleness-audit detail (2026-07-07)
+
+43 confirmed findings applied -- reference-dive drift from the 2026-06-25 Male->Female repoint, renamed sections, swapped-tint / inverted-axis errors, the per-kind auto-anchor gating description; all factual, voice-preserving.
