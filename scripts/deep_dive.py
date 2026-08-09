@@ -369,6 +369,42 @@ def classify_tier_indices(atk, dfn, hp, thresholds):
             if meets_threshold(thresh, atk, dfn, hp)]
 
 
+def sp_rank_array(meta):
+    """Return 1-based stat-product ranks for a canonical_meta list.
+
+    ``meta`` entries are the canonical tuples
+    ``(atk_iv, def_iv, sta_iv, level, cp, atk, def_, hp)``; the returned
+    list is parallel to ``meta`` and becomes ``DATA.spRanks``.
+
+    The sort key MUST match ``gopvpsim.pokemon.iv_rank``
+    (src/gopvpsim/pokemon.py:415-421): the UNROUNDED stat product
+    descending, ties broken by IV sum descending. That is PvPoke's
+    convention, and it is the same convention the page's off-grid
+    ``DATA.collection.rankLookup`` carries (built from ``iv_rank`` via
+    ``user_collection.compute_rank_lookup``) -- so the on-grid and
+    off-grid SP-rank paths in deep_dive_engine.js agree cell for cell.
+    (One gap remains, deliberately: on a ``--species-iv-floor`` dive the
+    grid is a SUBSET, so these ranks are dense 1..n over the pruned rows
+    while ``rankLookup`` stays a global 1..4096 rank. Same convention,
+    different scale -- see the comment at deep_dive_engine.js:1270.)
+
+    The ``iv_sp``/``ivSp`` arrays are rounded to 0.1 for DISPLAY only and
+    must never be used as the ranking key: rounding creates ties that
+    aren't real and then breaks them by enumeration order (lowest a/d/s),
+    which is neither PvPoke's answer nor ours (33-81% of rows differed on
+    the species we measured, and the rank-1 marker landed on x/15/14
+    instead of x/15/15).
+    """
+    order = sorted(range(len(meta)),
+                   key=lambda i: (meta[i][5] * meta[i][6] * meta[i][7],
+                                  meta[i][0] + meta[i][1] + meta[i][2]),
+                   reverse=True)
+    ranks = [0] * len(meta)
+    for rank, idx in enumerate(order):
+        ranks[idx] = rank + 1
+    return ranks
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -1357,11 +1393,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
     # frontier lives in shadow-effective space (correct).
     iv_efficient = efficient_frontier(list(zip(iv_atk, iv_def, iv_hp)))
 
-    # Compute stat product ranks (same for all movesets)
-    sp_sorted = sorted(range(n_ivs), key=lambda i: iv_sp[i], reverse=True)
-    sp_ranks = [0] * n_ivs
-    for rank, idx in enumerate(sp_sorted):
-        sp_ranks[idx] = rank + 1
+    # Compute stat product ranks (same for all movesets). Ranked off the
+    # UNROUNDED meta stats with the IV-sum tiebreak, so DATA.spRanks agrees
+    # with the off-grid DATA.collection.rankLookup (iv_rank / PvPoke
+    # convention); iv_sp above is the 0.1-rounded DISPLAY array only.
+    sp_ranks = sp_rank_array(meta)
 
     # Classify IVs by threshold tier
     # iv_tiers: primary tier (most restrictive match, for coloring) - -1 = none
@@ -1538,10 +1574,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         def_lv = [round(m[6], 2) for m in meta_lvl]
         hp_lv = [m[7] for m in meta_lvl]
         sp_lv = [round(m[5] * m[6] * m[7], 1) for m in meta_lvl]
-        sp_sorted_lv = sorted(range(len(meta_lvl)), key=lambda i: sp_lv[i], reverse=True)
-        sp_ranks_lv = [0] * len(meta_lvl)
-        for _r, _idx in enumerate(sp_sorted_lv):
-            sp_ranks_lv[_idx] = _r + 1
+        # Same convention as the L50 grid above -- unrounded SP, IV-sum
+        # tiebreak; sp_lv is display-only. See sp_rank_array's docstring.
+        sp_ranks_lv = sp_rank_array(meta_lvl)
         eff_lv = efficient_frontier(list(zip(atk_lv, def_lv, hp_lv)))
         tiers_lv = [-1] * len(meta_lvl)
         all_tiers_lv = [[] for _ in range(len(meta_lvl))]

@@ -1267,7 +1267,11 @@ function renderMatchesList() {
                        ? DATA.collection.rankLookupAlt : DATA.collection.rankLookup)) || {};
   var collSpecies = (DATA.collection && DATA.collection.speciesKey) || '';
   function lookupSpRank(rec) {
-    // On-grid: use DATA.spRanks — same data, cheaper lookup.
+    // On-grid: use DATA.spRanks — same convention as rankLookup (unrounded
+    // stat product, IV-sum-descending tiebreak), and a cheaper lookup.
+    // Caveat: on a --species-iv-floor dive the grid is a SUBSET, so spRanks
+    // is dense-ranked 1..n over that subset while rankLookup stays a global
+    // 1..4096 rank. Those two scales interleave in the same column here.
     if (rec.canonicalIvIdx >= 0) return DATA.spRanks[rec.canonicalIvIdx];
     // Off-grid: consult the precomputed rank lookup.
     var spBlock = rankLookup[collSpecies];
