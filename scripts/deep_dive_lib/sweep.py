@@ -952,7 +952,18 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     for i, r in enumerate(results):
         r['battle_rank'] = i + 1
 
-    by_sp = sorted(results, key=lambda r: r['stat_product'], reverse=True)
+    # Same rank convention as gopvpsim.pokemon.iv_rank / deep_dive's
+    # sp_rank_array: unrounded stat product descending, IV sum descending
+    # as the tiebreak (PvPoke's convention). Feeds the CLI summary table.
+    # The trailing -a/-d/-s components settle FULL ties (identical stat
+    # product AND IV sum, which are common) in ascending a/d/s order, i.e.
+    # iv_rank's enumeration order -- without them the ranks of tied rows
+    # would inherit the avg_score sort applied just above.
+    by_sp = sorted(results,
+                   key=lambda r: (r['stat_product'],
+                                  r['atk_iv'] + r['def_iv'] + r['sta_iv'],
+                                  -r['atk_iv'], -r['def_iv'], -r['sta_iv']),
+                   reverse=True)
     for i, r in enumerate(by_sp):
         r['sp_rank'] = i + 1
 
