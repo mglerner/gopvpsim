@@ -62,13 +62,6 @@ below later found one on a wider grid.)
 
 ### Open follow-ups (non-gating; render/tooling-only ones re-render from replay)
 
-- **[ops] retire the superseded July replay blobs** -- `userdata/replay/`
-  still holds the 97 pre-v8 blobs (20260706-09) beside the v8 set; a
-  wide `--since-hours` re-render picks up BOTH and wastes ~an hour
-  re-rendering stale-sim pages that the v8 renders then overwrite
-  (caught live 2026-08-08; that chain run was restarted at
-  `--since-hours 60`). Move them to `userdata/replay_retired/` (bulk
-  mv needs Michael or a permission rule).
 - **[tooling] dev-count `test_count` sentinel is a serialization point**
   (AFK-churn gate finding): six sentinel-bump commits raced across
   concurrent lanes in one 28-commit churn. Consider deriving the live
