@@ -24,6 +24,11 @@ SCRIPTS = Path(__file__).resolve().parent
 # (script name, FULL argument tuple). Not every gate takes --ship, so each
 # entry carries its complete argv.
 SHIP_GATES = (
+    # Fast test suite + loud node-presence check FIRST: fail on broken
+    # code in ~44s before the multi-minute link scan. Wired 2026-08-09
+    # (test-suite review Phase 1) -- before this, no publish path ever
+    # ran pytest; the 1,782-test contract layer was convention-only.
+    ('verify_tests.py', ()),
     ('verify_article_links.py', ('--ship',)),
     ('verify_no_unicode_dashes.py', ('--ship', '-q')),
     # Dev-count sentinels render into the published guides
