@@ -6,6 +6,7 @@ verify_overnight.py) must all route through it -- two of them once ran
 only the link gate, so a chain printed SUCCESS with dash violations
 present. These tests pin the roster contents and the routing.
 """
+import ast
 import os
 import sys
 from pathlib import Path
@@ -84,5 +85,12 @@ def test_entry_points_route_through_the_roster():
                 continue
             assert 'verify_article_links.py' not in stripped, (entry, line)
             assert 'verify_no_unicode_dashes.py' not in stripped, (entry, line)
-    vo = (_SCRIPTS / 'verify_overnight.py').read_text()
-    assert 'from run_ship_gates import SHIP_GATES' in vo
+    # The fourth entry point imports the roster rather than shelling out.
+    # Structural (ast), not an import-line substring: verify_overnight's
+    # import is function-local, so an isort/wrap/alias must not break this,
+    # while DROPPING it must (2026-08-09 test-suite review, Phase 3).
+    vo_imports = [n for n in ast.walk(
+        ast.parse((_SCRIPTS / 'verify_overnight.py').read_text()))
+        if isinstance(n, ast.ImportFrom) and n.module == 'run_ship_gates'
+        and any(a.name == 'SHIP_GATES' for a in n.names)]
+    assert vo_imports, 'verify_overnight stopped importing the shared roster'

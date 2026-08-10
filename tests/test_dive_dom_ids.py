@@ -68,6 +68,7 @@ def test_id_scan_finds_the_expected_scale():
     assert len(ids) >= 35, f'only {len(ids)} literal DOM ids found: {sorted(ids)}'
 
 
+@pytest.mark.render
 def test_shipped_js_is_actually_injected(small_dive_html):
     """Second anti-vacuity guard, and the one that matters most: the ids
     come from the Python side, so a page that dropped the JS entirely
@@ -77,6 +78,7 @@ def test_shipped_js_is_actually_injected(small_dive_html):
         assert probe in small_dive_html, f'{path.name} not injected into the dive'
 
 
+@pytest.mark.render
 def test_every_literal_dom_id_resolves(small_dive_html):
     """The guard itself: every id the shipped JS looks up by literal --
     from the JS files AND from the inline JS deep_dive.py emits -- is
@@ -227,6 +229,7 @@ def test_bb_host_pairs_are_read_from_the_engine():
     assert 'dd-bb-prose-host' in pairs
 
 
+@pytest.mark.render
 def test_id_contexts_cover_live_and_template(dive_id_rows):
     """Anti-vacuity for the two view assertions: the fixture must really
     render a best-buddy host AND its template, or the L50/L51 split is a
@@ -241,6 +244,7 @@ def test_id_contexts_cover_live_and_template(dive_id_rows):
         'not seeing the page')
 
 
+@pytest.mark.render
 def test_no_duplicate_ids_in_the_live_page(dive_id_rows):
     """L50 view: everything outside ``<template>``. This is the document
     getElementById actually walks on load."""
@@ -249,6 +253,7 @@ def test_no_duplicate_ids_in_the_live_page(dive_id_rows):
     assert not dups, f'duplicate DOM ids in the rendered dive: {dups}'
 
 
+@pytest.mark.render
 def test_no_duplicate_ids_after_the_best_buddy_swap(dive_id_rows):
     """L51 view: setBestBuddyLevel('51') replaces each host's children with
     its template's, so the observable document is doc-level ids + template
