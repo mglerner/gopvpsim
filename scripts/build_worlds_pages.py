@@ -237,7 +237,19 @@ _SLICE_ABBR = {('rank1', 'top512'): 'r1/512', ('rank1', 'atkband'): 'r1/atk',
                ('maxatk512', 'atkband'): 'maxA/atk'}
 
 
-def _digin(cell, opp_name):
+def pair_link_map(website_dir=WEBSITE_DIR):
+    """{frozenset({a, b}): filename} for pair detail pages that EXIST on
+    disk -- links are only emitted against real files (ship-gate rule)."""
+    out = {}
+    for p in Path(website_dir).glob('worlds-pair-*.html'):
+        stem = p.name[len('worlds-pair-'):-len('.html')]
+        if '--' in stem:
+            a, b = stem.split('--', 1)
+            out[frozenset((a, b))] = p.name
+    return out
+
+
+def _digin(cell, opp_name, pair_link=None):
     """Per-row expansion: the FULL Tier-1 data for this direction as
     exact beats-N counts -- every probe spread x cohort x bait slice,
     per scenario. This is the interim dig-in for IV-decided cells until
@@ -257,6 +269,11 @@ def _digin(cell, opp_name):
             amb = ' class="amb"' if sl.status[i] == 'amber' else ''
             tds.append(f'<td{amb}>{int(sl.wins[i])}/{sl.n}</td>')
         rows.append(f'<tr><th>{SCEN_LABELS[i]}</th>{"".join(tds)}</tr>')
+    link_html = (f' <a href="{esc(pair_link)}">Full detail page (all 4096 '
+                 'of your spreads + reach/deny cutoffs)</a>.'
+                 if pair_link else
+                 ' The full-grid detail page for this pair is deferred by '
+                 'the Tier-2 bake budget.')
     return (f'<details class="digin"><summary>details</summary>'
             f'<div class="table-scroll"><table>'
             f'<tr><th>scen</th>{heads}</tr>{"".join(rows)}</table></div>'
@@ -264,13 +281,12 @@ def _digin(cell, opp_name):
             ' for every slice: probe spread (r1 = rank-1 SP, maxA = max '
             'attack in top-512) x opponent cohort (512 = top-512 SP, atk = '
             'best-SP-per-attack-IV band; the cohorts overlap) x bait mode. '
-            'Highlighted = IV-decided. Closed-form attack/defense cutoffs '
-            'for these cells land on the per-pair detail pages (session '
-            '4).</p></details>')
+            f'Highlighted = IV-decided.{link_html}</p></details>')
 
 
-def _mini_cell(row, focal_name, opp_name):
-    """Matrix cell: 3x3 mini-grid of headline per-scenario status."""
+def _mini_cell(row, focal_name, opp_name, pair_link=None):
+    """Matrix cell: 3x3 mini-grid of headline per-scenario status. An
+    IV-decided cell whose pair page exists links to it."""
     if row.get('missing'):
         return '<td title="missing plane">?</td>'
     cls = {'green': 'g', 'red': 'r', 'amber': 'a'}
@@ -279,7 +295,10 @@ def _mini_cell(row, focal_name, opp_name):
                      for i, f in enumerate(row['frac']))
     tip = f'{focal_name} vs {opp_name} (rank-1 spread, top-512, bait): {tips}'
     td_cls = ' class="pair-amber"' if row['amber'] else ''
-    return f'<td{td_cls} title="{esc(tip)}"><span class="mini">{boxes}</span></td>'
+    mini = f'<span class="mini">{boxes}</span>'
+    if row['amber'] and pair_link:
+        mini = f'<a href="{esc(pair_link)}">{mini}</a>'
+    return f'<td{td_cls} title="{esc(tip)}">{mini}</td>'
 
 
 def provenance_html(meta, manifest):
@@ -325,8 +344,9 @@ LEGEND = ('<p class="legend"><span class="sc sc-green">W</span> beats every '
           'phones the cheat sheets\' W/L/? letters and IV-decided column '
           'carry the outcome. The hub matrix itself is a color-only '
           'overview -- its row links open the text-carrying cheat sheet. '
-          'Per-pair detail pages for IV-decided cells are planned '
-          '(session 4) and not yet linked.</p>')
+          'IV-decided pairs whose full Tier-2 grids are baked link to a '
+          'per-pair detail page; the rest are deferred by the bake budget '
+          '(list on the hub).</p>')
 
 NOT_BUILT = (
     '<div class="notbuilt"><p><strong>Deliberately not built:</strong> '
@@ -381,9 +401,10 @@ def render_rejects_table(rejects):
             + ''.join(rows) + '</table></div>')
 
 
-def render_matrix(entries, cells):
+def render_matrix(entries, cells, links=None):
     ids = [e['species_id'] for e in entries]
     names = {e['species_id']: e['name'] for e in entries}
+    links = links or {}
     rows_html = ['<tr><th></th>' + ''.join(
         f'<th class="colhead">{esc(names[o])}</th>' for o in ids) + '</tr>']
     summary = wrd.matrix_summary(cells, entries)
@@ -393,7 +414,8 @@ def render_matrix(entries, cells):
             if f == o:
                 tds.append('<td></td>')
             else:
-                tds.append(_mini_cell(summary[(f, o)], names[f], names[o]))
+                tds.append(_mini_cell(summary[(f, o)], names[f], names[o],
+                                      links.get(frozenset((f, o)))))
         rows_html.append(
             f'<tr><th class="rowhead"><a href="{sheet_filename(f)}">'
             f'{esc(names[f])}</a></th>' + ''.join(tds) + '</tr>')
@@ -401,7 +423,41 @@ def render_matrix(entries, cells):
             + ''.join(rows_html) + '</table></div>')
 
 
-def render_hub(meta, cells, manifest, slug_map):
+def tier2_status_html(entries, fn, deferred, n_pages):
+    """Hub block: what Tier-2 has baked, what is deferred, and the
+    MEASURED false-negative rate of the amber screen (or an explicit
+    not-yet-measured line -- never silence)."""
+    names = {e['species_id']: e['name'] for e in entries}
+    if fn is None:
+        fn_html = ('<p class="section-intro">Amber-screen false-negative '
+                   'rate: not yet measured (clean-sample grids not '
+                   'baked).</p>')
+    else:
+        worst = max((w for _p, d, w in fn['pairs'] if d), default=0.0)
+        fn_html = (
+            f'<p class="section-intro">Amber-screen check: of '
+            f'{fn["n"]} sampled clean (not-flagged) pairs given the full '
+            f'4096-spread treatment, <strong>{fn["fn"]}</strong> turn out '
+            'IV-decided somewhere in the top-512 x top-512 block '
+            f'(largest losing-minority share {100 * worst:.2f}%). The '
+            'amber flags are a screen, not a proof of settledness.</p>')
+    if deferred:
+        listed = ', '.join(f'{esc(names.get(a, a))} / {esc(names.get(b, b))}'
+                           for a, b in deferred[:20])
+        more = (f' (+{len(deferred) - 20} more)'
+                if len(deferred) > 20 else '')
+        def_html = (f'<p class="section-intro">{len(deferred)} IV-decided '
+                    f'pairs are deferred by the Tier-2 bake budget (usage-'
+                    f'ranked worklist): {listed}{more}. A deferred pair '
+                    'still has full Tier-1 data on the cheat sheets.</p>')
+    else:
+        def_html = ''
+    return (f'<h2>Per-pair detail pages ({n_pages} baked)</h2>'
+            f'{fn_html}{def_html}')
+
+
+def render_hub(meta, cells, manifest, slug_map, links=None, fn=None,
+               deferred=None):
     entries = meta['entries']
     n_amber = sum(1 for c in cells.values() if not c.missing and c.amber)
     body = f"""
@@ -427,7 +483,8 @@ shield scenarios; an outlined cell is IV-decided somewhere in ANY slice
 {n_amber} of {len(cells)} directions qualify. Never aggregated to one
 number.</p>
 {LEGEND}
-{render_matrix(entries, cells)}
+{render_matrix(entries, cells, links)}
+{tier2_status_html(entries, fn, deferred or [], len(links or {}))}
 <h2>Candidates that stayed out</h2>
 <p class="section-intro">The usage top-{meta["reject_top_n"]} that did not
 make the meta, plus the banned row. Collapsed-rank PLAYED* entries above are
@@ -448,9 +505,10 @@ shown as data; we do not claim nerf vs model error.</p>
         extra_css=WORLDS_CSS)
 
 
-def render_cheat_sheet(entry, meta, cells, manifest, slug_map):
+def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None):
     entries = meta['entries']
     names = {e['species_id']: e['name'] for e in entries}
+    links = links or {}
     sid = entry['species_id']
     rows = []
     for opp in entries:
@@ -476,9 +534,10 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map):
         else:
             mband = '<span class="mband">missing</span>'
         oname = names[oid]
+        plink = links.get(frozenset((sid, oid)))
         rows.append(
             f'<tr><td><a href="{sheet_filename(oid)}">{esc(oname)}</a>'
-            f'{badge_html(opp)}<br>{_digin(cell, oname)}</td>'
+            f'{badge_html(opp)}<br>{_digin(cell, oname, plink)}</td>'
             f'<td><span style="display:inline-block">'
             f'{_grid9(bait, oname, "bait")}</span>'
             f'<span style="display:inline-block">'
@@ -541,11 +600,26 @@ def build(website_dir=WEBSITE_DIR, planes_dir=wp.PLANES_DIR,
     website_dir = Path(website_dir)
     website_dir.mkdir(parents=True, exist_ok=True)
     slug_map = dive_slug_map(entries, website_dir)
+    links = pair_link_map(website_dir)
+    # Tier-2 extras are OPTIONAL (session-3 pages rendered without them);
+    # when the tier2 manifest exists, the hub gains the FN-rate block and
+    # the deferred list.
+    fn = None
+    deferred = []
+    try:
+        import worlds_fn
+        import worlds_tier2
+        t2m = worlds_tier2.load_manifest()
+        if t2m is not None:
+            fn = worlds_fn.fn_rate()
+            deferred = [tuple(p) for p in t2m.get('deferred', [])]
+    except ImportError:
+        pass
     (website_dir / 'worlds.html').write_text(
-        render_hub(meta, cells, manifest, slug_map))
+        render_hub(meta, cells, manifest, slug_map, links, fn, deferred))
     for e in entries:
         (website_dir / sheet_filename(e['species_id'])).write_text(
-            render_cheat_sheet(e, meta, cells, manifest, slug_map))
+            render_cheat_sheet(e, meta, cells, manifest, slug_map, links))
     print(f'Wrote worlds.html + {len(entries)} cheat sheets to '
           f'{website_dir} ({len(cells)} cells, '
           f'{sum(1 for c in cells.values() if c.amber)} IV-decided '
