@@ -89,6 +89,25 @@ def test_511_of_512_style_cell_is_amber(planes_dir):
     assert cell.slices[('rank1', 'atkband', True)].status[4] == 'amber'
 
 
+def test_spread_flip_is_amber_even_when_both_slices_uniform(planes_dir):
+    """Focal-axis decidedness: rank1 loses the WHOLE cohort while
+    maxatk512 beats the WHOLE cohort in scenario 3 -- every slice is
+    uniform (no within-cohort mix) yet the pair is IV-decided. The
+    within-cohort test alone missed this class (2026-08-10)."""
+    won = np.zeros((2, 4, 9), dtype=bool)
+    won[1, :, 3] = True          # maxatk512 spread sweeps scenario 1-0
+    score = np.where(won, 700, 300).astype(np.uint16)
+    for bait in (True, False):
+        _write_synthetic(planes_dir, 'a', 'b', bait, won, score)
+    cell = wrd.build_cell('a', 'b', planes_dir)
+    # No slice shows a within-cohort mix...
+    assert all('amber' not in s.status for s in cell.slices.values())
+    # ...but the cell is amber via the spread flip.
+    assert cell.spread_flip_scenarios() == [3]
+    assert cell.amber
+    assert cell.amber_scenarios() == [3]
+
+
 def test_missing_plane_marks_cell_missing(planes_dir):
     won = np.ones((2, 4, 9), dtype=bool)
     score = np.full(won.shape, 700, dtype=np.uint16)
