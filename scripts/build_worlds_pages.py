@@ -62,16 +62,28 @@ WORLDS_CSS = """
           text-align: left; vertical-align: top; }
   .num { text-align: right; font-variant-numeric: tabular-nums; }
   .table-scroll { overflow-x: auto; }
-  .strip { display: inline-flex; gap: 2px; vertical-align: middle; }
-  .strip .sc { width: 20px; height: 20px; border-radius: 3px;
-               display: inline-block; color: #ffffff; font-size: 11px;
-               font-weight: 700; text-align: center; line-height: 20px; }
+  .g9 { display: inline-grid; grid-template-columns: 14px repeat(3, 20px);
+        gap: 2px; vertical-align: top; margin: 2px 10px 2px 0; }
+  .g9 .sc { width: 20px; height: 20px; border-radius: 3px;
+            display: inline-block; color: #ffffff; font-size: 11px;
+            font-weight: 700; text-align: center; line-height: 20px; }
+  .g9 .glab { color: var(--text-muted); font-size: 10px; line-height: 20px;
+              text-align: center; }
+  .g9 .gcorner { font-size: 9px; line-height: 10px; text-align: right;
+                 color: var(--text-muted); }
+  .gcap { display: block; color: var(--text-muted); font-size: 11px;
+          text-align: center; margin-top: 1px; }
+  .digin summary { cursor: pointer; color: var(--accent); font-size: 12px; }
+  .digin table { border-collapse: collapse; font-size: 12px; margin: 6px 0; }
+  .digin th, .digin td { border-bottom: 1px solid var(--border);
+          padding: 2px 7px; text-align: right;
+          font-variant-numeric: tabular-nums; }
+  .digin th { color: var(--text-muted); font-weight: 600; }
+  .digin td.amb { color: var(--flip); font-weight: 700; }
   .sc-green { background: var(--win); }
   .sc-red { background: var(--loss); }
   .sc-amber { background: var(--flip); }
   .sc-miss { background: var(--border-2); }
-  .striplab { color: var(--text-muted); font-size: 11px; width: 26px;
-              display: inline-block; }
   .matrix-scroll { overflow-x: auto; border: 1px solid var(--border);
                    border-radius: 4px; }
   table.matrix { border-collapse: collapse; }
@@ -189,22 +201,72 @@ def _pct(f):
     return f'{100 * f:.1f}%'
 
 
-def _strip(slice_, opp_name, bait_label):
-    """One 9-cell scenario strip. Each cell carries a W/L/? letter (the
-    outcome must not be color-alone: phones cannot hover and the three
-    fills are near-isoluminant in grayscale) and an exact-count
-    tooltip."""
+def _grid9(slice_, opp_name, bait_label):
+    """One 3x3 scenario grid in PvPoke's battle-matrix layout (rows =
+    own shields top to bottom, columns = opponent shields left to
+    right -- Michael 2026-08-10, for visual consistency with PvPoke's
+    matchup pages). Each cell carries a W/L/? letter (the outcome must
+    not be color-alone: phones cannot hover and the three fills are
+    near-isoluminant in grayscale) and an exact-count tooltip."""
+    head = ('<span class="gcorner"></span>'
+            + ''.join(f'<span class="glab">{c}</span>' for c in '012'))
     if slice_ is None:
-        cells = ''.join('<span class="sc sc-miss"></span>' for _ in range(9))
-        return f'<span class="strip" title="no plane">{cells}</span>'
-    parts = []
+        cells = ''.join(
+            f'<span class="glab">{r}</span>' + ''.join(
+                '<span class="sc sc-miss"></span>' for _ in range(3))
+            for r in '012')
+        return (f'<span class="g9" title="no plane">{head}{cells}</span>'
+                f'<span class="gcap">{esc(bait_label)}</span>')
+    parts = [head]
     for i, st in enumerate(slice_.status):
+        if i % 3 == 0:
+            parts.append(f'<span class="glab">{i // 3}</span>')
         tip = (f'{bait_label} {SCEN_LABELS[i]} vs {opp_name}: beats '
                f'{int(slice_.wins[i])} of {slice_.n} spreads (margin '
                f'{int(slice_.margin_lo[i]):+d}..{int(slice_.margin_hi[i]):+d})')
         parts.append(f'<span class="sc sc-{st}" title="{esc(tip)}">'
                      f'{_LETTER[st]}</span>')
-    return f'<span class="strip">{"".join(parts)}</span>'
+    return (f'<span class="g9">{"".join(parts)}</span>'
+            f'<span class="gcap">{esc(bait_label)}</span>')
+
+
+_SLICE_COLS = [(s, c, b) for b in (True, False)
+               for s in ('rank1', 'maxatk512') for c in ('top512', 'atkband')]
+_SLICE_ABBR = {('rank1', 'top512'): 'r1/512', ('rank1', 'atkband'): 'r1/atk',
+               ('maxatk512', 'top512'): 'maxA/512',
+               ('maxatk512', 'atkband'): 'maxA/atk'}
+
+
+def _digin(cell, opp_name):
+    """Per-row expansion: the FULL Tier-1 data for this direction as
+    exact beats-N counts -- every probe spread x cohort x bait slice,
+    per scenario. This is the interim dig-in for IV-decided cells until
+    the session-4 per-pair detail pages (closed-form atk/def cutoffs +
+    full 4096x512 grids) replace it with links."""
+    heads = ''.join(
+        f'<th>{"bait" if b else "no-bait"}<br>{_SLICE_ABBR[(s, c)]}</th>'
+        for s, c, b in _SLICE_COLS)
+    rows = []
+    for i in range(9):
+        tds = []
+        for s, c, b in _SLICE_COLS:
+            sl = cell.slices.get((s, c, b))
+            if sl is None:
+                tds.append('<td>-</td>')
+                continue
+            amb = ' class="amb"' if sl.status[i] == 'amber' else ''
+            tds.append(f'<td{amb}>{int(sl.wins[i])}/{sl.n}</td>')
+        rows.append(f'<tr><th>{SCEN_LABELS[i]}</th>{"".join(tds)}</tr>')
+    return (f'<details class="digin"><summary>details</summary>'
+            f'<div class="table-scroll"><table>'
+            f'<tr><th>scen</th>{heads}</tr>{"".join(rows)}</table></div>'
+            f'<p class="legend">Exact spreads-beaten counts vs {esc(opp_name)}'
+            ' for every slice: probe spread (r1 = rank-1 SP, maxA = max '
+            'attack in top-512) x opponent cohort (512 = top-512 SP, atk = '
+            'best-SP-per-attack-IV band; the cohorts overlap) x bait mode. '
+            'Highlighted = IV-decided. Closed-form attack/defense cutoffs '
+            'for these cells land on the per-pair detail pages (session '
+            '4).</p></details>')
 
 
 def _mini_cell(row, focal_name, opp_name):
@@ -250,10 +312,11 @@ LEGEND = ('<p class="legend"><span class="sc sc-green">W</span> beats every '
           'cohort spread &nbsp; <span class="sc sc-amber">?</span> '
           'IV-decided (some spreads win, some lose) &nbsp; <span class="sc '
           'sc-red">L</span> beats no cohort spread (an exact 500-500 tie '
-          'counts as not beaten). Scenario order: '
-          + ', '.join(SCEN_LABELS) + ' (own shields - opponent shields); '
-          'the 3x3 matrix cells read row-major, rows = own shields top to '
-          'bottom, columns = opponent shields left to right. Bait modes '
+          'counts as not beaten). Every 3x3 grid uses PvPoke\'s '
+          'battle-matrix layout: rows = own shields 0/1/2 top to bottom, '
+          'columns = opponent shields left to right (scenario labels read '
+          'own-opp, e.g. 2-1 = you keep two shields, they keep one). '
+          'Bait modes '
           'apply to the FOCAL side only -- in the no-bait line the '
           'opponent still baits, so the two directions of a no-bait pair '
           'describe different battles and their sheets need not mirror. '
@@ -414,11 +477,11 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map):
         oname = names[oid]
         rows.append(
             f'<tr><td><a href="{sheet_filename(oid)}">{esc(oname)}</a>'
-            f'{badge_html(opp)}</td>'
-            f'<td><span class="striplab">bait</span>'
-            f'{_strip(bait, oname, "bait")}<br>'
-            f'<span class="striplab">no-b</span>'
-            f'{_strip(nobait, oname, "no-bait")}</td>'
+            f'{badge_html(opp)}<br>{_digin(cell, oname)}</td>'
+            f'<td><span style="display:inline-block">'
+            f'{_grid9(bait, oname, "bait")}</span>'
+            f'<span style="display:inline-block">'
+            f'{_grid9(nobait, oname, "no-bait")}</span></td>'
             f'<td>{flag_html}</td><td>{mband}</td></tr>')
     forced = entry.get('forced_reason')
     forced_html = (f'<p class="section-intro"><strong>Why it is in the '
@@ -437,7 +500,8 @@ sizes and margins).{dive_html}</p>
 {forced_html}
 {LEGEND}
 <div class="table-scroll"><table class="sheet">
-<tr><th>Opponent</th><th>shield scenarios (bait / no-bait)</th>
+<tr><th>Opponent</th><th>shield matchups (rows = own shields,
+columns = opponent's; bait / no-bait)</th>
 <th>IV-decided</th><th>score margin (both bait modes)</th></tr>
 {''.join(rows)}
 </table></div>
