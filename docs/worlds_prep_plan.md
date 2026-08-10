@@ -49,7 +49,7 @@ the **"Worlds 2026 robustness analysis"** — never "deep dives".
   Turin, 2026-06-06). This is flagged on every page; the badge system carries
   it per-entry.
 
-## The meta: 30 entries
+## The meta: 31 entries
 
 Badges: **PLAYED** = top-25 recent usage AND top-30 current rank; **PLAYED**\*
 = top-25 usage, current rank sank below 30; **MODEL** = current top-30 rank,
@@ -91,11 +91,28 @@ Switch). Moveset rule: per-variant modal when modal% >= 60, else
 | 28  | Altaria (Shadow)    | PLAYED  | 4.6%  | 6    | per-variant modal TBD at bake             |
 | 29  | Grumpig             | PLAYED* | 7.3%  | 43   | Psywave / Dynamic Punch / Shadow Ball     |
 | 30  | Diggersby           | PLAYED* | 8.3%  | 41   | Mud Shot / Fire Punch / Scorching Sands   |
+| 31  | Mantine             | FORCED  | 0.6%  | 53   | Wing Attack / Twister / Water Pulse       |
 
 Aegislash ships as `aegislash_shield` with the "Starts Blade" variant per the
 existing dive convention; it is the arithmetic-hostile entry (form change
 disables signature dedup and breaks closed-form separability) — budgeted as
 the expensive pair-family and footnoted out of the closed-form pages.
+
+Mantine (#31) is the second FORCED entry (added 2026-08-10 at Michael's
+request): DragapultSim specifically called it a top Worlds threat alongside
+Tinkaton. It earns no badge on our axes — open-GL rank 53, 0.61% recent
+open-GL usage (11/1,801 teams) — but it was a real pick at NAIC (7.25%,
+24/331 teams, in a Mantine-friendly limited meta; NAIC cup rank 5), which is
+the likely context for the callout. Its provenance chip states all of this.
+Moveset: PvPoke default, which matches the NAIC field modal (19/24 ran Wing
+Attack / Twister / Water Pulse). Once the amber pipeline exists,
+Tinkaton-vs-Mantine is the designated validation pair: DragapultSim's thread
+(x.com/DragapultSim/status/2083251310996939262) published specific numbers —
+Tinkaton needs 110.21 atk to guarantee the Gigaton-2-shot breakpoint (12/6/11
+best spread) or 108.27 atk targeting rank-1 Mantine (4/1/12); Mantine denies
+with 170.36 def (0/15/7, bulkpoints any Tinkaton under 109.28 atk) or 165.73
+def (bulkpoints under 108.27) — to check our reach-or-deny card against
+before shipping.
 
 Runner-ups that stay OUT but render as rejects on the candidate page:
 Cradily (biggest faller, -34.6pp old->recent), Talonflame, Annihilape (rank
@@ -141,7 +158,7 @@ exactly the spreads this analysis is about). Cohorts labeled separately.
   (move, tier, atk-cutoff, def-cutoff) tables; feeds products 4, 5, 6 and the
   equivalence classes. Aegislash excluded (footnoted).
 - **Tier 1 — probe** (minutes): probe focal spreads x cohorts x 9 scenarios x
-  both directions x 435 pairs. Feeds the matrix + cheat sheets.
+  both directions x 465 pairs. Feeds the matrix + cheat sheets.
 - **Tier 2 — joint grids** (overnight max): full 4096 x 512 x 9, amber pairs
   only, usage-ranked worklist with a hard wall-clock budget cap; deferred
   pairs are listed on the page. The amber screen's false-negative rate is
