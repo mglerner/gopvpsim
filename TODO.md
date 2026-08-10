@@ -43,18 +43,30 @@ in sampled cells" held for the hunt's own samples; the NB-1 bounding sweep
 below later found one on a wider grid.)
 
 **Still open:**
-- **[comment-only, rides the next engine-hash bump window]** three stale
-  in-code rationales, batched because each is in a hashed file or
-  meaningless alone: `battle.py:1659-1665` would_shield attribution (+
-  the `tests/test_nb1_selection_freeze.py:134-142` docstring that
-  propagates it), and `formchange.py:127-148`'s "same fixed point"
-  claim (round-2 FC-2; the DEVELOPER_NOTES half was corrected
-  2026-07-16). Exact wording is spelled out in
-  `docs/reviews/2026-08-09_would_shield_diagnosis.md` -- which also
-  RESOLVES the old would_shield/always-shield medium: shared-structure
-  divergence, the +201 is PvPoke's stale damage cache, and the suggested
-  policy-consult fix measurably worsens oracle agreement (201 -> 730).
-  Do not reopen it as a behavior change without that doc's gates.
+- **[rides the next engine-hash bump window]** batched because each is
+  in a hashed file or meaningless alone: (a) `battle.py:1659-1665`
+  would_shield attribution comment (+ the
+  `tests/test_nb1_selection_freeze.py:134-142` docstring that
+  propagates it) and `formchange.py:127-148`'s "same fixed point"
+  claim (round-2 FC-2) -- wording spelled out in
+  `docs/reviews/2026-08-09_would_shield_diagnosis.md`, which also
+  RESOLVES the old would_shield/always-shield medium (shared-structure
+  divergence; the +201 is PvPoke's stale damage cache; the suggested
+  fix worsens oracle error 201 -> 730 -- do not reopen without that
+  doc's gates); (b) **relocate `data.py:parse_types` into a hashed
+  module** (test-suite review F5: damage-affecting but outside every
+  cache hash; `tests/test_engine_files_closure.py` allowlists it with
+  a pointer here until then). Behavior-neutral, so the fully-blessing
+  `--from-engine` migration predicate is trivially provable.
+- **[decision, S8a tie semantics]** the S8a vectorization (`8a7fdc7`)
+  silently changed `aggregate_flips_by_anchor`'s win test from
+  `>= WIN_RATING` to `> WIN_RATING` (verified vs `8a7fdc7^`); the
+  frozen test oracle kept `>=`, so exact-500 tie scores diverge --
+  currently unreachable by the fixtures, documented in
+  `tests/test_aggregate_flips_by_anchor.py`'s oracle docstring.
+  Decide: keep `>` (matches `_won_set`/PvPoke -- likely intended) and
+  update the oracle + plant a 500-tie in the fixture, or revert
+  production to `>=`. (Lane A escalation, 2026-08-09.)
 - **js-parity residue** (LOW): only the winsMirror branch inside the
   SHA-pinned `deep_dive_engine.js` region (~:1497-1511) still uses the
   literal "Gives up vs #1" header for a fourth metric (a mirror-cohort

@@ -2,6 +2,41 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-09 (evening) -- test-suite review phases 2-4: the suite now discriminates
+
+5 adversarially-verified lanes (20 agents; every replanted/converted
+test proven to FAIL against broken code before landing):
+
+- **Phase 2 dead weight** (`e6dcc2e`, `d27f481`): the three vacuous
+  S8a oracle-parity files replanted (scores now couple to the swept
+  stat; all 14 tests fail under a type-correct stub, previously 13
+  passed) with non-emptiness asserts on every comparison; the 33.9s
+  permanently-xfailed gamemaster sweep replaced by a 1.7s seeded
+  banded sample + a slow-marked full sweep that actually asserts (last
+  permanent xfail gone; 14 -> 13 xfails, all strict); 72-cell
+  turn-mechanics grid shrunk to its 3 distinct signatures; duplicate
+  conftest TTL fixtures merged; 4 tracked-file skips -> hard asserts;
+  `render`/`local_artifacts` markers added. Fast tier 44s -> 36s.
+- **Phase 3 pin conversions** (`aa74af1`, `8a78c4e`): the silent-rot
+  absence pins re-planted as tolerant structural scans WITH positive
+  controls (respelled antipatterns now caught -- proven per pin);
+  import-text pins -> object identity; bake pins -> rendered-DATA
+  assertions; the print() pin -> an AST scan; KEEP-list items
+  untouched.
+- **Phase 4 blind spots** (`64b3e29`): six new files, 50 tests --
+  JIT-vs-pure-Python equivalence (+ overflow-sentinel fallback, with a
+  counting-shim anti-vacuity guard), ship-gate detector
+  positive/negative controls, worker-logging spawn delivery,
+  `_ENGINE_FILES` closure guard (data.py allowlisted with a pointer to
+  the queued parse_types relocation; sweep_cache's overclaiming
+  comment fixed), gobattlekit 9-name signature pin (+ `__all__` on
+  thresholds.py), attribution surfaces on the rendered dive.
+- **Policy adopted**: the testing-policy block is now in CLAUDE.md's
+  Testing section. Suite 1783: full ~79s / fast tier 36s / gates
+  green. Lane A escalated one real find for decision: the S8a
+  vectorization silently changed aggregate's tie handling (`>=` ->
+  `>`) -- TODO carries the decision bullet.
+
 ## 2026-08-09 (day) -- both-reference card lines, publish, test-suite review + Phase 1
 
 **Card flip lines (Michael feature request):** the recommendation
