@@ -131,7 +131,10 @@ def test_cheat_sheet_contracts(cells):
     # Per-row dig-in expansion: full Tier-1 slice counts as text.
     assert '<details class="digin">' in html_text
     assert '2/3' in html_text                         # exact count cell
-    assert 'session 4' in html_text                   # detail-pages pointer
+    # No pair page exists in the fixture -> the dig-in says deferred,
+    # never a dead link.
+    assert 'deferred by the Tier-2 bake budget' in html_text
+    assert 'worlds-pair-' not in html_text
     assert 'score margin (both bait modes)' in html_text
     assert 'FOCAL side only' in html_text             # no-bait disclosure
     assert 'worlds.html' in html_text                 # back link
