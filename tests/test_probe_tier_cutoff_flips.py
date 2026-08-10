@@ -69,21 +69,64 @@ def _reference_probe(data_obj, score_arrays_all, moveset_idx,
     return results
 
 
+# Per-cell win rules: (stat, cut). Each (mode, scenario, opponent) cell
+# picks one, and an IV wins that cell iff its stat clears the cut. The
+# mixture is deliberate — cuts that line up with a probed tier cutoff make
+# the 0.75/0.25 winrate gate fire, cuts that straddle or key off another
+# stat make it stay silent, so the oracle emits a partial (not saturated)
+# record set.
+_WIN_RULES = [
+    ('def', 140.0),
+    ('def', 145.0),
+    ('atk', 130.0),
+    ('hp', 130),
+    ('def', 120.0),
+    ('atk', 125.0),
+    ('def', 138.0),
+    ('hp', 160),
+]
+
+
 def _make_inputs(seed, nIvs=256, nS=9, nO=5, modes=('pvpoke', 'rank1')):
+    """Random inputs whose SCORES are coupled to the IV stats being probed.
+
+    The pre-2026-08-09 version drew scores as i.i.d. ``randint(0, 1000)``,
+    independent of ivAtk/ivDef/ivHp. Both winrates then sat at ~0.50 and
+    the ``pass_wr >= 0.75 and fail_wr <= 0.25`` conjunction — the entire
+    body of the function under test — never fired: the oracle produced 0
+    records in 20/20 (seed x cutoff) cases, so every comparison below was
+    empty-vs-empty and the file passed with the production function gutted.
+
+    Scores are now generated the way tests/test_matchup_boundaries.py
+    does it (``win = ivDef[iv] >= stat_cut`` plus ~6% noise), just with a
+    per-cell rule table so atk/def/hp cutoffs all get exercised.
+    """
     rng = random.Random(seed)
     scenarios = [[s0, s1] for s0 in range(3) for s1 in range(3)][:nS]
     opponents = [f'OPP_{i}' for i in range(nO)]
+    iv_atk = [round(100 + 50 * rng.random(), 2) for _ in range(nIvs)]
+    iv_def = [round(100 + 50 * rng.random(), 2) for _ in range(nIvs)]
+    iv_hp = [rng.randint(100, 200) for _ in range(nIvs)]
     data_obj = {
         'nIvs': nIvs,
-        'ivAtk': [round(100 + 50 * rng.random(), 2) for _ in range(nIvs)],
-        'ivDef': [round(100 + 50 * rng.random(), 2) for _ in range(nIvs)],
-        'ivHp': [rng.randint(100, 200) for _ in range(nIvs)],
+        'ivAtk': iv_atk,
+        'ivDef': iv_def,
+        'ivHp': iv_hp,
         'oppIvModes': list(modes),
     }
+    by_stat = {'atk': iv_atk, 'def': iv_def, 'hp': iv_hp}
     score_arrays = {}
-    for mode in modes:
-        score_arrays[f'0_{mode}'] = [rng.randint(0, 1000)
-                                     for _ in range(nIvs * nS * nO)]
+    for mi, mode in enumerate(modes):
+        flat = []
+        for iv in range(nIvs):
+            for si in range(nS):
+                for oi in range(nO):
+                    stat, cut = _WIN_RULES[(si * nO + oi + mi) % len(_WIN_RULES)]
+                    win = by_stat[stat][iv] >= cut
+                    if rng.random() < 0.06:   # ~6% noise, as in the sibling
+                        win = not win         # boundaries fixture
+                    flat.append(700 if win else 300)
+        score_arrays[f'0_{mode}'] = flat
     return data_obj, score_arrays, scenarios, opponents
 
 
@@ -116,6 +159,14 @@ def test_matches_reference_random_inputs():
                              (125.0, 138.0, 140)]:
             ref = _reference_probe(data_obj, score_arrays, 0,
                                    ac, dc, hc, scenarios, opponents)
+            # Anti-vacuity: an empty-vs-empty comparison proves nothing.
+            # Measured floor over seeds 0..19 x these 4 cuts is 5 records
+            # (typical 15-33); a fixture that stops clearing the winrate
+            # gate must fail loudly here rather than pass silently.
+            assert ref, (
+                f'oracle produced no records for seed={seed} '
+                f'cut=({ac},{dc},{hc}) — fixture no longer exercises the '
+                f'winrate gate, so the parity check below is vacuous')
             got = analysis.probe_tier_cutoff_flips(
                 data_obj, score_arrays, 0,
                 ac, dc, hc, scenarios, opponents)
@@ -123,8 +174,23 @@ def test_matches_reference_random_inputs():
                 f'seed={seed} cut=({ac},{dc},{hc}) ref={len(ref)} got={len(got)}')
 
 
+def _reachable_cut_control(data_obj, score_arrays, scenarios, opponents):
+    """The same fixture DOES yield flips at a reachable cut.
+
+    Without this, `got == []` below is satisfied by any function that
+    always returns [] — which is exactly how this file used to pass with
+    the production implementation gutted.
+    """
+    analysis._invalidate_np_caches()
+    control = analysis.probe_tier_cutoff_flips(
+        data_obj, score_arrays, 0,
+        0.0, 140.0, 0, scenarios, opponents)
+    assert control, 'control cut produced no flips — fixture is dead'
+
+
 def test_empty_when_no_ivs_meet_cut():
     data_obj, score_arrays, scenarios, opponents = _make_inputs(0)
+    _reachable_cut_control(data_obj, score_arrays, scenarios, opponents)
     analysis._invalidate_np_caches()
     # Cut higher than any IV stat -> no passers
     got = analysis.probe_tier_cutoff_flips(
@@ -135,6 +201,7 @@ def test_empty_when_no_ivs_meet_cut():
 
 def test_empty_when_all_ivs_meet_cut():
     data_obj, score_arrays, scenarios, opponents = _make_inputs(0)
+    _reachable_cut_control(data_obj, score_arrays, scenarios, opponents)
     analysis._invalidate_np_caches()
     # Cut below any IV stat -> no failers
     got = analysis.probe_tier_cutoff_flips(
@@ -148,14 +215,22 @@ def test_missing_scores_key_skips_mode():
     # Remove one mode's scores
     del score_arrays['0_rank1']
     analysis._invalidate_np_caches()
+    ref = _reference_probe(data_obj, score_arrays, 0,
+                           0.0, 140.0, 130, scenarios, opponents)
+    assert ref, 'oracle produced no records — comparison would be vacuous'
     got = analysis.probe_tier_cutoff_flips(
         data_obj, score_arrays, 0,
         0.0, 140.0, 130, scenarios, opponents)
+    # The surviving mode must still produce results — without this floor
+    # the all() below is satisfied by an empty list.
+    assert got
     # All returned entries must be from the remaining mode
     assert all(r['opp_iv_mode'] == 'pvpoke' for r in got)
+    assert _equal_result_lists(ref, got)
 
 
 def test_zero_nIvs_returns_empty():
+    _reachable_cut_control(*_make_inputs(0))
     data_obj = {'nIvs': 0, 'ivAtk': [], 'ivDef': [], 'ivHp': [],
                 'oppIvModes': ['pvpoke']}
     scenarios = [[0, 0]]
