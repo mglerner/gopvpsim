@@ -542,8 +542,9 @@ class TestRepoFiles:
     def test_annihilape_toml_loads(self):
         repo_root = Path(__file__).resolve().parent.parent
         p = repo_root / "thresholds" / "annihilape.toml"
-        if not p.exists():
-            pytest.skip("thresholds/annihilape.toml not present")
+        # Hard assert, not a skip: git-tracked, so absence means a broken
+        # checkout (2026-08-09 test-suite review, silent-hole class).
+        assert p.exists(), f"tracked fixture missing: {p}"
         reg = th.load_toml(p)
         sp = reg.get_spread("Annihilape", "Great", "lurgan_ape")
         assert isinstance(sp, th.IvListSpread)
@@ -558,8 +559,9 @@ class TestRepoFiles:
     def test_tinkaton_toml_loads(self):
         repo_root = Path(__file__).resolve().parent.parent
         p = repo_root / "thresholds" / "tinkaton.toml"
-        if not p.exists():
-            pytest.skip("thresholds/tinkaton.toml not present")
+        # Hard assert, not a skip: git-tracked, so absence means a broken
+        # checkout (2026-08-09 test-suite review, silent-hole class).
+        assert p.exists(), f"tracked fixture missing: {p}"
         reg = th.load_toml(p)
         sp = reg.get_spread("Tinkaton", "Great", "GH Great")
         assert isinstance(sp, th.StatCutoffSpread)

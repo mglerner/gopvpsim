@@ -209,7 +209,6 @@ def test_new_charged_buff_applies():
 # decisions diverge, they fail ON PURPOSE, forcing that change to be
 # corpus-floor-verified and these fixtures consciously updated.
 # ---------------------------------------------------------------------------
-import itertools
 from gopvpsim.battle import (pvpoke_dp, _calc_turns_to_live,
                              _optimize_move_timing, would_shield)
 
@@ -234,8 +233,42 @@ def _decision_pair(energy, hp, a_shields, d_shields):
     return a, d
 
 
-@pytest.mark.parametrize("energy,hp,a_sh,d_sh", list(itertools.product(
-    [0, 40, 55, 100], [12, 80, 160], [0, 2], [0, 1, 2])))
+# The cells below replace an itertools.product grid of
+# energy[0,40,55,100] x hp[12,80,160] x a_sh[0,2] x d_sh[0,1,2] = 72 cells.
+# Measured 2026-08-09: all 72 collapse to exactly THREE distinct output
+# signatures over the four decision functions, and the partition depends
+# only on (energy, d_sh) -- hp and a_sh never change any output here.
+#
+#   54 cells -> (pvpoke_dp=None, ttl=inf, timing=True,  shield=False)  energy < 100
+#   12 cells -> (pvpoke_dp=0,    ttl=inf, timing=False, shield=False)  energy=100, d_sh>=1
+#    6 cells -> (pvpoke_dp=1,    ttl=inf, timing=False, shield=False)  energy=100, d_sh=0
+#
+# Per-function distinct outputs: pvpoke_dp 3, _calc_turns_to_live 1,
+# _optimize_move_timing 2, would_shield 1. Two representatives per signature
+# (varying hp and a_sh across them, so the collapse claim itself stays
+# spot-checked) preserve the full tripwire signal at 7 cells instead of 72.
+#
+# The signature collapse is an argument about OUTPUT VALUES, not about which
+# code paths the inputs exercise -- so signature coverage alone is not enough
+# for a tripwire aimed at a FUTURE re-optimization. Every distinct value of
+# every axis is therefore kept, in particular energy=40: the attacker's
+# charged moves cost 40 and 55, so 40 is the only state where it can afford
+# EXACTLY ONE of them (0 = neither, 55/100 = both). A grounded bait /
+# affordability change would diverge there and nowhere else, and dropping it
+# made exactly that mutation invisible (caught in adversarial review
+# 2026-08-09 -- it failed 18 of the original 72 cells and 0 of 6).
+@pytest.mark.parametrize("energy,hp,a_sh,d_sh", [
+    # signature A (54 cells): energy < 100
+    (0, 12, 0, 0),
+    (40, 80, 0, 1),    # the only "exactly one charged move affordable" state
+    (55, 160, 2, 2),
+    # signature B (12 cells): energy = 100, defender has shields
+    (100, 80, 0, 1),
+    (100, 12, 2, 2),
+    # signature C (6 cells): energy = 100, defender unshielded
+    (100, 12, 0, 0),
+    (100, 160, 2, 0),
+])
 def test_new_decisions_identical_to_legacy(energy, hp, a_sh, d_sh):
     """Pure-plumbing invariant: new == legacy for every decision function.
     Rebuild a fresh pair before each call so one function's caching/temporary
