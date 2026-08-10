@@ -170,6 +170,15 @@ carry the finder's own evidence/repro records.
   resolve in list order), `:2790` (stable fast-landing sort leaves
   equal keys in index order), `:1962` (`cmp_atk` strips the shadow
   x1.2, making every normal-vs-own-shadow matchup an exact tie).
+  [Correction 2026-08-10, Worlds session-2 float audit: the last
+  clause is false for ~1/3 of spreads — `fl(fl(x*6/5)/(6/5)) != x`
+  in general (Quagsire twins: only 186/512 exact ties; 30 of PvPoke's
+  227 exact cross-meta shadow-twin ties break by 1 ULP, all
+  Quagsire-vs-Shadow-Quagsire in that corpus). PvPoke compares raw
+  `stats.atk` and has no artifact. Pinned by
+  tests/test_worlds_tier0.py::test_cmp_shadow_roundtrip_artifact_is_real;
+  engine-side fix is a pending decision (TODO.md Worlds block) since
+  it is NOT behavior-neutral.]
 - **What happens:** p0 acts first on simultaneous actions when both
   sides have identical `cmp_atk`. 21/432 default-moveset mirror sims
   (GL+UL pools, 0-0/1-1/2-2) score away from 500/500 (up to 106/893

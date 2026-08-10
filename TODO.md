@@ -11,17 +11,38 @@ lines of mostly-completed chronological batches. -->
 **Plan of record: `docs/worlds_prep_plan.md`** (read it before touching
 anything Worlds). Session 1 DONE 2026-08-10 (`770a74d`): `worlds/meta.toml`
 (31 entries) + `scripts/worlds_meta.py` + tests; go/no-go probe = GO
-(60/720 amber, structured). Worlds is Aug 28-30 — sessions 2-5 are:
-robustness driver + Tier-0 closed-form + manifest-stamped `worlds/planes/`
-writer; Tier-1 bake + matrix + cheat sheets + hub; amber pages +
-reach-or-deny + Tier-2 bake + FN-rate; IV explorer + CMP board +
+(60/720 amber, structured). Session 2 DONE 2026-08-10 (`4ef544d` +
+`5c414c3` + `34a3803`): bool-plane core split into
+`deep_dive_lib/robustness.py` (opp_plane + plane_task_worker; wrapper
+semantics pinned), Tier-0 closed-form `scripts/worlds_tier0.py` (exact
+bisected cutoffs; DragapultSim's 110.21 Tinkaton-vs-Mantine reproduced as
+an oracle pin), and `scripts/worlds_planes.py` + `scripts/worlds_bake.py`
+(manifest-stamped idempotent driver; dry-run verifies the full 1,860-key
+Tier-1 worklist; guardrails are code + tests, incl. a sweep-cache poison
+and a non-memoized mid-bake engine-digest check). Worlds is Aug 28-30 —
+sessions 3-5 remain: Tier-1 bake + matrix + cheat sheets + hub; amber
+pages + reach-or-deny + Tier-2 bake + FN-rate; IV explorer + CMP board +
 `verify_worlds.py` + publish. Planning artifacts (design panel, judge
 verdicts, evidence brief, probe script, usage JSON) preserved in
 `userdata/worlds_planning/`. Standing rules: legacy engine only, both bait
 modes, never the sweep cache, no `*_great.toml`, no `src/gopvpsim/` edits
 mid-season; the pending engine-hash-bump batch (below, "rides the next
-engine-hash bump window") must land BEFORE any Worlds bake or not at all
-until after Worlds.
+engine-hash bump window") must land BEFORE any Worlds bake (session 3) or
+not at all until after Worlds.
+
+**NEEDS MICHAEL (before session 3): cmp_atk 1-ULP shadow-tie artifact.**
+The session-2 float audit found `cmp_atk`'s divide-by-1.2 reconstruction
+breaks 30 of PvPoke's 227 exact shadow-twin CMP ties by 1 ULP (Quagsire
+family; PvPoke compares raw `stats.atk`, no artifact; pinned in
+`tests/test_worlds_tier0.py::test_cmp_shadow_roundtrip_artifact_is_real`;
+correction addendum in the round-2 review doc, PROP-1). The clean fix
+(carry pre-shadow atk on BattlePokemon) is an engine change that is NOT
+behavior-neutral (30 tie cells flip), so it cannot ride the
+behavior-neutral batch's fully-blessing migration — it either gets its own
+hash bump + test-with-pre-fix-value + migration story, or defers past
+Worlds with the Tier-0 `cmp_threshold` (which deliberately matches OUR
+engine so the CMP board can never contradict the baked planes) footnoting
+the artifact. Decide before the session-3 bake pins the vintage.
 
 ## Re-dive runbook
 
