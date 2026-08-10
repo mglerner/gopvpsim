@@ -22,7 +22,9 @@ Pure-Python; nothing here simulates a battle or hits the network.
 """
 from __future__ import annotations
 
+import ast
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -232,11 +234,49 @@ def test_card_renders_the_archive_line_with_and_without_a_date():
     assert 'Dated snapshot - archived cup meta' in without_date
 
 
+def _imports_from(source, module, name):
+    """ImportFrom sites for ``name`` out of ``module``, alias-tolerant.
+
+    Structural, so an isort pass, an added import name, an ``as`` alias or a
+    parenthesized line wrap cannot break it -- and a consumer that DROPS the
+    import cannot hide behind a re-spelling either.
+    """
+    return [n.lineno for n in ast.walk(ast.parse(source))
+            if isinstance(n, ast.ImportFrom) and n.module == module
+            and any(a.name == name for a in n.names)]
+
+
+# The header the shared formatter replaced, whitespace/quote tolerant: the
+# f-string body is what matters, not how it was quoted or spaced.
+_OPEN_CODED_CUP_HEADER = re.compile(
+    r'\{\s*cup_label\s*\}\s*\(\s*\{\s*league\s*\.\s*title\s*\(\s*\)\s*\}'
+    r'\s*League\s*\)')
+
+
 def test_dive_page_banner_uses_the_shared_formatter():
-    """Source pin: the full dive page must not re-derive the cup header."""
+    """The full dive page must not re-derive the cup header.
+
+    Absence + positive control (2026-08-09 review): the "no open-coded
+    header" half is a tolerant regex, and it is paired with the structural
+    import check, so it can never be satisfied by a deep_dive.py that
+    stopped rendering a cup header at all.
+    """
     src = (REPO_ROOT / 'scripts' / 'deep_dive.py').read_text()
-    assert 'from deep_dive_card import cup_label_and_snapshot' in src
-    assert "f'{cup_label} ({league.title()} League)'" not in src
+    assert _imports_from(src, 'deep_dive_card', 'cup_label_and_snapshot'), \
+        'deep_dive stopped importing the shared cup header formatter'
+    assert not _OPEN_CODED_CUP_HEADER.findall(src)
+
+
+def test_the_open_coded_header_regex_catches_a_respelling():
+    """Guard the guard: the original spelling and four reformattings."""
+    for snippet in ("f'{cup_label} ({league.title()} League)'",
+                    'f"{cup_label} ({league.title()} League)"',
+                    "f'{ cup_label } ({ league.title() } League)'",
+                    "f'{cup_label}  ({league . title()} League)'",
+                    "hdr = f'{cup_label} ({league.title()} League)' + tail"):
+        assert _OPEN_CODED_CUP_HEADER.findall(snippet), snippet
+    assert not _OPEN_CODED_CUP_HEADER.findall(
+        "f'{cup_label} ({league_label})'")
 
 
 # ---- run_website_dives slug preflight --------------------------------------

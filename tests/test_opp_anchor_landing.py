@@ -31,6 +31,8 @@ import ast
 import re
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RENDERING = REPO_ROOT / 'scripts' / 'deep_dive_rendering.py'
 
@@ -99,6 +101,7 @@ def test_boundary_bullets_do_not_claim_opponent_anchors():
                     f'inside tier cards, so it would claim the anchors.')
 
 
+@pytest.mark.render
 def test_best_buddy_template_carries_its_own_opponent_anchors(small_dive_html):
     """The L51 <template> is swapped into the host on toggle, so it needs a
     full set of ``id="opp-"`` targets of its own or every #opp- link on the
@@ -118,6 +121,7 @@ def test_best_buddy_template_carries_its_own_opponent_anchors(small_dive_html):
         f'rendering.reset_opp_anchor_registry() call.')
 
 
+@pytest.mark.render
 def test_opponent_anchors_land_inside_the_threats_section(small_dive_html):
     """End-to-end landing check on the live (L50) copy: when the threats
     section renders, it owns every opponent anchor."""

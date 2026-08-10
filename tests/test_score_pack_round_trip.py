@@ -102,17 +102,23 @@ def test_guide_embeds_the_shared_template_verbatim():
             in render_iv_envelope_article.CMP_SETUP_JS)
 
 
+@pytest.mark.render
 def test_dive_emits_the_shared_template(small_dive_html):
     assert score_pack.decoder_js('_unpackU16') in small_dive_html
-    # One decoder body, two decode loops (scores + --compare-energy energy).
+    # Exactly ONE decoder body -- that is the single-source contract this
+    # file exists for, so it stays an equality.
     assert small_dive_html.count('new DecompressionStream') == 1
-    assert small_dive_html.count('await _unpackU16(') == 2
+    # ...but the number of CALL SITES is a floor, not a count: today it is
+    # scores + --compare-energy energy, and a third packed grid must not
+    # turn this into a repair commit (2026-08-09 review, Phase 3).
+    assert small_dive_html.count('await _unpackU16(') >= 1
 
 
 # ---------------------------------------------------------------------------
 # Behavioral round trips (node)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.render
 @pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
 def test_dive_page_decoder_round_trips_its_own_shipped_bytes(small_dive_html):
     """Chain 1: run the page's OWN emitted decoder over the page's OWN

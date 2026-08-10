@@ -3,6 +3,7 @@
 Synthetic-data tests: planted cluster structure, determinism, the parsimony
 floor, single-stat flip directions, tree rule extraction, degenerate inputs.
 """
+import ast
 import importlib.util
 import re
 from pathlib import Path
@@ -424,19 +425,150 @@ def test_named_anchor_does_not_leak_across_a_shadow_variant():
     assert "<b>UNNAMED</b>" in _flip_row(html, "Sableye (Shadow)")
 
 
+# Winrate-tint CSS, whitespace-tolerant at every join. The originals were
+# exact substrings with no space after ``:`` or ``,``; a single reformat of
+# the emitter would have broken the positive half and, worse, SILENTLY
+# satisfied the negative half (2026-08-09 test-suite review, Phase 3).
+_MIX_WIN = re.compile(r"color-mix\(\s*in\s+srgb\s*,\s*var\(\s*--matrix-win-bg\s*\)")
+_MIX_LOSS = re.compile(r"color-mix\(\s*in\s+srgb\s*,\s*var\(\s*--matrix-loss-bg\s*\)")
+_FG_WIN = re.compile(r"color\s*:\s*var\(\s*--matrix-win-fg\s*\)")
+_FG_LOSS = re.compile(r"color\s*:\s*var\(\s*--matrix-loss-fg\s*\)")
+# Retired dark-only fills. `rgba?\(` also catches the modern space-separated
+# `rgb(57 135 229)` spelling, which the old `"rgba(" not in html` missed.
+_LEGACY_RGB = re.compile(r"rgba?\(\s*\d")
+_LEGACY_TRIPLE = re.compile(r"\b57\s*[,\s]\s*135\s*[,\s]\s*229\b"
+                            r"|\b230\s*[,\s]\s*103\s*[,\s]\s*103\b")
+# Outcome TEXT tokens used as a fill. Tolerates `var( --win )`.
+_TEXT_TOKEN_FILL = re.compile(r"var\(\s*--(?:win|loss)\s*\)")
+
+
 def test_winrate_tint_uses_theme_matrix_tokens():
     html = _render(["Sableye"])
-    # the matchup-web heatmap lane: fill-role token + its PAIRED text color
-    assert "color-mix(in srgb,var(--matrix-win-bg)" in html
-    assert "color-mix(in srgb,var(--matrix-loss-bg)" in html
-    assert "color:var(--matrix-win-fg)" in html
-    assert "color:var(--matrix-loss-fg)" in html
-    # the old dark-only rgba triples must not come back
-    assert "rgba(" not in html
-    assert "57,135,229" not in html and "230,103,103" not in html
+    # the matchup-web heatmap lane: fill-role token + its PAIRED text color.
+    # These four are also the POSITIVE CONTROL for the three negatives
+    # below: a page that emitted no tinted cells at all would satisfy every
+    # "must not come back" assertion for free.
+    assert _MIX_WIN.search(html)
+    assert _MIX_LOSS.search(html)
+    assert _FG_WIN.search(html)
+    assert _FG_LOSS.search(html)
+    # the old dark-only rgb/rgba fills must not come back
+    assert not _LEGACY_RGB.findall(html)
+    assert not _LEGACY_TRIPLE.findall(html)
     # nor the outcome TEXT tokens used as a fill (fails AA, see governance s3)
-    assert "var(--win)" not in html and "var(--loss)" not in html
+    assert not _TEXT_TOKEN_FILL.findall(html)
     assert "Green tint" in html
+
+
+def test_the_tint_patterns_catch_reformatted_and_respelled_css():
+    """Guard the guard. Left column: spellings the exact substrings caught.
+    Right: reformattings/respellings that slipped past them."""
+    for pat, samples in (
+            (_MIX_WIN, ["color-mix(in srgb,var(--matrix-win-bg) 40%,#fff)",
+                        "color-mix(in srgb, var(--matrix-win-bg) 40%, #fff)",
+                        "color-mix( in  srgb , var( --matrix-win-bg ) 40%)"]),
+            (_FG_WIN, ["color:var(--matrix-win-fg)",
+                       "color: var(--matrix-win-fg)",
+                       "color : var( --matrix-win-fg )"]),
+            (_LEGACY_RGB, ["background:rgba(57,135,229,.4)",
+                           "background:rgb(57 135 229)",
+                           "background: rgba( 230, 103, 103, 0.4 )"]),
+            (_LEGACY_TRIPLE, ["rgba(57,135,229,.4)", "rgb(57 135 229)",
+                              "rgba(230, 103, 103, .4)"]),
+            (_TEXT_TOKEN_FILL, ["background:var(--win)", "color: var( --loss )",
+                                "background:var(--win )"]),
+    ):
+        for s in samples:
+            assert pat.search(s), (pat.pattern, s)
+    # ...and the survivors must not be false-positived by the tokens that
+    # legitimately ship: --matrix-win-fg is not --win.
+    assert not _TEXT_TOKEN_FILL.search("color:var(--matrix-win-fg)")
+    assert not _LEGACY_RGB.search("color-mix(in srgb,var(--matrix-win-bg) 40%)")
+
+
+# ---------------------------------------------------------------------------
+# retired surfaces (free source scan -- see the blob smoke test below)
+# ---------------------------------------------------------------------------
+
+# The alpha-overlay / cluster-gap experiment, retired 2026-07. These four
+# ids/vars used to be asserted absent inside the 8.5s blob-gated render
+# smoke, i.e. they cost the most and ran on exactly one machine. They are a
+# pure source-text property, so they run everywhere for free now
+# (2026-08-09 test-suite review, cost-hygiene rec 6).
+_RETIRED_SURFACES = ("alpha-chk", "dd-alpha", "clusterGaps", "cluster-chk")
+
+# Every file that contributes body to the rendered dive page. The blob smoke
+# this replaced saw the whole page, so anything injected into it belongs here
+# or the move is a coverage regression -- deep_dive_user_collection.js
+# (injected at deep_dive.py:3043) and the two narrative emitters were missing
+# from the first cut (2026-08-09 adversarial review).
+_EMITTERS = ("deep_dive.py", "deep_dive_rendering.py", "deep_dive_engine.js",
+             "deep_dive_matchup_clusters.py", "cmp_panels.js",
+             "deep_dive_user_collection.js", "deep_dive_narrative.py",
+             "patch_dive_species_narrative.py")
+
+
+def _strings_only(path):
+    """Source with comments removed, so PROSE naming a retired surface is
+    not mistaken for the surface coming back (deep_dive.py:1661 is exactly
+    such a comment). Python: keep only string literals. JS: strip // and
+    /* */.
+    """
+    text = path.read_text()
+    if path.suffix == ".py":
+        # ast, not tokenize: since 3.12 an f-string body is FSTRING_MIDDLE,
+        # not STRING, and this repo emits its HTML almost entirely from
+        # f-strings -- a STRING-only filter would have scanned nothing that
+        # matters. ast folds the literal chunks of a JoinedStr into
+        # Constant nodes and drops comments, which is exactly the split
+        # this scan wants.
+        return "\n".join(
+            n.value for n in ast.walk(ast.parse(text))
+            if isinstance(n, ast.Constant) and isinstance(n.value, str))
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+    return re.sub(r"(?m)^\s*//.*$", " ", text)
+
+
+def test_retired_alpha_overlay_surfaces_stay_retired():
+    for name in _EMITTERS:
+        path = REPO_ROOT / "scripts" / name
+        assert path.exists(), f"stale emitter list: {name}"
+        body = _strings_only(path)
+        # Anti-vacuity PER FILE, not as a total: a summed floor lets any one
+        # emitter silently scan to zero while the others carry it
+        # (2026-08-09 adversarial review). The smallest real emitter is a
+        # few kB, so 1000 chars is comfortably below every live file.
+        assert len(body) > 1000, (name, len(body))
+        for dead in _RETIRED_SURFACES:
+            assert dead not in body, (name, dead)
+    # ...and the live replacement surfaces must still be findable by the
+    # same scan, on both the Python and the JS side.
+    assert "dd-matchup-clusters" in _strings_only(
+        REPO_ROOT / "scripts" / "deep_dive_matchup_clusters.py")
+    assert "dd-" in _strings_only(REPO_ROOT / "scripts" / "deep_dive_engine.js")
+
+
+def test_the_retired_surface_scan_ignores_prose_but_not_code():
+    """Guard the guard: a comment naming the retired surface is fine (that
+    is documentation); a string literal or a JS identifier is not."""
+    # deep_dive.py names clusterGaps in a COMMENT (:1661) -- that must not
+    # read as a resurfacing, or the scan becomes un-landable.
+    assert "clusterGaps" not in _strings_only(REPO_ROOT / "scripts" / "deep_dive.py")
+    import types
+    fake_py = types.SimpleNamespace(
+        suffix=".py",
+        read_text=lambda: ("# clusterGaps retired\n"
+                           "X = 'dd-alpha'\n"
+                           "Y = f'<input id=\"alpha-chk\" v={v}>'\n"))
+    assert "dd-alpha" in _strings_only(fake_py)
+    # f-string bodies MUST be scanned -- this repo emits its HTML from them.
+    assert "alpha-chk" in _strings_only(fake_py)
+    assert "clusterGaps" not in _strings_only(fake_py)
+    fake_js = types.SimpleNamespace(
+        suffix=".js",
+        read_text=lambda: "// alpha-chk retired\nvar clusterGaps = 1;\n")
+    assert "clusterGaps" in _strings_only(fake_js)
+    assert "alpha-chk" not in _strings_only(fake_js)
 
 
 def test_wr_cell_pairs_every_fill_with_its_text_color():
@@ -565,6 +697,7 @@ def test_weak_separation_headline_follows_weak_sil(monkeypatch):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.slow
+@pytest.mark.local_artifacts
 def test_render_smoke_from_real_blob(tmp_path):
     """Full render_dive_html pass on the smallest local replay blob: the
     section must be present, and the verify_overnight '"opponents": ['
@@ -582,6 +715,5 @@ def test_render_smoke_from_real_blob(tmp_path):
     assert "matchup-clusters:v1" in html
     assert 'id="dd-matchup-clusters"' in html
     assert html.count('"opponents": [') == 1   # verify_overnight extraction
-    # retired surfaces must not resurface
-    for dead in ("alpha-chk", "dd-alpha", "clusterGaps", "cluster-chk"):
-        assert dead not in html, dead
+    # (the retired-surface denylist moved to the free source scan above --
+    # it needed no blob, no render and no 8.5s, and it ran on one machine)
