@@ -1,5 +1,17 @@
 # Test-suite review -- 2026-08-09
 
+> **Status (2026-08-09, same day): ALL FOUR PHASES EXECUTED.** Phase 1
+> (mechanize) shipped in `2a12efd` -- verify_tests.py gate on every
+> publish path, hook activated. Phases 2-4 shipped via 5
+> adversarially-verified lanes (`e6dcc2e` S8a replants, `d27f481` dead
+> weight, `aa74af1` + `8a78c4e` pin conversions, `64b3e29` blind
+> spots) -- every replanted/converted test proven to fail against
+> broken code. Testing policy adopted into CLAUDE.md. Suite 1783: fast
+> tier 36s, full ~79s, last permanent xfail gone, all 13 remaining
+> strict. STILL OPEN: the parse_types relocation (next bump window;
+> closure test allowlists it) and lane A's escalated S8a tie-semantics
+> decision (TODO). CHANGELOG "2026-08-09 (evening)" has the detail.
+>
 > **Question (Michael):** "Is it what we want? Do we want more/less/
 > different things? This whole codebase is mostly claude-automated (with
 > obvious human input), so we need a solid (but not overdone/fragile)
