@@ -326,8 +326,43 @@ deep dives run several × slower (the 2026-06-15 uv switch initially
 missed `[perf]`, which is the kind of regression to watch for).
 
 ## Testing
-- `python -m pytest tests/test_battle.py -q` — run all battle tests (243 passed
-  + 13 strict xfails as of 2026-08-09; the old "99/102" note here was stale)
+
+Testing policy (adopted 2026-08-09 with the test-suite review,
+`docs/reviews/2026-08-09_test_suite_review.md`; the review's KEEP list
+names the template tests to copy):
+
+- Every behavior fix ships in the same commit as a test that FAILS
+  without it; record the pre-fix value in the test (model:
+  `tests/test_port_fidelity_68ad233.py`).
+- Pin contracts at boundaries (oracle scores, rendered artifacts,
+  JS<->Python parity), not implementation shape.
+- Source-scan rules: prefer `is` identity over import-line text;
+  prefer the rendered artifact over the producing source; scan Python
+  via ast/tokenize and JS via `strip_js`, not raw regex; absence pins
+  need a tolerant regex PLUS a positive control that fails when the
+  canonical replacement disappears; every scan needs a `>=` floor set
+  BELOW today's count or a scanner self-test; counts are floors, never
+  `==` (unless derived from the same data the code used).
+- Oracle-parity tests must assert the compared output is non-trivial
+  ("both empty" is the default silent failure mode — it cost the suite
+  13 dead tests before 2026-08-09).
+- xfail is `strict=True` unless documented why not; permanent xfails
+  are banned — convert to a banded assertion on the measured rate.
+- New slow (>2s) tests get `@pytest.mark.slow`; real-render consumers
+  get `@pytest.mark.render`; blob/machine-dependent tests get
+  `@pytest.mark.local_artifacts`. Never add a default `-m` filter to
+  addopts.
+- Do not add test-only dependencies (hypothesis, mutmut, xdist)
+  without a decision recorded in the review doc.
+
+Commands:
+
+- `python -m pytest tests -q -m "not slow"` — the fast tier (~36s);
+  this is what the `verify_tests.py` ship gate runs
+- `python -m pytest tests -q` — full suite incl. the slow gamemaster
+  sweep (~80s)
+- `python -m pytest tests/test_battle.py -q` — battle tests only (243
+  passed + 13 strict xfails as of 2026-08-09)
 - Tests verify scores against PvPoke ground truth from pvpoke.com/battle/
 - **Default movesets** — when a test or sim needs "the default moveset" for a
   species in a given league, ALWAYS call `gopvpsim.data.get_default_moveset(
