@@ -165,9 +165,18 @@ def test_plane_task_worker_stacks_spreads():
     }
     won, score, n_sims = robustness.plane_task_worker(task)
     assert won.shape == (2, 8, 2) and score.shape == (2, 8, 2)
-    ref = robustness.opp_plane(
-        FOCAL[0], FOCAL[1], FOCAL[2], FOCAL[3], task['focal_spreads'][0],
-        OPP[0], OPP[1], OPP[2], OPP[3], 'great', [(0, 0), (1, 1)],
-        cohort=cohort)
-    assert np.array_equal(won[0], ref[0])
-    assert np.array_equal(score[0], ref[1])
+    # BOTH spreads compared to independent references: the session-2a
+    # version checked index 0 only, and a worker mutant that re-simmed
+    # spread 0 for every spread survived the whole fast tier (proven
+    # 2026-08-10 review) -- exactly the rank1-vs-maxatk axis the Worlds
+    # planes exist to measure.
+    for i in (0, 1):
+        ref = robustness.opp_plane(
+            FOCAL[0], FOCAL[1], FOCAL[2], FOCAL[3], task['focal_spreads'][i],
+            OPP[0], OPP[1], OPP[2], OPP[3], 'great', [(0, 0), (1, 1)],
+            cohort=cohort)
+        assert np.array_equal(won[i], ref[0]), f'spread {i}'
+        assert np.array_equal(score[i], ref[1]), f'spread {i}'
+    # Non-trivial fixture: the two spreads' planes actually differ
+    # (score column 1 is 559 vs 556 today), so the per-index refs bite.
+    assert not np.array_equal(score[0], score[1])

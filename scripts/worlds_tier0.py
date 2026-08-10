@@ -27,10 +27,16 @@ Two things this module refuses to do, both audit findings:
 
 Cutoffs are per (move, tier, opponent def) / (move, tier, attacker atk)
 FUNCTIONS, not a single separable pair -- in float arithmetic the
-rounding depends on both operands, and the shipped reach numbers
-(DragapultSim's 110.21 Tinkaton-vs-Mantine) are COMPOSITE
-``n_fast * dmg_fast + n_charged * dmg_charged >= hp`` cutoffs
-(``ko_cutoff``), which the plan's per-move framing understates.
+rounding depends on both operands, and the shipped reach numbers are
+COMPOSITE ``n_fast * dmg_fast + n_charged * dmg_charged >= hp`` cutoffs
+(``ko_cutoff``), which the plan's per-move framing understates. Two
+DISTINCT quantities feed a reach card and must never be conflated
+(2026-08-10 review): the per-spread ``ko_cutoff`` (one opponent
+(def, hp)) and the cohort-max ``guarantee_cutoff`` ("beats every
+plausible X") -- DragapultSim's published Tinkaton-vs-Mantine pair maps
+109.28 to the former (the 0/15/7 anchor) and 110.21 to the latter, and
+our engine reproduces both to <0.1 under the minimal ENERGY-LEGAL plan
+(14 Fairy Wind + 2 Gigaton; 12 fast moves cannot fund 2 Gigatons).
 
 Stage axes: stage-0 reach cutoffs are conservative (safe) but stage-0
 DENY cutoffs are optimistic whenever the attacker carries an
@@ -203,10 +209,15 @@ def ko_cutoff(fast, charged, n_fast, n_charged, hp,
               attacker_types, defender_types, def_,
               stage_atk=0, stage_def=0, bracket=ATK_BRACKET):
     """Minimal effective atk with ``n_fast * dmg(fast) + n_charged *
-    dmg(charged) >= hp`` -- the shape of the shipped reach number
-    (DragapultSim's "Tinkaton needs 110.21 atk for the Gigaton-2-shot
-    vs any plausible Mantine" is this with n_fast=12, n_charged=2 vs
-    the 0/15/7 spread; reproduced exactly by the test suite).
+    dmg(charged) >= hp`` -- the PER-SPREAD reach/deny quantity (one
+    opponent (def, hp)). The "beats every plausible X" guarantee is
+    ``guarantee_cutoff``, its max over a cohort -- do not print one as
+    the other (the reach-card conflation the 2026-08-10 review caught).
+    Callers own energy feasibility of (n_fast, n_charged): this is
+    damage arithmetic only, and an energy-infeasible plan produces a
+    number no battle can realize (minimal legal n_fast is
+    ``ceil(n_charged * charged.energy / fast.energyGain)`` from zero
+    energy).
 
     A sum of monotone-nondecreasing float maps is monotone, so the same
     bisection argument applies. ``n_fast=0`` / ``n_charged=0`` are
