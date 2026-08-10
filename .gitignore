@@ -42,6 +42,12 @@ htmlcov/
 # on userdata/dives/ vs /tmp/ for HTML output files.
 userdata/
 
+# Worlds 2026 robustness planes: large regenerable sim blobs (a Tier-2
+# plane is ~2.4MB packed-bool + ~38MB uint16 score per direction/bait).
+# Only the npz blobs are ignored -- worlds/planes/manifest.json and
+# worlds/meta.toml stay TRACKED as the provenance record.
+/worlds/planes/*.npz
+
 # In-session scratch grids (reproducible; findings live in DEVELOPER_NOTES.md).
 # The oracle-grid expansion (2026-06-12) is regenerable via run_grid.py.
 scratch_oracle_grid/

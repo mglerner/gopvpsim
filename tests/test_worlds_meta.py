@@ -371,14 +371,21 @@ def test_worlds_dir_has_no_great_toml():
     """
     worlds = META_PATH.parent
     assert worlds.is_dir()
-    assert list(worlds.glob('*.toml')), 'nothing in worlds/ -- scan is dead'
-    assert not list(worlds.glob('*_great.toml'))
+    assert list(worlds.rglob('*.toml')), 'nothing in worlds/ -- scan is dead'
+    # rglob, not glob: worlds/planes/ (session 2) is a subdirectory a
+    # non-recursive scan would silently skip.
+    assert not list(worlds.rglob('*_great.toml'))
 
 
 def test_great_toml_glob_positive_control(tmp_path):
-    """The guard's glob really does catch the shape it is guarding against."""
+    """The guard's glob really does catch the shape it is guarding against,
+    including one level down (the rglob upgrade's whole point)."""
     (tmp_path / 'lickilicky_great.toml').write_text('x = 1\n')
-    assert list(tmp_path.glob('*_great.toml'))
+    assert list(tmp_path.rglob('*_great.toml'))
+    sub = tmp_path / 'planes'
+    sub.mkdir()
+    (sub / 'azumarill_great.toml').write_text('x = 1\n')
+    assert len(list(tmp_path.rglob('*_great.toml'))) == 2
 
 
 # ---------------------------------------------------------------------------
