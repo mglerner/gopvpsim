@@ -27,6 +27,8 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
@@ -77,10 +79,14 @@ def test_guide_emits_the_shared_block_verbatim():
     assert CMP_PANEL_CSS in guide.style()
 
 
-def test_dive_splices_the_shared_block():
-    assert '{rendering.CMP_PANEL_CSS}' in DEEP_DIVE_PY.read_text()
+# (A source pin on the dive's ``{rendering.CMP_PANEL_CSS}`` f-string
+# interpolation used to live here. It was strictly dominated by the render
+# check below -- same contract, on the page that actually ships -- while
+# adding a tripwire on the import alias. Removed 2026-08-09, test suite
+# review, fragility lens.)
 
 
+@pytest.mark.render
 def test_dive_emits_the_shared_block_verbatim(small_dive_html):
     """The one check on the page that actually ships. Source-level splicing
     could still be defeated by an f-string that never reaches the <style>."""

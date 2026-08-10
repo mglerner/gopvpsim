@@ -291,11 +291,19 @@ def test_clusters_flip_table_carries_the_best_rule_label():
     # the note, the column header and its tooltip.
     assert 'Matchup flip thresholds (candidate anchors)' in html
     assert 'Best single-stat rule</th>' in html
-    # The tip renders twice per scenario block: as prose under the summary
-    # and as the column tooltip. Three even-shield blocks here.
+    # The tip renders twice per scenario block: as prose under the summary and
+    # as the column tooltip. The expected count is DERIVED from the blocks the
+    # same render emitted (it was hardcoded to 3, justified only by a comment),
+    # and both patterns tolerate attribute spacing / quote style -- the pinned
+    # contract is "muted prose plus a column tooltip, once per block", not the
+    # style attribute's exact text.
     head = rendering.BEST_RULE_TIP[:40]
-    assert html.count(f'--text-muted)">{head}') == 3
-    assert html.count(f'<th title="{head}') == 3
+    n_blocks = len(re.findall(r'data-scen="', html))
+    assert n_blocks, 'no scenario blocks rendered'      # anti-vacuity
+    prose = re.findall(r'--text-muted\)[^<>]*>\s*' + re.escape(head), html)
+    tooltip = re.findall(r'<th\s+title=["\']\s*' + re.escape(head), html)
+    assert len(prose) == n_blocks, (len(prose), n_blocks)
+    assert len(tooltip) == n_blocks, (len(tooltip), n_blocks)
 
 
 def test_threats_section_carries_the_boundary_label():

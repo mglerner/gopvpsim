@@ -24,7 +24,7 @@ which fail SILENTLY when they drift:
 Pattern mirrors tests/test_js_score_key_parity.py; the node halves skip if
 node is absent.
 """
-import importlib.util
+import ast
 import json
 import re
 import shutil
@@ -44,17 +44,77 @@ _ARTICLE = _SCRIPTS / "generate_article.py"
 
 sys.path.insert(0, str(_SCRIPTS))
 sys.path.insert(0, str(_ROOT / "src"))
-_spec = importlib.util.spec_from_file_location(
-    "deep_dive_rendering", _SCRIPTS / "deep_dive_rendering.py")
-rendering = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-_spec.loader.exec_module(rendering)
+
+# Plain imports, not spec_from_file_location: both modules must come from the
+# ONE sys.modules entry so ``clusters.scenario_label is rendering.scenario_label``
+# means "the same function object", not "two copies of the same file".
+import deep_dive_matchup_clusters as clusters  # noqa: E402
+import deep_dive_rendering as rendering  # noqa: E402
 
 from gopvpsim.pokemon import MAX_CPM_LEVEL, bestbuddy_caps  # noqa: E402
 
 
 def _js():
     return _JS.read_text()
+
+
+def _dive_data(html):
+    """The rendered page's ``DATA`` blob, as a dict.
+
+    Located by the assignment and decoded with ``raw_decode`` (not a
+    ``.*?};`` regex), so nothing here depends on how the bake formats the
+    JSON.
+    """
+    m = re.search(r"\bDATA\s*=\s*\{", html)
+    assert m, "the dive emitted no DATA blob"
+    data, _ = json.JSONDecoder().raw_decode(html, m.end() - 1)
+    return data
+
+
+def _call_nodes(src, name):
+    """Every ``name(...)`` call node in ``src``."""
+    return [n for n in ast.walk(ast.parse(src))
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+            and n.func.id == name]
+
+
+def _calls_to(src, name):
+    """Every ``name(...)`` call in ``src``, re-printed from the AST.
+
+    ``ast.unparse`` normalizes wrapping, spacing and quote style away, so a
+    reformat is not a contract change -- but a call whose ARGUMENTS changed
+    shape still shows up.
+    """
+    return [ast.unparse(n) for n in _call_nodes(src, name)]
+
+
+def _labels_a_loop_pair_via_helper(src):
+    """``<name> = scenario_label(<loop var>)`` inside ``for <loop var> in ...``.
+
+    This pins the PAYLOAD-KEY site specifically. "the module calls
+    scenario_label somewhere" is not good enough: deep_dive_matchup_clusters
+    has two further, purely-prose call sites, so a non-emptiness check stays
+    true even if the payload key is re-formed inline. Both the loop variable
+    and the assigned name are free (a rename is not a drift), but
+    ``f'{pair[0]}v{pair[1]}'``, ``'%dv%d' % pair``, string concatenation and
+    ``'v'.join(map(str, pair))`` all fail -- and three of those four slip past
+    the interpolation-only regexes elsewhere in the suite.
+    """
+    for loop in ast.walk(ast.parse(src)):
+        if not (isinstance(loop, ast.For) and isinstance(loop.target, ast.Name)):
+            continue
+        var = loop.target.id
+        for n in ast.walk(loop):
+            if not (isinstance(n, ast.Assign) and isinstance(n.value, ast.Call)):
+                continue
+            call = n.value
+            if (isinstance(call.func, ast.Name)
+                    and call.func.id == "scenario_label"
+                    and len(call.args) == 1
+                    and isinstance(call.args[0], ast.Name)
+                    and call.args[0].id == var):
+                return True
+    return False
 
 
 def _node(program):
@@ -78,9 +138,19 @@ def test_python_scenario_label_shape():
     assert rendering.scenario_label([0, 2]) == "0v2"
 
 
-def test_bake_emits_scenario_labels():
-    assert ("'scenarioLabels': [scenario_label(s) for s in shield_scenarios]"
-            in _PY.read_text())
+@pytest.mark.render
+def test_bake_emits_scenario_labels(small_dive_html):
+    """The SHIPPED page carries one canonical label per baked scenario.
+
+    Asserted on the rendered DATA blob rather than on the comprehension in
+    deep_dive.py that builds it: the source pin broke on a line wrap or a
+    rename of ``shield_scenarios``, and could not see whether the entry ever
+    reached the page.
+    """
+    data = _dive_data(small_dive_html)
+    assert data.get("scenarios"), "fixture baked no scenarios"
+    assert data.get("scenarioLabels") == [
+        rendering.scenario_label(s) for s in data["scenarios"]]
 
 
 def test_js_reads_the_baked_scenario_label():
@@ -96,10 +166,25 @@ def test_js_reads_the_baked_scenario_label():
 def test_cluster_payload_uses_the_same_label_form():
     """The clusters module keys its payload with the SHARED helper (entry 12
     routed its last hand-typed f-string through it), so the JS overlay can
-    never stop finding its scenario in DATA.scenarioLabels."""
+    never stop finding its scenario in DATA.scenarioLabels.
+
+    Object identity, not the text of the import line: adding a third imported
+    name, reordering, or isort-ing the module is not a contract change, while
+    a local re-definition or an import of a second copy fails. The call-site
+    half is AST-derived and aimed at the payload loop specifically (a rename of
+    the loop variable or of ``label`` is not a drift, but hand-rolling the key
+    from the tuple is); that the payload keys really come out in ``{a}v{b}``
+    form is additionally asserted behaviorally, on a real render, at
+    tests/test_scenario_vocabulary.py::test_rendered_scenario_blocks_use_the_canonical_labels
+    -- though that test pins only the rendered strings, which every inline
+    re-forming of the same shape would also produce, so it cannot stand in for
+    the structural check below.
+    """
+    assert clusters.scenario_label is rendering.scenario_label
     text = _CLUSTERS.read_text()
-    assert "from deep_dive_rendering import BEST_RULE_TIP, scenario_label" in text
-    assert "label = scenario_label(pair)" in text
+    assert _labels_a_loop_pair_via_helper(text), (
+        "the clusters payload loop no longer keys off the shared "
+        "scenario_label helper")
     assert not re.search(r'f"\{pair\[0\]\}\w*\{pair\[1\]\}"', text), (
         "the clusters payload key is being re-formed from the tuple again")
 
@@ -216,12 +301,81 @@ def test_python_tier_slug_rule():
     assert rendering.tier_slug("") == ""
 
 
+def _slugs_original_then_name(call):
+    """``tier_slug(<x>.get('original_name') or <x>.get('name') or '')``.
+
+    The receiver name is free (the renderer's ``t`` vs the bake's ``_t``) but
+    the ORDER is pinned, because it is load-bearing and asymmetric: tiers get
+    renamed, and the card anchor ``id="tier-card-{slug}"`` only keeps matching
+    ``DATA.tiers[i].slug`` (and generate_article's deep links) while BOTH sides
+    slug ``original_name`` first. A membership-only check passes a
+    renderer-side swap to ``name or original_name`` -- exactly the silent
+    dead-anchor class this file exists to catch.
+    """
+    if len(call.args) != 1 or call.keywords:
+        return False
+    arg = call.args[0]
+    if not (isinstance(arg, ast.BoolOp) and isinstance(arg.op, ast.Or)):
+        return False
+    got = []
+    for v in arg.values:
+        if (isinstance(v, ast.Call) and isinstance(v.func, ast.Attribute)
+                and v.func.attr == "get" and len(v.args) == 1
+                and isinstance(v.args[0], ast.Constant)):
+            got.append(v.args[0].value)
+        elif isinstance(v, ast.Constant):
+            got.append(v.value)
+        else:
+            return False
+    return got == ["original_name", "name", ""]
+
+
+def _stamps_slug_from_helper(node):
+    """``<expr>['slug'] = tier_slug(<the original_name-first chain>)``."""
+    for n in ast.walk(node):
+        if not isinstance(n, ast.Assign):
+            continue
+        if not (isinstance(n.value, ast.Call)
+                and isinstance(n.value.func, ast.Name)
+                and n.value.func.id == "tier_slug"
+                and _slugs_original_then_name(n.value)):
+            continue
+        for tgt in n.targets:
+            if (isinstance(tgt, ast.Subscript)
+                    and isinstance(tgt.slice, ast.Constant)
+                    and tgt.slice.value == "slug"):
+                return True
+    return False
+
+
 def test_card_renderer_and_bake_use_the_helper():
-    assert ("_tier_slug = tier_slug(t.get('original_name') or t.get('name') or '')"
-            in (_SCRIPTS / "deep_dive_rendering.py").read_text())
-    text = _PY.read_text()
-    assert "_t['slug'] = tier_slug(" in text
-    assert "for _tiers_key in ('tiers', 'pasteTiers'):" in text
+    """Both slug producers call the ONE helper -- derived from the AST.
+
+    These were three whole-expression pins (the renderer's assignment with its
+    ``or`` chain and empty-string default, the bake's subscript assignment, and
+    the ``('tiers', 'pasteTiers')`` loop header including its loop variable).
+    Any extraction, reorder, line-wrap or local rename broke them without
+    changing the contract. Structure survives all of that and still fails if
+    the helper, the ``original_name``-FIRST fallback chain, the slug stamp, or
+    either tier list drops out. Both sides' arguments are matched by the same
+    order-pinned structural rule, so the renderer and the bake cannot drift
+    apart from each other either.
+    """
+    src = (_SCRIPTS / "deep_dive_rendering.py").read_text()
+    assert any(_slugs_original_then_name(c)
+               for c in _call_nodes(src, "tier_slug")), (
+        "the card renderer no longer slugs original_name-then-name-or-'' "
+        f"through tier_slug: {_calls_to(src, 'tier_slug')}")
+
+    # The bake stamps BOTH tier lists, from the same helper.
+    loops = [n for n in ast.walk(ast.parse(_PY.read_text()))
+             if isinstance(n, ast.For)
+             and isinstance(n.iter, (ast.Tuple, ast.List))
+             and {"tiers", "pasteTiers"} <= {e.value for e in n.iter.elts
+                                             if isinstance(e, ast.Constant)}]
+    assert loops, "the bake no longer walks both ('tiers', 'pasteTiers')"
+    assert any(_stamps_slug_from_helper(n) for n in loops), (
+        "the bake's tier loop no longer sets ['slug'] from tier_slug()")
 
 
 def test_js_reads_the_baked_slug():

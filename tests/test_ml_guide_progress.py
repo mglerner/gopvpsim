@@ -7,6 +7,7 @@ battle sim (which would collide on output files and be slow). The phase-line
 logic is exercised by calling the watch-view helpers directly against synthetic
 per-guide / wrapper logs.
 """
+import ast
 import sys
 from pathlib import Path
 
@@ -19,12 +20,70 @@ import chain_status as cs  # noqa: E402
 ANALYSIS = REPO_ROOT / "scripts" / "iv_envelope_analysis.py"
 
 
+def _print_calls(src):
+    """Line numbers of real ``print(...)`` / ``builtins.print(...)`` CALLS.
+
+    AST, not a substring scan (the tokenize/AST idiom of
+    tests/test_win_boundary.py's ``>=`` scan). The old ``"print(" not in src``
+    pin was both too broad and too narrow: a COMMENT reading "never call
+    print() here" failed it, while ``print (x)`` and ``builtins.print(x)``
+    slipped past. Structure excludes comments and docstrings and sees through
+    the space, and ``pprint(``/``sprint(`` are simply different names.
+    """
+    lines = []
+    for node in ast.walk(ast.parse(src)):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if isinstance(func, ast.Name) and func.id == "print":
+            lines.append(node.lineno)
+        elif (isinstance(func, ast.Attribute) and func.attr == "print"
+              and isinstance(func.value, ast.Name)
+              and func.value.id == "builtins"):
+            lines.append(node.lineno)
+    return sorted(lines)
+
+
+def _calls_to_logger(src):
+    """Line numbers of ``<something>.logger.<level>(...)`` / ``logger.<level>(...)``
+    calls -- the routing the guard below says progress must use."""
+    return sorted(
+        node.lineno
+        for node in ast.walk(ast.parse(src))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "logger")
+
+
 def test_no_bare_print_in_iv_envelope():
     """All progress/status is routed through the structured logger."""
     src = ANALYSIS.read_text()
-    assert "print(" not in src, (
+    # Anti-vacuity: an empty or truncated file has no print() calls either, so
+    # assert the positive half of the contract before asserting the negative.
+    assert _calls_to_logger(src), (
+        f"{ANALYSIS.name} has no logger calls -- empty, truncated, or moved?")
+    offenders = _print_calls(src)
+    assert not offenders, (
         "iv_envelope_analysis.py must route progress through the logger, "
-        "not bare print()")
+        f"not bare print() -- calls at lines {offenders}")
+
+
+def test_print_scanner_sees_the_shapes_the_old_substring_pin_did_not():
+    """Scanner self-test: without it, a scan that stopped matching would leave
+    the guard above green forever (the anti-vacuity companion pattern of
+    tests/test_win_boundary.py:380-437)."""
+    src = (
+        "# never call print() here\n"                 # 1: comment, not a call
+        "'''docstring naming print(x)'''\n"           # 2: string, not a call
+        "import builtins\n"                           # 3
+        "def f(x):\n"                                 # 4
+        "    pprint(x)\n"                             # 5: different name
+        "    sprint(x)\n"                             # 6: different name
+        "    print(x)\n"                              # 7: CALL
+        "    print (x)\n"                             # 8: CALL (space)
+        "    builtins.print(x)\n"                     # 9: CALL (qualified)
+    )
+    assert _print_calls(src) == [7, 8, 9]
 
 
 def test_species_from_cmd_reconstructs_full_name():

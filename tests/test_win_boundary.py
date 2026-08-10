@@ -516,12 +516,34 @@ def test_js_fallback_pinned_to_python_constant():
     assert int(m.group(1)) == WIN_RATING
 
 
-def test_dive_bakes_win_rating_into_data():
-    """deep_dive.py emits DATA.winRating from the Python constant."""
-    src = (SCRIPTS / 'deep_dive.py').read_text()
-    assert "'winRating': WIN_RATING," in src, (
-        "deep_dive.py must bake 'winRating': WIN_RATING into data_obj so the "
-        'page JS reads the boundary instead of hardcoding it')
+def _dive_data(html):
+    """The rendered page's ``DATA`` blob, as a dict.
+
+    Located by the assignment and decoded with ``raw_decode`` (not a
+    ``.*?};`` regex), so nothing here depends on how the bake formats the
+    JSON.
+    """
+    m = re.search(r'\bDATA\s*=\s*\{', html)
+    assert m, 'the dive emitted no DATA blob'
+    data, _ = json.JSONDecoder().raw_decode(html, m.end() - 1)
+    return data
+
+
+@pytest.mark.render
+def test_dive_bakes_win_rating_into_data(small_dive_html):
+    """The SHIPPED page carries DATA.winRating == the Python constant.
+
+    Asserted on the rendered blob rather than on deep_dive.py's
+    ``'winRating': WIN_RATING,`` source line: the source pin could not tell a
+    dict entry that is built from an f-string that never reaches the page, and
+    it failed on a trailing comma or quote-style change that is not a contract
+    change.
+    """
+    data = _dive_data(small_dive_html)
+    assert 'winRating' in data, (
+        'the dive must bake DATA.winRating so the page JS reads the boundary '
+        'instead of hardcoding it')
+    assert data['winRating'] == WIN_RATING
 
 
 def test_js_helpers_agree_with_python_is_win():
