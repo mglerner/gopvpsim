@@ -32,19 +32,22 @@ mid-season; the pending engine-hash-bump batch (below, "rides the next
 engine-hash bump window") must land BEFORE any Worlds bake (session 3) or
 not at all until after Worlds.
 
-**NEEDS MICHAEL (before session 3): cmp_atk 1-ULP shadow-tie artifact.**
-The session-2 float audit found `cmp_atk`'s divide-by-1.2 reconstruction
-breaks 30 of PvPoke's 227 exact shadow-twin CMP ties by 1 ULP (Quagsire
-family; PvPoke compares raw `stats.atk`, no artifact; pinned in
+**DECIDED (Michael, 2026-08-10) — session-3 sequencing.** (1) The
+behavior-neutral engine-hash batch (below) lands as the FIRST block of
+session 3: wording fixes per `docs/reviews/2026-08-09_would_shield_
+diagnosis.md`, parse_types relocation into a hashed module, ONE hash
+bump, then `migrate_cache.py --from-engine` with the fully-blessing
+predicate — the Tier-1 bake runs only after the migration, so the Worlds
+manifest pins the final pre-Worlds vintage. (2) The cmp_atk 1-ULP
+shadow-tie artifact (session-2 float audit: divide-by-1.2 breaks 30 of
+PvPoke's 227 exact shadow-twin CMP ties; pinned in
 `tests/test_worlds_tier0.py::test_cmp_shadow_roundtrip_artifact_is_real`;
-correction addendum in the round-2 review doc, PROP-1). The clean fix
-(carry pre-shadow atk on BattlePokemon) is an engine change that is NOT
-behavior-neutral (30 tie cells flip), so it cannot ride the
-behavior-neutral batch's fully-blessing migration — it either gets its own
-hash bump + test-with-pre-fix-value + migration story, or defers past
-Worlds with the Tier-0 `cmp_threshold` (which deliberately matches OUR
-engine so the CMP board can never contradict the baked planes) footnoting
-the artifact. Decide before the session-3 bake pins the vintage.
+PROP-1 correction addendum in the round-2 review doc) is DEFERRED past
+Worlds: planes + CMP board stay engine-consistent by construction, and
+the session-5 CMP board must carry the footnote. Post-Worlds the fix
+(carry pre-shadow atk on BattlePokemon) gets its own hash bump, a
+test recording the pre-fix values, and a no-shadow-either-side
+migration predicate — do NOT fold it into the neutral batch.
 
 ## Re-dive runbook
 
