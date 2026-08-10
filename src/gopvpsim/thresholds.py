@@ -19,6 +19,28 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Union
 
+# THE module's public surface. Declared because this module has an EXTERNAL
+# consumer -- ../gobattlekit/tools/threshold_export/export_thresholds.py
+# imports IvListSpread, StatCutoffSpread and load_file from here, and a
+# rename would break the sibling repo silently, surfacing only when someone
+# runs an export. `load_toml` / `load_legacy_json` / `load_file` are three
+# similarly-named entry points with no marker of which is the external one;
+# this list is that marker. Signatures are pinned in
+# tests/test_gobattlekit_api_pin.py.
+__all__ = [
+    # Spreads
+    'StatCutoffSpread', 'IvListSpread', 'Spread',
+    # Anchors
+    'CmpAnchor', 'DamageBreakpointAnchor', 'BulkpointAnchor', 'Anchor',
+    # Containers
+    'LeagueThresholds', 'SpeciesThresholds', 'ThresholdRegistry',
+    # Loaders / converters
+    'load_file', 'load_toml', 'load_legacy_json', 'as_legacy_dict',
+    'parse_inline_anchor',
+    # Errors
+    'ThresholdError',
+]
+
 
 # ---------------------------------------------------------------------------
 # Spread types
