@@ -50,7 +50,12 @@ the **"Worlds 2026 robustness analysis"** — never "deep dives".
   Opponent IV cohorts are model-derived, never "IVs the pros ran".
 - All usage evidence predates the June rebalance (the last open-GL event is
   Turin, 2026-06-06). This is flagged on every page; the badge system carries
-  it per-entry.
+  it per-entry. [Session-3 verify pass, 2026-08-10: "predates" may overclaim
+  -- the Forever Forward data reached pvpoke master 2026-06-02 (merge
+  0fa32eb76), four days BEFORE Turin, so the final corpus events may
+  straddle the in-game patch. The shipped pages use the softened "corpus
+  ends 2026-06-06, at the rebalance boundary" wording; resolve the actual
+  in-game patch date (session 4) before restoring the stronger claim.]
 
 ## The meta: 31 entries
 

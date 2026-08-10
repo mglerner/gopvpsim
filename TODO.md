@@ -21,10 +21,24 @@ quantities paired correctly — see the plan doc's session-2 note), and
 `scripts/worlds_planes.py` + `scripts/worlds_bake.py`
 (manifest-stamped idempotent driver; dry-run verifies the full 1,860-key
 Tier-1 worklist; guardrails are code + tests, incl. a sweep-cache poison
-and a non-memoized mid-bake engine-digest check). Worlds is Aug 28-30 —
-sessions 3-5 remain: Tier-1 bake + matrix + cheat sheets + hub; amber
-pages + reach-or-deny + Tier-2 bake + FN-rate; IV explorer + CMP board +
-`verify_worlds.py` + publish. Planning artifacts (design panel, judge
+and a non-memoized mid-bake engine-digest check). Session 3 DONE 2026-08-10: engine batch + migration (above), Tier-1
+bake (1,860/1,860 planes, 7.06M sims, 115s, manifest at the final
+vintage), `worlds_render_data.py` + `build_worlds_pages.py` (hub +
+31x31 matrix + 31 cheat sheets + index card, all root-level; ship
+gates green), page layer adversarially verified (orientation + all
+16,740 rendered numbers regenerated from planes, 0 mismatches; 84
+independent re-sims exact) with the review's honesty findings fixed
+(both-mode margin bands, exact spread counts, W/L/? letters,
+focal-only no-bait + tie + corpus-convention disclosures, badge_rule
+divergence shown, simmed moveset order). Worlds is Aug 28-30 —
+sessions 4-5 remain: amber pages + reach-or-deny + Tier-2 bake +
+FN-rate; IV explorer + CMP board + `verify_worlds.py` + publish.
+Session-4 carry-ins from the verify pass: resolve the in-game
+Forever-Forward patch date (plan doc note; pages ship "straddle"
+wording), a11y polish (badge text 4.36:1 in pokemon-dark; matrix
+mini-grid relies on cheat sheets as its text alternative), optional
+pooled-usage display (usage_recent_pooled_pct is in meta.toml but
+unshown). Planning artifacts (design panel, judge
 verdicts, evidence brief, probe script, usage JSON) preserved in
 `userdata/worlds_planning/`. Standing rules: legacy engine only, both bait
 modes, never the sweep cache, no `*_great.toml`, no `src/gopvpsim/` edits

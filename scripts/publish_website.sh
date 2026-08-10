@@ -65,6 +65,12 @@ echo "Regenerating reader guides..."
 python "${REPO_ROOT}/scripts/build_guides.py"
 echo
 
+if [ -f "${REPO_ROOT}/worlds/planes/manifest.json" ]; then
+  echo "Regenerating Worlds 2026 pages..."
+  python "${REPO_ROOT}/scripts/build_worlds_pages.py"
+  echo
+fi
+
 echo "Regenerating index.html..."
 python "${REPO_ROOT}/scripts/build_website_index.py"
 echo
