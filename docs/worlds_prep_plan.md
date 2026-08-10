@@ -147,6 +147,13 @@ tests/test_worlds_tier0.py — the residual is cross-implementation
 stat/rounding, not error. Their 108.27 / "rank-1 (4/1/12)" / 165.73 trio
 does NOT map onto our stat model (our 4/1/12 Mantine has 159.02 def; our SP
 rank-1 is 0/15/14) — treat those as unmapped, revisit in session 4.]
+[Session-4 partial resolution (2026-08-10): 108.27 now maps STRUCTURALLY —
+it is a per-spread ko_cutoff vs their rank-1 anchor, and our reach strip's
+same quantity vs OUR rank-1 anchor (0/15/14) gives 108.22; the 0.05
+residual is the anchor-spread difference under their stat model. The
+165.73 deny and the 4/1/12 anchor identity remain unmapped (their stat
+model differs); no further action planned — the pair pages print OUR
+anchors explicitly.]
 
 Runner-ups that stay OUT but render as rejects on the candidate page:
 Cradily (biggest faller, -34.6pp old->recent), Talonflame, Annihilape (rank

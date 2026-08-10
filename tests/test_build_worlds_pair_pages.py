@@ -91,3 +91,24 @@ def test_pair_page_filename_sorted():
     assert (bpp.pair_page_filename('mantine', 'tinkaton')
             == bpp.pair_page_filename('tinkaton', 'mantine')
             == 'worlds-pair-mantine--tinkaton.html')
+
+
+def test_worlds_fn_grid_decided():
+    import worlds_fn
+    won = np.ones((600, 5, 9), dtype=bool)
+    grid = {'won': won, 'top512_mask': np.array([True] * 4 + [False])}
+    assert worlds_fn.grid_decided(grid) == (False, 0.0)      # constant
+    won2 = won.copy()
+    won2[3, 1, 4] = False                    # one losing cell in-block
+    d, w = worlds_fn.grid_decided({'won': won2,
+                                   'top512_mask': grid['top512_mask']})
+    assert d is True and w == pytest.approx(1 / (512 * 4))
+    # A flip OUTSIDE the top512 block (masked col or focal rank > 512)
+    # must not count.
+    won3 = won.copy()
+    won3[3, 4, 4] = False                    # masked-out cohort column
+    won3[555, 1, 4] = False                  # focal rank beyond 512
+    assert worlds_fn.grid_decided({'won': won3,
+                                   'top512_mask': grid['top512_mask']}) \
+        == (False, 0.0)
+    assert worlds_fn.grid_decided(None) == (False, 0.0)

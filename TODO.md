@@ -33,12 +33,15 @@ focal-only no-bait + tie + corpus-convention disclosures, badge_rule
 divergence shown, simmed moveset order). Worlds is Aug 28-30 —
 sessions 4-5 remain: amber pages + reach-or-deny + Tier-2 bake +
 FN-rate; IV explorer + CMP board + `verify_worlds.py` + publish.
-Session-4 carry-ins from the verify pass: resolve the in-game
-Forever-Forward patch date (plan doc note; pages ship "straddle"
-wording), a11y polish (badge text 4.36:1 in pokemon-dark; matrix
-mini-grid relies on cheat sheets as its text alternative), optional
-pooled-usage display (usage_recent_pooled_pct is in meta.toml but
-unshown). Planning artifacts (design panel, judge
+Session-4 carry-in status (2026-08-10): rebalance date RESOLVED
+(Forever Forward live in-game 2026-06-02 1pm PDT; Turin was
+post-rebalance -- pages state the split; plan doc corrected).
+DragapultSim trio PARTIALLY resolved (108.27 maps structurally to the
+per-spread rank-1-anchor cutoff, ours 108.22; 165.73 deny stays
+unmapped -- plan doc note). Still open for session 5: a11y polish
+(badge text 4.36:1 in pokemon-dark; matrix mini-grid relies on cheat
+sheets as its text alternative), optional pooled-usage display
+(usage_recent_pooled_pct in meta.toml, unshown). Planning artifacts (design panel, judge
 verdicts, evidence brief, probe script, usage JSON) preserved in
 `userdata/worlds_planning/`. Standing rules: legacy engine only, both bait
 modes, never the sweep cache, no `*_great.toml`, no `src/gopvpsim/` edits
