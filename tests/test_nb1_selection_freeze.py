@@ -132,13 +132,17 @@ def test_group_c9_dontbait_staleness_oinkologne_florges():
 
 
 def test_group_c10_dontbait_staleness_florges_seismitoad():
-    # Florges L27 vs Seismitoad L38 UL, 2-1. Ours 866 (oracle 665). CAVEAT:
-    # our score here is inflated by a SEPARATE open bug on OUR side -- the
-    # opponent-side would_shield=False feeds this override while the actual
-    # scenario policy always shields, so we waste our nuke into a shield. That
-    # is not "better play"; it is an internal would_shield/always-shield
-    # inconsistency (tracked separately). This cell pins current behavior so a
-    # future fix to that bug is noticed here, not that ours is correct.
+    # Florges L27 vs Seismitoad L38 UL, 2-1. Ours 866 (oracle 665). The old
+    # "separate open bug on OUR side" caveat here was FALSIFIED 2026-08-09
+    # (docs/reviews/2026-08-09_would_shield_diagnosis.md): the
+    # would_shield-vs-always-shield mismatch feeding this override is
+    # PvPoke's own shared structure (both sims waste the nuke into a shield),
+    # and the 2-1 gap is PvPoke's mixed-stale move.damage cache skipping the
+    # SECOND override (EP.damage fresh-on-use 50 vs IW.damage init-stale 35
+    # -> 1.2857 < 1.5, where every internally consistent ratio crosses 1.5).
+    # Consulting the active policy instead
+    # worsens total oracle error 201 -> 730. This cell pins current behavior;
+    # do not change it without that doc's gates.
     assert _score0(FLORGES_UL, SEISMITOAD, 2, 1) == 866
 
 

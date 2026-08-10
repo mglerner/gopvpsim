@@ -222,6 +222,22 @@ def get_moves():
 # Damage calculation
 # ---------------------------------------------------------------------------
 
+def parse_types(mon: dict) -> list[str]:
+    """Extract a Pokemon's type list from a gamemaster entry, filtering placeholder 'none' values.
+
+    Single-type Pokemon are stored as e.g. ['steel', 'none'] in PvPoke's gamemaster.
+
+    Lives here (not data.py) because it is damage-affecting -- it produces the
+    type lists that reach type_effectiveness()/stab() on every damage calc --
+    and must sit inside the engine-hashed closure (sweep_cache._ENGINE_FILES)
+    so an edit to it invalidates cached sweep columns.
+    """
+    types = mon.get('types', [mon.get('type1', 'normal')])
+    if isinstance(types, str):
+        types = [types]
+    return [t for t in types if t and t != 'none']
+
+
 def type_effectiveness(move_type, defender_types):
     """Combined type effectiveness multiplier for a move vs a defender.
 

@@ -88,7 +88,13 @@ yet other scores and contradicts the documented bandaid[929] divergence.
   1. `battle.py:1659-1665`: reattribute -- any internally consistent
      ratio fires here (ours 1.6071 fresh / 1.5943 frozen vs PvPoke
      1.2857 mixed-stale); the divergence is entirely PvPoke's stale
-     EP.damage.
+     EP.damage. [Corrected 2026-08-10, session-3 adversarial verify:
+     "stale EP.damage" has it backwards -- per the Mechanism section
+     above, EP.damage is the FRESH value (refreshed on use at T12, 50)
+     and IW.damage is the init-stale one (35); (50/50)/(35/45) =
+     1.2857. The divergence is PvPoke's MIXED-stale move.damage cache
+     with the staleness on Icy Wind. The shipped comments carry the
+     corrected wording.]
   2. `tests/test_nb1_selection_freeze.py:134-142` docstring: same
      reattribution (not hash-gated, but meaningless without #1 -- keep
      them together).

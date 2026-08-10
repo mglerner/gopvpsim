@@ -504,7 +504,8 @@ def annihilape_focal_context():
     """Build (focal_moves, focal_types) for an Annihilape Low Kick / Rage Fist /
     Close Combat moveset using the real gamemaster."""
     from gopvpsim.moves import get_moves
-    from gopvpsim.data import load_gamemaster, parse_types
+    from gopvpsim.data import load_gamemaster
+    from gopvpsim.moves import parse_types
     fast, charged = get_moves()
     gm = load_gamemaster()
     entry = next(m for m in gm['pokemon'] if m['speciesName'] == 'Annihilape')

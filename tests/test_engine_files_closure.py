@@ -43,18 +43,15 @@ ALLOWLIST = {
         "cache utility, not sim math. Nothing it defines feeds a damage, "
         "stat or timing calculation.",
     'data.py':
-        "KNOWN HOLE, not an endorsement. data.parse_types (data.py:207-215) "
-        "IS damage-affecting -- it produces the type lists that reach "
-        "type_effectiveness() and stab() on every calc_damage call -- so an "
-        "edit to it can change a score while engine_hash() stands still. "
-        "The fix is to relocate parse_types into an already-hashed module "
-        "(pokemon.py or moves.py) per the rule DEVELOPER_NOTES.md:384-388 "
-        "already states for the league table; it is QUEUED FOR THE NEXT "
-        "ENGINE-HASH BUMP WINDOW rather than done here, because adding "
-        "data.py to _ENGINE_FILES costs a full cold re-dive. Empirically "
-        "low risk: parse_types' body has changed exactly once in 1165 "
-        "commits (the commit that created it). See the 2026-08-09 "
-        "test-suite review, finding F5.",
+        "loader/cache module: gamemaster fetch + TTL cache, rankings, "
+        "sprites, default movesets. Nothing it defines feeds a damage, stat "
+        "or timing calculation. Its one damage-affecting function, "
+        "parse_types, was RELOCATED to moves.py (hashed) in the 2026-08-10 "
+        "engine-hash bump window, closing test-suite-review finding F5 -- "
+        "the entry used to be a documented KNOWN HOLE for exactly that "
+        "function. data.py stays in the closure through moves.py's "
+        "load_gamemaster import; if a future edit adds sim math here, move "
+        "it to a hashed module instead of widening this reason.",
 }
 
 
@@ -135,7 +132,10 @@ def test_the_walker_finds_the_edges_a_runtime_probe_would_miss():
     """Guard the guard: the closure walk must be non-trivial and must see
     both module-scope and function-level relative imports."""
     direct = _intra_package_imports(PKG_DIR / 'battle.py')
-    assert 'moves' in direct and 'data' in direct and 'pokemon' in direct, direct
+    # battle.py stopped importing data directly when parse_types moved to
+    # moves.py (2026-08-10); data.py stays in the CLOSURE via moves.py's
+    # load_gamemaster import (pinned by test_closure_is_the_expected_set).
+    assert 'moves' in direct and 'pokemon' in direct, direct
     # formchange is imported ONLY inside function bodies (battle.py:2041,
     # 2093, 2126). If the walk ever stops descending into functions, this
     # is what says so -- otherwise the whole test quietly narrows.

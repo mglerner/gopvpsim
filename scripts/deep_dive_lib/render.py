@@ -17,7 +17,8 @@ import sys
 
 from gopvpsim.pokemon import Pokemon, get_species, find_pokemon_entry
 from gopvpsim.moves import get_moves
-from gopvpsim.data import get_default_moveset, parse_types
+from gopvpsim.data import get_default_moveset
+from gopvpsim.moves import parse_types
 from gopvpsim.display import pretty_species
 from gopvpsim.efficiency import efficient_frontier
 

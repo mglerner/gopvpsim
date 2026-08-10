@@ -111,6 +111,21 @@ def test_self_debuff_either_side_predicate():
     assert p({'species': 'X', 'charged': []}, azu) is True  # empty charged
 
 
+def test_neutral_batch_20260810_predicate():
+    """The 2026-08-10 fully-blessing predicate: the whole engine delta is
+    behavior-neutral (comment rewording + verbatim parse_types relocation),
+    so NO column is affected — including columns with missing/unresolvable
+    metadata. The usual never-bless-blind fail-safe deliberately does not
+    apply: the proof rests on the engine delta alone and reads no column
+    metadata at all. Scoping to the right vintage is migrate_engine's
+    from-engine stamp check, not the predicate."""
+    p = migrate_cache.PREDICATES['neutral_batch_20260810']
+    lick = {'species': 'Lickitung', 'charged': ['BODY_SLAM', 'POWER_WHIP']}
+    assert p(lick, lick) is False
+    assert p(None, None) is False
+    assert p({}, {'species': 'X'}) is False
+
+
 def _delta_gm(**move_powers):
     """Minimal gamemaster for the form-change-swap delta test. Overriding a move
     power lets a caller build an old/new pair differing in exactly one move.

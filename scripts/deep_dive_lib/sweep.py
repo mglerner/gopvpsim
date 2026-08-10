@@ -26,7 +26,7 @@ from gopvpsim.pokemon import (
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL, cp as calc_cp,
 )
 from gopvpsim.moves import get_moves
-from gopvpsim.data import parse_types
+from gopvpsim.moves import parse_types
 from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp, ENERGY_CAP
 from gopvpsim.formchange import attach_form_change
 

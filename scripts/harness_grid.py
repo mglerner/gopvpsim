@@ -31,7 +31,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / 'src'))
 
-from gopvpsim.data import load_rankings, parse_types
+from gopvpsim.data import load_rankings
+from gopvpsim.moves import parse_types
 from gopvpsim.pokemon import Pokemon, iv_rank, LEAGUE_CP, find_pokemon_entry
 from gopvpsim.moves import get_moves
 from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp

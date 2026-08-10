@@ -29,7 +29,8 @@ import numpy as np
 from gopvpsim.pokemon import (
     Pokemon, find_pokemon_entry, iv_rank, LEAGUE_CAPS,
 )
-from gopvpsim.data import load_gamemaster, parse_types
+from gopvpsim.data import load_gamemaster
+from gopvpsim.moves import parse_types
 from gopvpsim.moves import get_moves
 from gopvpsim.battle import simulate, pvpoke_dp
 

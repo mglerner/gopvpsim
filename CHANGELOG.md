@@ -2,6 +2,41 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-10 -- behavior-neutral engine-hash batch + two-leg warm cache migration
+
+Worlds session 3, block 1 (Michael's decided sequencing). One engine-hash
+bump `1415857072fa -> 5839391a7596`* carrying: (a) the would_shield
+attribution rewording per `docs/reviews/2026-08-09_would_shield_diagnosis.md`
+(battle.py + the test_group_c10 docstring; the review doc's own disposition
+bullet had the staleness BACKWARDS -- EP.damage is the fresh-on-use value
+(50), IW.damage the init-stale one (35), (50/50)/(35/45)=1.2857 -- caught by
+the session's adversarial verify pass and corrected in all three places);
+(b) `parse_types` relocated verbatim `data.py -> moves.py`, closing
+test-suite-review F5 (damage-affecting but unhashed) -- 21 call sites
+repointed, `data.py` keeps a lazy PEP-562 alias because gobattlekit's
+`export_thresholds.py` imports it from `gopvpsim.data` by name
+(`test_gobattlekit_api_pin`); alias removal is a post-Worlds TODO. FC-2's
+formchange.py half turned out to have already landed in `281a40a` (the
+2026-08-09 diagnosis doc listed it stale). Neutrality proven, not assumed:
+token-stream diff (battle.py comment-only), AST-identical parse_types body,
+1,539-battle differential vs a HEAD tree bit-identical (JIT active) + an
+independent 819-cell probe, full suite green (1856+1 passed, 13 xfail).
+
+Cache migration was TWO-legged because both sidecar stamps were stale
+(engine: this bump; gamemaster: pvpoke `ea8f7691c -> f60a41199`, the
+purely-additive Mega Starmie patch, `d0506c8999e9 -> 8f1d6cca5c0f`) and each
+migrate mode requires the OTHER axis current -- a single-leg run provably
+blesses 0 columns (dry-run: 146,968 skipped). Sequence: `--from-gamemaster`
+FIRST from a pre-batch `git archive` tree (computed delta: 1 species added,
+0 changed/removed -> bless-all), then commit, then `--from-engine
+1415857072fa --predicate neutral_batch_20260810` (fully-blessing; proof in
+its docstring + `test_neutral_batch_20260810_predicate`). The 96 slayer-cache
+entries have no gamemaster-migration path (opaque keys) and cold re-bake on
+demand, matching the 2026-06-29 precedent.
+
+*The engine hash also covers `scripts/deep_dive_signature.py` as a sixth
+input -- the "five files" shorthand in older notes undercounts it.
+
 ## 2026-08-10 -- S8a tie semantics decided: exact 500 is a tie, not a win
 
 Resolution of lane A's 2026-08-09 escalation (Michael's call): KEEP the

@@ -74,9 +74,10 @@ from gopvpsim.theme import (
 )
 from gopvpsim.data import (
     load_gamemaster, load_rankings, get_default_moveset,
-    parse_types, sprite_data_uri, load_group as fetch_group, species_id,
+    sprite_data_uri, load_group as fetch_group, species_id,
     cup_pretty_name, get_rankings_for, rankings_cache_path,
 )
+from gopvpsim.moves import parse_types
 from gopvpsim.battle import (
     BattlePokemon, simulate,
     pvpoke_dp, pvpoke_simulate_shield, ENERGY_CAP, WIN_RATING,

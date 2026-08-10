@@ -20,8 +20,7 @@ from .breakpoints import (
     atk_for_damage, breakpoints as scan_breakpoints,
     def_for_damage, bulkpoints as scan_bulkpoints,
 )
-from .data import parse_types
-from .moves import damage as calc_damage, get_moves
+from .moves import damage as calc_damage, get_moves, parse_types
 from .pokemon import (
     LEAGUE_CAPS, SHADOW_ATK_BONUS, SHADOW_DEF_MULT,
     Pokemon, best_level, battle_stats, find_pokemon_entry, get_species,
