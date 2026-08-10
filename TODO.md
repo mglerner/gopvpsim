@@ -58,15 +58,6 @@ below later found one on a wider grid.)
   cache hash; `tests/test_engine_files_closure.py` allowlists it with
   a pointer here until then). Behavior-neutral, so the fully-blessing
   `--from-engine` migration predicate is trivially provable.
-- **[decision, S8a tie semantics]** the S8a vectorization (`8a7fdc7`)
-  silently changed `aggregate_flips_by_anchor`'s win test from
-  `>= WIN_RATING` to `> WIN_RATING` (verified vs `8a7fdc7^`); the
-  frozen test oracle kept `>=`, so exact-500 tie scores diverge --
-  currently unreachable by the fixtures, documented in
-  `tests/test_aggregate_flips_by_anchor.py`'s oracle docstring.
-  Decide: keep `>` (matches `_won_set`/PvPoke -- likely intended) and
-  update the oracle + plant a 500-tie in the fixture, or revert
-  production to `>=`. (Lane A escalation, 2026-08-09.)
 - **js-parity residue** (LOW): only the winsMirror branch inside the
   SHA-pinned `deep_dive_engine.js` region (~:1497-1511) still uses the
   literal "Gives up vs #1" header for a fourth metric (a mirror-cohort

@@ -2,6 +2,23 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-10 -- S8a tie semantics decided: exact 500 is a tie, not a win
+
+Resolution of lane A's 2026-08-09 escalation (Michael's call): KEEP the
+strict `>` that the S8a vectorization (`8a7fdc7`, 2026-04-17) silently
+introduced in `aggregate_flips_by_anchor` -- it matches
+`battle.is_win`, PvPoke (exact 500 = tie), the sibling probe/losses
+paths, and everything shipped since April. The frozen test oracle
+(transcribed from the pre-S8a `>=` code) is now corrected to `>`, the
+parity fixture plants exact-500 cells (losses vs OPP_0), and a new
+`test_tie_score_is_not_a_win` pins the boundary directly with a
+501-control. Discrimination proven by mutation: regressing production
+to `>=` fails 2 tests; restored, all pass. Retroactive record: the
+April S8a commit was presented as behavior-neutral vectorization but
+also fixed this tie-handling bug -- production `>=` counted exact ties
+as wins, contradicting the canonical convention. No production change
+today; test-only.
+
 ## 2026-08-09 (evening) -- test-suite review phases 2-4: the suite now discriminates
 
 5 adversarially-verified lanes (20 agents; every replanted/converted

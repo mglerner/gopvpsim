@@ -42,18 +42,16 @@ def _reference_aggregate(scores_flat, nIvs, nS, nO,
                          pass_winrate_min=0.75, fail_winrate_max=0.25):
     """Pre-S8a pure-Python implementation, frozen as the oracle.
 
-    KNOWN UNTESTED BOUNDARY — tie scores (score == win_threshold == 500).
-    This oracle counts a win as ``>= win_threshold`` because that is what
-    the pre-S8a production code did; the S8a vectorisation changed it to
-    ``> win_threshold`` (deep_dive_analysis.py, "500 = tie, not a win"),
-    matching the sibling probe/losses paths and _won_set. The fixture below
-    emits only 700/300, so score == 500 never occurs and this parity check
-    CANNOT see the disagreement: a 700/500 variant of the same fixture makes
-    the oracle emit a record where production emits none. Do not read the
-    parity assertions as certifying tie handling. Reconciling the two (fix
-    the oracle to ``>`` and add a 500 to the fixture, or revert production)
-    is a semantics decision, deliberately left to the S8a owner rather than
-    silently blessed here.
+    TIE SEMANTICS (decided by Michael, 2026-08-10): a score of exactly
+    ``win_threshold`` (500) is a TIE, not a win — ``> win_threshold``,
+    matching ``battle.is_win``/PvPoke and the sibling probe/losses
+    paths. History: pre-S8a production used ``>=``; the S8a
+    vectorisation (8a7fdc7) silently corrected it to ``>``, and this
+    oracle — transcribed from the pre-S8a code — carried the old
+    ``>=`` until 2026-08-10, masked because the fixture emitted only
+    700/300. The fixture now plants exact-500 cells (losses vs OPP_0)
+    and test_tie_score_is_not_a_win pins the boundary directly, so a
+    production regression to ``>=`` fails this file.
     """
     opp_idx_by_name = {}
     for oi, name in enumerate(opponents):
@@ -81,9 +79,9 @@ def _reference_aggregate(scores_flat, nIvs, nS, nO,
         flipped_scenarios = []
         for si in range(nS):
             pw = sum(1 for iv in passing
-                     if scores_flat[iv*nS*nO+si*nO+oi] >= win_threshold) / len(passing)
+                     if scores_flat[iv*nS*nO+si*nO+oi] > win_threshold) / len(passing)
             fw = sum(1 for iv in failing
-                     if scores_flat[iv*nS*nO+si*nO+oi] >= win_threshold) / len(failing)
+                     if scores_flat[iv*nS*nO+si*nO+oi] > win_threshold) / len(failing)
             if pw >= pass_winrate_min and fw <= fail_winrate_max:
                 flipped_scenarios.append(scenarios[si])
         if flipped_scenarios:
@@ -107,10 +105,10 @@ def _reference_aggregate(scores_flat, nIvs, nS, nO,
                     hp_flipped = []
                     for si in range(nS):
                         pw = sum(1 for iv in sub_pass
-                                 if scores_flat[iv*nS*nO+si*nO+oi] >= win_threshold
+                                 if scores_flat[iv*nS*nO+si*nO+oi] > win_threshold
                                  ) / len(sub_pass)
                         fw = sum(1 for iv in sub_fail
-                                 if scores_flat[iv*nS*nO+si*nO+oi] >= win_threshold
+                                 if scores_flat[iv*nS*nO+si*nO+oi] > win_threshold
                                  ) / len(sub_fail)
                         if pw >= pass_winrate_min and fw <= fail_winrate_max:
                             hp_flipped.append(scenarios[si])
@@ -192,7 +190,13 @@ def _make_inputs(seed, nIvs=256, nS=9, nO=5):
                         win = win and iv_hp[iv] >= (hp_floor or 140)
                 if rng.random() < 0.06:   # ~6% noise, as in the sibling
                     win = not win         # boundaries fixture
-                scores_flat.append(700 if win else 300)
+                # Losses vs OPP_0 are EXACT TIES (500), pinning the
+                # tie-is-not-a-win boundary through the parity tests: a
+                # production regression to ``>= win_threshold`` turns
+                # OPP_0's failing cohort into ~100% "winners" and kills
+                # its phase-1 flip, diverging from the oracle.
+                loss = 500 if oi == 0 else 300
+                scores_flat.append(700 if win else loss)
     return data_obj, scores_flat, scenarios, opponents
 
 
@@ -324,3 +328,39 @@ def test_debug_stats_populated():
     assert stats.get('considered') == 3
     assert stats.get('no_opponent') == 1
     assert stats.get('unknown_opponent') == 1
+
+
+def test_tie_score_is_not_a_win():
+    """A score of exactly WIN_RATING (500) is a tie, not a win — decided
+    2026-08-10 (matches battle.is_win/PvPoke; see _reference_aggregate's
+    docstring for the history). Minimal direct pin, independent of the
+    random parity fixture: the passing cohort scores exactly 500
+    everywhere, so under tie-is-not-a-win NO scenario can clear the
+    pass_winrate_min gate and no record may be emitted; nudging the same
+    cells to 501 must emit one (anti-vacuity: proves the gate, not the
+    fixture, is what stops the record)."""
+    nIvs, nS, nO = 8, 3, 1
+    scenarios = [[0, 0], [1, 1], [2, 2]]
+    opponents = ['OPP_0']
+    data_obj = {
+        'ivAtk': [140.0] * 4 + [110.0] * 4,
+        'ivDef': [120.0] * 8,
+        'ivHp': [150] * 8,
+    }
+    anchors = [_FakeAnchor('atk_cut', 'OPP_0', 'atk', 130.0)]
+
+    def scores(pass_score):
+        flat = []
+        for iv in range(nIvs):
+            for _si in range(nS):
+                flat.append(pass_score if data_obj['ivAtk'][iv] >= 130.0
+                            else 300)
+        return flat
+
+    tied = analysis.aggregate_flips_by_anchor(
+        scores(500), nIvs, nS, nO, anchors, data_obj, scenarios, opponents)
+    assert tied == [], (
+        f'exact-500 scores counted as wins (>= regression): {tied}')
+    won = analysis.aggregate_flips_by_anchor(
+        scores(501), nIvs, nS, nO, anchors, data_obj, scenarios, opponents)
+    assert won, 'control failed: 501 scores should produce a flip record'
