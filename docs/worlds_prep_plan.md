@@ -106,10 +106,18 @@ Altaria (Shadow)'s literal badge is PLAYED (it was split out of a pooled
 PLAYED row) while the per-variant mechanical rule says MODEL; meta.toml
 records both (`badge` vs `badge_rule`) so the divergence is visible.
 
-Aegislash ships as `aegislash_shield` with the "Starts Blade" variant per the
-existing dive convention; it is the arithmetic-hostile entry (form change
-disables signature dedup and breaks closed-form separability) — budgeted as
-the expensive pair-family and footnoted out of the closed-form pages.
+Aegislash ships as `aegislash_shield` — the real, battle-reachable Aegislash
+(starts Shield, transforms to Blade on its first charged move). [Corrected
+2026-08-10, session-2 design audit: this doc previously said "with the
+'Starts Blade' variant per the existing dive convention", conflating two
+shipped dives — "Starts Blade" is the display label of the SEPARATE
+`aegislash-blade-great-league` dive, an unreachable diagnostic hypothetical
+(src/gopvpsim/display.py DIVE_CHIP_OVERRIDES), which is NOT part of the
+Worlds meta.] It is the arithmetic-hostile entry (form change disables
+signature dedup, and Blade atk is NON-MONOTONE in the Shield atk IV — a +1
+atk IV can drop a whole Blade level via CP-cap quantization, so closed-form
+inequality cards are wrong in sign, not just imprecise) — budgeted as the
+expensive pair-family and footnoted out of the closed-form pages.
 
 Mantine (#31) is the second FORCED entry (added 2026-08-10 at Michael's
 request): DragapultSim specifically called it a top Worlds threat alongside
@@ -196,10 +204,14 @@ committed successor).
 
 ## Guardrails (as code, per the {layer} x {lens} rule)
 
-- Worlds planes live in `worlds/planes/*.npz` (packbits won-bool + margin),
-  NEVER the sweep disk cache. Manifest stamps engine hash + gamemaster hash;
-  `verify_worlds.py` hard-fails on mismatch and runs an ML-completeness-style
-  coverage check.
+- Worlds planes live in `worlds/planes/*.npz` (packbits won-bool + uint16
+  RAW pvpoke score; margin = score - 500 is derived at read time — corrected
+  2026-08-10: the original "margin" wording would wrap negative losses in
+  uint16, and the won-plane stays the win/loss authority since >500 is a
+  strict inequality), NEVER the sweep disk cache. Manifest stamps engine
+  hash + gamemaster hash + a worlds_code source hash (producer code lives
+  outside the engine hash — the CACHE_VERSION-shaped gap); `verify_worlds.py`
+  hard-fails on mismatch and runs an ML-completeness-style coverage check.
 - **The bake driver is idempotent and manifest-driven: it bakes only pairs
   missing from the manifest.** Adding a mon later (Michael asked re: Cradily,
   2026-08-10) = one meta.toml row + N new pairs simmed + re-render — an

@@ -106,11 +106,14 @@ _FORM_DEFAULTS = {
 # ---------------------------------------------------------------------------
 
 AEGISLASH_REASON = (
-    'Editorial include. Ships as aegislash_shield with the "Starts Blade" '
-    'variant per the existing dive convention. The arithmetic-hostile entry: '
-    'the form change disables signature dedup and breaks closed-form '
-    'separability, so it is budgeted as the expensive pair-family and '
-    'footnoted out of the closed-form pages.'
+    'Editorial include. Ships as aegislash_shield -- the real, '
+    'battle-reachable Aegislash (starts Shield, transforms to Blade on its '
+    'first charged move); the site\'s separate "Starts Blade" dive is an '
+    'unreachable diagnostic hypothetical and is NOT this entry. The '
+    'arithmetic-hostile entry: the form change disables signature dedup, '
+    'and Blade attack is non-monotone in the Shield attack IV, so it is '
+    'budgeted as the expensive pair-family and footnoted out of the '
+    'closed-form pages.'
 )
 
 MANTINE_REASON = (
