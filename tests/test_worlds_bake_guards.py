@@ -221,6 +221,64 @@ def test_bake_refuses_stamp_mismatch_without_deleting(tmp_path):
     assert wp.load_manifest(tmp_path)['engine'] != 'stale-engine'
 
 
+def test_rebake_all_dry_run_deletes_nothing(tmp_path):
+    """Session-2c deleted every plane on `--rebake-all --dry-run` (the
+    natural 'preview the cost of a full re-bake' invocation) before the
+    dry-run early-exit ran -- 2026-08-10 review, HIGH. Now planning is
+    non-destructive: deletion happens only once the bake is committed."""
+    entries = tomllib.load(open(wp.META_TOML, 'rb'))['entries']
+    two = [e for e in entries
+           if e['species_id'] in ('lickilicky', 'azumarill')]
+    wb.bake(two, planes_dir=tmp_path, k=4, scenarios=[(1, 1)], workers=0)
+    before = sorted(p.name for p in tmp_path.iterdir())
+    manifest_before = wp.load_manifest(tmp_path)
+    baked, _ = wb.bake(two, planes_dir=tmp_path, k=4, scenarios=[(1, 1)],
+                       workers=0, rebake_all=True, dry_run=True)
+    assert baked == 0
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
+    assert wp.load_manifest(tmp_path) == manifest_before
+    # The real (non-dry) rebake still works and never leaves the old
+    # manifest pointing at deleted files.
+    baked2, _ = wb.bake(two, planes_dir=tmp_path, k=4, scenarios=[(1, 1)],
+                        workers=0, rebake_all=True)
+    assert baked2 == 4
+
+
+def test_incremental_meta_add_extends_without_deleting(tmp_path):
+    """The plan's pinned late-add affordance (docs/worlds_prep_plan.md:
+    'Adding a mon later = one meta.toml row + N new pairs simmed'):
+    session-2c hashed the WHOLE meta.toml into a refuse-stamp, so ANY
+    meta edit -- including the 580bfa7 prose fix -- forced --rebake-all.
+    Pre-fix behavior: SystemExit 'stamp mismatch' here. Now: additive
+    delta bakes exactly the new pairs, existing planes untouched."""
+    entries = tomllib.load(open(wp.META_TOML, 'rb'))['entries']
+    by_id = {e['species_id']: e for e in entries}
+    two = [by_id['lickilicky'], by_id['azumarill']]
+    wb.bake(two, planes_dir=tmp_path, k=3, scenarios=[(1, 1)], workers=0)
+    npz_before = sorted(p.name for p in tmp_path.glob('*.npz'))
+    assert len(npz_before) == 4
+
+    three = two + [by_id['tinkaton']]
+    baked, _ = wb.bake(three, planes_dir=tmp_path, k=3, scenarios=[(1, 1)],
+                       workers=0)
+    assert baked == 8                       # exactly the new pairs' planes
+    assert set(npz_before) <= {p.name for p in tmp_path.glob('*.npz')}
+    manifest = wp.load_manifest(tmp_path)
+    assert len(manifest['entries']) == 12
+    assert set(manifest['meta_entries']) == {'lickilicky', 'azumarill',
+                                             'tinkaton'}
+
+    # A sim-relevant CHANGE to an existing entry still refuses, without
+    # deleting anything.
+    doctored = [dict(by_id['lickilicky'],
+                     charged_move_ids=['BODY_SLAM', 'EARTHQUAKE']),
+                by_id['azumarill'], by_id['tinkaton']]
+    with pytest.raises(SystemExit, match='sim-relevant meta change'):
+        wb.bake(doctored, planes_dir=tmp_path, k=3, scenarios=[(1, 1)],
+                workers=0)
+    assert len(list(tmp_path.glob('*.npz'))) == 12
+
+
 def test_bake_aborts_when_engine_digest_changes_mid_bake(tmp_path,
                                                         monkeypatch):
     entries = tomllib.load(open(wp.META_TOML, 'rb'))['entries']

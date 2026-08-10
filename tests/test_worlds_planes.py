@@ -141,12 +141,57 @@ def test_worlds_code_hash_files_exist_and_hash_is_sensitive(tmp_path,
     for p in wp._WORLDS_SOURCE_FILES:
         assert p.exists(), f'renamed producer source: {p}'
     assert len(wp._WORLDS_SOURCE_FILES) >= 4
+    names = {p.name for p in wp._WORLDS_SOURCE_FILES}
+    # Boundary pins (2026-08-10 review): sweep.py builds every simmed
+    # mon and is outside the engine hash -> IN; worlds_tier0.py never
+    # runs in the plane path -> OUT (a tier0 edit must not cold a
+    # 1,860-plane bake).
+    assert 'sweep.py' in names
+    assert 'worlds_tier0.py' not in names
     before = wp.worlds_code_hash()
     clone = tmp_path / 'x.py'
     clone.write_bytes(wp._WORLDS_SOURCE_FILES[0].read_bytes() + b'\n# byte\n')
     monkeypatch.setattr(wp, '_WORLDS_SOURCE_FILES',
                         (clone,) + wp._WORLDS_SOURCE_FILES[1:])
     assert wp.worlds_code_hash() != before
+
+
+def test_margin_helper_widens_before_subtracting():
+    """score - 500 on the raw uint16 plane wraps every loss to ~65k --
+    the helper is THE read recipe (2026-08-10 review)."""
+    score = np.array([[300, 500, 700]], dtype=np.uint16)
+    m = wp.margin(score)
+    assert m.tolist() == [[-200, 0, 200]]
+    assert m.dtype == np.int32
+    # The naive spelling really is broken (pin the hazard itself).
+    assert (score - np.uint16(500))[0, 0] != -200
+
+
+def test_meta_delta_add_change_remove():
+    """Per-entry sim-relevant diffing: an added entry extends, a changed
+    moveset / removed entry invalidates -- and NON-sim fields (usage,
+    badges, prose, `generated`) are invisible to the digest, which is
+    the whole point (whole-file hashing forced a full cold re-bake on
+    every prose edit; 2026-08-10 review, HIGH)."""
+    e1 = {'species_id': 'a', 'species': 'A', 'shadow': False,
+          'fast_move_id': 'F', 'charged_move_ids': ['C1', 'C2'],
+          'usage_recent_pct': 10.0, 'badge': 'PLAYED'}
+    e2 = {'species_id': 'b', 'species': 'B', 'shadow': True,
+          'fast_move_id': 'G', 'charged_move_ids': ['C3', 'C4']}
+    manifest = {'meta_entries': wp.meta_sim_digests([e1, e2])}
+    # Non-sim churn: invisible.
+    e1_prose = {**e1, 'usage_recent_pct': 99.9, 'badge': 'MODEL',
+                'forced_reason': 'reworded'}
+    assert wp.meta_delta(manifest, [e1_prose, e2]) == ([], [], [])
+    # Added: extendable.
+    e3 = {'species_id': 'c', 'species': 'C', 'shadow': False,
+          'fast_move_id': 'H', 'charged_move_ids': ['C5']}
+    assert wp.meta_delta(manifest, [e1, e2, e3]) == ([], [], ['c'])
+    # Changed moveset: invalidates.
+    e2_new_move = {**e2, 'charged_move_ids': ['C3', 'C9']}
+    assert wp.meta_delta(manifest, [e1, e2_new_move]) == (['b'], [], [])
+    # Removed: invalidates.
+    assert wp.meta_delta(manifest, [e1]) == ([], ['b'], [])
 
 
 def test_fresh_stamps_refuses_fake_gamemaster(monkeypatch):

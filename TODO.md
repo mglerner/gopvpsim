@@ -15,8 +15,10 @@ anything Worlds). Session 1 DONE 2026-08-10 (`770a74d`): `worlds/meta.toml`
 `5c414c3` + `34a3803`): bool-plane core split into
 `deep_dive_lib/robustness.py` (opp_plane + plane_task_worker; wrapper
 semantics pinned), Tier-0 closed-form `scripts/worlds_tier0.py` (exact
-bisected cutoffs; DragapultSim's 110.21 Tinkaton-vs-Mantine reproduced as
-an oracle pin), and `scripts/worlds_planes.py` + `scripts/worlds_bake.py`
+bisected cutoffs; DragapultSim's Tinkaton-vs-Mantine numbers reproduced
+<0.1 under the energy-legal 14-fast plan with guarantee-vs-per-spread
+quantities paired correctly — see the plan doc's session-2 note), and
+`scripts/worlds_planes.py` + `scripts/worlds_bake.py`
 (manifest-stamped idempotent driver; dry-run verifies the full 1,860-key
 Tier-1 worklist; guardrails are code + tests, incl. a sweep-cache poison
 and a non-memoized mid-bake engine-digest check). Worlds is Aug 28-30 —

@@ -101,36 +101,68 @@ def test_def_cutoff_take_and_deny_asymmetry():
     assert take >= tier and deny < tier
 
 
-def test_ko_cutoff_reproduces_dragapultsim_gigaton_two_shot():
-    """Third-party oracle pin (docs/worlds_prep_plan.md, the designated
-    validation pair): Tinkaton guarantees the Gigaton-2-shot vs Mantine
-    0/15/7 (12 Fairy Wind + 2 Gigaton Hammer >= 120 HP) at 110.21 atk --
-    DragapultSim's published number, reproduced to its 2dp rounding.
-    Their best spread 12/6/11 clears the cutoff; the deep-bulk anchor
-    itself is the binding constraint of the reach claim."""
+def test_ko_cutoff_brackets_dragapultsim_published_numbers():
+    """Third-party comparison pin (docs/worlds_prep_plan.md, the
+    designated validation pair) -- against the ENERGY-LEGAL plan, with
+    the published quantities paired correctly (2026-08-10 review):
+
+    Gigaton costs 60, Fairy Wind gains 9, energy starts at 0, so 2
+    Gigatons need >= 14 fast moves -- the minimal legal plan is (14, 2).
+    Under it our engine yields 109.20 for the single-spread cutoff vs
+    the 0/15/7 bulk anchor (DragapultSim published 109.28 as that
+    spread's deny threshold) and 110.18 for the cohort-wide guarantee
+    (they published 110.21 as "guarantee vs any plausible Mantine").
+    The ~0.03-0.08 residual is a cross-implementation stat/rounding
+    gap, asserted as a band, NOT an exactness claim. (The session-2b
+    version of this test pinned '110.21' exactly -- via the
+    energy-ILLEGAL plan (12, 2), a one-parameter fit to the published
+    number with the quantities mis-paired; recorded here per the
+    testing policy's record-the-pre-fix-value rule.)"""
+    # The plan must be energy-legal, forever.
+    assert 14 * FAIRY_WIND['energyGain'] >= 2 * GIGATON['energy']
+    assert 13 * FAIRY_WIND['energyGain'] < 2 * GIGATON['energy']
+
     m = _mantine(0, 15, 7)
     assert m['hp'] == 120
     assert f"{m['def_']:.2f}" == '170.36'
-    cut = t0.ko_cutoff(FAIRY_WIND, GIGATON, 12, 2, m['hp'],
+    cut = t0.ko_cutoff(FAIRY_WIND, GIGATON, 14, 2, m['hp'],
                        TINKATON_TYPES, MANTINE_TYPES, m['def_'])
-    assert f'{cut:.2f}' == '110.21'
-    best = next(e for e in iv_rank('Tinkaton', league='great', shadow=False)
+    assert f'{cut:.2f}' == '109.20'
+    assert abs(cut - 109.28) < 0.1               # their per-spread number
+
+    cohort = iv_rank('Mantine', league='great', shadow=False)
+    g, binding = t0.guarantee_cutoff(FAIRY_WIND, GIGATON, 14, 2,
+                                     TINKATON_TYPES, MANTINE_TYPES, cohort)
+    assert f'{g:.2f}' == '110.18'
+    assert abs(g - 110.21) < 0.1                 # their guarantee number
+    assert binding in cohort
+    # DragapultSim's best-spread claim holds under our numbers too:
+    # 12/6/11 clears the cohort guarantee.
+    best = next(e for e in cohort_tinkaton()
                 if (e['atk_iv'], e['def_iv'], e['sta_iv']) == (12, 6, 11))
-    assert best['atk'] >= cut
-    # And the cutoff is exact: one float below fails the plan.
+    assert best['atk'] >= g
+    # And the per-spread cutoff is exact: one float below fails the plan.
     below = math.nextafter(cut, -math.inf)
-    total = (12 * t0.staged_damage(FAIRY_WIND, below, m['def_'],
+    total = (14 * t0.staged_damage(FAIRY_WIND, below, m['def_'],
                                    TINKATON_TYPES, MANTINE_TYPES)
              + 2 * t0.staged_damage(GIGATON, below, m['def_'],
                                     TINKATON_TYPES, MANTINE_TYPES))
     assert total < m['hp']
 
 
+def cohort_tinkaton():
+    return iv_rank('Tinkaton', league='great', shadow=False)
+
+
 def test_guarantee_cutoff_maxes_over_the_cohort():
+    """max-over-cohort semantics, plus the value pinned on the full
+    cohort so the ko_cutoff-vs-guarantee_cutoff distinction can never
+    silently drift again (the session-2b docstrings conflated the two
+    quantities; 2026-08-10 review, HIGH)."""
     cohort = iv_rank('Mantine', league='great', shadow=False)[:16]
-    cut, binding = t0.guarantee_cutoff(FAIRY_WIND, GIGATON, 12, 2,
+    cut, binding = t0.guarantee_cutoff(FAIRY_WIND, GIGATON, 14, 2,
                                        TINKATON_TYPES, MANTINE_TYPES, cohort)
-    per = [t0.ko_cutoff(FAIRY_WIND, GIGATON, 12, 2, e['hp'],
+    per = [t0.ko_cutoff(FAIRY_WIND, GIGATON, 14, 2, e['hp'],
                         TINKATON_TYPES, MANTINE_TYPES, e['def_'])
            for e in cohort]
     assert cut == max(per)

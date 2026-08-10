@@ -24,8 +24,9 @@ Write guards (hard failures, not conventions):
   never stamp fake provenance);
 * scores must fit the uint16 [0, 1000] pvpoke range (the plane stores
   the RAW score; the won-plane is the win/loss authority and margin is
-  derived at read time -- a signed "margin" plane in uint16 would wrap
-  every loss).
+  derived at read time via the ``margin`` helper, which widens before
+  subtracting -- a signed "margin" plane in uint16, or a bare
+  ``score - 500`` on the raw array, wraps every loss).
 
 The won plane is ``np.packbits`` with explicit ``bitorder='big'`` and
 the shape stored both in the manifest and INSIDE the npz (packbits pads
@@ -65,11 +66,17 @@ MECHANICS = 'legacy'
 # The plane-producing sources. A byte change in any of these stamps new
 # manifests differently and REFUSES to extend old ones (see module
 # docstring). Explicit tuple so a rename fails loud in the tests.
+# Boundary (2026-08-10 review): deep_dive_lib/sweep.py is IN -- it builds
+# every simmed BattlePokemon (BattleSide/make_battle_pokemon/
+# group_ivs_by_stat_profile) yet sits outside the engine hash;
+# worlds_tier0.py is OUT -- it never runs in the plane path (a render-time
+# consumer; its vintage gets stamped with the rendered products, session
+# 4), so a tier0 edit must not cold a 1,860-plane bake.
 _WORLDS_SOURCE_FILES = (
     REPO / 'scripts' / 'worlds_planes.py',
     REPO / 'scripts' / 'worlds_bake.py',
-    REPO / 'scripts' / 'worlds_tier0.py',
     REPO / 'scripts' / 'deep_dive_lib' / 'robustness.py',
+    REPO / 'scripts' / 'deep_dive_lib' / 'sweep.py',
 )
 
 
@@ -81,8 +88,36 @@ def worlds_code_hash():
     return h.hexdigest()[:12]
 
 
-def meta_toml_hash():
-    return hashlib.md5(META_TOML.read_bytes()).hexdigest()[:12]
+def entry_sim_digest(entry):
+    """Digest of the SIM-RELEVANT fields of one meta entry -- the only
+    meta.toml content a plane depends on. Usage percentages, badges,
+    prose reasons and the `generated` stamp are deliberately excluded:
+    hashing the whole file (the original design) turned every prose
+    edit or Dracoviz usage re-poll into a full 465-pair cold re-bake,
+    the same over-broad-stamp mistake the sweep cache's v7 gamemaster
+    narrowing fixed (2026-08-10 review, HIGH)."""
+    blob = json.dumps([entry['species_id'], entry['species'],
+                       bool(entry['shadow']), entry['fast_move_id'],
+                       list(entry['charged_move_ids'])])
+    return hashlib.md5(blob.encode()).hexdigest()[:12]
+
+
+def meta_sim_digests(entries):
+    return {e['species_id']: entry_sim_digest(e) for e in entries}
+
+
+def meta_delta(manifest, entries):
+    """(changed, removed, added) species_ids between the manifest's
+    recorded meta and the current entries -- computed from the actual
+    sim-relevant delta, migrate_cache-style. A purely-ADDED delta is
+    extendable (bake exactly the new pairs); changed/removed entries
+    invalidate planes and must refuse."""
+    old = (manifest or {}).get('meta_entries', {})
+    new = meta_sim_digests(entries)
+    changed = sorted(s for s in old if s in new and new[s] != old[s])
+    removed = sorted(s for s in old if s not in new)
+    added = sorted(s for s in new if s not in old)
+    return changed, removed, added
 
 
 def out_path(name, planes_dir=PLANES_DIR):
@@ -141,8 +176,8 @@ def plane_arrays(won, score, focal_ivs, focal_levels, opp_ivs, opp_levels,
     """Assemble + validate the npz dict for one (pair, direction, bait).
 
     ``won`` is the authority for win/loss (packed); ``score`` is the raw
-    focal pvpoke_score in [0, 1000] (margin = score - 500, derived at
-    read time). Shapes: won/score (n_spreads, n_cohort, n_scenarios).
+    focal pvpoke_score in [0, 1000] (signed margin comes from the
+    ``margin`` helper at read time, never bare uint16 subtraction). Shapes: won/score (n_spreads, n_cohort, n_scenarios).
     """
     won = np.asarray(won)
     score = np.asarray(score, dtype=np.uint16)
@@ -185,6 +220,15 @@ def read_plane(name, planes_dir=PLANES_DIR):
     return raw
 
 
+def margin(score):
+    """Signed win margin (score - 500) from the uint16 raw-score plane.
+
+    THE read recipe: ``plane['score'] - 500`` on the raw uint16 array
+    wraps every loss to ~65k (2026-08-10 review) -- widen first. Never
+    re-derive win/loss from this; ``won`` is the authority."""
+    return np.asarray(score).astype(np.int32) - 500
+
+
 def fresh_stamps():
     """The global manifest stamps for a NEW bake. Hard-fails rather than
     stamping fake provenance."""
@@ -199,12 +243,13 @@ def fresh_stamps():
         'engine': engine_hash(),
         'gamemaster': gm,
         'worlds_code': worlds_code_hash(),
-        'meta_toml': meta_toml_hash(),
     }
 
 
+# Meta changes are NOT a stamp: they are diffed per-entry (meta_delta) so
+# an additive meta row extends the manifest instead of refusing.
 STAMP_KEYS = ('plane_version', 'mechanics', 'engine', 'gamemaster',
-              'worlds_code', 'meta_toml')
+              'worlds_code')
 
 
 def stamp_mismatches(manifest):

@@ -64,9 +64,13 @@ from deep_dive_lib.robustness import plane_task_worker
 SCENARIOS = [(sf, so) for sf in range(3) for so in range(3)]
 TOP_K = 512
 
-# The engine-cleanliness file set: the sweep-cache engine hash inputs
-# (src files + deep_dive_signature.py -- see sweep_cache._ENGINE_FILES).
-ENGINE_TREE = ('src/gopvpsim', 'scripts/deep_dive_signature.py')
+# The cleanliness file set: the sweep-cache engine hash inputs (src files
+# + deep_dive_signature.py -- see sweep_cache._ENGINE_FILES) PLUS the
+# worlds_code_hash sources -- a dirty producer file would stamp its WIP
+# hash into a fresh manifest and silently bake unreviewed code.
+ENGINE_TREE = ('src/gopvpsim', 'scripts/deep_dive_signature.py',
+               *(str(p.relative_to(wp.REPO))
+                 for p in wp._WORLDS_SOURCE_FILES))
 _ENGINE_SRC_FILES = ('battle.py', '_dp_jit.py', 'moves.py', 'formchange.py',
                      'pokemon.py')
 
@@ -168,10 +172,24 @@ def load_meta():
     return meta['entries']
 
 
+_IV_RANK_MEMO: dict = {}
+
+
+def _ranked(species, shadow):
+    """Parent-side iv_rank memo: probe_spreads / cohort_indices /
+    _finish_task each need the ranked list, and recomputing two full
+    4096-IV rankings per task in the parent serializes the pool
+    (2026-08-10 review). 62 unique (species, shadow) pairs total."""
+    key = (species, bool(shadow))
+    if key not in _IV_RANK_MEMO:
+        _IV_RANK_MEMO[key] = iv_rank(species, league='great', shadow=shadow)
+    return _IV_RANK_MEMO[key]
+
+
 def probe_spreads(species, shadow):
     """Tier-1 focal probe spreads: rank-1 SP + max-atk within top-512
     (the session-1 go/no-go probe's convention)."""
-    ranked = iv_rank(species, league='great', shadow=shadow)
+    ranked = _ranked(species, shadow)
     top = ranked[:TOP_K]
     r1 = top[0]
     maxatk = max(top, key=lambda e: e['atk'])
@@ -186,7 +204,7 @@ def cohort_indices(species, shadow):
     off-SP spreads; sweeping only top-512-SP would miss exactly the
     spreads this analysis is about). Masks label each union row's
     cohort membership for the renderers."""
-    ranked = iv_rank(species, league='great', shadow=shadow)
+    ranked = _ranked(species, shadow)
     top512 = list(range(min(TOP_K, len(ranked))))
     byatk, seen = [], set()
     for i, e in enumerate(ranked):
@@ -261,11 +279,9 @@ def _finish_task(task, result, manifest, planes_dir):
     """npz first, manifest entry second (worlds_planes ordering
     contract), then persist the manifest."""
     won, score, n_sims = result
-    ranked = iv_rank(task['opponent'], league='great',
-                     shadow=task['opp_shadow'])
+    ranked = _ranked(task['opponent'], task['opp_shadow'])
     cohort_entries = [ranked[i] for i in task['cohort']]
-    focal_ranked = iv_rank(task['focal_species'], league='great',
-                           shadow=task['focal_shadow'])
+    focal_ranked = _ranked(task['focal_species'], task['focal_shadow'])
     lvl = {(e['atk_iv'], e['def_iv'], e['sta_iv']): e['level']
            for e in focal_ranked}
     arrs = wp.plane_arrays(
@@ -293,16 +309,16 @@ def _finish_task(task, result, manifest, planes_dir):
 def bake(entries, planes_dir=wp.PLANES_DIR, k=TOP_K, scenarios=SCENARIOS,
          pair_limit=None, workers=0, rebake_all=False, dry_run=False):
     """The guarded bake. Returns (n_baked, n_skipped)."""
-    manifest = wp.load_manifest(planes_dir)
-    if manifest is not None and rebake_all:
-        for entry in manifest.get('entries', {}).values():
-            p = wp.out_path(entry['file'], planes_dir)
-            if p.exists():
-                p.unlink()
-        manifest = None
+    old_manifest = wp.load_manifest(planes_dir)
+    # Plan first, destroy later: --rebake-all plans against a FRESH
+    # manifest but must not unlink anything until we are actually
+    # committed to baking (--dry-run previews a full re-bake's cost; the
+    # original ordering deleted every plane on that preview -- 2026-08-10
+    # review, HIGH).
+    manifest = None if rebake_all else old_manifest
     if manifest is None:
         manifest = {**wp.fresh_stamps(), 'created': date.today().isoformat(),
-                    'entries': {}}
+                    'meta_entries': {}, 'entries': {}}
     else:
         mismatches = wp.stamp_mismatches(manifest)
         if mismatches:
@@ -313,6 +329,20 @@ def bake(entries, planes_dir=wp.PLANES_DIR, k=TOP_K, scenarios=SCENARIOS,
                      'Guardrails). Re-run with --rebake-all to DELETE '
                      'worlds/planes/*.npz and start a fresh manifest.\n'
                      + '\n'.join(lines))
+        # Meta changes are a per-entry DELTA, not a stamp: an additive
+        # row (the documented late-add path) extends the manifest and
+        # bakes exactly the new pairs; a changed/removed entry
+        # invalidates its planes and refuses.
+        changed, removed, added = wp.meta_delta(manifest, entries)
+        if changed or removed:
+            sys.exit('ABORT: sim-relevant meta change for existing '
+                     f'entries (changed: {changed or "-"}, removed: '
+                     f'{removed or "-"}) -- their planes are stale. '
+                     'Re-run with --rebake-all to start fresh.')
+        if added:
+            print(f'Meta extended by {len(added)} entries '
+                  f'({", ".join(added)}): baking their pairs only.')
+    manifest['meta_entries'] = wp.meta_sim_digests(entries)
 
     total_keys = len(wp.expected_tier1_keys(entries)) if pair_limit is None \
         else None
@@ -325,6 +355,16 @@ def bake(entries, planes_dir=wp.PLANES_DIR, k=TOP_K, scenarios=SCENARIOS,
           + (f' (target {total_keys} keys).' if total_keys else '.'))
     if dry_run or not tasks:
         return 0, n_skipped
+
+    if rebake_all and old_manifest is not None:
+        # Committed to baking: delete the old vintage and land the fresh
+        # (empty) manifest in the same step, so no window exists where
+        # the on-disk manifest points at deleted files.
+        for entry in old_manifest.get('entries', {}).values():
+            p = wp.out_path(entry['file'], planes_dir)
+            if p.exists():
+                p.unlink()
+        wp.save_manifest(manifest, planes_dir)
 
     start_digest = fresh_engine_digest()
     t0 = time.time()

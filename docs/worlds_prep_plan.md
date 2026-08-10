@@ -133,7 +133,15 @@ Tinkaton needs 110.21 atk to guarantee the Gigaton-2-shot breakpoint (12/6/11
 best spread) or 108.27 atk targeting rank-1 Mantine (4/1/12); Mantine denies
 with 170.36 def (0/15/7, bulkpoints any Tinkaton under 109.28 atk) or 165.73
 def (bulkpoints under 108.27) — to check our reach-or-deny card against
-before shipping.
+before shipping. [Session-2 reproduction (2026-08-10): under the minimal
+ENERGY-LEGAL plan (14 Fairy Wind + 2 Gigaton — 12 fasts cannot fund 2
+Gigatons) and with the quantities paired correctly, our engine gives
+guarantee_cutoff = 110.18 (their 110.21 "guarantee") and per-spread cutoff
+109.20 vs the 0/15/7 anchor (their 109.28), both banded <0.1 in
+tests/test_worlds_tier0.py — the residual is cross-implementation
+stat/rounding, not error. Their 108.27 / "rank-1 (4/1/12)" / 165.73 trio
+does NOT map onto our stat model (our 4/1/12 Mantine has 159.02 def; our SP
+rank-1 is 0/15/14) — treat those as unmapped, revisit in session 4.]
 
 Runner-ups that stay OUT but render as rejects on the candidate page:
 Cradily (biggest faller, -34.6pp old->recent), Talonflame, Annihilape (rank
