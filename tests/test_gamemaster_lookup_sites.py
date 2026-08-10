@@ -269,11 +269,23 @@ def test_species_has_form_change_hits(species, expected):
 
 def test_species_has_form_change_miss_is_false_not_a_raise(monkeypatch):
     """A raising accessor here would abort IV dedup for the whole sweep
-    instead of falling back to the conservative per-IV grouping."""
+    instead of falling back to the conservative per-IV grouping.
+
+    The patch targets deep_dive_lib.robustness -- the module the function
+    LIVES in since the Worlds session-2 split (deep_dive only aliases it).
+    Patching the deep_dive alias module would silently stop reaching the
+    lookup, so the positive control below proves the misser actually
+    bites: a real form-changer must flip True -> False under it."""
+    _ensure_scripts_on_path()
+    from deep_dive_lib import robustness
     dd = _deep_dive()
     dd._FORM_CHANGE_SPECIES_CACHE.clear()
-    monkeypatch.setattr(dd, 'find_pokemon_entry', _misser)
+    monkeypatch.setattr(robustness, 'find_pokemon_entry', _misser)
     assert dd._species_has_form_change(KNOWN_SPECIES) is False
+    # Positive control: without the patch this is True
+    # (test_species_has_form_change_hits); False here proves the misser
+    # is the lookup the function reads, not a dead seam.
+    assert dd._species_has_form_change(FORM_CHANGE_SPECIES) is False
     dd._FORM_CHANGE_SPECIES_CACHE.clear()
 
 
@@ -323,6 +335,7 @@ _CONVERTED = (
     'scripts/harness_grid.py',
     'scripts/deep_dive.py',
     'scripts/deep_dive_lib/render.py',
+    'scripts/deep_dive_lib/robustness.py',
     'scripts/deep_dive_lib/sweep.py',
     'src/gopvpsim/anchors.py',
     'src/gopvpsim/breakpoints.py',
@@ -337,8 +350,9 @@ _ALLOWED_SCANS = {
      "return {m['speciesId']: m['speciesName'] for m in gm['pokemon']}"),
     # _species_has_form_change: the reverse direction -- "which entry's
     # formChange points AT this speciesId". The speciesName index cannot
-    # answer it.
-    ('scripts/deep_dive.py',
+    # answer it. (Moved to deep_dive_lib/robustness.py in the Worlds
+    # session-2 split.)
+    ('scripts/deep_dive_lib/robustness.py',
      "for m in load_gamemaster()['pokemon'])"),
 }
 
