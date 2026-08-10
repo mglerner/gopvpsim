@@ -6,6 +6,23 @@ delete its bullet or move the writeup out -- do not leave a 'DONE/RESOLVED'
 narrative inline. This convention was set 2026-06-27 after the file hit ~1980
 lines of mostly-completed chronological batches. -->
 
+## Worlds 2026 robustness analysis — IN PROGRESS (sessions 2-5 remain)
+
+**Plan of record: `docs/worlds_prep_plan.md`** (read it before touching
+anything Worlds). Session 1 DONE 2026-08-10 (`770a74d`): `worlds/meta.toml`
+(31 entries) + `scripts/worlds_meta.py` + tests; go/no-go probe = GO
+(60/720 amber, structured). Worlds is Aug 28-30 — sessions 2-5 are:
+robustness driver + Tier-0 closed-form + manifest-stamped `worlds/planes/`
+writer; Tier-1 bake + matrix + cheat sheets + hub; amber pages +
+reach-or-deny + Tier-2 bake + FN-rate; IV explorer + CMP board +
+`verify_worlds.py` + publish. Planning artifacts (design panel, judge
+verdicts, evidence brief, probe script, usage JSON) preserved in
+`userdata/worlds_planning/`. Standing rules: legacy engine only, both bait
+modes, never the sweep cache, no `*_great.toml`, no `src/gopvpsim/` edits
+mid-season; the pending engine-hash-bump batch (below, "rides the next
+engine-hash bump window") must land BEFORE any Worlds bake or not at all
+until after Worlds.
+
 ## Re-dive runbook
 
 For the next cold re-dive: `docs/predive_checklist.md` is the STANDING
