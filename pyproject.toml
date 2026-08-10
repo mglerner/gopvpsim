@@ -41,4 +41,6 @@ testpaths = ["tests"]
 markers = [
     "integration: requires network access or a warm cache (pvpoke gamemaster)",
     "slow: takes more than ~10s; iterate with -m 'not slow', but the full suite (no -m filter) remains the pre-commit gate",
+    "render: needs the session-scoped small_dive_html real render (~14s)",
+    "local_artifacts: needs userdata/ blobs or a rendered dive; skips on a fresh clone",
 ]

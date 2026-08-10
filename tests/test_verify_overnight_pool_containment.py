@@ -106,6 +106,7 @@ def test_dive_pool_map_covers_every_dive_with_a_pool_file():
         assert path.exists(), f"declared pool file missing: {path}"
 
 
+@pytest.mark.local_artifacts
 def test_real_dives_contain_their_declared_pools():
     """Cross-path check: real pool files vs real rendered opponent lists.
 

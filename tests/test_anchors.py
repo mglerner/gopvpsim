@@ -492,8 +492,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 @pytest.fixture
 def annihilape_registry():
     p = REPO_ROOT / "thresholds" / "annihilape.toml"
-    if not p.exists():
-        pytest.skip("thresholds/annihilape.toml not present")
+    # Hard assert, not a skip: this file is git-tracked, so its absence can
+    # only mean a broken checkout, and a skip would turn that into a green
+    # run (2026-08-09 test-suite review, silent-hole class).
+    assert p.exists(), f"tracked fixture missing: {p}"
     return T.load_toml(p)
 
 

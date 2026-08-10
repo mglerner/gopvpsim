@@ -123,6 +123,21 @@ def _pin_data_cache_ttl():
     an in-flight overnight dive chain (the documented reproducibility
     hazard). With CACHE_TTL pinned to infinity an existing cache file is
     used as-is regardless of age; a genuinely cold cache still fetches once.
+
+    Longer form of the same rationale (T1, 2026-06-12): without this, any
+    pytest invocation whose tests hit load_gamemaster/load_rankings can
+    refresh the 24h-TTL cache mid-run — which silently changes opponent
+    resolution for any concurrently running dive chain (the reason "no
+    pytest while a dive chain runs" was a standing rule). Pinning the TTL
+    to infinity makes the suite read-only on the cache: stale-but-present
+    data is always served, a fetch only happens if no cache file exists at
+    all.
+
+    (A byte-equivalent duplicate of this fixture, `_pin_gamemaster_cache`,
+    lived below until the 2026-08-09 test-suite review: both were
+    session-scoped autouse and both set CACHE_TTL = inf, so the second one
+    saved the value the first had already pinned and its restore was a
+    provable no-op. Merged into this one.)
     """
     orig = data_module.CACHE_TTL
     data_module.CACHE_TTL = float('inf')
@@ -167,21 +182,3 @@ def mock_gm(monkeypatch):
     gopvpsim.invalidate_caches()
     yield
     gopvpsim.invalidate_caches()
-
-
-@pytest.fixture(autouse=True, scope='session')
-def _pin_gamemaster_cache():
-    """Freeze the on-disk gamemaster/rankings cache for the whole test
-    session (T1, 2026-06-12). Without this, any pytest invocation whose
-    tests hit load_gamemaster/load_rankings can refresh the 24h-TTL
-    cache mid-run — which silently changes opponent resolution for any
-    concurrently running dive chain (the reason "no pytest while a dive
-    chain runs" was a standing rule). Pinning the TTL to infinity makes
-    the suite read-only on the cache: stale-but-present data is always
-    served, a fetch only happens if no cache file exists at all.
-    """
-    import gopvpsim.data as _data
-    old = _data.CACHE_TTL
-    _data.CACHE_TTL = float('inf')
-    yield
-    _data.CACHE_TTL = old

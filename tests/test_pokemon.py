@@ -587,26 +587,60 @@ def test_compute_default_ivs_result_is_stat_product_rank2_or_higher():
     assert idx <= 5, f"Expected top-5 combo, got rank {idx + 1}"
 
 
-@pytest.mark.integration
-@pytest.mark.slow  # ~77s — 75% of total suite wall time (2026-06-12)
-@pytest.mark.xfail(reason=(
-    "compute_default_ivs uses iv_floor=4 (current PvPoke source), but "
-    "gamemaster.json was generated with iv_floor≈2 for many Pokemon, so "
-    "~3-5% of entries will differ. pvpoke_default_ivs() is always authoritative."
-))
-def test_compute_default_ivs_matches_gamemaster_broadly():
-    """
-    Ideally compute_default_ivs() would match pvpoke_default_ivs() for every
-    Pokemon.  This test documents that it doesn't due to algorithm evolution.
-    """
+# ===========================================================================
+# compute_default_ivs() vs the gamemaster's baked defaultIVs
+#
+# compute_default_ivs() uses iv_floor=4 (current PvPoke source), but
+# gamemaster.json was generated with iv_floor≈2 for many Pokemon, so a few
+# percent of entries will differ.  pvpoke_default_ivs() is always
+# authoritative; compute_default_ivs() is the fallback for entries the
+# gamemaster doesn't carry.  That mismatch is a documented, permanent
+# property of the data — not a bug to fix.
+#
+# This used to be ONE permanently-xfailed test asserting `mismatches == 0`
+# over all 5,208 entries: guaranteed to xfail, ~34s of dead wall time, zero
+# regression signal (2026-08-09 test-suite review).  It is now two real
+# assertions on a two-sided band.  The LOWER bound keeps the documented
+# limitation honest — if the mismatches ever vanish, the gamemaster was
+# regenerated with iv_floor=4 and compute_default_ivs() became authoritative,
+# which we want to be told about loudly.  The UPPER bound is the regression
+# signal the xfail never had: a real break in compute_default_ivs() pushes
+# the rate toward 1.0.
+#
+# Measured 2026-08-09: 209/5211 = 4.01% over the full sweep (~34s);
+# 4/200 = 2.0% on the seeded n=200 sample (~1.7s).
+# ===========================================================================
+
+# Brackets the measured 4.01% (209/5211) with room for ordinary gamemaster
+# churn on either side.  Both edges are load-bearing — see the block above.
+# n=5211 makes this tight band safe: the rate has to move by ~105 entries in
+# either direction to breach it.
+DEFAULT_IV_MISMATCH_BAND = (0.02, 0.06)
+
+# The SAMPLED test needs a wider band, and this is not conservatism — it is
+# sampling noise.  At n=200 around p=0.0401 the count has sd ≈ 2.7, so the
+# full-sweep band is only ±1.6 sd and trips on ordinary churn: measured over
+# 20,000 fresh 200-draws from the real mismatch mask, (0.02, 0.06) is out of
+# band 9.4% of the time, versus 0.23% for the band below.  That is not
+# theoretical — the shipped seed-0 sample sits at exactly 4/200 = 0.0200,
+# passing the tight band only on the `<=`, and a single entry leaving the
+# sample would redden the ship gate (scripts/verify_tests.py runs this tier)
+# while blaming a code regression for a gamemaster reshuffle.  Widening costs
+# no discrimination: the mutation proofs are 0.00% (algorithm made to match
+# the gamemaster) and 99.90% (algorithm gutted), both still far outside.
+DEFAULT_IV_SAMPLE_BAND = (0.01, 0.09)
+
+DEFAULT_IV_SAMPLE_SIZE = 200
+DEFAULT_IV_SAMPLE_SEED = 0
+
+
+def _gamemaster_default_iv_entries():
+    """Every (species, league, gm_combo) the gamemaster carries defaultIVs for."""
     from gopvpsim.data import load_gamemaster
-    from gopvpsim.pokemon import LEAGUE_CP
 
     gm = load_gamemaster()
     league_map = {500: 'little', 1500: 'great', 2500: 'ultra'}
-    mismatches = 0
-    total = 0
-
+    entries = []
     for mon in gm['pokemon']:
         div = mon.get('defaultIVs', {})
         for key, combo in div.items():
@@ -615,18 +649,68 @@ def test_compute_default_ivs_matches_gamemaster_broadly():
             cap_s = key[2:]
             if not cap_s.isdigit():
                 continue
-            cap = int(cap_s)
-            league = league_map.get(cap)
+            league = league_map.get(int(cap_s))
             if not league:
                 continue
             gm_val = (float(combo[0]), int(combo[1]), int(combo[2]), int(combo[3]))
-            alg_val = compute_default_ivs(mon['speciesName'], league, 50.0)
-            total += 1
-            if gm_val != alg_val:
-                mismatches += 1
+            entries.append((mon['speciesName'], league, gm_val))
+    return entries
 
-    # This assertion will fail — that's expected and documented via xfail
-    assert mismatches == 0, f"{mismatches}/{total} entries differ from gamemaster"
+
+def _default_iv_mismatches(entries):
+    return sum(1 for species, league, gm_val in entries
+               if compute_default_ivs(species, league, 50.0) != gm_val)
+
+
+@pytest.mark.integration
+def test_compute_default_ivs_mismatch_rate_sampled():
+    """Seeded 200-entry sample of the gamemaster-vs-algorithm mismatch rate.
+
+    Deterministic (fixed seed over a deterministic gamemaster), ~1.7s, and
+    two-sided so it fails whether compute_default_ivs() starts agreeing with
+    the gamemaster everywhere or stops agreeing anywhere.
+    """
+    import random
+
+    entries = _gamemaster_default_iv_entries()
+    assert len(entries) >= 4000, (
+        f"only {len(entries)} gamemaster defaultIVs entries — expected ~5200; "
+        "the extraction above is probably broken, not the algorithm"
+    )
+    sample = random.Random(DEFAULT_IV_SAMPLE_SEED).sample(
+        entries, DEFAULT_IV_SAMPLE_SIZE)
+
+    mismatches = _default_iv_mismatches(sample)
+    rate = mismatches / len(sample)
+    lo, hi = DEFAULT_IV_SAMPLE_BAND
+    assert lo <= rate <= hi, (
+        f"{mismatches}/{len(sample)} sampled entries differ from the "
+        f"gamemaster ({rate:.2%}); expected {lo:.0%}-{hi:.0%}, measured "
+        f"4.01% (209/5211) over the full sweep on 2026-08-09. "
+        "Below the band means the iv_floor gap closed (gamemaster "
+        "regenerated?); above it means compute_default_ivs() regressed. "
+        "This band is wide enough that sampling noise alone should not "
+        "trip it; if it did, run the --slow full sweep before believing it."
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.slow  # ~34s — the full 5,208-entry sweep
+def test_compute_default_ivs_mismatch_rate_full_sweep():
+    """The unsampled version of the test above, over every gamemaster entry."""
+    entries = _gamemaster_default_iv_entries()
+    assert len(entries) >= 4000, (
+        f"only {len(entries)} gamemaster defaultIVs entries — expected ~5200"
+    )
+
+    mismatches = _default_iv_mismatches(entries)
+    rate = mismatches / len(entries)
+    lo, hi = DEFAULT_IV_MISMATCH_BAND
+    assert lo <= rate <= hi, (
+        f"{mismatches}/{len(entries)} entries differ from the gamemaster "
+        f"({rate:.2%}); expected {lo:.0%}-{hi:.0%}, measured 4.01% "
+        "(209/5211) on 2026-08-09."
+    )
 
 
 # ===========================================================================

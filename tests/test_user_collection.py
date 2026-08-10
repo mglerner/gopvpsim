@@ -2,8 +2,9 @@
 Tests for gopvpsim.user_collection and gopvpsim.evolution_lines.
 
 The Poke Genie fixture at ``tests/fixtures/poke_genie_export.csv`` is a
-checked-in export of the maintainer's collection. Tests that need it
-still skip cleanly when it's absent, so a stripped checkout stays green.
+checked-in export of the maintainer's collection. It is git-tracked, so
+tests that need it assert its presence rather than skipping: absence can
+only mean a broken checkout, and must not produce a green run.
 """
 from pathlib import Path
 
@@ -25,12 +26,15 @@ FIXTURE_PATH = (
 )
 
 
-def _fixture_or_skip():
-    """Return the fixture path, or pytest.skip if it's not present."""
-    if not FIXTURE_PATH.exists():
-        pytest.skip(
-            f"Poke Genie fixture not available at {FIXTURE_PATH}."
-        )
+def _tracked_fixture():
+    """Return the fixture path, failing loudly if it isn't there.
+
+    This used to pytest.skip. The CSV is git-tracked, so on any clean
+    checkout the condition cannot fire; on a bad merge or a stray ``rm`` it
+    silently turned this whole 44-test file into a green run (2026-08-09
+    test-suite review, silent-hole class).
+    """
+    assert FIXTURE_PATH.exists(), f"tracked fixture missing: {FIXTURE_PATH}"
     return FIXTURE_PATH
 
 
@@ -230,7 +234,7 @@ def test_compute_rank_lookup_matches_iv_rank():
 # ---------------------------------------------------------------------------
 
 def test_parse_csv_returns_nonempty_list():
-    path = _fixture_or_skip()
+    path = _tracked_fixture()
     mons = parse_csv(str(path))
     assert len(mons) > 0
     # Every mon dict must have the required fields populated.
@@ -247,7 +251,7 @@ def test_parse_csv_returns_nonempty_list():
 
 
 def test_parse_csv_extracts_tinkatinks_and_tinkatons():
-    path = _fixture_or_skip()
+    path = _tracked_fixture()
     mons = parse_csv(str(path))
     tinkatinks = [m for m in mons if m['name'] == 'Tinkatink']
     tinkatons = [m for m in mons if m['name'] == 'Tinkaton']
@@ -258,7 +262,7 @@ def test_parse_csv_extracts_tinkatinks_and_tinkatons():
 
 
 def test_parse_csv_shadow_flag_parses():
-    path = _fixture_or_skip()
+    path = _tracked_fixture()
     mons = parse_csv(str(path))
     # Any collection will have some shadow mons — check the flag parses
     # as a real bool (not the raw '1'/'0' string).
@@ -273,7 +277,7 @@ def test_parse_csv_shadow_flag_parses():
 def test_check_thresholds_finds_tinkatinks_via_evolution_walk():
     """A threshold on 'Tinkaton' should match the user's Tinkatinks via
     pre-evo walkup, not require them to already be evolved."""
-    path = _fixture_or_skip()
+    path = _tracked_fixture()
 
     # Permissive threshold — any Tinkaton with atk≥90 should match.
     thresholds = {
@@ -305,7 +309,7 @@ def test_check_thresholds_finds_tinkatinks_via_evolution_walk():
 def test_check_thresholds_onlytop_rank_cap():
     """The onlytop filter should exclude mons whose SP rank exceeds the
     cap, even when their stat floors match."""
-    path = _fixture_or_skip()
+    path = _tracked_fixture()
     thresholds = {
         'Tinkaton': {
             'Great': {
@@ -324,7 +328,7 @@ def test_check_thresholds_onlytop_rank_cap():
 
 def test_check_thresholds_ivs_whitelist():
     """The ivs whitelist should match only the specified IV triples."""
-    path = _fixture_or_skip()
+    path = _tracked_fixture()
     thresholds = {
         'Tinkaton': {
             'Great': {
@@ -378,7 +382,7 @@ def test_parse_csv_and_parse_csv_text_agree_on_fixture():
     """The file-based and string-based parsers must produce identical
     results for the same content — this is the guarantee the JS port
     will rely on."""
-    path = _fixture_or_skip()
+    path = _tracked_fixture()
     via_path = parse_csv(str(path))
     via_text = parse_csv_text(path.read_text(encoding='utf-8-sig'))
     assert via_path == via_text
@@ -387,7 +391,7 @@ def test_parse_csv_and_parse_csv_text_agree_on_fixture():
 def test_match_mons_matches_check_thresholds_on_fixture():
     """match_mons(parse_csv(...)) must return the same result as the
     check_thresholds convenience wrapper."""
-    path = _fixture_or_skip()
+    path = _tracked_fixture()
     thresholds = {
         'Tinkaton': {
             'Great': {
@@ -423,7 +427,7 @@ def test_match_mons_on_inline_csv():
 def test_check_thresholds_include_empty_returns_unmatched_species():
     """With include_empty=True, species that have no matches should
     still appear in results with an empty list."""
-    path = _fixture_or_skip()
+    path = _tracked_fixture()
     thresholds = {
         # Unreasonable floor that no Tinkaton in any collection hits.
         'Tinkaton': {
