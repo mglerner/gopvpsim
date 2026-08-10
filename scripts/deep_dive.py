@@ -109,7 +109,8 @@ from deep_dive_logging import (
 # this file: `deep_dive.<name>` is a read surface for tests and the analysis /
 # patch scripts (deep_dive.get_moves, deep_dive.get_rankings_for, ...), so
 # pruning them is a deliberate follow-up, not a side effect of moving code.
-from deep_dive_lib import categories, opponents, render, score_pack, sweep
+from deep_dive_lib import (categories, opponents, render, robustness,
+                           score_pack, sweep)
 
 logger = get_logger()
 
@@ -563,155 +564,13 @@ REC_STRONG_POOL_N = render.REC_STRONG_POOL_N
 REC_NOTABLE_MAX_CLEAR_FRAC = render.REC_NOTABLE_MAX_CLEAR_FRAC
 REC_TWO_ONES_MIN_WINRATE_GAP = render.REC_TWO_ONES_MIN_WINRATE_GAP
 
-_FORM_CHANGE_SPECIES_CACHE: dict = {}
-
-
-def _species_has_form_change(species_name):
-    """True if the species participates in a formChange (either directly or
-    as a sibling form), so its effective stats are NOT a safe dedup key (the
-    alt form's stats are non-linear in raw IVs + level). Cached; defaults
-    False on lookup miss.
-
-    A form-changing species is detected two ways: its own gamemaster entry
-    declares a formChange, OR its speciesId is the alternativeFormId of some
-    other form's formChange. The second case covers sibling forms whose pool
-    name lacks the formChange key (e.g. 'Morpeko (Hangry)', reachable only via
-    'Morpeko (Full Belly)'.formChange.alternativeFormId) -- they are now
-    detected rather than silently misgrouped. For Morpeko specifically the two
-    forms share identical baseStats so dedup was already exact, but resolving
-    through the sibling link makes this robust to a FUTURE stat-divergent
-    toggle/set species pool-named by a key-lacking form."""
-    if species_name in _FORM_CHANGE_SPECIES_CACHE:
-        return _FORM_CHANGE_SPECIES_CACHE[species_name]
-    mon = find_pokemon_entry(species_name)
-    has = bool(mon and mon.get('formChange'))
-    if mon and not has:
-        sid = mon['speciesId']
-        # The REVERSE direction (which entry points AT sid) is not a
-        # speciesName lookup, so it stays a scan over gm['pokemon'].
-        has = any((m.get('formChange') or {}).get('alternativeFormId') == sid
-                  for m in load_gamemaster()['pokemon'])
-    _FORM_CHANGE_SPECIES_CACHE[species_name] = has
-    return has
-
-
-def opp_iv_robustness(focal_species, focal_fast, focal_charged, focal_shadow,
-                      focal_ivs, opponent, opp_fast, opp_charged, opp_shadow,
-                      league, shield_scenarios, k=512, dedup='signature',
-                      mechanics='legacy', focal_max_level=None):
-    """Opponent-IV robustness for ONE fixed focal IV vs ONE opponent.
-
-    Sweeps the opponent across its top-``k`` stat-product IV spreads (the
-    "top-512 ranks" robustness notion: do we beat this opponent regardless
-    of which good IV it rolled?), groups those IVs into sets that fight
-    bit-identical battles vs the fixed focal (``dedup``), sims one
-    representative per group over every ``shield_scenarios`` pair, and
-    weights each group by its size.
-
-    ``dedup`` (see _opp_robustness_groups): 'signature' (default, exact
-    damage-signature dedup, ~1.5x fewer sims than no-dedup on a top-512
-    cohort), 'profile' (effective-stat dedup), or 'none' (one sim per IV,
-    the test reference).
-
-    Returns ``(weighted_wins, weighted_total)`` floats (caller sums across
-    opponents and divides), or ``None`` if the opponent has no valid IVs.
-    A win is focal ``pvpoke_score(0) > 500`` (>500 = focal won; 500 = tie).
-    Opponents are built via make_battle_pokemon (raw IVs + shadow flag),
-    so shadow multipliers are applied exactly once and form-change
-    transforms (Aegislash) are wired up like the oracle path.
-
-    Signature dedup is verified bit-identical to no-dedup on
-    representative shadow + non-shadow cases
-    (test_opp_iv_robustness_signature_dedup_is_exact): deep_dive_signature
-    strips the shadow x1.2 from each side's CMP column, so its grouping
-    matches the engine's unboosted cmp_atk (2026-06-13 fix) even for
-    shadow-mismatched focal/opponent pairs.
-    """
-    from gopvpsim.pokemon import iv_rank
-    ranked = iv_rank(opponent, league=league, shadow=opp_shadow)
-    if not ranked:
-        return None
-    ranked = ranked[:k]
-    a0, d0, s0 = focal_ivs
-    focal_bp = make_battle_pokemon(focal_species, focal_fast, focal_charged,
-                                   league, 2, a0, d0, s0, shadow=focal_shadow,
-                                   max_level=focal_max_level)
-    groups = _opp_robustness_groups(
-        focal_bp, focal_species, focal_fast, focal_charged, focal_shadow,
-        focal_ivs, opponent, opp_fast, opp_charged, opp_shadow, league, ranked,
-        dedup=dedup, focal_max_level=focal_max_level)
-    wins = 0.0
-    total = 0.0
-    for members in groups:
-        rep = ranked[members[0]]
-        w = len(members)
-        opp_bp = make_battle_pokemon(
-            opponent, opp_fast, opp_charged, league, 2,
-            rep['atk_iv'], rep['def_iv'], rep['sta_iv'], shadow=opp_shadow)
-        for sf, so in shield_scenarios:
-            focal_bp.reset_for_battle(sf, opponent=opp_bp)
-            opp_bp.reset_for_battle(so, opponent=focal_bp)
-            res = simulate(focal_bp, opp_bp,
-                           charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp,
-                           mechanics=mechanics)
-            total += w
-            if res.pvpoke_score(0) > 500:
-                wins += w
-    return wins, total
-
-
-def _opp_robustness_groups(focal_bp, focal_species, focal_fast, focal_charged,
-                           focal_shadow, focal_ivs, opponent, opp_fast,
-                           opp_charged, opp_shadow, league, ranked,
-                           dedup='signature', focal_max_level=None):
-    """Group the opponent's top-k IVs (``ranked``) into sets that fight
-    bit-identical battles vs the fixed focal, so one representative sim
-    covers each set. Returns a list of member-position lists (indexing
-    ``ranked``).
-
-    ``dedup``:
-      'signature' - exact damage-signature dedup (deep_dive_signature) for
-        fixed-form opponents; collapses the top-512 cohort hard. Form-change
-        opponents always fall back to per-IV (their alt-form stats are
-        non-linear in raw IVs+level).
-      'profile'   - effective-stat dedup (the conservative original).
-      'none'      - one group per IV (the no-dedup reference for tests).
-    """
-    n = len(ranked)
-    if dedup == 'none' or _species_has_form_change(opponent):
-        return [[i] for i in range(n)]
-    if dedup == 'profile':
-        groups, _ = group_ivs_by_stat_profile(ranked, per_iv=False)
-        return list(groups.values())
-    # signature dedup
-    import deep_dive_signature as _sig
-    league_cp = LEAGUE_CAPS[league]
-    fast_db, charged_db = get_moves()
-    # None-on-miss on purpose: a species absent from the gamemaster falls
-    # back to the no-dedup grouping below instead of raising.
-    opp_mon = find_pokemon_entry(opponent)
-    focal_mon = find_pokemon_entry(focal_species)
-    if opp_mon is None or focal_mon is None:
-        return [[i] for i in range(n)]
-    profile_list = [(None, r['atk'], r['def_'], r['hp'],
-                     r['atk_iv'], r['def_iv'], r['sta_iv'], r['level'])
-                    for r in ranked]
-    swept = _sig.build_focal_side(
-        opp_mon, parse_types(opp_mon), dict(fast_db[opp_fast]),
-        [dict(charged_db[c]) for c in opp_charged],
-        profile_list, league_cp, opp_shadow)
-    focal_pk = Pokemon.at_best_level(focal_species, *focal_ivs,
-                                     league=league, shadow=focal_shadow,
-                                     max_level=focal_max_level)
-    fixed = _sig.build_opp_side({
-        'types': parse_types(focal_mon),
-        'fm': dict(fast_db[focal_fast]),
-        'cms': [dict(charged_db[c]) for c in focal_charged],
-        'atk': focal_bp.atk, 'def_': focal_bp.def_,
-        'mon': focal_mon, 'ivs': tuple(focal_ivs), 'level': focal_pk.level,
-        'shadow': focal_shadow,
-    }, league_cp)
-    return [members for _rep, members in _sig.signature_groups(swept, fixed)]
+# Moved to deep_dive_lib/robustness.py (Worlds 2026 robustness split,
+# session 2); re-exported here so existing importers keep working. The
+# cache alias is the SAME dict object (tests clear it through this name).
+_FORM_CHANGE_SPECIES_CACHE = robustness._FORM_CHANGE_SPECIES_CACHE
+_species_has_form_change = robustness._species_has_form_change
+opp_iv_robustness = robustness.opp_iv_robustness
+_opp_robustness_groups = robustness._opp_robustness_groups
 
 
 def _compute_card_robustness(species, focal_fast, focal_charged, focal_shadow,
