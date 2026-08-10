@@ -174,6 +174,12 @@ matrix demotes — decided before any renderer is written.
   NEVER the sweep disk cache. Manifest stamps engine hash + gamemaster hash;
   `verify_worlds.py` hard-fails on mismatch and runs an ML-completeness-style
   coverage check.
+- **The bake driver is idempotent and manifest-driven: it bakes only pairs
+  missing from the manifest.** Adding a mon later (Michael asked re: Cradily,
+  2026-08-10) = one meta.toml row + N new pairs simmed + re-render — an
+  evening, mostly unattended. Caveat: only while engine + gamemaster hashes
+  are unchanged; a hash mismatch forces a full plane re-bake (by design). So
+  batch late adds, and don't touch engine files mid-season.
 - Tests assert: no output path matches `*_great.toml` (iOS bundler collision,
   topn_cup_filter_plan.md:281-306); the bake runs with the sweep cache
   disabled; the driver leaves `src/gopvpsim/` untouched (engine-hash bump
