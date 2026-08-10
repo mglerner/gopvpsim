@@ -46,7 +46,8 @@ from render_article import (  # type: ignore[import-not-found]
     _toml_string,
 )
 
-from gopvpsim.data import load_gamemaster, get_default_moveset, parse_types  # type: ignore[import-not-found]
+from gopvpsim.data import load_gamemaster, get_default_moveset  # type: ignore[import-not-found]
+from gopvpsim.moves import parse_types  # type: ignore[import-not-found]
 from gopvpsim.pokemon import iv_rank, LEAGUE_CP  # type: ignore[import-not-found]
 from deep_dive_rendering import (  # type: ignore[import-not-found]
     opp_slug,

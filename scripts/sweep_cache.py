@@ -45,12 +45,11 @@ from cache_base import write_planes, read_planes
 
 # Manual escape hatch: bump on any battle-behavior change that the engine
 # source hash misses. It mostly can't -- _ENGINE_FILES covers battle.py's
-# import closure -- with ONE known exception: data.py is in that closure and
-# is NOT hashed, and data.parse_types is damage-affecting, so an edit to it
-# needs a bump here (relocating parse_types into a hashed module is queued
-# for the next engine-hash bump window; 2026-08-09 test-suite review F5).
-# tests/test_engine_files_closure.py enforces the rest of the closure and
-# will fail if a NEW unhashed engine dependency appears.
+# import closure, and the one known exception (data.parse_types,
+# damage-affecting but unhashed; 2026-08-09 test-suite review F5) was closed
+# 2026-08-10 by relocating parse_types into moves.py (hashed).
+# tests/test_engine_files_closure.py enforces the closure and will fail if a
+# NEW unhashed engine dependency appears.
 # v2 (2026-06-12): S7 cleanup touched dive worker/orchestration code in
 # scripts/ (outside the engine hash); bump per the standing rule.
 # v3 (2026-06-12): energy-lead axis added to _sweep_worker plumbing

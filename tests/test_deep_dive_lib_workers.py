@@ -28,7 +28,8 @@ deep_dive = load_deep_dive()
 import deep_dive_slayer  # noqa: E402  (importable after deep_dive's sys.path insert)
 from deep_dive_lib import sweep as sweep_mod  # noqa: E402
 
-from gopvpsim.data import load_gamemaster, parse_types  # noqa: E402
+from gopvpsim.data import load_gamemaster  # noqa: E402
+from gopvpsim.moves import parse_types  # noqa: E402
 from gopvpsim.moves import get_moves  # noqa: E402
 from gopvpsim.pokemon import Pokemon, LEAGUE_CAPS  # noqa: E402
 

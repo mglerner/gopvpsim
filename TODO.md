@@ -28,17 +28,15 @@ pages + reach-or-deny + Tier-2 bake + FN-rate; IV explorer + CMP board +
 verdicts, evidence brief, probe script, usage JSON) preserved in
 `userdata/worlds_planning/`. Standing rules: legacy engine only, both bait
 modes, never the sweep cache, no `*_great.toml`, no `src/gopvpsim/` edits
-mid-season; the pending engine-hash-bump batch (below, "rides the next
-engine-hash bump window") must land BEFORE any Worlds bake (session 3) or
-not at all until after Worlds.
+mid-season. The behavior-neutral engine-hash batch LANDED as session 3's
+first block (2026-08-10, per Michael's sequencing decision): wording fixes
++ parse_types relocation, one hash bump `1415857072fa -> <new>`, cache
+warm-migrated (gamemaster leg first from a pre-batch tree — both stamps
+were stale, see the session-3 commit message — then the fully-blessing
+engine leg). The Tier-1 bake pins this final pre-Worlds vintage.
 
-**DECIDED (Michael, 2026-08-10) — session-3 sequencing.** (1) The
-behavior-neutral engine-hash batch (below) lands as the FIRST block of
-session 3: wording fixes per `docs/reviews/2026-08-09_would_shield_
-diagnosis.md`, parse_types relocation into a hashed module, ONE hash
-bump, then `migrate_cache.py --from-engine` with the fully-blessing
-predicate — the Tier-1 bake runs only after the migration, so the Worlds
-manifest pins the final pre-Worlds vintage. (2) The cmp_atk 1-ULP
+**DECIDED (Michael, 2026-08-10) — session-3 sequencing.** (1) DONE — the
+engine-hash batch landed first (above). (2) The cmp_atk 1-ULP
 shadow-tie artifact (session-2 float audit: divide-by-1.2 breaks 30 of
 PvPoke's 227 exact shadow-twin CMP ties; pinned in
 `tests/test_worlds_tier0.py::test_cmp_shadow_roundtrip_artifact_is_real`;
@@ -86,21 +84,6 @@ in sampled cells" held for the hunt's own samples; the NB-1 bounding sweep
 below later found one on a wider grid.)
 
 **Still open:**
-- **[rides the next engine-hash bump window]** batched because each is
-  in a hashed file or meaningless alone: (a) `battle.py:1659-1665`
-  would_shield attribution comment (+ the
-  `tests/test_nb1_selection_freeze.py:134-142` docstring that
-  propagates it) and `formchange.py:127-148`'s "same fixed point"
-  claim (round-2 FC-2) -- wording spelled out in
-  `docs/reviews/2026-08-09_would_shield_diagnosis.md`, which also
-  RESOLVES the old would_shield/always-shield medium (shared-structure
-  divergence; the +201 is PvPoke's stale damage cache; the suggested
-  fix worsens oracle error 201 -> 730 -- do not reopen without that
-  doc's gates); (b) **relocate `data.py:parse_types` into a hashed
-  module** (test-suite review F5: damage-affecting but outside every
-  cache hash; `tests/test_engine_files_closure.py` allowlists it with
-  a pointer here until then). Behavior-neutral, so the fully-blessing
-  `--from-engine` migration predicate is trivially provable.
 - **js-parity residue** (LOW): only the winsMirror branch inside the
   SHA-pinned `deep_dive_engine.js` region (~:1497-1511) still uses the
   literal "Gives up vs #1" header for a fourth metric (a mirror-cohort
@@ -345,6 +328,13 @@ CHANGELOG.md). The minor polish residue:
 The S7 dead-code removal pass ran 2026-06-12 (see CHANGELOG). Still open
 (deliberately NOT cut in S7):
 
+- **parse_types lazy alias in data.py** — the 2026-08-10 relocation
+  (engine-hash batch) moved `parse_types` to `moves.py`, but
+  `../gobattlekit/tools/threshold_export/export_thresholds.py` imports
+  it from `gopvpsim.data` by name (pinned by
+  `tests/test_gobattlekit_api_pin.py`), so `data.py` keeps a lazy
+  PEP-562 `__getattr__` alias. Post-Worlds: switch gobattlekit's import
+  to `gopvpsim.moves`, re-pin the api-pin test, then delete the alias.
 - **Gobattlekit threshold schema compatibility** in
   `gopvpsim.user_collection.check_thresholds` (and `as_legacy_dict` in
   thresholds.py) — once gobattlekit has actually migrated to use the

@@ -20,7 +20,7 @@ for p in (REPO_ROOT / 'src', REPO_ROOT / 'scripts'):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from gopvpsim.data import parse_types  # noqa: E402
+from gopvpsim.moves import parse_types  # noqa: E402
 from gopvpsim.moves import get_moves, damage as engine_damage  # noqa: E402
 from gopvpsim.pokemon import find_pokemon_entry, iv_rank  # noqa: E402
 import worlds_tier0 as t0  # noqa: E402

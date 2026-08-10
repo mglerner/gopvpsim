@@ -45,6 +45,11 @@ Engine predicates (PROVEN, not guessed):
                 tests/test_migrate_cache.py and the engine A/B regression in
                 tests/test_bandaid910_bestcm.py.
 
+  neutral_batch_20260810 — the 2026-08-10 behavior-neutral bump
+                (--from-engine 1415857072fa): comment rewording + the
+                parse_types relocation into moves.py. Blesses everything
+                (see the predicate's docstring for the proof sketch).
+
 Preconditions enforced here:
   - ENGINE mode: only columns whose engine stamp == --from-engine are touched
     (scopes the predicate to the exact characterized delta), AND only columns
@@ -136,11 +141,26 @@ def _self_debuff_either_side(f, c):
     return bool(set(fch) & sd) or bool(set(cch) & sd)
 
 
+def _neutral_batch_20260810(f, c):
+    """2026-08-10 behavior-neutral engine-hash batch (pinned --from-engine
+    1415857072fa). The ENTIRE engine delta at this bump is: (a) comment-only
+    rewording in battle.py (the would_shield/always-shield reattribution per
+    docs/reviews/2026-08-09_would_shield_diagnosis.md; bytecode-identical),
+    (b) parse_types relocated VERBATIM from data.py (unhashed) into moves.py
+    (hashed; test-suite review F5), and (c) the matching import-statement
+    reshuffles in battle.py/formchange.py. No arithmetic, control-flow, or
+    data change anywhere in the hashed closure, so no column's scores can
+    change: nothing is affected, every column is blessed. One-shot; never
+    re-run against any other --from-engine hash."""
+    return False
+
+
 # affected(focal_fields, col_fields) -> True if the engine change changed
 # this column's scores (must be re-simmed); False if provably unchanged.
 PREDICATES = {
     'shadow_xor': lambda f, c: bool(f.get('shadow')) != bool(c.get('shadow')),
     'self_debuff_either_side': _self_debuff_either_side,
+    'neutral_batch_20260810': _neutral_batch_20260810,
 }
 
 

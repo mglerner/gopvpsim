@@ -31,7 +31,8 @@ import profile_slayer  # noqa: E402  (scripts/ is on sys.path after the load)
 from deep_dive_lib.sweep import BattleSide, build_battle_pair  # noqa: E402
 
 from gopvpsim.battle import BattlePokemon  # noqa: E402
-from gopvpsim.data import load_gamemaster, parse_types  # noqa: E402
+from gopvpsim.data import load_gamemaster  # noqa: E402
+from gopvpsim.moves import parse_types  # noqa: E402
 from gopvpsim.formchange import attach_form_change  # noqa: E402
 from gopvpsim.moves import get_moves  # noqa: E402
 from gopvpsim.pokemon import Pokemon, LEAGUE_CAPS  # noqa: E402

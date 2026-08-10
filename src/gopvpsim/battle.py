@@ -23,8 +23,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Callable
 
-from .moves import damage as calc_damage, type_effectiveness, stab
-from .data import parse_types
+from .moves import damage as calc_damage, type_effectiveness, stab, parse_types
 from .pokemon import SHADOW_ATK_BONUS
 
 # Optional numba JIT for the near-KO DP loop and the turnsToLive sub-DP.
@@ -1648,21 +1647,27 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # 2026-07-03_nb1_bounding_sweep.md section 2 (carve-out) and
     # DEVELOPER_NOTES.md divergence #3.
     #
-    # would_shield/always-shield inconsistency (INVESTIGATED 2026-07-03, left
-    # unchanged): the `would_shield(...)` gate below is a FAITHFUL port of
-    # PvPoke's ActionLogic.js:860 (same function, same activeChargedMoves[1]
+    # would_shield/always-shield inconsistency (INVESTIGATED 2026-07-03;
+    # re-diagnosed 2026-08-09 in
+    # docs/reviews/2026-08-09_would_shield_diagnosis.md): the
+    # `would_shield(...)` gate below is a FAITHFUL port of PvPoke's
+    # ActionLogic.js:860 (same function, same activeChargedMoves[1]
     # target). It predicts the opponent WON'T shield and, if so, throws the
     # expensive move -- but the actual simulate shield policy always-shields
     # standard moves, so the thrown move can be shielded and wasted. That
     # predict-vs-policy mismatch is PvPoke's OWN structure (its override
-    # consults wouldShield while Battle.js:1077 always-shields), so it is not a
-    # port infidelity and is NOT changed here. It is why the fresh-dpeRatio
-    # carve-out above can INFLATE our score vs the oracle (Florges vs
-    # Seismitoad UL 2-1: ours 866 vs oracle 665 -- our fresh ratio 1.607 fires
-    # the override and Seismitoad wastes Earth Power into a shield where
-    # PvPoke's mixed-stale ratio baits Icy Wind instead). The +201 is a
-    # downstream consequence of the carve-out + PvPoke's shared structure, not
-    # "better play"; pinned as tests/...Group C test_group_c10 with this caveat.
+    # consults wouldShield while Battle.js:1084 always-shields), so it is not
+    # a port infidelity and is NOT changed here -- measured 2026-08-09:
+    # consulting the active policy instead effectively deletes the override
+    # and WORSENS total oracle error 201 -> 730 on the traced pair. On that
+    # pair (Florges vs Seismitoad UL 2-1: ours 866 vs oracle 665) the
+    # divergence is entirely PvPoke's mixed-stale move.damage cache, NOT the
+    # fresh-dpeRatio carve-out above: EVERY internally consistent EP/IW ratio
+    # crosses the 1.5 gate (ours 1.6071 fresh; the frozen stage-(0,0) ratio
+    # 1.5943 fires it too), while PvPoke skips its second override only
+    # because its cache mixes a fresh EP.damage (refreshed on use at T12,
+    # 50) with a still-init-stale IW.damage (35), yielding 1.2857 < 1.5.
+    # Pinned as tests/test_nb1_selection_freeze.py Group C test_group_c10.
     if bait_shields and defender.shields > 0 and n_cms > 1:
         fm0_dpe = cm_dmgs[final_first_thrown] / cm_energy[final_first_thrown]
         if fm0_dpe > 0 and attacker.energy >= cm_energy[1]:

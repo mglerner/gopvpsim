@@ -2457,7 +2457,7 @@ def test_disguise_break_uses_only_pre_shuffle_cheapest_move():
 def test_from_pokemon_uses_the_cached_entry_index():
     """The species lookup is the cached speciesName index, not a linear scan
     of gm['pokemon'] -- a sweep builds millions of BattlePokemon."""
-    from gopvpsim.data import parse_types
+    from gopvpsim.moves import parse_types
     from gopvpsim.pokemon import Pokemon, get_pokemon_entry, get_entry_index
 
     bp = _make_battle_pokemon_default('Azumarill', 'great', shields=1)

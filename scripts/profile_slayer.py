@@ -30,7 +30,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from gopvpsim.battle import simulate, pvpoke_dp
-from gopvpsim.data import load_gamemaster, parse_types
+from gopvpsim.data import load_gamemaster
+from gopvpsim.moves import parse_types
 from gopvpsim.moves import get_moves
 from gopvpsim.pokemon import LEAGUE_CAPS
 

@@ -223,7 +223,7 @@ def main():
     print()
 
     if args.stats:
-        from gopvpsim.data import parse_types
+        from gopvpsim.moves import parse_types
         for label, species, fast_id, charged_ids_list, ivs, shadow in [
             ('P1', species1, fast1, charged_ids1, args.ivs1, args.shadow1),
             ('P2', species2, fast2, charged_ids2, args.ivs2, args.shadow2),

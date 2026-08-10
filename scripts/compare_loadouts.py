@@ -49,8 +49,8 @@ from gopvpsim.theme import (  # type: ignore[import-not-found]  # noqa: E402
 from gopvpsim.data import (  # type: ignore[import-not-found]
     load_gamemaster,
     get_default_moveset,
-    parse_types,
 )
+from gopvpsim.moves import parse_types  # type: ignore[import-not-found]
 from gopvpsim.pokemon import LEAGUE_CP  # type: ignore[import-not-found]
 from deep_dive_rendering import opp_slug  # type: ignore[import-not-found]
 from render_article import (  # type: ignore[import-not-found]

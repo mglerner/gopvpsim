@@ -15,8 +15,7 @@ Pokemon with an existing trigger type requires no code changes here.
 import math
 from dataclasses import dataclass
 
-from .data import parse_types
-from .moves import get_moves
+from .moves import get_moves, parse_types
 from .pokemon import CPM, cp, effective_stats, get_pokemon_entry_by_id
 
 

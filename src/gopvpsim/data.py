@@ -204,17 +204,6 @@ def load_gamemaster():
     return _fetch_json("gamemaster")
 
 
-def parse_types(mon: dict) -> list[str]:
-    """Extract a Pokemon's type list from a gamemaster entry, filtering placeholder 'none' values.
-
-    Single-type Pokemon are stored as e.g. ['steel', 'none'] in PvPoke's gamemaster.
-    """
-    types = mon.get('types', [mon.get('type1', 'normal')])
-    if isinstance(types, str):
-        types = [types]
-    return [t for t in types if t and t != 'none']
-
-
 def _fetch_bytes(key, url, subdir="sprites", ttl=CACHE_TTL):
     """Binary sibling of _fetch_json: TTL-cache an arbitrary asset under
     CACHE_DIR/<subdir>/<key>. Returns bytes, or None on any failure
@@ -486,3 +475,18 @@ def get_default_moveset(species_name, league='great', shadow=False, cup=None):
         f"not found in {league} league rankings. "
         f"Available species can be listed with load_rankings({league!r})."
     )
+
+
+def __getattr__(name):
+    # Lazy compatibility alias: parse_types RELOCATED to moves.py (hashed)
+    # in the 2026-08-10 engine-hash bump window (test-suite review F5), but
+    # ../gobattlekit/tools/threshold_export/export_thresholds.py imports it
+    # from HERE by name (pinned by tests/test_gobattlekit_api_pin.py). A
+    # module-scope re-export would be an import-order-dependent cycle (moves
+    # imports data at module scope), so the alias is lazy. Remove it once
+    # gobattlekit's import moves to gopvpsim.moves (post-Worlds coordination;
+    # TODO.md).
+    if name == 'parse_types':
+        from .moves import parse_types
+        return parse_types
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

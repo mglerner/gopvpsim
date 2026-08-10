@@ -30,7 +30,8 @@ deep_dive = load_deep_dive()
 import deep_dive_signature as sig  # noqa: E402
 
 from gopvpsim.battle import _stat_stage_mult  # noqa: E402
-from gopvpsim.data import load_gamemaster, parse_types  # noqa: E402
+from gopvpsim.data import load_gamemaster  # noqa: E402
+from gopvpsim.moves import parse_types  # noqa: E402
 from gopvpsim.moves import damage as scalar_damage, get_moves  # noqa: E402
 from gopvpsim.pokemon import LEAGUE_CAPS, Pokemon  # noqa: E402
 

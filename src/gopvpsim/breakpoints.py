@@ -154,7 +154,7 @@ def bulkpoints(
 
 def _get_types(species_name: str) -> list[str]:
     """Return the type list for a species from the gamemaster."""
-    from .data import parse_types
+    from .moves import parse_types
     # find_pokemon_entry, not get_pokemon_entry: the cached index's own
     # KeyError carries only the bare name, and callers key off THIS message
     # (DRY review 2026-08-05 entry 12 / L11).
