@@ -122,6 +122,15 @@ def test_cheat_sheet_contracts(cells):
     # W/L/? letters make the outcome color-independent.
     assert '>W</span>' in html_text and '>L</span>' in html_text \
         and '>?</span>' in html_text
+    # PvPoke-style 3x3 grids (Michael 2026-08-10): 4-column grid with
+    # 0/1/2 axis labels, one grid per bait mode with a caption.
+    assert 'class="g9"' in html_text
+    assert html_text.count('class="gcap"') >= 2       # bait + no-bait caps
+    assert '<span class="glab">0</span>' in html_text
+    # Per-row dig-in expansion: full Tier-1 slice counts as text.
+    assert '<details class="digin">' in html_text
+    assert '2/3' in html_text                         # exact count cell
+    assert 'session 4' in html_text                   # detail-pages pointer
     assert 'score margin (both bait modes)' in html_text
     assert 'FOCAL side only' in html_text             # no-bait disclosure
     assert 'worlds.html' in html_text                 # back link
