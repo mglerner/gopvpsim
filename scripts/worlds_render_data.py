@@ -87,17 +87,44 @@ class Cell:
 
     @property
     def amber(self):
-        """IV-decided anywhere: any slice, any scenario."""
-        return any('amber' in s.status for s in self.slices.values())
+        """IV-decided anywhere: any slice with a within-cohort mix, OR a
+        focal-axis flip (see spread_flip_scenarios -- the two probe
+        spreads landing on OPPOSITE uniform outcomes is IV-decided even
+        though each slice alone looks settled; gap found designing the
+        Tier-2 screen, 2026-08-10)."""
+        return (any('amber' in s.status for s in self.slices.values())
+                or bool(self.spread_flip_scenarios()))
+
+    def spread_flip_scenarios(self):
+        """Scenario indices where, for some (cohort, bait), the rank1
+        and maxatk512 probe spreads land on OPPOSITE uniform outcomes
+        (one beats the whole cohort, the other beats none) -- pure
+        focal-IV decidedness that the within-cohort amber test cannot
+        see. A mixed slice is already amber, so only the 0-vs-1 case is
+        new information."""
+        idx = set()
+        for cohort in ('top512', 'atkband'):
+            for bait in (True, False):
+                a = self.slices.get(('rank1', cohort, bait))
+                b = self.slices.get(('maxatk512', cohort, bait))
+                if a is None or b is None:
+                    continue
+                for i in range(len(a.frac)):
+                    fa, fb = float(a.frac[i]), float(b.frac[i])
+                    if {fa, fb} == {0.0, 1.0}:
+                        idx.add(i)
+        return sorted(idx)
 
     def amber_scenarios(self):
-        """Sorted scenario indices that are amber in ANY slice (the
-        cheat-sheet flag: WHERE the IVs decide)."""
+        """Sorted scenario indices that are IV-decided in ANY slice (the
+        cheat-sheet flag: WHERE the IVs decide) -- within-cohort mixes
+        plus focal-axis spread flips."""
         idx = set()
         for s in self.slices.values():
             for i, st in enumerate(s.status):
                 if st == 'amber':
                     idx.add(i)
+        idx.update(self.spread_flip_scenarios())
         return sorted(idx)
 
 

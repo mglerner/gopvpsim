@@ -98,7 +98,8 @@ def test_hub_contracts(cells):
     assert 'badge-played">PLAYED' in html_text
     assert 'badge-forced">FORCED' in html_text
     assert 'pair-amber' in html_text                  # IV-decided outline
-    assert 'rebalance boundary' in html_text          # softened, verifiable
+    assert 'went live in-game 2026-06-02' in html_text  # resolved date
+    assert 'Turin' in html_text                         # post-rebalance split
     assert 'Internationals are excluded' in html_text
     assert 'human decision' in html_text              # editorial membership
     assert '(rule: MODEL)' in html_text               # badge_rule divergence
