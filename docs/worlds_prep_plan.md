@@ -168,6 +168,19 @@ Session-1 **go/no-go probe**: Tier 1 on 5 pairs; count amber. If amber is
 scarce, the headline pivots to the closed-form breakpoint ladder and the
 matrix demotes — decided before any renderer is written.
 
+**Probe result (2026-08-10): GO.** 5 pairs x 2 directions x (2 probe spreads
+x 2 cohorts x 9 scenarios x 2 bait modes = 72 cells/direction): 60/720 cells
+amber (8.3%), 8 of 10 directions carry at least one amber cell, and the amber
+concentrates in specific shield scenarios rather than scattering like noise
+(Tinkaton-vs-Mantine is IV-decided in the 0-0 and 2-2 lines — matching
+DragapultSim's "notably in the 0s & 2s" — while Corviknight-vs-Lickilicky
+ambers at 0-0/2-2 and Quagsire(S)-vs-Empoleon at the asymmetric 1-2/2-0).
+58,068 sims in 8.7 s single-process (6.7k sims/s serial; the bake pool
+parallelizes this), so full Tier 1 over 465 pairs projects to minutes.
+Matrix confirmed as the headline; renderer work proceeds. Probe script:
+session scratchpad `go_no_go_probe.py` (throwaway; the Tier-1 driver is the
+committed successor).
+
 ## Guardrails (as code, per the {layer} x {lens} rule)
 
 - Worlds planes live in `worlds/planes/*.npz` (packbits won-bool + margin),
