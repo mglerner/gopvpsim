@@ -2,6 +2,40 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-10 -- Worlds session 3, block 2: Tier-1 bake + matrix + cheat sheets + hub
+
+Full Tier-1 bake straight after the migration so the manifest pins the
+final pre-Worlds vintage: 1,860/1,860 planes (7.06M sims, 115s, 61k
+sims/s pooled), stamps engine `5839391a7596` / gamemaster `8f1d6cca5c0f`
+/ worlds_code `653d776f9028`; mid-bake engine-digest check clean. New
+renderer stack, both deliberately OUTSIDE the plane-producer hash:
+`scripts/worlds_render_data.py` (plane -> per-scenario fractions/wins/
+margins; STRICT green/amber/red, no epsilon; coverage + stamp refusal
+paths) and `scripts/build_worlds_pages.py` (root-level `worlds.html`
+hub with meta table + rejects/banned table + 31x31 robustness matrix,
+plus 31 `worlds-<species_id>.html` cheat sheets; `_page_shell` gained
+viewport meta + `extra_css`; index card + publish_website.sh wiring).
+
+Adversarially verified (2 workflows, 8 Opus lenses total): orientation
+proven end-to-end (84 independent re-sims match planes exactly incl.
+form-change/shadow cells; complementary-direction scores; every one of
+the 16,740 strip tooltips + 930 matrix tooltips/margin bands
+regenerated from raw npz with 0 mismatches; won == score>500 across
+all planes, no uint16 wrap). The review's page-layer honesty findings
+were all fixed and re-pinned in tests: margin bands now span BOTH bait
+modes (bait-only band hid a -279 no-bait loss behind "+13..+279"),
+tooltips print exact "beats N of n" counts (rounding had collapsed 127
+IV-decided cells to a settled-looking 0%/100%), W/L/? letters make
+outcomes color-independent (the three fills are isoluminant in
+grayscale), the focal-only no-bait semantics + tie-counts-as-loss +
+excluded-Internationals + team-level/per-variant conventions are
+disclosed, badge_rule divergence renders (Altaria (Shadow) PLAYED/rule
+MODEL), movesets display in SIMMED slot order (4 equal-energy cases),
+and the "usage predates the rebalance" claim was softened to the
+verifiable "corpus ends at the rebalance boundary" (pvpoke merged
+Forever Forward 2026-06-02, before Turin -- plan doc carries the
+correction note; in-game date TBD session 4).
+
 ## 2026-08-10 -- behavior-neutral engine-hash batch + two-leg warm cache migration
 
 Worlds session 3, block 1 (Michael's decided sequencing). One engine-hash

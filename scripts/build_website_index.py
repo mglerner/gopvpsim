@@ -584,20 +584,23 @@ def _index_css() -> str:
 
 
 def _page_shell(*, title: str, heading: str, intro_html: str, body_html: str,
-                extra_about_html: str = '') -> str:
+                extra_about_html: str = '', extra_css: str = '') -> str:
     """Wrap a landing page's body in the shared document chrome.
 
     Theme head script + picker, the shared stylesheet, the PvPoke attribution
     footer and the support footer, in one place -- the main index and the cup
-    index carried near-identical copies of all of it.
+    index carried near-identical copies of all of it. ``extra_css`` appends
+    page-specific rules AFTER the shared sheet (the Worlds pages' badge/matrix
+    rules live with their renderer, not here).
     """
     return f"""<!DOCTYPE html>
 <html {data_theme_attr()}>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 {theme_head_script()}
 <title>{title}</title>
-<style>{_index_css()}</style>
+<style>{_index_css()}{extra_css}</style>
 </head>
 <body>
 {theme_picker_html()}
@@ -617,7 +620,8 @@ def render_index(dives: list[dict],
                  matchup_web: list[dict] | None = None,
                  iv_guides: list[dict] | None = None,
                  guides_landing: dict | None = None,
-                 cups: list[dict] | None = None) -> str:
+                 cups: list[dict] | None = None,
+                 worlds: dict | None = None) -> str:
     dives_html = _render_dives_grouped(dives)
     articles_html = _render_entry_list(articles)
     comparisons_html = _render_entry_list(comparisons)
@@ -674,6 +678,23 @@ def render_index(dives: list[dict],
     # "Limited Cups" card: a single link to the separate cup-index page. Kept
     # out of the evergreen "Dives" list so rotating cup content is easy to find
     # and easy to retire when a cup ends.
+    # "Worlds 2026" card: one link to the season-scoped robustness hub
+    # (docs/worlds_prep_plan.md product 1). Retire-able in one commit: drop
+    # the card + worlds*.html and the section disappears.
+    worlds_section = ''
+    if worlds:
+        worlds_section = (
+            '\n<h2>Worlds 2026</h2>\n'
+            '<p class="section-intro">IV-robustness analysis for the Worlds '
+            '2026 open Great League meta (old battle system): who beats whom '
+            'across the opponent\'s plausible IV spreads, per shield '
+            'scenario.</p>\n'
+            '<ul>\n'
+            '  <li class="dive"><a href="worlds.html">'
+            f'Worlds 2026 hub ({worlds["n_entries"]} meta entries, '
+            'matrix + per-species cheat sheets)</a></li>\n'
+            '</ul>\n')
+
     cups_section = ''
     if cups:
         n_cups = len({_parse_dive_slug(d['slug']).get('cup')
@@ -725,7 +746,7 @@ open it.</p>
 </ul>
 </div>
 </div>
-{matchup_web_section}{cups_section}{articles_section}{comparisons_section}{guides_section}""",
+{matchup_web_section}{worlds_section}{cups_section}{articles_section}{comparisons_section}{guides_section}""",
         extra_about_html='<p class="about">If you find something broken or '
                          'surprising, reach out on Discord: '
                          '<a href="https://discord.com/users/460510521112920105">'
@@ -1000,11 +1021,23 @@ def main() -> int:
         except tomllib.TOMLDecodeError:
             guides_landing = None
 
+    # Worlds 2026 card: shown iff the hub page exists (built separately by
+    # scripts/build_worlds_pages.py, which publish_website.sh runs BEFORE
+    # this script). Entry count read from the meta of record.
+    worlds_info = None
+    if (WEBSITE_DIR / 'worlds.html').exists():
+        worlds_meta_path = REPO_ROOT / 'worlds' / 'meta.toml'
+        with open(worlds_meta_path, 'rb') as f:
+            worlds_info = {
+                'n_entries': len(tomllib.load(f)['entries']),
+            }
+
     index_html = render_index(dives, articles, comparisons,
                               matchup_web=matchup_web,
                               iv_guides=iv_guides,
                               guides_landing=guides_landing,
-                              cups=cup_dives)
+                              cups=cup_dives,
+                              worlds=worlds_info)
     INDEX_PATH.write_text(index_html)
 
     # Separate cup-index page (only when cup dives exist). Written as a
