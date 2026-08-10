@@ -360,9 +360,11 @@ def bake(budget_minutes, workers, clean_n=0, pair_limit=None, dry_run=False,
         pending = []          # [(pair, is_clean, [(task, async_result)])]
         it = iter(todo)
         exhausted = False
+        # Keep enough pairs in flight to saturate the pool (4 tasks per
+        # pair), +1 so a finishing pair never idles workers.
+        window = max(2, workers // 4 + 1)
         while True:
-            # Keep ~2 pairs in flight; stop admitting once over budget.
-            while (not exhausted and len(pending) < 2):
+            while (not exhausted and len(pending) < window):
                 if (time.time() - start) / 60 > budget_minutes:
                     exhausted = True
                     break
