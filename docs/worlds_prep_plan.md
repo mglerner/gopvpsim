@@ -18,8 +18,11 @@ the **"Worlds 2026 robustness analysis"** — never "deep dives".
 - **Open Great League** 1500 + the Play! Pokemon banned list (Michael
   confirmed 2026-08-10: Worlds is NOT a limited meta like the 2026
   Internationals). `format_confirmed = true` from day one.
-- **Mimikyu is banned** (Play! ban list + Niantic: not eligible for
-  Competitors Cup; it only functions under the new turn system). It is
+- **Mimikyu is banned** (Play! ban list:
+  pokemon.com/us/play-pokemon/about/play-pokemon-pokemon-go-championship-series-banned-pokemon-list,
+  where it is listed first; + Niantic: not eligible for Competitors Cup; it
+  only functions under the new turn system. Both re-verified by direct fetch
+  2026-08-10). It is
   PvPoke's open-GL #1, so the page shows it as an explicit "banned at Worlds"
   row rather than silently omitting it. Corpus sanity check: 0 Mimikyu in
   21,719 roster entries across 36 captured events.
@@ -92,6 +95,16 @@ Switch). Moveset rule: per-variant modal when modal% >= 60, else
 | 29  | Grumpig             | PLAYED* | 7.3%  | 43   | Psywave / Dynamic Punch / Shadow Ball     |
 | 30  | Diggersby           | PLAYED* | 8.3%  | 41   | Mud Shot / Fire Punch / Scorching Sands   |
 | 31  | Mantine             | FORCED  | 0.6%  | 53   | Wing Attack / Twister / Water Pulse       |
+
+Convention note (locked at meta.toml generation, 2026-08-10): the Usage
+column above mixes conventions — split species (Quagsire, Forretress) show
+per-variant shares while unsplit rows show pooled (shadow-agnostic) shares.
+`worlds/meta.toml` makes **per-variant primary** (the only self-consistent
+basis once variants are separate entries) and emits
+`usage_recent_pooled_pct` alongside, which reproduces every number above.
+Altaria (Shadow)'s literal badge is PLAYED (it was split out of a pooled
+PLAYED row) while the per-variant mechanical rule says MODEL; meta.toml
+records both (`badge` vs `badge_rule`) so the divergence is visible.
 
 Aegislash ships as `aegislash_shield` with the "Starts Blade" variant per the
 existing dive convention; it is the arithmetic-hostile entry (form change
