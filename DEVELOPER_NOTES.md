@@ -394,7 +394,7 @@ pinned exactly in `tests/test_js_shadow_constants.py`.
 
 ## PvPoke bugs found
 
-<!-- sync:pvpoke_bugs_documented -->5<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8 —
+<!-- sync:pvpoke_bugs_documented -->6<!-- /sync --> bugs documented below (sections 1, 2, 3, 7, 8, 9 —
 numbering reflects discovery order; section 4 was retracted 2026-04-15
 and is excluded from the count). **FILED UPSTREAM 2026-07-16** as pvpoke/pvpoke issues: #378 (our §3
 Gyro Ball), #379 (§8 Morpeko), #380 (§1 dead pruning), #381 (the
@@ -535,6 +535,42 @@ better here — it's wrong about the mechanic — and our deviation matches
 the verified game behavior. Pinned by a chargedLog regression assertion
 on `test_morpeko_vs_azumarill_form_change` and marked as a known
 divergence in `scripts/audit_oracle_harness.py`.
+
+### 9. Stale IV-rank chip on battle permalink loads (UI-only)
+
+**File**: `Interface.js:1858-1875` (URL-param branch) vs
+`PokeSelect.js:418` (updateIVRank) and `PokeSelect.js:1320-1335`
+(manual IV input handler). Found 2026-08-10.
+
+When a battle permalink URL carries custom IVs, Interface.js calls
+`pokeSelectors[i].setPokemon(arr[0])` — which renders the green
+"Rank #N / 4096" chip via `updateIVRank()` while the Pokemon still has
+its **default** IV spread — and then applies the URL's IVs/level with
+`pokemon.setIV(...)` / `setLevel(...)` directly, filling the input
+fields but never calling `updateIVRank()` again. The stats panel
+updates; the rank chip keeps the default spread's rank. Typing an IV
+by hand DOES refresh (the input handler calls `updateIVRank`), which
+is why the bug only bites on permalink loads.
+
+**Worked example (GL Mimikyu 0/8/14, level 26)**: the chip shows
+"Rank #42 / 4096" — the rank of PvPoke's default GL Mimikyu spread
+5/13/15 (L25, CP 1500) — while the true overall rank of 0/8/14 is
+**#80/4096**. Verified by running PvPoke's own `Pokemon.js`
+`getIVRank("overall")` under node (pvpoke_trace.js-style shims):
+80/4096 for 0/8/14, 42/4096 for the default spread, under both forms
+and every level cap. Our deep-dive card's SP #80 for that spread is
+correct; PvPoke's own engine agrees with us.
+
+**Impact**: display-only — no effect on sims, scores, or rankings.
+Not filed upstream yet.
+
+**Related non-bug (stat display convention)**: PvPoke truncates
+displayed atk/def to 1 decimal (`PokeSelect.js:75`,
+`Math.floor(stat*10)/10`) while our cards round
+(`deep_dive_engine.js:3838`, `toFixed(1)`). Same underlying stat:
+0/8/14 Mimikyu's exact atk 120.5661873 renders as their 120.5 vs our
+120.6. Divergence is cosmetic; no action needed unless we want
+pixel-parity, in which case switch our display to floor.
 
 ### 4. Mimikyu SS timing — RETRACTED 2026-04-15
 
