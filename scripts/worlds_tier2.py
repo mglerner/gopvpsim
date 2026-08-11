@@ -145,9 +145,16 @@ def amber_worklist(entries, cells=None):
 
 
 def clean_sample(entries, cells, n, seed=20260810):
-    """Seeded sample of NON-amber pairs for the FN-rate measurement."""
+    """Seeded sample of pairs with NO amber direction, for the FN-rate
+    measurement. A pair is clean only if BOTH directions are non-amber
+    -- the original set-comprehension admitted a pair whenever EITHER
+    direction was non-amber, so 7 of the first sample's 15 "clean"
+    pairs were amber-worklist members (caught 2026-08-10 evening via a
+    worklist-count discrepancy; their manifest entries were retagged)."""
+    amber = {tuple(sorted(k)) for k, c in cells.items()
+             if not c.missing and c.amber}
     clean = sorted({tuple(sorted(k)) for k, c in cells.items()
-                    if not c.missing and not c.amber})
+                    if not c.missing} - amber)
     rng = random.Random(seed)
     return sorted(rng.sample(clean, min(n, len(clean))))
 
