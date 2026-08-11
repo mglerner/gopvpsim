@@ -158,11 +158,12 @@ def reach_rows(focal_entry, opp_entry, focal_ranked, opp_cohort):
                 'reach4096': int((atk4096 >= guar).sum()),
                 'reach512': int((atk512 >= guar).sum()),
                 'reach_anchor512': int((atk512 >= per).sum()),
+                'reach_anchor4096': int((atk4096 >= per).sum()),
                 'deny512': deny512,
             })
     return {'rows': rows, 'stage_flag': stage_flag,
             'fast_name': focal_entry['fast_move'],
-            'anchor': anchor}
+            'anchor': anchor, 'atk_max': float(atk4096.max())}
 
 
 def reach_table_html(reach, focal_name, opp_name):
@@ -176,6 +177,30 @@ def reach_table_html(reach, focal_name, opp_name):
     if not reach['rows']:
         return '<p class="section-intro">No closed-form plan applies.</p>'
     a = reach['anchor']
+    # Collapse plans NO attainable spread can complete -- neither the
+    # guarantee nor even the rank-1-anchor cutoff is reachable by any
+    # of the 4096 spreads (Michael 2026-08-11: three of Tinkaton vs
+    # Mantine's four rows were counterfactual-only, e.g. Bulldoze needs
+    # eff atk 757.57 against a 113.55 ceiling because Water/Flying
+    # double-resists it). They move to a one-line footnote, never
+    # silently omitted.
+    live = [r for r in reach['rows']
+            if r['reach4096'] > 0 or r['reach_anchor4096'] > 0]
+    dead = [r for r in reach['rows'] if r not in live]
+    dead_html = ''
+    if dead:
+        listed = '; '.join(
+            f'{r["n_charged"]}x {esc(r["move"])} + {r["n_fast"]}x '
+            f'{esc(reach["fast_name"])} (needs {r["guarantee"]:.2f})'
+            for r in dead)
+        dead_html = (
+            f'<p class="section-intro">Plans NO attainable spread can '
+            f'complete (attainable effective atk tops out at '
+            f'{reach["atk_max"]:.2f}): {listed}.</p>')
+    if not live:
+        return (f'<p class="section-intro">No energy-legal damage plan '
+                'is completable by any attainable spread.</p>'
+                + dead_html)
     rows_html = ''.join(
         f'<tr><td>{r["n_charged"]}x {esc(r["move"])} + {r["n_fast"]}x '
         f'{esc(reach["fast_name"])}</td>'
@@ -185,7 +210,7 @@ def reach_table_html(reach, focal_name, opp_name):
         f'{r["reach4096"]}/4096)</span></td>'
         f'<td>{r["reach_anchor512"]}/512</td>'
         f'<td>{r["deny512"]}/512</td></tr>'
-        for r in reach['rows'])
+        for r in live)
     flag = ('<p class="stageflag">Stage-0 numbers: this pair carries a '
             'stat-stage-moving move, so in-battle stages can shift these '
             'cutoffs (deny cutoffs shift optimistically). Grids above '
@@ -210,7 +235,7 @@ purpose.</p>
 <p class="confirmed">Every cutoff above is boundary-confirmed against
 the engine damage function at render time (crosses at the printed
 value, falls short one float below).</p>
-{flag}"""
+{dead_html}{flag}"""
 
 
 # ---------------------------------------------------------------------------
