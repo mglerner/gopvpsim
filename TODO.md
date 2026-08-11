@@ -47,7 +47,18 @@ CMP board (worlds-cmp.html; union-cohort ranges after the hundo
 blind-spot catch, ceiled thresholds, 1-ULP shadow-tie footnote
 carried), `verify_worlds.py` registered as ship gate #5 (stamps,
 coverage, page/deferred agreement, FN freshness, cmp/explorer
-staleness, *_great.toml glob). Worlds is Aug 28-30. REMAINING:
+staleness, *_great.toml glob). **Session-6 candidate (Michael 2026-08-11, scoped in-session):
+survival strip on pair pages** -- the bulk half of the DragapultSim
+framing ("this def/HP survives one more fast hit -> the turn that
+funds the 2nd charged move"). Scoping decided to avoid ladder bloat:
+(a) tied to the reach table's LIVE plan only (its n_fast implies the
+turns you must survive), (b) one row per attainable incoming fast
+tier: hits-survived by (def-tier x HP), with the shed-cutoff that buys
++1 hit, (c) fast-pressure-only arithmetic, labeled, grids as battle
+truth, (d) new surface = its own adversarial round before ship. Not
+publish-gating.
+
+Worlds is Aug 28-30. REMAINING:
 (a) Michael's publish go (`publish_website.sh --push`); (b) a11y
 polish still open: badge text 4.36:1 in pokemon-dark, hub matrix
 mini-grids color-only (cheat sheets are the text alternative);
