@@ -43,21 +43,16 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / 'src'))
 sys.path.insert(0, str(REPO / 'scripts'))
 
-from gopvpsim.pokemon import Pokemon, iv_rank, find_pokemon_entry, LEAGUE_CAPS
-from gopvpsim.moves import get_moves, parse_types
-from gopvpsim.battle import simulate, pvpoke_dp
-
 import worlds_planes as wp
 import worlds_bake as wb
 import worlds_render_data as wrd
-from deep_dive_lib.sweep import make_battle_pokemon
-from deep_dive_lib.robustness import _species_has_form_change
+from worlds_tier2_worker import tier2_task_worker  # noqa: F401
 
 TIER2_DIR = wp.PLANES_DIR / 'tier2'
 TIER2_SCHEMA = 1
 
 _TIER2_SOURCE_FILES = (
-    REPO / 'scripts' / 'worlds_tier2.py',
+    REPO / 'scripts' / 'worlds_tier2_worker.py',
     REPO / 'scripts' / 'deep_dive_lib' / 'robustness.py',
     REPO / 'scripts' / 'deep_dive_lib' / 'sweep.py',
     REPO / 'scripts' / 'deep_dive_signature.py',
@@ -128,125 +123,6 @@ def read_grid(name, tier2_dir=TIER2_DIR):
         return None
     raw['won'] = wp.unpack_won(raw['won_packed'], tuple(raw['won_shape']))
     return raw
-
-
-def tier2_task_worker(task):
-    """One (direction, bait) full grid. Module-level for spawn pickling;
-    never prints (worker stdout convention).
-
-    Structure: for each opponent cohort row (a FIXED opponent instance),
-    signature-dedup the full 4096-spread focal side against it and sim
-    one representative per group x 9 scenarios, fanning out to members.
-    Mirrors robustness.opp_plane with the varying/fixed roles swapped.
-    Form-change FOCAL species get no dedup (their alt-form stats are
-    non-linear in raw IVs; same rule as _opp_robustness_groups) -- the
-    plan's "expensive pair-family".
-    """
-    import functools
-    import deep_dive_signature as _sig
-
-    league = task['league']
-    league_cp = LEAGUE_CAPS[league]
-    fast_db, charged_db = get_moves()
-    focal_ranked = iv_rank(task['focal_species'], league=league,
-                           shadow=task['focal_shadow'])
-    opp_ranked_full = iv_rank(task['opponent'], league=league,
-                              shadow=task['opp_shadow'])
-    opp_rows = [opp_ranked_full[i] for i in task['cohort']]
-    scen = list(task['scenarios'])
-    nf, no, ns = len(focal_ranked), len(opp_rows), len(scen)
-
-    focal_mon = find_pokemon_entry(task['focal_species'])
-    focal_types = parse_types(focal_mon)
-    fm = dict(fast_db[task['focal_fast']])
-    cms = [dict(charged_db[c]) for c in task['focal_charged']]
-    dedup = not _species_has_form_change(task['focal_species'])
-    if dedup:
-        profile_list = [(None, r['atk'], r['def_'], r['hp'],
-                         r['atk_iv'], r['def_iv'], r['sta_iv'], r['level'])
-                        for r in focal_ranked]
-        swept = _sig.build_focal_side(focal_mon, focal_types, fm, cms,
-                                      profile_list, league_cp,
-                                      task['focal_shadow'])
-    opp_mon = find_pokemon_entry(task['opponent'])
-    opp_fm = dict(fast_db[task['opp_fast']])
-    opp_cms = [dict(charged_db[c]) for c in task['opp_charged']]
-
-    if task['bait']:
-        focal_policy = pvpoke_dp
-    else:
-        focal_policy = functools.partial(pvpoke_dp, bait_shields=False)
-
-    won = np.zeros((nf, no, ns), dtype=bool)
-    score = np.zeros((nf, no, ns), dtype=np.uint16)
-    n_sims = 0
-    # Focal BattlePokemon are rebuilt per (group rep, row); the opponent
-    # instance is fixed per row.
-    for oi, orow in enumerate(opp_rows):
-        opp_bp = make_battle_pokemon(
-            task['opponent'], task['opp_fast'], task['opp_charged'], league,
-            2, orow['atk_iv'], orow['def_iv'], orow['sta_iv'],
-            shadow=task['opp_shadow'])
-        if dedup:
-            opp_pk = Pokemon.at_best_level(
-                task['opponent'], orow['atk_iv'], orow['def_iv'],
-                orow['sta_iv'], league=league, shadow=task['opp_shadow'])
-            fixed = _sig.build_opp_side({
-                'types': parse_types(opp_mon), 'fm': opp_fm, 'cms': opp_cms,
-                'atk': opp_bp.atk, 'def_': opp_bp.def_, 'mon': opp_mon,
-                'ivs': (orow['atk_iv'], orow['def_iv'], orow['sta_iv']),
-                'level': opp_pk.level, 'shadow': task['opp_shadow'],
-            }, league_cp)
-            groups = [m for _r, m in _sig.signature_groups(swept, fixed)]
-        else:
-            groups = [[i] for i in range(nf)]
-        fill = np.zeros(nf, dtype=np.int64)
-        for members in groups:
-            rep = focal_ranked[members[0]]
-            focal_bp = make_battle_pokemon(
-                task['focal_species'], task['focal_fast'],
-                task['focal_charged'], league, 2,
-                rep['atk_iv'], rep['def_iv'], rep['sta_iv'],
-                shadow=task['focal_shadow'])
-            for si, (sf, so) in enumerate(scen):
-                focal_bp.reset_for_battle(sf, opponent=opp_bp)
-                opp_bp.reset_for_battle(so, opponent=focal_bp)
-                res = simulate(focal_bp, opp_bp,
-                               charged_policy_0=focal_policy,
-                               charged_policy_1=pvpoke_dp,
-                               mechanics=task.get('mechanics', 'legacy'))
-                sc = res.pvpoke_score(0)
-                n_sims += 1
-                idx = np.asarray(members)
-                won[idx, oi, si] = sc > 500
-                score[idx, oi, si] = sc
-            fill[members] += 1
-        if not (fill == 1).all():
-            bad = np.flatnonzero(fill != 1)
-            raise RuntimeError(
-                f'tier2 dedup not a partition at opp row {oi}: '
-                f'{len(bad)} positions, first {bad[0]}')
-
-    packed, shape = wp.pack_won(won)
-    arrs = {
-        'won_packed': packed,
-        'won_shape': np.asarray(shape, dtype=np.int64),
-        'score': score,
-        'focal_ivs': np.asarray(
-            [(r['atk_iv'], r['def_iv'], r['sta_iv']) for r in focal_ranked],
-            dtype=np.int64),
-        'focal_levels': np.asarray([r['level'] for r in focal_ranked]),
-        'opp_ivs': np.asarray(
-            [(r['atk_iv'], r['def_iv'], r['sta_iv']) for r in opp_rows],
-            dtype=np.int64),
-        'opp_levels': np.asarray([r['level'] for r in opp_rows]),
-        'scenarios': np.asarray(scen, dtype=np.int64),
-        'top512_mask': np.asarray(task['top512_mask'], dtype=bool),
-        'atkband_mask': np.asarray(task['atkband_mask'], dtype=bool),
-    }
-    if int(arrs['score'].max(initial=0)) > 1000:
-        raise RuntimeError('score out of pvpoke range')
-    return arrs, n_sims
 
 
 def amber_worklist(entries, cells=None):
@@ -354,17 +230,23 @@ def bake(budget_minutes, workers, clean_n=0, pair_limit=None, dry_run=False,
 
     start = time.time()
     start_digest = wb.fresh_engine_digest()
-    done_pairs = 0
+    done_grids = 0
     total_sims = 0
     with multiprocessing.Pool(workers) as pool:
-        pending = []          # [(pair, is_clean, [(task, async_result)])]
+        # Task-level admission + OUT-OF-ORDER harvest. The original loop
+        # blocked on the OLDEST pair's results in admission order, so one
+        # slow (Aegislash-family) pair idled every other worker behind it
+        # -- observed live 2026-08-10: 3 of 16 workers busy. Admission
+        # stays pair-atomic (a budget cutoff never half-admits a pair);
+        # harvest is per-GRID as results become ready (idempotent-safe:
+        # is_baked keys per grid, so a partially-harvested pair simply
+        # re-bakes its missing grids on rerun).
+        inflight = []         # [(task, is_clean, async_result)]
         it = iter(todo)
         exhausted = False
-        # Keep enough pairs in flight to saturate the pool (4 tasks per
-        # pair), +1 so a finishing pair never idles workers.
-        window = max(2, workers // 4 + 1)
-        while True:
-            while (not exhausted and len(pending) < window):
+        window_tasks = workers + 4
+        while inflight or not exhausted:
+            while not exhausted and len(inflight) < window_tasks:
                 if (time.time() - start) / 60 > budget_minutes:
                     exhausted = True
                     break
@@ -373,13 +255,16 @@ def bake(budget_minutes, workers, clean_n=0, pair_limit=None, dry_run=False,
                 except StopIteration:
                     exhausted = True
                     break
-                pending.append((pair, is_clean, [
-                    (t, pool.apply_async(tier2_task_worker, (t,)))
-                    for t in tasks]))
-            if not pending:
-                break
-            pair, is_clean, jobs = pending.pop(0)
-            for t, ar in jobs:
+                inflight.extend(
+                    (t, is_clean, pool.apply_async(tier2_task_worker, (t,)))
+                    for t in tasks)
+            ready = [x for x in inflight if x[2].ready()]
+            if not ready:
+                time.sleep(1.0)
+                continue
+            for entry in ready:
+                inflight.remove(entry)
+                t, is_clean, ar = entry
                 arrs, n_sims = ar.get()
                 write_grid(t['file'], arrs, tier2_dir)
                 manifest['entries'][t['key']] = {
@@ -390,12 +275,12 @@ def bake(budget_minutes, workers, clean_n=0, pair_limit=None, dry_run=False,
                     'baked': date.today().isoformat(),
                 }
                 total_sims += n_sims
+                done_grids += 1
+                el = (time.time() - start) / 60
+                print(f'  [{done_grids}] {t["key"]}'
+                      f'{" (clean)" if is_clean else ""} '
+                      f'({n_sims} sims), {el:.1f} min elapsed')
             save_manifest(manifest, tier2_dir)
-            done_pairs += 1
-            el = (time.time() - start) / 60
-            print(f'  [{done_pairs}] {pair[0]}|{pair[1]}'
-                  f'{" (clean)" if is_clean else ""} done, {el:.1f} min '
-                  'elapsed')
     # Deferred = worklist pairs still not fully baked (recomputed, not
     # tracked incrementally, so a re-run shrinks it naturally).
     manifest['deferred'] = [
@@ -404,7 +289,7 @@ def bake(budget_minutes, workers, clean_n=0, pair_limit=None, dry_run=False,
                for t in pair_tasks(pair, resolved))]
     save_manifest(manifest, tier2_dir)
     dt = time.time() - start
-    print(f'Baked {done_pairs} pairs, {total_sims} sims in {dt / 60:.1f} min '
+    print(f'Baked {done_grids} grids, {total_sims} sims in {dt / 60:.1f} min '
           f'({total_sims / max(dt, 1):.0f} sims/s); '
           f'{len(manifest["deferred"])} pairs deferred.')
     if wb.fresh_engine_digest() != start_digest:
