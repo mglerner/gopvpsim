@@ -151,7 +151,11 @@ def test_cheat_sheet_contracts(cells):
     # never a dead link.
     assert 'deferred by the Tier-2 bake budget' in html_text
     assert 'worlds-pair-' not in html_text
-    assert 'score margin (both bait modes)' in html_text
+    # Closest-scenario readout: fixture's mixed scenario 0-2 has band
+    # -200..+200 (contains zero -> maximally close), beating the
+    # all-win +200..+200 scenarios in both modes.
+    assert 'closest scenario (score margin)' in html_text
+    assert 'closest: 0-2 (bait) -200..+200' in html_text
     assert 'FOCAL side only' in html_text             # no-bait disclosure
     assert 'worlds.html' in html_text                 # back link
     _no_dashes(html_text)
