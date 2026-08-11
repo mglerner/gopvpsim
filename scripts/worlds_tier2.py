@@ -189,15 +189,33 @@ def pair_tasks(pair, resolved):
 
 
 def bake(budget_minutes, workers, clean_n=0, pair_limit=None, dry_run=False,
-         tier2_dir=TIER2_DIR):
+         tier2_dir=TIER2_DIR, include_pairs=()):
     entries = wb.load_meta()
     wb.preflight_moveset_legality(entries)
     ranked_pairs, cells = amber_worklist(entries)
     sample = clean_sample(entries, cells, clean_n) if clean_n else []
+    # ``include_pairs``: amber pairs jumped to the FRONT of the queue
+    # (after the clean sample), e.g. a specifically-requested detail
+    # page. Must be on the amber worklist -- a non-amber request is a
+    # hard error, not a silent extra bake.
+    front = []
+    for p in include_pairs:
+        pair = tuple(sorted(p))
+        if pair not in set(ranked_pairs):
+            sys.exit(f'ABORT: --include-pair {pair} is not on the amber '
+                     'worklist')
+        front.append(pair)
+    ranked_pairs = front + [p for p in ranked_pairs if p not in set(front)]
     # Clean-sample pairs bake FIRST: the FN measurement is small, fixed
     # size, and the budget must not silently starve it behind 401 amber
     # pairs.
     worklist = [(p, True) for p in sample] + [(p, False) for p in ranked_pairs]
+    # The deferred record must always be computed against the FULL
+    # worklist -- a --pair-limit run recomputing it from the truncated
+    # list wrote 'deferred: 0' after a 1-pair targeted bake
+    # (verify_worlds' deferred-agreement check catches it; fixed at the
+    # source 2026-08-11).
+    full_worklist = list(worklist)
     if pair_limit is not None:
         worklist = worklist[:pair_limit]
 
@@ -291,7 +309,7 @@ def bake(budget_minutes, workers, clean_n=0, pair_limit=None, dry_run=False,
     # Deferred = worklist pairs still not fully baked (recomputed, not
     # tracked incrementally, so a re-run shrinks it naturally).
     manifest['deferred'] = [
-        list(pair) for pair, _is_clean in worklist
+        list(pair) for pair, _is_clean in full_worklist
         if any(not baked_ok(t['key'])
                for t in pair_tasks(pair, resolved))]
     save_manifest(manifest, tier2_dir)
@@ -315,12 +333,18 @@ def main():
                          'inputs); they bake FIRST')
     ap.add_argument('--pair-limit', type=int, default=None,
                     help='cap the worklist (smoke)')
+    ap.add_argument('--include-pair', action='append', default=[],
+                    metavar='A,B',
+                    help='amber pair (two species_ids, comma-separated) '
+                         'jumped to the front of the queue; repeatable')
     ap.add_argument('--dry-run', action='store_true')
     args = ap.parse_args()
+    include = [tuple(s.split(',')) for s in args.include_pair]
     wb.install_sweep_cache_poison()
     wb.preflight_engine_clean()
     bake(args.budget_minutes, args.workers, clean_n=args.clean_sample,
-         pair_limit=args.pair_limit, dry_run=args.dry_run)
+         pair_limit=args.pair_limit, dry_run=args.dry_run,
+         include_pairs=include)
     return 0
 
 
