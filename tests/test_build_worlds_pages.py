@@ -69,11 +69,17 @@ def cells(tmp_path):
     won = np.zeros((2, 4, 9), dtype=bool)
     won[:, :, 0] = True            # 0-0 green
     won[:, (0, 1), 2] = True       # 0-2 amber
-    score = np.where(won, 700, 300).astype(np.uint16)
+    # alpha->beta differs by bait mode (scenario 1-2 flips no-bait);
+    # beta->alpha is bait-independent -- so one sheet shows two grids
+    # and the other shows the collapsed single grid.
+    won_nb = won.copy()
+    won_nb[:, :, 5] = True
     for f, o in (('alpha', 'beta_shadow'), ('beta_shadow', 'alpha')):
         for bait in (True, False):
+            w = won_nb if (f == 'alpha' and not bait) else won
+            score = np.where(w, 700, 300).astype(np.uint16)
             arrs = wp.plane_arrays(
-                won, score, focal_ivs=[(0, 15, 15), (12, 1, 15)],
+                w, score, focal_ivs=[(0, 15, 15), (12, 1, 15)],
                 focal_levels=[24.0, 25.5],
                 opp_ivs=[(0, 15, 14), (1, 15, 11), (4, 1, 12),
                          (15, 15, 15)],
@@ -124,10 +130,20 @@ def test_cheat_sheet_contracts(cells):
     assert '>W</span>' in html_text and '>L</span>' in html_text \
         and '>?</span>' in html_text
     # PvPoke-style 3x3 grids (Michael 2026-08-10): 4-column grid with
-    # 0/1/2 axis labels, one grid per bait mode with a caption.
+    # 0/1/2 axis labels. alpha->beta DIFFERS by bait mode, so this
+    # sheet shows both grids, never the collapsed form.
     assert 'class="g9"' in html_text
-    assert html_text.count('class="gcap"') >= 2       # bait + no-bait caps
+    assert html_text.count('class="gcap"') == 2       # bait + no-bait caps
+    assert '>bait</span>' in html_text and '>no-bait</span>' in html_text
+    assert 'bait-independent' not in html_text
     assert '<span class="glab">0</span>' in html_text
+    # Badges moved off the rows/heading into the provenance tail
+    # (Michael 2026-08-11). Pin the MARKUP absence (the shared CSS
+    # still defines .badge-* rules for the hub).
+    assert 'class="badge ' not in html_text
+    assert 'Selection provenance' in html_text
+    assert 'badged <strong>PLAYED</strong>' in html_text
+    assert '(the mechanical rule says MODEL' in html_text
     # Per-row dig-in expansion: full Tier-1 slice counts as text.
     assert '<details class="digin">' in html_text
     assert '2/3' in html_text                         # exact count cell
@@ -139,10 +155,16 @@ def test_cheat_sheet_contracts(cells):
     assert 'FOCAL side only' in html_text             # no-bait disclosure
     assert 'worlds.html' in html_text                 # back link
     _no_dashes(html_text)
-    # FORCED provenance renders on the forced entry's own sheet
+    # FORCED provenance renders on the forced entry's own sheet, and
+    # beta->alpha is bait-independent -> ONE collapsed grid per row
+    # with the unioned-margin tooltip.
     forced = bwp.render_cheat_sheet(META['entries'][1], META, cells,
                                     MANIFEST, slug_map={})
     assert 'Editorial include for testing.' in forced
+    assert forced.count('class="gcap"') == 1
+    assert '>bait-independent</span>' in forced
+    assert 'across both modes' in forced
+    assert 'badged <strong>FORCED</strong>' in forced
 
 
 def test_dive_slug_map_links_only_existing_dirs(tmp_path):

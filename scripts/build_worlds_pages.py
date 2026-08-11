@@ -201,13 +201,19 @@ def _pct(f):
     return f'{100 * f:.1f}%'
 
 
-def _grid9(slice_, opp_name, bait_label):
+def _grid9(slice_, opp_name, bait_label, alt_slice=None):
     """One 3x3 scenario grid in PvPoke's battle-matrix layout (rows =
     own shields top to bottom, columns = opponent shields left to
     right -- Michael 2026-08-10, for visual consistency with PvPoke's
     matchup pages). Each cell carries a W/L/? letter (the outcome must
     not be color-alone: phones cannot hover and the three fills are
-    near-isoluminant in grayscale) and an exact-count tooltip."""
+    near-isoluminant in grayscale) and an exact-count tooltip.
+
+    ``alt_slice``: the collapsed bait-independent form (Michael
+    2026-08-11) -- the caller has verified the two bait modes' win
+    counts are IDENTICAL per scenario, so one grid represents both
+    exactly; only the margin band may differ, so the tooltip unions it
+    and says so."""
     head = ('<span class="gcorner"></span>'
             + ''.join(f'<span class="glab">{c}</span>' for c in '012'))
     if slice_ is None:
@@ -221,9 +227,15 @@ def _grid9(slice_, opp_name, bait_label):
     for i, st in enumerate(slice_.status):
         if i % 3 == 0:
             parts.append(f'<span class="glab">{i // 3}</span>')
+        lo, hi = int(slice_.margin_lo[i]), int(slice_.margin_hi[i])
+        if alt_slice is not None:
+            lo = min(lo, int(alt_slice.margin_lo[i]))
+            hi = max(hi, int(alt_slice.margin_hi[i]))
+            band = f'margin {lo:+d}..{hi:+d} across both modes'
+        else:
+            band = f'margin {lo:+d}..{hi:+d}'
         tip = (f'{bait_label} {SCEN_LABELS[i]} vs {opp_name}: beats '
-               f'{int(slice_.wins[i])} of {slice_.n} spreads (margin '
-               f'{int(slice_.margin_lo[i]):+d}..{int(slice_.margin_hi[i]):+d})')
+               f'{int(slice_.wins[i])} of {slice_.n} spreads ({band})')
         parts.append(f'<span class="sc sc-{st}" title="{esc(tip)}">'
                      f'{_LETTER[st]}</span>')
     return (f'<span class="g9">{"".join(parts)}</span>'
@@ -362,10 +374,9 @@ NOT_BUILT = (
     '<div class="notbuilt"><p><strong>Deliberately not built:</strong> '
     'team composition, lead/switch/closer roles, energy management lines, '
     'or "best 6" advice. This analysis is IV-robustness arithmetic on 1v1 '
-    'sims; the authors are not competitive players, and pretending '
-    'otherwise would be worse than saying so. What IS here: who beats '
-    'whom across the opponent\'s plausible IV spreads, per shield '
-    'scenario, both bait modes.</p></div>')
+    'sims, not necessarily expert-level competitive advice. What IS '
+    'here: who beats whom across the opponent\'s plausible IV spreads, '
+    'per shield scenario, both bait modes.</p></div>')
 
 
 def render_meta_table(entries, slug_map):
@@ -565,18 +576,49 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None):
         rev = cells.get((oid, sid))
         pair_amber = cell.amber or (rev is not None and not rev.missing
                                     and rev.amber)
+        # Collapse to ONE grid when the bait modes' win counts are
+        # IDENTICAL per scenario (Michael 2026-08-11) -- exact-equality
+        # collapse only, so nothing displayed can differ between the
+        # modes except the margin band, which the tooltip unions.
+        bait_indep = (bait is not None and nobait is not None
+                      and bait.n == nobait.n
+                      and (bait.wins == nobait.wins).all())
+        if bait_indep:
+            grids = (f'<span style="display:inline-block">'
+                     f'{_grid9(bait, oname, "bait-independent", nobait)}'
+                     '</span>')
+        else:
+            grids = (f'<span style="display:inline-block">'
+                     f'{_grid9(bait, oname, "bait")}</span>'
+                     f'<span style="display:inline-block">'
+                     f'{_grid9(nobait, oname, "no-bait")}</span>')
         rows.append(
-            f'<tr><td><a href="{sheet_filename(oid)}">{esc(oname)}</a>'
-            f'{badge_html(opp)}<br>'
+            f'<tr><td><a href="{sheet_filename(oid)}">{esc(oname)}</a><br>'
             f'{_digin(cell, oname, plink, pair_amber)}</td>'
-            f'<td><span style="display:inline-block">'
-            f'{_grid9(bait, oname, "bait")}</span>'
-            f'<span style="display:inline-block">'
-            f'{_grid9(nobait, oname, "no-bait")}</span></td>'
+            f'<td>{grids}</td>'
             f'<td>{flag_html}</td><td>{mband}</td></tr>')
     forced = entry.get('forced_reason')
     forced_html = (f'<p class="section-intro"><strong>Why it is in the '
                    f'meta:</strong> {esc(forced)}</p>' if forced else '')
+    # Selection provenance moved OFF the rows and heading into this
+    # end-of-page paragraph (Michael 2026-08-11: badge chips carried
+    # too much visual weight for what is selection metadata, not
+    # matchup info). The hub's meta table keeps the full per-entry
+    # badge display and legend.
+    own_badge = entry['badge']
+    rule = entry.get('badge_rule', own_badge)
+    rule_note = (f' (the mechanical rule says {esc(rule)}; the divergence '
+                 'is deliberate and explained on the hub)'
+                 if rule and rule != own_badge else '')
+    provenance_tail = (
+        '<p class="section-intro">Selection provenance: this entry is '
+        f'badged <strong>{esc(own_badge)}</strong>{rule_note}. Badges '
+        'describe how each species earned its meta slot (PLAYED = '
+        'tournament usage + current rank; PLAYED* = usage but rank '
+        'collapsed post-rebalance; MODEL = rank only, no tournament '
+        'footprint; FORCED = editorial include) -- definitions and '
+        'per-entry data in the <a href="worlds.html">hub meta '
+        'table</a>.</p>')
     fast, charged = display_moveset(entry)
     moves = f'{esc(fast)} / ' + ' + '.join(esc(m) for m in charged)
     dive = slug_map.get(sid)
@@ -600,11 +642,12 @@ columns = opponent's; bait / no-bait)</th>
 both bait modes) - the strips show only the headline slice, so a flag
 can name a scenario whose strip looks settled.</p>
 {NOT_BUILT}
+{provenance_tail}
 <p><a href="worlds.html">Back to the Worlds 2026 hub</a></p>
 """
     return _page_shell(
         title=f'{entry["name"]} - Worlds 2026 cheat sheet',
-        heading=f'{entry["name"]} at Worlds 2026 {badge_html(entry)}',
+        heading=f'{entry["name"]} at Worlds 2026',
         intro_html=provenance_html(meta, manifest),
         body_html=body,
         extra_css=WORLDS_CSS)
