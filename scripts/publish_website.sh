@@ -67,6 +67,11 @@ echo
 
 if [ -f "${REPO_ROOT}/worlds/planes/manifest.json" ]; then
   echo "Regenerating Worlds 2026 pages..."
+  if [ -f "${REPO_ROOT}/worlds/planes/tier2/manifest.json" ]; then
+    python "${REPO_ROOT}/scripts/build_worlds_pair_pages.py"
+  fi
+  python "${REPO_ROOT}/scripts/build_worlds_cmp.py"
+  python "${REPO_ROOT}/scripts/build_worlds_explorer.py"
   python "${REPO_ROOT}/scripts/build_worlds_pages.py"
   echo
 fi

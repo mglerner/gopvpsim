@@ -2,6 +2,42 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-11 -- Worlds session 5: IV explorer, CMP board, verify_worlds gate
+
+IV explorer (`worlds-explorer.html`): the browser receives BAKED
+tier-0 cutoff ladders (worlds_explorer_data.py, 1.1MB blob) and never
+computes damage -- the JS surface is stat math (delegated to the
+parity-tested POGOCollection) plus threshold comparisons, closing the
+retyped-damage-constant drift class by construction (scan-pinned).
+Parity: stats bit-exact vs gopvpsim.pokemon; 5,700+ ladder read-outs
+equal worlds_tier0.staged_damage at the same effective stats; every
+shipped cutoff verified min/max-true at adjacent floats. Under-range /
+over-cap builds get explicit banners, never clamped read-outs.
+
+CMP board (`worlds-cmp.html`): priority order + contested pairs with
+exact flip thresholds (tier0.cmp_threshold), PROP-1 tie semantics, and
+the mandatory cmp_atk 1-ULP shadow-tie footnote.
+
+Two adversarial rounds drove real fixes: (1) the board's ranges now
+cover the UNION cohort (top-512 SP + attack band) after the hundo
+blind spot -- a 15/15/15 Wigglytuff (SP rank 2137) beats Sableye
+(Shadow)'s rank-1 on CMP while every top-512 Wigglytuff loses; 124
+pairs the top-512 ranges called "settled" were IV-decided; (2) all
+displayed cutoffs/thresholds round UP so reaching the printed number
+always suffices (plain 2dp had rendered unreached cutoffs as "+0.00"
+on 22.6% of builds and read exact CMP ties as wins at display
+precision); (3) a shadow threshold 1.2x re-scaling bug was caught by
+the new threshold-consistency test before ever rendering; (4)
+sub-0.01 gaps print as "<0.01" with the not-closeable-by-powering-up
+caveat.
+
+`verify_worlds.py` wired as SHIP_GATES entry 5: Tier-1 stamp+coverage,
+Tier-2 soundness + deferred-list agreement, all rendered surfaces
+incl. pair-page set equality, hub FN freshness, cmp/explorer
+byte-freshness vs current meta, and the *_great.toml collision glob.
+Full roster green (1878 fast-tier tests, links, dashes, sentinels,
+worlds). Publish held for Michael's explicit go.
+
 ## 2026-08-11 -- Worlds session 4: Tier-2 grids, pair detail pages, measured FN-rate
 
 Overnight Tier-2 bake (after an eventful evening -- see the session-4

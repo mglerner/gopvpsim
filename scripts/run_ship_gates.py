@@ -36,6 +36,11 @@ SHIP_GATES = (
     # sentinel is a public wrong number. Wired in 2026-08-06 after the
     # final gate found it uncalled anywhere and a month stale.
     ('verify_dev_counts.py', ('--quiet',)),
+    # Worlds 2026 surfaces (season-scoped; retires with worlds/):
+    # manifest stamps + coverage, pair-page/deferred agreement, hub FN
+    # numbers fresh, *_great.toml collision glob. Wired 2026-08-11
+    # (session 5).
+    ('verify_worlds.py', ('--quiet',)),
 )
 
 
