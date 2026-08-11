@@ -468,8 +468,19 @@ def tier2_status_html(entries, fn, deferred, n_pages):
                     'still has full Tier-1 data on the cheat sheets.</p>')
     else:
         def_html = ''
+    cmp_html = ''
+    if (Path(WEBSITE_DIR) / 'worlds-cmp.html').exists():
+        cmp_html = ('<p class="section-intro"><a href="worlds-cmp.html">'
+                    'CMP board</a>: meta-wide charge-move-priority order '
+                    'with per-pair IV flip thresholds for the contested '
+                    'pairs.</p>')
+    if (Path(WEBSITE_DIR) / 'worlds-explorer.html').exists():
+        cmp_html += ('<p class="section-intro"><a href="worlds-explorer'
+                     '.html">IV explorer</a>: enter your IVs and level, '
+                     'see the breakpoints you reach and the bulkpoints '
+                     'you hold vs all 31 entries.</p>')
     return (f'<h2>Per-pair detail pages ({n_pages} baked)</h2>'
-            f'{fn_html}{def_html}')
+            f'{fn_html}{def_html}{cmp_html}')
 
 
 def render_hub(meta, cells, manifest, slug_map, links=None, fn=None,

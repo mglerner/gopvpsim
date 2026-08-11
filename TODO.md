@@ -39,10 +39,20 @@ by budget, listed on the hub -- extend by re-running
 reach-or-deny with deny counts), measured FN-rate on the hub (4/21
 clean pairs show IV-dependence; worst spread-impact printed), all
 adversarially verified twice (second round forced the grid-based
-scenario selector + wording fixes). Worlds is Aug 28-30 — session 5
-remains: IV explorer + CMP board (carry the cmp_atk 1-ULP footnote) +
-`verify_worlds.py` + ship gates + publish; plus a11y polish and the
-optional Tier-2 budget extension.
+scenario selector + wording fixes). Session 5 DONE 2026-08-11 except the publish itself: IV explorer
+(worlds-explorer.html; baked closed-form ladders, zero damage
+constants in JS, stat math delegated to POGOCollection, parity
+bit-exact + engine-checked; conservative rounded-up cutoff display),
+CMP board (worlds-cmp.html; union-cohort ranges after the hundo
+blind-spot catch, ceiled thresholds, 1-ULP shadow-tie footnote
+carried), `verify_worlds.py` registered as ship gate #5 (stamps,
+coverage, page/deferred agreement, FN freshness, cmp/explorer
+staleness, *_great.toml glob). Worlds is Aug 28-30. REMAINING:
+(a) Michael's publish go (`publish_website.sh --push`); (b) a11y
+polish still open: badge text 4.36:1 in pokemon-dark, hub matrix
+mini-grids color-only (cheat sheets are the text alternative);
+(c) optional Tier-2 budget extension (335 amber pairs deferred;
+idempotent re-run).
 Session-4 carry-in status (2026-08-10): rebalance date RESOLVED
 (Forever Forward live in-game 2026-06-02 1pm PDT; Turin was
 post-rebalance -- pages state the split; plan doc corrected).
