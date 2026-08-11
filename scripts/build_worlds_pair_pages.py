@@ -137,6 +137,18 @@ def reach_rows(focal_entry, opp_entry, focal_ranked, opp_cohort):
                         f'boundary confirmation FAILED for '
                         f'{focal_entry["species_id"]} {cid} x{n_charged}: '
                         f'cutoff {cutoff} vs hp {tgt["hp"]}')
+            # Deny count: opponent top-512 spreads whose (def_, hp)
+            # survive this plan from the FOCAL's rank-1 spread ("coverage
+            # counts both sides" per the plan). A count, not a cutoff --
+            # no boundary claim to confirm.
+            f_anchor_atk = focal_ranked[0]['atk']
+            deny512 = sum(
+                1 for e in opp_cohort
+                if (n_fast * t0.staged_damage(fm, f_anchor_atk, e['def_'],
+                                              ftypes, otypes)
+                    + n_charged * t0.staged_damage(cm, f_anchor_atk,
+                                                   e['def_'], ftypes,
+                                                   otypes)) < e['hp'])
             rows.append({
                 'move': id2name.get(cid, cid),
                 'n_fast': n_fast, 'n_charged': n_charged,
@@ -146,6 +158,7 @@ def reach_rows(focal_entry, opp_entry, focal_ranked, opp_cohort):
                 'reach4096': int((atk4096 >= guar).sum()),
                 'reach512': int((atk512 >= guar).sum()),
                 'reach_anchor512': int((atk512 >= per).sum()),
+                'deny512': deny512,
             })
     return {'rows': rows, 'stage_flag': stage_flag,
             'fast_name': focal_entry['fast_move'],
@@ -170,28 +183,33 @@ def reach_table_html(reach, focal_name, opp_name):
         f'<td>{r["per_spread"]:.2f}</td>'
         f'<td>{r["reach512"]}/512 <span class="mband">('
         f'{r["reach4096"]}/4096)</span></td>'
-        f'<td>{r["reach_anchor512"]}/512</td></tr>'
+        f'<td>{r["reach_anchor512"]}/512</td>'
+        f'<td>{r["deny512"]}/512</td></tr>'
         for r in reach['rows'])
     flag = ('<p class="stageflag">Stage-0 numbers: this pair carries a '
             'stat-stage-moving move, so in-battle stages can shift these '
             'cutoffs (deny cutoffs shift optimistically). Grids above '
             'include all stage effects.</p>' if reach['stage_flag'] else '')
     return f"""
+<p class="section-intro">DAMAGE-PLAN thresholds (minimal energy-legal
+plan from zero energy), NOT full-battle guarantees -- shields, energy
+timing and bulk live in the grids above, and only grid numbers use the
+word "beats" on this page. All atk/def values are EFFECTIVE stats
+(shadow multiplier applied -- the scale iv_rank and PvPoke stat
+displays use). Guarantee vs rank-1 columns are different quantities on
+purpose.</p>
 <div class="table-scroll"><table class="reach">
 <tr><th>damage plan (energy-legal)</th>
-<th>guarantee atk (beats every top-512 {esc(opp_name)})</th>
+<th>guarantee atk (plan KOs every top-512 {esc(opp_name)})</th>
 <th>atk vs rank-1 ({a['atk_iv']}/{a['def_iv']}/{a['sta_iv']})</th>
-<th>{esc(focal_name)} top-512 spreads reaching guarantee</th>
-<th>reaching rank-1 cutoff</th></tr>
+<th>{esc(focal_name)} top-512 spreads meeting guarantee</th>
+<th>meeting rank-1 cutoff</th>
+<th>top-512 {esc(opp_name)} denying your rank-1</th></tr>
 {rows_html}
 </table></div>
 <p class="confirmed">Every cutoff above is boundary-confirmed against
 the engine damage function at render time (crosses at the printed
 value, falls short one float below).</p>
-<p class="section-intro">These are DAMAGE-PLAN thresholds (minimal
-energy-legal plan from zero energy), not full-battle guarantees --
-shields, energy timing and bulk live in the grids above. Guarantee vs
-rank-1 columns are different quantities on purpose.</p>
 {flag}"""
 
 
@@ -211,14 +229,16 @@ def curve_svg(frac_by_rank, scen_label, opp_name, bin_size=16,
             for i in range(nb)]
     pts = []
     for i, f in enumerate(bins):
-        x = pad_l + pw * i / max(nb - 1, 1)
+        # Bin CENTER on the same rank scale as the axis ticks (a
+        # 0..nb-1 spread misplaced centers by up to half a bin).
+        x = pad_l + pw * ((i + 0.5) * bin_size) / n
         y = pad_t + ph * (1 - f)
         pts.append((x, y))
     line = ' '.join(f'{x:.1f},{y:.1f}' for x, y in pts)
     area = (f'{pad_l:.1f},{pad_t + ph:.1f} ' + line
             + f' {pad_l + pw:.1f},{pad_t + ph:.1f}')
     hovers = ''.join(
-        f'<rect x="{pad_l + pw * i / max(nb - 1, 1) - pw / nb / 2:.1f}" '
+        f'<rect x="{pad_l + pw * (i * bin_size) / n:.1f}" '
         f'y="{pad_t}" width="{pw / nb:.1f}" height="{ph}" fill="transparent">'
         f'<title>SP ranks {i * bin_size + 1}-{min((i + 1) * bin_size, n)}: '
         f'beats {100 * bins[i]:.1f}% of top-512 {esc(opp_name)}</title>'
@@ -252,9 +272,26 @@ def curve_svg(frac_by_rank, scen_label, opp_name, bin_size=16,
 # Page assembly
 # ---------------------------------------------------------------------------
 
+def _grid_mixed_scenarios(grid_bait, grid_nobait):
+    """Scenario indices whose focal-top-512 x opp-top-512 block is
+    genuinely mixed in EITHER bait mode -- the full-grid ground truth.
+    THIS selects what a pair page renders; the Tier-1 probe screen must
+    not (it missed an omitted 35.2%-minority scenario in the first
+    render -- adversarial-verify catch, 2026-08-11)."""
+    mixed = set()
+    for grid in (grid_bait, grid_nobait):
+        if grid is None:
+            continue
+        w = grid['won'][:512][:, grid['top512_mask'], :]
+        for si in range(w.shape[2]):
+            n_true = int(w[:, :, si].sum())
+            if 0 < n_true < w[:, :, si].size:
+                mixed.add(si)
+    return mixed
+
+
 def direction_section(focal_entry, opp_entry, cell, grid_bait, grid_nobait):
     fname, oname = focal_entry['name'], opp_entry['name']
-    amber = cell.amber_scenarios()
     parts = [f'<h2>{esc(fname)} vs {esc(oname)}</h2>']
     if grid_bait is None:
         parts.append('<p class="section-intro">Tier-2 grid not baked for '
@@ -264,7 +301,26 @@ def direction_section(focal_entry, opp_entry, cell, grid_bait, grid_nobait):
     won = grid_bait['won']                      # (4096, n, 9)
     mask = grid_bait['top512_mask']
     nb_won = grid_nobait['won'] if grid_nobait is not None else None
-    for si in amber:
+    mixed = _grid_mixed_scenarios(grid_bait, grid_nobait)
+    probe_only = set(cell.amber_scenarios()) - mixed
+    if not mixed and not probe_only:
+        parts.append(
+            '<p class="section-intro">Full-grid check: NO scenario in '
+            'this direction is IV-decided within the top-512 x top-512 '
+            'block -- each of the 9 is a uniform win or a uniform loss '
+            'for every spread pairing (the cheat-sheet strips show '
+            'which).</p>')
+    for si in sorted(mixed | probe_only):
+        if si in probe_only:
+            parts.append(
+                f'<h3>{SCEN_LABELS[si]} (IV-decided in probe slices '
+                'only)</h3>'
+                '<p class="counts">Flagged by the Tier-1 screen via the '
+                'attack-band cohort or a probe spread, but the full '
+                'top-512 x top-512 block is uniform for this scenario -- '
+                'the IV-dependence lives outside it (see the cheat-sheet '
+                'dig-in for the flagged slice).</p>')
+            continue
         w = won[:, mask, si]                    # (4096, 512)
         frac = w.mean(axis=1)
         sweeps = int((frac == 1.0).sum())

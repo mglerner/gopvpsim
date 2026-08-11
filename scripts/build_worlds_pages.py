@@ -249,7 +249,7 @@ def pair_link_map(website_dir=WEBSITE_DIR):
     return out
 
 
-def _digin(cell, opp_name, pair_link=None):
+def _digin(cell, opp_name, pair_link=None, pair_amber=False):
     """Per-row expansion: the FULL Tier-1 data for this direction as
     exact beats-N counts -- every probe spread x cohort x bait slice,
     per scenario. This is the interim dig-in for IV-decided cells until
@@ -269,11 +269,18 @@ def _digin(cell, opp_name, pair_link=None):
             amb = ' class="amb"' if sl.status[i] == 'amber' else ''
             tds.append(f'<td{amb}>{int(sl.wins[i])}/{sl.n}</td>')
         rows.append(f'<tr><th>{SCEN_LABELS[i]}</th>{"".join(tds)}</tr>')
-    link_html = (f' <a href="{esc(pair_link)}">Full detail page (all 4096 '
-                 'of your spreads + reach/deny cutoffs)</a>.'
-                 if pair_link else
-                 ' The full-grid detail page for this pair is deferred by '
-                 'the Tier-2 bake budget.')
+    if pair_link:
+        link_html = (f' <a href="{esc(pair_link)}">Full detail page (all '
+                     '4096 of your spreads + reach/deny cutoffs)</a>.')
+    elif pair_amber:
+        link_html = (' The full-grid detail page for this pair is '
+                     'deferred by the Tier-2 bake budget.')
+    else:
+        # Non-amber pairs were never on the Tier-2 worklist -- saying
+        # "deferred" here was false for 128 rows (verify catch,
+        # 2026-08-11).
+        link_html = (' No detail page: this pair is not flagged '
+                     'IV-decided.')
     return (f'<details class="digin"><summary>details</summary>'
             f'<div class="table-scroll"><table>'
             f'<tr><th>scen</th>{heads}</tr>{"".join(rows)}</table></div>'
@@ -296,7 +303,10 @@ def _mini_cell(row, focal_name, opp_name, pair_link=None):
     tip = f'{focal_name} vs {opp_name} (rank-1 spread, top-512, bait): {tips}'
     td_cls = ' class="pair-amber"' if row['amber'] else ''
     mini = f'<span class="mini">{boxes}</span>'
-    if row['amber'] and pair_link:
+    # Link whenever the pair page EXISTS -- gating on this direction's
+    # amber flag left 8 pairs linked from only one matrix cell while
+    # both cheat sheets linked them (verify catch, 2026-08-11).
+    if pair_link:
         mini = f'<a href="{esc(pair_link)}">{mini}</a>'
     return f'<td{td_cls} title="{esc(tip)}">{mini}</td>'
 
@@ -433,14 +443,20 @@ def tier2_status_html(entries, fn, deferred, n_pages):
                    'rate: not yet measured (clean-sample grids not '
                    'baked).</p>')
     else:
-        worst = max((w for _p, d, w in fn['pairs'] if d), default=0.0)
+        worst_impact = max((r[3] for r in fn['pairs'] if r[1]),
+                           default=0.0)
+        worst_cell = max((r[2] for r in fn['pairs'] if r[1]), default=0.0)
         fn_html = (
             f'<p class="section-intro">Amber-screen check: of '
             f'{fn["n"]} sampled clean (not-flagged) pairs given the full '
-            f'4096-spread treatment, <strong>{fn["fn"]}</strong> turn out '
-            'IV-decided somewhere in the top-512 x top-512 block '
-            f'(largest losing-minority share {100 * worst:.2f}%). The '
-            'amber flags are a screen, not a proof of settledness.</p>')
+            f'4096-spread treatment, <strong>{fn["fn"]}</strong> show '
+            'some IV-dependence in the top-512 x top-512 block. Worst '
+            f'case, {100 * worst_impact:.1f}% of a focal\'s top-512 '
+            'spreads have an outcome that depends on the opponent\'s IV '
+            f'roll in some scenario (largest mixed-cell share of a '
+            f'block: {100 * worst_cell:.2f}%). The amber flags are a '
+            'screen, not a proof of settledness; detail pages select '
+            'their scenarios from the full grids, not the screen.</p>')
     if deferred:
         listed = ', '.join(f'{esc(names.get(a, a))} / {esc(names.get(b, b))}'
                            for a, b in deferred[:20])
@@ -535,9 +551,13 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None):
             mband = '<span class="mband">missing</span>'
         oname = names[oid]
         plink = links.get(frozenset((sid, oid)))
+        rev = cells.get((oid, sid))
+        pair_amber = cell.amber or (rev is not None and not rev.missing
+                                    and rev.amber)
         rows.append(
             f'<tr><td><a href="{sheet_filename(oid)}">{esc(oname)}</a>'
-            f'{badge_html(opp)}<br>{_digin(cell, oname, plink)}</td>'
+            f'{badge_html(opp)}<br>'
+            f'{_digin(cell, oname, plink, pair_amber)}</td>'
             f'<td><span style="display:inline-block">'
             f'{_grid9(bait, oname, "bait")}</span>'
             f'<span style="display:inline-block">'
