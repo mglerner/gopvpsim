@@ -560,15 +560,26 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None):
         flag_html = ('<span class="flags">IVs decide: '
                      + ', '.join(SCEN_LABELS[i] for i in flags) + '</span>'
                      if flags else '')
-        # Band over BOTH bait modes: a bait-only band can print an
-        # all-positive floor on a row whose no-bait line is a total loss
-        # (Tinkaton vs Furret +13..+279 vs no-bait -279; adversarial-
-        # verify finding).
-        both = [s for s in (bait, nobait) if s is not None]
-        if both:
-            lo = int(min(min(s.margin_lo) for s in both))
-            hi = int(max(max(s.margin_hi) for s in both))
-            mband = f'<span class="mband">margin {lo:+d}..{hi:+d}</span>'
+        # Closest-scenario readout (Michael 2026-08-11, replacing the
+        # cross-scenario min..max band: 94% of those bands straddled
+        # zero and restated the grid). One (scenario, mode): the margin
+        # band nearest zero -- a zero-containing band (mixed outcomes or
+        # an exact tie) is maximally close, tie-broken by the smaller
+        # band extreme. Per-scenario, so nothing aggregates.
+        best = None
+        for mode, s in (('bait', bait), ('no-bait', nobait)):
+            if s is None:
+                continue
+            for i in range(len(s.frac)):
+                lo, hi = int(s.margin_lo[i]), int(s.margin_hi[i])
+                close = 0 if lo <= 0 <= hi else min(abs(lo), abs(hi))
+                key = (close, max(abs(lo), abs(hi)))
+                if best is None or key < best[0]:
+                    best = (key, mode, i, lo, hi)
+        if best is not None:
+            _k, mode, i, lo, hi = best
+            mband = (f'<span class="mband">closest: {SCEN_LABELS[i]} '
+                     f'({mode}) {lo:+d}..{hi:+d}</span>')
         else:
             mband = '<span class="mband">missing</span>'
         oname = names[oid]
@@ -635,7 +646,7 @@ sizes and margins).{dive_html}</p>
 <div class="table-scroll"><table class="sheet">
 <tr><th>Opponent</th><th>shield matchups (rows = own shields,
 columns = opponent's; bait / no-bait)</th>
-<th>IV-decided</th><th>score margin (both bait modes)</th></tr>
+<th>IV-decided</th><th>closest scenario (score margin)</th></tr>
 {''.join(rows)}
 </table></div>
 <p>"IVs decide" unions every slice (both probe spreads, both cohorts,
