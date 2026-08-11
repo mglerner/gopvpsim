@@ -58,8 +58,12 @@ tier: hits-survived by (def-tier x HP), with the shed-cutoff that buys
 truth, (d) new surface = its own adversarial round before ship. Not
 publish-gating.
 
-Worlds is Aug 28-30. REMAINING:
-(a) Michael's publish go (`publish_website.sh --push`); (b) a11y
+Worlds is Aug 28-30. **PUBLISH GATE (Michael 2026-08-11): do not
+publish until ALL 401 amber pairs have detail pages** -- completion
+run launched 2026-08-11 (~26-35h of compute; idempotent, resumable).
+REMAINING:
+(a) full amber coverage, then Michael's publish go
+(`publish_website.sh --push`); (b) a11y
 polish still open: badge text 4.36:1 in pokemon-dark, hub matrix
 mini-grids color-only (cheat sheets are the text alternative);
 (c) optional Tier-2 budget extension (335 amber pairs deferred;
