@@ -30,9 +30,19 @@ gates green), page layer adversarially verified (orientation + all
 independent re-sims exact) with the review's honesty findings fixed
 (both-mode margin bands, exact spread counts, W/L/? letters,
 focal-only no-bait + tie + corpus-convention disclosures, badge_rule
-divergence shown, simmed moveset order). Worlds is Aug 28-30 —
-sessions 4-5 remain: amber pages + reach-or-deny + Tier-2 bake +
-FN-rate; IV explorer + CMP board + `verify_worlds.py` + publish.
+divergence shown, simmed moveset order). Session 4 DONE 2026-08-11 (overnight bake + morning consolidation):
+Tier-2 joint grids for the top-66 usage-ranked amber pairs + 21 clean
+FN samples (87 pairs, 348 grids, ~2.1B sims; 335 amber pairs deferred
+by budget, listed on the hub -- extend by re-running
+`worlds_tier2.py`, idempotent), 66 per-pair detail pages
+(grid-selected scenarios, SVG robustness curves, boundary-confirmed
+reach-or-deny with deny counts), measured FN-rate on the hub (4/21
+clean pairs show IV-dependence; worst spread-impact printed), all
+adversarially verified twice (second round forced the grid-based
+scenario selector + wording fixes). Worlds is Aug 28-30 — session 5
+remains: IV explorer + CMP board (carry the cmp_atk 1-ULP footnote) +
+`verify_worlds.py` + ship gates + publish; plus a11y polish and the
+optional Tier-2 budget extension.
 Session-4 carry-in status (2026-08-10): rebalance date RESOLVED
 (Forever Forward live in-game 2026-06-02 1pm PDT; Turin was
 post-rebalance -- pages state the split; plan doc corrected).

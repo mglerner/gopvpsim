@@ -2,6 +2,36 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-11 -- Worlds session 4: Tier-2 grids, pair detail pages, measured FN-rate
+
+Overnight Tier-2 bake (after an eventful evening -- see the session-4
+commits: lid-sleep ate the first budget; head-of-line blocking idled
+13/16 workers and was fixed with out-of-order harvest + producer-stamp
+narrowing to `worlds_tier2_worker.py`; a clean-sample direction bug
+contaminated the FN inputs and was fixed + retagged): 87 complete
+pairs / 348 grids / ~2.1B sims at 64k sims/s on the fixed driver --
+the top-66 usage-ranked amber pairs plus 21 genuinely-clean FN
+samples; 335 amber pairs deferred by budget (hub lists them;
+`worlds_tier2.py` re-runs extend idempotently).
+
+66 per-pair detail pages shipped with per-scenario full-grid counts,
+SVG robustness curves (bin-centered, bait/top-512 provenance
+adversarially confirmed), and boundary-confirmed reach-or-deny strips
+(now incl. deny counts vs the focal rank-1 anchor). Two adversarial
+verify rounds: round 1 confirmed every printed number reproduces from
+the grids (1,442 assertions incl. all 62,976 curve points; 496 reach
+rows re-bisected against the engine; Tier-1 vs Tier-2 cross-bake 0
+mismatches) and round 2's structural catches all landed as fixes:
+scenario selection now comes from the GRIDS (the Tier-1 probe screen
+had silently dropped 84 mixed scenario slots, worst 35.2% minority --
+Aegislash vs Kingdra 2-2 now renders 290-sweep/101-shutout), reach
+headers no longer say "beats" (damage-plan language only), the FN
+block reports spread-impact instead of the misread-prone cell-minority
+share, cheat sheets no longer claim "deferred" for never-worklisted
+pairs, and matrix pair-links are bidirectional. Measured FN-rate: 4 of
+21 clean pairs show IV-dependence in the full block; the pages'
+scenario selection no longer depends on the screen at all.
+
 ## 2026-08-10 -- Worlds session 3, block 2: Tier-1 bake + matrix + cheat sheets + hub
 
 Full Tier-1 bake straight after the migration so the manifest pins the

@@ -65,3 +65,5 @@ scratch_oracle_grid/
 # while developing these tools. Kept local-only (not published) to
 # avoid reproducing third-party copyrighted text.
 /docs/reference_deep_dives/
+# tier2 joint grids are heavier blobs; only tier2/manifest.json is tracked
+/worlds/planes/tier2/*.npz

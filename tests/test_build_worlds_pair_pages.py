@@ -97,12 +97,22 @@ def test_worlds_fn_grid_decided():
     import worlds_fn
     won = np.ones((600, 5, 9), dtype=bool)
     grid = {'won': won, 'top512_mask': np.array([True] * 4 + [False])}
-    assert worlds_fn.grid_decided(grid) == (False, 0.0)      # constant
+    assert worlds_fn.grid_decided(grid) == (False, 0.0, 0.0)  # constant
     won2 = won.copy()
     won2[3, 1, 4] = False                    # one losing cell in-block
-    d, w = worlds_fn.grid_decided({'won': won2,
-                                   'top512_mask': grid['top512_mask']})
-    assert d is True and w == pytest.approx(1 / (512 * 4))
+    d, wc, wi = worlds_fn.grid_decided({'won': won2,
+                                        'top512_mask': grid['top512_mask']})
+    assert d is True and wc == pytest.approx(1 / (512 * 4))
+    # spread impact: exactly one of the 512 focal rows is mixed
+    assert wi == pytest.approx(1 / 512)
+    # Winning-minority case: all rows lose to opp col 1 but beat the
+    # rest -- cell minority is the LOSING side here (512/2048), while
+    # every row is mixed (impact 100%). The two metrics must diverge.
+    won4 = won.copy()
+    won4[:512, 1, 4] = False
+    d4, wc4, wi4 = worlds_fn.grid_decided(
+        {'won': won4, 'top512_mask': grid['top512_mask']})
+    assert d4 and wc4 == pytest.approx(512 / 2048) and wi4 == 1.0
     # A flip OUTSIDE the top512 block (masked col or focal rank > 512)
     # must not count.
     won3 = won.copy()
@@ -110,5 +120,5 @@ def test_worlds_fn_grid_decided():
     won3[555, 1, 4] = False                  # focal rank beyond 512
     assert worlds_fn.grid_decided({'won': won3,
                                    'top512_mask': grid['top512_mask']}) \
-        == (False, 0.0)
-    assert worlds_fn.grid_decided(None) == (False, 0.0)
+        == (False, 0.0, 0.0)
+    assert worlds_fn.grid_decided(None) == (False, 0.0, 0.0)
