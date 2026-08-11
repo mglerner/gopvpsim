@@ -44,6 +44,16 @@ def test_reach_reproduces_dragapultsim_guarantee(tinkaton_mantine_reach):
     assert gh2['reach512'] == 0 and gh2['reach4096'] > 0
     # Bulldoze carries an opponent-def debuff -> stage flag on.
     assert reach['stage_flag'] is True
+    # Unreachable-plan collapse (Michael 2026-08-11): the Bulldoze rows
+    # (double-resisted; cutoff ~757 vs an attainable ceiling ~113.55)
+    # and 1x Gigaton leave the table for the footnote; the live 2x
+    # Gigaton row stays.
+    html_text = bpp.reach_table_html(reach, 'Tinkaton', 'Mantine')
+    assert 'NO attainable spread can complete' in html_text
+    assert 'tops out at 113.55' in html_text
+    assert 'Bulldoze + 5x Fairy Wind (needs 757.57)' in html_text
+    assert html_text.count('<tr><td>') == 1          # only 2x Gigaton
+    assert '2x Gigaton Hammer' in html_text
 
 
 def test_boundary_confirmation_rejects_corrupt_cutoff(tinkaton_mantine_reach):
