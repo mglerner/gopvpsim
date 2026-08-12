@@ -1120,6 +1120,28 @@
  ],
  "engine": "5839391a7596",
  "entries": {
+  "aegislash_shield|altaria|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "aegislash_shield__vs__altaria__bait__t2.npz",
+   "n_sims": 19132416,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "aegislash_shield|altaria|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "aegislash_shield__vs__altaria__nobait__t2.npz",
+   "n_sims": 19132416,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "aegislash_shield|corviknight|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -1161,6 +1183,28 @@
    "won_shape": [
     4096,
     514,
+    9
+   ]
+  },
+  "aegislash_shield|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "aegislash_shield__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 19095552,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "aegislash_shield|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "aegislash_shield__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 19095552,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -1274,6 +1318,28 @@
     9
    ]
   },
+  "aegislash_shield|stunfisk|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "aegislash_shield__vs__stunfisk__bait__t2.npz",
+   "n_sims": 19095552,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "aegislash_shield|stunfisk|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "aegislash_shield__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 19095552,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "aegislash_shield|wigglytuff|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -1293,6 +1359,28 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "altaria_shadow|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria_shadow__vs__altaria__bait__t2.npz",
+   "n_sims": 1534986,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "altaria_shadow|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria_shadow__vs__altaria__nobait__t2.npz",
+   "n_sims": 1534986,
+   "won_shape": [
+    4096,
+    519,
     9
    ]
   },
@@ -1340,6 +1428,28 @@
     9
    ]
   },
+  "altaria_shadow|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "altaria_shadow__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 13593159,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria_shadow|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "altaria_shadow__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 13593159,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "altaria_shadow|lickilicky|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -1381,6 +1491,138 @@
    "won_shape": [
     4096,
     519,
+    9
+   ]
+  },
+  "altaria_shadow|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria_shadow__vs__stunfisk__bait__t2.npz",
+   "n_sims": 1266048,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria_shadow|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria_shadow__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 1266048,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|aegislash_shield|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__aegislash_shield__bait__t2.npz",
+   "n_sims": 5462190,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "altaria|aegislash_shield|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__aegislash_shield__nobait__t2.npz",
+   "n_sims": 5462190,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "altaria|altaria_shadow|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__altaria_shadow__bait__t2.npz",
+   "n_sims": 1534986,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "altaria|altaria_shadow|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__altaria_shadow__nobait__t2.npz",
+   "n_sims": 1534986,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "altaria|azumarill|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__azumarill__bait__t2.npz",
+   "n_sims": 2216583,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "altaria|azumarill|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__azumarill__nobait__t2.npz",
+   "n_sims": 2216583,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "altaria|clodsire|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__clodsire__bait__t2.npz",
+   "n_sims": 1486350,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "altaria|clodsire|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__clodsire__nobait__t2.npz",
+   "n_sims": 1486350,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "altaria|corsola_galarian|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 1219275,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "altaria|corsola_galarian|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 1219275,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -1450,6 +1692,204 @@
     9
    ]
   },
+  "altaria|fearow|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__fearow__bait__t2.npz",
+   "n_sims": 1173537,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "altaria|fearow|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__fearow__nobait__t2.npz",
+   "n_sims": 1173537,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "altaria|feraligatr|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__feraligatr__bait__t2.npz",
+   "n_sims": 2516940,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "altaria|feraligatr|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__feraligatr__nobait__t2.npz",
+   "n_sims": 2516940,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "altaria|forretress|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__forretress__bait__t2.npz",
+   "n_sims": 11971926,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|forretress|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__forretress__nobait__t2.npz",
+   "n_sims": 11971926,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|furret|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__furret__bait__t2.npz",
+   "n_sims": 3279339,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|furret|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__furret__nobait__t2.npz",
+   "n_sims": 3279339,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|gourgeist_super|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__gourgeist_super__bait__t2.npz",
+   "n_sims": 1448172,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "altaria|gourgeist_super|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__gourgeist_super__nobait__t2.npz",
+   "n_sims": 1448172,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "altaria|grumpig|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__grumpig__bait__t2.npz",
+   "n_sims": 1092375,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "altaria|grumpig|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__grumpig__nobait__t2.npz",
+   "n_sims": 1092375,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "altaria|guzzlord|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__guzzlord__bait__t2.npz",
+   "n_sims": 1976679,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "altaria|guzzlord|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__guzzlord__nobait__t2.npz",
+   "n_sims": 1976679,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "altaria|jellicent|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__jellicent__bait__t2.npz",
+   "n_sims": 1762164,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|jellicent|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__jellicent__nobait__t2.npz",
+   "n_sims": 1762164,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|kingdra|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__kingdra__bait__t2.npz",
+   "n_sims": 1299276,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "altaria|kingdra|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__kingdra__nobait__t2.npz",
+   "n_sims": 1299276,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
   "altaria|lickilicky|bait": {
    "baked": "2026-08-10",
    "clean_sample": false,
@@ -1469,6 +1909,28 @@
    "won_shape": [
     4096,
     517,
+    9
+   ]
+  },
+  "altaria|mantine|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__mantine__bait__t2.npz",
+   "n_sims": 1530639,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|mantine|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__mantine__nobait__t2.npz",
+   "n_sims": 1530639,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -1560,6 +2022,94 @@
     9
    ]
   },
+  "altaria|sableye_shadow|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__sableye_shadow__bait__t2.npz",
+   "n_sims": 9343053,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "altaria|sableye_shadow|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__sableye_shadow__nobait__t2.npz",
+   "n_sims": 9343053,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "altaria|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__stunfisk__bait__t2.npz",
+   "n_sims": 992250,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 992250,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|tinkaton|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__tinkaton__bait__t2.npz",
+   "n_sims": 5960979,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|tinkaton|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__tinkaton__nobait__t2.npz",
+   "n_sims": 5960979,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "altaria|togekiss|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__togekiss__bait__t2.npz",
+   "n_sims": 1164645,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
+  "altaria|togekiss|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "altaria__vs__togekiss__nobait__t2.npz",
+   "n_sims": 1164645,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
   "altaria|wigglytuff|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -1579,6 +2129,50 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "azumarill|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "azumarill__vs__altaria__bait__t2.npz",
+   "n_sims": 2161692,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "azumarill|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "azumarill__vs__altaria__nobait__t2.npz",
+   "n_sims": 2161692,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "azumarill|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "azumarill__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 1894797,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "azumarill|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "azumarill__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 1894797,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -1626,6 +2220,28 @@
     9
    ]
   },
+  "azumarill|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "azumarill__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 8532549,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "azumarill|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "azumarill__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 8532549,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "azumarill|lickilicky|bait": {
    "baked": "2026-08-10",
    "clean_sample": false,
@@ -1667,6 +2283,28 @@
    "won_shape": [
     4096,
     519,
+    9
+   ]
+  },
+  "azumarill|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "azumarill__vs__stunfisk__bait__t2.npz",
+   "n_sims": 2263617,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "azumarill|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "azumarill__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 2263617,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -1714,6 +2352,50 @@
     9
    ]
   },
+  "clodsire|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "clodsire__vs__altaria__bait__t2.npz",
+   "n_sims": 1871100,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "clodsire|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "clodsire__vs__altaria__nobait__t2.npz",
+   "n_sims": 1871100,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "clodsire|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "clodsire__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 2344428,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "clodsire|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "clodsire__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 2344428,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "clodsire|corviknight|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -1755,6 +2437,28 @@
    "won_shape": [
     4096,
     514,
+    9
+   ]
+  },
+  "clodsire|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "clodsire__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 13284792,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "clodsire|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "clodsire__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 13284792,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -1802,6 +2506,28 @@
     9
    ]
   },
+  "clodsire|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "clodsire__vs__stunfisk__bait__t2.npz",
+   "n_sims": 3034224,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "clodsire|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "clodsire__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 3034224,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "clodsire|wigglytuff|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -1821,6 +2547,72 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "corsola_galarian|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__altaria__bait__t2.npz",
+   "n_sims": 1655145,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "corsola_galarian|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__altaria__nobait__t2.npz",
+   "n_sims": 1655145,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "corsola_galarian|azumarill|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__azumarill__bait__t2.npz",
+   "n_sims": 2224791,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "corsola_galarian|azumarill|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__azumarill__nobait__t2.npz",
+   "n_sims": 2224791,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "corsola_galarian|clodsire|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__clodsire__bait__t2.npz",
+   "n_sims": 2757600,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "corsola_galarian|clodsire|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__clodsire__nobait__t2.npz",
+   "n_sims": 2757600,
+   "won_shape": [
+    4096,
+    520,
     9
    ]
   },
@@ -1890,6 +2682,160 @@
     9
    ]
   },
+  "corsola_galarian|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 11465145,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 11465145,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|forretress|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__forretress__bait__t2.npz",
+   "n_sims": 10140831,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|forretress|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__forretress__nobait__t2.npz",
+   "n_sims": 10140831,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|furret|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__furret__bait__t2.npz",
+   "n_sims": 5001030,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|furret|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__furret__nobait__t2.npz",
+   "n_sims": 5001030,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|gourgeist_super|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__gourgeist_super__bait__t2.npz",
+   "n_sims": 3760299,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "corsola_galarian|gourgeist_super|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__gourgeist_super__nobait__t2.npz",
+   "n_sims": 3760299,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "corsola_galarian|grumpig|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__grumpig__bait__t2.npz",
+   "n_sims": 3069063,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "corsola_galarian|grumpig|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__grumpig__nobait__t2.npz",
+   "n_sims": 3069063,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "corsola_galarian|jellicent|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__jellicent__bait__t2.npz",
+   "n_sims": 4148469,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|jellicent|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__jellicent__nobait__t2.npz",
+   "n_sims": 4148469,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|medicham|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__medicham__bait__t2.npz",
+   "n_sims": 1560393,
+   "won_shape": [
+    4096,
+    513,
+    9
+   ]
+  },
+  "corsola_galarian|medicham|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__medicham__nobait__t2.npz",
+   "n_sims": 1560393,
+   "won_shape": [
+    4096,
+    513,
+    9
+   ]
+  },
   "corsola_galarian|quagsire_shadow|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -1909,6 +2855,94 @@
    "won_shape": [
     4096,
     519,
+    9
+   ]
+  },
+  "corsola_galarian|quagsire|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__quagsire__bait__t2.npz",
+   "n_sims": 2053098,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "corsola_galarian|quagsire|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__quagsire__nobait__t2.npz",
+   "n_sims": 2053098,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "corsola_galarian|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__stunfisk__bait__t2.npz",
+   "n_sims": 2098809,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 2098809,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|tinkaton|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__tinkaton__bait__t2.npz",
+   "n_sims": 6690411,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|tinkaton|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__tinkaton__nobait__t2.npz",
+   "n_sims": 6690411,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "corsola_galarian|togekiss|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__togekiss__bait__t2.npz",
+   "n_sims": 2095488,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
+  "corsola_galarian|togekiss|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "corsola_galarian__vs__togekiss__nobait__t2.npz",
+   "n_sims": 2095488,
+   "won_shape": [
+    4096,
+    514,
     9
    ]
   },
@@ -2660,6 +3694,28 @@
     9
    ]
   },
+  "diggersby|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "diggersby__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 14560137,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "diggersby|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "diggersby__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 14560137,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "diggersby|forretress|bait": {
    "baked": "2026-08-10",
    "clean_sample": true,
@@ -2745,6 +3801,28 @@
    "won_shape": [
     4096,
     519,
+    9
+   ]
+  },
+  "diggersby|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "diggersby__vs__stunfisk__bait__t2.npz",
+   "n_sims": 6960915,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "diggersby|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "diggersby__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 6960915,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -3144,6 +4222,72 @@
     9
    ]
   },
+  "empoleon|jumpluff|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "empoleon__vs__jumpluff__bait__t2.npz",
+   "n_sims": 4752495,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "empoleon|jumpluff|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "empoleon__vs__jumpluff__nobait__t2.npz",
+   "n_sims": 4752495,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "empoleon|kingdra|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "empoleon__vs__kingdra__bait__t2.npz",
+   "n_sims": 1000926,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "empoleon|kingdra|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "empoleon__vs__kingdra__nobait__t2.npz",
+   "n_sims": 1000926,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "empoleon|mantine|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "empoleon__vs__mantine__bait__t2.npz",
+   "n_sims": 736254,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "empoleon|mantine|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "empoleon__vs__mantine__nobait__t2.npz",
+   "n_sims": 736254,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "empoleon|medicham|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -3320,6 +4464,28 @@
     9
    ]
   },
+  "fearow|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "fearow__vs__altaria__bait__t2.npz",
+   "n_sims": 1213632,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "fearow|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "fearow__vs__altaria__nobait__t2.npz",
+   "n_sims": 1213632,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "fearow|corviknight|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -3361,6 +4527,28 @@
    "won_shape": [
     4096,
     514,
+    9
+   ]
+  },
+  "fearow|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "fearow__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 12501603,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "fearow|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "fearow__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 12501603,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -3430,6 +4618,28 @@
     9
    ]
   },
+  "fearow|stunfisk|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "fearow__vs__stunfisk__bait__t2.npz",
+   "n_sims": 2170899,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "fearow|stunfisk|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "fearow__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 2170899,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "fearow|wigglytuff|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -3449,6 +4659,28 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "feraligatr|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "feraligatr__vs__altaria__bait__t2.npz",
+   "n_sims": 2036466,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "feraligatr|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "feraligatr__vs__altaria__nobait__t2.npz",
+   "n_sims": 2036466,
+   "won_shape": [
+    4096,
+    519,
     9
    ]
   },
@@ -3540,6 +4772,28 @@
     9
    ]
   },
+  "feraligatr|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "feraligatr__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 10532034,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "feraligatr|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "feraligatr__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 10532034,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "feraligatr|lickilicky|bait": {
    "baked": "2026-08-10",
    "clean_sample": false,
@@ -3584,6 +4838,138 @@
     9
    ]
   },
+  "feraligatr|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "feraligatr__vs__stunfisk__bait__t2.npz",
+   "n_sims": 2552607,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "feraligatr|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "feraligatr__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 2552607,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|aegislash_shield|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__aegislash_shield__bait__t2.npz",
+   "n_sims": 13067496,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "forretress_shadow|aegislash_shield|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__aegislash_shield__nobait__t2.npz",
+   "n_sims": 13067496,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "forretress_shadow|altaria_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__altaria_shadow__bait__t2.npz",
+   "n_sims": 12591441,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "forretress_shadow|altaria_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__altaria_shadow__nobait__t2.npz",
+   "n_sims": 12591441,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "forretress_shadow|azumarill|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__azumarill__bait__t2.npz",
+   "n_sims": 8368695,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "forretress_shadow|azumarill|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__azumarill__nobait__t2.npz",
+   "n_sims": 8368695,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "forretress_shadow|clodsire|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__clodsire__bait__t2.npz",
+   "n_sims": 11575575,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "forretress_shadow|clodsire|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__clodsire__nobait__t2.npz",
+   "n_sims": 11575575,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "forretress_shadow|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 9320607,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "forretress_shadow|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 9320607,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "forretress_shadow|corviknight|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -3603,6 +4989,28 @@
    "won_shape": [
     4096,
     517,
+    9
+   ]
+  },
+  "forretress_shadow|diggersby|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__diggersby__bait__t2.npz",
+   "n_sims": 12601251,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "forretress_shadow|diggersby|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__diggersby__nobait__t2.npz",
+   "n_sims": 12601251,
+   "won_shape": [
+    4096,
+    519,
     9
    ]
   },
@@ -3628,6 +5036,116 @@
     9
    ]
   },
+  "forretress_shadow|fearow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__fearow__bait__t2.npz",
+   "n_sims": 11555217,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "forretress_shadow|fearow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__fearow__nobait__t2.npz",
+   "n_sims": 11555217,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "forretress_shadow|feraligatr|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__feraligatr__bait__t2.npz",
+   "n_sims": 10523268,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "forretress_shadow|feraligatr|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__feraligatr__nobait__t2.npz",
+   "n_sims": 10523268,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "forretress_shadow|forretress|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__forretress__bait__t2.npz",
+   "n_sims": 13561560,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|forretress|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__forretress__nobait__t2.npz",
+   "n_sims": 13561560,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|furret|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__furret__bait__t2.npz",
+   "n_sims": 8178336,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|furret|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__furret__nobait__t2.npz",
+   "n_sims": 8178336,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|gourgeist_super|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__gourgeist_super__bait__t2.npz",
+   "n_sims": 9806427,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "forretress_shadow|gourgeist_super|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__gourgeist_super__nobait__t2.npz",
+   "n_sims": 9806427,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
   "forretress_shadow|grumpig|bait": {
    "baked": "2026-08-10",
    "clean_sample": true,
@@ -3647,6 +5165,50 @@
    "won_shape": [
     4096,
     517,
+    9
+   ]
+  },
+  "forretress_shadow|jellicent|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__jellicent__bait__t2.npz",
+   "n_sims": 9595674,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|jellicent|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__jellicent__nobait__t2.npz",
+   "n_sims": 9595674,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|jumpluff|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__jumpluff__bait__t2.npz",
+   "n_sims": 12928626,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "forretress_shadow|jumpluff|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__jumpluff__nobait__t2.npz",
+   "n_sims": 12928626,
+   "won_shape": [
+    4096,
+    521,
     9
    ]
   },
@@ -3716,6 +5278,160 @@
     9
    ]
   },
+  "forretress_shadow|medicham|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__medicham__bait__t2.npz",
+   "n_sims": 9157248,
+   "won_shape": [
+    4096,
+    513,
+    9
+   ]
+  },
+  "forretress_shadow|medicham|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__medicham__nobait__t2.npz",
+   "n_sims": 9157248,
+   "won_shape": [
+    4096,
+    513,
+    9
+   ]
+  },
+  "forretress_shadow|ninetales|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__ninetales__bait__t2.npz",
+   "n_sims": 13379994,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "forretress_shadow|ninetales|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__ninetales__nobait__t2.npz",
+   "n_sims": 13379994,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "forretress_shadow|quagsire|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__quagsire__bait__t2.npz",
+   "n_sims": 9636813,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "forretress_shadow|quagsire|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__quagsire__nobait__t2.npz",
+   "n_sims": 9636813,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "forretress_shadow|sableye_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__sableye_shadow__bait__t2.npz",
+   "n_sims": 12983427,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "forretress_shadow|sableye_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__sableye_shadow__nobait__t2.npz",
+   "n_sims": 12983427,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "forretress_shadow|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__stunfisk__bait__t2.npz",
+   "n_sims": 9245376,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 9245376,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|tinkaton|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__tinkaton__bait__t2.npz",
+   "n_sims": 12628332,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|tinkaton|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__tinkaton__nobait__t2.npz",
+   "n_sims": 12628332,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress_shadow|togekiss|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__togekiss__bait__t2.npz",
+   "n_sims": 10931004,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
+  "forretress_shadow|togekiss|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress_shadow__vs__togekiss__nobait__t2.npz",
+   "n_sims": 10931004,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
   "forretress_shadow|wigglytuff|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -3757,6 +5473,50 @@
    "won_shape": [
     4096,
     520,
+    9
+   ]
+  },
+  "forretress|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "forretress__vs__altaria__bait__t2.npz",
+   "n_sims": 11028996,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "forretress|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "forretress__vs__altaria__nobait__t2.npz",
+   "n_sims": 11028996,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "forretress|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 8308701,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "forretress|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 8308701,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -3826,6 +5586,28 @@
     9
    ]
   },
+  "forretress|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 13564098,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "forretress__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 13564098,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "forretress|lickilicky|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -3867,6 +5649,72 @@
    "won_shape": [
     4096,
     519,
+    9
+   ]
+  },
+  "forretress|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "forretress__vs__stunfisk__bait__t2.npz",
+   "n_sims": 8349327,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "forretress|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "forretress__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 8349327,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "furret|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "furret__vs__altaria__bait__t2.npz",
+   "n_sims": 2835558,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "furret|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "furret__vs__altaria__nobait__t2.npz",
+   "n_sims": 2835558,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "furret|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "furret__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 2947698,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "furret|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "furret__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 2947698,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -3914,6 +5762,28 @@
     9
    ]
   },
+  "furret|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "furret__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 7656210,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "furret|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "furret__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 7656210,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "furret|lickilicky|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -3936,6 +5806,28 @@
     9
    ]
   },
+  "furret|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "furret__vs__stunfisk__bait__t2.npz",
+   "n_sims": 5456115,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "furret|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "furret__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 5456115,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "furret|wigglytuff|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -3955,6 +5847,50 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "gourgeist_super|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "gourgeist_super__vs__altaria__bait__t2.npz",
+   "n_sims": 1260531,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "gourgeist_super|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "gourgeist_super__vs__altaria__nobait__t2.npz",
+   "n_sims": 1260531,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "gourgeist_super|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "gourgeist_super__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 1923606,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "gourgeist_super|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "gourgeist_super__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 1923606,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -3999,6 +5935,28 @@
    "won_shape": [
     4096,
     514,
+    9
+   ]
+  },
+  "gourgeist_super|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "gourgeist_super__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 9200043,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "gourgeist_super|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "gourgeist_super__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 9200043,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -4068,6 +6026,28 @@
     9
    ]
   },
+  "gourgeist_super|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "gourgeist_super__vs__stunfisk__bait__t2.npz",
+   "n_sims": 1090026,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "gourgeist_super|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "gourgeist_super__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 1090026,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "gourgeist_super|wigglytuff|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -4087,6 +6067,50 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "grumpig|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "grumpig__vs__altaria__bait__t2.npz",
+   "n_sims": 884610,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "grumpig|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "grumpig__vs__altaria__nobait__t2.npz",
+   "n_sims": 884610,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "grumpig|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "grumpig__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 1699245,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "grumpig|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "grumpig__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 1699245,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -4200,6 +6224,28 @@
     9
    ]
   },
+  "grumpig|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "grumpig__vs__stunfisk__bait__t2.npz",
+   "n_sims": 1264788,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "grumpig|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "grumpig__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 1264788,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "grumpig|wigglytuff|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -4219,6 +6265,28 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "guzzlord|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "guzzlord__vs__altaria__bait__t2.npz",
+   "n_sims": 3454191,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "guzzlord|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "guzzlord__vs__altaria__nobait__t2.npz",
+   "n_sims": 3454191,
+   "won_shape": [
+    4096,
+    519,
     9
    ]
   },
@@ -4310,6 +6378,72 @@
     9
    ]
   },
+  "guzzlord|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "guzzlord__vs__stunfisk__bait__t2.npz",
+   "n_sims": 3165111,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "guzzlord|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "guzzlord__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 3165111,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "jellicent|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "jellicent__vs__altaria__bait__t2.npz",
+   "n_sims": 1567935,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "jellicent|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "jellicent__vs__altaria__nobait__t2.npz",
+   "n_sims": 1567935,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "jellicent|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "jellicent__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 2695248,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "jellicent|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "jellicent__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 2695248,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "jellicent|corviknight|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -4351,6 +6485,28 @@
    "won_shape": [
     4096,
     514,
+    9
+   ]
+  },
+  "jellicent|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "jellicent__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 10045188,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "jellicent|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "jellicent__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 10045188,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -4398,6 +6554,28 @@
     9
    ]
   },
+  "jellicent|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "jellicent__vs__stunfisk__bait__t2.npz",
+   "n_sims": 2481255,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "jellicent|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "jellicent__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 2481255,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "jellicent|wigglytuff|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -4442,6 +6620,50 @@
     9
    ]
   },
+  "jumpluff|empoleon|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "jumpluff__vs__empoleon__bait__t2.npz",
+   "n_sims": 4595292,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
+  "jumpluff|empoleon|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "jumpluff__vs__empoleon__nobait__t2.npz",
+   "n_sims": 4595292,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
+  "jumpluff|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "jumpluff__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 13925772,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "jumpluff|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "jumpluff__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 13925772,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "jumpluff|lickilicky|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -4461,6 +6683,28 @@
    "won_shape": [
     4096,
     517,
+    9
+   ]
+  },
+  "jumpluff|stunfisk|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "jumpluff__vs__stunfisk__bait__t2.npz",
+   "n_sims": 3778578,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "jumpluff|stunfisk|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "jumpluff__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 3778578,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -4530,6 +6774,28 @@
     9
    ]
   },
+  "kingdra|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "kingdra__vs__altaria__bait__t2.npz",
+   "n_sims": 1100727,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "kingdra|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "kingdra__vs__altaria__nobait__t2.npz",
+   "n_sims": 1100727,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "kingdra|corviknight|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -4549,6 +6815,28 @@
    "won_shape": [
     4096,
     517,
+    9
+   ]
+  },
+  "kingdra|empoleon|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "kingdra__vs__empoleon__bait__t2.npz",
+   "n_sims": 1126071,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
+  "kingdra|empoleon|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "kingdra__vs__empoleon__nobait__t2.npz",
+   "n_sims": 1126071,
+   "won_shape": [
+    4096,
+    514,
     9
    ]
   },
@@ -4637,6 +6925,28 @@
    "won_shape": [
     4096,
     519,
+    9
+   ]
+  },
+  "kingdra|stunfisk|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "kingdra__vs__stunfisk__bait__t2.npz",
+   "n_sims": 1603971,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "kingdra|stunfisk|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "kingdra__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 1603971,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -5234,6 +7544,28 @@
     9
    ]
   },
+  "mantine|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "mantine__vs__altaria__bait__t2.npz",
+   "n_sims": 1078551,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "mantine|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "mantine__vs__altaria__nobait__t2.npz",
+   "n_sims": 1078551,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "mantine|corviknight|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -5275,6 +7607,28 @@
    "won_shape": [
     4096,
     519,
+    9
+   ]
+  },
+  "mantine|empoleon|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "mantine__vs__empoleon__bait__t2.npz",
+   "n_sims": 804690,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
+  "mantine|empoleon|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "mantine__vs__empoleon__nobait__t2.npz",
+   "n_sims": 804690,
+   "won_shape": [
+    4096,
+    514,
     9
    ]
   },
@@ -5432,6 +7786,28 @@
     9
    ]
   },
+  "medicham|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "medicham__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 2669274,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "medicham|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "medicham__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 2669274,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "medicham|corviknight|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -5498,6 +7874,28 @@
     9
    ]
   },
+  "medicham|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "medicham__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 14258448,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "medicham|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "medicham__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 14258448,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "medicham|quagsire_shadow|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -5517,6 +7915,28 @@
    "won_shape": [
     4096,
     519,
+    9
+   ]
+  },
+  "medicham|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "medicham__vs__stunfisk__bait__t2.npz",
+   "n_sims": 3781692,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "medicham|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "medicham__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 3781692,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -5605,6 +8025,28 @@
    "won_shape": [
     4096,
     514,
+    9
+   ]
+  },
+  "ninetales|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "ninetales__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 13210830,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "ninetales|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "ninetales__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 13210830,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -6312,6 +8754,28 @@
     9
    ]
   },
+  "quagsire|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "quagsire__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 1721160,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "quagsire|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "quagsire__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 1721160,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "quagsire|corviknight|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -6331,6 +8795,28 @@
    "won_shape": [
     4096,
     517,
+    9
+   ]
+  },
+  "quagsire|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "quagsire__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 10832364,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "quagsire|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "quagsire__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 10832364,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -6422,6 +8908,28 @@
     9
    ]
   },
+  "sableye_shadow|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "sableye_shadow__vs__altaria__bait__t2.npz",
+   "n_sims": 11540988,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "sableye_shadow|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "sableye_shadow__vs__altaria__nobait__t2.npz",
+   "n_sims": 11540988,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "sableye_shadow|corviknight|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -6463,6 +8971,28 @@
    "won_shape": [
     4096,
     514,
+    9
+   ]
+  },
+  "sableye_shadow|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "sableye_shadow__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 15622893,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "sableye_shadow|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "sableye_shadow__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 15622893,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -6510,6 +9040,182 @@
     9
    ]
   },
+  "sableye_shadow|stunfisk|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "sableye_shadow__vs__stunfisk__bait__t2.npz",
+   "n_sims": 12736692,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "sableye_shadow|stunfisk|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "sableye_shadow__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 12736692,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|aegislash_shield|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "stunfisk__vs__aegislash_shield__bait__t2.npz",
+   "n_sims": 5033493,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "stunfisk|aegislash_shield|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "stunfisk__vs__aegislash_shield__nobait__t2.npz",
+   "n_sims": 5033493,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "stunfisk|altaria_shadow|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__altaria_shadow__bait__t2.npz",
+   "n_sims": 1789767,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "stunfisk|altaria_shadow|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__altaria_shadow__nobait__t2.npz",
+   "n_sims": 1789767,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "stunfisk|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__altaria__bait__t2.npz",
+   "n_sims": 1358910,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "stunfisk|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__altaria__nobait__t2.npz",
+   "n_sims": 1358910,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "stunfisk|azumarill|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__azumarill__bait__t2.npz",
+   "n_sims": 2406870,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "stunfisk|azumarill|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__azumarill__nobait__t2.npz",
+   "n_sims": 2406870,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "stunfisk|clodsire|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__clodsire__bait__t2.npz",
+   "n_sims": 2830617,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "stunfisk|clodsire|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__clodsire__nobait__t2.npz",
+   "n_sims": 2830617,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "stunfisk|corsola_galarian|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 1724112,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "stunfisk|corsola_galarian|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 1724112,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "stunfisk|diggersby|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__diggersby__bait__t2.npz",
+   "n_sims": 4732416,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "stunfisk|diggersby|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__diggersby__nobait__t2.npz",
+   "n_sims": 4732416,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "stunfisk|empoleon|bait": {
    "baked": "2026-08-10",
    "clean_sample": true,
@@ -6529,6 +9235,270 @@
    "won_shape": [
     4096,
     514,
+    9
+   ]
+  },
+  "stunfisk|fearow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "stunfisk__vs__fearow__bait__t2.npz",
+   "n_sims": 2422881,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "stunfisk|fearow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "stunfisk__vs__fearow__nobait__t2.npz",
+   "n_sims": 2422881,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "stunfisk|feraligatr|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__feraligatr__bait__t2.npz",
+   "n_sims": 3716631,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "stunfisk|feraligatr|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__feraligatr__nobait__t2.npz",
+   "n_sims": 3716631,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "stunfisk|forretress_shadow|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 10936359,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|forretress_shadow|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 10936359,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|forretress|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__forretress__bait__t2.npz",
+   "n_sims": 9702891,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|forretress|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__forretress__nobait__t2.npz",
+   "n_sims": 9702891,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|furret|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__furret__bait__t2.npz",
+   "n_sims": 7196499,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|furret|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__furret__nobait__t2.npz",
+   "n_sims": 7196499,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|gourgeist_super|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__gourgeist_super__bait__t2.npz",
+   "n_sims": 1807245,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "stunfisk|gourgeist_super|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__gourgeist_super__nobait__t2.npz",
+   "n_sims": 1807245,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "stunfisk|grumpig|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__grumpig__bait__t2.npz",
+   "n_sims": 1891116,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "stunfisk|grumpig|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__grumpig__nobait__t2.npz",
+   "n_sims": 1891116,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "stunfisk|guzzlord|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__guzzlord__bait__t2.npz",
+   "n_sims": 2024892,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "stunfisk|guzzlord|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__guzzlord__nobait__t2.npz",
+   "n_sims": 2024892,
+   "won_shape": [
+    4096,
+    515,
+    9
+   ]
+  },
+  "stunfisk|jellicent|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__jellicent__bait__t2.npz",
+   "n_sims": 3127347,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|jellicent|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__jellicent__nobait__t2.npz",
+   "n_sims": 3127347,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|jumpluff|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "stunfisk__vs__jumpluff__bait__t2.npz",
+   "n_sims": 5607639,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "stunfisk|jumpluff|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "stunfisk__vs__jumpluff__nobait__t2.npz",
+   "n_sims": 5607639,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "stunfisk|kingdra|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "stunfisk__vs__kingdra__bait__t2.npz",
+   "n_sims": 2398788,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "stunfisk|kingdra|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "stunfisk__vs__kingdra__nobait__t2.npz",
+   "n_sims": 2398788,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "stunfisk|medicham|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__medicham__bait__t2.npz",
+   "n_sims": 1854927,
+   "won_shape": [
+    4096,
+    513,
+    9
+   ]
+  },
+  "stunfisk|medicham|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__medicham__nobait__t2.npz",
+   "n_sims": 1854927,
+   "won_shape": [
+    4096,
+    513,
     9
    ]
   },
@@ -6598,6 +9568,72 @@
     9
    ]
   },
+  "stunfisk|sableye_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "stunfisk__vs__sableye_shadow__bait__t2.npz",
+   "n_sims": 11625462,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "stunfisk|sableye_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "stunfisk__vs__sableye_shadow__nobait__t2.npz",
+   "n_sims": 11625462,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "stunfisk|tinkaton|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__tinkaton__bait__t2.npz",
+   "n_sims": 7292196,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|tinkaton|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__tinkaton__nobait__t2.npz",
+   "n_sims": 7292196,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "stunfisk|togekiss|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__togekiss__bait__t2.npz",
+   "n_sims": 2036160,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
+  "stunfisk|togekiss|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "stunfisk__vs__togekiss__nobait__t2.npz",
+   "n_sims": 2036160,
+   "won_shape": [
+    4096,
+    514,
+    9
+   ]
+  },
   "stunfisk|wigglytuff|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -6617,6 +9653,50 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "tinkaton|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "tinkaton__vs__altaria__bait__t2.npz",
+   "n_sims": 4624425,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "tinkaton|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "tinkaton__vs__altaria__nobait__t2.npz",
+   "n_sims": 4624425,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "tinkaton|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "tinkaton__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 3889260,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "tinkaton|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "tinkaton__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 3889260,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -6661,6 +9741,28 @@
    "won_shape": [
     4096,
     514,
+    9
+   ]
+  },
+  "tinkaton|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "tinkaton__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 12415500,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "tinkaton|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "tinkaton__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 12415500,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -6752,6 +9854,50 @@
     9
    ]
   },
+  "tinkaton|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "tinkaton__vs__stunfisk__bait__t2.npz",
+   "n_sims": 5032665,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "tinkaton|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "tinkaton__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 5032665,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "togekiss|altaria|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "togekiss__vs__altaria__bait__t2.npz",
+   "n_sims": 757998,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "togekiss|altaria|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "togekiss__vs__altaria__nobait__t2.npz",
+   "n_sims": 757998,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "togekiss|azumarill|bait": {
    "baked": "2026-08-10",
    "clean_sample": false,
@@ -6771,6 +9917,28 @@
    "won_shape": [
     4096,
     521,
+    9
+   ]
+  },
+  "togekiss|corsola_galarian|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "togekiss__vs__corsola_galarian__bait__t2.npz",
+   "n_sims": 1175418,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "togekiss|corsola_galarian|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "togekiss__vs__corsola_galarian__nobait__t2.npz",
+   "n_sims": 1175418,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -6818,6 +9986,28 @@
     9
    ]
   },
+  "togekiss|forretress_shadow|bait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "togekiss__vs__forretress_shadow__bait__t2.npz",
+   "n_sims": 9533907,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "togekiss|forretress_shadow|nobait": {
+   "baked": "2026-08-12",
+   "clean_sample": false,
+   "file": "togekiss__vs__forretress_shadow__nobait__t2.npz",
+   "n_sims": 9533907,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
   "togekiss|lickilicky|bait": {
    "baked": "2026-08-11",
    "clean_sample": false,
@@ -6859,6 +10049,28 @@
    "won_shape": [
     4096,
     519,
+    9
+   ]
+  },
+  "togekiss|stunfisk|bait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "togekiss__vs__stunfisk__bait__t2.npz",
+   "n_sims": 1279215,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "togekiss|stunfisk|nobait": {
+   "baked": "2026-08-11",
+   "clean_sample": false,
+   "file": "togekiss__vs__stunfisk__nobait__t2.npz",
+   "n_sims": 1279215,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
