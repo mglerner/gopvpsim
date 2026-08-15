@@ -625,6 +625,14 @@ new dive section — MICHAEL: review + promote to `both`.
 Open follow-ups:
 
 - **Review the Matchup Clusters guide** (`authorship=ai` -> `both`).
+- **Review the IV Robustness guide** (`guides/iv-robustness/`,
+  published 2026-08-15 at `authorship=ai` -> promote to `both`).
+  General robustness methodology (planes, cohorts/probes, W/L/? grids,
+  curves, reach/deny, honesty rails) with the Worlds pages as the
+  worked example. Follow-up when convenient: link the guide FROM the
+  Worlds hub/cheat sheets -- that means re-rendering Worlds surfaces,
+  so it requires the gamemaster re-pin first (see the Worlds NOTE
+  above); don't do it casually.
 - **Two stale screenshots** (low): `envelope-position/screenshots/
   envelope-example.png` (pre-rename "Top Picks" legend) and
   `iv-flavor-guide/screenshots/flavor-example.png` (pre-2026-06-25
