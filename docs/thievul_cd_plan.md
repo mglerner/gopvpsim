@@ -59,9 +59,28 @@ for PvP" before the event.
 - cd_prep dives and the sweep cache coexisted fine in the Oinkologne
   arc; nothing new needed there.
 
-## Open input
+## The request (from Michael's screenshots, 2026-08-14)
 
-- Michael has a Reddit comment thread (r/TheSilphArena, comment
-  p3ol6jc on the launch post) that may contain the specific request
-  behind this dive. Claude cannot fetch reddit.com -- ask Michael for
-  a screenshot/paste of it before finalizing the article's framing.
+The dive is a direct user request on the launch post
+(r/TheSilphArena): **u/LeansCenter** (9h before the screenshot):
+"Thank you for your continued work on this! I use it alllll the time.
+Any chance you'll have a GL Thievul deep dive before Comm Day? It
+doesn't appear that Thievul is too spectacular in UL so no analysis
+needed and besides, a Hundo is optimal anyway."
+
+- **Scope: GL only, confirmed by the requester.** (Sanity-check the
+  UL hundo claim in passing if cheap, but UL is not a deliverable.)
+- LeansCenter is the SAME user whose top-10/20/50 + limited-cups
+  feedback became the shipped top-N/cup filter -- second closed
+  feedback loop with one person. When the dive ships, Michael can
+  reply on that comment.
+- Related thread context worth remembering: LeansCenter also asked
+  (8-9d ago) whether the post-Worlds move rebalance will reshuffle
+  per-species IV rankings (their example: Tinkaton 0/8/15 -- does a
+  move nerf/buff move the top spread?). Michael replied he is looking
+  forward to seeing the shifts. That is a natural post-rebalance
+  analysis/article for later -- do not scope it into the Thievul
+  session, just don't lose it.
+- Post metadata for reference: Michael posts as u/SpaceBearAI; the
+  post links mglerner.com/pogo-dives + the github repo; 36 upvotes /
+  21 comments / 4.9K views despite a 4-day automod removal.
