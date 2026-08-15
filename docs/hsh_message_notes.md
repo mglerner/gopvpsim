@@ -1,9 +1,18 @@
 # Notes for the Homeslice Henry discord message (drafted 2026-08-14)
 
 Context: Michael is messaging Henry, pointing him at the Reddit launch
-post (r/TheSilphArena) and asking him to check out the site. These are
-talking points -- Michael writes the actual message. What's new since
-the launch post (2026-07-02), strongest first:
+post (r/TheSilphArena, posted as u/SpaceBearAI) and asking him to
+check out the site. Useful framing from the post itself: it already
+name-checks the deep dives "on HSH's discord" (alongside RyanSwag and
+JRE47) as the expert bar the site does NOT claim to reach -- "I'm just
+a filthy casual, so I didn't try to interpret it all." That humility +
+the AI-transparency section ("super clear about what's AI generated,
+what's human generated, and what's a hybrid") is the right opening
+note with Henry: this is a data instrument looking for expert eyes,
+not a rival dive author.
+
+These are talking points -- Michael writes the actual message. What's
+new since the launch post (2026-07-02), strongest first:
 
 1. **The Worlds 2026 suite went live 2026-08-14** -- the hook for a
    PvP creator two weeks from Worlds. pogodives.com/worlds.html: the
@@ -20,10 +29,12 @@ the launch post (2026-07-02), strongest first:
    cutoff is boundary-confirmed against the engine at render time; the
    pages annotate when a number is vacuous rather than letting it read
    as signal. The site says when it is uncertain.
-3. **Reddit feedback shipped**: the top-10/20/50 opponent filter and
-   limited-cup dives came directly from launch-thread requests
-   (u/LeansCenter). Worth stating explicitly -- the feedback loop is
-   real.
+3. **Reddit feedback shipped -- twice, for the same user**: the
+   top-10/20/50 opponent filter and limited-cup dives came directly
+   from u/LeansCenter's launch-thread requests, and Saturday's Thievul
+   CD dive answers their newest comment ("I use it alllll the time.
+   Any chance you'll have a GL Thievul deep dive before Comm Day?").
+   Worth stating explicitly -- the feedback loop is real and fast.
 4. **Five PvPoke bug reports filed upstream** (pvpoke/pvpoke #378-382:
    Gyro Ball, Morpeko, dead pruning, DPE overwrite, bestChargedMove
    question) -- engine credibility, and a signal this complements
