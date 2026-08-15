@@ -6,6 +6,16 @@ delete its bullet or move the writeup out -- do not leave a 'DONE/RESOLVED'
 narrative inline. This convention was set 2026-06-27 after the file hit ~1980
 lines of mostly-completed chronological batches. -->
 
+## NEXT SESSION (2026-08-15): Thievul CD dive — DEADLINE Sat, CD is Sun 08-16
+
+Plan of record: `docs/thievul_cd_plan.md` (facts verified, CD-prep
+rule check DONE — the gamemaster genuinely lags, `[cd_prep]` injection
+of ICY_WIND is correct; cautions re: the pinned Worlds gamemaster and
+sweep-cache migration are in the doc). Separately,
+`docs/hsh_message_notes.md` has the talking points for Michael's
+discord message to Homeslice Henry. Reddit thread input still needed
+(Claude can't fetch reddit — ask Michael for a screenshot).
+
 ## Worlds 2026 robustness analysis — IN PROGRESS (sessions 2-5 remain)
 
 **Plan of record: `docs/worlds_prep_plan.md`** (read it before touching
