@@ -301,7 +301,13 @@ def test_meta_has_no_mimikyu_entry(meta):
     banned = [r for r in meta['rejects'] if r.get('banned')]
     assert len(banned) == 1
     assert banned[0]['name'] == 'Mimikyu'
-    assert banned[0]['current_rank'] == 1
+    # current_rank tracks PvPoke's LIVE site ranking, a moving external
+    # value -- it was 1 at the 2026-08-10 generation, then PvPoke's
+    # rankings refresh dropped it to 5 (caught 2026-08-14; the == 1 pin
+    # violated the no-pinning-moving-externals rule). Assert presence
+    # and plausibility, not the exact position.
+    assert isinstance(banned[0]['current_rank'], int)
+    assert banned[0]['current_rank'] >= 1
     assert len(banned[0]['citations']) == 2
 
 
