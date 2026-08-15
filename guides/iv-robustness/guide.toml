@@ -1,0 +1,13 @@
+title = "IV Robustness"
+slug = "iv-robustness"
+description = "How we test whether a matchup outcome survives the IVs - outcome planes, cohorts and probe spreads, W/L/? grids, robustness curves, and closed-form reach/deny cutoffs."
+# Sits after Matchup Clusters (4.5): both are "beyond the average score"
+# methodology, and the Worlds robustness pages build on the same
+# marginal-matchup instinct. Before the CD-article guide (5).
+order = 4.8
+coming_soon = false
+# Drafted 2026-08-15 (Claude, at Michael's request) after the Worlds 2026
+# robustness pages shipped, framed as GENERAL methodology (the Worlds
+# pages are the current worked example, not the definition).
+# MICHAEL: review + promote to "both" when satisfied.
+authorship = "ai"
