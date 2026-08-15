@@ -950,6 +950,26 @@ DIVES = [
         'top_movesets': 4,
         'no_thresholds': True,
     },
+    # Thievul GL -- Nickit CD (Icy Wind) prep dive, added 2026-08-14 for
+    # the 2026-08-16 CD (docs/thievul_cd_plan.md; direct request from
+    # u/LeansCenter, GL-only scope -- hundo maxes at CP 2444 so UL never
+    # binds). Deliberately NOT no_thresholds: thresholds/thievul.toml
+    # carries the [cd_prep] ICY_WIND injection, which deep_dive.py only
+    # reads on the thresholds auto-discover path. Reference pinned to the
+    # PRE-CD PvPoke default (post-CD rankings already default to
+    # SP + NS/IW), so the reference delta answers "what does Icy Wind
+    # buy"; the reference gets its own sweep + page even if it screens
+    # below top_movesets. Charged pair alphabetical per the Sableye
+    # dedup note above.
+    {
+        'species': 'Thievul',
+        'league': 'great',
+        'slug': 'thievul-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'top_movesets': 4,
+        'reference': 'SUCKER_PUNCH,NIGHT_SLASH,PLAY_ROUGH',
+    },
 ]
 
 
