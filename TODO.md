@@ -58,18 +58,19 @@ tier: hits-survived by (def-tier x HP), with the shed-cutoff that buys
 truth, (d) new surface = its own adversarial round before ship. Not
 publish-gating.
 
-Worlds is Aug 28-30. **PUBLISH GATE: full amber coverage MET
-2026-08-14 (`c80889d`)** -- 401/401 amber pairs baked + detail pages
-rendered, 0 deferred, verify_worlds OK; gamemaster held at the
-pre-Worlds vintage 8f1d6cca5c0f throughout (only upstream delta:
-three added mega forms, sim-irrelevant). NOTE: the data cache now
-holds that pinned old blob; the next TTL refetch (or deleting
-`~/Documents/gopvpsim_cache/gamemaster.json`) returns to current --
-fine after publish, but re-pin from pvpoke `f60a41199` if any Worlds
-surface needs re-rendering. REMAINING:
-(a) Michael's publish go (`publish_website.sh --push`); (b) a11y
-polish still open: badge text 4.36:1 in pokemon-dark, hub matrix
-mini-grids color-only (cheat sheets are the text alternative).
+Worlds is Aug 28-30. **PUBLISHED 2026-08-14** (Michael's go;
+`publish_website.sh --push`, live-verified at pogodives.com): 401/401
+amber pairs baked + pages, verify_worlds OK, plus the same-day
+pre-publish polish batch (`157bf71`: cheat-sheet grid links, moot deny
+annotation, curve hover readout). Gamemaster held at the pre-Worlds
+vintage 8f1d6cca5c0f throughout (only upstream delta: three added mega
+forms, sim-irrelevant). NOTE: the data cache holds that pinned old
+blob; the next TTL refetch returns to current -- fine now that the
+site is published, but re-pin from pvpoke `f60a41199` before
+re-rendering any Worlds surface pre-Worlds. REMAINING (all
+non-gating): (a) a11y polish: badge text 4.36:1 in pokemon-dark, hub
+matrix mini-grids color-only (cheat sheets are the text alternative);
+(b) optional session-6 survival strip (scoped above).
 Session-4 carry-in status (2026-08-10): rebalance date RESOLVED
 (Forever Forward live in-game 2026-06-02 1pm PDT; Turin was
 post-rebalance -- pages state the split; plan doc corrected).
