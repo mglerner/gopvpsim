@@ -960,14 +960,16 @@ DIVES = [
     # SP + NS/IW), so the reference delta answers "what does Icy Wind
     # buy"; the reference gets its own sweep + page even if it screens
     # below top_movesets. Charged pair alphabetical per the Sableye
-    # dedup note above.
+    # dedup note above. top_movesets 4 -> 6 on 2026-08-15 (Michael):
+    # widen the dropdown past the Sucker Punch builds (the next screened
+    # movesets, likely Snarl variants).
     {
         'species': 'Thievul',
         'league': 'great',
         'slug': 'thievul-great-league',
         'html_base': 'index.html',
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
-        'top_movesets': 4,
+        'top_movesets': 6,
         'reference': 'SUCKER_PUNCH,NIGHT_SLASH,PLAY_ROUGH',
     },
 ]
