@@ -1,0 +1,43 @@
+# Thievul -- Great League thresholds and CD-prep injection.
+#
+# CD: Nickit Community Day, Sun 2026-08-16 (evolve during the event or
+# up to 4h after for Icy Wind -- Ice charged attack, elite / not
+# TM-able afterward). Plan of record: docs/thievul_cd_plan.md.
+# Deep dive: userdata/website/thievul-great-league/
+#
+# This file pre-exists the dive to carry the [cd_prep] table below.
+# deep_dive.py only reads cd_prep on the thresholds AUTO-DISCOVER path,
+# so do NOT run the Thievul dive with --no-thresholds -- that silently
+# skips the injection. Spread/threshold data gets populated after the
+# dive, following the Oinkologne recipe.
+
+[Thievul]
+sources = "gopvpsim deep dive (2026-08-15); pre-CD Icy Wind analysis"
+
+[Thievul.article]
+slug = "thievul-cd-2026-08"
+
+# Species narrative: auto-generated from dive data by
+# scripts/auto_gen_narrative.py; override by setting any field to
+# non-empty prose (human-authored content wins).
+[Thievul.intro]
+body = ""
+
+[Thievul.meta_role]
+good_at = ""
+bad_at = ""
+body = ""
+
+# CD-prep rule check (CLAUDE.md) run 2026-08-14, re-verified at fire
+# time: the PINNED pre-Worlds gamemaster we sim with (8f1d6cca5c0f,
+# pvpoke f60a41199) has no ICY_WIND for Thievul, so injection is
+# required. Upstream pvpoke has since added it (f754cd6fc "Icy Wind
+# Thievul", 2026-08-14: chargedMoves + eliteMoves = ["ICY_WIND"]), so
+# the injected pool exactly matches current pvpoke's legal pool --
+# injection becomes a harmless no-op the moment the cached gamemaster
+# refreshes off the Worlds pin. Delete this table after the CD ships
+# or once the un-pinned gamemaster stably lists Icy Wind.
+[Thievul.cd_prep]
+event = "Icy Wind Community Day 2026-08-16 (Nickit)"
+charged_moves = ["ICY_WIND"]
+notes = "Pinned pre-Worlds gamemaster lags; upstream pvpoke f754cd6fc already lists ICY_WIND as an elite charged move, so injected pool == current pvpoke pool."

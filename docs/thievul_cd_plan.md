@@ -21,6 +21,21 @@ for PvP" before the event.
   it). So `[cd_prep]` injection of `ICY_WIND` into the charged pool is
   CORRECT here -- this is the opposite of the 2026-06 Baxcalibur trap
   recorded in CLAUDE.md.
+- **UPDATE (2026-08-14, fire-off session): upstream pvpoke caught up.**
+  `f754cd6fc` "Icy Wind Thievul" (2026-08-14) adds ICY_WIND to
+  Thievul's `chargedMoves` AND `eliteMoves`, and the refreshed
+  rankings cache now defaults Thievul to Sucker Punch / Night Slash +
+  Icy Wind (overall GL rank ~41). Injection STAYS correct because we
+  sim on the PINNED pre-Worlds gamemaster (`8f1d6cca5c0f`), which
+  still lacks the move -- and the injected pool exactly matches
+  current pvpoke's legal pool, so results are vintage-equivalent.
+  Pre-CD PvPoke default (the dive's pinned `--reference`):
+  Sucker Punch / Night Slash + Play Rough (verified from `e5ee9b767`
+  rankings).
+- **UL sanity check (requester's claim): CONFIRMED.** Hundo Thievul
+  maxes at CP 2415 (L50) / 2444 (L51 best-buddy) -- it cannot reach
+  the 2500 cap, so "a hundo is optimal anyway" in UL is literally
+  true. GL-only scope stands.
 
 ## The work (Oinkologne CD recipe)
 
@@ -29,6 +44,14 @@ for PvP" before the event.
    `enumerate_movesets(..., cd_prep_charged=)`, commit `e61c14e`).
    Check whether Thievul even reaches 1500 comfortably / whether a UL
    cap matters (almost certainly GL-only).
+   **FIRED 2026-08-14 (evening):** `thresholds/thievul.toml` created
+   (cd_prep + article slug `thievul-cd-2026-08`), `run_website_dives.py`
+   entry added (slug `thievul-great-league`, gl_top50_plus_cs pool,
+   top_movesets=4, reference pinned to the pre-CD default
+   SUCKER_PUNCH,NIGHT_SLASH,PLAY_ROUGH), dive launched overnight with
+   the sweep cache ON (engine untouched) on the pinned gamemaster.
+   NOTE: the dive entry must NOT use no_thresholds -- cd_prep only
+   loads on the thresholds auto-discover path.
 2. Moveset comparison for the CD question: Icy Wind vs Play Rough as
    the second charged move (and Snarl vs Sucker Punch fast) --
    `compare_loadouts.py` if it fits N=2.
