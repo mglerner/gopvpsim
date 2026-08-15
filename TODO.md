@@ -58,16 +58,18 @@ tier: hits-survived by (def-tier x HP), with the shed-cutoff that buys
 truth, (d) new surface = its own adversarial round before ship. Not
 publish-gating.
 
-Worlds is Aug 28-30. **PUBLISH GATE (Michael 2026-08-11): do not
-publish until ALL 401 amber pairs have detail pages** -- completion
-run launched 2026-08-11 (~26-35h of compute; idempotent, resumable).
-REMAINING:
-(a) full amber coverage, then Michael's publish go
-(`publish_website.sh --push`); (b) a11y
+Worlds is Aug 28-30. **PUBLISH GATE: full amber coverage MET
+2026-08-14 (`c80889d`)** -- 401/401 amber pairs baked + detail pages
+rendered, 0 deferred, verify_worlds OK; gamemaster held at the
+pre-Worlds vintage 8f1d6cca5c0f throughout (only upstream delta:
+three added mega forms, sim-irrelevant). NOTE: the data cache now
+holds that pinned old blob; the next TTL refetch (or deleting
+`~/Documents/gopvpsim_cache/gamemaster.json`) returns to current --
+fine after publish, but re-pin from pvpoke `f60a41199` if any Worlds
+surface needs re-rendering. REMAINING:
+(a) Michael's publish go (`publish_website.sh --push`); (b) a11y
 polish still open: badge text 4.36:1 in pokemon-dark, hub matrix
-mini-grids color-only (cheat sheets are the text alternative);
-(c) optional Tier-2 budget extension (335 amber pairs deferred;
-idempotent re-run).
+mini-grids color-only (cheat sheets are the text alternative).
 Session-4 carry-in status (2026-08-10): rebalance date RESOLVED
 (Forever Forward live in-game 2026-06-02 1pm PDT; Turin was
 post-rebalance -- pages state the split; plan doc corrected).
