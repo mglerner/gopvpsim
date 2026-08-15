@@ -132,3 +132,51 @@ def test_worlds_fn_grid_decided():
                                    'top512_mask': grid['top512_mask']}) \
         == (False, 0.0, 0.0)
     assert worlds_fn.grid_decided(None) == (False, 0.0, 0.0)
+
+
+def test_deny_moot_annotation(tinkaton_mantine_reach):
+    """A 512/512 deny count is trivially true whenever the focal rank-1
+    misses the plan against every build; it must carry the moot marker
+    (Michael 2026-08-14 -- pre-fix, Azumarill vs Jellicent rendered a
+    bare 512/512 that read as per-build signal). A strictly-between
+    count stays unannotated: that is the informative case."""
+    reach, _ = tinkaton_mantine_reach
+    live = next(r for r in reach['rows']
+                if r['reach4096'] > 0 or r['reach_anchor4096'] > 0)
+    fake = dict(reach, rows=[dict(live, deny512=512),
+                             dict(live, deny512=137)])
+    html_text = bpp.reach_table_html(fake, 'A', 'B')
+    assert '(moot: rank-1 never reaches)' in html_text
+    assert html_text.count('moot: rank-1 never reaches') == 1
+    assert f'{reach["r1_atk"]:.2f}' in html_text     # hover tip cites atk
+    assert '>137/512</td>' in html_text              # informative: bare
+
+
+def test_rank_pack_roundtrip():
+    """The 8-hex-per-rank pack must decode (at the JS substr offsets:
+    0/1/2 IV nibbles, 3-4 level*2, 5-7 CP) back to iv_rank's spreads."""
+    ranked = iv_rank('Azumarill', league='great', shadow=False)
+    pack = bpp.rank_pack(ranked)
+    assert len(pack) == 8 * len(ranked) == 8 * 4096
+    for idx in (0, 1, 2500, 4095):
+        s = pack[idx * 8:(idx + 1) * 8]
+        r = ranked[idx]
+        assert (int(s[0], 16), int(s[1], 16), int(s[2], 16)) == \
+            (r['atk_iv'], r['def_iv'], r['sta_iv'])
+        assert int(s[3:5], 16) / 2 == r['level']
+        assert int(s[5:8], 16) == r['cp']
+
+
+def test_curve_svg_pack_attrs():
+    """pack_id wires the data-* attributes PAIR_JS inverts; the geometry
+    attrs must equal the python layout constants (padl/pw/w), and the
+    no-pack call shape stays attribute-free (old call sites)."""
+    frac = np.linspace(0.0, 1.0, 4096)
+    svg = bpp.curve_svg(frac, '0-0', 'Mantine', pack_id='azumarill')
+    assert 'data-pack="azumarill"' in svg
+    assert 'data-n="4096"' in svg and 'data-bin="16"' in svg
+    assert 'data-w="680"' in svg and 'data-padl="34"' in svg \
+        and 'data-pw="642"' in svg
+    bins = svg.split('data-bins="')[1].split('"')[0].split(',')
+    assert len(bins) == 256                          # 4096 / bin 16
+    assert 'data-pack' not in bpp.curve_svg(frac, '0-0', 'Mantine')

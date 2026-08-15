@@ -62,7 +62,69 @@ PAIR_CSS = WORLDS_CSS + """
         text-align: left; }
   .stageflag { color: var(--flip); font-size: 12px; }
   .confirmed { color: var(--win); font-size: 12px; }
+  .curve-readout { color: var(--text-muted); font-size: 13px;
+        min-height: 18px; margin: 2px 0 10px;
+        font-variant-numeric: tabular-nums; }
 """
+
+# Cursor-following readout under each robustness curve: the exact IV
+# spread at the hovered SP rank plus the drawn bin's cohort share
+# (Michael 2026-08-14). The rank -> spread pack is 8 hex chars per rank
+# (3 IV nibbles, level*2 byte, CP 3 nibbles), keyed by direction. The
+# readout's hint text is injected here so a no-JS browser shows no dead
+# affordance -- native <title> tooltips remain the no-JS fallback.
+PAIR_JS = """
+<script>
+(function () {
+  var HINT = 'Hover the curve for the exact IV spread at each rank.';
+  function decode(pack, i) {
+    var s = pack.substr(i * 8, 8);
+    return { a: parseInt(s[0], 16), d: parseInt(s[1], 16),
+             st: parseInt(s[2], 16),
+             lvl: parseInt(s.substr(3, 2), 16) / 2,
+             cp: parseInt(s.substr(5, 3), 16) };
+  }
+  var svgs = document.querySelectorAll('svg.curve[data-pack]');
+  Array.prototype.forEach.call(svgs, function (svg) {
+    var pack = (window.WPACK || {})[svg.getAttribute('data-pack')];
+    var out = svg.nextElementSibling;
+    if (!pack || !out || out.className !== 'curve-readout') return;
+    var n = +svg.getAttribute('data-n');
+    var bs = +svg.getAttribute('data-bin');
+    var w = +svg.getAttribute('data-w');
+    var padl = +svg.getAttribute('data-padl');
+    var pw = +svg.getAttribute('data-pw');
+    var bins = svg.getAttribute('data-bins').split(',');
+    var opp = svg.getAttribute('data-opp');
+    out.textContent = HINT;
+    svg.addEventListener('mousemove', function (ev) {
+      var rect = svg.getBoundingClientRect();
+      var fx = (ev.clientX - rect.left) / rect.width * w;
+      var r = Math.round((fx - padl) / pw * n);
+      if (r < 1) r = 1;
+      if (r > n) r = n;
+      var s = decode(pack, r - 1);
+      var b = Math.floor((r - 1) / bs);
+      out.textContent = 'SP rank ' + r + ': ' + s.a + '/' + s.d + '/' +
+        s.st + ' @ L' + s.lvl + ' (CP ' + s.cp + ') -- ranks ' +
+        (b * bs + 1) + '-' + Math.min((b + 1) * bs, n) + ' beat ' +
+        bins[b] + '% of top-512 ' + opp;
+    });
+    svg.addEventListener('mouseleave', function () {
+      out.textContent = HINT;
+    });
+  });
+})();
+</script>
+"""
+
+
+def rank_pack(ranked):
+    """8 hex chars per rank: atk/def/sta IV nibbles, level*2 byte,
+    CP as 3 nibbles (GL CP < 4096). Decoded by PAIR_JS."""
+    return ''.join(
+        f'{r["atk_iv"]:x}{r["def_iv"]:x}{r["sta_iv"]:x}'
+        f'{int(r["level"] * 2):02x}{r["cp"]:03x}' for r in ranked)
 
 
 def pair_page_filename(a, b):
@@ -163,7 +225,8 @@ def reach_rows(focal_entry, opp_entry, focal_ranked, opp_cohort):
             })
     return {'rows': rows, 'stage_flag': stage_flag,
             'fast_name': focal_entry['fast_move'],
-            'anchor': anchor, 'atk_max': float(atk4096.max())}
+            'anchor': anchor, 'atk_max': float(atk4096.max()),
+            'r1_atk': float(focal_ranked[0]['atk'])}
 
 
 def reach_table_html(reach, focal_name, opp_name):
@@ -201,6 +264,21 @@ def reach_table_html(reach, focal_name, opp_name):
         return (f'<p class="section-intro">No energy-legal damage plan '
                 'is completable by any attainable spread.</p>'
                 + dead_html)
+    def deny_cell(r):
+        # A 512/512 deny is trivially true whenever your rank-1's atk
+        # misses the plan against EVERY opponent build -- it reads like
+        # per-build signal but carries none (Michael 2026-08-14). The
+        # informative deny counts are the strictly-between ones, where
+        # the boundary cuts through the opponent cohort.
+        if r['deny512'] != 512:
+            return f'<td>{r["deny512"]}/512</td>'
+        tip = (f'Moot as a build filter: your rank-1 spread (eff atk '
+               f'{reach["r1_atk"]:.2f}) falls short of this plan against '
+               f'every top-512 build -- even the cutoff vs its rank-1 '
+               f'alone is {r["per_spread"]:.2f} -- so the denial is total '
+               f'no matter which build the opponent brings.')
+        return (f'<td>512/512 <span class="mband" title="{esc(tip)}">'
+                '(moot: rank-1 never reaches)</span></td>')
     rows_html = ''.join(
         f'<tr><td>{r["n_charged"]}x {esc(r["move"])} + {r["n_fast"]}x '
         f'{esc(reach["fast_name"])}</td>'
@@ -209,7 +287,7 @@ def reach_table_html(reach, focal_name, opp_name):
         f'<td>{r["reach512"]}/512 <span class="mband">('
         f'{r["reach4096"]}/4096)</span></td>'
         f'<td>{r["reach_anchor512"]}/512</td>'
-        f'<td>{r["deny512"]}/512</td></tr>'
+        + deny_cell(r) + '</tr>'
         for r in live)
     flag = ('<p class="stageflag">Stage-0 numbers: this pair carries a '
             'stat-stage-moving move, so in-battle stages can shift these '
@@ -243,9 +321,13 @@ value, falls short one float below).</p>
 # ---------------------------------------------------------------------------
 
 def curve_svg(frac_by_rank, scen_label, opp_name, bin_size=16,
-              width=680, height=120):
+              width=680, height=120, pack_id=None):
     """Step-area of fraction-of-cohort-beaten by focal SP rank (binned
-    means). Single series; native tooltips; recessive grid."""
+    means). Single series; native tooltips; recessive grid.
+
+    ``pack_id``: key into the page's WPACK rank->spread pack; when set,
+    the svg carries the data-* attributes PAIR_JS needs for the hover
+    readout (native <title> tooltips stay either way)."""
     n = len(frac_by_rank)
     nb = (n + bin_size - 1) // bin_size
     pad_l, pad_b, pad_t = 34, 16, 6
@@ -282,9 +364,17 @@ def curve_svg(frac_by_rank, scen_label, opp_name, bin_size=16,
         f'text-anchor="middle" font-size="9" fill="var(--text-muted)">'
         f'{r if r else 1}</text>'
         for r in (0, 1024, 2048, 3072, n))
+    data_attrs = ''
+    if pack_id is not None:
+        bins_attr = ','.join(f'{100 * b:.1f}' for b in bins)
+        data_attrs = (f' data-pack="{esc(pack_id)}" data-n="{n}" '
+                      f'data-bin="{bin_size}" data-w="{width}" '
+                      f'data-padl="{pad_l}" data-pw="{pw}" '
+                      f'data-opp="{esc(opp_name)}" data-bins="{bins_attr}"')
     return (f'<svg class="curve" viewBox="0 0 {width} {height}" '
             f'role="img" aria-label="fraction of {esc(opp_name)} top-512 '
-            f'beaten, by {esc(scen_label)} scenario and focal SP rank">'
+            f'beaten, by {esc(scen_label)} scenario and focal SP rank"'
+            f'{data_attrs}>'
             f'{gridlines}'
             f'<polygon points="{area}" fill="var(--accent)" '
             f'fill-opacity="0.22"/>'
@@ -326,6 +416,16 @@ def direction_section(focal_entry, opp_entry, cell, grid_bait, grid_nobait):
     won = grid_bait['won']                      # (4096, n, 9)
     mask = grid_bait['top512_mask']
     nb_won = grid_nobait['won'] if grid_nobait is not None else None
+    # iv_rank order is the grids' row order -- the same list feeds the
+    # hover-readout pack here and the reach strip below.
+    focal_ranked = iv_rank(focal_entry['species'], league='great',
+                           shadow=focal_entry['shadow'])
+    opp_ranked = iv_rank(opp_entry['species'], league='great',
+                         shadow=opp_entry['shadow'])
+    sid = focal_entry['species_id']
+    parts.append('<script>window.WPACK=window.WPACK||{};'
+                 f'window.WPACK["{esc(sid)}"]="{rank_pack(focal_ranked)}";'
+                 '</script>')
     mixed = _grid_mixed_scenarios(grid_bait, grid_nobait)
     probe_only = set(cell.amber_scenarios()) - mixed
     if not mixed and not probe_only:
@@ -365,11 +465,8 @@ def direction_section(focal_entry, opp_entry, cell, grid_bait, grid_nobait):
             f'<strong>{beats_r1}</strong> beat its rank-1 spread. '
             f'Across all 4096 spreads, <strong>{sweeps}</strong> sweep.'
             f'{extra}</p>'
-            + curve_svg(frac, SCEN_LABELS[si], oname))
-    focal_ranked = iv_rank(focal_entry['species'], league='great',
-                           shadow=focal_entry['shadow'])
-    opp_ranked = iv_rank(opp_entry['species'], league='great',
-                         shadow=opp_entry['shadow'])
+            + curve_svg(frac, SCEN_LABELS[si], oname, pack_id=sid)
+            + '<div class="curve-readout"></div>')
     opp_cohort = opp_ranked[:512]
     parts.append('<h3>Reach or deny (closed form)</h3>')
     parts.append(reach_table_html(
@@ -398,7 +495,8 @@ def render_pair_page(a_entry, b_entry, meta, cells, manifest, t2_manifest,
             + f'<a href="{sheet_filename(a)}">{esc(a_entry["name"])} cheat '
             + 'sheet</a> | '
             + f'<a href="{sheet_filename(b)}">{esc(b_entry["name"])} cheat '
-            + 'sheet</a></p>')
+            + 'sheet</a></p>'
+            + PAIR_JS)
     return _page_shell(
         title=f'{a_entry["name"]} vs {b_entry["name"]} - Worlds 2026',
         heading=f'{a_entry["name"]} vs {b_entry["name"]}: the IVs decide',
