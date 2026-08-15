@@ -94,6 +94,7 @@ WORLDS_CSS = """
                     text-align: left; }
   table.matrix th.rowhead { text-align: right; white-space: nowrap; }
   table.matrix td { padding: 2px; border: 1px solid var(--border); }
+  .gridlink { text-decoration: none; color: inherit; }
   .mini { display: grid; grid-template-columns: repeat(3, 7px);
           grid-auto-rows: 7px; gap: 1px; }
   .mini i { border-radius: 1px; }
@@ -366,9 +367,10 @@ LEGEND = ('<p class="legend"><span class="sc sc-green">W</span> beats every '
           'phones the cheat sheets\' W/L/? letters and IV-decided column '
           'carry the outcome. The hub matrix itself is a color-only '
           'overview -- its row links open the text-carrying cheat sheet. '
-          'IV-decided pairs whose full Tier-2 grids are baked link to a '
-          'per-pair detail page; the rest are deferred by the bake budget '
-          '(list on the hub).</p>')
+          'IV-decided pairs with baked Tier-2 grids link to a full '
+          'per-pair detail page -- click the 3x3 grid itself (cheat '
+          'sheets), the matrix cell (hub), or the details expander; any '
+          'budget-deferred pairs are listed on the hub.</p>')
 
 NOT_BUILT = (
     '<div class="notbuilt"><p><strong>Deliberately not built:</strong> '
@@ -603,6 +605,11 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None):
                      f'{_grid9(bait, oname, "bait")}</span>'
                      f'<span style="display:inline-block">'
                      f'{_grid9(nobait, oname, "no-bait")}</span>')
+        # The 3x3 grids click through to the pair detail page (Michael
+        # 2026-08-14); link only against a file that exists (ship-gate
+        # rule), same as _mini_cell.
+        if plink:
+            grids = f'<a class="gridlink" href="{esc(plink)}">{grids}</a>'
         rows.append(
             f'<tr><td><a href="{sheet_filename(oid)}">{esc(oname)}</a><br>'
             f'{_digin(cell, oname, plink, pair_amber)}</td>'

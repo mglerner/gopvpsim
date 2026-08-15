@@ -203,3 +203,19 @@ def test_build_refuses_on_stamp_mismatch(tmp_path, monkeypatch):
         bwp.build(website_dir=tmp_path / 'site', planes_dir=planes,
                   meta_path='unused')
     assert 'vintage' in str(e.value) or 'stamp' in str(e.value)
+
+
+def test_cheat_sheet_grid_links_to_pair_page(cells):
+    """The 3x3 grid block itself links to the pair page when one exists
+    (Michael 2026-08-14 -- pre-fix only the dig-in paragraph linked).
+    The no-links case is pinned above ('worlds-pair-' absent)."""
+    links = {frozenset(('alpha', 'beta_shadow')):
+             'worlds-pair-alpha--beta_shadow.html'}
+    html_text = bwp.render_cheat_sheet(META['entries'][0], META, cells,
+                                       MANIFEST, slug_map={}, links=links)
+    anchor = ('<a class="gridlink" '
+              'href="worlds-pair-alpha--beta_shadow.html">')
+    assert anchor in html_text
+    i = html_text.find(anchor)
+    seg = html_text[i:html_text.find('</a>', i)]
+    assert 'class="g9"' in seg                       # grid inside anchor
