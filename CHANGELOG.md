@@ -2,6 +2,35 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-14 -- Worlds 2026 PUBLISHED (pogodives.com)
+
+Full amber coverage shipped: 401/401 IV-decided pairs baked
+(`c80889d`; three resumable legs across a suspend + a monitor-standby
+power loss, zero partial pairs, ~5.1B sims total for the completion
+run) and all surfaces rendered + live (hub, 31 cheat sheets, 401 pair
+pages, CMP board, IV explorer). Gamemaster pinned at the pre-Worlds
+vintage 8f1d6cca5c0f for every leg and render (upstream delta since:
+three mega forms, sim-irrelevant; old blob restored from pvpoke
+`f60a41199` on each cache TTL expiry).
+
+Same-day pre-publish polish (`157bf71`, each with a fails-without-it
+test): cheat-sheet 3x3 grids link to pair pages (802 links, all
+resolve); trivial 512/512 deny cells annotated "(moot: rank-1 never
+reaches)" with an atk-citing hover tip (17 cells; strictly-between
+counts stay bare); robustness curves got a cursor-following IV
+readout (8-hex-per-rank WPACK, JS-injected hint so no-JS shows no
+dead affordance). Adversarially verified: WPACK decodes == fresh
+iv_rank, data-bins bit-match npz re-derivation. Also `6a45bba`:
+meta current_rank refreshed to PvPoke's live rankings (Mimikyu 1 ->
+5) and the ==1 moving-external test pin relaxed.
+
+Post-publish spot-check (Michael's read of the Altaria-Jellicent
+curves): 1-1 and 2-2 win matrices verified cell-identical in the npz
+(both bait modes), and the win boundary confirmed as the Dragon
+Breath 2 -> 3 damage tier vs each Jellicent build's def (cutoffs
+105.75-108.58 across the cohort; win fraction exactly monotone in
+focal atk).
+
 ## 2026-08-11 -- Worlds session 5: IV explorer, CMP board, verify_worlds gate
 
 IV explorer (`worlds-explorer.html`): the browser receives BAKED
