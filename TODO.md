@@ -6,15 +6,21 @@ delete its bullet or move the writeup out -- do not leave a 'DONE/RESOLVED'
 narrative inline. This convention was set 2026-06-27 after the file hit ~1980
 lines of mostly-completed chronological batches. -->
 
-## NEXT SESSION (2026-08-15): Thievul CD dive — DEADLINE Sat, CD is Sun 08-16
+## Thievul CD — dive PUBLISHED 2026-08-15; residue only (CD is Sun 08-16)
 
-Plan of record: `docs/thievul_cd_plan.md` (facts verified, CD-prep
-rule check DONE — the gamemaster genuinely lags, `[cd_prep]` injection
-of ICY_WIND is correct; cautions re: the pinned Worlds gamemaster and
-sweep-cache migration are in the doc). Separately,
-`docs/hsh_message_notes.md` has the talking points for Michael's
-discord message to Homeslice Henry. Reddit thread input still needed
-(Claude can't fetch reddit — ask Michael for a screenshot).
+Dive shipped and live-verified at pogodives.com/thievul-great-league/
+(4 pages: landing = SP / Icy Wind + Play Rough, the 62W-25L 1-1 build;
+pre-CD reference SP / NS+PR rendered as m3). Plan + verified numbers:
+`docs/thievul_cd_plan.md`. **The CD article was DROPPED by Michael's
+decision 2026-08-15** — the `thresholds/thievul.toml` article slug
+stays pre-registered but inert (the renderer only emits the link when
+the article dir exists). Residue: (a) Michael's reply to u/LeansCenter
+on the r/TheSilphArena launch thread (bullets drafted in-session
+2026-08-15: 44W-44L -> 62W-25L at 1-1/rank-1 IVs/88-mon pool; IW+PR
+beats PvPoke's NS+IW default by ~14 wins; PvPoke overall GL rank
+122 -> 41); (b) Michael's HSH discord message
+(`docs/hsh_message_notes.md`); (c) post-CD cleanup: delete the
+`[cd_prep]` table once the un-pinned gamemaster stably lists Icy Wind.
 
 ## Worlds 2026 robustness analysis — IN PROGRESS (sessions 2-5 remain)
 
