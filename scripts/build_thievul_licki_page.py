@@ -664,6 +664,10 @@ PAGE_CSS = """
 
 BODY_TEMPLATE = """
 <h1>{focal} vs {opponent}: how much do IVs actually matter?</h1>
+<noscript><div class="tl-missing"><strong>This page needs JavaScript.</strong>
+Every panel is computed in your browser from a data blob embedded in this
+file - nothing is pre-rendered, so with JavaScript disabled the sections
+below stay empty. No data is sent anywhere either way.</div></noscript>
 {archive_block}
 <div class="tl-banner-ai"><strong>Human-guided, AI-generated
 (Claude).</strong> <a href="#tl-methodology">Methodology, honesty notes and
@@ -728,7 +732,7 @@ here"></textarea>
 <div id="tl-heat"></div>
 <p class="tl-note" id="tl-heat-note"></p>
 
-<h2>The cliff: coverage vs attack</h2>
+<h2>Coverage vs attack: is there a cliff?</h2>
 <div class="tl-ctl">
   <div><label for="tl-cliff-color">Colour by</label>
     <select id="tl-cliff-color"></select></div>
@@ -1047,9 +1051,21 @@ def render_page(data, missing, spec):
     cells = m.get('matchup_cells') or 0
     # ONE line. Everything else that used to live up here now sits in the
     # collapsible methodology section at the bottom.
+    # Duplicate grids are NOT extra work: quoting the raw product
+    # overstated the Lickilicky page by 25%. The headline uses the
+    # distinct count and says so when they differ.
+    duplicates = m.get('duplicate_grids') or []
+    n_distinct = n_grids - sum(len(g) - 1 for g in duplicates)
+    distinct_cells = n_distinct * N_IV * N_IV * N_SCEN
+    dup_clause = (
+        f" ({n_grids} grids were baked, but "
+        + '/'.join('+'.join(g) for g in duplicates)
+        + " are byte-identical, so they count once)"
+        if duplicates else "")
     intro = (
         f"{N_IV:,} x {N_IV:,} IV spreads x {N_SCEN} shield scenarios x "
-        f"{n_grids} moveset/bait grid(s) = {cells:,} simulated matchups, "
+        f"{n_distinct} distinct moveset/bait grid(s) = "
+        f"{distinct_cells:,} simulated matchups{dup_clause}, "
         f"for the {spec['focal']} Community Day. "
         f"<a href=\"{MAIN_DIVE_URL}\">{spec['focal']}'s main Great League "
         f"dive</a>."
@@ -1076,7 +1092,8 @@ def render_page(data, missing, spec):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {theme_head_script()}
-<title>{spec['focal']} vs {spec['opponent']} - IV robustness</title>
+<title>{spec['focal']} vs {spec['opponent']} - IV robustness{
+    ' (archived)' if ARCHIVE_NOTE.get(spec['opponent'].lower()) else ''}</title>
 <style>{theme_css()}{PAGE_CSS}</style>
 </head>
 <body>
