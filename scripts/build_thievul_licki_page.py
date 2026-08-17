@@ -466,7 +466,9 @@ def load_meta_wins(data_dir, focal_tbl, grid_labels, *, oppiv='pvpoke'):
             + ' entries, Thievul mirror included) at the dive\'s own '
             'opponent IVs (' + oppiv + ') and movesets, with the opponent '
             'always baiting; ties (score exactly 500) are not counted as '
-            'wins.'),
+            'wins. NOTE the two sides: the "baiting / no bait" in a GRID '
+            'label is the ' + FOCAL + '\'s policy, while the opponent in '
+            'every grid always baits.'),
     }
 
 
@@ -700,8 +702,7 @@ below. Only {collection_species} rows are read.</p>
   <div><label for="tl-manual-species">Species (what each one feeds)</label>
     <select id="tl-manual-species">
       <option value="thievul">{focal} - ranked in the table below</option>
-      <option value="licki">{opponent} - heatmap overlay, drill-down and
-        the anti-{focal} section</option>
+      <option value="licki">{opponent} - {licki_scope}</option>
     </select></div>
   <div><label for="tl-manual-a">Atk IV</label>
     <select id="tl-manual-a"></select></div>
@@ -732,7 +733,8 @@ here"></textarea>
   <div><label><input id="tl-heat-named" type="checkbox" checked>
     show named builds</label></div>
   <div class="tl-note">Hover a cell to outline that {focal} row and that
-    {opponent} column across the whole grid.</div>
+    {opponent} column across the view (the caption under the plot states
+    the exact extent, which narrows as you zoom).</div>
 </div>
 <div id="tl-heat"></div>
 <p class="tl-note" id="tl-heat-note"></p>
@@ -767,6 +769,8 @@ here"></textarea>
     <input id="tl-drill-licki" type="text" value="1" size="10"></div>
   <div><label for="tl-drill-thievul">Your {focal} (rank or a/d/s)</label>
     <input id="tl-drill-thievul" type="text" value="1" size="10"></div>
+  <div><label for="tl-drill-mine">Your {opponent} spreads</label>
+    <select id="tl-drill-mine"></select></div>
   <div><button id="tl-drill-go">Update</button></div>
 </div>
 <div id="tl-drill-out"></div>
@@ -777,9 +781,7 @@ here"></textarea>
 <h2>Recommendations</h2>
 <div id="tl-reco" class="tl-cards"></div>
 
-<h2>The other side: anti-{focal} {opponent} tech</h2>
-<div id="tl-denial"></div>
-
+{denial_section}
 <details id="tl-methodology" class="tl-methodology">
 <summary>Methodology, honesty notes and disclosures</summary>
 <p class="tl-prov">{provenance}</p>
@@ -1102,6 +1104,14 @@ def render_page(data, missing, spec):
         + (CROSSLINK.get(spec['opponent'].lower(), ''))
     )
     archive = ARCHIVE_NOTE.get(spec['opponent'].lower())
+    # An archived page states it will not be updated, so a section whose
+    # input is absent is OMITTED rather than shipped as an eternal
+    # "not baked yet" placeholder.
+    has_denial = data.get('licki_denial') is not None
+    denial_section = (
+        f"<h2>The other side: anti-{spec['focal']} {spec['opponent']} "
+        f"tech</h2>\n<div id=\"tl-denial\"></div>\n"
+        if has_denial or not archive else '')
     archive_block = (f'<div class="tl-archive"><strong>{archive}</strong>'
                      f'</div>' if archive else '')
     body = BODY_TEMPLATE.format(
@@ -1114,6 +1124,10 @@ def render_page(data, missing, spec):
         design_doc=design,
         intro=intro,
         archive_block=archive_block,
+        denial_section=denial_section,
+        licki_scope=('heatmap overlay, drill-down and the anti-'
+                     + spec['focal'] + ' section' if has_denial
+                     else 'heatmap overlay and drill-down'),
         attribution=PVPOKE_ATTRIBUTION_HTML,
     )
     return f"""<!DOCTYPE html>
