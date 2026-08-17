@@ -283,6 +283,7 @@
     }
     return out;
   }
+  var _cohortWarn = '';
   function cohortIndices() {
     if (state.cohort === 'all') return null;            // handled by cov table
     if (state.cohort === 'top512') return null;          // handled by cov table
@@ -292,7 +293,32 @@
       return a;
     }
     if (state.cohort === 'rank1') return [0];
-    return parseRanks(state.customText);
+    var raw = String(state.customText || '').split(/[,\s]+/)
+      .filter(Boolean);
+    var got = parseRanks(state.customText);
+    // Tokens that parsed to nothing used to vanish silently, unlike the
+    // drill-down inputs which warn.
+    var kept = {};
+    got.forEach(function (i) { kept[i + 1] = 1; });
+    var dropped = raw.filter(function (tok) {
+      var mm = tok.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (mm) {
+        for (var r2 = +mm[1]; r2 <= +mm[2]; r2++) {
+          if (kept[r2]) return false;
+        }
+        return true;
+      }
+      var mi = tok.match(/^(\d+)\/(\d+)\/(\d+)$/);
+      if (mi) return ivIndex('licki', +mi[1], +mi[2], +mi[3]) < 0;
+      var v2 = parseInt(tok, 10);
+      return !(!isNaN(v2) && v2 >= 1 && v2 <= N);
+    });
+    _cohortWarn = dropped.length
+      ? ' Ignored ' + dropped.length + ' entry/entries this page could not '
+        + 'read as a rank or an IV triple in the analyzed grid: '
+        + dropped.slice(0, 5).join(', ') + '.'
+      : '';
+    return got;
   }
   function cohortLabel() {
     if (state.cohort === 'all') return 'all 4096 ' + OPP + ' spreads';
@@ -300,7 +326,8 @@
     if (state.cohort === 'top100') return 'top 100 ' + OPP + ' spreads (by stat product)';
     if (state.cohort === 'rank1') return 'rank-1 ' + OPP + ' only';
     var c = cohortIndices() || [];
-    return 'custom ' + OPP + ' cohort (' + c.length + ' spread(s))';
+    return 'custom ' + OPP + ' cohort (' + c.length + ' spread(s))'
+      + _cohortWarn;
   }
 
   // ---- coverage ----
@@ -1459,18 +1486,38 @@
       if (sb) {
         setHtml('tl-tldr', $('tl-tldr').innerHTML + sb);
       }
-      var bridge = '';
-    var firstCard = (D.reco.cards || [])[0];
-    if (firstCard) {
-      var fg = cardGrid(firstCard);
-      bridge = (fg && fg !== state.label)
-        ? 'These cards are computed on ' + gridPretty(fg)
-          + ', while the panels below are showing '
-          + gridPretty(state.label)
-          + ' - switch the grid in Controls to compare like with like. '
-        : 'These cards use the top-512 cohort, while the panels below '
-          + 'follow the cohort control (which starts on all 4096), so the '
-          + 'same spread can read differently in the two places. ';
+      // Derived from every VISIBLE card, not cards[0]: the band showed the
+    // cohort-only explanation while three of four cards were flagged
+    // "(not the selected grid)".
+    var bridge = '';
+    var shown = (D.reco.cards || []).slice(0, 4);
+    var offGridNames = [];
+    shown.forEach(function (c) {
+      var g = cardGrid(c);
+      if (g && g !== state.label) {
+        var nm = gridPretty(g);
+        if (offGridNames.indexOf(nm) < 0) offGridNames.push(nm);
+      }
+    });
+    var offGridCards = shown.filter(function (c) {
+      var g = cardGrid(c);
+      return g && g !== state.label;
+    }).length;
+    if (offGridNames.length) {
+      bridge = (offGridCards === shown.length
+        ? 'All ' + shown.length + ' cards are computed on '
+        : offGridCards + ' of these ' + shown.length
+          + ' cards are computed on ')
+        + esc(offGridNames.join(' and '))
+        + ', while the panels below are showing '
+        + esc(gridPretty(state.label))
+        + ' - each card carries its own grid chip, and switching the grid '
+        + 'in Controls puts them on the same footing. ';
+    }
+    if (shown.length) {
+      bridge += 'Card numbers use the top-512 cohort, while the panels '
+        + 'below follow the cohort control (which starts on all 4096), so '
+        + 'the same spread can read differently in the two places. ';
     }
     setHtml('tl-tldr-link', bridge + '');
       return;
@@ -1585,26 +1632,47 @@
         + '</p>';
     }
     setHtml('tl-tldr', headline + satBlock() + cards);
+    // Derived from every VISIBLE card, not cards[0]: the band showed the
+    // cohort-only explanation while three of four cards were flagged
+    // "(not the selected grid)".
     var bridge = '';
-    var firstCard = (D.reco.cards || [])[0];
-    if (firstCard) {
-      var fg = cardGrid(firstCard);
-      bridge = (fg && fg !== state.label)
-        ? 'These cards are computed on ' + gridPretty(fg)
-          + ', while the panels below are showing '
-          + gridPretty(state.label)
-          + ' - switch the grid in Controls to compare like with like. '
-        : 'These cards use the top-512 cohort, while the panels below '
-          + 'follow the cohort control (which starts on all 4096), so the '
-          + 'same spread can read differently in the two places. ';
+    var shown = (D.reco.cards || []).slice(0, 4);
+    var offGridNames = [];
+    shown.forEach(function (c) {
+      var g = cardGrid(c);
+      if (g && g !== state.label) {
+        var nm = gridPretty(g);
+        if (offGridNames.indexOf(nm) < 0) offGridNames.push(nm);
+      }
+    });
+    var offGridCards = shown.filter(function (c) {
+      var g = cardGrid(c);
+      return g && g !== state.label;
+    }).length;
+    if (offGridNames.length) {
+      bridge = (offGridCards === shown.length
+        ? 'All ' + shown.length + ' cards are computed on '
+        : offGridCards + ' of these ' + shown.length
+          + ' cards are computed on ')
+        + esc(offGridNames.join(' and '))
+        + ', while the panels below are showing '
+        + esc(gridPretty(state.label))
+        + ' - each card carries its own grid chip, and switching the grid '
+        + 'in Controls puts them on the same footing. ';
+    }
+    if (shown.length) {
+      bridge += 'Card numbers use the top-512 cohort, while the panels '
+        + 'below follow the cohort control (which starts on all 4096), so '
+        + 'the same spread can read differently in the two places. ';
     }
     setHtml('tl-tldr-link', bridge +
       'The grid below shows every one of the ' + N + ' x ' + N
       + ' ' + FOCAL + '-vs-' + OPP + ' matchups; below it are the cliff '
       + '(coverage vs attack) and frontier (attack vs rank) panels, then '
       + 'the full panels (coverage, Pareto, '
-      + 'drill-down, mechanism), the anti-' + FOCAL + ' ' + OPP
-      + ' section, and finally the Recommendations cards.');
+      + 'drill-down, mechanism), then the Recommendations cards'
+      + (D.licki_denial ? ', and finally the anti-' + FOCAL + ' ' + OPP
+        + ' section' : '') + '.');
   }
 
   // ---- SP-breakpoint classes (the cliff / frontier colouring) ----
@@ -1736,17 +1804,16 @@
       return ['misses', 'rank-1 only', 'clears vs all'][k] + ' '
         + fmt(means[k], 1) + '%';
     }).join(' / ');
-    var verdict, drives;
-    // Nothing MEANINGFULLY varies: no factor "explains" anything here, and
-    // pointing at bulk would be as wrong as pointing at the breakpoint.
-    // An exact-equality test was not enough -- views where 4081 of 4096
-    // spreads beat everything (a 0.12-point spread) escaped into the
-    // "partially explains ... bulk is doing the work" branch.
     var cmn = Infinity, cmx = -Infinity;
     for (var q = 0; q < cov.pct.length; q++) {
       if (cov.pct[q] < cmn) cmn = cov.pct[q];
       if (cov.pct[q] > cmx) cmx = cov.pct[q];
     }
+    // NO CAUSAL LANGUAGE. This panel measures one thing -- coverage by
+    // Sucker Punch breakpoint class -- so it reports exactly that: the
+    // class means, whether they rise, and how wide the spread is. It does
+    // not attribute the outcome to the breakpoint, to bulk, or to
+    // anything else, because nothing here measures explanatory power.
     if (cmx - cmn <= FLAT_RANGE_PP) {
       var same = (cmx - cmn <= 1e-9);
       return {
@@ -1754,42 +1821,22 @@
           + commas(cov.pct.length) + ' ' + FOCAL + ' spreads sit '
           + (same ? 'at ' + fmt(cmn, 1) + '%'
             : 'between ' + fmt(cmn, 1) + '% and ' + fmt(cmx, 1) + '% (a '
-              + fmt(cmx - cmn, 2) + '-point spread)')
-          + ', so neither the Sucker Punch breakpoint nor bulk decides '
-          + 'anything here. ' + capFirst(sensitivePointer(state.label)),
-        means: means, monotone: true, gap: 0, drives: false, flat: true
+              + fmt(cmx - cmn, 2) + '-point spread)') + '. '
+          + capFirst(sensitivePointer(state.label)),
+        means: means, monotone: true, gap: 0, flat: true
       };
     }
-    if (monotone && gap >= CLIFF_EXPLAIN_GAP) {
-      verdict = 'The Sucker Punch breakpoint largely explains this view';
-      drives = true;
-    } else if (monotone) {
-      verdict = 'The Sucker Punch breakpoint only partially explains this '
-        + 'view (the spread between classes is under '
-        + CLIFF_EXPLAIN_GAP + ' points)';
-      drives = false;
-    } else {
-      verdict = 'The Sucker Punch breakpoint does NOT drive this view -- '
-        + 'spreads that MISS it score at least as well as spreads that '
-        + 'clear it';
-      drives = false;
-    }
-    // Do not tell the reader to switch to a colouring they are already on.
-    var hint = '';
-    if (!drives) {
-      if (state.cliffColor === 'sp') {
-        hint = ' Bulk is doing more of the work here: switch the colour '
-          + 'control to defense or HP to see it.';
-      } else {
-        hint = ' The dots are currently coloured by '
-          + (state.cliffColor === 'def' ? 'defense' : 'HP')
-          + ', which is where more of the separation lives in this view.';
-      }
-    }
     return {
-      text: verdict + ' (mean coverage by class: ' + txt + ').' + hint,
-      means: means, monotone: monotone, gap: gap, drives: drives,
-      flat: false
+      text: 'Mean coverage by Sucker Punch breakpoint class: ' + txt + '. '
+        + (monotone
+          ? 'The means rise across the classes, by ' + fmt(gap, 1)
+            + ' points from lowest to highest.'
+          : 'The means do NOT rise across the classes: spreads that miss '
+            + 'the breakpoint average at least as much coverage as spreads '
+            + 'that clear it.')
+        + ' Coverage across all ' + commas(cov.pct.length) + ' spreads '
+        + 'ranges ' + fmt(cmn, 1) + '% to ' + fmt(cmx, 1) + '%.',
+      means: means, monotone: monotone, gap: gap, flat: false
     };
   }
 
@@ -1869,13 +1916,16 @@
       .concat(sat.note ? [satAnnotation(sat.text, c)] : []);
     Plotly.react('tl-cliff-plot', traces, layout, { responsive: true });
     var ex = cliffExplanation(sc, cov);
+    // Neutral pointer only: naming a colouring is not an explanation, and
+    // this panel must never imply one stat "explains" a view.
     var colourSays = (mode === 'sp')
       ? 'Colour is the Sucker Punch breakpoint class from the closed-form '
-        + 'layer.'
+        + 'layer; colour by defense or HP to inspect other stat '
+        + 'relationships.'
       : 'Colour is each spread\'s '
         + (mode === 'def' ? 'defense' : 'HP')
-        + ' (single-hue ramp, darker = higher); the breakpoint classes are '
-        + 'on the "SP breakpoint class" setting.';
+        + ' (single-hue ramp, darker = higher); the "SP breakpoint class" '
+        + 'setting colours by breakpoint class instead.';
     setHtml('tl-cliff-note',
       '<strong>' + esc(ex.text) + '</strong> ' + esc(colourSays) + ' '
       + 'Each dot is one of the 4096 ' + esc(FOCAL) + ' IV spreads: x is '
@@ -2465,6 +2515,31 @@
 
   // ---- drill-down ----
   var _drillWarn = '';
+  // Owned opponent spreads are offered as drill-down targets: the species
+  // dropdown promises this, so it has to be true.
+  function ownedLickiOptions() {
+    return state.user.filter(function (u) { return u.side === 'licki'; });
+  }
+  function syncDrillPicker() {
+    var sel = $('tl-drill-mine');
+    if (!sel) return;
+    var owned = ownedLickiOptions();
+    sel.innerHTML = '';
+    var o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = owned.length
+      ? 'jump to one of your ' + OPP + '...'
+      : '(add your ' + OPP + ' above to pick them here)';
+    sel.appendChild(o0);
+    owned.forEach(function (u) {
+      var o = document.createElement('option');
+      o.value = String(u.idx + 1);
+      o.textContent = u.label + ' ' + ivStr('licki', u.idx)
+        + ' (rank ' + (u.idx + 1) + ')';
+      sel.appendChild(o);
+    });
+    sel.disabled = !owned.length;
+  }
   function drillLickiIndex() {
     var v = ($('tl-drill-licki') || {}).value || '';
     var ranks = parseRanks(v);
@@ -2854,8 +2929,9 @@
     }
     return anyNeg || /stage/i.test(String(key || ''));
   }
-  function stageMapHtml(label, v, key) {
-    var subject = cleanSubject(label);
+  function stageMapHtml(label, v, key, owner) {
+    var subject = cleanSubject(label)
+      + (owner ? ' for ' + owner : '');
     var rows = Object.keys(v).sort(function (a, b) { return b - a; })
       .map(function (k) {
         var val = v[k];
@@ -2988,7 +3064,37 @@
                  && !Object.keys(v).some(function (kk) {
                    return v[kk] && typeof v[kk] === 'object';
                  })) {
-        sub.push(stageMapHtml(label, v, k));
+        sub.push(stageMapHtml(label, v, k, o.ivs
+          ? (Array.isArray(o.ivs) ? o.ivs.join('/') : String(o.ivs))
+          : ''));
+      } else if (isStageMap(v, k) && Object.keys(v).some(function (kk) {
+        return Array.isArray(v[kk]);
+      })) {
+        // stage -> ARRAY of per-build values. The array is positional, so
+        // it is labelled from the sibling `order` list; raw indices 0/1
+        // are unreadable.
+        var names = (o.order && Array.isArray(o.order)) ? o.order : null;
+        sub.push('<h5>' + esc(cleanSubject(label)) + ' by ' + esc(OPP)
+          + ' attack stage, per build'
+          + (names ? ' (' + esc(names.map(function (x) {
+            return ivify(String(x));
+          }).join(' vs ')) + ')' : '') + '</h5>'
+          + (names ? '' : '<p class="tl-note">Rows are positional and this '
+            + 'block ships no name list, so they are shown by index.</p>')
+          + '<div class="tl-scroll"><table class="tl"><tr><th>' + esc(OPP)
+          + ' attack stage</th>'
+          + (names || (v[Object.keys(v)[0]] || []).map(function (_, ix) {
+            return 'index ' + ix;
+          })).map(function (nm) {
+            return '<th>' + esc(ivify(String(nm))) + '</th>';
+          }).join('') + '</tr>'
+          + Object.keys(v).sort(function (a, b) { return b - a; })
+            .map(function (st) {
+              return '<tr><td>' + esc(st) + '</td>'
+                + (v[st] || []).map(function (cell) {
+                  return '<td>' + esc(cellText(cell)) + '</td>';
+                }).join('') + '</tr>';
+            }).join('') + '</table></div>');
       } else if (isStageMap(v, k)) {
         // stage -> histogram: label each stage, then render its histogram
         sub.push('<h5>' + esc(cleanSubject(label)) + ' by ' + esc(OPP)
@@ -3276,6 +3382,11 @@
       var rc = ver.resisted_charged_sim_checks || [];
       if (rc.length) {
         P.push('<h5>Resisted charged-move probes</h5>'
+        + '<p class="tl-note">The ' + esc(OPP) + ' in this analysis '
+        + 'carries its default charged pair, so a move can be on the '
+        + 'moveset and still never be thrown: the engine picks by its own '
+        + 'policy across all nine shield scenarios. That is what these '
+        + 'probes record.</p>'
           + (ver.resisted_charged_note
             ? '<p class="tl-note">' + esc(ver.resisted_charged_note) + '</p>'
             : '')
@@ -3368,8 +3479,10 @@
     if (!host) return;
     var DEN = D.licki_denial;
     if (!DEN) {
-      showMissing('tl-denial', 'the anti-' + FOCAL + ' ' + OPP
-        + ' analysis (licki_denial.json) is not embedded in this page.');
+      // The builder omits the section entirely when the input is absent
+      // (an archived page must not carry an eternal placeholder), so if
+      // the host somehow exists there is nothing honest to draw.
+      setHtml('tl-denial', '');
       return;
     }
     var m = DEN.meta || {}, cf = DEN.closed_form || {};
@@ -3393,37 +3506,57 @@
     var wallRows = (DEN.wall_table || {}).rows || [];
     var best = wallRows[0];
     var vparts = [];
+    var wallGrid = wallCell.split('|')[0], wallScen = wallCell.split('|')[1];
+    var defGrid = state.label;
+    var sameGrid = (wallGrid === defGrid);
     if (bpPop && best) {
-      vparts.push('<li>Against a breakpoint-clearing ' + esc(FOCAL)
-        + ' at ' + esc(gridPretty(wallCell.split('|')[0])) + ' '
-        + esc(wallCell.split('|')[1]) + ', there is no ' + esc(OPP)
-        + ' answer: the best defense step denies '
-        + best.denies.bp2992 + ' of the ' + commas(bpPop)
-        + ' breakpoint-clearing spreads.</li>');
+      vparts.push('<li><strong>In one cell -- ' + esc(gridAbbrev(wallGrid))
+        + ' ' + esc(wallScen) + ', against the '
+        + commas(bpPop) + ' breakpoint-clearing ' + esc(FOCAL)
+        + ' spreads -- there is no ' + esc(OPP) + ' answer:</strong> the '
+        + 'best defense step denies ' + best.denies.bp2992 + ' of them. '
+        + (sameGrid ? 'That is the grid selected above.'
+          : 'On ' + esc(gridAbbrev(defGrid)) + ', the grid this page '
+            + 'defaults to, the picture differs -- see the ranked table '
+            + 'below, where several builds deny most or all of that same '
+            + 'population.') + '</li>');
     }
     if (best) {
-      vparts.push('<li>Against the ' + esc(FOCAL) + ' people actually '
-        + 'build, rank-1 is already the answer: '
+      vparts.push('<li><strong>Against the top-512 ' + esc(FOCAL)
+        + ' spreads in that same cell (' + esc(gridAbbrev(wallGrid)) + ' '
+        + esc(wallScen) + '), rank-1 is already the answer:</strong> '
         + esc(best.ivs.join('/')) + ' (rank ' + best.rank + ', defense '
         + best.def + ') denies '
-        + denialPct(best.denies.top512, pops.top512) + ' of the top-512 '
-        + 'in that cell, at ' + (best.rank === 1 ? 'zero'
-          : 'near-zero') + ' stat-product cost.</li>');
+        + denialPct(best.denies.top512, pops.top512) + ' of them, at '
+        + (best.rank === 1 ? 'zero' : 'near-zero') + ' stat-product '
+        + 'cost.</li>');
     }
-    // the bait lever, computed from the two IW+PR cells
+    // The bait lever is per moveset: on a grid whose bait/no-bait pair is
+    // byte-identical it is provably a no-op, and saying otherwise would
+    // contradict this page's own IDENTICAL GRIDS rail.
     var byCell = {};
     (DEN.sensitive_cells || []).forEach(function (c) {
       byCell[c.grid + '|' + c.scenario] = c;
     });
     var baited = byCell['iwpr_bait|1-1'], unbaited = byCell['iwpr_nobait|1-1'];
+    var dupPairs = (META.duplicate_grids || []);
+    var noopGrids = [];
+    dupPairs.forEach(function (g) {
+      if (g.length > 1) noopGrids.push(msAbbrev(g[0]));
+    });
     if (baited && unbaited) {
-      vparts.push('<li>The largest lever in the dataset is not an IV: it '
-        + 'is whether ' + esc(FOCAL) + ' baits. At 1-1 on '
-        + esc(gridPretty('iwpr_bait')) + ' the mean denial is '
+      vparts.push('<li><strong>Whether ' + esc(FOCAL) + ' baits is a '
+        + 'bigger lever than any ' + esc(OPP) + ' IV -- on the IW+PR '
+        + 'moveset:</strong> at 1-1 the mean denial is '
         + denialPct(baited.all4096.mean, baited.all4096.pop_n)
-        + ' of all ' + commas(N) + '; with the same moveset NOT baiting it '
-        + 'is ' + denialPct(unbaited.all4096.mean, unbaited.all4096.pop_n)
-        + '.</li>');
+        + ' of all ' + commas(N) + ' when ' + esc(FOCAL) + ' baits and '
+        + denialPct(unbaited.all4096.mean, unbaited.all4096.pop_n)
+        + ' when it does not.'
+        + (noopGrids.length
+          ? ' On ' + esc(noopGrids.join(' / ')) + ' baiting changes '
+            + 'nothing at all: those bait and no-bait grids are '
+            + 'byte-identical, so the lever does not exist there.'
+          : '') + '</li>');
     }
     P.push('<div class="tl-verdict-denial"><h4>Verdict</h4><ul>'
       + vparts.join('') + '</ul></div>');
@@ -3976,7 +4109,13 @@
         + cells + otherCell
         + '<td>' + (r.tier === null ? '-' : esc(r.tier)) + '</td>'
         + '<td>' + (r.wins === null ? '-' : esc(fmt(r.wins, 0))) + '</td>'
-        + '<td>' + chips + '</td>'
+        + '<td>' + (r.focal ? chips
+          : '<span class="tl-note">not ranked here - your ' + esc(OPP)
+            + ' spreads are used by the heatmap overlay, the drill-down '
+            + 'picker'
+            + (D.licki_denial ? ' and the anti-' + esc(FOCAL) + ' section'
+              : '') + '</span>')
+        + '</td>'
         + '<td>' + (r.i >= 0
           ? '<button data-drop="' + r.i + '">remove</button>' : '')
         + '</td></tr>';
@@ -3985,7 +4124,9 @@
     setHtml('tl-user-list',
       (topRow && topRow.focal && !topRow.overCap
         ? '<p class="tl-note"><strong>Build this one:</strong> '
-          + esc(topRow.u.label) + ' ' + esc(topRow.u.ivs
+          + esc(topRow.u.label)
+          + (topRow.u.label !== FOCAL ? ' (scored as the ' + esc(FOCAL)
+            + ' it becomes)' : '') + ' ' + esc(topRow.u.ivs
             || ivStr(topRow.u.side, topRow.u.idx))
           + (typeof topRow.u.cp === 'number' ? ' (CP ' + esc(topRow.u.cp)
             + ')' : '') + ' - top of the ranking below.</p>'
@@ -4284,8 +4425,9 @@
         + ') and check whether the conclusion survives.'
         + (Object.keys(dropped).length
           ? ' (' + esc(Object.keys(dropped).map(gridPretty).join(' / '))
-            + ' is omitted here: it is byte-identical to another grid, so '
-            + 'it cannot change any conclusion.)'
+            + ' is not listed here because it is byte-identical to another '
+            + 'grid; it stays selectable in the dropdown, marked '
+            + '"identical to", so nothing disappears silently.)'
           : ''));
     } else if (GRID_LABELS.length > 1 && distinctGrids.length === 1) {
       b.push('Moveset robustness: the ' + GRID_LABELS.length
@@ -4311,6 +4453,7 @@
     renderBanners();
     renderTldr();      // the saturation summary is per-grid
     renderUser();      // the verdict table follows the grid/scenario too
+    syncDrillPicker(); // your opponent spreads are drill-down targets
     renderDrill();     // ...and so do YOUR gold stars in the drill-down
     renderDenial();    // ...and your own opponent spreads over there
     drawHeat();
@@ -4338,9 +4481,20 @@
         o0.value = ''; o0.textContent = '(no grid baked)';
         g.appendChild(o0); g.disabled = true;
       }
+      // Same policy everywhere: the byte-identical grid stays selectable
+      // (so nothing silently disappears) but is MARKED, exactly as the
+      // rail and the summary describe it.
+      var dupOfLabel = {};
+      (META.duplicate_grids || []).forEach(function (grp) {
+        grp.slice(1).forEach(function (lb) { dupOfLabel[lb] = grp[0]; });
+      });
       GRID_LABELS.forEach(function (lb) {
         var o = document.createElement('option');
-        o.value = lb; o.textContent = gridPretty(lb); g.appendChild(o);
+        o.value = lb;
+        o.textContent = gridPretty(lb)
+          + (dupOfLabel[lb]
+            ? ' (identical to ' + gridPretty(dupOfLabel[lb]) + ')' : '');
+        g.appendChild(o);
       });
       if (state.label) g.value = state.label;
       g.addEventListener('change', function () {
@@ -4465,6 +4619,15 @@
       hn.addEventListener('change', function () {
         state.heatNamed = !!hn.checked;
         drawHeat();
+      });
+    }
+    var dmine = $('tl-drill-mine');
+    if (dmine) {
+      dmine.addEventListener('change', function () {
+        if (!dmine.value) return;
+        var box = $('tl-drill-licki');
+        if (box) box.value = dmine.value;
+        renderDrill();
       });
     }
     ['tl-drill-licki', 'tl-drill-thievul'].forEach(function (id) {
