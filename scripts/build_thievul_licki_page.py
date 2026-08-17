@@ -603,6 +603,8 @@ PAGE_CSS = """
      this one number is what buys a thicker band -- see the note in
      thievul_licki_page.js onHeatHover. */
   .tl-heat { width: 100%; height: 760px; }
+  /* 3 rows of ~250px small multiples plus title/legend chrome. */
+  .tl-plot-grid { height: 830px; }
   .tl-tldr-headline { flex: 1 1 100%; margin: 0 0 2px; font-size: 14.5px;
        color: var(--text); }
   .tl-tldr-qual { color: var(--flip); font-size: 12.5px; }
@@ -739,6 +741,10 @@ here"></textarea>
 <p class="tl-note" id="tl-frontier-note"></p>
 
 <h2>Coverage: which {focal} spreads beat the most {opponent}</h2>
+<div class="tl-ctl">
+  <div><label for="tl-cov-view">View</label>
+    <select id="tl-cov-view"></select></div>
+</div>
 <div id="tl-scatter"></div>
 <p class="tl-note" id="tl-scatter-note"></p>
 

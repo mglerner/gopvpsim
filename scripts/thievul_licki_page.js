@@ -172,6 +172,7 @@
     overCap: [],      // scanned mons that can no longer BE the analyzed build
     basis: 'primary', // which moveset the ranked table ranks FOR
     cliffColor: 'sp', // cliff panel colouring: sp | def | hp
+    covView: 'single',// coverage panel: single | grid (3x3 scenarios)
     heatRange: null,  // null = whole 4096x4096; else {i0,i1,j0,j1} indices
     heatNamed: true
   };
@@ -264,7 +265,10 @@
   // ---- coverage ----
   // Returns a Promise of {pct: Float64Array(4096), denom, note} or
   // {missing: 'reason'}.
-  function coverage() {
+  // siOpt: compute for THAT scenario instead of the dropdown's (the 3x3
+  // small-multiples view needs all nine independently).
+  function coverage(siOpt) {
+    var oneSi = (typeof siOpt === 'number') ? siOpt : null;
     if (!HAS_GRIDS || !state.label) {
       return Promise.resolve({ missing:
         'no simulation grid is embedded in this page yet' });
@@ -275,15 +279,16 @@
     if (fromTable) {
       var denom = (state.cohort === 'all') ? N : 512;
       var out = new Float64Array(N);
-      if (state.scenarioAll) {
+      if (oneSi === null && state.scenarioAll) {
         for (var i = 0; i < N; i++) {
           var acc = 0;
           for (var si = 0; si < NS; si++) acc += fromTable[i * NS + si];
           out[i] = 100 * acc / (NS * denom);
         }
       } else {
+        var useSi = (oneSi === null) ? state.si : oneSi;
         for (var j = 0; j < N; j++) {
-          out[j] = 100 * fromTable[j * NS + state.si] / denom;
+          out[j] = 100 * fromTable[j * NS + useSi] / denom;
         }
       }
       return Promise.resolve({ pct: out, denom: denom, note: '' });
@@ -295,8 +300,8 @@
         'the custom ' + OPP + ' cohort is empty - enter ranks (e.g. "1-50") '
         + 'or IV triples (e.g. "15/15/14")' });
     }
-    var sis = state.scenarioAll
-      ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [state.si];
+    var sis = (oneSi !== null) ? [oneSi]
+      : (state.scenarioAll ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [state.si]);
     for (var k = 0; k < sis.length; k++) {
       if (!haveWon(state.label, sis[k])) {
         return Promise.resolve({ missing:
@@ -545,7 +550,6 @@
   var HEAT_PX_H = 634;
   var HEAT_PX_W = 840;
   var HEAT_BINS = 256;   // overview bins per axis
-  var HEAT_FULL = 256;   // <= this many spreads per axis -> 1 cell = 1 matchup
   var _heatTimer = null;
   var POPCNT = (function () {
     var t = new Uint8Array(256);
@@ -577,9 +581,24 @@
     }
     return c;
   }
-  function heatEdges(start, n, nb) {
+  // Smallest power-of-two bin that keeps an axis at or under HEAT_BINS
+  // cells. 4096 spreads -> 16; 900 -> 4; 220 -> 1 (exact cells). Chosen
+  // per axis, so a tall narrow window gets fine columns and coarse rows.
+  var HEAT_BIN_STEPS = [1, 2, 4, 8, 16];
+  function heatBinSize(span) {
+    for (var i = 0; i < HEAT_BIN_STEPS.length; i++) {
+      if (Math.ceil(span / HEAT_BIN_STEPS[i]) <= HEAT_BINS) {
+        return HEAT_BIN_STEPS[i];
+      }
+    }
+    return HEAT_BIN_STEPS[HEAT_BIN_STEPS.length - 1];
+  }
+  function heatEdges(start, n, bin) {
+    var nb = Math.ceil(n / bin);
     var e = new Int32Array(nb + 1);
-    for (var k = 0; k <= nb; k++) e[k] = start + Math.floor(k * n / nb);
+    for (var k = 0; k <= nb; k++) {
+      e[k] = Math.min(start + k * bin, start + n);
+    }
     return e;
   }
   function heatRange() {
@@ -608,9 +627,11 @@
   // ONLY for the cells actually drawn (never 4096x4096 of them).
   function heatBin(slices, r) {
     var nr = r.i1 - r.i0 + 1, nc = r.j1 - r.j0 + 1;
-    var nby = Math.min(HEAT_BINS, nr), nbx = Math.min(HEAT_BINS, nc);
-    var ye = heatEdges(r.i0, nr, nby), xe = heatEdges(r.j0, nc, nbx);
-    var full = (nr <= HEAT_FULL && nc <= HEAT_FULL);
+    var binY = heatBinSize(nr), binX = heatBinSize(nc);
+    var ye = heatEdges(r.i0, nr, binY), xe = heatEdges(r.j0, nc, binX);
+    var nby = ye.length - 1, nbx = xe.length - 1;
+    // Exact cells only when BOTH axes are down to one rank per cell.
+    var full = (binY === 1 && binX === 1);
     var z = [], txt = [], xc = [], yc = [], bx, by, s, fi;
     for (bx = 0; bx < nbx; bx++) xc.push((xe[bx] + xe[bx + 1] + 1) / 2);
     for (by = 0; by < nby; by++) {
@@ -638,8 +659,8 @@
       z.push(zrow); txt.push(trow);
     }
     return { z: z, text: txt, x: xc, y: yc, full: full, ye: ye, xe: xe,
-             nby: nby, nbx: nbx,
-             rowsPerBin: nr / nby, colsPerBin: nc / nbx,
+             nby: nby, nbx: nbx, binY: binY, binX: binX,
+             rowsPerBin: binY, colsPerBin: binX,
              nr: nr, nc: nc };
   }
   // Diverging scale on the page's own outcome tokens: --loss ... neutral
@@ -715,8 +736,10 @@
         line: { color: gold, width: 1.5, dash: 'dash' }
       });
     });
-    var full = (r.i1 - r.i0 + 1) <= HEAT_FULL
-      && (r.j1 - r.j0 + 1) <= HEAT_FULL;
+    // Cell-level outlines only when the grid is drawing exact cells --
+    // same rule the binning uses, so the two can never disagree.
+    var full = (heatBinSize(r.i1 - r.i0 + 1) === 1
+      && heatBinSize(r.j1 - r.j0 + 1) === 1);
     var xs = [], ys = [], hv = [], capped = false, a, b, s;
     for (a = 0; a < capT.length && !capped; a++) {
       for (b = 0; b < capL.length; b++) {
@@ -968,10 +991,11 @@
         + ' as ' + b.nby + ' x ' + b.nbx + ' cells: ' + cell + '. '
         + 'Hover any cell to outline that ' + FOCAL + ' row and that '
         + OPP + ' column across the whole grid. '
-        + 'Zoom (box-select or the zoom tool) to re-bin the visible window; '
-        + 'at ' + HEAT_FULL + ' spreads or fewer per axis it switches to '
-        + 'per-matchup cells. Double-click / "reset axes" returns to the '
-        + 'whole grid. Grid: ' + esc(gridPretty(state.label)) + '; '
+        + 'Zoom (box-select or the zoom tool) to re-bin the visible window: '
+        + 'each axis independently picks the smallest bin of 1, 2, 4, 8 or '
+        + '16 ranks that keeps it under ' + HEAT_BINS + ' cells, so zooming '
+        + 'in sharpens until every cell is one matchup. Double-click / '
+        + '"reset axes" returns to the whole grid. Grid: ' + esc(gridPretty(state.label)) + '; '
         + esc(scenarioText()) + (state.scenarioAll
           ? ' - each cell averages all 9 scenarios' : '')
         + '. The ' + OPP + '-cohort control does NOT apply here: this panel '
@@ -1077,21 +1101,32 @@
       // gutter and one under the x-axis, at the band's centre. They are
       // POINTERS, not extents -- they sit outside the data area entirely,
       // and the hover text states the exact rank range.
+      // Carets on ALL FOUR margins, so the crosshair is findable no matter
+      // which edge of the grid the eye is near.
       var carets = [];
+      var caretFont = { color: c.ink, size: 15 };
       if (row) {
+        var ymid = (row[0] + row[1]) / 2;
         carets.push({
-          xref: 'paper', x: -0.006, xanchor: 'right',
-          yref: 'y', y: (row[0] + row[1]) / 2, yanchor: 'middle',
-          showarrow: false, text: '&gt;', align: 'right',
-          font: { color: c.ink, size: 15 }
+          xref: 'paper', x: -0.006, xanchor: 'right', yref: 'y', y: ymid,
+          yanchor: 'middle', showarrow: false, text: '&gt;',
+          font: caretFont
+        });
+        carets.push({
+          xref: 'paper', x: 1.006, xanchor: 'left', yref: 'y', y: ymid,
+          yanchor: 'middle', showarrow: false, text: '&lt;',
+          font: caretFont
         });
       }
       if (col) {
+        var xmid = (col[0] + col[1]) / 2;
         carets.push({
-          yref: 'paper', y: -0.012, yanchor: 'top',
-          xref: 'x', x: (col[0] + col[1]) / 2, xanchor: 'center',
-          showarrow: false, text: '^',
-          font: { color: c.ink, size: 15 }
+          yref: 'paper', y: -0.012, yanchor: 'top', xref: 'x', x: xmid,
+          xanchor: 'center', showarrow: false, text: '^', font: caretFont
+        });
+        carets.push({
+          yref: 'paper', y: 1.012, yanchor: 'bottom', xref: 'x', x: xmid,
+          xanchor: 'center', showarrow: false, text: 'v', font: caretFont
         });
       }
       try {
@@ -1143,8 +1178,21 @@
     state.heatRange = { i0: ny[0], i1: ny[1], j0: nx[0], j1: nx[1] };
     drawHeat();
   }
+  // Plotly re-emits plotly_relayout for OUR OWN patches -- including the
+  // {shapes, annotations} update the hover stripes push on every cell.
+  // Those carry no axis keys, and because the debounce timer is shared
+  // they used to REPLACE a pending zoom that had not fired yet: drag to
+  // zoom, leave the cursor on the plot (which is where it already is
+  // after a drag), and the zoom was silently dropped. Only range events
+  // may touch the timer.
+  function isRangeEvent(ev) {
+    for (var k in ev) {
+      if (/^[xy]axis\.(range|autorange)/.test(k)) return true;
+    }
+    return false;
+  }
   function onHeatRelayout(ev) {
-    if (!ev) return;
+    if (!ev || !isRangeEvent(ev)) return;
     if (_heatTimer) clearTimeout(_heatTimer);
     _heatTimer = setTimeout(function () {
       _heatTimer = null;
@@ -1866,6 +1914,179 @@
       + (state.scenarioAll ? ' x 9 scenarios' : '') + '.'
       + esc(sat.note)
       + ' Named builds are the diamond markers - hover for the name.');
+  }
+
+  // ---- coverage panel: 3x3 small multiples over all nine scenarios ----
+  // "Should I build THIS IV" is really a question about all nine shield
+  // scenarios at once. Tiles whose outcome is already decided (every
+  // spread wins / no spread wins) are drawn as a flat labelled panel
+  // instead of a dot cloud, so the eye goes straight to the scenarios
+  // where IVs actually change something.
+  function renderScatterGrid(covs) {
+    var host = $('tl-scatter');
+    if (!host) return;
+    var bad = covs.filter(function (c) { return c && c.missing; })[0];
+    if (bad) { showMissing('tl-scatter', bad.missing); return; }
+    host.innerHTML = '<div id="tl-scatter-plot" class="tl-plot '
+      + 'tl-plot-grid"></div>';
+    var c = plotChrome();
+    var cg = colorGroups();
+    var nb = namedBuilds();
+    var mine = state.user.filter(function (u) { return u.side === 'thievul'; });
+    var traces = [], anns = [], layout = {}, live = 0, flat = 0;
+    var shownLegend = {};
+    for (var si = 0; si < NS; si++) {
+      var sf = Math.floor(si / 3), so = si % 3;
+      var suffix = si === 0 ? '' : String(si + 1);
+      var xa = 'x' + suffix, ya = 'y' + suffix;
+      var x0 = so * 0.345, y1 = 1 - sf * 0.335;
+      layout['xaxis' + suffix] = {
+        domain: [x0, x0 + 0.30], anchor: ya,
+        range: [N + 60, -60], gridcolor: c.grid, zerolinecolor: c.grid,
+        showticklabels: (sf === 2), tickfont: { size: 9 }
+      };
+      layout['yaxis' + suffix] = {
+        domain: [Math.max(0, y1 - 0.28), y1], anchor: xa,
+        range: COV_Y_RANGE, gridcolor: c.grid, zerolinecolor: c.grid,
+        showticklabels: (so === 0), tickfont: { size: 9 }
+      };
+      var pct = covs[si].pct;
+      var mn = Infinity, mx = -Infinity;
+      for (var i = 0; i < N; i++) {
+        if (pct[i] < mn) mn = pct[i];
+        if (pct[i] > mx) mx = pct[i];
+      }
+      anns.push({
+        xref: xa + ' domain', yref: ya + ' domain', x: 0.5, y: 1.13,
+        xanchor: 'center', yanchor: 'bottom', showarrow: false,
+        text: '<b>' + scenarioLabel(si) + '</b>',
+        font: { color: c.ink, size: 11 }
+      });
+      // Decided tiles: say what they are, do not draw 4096 identical dots.
+      var decided = null;
+      if (mn >= 100 - 1e-9) {
+        decided = 'every ' + FOCAL + ' spread beats every ' + OPP + ' here';
+      } else if (mx <= 1e-9) {
+        decided = 'no ' + FOCAL + ' spread beats any ' + OPP + ' here';
+      } else if (mx < 1) {
+        decided = 'no ' + FOCAL + ' spread wins more than ' + fmt(mx, 2)
+          + '% here';
+      }
+      if (decided) {
+        flat++;
+        anns.push({
+          xref: xa + ' domain', yref: ya + ' domain', x: 0.5, y: 0.5,
+          xanchor: 'center', yanchor: 'middle', showarrow: false,
+          text: decided, font: { color: c.muted, size: 10 },
+          bgcolor: c.legendBg, bordercolor: c.legendBorder,
+          borderwidth: 1, borderpad: 4, align: 'center'
+        });
+        // one invisible point keeps the subplot's axes alive
+        traces.push({ type: 'scatter', mode: 'markers', x: [N / 2],
+                      y: [50], xaxis: xa, yaxis: ya, showlegend: false,
+                      hoverinfo: 'skip',
+                      marker: { size: 0.1, color: 'rgba(0,0,0,0)' } });
+        continue;
+      }
+      live++;
+      var groups = (cg.mode === 'tier') ? cg.groups
+        : [{ name: FOCAL + ' spreads', idx: null, color: c.muted }];
+      groups.forEach(function (g) {
+        var xs = [], ys = [], hv = [];
+        var idxs = g.idx;
+        if (idxs) {
+          for (var q = 0; q < idxs.length; q++) {
+            xs.push(idxs[q] + 1);
+            ys.push(pct[idxs[q]]);
+            hv.push(statLine('thievul', idxs[q]) + '<br>'
+              + scenarioLabel(si) + ' coverage ' + fmt(pct[idxs[q]], 1) + '%');
+          }
+        } else {
+          for (var q2 = 0; q2 < N; q2++) {
+            xs.push(q2 + 1);
+            ys.push(pct[q2]);
+            hv.push(statLine('thievul', q2) + '<br>' + scenarioLabel(si)
+              + ' coverage ' + fmt(pct[q2], 1) + '%');
+          }
+        }
+        traces.push({
+          type: 'scattergl', mode: 'markers', name: g.name,
+          legendgroup: g.name, showlegend: !shownLegend[g.name],
+          x: xs, y: ys, hovertext: hv,
+          hovertemplate: '%{hovertext}<extra></extra>',
+          xaxis: xa, yaxis: ya,
+          marker: { size: 3, color: g.color, opacity: 0.6 }
+        });
+        shownLegend[g.name] = 1;
+      });
+      // Named builds + your own spreads go ONLY on the live tiles.
+      if (nb.length) {
+        traces.push({
+          type: 'scatter', mode: 'markers', name: 'named builds',
+          legendgroup: 'named builds',
+          showlegend: !shownLegend['named builds'],
+          x: nb.map(function (b) { return b.idx + 1; }),
+          y: nb.map(function (b) { return pct[b.idx]; }),
+          hovertext: nb.map(function (b) {
+            return b.label + '<br>' + scenarioLabel(si) + ' coverage '
+              + fmt(pct[b.idx], 1) + '%';
+          }),
+          hovertemplate: '%{hovertext}<extra></extra>',
+          xaxis: xa, yaxis: ya,
+          marker: { size: 7, color: c.ink, symbol: 'diamond-open',
+                    line: { width: 1.5, color: c.ink } }
+        });
+        shownLegend['named builds'] = 1;
+      }
+      if (mine.length) {
+        traces.push({
+          type: 'scatter', mode: 'markers', name: 'your spreads',
+          legendgroup: 'your spreads',
+          showlegend: !shownLegend['your spreads'],
+          x: mine.map(function (u) { return u.idx + 1; }),
+          y: mine.map(function (u) { return pct[u.idx]; }),
+          hovertext: mine.map(function (u) {
+            return 'YOURS: ' + u.label + '<br>' + scenarioLabel(si)
+              + ' coverage ' + fmt(pct[u.idx], 1) + '%';
+          }),
+          hovertemplate: '%{hovertext}<extra></extra>',
+          xaxis: xa, yaxis: ya,
+          marker: { size: 10, color: c.gold, symbol: 'star',
+                    line: { width: 1, color: c.ink } }
+        });
+        shownLegend['your spreads'] = 1;
+      }
+    }
+    layout.title = gridPretty(state.label)
+      + ' - all 9 shield scenarios (rows: your shields, columns: theirs)';
+    layout.paper_bgcolor = c.paper;
+    layout.plot_bgcolor = c.plot;
+    layout.font = { color: c.font, size: 11 };
+    layout.hovermode = 'closest';
+    layout.hoverlabel = {
+      bgcolor: c.hoverBg, bordercolor: c.hoverBorder,
+      font: { size: 11, color: c.font, family: 'monospace' },
+      namelength: -1, align: 'left'
+    };
+    layout.legend = { bgcolor: c.legendBg, bordercolor: c.legendBorder,
+                      borderwidth: 1, x: 1.01, xanchor: 'left', y: 1,
+                      yanchor: 'top' };
+    layout.margin = { l: 55, r: 210, t: 70, b: 45 };
+    layout.annotations = anns;
+    Plotly.react('tl-scatter-plot', traces, layout, { responsive: true });
+    setHtml('tl-scatter-note',
+      'One tile per shield scenario: rows are YOUR shields (0/1/2), '
+      + 'columns are the ' + esc(OPP) + '\'s. Each dot is one of the 4096 '
+      + esc(FOCAL) + ' spreads (x = stat-product rank, y = share of the '
+      + 'cohort beaten, shared 0-100% scale). ' + esc(cg.note) + ' '
+      + flat + ' of 9 tiles are already decided and are drawn as a label '
+      + 'instead of a dot cloud; the other ' + live + ' are where IVs '
+      + 'change the result, and only those carry the named-build diamonds '
+      + 'and your gold stars. Every dot is plotted -- nothing is thinned '
+      + 'or sampled. This view follows the grid and cohort controls ('
+      + esc(gridPretty(state.label)) + ', ' + esc(cohortLabel())
+      + ') and IGNORES the shield-scenario dropdown, since it shows all '
+      + 'nine at once.');
   }
 
   // ---- pareto ----
@@ -3335,9 +3556,15 @@
     drawHeat();
     renderMechanism();
     coverage().then(function (cov) {
-      renderScatter(cov);
       renderPareto(cov);
       renderCliff(cov);
+      if (state.covView === 'grid') {
+        var all = [];
+        for (var si = 0; si < NS; si++) all.push(coverage(si));
+        Promise.all(all).then(renderScatterGrid);
+      } else {
+        renderScatter(cov);
+      }
     });
     renderFrontier();
   }
@@ -3405,6 +3632,21 @@
     if (cc) {
       cc.addEventListener('change', function () {
         state.customText = cc.value; refresh();
+      });
+    }
+    var cv = $('tl-cov-view');
+    if (cv) {
+      [['single', 'one scenario (follows the dropdown)'],
+       ['grid', 'all 9 scenarios']].forEach(function (pair) {
+        var o = document.createElement('option');
+        o.value = pair[0];
+        o.textContent = pair[1];
+        cv.appendChild(o);
+      });
+      cv.value = state.covView;
+      cv.addEventListener('change', function () {
+        state.covView = cv.value;
+        refresh();
       });
     }
     var cc = $('tl-cliff-color');
