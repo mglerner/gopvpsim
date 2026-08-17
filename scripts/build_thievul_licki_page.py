@@ -1070,7 +1070,7 @@ def render_page(data, missing, spec):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {theme_head_script()}
-<title>{spec['focal']} vs {spec['opponent']} - IV robustness (local)</title>
+<title>{spec['focal']} vs {spec['opponent']} - IV robustness</title>
 <style>{theme_css()}{PAGE_CSS}</style>
 </head>
 <body>
