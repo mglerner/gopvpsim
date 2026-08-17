@@ -31,6 +31,7 @@ the first (Lickitung) page:
   sensitive scenarios -- not a hidden optimization choice.
 """
 import argparse
+import hashlib
 import json
 import pathlib
 import sys
@@ -229,14 +230,16 @@ def main():
                    f'scenarios ({", ".join(ns_scens)}); for readers '
                    f'following PvPoke\'s default moveset. Tiebreak: '
                    f'{ns_tiebreak}', i_ns,
-                   [f'{n_tied_ns} spread(s) tie on {ns_scens[0]} '
-                    f'coverage under NS+IW'], [], 'nsiw_bait')
+                   [f'{n_tied_ns} spread{"" if n_tied_ns == 1 else "s"} '
+                    f'tie on {ns_scens[0]} coverage under NS+IW'], [],
+                   'nsiw_bait', ns_scens)
 
     named = [
         ('The Licki smasher', f'Best {", ".join(pick_scens)} record vs '
          f'{opp_name} ({grid_pretty(primary)}); tiebreak: {tiebreak}',
          i_smash,
-         [f'{n_tied_smash} spread(s) tie on the primary metric '
+         [f'{n_tied_smash} spread{"" if n_tied_smash == 1 else "s"} tie '
+          f'on the primary metric '
           f'({pick_scens[0]} top-512 coverage); tiebreak chain: {tiebreak}'],
          ['Optimized purely for this matchup; check the meta line before '
           'committing dust.']),
@@ -263,7 +266,23 @@ def main():
          find(15, 15, 15), [], []),
     ]
 
-    def card(title, subtitle, i, extra, caveats):
+    # Byte-identical win grids, grouped (see the collapse in card()).
+    grid_groups = []
+    _seen = {}
+    for label in sorted(won):
+        key = hashlib.md5(np.ascontiguousarray(won[label])).hexdigest()
+        if key in _seen:
+            grid_groups[_seen[key]].append(label)
+        else:
+            _seen[key] = len(grid_groups)
+            grid_groups.append([label])
+
+    def card(title, subtitle, i, extra, caveats, scens=None):
+        # A card prints the SAME scenarios its own tiebreak chain ranked
+        # on -- the NS+IW card is chosen on the NS+IW grid's sensitive
+        # scenarios, so printing the primary grid's set underneath it
+        # would be a different question than the one it answered.
+        scens = list(scens or pick_scens)
         m = metrics(i)
         r = ranked[i]
         lines = [
@@ -271,10 +290,19 @@ def main():
             f'#{i + 1}, L{r["level"]}, CP {r["cp"]}, atk {r["atk"]:.2f} / '
             f'def {r["def_"]:.2f} / hp {r["hp"]}',
         ]
-        for label in sorted(won):
-            covs = ', '.join(f'{s}: {m[label][s]}%' for s in pick_scens)
-            lines.append(f'[{m[label]["pretty"]}] top-512 coverage -- '
-                         f'{covs}')
+        # BYTE-IDENTICAL grids collapse to one line naming both: two
+        # lines of identical digits read as a rendering bug, and the
+        # duplication is a property of the data (a bait grid can be
+        # byte-identical to its no-bait twin), not a finding. Grids that
+        # merely happen to agree at THESE scenarios still get their own
+        # line -- "=" here means the whole 4096x4096x9 grid is the same.
+        for group in grid_groups:
+            # ONE decimal, matching the page's COV_DP: the band and the
+            # verdict table render these same stored values, and the 2dp
+            # repr here made one quantity print two ways.
+            covs = ', '.join(f'{s}: {m[group[0]][s]:.1f}%' for s in scens)
+            pretty = ' = '.join(m[la]['pretty'] for la in group)
+            lines.append(f'[{pretty}] top-512 coverage -- {covs}')
         mw_line = ' / '.join(
             f'{cfg["moveset_of"][ms]} {m["meta_wins_11"][ms]}W'
             for ms in sorted(m['meta_wins_11']))
@@ -286,10 +314,11 @@ def main():
         return {'title': title, 'subtitle': subtitle,
                 'spread': spread_row(i), 'rank': i + 1,
                 'lines': lines + extra, 'metrics': m,
+                'scenarios': scens,
                 'caveats': caveats}
 
     def card_with_grid(spec):
-        c = card(*spec[:5])
+        c = card(*spec[:5], scens=(spec[6] if len(spec) > 6 else None))
         # Every card states the grid it was computed on, structurally --
         # the page no longer has to guess it from the subtitle.
         c['grid'] = spec[5] if len(spec) > 5 else primary
