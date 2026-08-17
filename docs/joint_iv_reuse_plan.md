@@ -173,6 +173,28 @@ Policy per artifact:
 - **Cheap derived blobs** (meta-wins extraction, breakpoints, denial,
   reco): recompute-on-demand, inputs already stamped; no machinery.
 
+## 3c. Feedback into the normal dives (phased)
+
+- **Phase A — links (with the kit, low risk)**: the kit maintains a
+  registry of published robustness pages keyed by (focal, opponent,
+  league); dive renders decorate matching opponent rows with the link
+  (post-render patcher precedent: `patch_dive_envelope_tags.py`, so
+  shipped dives can be retrofitted without re-simming). Reverse links
+  already exist.
+- **Phase B — spread call-outs via thresholds (later, guarded)**:
+  robustness runs EMIT per-opponent spread/anchor DATA into
+  `thresholds/*.toml` (the existing curated-matchup-facts vehicle;
+  ship-mode narrative policy untouched — it gates prose blocks, not
+  data). Two mandatory guardrails: (1) scope labeling — call-outs
+  render as a distinct "matchup tech" category, never mixed into the
+  main IV tiers, conditions attached (moveset/bait/scenario/cohort);
+  a single-matchup optimum can contradict the whole-meta rec (rank-1
+  vs the smasher, 2026-08-16), and a conditional claim traveling
+  without its conditions is exactly the 6/15/5 failure mode. (2)
+  vintage gating — call-outs carry engine+gamemaster stamps; a dive
+  render drops stale ones VISIBLY rather than serving them
+  (input-freshness lens; stale is a safe miss).
+
 ## 4. Open decisions (Michael)
 
 - Kit naming + where configs live (`pairs/*.toml` vs entries in one
