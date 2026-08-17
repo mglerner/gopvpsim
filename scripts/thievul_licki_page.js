@@ -1,0 +1,3039 @@
+// Thievul vs Lickitung IV-robustness page app (one-off local analysis,
+// 2026-08-16 Thievul CD). DOM + Plotly driver for the standalone page
+// built by scripts/build_thievul_licki_page.py.
+//
+// HARD RULE: this file contains NO analysis numbers. Every number it
+// paints comes from the TL_DATA blob the builder injects. When a piece
+// of TL_DATA is absent (the sim was still baking at build time), the
+// panel that needs it renders a VISIBLE "not baked yet" placeholder --
+// never a silent fallback, never a made-up number.
+//
+// TL_DATA keys consumed (the builder/assembly contract):
+//   meta {generated, engine, gamemaster, total_sims, scenarios[9],
+//         grids{label:{focal_fast,focal_charged,bait,shape,pretty}},
+//         movesets{label:pretty}, opp_moveset, provenance, notes[],
+//         named_builds[{label,ivs[3]}], missing[]}
+//   thievul / licki {ivs[[a,d,s]], level[], cp[], atk[], def[], hp[]}
+//   cov {label: {all:[4096*9], top512:[4096*9]}}
+//   meta_wins {pool_n, wins_11:[4096], note}
+//   won_b64 {label: {si: base64(gzip(packbits(4096x4096 bool)))}}
+//   breakpoints {sp_damage_vs_licki_rank1:[4096], tables[], verdicts[]}
+//   reco {cards[{title, subtitle, spread, rank, lines[], caveats[],
+//         metrics{cov512_11, meta_wins_11}}], pool_n, notes[]}
+//         -- the TL;DR band renders the first 3-4 cards' metrics VERBATIM
+//   collection {cpm, shadowAtkBonus, shadowDefMult, pokemonIndex,
+//               preToFinals, leagueCaps, rankLookup, thresholds,
+//               league, leagueLabel, leagueCap, maxLevel, requireGender,
+//               focalSpecies, oppSpecies, oppFinalSpecies}
+(function () {
+  'use strict';
+
+  var D = (typeof TL_DATA !== 'undefined') ? TL_DATA : {};
+  var META = D.meta || {};
+  var N = 4096;
+  var NS = 9;
+  // Species names come from the DATA, never from a literal here: the same
+  // page renders Thievul vs Lickitung and Thievul vs Lickilicky (the
+  // community's "Licki"). The internal side keys stay 'thievul'/'licki'
+  // because they name the TL_DATA arrays, not the species.
+  var FOCAL = META.focal || 'Thievul';
+  var OPP = META.opponent || 'Lickitung';
+
+  // ---- tiny DOM helpers ----
+  function $(id) { return document.getElementById(id); }
+  // The community shorthand "Licki" is exactly the ambiguity this page
+  // exists to resolve, so it is expanded to the analyzed species wherever
+  // it appears -- including in text the assembly generated. \b keeps
+  // "Lickitung"/"Lickilicky" untouched.
+  function expandLicki(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/\bLicki\b/g, OPP).replace(/\bLickis\b/g, OPP + ' spreads');
+  }
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function setHtml(id, html) { var n = $(id); if (n) n.innerHTML = html; }
+  function missingBox(msg) {
+    return '<div class="tl-missing"><strong>Data not baked yet.</strong> '
+      + esc(msg) + '</div>';
+  }
+  function showMissing(id, msg) { setHtml(id, missingBox(msg)); }
+  function fmt(x, dp) {
+    if (x === null || x === undefined || isNaN(x)) return '-';
+    return Number(x).toFixed(dp === undefined ? 1 : dp);
+  }
+
+  // ---- theme plumbing (mirrors deep_dive_engine.js themeColor/plotChrome) ----
+  var _themeCache = {};
+  function themeColor(name) {
+    if (Object.prototype.hasOwnProperty.call(_themeCache, name)) {
+      return _themeCache[name];
+    }
+    var v = '';
+    try {
+      v = getComputedStyle(document.documentElement)
+        .getPropertyValue(name).trim();
+    } catch (e) { v = ''; }
+    _themeCache[name] = v;
+    return v;
+  }
+  function plotChrome() {
+    return {
+      paper: 'rgba(0,0,0,0)',
+      plot: themeColor('--surface-2'),
+      font: themeColor('--text'),
+      grid: themeColor('--border-2'),
+      legendBg: themeColor('--surface'),
+      legendBorder: themeColor('--border-2'),
+      hoverBg: themeColor('--surface-2'),
+      hoverBorder: themeColor('--text-muted'),
+      ink: themeColor('--text'),
+      gold: themeColor('--notable'),
+      muted: themeColor('--text-muted')
+    };
+  }
+  var TIER_TOKENS = ['--tier-1', '--tier-2', '--tier-3', '--tier-4',
+                     '--tier-5', '--tier-6', '--tier-7', '--tier-8'];
+  function tierColor(i) { return themeColor(TIER_TOKENS[i % TIER_TOKENS.length]); }
+
+  function baseLayout(title, xTitle, yTitle) {
+    var c = plotChrome();
+    return {
+      title: title,
+      xaxis: { title: xTitle, gridcolor: c.grid, zerolinecolor: c.grid },
+      yaxis: { title: yTitle, gridcolor: c.grid, zerolinecolor: c.grid },
+      paper_bgcolor: c.paper, plot_bgcolor: c.plot,
+      font: { color: c.font }, hovermode: 'closest',
+      legend: {
+        bgcolor: c.legendBg, bordercolor: c.legendBorder, borderwidth: 1,
+        x: 1.02, xanchor: 'left', y: 1, yanchor: 'top'
+      },
+      hoverlabel: {
+        bgcolor: c.hoverBg, bordercolor: c.hoverBorder,
+        font: { size: 11, color: c.font, family: 'monospace' },
+        namelength: -1, align: 'left'
+      },
+      margin: { r: 190, t: 46 }
+    };
+  }
+
+  // ---- data presence ----
+  var GRID_LABELS = Object.keys(D.cov || {});
+  var HAS_GRIDS = GRID_LABELS.length > 0;
+  var HAS_META_WINS = !!(D.meta_wins && D.meta_wins.wins_11);
+  var HAS_BP = !!D.breakpoints;
+  var HAS_RECO = !!D.reco;
+  var WON = D.won_b64 || {};
+  var LEAGUE_CAP_TEXT = (D.collection && D.collection.leagueCap)
+    ? ('CP ' + D.collection.leagueCap) : 'league CP';
+
+  function scenarioLabel(si) {
+    var sc = META.scenarios || [];
+    return sc[si] !== undefined ? sc[si] : String(si);
+  }
+
+  // ---- IV index helpers ----
+  function ivIndex(side, a, d, s) {
+    var ivs = (D[side] || {}).ivs;
+    if (!ivs) return -1;
+    for (var i = 0; i < ivs.length; i++) {
+      if (ivs[i][0] === a && ivs[i][1] === d && ivs[i][2] === s) return i;
+    }
+    return -1;
+  }
+  function ivStr(side, i) {
+    var ivs = (D[side] || {}).ivs;
+    if (!ivs || !ivs[i]) return '?';
+    return ivs[i][0] + '/' + ivs[i][1] + '/' + ivs[i][2];
+  }
+  function statLine(side, i) {
+    var t = D[side] || {};
+    if (!t.ivs || !t.ivs[i]) return '';
+    return 'IVs ' + ivStr(side, i) + ' (rank ' + (i + 1) + ')'
+      + '<br>L' + t.level[i] + ' CP ' + t.cp[i]
+      + '<br>atk ' + fmt(t.atk[i], 2) + ' def ' + fmt(t.def[i], 2)
+      + ' hp ' + t.hp[i];
+  }
+
+  // ---- state ----
+  var state = {
+    label: HAS_GRIDS ? GRID_LABELS[0] : null,
+    // si = sf*3+so. Default 0 (0-0), NOT the usual 1-1: on this matchup
+    // 1-1 is saturated (every Thievul spread beats every Lickitung), so a
+    // 1-1 first paint shows a flat wall of green on every panel. 0-0 is
+    // the IV-sensitive slice, which is what the page is about.
+    si: 0,
+    scenarioAll: false,
+    cohort: 'all',
+    customText: '',
+    user: [],         // [{side, idx, label, cp}]
+    overCap: [],      // scanned mons that can no longer BE the analyzed build
+    basis: 'primary', // which moveset the ranked table ranks FOR
+    heatRange: null,  // null = whole 4096x4096; else {i0,i1,j0,j1} indices
+    heatNamed: true
+  };
+
+  // ---- won_b64 decode (gzip via DecompressionStream; file:// safe) ----
+  var _wonCache = {};
+  function haveWon(label, si) {
+    return !!(WON[label] && WON[label][String(si)]);
+  }
+  function haveWonAll(label) {
+    for (var si = 0; si < NS; si++) { if (!haveWon(label, si)) return false; }
+    return true;
+  }
+  function decodeWon(label, si) {
+    var key = label + ':' + si;
+    if (_wonCache[key]) return _wonCache[key];
+    var b64 = (WON[label] || {})[String(si)];
+    if (!b64) return Promise.reject(new Error('no won slice ' + key));
+    var p = (function () {
+      var bin = atob(b64);
+      var raw = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) raw[i] = bin.charCodeAt(i);
+      if (typeof DecompressionStream === 'undefined') {
+        return Promise.reject(new Error(
+          'this browser has no DecompressionStream(gzip)'));
+      }
+      var stream = new Blob([raw]).stream()
+        .pipeThrough(new DecompressionStream('gzip'));
+      return new Response(stream).arrayBuffer().then(function (buf) {
+        return new Uint8Array(buf);
+      });
+    })();
+    _wonCache[key] = p;
+    return p;
+  }
+  function bitAt(bytes, fi, oi) {
+    var idx = fi * N + oi;
+    return (bytes[idx >> 3] & (0x80 >> (idx & 7))) !== 0;
+  }
+
+  // ---- cohorts ----
+  function parseRanks(text) {
+    var out = [];
+    var seen = {};
+    var parts = String(text || '').split(/[,\s]+/);
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i].trim();
+      if (!p) continue;
+      var m = p.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (m) {
+        var lo = parseInt(m[1], 10), hi = parseInt(m[2], 10);
+        for (var r = lo; r <= hi; r++) {
+          if (r >= 1 && r <= N && !seen[r]) { seen[r] = 1; out.push(r - 1); }
+        }
+        continue;
+      }
+      var mi = p.match(/^(\d+)\/(\d+)\/(\d+)$/);
+      if (mi) {
+        var ix = ivIndex('licki', +mi[1], +mi[2], +mi[3]);
+        if (ix >= 0 && !seen[ix + 1]) { seen[ix + 1] = 1; out.push(ix); }
+        continue;
+      }
+      var v = parseInt(p, 10);
+      if (!isNaN(v) && v >= 1 && v <= N && !seen[v]) {
+        seen[v] = 1; out.push(v - 1);
+      }
+    }
+    return out;
+  }
+  function cohortIndices() {
+    if (state.cohort === 'all') return null;            // handled by cov table
+    if (state.cohort === 'top512') return null;          // handled by cov table
+    if (state.cohort === 'top100') {
+      var a = [];
+      for (var i = 0; i < 100; i++) a.push(i);
+      return a;
+    }
+    if (state.cohort === 'rank1') return [0];
+    return parseRanks(state.customText);
+  }
+  function cohortLabel() {
+    if (state.cohort === 'all') return 'all 4096 ' + OPP + ' spreads';
+    if (state.cohort === 'top512') return 'top 512 ' + OPP + ' spreads (by stat product)';
+    if (state.cohort === 'top100') return 'top 100 ' + OPP + ' spreads (by stat product)';
+    if (state.cohort === 'rank1') return 'rank-1 ' + OPP + ' only';
+    var c = cohortIndices() || [];
+    return 'custom ' + OPP + ' cohort (' + c.length + ' spread(s))';
+  }
+
+  // ---- coverage ----
+  // Returns a Promise of {pct: Float64Array(4096), denom, note} or
+  // {missing: 'reason'}.
+  function coverage() {
+    if (!HAS_GRIDS || !state.label) {
+      return Promise.resolve({ missing:
+        'no simulation grid is embedded in this page yet' });
+    }
+    var tbl = D.cov[state.label] || {};
+    var fromTable = (state.cohort === 'all') ? tbl.all
+      : (state.cohort === 'top512') ? tbl.top512 : null;
+    if (fromTable) {
+      var denom = (state.cohort === 'all') ? N : 512;
+      var out = new Float64Array(N);
+      if (state.scenarioAll) {
+        for (var i = 0; i < N; i++) {
+          var acc = 0;
+          for (var si = 0; si < NS; si++) acc += fromTable[i * NS + si];
+          out[i] = 100 * acc / (NS * denom);
+        }
+      } else {
+        for (var j = 0; j < N; j++) {
+          out[j] = 100 * fromTable[j * NS + state.si] / denom;
+        }
+      }
+      return Promise.resolve({ pct: out, denom: denom, note: '' });
+    }
+    // Cohort needs the raw win bitmap.
+    var cohort = cohortIndices() || [];
+    if (!cohort.length) {
+      return Promise.resolve({ missing:
+        'the custom ' + OPP + ' cohort is empty - enter ranks (e.g. "1-50") '
+        + 'or IV triples (e.g. "15/15/14")' });
+    }
+    var sis = state.scenarioAll
+      ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [state.si];
+    for (var k = 0; k < sis.length; k++) {
+      if (!haveWon(state.label, sis[k])) {
+        return Promise.resolve({ missing:
+          'the full win grid for ' + state.label + ' scenario '
+          + scenarioLabel(sis[k]) + ' is not embedded in this page, so this '
+          + 'cohort cannot be computed (the All-4096 and Top-512 cohorts '
+          + 'still work - they are pre-aggregated)' });
+      }
+    }
+    var coh = new Int32Array(cohort);
+    return Promise.all(sis.map(function (si) {
+      return decodeWon(state.label, si);
+    })).then(function (slices) {
+      var out2 = new Float64Array(N);
+      for (var fi = 0; fi < N; fi++) {
+        var c = 0;
+        for (var s = 0; s < slices.length; s++) {
+          var bytes = slices[s];
+          for (var q = 0; q < coh.length; q++) {
+            if (bitAt(bytes, fi, coh[q])) c++;
+          }
+        }
+        out2[fi] = 100 * c / (slices.length * coh.length);
+      }
+      return { pct: out2, denom: coh.length, note: '' };
+    }, function (err) {
+      return { missing: 'win-grid decode failed: ' + err.message };
+    });
+  }
+
+  // ---- named / user markers ----
+  // breakpoints.named_spreads and reco.named_builds overlap heavily -- rank
+  // 1 is named three times across the two sources ("rank-1 stat product",
+  // "rank1", "no-meta-cost"), 456 and 534 twice each. Concatenating them
+  // painted the same row two or three times with three separate labels,
+  // which is what turned the right edge of every panel into a jumble. One
+  // ROW = one entry = one merged label, deduped by rank.
+  function shortName(label, idx) {
+    var s = String(label || '').trim();
+    s = s.replace(/^#\d+\s*/, '');              // reco prefixes "#752 "
+    var iv = ivStr('thievul', idx);
+    if (s.indexOf(iv) === 0) s = s.slice(iv.length).trim();
+    s = s.replace(/^\((.*)\)$/, '$1').trim();   // "(smasher)" -> "smasher"
+    return s;
+  }
+  function namedBuilds() {
+    var raw = [];
+    var ns = (D.breakpoints || {}).named_spreads;
+    if (ns) {
+      Object.keys(ns).forEach(function (k) {
+        raw.push({ label: ns[k].label || k, ivs: ns[k].ivs, rank: ns[k].rank });
+      });
+    } else {
+      raw = raw.concat(META.named_builds || []);
+    }
+    raw = raw.concat((D.reco && D.reco.named_builds) || []);
+    var byIdx = {}, order = [];
+    raw.forEach(function (b) {
+      var idx = (b.ivs)
+        ? ivIndex('thievul', b.ivs[0], b.ivs[1], b.ivs[2])
+        : (b.rank !== undefined && b.rank !== null ? b.rank - 1 : -1);
+      if (idx < 0 || idx >= N) return;
+      if (!byIdx[idx]) { byIdx[idx] = []; order.push(idx); }
+      var nm = shortName(b.label, idx);
+      if (nm && byIdx[idx].indexOf(nm) < 0) byIdx[idx].push(nm);
+    });
+    return order.sort(function (a, b) { return a - b; }).map(function (idx) {
+      var names = byIdx[idx];
+      var tag = '#' + (idx + 1) + ' ' + ivStr('thievul', idx);
+      return {
+        idx: idx, tag: tag, names: names,
+        label: tag + (names.length ? ' - ' + names.join(' / ') : '')
+      };
+    });
+  }
+  function commas(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  // ---- per-grid saturation, computed from the embedded coverage ----
+  // cov[label] carries, for EVERY embedded grid, how many opponent spreads
+  // each focal spread beats in each scenario. A scenario is SATURATED for a
+  // cohort when the MINIMUM coverage equals the denominator. This is
+  // recomputed for the SELECTED grid instead of being frozen into a single
+  // headline, because the answer is moveset-dependent: a conclusion that
+  // holds for one charged-move pair need not hold for PvPoke's default one.
+  var _satCache = {};
+  function saturationForGrid(label) {
+    if (!label) return null;
+    if (_satCache[label]) return _satCache[label];
+    var tbl = (D.cov || {})[label];
+    if (!tbl) return null;
+    var out = { all: [], top512: [], hopeless: [], source: 'page',
+                mismatch: '' };
+    [['all', N], ['top512', 512]].forEach(function (pair) {
+      var arr = tbl[pair[0]], denom = pair[1];
+      if (!arr) { out[pair[0]] = null; return; }
+      for (var si = 0; si < NS; si++) {
+        var sat = true, mx = 0;
+        for (var i = 0; i < N; i++) {
+          var c = arr[i * NS + si];
+          if (c !== denom) sat = false;
+          if (c > mx) mx = c;
+        }
+        if (sat) out[pair[0]].push(scenarioLabel(si));
+        if (pair[0] === 'all' && mx === 0) {
+          out.hopeless.push(scenarioLabel(si));
+        }
+      }
+    });
+    // The assembly ships its own per-grid classification. We keep the
+    // page's computed sets (they carry BOTH cohorts) but cross-check, so a
+    // disagreement is shown rather than one of them silently winning.
+    var pg = ((D.reco || {}).per_grid_scenarios || {})[label]
+      || ((D.reco || {}).saturated_by_grid || {})[label]
+      || ((D.reco || {}).saturated_scenarios_by_grid || {})[label];
+    if (pg) {
+      var rs = Array.isArray(pg) ? pg
+        : (pg.saturated_win || pg.all || pg.all_4096 || null);
+      if (rs && rs.slice().sort().join(',')
+          !== (out.all || []).slice().sort().join(',')) {
+        out.mismatch = ' DISAGREEMENT: the recommendation blob lists '
+          + (rs.length ? rs.join(', ') : 'none')
+          + ' as saturated for this grid, but the embedded coverage counts '
+          + 'give ' + ((out.all || []).length ? out.all.join(', ') : 'none')
+          + ' - trust neither until that is resolved.';
+      }
+      // The blob's "hopeless" is a rounded/editorial rule; the page's is
+      // literal (zero wins anywhere). Where they differ, say exactly how
+      // many wins are actually left rather than picking a side.
+      var rh = pg.hopeless || [];
+      var extra = rh.filter(function (s) {
+        return out.hopeless.indexOf(s) < 0;
+      });
+      if (extra.length) {
+        var arrAll = ((D.cov || {})[label] || {}).all;
+        out.nearly = extra.map(function (s) {
+          var si = (META.scenarios || []).indexOf(s);
+          var best = 0, tot = 0;
+          if (arrAll && si >= 0) {
+            for (var i = 0; i < N; i++) {
+              var c = arrAll[i * NS + si];
+              tot += c;
+              if (c > best) best = c;
+            }
+          }
+          return s + ' (best spread beats ' + best + ' of ' + N + '; '
+            + commas(tot) + ' winning matchups in all)';
+        });
+      }
+    }
+    _satCache[label] = out;
+    return out;
+  }
+  function scenarioComplement(list) {
+    var have = {}, out = [];
+    (list || []).forEach(function (s) { have[s] = 1; });
+    for (var si = 0; si < NS; si++) {
+      var lb = scenarioLabel(si);
+      if (!have[lb]) out.push(lb);
+    }
+    return out;
+  }
+  function satSentence(label) {
+    var s = saturationForGrid(label);
+    if (!s) return '';
+    var pretty = gridPretty(label);
+    var isDefault = (META.default_moveset_label === label);
+    var head = pretty + (isDefault
+      ? ' (PvPoke\'s default ' + FOCAL + ' moveset)' : '');
+    if (!(s.all || []).length && !(s.top512 || []).length
+        && !(s.hopeless || []).length) {
+      return head + ': NO shield scenario is decided either way - IV choice '
+        + 'can change the result in all 9.' + (s.mismatch || '');
+    }
+    var bits = [];
+    if (s.all) {
+      bits.push((s.all.length
+        ? 'every ' + FOCAL + ' spread beats every one of the 4096 ' + OPP
+          + ' spreads at ' + s.all.join(', ')
+        : 'no scenario is saturated against all 4096 ' + OPP + ' spreads'));
+    }
+    if (s.top512) {
+      bits.push('against the top-512 cohort: '
+        + (s.top512.length ? s.top512.join(', ') : 'none'));
+    }
+    var nearlyKeys = (s.nearly || []).map(function (x) {
+      return String(x).split(' ')[0];
+    });
+    var rest = scenarioComplement(
+      (s.all || []).concat(s.hopeless || []).concat(nearlyKeys));
+    return head + ': ' + bits.join('; ')
+      + ((s.hopeless || []).length
+        ? '. UNWINNABLE for every spread at ' + s.hopeless.join(', ') : '')
+      + ((s.nearly || []).length
+        ? '. The recommendation blob also treats ' + s.nearly.join('; ')
+          + ' as unwinnable' : '')
+      + (rest.length ? '. IV choice can still decide ' + rest.join(', ')
+        : '. No scenario is left for IV choice to decide.')
+      + (s.mismatch || '');
+  }
+
+  // ---- saturation (a flat series is a finding, not a broken plot) ----
+  var COV_Y_RANGE = [0, 102];
+  function coverageSaturation(pct) {
+    var mn = Infinity, mx = -Infinity;
+    for (var i = 0; i < pct.length; i++) {
+      if (pct[i] < mn) mn = pct[i];
+      if (pct[i] > mx) mx = pct[i];
+    }
+    if (!(mx - mn <= 1e-9)) return { note: '', text: '' };
+    var what = (mn >= 100 - 1e-9)
+      ? 'every one of the ' + pct.length + ' ' + FOCAL + ' spreads beats '
+        + 'every ' + OPP + ' in this cohort'
+      : (mn <= 1e-9
+        ? 'no ' + FOCAL + ' spread beats any ' + OPP + ' in this cohort'
+        : 'all ' + pct.length + ' ' + FOCAL + ' spreads sit at exactly '
+          + fmt(mn, 1) + '%');
+    return {
+      note: ' SATURATED: ' + what + ' in this scenario, so IV choice does '
+        + 'not decide anything here - compare 0-0 / 0-1.',
+      text: what.charAt(0).toUpperCase() + what.slice(1) + '.<br>IV choice '
+        + 'does not matter in this scenario - compare 0-0 / 0-1.'
+    };
+  }
+  function satAnnotation(text, c) {
+    return {
+      xref: 'paper', yref: 'paper', x: 0.5, y: 0.5, xanchor: 'center',
+      yanchor: 'middle', showarrow: false, text: text,
+      font: { color: c.ink, size: 13 }, bgcolor: c.legendBg,
+      bordercolor: c.legendBorder, borderwidth: 1, borderpad: 8,
+      opacity: 0.95
+    };
+  }
+
+  // ---- joint win heatmap (hero panel) ----
+  // The whole 4096 x 4096 joint IV space in one picture. Every cell is
+  // computed HERE, in the browser, from the same decoded win bitmap the
+  // drill-down uses -- there is no second, pre-binned copy of the data that
+  // could disagree with it. Zooming re-bins the visible window, and once a
+  // window is small enough every cell is one literal simulated matchup.
+  var HEAT_BINS = 256;   // overview bins per axis
+  var HEAT_FULL = 256;   // <= this many spreads per axis -> 1 cell = 1 matchup
+  var _heatTimer = null;
+  var POPCNT = (function () {
+    var t = new Uint8Array(256);
+    for (var i = 0; i < 256; i++) {
+      var c = 0, v = i;
+      while (v) { c += v & 1; v >>= 1; }
+      t[i] = c;
+    }
+    return t;
+  })();
+  // Set bits of focal row fi over opponent indices [o0, o1). Rows are
+  // byte-aligned (N = 4096 = 512 bytes/row), so whole bytes go through the
+  // popcount table and only the two ragged ends are walked bit by bit.
+  function rowCount(bytes, fi, o0, o1) {
+    var s = fi * N + o0, e = fi * N + o1;
+    if (e <= s) return 0;
+    var c = 0, b;
+    var sb = s >> 3, eb = e >> 3;
+    if (sb === eb) {
+      for (b = s; b < e; b++) if (bytes[b >> 3] & (0x80 >> (b & 7))) c++;
+      return c;
+    }
+    for (b = s; b < ((sb + 1) << 3); b++) {
+      if (bytes[b >> 3] & (0x80 >> (b & 7))) c++;
+    }
+    for (var by = sb + 1; by < eb; by++) c += POPCNT[bytes[by]];
+    for (b = eb << 3; b < e; b++) {
+      if (bytes[b >> 3] & (0x80 >> (b & 7))) c++;
+    }
+    return c;
+  }
+  function heatEdges(start, n, nb) {
+    var e = new Int32Array(nb + 1);
+    for (var k = 0; k <= nb; k++) e[k] = start + Math.floor(k * n / nb);
+    return e;
+  }
+  function heatRange() {
+    return state.heatRange || { i0: 0, i1: N - 1, j0: 0, j1: N - 1 };
+  }
+  function heatCellText(fi, oi, cnt, nsl) {
+    var T = D.thievul || {}, L = D.licki || {};
+    return FOCAL + ' #' + (fi + 1) + ' ' + ivStr('thievul', fi)
+      + ' (L' + (T.level ? T.level[fi] : '?')
+      + ', CP ' + (T.cp ? T.cp[fi] : '?') + ')'
+      + '<br>vs ' + OPP + ' #' + (oi + 1) + ' ' + ivStr('licki', oi)
+      + ' (L' + (L.level ? L.level[oi] : '?')
+      + ', CP ' + (L.cp ? L.cp[oi] : '?') + ')'
+      + '<br>result: ' + (nsl === 1
+        ? (cnt > 0 ? 'WIN' : 'LOSS')
+        : 'won ' + cnt + ' of ' + nsl + ' shield scenarios');
+  }
+  function heatBinText(i0, i1, j0, j1, c, tot) {
+    return FOCAL + ' ranks ' + (i0 + 1) + '-' + (i1 + 1)
+      + ' (best in bin ' + ivStr('thievul', i0) + ')'
+      + '<br>vs ' + OPP + ' ranks ' + (j0 + 1) + '-' + (j1 + 1)
+      + ' (best in bin ' + ivStr('licki', j0) + ')'
+      + '<br>won ' + c + ' of ' + tot + ' (' + fmt(100 * c / tot, 1) + '%)';
+  }
+  // Bin the decoded slices over an index window. Hover strings are built
+  // ONLY for the cells actually drawn (never 4096x4096 of them).
+  function heatBin(slices, r) {
+    var nr = r.i1 - r.i0 + 1, nc = r.j1 - r.j0 + 1;
+    var nby = Math.min(HEAT_BINS, nr), nbx = Math.min(HEAT_BINS, nc);
+    var ye = heatEdges(r.i0, nr, nby), xe = heatEdges(r.j0, nc, nbx);
+    var full = (nr <= HEAT_FULL && nc <= HEAT_FULL);
+    var z = [], txt = [], xc = [], yc = [], bx, by, s, fi;
+    for (bx = 0; bx < nbx; bx++) xc.push((xe[bx] + xe[bx + 1] + 1) / 2);
+    for (by = 0; by < nby; by++) {
+      yc.push((ye[by] + ye[by + 1] + 1) / 2);
+      var acc = new Float64Array(nbx);
+      for (s = 0; s < slices.length; s++) {
+        for (fi = ye[by]; fi < ye[by + 1]; fi++) {
+          for (bx = 0; bx < nbx; bx++) {
+            acc[bx] += rowCount(slices[s], fi, xe[bx], xe[bx + 1]);
+          }
+        }
+      }
+      var zrow = new Array(nbx), trow = new Array(nbx);
+      var rows = ye[by + 1] - ye[by];
+      for (bx = 0; bx < nbx; bx++) {
+        var cols = xe[bx + 1] - xe[bx];
+        var tot = slices.length * rows * cols;
+        var cnt = acc[bx];
+        zrow[bx] = cnt / tot;
+        trow[bx] = full
+          ? heatCellText(ye[by], xe[bx], cnt, slices.length)
+          : heatBinText(ye[by], ye[by + 1] - 1, xe[bx], xe[bx + 1] - 1,
+                        cnt, tot);
+      }
+      z.push(zrow); txt.push(trow);
+    }
+    return { z: z, text: txt, x: xc, y: yc, full: full,
+             nby: nby, nbx: nbx,
+             rowsPerBin: nr / nby, colsPerBin: nc / nbx,
+             nr: nr, nc: nc };
+  }
+  // Diverging scale on the page's own outcome tokens: --loss ... neutral
+  // ... --win, with 0.5 (an even split) sitting on the neutral midpoint.
+  // Both ends are the same colors the win/loss tables use, in every theme.
+  function heatScale() {
+    var lo = themeColor('--loss') || '#c31c1c';
+    var mid = themeColor('--matrix-tie-bg') || '#888888';
+    var hi = themeColor('--win') || '#247934';
+    return [[0, lo], [0.5, mid], [1, hi]];
+  }
+  function heatSlicePick() {
+    if (!HAS_GRIDS || !state.label) {
+      return { missing: 'no simulation grid is embedded in this page yet, '
+        + 'so there is nothing to draw here.' };
+    }
+    var sis = [];
+    if (state.scenarioAll) {
+      for (var si = 0; si < NS; si++) sis.push(si);
+    } else {
+      sis.push(state.si);
+    }
+    for (var k = 0; k < sis.length; k++) {
+      if (!haveWon(state.label, sis[k])) {
+        return { missing: (state.scenarioAll
+            ? 'the "all 9 (mean)" view needs the full win grid for every '
+              + 'shield scenario, and '
+            : 'this view needs the full win grid, and ')
+          + state.label + ' scenario ' + scenarioLabel(sis[k])
+          + ' is not embedded in this page (the pre-aggregated coverage '
+          + 'panels below still work; this heatmap needs the per-matchup '
+          + 'bitmap)' };
+      }
+    }
+    return { sis: sis };
+  }
+  // Overlay for spreads YOU own (manual entries + Poke Genie CSV). Owned
+  // Thievul are rows, owned Lickitung are columns, and an intersection is a
+  // real simulated matchup -- so it gets a ring, its exact win/loss in the
+  // hover, and (once zoomed to per-matchup cells) an outline around the
+  // cell itself. Counts are capped so a 200-mon CSV cannot bury the plot;
+  // whatever is dropped is SAID in the caption, never dropped silently.
+  var OVL_LINE_CAP = 40;    // guide lines per axis
+  var OVL_MARK_CAP = 400;   // intersection rings
+  function heatOverlay(r, slices, c) {
+    var out = { shapes: [], trace: null, note: '' };
+    var mine = { thievul: [], licki: [] };
+    state.user.forEach(function (u) {
+      if (mine[u.side]) mine[u.side].push(u);
+    });
+    if (!mine.thievul.length && !mine.licki.length) return out;
+    function visible(side, lo, hi) {
+      return mine[side].slice().sort(function (a, b) {
+        return a.idx - b.idx;
+      }).filter(function (u) { return u.idx >= lo && u.idx <= hi; });
+    }
+    var visT = visible('thievul', r.i0, r.i1);
+    var visL = visible('licki', r.j0, r.j1);
+    var capT = visT.slice(0, OVL_LINE_CAP);
+    var capL = visL.slice(0, OVL_LINE_CAP);
+    var gold = c.gold || '#b68a14';
+    capT.forEach(function (u) {
+      out.shapes.push({
+        type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y',
+        y0: u.idx + 1, y1: u.idx + 1,
+        line: { color: gold, width: 1.5, dash: 'dash' }
+      });
+    });
+    capL.forEach(function (u) {
+      out.shapes.push({
+        type: 'line', yref: 'paper', y0: 0, y1: 1, xref: 'x',
+        x0: u.idx + 1, x1: u.idx + 1,
+        line: { color: gold, width: 1.5, dash: 'dash' }
+      });
+    });
+    var full = (r.i1 - r.i0 + 1) <= HEAT_FULL
+      && (r.j1 - r.j0 + 1) <= HEAT_FULL;
+    var xs = [], ys = [], hv = [], capped = false, a, b, s;
+    for (a = 0; a < capT.length && !capped; a++) {
+      for (b = 0; b < capL.length; b++) {
+        if (xs.length >= OVL_MARK_CAP) { capped = true; break; }
+        var t = capT[a], l = capL[b], cnt = 0;
+        for (s = 0; s < slices.length; s++) {
+          if (bitAt(slices[s], t.idx, l.idx)) cnt++;
+        }
+        xs.push(l.idx + 1);
+        ys.push(t.idx + 1);
+        hv.push('YOURS: ' + t.label + ' ' + FOCAL + ' #' + (t.idx + 1) + ' '
+          + ivStr('thievul', t.idx)
+          + '<br>vs YOURS: ' + l.label + ' ' + OPP + ' #' + (l.idx + 1) + ' '
+          + ivStr('licki', l.idx)
+          + '<br>result: ' + (slices.length === 1
+            ? (cnt ? 'WIN' : 'LOSS')
+            : 'won ' + cnt + ' of ' + slices.length + ' shield scenarios'));
+        if (full) {
+          out.shapes.push({
+            type: 'rect', xref: 'x', yref: 'y',
+            x0: l.idx + 0.5, x1: l.idx + 1.5,
+            y0: t.idx + 0.5, y1: t.idx + 1.5,
+            line: { color: gold, width: 2 }, fillcolor: 'rgba(0,0,0,0)'
+          });
+        }
+      }
+    }
+    if (xs.length) {
+      out.trace = {
+        type: 'scatter', mode: 'markers', name: 'your spreads',
+        x: xs, y: ys, hovertext: hv,
+        hovertemplate: '%{hovertext}<extra></extra>',
+        marker: { size: 13, symbol: 'circle-open', color: gold,
+                  line: { width: 2, color: gold } }
+      };
+    }
+    var msg = ' YOUR SPREADS: gold dashed lines mark them (rows = your '
+      + FOCAL + ', columns = your ' + OPP + ')'
+      + (xs.length
+        ? '; ' + xs.length + ' ring(s) mark matchups where you own both '
+          + 'sides' + (full ? ', outlined at cell level in this zoom' : '')
+        : (mine.thievul.length && mine.licki.length
+          ? ' - no matchup where you own both sides falls inside the '
+            + 'current zoom window, so there is nothing to ring here'
+          : ' - you own spreads on only one side, so there is no '
+            + 'intersection to ring'))
+      + '.';
+    var caps = [];
+    if (visT.length > capT.length) {
+      caps.push('drawing ' + capT.length + ' of ' + visT.length
+        + ' owned ' + FOCAL + ' rows (overlay cap ' + OVL_LINE_CAP + ')');
+    }
+    if (visL.length > capL.length) {
+      caps.push('drawing ' + capL.length + ' of ' + visL.length
+        + ' owned ' + OPP + ' columns (overlay cap ' + OVL_LINE_CAP + ')');
+    }
+    if (capped) {
+      caps.push('intersection rings capped at ' + OVL_MARK_CAP);
+    }
+    var offT = mine.thievul.length - visT.length;
+    var offL = mine.licki.length - visL.length;
+    if (offT || offL) {
+      caps.push(offT + ' owned ' + FOCAL + ' and ' + offL + ' owned '
+        + OPP + ' spread(s) fall outside the current zoom window');
+    }
+    out.note = msg + (caps.length ? ' NOT ALL DRAWN: ' + caps.join('; ')
+      + '.' : '');
+    return out;
+  }
+  function drawHeat() {
+    var host = $('tl-heat');
+    if (!host) return;
+    var pick = heatSlicePick();
+    if (pick.missing) {
+      showMissing('tl-heat', pick.missing);
+      setHtml('tl-heat-note', '');
+      return;
+    }
+    if (host.innerHTML.indexOf('tl-heat-plot') < 0) {
+      host.innerHTML = '<div id="tl-heat-plot" class="tl-heat"></div>';
+    }
+    var r = heatRange();
+    Promise.all(pick.sis.map(function (si) {
+      return decodeWon(state.label, si);
+    })).then(function (slices) {
+      var b = heatBin(slices, r);
+      var c = plotChrome();
+      var traces = [{
+        type: 'heatmap', x: b.x, y: b.y, z: b.z, text: b.text,
+        hovertemplate: '%{text}<extra></extra>',
+        colorscale: heatScale(), zmin: 0, zmax: 1, zsmooth: false,
+        xgap: 0, ygap: 0,
+        colorbar: {
+          title: { text: FOCAL + ' win %', side: 'right' },
+          thickness: 12, tickmode: 'array',
+          tickvals: [0, 0.25, 0.5, 0.75, 1],
+          ticktext: ['0 (' + OPP + ' wins)', '25', '50', '75',
+                     '100 (' + FOCAL + ' wins)']
+        }
+      }];
+      var layout = baseLayout(
+        gridPretty(state.label) + ' - ' + scenarioText(),
+        OPP + ' stat-product rank (1 = best)',
+        FOCAL + ' stat-product rank (1 = best)');
+      layout.xaxis.range = [r.j0 + 0.5, r.j1 + 1.5];
+      layout.yaxis.range = [r.i1 + 1.5, r.i0 + 0.5];   // rank 1 at the top
+      layout.hovermode = 'closest';
+      layout.margin = { r: 210, t: 46 };
+      layout.showlegend = false;
+      var shapes = [], anns = [], namedNote = '';
+      if (state.heatNamed) {
+        // One dotted line per unique rank. Labels sit INSIDE the plot at
+        // the right edge (they can never reach the colorbar), on a plate
+        // so they stay legible over red or green. Ranks whose labels would
+        // land within LABEL_MIN_PX of each other are COMBINED into one
+        // label rather than stacked -- #1/#3/#21 are 3px apart at full
+        // zoom and no amount of nudging makes three labels fit there. The
+        // full names of every marked build are in the caption.
+        var LABEL_MIN_PX = 14;
+        var vis = namedBuilds().filter(function (nb) {
+          return nb.idx >= r.i0 && nb.idx <= r.i1;
+        });
+        var pxPerRank = 554 / (r.i1 - r.i0 + 1);   // approx drawn height
+        var groups = [];
+        vis.forEach(function (nb) {
+          shapes.push({
+            type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y',
+            y0: nb.idx + 1, y1: nb.idx + 1,
+            line: { color: c.ink, width: 1, dash: 'dot' }
+          });
+          var px = (nb.idx - r.i0) * pxPerRank;
+          var g = groups.length ? groups[groups.length - 1] : null;
+          if (g && (px - g.px) < LABEL_MIN_PX) {
+            g.members.push(nb);
+          } else {
+            groups.push({ px: px, members: [nb] });
+          }
+        });
+        groups.forEach(function (g) {
+          var txt;
+          if (g.members.length === 1) {
+            txt = g.members[0].tag;
+          } else {
+            txt = g.members.slice(0, 3).map(function (m) {
+              return '#' + (m.idx + 1);
+            }).join(' / ');
+            if (g.members.length > 3) {
+              txt += ' +' + (g.members.length - 3) + ' more (see caption)';
+            }
+          }
+          anns.push({
+            xref: 'paper', x: 0.995, xanchor: 'right', yref: 'y',
+            y: g.members[0].idx + 1, yanchor: 'middle', showarrow: false,
+            text: txt, font: { color: c.ink, size: 10 },
+            bgcolor: c.legendBg, bordercolor: c.legendBorder,
+            borderwidth: 1, borderpad: 2, opacity: 0.92
+          });
+        });
+        if (vis.length) {
+          // Hover carries the full merged name for each marked row.
+          traces.push({
+            type: 'scatter', mode: 'markers', name: 'named builds',
+            x: vis.map(function () { return r.j0 + 1; }),
+            y: vis.map(function (nb) { return nb.idx + 1; }),
+            hovertext: vis.map(function (nb) { return nb.label; }),
+            hovertemplate: '%{hovertext}<extra></extra>',
+            marker: { size: 9, color: c.ink, symbol: 'diamond-open',
+                      line: { width: 2, color: c.ink } }
+          });
+          namedNote = ' Named builds marked (dotted rows): '
+            + vis.map(function (nb) { return nb.label; }).join('; ') + '.';
+        }
+      }
+      // A uniform slice is a FINDING, not a broken render: say so on the
+      // plot, with the count computed from what is actually displayed.
+      var zmn = Infinity, zmx = -Infinity;
+      b.z.forEach(function (row) {
+        row.forEach(function (v) {
+          if (v < zmn) zmn = v;
+          if (v > zmx) zmx = v;
+        });
+      });
+      var uniform = (zmn === 1 && zmx === 1) ? 1
+        : ((zmn === 0 && zmx === 0) ? 0 : null);
+      var totalCells = b.nr * b.nc * pick.sis.length;
+      var satNote = '';
+      if (uniform !== null) {
+        satNote = ' SATURATED: all ' + commas(totalCells) + ' matchups in '
+          + 'this view are ' + FOCAL + (uniform ? ' wins' : ' losses')
+          + ' - IV choice does not decide anything here.';
+        anns.push({
+          xref: 'paper', yref: 'paper', x: 0.5, y: 0.5,
+          xanchor: 'center', yanchor: 'middle', showarrow: false,
+          text: 'All ' + commas(totalCells) + ' matchups in this view: '
+            + FOCAL + ' ' + (uniform ? 'WINS' : 'LOSES') + ' every one.'
+            + '<br>IV choice does not matter in this scenario - '
+            + sensitivePointer(state.label),
+          font: { color: c.ink, size: 13 },
+          bgcolor: c.legendBg, bordercolor: c.legendBorder,
+          borderwidth: 1, borderpad: 8, opacity: 0.95
+        });
+      }
+      // ---- your own spreads, in the page's gold "yours" convention ----
+      // Owned Thievul are ROWS, owned Lickitung are COLUMNS; where you own
+      // both, the intersection is one real simulated matchup and gets a
+      // ring (plus a cell outline once the zoom is at per-matchup
+      // resolution). Everything here comes from the IV-input panel, so a
+      // CSV load / manual add / clear redraws it through refresh().
+      var ov = heatOverlay(r, slices, c);
+      shapes = shapes.concat(ov.shapes);
+      if (ov.trace) traces.push(ov.trace);
+      layout.shapes = shapes;
+      layout.annotations = anns;
+      layout.showlegend = traces.length > 1;   // heatmap itself has no entry
+      Plotly.react('tl-heat-plot', traces, layout,
+                   { responsive: true, scrollZoom: false });
+      var gd = $('tl-heat-plot');
+      if (gd && typeof gd.on === 'function' && !gd._tlHeatBound) {
+        gd._tlHeatBound = true;
+        gd.on('plotly_relayout', onHeatRelayout);
+      }
+      var cell = b.full
+        ? (pick.sis.length === 1
+          ? 'one cell = ONE simulated matchup (win or loss)'
+          : 'one cell = ONE ' + FOCAL + '-vs-' + OPP + ' pair, colored by the '
+            + 'fraction of the ' + pick.sis.length
+            + ' shield scenarios it wins')
+        : 'one cell = ' + fmt(b.rowsPerBin, b.rowsPerBin % 1 ? 1 : 0)
+          + ' x ' + fmt(b.colsPerBin, b.colsPerBin % 1 ? 1 : 0)
+          + ' = ' + fmt(b.rowsPerBin * b.colsPerBin, 0) + ' matchups, '
+          + 'colored by the fraction ' + FOCAL + ' wins';
+      setHtml('tl-heat-note',
+        'Rows: all 4096 ' + FOCAL + ' IV spreads, stat-product rank 1 at '
+        + 'the TOP. Columns: all 4096 ' + OPP + ' IV spreads, rank 1 at the '
+        + 'LEFT. Both '
+        + 'axes are stat-product rank order, so the bulkiest spreads sit '
+        + 'top and left. Showing ' + FOCAL + ' ranks ' + (r.i0 + 1) + '-'
+        + (r.i1 + 1) + ' x ' + OPP + ' ranks ' + (r.j0 + 1) + '-' + (r.j1 + 1)
+        + ' as ' + b.nby + ' x ' + b.nbx + ' cells: ' + cell + '. '
+        + 'Zoom (box-select or the zoom tool) to re-bin the visible window; '
+        + 'at ' + HEAT_FULL + ' spreads or fewer per axis it switches to '
+        + 'per-matchup cells. Double-click / "reset axes" returns to the '
+        + 'whole grid. Grid: ' + esc(gridPretty(state.label)) + '; '
+        + esc(scenarioText()) + (state.scenarioAll
+          ? ' - each cell averages all 9 scenarios' : '')
+        + '. The ' + OPP + '-cohort control does NOT apply here: this panel '
+        + 'always shows all 4096 x 4096 matchups. Ties (score exactly 500) '
+        + 'count as losses.' + esc(satNote) + esc(ov.note)
+        + esc(namedNote));
+    }, function (err) {
+      showMissing('tl-heat', 'win-grid decode failed: ' + err.message);
+    });
+  }
+  // Which scenarios are actually IV-sensitive on THIS grid? Never a
+  // hardcoded pair: on some datasets 0-1 is unwinnable for every spread,
+  // so pointing a reader at it would be pointing at a wall of red.
+  function sensitivePointer(label) {
+    var s = saturationForGrid(label);
+    if (!s) return 'try another shield scenario.';
+    var nearly = (s.nearly || []).map(function (x) {
+      return String(x).split(' ')[0];
+    });
+    var rest = scenarioComplement(
+      (s.all || []).concat(s.hopeless || []).concat(nearly));
+    if (!rest.length) {
+      return 'no scenario on this grid is decided by IVs.';
+    }
+    return 'switch the shield scenario (' + rest.slice(0, 2).join(', ')
+      + ') to see where it does.';
+  }
+  function clampIdx(v) { return Math.max(0, Math.min(N - 1, v)); }
+  function applyHeatRelayout(ev) {
+    var cur = heatRange();
+    if (ev['xaxis.autorange'] || ev['yaxis.autorange']) {
+      if (state.heatRange === null) return;
+      state.heatRange = null;
+      drawHeat();
+      return;
+    }
+    var xr = ev['xaxis.range']
+      || [ev['xaxis.range[0]'], ev['xaxis.range[1]']];
+    var yr = ev['yaxis.range']
+      || [ev['yaxis.range[0]'], ev['yaxis.range[1]']];
+    function span(rr, lo, hi) {
+      if (!rr || rr[0] === undefined || rr[0] === null
+          || rr[1] === undefined || rr[1] === null) {
+        return [lo, hi];
+      }
+      var a = clampIdx(Math.ceil(Math.min(rr[0], rr[1]) - 1));
+      var b = clampIdx(Math.floor(Math.max(rr[0], rr[1]) - 1));
+      if (b < a) b = a;
+      return [a, b];
+    }
+    var nx = span(xr, cur.j0, cur.j1);
+    var ny = span(yr, cur.i0, cur.i1);
+    if (nx[0] === cur.j0 && nx[1] === cur.j1
+        && ny[0] === cur.i0 && ny[1] === cur.i1) {
+      return;   // our own react() echo, or a pan that changed nothing
+    }
+    state.heatRange = { i0: ny[0], i1: ny[1], j0: nx[0], j1: nx[1] };
+    drawHeat();
+  }
+  function onHeatRelayout(ev) {
+    if (!ev) return;
+    if (_heatTimer) clearTimeout(_heatTimer);
+    _heatTimer = setTimeout(function () {
+      _heatTimer = null;
+      applyHeatRelayout(ev);
+    }, 150);
+  }
+
+  // ---- TL;DR band ----
+  // Reads reco only. Values are printed VERBATIM (this band computes
+  // nothing) and labels are DERIVED FROM THE KEY ITSELF -- `cov512_00`
+  // says "0-0 shields" because the key says 00, not because anything here
+  // assumes which scenario matters. Which metrics exist is the assembly's
+  // call: on a grid where a scenario is saturated it emits `cov512_00`
+  // instead of `cov512_11`, and the preference list below just takes the
+  // first one that is actually present.
+  // dp defaults to "as given"; coverage percentages are pinned to 2dp so
+  // the band and the reco cards can never print the same number twice with
+  // different precision.
+  function metricText(v, dp) {
+    if (v === null || v === undefined) return '-';
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number') {
+      if (dp !== undefined) return fmt(v, dp);
+      return (Math.abs(v % 1) > 1e-9) ? fmt(v, 1) : String(v);
+    }
+    return String(v);
+  }
+  // "one of 7 tied; tiebreak: stat-product rank" -- rendered only from
+  // fields the assembly actually provides.
+  function tieText(c) {
+    if (typeof c.tie_note === 'string' && c.tie_note) return c.tie_note;
+    var ti = c.tie || (c.metrics || {}).tie;
+    if (ti && typeof ti === 'object') {
+      var n = ti.n_tied !== undefined ? ti.n_tied : ti.n;
+      var tb = ti.tiebreak || ti.tie_break || '';
+      if (n !== undefined || tb) {
+        return (n !== undefined ? 'one of ' + n + ' tied' : 'tied')
+          + (tb ? '; tiebreak: ' + tb : '');
+      }
+    }
+    // Fall back to the assembly's own generated sentence, matched with a
+    // strict pattern -- if it does not match exactly, nothing is claimed.
+    var out = '';
+    (c.lines || []).forEach(function (l) {
+      var m2 = String(l).match(
+        /^(\d+) spread\(s\) tie on ([^;]+); tiebreak chain: (.+)$/);
+      if (m2) out = 'one of ' + m2[1] + ' tied on ' + m2[2]
+        + '; tiebreak: ' + m2[3];
+    });
+    if (!out && typeof c.subtitle === 'string') {
+      var m3 = c.subtitle.match(/tiebreak:\s*(.+)$/i);
+      if (m3) out = 'tiebreak: ' + m3[1];
+    }
+    return out;
+  }
+  // Cards may carry `spread` as a plain string or as the assembly's
+  // object ({ivs, rank, level, cp, ...}). Both render; neither becomes
+  // "[object Object]".
+  function spreadText(c) {
+    var sp = c.spread, ivs = null, rank = c.rank;
+    if (sp && typeof sp === 'object' && !Array.isArray(sp)) {
+      ivs = sp.ivs;
+      if (sp.rank !== undefined && sp.rank !== null) rank = sp.rank;
+    } else if (Array.isArray(sp)) {
+      ivs = sp;
+    } else if (typeof sp === 'string' && sp) {
+      return sp + (rank ? ' (rank ' + rank + ')' : '');
+    } else if (c.ivs) {
+      ivs = c.ivs;
+    }
+    if (!ivs || !ivs.length) return '';
+    return ivs.join('/') + (rank ? ' (rank ' + rank + ')' : '');
+  }
+  var COV_PREF = ['cov512_11', 'cov512_00', 'cov512_01', 'cov512_02',
+                  'cov_all_00'];
+  // Which grid is a card actually computed on? Cards may say so
+  // structurally (c.grid); otherwise the per-grid metric objects carry a
+  // `pretty` tag ("SP/NS+IW, baiting") and the assembly's subtitle names
+  // that same tag, so the card's own basis is recoverable from the data
+  // instead of being assumed to be the primary grid. Without a match we
+  // fall back to the primary grid (and the label still says which grid the
+  // number came from, so nothing is mislabeled either way).
+  function cardGrid(c) {
+    if (c.grid) return c.grid;
+    if (c.primary_grid) return c.primary_grid;
+    var m = c.metrics || {}, sub = String(c.subtitle || ''), best = null;
+    Object.keys(m).forEach(function (k) {
+      var g = m[k];
+      if (!g || typeof g !== 'object' || !g.pretty) return;
+      var tag = String(g.pretty).split(',')[0].trim();
+      if (!tag || sub.indexOf(tag) < 0) return;
+      if (best === null || (/_bait$/.test(k) && !/_bait$/.test(best))) {
+        best = k;
+      }
+    });
+    return best || (D.reco || {}).primary_grid || null;
+  }
+  function metricLabel(key) {
+    var m = key.match(/^cov512_(\d)(\d)$/);
+    if (m) {
+      return 'top-512 ' + OPP + ' beaten (' + m[1] + '-' + m[2]
+        + ' shields)';
+    }
+    m = key.match(/^cov_all_(\d)(\d)$/);
+    if (m) {
+      return 'all-4096 ' + OPP + ' beaten (' + m[1] + '-' + m[2]
+        + ' shields)';
+    }
+    if (key === 'meta_wins_11') return 'meta wins (1-1 shields)';
+    return key.replace(/_/g, ' ');
+  }
+  // Where IV choice cannot matter, PER GRID -- computed live, so it
+  // follows the grid dropdown and always names the moveset it describes.
+  function satBlock() {
+    var labels = GRID_LABELS.slice();
+    if (!labels.length) return '';
+    var rows = labels.map(function (lb) {
+      var s = satSentence(lb);
+      if (!s) return '';
+      return '<li' + (lb === state.label ? ' class="tl-sat-current"' : '')
+        + '>' + esc(s) + (lb === state.label ? ' <em>(selected)</em>' : '')
+        + '</li>';
+    }).filter(Boolean).join('');
+    if (!rows) return '';
+    return '<div class="tl-satblock"><strong>Where IV choice cannot '
+      + 'matter</strong> (computed from the embedded grids, per moveset):'
+      + '<ul>' + rows + '</ul></div>';
+  }
+  function renderTldr() {
+    if (!HAS_RECO || !(D.reco.cards || []).length) {
+      showMissing('tl-tldr',
+        'the short version (recommended spreads and their headline numbers) '
+        + 'lands after the sim grids bake -- the recommendation blob is '
+        + 'computed in the assembly phase and is not embedded in this page '
+        + 'yet. The panels below already work off whatever IS embedded.'
+        + ' The per-moveset saturation summary below is computed by this '
+        + 'page from the embedded grids and does not need it.');
+      var sb = satBlock();
+      if (sb) {
+        setHtml('tl-tldr', $('tl-tldr').innerHTML + sb);
+      }
+      setHtml('tl-tldr-link', '');
+      return;
+    }
+    var poolN = (D.reco.pool_n !== undefined && D.reco.pool_n !== null)
+      ? D.reco.pool_n
+      : ((D.meta_wins || {}).pool_n);
+    var cardGridDefault = D.reco.primary_grid || null;
+    var cards = (D.reco.cards || []).slice(0, 4).map(function (c) {
+      var m = c.metrics || {};
+      // Which grid produced these numbers? Cards may name their own; else
+      // the blob's primary_grid. Never leave it unlabeled.
+      var cGrid = cardGrid(c) || cardGridDefault;
+      var gridLab = cGrid ? ' - ' + gridPretty(cGrid) : '';
+      function metricDiv(key, suffix, dp) {
+        return '<div class="tl-tldr-metric"><span class="tl-tldr-num">'
+          + esc(metricText(m[key], dp)) + esc(suffix || '')
+          + '</span><span class="tl-tldr-lab">' + esc(metricLabel(key))
+          + esc(gridLab) + '</span></div>';
+      }
+      var bits = [];
+      // Schema A (flat): metrics.cov512_00 = 95.12
+      // Schema B (per grid): metrics[gridLabel] = {"1-1": 100.0, ...,
+      //                       pretty: "SP/IW+PR, baiting"}
+      // Both are rendered from the data; neither is assumed.
+      var covDone = false;
+      for (var k = 0; k < COV_PREF.length; k++) {
+        if (typeof m[COV_PREF[k]] === 'number') {
+          bits.push('<div class="tl-tldr-metric"><span class="tl-tldr-num">'
+            + esc(covText(m[COV_PREF[k]])) + '%</span>'
+            + '<span class="tl-tldr-lab">' + esc(metricLabel(COV_PREF[k]))
+            + esc(gridLab) + '</span></div>');
+          covDone = true;
+          break;
+        }
+      }
+      if (!covDone && cGrid && m[cGrid] && typeof m[cGrid] === 'object') {
+        var g = m[cGrid];
+        var picks = (D.reco.pick_scenarios || []).filter(function (s) {
+          return typeof g[s] === 'number';
+        });
+        if (!picks.length) {
+          picks = Object.keys(g).filter(function (s) {
+            return typeof g[s] === 'number';
+          });
+        }
+        if (picks.length) {
+          bits.push('<div class="tl-tldr-metric"><span class="tl-tldr-num">'
+            + esc(covText(g[picks[0]])) + '%</span>'
+            + '<span class="tl-tldr-lab">top-512 ' + esc(OPP)
+            + ' beaten (' + esc(picks[0]) + ' shields) - '
+            + esc(g.pretty || gridPretty(cGrid)) + '</span></div>');
+        }
+      }
+      var mw = m.meta_wins_11;
+      if (typeof mw === 'number') {
+        bits.push(metricDiv('meta_wins_11',
+          (poolN !== undefined && poolN !== null) ? ' / ' + poolN : ''));
+      } else if (mw && typeof mw === 'object') {
+        // Keyed by moveset ({iwpr: 58, nsiw: 45}); show the one belonging
+        // to this card's grid, named.
+        var msKey = cGrid ? String(cGrid).split('_')[0] : null;
+        var useKey = (msKey && mw[msKey] !== undefined)
+          ? msKey : Object.keys(mw)[0];
+        if (useKey !== undefined && typeof mw[useKey] === 'number') {
+          bits.push('<div class="tl-tldr-metric"><span class="tl-tldr-num">'
+            + esc(mw[useKey])
+            + ((poolN !== undefined && poolN !== null) ? ' / ' + esc(poolN)
+              : '')
+            + '</span><span class="tl-tldr-lab">meta wins (1-1 shields) - '
+            + esc(useKey) + ' moveset</span></div>');
+        }
+      }
+      var spread = spreadText(c);
+      var tie = expandLicki(tieText(c));
+      return '<div class="tl-card tl-tldr-card"><h4>'
+        + esc(expandLicki(c.title || ''))
+        + '</h4>'
+        + (spread ? '<div class="tl-card-spread">' + esc(spread)
+          + '</div>' : '')
+        + (tie ? '<div class="tl-card-caveat">' + esc(tie) + '</div>' : '')
+        + (bits.length ? '<div class="tl-tldr-metrics">' + bits.join('')
+          + '</div>' : '')
+        + '</div>';
+    }).join('');
+    var headline = '';
+    if (D.reco.headline) {
+      headline = '<p class="tl-tldr-headline">'
+        + esc(expandLicki(D.reco.headline))
+        + (D.reco.primary_grid
+          ? ' <span class="tl-tldr-qual">[that sentence is for '
+            + esc(gridPretty(D.reco.primary_grid)) + ' only]</span>'
+          : '')
+        + '</p>';
+    }
+    setHtml('tl-tldr', headline + satBlock() + cards);
+    setHtml('tl-tldr-link',
+      'The grid below shows every one of the ' + N + ' x ' + N
+      + ' ' + FOCAL + '-vs-' + OPP + ' matchups; the full panels (coverage, '
+      + 'Pareto, '
+      + 'drill-down, mechanism) are further down.');
+  }
+
+  // ---- main scatter ----
+  function colorGroups() {
+    // Color = Sucker Punch damage tier vs the rank-1 opponent, when the
+    // breakpoint layer is present; otherwise fall back to effective attack
+    // (and SAY SO on the page).
+    var bp = D.breakpoints || {};
+    var dmg = null;
+    try {
+      dmg = bp.thievul_offense.moves.SUCKER_PUNCH.tier_vs_rank1_licki_by_spread;
+    } catch (e) { dmg = null; }
+    if (!dmg) dmg = bp.sp_damage_vs_licki_rank1;
+    if (dmg && dmg.length === N) {
+      var byVal = {};
+      for (var i = 0; i < N; i++) {
+        var v = dmg[i];
+        if (!byVal[v]) byVal[v] = [];
+        byVal[v].push(i);
+      }
+      var vals = Object.keys(byVal).map(Number).sort(function (a, b) {
+        return a - b;
+      });
+      return {
+        mode: 'tier',
+        groups: vals.map(function (v, gi) {
+          return { name: 'SP ' + v + ' dmg', idx: byVal[v], color: tierColor(gi) };
+        }),
+        note: 'Color = Sucker Punch damage per hit vs the rank-1 ' + OPP + ' '
+          + '(from the closed-form breakpoint layer).'
+      };
+    }
+    return {
+      mode: 'atk',
+      groups: null,
+      note: 'Color = effective attack (FALLBACK - the closed-form '
+        + 'breakpoint layer is not embedded in this page, so damage tiers '
+        + 'are not available).'
+    };
+  }
+
+  function renderScatter(cov) {
+    var host = $('tl-scatter');
+    if (!host) return;
+    if (cov.missing) { showMissing('tl-scatter', cov.missing); return; }
+    host.innerHTML = '<div id="tl-scatter-plot" class="tl-plot"></div>';
+    var T = D.thievul;
+    var cg = colorGroups();
+    var mw = HAS_META_WINS ? metaWinsArray() : null;
+    var x = new Array(N), hov = new Array(N);
+    for (var i = 0; i < N; i++) {
+      x[i] = i + 1;
+      hov[i] = FOCAL + ' ' + statLine('thievul', i)
+        + '<br>coverage ' + fmt(cov.pct[i], 1) + '%'
+        + (mw ? '<br>meta wins ' + fmt(mw.vals[i], 1) + '/'
+          + D.meta_wins.pool_n + ' (' + mw.note + ')' : '');
+    }
+    var traces = [];
+    if (cg.mode === 'tier') {
+      cg.groups.forEach(function (g) {
+        traces.push({
+          type: 'scattergl', mode: 'markers', name: g.name,
+          x: g.idx.map(function (i2) { return x[i2]; }),
+          y: g.idx.map(function (i2) { return cov.pct[i2]; }),
+          text: g.idx.map(function (i2) { return hov[i2]; }),
+          hovertemplate: '%{text}<extra></extra>',
+          marker: { size: 5, color: g.color, opacity: 0.75 }
+        });
+      });
+    } else {
+      traces.push({
+        type: 'scattergl', mode: 'markers', name: FOCAL + ' spreads',
+        x: x, y: Array.prototype.slice.call(cov.pct), text: hov,
+        hovertemplate: '%{text}<extra></extra>',
+        marker: {
+          size: 5, opacity: 0.75, color: T.atk,
+          colorscale: 'Viridis',
+          colorbar: { title: 'atk', thickness: 10 }
+        }
+      });
+    }
+    var c = plotChrome();
+    var nb = namedBuilds();
+    if (nb.length) {
+      // Markers + legend + HOVER only. On-plot text labels piled up
+      // illegibly here (10 named ranks, several within a few ranks of each
+      // other); the names live in the hover, the TL;DR band and the reco
+      // cards instead.
+      traces.push({
+        type: 'scattergl', mode: 'markers', name: 'named builds',
+        x: nb.map(function (b) { return b.idx + 1; }),
+        y: nb.map(function (b) { return cov.pct[b.idx]; }),
+        hovertext: nb.map(function (b) {
+          return b.label + '<br>' + statLine('thievul', b.idx)
+            + '<br>coverage ' + fmt(cov.pct[b.idx], 1) + '%';
+        }),
+        hovertemplate: '%{hovertext}<extra></extra>',
+        marker: { size: 11, color: c.ink, symbol: 'diamond-open',
+                  line: { width: 2, color: c.ink } }
+      });
+    }
+    var mine = state.user.filter(function (u) { return u.side === 'thievul'; });
+    if (mine.length) {
+      traces.push({
+        type: 'scattergl', mode: 'markers', name: 'yours',
+        x: mine.map(function (u) { return u.idx + 1; }),
+        y: mine.map(function (u) { return cov.pct[u.idx]; }),
+        hovertext: mine.map(function (u) {
+          return 'YOURS: ' + u.label + '<br>' + statLine('thievul', u.idx)
+            + '<br>coverage ' + fmt(cov.pct[u.idx], 1) + '%';
+        }),
+        hovertemplate: '%{hovertext}<extra></extra>',
+        marker: { size: 12, color: c.gold, symbol: 'star',
+                  line: { width: 1, color: c.ink } }
+      });
+    }
+    var layout = baseLayout(
+      gridPretty(state.label) + ' - ' + scenarioText(),
+      FOCAL + ' stat-product rank (1 = best)',
+      OPP + ' spreads beaten (%)');
+    layout.xaxis.range = [N + 60, -60];
+    // Fixed y range: a flat 100% series otherwise auto-zooms to a 99-101%
+    // window, which reads as a broken plot rather than "everything wins".
+    layout.yaxis.range = COV_Y_RANGE;
+    var sat = coverageSaturation(cov.pct);
+    if (sat.note) {
+      layout.annotations = [satAnnotation(sat.text, c)];
+    }
+    Plotly.react('tl-scatter-plot', traces, layout, { responsive: true });
+    setHtml('tl-scatter-note',
+      esc(cg.note) + ' Cohort: ' + esc(cohortLabel()) + '. '
+      + 'Denominator ' + cov.denom + ' ' + OPP + ' spread(s)'
+      + (state.scenarioAll ? ' x 9 scenarios' : '') + '.'
+      + esc(sat.note)
+      + ' Named builds are the diamond markers - hover for the name.');
+  }
+
+  // ---- pareto ----
+  // Meta wins for the CURRENT grid + scenario when the richer per-grid
+  // table is present; otherwise the contract's fixed 1-1 array, labeled.
+  function metaWinsArray() {
+    var MW = D.meta_wins;
+    if (!MW) return null;
+    var byGrid = MW.wins || null;
+    if (byGrid && state.label && byGrid[state.label]) {
+      var byS = byGrid[state.label];
+      if (state.scenarioAll) {
+        var keys = Object.keys(byS);
+        if (keys.length) {
+          var acc = new Float64Array(N);
+          keys.forEach(function (k) {
+            var a = byS[k];
+            for (var i = 0; i < N; i++) acc[i] += a[i];
+          });
+          for (var j = 0; j < N; j++) acc[j] /= keys.length;
+          return { vals: acc, note: 'mean over ' + keys.length
+            + ' shield scenario(s), grid ' + gridPretty(state.label) };
+        }
+      } else {
+        var arr = byS[scenarioLabel(state.si)];
+        if (arr) {
+          return { vals: arr, note: 'shields ' + scenarioLabel(state.si)
+            + ', grid ' + gridPretty(state.label) };
+        }
+      }
+    }
+    if (MW.wins_11) {
+      return { vals: MW.wins_11, note: 'FIXED at ' + (MW.wins_11_key
+        || '1-1 shields, landing-build moveset') + ' - it does NOT follow '
+        + 'the grid/scenario dropdowns' };
+    }
+    return null;
+  }
+
+  function renderPareto(cov) {
+    if (!HAS_META_WINS) {
+      showMissing('tl-pareto',
+        'meta_wins (per-IV wins vs the dive pool at 1-1) is not embedded '
+        + 'in this page, so the Pareto panel cannot be drawn.');
+      return;
+    }
+    if (cov.missing) { showMissing('tl-pareto', cov.missing); return; }
+    var mw = metaWinsArray();
+    if (!mw) {
+      showMissing('tl-pareto',
+        'meta_wins carries no usable win array for this selection.');
+      return;
+    }
+    var host = $('tl-pareto');
+    host.innerHTML = '<div id="tl-pareto-plot" class="tl-plot"></div>';
+    var W = mw.vals;
+    var pts = [];
+    for (var i = 0; i < N; i++) pts.push({ i: i, w: W[i], c: cov.pct[i] });
+    // Pareto frontier: maximize both meta wins and opponent coverage.
+    var order = pts.slice().sort(function (a, b) {
+      return (b.w - a.w) || (b.c - a.c);
+    });
+    var front = [], bestC = -1;
+    for (var k = 0; k < order.length; k++) {
+      if (order[k].c > bestC) { front.push(order[k]); bestC = order[k].c; }
+    }
+    var frontSet = {};
+    front.forEach(function (p) { frontSet[p.i] = 1; });
+    var c = plotChrome();
+    function hov(p) {
+      return statLine('thievul', p.i)
+        + '<br>meta wins ' + fmt(p.w, 1) + '/' + D.meta_wins.pool_n
+        + '<br>' + OPP + ' coverage ' + fmt(p.c, 1) + '%';
+    }
+    var rest = pts.filter(function (p) { return !frontSet[p.i]; });
+    var traces = [{
+      type: 'scattergl', mode: 'markers', name: 'dominated',
+      x: rest.map(function (p) { return p.w; }),
+      y: rest.map(function (p) { return p.c; }),
+      hovertext: rest.map(hov), hovertemplate: '%{hovertext}<extra></extra>',
+      marker: { size: 4, color: c.muted, opacity: 0.5 }
+    }, {
+      type: 'scattergl', mode: 'markers', name: 'Pareto frontier',
+      x: front.map(function (p) { return p.w; }),
+      y: front.map(function (p) { return p.c; }),
+      hovertext: front.map(hov), hovertemplate: '%{hovertext}<extra></extra>',
+      marker: { size: 8, color: themeColor('--win') }
+    }];
+    var nb = namedBuilds();
+    if (nb.length) {
+      // Hover-only names here too (see renderScatter).
+      traces.push({
+        type: 'scattergl', mode: 'markers', name: 'named builds',
+        x: nb.map(function (b) { return W[b.idx]; }),
+        y: nb.map(function (b) { return cov.pct[b.idx]; }),
+        hovertext: nb.map(function (b) {
+          return b.label + '<br>' + hov({ i: b.idx, w: W[b.idx],
+                                          c: cov.pct[b.idx] });
+        }),
+        hovertemplate: '%{hovertext}<extra></extra>',
+        marker: { size: 11, color: c.ink, symbol: 'diamond-open',
+                  line: { width: 2, color: c.ink } }
+      });
+    }
+    var mine = state.user.filter(function (u) { return u.side === 'thievul'; });
+    if (mine.length) {
+      traces.push({
+        type: 'scattergl', mode: 'markers', name: 'yours',
+        x: mine.map(function (u) { return W[u.idx]; }),
+        y: mine.map(function (u) { return cov.pct[u.idx]; }),
+        hovertext: mine.map(function (u) {
+          return 'YOURS: ' + u.label + '<br>'
+            + hov({ i: u.idx, w: W[u.idx], c: cov.pct[u.idx] });
+        }),
+        hovertemplate: '%{hovertext}<extra></extra>',
+        marker: { size: 12, color: c.gold, symbol: 'star',
+                  line: { width: 1, color: c.ink } }
+      });
+    }
+    var layout = baseLayout(
+      'Meta wins vs ' + OPP + ' coverage',
+      'Meta wins (out of ' + D.meta_wins.pool_n + ')',
+      OPP + ' spreads beaten (%)');
+    layout.yaxis.range = COV_Y_RANGE;
+    var psat = coverageSaturation(cov.pct);
+    if (psat.note) layout.annotations = [satAnnotation(psat.text, c)];
+    Plotly.react('tl-pareto-plot', traces, layout, { responsive: true });
+    setHtml('tl-pareto-note',
+      'Meta axis: ' + esc(mw.note) + '. ' + esc(D.meta_wins.note || '')
+      + ' ' + esc(OPP) + ' cohort: ' + esc(cohortLabel()) + '.'
+      + esc(psat.note)
+      + ' Named builds are the diamond markers - hover for the name.');
+  }
+
+  // ---- drill-down ----
+  function drillLickiIndex() {
+    var v = ($('tl-drill-licki') || {}).value || '';
+    var ranks = parseRanks(v);
+    return ranks.length ? ranks[0] : 0;
+  }
+  function drillThievulIndex() {
+    var v = ($('tl-drill-thievul') || {}).value || '';
+    var t = String(v).trim();
+    var m = t.match(/^(\d+)\/(\d+)\/(\d+)$/);
+    if (m) {
+      var ix = ivIndex('thievul', +m[1], +m[2], +m[3]);
+      return ix >= 0 ? ix : 0;
+    }
+    var r = parseInt(t, 10);
+    return (!isNaN(r) && r >= 1 && r <= N) ? r - 1 : 0;
+  }
+
+  function renderDrill() {
+    if (!HAS_GRIDS || !state.label) {
+      showMissing('tl-drill-out',
+        'no simulation grid is embedded in this page yet.');
+      return;
+    }
+    var sis = [];
+    for (var si = 0; si < NS; si++) {
+      if (haveWon(state.label, si)) sis.push(si);
+    }
+    if (!sis.length) {
+      showMissing('tl-drill-out',
+        'the per-spread win grid (won_b64) for ' + state.label + ' is not '
+        + 'embedded in this page, so the drill-down cannot be computed. '
+        + 'The aggregate coverage panels above are unaffected.');
+      return;
+    }
+    var oi = drillLickiIndex();
+    var fi = drillThievulIndex();
+    setHtml('tl-drill-out', '<p class="tl-note">Computing...</p>');
+    Promise.all(sis.map(function (s) { return decodeWon(state.label, s); }))
+      .then(function (slices) {
+        // Panel A: per-focal win COUNT vs the chosen opponent, out of the
+        // embedded scenarios (a raw "6 of 9" reads; the old 66.7% did not).
+        var denom = slices.length;
+        var wins = new Int32Array(N);
+        var wonScen = new Array(N);
+        for (var f = 0; f < N; f++) {
+          var c = 0, wl = [], ll = [];
+          for (var s = 0; s < denom; s++) {
+            if (bitAt(slices[s], f, oi)) { c++; wl.push(scenarioLabel(sis[s])); }
+            else { ll.push(scenarioLabel(sis[s])); }
+          }
+          wins[f] = c;
+          wonScen[f] = { won: wl, lost: ll };
+        }
+        // Panel B: which opponents beat the chosen focal (current scenario).
+        var scIdx = sis.indexOf(state.si);
+        var useIdx = scIdx >= 0 ? scIdx : 0;
+        var scUsed = sis[useIdx];
+        var losses = [];
+        for (var o = 0; o < N; o++) {
+          if (!bitAt(slices[useIdx], fi, o)) losses.push(o);
+        }
+        var host = $('tl-drill-out');
+        host.innerHTML =
+          '<div id="tl-drill-plot" class="tl-plot"></div>'
+          + '<p class="tl-note" id="tl-drill-note"></p>'
+          + '<div id="tl-hardest"></div>';
+        var c2 = plotChrome();
+        var hv = new Array(N);
+        for (var q = 0; q < N; q++) {
+          hv[q] = statLine('thievul', q) + '<br>wins ' + wins[q] + ' of '
+            + denom + ' embedded scenario(s)'
+            + '<br>won: ' + (wonScen[q].won.join(', ') || 'none')
+            + '<br>lost: ' + (wonScen[q].lost.join(', ') || 'none');
+        }
+        // Same Sucker-Punch damage-tier palette as the main scatter.
+        var dcg = colorGroups();
+        var traces = [];
+        if (dcg.mode === 'tier') {
+          dcg.groups.forEach(function (g) {
+            traces.push({
+              type: 'scattergl', mode: 'markers', name: g.name,
+              x: g.idx.map(function (i2) { return i2 + 1; }),
+              y: g.idx.map(function (i2) { return wins[i2]; }),
+              text: g.idx.map(function (i2) { return hv[i2]; }),
+              hovertemplate: '%{text}<extra></extra>',
+              marker: { size: 4, color: g.color, opacity: 0.7 }
+            });
+          });
+        } else {
+          var xs = [], ys = [];
+          for (var q2 = 0; q2 < N; q2++) { xs.push(q2 + 1); ys.push(wins[q2]); }
+          traces.push({
+            type: 'scattergl', mode: 'markers', name: FOCAL + ' spreads',
+            x: xs, y: ys, hovertext: hv,
+            hovertemplate: '%{hovertext}<extra></extra>',
+            marker: { size: 4, color: c2.muted, opacity: 0.6 }
+          });
+        }
+        var mine = state.user.filter(function (u) {
+          return u.side === 'thievul';
+        });
+        if (mine.length) {
+          traces.push({
+            type: 'scattergl', mode: 'markers', name: 'yours',
+            x: mine.map(function (u) { return u.idx + 1; }),
+            y: mine.map(function (u) { return wins[u.idx]; }),
+            hovertext: mine.map(function (u) {
+              return 'YOURS: ' + u.label + '<br>' + hv[u.idx];
+            }),
+            hovertemplate: '%{hovertext}<extra></extra>',
+            marker: { size: 12, color: c2.gold, symbol: 'star',
+                      line: { width: 1, color: c2.ink } }
+          });
+        }
+        var layout = baseLayout(
+          'vs ' + OPP + ' ' + ivStr('licki', oi) + ' (' + OPP + ' rank '
+            + (oi + 1) + ') - ' + gridPretty(state.label),
+          FOCAL + ' stat-product rank (1 = best)',
+          'shield scenarios won (of ' + denom + ')');
+        layout.xaxis.range = [N + 60, -60];
+        var tv = [], tt = [];
+        for (var k2 = 0; k2 <= denom; k2++) {
+          tv.push(k2);
+          tt.push(k2 + '/' + denom);
+        }
+        layout.yaxis.tickmode = 'array';
+        layout.yaxis.tickvals = tv;
+        layout.yaxis.ticktext = tt;
+        layout.yaxis.range = [0, denom + 0.5];
+        Plotly.react('tl-drill-plot', traces, layout, { responsive: true });
+        setHtml('tl-drill-note',
+          'Grid: ' + esc(gridPretty(state.label))
+          + ' (follows the grid dropdown above). '
+          + 'Scenario slices embedded for this grid: '
+          + sis.map(scenarioLabel).join(', ')
+          + '. Each dot is one ' + FOCAL + ' spread; the y value counts how '
+          + 'many '
+          + 'of those ' + denom + ' shield scenarios it wins against this '
+          + OPP + ' (hover lists which). ' + esc(dcg.note)
+          + ' Ties (score == 500) count as losses.');
+        var rows = losses.slice(0, 40).map(function (o2) {
+          var L = D.licki;
+          return '<tr><td>' + (o2 + 1) + '</td><td>' + ivStr('licki', o2)
+            + '</td><td>' + L.level[o2] + '</td><td>' + L.cp[o2]
+            + '</td><td>' + fmt(L.atk[o2], 2) + '</td><td>'
+            + fmt(L.def[o2], 2) + '</td><td>' + L.hp[o2] + '</td></tr>';
+        }).join('');
+        setHtml('tl-hardest',
+          '<h4>' + esc(OPP) + ' spreads that the ' + esc(FOCAL) + ' '
+          + esc(ivStr('thievul', fi)) + ' (' + esc(FOCAL)
+          + ' stat-product rank ' + (fi + 1) + ') does NOT beat '
+          + '(loss or tie) at ' + esc(scenarioLabel(scUsed)) + ' on '
+          + esc(gridPretty(state.label)) + '</h4>'
+          + '<p class="tl-note">' + losses.length + ' of ' + N
+          + ' ' + esc(OPP) + ' spreads are not beaten (a tie, score '
+          + 'exactly 500, is counted here too - the win grid records "did '
+          + FOCAL + ' win", so ties and losses are indistinguishable in it)'
+          + (scUsed !== state.si
+            ? ' (shown for ' + esc(scenarioLabel(scUsed))
+              + ' - the selected scenario is not embedded as a full grid)'
+            : '')
+          + '. First ' + Math.min(40, losses.length)
+          + ' listed by ' + esc(OPP) + ' stat-product rank.</p>'
+          + (losses.length
+            ? '<div class="tl-scroll"><table class="tl"><tr><th>' + esc(OPP)
+              + ' rank</th>'
+              + '<th>IVs</th><th>level</th><th>CP</th><th>atk</th>'
+              + '<th>def</th><th>hp</th></tr>' + rows + '</table></div>'
+            : '<p class="tl-note">None - this Thievul spread beats every '
+              + esc(OPP) + ' spread in this scenario.</p>'));
+      }, function (err) {
+        showMissing('tl-drill-out', 'win-grid decode failed: ' + err.message);
+      });
+  }
+
+  // ---- mechanism (breakpoints) ----
+  function renderTableSpec(t) {
+    var head = '<tr>' + (t.columns || []).map(function (c) {
+      return '<th>' + esc(c) + '</th>';
+    }).join('') + '</tr>';
+    var body = (t.rows || []).map(function (r) {
+      return '<tr>' + r.map(function (v) {
+        return '<td>' + esc(v) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    return '<h4>' + esc(t.title || '') + '</h4>'
+      + (t.note ? '<p class="tl-note">' + esc(t.note) + '</p>' : '')
+      + '<div class="tl-scroll"><table class="tl">' + head + body
+      + '</table></div>';
+  }
+  // The breakpoint layer keeps its KEY names fixed across opponents so one
+  // renderer reads every file: "lick_*", "body_slam_*" and "power_whip_*"
+  // name the fast, first-charged and second-charged SLOTS, not those moves.
+  // The move actually in each slot comes from meta.move_slots. The
+  // Lickitung file predates that block, so it falls back to the names its
+  // keys were originally written for.
+  function prettyMove(id) {
+    if (!id) return '';
+    return String(id).split('_').map(function (w) {
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join(' ');
+  }
+  function slotNames() {
+    var ms = ((D.breakpoints || {}).meta || {}).move_slots || {};
+    return {
+      fast: prettyMove(ms.fast) || 'Lick',
+      c1: prettyMove(ms.charged_1) || 'Body Slam',
+      c2: prettyMove(ms.charged_2) || 'Power Whip'
+    };
+  }
+  // Spread-summary rows as produced by the breakpoint layer (claims /
+  // named_spreads entries share one shape).
+  function spreadCols() {
+    var s = slotNames();
+    return [
+      ['label', 'build'], ['ivs', 'IVs'], ['rank', 'SP rank'],
+      ['level', 'level'], ['cp', 'CP'], ['atk', 'atk'], ['def', 'def'],
+      ['hp', 'hp'], ['sp_dmg_vs_rank1_licki', 'SP dmg vs rank-1 ' + OPP],
+      ['sp_ge_hi_frac.all', 'SP-tier coverage (all 4096)'],
+      ['sp_ge_hi_frac.top512', 'SP-tier coverage (top 512)'],
+      ['body_slam_dmg_from_rank1_licki', s.c1 + ' taken'],
+      ['body_slams_to_ko', s.c1 + ' hits to KO'],
+      ['hp_margin_over_prev_bs_tier', 'HP over prev ' + s.c1 + ' tier'],
+      ['power_whips_to_ko', s.c2 + ' hits to KO'],
+      ['lick_dmg_from_rank1_licki', s.fast + ' taken']
+    ];
+  }
+  function dig(o, path) {
+    var parts = path.split('.');
+    var cur = o;
+    for (var i = 0; i < parts.length; i++) {
+      if (cur === null || cur === undefined) return undefined;
+      cur = cur[parts[i]];
+    }
+    return cur;
+  }
+  function cellText(v) {
+    if (v === null || v === undefined) return '-';
+    if (Array.isArray(v)) return v.join('/');
+    if (typeof v === 'boolean') return v ? 'yes' : 'no';
+    return String(v);
+  }
+  function spreadTable(rows, title, note) {
+    if (!rows || !rows.length) return '';
+    var cols = spreadCols();
+    var head = '<tr>' + cols.map(function (c) {
+      return '<th>' + esc(c[1]) + '</th>';
+    }).join('') + '</tr>';
+    var body = rows.map(function (r) {
+      return '<tr>' + cols.map(function (c) {
+        return '<td>' + esc(cellText(dig(r, c[0]))) + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+    return (title ? '<h4>' + esc(title) + '</h4>' : '')
+      + (note ? '<p class="tl-note">' + esc(note) + '</p>' : '')
+      + '<div class="tl-scroll"><table class="tl">' + head + body
+      + '</table></div>';
+  }
+  function kvTable(obj, keys) {
+    var rows = keys.filter(function (k) {
+      return dig(obj, k[0]) !== undefined;
+    }).map(function (k) {
+      return '<tr><td>' + esc(k[1]) + '</td><td>'
+        + esc(cellText(dig(obj, k[0]))) + '</td></tr>';
+    }).join('');
+    return rows
+      ? '<div class="tl-scroll"><table class="tl">' + rows + '</table></div>'
+      : '';
+  }
+
+  // Generic renderer for the breakpoint layer's `answers` block: nested
+  // objects become nested tables, keyed by the JSON key itself. Nothing is
+  // relabeled or reinterpreted -- the page shows what A2 computed.
+  function objListTable(list) {
+    var cols = [];
+    list.forEach(function (r) {
+      Object.keys(r).forEach(function (k) {
+        if (cols.indexOf(k) < 0) cols.push(k);
+      });
+    });
+    return '<div class="tl-scroll"><table class="tl"><tr>'
+      + cols.map(function (c) {
+        return '<th>' + esc(answerLabel(c)) + '</th>';
+      }).join('') + '</tr>'
+      + list.map(function (r) {
+        return '<tr>' + cols.map(function (c) {
+          return '<td>' + esc(cellText(r[c])) + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</table></div>';
+  }
+  // A few keys in the breakpoint layer are CONTINUOUS cutoffs rather than
+  // stats any real spread has; the generic renderer would otherwise paint
+  // them under a name that reads like a realized value.
+  var ANSWER_LABELS = {
+    max_thievul_def_still_taking_tier_hi:
+      'defense cutoff for the higher damage tier (continuous tier '
+      + 'boundary, NOT a defense any real spread has)',
+    min_thievul_atk_for_hi_tier:
+      'attack needed for the higher damage tier (continuous tier '
+      + 'boundary, NOT a realized spread stat)'
+  };
+  // Keys in the breakpoint layer are spelled for the original opponent
+  // ("lickitung"/"licki") and focal ("thievul"); the SPECIES they name is
+  // whatever this dataset analyzes, so they are relabeled here rather than
+  // leaking a literal key like `max_lickitung_cmp_atk` into the page.
+  function answerLabel(k) {
+    if (ANSWER_LABELS[k]) return ANSWER_LABELS[k];
+    return String(k).replace(/_/g, ' ')
+      .replace(/\blickitung\b/gi, OPP)
+      .replace(/\blicki\b/gi, OPP)
+      .replace(/\bthievul\b/gi, FOCAL);
+  }
+  function answersHtml(o, depth) {
+    var rows = [], sub = [];
+    // n_spreads_taking_{1,2}_lick_* are FIXED 1-damage / 2-damage buckets
+    // written for the Lickitung file. When the layer ships a histogram
+    // instead, those buckets read 0 and would be misleading -- so they are
+    // relabeled (never dropped) and the histogram is named as the answer.
+    var hasHist = !!o.fast_move_dmg_histogram_vs_rank1;
+    var sn = slotNames();
+    Object.keys(o).forEach(function (k) {
+      var v = o[k];
+      var label = answerLabel(k);
+      if (hasHist && /^n_spreads_taking_\d_lick_vs_rank1$/.test(k)) {
+        label = label + ' (a fixed 1/2-damage bucket carried over from the '
+          + 'original schema - it does not apply to ' + sn.fast + ', see '
+          + 'the histogram below)';
+      }
+      if (k === 'fast_move_dmg_histogram_vs_rank1') {
+        label = sn.fast + ' damage taken from the rank-1 ' + OPP
+          + ', by number of spreads';
+      }
+      if (v === null || typeof v !== 'object') {
+        rows.push([label, cellText(v)]);
+      } else if (Array.isArray(v)) {
+        if (v.length && typeof v[0] === 'object') {
+          sub.push('<h5>' + esc(label) + '</h5>' + objListTable(v));
+        } else if (v.length <= 16) {
+          rows.push([label, v.join(', ')]);
+        } else {
+          rows.push([label, v.length + ' values']);
+        }
+      } else if (depth >= 3) {
+        rows.push([label, JSON.stringify(v).slice(0, 300)]);
+      } else {
+        sub.push('<h5>' + esc(label) + '</h5>' + answersHtml(v, depth + 1));
+      }
+    });
+    var tbl = rows.length
+      ? '<div class="tl-scroll"><table class="tl">'
+        + rows.map(function (r) {
+          return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1])
+            + '</td></tr>';
+        }).join('') + '</table></div>'
+      : '';
+    return tbl + sub.join('');
+  }
+
+  // Stat boundaries must never be shown rounded: 122.1 is not an attack
+  // any spread has. Cross-check the emitted "value" fields against the
+  // file's OWN atk_values list and say so when they disagree.
+  function bpAttainNote(bpk) {
+    var vals = null;
+    try { vals = D.breakpoints.spread_index.thievul.atk_values; }
+    catch (e) { vals = null; }
+    if (!vals || !vals.length) return '';
+    var out = [];
+    [['lowest_thievul_atk_value_clearing', 'lowest attack that clears'],
+     ['highest_thievul_atk_value_failing', 'highest attack that fails']]
+      .forEach(function (pair) {
+        var v = bpk[pair[0]];
+        if (typeof v !== 'number' || vals.indexOf(v) >= 0) return;
+        var need = bpk.min_thievul_atk_for_hi_tier;
+        var nearest = null;
+        for (var i = 0; i < vals.length; i++) {
+          if (typeof need === 'number' && vals[i] >= need) {
+            nearest = vals[i];
+            break;
+          }
+        }
+        out.push('"' + pair[1] + '" is reported as ' + v
+          + ', which is NOT one of the ' + vals.length + ' attack values '
+          + FOCAL + ' spreads can actually have (it is a rounded boundary)'
+          + (nearest !== null ? '; the lowest attainable attack at or above '
+            + 'the ' + need + ' cutoff is ' + nearest : ''));
+      });
+    return out.length
+      ? '<div class="tl-missing"><strong>Rounded stat boundary.</strong> '
+        + esc(out.join('. ')) + '.</div>'
+      : '';
+  }
+  function renderMechanism() {
+    if (!HAS_BP) {
+      showMissing('tl-mech',
+        'breakpoints.json (the closed-form damage/bulk layer) is not '
+        + 'embedded in this page, so the mechanism tables and the explicit '
+        + 'read-outs on the "6/15/5" and "15 HP" claims are unavailable.');
+      return;
+    }
+    var bp = D.breakpoints;
+    var P = [];
+    if (bp.meta && bp.meta.model) {
+      P.push('<div class="tl-rail">' + esc(bp.meta.model) + '</div>');
+    }
+    if (bp.survival && bp.survival.model) {
+      P.push('<div class="tl-rail">Survival model: '
+        + esc(bp.survival.model) + '</div>');
+    }
+
+    // -- the breakpoint layer's own answers block --
+    if (bp.answers) {
+      P.push('<h3>Closed-form answers</h3>'
+        + '<p class="tl-note">Rendered verbatim from breakpoints.json '
+        + '"answers" - key names are the analysis script\'s own.</p>'
+        + answersHtml(bp.answers, 0));
+    }
+
+    // -- claim A: "6/15/5 is the best spread for the SP breakpoint" --
+    var A = (bp.claims || {}).a_615_best_for_sp_bp;
+    if (A) {
+      P.push('<div class="tl-verdict"><div class="tl-verdict-claim">'
+        + 'What about the 6/15/5 spread?</div>'
+        + '<div class="tl-verdict-detail">' + esc(A.claim)
+        + (/\bLicki\b/.test(String(A.claim || ''))
+          ? ' <em>(quoted verbatim; "Licki" here means ' + esc(OPP)
+            + ', the species this page analyzes)</em>' : '')
+        + '</div>'
+        + '<div class="tl-verdict-call">Clears the Sucker Punch breakpoint '
+        + 'vs the rank-1 ' + esc(OPP) + ': '
+        + cellText(A.clears_bp_vs_rank1_licki)
+        + '. At MAXIMUM Sucker Punch coverage (all-4096 cohort): '
+        + cellText(dig(A, 'is_615_at_max_coverage.all'))
+        + '; (top-512 cohort): '
+        + cellText(dig(A, 'is_615_at_max_coverage.top512')) + '.</div>'
+        + '<div class="tl-verdict-detail">These are read-outs of the '
+        + 'closed-form damage layer only (no shields, energy or timing); '
+        + 'the simulated grids above are what decide fights.</div></div>');
+      P.push(kvTable(A, [
+        ['spread.ivs', '6/15/5 IVs'],
+        ['spread.rank', 'stat-product rank'],
+        ['spread.level', 'level'], ['spread.cp', 'CP'],
+        ['spread.atk', 'atk'], ['spread.def', 'def'], ['spread.hp', 'hp'],
+        ['spread.sp_dmg_vs_rank1_licki', 'SP damage vs rank-1 ' + OPP],
+        ['spread.sp_ge_hi_frac.all',
+         'fraction of all 4096 ' + OPP + ' it reaches the higher SP tier on'],
+        ['spread.sp_ge_hi_frac.top512', 'same, top-512 ' + OPP + ' cohort'],
+        ['max_ge_hi_frac.all', 'best achievable fraction (all 4096)'],
+        ['n_spreads_at_max_coverage.all',
+         'Thievul spreads at that best fraction (all 4096)'],
+        ['n_spreads_strictly_better_than_615.all',
+         'Thievul spreads strictly better than 6/15/5 (all 4096)'],
+        ['n_spreads_tied_with_615.all', 'spreads tied with 6/15/5 (all 4096)'],
+        ['coverage_rank_of_615.all', 'coverage rank of 6/15/5 (all 4096)'],
+        ['n_spreads_strictly_better_than_615.rank1',
+         'spreads strictly better than 6/15/5 (rank-1 ' + OPP + ' only)'],
+        ['best_iv_rank_at_max_coverage',
+         'best stat-product rank among max-coverage spreads'],
+        ['best_stat_product_spread_at_max_coverage.ivs',
+         'that spread\'s IVs']
+      ]));
+      P.push(spreadTable(A.max_coverage_examples,
+        'Example spreads at maximum Sucker Punch coverage',
+        'From breakpoints.json claims.a_615_best_for_sp_bp.'
+        + 'max_coverage_examples.'));
+    }
+
+    // -- claim B: "do you not want 15 hp" --
+    var B = (bp.claims || {}).b_15_hp;
+    if (B) {
+      P.push('<div class="tl-verdict"><div class="tl-verdict-claim">'
+        + 'What about 15 HP?</div>'
+        + '<div class="tl-verdict-detail">' + esc(B.claim) + '</div>'
+        + '<div class="tl-verdict-call">'
+        + cellText(B.n_sta15_clearing_sp_bp_vs_rank1) + ' of '
+        + cellText(B.n_sta15_spreads) + ' sta-15 spreads clear the Sucker '
+        + 'Punch breakpoint vs the rank-1 ' + esc(OPP)
+        + '; the best sta-15 spread '
+        + 'by stat product is rank ' + cellText(B.best_rank_sta15)
+        + ' (rank ' + cellText(B.best_rank_sta15_clearing_bp)
+        + ' among those that clear the breakpoint).</div></div>');
+      var dc = B.direct_comparison_6_15_5_vs_6_15_15;
+      if (dc) {
+        P.push(spreadTable(Object.keys(dc).map(function (k) {
+          var r = dc[k];
+          if (r && !r.label) r.label = k;
+          return r;
+        }), 'Direct comparison: 6/15/5 vs 6/15/15', ''));
+      }
+      P.push(spreadTable(B.best_sta15_by_iv_rank,
+        'Best sta-15 spreads by stat-product rank', ''));
+      P.push(spreadTable(B.best_sta15_clearing_bp_by_iv_rank,
+        'Best sta-15 spreads that clear the SP breakpoint', ''));
+      if (B.sta15_max_coverage_spread) {
+        P.push(spreadTable([B.sta15_max_coverage_spread],
+          'Best sta-15 spread by Sucker Punch coverage', ''));
+      }
+    }
+
+    // -- SP breakpoint mechanics --
+    var mv = dig(bp, 'thievul_offense.moves') || {};
+    Object.keys(mv).forEach(function (name) {
+      var m = mv[name];
+      var rows = (m.tier_boundaries || []).map(function (t) {
+        return '<tr><td>' + esc(t.tier_from) + ' -> ' + esc(t.tier_to)
+          + '</td><td>' + esc(t.min_atk_over_def) + '</td></tr>';
+      }).join('');
+      var bpk = m.breakpoint_vs_rank1_licki;
+      P.push('<h4>' + esc(name) + ' (Thievul -> '
+        + esc(dig(bp, 'thievul_offense.defender') || '') + ')</h4>'
+        + '<p class="tl-note">' + esc(m.damage_identity || '') + ', K = '
+        + esc(m.damage_constant_K) + '. Damage tiers reachable: '
+        + esc((m.tiers || []).join(', ')) + '.</p>'
+        + (rows
+          ? '<div class="tl-scroll"><table class="tl"><tr><th>tier step</th>'
+            + '<th>min atk/def</th></tr>' + rows + '</table></div>' : '')
+        + (bpk ? bpAttainNote(bpk) : '')
+        + (bpk ? kvTable(bpk, [
+            ['licki_ivs', 'rank-1 ' + OPP + ' IVs'],
+            ['licki_def', 'its defense'],
+            ['base_tier', 'damage below the breakpoint'],
+            ['hi_tier', 'damage above the breakpoint'],
+            ['min_thievul_atk_for_hi_tier', 'attack needed for the high tier'],
+            ['lowest_thievul_atk_value_clearing', 'lowest attack that clears'],
+            ['highest_thievul_atk_value_failing', 'highest attack that fails'],
+            ['n_spreads_clearing', 'Thievul spreads that clear it']
+          ]) : ''));
+    });
+
+    // -- survival for named + user spreads --
+    var surv = dig(bp, 'survival.per_thievul_spread_vs_rank1_licki_stage0');
+    if (surv) {
+      var sn = slotNames();
+      var picks = namedBuilds().concat(
+        state.user.filter(function (u) { return u.side === 'thievul'; })
+          .map(function (u) { return { label: 'YOURS: ' + u.label,
+                                       idx: u.idx }; }));
+      var srows = picks.map(function (p) {
+        return '<tr><td>' + esc(p.label) + '</td><td>'
+          + esc(ivStr('thievul', p.idx)) + '</td><td>' + (p.idx + 1)
+          + '</td><td>' + esc(surv.hp[p.idx]) + '</td><td>'
+          + esc(surv.body_slam_dmg[p.idx]) + '</td><td>'
+          + esc(surv.body_slams_to_ko[p.idx]) + '</td><td>'
+          + esc(surv.hp_margin_over_prev_bs_tier[p.idx]) + '</td><td>'
+          + esc(surv.power_whip_dmg[p.idx]) + '</td><td>'
+          + esc(surv.power_whips_to_ko[p.idx]) + '</td><td>'
+          + esc(surv.lick_dmg[p.idx]) + '</td></tr>';
+      }).join('');
+      // If the layer's own probe says the engine never throws one of these
+      // moves with the default moveset, say it HERE, next to its columns.
+      var rcv = ((bp.verification || {}).resisted_charged_sim_checks || [])
+        .filter(function (r) { return r.thrown_with_default_moveset === false; });
+      var rcNote = rcv.length
+        ? ' ' + rcv.map(function (r) { return prettyMove(r.move); })
+            .join(' and ') + ' is never thrown by the engine with the '
+          + 'default moveset (see the resisted-charged probe below), so '
+          + 'those columns describe damage you will rarely actually take.'
+        : '';
+      P.push('<h4>Bulk vs the rank-1 ' + esc(OPP) + ' (stage 0)</h4>'
+        + '<p class="tl-note">Named builds plus any spread you added under '
+        + '"Your IVs". Additive model, no shields or healing.'
+        + esc(rcNote) + '</p>'
+        + '<div class="tl-scroll"><table class="tl"><tr><th>build</th>'
+        + '<th>IVs</th><th>SP rank</th><th>hp</th><th>' + esc(sn.c1)
+        + ' dmg</th><th>' + esc(sn.c1) + ' to KO</th><th>hp over prev '
+        + esc(sn.c1) + ' tier</th><th>' + esc(sn.c2) + ' dmg</th><th>'
+        + esc(sn.c2) + ' to KO</th><th>' + esc(sn.fast) + ' dmg</th></tr>'
+        + srows + '</table></div>');
+    }
+
+    // -- CMP --
+    if (bp.cmp) {
+      P.push('<h4>CMP (charge move priority)</h4>'
+        + '<p class="tl-note">' + esc(bp.cmp.definition || '') + '</p>'
+        + '<div class="tl-verdict"><div class="tl-verdict-call">'
+        + esc(bp.cmp.verdict || '') + '</div></div>'
+        + kvTable(bp.cmp, [
+            ['min_thievul_cmp_atk', 'lowest Thievul CMP attack'],
+            ['min_thievul_spread', 'that spread'],
+            ['max_lickitung_cmp_atk', 'highest ' + OPP + ' CMP attack'],
+            ['max_lickitung_spread', 'that spread'],
+            ['margin', 'margin']
+          ]));
+    }
+
+    // -- verification --
+    var ver = bp.verification;
+    if (ver) {
+      var fs = ver.formula_samples || [];
+      var bad = fs.filter(function (r) { return r.match === false; }).length;
+      var sc = ver.sim_checks || [];
+      var scBad = sc.filter(function (r) { return r.match === false; }).length;
+      P.push('<h4>Verification (from breakpoints.json)</h4>'
+        + '<p class="tl-note">Closed-form vs independent formula: '
+        + (fs.length - bad) + '/' + fs.length + ' samples match. '
+        + 'Closed-form vs the battle engine: ' + (sc.length - scBad) + '/'
+        + sc.length + ' checks match.'
+        + (ver.icy_wind_stage_check
+          ? ' Icy Wind stage check: observed Body Slam damages all found in '
+            + 'the closed-form stage set: '
+            + cellText(ver.icy_wind_stage_check.all_observed_in_closed_form_set)
+            + '.' : '')
+        + '</p>'
+        + ((bad || scBad)
+          ? '<div class="tl-missing"><strong>Verification mismatch.</strong> '
+            + 'Some samples in breakpoints.json did not match; treat this '
+            + 'section as unverified.</div>' : ''));
+      // Resisted-charged probes: these record moves the engine may never
+      // actually throw, which is itself a page-worthy fact.
+      var rc = ver.resisted_charged_sim_checks || [];
+      if (rc.length) {
+        P.push('<h5>Resisted charged-move probes</h5>'
+          + (ver.resisted_charged_note
+            ? '<p class="tl-note">' + esc(ver.resisted_charged_note) + '</p>'
+            : '')
+          + '<div class="tl-scroll"><table class="tl"><tr><th>move</th>'
+          + '<th>type</th><th>effectiveness vs ' + esc(FOCAL) + '</th>'
+          + '<th>thrown with the default moveset?</th>'
+          + '<th>damage (by stage)</th></tr>'
+          + rc.map(function (r) {
+            return '<tr><td>' + esc(prettyMove(r.move)) + '</td><td>'
+              + esc(r.move_type || '') + '</td><td>'
+              + esc(cellText(r.effectiveness_vs_thievul)) + 'x</td><td>'
+              + (r.thrown_with_default_moveset === false
+                ? 'NO - the engine never chose it, so this probe forced it'
+                : cellText(r.thrown_with_default_moveset))
+              + '</td><td>'
+              + esc((r.sim_damages_in_order || []).join(', ')) + '</td></tr>';
+          }).join('') + '</table></div>');
+      }
+    }
+
+    // Optional generic blocks (assembly may append these).
+    (bp.verdicts || []).forEach(function (v) {
+      P.push('<div class="tl-verdict"><div class="tl-verdict-claim">'
+        + esc(v.claim) + '</div><div class="tl-verdict-call">'
+        + esc(v.verdict) + '</div>'
+        + (v.detail ? '<div class="tl-verdict-detail">' + esc(v.detail)
+          + '</div>' : '') + '</div>');
+    });
+    (bp.tables || []).forEach(function (t) { P.push(renderTableSpec(t)); });
+    (bp.notes || []).forEach(function (n) {
+      P.push('<p class="tl-note">' + esc(n) + '</p>');
+    });
+    setHtml('tl-mech', P.join(''));
+  }
+
+  // ---- recommendations ----
+  function renderReco() {
+    if (!HAS_RECO) {
+      showMissing('tl-reco',
+        'the recommendation blob is computed in the assembly phase (after '
+        + 'the grids finish baking) and is not embedded in this page yet.');
+      return;
+    }
+    var recoGrid = D.reco.primary_grid || null;
+    var cards = (D.reco.cards || []).map(function (c) {
+      var cGrid = cardGrid(c) || recoGrid;
+      var tie = tieText(c);
+      return '<div class="tl-card"><h4>' + esc(expandLicki(c.title || ''))
+        + '</h4>'
+        + (c.subtitle ? '<div class="tl-card-sub">'
+          + esc(expandLicki(c.subtitle)) + '</div>' : '')
+        + (cGrid ? '<div class="tl-card-sub">Numbers on this card come '
+          + 'from: ' + esc(gridPretty(cGrid)) + '</div>' : '')
+        + (tie ? '<div class="tl-card-caveat">' + esc(tie) + '</div>' : '')
+        + (spreadText(c) ? '<div class="tl-card-spread">'
+          + esc(spreadText(c)) + '</div>' : '')
+        + '<ul>' + (c.lines || []).map(function (l) {
+          return '<li>' + esc(expandLicki(l)) + '</li>';
+        }).join('') + '</ul>'
+        + ((c.caveats || []).length
+          ? '<div class="tl-card-caveat">' + (c.caveats || []).map(function (x) {
+              return esc(x);
+            }).join('<br>') + '</div>' : '')
+        + '</div>';
+    }).join('');
+    var notes = (D.reco.notes || []).map(function (n) {
+      return '<p class="tl-note">' + esc(expandLicki(n)) + '</p>';
+    }).join('');
+    setHtml('tl-reco', (cards || missingBox(
+      'the recommendation blob has no cards.')) + notes);
+  }
+
+  // ---- your IVs ----
+  // Returns false when this exact spread is already listed, so callers can
+  // report "matched N (M were duplicate spreads)" instead of claiming more
+  // rows than the table shows. On a duplicate we keep the HIGHEST scanned
+  // CP, because the CP column exists so you can find the mon in-game and
+  // the strongest copy is the one you would evolve.
+  function addUser(side, idx, label, opts) {
+    opts = opts || {};
+    for (var i = 0; i < state.user.length; i++) {
+      var u = state.user[i];
+      if (u.side === side && u.idx === idx) {
+        if (typeof opts.cp === 'number'
+            && (typeof u.cp !== 'number' || opts.cp > u.cp)) {
+          u.cp = opts.cp;
+        }
+        return false;
+      }
+    }
+    state.user.push({ side: side, idx: idx, label: label,
+                      cp: (typeof opts.cp === 'number') ? opts.cp : null,
+                      note: opts.note || '' });
+    return true;
+  }
+
+  // ---- verdict-table plumbing (all read from TL_DATA) ----
+  function primaryGrid() {
+    var pg = (D.reco || {}).primary_grid;
+    return (pg && (D.cov || {})[pg]) ? pg : state.label;
+  }
+  function msKeyOf(label) { return String(label || '').split('_')[0]; }
+  function msAbbrev(label) {
+    var g = (META.grids || {})[label] || {};
+    var ch = g.focal_charged || [];
+    if (!ch.length) return msKeyOf(label).toUpperCase();
+    return ch.map(function (m) {
+      return String(m).split('_').map(function (w) {
+        return w.charAt(0).toUpperCase();
+      }).join('');
+    }).join('+');
+  }
+  // The bait grid on the OTHER moveset -- the moveset-robustness check.
+  function otherMovesetGrid(primary) {
+    var pk = msKeyOf(primary), pick = null;
+    GRID_LABELS.forEach(function (lb) {
+      if (msKeyOf(lb) === pk) return;
+      if (pick === null || /_bait$/.test(lb)) {
+        if (pick === null || !/_bait$/.test(pick)) pick = lb;
+      }
+    });
+    return pick;
+  }
+  // ---- build basis ----
+  // The ranking answers "which of MY mons should I build" -- and that
+  // depends on which moveset you intend to run. Basis 'primary' ranks on
+  // the reco's primary grid and its pick scenarios; basis 'other' ranks on
+  // the other moveset's bait grid over ITS OWN sensitive scenarios, in the
+  // same priority order the assembly used. Everything is read from the
+  // blob; nothing about which scenarios matter is assumed here.
+  function scenarioPriority() {
+    var rule = String((D.reco || {}).scenario_priority_rule || '');
+    var m = rule.match(/fixed order ([0-9\-,\s]+)/);
+    if (m) {
+      var order = m[1].split(',').map(function (s) { return s.trim(); })
+        .filter(Boolean);
+      if (order.length) return order;
+    }
+    return (META.scenarios || []).slice();
+  }
+  function basisGrid() {
+    var pg = primaryGrid();
+    if (state.basis === 'other') return otherMovesetGrid(pg) || pg;
+    return pg;
+  }
+  function crossGrid() {
+    var pg = primaryGrid(), og = otherMovesetGrid(pg);
+    return (state.basis === 'other') ? pg : og;
+  }
+  function basisPicks() {
+    var lb = basisGrid();
+    if (state.basis !== 'other') return pickScenarios();
+    var sc = META.scenarios || [];
+    var pgs = ((D.reco || {}).per_grid_scenarios || {})[lb] || {};
+    var sens = pgs.sensitive;
+    if (!sens || !sens.length) {
+      var s = saturationForGrid(lb);
+      var nearly = ((s && s.nearly) || []).map(function (x) {
+        return String(x).split(' ')[0];
+      });
+      sens = s ? scenarioComplement((s.all || [])
+        .concat(s.hopeless || []).concat(nearly)) : sc.slice();
+    }
+    var order = scenarioPriority();
+    var ranked = order.filter(function (x) { return sens.indexOf(x) >= 0; });
+    sens.forEach(function (x) {
+      if (ranked.indexOf(x) < 0) ranked.push(x);
+    });
+    var want = Math.max(1, pickScenarios().length);
+    return ranked.slice(0, want).map(function (lbl) {
+      return { label: lbl, si: sc.indexOf(lbl) };
+    }).filter(function (o) { return o.si >= 0; });
+  }
+  function basisLabel(lb) {
+    return msAbbrev(lb) + ' (' + gridPretty(lb) + ')';
+  }
+  function pickScenarios() {
+    var sc = META.scenarios || [];
+    var want = (D.reco || {}).pick_scenarios || [];
+    var out = [];
+    want.forEach(function (s) {
+      var si = sc.indexOf(s);
+      if (si >= 0) out.push({ label: s, si: si });
+    });
+    if (!out.length) out.push({ label: scenarioLabel(state.si), si: state.si });
+    return out;
+  }
+  function cov512Pct(label, idx, si) {
+    var tbl = (D.cov || {})[label];
+    if (!tbl || !tbl.top512) return null;
+    return 100 * tbl.top512[idx * NS + si] / 512;
+  }
+  function spTierArray() {
+    var bp = D.breakpoints || {};
+    try {
+      return bp.thievul_offense.moves.SUCKER_PUNCH
+        .tier_vs_rank1_licki_by_spread || null;
+    } catch (e) { return bp.sp_damage_vs_licki_rank1 || null; }
+  }
+  // The verdict table is anchored to the RECOMMENDATION's basis, not to
+  // the grid/scenario dropdowns: the reco tiebreak chain ends in "meta
+  // wins (<primary grid>, 1-1)", so ranking on whatever scenario the
+  // reader happens to be exploring would reorder the recommendation. The
+  // caption says this out loud.
+  var RECO_META_SCEN = '1-1';
+  var OTHER_ROBUST_PCT = 80;
+  // Coverage percentages are printed at ONE precision everywhere on the
+  // page -- the TL;DR band, the verdict table and the reco cards' own
+  // generated lines all show 1dp, so the same quantity can never appear
+  // twice with two different renderings.
+  var COV_DP = 1;
+  // The reco cards' generated lines print each percentage with Python's
+  // natural repr of the stored 2dp value ("100.0%", "94.73%"). The band
+  // reads the SAME stored values, so it renders them the same way -- a
+  // fixed decimal count would make one of the two disagree.
+  function covText(v) {
+    if (typeof v !== 'number') return metricText(v);
+    var s = String(v);
+    if (s.indexOf('.') < 0) s += '.0';
+    return s;
+  }
+  function recoMetaWins() {
+    var MW = D.meta_wins;
+    if (!MW) return null;
+    var pg = basisGrid();
+    var byGrid = MW.wins || {};
+    var byS = byGrid[pg];
+    if (byS) {
+      if (byS[RECO_META_SCEN]) {
+        return { vals: byS[RECO_META_SCEN],
+                 note: 'shields ' + RECO_META_SCEN + ', grid '
+                   + gridPretty(pg) + ' (fixed - it does NOT follow the '
+                   + 'controls, because the ranking is the '
+                   + 'recommendation\'s)' };
+      }
+      var k0 = Object.keys(byS)[0];
+      if (k0) {
+        return { vals: byS[k0], note: 'shields ' + k0 + ', grid '
+          + gridPretty(pg) + ' (fixed)' };
+      }
+    }
+    if (MW.wins_11) {
+      return { vals: MW.wins_11, note: (MW.wins_11_key || '1-1 shields')
+        + ' (fixed)' };
+    }
+    return null;
+  }
+  function spHiTier() {
+    try {
+      return D.breakpoints.thievul_offense.moves.SUCKER_PUNCH
+        .breakpoint_vs_rank1_licki.hi_tier;
+    } catch (e) { return null; }
+  }
+  // Why a scenario is NOT a ranking column: it is either already decided
+  // (saturated or hopeless on this basis grid) or it lost the priority
+  // cut. Computed per basis, so the answer changes with the toggle.
+  function notShownText(lb, picks) {
+    var s = saturationForGrid(lb);
+    if (!s) return '';
+    var shown = {};
+    picks.forEach(function (p) { shown[p.label] = 1; });
+    var sat = (s.all || []).filter(function (x) { return !shown[x]; });
+    var hop = (s.hopeless || []).filter(function (x) { return !shown[x]; });
+    var nearly = (s.nearly || []).map(function (x) {
+      return String(x).split(' ')[0];
+    }).filter(function (x) { return !shown[x] && hop.indexOf(x) < 0; });
+    var rest = scenarioComplement((s.all || []).concat(s.hopeless || [])
+      .concat(nearly)).filter(function (x) { return !shown[x]; });
+    var bits = [];
+    if (sat.length) {
+      bits.push(sat.join(', ') + ' - every ' + FOCAL + ' spread beats '
+        + 'every ' + OPP + ' there on this build, so IVs cannot separate '
+        + 'them');
+    }
+    if (hop.length) {
+      bits.push(hop.join(', ') + ' - lost regardless of IVs');
+    }
+    if (nearly.length) {
+      bits.push(nearly.join(', ') + ' - effectively lost regardless of IVs '
+        + '(see the summary at the top)');
+    }
+    if (rest.length) {
+      bits.push(rest.join(', ') + ' - IV-sensitive, but below the top '
+        + picks.length + ' in the assembly\'s priority order');
+    }
+    return bits.length
+      ? ' Not shown as ranking columns: ' + bits.join('; ') + '.' : '';
+  }
+  // A ranked verdict table, not a matching log: every column is a number
+  // you would use to decide which of YOUR mons to build, and the row order
+  // IS the recommendation (the reco blob's own tiebreak chain).
+  function renderUser() {
+    var picks = basisPicks();
+    var pg = basisGrid();
+    var og = crossGrid();
+    var tiers = spTierArray();
+    var hiTier = spHiTier();
+    var mw = HAS_META_WINS ? recoMetaWins() : null;
+    var poolN = (D.meta_wins || {}).pool_n;
+    var primarySi = picks[0] ? picks[0].si : state.si;
+
+    var rows = state.user.map(function (u, i) {
+      var focal = (u.side === 'thievul');
+      var covs = picks.map(function (p) {
+        return focal ? cov512Pct(pg, u.idx, p.si) : null;
+      });
+      var otherPct = (focal && og) ? cov512Pct(og, u.idx, primarySi) : null;
+      var tier = (focal && tiers && tiers.length > u.idx)
+        ? tiers[u.idx] : null;
+      var wins = (focal && mw && mw.vals) ? mw.vals[u.idx] : null;
+      // Every chip carries its own definition AND this spread's numbers
+      // in the tooltip, so no chip is a bare adjective.
+      var chips = [];
+      if (focal && covs.length && covs.every(function (c) {
+        return c !== null && c >= 100 - 1e-9;
+      })) {
+        chips.push(['ok', 'full coverage',
+          'full coverage FOR THIS BASIS: 100% of the top-512 ' + OPP
+          + ' beaten at '
+          + picks.map(function (p) { return p.label; }).join(' and ')
+          + ' on ' + gridPretty(pg) + ' (this spread: '
+          + covs.map(function (c) { return fmt(c, 1) + '%'; }).join(', ')
+          + '). Switch the build-basis control to score it for the other '
+          + 'moveset.']);
+      }
+      if (tier !== null && hiTier !== null && tier < hiTier) {
+        chips.push(['warn', 'misses SP bp',
+          'misses SP bp: Sucker Punch does ' + tier + ' vs the rank-1 '
+          + OPP + '; ' + hiTier + ' needed to clear the breakpoint']);
+      }
+      if (otherPct !== null && otherPct >= OTHER_ROBUST_PCT) {
+        chips.push(['ok', msAbbrev(og) + ' robust',
+          msAbbrev(og) + ' robust: beats >= ' + OTHER_ROBUST_PCT
+          + '% of the top-512 ' + OPP + ' at ' + scenarioLabel(primarySi)
+          + ' on the ' + gridPretty(og) + ' grid (this spread: '
+          + fmt(otherPct, 1) + '%)']);
+      }
+      return { u: u, i: i, focal: focal, covs: covs, otherPct: otherPct,
+               tier: tier, wins: wins, chips: chips, overCap: false };
+    });
+    // Over-cap mons: kept OUT of state.user (so the plot overlays are
+    // untouched) but shown here, because "you cannot build this one" is
+    // exactly the verdict the table exists to give.
+    (state.overCap || []).forEach(function (o) {
+      rows.push({ u: o, i: -1, focal: (o.side === 'thievul'), covs:
+        picks.map(function () { return null; }), otherPct: null,
+        tier: null, wins: null,
+        chips: [['warn', 'over cap',
+          'over cap: scanned L' + o.level + ' > analyzed cap L'
+          + o.gridLevel + '; power-ups are one-way, so this one can no '
+          + 'longer be the analyzed build']],
+        overCap: true });
+    });
+
+    // Sort = the reco tiebreak chain: pick-scenario coverage in order,
+    // then meta wins, then stat-product rank. Over-cap and non-focal rows
+    // sink to the bottom (they have no coverage to rank on).
+    rows.sort(function (a, b) {
+      if (a.overCap !== b.overCap) return a.overCap ? 1 : -1;
+      if (a.focal !== b.focal) return a.focal ? -1 : 1;
+      for (var k = 0; k < picks.length; k++) {
+        var av = (a.covs[k] === null) ? -1 : a.covs[k];
+        var bv = (b.covs[k] === null) ? -1 : b.covs[k];
+        if (av !== bv) return bv - av;
+      }
+      var aw = (a.wins === null) ? -1 : a.wins;
+      var bw = (b.wins === null) ? -1 : b.wins;
+      if (aw !== bw) return bw - aw;
+      return a.u.idx - b.u.idx;
+    });
+
+    if (!rows.length) {
+      setHtml('tl-user-list', '<p class="tl-note tl-user-empty">Paste or '
+        + 'pick your Poke Genie CSV above (or add a spread by hand) and '
+        + 'your ' + esc(FOCAL) + ' are ranked here: coverage vs the '
+        + 'top-512 ' + esc(OPP) + ', meta wins, and which one to build.'
+        + '</p>');
+      return;
+    }
+
+    var covHead = picks.map(function (p) {
+      return '<th>top-512 @ ' + esc(p.label) + '</th>';
+    }).join('');
+    var otherHead = og
+      ? '<th>' + esc(msAbbrev(og)) + ' ' + esc(scenarioLabel(primarySi))
+        + '</th>' : '';
+    var head = '<tr><th>species</th><th>IVs</th><th>CP now</th>'
+      + '<th>SP rank</th>' + covHead + otherHead + '<th>SP dmg</th>'
+      + '<th>meta wins' + (poolN ? ' /' + esc(poolN) : '') + '</th>'
+      + '<th>verdict</th><th></th></tr>';
+    var body = rows.map(function (r, ri) {
+      var u = r.u;
+      var cells = picks.map(function (p, k) {
+        return '<td>' + (r.covs[k] === null ? '-'
+          : fmt(r.covs[k], 1) + '%') + '</td>';
+      }).join('');
+      var otherCell = og
+        ? '<td>' + (r.otherPct === null ? '-' : fmt(r.otherPct, 1) + '%')
+          + '</td>' : '';
+      var chips = r.chips.map(function (c) {
+        return '<span class="tl-chip tl-chip-' + c[0] + '" title="'
+          + esc(c[2] || c[1]) + '">' + esc(c[1]) + '</span>';
+      }).join(' ');
+      return '<tr' + (ri === 0 && !r.overCap && r.focal
+          ? ' class="tl-user-top"' : '') + '>'
+        + '<td>' + esc(u.label) + '</td>'
+        + '<td>' + esc(u.ivs || ivStr(u.side, u.idx)) + '</td>'
+        + '<td>' + (typeof u.cp === 'number' ? esc(u.cp) : '-') + '</td>'
+        + '<td>' + (u.idx >= 0 ? (u.idx + 1) : '-') + '</td>'
+        + cells + otherCell
+        + '<td>' + (r.tier === null ? '-' : esc(r.tier)) + '</td>'
+        + '<td>' + (r.wins === null ? '-' : esc(fmt(r.wins, 0))) + '</td>'
+        + '<td>' + chips + '</td>'
+        + '<td>' + (r.i >= 0
+          ? '<button data-drop="' + r.i + '">remove</button>' : '')
+        + '</td></tr>';
+    }).join('');
+    var topRow = rows[0];
+    setHtml('tl-user-list',
+      (topRow && topRow.focal && !topRow.overCap
+        ? '<p class="tl-note"><strong>Build this one:</strong> '
+          + esc(topRow.u.label) + ' ' + esc(topRow.u.ivs
+            || ivStr(topRow.u.side, topRow.u.idx))
+          + (typeof topRow.u.cp === 'number' ? ' (CP ' + esc(topRow.u.cp)
+            + ')' : '') + ' - top of the ranking below.</p>'
+        : '')
+      + '<div class="tl-scroll"><table class="tl">' + head + body
+      + '</table></div>'
+      + '<p class="tl-note">Ranked for <strong>'
+      + esc(msAbbrev(pg)) + '</strong> (' + esc(gridPretty(pg))
+      + ') - use the build-basis control above to rank for the other '
+      + 'moveset instead. Sorted by the recommendation\'s own tiebreak '
+      + 'chain: top-512 coverage at '
+      + picks.map(function (p) { return p.label; }).join(', then ')
+      + ', then meta wins, then stat-product rank. Coverage columns are the '
+      + 'percentage of the top-512 ' + esc(OPP) + ' spreads beaten on '
+      + esc(gridPretty(pg)) + (og
+        ? '; the ' + esc(msAbbrev(og)) + ' column is the same scenario on '
+          + esc(gridPretty(og)) + ' (the moveset-robustness check)' : '')
+      + '. SP dmg is Sucker Punch damage vs the rank-1 ' + esc(OPP)
+      + (hiTier !== null ? ' (' + esc(hiTier) + ' clears the breakpoint)'
+        : '')
+      + '. Meta wins: ' + esc(mw ? mw.note : 'not embedded')
+      + '. CP now is the CP scanned from your CSV, so you can find the mon '
+      + 'in-game. This table is anchored to the BUILD BASIS selected '
+      + 'above (top-512 cohort, ' + esc(RECO_META_SCEN) + ' meta on that '
+      + 'grid) and deliberately does NOT follow the grid / scenario '
+      + 'controls further down.' + esc(notShownText(pg, picks))
+      + '</p>');
+    var host = $('tl-user-list');
+    if (!host) return;
+    Array.prototype.forEach.call(host.querySelectorAll('button[data-drop]'),
+      function (b) {
+        b.addEventListener('click', function () {
+          state.user.splice(+b.getAttribute('data-drop'), 1);
+          renderUser(); refresh();
+        });
+      });
+  }
+
+  function loadCsv(text) {
+    var C = D.collection;
+    if (!C || typeof POGOCollection === 'undefined') {
+      setHtml('tl-csv-status', missingBox(
+        'the collection blob is not embedded in this page.'));
+      return;
+    }
+    var mons, res;
+    try {
+      POGOCollection.setConstants({
+        cpm: C.cpm, shadowAtkBonus: C.shadowAtkBonus,
+        shadowDefMult: C.shadowDefMult
+      });
+      mons = POGOCollection.parseCsvText(text);
+      res = POGOCollection.matchMons(mons, C.thresholds, {
+        league: C.league, maxLevel: C.maxLevel,
+        pokemonIndex: C.pokemonIndex, preToFinals: C.preToFinals,
+        leagueCaps: C.leagueCaps, rankLookup: C.rankLookup,
+        requireGender: C.requireGender || null
+      });
+    } catch (e) {
+      setHtml('tl-csv-status',
+        '<div class="tl-missing"><strong>CSV parse failed.</strong> '
+        + esc(e.message) + '</div>');
+      return;
+    }
+    var added = 0, dupes = 0, offGrid = 0, overCapN = 0, other = [],
+      matchedMons = [];
+    Object.keys(res).forEach(function (sp) {
+      res[sp].forEach(function (r) {
+        if (r.mon) matchedMons.push(r.mon);
+        var side = (sp === C.focalSpecies) ? 'thievul'
+          : (sp === C.oppSpecies) ? 'licki' : null;
+        if (!side) {
+          other.push(sp + ' ' + r.mon.atk_iv + '/' + r.mon.def_iv + '/'
+                     + r.mon.sta_iv);
+          return;
+        }
+        var idx = ivIndex(side, r.mon.atk_iv, r.mon.def_iv, r.mon.sta_iv);
+        if (idx < 0) { offGrid++; return; }
+        // Species AS SCANNED. That it is analyzed as the final form is
+        // implicit (the whole page is about that species) and the cohort
+        // text says so; repeating it on every row is noise.
+        var nm = r.csv_species || sp;
+        // No evolve / power-up notes: anyone reading this already knows a
+        // Nickit must be evolved. The only level fact worth a warning is
+        // "you are already ABOVE the analyzed build and cannot power down".
+        var gridLevel = (D[side] || {}).level[idx];
+        var actual = (r.mon && typeof r.mon.level === 'number')
+          ? r.mon.level : null;
+        if (actual !== null && actual > gridLevel) {
+          var seenOC = false;
+          for (var oc = 0; oc < state.overCap.length; oc++) {
+            if (state.overCap[oc].side === side
+                && state.overCap[oc].idx === idx) {
+              var prev = state.overCap[oc];
+              if (r.mon && typeof r.mon.cp === 'number'
+                  && (typeof prev.cp !== 'number' || r.mon.cp > prev.cp)) {
+                prev.cp = r.mon.cp;
+              }
+              seenOC = true;
+              break;
+            }
+          }
+          if (seenOC) { dupes++; return; }
+          state.overCap.push({
+            side: side, idx: idx, label: nm,
+            ivs: ivStr(side, idx),
+            cp: (r.mon && typeof r.mon.cp === 'number') ? r.mon.cp : null,
+            level: actual, gridLevel: gridLevel
+          });
+          overCapN++;
+          return;
+        }
+        if (addUser(side, idx, nm, {
+          cp: (r.mon && typeof r.mon.cp === 'number') ? r.mon.cp : null
+        })) {
+          added++;
+        } else {
+          dupes++;
+        }
+      });
+    });
+    // Rows of an analyzed species that the matcher produced nothing for.
+    // The usual cause is mechanical and checkable: at the scanned level the
+    // FINAL form is already over the league CP cap, and power-ups are
+    // one-way -- so there is no legal build. We compute that CP and say so
+    // rather than dropping the row in silence.
+    var dropped = [];
+    var relevant = C.collectionSpecies || [];
+    mons.forEach(function (mon) {
+      if (relevant.indexOf(mon.name) < 0) return;
+      if (matchedMons.indexOf(mon) >= 0) return;
+      var finals = (C.preToFinals || {})[mon.name] || [mon.name];
+      // OVER-CAP rows never reach the matcher's output at all (no level
+      // at or above the scanned one keeps them under the cap), so they are
+      // classified HERE. They belong in the verdict table with an "over
+      // cap" chip -- that is the answer the reader needs -- rather than in
+      // a footnote.
+      var oside = null, oidx = -1;
+      for (var fi2 = 0; fi2 < finals.length; fi2++) {
+        var s2 = (finals[fi2] === C.focalSpecies) ? 'thievul'
+          : (finals[fi2] === C.oppSpecies) ? 'licki' : null;
+        if (!s2) continue;
+        var ix2 = ivIndex(s2, mon.atk_iv, mon.def_iv, mon.sta_iv);
+        if (ix2 >= 0) { oside = s2; oidx = ix2; break; }
+      }
+      if (oside !== null
+          && typeof mon.level === 'number'
+          && mon.level > (D[oside] || {}).level[oidx]) {
+        var dup = false;
+        for (var oc2 = 0; oc2 < state.overCap.length; oc2++) {
+          if (state.overCap[oc2].side === oside
+              && state.overCap[oc2].idx === oidx) {
+            if (typeof mon.cp === 'number'
+                && (typeof state.overCap[oc2].cp !== 'number'
+                  || mon.cp > state.overCap[oc2].cp)) {
+              state.overCap[oc2].cp = mon.cp;
+            }
+            dup = true;
+            break;
+          }
+        }
+        if (!dup) {
+          state.overCap.push({
+            side: oside, idx: oidx,
+            label: mon.name,
+            ivs: ivStr(oside, oidx),
+            cp: (typeof mon.cp === 'number') ? mon.cp : null,
+            level: mon.level, gridLevel: (D[oside] || {}).level[oidx]
+          });
+          overCapN++;
+        }
+        return;
+      }
+      var why = '';
+      for (var f = 0; f < finals.length; f++) {
+        var base = (C.pokemonIndex || {})[finals[f]];
+        if (!base) continue;
+        try {
+          var cpAtLevel = POGOCollection.computeCp(
+            base.atk, base.def, base.hp,
+            mon.atk_iv, mon.def_iv, mon.sta_iv, mon.level);
+          if (cpAtLevel > C.leagueCap) {
+            why = 'as ' + finals[f] + ' at your level ' + mon.level
+              + ' it would be CP ' + cpAtLevel + ', over the '
+              + C.leagueCap + ' cap, and power-ups are one-way';
+          }
+        } catch (e) { /* fall through to the generic wording */ }
+      }
+      dropped.push(mon.name + ' ' + mon.atk_iv + '/' + mon.def_iv + '/'
+        + mon.sta_iv + ' (L' + mon.level + ')'
+        + (why ? ' - ' + why : ' - no build in the analyzed grid'));
+    });
+    setHtml('tl-csv-status',
+      '<p class="tl-note">Parsed ' + mons.length + ' row(s); matched '
+      + added + ' spread(s) on the analyzed grids'
+      + (dupes ? '; ' + dupes + ' duplicate spread(s) collapsed, keeping '
+        + 'the highest scanned CP (the same IVs appear more than once in '
+        + 'your export)' : '')
+      + (overCapN ? '; ' + overCapN + ' already above the analyzed build\'s '
+        + 'level, listed in the table with an "over cap" verdict' : '')
+      + (offGrid ? '; ' + offGrid + ' off-grid (not in the 4096)' : '')
+      + (other.length
+        ? '; ' + other.length + ' related row(s) outside the two analyzed '
+          + 'species (' + esc(other.slice(0, 6).join(', ')) + ')'
+        : '')
+      + '. Nothing leaves your browser.</p>'
+      + (dropped.length
+        ? '<p class="tl-note">' + dropped.length + ' row(s) of the analyzed '
+          + 'species produced no usable build: '
+          + esc(dropped.slice(0, 6).join('; '))
+          + (dropped.length > 6 ? '; and ' + (dropped.length - 6) + ' more'
+            : '') + '.</p>'
+        : ''));
+    renderUser();
+    refresh();
+  }
+
+  // ---- controls / banners ----
+  function gridPretty(label) {
+    var g = (META.grids || {})[label];
+    if (!g) return String(label);
+    return g.pretty || (g.focal_fast + ' + ' + (g.focal_charged || []).join('/')
+      + (g.bait ? ', baiting' : ', no bait'));
+  }
+  function scenarioText() {
+    return state.scenarioAll ? 'all 9 shield scenarios (mean)'
+      : 'shields ' + scenarioLabel(state.si) + ' (you-opponent)';
+  }
+  function renderBanners() {
+    var b = [];
+    if (META.provenance) b.push(esc(META.provenance));
+    (META.notes || []).forEach(function (n) {
+      b.push(esc(expandLicki(n)));
+    });
+    // Cohort weighting. This page does NOT model the ladder population --
+    // it has no data on which spreads you actually meet -- so it says what
+    // the two cohorts ARE and leaves the choice to the reader.
+    if (state.cohort === 'all' || state.cohort === 'top512') {
+      b.push(esc(OPP) + ' cohort weighting is a MODELING CHOICE: '
+        + esc(cohortLabel()) + '. Nothing in this analysis measures which '
+        + esc(OPP) + ' spreads people actually run, so neither cohort is '
+        + '"the real one" - the all-4096 and top-512 numbers differ, and '
+        + 'comparing both is the honest read.');
+    } else {
+      b.push(esc(OPP) + ' cohort: ' + esc(cohortLabel())
+        + ' - a narrow cohort. Compare against the all-4096 and top-512 '
+        + 'views before concluding.');
+    }
+    // The level range of the analyzed opponent grid, computed here (finding:
+    // every spread in the denominator is an XL build, which the old text
+    // wrongly framed as what separates the cohorts).
+    var LV = (D.licki || {}).level;
+    if (LV && LV.length) {
+      var lmin = LV[0], lmax = LV[0];
+      for (var li = 1; li < LV.length; li++) {
+        if (LV[li] < lmin) lmin = LV[li];
+        if (LV[li] > lmax) lmax = LV[li];
+      }
+      b.push('Every one of the 4096 ' + esc(OPP) + ' spreads in the '
+        + 'denominator is the CP-capped best build for its IVs, level '
+        + lmin + ' to ' + lmax + (lmax > 40
+          ? ' - i.e. ALL of them need XL candy (above level 40). This page '
+            + 'assumes the ' + esc(OPP) + ' you face is maxed; a level-40 '
+            + esc(OPP) + ' is not in this grid at all.'
+          : '.'));
+    }
+    // Meta-wins axis: state the ACTUAL current binding, not a fixed claim.
+    var mwb = metaWinsArray();
+    if (mwb) {
+      b.push('Meta-wins axis is currently bound to: ' + esc(mwb.note)
+        + '. It follows the grid/scenario controls unless that note says '
+        + 'otherwise.');
+    }
+    b.push('Ties (battle score exactly 500) count as LOSSES, matching the '
+      + 'worlds-grid convention.');
+    if (GRID_LABELS.length > 1) {
+      b.push('Moveset robustness: switch the grid dropdown ('
+        + esc(GRID_LABELS.map(gridPretty).join(' / '))
+        + ') and check whether the conclusion survives.');
+    } else if (!GRID_LABELS.length) {
+      b.push('NO simulation grid is embedded in this build, so this page '
+        + 'makes no claim at all about which spreads beat ' + esc(OPP)
+        + '.');
+    } else if (GRID_LABELS.length === 1) {
+      b.push('Only ONE grid is embedded ('
+        + esc(gridPretty(GRID_LABELS[0]))
+        + '), so moveset-robustness of any conclusion is NOT established '
+        + 'by this page.');
+    }
+    setHtml('tl-banner', b.map(function (t) {
+      return '<div class="tl-rail">' + t + '</div>';
+    }).join(''));
+  }
+
+  function refresh() {
+    renderBanners();
+    renderTldr();      // the saturation summary is per-grid
+    renderUser();      // the verdict table follows the grid/scenario too
+    drawHeat();
+    renderMechanism();
+    coverage().then(function (cov) {
+      renderScatter(cov);
+      renderPareto(cov);
+    });
+  }
+
+  // ---- init ----
+  function initControls() {
+    var g = $('tl-grid');
+    if (g) {
+      if (!GRID_LABELS.length) {
+        var o0 = document.createElement('option');
+        o0.value = ''; o0.textContent = '(no grid baked)';
+        g.appendChild(o0); g.disabled = true;
+      }
+      GRID_LABELS.forEach(function (lb) {
+        var o = document.createElement('option');
+        o.value = lb; o.textContent = gridPretty(lb); g.appendChild(o);
+      });
+      if (state.label) g.value = state.label;
+      g.addEventListener('change', function () {
+        state.label = g.value; refresh(); renderDrill();
+      });
+    }
+    var s = $('tl-scenario');
+    if (s) {
+      for (var si = 0; si < NS; si++) {
+        var o = document.createElement('option');
+        o.value = String(si);
+        o.textContent = scenarioLabel(si) + ' shields (you-opponent)';
+        s.appendChild(o);
+      }
+      var oa = document.createElement('option');
+      oa.value = 'all'; oa.textContent = 'all 9 (mean)';
+      s.appendChild(oa);
+      s.value = String(state.si);
+      s.addEventListener('change', function () {
+        state.scenarioAll = (s.value === 'all');
+        if (!state.scenarioAll) state.si = +s.value;
+        refresh(); renderDrill();
+      });
+    }
+    var c = $('tl-cohort');
+    if (c) {
+      [['all', 'All 4096 ' + OPP],
+       ['top512', 'Top 512 by stat product'],
+       ['top100', 'Top 100 by stat product'],
+       ['rank1', 'Rank 1 only'],
+       ['custom', 'Custom (ranks / IV triples)']].forEach(function (p) {
+        var o = document.createElement('option');
+        o.value = p[0];
+        o.textContent = p[1]
+          + ((p[0] === 'top100' || p[0] === 'rank1' || p[0] === 'custom')
+             && state.label && !haveWon(state.label, state.si)
+            ? ' (needs full win grid)' : '');
+        c.appendChild(o);
+      });
+      c.value = state.cohort;
+      c.addEventListener('change', function () {
+        state.cohort = c.value;
+        var box = $('tl-cohort-custom');
+        if (box) box.style.display = (c.value === 'custom') ? '' : 'none';
+        refresh();
+      });
+    }
+    var cc = $('tl-cohort-custom-input');
+    if (cc) {
+      cc.addEventListener('change', function () {
+        state.customText = cc.value; refresh();
+      });
+    }
+    var bs = $('tl-basis');
+    if (bs) {
+      var pg0 = primaryGrid(), og0 = otherMovesetGrid(pg0);
+      [['primary', pg0], ['other', og0]].forEach(function (pair) {
+        if (!pair[1]) return;
+        var o = document.createElement('option');
+        o.value = pair[0];
+        o.textContent = 'rank for ' + msAbbrev(pair[1]);
+        bs.appendChild(o);
+      });
+      bs.value = state.basis;
+      bs.addEventListener('change', function () {
+        state.basis = bs.value;
+        renderUser();
+      });
+    }
+    var hn = $('tl-heat-named');
+    if (hn) {
+      hn.checked = state.heatNamed;
+      hn.addEventListener('change', function () {
+        state.heatNamed = !!hn.checked;
+        drawHeat();
+      });
+    }
+    ['tl-drill-licki', 'tl-drill-thievul'].forEach(function (id) {
+      var n = $(id);
+      if (n) n.addEventListener('change', renderDrill);
+    });
+    var go = $('tl-drill-go');
+    if (go) go.addEventListener('click', renderDrill);
+
+    var add = $('tl-manual-add');
+    if (add) {
+      add.addEventListener('click', function () {
+        var side = ($('tl-manual-species') || {}).value || 'thievul';
+        var a = +($('tl-manual-a') || {}).value;
+        var d = +($('tl-manual-d') || {}).value;
+        var st = +($('tl-manual-s') || {}).value;
+        var idx = ivIndex(side, a, d, st);
+        if (idx < 0) {
+          setHtml('tl-manual-status',
+            '<span class="tl-warn">' + esc(a + '/' + d + '/' + st)
+            + ' is not in the analyzed grid for that species.</span>');
+          return;
+        }
+        addUser(side, idx, (side === 'thievul' ? FOCAL : OPP), {});
+        setHtml('tl-manual-status', '');
+        renderUser(); refresh();
+      });
+    }
+    var clr = $('tl-user-clear');
+    if (clr) {
+      clr.addEventListener('click', function () {
+        state.user = []; state.overCap = []; renderUser(); refresh();
+      });
+    }
+    var csvBtn = $('tl-csv-load');
+    if (csvBtn) {
+      csvBtn.addEventListener('click', function () {
+        loadCsv(($('tl-csv') || {}).value || '');
+      });
+    }
+    var csvFile = $('tl-csv-file');
+    if (csvFile) {
+      csvFile.addEventListener('change', function () {
+        var f = csvFile.files && csvFile.files[0];
+        if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function () { loadCsv(String(rd.result)); };
+        rd.readAsText(f);
+      });
+    }
+    // IV selects
+    ['tl-manual-a', 'tl-manual-d', 'tl-manual-s'].forEach(function (id) {
+      var sel = $(id);
+      if (!sel) return;
+      for (var v = 0; v <= 15; v++) {
+        var o = document.createElement('option');
+        o.value = String(v); o.textContent = String(v); sel.appendChild(o);
+      }
+      sel.value = '15';
+    });
+  }
+
+  function init() {
+    initControls();
+    renderUser();
+    renderTldr();
+    renderReco();
+    refresh();
+    renderDrill();
+    // Re-render on theme change (drop the memo first).
+    try {
+      var obs = new MutationObserver(function () {
+        _themeCache = {};
+        refresh(); renderDrill();
+      });
+      obs.observe(document.documentElement,
+                  { attributes: true, attributeFilter: ['data-theme'] });
+    } catch (e) { /* no observer: charts keep the load-time theme */ }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();

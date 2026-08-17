@@ -14,7 +14,19 @@ pre-CD reference SP / NS+PR rendered as m3). Plan + verified numbers:
 `docs/thievul_cd_plan.md`. **The CD article was DROPPED by Michael's
 decision 2026-08-15** — the `thresholds/thievul.toml` article slug
 stays pre-registered but inert (the renderer only emits the link when
-the article dir exists). Residue: (a) Michael's reply to u/LeansCenter
+the article dir exists). **CD-day addendum (2026-08-16): the Thievul-vs-Licki IV-robustness
+analysis SHIPPED** -- full 4096x4096 joint IV grids vs Lickilicky
+(primary; 4 moveset/bait grids) and Lickitung (secondary), published as
+`thievul-lickilicky-robustness.html` + `thievul-lickitung-robustness.html`
+with an index card. Pipeline + contract: `docs/thievul_licki_analysis.md`
+(scripts `thievul_licki_*`, data in gitignored `userdata/thievul_lick*`).
+Post-publish residue: (a) tests/fixtures/poke_genie_export.csv is
+locally modified with Michael's real CD-day export -- decide keep vs
+revert (it is NOT committed and NOT embedded in the pages); (b) the
+pinned gamemaster cache TTL-refreshed to `e6050f77bf06` during the
+session (disclosed on-page; re-pin from pvpoke `f60a41199` before any
+Worlds re-render, per the Worlds NOTE above).
+Residue: (a) Michael's reply to u/LeansCenter
 on the r/TheSilphArena launch thread (bullets drafted in-session
 2026-08-15: 44W-44L -> 62W-25L at 1-1/rank-1 IVs/88-mon pool; IW+PR
 beats PvPoke's NS+IW default by ~14 wins; PvPoke overall GL rank

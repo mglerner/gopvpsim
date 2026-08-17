@@ -621,7 +621,8 @@ def render_index(dives: list[dict],
                  iv_guides: list[dict] | None = None,
                  guides_landing: dict | None = None,
                  cups: list[dict] | None = None,
-                 worlds: dict | None = None) -> str:
+                 worlds: dict | None = None,
+                 iv_robustness: dict | None = None) -> str:
     dives_html = _render_dives_grouped(dives)
     articles_html = _render_entry_list(articles)
     comparisons_html = _render_entry_list(comparisons)
@@ -695,6 +696,24 @@ def render_index(dives: list[dict],
             'matrix + per-species cheat sheets)</a></li>\n'
             '</ul>\n')
 
+    # "IV robustness" card: the Thievul CD one-off. The LICKILICKY page is
+    # the card (that is what "Licki" means in the GL meta); the Lickitung
+    # page is reachable from it rather than taking a second card, since it
+    # is the secondary reading. Retire-able in one commit: drop the card +
+    # the two thievul-lick*.html files and the section disappears.
+    iv_rob_section = ''
+    if iv_robustness:
+        iv_rob_section = (
+            '\n<h2>IV robustness</h2>\n'
+            '<p class="section-intro">Every IV spread of one Pokemon '
+            'simulated against every IV spread of another, per shield '
+            'scenario: how much the matchup actually turns on IVs.</p>\n'
+            '<ul>\n'
+            '  <li class="dive"><a href="'
+            + iv_robustness['href'] + '">'
+            + iv_robustness['title'] + '</a></li>\n'
+            '</ul>\n')
+
     cups_section = ''
     if cups:
         n_cups = len({_parse_dive_slug(d['slug']).get('cup')
@@ -746,7 +765,7 @@ open it.</p>
 </ul>
 </div>
 </div>
-{matchup_web_section}{worlds_section}{cups_section}{articles_section}{comparisons_section}{guides_section}""",
+{matchup_web_section}{worlds_section}{iv_rob_section}{cups_section}{articles_section}{comparisons_section}{guides_section}""",
         extra_about_html='<p class="about">If you find something broken or '
                          'surprising, reach out on Discord: '
                          '<a href="https://discord.com/users/460510521112920105">'
@@ -1032,12 +1051,23 @@ def main() -> int:
                 'n_entries': len(tomllib.load(f)['entries']),
             }
 
+    # IV-robustness card: shown iff the Lickilicky page is present.
+    iv_rob = None
+    _iv_rob_page = WEBSITE_DIR / 'thievul-lickilicky-robustness.html'
+    if _iv_rob_page.exists():
+        iv_rob = {
+            'href': _iv_rob_page.name,
+            'title': ('Thievul vs Lickilicky: how much do IVs matter? '
+                      '(4096 x 4096 matchups, Community Day)'),
+        }
+
     index_html = render_index(dives, articles, comparisons,
                               matchup_web=matchup_web,
                               iv_guides=iv_guides,
                               guides_landing=guides_landing,
                               cups=cup_dives,
-                              worlds=worlds_info)
+                              worlds=worlds_info,
+                              iv_robustness=iv_rob)
     INDEX_PATH.write_text(index_html)
 
     # Separate cup-index page (only when cup dives exist). Written as a
