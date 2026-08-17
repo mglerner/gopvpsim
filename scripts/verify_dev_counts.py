@@ -137,6 +137,9 @@ def _rewrite_sentinel(text: str, key: str, value: int) -> tuple[str, int]:
     return pattern.subn(_sub, text)
 
 
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
+
+
 def _derive_test_count() -> int:
     """Run pytest --collect-only and parse the tests-collected total."""
     result = subprocess.run(
@@ -146,7 +149,11 @@ def _derive_test_count() -> int:
         capture_output=True, text=True, check=False,
     )
     # The final non-empty stdout line is ``"N tests collected in Xs"``.
-    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    # pytest colorizes it under color-forcing environments (FORCE_COLOR,
+    # some terminals), which broke the match twice on 2026-08-16/17 --
+    # strip ANSI SGR sequences before parsing.
+    stdout = _ANSI_RE.sub('', result.stdout)
+    lines = [ln for ln in stdout.splitlines() if ln.strip()]
     if not lines:
         raise RuntimeError(
             f'pytest --collect-only produced no output; '
