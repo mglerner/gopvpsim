@@ -70,6 +70,11 @@
   function showMissing(id, msg, kind) {
     setHtml(id, missingBox(msg, kind));
   }
+  // "3 spread(s)" is a placeholder, not English. Every counted noun on the
+  // page goes through this.
+  function plural(n, one, many) {
+    return commas(n) + ' ' + (n === 1 ? one : (many || one + 's'));
+  }
   function fmt(x, dp) {
     if (x === null || x === undefined || isNaN(x)) return '-';
     return Number(x).toFixed(dp === undefined ? 1 : dp);
@@ -313,10 +318,16 @@
       var v2 = parseInt(tok, 10);
       return !(!isNaN(v2) && v2 >= 1 && v2 <= N);
     });
+    // A standalone SENTENCE (leading space, terminal period) that callers
+    // append after their own punctuation -- it used to be glued onto the
+    // end of the cohort label mid-clause, which produced "...spread(s)
+    // Ignored 2 entry/entries ...: 99999.." with no break and a doubled
+    // period.
     _cohortWarn = dropped.length
-      ? ' Ignored ' + dropped.length + ' entry/entries this page could not '
-        + 'read as a rank or an IV triple in the analyzed grid: '
-        + dropped.slice(0, 5).join(', ') + '.'
+      ? ' Ignored ' + dropped.length
+        + (dropped.length === 1 ? ' entry' : ' entries')
+        + ' this page could not read as a rank or an IV triple in the '
+        + 'analyzed grid: ' + dropped.slice(0, 5).join(', ') + '.'
       : '';
     return got;
   }
@@ -326,9 +337,13 @@
     if (state.cohort === 'top100') return 'top 100 ' + OPP + ' spreads (by stat product)';
     if (state.cohort === 'rank1') return 'rank-1 ' + OPP + ' only';
     var c = cohortIndices() || [];
-    return 'custom ' + OPP + ' cohort (' + c.length + ' spread(s))'
-      + _cohortWarn;
+    return 'custom ' + OPP + ' cohort (' + plural(c.length, 'spread') + ')';
   }
+  // The ignored-entry warning, as a sentence to append AFTER the caller's
+  // own period. cohortLabel() no longer carries it (it was rendering
+  // mid-clause with a doubled period). cohortIndices() must have run
+  // first, which every caller of cohortLabel() guarantees.
+  function cohortWarnText() { return _cohortWarn; }
 
   // ---- coverage ----
   // Returns a Promise of {pct: Float64Array(4096), denom, note} or
@@ -366,7 +381,11 @@
     if (!cohort.length) {
       return Promise.resolve({ kind: 'input', missing:
         'the custom ' + OPP + ' cohort is empty - enter ranks (e.g. "1-50") '
-        + 'or IV triples (e.g. "15/15/14") in the box above' });
+        + 'or IV triples (e.g. "15/15/14") in the box above.'
+        // What was typed and ignored is the actionable half; dropping it
+        // for the generic message left a reader who typed only
+        // unparseable tokens with no clue why the box did nothing.
+        + cohortWarnText() });
     }
     var sis = (oneSi !== null) ? [oneSi]
       : (state.scenarioAll ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [state.si]);
@@ -430,9 +449,13 @@
       Object.keys(ns).forEach(function (k) {
         raw.push({ label: ns[k].label || k, ivs: ns[k].ivs, rank: ns[k].rank });
       });
-    } else {
-      raw = raw.concat(META.named_builds || []);
     }
+    // META.named_builds is merged ALWAYS, not only as a fallback: the
+    // blob's label for 6/15/5 is the bare IV tag (which shortName drops as
+    // redundant), while META carries the informative "6/15/5 (discord
+    // claim)" -- the claim this page exists to test. Everything here is
+    // deduped by rank and by name, so merging cannot double-paint a row.
+    raw = raw.concat(META.named_builds || []);
     raw = raw.concat((D.reco && D.reco.named_builds) || []);
     var byIdx = {}, order = [];
     raw.forEach(function (b) {
@@ -582,6 +605,7 @@
         ? '. The recommendation blob also treats ' + s.nearly.join('; ')
           + ' as unwinnable' : '')
       + (rest.length ? '. IV choice can still decide ' + rest.join(', ')
+          + '.'
         : '. No scenario is left for IV choice to decide.')
       + (cohortOnly.length
         ? ' (' + cohortOnly.join(', ') + ' is saturated against the '
@@ -590,6 +614,50 @@
           + 'all 4096.)'
         : '')
       + (s.mismatch || '');
+  }
+
+  // The disclosure of the cliff rule is GENERATED from the rule itself --
+  // by running cliffExplanation over synthetic inputs that hit each branch
+  // and quoting what it actually says. Hand-written parallel prose drifted
+  // from the code inside a single batch; this cannot.
+  function cliffRuleText() {
+    function probe(pcts, clsPattern) {
+      var fakeCov = { pct: pcts };
+      var fakeSc = { cls: clsPattern, hi: 7, tier: [] };
+      return cliffExplanation(fakeSc, fakeCov).text;
+    }
+    var n = N;
+    function build(vals) {
+      // one third of the space in each breakpoint class, at the given
+      // class means, so the branch under test is the one that fires
+      var pcts = new Float64Array(n), cls = new Uint8Array(n);
+      for (var i = 0; i < n; i++) {
+        var k = i % 3;
+        cls[i] = k;
+        pcts[i] = vals[k];
+      }
+      return { pcts: pcts, cls: cls };
+    }
+    var flat = build([50, 50, 50]);
+    var rise = build([10, 50, 90]);
+    var inv = build([90, 50, 10]);
+    // Branch 4 is "not rising, but not inverted by CLIFF_INVERSION_PP
+    // either" -- so the means must go DOWN a little, not up.
+    var mild = build([52, 51, 50]);
+    return 'CLIFF PANEL RULE (generated from the code that renders it, by '
+      + 'running the same function on synthetic inputs): the sentence above '
+      + 'that panel is computed, never authored. It reports the mean '
+      + 'coverage of each Sucker Punch breakpoint class and whether those '
+      + 'means rise -- it never attributes the outcome to the breakpoint, '
+      + 'to bulk, or to any other cause, because nothing on this page '
+      + 'measures explanatory power. The four things it can say are '
+      + 'exactly these: (1) when the whole coverage range spans '
+      + FLAT_RANGE_PP + ' point or less -- "'
+      + probe(flat.pcts, flat.cls) + '"; (2) when the means rise -- "'
+      + probe(rise.pcts, rise.cls) + '"; (3) when they are inverted by at '
+      + 'least ' + CLIFF_INVERSION_PP + ' points -- "'
+      + probe(inv.pcts, inv.cls) + '"; (4) otherwise -- "'
+      + probe(mild.pcts, mild.cls) + '".';
   }
 
   // ---- saturation (a flat series is a finding, not a broken plot) ----
@@ -601,18 +669,28 @@
       if (pct[i] > mx) mx = pct[i];
     }
     if (!(mx - mn <= 1e-9)) return { note: '', text: '' };
-    var what = (mn >= 100 - 1e-9)
-      ? 'every one of the ' + pct.length + ' ' + FOCAL + ' spreads beats '
-        + 'every ' + OPP + ' in this cohort'
-      : (mn <= 1e-9
-        ? 'no ' + FOCAL + ' spread beats any ' + OPP + ' in this cohort'
-        : 'all ' + pct.length + ' ' + FOCAL + ' spreads sit at exactly '
-          + fmt(mn, 1) + '%');
+    // One keyword per DIRECTION. "SATURATED" was used for both the
+    // all-win and the all-loss case, and a reader meeting it on an
+    // all-loss panel reads "you win everything". The three words match
+    // the TL;DR band's vocabulary exactly.
+    var key, what;
+    if (mn >= 100 - 1e-9) {
+      key = 'ALREADY WON';
+      what = 'every one of the ' + pct.length + ' ' + FOCAL + ' spreads '
+        + 'beats every ' + OPP + ' in this cohort';
+    } else if (mn <= 1e-9) {
+      key = 'UNWINNABLE';
+      what = 'no ' + FOCAL + ' spread beats any ' + OPP + ' in this cohort';
+    } else {
+      key = 'FLAT';
+      what = 'all ' + pct.length + ' ' + FOCAL + ' spreads sit at exactly '
+        + fmt(mn, 1) + '%';
+    }
     // Where to look instead is COMPUTED (sensitivePointer). A hardcoded
     // pair sent readers at 0-1, which this very page labels unwinnable.
     var ptr = sensitivePointer(state.label);
     return {
-      note: ' SATURATED: ' + what + ' in this scenario, so IV choice does '
+      note: ' ' + key + ': ' + what + ' in this scenario, so IV choice does '
         + 'not decide anything here - ' + ptr,
       text: capFirst(what) + '.<br>IV choice '
         + 'does not matter in this scenario - ' + ptr
@@ -715,7 +793,10 @@
       + ' (best in bin ' + ivStr('thievul', i0) + ')'
       + '<br>vs ' + OPP + ' ranks ' + (j0 + 1) + '-' + (j1 + 1)
       + ' (best in bin ' + ivStr('licki', j0) + ')'
-      + '<br>won ' + c + ' of ' + tot + ' (' + fmt(100 * c / tot, 1) + '%)';
+      // Thousands separators, like the caption's copy of the same
+      // denominator -- "2304" here vs "2,304" there read as two numbers.
+      + '<br>won ' + commas(c) + ' of ' + commas(tot)
+      + ' (' + fmt(100 * c / tot, 1) + '%)';
   }
   // Bin the decoded slices over an index window. Hover strings are built
   // ONLY for the cells actually drawn (never 4096x4096 of them).
@@ -755,6 +836,13 @@
     return { z: z, text: txt, x: xc, y: yc, full: full, ye: ye, xe: xe,
              nby: nby, nbx: nbx, binY: binY, binX: binX,
              rowsPerBin: binY, colsPerBin: binX,
+             // ONE source for "how many outcomes are behind a cell": the
+             // caption and the hover text both read these, so they cannot
+             // disagree by a factor of 9 the way they did when the caption
+             // counted matchups and the hover counted matchups x
+             // scenarios.
+             nSlices: slices.length,
+             cellDenom: binY * binX * slices.length,
              nr: nr, nc: nc };
   }
   // Diverging scale on the page's own outcome tokens: --loss ... neutral
@@ -873,7 +961,7 @@
     var msg = ' YOUR SPREADS: gold dashed lines mark them (rows = your '
       + FOCAL + ', columns = your ' + OPP + ')'
       + (xs.length
-        ? '; ' + xs.length + ' ring(s) mark matchups where you own both '
+        ? '; ' + plural(xs.length, 'ring') + ' mark matchups where you own both '
           + 'sides' + (full ? ', outlined at cell level in this zoom' : '')
         : (mine.thievul.length && mine.licki.length
           ? ' - no matchup where you own both sides falls inside the '
@@ -897,7 +985,7 @@
     var offL = mine.licki.length - visL.length;
     if (offT || offL) {
       caps.push(offT + ' owned ' + FOCAL + ' and ' + offL + ' owned '
-        + OPP + ' spread(s) fall outside the current zoom window');
+        + OPP + ' spreads fall outside the current zoom window');
     }
     out.note = msg + (caps.length ? ' NOT ALL DRAWN: ' + caps.join('; ')
       + '.' : '');
@@ -1024,8 +1112,9 @@
       var totalCells = b.nr * b.nc * pick.sis.length;
       var satNote = '';
       if (uniform !== null) {
-        satNote = ' SATURATED: all ' + commas(totalCells) + ' matchups in '
-          + 'this view are ' + FOCAL + (uniform ? ' wins' : ' losses')
+        satNote = ' ' + (uniform ? 'ALREADY WON' : 'UNWINNABLE') + ': all '
+          + commas(totalCells) + ' matchups in this view are ' + FOCAL
+          + (uniform ? ' wins' : ' losses')
           + ' - IV choice does not decide anything here.';
         anns.push({
           xref: 'paper', yref: 'paper', x: 0.5, y: 0.5,
@@ -1068,13 +1157,16 @@
       var cell = b.full
         ? (pick.sis.length === 1
           ? 'one cell = ONE simulated matchup (win or loss)'
-          : 'one cell = ONE ' + FOCAL + '-vs-' + OPP + ' pair, colored by the '
-            + 'fraction of the ' + pick.sis.length
-            + ' shield scenarios it wins')
-        : 'one cell = ' + fmt(b.rowsPerBin, b.rowsPerBin % 1 ? 1 : 0)
-          + ' x ' + fmt(b.colsPerBin, b.colsPerBin % 1 ? 1 : 0)
-          + ' = ' + fmt(b.rowsPerBin * b.colsPerBin, 0) + ' matchups, '
-          + 'colored by the fraction ' + FOCAL + ' wins';
+          : 'one cell = ONE ' + FOCAL + '-vs-' + OPP + ' pair across '
+            + b.nSlices + ' shield scenarios (' + b.cellDenom
+            + ' outcomes), colored by the fraction ' + FOCAL + ' wins')
+        : 'one cell = ' + fmt(b.rowsPerBin, 0) + ' x '
+          + fmt(b.colsPerBin, 0) + ' = '
+          + fmt(b.rowsPerBin * b.colsPerBin, 0) + ' matchups'
+          + (b.nSlices > 1
+            ? ' x ' + b.nSlices + ' shield scenarios = '
+              + commas(b.cellDenom) + ' outcomes' : '')
+          + ', colored by the fraction ' + FOCAL + ' wins';
       setHtml('tl-heat-note',
         'Rows: all 4096 ' + FOCAL + ' IV spreads, stat-product rank 1 at '
         + 'the TOP. Columns: all 4096 ' + OPP + ' IV spreads, rank 1 at the '
@@ -1083,11 +1175,22 @@
         + 'top and left. Showing ' + FOCAL + ' ranks ' + (r.i0 + 1) + '-'
         + (r.i1 + 1) + ' x ' + OPP + ' ranks ' + (r.j0 + 1) + '-' + (r.j1 + 1)
         + ' as ' + b.nby + ' x ' + b.nbx + ' cells: ' + cell + '. '
-        + 'Hover any cell to outline that ' + FOCAL + ' row and that '
-        + OPP + ' column across the visible window'
+        // The highlight follows the BINNING: at 16-rank bins it is a
+        // 16-spread band, not one spread's row. Saying "row"/"column"
+        // with no width let a reader believe they were looking at a
+        // single matchup's neighbourhood.
+        + 'Hover any cell to outline it across the visible window: '
+        + (b.rowsPerBin === 1 && b.colsPerBin === 1
+          ? 'at this zoom each cell is one spread, so the highlight is '
+            + 'that single ' + FOCAL + ' row and that single ' + OPP
+            + ' column'
+          : 'the highlight is a band ' + plural(b.rowsPerBin, FOCAL + ' rank')
+            + ' tall and ' + plural(b.colsPerBin, OPP + ' rank')
+            + ' wide -- the current bin size, not one spread; the '
+            + 'hover text names the exact rank range')
         + ((r.i0 > 0 || r.i1 < N - 1 || r.j0 > 0 || r.j1 < N - 1)
-          ? ' (you are zoomed in, so that is a slice of the full grid)'
-          : ' - currently the whole grid')
+          ? ', within the zoomed slice of the full grid'
+          : ', which is currently the whole grid')
         + '. '
         + 'Zoom (box-select or the zoom tool) to re-bin the visible window: '
         + 'each axis independently picks the smallest bin of 1, 2, 4, 8 or '
@@ -1464,9 +1567,15 @@
           .indexOf(state.label) >= 0);
         return '<li' + (isCur ? ' class="tl-sat-current"' : '') + '>'
           + esc(s)
-          + (also.length ? ' <em>(identical to ' + esc(also.join(', '))
-            + ', which is the same grid)</em>' : '')
-          + (isCur ? ' <em>(selected)</em>' : '') + '</li>';
+          // ONE parenthetical, not two: "identical to X" and "which is
+          // the same grid" said the same thing, and "(selected)" then
+          // followed as a second bare aside.
+          + (also.length || isCur
+            ? ' <em>(' + [].concat(
+                also.length ? ['byte-identical to ' + esc(also.join(', '))]
+                  : [],
+                isCur ? ['selected'] : []).join('; ') + ')</em>'
+            : '') + '</li>';
       }).filter(Boolean).join('');
     if (!rows) return '';
     return '<div class="tl-satblock"><strong>Where IV choice cannot '
@@ -1779,6 +1888,9 @@
   // Coverage range (percentage points) below which a view counts as flat:
   // no causal claim is made about it in either direction.
   var FLAT_RANGE_PP = 1.0;
+  // Below this the means merely fail to rise; at or above it they are
+  // meaningfully INVERTED and the sentence says so in those words.
+  var CLIFF_INVERSION_PP = 5.0;
   function capFirst(s) {
     s = String(s || '');
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
@@ -1831,9 +1943,16 @@
         + (monotone
           ? 'The means rise across the classes, by ' + fmt(gap, 1)
             + ' points from lowest to highest.'
-          : 'The means do NOT rise across the classes: spreads that miss '
-            + 'the breakpoint average at least as much coverage as spreads '
-            + 'that clear it.')
+          : (vals.length > 1
+              && vals[0] - vals[vals.length - 1] >= CLIFF_INVERSION_PP
+            ? 'The means run the OTHER way here: spreads that MISS the '
+              + 'breakpoint average ' + fmt(vals[0], 1) + '%, while '
+              + 'spreads that clear it against every ' + OPP + ' average '
+              + fmt(vals[vals.length - 1], 1) + '% -- '
+              + fmt(vals[0] - vals[vals.length - 1], 1) + ' points LOWER.'
+            : 'The means do not rise across the classes: spreads that miss '
+              + 'the breakpoint average at least as much coverage as '
+              + 'spreads that clear it.'))
         + ' Coverage across all ' + commas(cov.pct.length) + ' spreads '
         + 'ranges ' + fmt(cmn, 1) + '% to ' + fmt(cmx, 1) + '%.',
       means: means, monotone: monotone, gap: gap, flat: false
@@ -1934,6 +2053,7 @@
       + 'Sucker Punch breakpoint starts clearing. Follows the controls '
       + 'above: ' + esc(gridPretty(state.label)) + ', '
       + esc(scenarioText()) + ', cohort ' + esc(cohortLabel()) + '.'
+      + esc(cohortWarnText())
       + esc(sat.note)
       + ' Diamonds are named builds, gold stars your own spreads (hover '
       + 'for names).');
@@ -1999,8 +2119,10 @@
           + 'one is coloured by '
           + (state.cliffColor === 'def' ? 'defense' : 'HP') + '.')
       + ' The dashed lines are the same breakpoint thresholds. This panel '
-      + 'does not depend '
-      + 'on the shield scenario or cohort: it is the IV space itself.');
+      + 'does not depend on ANY of the controls -- not the moveset/bait '
+      + 'grid, not the shield scenario, not the ' + esc(OPP) + ' cohort: '
+      + 'it is the IV space itself, which is the same picture for every '
+      + 'grid.');
   }
 
   // Named builds (deduped) + your own spreads, as overlay traces on any
@@ -2193,8 +2315,9 @@
     setHtml('tl-scatter-note',
       'Grid: ' + esc(gridPretty(state.label)) + '; ' + esc(scenarioText())
       + '. ' + esc(cg.note) + ' Cohort: ' + esc(cohortLabel()) + '. '
-      + 'Denominator ' + cov.denom + ' ' + OPP + ' spread(s)'
+      + 'Denominator ' + plural(cov.denom, OPP + ' spread')
       + (state.scenarioAll ? ' x 9 scenarios' : '') + '.'
+      + esc(cohortWarnText())
       + esc(sat.note)
       + ' Named builds are the diamond markers - hover for the name.');
   }
@@ -2373,7 +2496,7 @@
       + 'or sampled. This view follows the grid and cohort controls ('
       + esc(gridPretty(state.label)) + ', ' + esc(cohortLabel())
       + ') and IGNORES the shield-scenario dropdown, since it shows all '
-      + 'nine at once.');
+      + 'nine at once.' + esc(cohortWarnText()));
   }
 
   // ---- pareto ----
@@ -2395,7 +2518,7 @@
           });
           for (var j = 0; j < N; j++) acc[j] /= keys.length;
           return { vals: acc, note: 'mean over ' + keys.length
-            + ' shield scenario(s), grid ' + gridPretty(state.label) };
+            + ' shield scenarios, grid ' + gridPretty(state.label) };
         }
       } else {
         var arr = byS[scenarioLabel(state.si)];
@@ -2507,8 +2630,21 @@
     if (psat.note) layout.annotations = [satAnnotation(psat.text, c)];
     Plotly.react('tl-pareto-plot', traces, layout, { responsive: true });
     setHtml('tl-pareto-note',
-      'Meta axis: ' + esc(mw.note) + '. ' + esc(D.meta_wins.note || '')
+      // Reading guide FIRST, like every other panel: the frontier is
+      // defined, the tradeoff named, and its size stated -- three green
+      // dots with no caption look equally like the finding and like a
+      // broken render.
+      'Reading guide: RIGHT is more meta wins, UP is more ' + esc(OPP)
+      + ' beaten, and the two trade off -- attack-heavy spreads take the '
+      + 'matchup, balanced spreads take the meta. The '
+      + '<strong>frontier</strong> (highlighted) is every spread that no '
+      + 'other spread beats on BOTH axes at once: '
+      + esc(fmt(front.length, 0)) + ' of ' + esc(commas(N))
+      + ' here; the remaining ' + esc(commas(N - front.length))
+      + ' are dominated (some other spread is at least as good on both). '
+      + 'Meta axis: ' + esc(mw.note) + '. ' + esc(D.meta_wins.note || '')
       + ' ' + esc(OPP) + ' cohort: ' + esc(cohortLabel()) + '.'
+      + esc(cohortWarnText())
       + esc(psat.note)
       + ' Named builds are the diamond markers - hover for the name.');
   }
@@ -2623,7 +2759,7 @@
         var hv = new Array(N);
         for (var q = 0; q < N; q++) {
           hv[q] = statLine('thievul', q) + '<br>wins ' + wins[q] + ' of '
-            + denom + ' embedded scenario(s)'
+            + plural(denom, 'embedded scenario')
             + '<br>won: ' + (wonScen[q].won.join(', ') || 'none')
             + '<br>lost: ' + (wonScen[q].lost.join(', ') || 'none');
         }
@@ -2693,7 +2829,14 @@
           + 'many '
           + 'of those ' + denom + ' shield scenarios it wins against this '
           + OPP + ' (hover lists which). ' + esc(dcg.note)
-          + ' Ties (score == 500) count as losses.');
+          + ' Ties (score == 500) count as losses.'
+          // The shield dropdown moves the TABLE below and leaves this plot
+          // alone. That is by design (the y axis already IS the count over
+          // scenarios), but a reader watching one half of the section move
+          // has no way to know that without being told.
+          + ' This plot does NOT follow the shield-scenario dropdown -- it '
+          + 'shows all ' + denom + ' at once, by construction. The table '
+          + 'below it does follow the dropdown.');
         var rows = losses.slice(0, 40).map(function (o2) {
           var L = D.licki;
           return '<tr><td>' + (o2 + 1) + '</td><td>' + ivStr('licki', o2)
@@ -2762,13 +2905,18 @@
       return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
     }).join(' ');
   }
+  // Move-slot names come from the blob. When a slot is missing the label
+  // says so IN PLACE OF a name -- the old fallback substituted Lickitung's
+  // moves, which on another opponent would have been a made-up number's
+  // twin: a confident wrong word with nothing marking it.
   function slotNames() {
     var ms = ((D.breakpoints || {}).meta || {}).move_slots || {};
-    return {
-      fast: prettyMove(ms.fast) || 'Lick',
-      c1: prettyMove(ms.charged_1) || 'Body Slam',
-      c2: prettyMove(ms.charged_2) || 'Power Whip'
-    };
+    function slot(key) {
+      return prettyMove(ms[key])
+        || '[move slot "' + key + '" missing from breakpoints.meta]';
+    }
+    return { fast: slot('fast'), c1: slot('charged_1'),
+             c2: slot('charged_2') };
   }
   // Spread-summary rows as produced by the breakpoint layer (claims /
   // named_spreads entries share one shape).
@@ -2861,10 +3009,11 @@
   // stats any real spread has; the generic renderer would otherwise paint
   // them under a name that reads like a realized value.
   var ANSWER_LABELS = {
+    // A 30-word parenthetical inside a two-column cell is unreadable; the
+    // caveat it carried is the "is constant" row directly above it.
     body_slams_to_ko_stage0_value:
-      'value the layer reports at stage 0 (see the by-stage histogram '
-      + 'below for the actual spread-by-spread distribution, which is NOT '
-      + 'a single number when the "is constant" row says no)',
+      'value reported at attack stage 0 (see the by-stage histogram below '
+      + 'when "is constant" says no)',
     max_thievul_def_still_taking_tier_hi:
       'defense cutoff for the higher damage tier (continuous tier '
       + 'boundary, NOT a defense any real spread has)',
@@ -2911,6 +3060,11 @@
       .replace(/\blicks\b/gi, sn.fast + ' hits')
       .replace(/\blick\b/gi, sn.fast)
       .replace(/\bto ko\b/g, 'to KO')
+      // The blob's key names spell comparisons out ("n_..._ge_tier_hi");
+      // rendered raw they read as a typo ("taking ge tier hi").
+      .replace(/\bge\b/g, 'at or above')
+      .replace(/\ble\b/g, 'at or below')
+      .replace(/\btier hi\b/g, 'the high tier')
       .replace(/\bstage0\b/g, 'stage 0');
     return s;
   }
@@ -2976,7 +3130,11 @@
   // A one-bucket histogram is a SENTENCE, not a table.
   function cleanSubject(label) {
     return String(label).replace(/\s*histogram\s*/ig, ' ')
-      .replace(/\s*stage 0\s*/i, ' ').replace(/\s+/g, ' ').trim();
+      .replace(/\s*stage 0\s*/i, ' ')
+      // The callers append "by <opponent> attack stage" themselves, so a
+      // label that already carries "by stage" doubled the phrase.
+      .replace(/\s*\bby stage\b\s*/ig, ' ')
+      .replace(/\s+/g, ' ').trim();
   }
   // What is being counted? A key naming PAIRS counts focal x opponent
   // matchups (4096^2), not spreads (4096). Getting this wrong turned a
@@ -3021,6 +3179,14 @@
   }
   function answersHtml(o, depth) {
     var rows = [], sub = [];
+    // A block carrying an `order` list is a PER-BUILD comparison: its
+    // sibling arrays are positional, one entry per named build. Rendered
+    // as "7, 6" with the key hidden in a trailing "order" row, the reader
+    // had to scroll to the bottom and mentally zip every row. Given the
+    // names, it becomes a real table with named columns -- the same
+    // treatment the by-stage block already gets.
+    var orderNames = (Array.isArray(o.order) && o.order.length > 1)
+      ? o.order.map(function (x) { return ivify(String(x)); }) : null;
     // n_spreads_taking_{1,2}_lick_* are FIXED 1-damage / 2-damage buckets
     // written for the Lickitung file. When the layer ships a histogram
     // instead, those buckets read 0 and would be misleading -- so they are
@@ -3030,6 +3196,8 @@
     Object.keys(o).forEach(function (k) {
       var v = o[k];
       var label = answerLabel(k);
+      // The order list becomes the column header, so it is not also a row.
+      if (orderNames && k === 'order') return;
       if (hasHist && /^n_spreads_taking_\d_lick_vs_rank1$/.test(k)) {
         label = label + ' (a fixed 1/2-damage bucket carried over from the '
           + 'original schema - it does not apply to ' + sn.fast + ', see '
@@ -3047,14 +3215,17 @@
           + 'instead.';
       }
       if (k === 'fast_move_dmg_histogram_vs_rank1') {
-        label = sn.fast + ' damage taken from the rank-1 ' + OPP
-          + ', by number of spreads';
+        // histogramHtml appends "over all N Thievul spreads" itself, so
+        // the label must not also say "by number of spreads".
+        label = sn.fast + ' damage taken from the rank-1 ' + OPP;
       }
       if (v === null || typeof v !== 'object') {
         rows.push([label, cellText(v)]);
       } else if (Array.isArray(v)) {
         if (v.length && typeof v[0] === 'object') {
           sub.push('<h5>' + esc(label) + '</h5>' + objListTable(v));
+        } else if (orderNames && v.length === orderNames.length) {
+          rows.push([label, v.map(function (x) { return String(x); })]);
         } else if (v.length <= 16) {
           rows.push([label, v.join(', ')]);
         } else {
@@ -3115,10 +3286,23 @@
         sub.push('<h5>' + esc(label) + '</h5>' + answersHtml(v, depth + 1));
       }
     });
+    var nCol = orderNames ? orderNames.length : 1;
     var tbl = rows.length
       ? '<div class="tl-scroll"><table class="tl">'
+        + (orderNames
+          ? '<tr><th></th>' + orderNames.map(function (nm) {
+              return '<th>' + esc(nm) + '</th>';
+            }).join('') + '</tr>'
+          : '')
         + rows.map(function (r) {
-          return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1])
+          if (Array.isArray(r[1])) {
+            return '<tr><td>' + esc(r[0]) + '</td>'
+              + r[1].map(function (cell) {
+                return '<td>' + esc(cell) + '</td>';
+              }).join('') + '</tr>';
+          }
+          return '<tr><td>' + esc(r[0]) + '</td><td'
+            + (nCol > 1 ? ' colspan="' + nCol + '"' : '') + '>' + esc(r[1])
             + '</td></tr>';
         }).join('') + '</table></div>'
       : '';
@@ -3128,6 +3312,39 @@
   // Stat boundaries must never be shown rounded: 122.1 is not an attack
   // any spread has. Cross-check the emitted "value" fields against the
   // file's OWN atk_values list and say so when they disagree.
+  // The table shows the ATTAINABLE value, with the blob's rounded
+  // boundary named as such beside it -- printing 122.1 as "lowest attack
+  // that clears" put a number on the page that no spread can have, one
+  // line above a note saying exactly that.
+  function attainableBpk(bpk) {
+    var vals = null;
+    try { vals = D.breakpoints.spread_index.thievul.atk_values; }
+    catch (e) { vals = null; }
+    if (!vals || !vals.length) return bpk;
+    var need = bpk.min_thievul_atk_for_hi_tier;
+    if (typeof need !== 'number') return bpk;
+    // Order-independent (the list happens to be sorted; nothing promises
+    // it): hi = smallest value at or above the cutoff, lo = largest below.
+    var lo = null, hi = null;
+    for (var i = 0; i < vals.length; i++) {
+      if (vals[i] >= need) { if (hi === null || vals[i] < hi) hi = vals[i]; }
+      else if (lo === null || vals[i] > lo) { lo = vals[i]; }
+    }
+    var out = {}, k;
+    for (k in bpk) {
+      if (Object.prototype.hasOwnProperty.call(bpk, k)) out[k] = bpk[k];
+    }
+    function sub(key, attain) {
+      var v = bpk[key];
+      if (typeof v !== 'number' || attain === null) return;
+      if (vals.indexOf(v) >= 0) return;
+      out[key] = attain + ' (attainable; the blob reports the rounded '
+        + 'boundary ' + v + ', which no ' + FOCAL + ' spread has)';
+    }
+    sub('lowest_thievul_atk_value_clearing', hi);
+    sub('highest_thievul_atk_value_failing', lo);
+    return out;
+  }
   function bpAttainNote(bpk) {
     var vals = null;
     try { vals = D.breakpoints.spread_index.thievul.atk_values; }
@@ -3285,7 +3502,7 @@
           ? '<div class="tl-scroll"><table class="tl"><tr><th>tier step</th>'
             + '<th>min atk/def</th></tr>' + rows + '</table></div>' : '')
         + (bpk ? bpAttainNote(bpk) : '')
-        + (bpk ? kvTable(bpk, [
+        + (bpk ? kvTable(attainableBpk(bpk), [
             ['licki_ivs', 'rank-1 ' + OPP + ' IVs'],
             ['licki_def', 'its defense'],
             ['base_tier', 'damage below the breakpoint'],
@@ -3507,7 +3724,11 @@
     var best = wallRows[0];
     var vparts = [];
     var wallGrid = wallCell.split('|')[0], wallScen = wallCell.split('|')[1];
-    var defGrid = state.label;
+    // ANTI-RECURRENCE: a sentence about what the PAGE defaults to must read
+    // the static default, never the current selection. Binding this to
+    // state.label made the sentence lie the moment a reader touched the
+    // grid dropdown.
+    var defGrid = DEFAULT_GRID;
     var sameGrid = (wallGrid === defGrid);
     if (bpPop && best) {
       vparts.push('<li><strong>In one cell -- ' + esc(gridAbbrev(wallGrid))
@@ -3886,20 +4107,25 @@
   // ...and its negative counterpart: without it a spread that collapses to
   // 0% on the other moveset still read as all-green.
   var OTHER_COLLAPSE_PCT = 40;
-  // Coverage percentages are printed at ONE precision everywhere on the
-  // page -- the TL;DR band, the verdict table and the reco cards' own
-  // generated lines all show 1dp, so the same quantity can never appear
-  // twice with two different renderings.
+  // The same bar applied to the RANKED moveset itself. Without it a
+  // spread could be worst-in-class on the very basis the table sorts by
+  // and still show no warning -- the cross-moveset chips only ever
+  // described the OTHER grid. "Build this one" is gated on the same
+  // number, so the page never recommends a spread it would warn about.
+  var BASIS_WEAK_PCT = OTHER_COLLAPSE_PCT;
+  // Coverage percentages are printed at ONE precision everywhere -- the
+  // TL;DR band (covText), the verdict table, and the reco cards' lines,
+  // which scripts/thievul_licki_assemble.py formats at the same single
+  // decimal. One quantity, one rendering.
   var COV_DP = 1;
-  // The reco cards' generated lines print each percentage with Python's
-  // natural repr of the stored 2dp value ("100.0%", "94.73%"). The band
-  // reads the SAME stored values, so it renders them the same way -- a
-  // fixed decimal count would make one of the two disagree.
+  // The band reads the same stored values the reco cards' generated lines
+  // print, and BOTH now render at COV_DP -- the assemble script formats
+  // its card lines with the same one decimal. Rendering the stored 2dp
+  // repr here is what put "97.27%" in the band next to "97.3%" in the
+  // table for the identical quantity.
   function covText(v) {
     if (typeof v !== 'number') return metricText(v);
-    var s = String(v);
-    if (s.indexOf('.') < 0) s += '.0';
-    return s;
+    return fmt(v, COV_DP);
   }
   function recoMetaWins() {
     var MW = D.meta_wins;
@@ -4011,6 +4237,14 @@
           + ' damage vs the rank-1 ' + OPP + '; ' + hiTier
           + ' is needed to clear it']);
       }
+      if (focal && covs[0] !== null && covs[0] <= BASIS_WEAK_PCT) {
+        chips.push(['warn', 'weak on ' + msAbbrev(pg),
+          'weak on the moveset this table RANKS BY: beats only '
+          + fmt(covs[0], 1) + '% of the top-512 ' + OPP + ' at '
+          + picks[0].label + ' on ' + gridPretty(pg) + ', at or below the '
+          + BASIS_WEAK_PCT + '% bar. Being top of this table means "best '
+          + 'of what you own", not "good".']);
+      }
       if (otherPct !== null && otherPct <= OTHER_COLLAPSE_PCT) {
         chips.push(['warn', 'collapses on ' + msAbbrev(og),
           'collapses on ' + msAbbrev(og) + ': beats only '
@@ -4109,28 +4343,52 @@
         + cells + otherCell
         + '<td>' + (r.tier === null ? '-' : esc(r.tier)) + '</td>'
         + '<td>' + (r.wins === null ? '-' : esc(fmt(r.wins, 0))) + '</td>'
-        + '<td>' + (r.focal ? chips
-          : '<span class="tl-note">not ranked here - your ' + esc(OPP)
-            + ' spreads are used by the heatmap overlay, the drill-down '
-            + 'picker'
-            + (D.licki_denial ? ' and the anti-' + esc(FOCAL) + ' section'
-              : '') + '</span>')
+        + '<td>' + chips
+          + (r.focal ? ''
+            : ' <span class="tl-note">'
+              + (r.overCap
+                ? 'over the ' + esc(LEAGUE_CAP_TEXT) + ' cap at its '
+                  + 'scanned level, so it is not usable at this league and '
+                  + 'is NOT fed to the other panels.'
+                : 'not ranked here - this ' + esc(OPP) + ' spread feeds '
+                  + 'the heatmap overlay and the drill-down picker'
+                  + (D.licki_denial ? ' and the anti-' + esc(FOCAL)
+                    + ' section' : '') + '.')
+              + '</span>')
         + '</td>'
         + '<td>' + (r.i >= 0
           ? '<button data-drop="' + r.i + '">remove</button>' : '')
         + '</td></tr>';
     }).join('');
     var topRow = rows[0];
+    // "Build this one" is a RECOMMENDATION, so it is gated on the top row
+    // clearing the same bar the weak chip uses -- otherwise the page would
+    // tell a reader whose best spread beats 12% of the cohort to build it.
+    // Below the bar it still names the best row, but as "the best of what
+    // you own", with the number, and it does not recommend.
+    var topOk = topRow && topRow.focal && !topRow.overCap
+      && topRow.covs[0] !== null && topRow.covs[0] > BASIS_WEAK_PCT;
+    var topName = topRow && topRow.u
+      ? esc(topRow.u.label)
+        + (topRow.u.label !== FOCAL ? ' (scored as the ' + esc(FOCAL)
+          + ' it becomes)' : '') + ' ' + esc(topRow.u.ivs
+          || ivStr(topRow.u.side, topRow.u.idx))
+        + (typeof topRow.u.cp === 'number' ? ' (CP ' + esc(topRow.u.cp)
+          + ')' : '')
+      : '';
     setHtml('tl-user-list',
-      (topRow && topRow.focal && !topRow.overCap
-        ? '<p class="tl-note"><strong>Build this one:</strong> '
-          + esc(topRow.u.label)
-          + (topRow.u.label !== FOCAL ? ' (scored as the ' + esc(FOCAL)
-            + ' it becomes)' : '') + ' ' + esc(topRow.u.ivs
-            || ivStr(topRow.u.side, topRow.u.idx))
-          + (typeof topRow.u.cp === 'number' ? ' (CP ' + esc(topRow.u.cp)
-            + ')' : '') + ' - top of the ranking below.</p>'
-        : '')
+      (topOk
+        ? '<p class="tl-note"><strong>Build this one:</strong> ' + topName
+          + ' - top of the ranking below.</p>'
+        : (topRow && topRow.focal && !topRow.overCap
+          ? '<p class="tl-note"><strong>Nothing here clears the bar.</strong> '
+            + 'Your best spread, ' + topName + ', beats '
+            + fmt(topRow.covs[0], 1) + '% of the top-512 ' + esc(OPP)
+            + ' at ' + esc(picks[0].label) + ' on ' + esc(gridPretty(pg))
+            + ' -- at or below the ' + BASIS_WEAK_PCT + '% bar, so it is '
+            + 'the best of what you own rather than a build recommendation.'
+            + '</p>'
+          : ''))
       + '<div class="tl-scroll"><table class="tl">' + head + body
       + '</table></div>'
       + '<p class="tl-note">Ranked for <strong>'
@@ -4260,11 +4518,25 @@
     // one-way -- so there is no legal build. We compute that CP and say so
     // rather than dropping the row in silence.
     var dropped = [];
-    var relevant = C.collectionSpecies || [];
+    // ANALYZED species only. C.collectionSpecies is the wider read set
+    // (the whole evolution line on both sides); a row of a species this
+    // page reads but never ranks is already reported in the "does not
+    // analyze" clause above, and must not be repeated here as an
+    // "analyzed species" that produced no build.
+    var relevant = C.analyzedSpecies || C.collectionSpecies || [];
     mons.forEach(function (mon) {
       if (relevant.indexOf(mon.name) < 0) return;
       if (matchedMons.indexOf(mon) >= 0) return;
-      var finals = (C.preToFinals || {})[mon.name] || [mon.name];
+      // The species ITSELF comes first: on the Lickitung page a scanned
+      // Lickitung IS the analyzed species, and looking only at what it
+      // evolves into classified it as an over-cap Lickilicky -- so it fell
+      // out of the over-cap branch entirely and was reported under the
+      // wrong species. preToFinals maps a final form to itself, so the
+      // dedupe keeps this a no-op for every already-final species.
+      var finals = [mon.name].concat(
+        ((C.preToFinals || {})[mon.name] || []).filter(function (s) {
+          return s !== mon.name;
+        }));
       // OVER-CAP rows never reach the matcher's output at all (no level
       // at or above the scanned one keeps them under the cap), so they are
       // classified HERE. They belong in the verdict table with an "over
@@ -4326,22 +4598,22 @@
         + (why ? ' - ' + why : ' - no build in the analyzed grid'));
     });
     setHtml('tl-csv-status',
-      '<p class="tl-note">Parsed ' + mons.length + ' row(s); added '
-      + added + ' new spread(s) to the table'
-      + (dupes ? '; ' + dupes + ' row(s) collapsed into a spread already '
+      '<p class="tl-note">Parsed ' + plural(mons.length, 'row') + '; added '
+      + plural(added, 'new spread') + ' to the table'
+      + (dupes ? '; ' + plural(dupes, 'row') + ' collapsed into a spread already '
         + 'listed, keeping the highest scanned CP (duplicate IVs in your '
         + 'export, or a re-paste of the same file)' : '')
       + (overCapN ? '; ' + overCapN + ' already above the analyzed build\'s '
         + 'level, listed in the table with an "over cap" verdict' : '')
       + (offGrid ? '; ' + offGrid + ' off-grid (not in the 4096)' : '')
       + (other.length
-        ? '; ' + other.length + ' row(s) of a related species this page '
+        ? '; ' + plural(other.length, 'row') + ' of a related species this page '
           + 'reads but does not analyze, so they are listed here rather '
           + 'than ranked (' + esc(other.slice(0, 6).join(', ')) + ')'
         : '')
       + '. Nothing leaves your browser.</p>'
       + (dropped.length
-        ? '<p class="tl-note">' + dropped.length + ' row(s) of the analyzed '
+        ? '<p class="tl-note">' + plural(dropped.length, 'row') + ' of the analyzed '
           + 'species produced no usable build: '
           + esc(dropped.slice(0, 6).join('; '))
           + (dropped.length > 6 ? '; and ' + (dropped.length - 6) + ' more'
@@ -4363,7 +4635,10 @@
       : 'shields ' + scenarioLabel(state.si) + ' (you-opponent)';
   }
   function renderBanners() {
-    var b = [];
+    // b = the collapsed methodology list; top = the always-visible strip
+    // under the controls. A rail goes in exactly ONE of them, so the two
+    // can never drift apart.
+    var b = [], top = [];
     if (META.provenance) b.push(esc(META.provenance));
     (META.notes || []).forEach(function (n) {
       b.push(esc(expandLicki(n)));
@@ -4372,15 +4647,15 @@
     // it has no data on which spreads you actually meet -- so it says what
     // the two cohorts ARE and leaves the choice to the reader.
     if (state.cohort === 'all' || state.cohort === 'top512') {
-      b.push(esc(OPP) + ' cohort weighting is a MODELING CHOICE: '
+      top.push(esc(OPP) + ' cohort weighting is a MODELING CHOICE: '
         + esc(cohortLabel()) + '. Nothing in this analysis measures which '
         + esc(OPP) + ' spreads people actually run, so neither cohort is '
         + '"the real one" - the all-4096 and top-512 numbers differ, and '
         + 'comparing both is the honest read.');
     } else {
-      b.push(esc(OPP) + ' cohort: ' + esc(cohortLabel())
+      top.push(esc(OPP) + ' cohort: ' + esc(cohortLabel())
         + ' - a narrow cohort. Compare against the all-4096 and top-512 '
-        + 'views before concluding.');
+        + 'views before concluding.' + esc(cohortWarnText()));
     }
     // The level range of the analyzed opponent grid, computed here (finding:
     // every spread in the denominator is an XL build, which the old text
@@ -4400,15 +4675,16 @@
             + esc(OPP) + ' is not in this grid at all.'
           : '.'));
     }
+    b.push(esc(cliffRuleText()));
     // Meta-wins axis: state the ACTUAL current binding, not a fixed claim.
     var mwb = metaWinsArray();
     if (mwb) {
-      b.push('Meta-wins axis is currently bound to: ' + esc(mwb.note)
+      top.push('Meta-wins axis is currently bound to: ' + esc(mwb.note)
         + '. It follows the grid/scenario controls unless that note says '
         + 'otherwise.');
     }
-    b.push('Ties (battle score exactly 500) count as LOSSES, matching the '
-      + 'worlds-grid convention.');
+    top.push('Ties (battle score exactly 500) count as LOSSES, matching '
+      + 'the worlds-grid convention.');
     // Collapse byte-identical grids: offering four when two are one grid
     // contradicts the IDENTICAL GRIDS rail four sentences above.
     var dupGroups = META.duplicate_grids || [];
@@ -4444,9 +4720,13 @@
         + '), so moveset-robustness of any conclusion is NOT established '
         + 'by this page.');
     }
-    setHtml('tl-banner', b.map(function (t) {
-      return '<div class="tl-rail">' + t + '</div>';
-    }).join(''));
+    function railHtml(list) {
+      return list.map(function (t) {
+        return '<div class="tl-rail">' + t + '</div>';
+      }).join('');
+    }
+    setHtml('tl-rails', railHtml(top));
+    setHtml('tl-banner', railHtml(b));
   }
 
   function refresh() {
@@ -4651,8 +4931,13 @@
             + ' is not in the analyzed grid for that species.</span>');
           return;
         }
-        addUser(side, idx, (side === 'thievul' ? FOCAL : OPP), {});
-        setHtml('tl-manual-status', '');
+        // addUser() returns false when the spread is already listed.
+        // Discarding that made the button a silent no-op -- the CSV path
+        // reports its collapsed duplicates, so this one did too little.
+        var ok = addUser(side, idx, (side === 'thievul' ? FOCAL : OPP), {});
+        setHtml('tl-manual-status', ok ? ''
+          : '<span class="tl-note">' + esc(a + '/' + d + '/' + st)
+            + ' is already in your table (nothing added).</span>');
         renderUser(); refresh();
       });
     }

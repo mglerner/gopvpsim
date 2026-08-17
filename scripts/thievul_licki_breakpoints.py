@@ -196,9 +196,13 @@ def main():
     keys_are_literal = (OPPONENT == 'Lickitung'
                         and (L_FAST, L_CH1, L_CH2)
                         == ('LICK', 'BODY_SLAM', 'POWER_WHIP'))
+    # move_slots is emitted ALWAYS, including when the key names happen to
+    # be literal: the renderer's only honest alternative to reading it is a
+    # hardcoded Lickitung-era move name, and a page that silently falls
+    # back to one is a page that can print a confidently wrong move.
+    meta['move_slots'] = {'fast': L_FAST, 'charged_1': L_CH1,
+                          'charged_2': L_CH2}
     if not keys_are_literal:
-        meta['move_slots'] = {'fast': L_FAST, 'charged_1': L_CH1,
-                              'charged_2': L_CH2}
         meta['schema_note'] = (
             'key names are held fixed across opponents so one renderer '
             'reads both files. Keys spelled "lickitung" name THE OPPONENT '
@@ -677,7 +681,10 @@ def main():
                          (0, 15, 11, 'rank-1 stat product'),
                          (0, 15, 15, '0/15/15'),
                          (15, 15, 15, 'hundo'),
-                         (15, 15, 0, 'max atk, min sta'),
+                         # "max atk IV", not "max atk": effective attack
+                         # depends on the CP-capped level too, and 15/15/0
+                         # is NOT the highest-attack spread in the 4096.
+                         (15, 15, 0, 'max atk IV, min sta IV'),
                          (10, 15, 15, '10/15/15')]:
         named[f'{a}/{d}/{s}'] = spread_card(a, d, s, lab)
     # exemplar of the max-coverage set with the highest HP (bulk-friendly)
