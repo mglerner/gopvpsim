@@ -101,6 +101,30 @@ PRETTY_FALLBACK = {
 
 # Root-level website pages link same-directory (the worlds-*.html
 # convention), so the link checker can resolve them on disk.
+# Frozen artifacts get a standing archive banner, keyed by opponent so a
+# rebuild reproduces it byte-for-byte without remembering a CLI flag.
+ARCHIVE_NOTE = {
+    'lickitung': (
+        'Archived 2026-08-17: Lickitung is out of the current Great League '
+        'meta; this analysis is kept for reference and will not be '
+        'updated.'),
+}
+
+# The Community Day move note is STATIC and date-anchored on purpose.
+# It used to be derived from whatever gamemaster the build happened to
+# load, which made the sentence flip between "not in the move pool at all
+# (a projection)" and "elite move" depending on the local cache vintage --
+# and after the CD itself (2026-08-16) the projection wording is simply
+# false: people have these Thievuls. Nothing here reads the live
+# gamemaster; the only gate is whether the BAKE MANIFEST says a grid used
+# the move.
+CD_MOVE = 'ICY_WIND'
+CD_MOVE_NOTE = (
+    'MOVE LEGALITY: Icy Wind is the 2026-08-16 Community Day exclusive '
+    '(elite move; not obtainable by regular TM). The pinned bake '
+    'gamemaster predates the CD, so the move was injected for simulation; '
+    'PvPoke upstream added it as an elite move on 2026-08-14.')
+
 MAIN_DIVE_URL = 'thievul-great-league/index.html'
 # The two published readings of the community shorthand "Licki". Each page
 # links the other with a one-line statement of which species it analyzes.
@@ -110,18 +134,14 @@ PUBLISH_SLUG = {
 }
 CROSSLINK = {
     'lickilicky': (
-        ' In the Great League meta "Licki" usually means <strong>Lickilicky'
-        '</strong> (Rollout / Body Slam + Shadow Ball), which is what this '
-        'page analyzes. The same analysis against <strong>Lickitung</strong>'
-        ' (Lick / Body Slam + Power Whip) is at '
-        '<a href="' + PUBLISH_SLUG['lickitung'] + '">Thievul vs Lickitung'
-        '</a>.'),
+        ' "Licki" in the Great League meta means <strong>Lickilicky</strong>'
+        ' (Rollout / Body Slam + Shadow Ball), analyzed here; the '
+        '<a href="' + PUBLISH_SLUG['lickitung'] + '">Lickitung version</a> '
+        'is archived.'),
     'lickitung': (
-        ' This page analyzes <strong>Lickitung</strong> (Lick / Body Slam + '
-        'Power Whip). In the Great League meta "Licki" usually means '
-        '<strong>Lickilicky</strong>; that version of the analysis is at '
-        '<a href="' + PUBLISH_SLUG['lickilicky'] + '">Thievul vs Lickilicky'
-        '</a>.'),
+        ' This analyzes <strong>Lickitung</strong> (Lick / Body Slam + '
+        'Power Whip); "Licki" in the Great League meta usually means '
+        '<a href="' + PUBLISH_SLUG['lickilicky'] + '">Lickilicky</a>.'),
 }
 
 PLOTLY_FILENAME = 'plotly-2.35.2.min.js'
@@ -545,7 +565,15 @@ PAGE_CSS = """
        border-left: 4px solid var(--callout-ai); padding: 10px 14px;
        margin: 12px 0; font-size: 14px; }
   .tl-banner-ai strong { color: var(--callout-strong); }
-  .tl-intro { font-size: 15px; margin: 10px 0 4px; }
+  .tl-intro { font-size: 15px; margin: 8px 0 2px; }
+  .tl-archive { background: var(--surface); border-left: 4px solid
+       var(--flip); color: var(--flip); padding: 8px 14px; margin: 10px 0;
+       font-size: 14px; }
+  .tl-methodology { margin: 34px 0 0; border: 1px solid var(--border);
+       border-radius: 4px; padding: 8px 14px; background: var(--surface); }
+  .tl-methodology > summary { cursor: pointer; color: var(--heading);
+       font-size: 16px; font-weight: 600; }
+  .tl-banner-ai { padding: 8px 14px; margin: 8px 0; font-size: 13.5px; }
   .tl-prov { color: var(--text-muted); font-size: 12.5px; margin: 6px 0 0;
        font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .tl-missing { border-left: 4px solid var(--flip); color: var(--flip);
@@ -569,7 +597,12 @@ PAGE_CSS = """
        font-size: 13px; }
   button:hover { background: var(--border-2); }
   .tl-plot { width: 100%; height: 520px; }
-  .tl-heat { width: 100%; height: 660px; }
+  /* Both axes are the same 4096 ranks, so the data area wants to be near
+     square: at ~840px of data width (1180 body - 2x150 axis gutters) this
+     height puts a 16-rank hover band at ~2.5px instead of ~2.1px. Raising
+     this one number is what buys a thicker band -- see the note in
+     thievul_licki_page.js onHeatHover. */
+  .tl-heat { width: 100%; height: 760px; }
   .tl-tldr-headline { flex: 1 1 100%; margin: 0 0 2px; font-size: 14.5px;
        color: var(--text); }
   .tl-tldr-qual { color: var(--flip); font-size: 12.5px; }
@@ -629,20 +662,11 @@ PAGE_CSS = """
 
 BODY_TEMPLATE = """
 <h1>{focal} vs {opponent}: how much do IVs actually matter?</h1>
-<div class="tl-banner-ai">
-<strong>Human-guided, AI-generated (Claude).</strong> Every number on this
-page is read from the injected
-data blob; none is hand-written prose about results. Those numbers come
-from three different sources with different validity: the baked battle
-grids (full simulation), <code>breakpoints.json</code> (a closed-form
-damage/bulk layer with no shields, energy or timing), and
-<code>meta_wins</code> (extracted from an earlier deep-dive replay blob
-against that dive's pool). Each panel says which it is using. Do not
-treat this as a reviewed publication.
-</div>
+{archive_block}
+<div class="tl-banner-ai"><strong>Human-guided, AI-generated
+(Claude).</strong> <a href="#tl-methodology">Methodology, honesty notes and
+disclosures</a>.</div>
 <p class="tl-intro">{intro}</p>
-<p class="tl-prov">{provenance}</p>
-{missing_block}
 
 <h2>Controls</h2>
 <div class="tl-ctl">
@@ -657,13 +681,11 @@ treat this as a reviewed publication.
       (e.g. 1-50, 15/15/14)</label>
     <input id="tl-cohort-custom-input" type="text" size="26"></div>
 </div>
-<div id="tl-banner"></div>
 
 <h2>Your IVs: which one should you build?</h2>
-<p class="tl-note">Everything here runs in your browser; no data is sent
-anywhere. Paste your Poke Genie CSV (or pick the file) and your mons are
-ranked below. Only {collection_species} rows are read; pre-evolutions walk
-up to their final form.</p>
+<p class="tl-note">Runs entirely in your browser; nothing is uploaded.
+Paste your Poke Genie CSV (or pick the file) and your mons are ranked
+below. Only {collection_species} rows are read.</p>
 <div class="tl-ctl">
   <div><label for="tl-manual-species">Species</label>
     <select id="tl-manual-species">
@@ -698,11 +720,23 @@ here"></textarea>
 <div class="tl-ctl">
   <div><label><input id="tl-heat-named" type="checkbox" checked>
     show named builds</label></div>
-  <div class="tl-note">Grid, shield scenario and cohort controls are in
-    the Controls block below.</div>
+  <div class="tl-note">Hover a cell to outline that {focal} row and that
+    {opponent} column across the whole grid.</div>
 </div>
 <div id="tl-heat"></div>
 <p class="tl-note" id="tl-heat-note"></p>
+
+<h2>The cliff: coverage vs attack</h2>
+<div class="tl-ctl">
+  <div><label for="tl-cliff-color">Colour by</label>
+    <select id="tl-cliff-color"></select></div>
+</div>
+<div id="tl-cliff"></div>
+<p class="tl-note" id="tl-cliff-note"></p>
+
+<h2>Off the frontier: attack vs stat-product rank</h2>
+<div id="tl-frontier"></div>
+<p class="tl-note" id="tl-frontier-note"></p>
 
 <h2>Coverage: which {focal} spreads beat the most {opponent}</h2>
 <div id="tl-scatter"></div>
@@ -727,6 +761,13 @@ here"></textarea>
 
 <h2>Recommendations</h2>
 <div id="tl-reco" class="tl-cards"></div>
+
+<details id="tl-methodology" class="tl-methodology">
+<summary>Methodology, honesty notes and disclosures</summary>
+<p class="tl-prov">{provenance}</p>
+{missing_block}
+<div id="tl-banner"></div>
+</details>
 
 <footer class="tl-foot">
 <p>{attribution}</p>
@@ -874,35 +915,34 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             'moveset/bait robustness; switching between them in the dropdown '
             'will not change a single number.')
 
+    # Diagnostic only -- printed for the operator, never rendered, and no
+    # longer part of TL_DATA, so the published bytes do not depend on which
+    # gamemaster vintage happens to be cached at build time.
     injected = move_legality(spec, grids_meta)
-    dm_label, dm_moves = default_moveset_label(spec, grids_meta)
     if injected:
-        absent_bits, elite_bits = [], []
-        for lb, mv in sorted(injected.items()):
-            if mv['absent']:
-                absent_bits.append(
-                    f"{spec['pretty'][lb]} uses "
-                    + ', '.join(_pretty_move(m) for m in mv['absent']))
-            if mv['elite_only']:
-                elite_bits.append(
-                    f"{spec['pretty'][lb]} uses "
-                    + ', '.join(_pretty_move(m) for m in mv['elite_only']))
-        parts = []
-        if absent_bits:
-            parts.append(
-                'NOT in the ' + spec['focal'] + ' move pool at all ('
-                + '; '.join(absent_bits) + ') -- the bake injects the move, '
-                'so those grids are a PROJECTION of a build you cannot '
-                'currently field')
-        if elite_bits:
-            parts.append(
-                'legal only as an ELITE / Community-Day move ('
-                + '; '.join(elite_bits) + ') -- you can only have it on a '
-                + spec['focal'] + ' caught or evolved during the event, or '
-                'via an Elite TM')
-        notes.append(
-            'MOVE LEGALITY (checked against gamemaster '
-            + (gm_now or 'unknown') + '): ' + '; '.join(parts) + '.')
+        print(f'  note: move-legality probe vs the CURRENTLY LOADED '
+              f'gamemaster flags {sorted(injected)} '
+              f'(diagnostic only; the page ships the static CD note)')
+    uses_cd_move = any(
+        CD_MOVE == g.get('focal_fast')
+        or CD_MOVE in (g.get('focal_charged') or [])
+        for g in grids_meta.values())
+    if uses_cd_move:
+        notes.append(CD_MOVE_NOTE)
+    notes.append(
+        'CLIFF PANEL RULE: the line above that panel is computed, not '
+        'authored. The page takes the mean coverage of each Sucker Punch '
+        'breakpoint class (misses / clears vs the rank-1 opponent only / '
+        'clears vs every opponent) for the selected grid, scenario and '
+        'cohort. If those means rise across the classes AND the top-to-'
+        'bottom gap is at least 20 percentage points, it says the '
+        'breakpoint largely explains the view; if they rise by less it '
+        'says partially; if they do not rise at all it says the '
+        'breakpoint does not drive the view and points at bulk instead. '
+        'The breakpoint colouring is therefore not a claim that the '
+        'breakpoint matters in every view -- the note says when it does '
+        'not.')
+    dm_label, dm_moves = default_moveset_label(spec, grids_meta)
     if dm_label:
         notes.append(
             f"PvPoke's own default {spec['focal']} moveset for this league "
@@ -928,7 +968,6 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
         'mechanics': (manifest or {}).get('mechanics'),
         'total_sims': total_sims,
         'matchup_cells': len(cov) * N_IV * N_IV * N_SCEN,
-        'injected_moves': injected,
         'grid_hashes': grid_hashes,
         'duplicate_grids': duplicates,
         'default_moveset_label': dm_label,
@@ -1000,20 +1039,19 @@ def render_page(data, missing, spec):
         design = 'userdata/thievul_licki/DESIGN.md (shared contract)'
     n_grids = len(data['cov'])
     cells = m.get('matchup_cells') or 0
+    # ONE line. Everything else that used to live up here now sits in the
+    # collapsible methodology section at the bottom.
     intro = (
-        f"Every {spec['focal']} IV spread simulated against every "
-        f"{spec['opponent']} IV spread: {N_IV} x {N_IV} matchups per shield "
-        f"scenario, {n_grids} moveset/bait grid(s), "
-        f"{cells:,} simulated matchup cells in total. It answers one "
-        f"question -- how much do {spec['focal']}'s IVs change the "
-        f"{spec['opponent']} matchup -- for the "
-        f"{_dt.datetime.now(_dt.timezone.utc):%Y-%m} "
-        f"{spec['focal']} Community Day. "
-        f"{spec['focal']}'s full Great League analysis lives in the main "
-        f"dive: <a href=\"{MAIN_DIVE_URL}\">{spec['focal']} in Great "
-        f"League</a>."
+        f"{N_IV:,} x {N_IV:,} IV spreads x {N_SCEN} shield scenarios x "
+        f"{n_grids} moveset/bait grid(s) = {cells:,} simulated matchups, "
+        f"for the {spec['focal']} Community Day. "
+        f"<a href=\"{MAIN_DIVE_URL}\">{spec['focal']}'s main Great League "
+        f"dive</a>."
         + (CROSSLINK.get(spec['opponent'].lower(), ''))
     )
+    archive = ARCHIVE_NOTE.get(spec['opponent'].lower())
+    archive_block = (f'<div class="tl-archive"><strong>{archive}</strong>'
+                     f'</div>' if archive else '')
     body = BODY_TEMPLATE.format(
         provenance=prov,
         missing_block=missing_block_html(missing),
@@ -1023,6 +1061,7 @@ def render_page(data, missing, spec):
         data_dir=rel,
         design_doc=design,
         intro=intro,
+        archive_block=archive_block,
         attribution=PVPOKE_ATTRIBUTION_HTML,
     )
     return f"""<!DOCTYPE html>
