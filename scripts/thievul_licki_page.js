@@ -587,7 +587,7 @@
     return {
       note: ' SATURATED: ' + what + ' in this scenario, so IV choice does '
         + 'not decide anything here - ' + ptr,
-      text: what.charAt(0).toUpperCase() + what.slice(1) + '.<br>IV choice '
+      text: capFirst(what) + '.<br>IV choice '
         + 'does not matter in this scenario - ' + ptr
     };
   }
@@ -611,6 +611,9 @@
   // default bottom margin is 80 and the layout sets t=46, l/r=150 against
   // a ~1140px body). Only used to express a 2px frame offset in rank
   // units, so an approximation is fine.
+  // ONE approximation of the drawn plot area, used by both the hover
+  // frame offset and the named-label collision spacing (they disagreed by
+  // 14% when each carried its own constant).
   var HEAT_PX_H = 634;
   var HEAT_PX_W = 840;
   var HEAT_BINS = 256;   // overview bins per axis
@@ -926,7 +929,7 @@
         var vis = namedBuilds().filter(function (nb) {
           return nb.idx >= r.i0 && nb.idx <= r.i1;
         });
-        var pxPerRank = 554 / (r.i1 - r.i0 + 1);   // approx drawn height
+        var pxPerRank = HEAT_PX_H / (r.i1 - r.i0 + 1);
         var groups = [];
         vis.forEach(function (nb) {
           shapes.push({
@@ -1054,7 +1057,11 @@
         + (r.i1 + 1) + ' x ' + OPP + ' ranks ' + (r.j0 + 1) + '-' + (r.j1 + 1)
         + ' as ' + b.nby + ' x ' + b.nbx + ' cells: ' + cell + '. '
         + 'Hover any cell to outline that ' + FOCAL + ' row and that '
-        + OPP + ' column across the whole grid. '
+        + OPP + ' column across the visible window'
+        + ((r.i0 > 0 || r.i1 < N - 1 || r.j0 > 0 || r.j1 < N - 1)
+          ? ' (you are zoomed in, so that is a slice of the full grid)'
+          : ' - currently the whole grid')
+        + '. '
         + 'Zoom (box-select or the zoom tool) to re-bin the visible window: '
         + 'each axis independently picks the smallest bin of 1, 2, 4, 8 or '
         + '16 ranks that keeps it under ' + HEAT_BINS + ' cells, so zooming '
@@ -1074,6 +1081,10 @@
   // Which scenarios are actually IV-sensitive on THIS grid? Never a
   // hardcoded pair: on some datasets 0-1 is unwinnable for every spread,
   // so pointing a reader at it would be pointing at a wall of red.
+  // Point at scenarios where IVs MATERIALLY change the result, ranked by
+  // how much they do. "Not saturated" was too weak a test: 1-0 varies by
+  // 5 spreads out of 4096, so sending a reader there was sending them to
+  // another flat wall.
   function sensitivePointer(label) {
     var s = saturationForGrid(label);
     if (!s) return 'try another shield scenario.';
@@ -1082,11 +1093,28 @@
     });
     var rest = scenarioComplement(
       (s.all || []).concat(s.hopeless || []).concat(nearly));
-    if (!rest.length) {
-      return 'no scenario on this grid is decided by IVs.';
+    var tbl = (D.cov || {})[label] || {};
+    var arr = tbl.all;
+    var scored = rest.map(function (sc) {
+      var si = (META.scenarios || []).indexOf(sc);
+      if (!arr || si < 0) return { sc: sc, range: Infinity };
+      var mn = Infinity, mx = -Infinity;
+      for (var i = 0; i < N; i++) {
+        var v = arr[i * NS + si];
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+      }
+      return { sc: sc, range: 100 * (mx - mn) / N };
+    }).filter(function (o) { return o.range >= FLAT_RANGE_PP; })
+      .sort(function (a, b) { return b.range - a.range; });
+    if (!scored.length) {
+      return 'no scenario on this grid separates the spreads by more than '
+        + FLAT_RANGE_PP + ' point.';
     }
-    return 'switch the shield scenario (' + rest.slice(0, 2).join(', ')
-      + ') to see where it does.';
+    var names = scored.map(function (o) { return o.sc; });
+    return 'switch the shield scenario (' + names.slice(0, 2).join(', ')
+      + (names.length > 2 ? ', and ' + (names.length - 2) + ' more'
+        : '') + ') to see where it does.';
   }
   // ---- hover stripes ----
   // Hovering a cell outlines the ENTIRE row (that focal spread against
@@ -1390,13 +1418,29 @@
   function satBlock() {
     var labels = GRID_LABELS.slice();
     if (!labels.length) return '';
-    var rows = labels.map(function (lb) {
-      var s = satSentence(lb);
-      if (!s) return '';
-      return '<li' + (lb === state.label ? ' class="tl-sat-current"' : '')
-        + '>' + esc(s) + (lb === state.label ? ' <em>(selected)</em>' : '')
-        + '</li>';
-    }).filter(Boolean).join('');
+    // Byte-identical grids get ONE bullet naming both: two bullets with
+    // word-for-word identical findings read as a rendering bug.
+    var dupOf = {};
+    (META.duplicate_grids || []).forEach(function (g) {
+      g.slice(1).forEach(function (lb) { dupOf[lb] = g[0]; });
+    });
+    var alias = {};
+    (META.duplicate_grids || []).forEach(function (g) {
+      alias[g[0]] = g.slice(1);
+    });
+    var rows = labels.filter(function (lb) { return !dupOf[lb]; })
+      .map(function (lb) {
+        var s = satSentence(lb);
+        if (!s) return '';
+        var also = (alias[lb] || []).map(gridPretty);
+        var isCur = (lb === state.label || (alias[lb] || [])
+          .indexOf(state.label) >= 0);
+        return '<li' + (isCur ? ' class="tl-sat-current"' : '') + '>'
+          + esc(s)
+          + (also.length ? ' <em>(identical to ' + esc(also.join(', '))
+            + ', which is the same grid)</em>' : '')
+          + (isCur ? ' <em>(selected)</em>' : '') + '</li>';
+      }).filter(Boolean).join('');
     if (!rows) return '';
     return '<div class="tl-satblock"><strong>Where IV choice cannot '
       + 'matter</strong> (computed from the embedded grids, per moveset):'
@@ -1415,7 +1459,20 @@
       if (sb) {
         setHtml('tl-tldr', $('tl-tldr').innerHTML + sb);
       }
-      setHtml('tl-tldr-link', '');
+      var bridge = '';
+    var firstCard = (D.reco.cards || [])[0];
+    if (firstCard) {
+      var fg = cardGrid(firstCard);
+      bridge = (fg && fg !== state.label)
+        ? 'These cards are computed on ' + gridPretty(fg)
+          + ', while the panels below are showing '
+          + gridPretty(state.label)
+          + ' - switch the grid in Controls to compare like with like. '
+        : 'These cards use the top-512 cohort, while the panels below '
+          + 'follow the cohort control (which starts on all 4096), so the '
+          + 'same spread can read differently in the two places. ';
+    }
+    setHtml('tl-tldr-link', bridge + '');
       return;
     }
     var poolN = (D.reco.pool_n !== undefined && D.reco.pool_n !== null)
@@ -1528,12 +1585,26 @@
         + '</p>';
     }
     setHtml('tl-tldr', headline + satBlock() + cards);
-    setHtml('tl-tldr-link',
+    var bridge = '';
+    var firstCard = (D.reco.cards || [])[0];
+    if (firstCard) {
+      var fg = cardGrid(firstCard);
+      bridge = (fg && fg !== state.label)
+        ? 'These cards are computed on ' + gridPretty(fg)
+          + ', while the panels below are showing '
+          + gridPretty(state.label)
+          + ' - switch the grid in Controls to compare like with like. '
+        : 'These cards use the top-512 cohort, while the panels below '
+          + 'follow the cohort control (which starts on all 4096), so the '
+          + 'same spread can read differently in the two places. ';
+    }
+    setHtml('tl-tldr-link', bridge +
       'The grid below shows every one of the ' + N + ' x ' + N
       + ' ' + FOCAL + '-vs-' + OPP + ' matchups; below it are the cliff '
       + '(coverage vs attack) and frontier (attack vs rank) panels, then '
       + 'the full panels (coverage, Pareto, '
-      + 'drill-down, mechanism) are further down.');
+      + 'drill-down, mechanism), the anti-' + FOCAL + ' ' + OPP
+      + ' section, and finally the Recommendations cards.');
   }
 
   // ---- SP-breakpoint classes (the cliff / frontier colouring) ----
@@ -1637,6 +1708,13 @@
   // they do not, the colouring would quietly imply an explanation the data
   // does not support -- so the panel says so instead.
   var CLIFF_EXPLAIN_GAP = 20;   // percentage points
+  // Coverage range (percentage points) below which a view counts as flat:
+  // no causal claim is made about it in either direction.
+  var FLAT_RANGE_PP = 1.0;
+  function capFirst(s) {
+    s = String(s || '');
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  }
   function cliffExplanation(sc, cov) {
     var sums = [0, 0, 0], counts = [0, 0, 0];
     for (var i = 0; i < N; i++) {
@@ -1659,20 +1737,26 @@
         + fmt(means[k], 1) + '%';
     }).join(' / ');
     var verdict, drives;
-    // Nothing varies at all: no factor "explains" anything here, and
-    // pointing at bulk would be just as wrong as pointing at the
-    // breakpoint. Checked on the DISPLAYED coverage, not on the means.
+    // Nothing MEANINGFULLY varies: no factor "explains" anything here, and
+    // pointing at bulk would be as wrong as pointing at the breakpoint.
+    // An exact-equality test was not enough -- views where 4081 of 4096
+    // spreads beat everything (a 0.12-point spread) escaped into the
+    // "partially explains ... bulk is doing the work" branch.
     var cmn = Infinity, cmx = -Infinity;
     for (var q = 0; q < cov.pct.length; q++) {
       if (cov.pct[q] < cmn) cmn = cov.pct[q];
       if (cov.pct[q] > cmx) cmx = cov.pct[q];
     }
-    if (cmx - cmn <= 1e-9) {
+    if (cmx - cmn <= FLAT_RANGE_PP) {
+      var same = (cmx - cmn <= 1e-9);
       return {
         text: 'Nothing separates the spreads in this view: all '
-          + commas(cov.pct.length) + ' ' + FOCAL + ' spreads sit at '
-          + fmt(cmn, 1) + '%, so neither the Sucker Punch breakpoint nor '
-          + 'bulk decides anything here. ' + sensitivePointer(state.label),
+          + commas(cov.pct.length) + ' ' + FOCAL + ' spreads sit '
+          + (same ? 'at ' + fmt(cmn, 1) + '%'
+            : 'between ' + fmt(cmn, 1) + '% and ' + fmt(cmx, 1) + '% (a '
+              + fmt(cmx - cmn, 2) + '-point spread)')
+          + ', so neither the Sucker Punch breakpoint nor bulk decides '
+          + 'anything here. ' + capFirst(sensitivePointer(state.label)),
         means: means, monotone: true, gap: 0, drives: false, flat: true
       };
     }
@@ -1806,8 +1890,6 @@
   }
   function cliffHover(i, cov, sc) {
     return statLine('thievul', i)
-      + '<br>attack ' + fmt(D.thievul.atk[i], 2)
-      + ' def ' + fmt(D.thievul.def[i], 2) + ' hp ' + D.thievul.hp[i]
       + '<br>coverage ' + fmt(cov.pct[i], 1) + '%'
       + '<br>SP vs rank-1 ' + OPP + ': ' + sc.tier[i] + ' dmg ('
       + sc.hi + ' clears)';
@@ -1983,7 +2065,7 @@
       x[i] = i + 1;
       hov[i] = FOCAL + ' ' + statLine('thievul', i)
         + '<br>coverage ' + fmt(cov.pct[i], 1) + '%'
-        + (mw ? '<br>meta wins ' + fmt(mw.vals[i], 1) + '/'
+        + (mw ? '<br>meta wins ' + fmt(mw.vals[i], 0) + '/'
           + D.meta_wins.pool_n + ' (' + mw.note + ')' : '');
     }
     var traces = [];
@@ -2318,7 +2400,7 @@
     var c = plotChrome();
     function hov(p) {
       return statLine('thievul', p.i)
-        + '<br>meta wins ' + fmt(p.w, 1) + '/' + D.meta_wins.pool_n
+        + '<br>meta wins ' + fmt(p.w, 0) + '/' + D.meta_wins.pool_n
         + '<br>' + OPP + ' coverage ' + fmt(p.c, 1) + '%';
     }
     var rest = pts.filter(function (p) { return !frontSet[p.i]; });
@@ -2382,9 +2464,14 @@
   }
 
   // ---- drill-down ----
+  var _drillWarn = '';
   function drillLickiIndex() {
     var v = ($('tl-drill-licki') || {}).value || '';
     var ranks = parseRanks(v);
+    if (!ranks.length && String(v).trim()) {
+      _drillWarn += ' Could not read "' + String(v).trim() + '" as a '
+        + OPP + ' rank or IV triple, so rank 1 is shown instead.';
+    }
     return ranks.length ? ranks[0] : 0;
   }
   function drillThievulIndex() {
@@ -2393,9 +2480,17 @@
     var m = t.match(/^(\d+)\/(\d+)\/(\d+)$/);
     if (m) {
       var ix = ivIndex('thievul', +m[1], +m[2], +m[3]);
+      if (ix < 0) {
+        _drillWarn += ' ' + t + ' is not a ' + FOCAL + ' spread in the '
+          + 'analyzed grid, so rank 1 is shown instead.';
+      }
       return ix >= 0 ? ix : 0;
     }
     var r = parseInt(t, 10);
+    if (!(!isNaN(r) && r >= 1 && r <= N) && t) {
+      _drillWarn += ' Could not read "' + t + '" as a ' + FOCAL + ' rank '
+        + 'or IV triple, so rank 1 is shown instead.';
+    }
     return (!isNaN(r) && r >= 1 && r <= N) ? r - 1 : 0;
   }
 
@@ -2416,6 +2511,7 @@
         + 'The aggregate coverage panels above are unaffected.');
       return;
     }
+    _drillWarn = '';
     var oi = drillLickiIndex();
     var fi = drillThievulIndex();
     setHtml('tl-drill-out', '<p class="tl-note">Computing...</p>');
@@ -2517,7 +2613,8 @@
           + ' (follows the grid dropdown above). '
           + 'Scenario slices embedded for this grid: '
           + sis.map(scenarioLabel).join(', ')
-          + '. Each dot is one ' + FOCAL + ' spread; the y value counts how '
+          + '.' + esc(_drillWarn)
+          + ' Each dot is one ' + FOCAL + ' spread; the y value counts how '
           + 'many '
           + 'of those ' + denom + ' shield scenarios it wins against this '
           + OPP + ' (hover lists which). ' + esc(dcg.note)
@@ -2547,8 +2644,10 @@
               ? ' (shown for ' + esc(scenarioLabel(scUsed))
                 + ' - the selected scenario is not embedded as a full grid)'
               : ''))
-          + '. First ' + Math.min(40, losses.length)
-          + ' listed by ' + esc(OPP) + ' stat-product rank.</p>'
+          + (losses.length
+            ? '. First ' + Math.min(40, losses.length)
+              + ' listed by ' + esc(OPP) + ' stat-product rank.</p>'
+            : '.</p>')
           + (losses.length
             ? '<div class="tl-scroll"><table class="tl"><tr><th>' + esc(OPP)
               + ' rank</th>'
@@ -2601,11 +2700,12 @@
   function spreadCols() {
     var s = slotNames();
     return [
-      ['label', 'build'], ['ivs', 'IVs'], ['rank', 'SP rank'],
+      ['label', 'build'], ['ivs', 'IVs'], ['rank', 'rank (stat product)'],
       ['level', 'level'], ['cp', 'CP'], ['atk', 'atk'], ['def', 'def'],
-      ['hp', 'hp'], ['sp_dmg_vs_rank1_licki', 'SP dmg vs rank-1 ' + OPP],
-      ['sp_ge_hi_frac.all', 'SP-tier coverage (all 4096)'],
-      ['sp_ge_hi_frac.top512', 'SP-tier coverage (top 512)'],
+      ['hp', 'hp'],
+      ['sp_dmg_vs_rank1_licki', 'Sucker Punch dmg vs rank-1 ' + OPP],
+      ['sp_ge_hi_frac.all', 'Sucker Punch tier coverage (all 4096)'],
+      ['sp_ge_hi_frac.top512', 'Sucker Punch tier coverage (top 512)'],
       ['body_slam_dmg_from_rank1_licki', s.c1 + ' taken'],
       ['body_slams_to_ko', s.c1 + ' hits to KO'],
       ['hp_margin_over_prev_bs_tier', 'HP over prev ' + s.c1 + ' tier'],
@@ -2702,13 +2802,21 @@
   // whatever this dataset analyzes, so they are relabeled here rather than
   // leaking a literal key like `max_lickitung_cmp_atk` into the page.
   function ivify(s) {
-    // 61515 / 6155 are IV triples written without separators.
-    return String(s).replace(/\b(\d{5,6})\b/g, function (m) {
-      if (m.length === 6) {
-        return +m.slice(0, 2) + '/' + +m.slice(2, 4) + '/' + +m.slice(4, 6);
+    // 61515 / 615 are IV triples written without separators. JS \b does
+    // NOT match between a digit and an underscore, so split on underscores
+    // FIRST -- otherwise "615_vs_61515" never matched at all.
+    return String(s).split('_').map(function (part) {
+      if (/^\d{6}$/.test(part)) {
+        return +part.slice(0, 2) + '/' + +part.slice(2, 4) + '/'
+          + +part.slice(4, 6);
       }
-      return m;
-    }).replace(/\b615\b/g, '6/15/5');
+      if (/^\d{5}$/.test(part)) {
+        return +part.slice(0, 1) + '/' + +part.slice(1, 3) + '/'
+          + +part.slice(3, 5);
+      }
+      if (part === '615') return '6/15/5';
+      return part;
+    }).join('_');
   }
   function answerLabel(k) {
     if (ANSWER_LABELS[k]) return ANSWER_LABELS[k];
@@ -2780,8 +2888,9 @@
     for (var i = 0; i < rc.length; i++) {
       if (rc[i].thrown_with_default_moveset === false
           && prettyMove(rc[i].move) === moveName) {
-        return ' Note: the engine never throws ' + moveName + ' with the '
-          + 'default moveset (see the resisted-charged probe below), so '
+        return ' Note: the engine never throws ' + moveName + ' when the '
+          + OPP + ' runs its own default charged pair (see the '
+          + 'resisted-charged probe below), so '
           + 'this is a bulk reference rather than damage you routinely '
           + 'take.';
       }
@@ -3030,11 +3139,10 @@
         + 'Punch breakpoint vs the rank-1 ' + esc(OPP)
         + '. The best sta-15 spread by stat product is rank '
         + cellText(B.best_rank_sta15)
-        + ', which does NOT necessarily clear the breakpoint; the best '
-        + 'sta-15 spread that DOES clear it sits at stat-product rank '
+        + ', and it does not clear the breakpoint; the best sta-15 spread '
+        + 'that DOES clear it is a different spread, at stat-product rank '
         + cellText(B.best_rank_sta15_clearing_bp)
-        + ' and is a different spread (see the two tables below).'
-        + '</div></div>');
+        + ' (both are in the two tables below).</div></div>');
       var dc = B.direct_comparison_6_15_5_vs_6_15_15;
       if (dc) {
         P.push(spreadTable(Object.keys(dc).map(function (k) {
@@ -3108,8 +3216,9 @@
         .filter(function (r) { return r.thrown_with_default_moveset === false; });
       var rcNote = rcv.length
         ? ' ' + rcv.map(function (r) { return prettyMove(r.move); })
-            .join(' and ') + ' is never thrown by the engine with the '
-          + 'default moveset (see the resisted-charged probe below), so '
+            .join(' and ') + ' is never thrown by the engine when the '
+          + OPP + ' runs its own default charged pair (see the '
+          + 'resisted-charged probe below), so '
           + 'those columns describe damage you will rarely actually take.'
         : '';
       P.push('<h4>Bulk vs the rank-1 ' + esc(OPP) + ' (stage 0)</h4>'
@@ -3117,7 +3226,8 @@
         + '"Your IVs". Additive model, no shields or healing.'
         + esc(rcNote) + '</p>'
         + '<div class="tl-scroll"><table class="tl"><tr><th>build</th>'
-        + '<th>IVs</th><th>SP rank</th><th>hp</th><th>' + esc(sn.c1)
+        + '<th>IVs</th><th>rank (stat product)</th><th>hp</th><th>'
+        + esc(sn.c1)
         + ' dmg</th><th>' + esc(sn.c1) + ' to KO</th><th>hp over prev '
         + esc(sn.c1) + ' tier</th><th>' + esc(sn.c2) + ' dmg</th><th>'
         + esc(sn.c2) + ' to KO</th><th>' + esc(sn.fast) + ' dmg</th></tr>'
@@ -3178,7 +3288,8 @@
               + esc(r.move_type || '') + '</td><td>'
               + esc(cellText(r.effectiveness_vs_thievul)) + 'x</td><td>'
               + (r.thrown_with_default_moveset === false
-                ? 'NO - the engine never chose it, so this probe forced it'
+                ? 'NO - with the ' + esc(OPP) + ' default charged pair the '
+                + 'engine never chose it, so this probe forced it'
                 : cellText(r.thrown_with_default_moveset))
               + '</td><td>'
               + esc((r.sim_damages_in_order || []).join(', ')) + '</td></tr>';
@@ -3198,6 +3309,9 @@
     (bp.notes || []).forEach(function (n) {
       P.push('<p class="tl-note">' + esc(n) + '</p>');
     });
+    P.push('<p class="tl-note">This whole section is the closed-form '
+      + 'damage / bulk layer: it does NOT follow the grid, scenario or '
+      + 'cohort controls, and it models no shields, energy or timing.</p>');
     setHtml('tl-mech', P.join(''));
   }
 
@@ -3244,6 +3358,243 @@
       + 'each card states the grid its numbers come from.</p>' + notes);
   }
 
+  // ---- anti-focal (opponent-axis) denial sections ----
+  // Every number here comes from TL_DATA.licki_denial, which
+  // scripts/thievul_licki_denial.py recomputes from the same baked grids
+  // and cross-checks against the research run. Nothing is authored.
+  function denialPct(v, n) { return fmt(100 * v / n, 1) + '%'; }
+  function renderDenial() {
+    var host = $('tl-denial');
+    if (!host) return;
+    var DEN = D.licki_denial;
+    if (!DEN) {
+      showMissing('tl-denial', 'the anti-' + FOCAL + ' ' + OPP
+        + ' analysis (licki_denial.json) is not embedded in this page.');
+      return;
+    }
+    var m = DEN.meta || {}, cf = DEN.closed_form || {};
+    var sp = cf.sucker_punch || {}, ro = cf.rollout || {};
+    var pops = m.populations || {};
+    var P = [];
+
+    P.push('<p class="tl-note">' + esc(m.definition || '')
+      + ' Read down the opponent axis of the same grids: for each of the '
+      + commas(N) + ' ' + esc(OPP) + ' IV spreads, how many ' + esc(FOCAL)
+      + ' spreads it beats or ties, against three ' + esc(FOCAL)
+      + ' populations ('
+      + Object.keys(pops).map(function (k) {
+        return commas(pops[k]) + ' = '
+          + ((m.population_notes || {})[k] || k);
+      }).join('; ') + ').</p>');
+
+    // (a) verdict box -- three computed read-outs
+    var bpPop = pops.bp2992;
+    var wallCell = (DEN.wall_table || {}).cell || '';
+    var wallRows = (DEN.wall_table || {}).rows || [];
+    var best = wallRows[0];
+    var vparts = [];
+    if (bpPop && best) {
+      vparts.push('<li>Against a breakpoint-clearing ' + esc(FOCAL)
+        + ' at ' + esc(gridPretty(wallCell.split('|')[0])) + ' '
+        + esc(wallCell.split('|')[1]) + ', there is no ' + esc(OPP)
+        + ' answer: the best defense step denies '
+        + best.denies.bp2992 + ' of the ' + commas(bpPop)
+        + ' breakpoint-clearing spreads.</li>');
+    }
+    if (best) {
+      vparts.push('<li>Against the ' + esc(FOCAL) + ' people actually '
+        + 'build, rank-1 is already the answer: '
+        + esc(best.ivs.join('/')) + ' (rank ' + best.rank + ', defense '
+        + best.def + ') denies '
+        + denialPct(best.denies.top512, pops.top512) + ' of the top-512 '
+        + 'in that cell, at ' + (best.rank === 1 ? 'zero'
+          : 'near-zero') + ' stat-product cost.</li>');
+    }
+    // the bait lever, computed from the two IW+PR cells
+    var byCell = {};
+    (DEN.sensitive_cells || []).forEach(function (c) {
+      byCell[c.grid + '|' + c.scenario] = c;
+    });
+    var baited = byCell['iwpr_bait|1-1'], unbaited = byCell['iwpr_nobait|1-1'];
+    if (baited && unbaited) {
+      vparts.push('<li>The largest lever in the dataset is not an IV: it '
+        + 'is whether ' + esc(FOCAL) + ' baits. At 1-1 on '
+        + esc(gridPretty('iwpr_bait')) + ' the mean denial is '
+        + denialPct(baited.all4096.mean, baited.all4096.pop_n)
+        + ' of all ' + commas(N) + '; with the same moveset NOT baiting it '
+        + 'is ' + denialPct(unbaited.all4096.mean, unbaited.all4096.pop_n)
+        + '.</li>');
+    }
+    P.push('<div class="tl-verdict-denial"><h4>Verdict</h4><ul>'
+      + vparts.join('') + '</ul></div>');
+
+    // (b) the defense wall
+    if (wallRows.length) {
+      P.push('<h3>The defense wall</h3>'
+        + '<p class="tl-note">' + esc(sp.identity || '') + ', so '
+        + esc(sp.wall_condition || '') + '. The maximum ' + esc(OPP)
+        + ' defense in the species is ' + esc(sp.max_opponent_def)
+        + ', which walls ' + commas(sp.max_def_walls_n_focal) + ' of '
+        + commas(N) + ' ' + esc(FOCAL) + ' spreads ('
+        + fmt(100 * sp.max_def_walls_frac, 1) + '%) and '
+        + (sp.walls_median_focal ? 'does' : 'does NOT')
+        + ' wall a median-attack ' + esc(FOCAL) + '. Closed form and grid '
+        + 'agree: at the rank-1 ' + esc(OPP) + ' defense ('
+        + esc(sp.rank1_opponent_def) + ') the wall holds exactly '
+        + commas(sp.n_focal_walled_by_rank1_def) + ' spreads, which is the '
+        + commas(sp.n_focal_below_breakpoint) + ' that sit below the '
+        + 'Sucker Punch breakpoint.</p>'
+        + '<div class="tl-scroll"><table class="tl"><tr>'
+        + '<th>' + esc(OPP) + ' rank</th><th>IVs</th><th>level</th>'
+        + '<th>CP</th><th>defense</th><th>denies (all ' + commas(N)
+        + ')</th><th>denies (top 512)</th><th>denies (breakpoint set)</th>'
+        + '</tr>'
+        + wallRows.map(function (w) {
+          return '<tr><td>' + w.rank + '</td><td>' + esc(w.ivs.join('/'))
+            + '</td><td>' + w.level + '</td><td>' + w.cp + '</td><td>'
+            + w.def + '</td><td>' + commas(w.denies.all4096) + '</td><td>'
+            + commas(w.denies.top512) + '</td><td>'
+            + commas(w.denies.bp2992) + '</td></tr>';
+        }).join('') + '</table></div>');
+    }
+
+    // (c) the Rollout ladder
+    var ladder = DEN.rollout_ladder || [];
+    if (ladder.length) {
+      P.push('<h3>The attack route: the ' + esc(slotNames().fast)
+        + ' ladder</h3>'
+        + '<p class="tl-note">' + esc(ro.identity || '') + ', so '
+        + esc(ro.top_tier_condition || '') + '. ' + esc(OPP)
+        + ' attack across the species runs '
+        + esc((ro.opponent_atk_range || []).join(' to ')) + '.</p>'
+        + '<div class="tl-scroll"><table class="tl"><tr>'
+        + '<th>land the higher tier on...</th><th>' + esc(FOCAL)
+        + ' defense</th><th>' + esc(OPP) + ' attack needed</th>'
+        + '<th>' + esc(OPP) + ' spreads qualifying</th></tr>'
+        + ladder.map(function (l) {
+          return '<tr><td>' + esc(l.target) + '</td><td>' + l.focal_def
+            + '</td><td>' + l.opponent_atk_needed + '</td><td>'
+            + commas(l.n_opponent_qualifying) + '</td></tr>';
+        }).join('') + '</table></div>');
+    }
+
+    // (d) ranked builds + the rule and the caveat, adjacent
+    var ranked = (DEN.ranked_builds || []).slice(0, 12);
+    var named = DEN.named_builds || [];
+    var rule = DEN.composite_rule || {};
+    if (ranked.length) {
+      var cells = rule.cells || [];
+      var cellHead = cells.map(function (c) {
+        return '<th title="all 4096 / top 512 / breakpoint set">'
+          + esc(cellLabel(c)) + '</th>';
+      }).join('');
+      function buildRows(rows, withNote) {
+        return rows.map(function (b) {
+          return '<tr><td>' + esc(b.ivs.join('/')) + '</td><td>' + b.rank
+            + '</td><td>' + b.cp + '</td><td>' + b.stat_product_pct
+            + '%</td>'
+            + cells.map(function (c) {
+              var v = (b.per_cell || {})[c] || {};
+              return '<td>' + fmt(v.all4096, 0) + ' / ' + fmt(v.top512, 0)
+                + ' / ' + fmt(v.bp2992, 0) + '</td>';
+            }).join('')
+            + (withNote ? '<td>' + esc(b.note || '') + '</td>' : '')
+            + '</tr>';
+        }).join('');
+      }
+      P.push('<h3>Ranked anti-' + esc(FOCAL) + ' builds</h3>'
+        + '<p class="tl-note"><strong>How this ranking is computed:</strong> '
+        + esc(rule.formula || '') + ' over these cells: '
+        + esc(cells.map(cellLabel).join(', '))
+        + ' (' + esc(rule.cell_selection || '')
+        + '). This is ' + esc(rule.caveat || '') + '. '
+        + '<strong>And the cost is only proxied:</strong> '
+        + esc((DEN.caveats || [])[1] || '') + '</p>'
+        + '<div class="tl-scroll"><table class="tl"><tr><th>IVs</th>'
+        + '<th>rank (stat product)</th><th>CP</th><th>stat product</th>'
+        + cellHead + '</tr>' + buildRows(ranked, false) + '</table></div>'
+        + '<p class="tl-note">Cells are % of (all ' + commas(N)
+        + ' / top 512 / breakpoint-clearing ' + commas(pops.bp2992 || 0)
+        + ') ' + esc(FOCAL) + ' spreads denied.</p>');
+      if (named.length) {
+        P.push('<h4>Named ' + esc(OPP) + ' builds</h4>'
+          + '<div class="tl-scroll"><table class="tl"><tr><th>IVs</th>'
+          + '<th>rank (stat product)</th><th>CP</th><th>stat product</th>'
+          + cellHead + '<th>why it is here</th></tr>'
+          + buildRows(named, true) + '</table></div>');
+      }
+    }
+
+    // (e) YOUR Lickilickys
+    P.push(renderYourDenial(DEN, rule));
+
+    // ties + provenance
+    var ties = DEN.ties || {};
+    var tieBits = Object.keys(ties).map(function (g) {
+      return gridPretty(g) + ': ' + commas(ties[g].cells) + ' tied cells ('
+        + fmt(100 * ties[g].frac_of_cells, 4) + '% of that grid, '
+        + commas(ties[g].vs_bp_clearing) + ' of them against a '
+        + 'breakpoint-clearing ' + FOCAL + ')';
+    });
+    P.push('<p class="tl-note">Ties count for ' + esc(OPP)
+      + ' in every number above. Tie load: ' + esc(tieBits.join('; '))
+      + '. Recomputed by <code>scripts/thievul_licki_denial.py</code> from '
+      + 'the same baked grids as the rest of this page'
+      + (((m.cross_check || {}).agrees === true)
+        ? ' and cross-checked against the research run\'s saved marginals ('
+          + (m.cross_check.compared || 0) + ' arrays, exact agreement).'
+        : '.') + '</p>');
+    setHtml('tl-denial', P.join(''));
+  }
+
+  // (e) the payoff for entering your own opponent spreads
+  function renderYourDenial(DEN, rule) {
+    var mine = state.user.filter(function (u) { return u.side === 'licki'; });
+    if (!mine.length) {
+      return '<h3>Your ' + esc(OPP) + '</h3>'
+        + '<p class="tl-note tl-user-empty">Add your own ' + esc(OPP)
+        + ' spreads under "Your IVs" (pick ' + esc(OPP) + ' in the species '
+        + 'dropdown, or paste a Poke Genie CSV) and they are ranked here by '
+        + 'the same denial metrics.</p>';
+    }
+    var cells = rule.cells || [];
+    var byRank = {};
+    (DEN.ranked_builds || []).concat(DEN.named_builds || [])
+      .forEach(function (b) { byRank[b.rank] = b; });
+    // Rows the blob does not carry are computed from the marginals it does:
+    // only ranked/named builds ship per-cell numbers, so anything else is
+    // shown with its rank and CP and an explicit "not in the shipped
+    // table" note rather than a fabricated number.
+    var rows = mine.map(function (u) {
+      var b = byRank[u.idx + 1];
+      return '<tr><td>' + esc(u.label) + '</td><td>'
+        + esc(ivStr('licki', u.idx)) + '</td><td>'
+        + (typeof u.cp === 'number' ? esc(u.cp) : '-') + '</td><td>'
+        + (u.idx + 1) + '</td>'
+        + cells.map(function (c) {
+          var v = b ? ((b.per_cell || {})[c] || {}) : null;
+          return '<td>' + (v ? fmt(v.all4096, 0) + ' / ' + fmt(v.top512, 0)
+            + ' / ' + fmt(v.bp2992, 0) : '-') + '</td>';
+        }).join('')
+        + '<td>' + (b ? esc(b.note || '') + (b.composite_rank
+          ? ' (composite rank ' + b.composite_rank + ')' : '')
+          : 'outside the top-25 / named set shipped with this page')
+        + '</td></tr>';
+    }).join('');
+    return '<h3>Your ' + esc(OPP) + '</h3>'
+      + '<div class="tl-scroll"><table class="tl"><tr><th>source</th>'
+      + '<th>IVs</th><th>CP now (as scanned)</th>'
+      + '<th>rank (stat product)</th>'
+      + cells.map(function (c) {
+        return '<th>' + esc(cellLabel(c)) + '</th>';
+      }).join('') + '<th>note</th></tr>' + rows + '</table></div>'
+      + '<p class="tl-note">Cells are % of (all ' + commas(N)
+      + ' / top 512 / breakpoint-clearing) ' + esc(FOCAL) + ' spreads your '
+      + esc(OPP) + ' denies. Per-cell numbers ship only for the ranked and '
+      + 'named builds above; a spread outside that set shows its rank and '
+      + 'CP with the gap stated rather than a guessed number.</p>';
+  }
+
   // ---- your IVs ----
   // Returns false when this exact spread is already listed, so callers can
   // report "matched N (M were duplicate spreads)" instead of claiming more
@@ -3283,6 +3634,18 @@
     return (ms === msKeyOf(primaryGrid())) ? 'primary' : 'other';
   }
   function msKeyOf(label) { return String(label || '').split('_')[0]; }
+  // Cell headers must distinguish bait from no-bait: msAbbrev names the
+  // moveset only, so iwpr_bait and iwpr_nobait both rendered "IW+PR".
+  function gridAbbrev(label) {
+    var g = (META.grids || {})[label] || {};
+    var bait = (g.bait === false) ? ' no-bait'
+      : (g.bait === true ? ' bait' : '');
+    return msAbbrev(label) + bait;
+  }
+  function cellLabel(cellKey) {
+    var parts = String(cellKey).split('|');
+    return gridAbbrev(parts[0]) + ' ' + parts[1];
+  }
   function msAbbrev(label) {
     var g = (META.grids || {})[label] || {};
     var ch = g.focal_charged || [];
@@ -3387,6 +3750,9 @@
   // caption says this out loud.
   var RECO_META_SCEN = '1-1';
   var OTHER_ROBUST_PCT = 80;
+  // ...and its negative counterpart: without it a spread that collapses to
+  // 0% on the other moveset still read as all-green.
+  var OTHER_COLLAPSE_PCT = 40;
   // Coverage percentages are printed at ONE precision everywhere on the
   // page -- the TL;DR band, the verdict table and the reco cards' own
   // generated lines all show 1dp, so the same quantity can never appear
@@ -3507,9 +3873,18 @@
           + 'moveset.']);
       }
       if (tier !== null && hiTier !== null && tier < hiTier) {
-        chips.push(['warn', 'misses SP bp',
-          'misses SP bp: Sucker Punch does ' + tier + ' vs the rank-1 '
-          + OPP + '; ' + hiTier + ' needed to clear the breakpoint']);
+        chips.push(['warn', 'misses Sucker Punch bp',
+          'misses the Sucker Punch breakpoint: it does ' + tier
+          + ' damage vs the rank-1 ' + OPP + '; ' + hiTier
+          + ' is needed to clear it']);
+      }
+      if (otherPct !== null && otherPct <= OTHER_COLLAPSE_PCT) {
+        chips.push(['warn', 'collapses on ' + msAbbrev(og),
+          'collapses on ' + msAbbrev(og) + ': beats only '
+          + fmt(otherPct, 1) + '% of the top-512 ' + OPP + ' at '
+          + scenarioLabel(primarySi) + ' on the ' + gridPretty(og)
+          + ' grid, versus ' + fmt(covs[0], 1) + '% on this basis. Not '
+          + 'moveset-robust.']);
       }
       if (otherPct !== null && otherPct >= OTHER_ROBUST_PCT) {
         chips.push(['ok', msAbbrev(og) + ' robust',
@@ -3567,8 +3942,16 @@
     var otherHead = og
       ? '<th>' + esc(msAbbrev(og)) + ' ' + esc(scenarioLabel(primarySi))
         + '</th>' : '';
-    var head = '<tr><th>species</th><th>IVs</th><th>CP now</th>'
-      + '<th>SP rank</th>' + covHead + otherHead + '<th>SP dmg</th>'
+    var head = '<tr><th>species</th><th>IVs</th>'
+      + '<th title="The CP of the mon as scanned from your CSV, so you can '
+      + 'find it in-game. Every other number on the row describes the '
+      + 'CP-capped build of that IV spread, not the scanned mon.">'
+      + 'CP now (as scanned)</th>'
+      + '<th title="Stat-product rank of this IV spread, 1 = best. The '
+      + 'Sucker Punch column is damage, not a rank.">rank (stat product)'
+      + '</th>' + covHead + otherHead
+      + '<th title="Sucker Punch damage vs the rank-1 opponent.">'
+      + 'Sucker Punch dmg</th>'
       + '<th>meta wins' + (poolN ? ' /' + esc(poolN) : '') + '</th>'
       + '<th>verdict</th><th></th></tr>';
     var body = rows.map(function (r, ri) {
@@ -3625,7 +4008,7 @@
       + esc(gridPretty(pg)) + (og
         ? '; the ' + esc(msAbbrev(og)) + ' column is the same scenario on '
           + esc(gridPretty(og)) + ' (the moveset-robustness check)' : '')
-      + '. SP dmg is Sucker Punch damage vs the rank-1 ' + esc(OPP)
+      + '. The Sucker Punch column is damage vs the rank-1 ' + esc(OPP)
       + (hiTier !== null ? ' (' + esc(hiTier) + ' clears the breakpoint)'
         : '')
       + '. Meta wins: ' + esc(mw ? mw.note : 'not embedded')
@@ -3802,17 +4185,18 @@
         + (why ? ' - ' + why : ' - no build in the analyzed grid'));
     });
     setHtml('tl-csv-status',
-      '<p class="tl-note">Parsed ' + mons.length + ' row(s); matched '
-      + added + ' spread(s) on the analyzed grids'
-      + (dupes ? '; ' + dupes + ' duplicate spread(s) collapsed, keeping '
-        + 'the highest scanned CP (the same IVs appear more than once in '
-        + 'your export)' : '')
+      '<p class="tl-note">Parsed ' + mons.length + ' row(s); added '
+      + added + ' new spread(s) to the table'
+      + (dupes ? '; ' + dupes + ' row(s) collapsed into a spread already '
+        + 'listed, keeping the highest scanned CP (duplicate IVs in your '
+        + 'export, or a re-paste of the same file)' : '')
       + (overCapN ? '; ' + overCapN + ' already above the analyzed build\'s '
         + 'level, listed in the table with an "over cap" verdict' : '')
       + (offGrid ? '; ' + offGrid + ' off-grid (not in the 4096)' : '')
       + (other.length
-        ? '; ' + other.length + ' related row(s) outside the two analyzed '
-          + 'species (' + esc(other.slice(0, 6).join(', ')) + ')'
+        ? '; ' + other.length + ' row(s) of a related species this page '
+          + 'reads but does not analyze, so they are listed here rather '
+          + 'than ranked (' + esc(other.slice(0, 6).join(', ')) + ')'
         : '')
       + '. Nothing leaves your browser.</p>'
       + (dropped.length
@@ -3928,6 +4312,7 @@
     renderTldr();      // the saturation summary is per-grid
     renderUser();      // the verdict table follows the grid/scenario too
     renderDrill();     // ...and so do YOUR gold stars in the drill-down
+    renderDenial();    // ...and your own opponent spreads over there
     drawHeat();
     renderMechanism();
     coverage().then(function (cov) {
