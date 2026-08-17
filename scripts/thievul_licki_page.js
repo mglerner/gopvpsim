@@ -1,6 +1,8 @@
-// Thievul vs Lickitung IV-robustness page app (one-off local analysis,
-// 2026-08-16 Thievul CD). DOM + Plotly driver for the standalone page
-// built by scripts/build_thievul_licki_page.py.
+// Thievul IV-robustness page app (2026-08-16 Thievul Community Day).
+// DOM + Plotly driver for the standalone pages built by
+// scripts/build_thievul_licki_page.py -- one per analyzed opponent
+// (Lickilicky is the primary page; Lickitung is archived). The opponent
+// is read from TL_DATA.meta, never hardcoded here.
 //
 // HARD RULE: this file contains NO analysis numbers. Every number it
 // paints comes from the TL_DATA blob the builder injects. When a piece
@@ -55,11 +57,19 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
   function setHtml(id, html) { var n = $(id); if (n) n.innerHTML = html; }
-  function missingBox(msg) {
-    return '<div class="tl-missing"><strong>Data not baked yet.</strong> '
+  // Three different causes used to share one (wrong) headline. The
+  // headline now names the actual cause: absent data, a browser that
+  // cannot gunzip, or something the reader typed.
+  function missingBox(msg, kind) {
+    var head = (kind === 'browser') ? 'This browser cannot read the data.'
+      : (kind === 'input') ? 'Nothing to show for that input.'
+      : 'Data not baked yet.';
+    return '<div class="tl-missing"><strong>' + head + '</strong> '
       + esc(msg) + '</div>';
   }
-  function showMissing(id, msg) { setHtml(id, missingBox(msg)); }
+  function showMissing(id, msg, kind) {
+    setHtml(id, missingBox(msg, kind));
+  }
   function fmt(x, dp) {
     if (x === null || x === undefined || isNaN(x)) return '-';
     return Number(x).toFixed(dp === undefined ? 1 : dp);
@@ -227,6 +237,23 @@
     return (bytes[idx >> 3] & (0x80 >> (idx & 7))) !== 0;
   }
 
+  // A gzip-less browser is not missing data; say so.
+  function decodeKind(err) {
+    return /DecompressionStream/i.test(String(err && err.message))
+      ? 'browser' : 'data';
+  }
+  function decodeMsg(err) {
+    var m = String(err && err.message || err);
+    return /DecompressionStream/i.test(m)
+      ? 'the per-matchup win grids are gzip-compressed and this browser '
+        + 'does not support DecompressionStream(gzip), so the heatmap, the '
+        + 'drill-down and the narrow cohorts cannot be decoded here. The '
+        + 'aggregated panels still work. Recent Chrome, Edge, Firefox and '
+        + 'Safari all support it.'
+      : 'win-grid decode failed: ' + m;
+  }
+  var CAN_GUNZIP = (typeof DecompressionStream !== 'undefined');
+
   // ---- cohorts ----
   function parseRanks(text) {
     var out = [];
@@ -310,9 +337,9 @@
     // Cohort needs the raw win bitmap.
     var cohort = cohortIndices() || [];
     if (!cohort.length) {
-      return Promise.resolve({ missing:
+      return Promise.resolve({ kind: 'input', missing:
         'the custom ' + OPP + ' cohort is empty - enter ranks (e.g. "1-50") '
-        + 'or IV triples (e.g. "15/15/14")' });
+        + 'or IV triples (e.g. "15/15/14") in the box above' });
     }
     var sis = (oneSi !== null) ? [oneSi]
       : (state.scenarioAll ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [state.si]);
@@ -342,7 +369,7 @@
       }
       return { pct: out2, denom: coh.length, note: '' };
     }, function (err) {
-      return { missing: 'win-grid decode failed: ' + err.message };
+      return { kind: decodeKind(err), missing: decodeMsg(err) };
     });
   }
 
@@ -359,6 +386,14 @@
     var iv = ivStr('thievul', idx);
     if (s.indexOf(iv) === 0) s = s.slice(iv.length).trim();
     s = s.replace(/^\((.*)\)$/, '$1').trim();   // "(smasher)" -> "smasher"
+    // Drop names that carry no information beyond the tag already shown:
+    // the IV string itself, its punctuation-free key form, or a bare rank.
+    var bare = s.replace(/[^0-9a-z]/gi, '').toLowerCase();
+    var ivBare = iv.replace(/[^0-9]/g, '');
+    if (!bare) return '';
+    if (bare === ivBare) return '';
+    if (bare === 'rank' + (idx + 1)) return '';
+    if (/^rank\d*$/.test(bare)) return '';
     return s;
   }
   function namedBuilds() {
@@ -505,6 +540,12 @@
     var nearlyKeys = (s.nearly || []).map(function (x) {
       return String(x).split(' ')[0];
     });
+    // A scenario saturated for the top-512 cohort but not for all-4096
+    // must not be listed as decided AND still-decidable with no
+    // explanation; it is called out separately.
+    var cohortOnly = (s.top512 || []).filter(function (x) {
+      return (s.all || []).indexOf(x) < 0;
+    });
     var rest = scenarioComplement(
       (s.all || []).concat(s.hopeless || []).concat(nearlyKeys));
     return head + ': ' + bits.join('; ')
@@ -515,6 +556,12 @@
           + ' as unwinnable' : '')
       + (rest.length ? '. IV choice can still decide ' + rest.join(', ')
         : '. No scenario is left for IV choice to decide.')
+      + (cohortOnly.length
+        ? ' (' + cohortOnly.join(', ') + ' is saturated against the '
+          + 'top-512 cohort only, so it appears in both lists: decided if '
+          + 'you only meet top-512 ' + OPP + ', still IV-decidable across '
+          + 'all 4096.)'
+        : '')
       + (s.mismatch || '');
   }
 
@@ -534,11 +581,14 @@
         ? 'no ' + FOCAL + ' spread beats any ' + OPP + ' in this cohort'
         : 'all ' + pct.length + ' ' + FOCAL + ' spreads sit at exactly '
           + fmt(mn, 1) + '%');
+    // Where to look instead is COMPUTED (sensitivePointer). A hardcoded
+    // pair sent readers at 0-1, which this very page labels unwinnable.
+    var ptr = sensitivePointer(state.label);
     return {
       note: ' SATURATED: ' + what + ' in this scenario, so IV choice does '
-        + 'not decide anything here - compare 0-0 / 0-1.',
+        + 'not decide anything here - ' + ptr,
       text: what.charAt(0).toUpperCase() + what.slice(1) + '.<br>IV choice '
-        + 'does not matter in this scenario - compare 0-0 / 0-1.'
+        + 'does not matter in this scenario - ' + ptr
     };
   }
   function satAnnotation(text, c) {
@@ -764,9 +814,9 @@
         }
         xs.push(l.idx + 1);
         ys.push(t.idx + 1);
-        hv.push('YOURS: ' + t.label + ' ' + FOCAL + ' #' + (t.idx + 1) + ' '
+        hv.push('YOURS: ' + t.label + ' #' + (t.idx + 1) + ' '
           + ivStr('thievul', t.idx)
-          + '<br>vs YOURS: ' + l.label + ' ' + OPP + ' #' + (l.idx + 1) + ' '
+          + '<br>vs YOURS: ' + l.label + ' #' + (l.idx + 1) + ' '
           + ivStr('licki', l.idx)
           + '<br>result: ' + (slices.length === 1
             ? (cnt ? 'WIN' : 'LOSS')
@@ -1017,7 +1067,8 @@
         + 'count as losses.' + esc(satNote) + esc(ov.note)
         + esc(namedNote));
     }, function (err) {
-      showMissing('tl-heat', 'win-grid decode failed: ' + err.message);
+      showMissing('tl-heat', decodeMsg(err), decodeKind(err));
+      setHtml('tl-heat-note', '');
     });
   }
   // Which scenarios are actually IV-sensitive on THIS grid? Never a
@@ -1282,6 +1333,22 @@
   }
   var COV_PREF = ['cov512_11', 'cov512_00', 'cov512_01', 'cov512_02',
                   'cov_all_00'];
+  // "tiebreak: 1-1 coverage > 0-0 coverage > ..." -> "1-1". Read from the
+  // card's own stated chain so the headline number matches what the card
+  // says it ranked on.
+  function cardPrimaryScenario(c) {
+    var src = String(c.subtitle || '') + ' '
+      + ((c.lines || []).join(' '));
+    var m = src.match(/tiebreak(?:\s+chain)?:\s*(\d-\d)\s+coverage/i);
+    return m ? m[1] : null;
+  }
+  // Internal moveset key -> the label the rest of the page uses.
+  function msLabelFromKey(key) {
+    var lb = GRID_LABELS.filter(function (g) {
+      return msKeyOf(g) === key;
+    })[0];
+    return lb ? msAbbrev(lb) : String(key);
+  }
   // Which grid is a card actually computed on? Cards may say so
   // structurally (c.grid); otherwise the per-grid metric objects carry a
   // `pretty` tag ("SP/NS+IW, baiting") and the assembly's subtitle names
@@ -1385,9 +1452,15 @@
       }
       if (!covDone && cGrid && m[cGrid] && typeof m[cGrid] === 'object') {
         var g = m[cGrid];
-        var picks = (D.reco.pick_scenarios || []).filter(function (s) {
-          return typeof g[s] === 'number';
-        });
+        // The card states its OWN tiebreak chain; its headline number must
+        // be that chain's primary metric, not the global pick order (which
+        // belongs to the reco's primary grid and can name a scenario this
+        // card never ranked on).
+        var own = cardPrimaryScenario(c);
+        var picks = (own && typeof g[own] === 'number') ? [own]
+          : (D.reco.pick_scenarios || []).filter(function (s) {
+            return typeof g[s] === 'number';
+          });
         if (!picks.length) {
           picks = Object.keys(g).filter(function (s) {
             return typeof g[s] === 'number';
@@ -1417,14 +1490,26 @@
             + ((poolN !== undefined && poolN !== null) ? ' / ' + esc(poolN)
               : '')
             + '</span><span class="tl-tldr-lab">meta wins (1-1 shields) - '
-            + esc(useKey) + ' moveset</span></div>');
+            + esc(msLabelFromKey(useKey)) + '</span></div>');
         }
       }
       var spread = spreadText(c);
       var tie = expandLicki(tieText(c));
+      var basisPretty = c.basis_pretty || (cGrid ? gridPretty(cGrid) : '');
+      var isDefaultGrid = (cGrid === state.label);
       return '<div class="tl-card tl-tldr-card"><h4>'
         + esc(expandLicki(c.title || ''))
         + '</h4>'
+        + (basisPretty
+          ? '<div class="tl-chip '
+            + (isDefaultGrid ? 'tl-chip-ok' : 'tl-chip-warn')
+            + '" title="' + esc(isDefaultGrid
+              ? 'Computed on the grid currently selected in Controls.'
+              : 'Computed on a DIFFERENT grid than the one selected in '
+                + 'Controls (' + gridPretty(state.label) + ').')
+            + '">' + esc(basisPretty)
+            + esc(isDefaultGrid ? '' : ' (not the selected grid)')
+            + '</div>' : '')
         + (spread ? '<div class="tl-card-spread">' + esc(spread)
           + '</div>' : '')
         + (tie ? '<div class="tl-card-caveat">' + esc(tie) + '</div>' : '')
@@ -1445,8 +1530,9 @@
     setHtml('tl-tldr', headline + satBlock() + cards);
     setHtml('tl-tldr-link',
       'The grid below shows every one of the ' + N + ' x ' + N
-      + ' ' + FOCAL + '-vs-' + OPP + ' matchups; the full panels (coverage, '
-      + 'Pareto, '
+      + ' ' + FOCAL + '-vs-' + OPP + ' matchups; below it are the cliff '
+      + '(coverage vs attack) and frontier (attack vs rank) panels, then '
+      + 'the full panels (coverage, Pareto, '
       + 'drill-down, mechanism) are further down.');
   }
 
@@ -1573,6 +1659,23 @@
         + fmt(means[k], 1) + '%';
     }).join(' / ');
     var verdict, drives;
+    // Nothing varies at all: no factor "explains" anything here, and
+    // pointing at bulk would be just as wrong as pointing at the
+    // breakpoint. Checked on the DISPLAYED coverage, not on the means.
+    var cmn = Infinity, cmx = -Infinity;
+    for (var q = 0; q < cov.pct.length; q++) {
+      if (cov.pct[q] < cmn) cmn = cov.pct[q];
+      if (cov.pct[q] > cmx) cmx = cov.pct[q];
+    }
+    if (cmx - cmn <= 1e-9) {
+      return {
+        text: 'Nothing separates the spreads in this view: all '
+          + commas(cov.pct.length) + ' ' + FOCAL + ' spreads sit at '
+          + fmt(cmn, 1) + '%, so neither the Sucker Punch breakpoint nor '
+          + 'bulk decides anything here. ' + sensitivePointer(state.label),
+        means: means, monotone: true, gap: 0, drives: false, flat: true
+      };
+    }
     if (monotone && gap >= CLIFF_EXPLAIN_GAP) {
       verdict = 'The Sucker Punch breakpoint largely explains this view';
       drives = true;
@@ -1587,12 +1690,22 @@
         + 'clear it';
       drives = false;
     }
+    // Do not tell the reader to switch to a colouring they are already on.
+    var hint = '';
+    if (!drives) {
+      if (state.cliffColor === 'sp') {
+        hint = ' Bulk is doing more of the work here: switch the colour '
+          + 'control to defense or HP to see it.';
+      } else {
+        hint = ' The dots are currently coloured by '
+          + (state.cliffColor === 'def' ? 'defense' : 'HP')
+          + ', which is where more of the separation lives in this view.';
+      }
+    }
     return {
-      text: verdict + ' (mean coverage by class: ' + txt + ').'
-        + (drives ? ''
-          : ' Bulk is doing the work here: switch the colour control to '
-            + 'defense or HP to see it.'),
-      means: means, monotone: monotone, gap: gap, drives: drives
+      text: verdict + ' (mean coverage by class: ' + txt + ').' + hint,
+      means: means, monotone: monotone, gap: gap, drives: drives,
+      flat: false
     };
   }
 
@@ -1604,12 +1717,17 @@
   function renderCliff(cov) {
     var host = $('tl-cliff');
     if (!host) return;
-    if (cov.missing) { showMissing('tl-cliff', cov.missing); return; }
+    if (cov.missing) {
+      showMissing('tl-cliff', cov.missing, cov.kind);
+      setHtml('tl-cliff-note', '');       // never leave stale numbers up
+      return;
+    }
     var sc = spClasses();
     if (!sc) {
       showMissing('tl-cliff', 'the closed-form breakpoint layer is not '
         + 'embedded in this page, so Sucker Punch breakpoint classes '
         + 'cannot be computed.');
+      setHtml('tl-cliff-note', '');
       return;
     }
     host.innerHTML = '<div id="tl-cliff-plot" class="tl-plot"></div>';
@@ -1667,8 +1785,15 @@
       .concat(sat.note ? [satAnnotation(sat.text, c)] : []);
     Plotly.react('tl-cliff-plot', traces, layout, { responsive: true });
     var ex = cliffExplanation(sc, cov);
+    var colourSays = (mode === 'sp')
+      ? 'Colour is the Sucker Punch breakpoint class from the closed-form '
+        + 'layer.'
+      : 'Colour is each spread\'s '
+        + (mode === 'def' ? 'defense' : 'HP')
+        + ' (single-hue ramp, darker = higher); the breakpoint classes are '
+        + 'on the "SP breakpoint class" setting.';
     setHtml('tl-cliff-note',
-      '<strong>' + esc(ex.text) + '</strong> '
+      '<strong>' + esc(ex.text) + '</strong> ' + esc(colourSays) + ' '
       + 'Each dot is one of the 4096 ' + esc(FOCAL) + ' IV spreads: x is '
       + 'its effective attack, y is the share of the selected ' + esc(OPP)
       + ' cohort it beats. Dashed lines are the attack values where the '
@@ -1696,6 +1821,7 @@
     if (!sc) {
       showMissing('tl-frontier', 'the closed-form breakpoint layer is not '
         + 'embedded in this page, so this panel cannot be drawn.');
+      setHtml('tl-frontier-note', '');
       return;
     }
     host.innerHTML = '<div id="tl-frontier-plot" class="tl-plot"></div>';
@@ -1734,8 +1860,14 @@
       'Reading guide: UP is a better stat-product rank, RIGHT is more '
       + 'attack, and the frontier -- the upper-right edge -- is where IV '
       + 'tech lives, because those spreads buy attack without giving up '
-      + 'rank. Colour and the dashed lines are the same Sucker Punch '
-      + 'breakpoint classes as the panel above. This panel does not depend '
+      + 'rank. Colour here is always the Sucker Punch breakpoint class'
+      + (state.cliffColor === 'sp'
+        ? ' (the same as the panel above).'
+        : ', which is NOT what the panel above is currently showing - that '
+          + 'one is coloured by '
+          + (state.cliffColor === 'def' ? 'defense' : 'HP') + '.')
+      + ' The dashed lines are the same breakpoint thresholds. This panel '
+      + 'does not depend '
       + 'on the shield scenario or cohort: it is the IV space itself.');
   }
 
@@ -1837,7 +1969,11 @@
   function renderScatter(cov) {
     var host = $('tl-scatter');
     if (!host) return;
-    if (cov.missing) { showMissing('tl-scatter', cov.missing); return; }
+    if (cov.missing) {
+      showMissing('tl-scatter', cov.missing, cov.kind);
+      setHtml('tl-scatter-note', '');
+      return;
+    }
     host.innerHTML = '<div id="tl-scatter-plot" class="tl-plot"></div>';
     var T = D.thievul;
     var cg = colorGroups();
@@ -1923,7 +2059,8 @@
     }
     Plotly.react('tl-scatter-plot', traces, layout, { responsive: true });
     setHtml('tl-scatter-note',
-      esc(cg.note) + ' Cohort: ' + esc(cohortLabel()) + '. '
+      'Grid: ' + esc(gridPretty(state.label)) + '; ' + esc(scenarioText())
+      + '. ' + esc(cg.note) + ' Cohort: ' + esc(cohortLabel()) + '. '
       + 'Denominator ' + cov.denom + ' ' + OPP + ' spread(s)'
       + (state.scenarioAll ? ' x 9 scenarios' : '') + '.'
       + esc(sat.note)
@@ -1940,7 +2077,11 @@
     var host = $('tl-scatter');
     if (!host) return;
     var bad = covs.filter(function (c) { return c && c.missing; })[0];
-    if (bad) { showMissing('tl-scatter', bad.missing); return; }
+    if (bad) {
+      showMissing('tl-scatter', bad.missing, bad.kind);
+      setHtml('tl-scatter-note', '');
+      return;
+    }
     host.innerHTML = '<div id="tl-scatter-plot" class="tl-plot '
       + 'tl-plot-grid"></div>';
     var c = plotChrome();
@@ -2142,12 +2283,17 @@
 
   function renderPareto(cov) {
     if (!HAS_META_WINS) {
+      setHtml('tl-pareto-note', '');
       showMissing('tl-pareto',
         'meta_wins (per-IV wins vs the dive pool at 1-1) is not embedded '
         + 'in this page, so the Pareto panel cannot be drawn.');
       return;
     }
-    if (cov.missing) { showMissing('tl-pareto', cov.missing); return; }
+    if (cov.missing) {
+      showMissing('tl-pareto', cov.missing, cov.kind);
+      setHtml('tl-pareto-note', '');
+      return;
+    }
     var mw = metaWinsArray();
     if (!mw) {
       showMissing('tl-pareto',
@@ -2393,10 +2539,14 @@
           + ' ' + esc(OPP) + ' spreads are not beaten (a tie, score '
           + 'exactly 500, is counted here too - the win grid records "did '
           + FOCAL + ' win", so ties and losses are indistinguishable in it)'
-          + (scUsed !== state.si
-            ? ' (shown for ' + esc(scenarioLabel(scUsed))
-              + ' - the selected scenario is not embedded as a full grid)'
-            : '')
+          + (state.scenarioAll
+            ? ' (the dropdown is on "all 9 (mean)", which this table cannot '
+              + 'average - it lists one concrete scenario, '
+              + esc(scenarioLabel(scUsed)) + ')'
+            : (scUsed !== state.si
+              ? ' (shown for ' + esc(scenarioLabel(scUsed))
+                + ' - the selected scenario is not embedded as a full grid)'
+              : ''))
           + '. First ' + Math.min(40, losses.length)
           + ' listed by ' + esc(OPP) + ' stat-product rank.</p>'
           + (losses.length
@@ -2407,7 +2557,7 @@
             : '<p class="tl-note">None - this Thievul spread beats every '
               + esc(OPP) + ' spread in this scenario.</p>'));
       }, function (err) {
-        showMissing('tl-drill-out', 'win-grid decode failed: ' + err.message);
+        showMissing('tl-drill-out', decodeMsg(err), decodeKind(err));
       });
   }
 
@@ -2480,7 +2630,13 @@
   }
   function spreadTable(rows, title, note) {
     if (!rows || !rows.length) return '';
-    var cols = spreadCols();
+    var cols = spreadCols().filter(function (c) {
+      // An all-dashes column is noise; drop it rather than ship it.
+      return rows.some(function (r) {
+        var v = dig(r, c[0]);
+        return v !== undefined && v !== null && v !== '';
+      });
+    });
     var head = '<tr>' + cols.map(function (c) {
       return '<th>' + esc(c[1]) + '</th>';
     }).join('') + '</tr>';
@@ -2530,6 +2686,10 @@
   // stats any real spread has; the generic renderer would otherwise paint
   // them under a name that reads like a realized value.
   var ANSWER_LABELS = {
+    body_slams_to_ko_stage0_value:
+      'value the layer reports at stage 0 (see the by-stage histogram '
+      + 'below for the actual spread-by-spread distribution, which is NOT '
+      + 'a single number when the "is constant" row says no)',
     max_thievul_def_still_taking_tier_hi:
       'defense cutoff for the higher damage tier (continuous tier '
       + 'boundary, NOT a defense any real spread has)',
@@ -2541,9 +2701,18 @@
   // ("lickitung"/"licki") and focal ("thievul"); the SPECIES they name is
   // whatever this dataset analyzes, so they are relabeled here rather than
   // leaking a literal key like `max_lickitung_cmp_atk` into the page.
+  function ivify(s) {
+    // 61515 / 6155 are IV triples written without separators.
+    return String(s).replace(/\b(\d{5,6})\b/g, function (m) {
+      if (m.length === 6) {
+        return +m.slice(0, 2) + '/' + +m.slice(2, 4) + '/' + +m.slice(4, 6);
+      }
+      return m;
+    }).replace(/\b615\b/g, '6/15/5');
+  }
   function answerLabel(k) {
     if (ANSWER_LABELS[k]) return ANSWER_LABELS[k];
-    var s = String(k).replace(/_/g, ' ')
+    var s = ivify(String(k)).replace(/_/g, ' ')
       .replace(/\blickitung\b/gi, OPP)
       .replace(/\blicki\b/gi, OPP)
       .replace(/\bthievul\b/gi, FOCAL);
@@ -2561,6 +2730,37 @@
       .replace(/\bto ko\b/g, 'to KO')
       .replace(/\bstage0\b/g, 'stage 0');
     return s;
+  }
+  // A STAGE MAP is {attack stage: value} -- keys 0,-1,-2,... Its values are
+  // damages or hit counts, NOT counts of anything, so it must never be
+  // totalled or labelled "spreads".
+  function isStageMap(v, key) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+    var keys = Object.keys(v);
+    if (!keys.length) return false;
+    var anyNeg = false;
+    for (var i = 0; i < keys.length; i++) {
+      if (!/^-?\d+$/.test(keys[i])) return false;
+      if (+keys[i] > 0) return false;          // stages are 0 or negative
+      if (+keys[i] < 0) anyNeg = true;
+    }
+    return anyNeg || /stage/i.test(String(key || ''));
+  }
+  function stageMapHtml(label, v, key) {
+    var subject = cleanSubject(label);
+    var rows = Object.keys(v).sort(function (a, b) { return b - a; })
+      .map(function (k) {
+        var val = v[k];
+        return '<tr><td>' + esc(k) + '</td><td>'
+          + esc(typeof val === 'object' ? JSON.stringify(val) : val)
+          + '</td></tr>';
+      }).join('');
+    return '<p class="tl-note"><strong>' + esc(subject) + '</strong> by '
+      + esc(OPP) + ' attack stage (no shields or healing; one value per '
+      + 'stage, not a distribution).</p>'
+      + '<div class="tl-scroll"><table class="tl"><tr>'
+      + '<th>' + esc(OPP) + ' attack stage</th><th>value</th></tr>'
+      + rows + '</table></div>';
   }
   // A histogram is {bucket: count} with numeric keys and numeric values.
   function isHistogram(v) {
@@ -2589,34 +2789,49 @@
     return '';
   }
   // A one-bucket histogram is a SENTENCE, not a table.
+  function cleanSubject(label) {
+    return String(label).replace(/\s*histogram\s*/ig, ' ')
+      .replace(/\s*stage 0\s*/i, ' ').replace(/\s+/g, ' ').trim();
+  }
+  // What is being counted? A key naming PAIRS counts focal x opponent
+  // matchups (4096^2), not spreads (4096). Getting this wrong turned a
+  // pair total into "16,777,216 Thievul spreads".
+  function countedUnit(key) {
+    return /pair/i.test(String(key || ''))
+      ? FOCAL + ' x ' + OPP + ' matchup pairs'
+      : FOCAL + ' spreads';
+  }
   function histogramHtml(label, v, key) {
     var keys = Object.keys(v);
     var total = 0;
     keys.forEach(function (k) { total += v[k]; });
     // "Shadow Ball hits to KO stage 0 histogram" -> subject "Shadow Ball",
-    // measure "hits to KO", so the sentence reads like a sentence.
-    var subject = label.replace(/\s*histogram\s*/i, ' ')
-      .replace(/\s*stage 0\s*/i, ' ').replace(/\s+/g, ' ').trim();
+    // measure "hits to KO", so the sentence reads like a sentence. When
+    // there is no "hits ..." tail the subject is used ONCE, not twice.
+    var subject = cleanSubject(label);
     var parts = subject.match(/^(.*?)\s+(hits? .*)$/);
-    var moveName = parts ? parts[1] : subject.split(' ')[0];
+    var moveName = parts ? parts[1] : '';
     var measure = parts ? parts[2] : subject;
-    var note = neverThrownNote(moveName);
+    var note = neverThrownNote(moveName || subject.split(' ')[0]);
+    var unit = countedUnit(key);
     var atStage = /stage\s*0/i.test(String(key || label))
       ? 'attack stage 0, ' : '';
     if (keys.length === 1) {
-      return '<p class="tl-note"><strong>' + esc(moveName) + ': '
+      return '<p class="tl-note"><strong>'
+        + esc(moveName ? moveName + ': ' : '')
         + esc(keys[0]) + ' ' + esc(measure) + '</strong> - identical for '
-        + 'all ' + commas(total) + ' ' + esc(FOCAL) + ' spreads ('
+        + 'all ' + commas(total) + ' ' + esc(unit) + ' ('
         + atStage + 'additive model).' + esc(note) + '</p>';
     }
     var rows = keys.map(function (k) {
       return '<tr><td>' + esc(k) + '</td><td>' + commas(v[k]) + '</td></tr>';
     }).join('');
-    return '<p class="tl-note"><strong>' + esc(moveName) + ' ' + esc(measure)
-      + '</strong>, over all ' + commas(total) + ' ' + esc(FOCAL)
-      + ' spreads (' + atStage + 'additive model):' + esc(note) + '</p>'
+    return '<p class="tl-note"><strong>'
+      + esc(moveName ? moveName + ' ' : '') + esc(measure)
+      + '</strong>, over all ' + commas(total) + ' ' + esc(unit)
+      + ' (' + atStage + 'additive model):' + esc(note) + '</p>'
       + '<div class="tl-scroll"><table class="tl"><tr><th>value</th>'
-      + '<th>' + esc(FOCAL) + ' spreads</th></tr>' + rows
+      + '<th>' + esc(unit) + '</th></tr>' + rows
       + '</table></div>';
   }
   function answersHtml(o, depth) {
@@ -2635,6 +2850,17 @@
           + 'original schema - it does not apply to ' + sn.fast + ', see '
           + 'the histogram below)';
       }
+      // The layer's own note explains those keys using the ORIGINAL
+      // schema's move name. Quoting it verbatim on a page whose fast move
+      // is something else reads as a mistake, so the page states the same
+      // fact naming both the slot and the move actually in it.
+      if (k === 'fast_move_dmg_histogram_note') {
+        v = 'The n_spreads_taking_1/2_<fast-move slot> keys above are '
+          + 'fixed 1-damage and 2-damage buckets from the original schema. '
+          + 'The fast-move slot here is ' + sn.fast + ', which does not '
+          + 'deal those amounts, so both read 0 - use the histogram '
+          + 'instead.';
+      }
       if (k === 'fast_move_dmg_histogram_vs_rank1') {
         label = sn.fast + ' damage taken from the rank-1 ' + OPP
           + ', by number of spreads';
@@ -2649,6 +2875,23 @@
         } else {
           rows.push([label, v.length + ' values']);
         }
+      } else if (isStageMap(v, k)
+                 && !Object.keys(v).some(function (kk) {
+                   return v[kk] && typeof v[kk] === 'object';
+                 })) {
+        sub.push(stageMapHtml(label, v, k));
+      } else if (isStageMap(v, k)) {
+        // stage -> histogram: label each stage, then render its histogram
+        sub.push('<h5>' + esc(cleanSubject(label)) + ' by ' + esc(OPP)
+          + ' attack stage</h5>'
+          + Object.keys(v).sort(function (a, b) { return b - a; })
+            .map(function (st) {
+              return '<p class="tl-note">' + esc(OPP) + ' attack stage '
+                + esc(st) + ':</p>'
+                + (isHistogram(v[st])
+                  ? histogramHtml(cleanSubject(label), v[st], k)
+                  : answersHtml(v[st], depth + 1));
+            }).join(''));
       } else if (isHistogram(v)) {
         sub.push(histogramHtml(label, v, k));
       } else if (depth >= 3) {
@@ -2785,10 +3028,13 @@
         + cellText(B.n_sta15_clearing_sp_bp_vs_rank1) + ' of '
         + cellText(B.n_sta15_spreads) + ' sta-15 spreads clear the Sucker '
         + 'Punch breakpoint vs the rank-1 ' + esc(OPP)
-        + '; the best sta-15 spread '
-        + 'by stat product is rank ' + cellText(B.best_rank_sta15)
-        + ' (rank ' + cellText(B.best_rank_sta15_clearing_bp)
-        + ' among those that clear the breakpoint).</div></div>');
+        + '. The best sta-15 spread by stat product is rank '
+        + cellText(B.best_rank_sta15)
+        + ', which does NOT necessarily clear the breakpoint; the best '
+        + 'sta-15 spread that DOES clear it sits at stat-product rank '
+        + cellText(B.best_rank_sta15_clearing_bp)
+        + ' and is a different spread (see the two tables below).'
+        + '</div></div>');
       var dc = B.direct_comparison_6_15_5_vs_6_15_15;
       if (dc) {
         P.push(spreadTable(Object.keys(dc).map(function (k) {
@@ -2816,8 +3062,8 @@
           + '</td><td>' + esc(t.min_atk_over_def) + '</td></tr>';
       }).join('');
       var bpk = m.breakpoint_vs_rank1_licki;
-      P.push('<h4>' + esc(name) + ' (Thievul -> '
-        + esc(dig(bp, 'thievul_offense.defender') || '') + ')</h4>'
+      P.push('<h4>' + esc(prettyMove(name)) + ' (' + esc(FOCAL) + ' -> '
+        + esc(dig(bp, 'thievul_offense.defender') || OPP) + ')</h4>'
         + '<p class="tl-note">' + esc(m.damage_identity || '') + ', K = '
         + esc(m.damage_constant_K) + '. Damage tiers reachable: '
         + esc((m.tiers || []).join(', ')) + '.</p>'
@@ -2966,7 +3212,10 @@
     var recoGrid = D.reco.primary_grid || null;
     var cards = (D.reco.cards || []).map(function (c) {
       var cGrid = cardGrid(c) || recoGrid;
+      // The chain is already in the subtitle for these cards; printing
+      // it again as a caveat is noise.
       var tie = tieText(c);
+      if (tie && String(c.subtitle || '').indexOf('iebreak') >= 0) tie = '';
       return '<div class="tl-card"><h4>' + esc(expandLicki(c.title || ''))
         + '</h4>'
         + (c.subtitle ? '<div class="tl-card-sub">'
@@ -2989,7 +3238,10 @@
       return '<p class="tl-note">' + esc(expandLicki(n)) + '</p>';
     }).join('');
     setHtml('tl-reco', (cards || missingBox(
-      'the recommendation blob has no cards.')) + notes);
+      'the recommendation blob has no cards.'))
+      + '<p class="tl-note">These cards are computed once, in the assembly '
+      + 'step, and do NOT follow the grid / scenario / cohort controls: '
+      + 'each card states the grid its numbers come from.</p>' + notes);
   }
 
   // ---- your IVs ----
@@ -3359,8 +3611,12 @@
       + '</table></div>'
       + '<p class="tl-note">Ranked for <strong>'
       + esc(msAbbrev(pg)) + '</strong> (' + esc(gridPretty(pg))
-      + ') - this follows the moveset of the grid selected in Controls; '
-      + 'use the build-basis control above to override it. Sorted by the '
+      + ')' + (basisForMoveset(msKeyOf(state.label)) === state.basis
+        ? ' - this follows the moveset of the grid selected in Controls'
+        : ' - MANUALLY OVERRIDDEN: the grid selected in Controls is '
+          + esc(msAbbrev(state.label)) + ', so this ranking does NOT match '
+          + 'it until you change the grid moveset again')
+      + '. Sorted by the '
       + 'recommendation\'s own tiebreak '
       + 'chain: top-512 coverage at '
       + picks.map(function (p) { return p.label; }).join(', then ')
@@ -3373,11 +3629,12 @@
       + (hiTier !== null ? ' (' + esc(hiTier) + ' clears the breakpoint)'
         : '')
       + '. Meta wins: ' + esc(mw ? mw.note : 'not embedded')
-      + '. CP now is the CP scanned from your CSV, so you can find the mon '
-      + 'in-game. This table is anchored to the BUILD BASIS selected '
+      + '. CP now is the CP scanned from your CSV, so you can find the '
+      + 'mon in-game; rows added by hand have no scanned CP and show "-". '
+      + 'This table is anchored to the BUILD BASIS selected '
       + 'above (top-512 cohort, ' + esc(RECO_META_SCEN) + ' meta on that '
-      + 'grid) and deliberately does NOT follow the grid / scenario '
-      + 'controls further down.' + esc(notShownText(pg, picks))
+      + 'grid) and deliberately does NOT follow the shield-scenario or '
+      + 'cohort controls in Controls above.' + esc(notShownText(pg, picks))
       + '</p>');
     var host = $('tl-user-list');
     if (!host) return;
@@ -3627,10 +3884,30 @@
     }
     b.push('Ties (battle score exactly 500) count as LOSSES, matching the '
       + 'worlds-grid convention.');
-    if (GRID_LABELS.length > 1) {
+    // Collapse byte-identical grids: offering four when two are one grid
+    // contradicts the IDENTICAL GRIDS rail four sentences above.
+    var dupGroups = META.duplicate_grids || [];
+    var dropped = {};
+    dupGroups.forEach(function (g) {
+      g.slice(1).forEach(function (lb) { dropped[lb] = g[0]; });
+    });
+    var distinctGrids = GRID_LABELS.filter(function (lb) {
+      return !dropped[lb];
+    });
+    if (distinctGrids.length > 1) {
       b.push('Moveset robustness: switch the grid dropdown ('
-        + esc(GRID_LABELS.map(gridPretty).join(' / '))
-        + ') and check whether the conclusion survives.');
+        + esc(distinctGrids.map(gridPretty).join(' / '))
+        + ') and check whether the conclusion survives.'
+        + (Object.keys(dropped).length
+          ? ' (' + esc(Object.keys(dropped).map(gridPretty).join(' / '))
+            + ' is omitted here: it is byte-identical to another grid, so '
+            + 'it cannot change any conclusion.)'
+          : ''));
+    } else if (GRID_LABELS.length > 1 && distinctGrids.length === 1) {
+      b.push('Moveset robustness: the ' + GRID_LABELS.length
+        + ' embedded grids collapse to ONE distinct grid (the others are '
+        + 'byte-identical), so this page establishes nothing about '
+        + 'moveset or bait robustness.');
     } else if (!GRID_LABELS.length) {
       b.push('NO simulation grid is embedded in this build, so this page '
         + 'makes no claim at all about which spreads beat ' + esc(OPP)
@@ -3650,6 +3927,7 @@
     renderBanners();
     renderTldr();      // the saturation summary is per-grid
     renderUser();      // the verdict table follows the grid/scenario too
+    renderDrill();     // ...and so do YOUR gold stars in the drill-down
     drawHeat();
     renderMechanism();
     coverage().then(function (cov) {
@@ -3693,7 +3971,7 @@
           var bsel = $('tl-basis');
           if (bsel) bsel.value = state.basis;
         }
-        refresh(); renderDrill();
+        refresh();
       });
     }
     var s = $('tl-scenario');
@@ -3711,7 +3989,7 @@
       s.addEventListener('change', function () {
         state.scenarioAll = (s.value === 'all');
         if (!state.scenarioAll) state.si = +s.value;
-        refresh(); renderDrill();
+        refresh();
       });
     }
     var c = $('tl-cohort');
@@ -3725,8 +4003,10 @@
         o.value = p[0];
         o.textContent = p[1]
           + ((p[0] === 'top100' || p[0] === 'rank1' || p[0] === 'custom')
-             && state.label && !haveWon(state.label, state.si)
-            ? ' (needs full win grid)' : '');
+             && state.label
+             && (!haveWon(state.label, state.si) || !CAN_GUNZIP)
+            ? (CAN_GUNZIP ? ' (needs full win grid)'
+              : ' (needs gzip support this browser lacks)') : '');
         c.appendChild(o);
       });
       c.value = state.cohort;
@@ -3758,19 +4038,24 @@
         refresh();
       });
     }
-    var cc = $('tl-cliff-color');
-    if (cc) {
+    // NB: unique handle name on purpose -- a duplicate `var` in
+    // this function is what silently killed the custom-cohort
+    // input (the reviewer's blocker), and `clr` is taken below
+    // by the Clear-all button.
+    var cliffSel = $('tl-cliff-color');
+    if (cliffSel) {
       [['sp', 'colour: SP breakpoint class'], ['def', 'colour: defense'],
        ['hp', 'colour: HP']].forEach(function (pair) {
         var o = document.createElement('option');
         o.value = pair[0];
         o.textContent = pair[1];
-        cc.appendChild(o);
+        cliffSel.appendChild(o);
       });
-      cc.value = state.cliffColor;
-      cc.addEventListener('change', function () {
-        state.cliffColor = cc.value;
+      cliffSel.value = state.cliffColor;
+      cliffSel.addEventListener('change', function () {
+        state.cliffColor = cliffSel.value;
         coverage().then(renderCliff);
+        renderFrontier();   // its caption cross-references this setting
       });
     }
     var bs = $('tl-basis');
@@ -3857,8 +4142,27 @@
     });
   }
 
+  // A link to a collapsed <details> scrolls to a closed summary, so open
+  // it explicitly -- on click and on a #tl-methodology deep link.
+  function wireMethodologyLink() {
+    var det = document.getElementById('tl-methodology');
+    if (!det) return;
+    function openIt() {
+      try { det.open = true; } catch (e) { /* older engines */ }
+    }
+    if ((location.hash || '') === '#tl-methodology') openIt();
+    var links = document.querySelectorAll
+      ? document.querySelectorAll('a[href="#tl-methodology"]') : [];
+    Array.prototype.forEach.call(links, function (a) {
+      a.addEventListener('click', openIt);
+    });
+    window.addEventListener('hashchange', function () {
+      if ((location.hash || '') === '#tl-methodology') openIt();
+    });
+  }
   function init() {
     initControls();
+    wireMethodologyLink();
     renderUser();
     renderTldr();
     renderReco();
@@ -3868,7 +4172,7 @@
     try {
       var obs = new MutationObserver(function () {
         _themeCache = {};
-        refresh(); renderDrill();
+        refresh();
       });
       obs.observe(document.documentElement,
                   { attributes: true, attributeFilter: ['data-theme'] });

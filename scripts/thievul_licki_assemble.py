@@ -221,13 +221,13 @@ def main():
         n_tied_ns = int((ns_cols[0] >= ns_cols[0][i_ns] - 1e-12).sum())
         ns_tiebreak = (' > '.join(f'{s} coverage' for s in ns_scens)
                        + ' > meta wins (SP/NS+IW, 1-1) > stat-product rank')
-        ns_card = ('Best build if you run NS+IW',
+        ns_card = ('Best build if you run NS+IW (PvPoke default)',
                    f'Computed on the SP/NS+IW grid\'s own sensitive '
                    f'scenarios ({", ".join(ns_scens)}); for readers '
                    f'following PvPoke\'s default moveset. Tiebreak: '
                    f'{ns_tiebreak}', i_ns,
                    [f'{n_tied_ns} spread(s) tie on {ns_scens[0]} '
-                    f'coverage under NS+IW'], [])
+                    f'coverage under NS+IW'], [], 'nsiw_bait')
 
     named = [
         ('The Licki smasher', f'Best {", ".join(pick_scens)} record vs '
@@ -285,7 +285,44 @@ def main():
                 'lines': lines + extra, 'metrics': m,
                 'caveats': caveats}
 
-    cards = [card(*n) for n in named]
+    def card_with_grid(spec):
+        c = card(*spec[:5])
+        # Every card states the grid it was computed on, structurally --
+        # the page no longer has to guess it from the subtitle.
+        c['grid'] = spec[5] if len(spec) > 5 else primary
+        c['basis_pretty'] = grid_pretty(c['grid'])
+        return c
+
+    cards = [card_with_grid(n) for n in named]
+
+    # Two cards can select the SAME spread (on Lickilicky the smasher and
+    # the no-meta-cost pick are both 5/9/7). Shipping them twice with
+    # identical numbers reads as a rendering bug, so they are merged into
+    # one card that states both roles.
+    merged, by_rank = [], {}
+    for c in cards:
+        key = (c['rank'], c['grid'])
+        if key in by_rank:
+            first = by_rank[key]
+            if c['title'] not in first['title']:
+                first['title'] = f"{first['title']} (also: {c['title']})"
+            for extra_line in c['lines']:
+                if extra_line not in first['lines']:
+                    first['lines'].append(extra_line)
+            if c.get('subtitle') and c['subtitle'] not in first['subtitle']:
+                first['subtitle'] = (first['subtitle'].rstrip('.')
+                                     + '. Also the pick for: '
+                                     + c['subtitle'])
+            continue
+        by_rank[key] = c
+        merged.append(c)
+    cards = merged
+
+    # The PAGE defaults to the NS+IW grid, so the band must lead with the
+    # card computed on it; leading with an IW+PR card made the first
+    # numbers a reader sees belong to a moveset no panel below was showing.
+    default_grid = 'nsiw_bait' if 'nsiw_bait' in won else primary
+    cards.sort(key=lambda c: 0 if c.get('grid') == default_grid else 1)
 
     # Opponent-cohort level facts DERIVED from the baked npz (the first
     # version hardcoded Lickitung's "L44.5-50 XL" here; the independent
