@@ -538,6 +538,12 @@
   // drill-down uses -- there is no second, pre-binned copy of the data that
   // could disagree with it. Zooming re-bins the visible window, and once a
   // window is small enough every cell is one literal simulated matchup.
+  // Drawn plot area in CSS pixels (.tl-heat is 760px tall; plotly's
+  // default bottom margin is 80 and the layout sets t=46, l/r=150 against
+  // a ~1140px body). Only used to express a 2px frame offset in rank
+  // units, so an approximation is fine.
+  var HEAT_PX_H = 634;
+  var HEAT_PX_W = 840;
   var HEAT_BINS = 256;   // overview bins per axis
   var HEAT_FULL = 256;   // <= this many spreads per axis -> 1 cell = 1 matchup
   var _heatTimer = null;
@@ -1034,32 +1040,35 @@
       var row = bandFor(_heatBins.ye, pt.y);
       var col = bandFor(_heatBins.xe, pt.x);
       if (!row && !col) return;
-      // A bare 1.5px outline vanished against saturated reds and greens,
-      // and a 16-rank band is only a couple of pixels tall. Each stripe is
-      // now drawn three times: a light HALO casing underneath, a 2px ink
-      // border, and a translucent ink FILL so the band itself reads as a
-      // band rather than as a hairline.
+      // FRAME ONLY -- never a colour layer over the cells. A translucent
+      // ink fill tinted the data underneath (saturated green read as
+      // reddish-brown), so the band is marked by its border alone: a 2px
+      // ink edge over a wider light halo so it survives both palette
+      // extremes. The frame is drawn just OUTSIDE the band (expanded by
+      // ~2px worth of ranks) so it cannot cover the cells it points at.
       var c = plotChrome();
-      // Halo must be THINNER than the band it casings, or it smears over
-      // it: a 16-rank band is only ~2.5px tall at the default zoom.
       var halo = { color: hexToRgba(themeColor('--surface-2'), 0.95),
-                   width: 3 };
+                   width: 4 };
       var edge = { color: c.ink, width: 2 };
-      var fill = hexToRgba(c.ink, 0.12);
+      var CLEAR = 'rgba(0,0,0,0)';
+      var rr = _heatBins.r;
+      var spanY = (rr.i1 - rr.i0 + 1), spanX = (rr.j1 - rr.j0 + 1);
+      var dy = 2 * spanY / HEAT_PX_H;    // 2px, expressed in ranks
+      var dx = 2 * spanX / HEAT_PX_W;
       var extra = [];
       function band(spec) {
-        extra.push(Object.assign({}, spec, {
-          line: halo, fillcolor: 'rgba(0,0,0,0)' }));
-        extra.push(Object.assign({}, spec, {
-          line: edge, fillcolor: fill }));
+        extra.push(Object.assign({}, spec, { line: halo,
+                                             fillcolor: CLEAR }));
+        extra.push(Object.assign({}, spec, { line: edge,
+                                             fillcolor: CLEAR }));
       }
       if (row) {
         band({ type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y',
-               y0: row[0], y1: row[1] });
+               y0: row[0] - dy, y1: row[1] + dy });
       }
       if (col) {
         band({ type: 'rect', yref: 'paper', y0: 0, y1: 1, xref: 'x',
-               x0: col[0], x1: col[1] });
+               x0: col[0] - dx, x1: col[1] + dx });
       }
       // A few pixels of band cannot be made obvious by thickness alone
       // (4096 ranks / 256 bins over ~630px is ~2.5px per bin, and the
