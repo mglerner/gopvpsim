@@ -2930,9 +2930,18 @@
   }
 
   // ---- verdict-table plumbing (all read from TL_DATA) ----
+  // The primary grid is a property of the RECOMMENDATION, not of the
+  // dropdown: if it followed state.label then "primary" and "other" would
+  // swap meaning every time the grid changed, and the basis toggle would
+  // be meaningless.
   function primaryGrid() {
     var pg = (D.reco || {}).primary_grid;
-    return (pg && (D.cov || {})[pg]) ? pg : state.label;
+    if (pg && (D.cov || {})[pg]) return pg;
+    return GRID_LABELS.length ? GRID_LABELS[0] : state.label;
+  }
+  // Which basis corresponds to a given moveset key?
+  function basisForMoveset(ms) {
+    return (ms === msKeyOf(primaryGrid())) ? 'primary' : 'other';
   }
   function msKeyOf(label) { return String(label || '').split('_')[0]; }
   function msAbbrev(label) {
@@ -3263,8 +3272,9 @@
       + '</table></div>'
       + '<p class="tl-note">Ranked for <strong>'
       + esc(msAbbrev(pg)) + '</strong> (' + esc(gridPretty(pg))
-      + ') - use the build-basis control above to rank for the other '
-      + 'moveset instead. Sorted by the recommendation\'s own tiebreak '
+      + ') - this follows the moveset of the grid selected in Controls; '
+      + 'use the build-basis control above to override it. Sorted by the '
+      + 'recommendation\'s own tiebreak '
       + 'chain: top-512 coverage at '
       + picks.map(function (p) { return p.label; }).join(', then ')
       + ', then meta wins, then stat-product rank. Coverage columns are the '
@@ -3584,7 +3594,19 @@
       });
       if (state.label) g.value = state.label;
       g.addEventListener('change', function () {
-        state.label = g.value; refresh(); renderDrill();
+        var prevMs = msKeyOf(state.label);
+        state.label = g.value;
+        var newMs = msKeyOf(state.label);
+        // Changing MOVESET re-points the ranked table at that moveset;
+        // a bait-only change within the same moveset leaves it alone. The
+        // basis control remains a manual override -- last writer wins, so
+        // a manual choice holds until the next moveset change.
+        if (newMs !== prevMs) {
+          state.basis = basisForMoveset(newMs);
+          var bsel = $('tl-basis');
+          if (bsel) bsel.value = state.basis;
+        }
+        refresh(); renderDrill();
       });
     }
     var s = $('tl-scenario');
