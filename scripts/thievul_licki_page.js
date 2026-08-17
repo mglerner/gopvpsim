@@ -171,6 +171,7 @@
     user: [],         // [{side, idx, label, cp}]
     overCap: [],      // scanned mons that can no longer BE the analyzed build
     basis: 'primary', // which moveset the ranked table ranks FOR
+    cliffColor: 'sp', // cliff panel colouring: sp | def | hp
     heatRange: null,  // null = whole 4096x4096; else {i0,i1,j0,j1} indices
     heatNamed: true
   };
@@ -630,7 +631,7 @@
       }
       z.push(zrow); txt.push(trow);
     }
-    return { z: z, text: txt, x: xc, y: yc, full: full,
+    return { z: z, text: txt, x: xc, y: yc, full: full, ye: ye, xe: xe,
              nby: nby, nbx: nbx,
              rowsPerBin: nr / nby, colsPerBin: nc / nbx,
              nr: nr, nc: nc };
@@ -817,7 +818,7 @@
       layout.xaxis.range = [r.j0 + 0.5, r.j1 + 1.5];
       layout.yaxis.range = [r.i1 + 1.5, r.i0 + 0.5];   // rank 1 at the top
       layout.hovermode = 'closest';
-      layout.margin = { r: 210, t: 46 };
+      layout.margin = { l: 150, r: 150, t: 46 };   // l: named-build gutter
       layout.showlegend = false;
       var shapes = [], anns = [], namedNote = '';
       if (state.heatNamed) {
@@ -860,8 +861,11 @@
               txt += ' +' + (g.members.length - 3) + ' more (see caption)';
             }
           }
+          // LEFT gutter: inside the margin, right-anchored against the
+          // axis. On the right they covered the data and collided with
+          // the colorbar title.
           anns.push({
-            xref: 'paper', x: 0.995, xanchor: 'right', yref: 'y',
+            xref: 'paper', x: -0.012, xanchor: 'right', yref: 'y',
             y: g.members[0].idx + 1, yanchor: 'middle', showarrow: false,
             text: txt, font: { color: c.ink, size: 10 },
             bgcolor: c.legendBg, bordercolor: c.legendBorder,
@@ -872,7 +876,7 @@
           // Hover carries the full merged name for each marked row.
           traces.push({
             type: 'scatter', mode: 'markers', name: 'named builds',
-            x: vis.map(function () { return r.j0 + 1; }),
+            x: vis.map(function () { return r.j1 + 1; }),
             y: vis.map(function (nb) { return nb.idx + 1; }),
             hovertext: vis.map(function (nb) { return nb.label; }),
             hovertemplate: '%{hovertext}<extra></extra>',
@@ -924,12 +928,19 @@
       layout.shapes = shapes;
       layout.annotations = anns;
       layout.showlegend = traces.length > 1;   // heatmap itself has no entry
+      // Remember what the plot is showing so the hover handler can turn a
+      // hovered cell back into its bin band (and restore the base shapes).
+      _heatBaseShapes = shapes;
+      _heatBaseAnns = anns;
+      _heatBins = { ye: b.ye, xe: b.xe, r: r };
       Plotly.react('tl-heat-plot', traces, layout,
                    { responsive: true, scrollZoom: false });
       var gd = $('tl-heat-plot');
       if (gd && typeof gd.on === 'function' && !gd._tlHeatBound) {
         gd._tlHeatBound = true;
         gd.on('plotly_relayout', onHeatRelayout);
+        gd.on('plotly_hover', onHeatHover);
+        gd.on('plotly_unhover', onHeatUnhover);
       }
       var cell = b.full
         ? (pick.sis.length === 1
@@ -949,6 +960,8 @@
         + 'top and left. Showing ' + FOCAL + ' ranks ' + (r.i0 + 1) + '-'
         + (r.i1 + 1) + ' x ' + OPP + ' ranks ' + (r.j0 + 1) + '-' + (r.j1 + 1)
         + ' as ' + b.nby + ' x ' + b.nbx + ' cells: ' + cell + '. '
+        + 'Hover any cell to outline that ' + FOCAL + ' row and that '
+        + OPP + ' column across the whole grid. '
         + 'Zoom (box-select or the zoom tool) to re-bin the visible window; '
         + 'at ' + HEAT_FULL + ' spreads or fewer per axis it switches to '
         + 'per-matchup cells. Double-click / "reset axes" returns to the '
@@ -979,6 +992,115 @@
     }
     return 'switch the shield scenario (' + rest.slice(0, 2).join(', ')
       + ') to see where it does.';
+  }
+  // ---- hover stripes ----
+  // Hovering a cell outlines the ENTIRE row (that focal spread against
+  // every opponent) and the ENTIRE column (that opponent against every
+  // focal spread), so you can see what a spread does across the whole
+  // axis rather than in one cell. Binned view outlines the bin band;
+  // full-resolution view outlines the single rank.
+  function hexToRgba(hex, a) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+    if (!m) return 'rgba(127,127,127,' + a + ')';
+    var n = parseInt(m[1], 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ','
+      + (n & 255) + ',' + a + ')';
+  }
+  var _heatBaseShapes = [];
+  var _heatBaseAnns = [];
+  var _heatBins = null;
+  var _hoverTimer = null;
+  var _hoverKey = '';
+  function bandFor(edges, rank) {
+    // edges are 0-based index boundaries; rank is a 1-based axis value
+    var idx = Math.round(rank) - 1;
+    for (var k = 0; k + 1 < edges.length; k++) {
+      if (idx >= edges[k] && idx < edges[k + 1]) {
+        return [edges[k] + 0.5, edges[k + 1] + 0.5];
+      }
+    }
+    return null;
+  }
+  function onHeatHover(ev) {
+    if (!ev || !ev.points || !ev.points.length || !_heatBins) return;
+    var pt = ev.points[0];
+    if (pt.x === undefined || pt.y === undefined) return;
+    var key = pt.x + ':' + pt.y;
+    if (key === _hoverKey) return;
+    _hoverKey = key;
+    if (_hoverTimer) clearTimeout(_hoverTimer);
+    _hoverTimer = setTimeout(function () {
+      _hoverTimer = null;
+      var row = bandFor(_heatBins.ye, pt.y);
+      var col = bandFor(_heatBins.xe, pt.x);
+      if (!row && !col) return;
+      // A bare 1.5px outline vanished against saturated reds and greens,
+      // and a 16-rank band is only a couple of pixels tall. Each stripe is
+      // now drawn three times: a light HALO casing underneath, a 2px ink
+      // border, and a translucent ink FILL so the band itself reads as a
+      // band rather than as a hairline.
+      var c = plotChrome();
+      // Halo must be THINNER than the band it casings, or it smears over
+      // it: a 16-rank band is only ~2.5px tall at the default zoom.
+      var halo = { color: hexToRgba(themeColor('--surface-2'), 0.95),
+                   width: 3 };
+      var edge = { color: c.ink, width: 2 };
+      var fill = hexToRgba(c.ink, 0.12);
+      var extra = [];
+      function band(spec) {
+        extra.push(Object.assign({}, spec, {
+          line: halo, fillcolor: 'rgba(0,0,0,0)' }));
+        extra.push(Object.assign({}, spec, {
+          line: edge, fillcolor: fill }));
+      }
+      if (row) {
+        band({ type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y',
+               y0: row[0], y1: row[1] });
+      }
+      if (col) {
+        band({ type: 'rect', yref: 'paper', y0: 0, y1: 1, xref: 'x',
+               x0: col[0], x1: col[1] });
+      }
+      // A few pixels of band cannot be made obvious by thickness alone
+      // (4096 ranks / 256 bins over ~630px is ~2.5px per bin, and the
+      // arithmetic does not improve much short of a 1400px-tall plot). So
+      // the band is ALSO pointed at from the margins: a caret in the left
+      // gutter and one under the x-axis, at the band's centre. They are
+      // POINTERS, not extents -- they sit outside the data area entirely,
+      // and the hover text states the exact rank range.
+      var carets = [];
+      if (row) {
+        carets.push({
+          xref: 'paper', x: -0.006, xanchor: 'right',
+          yref: 'y', y: (row[0] + row[1]) / 2, yanchor: 'middle',
+          showarrow: false, text: '&gt;', align: 'right',
+          font: { color: c.ink, size: 15 }
+        });
+      }
+      if (col) {
+        carets.push({
+          yref: 'paper', y: -0.012, yanchor: 'top',
+          xref: 'x', x: (col[0] + col[1]) / 2, xanchor: 'center',
+          showarrow: false, text: '^',
+          font: { color: c.ink, size: 15 }
+        });
+      }
+      try {
+        Plotly.relayout('tl-heat-plot', {
+          shapes: _heatBaseShapes.concat(extra),
+          annotations: _heatBaseAnns.concat(carets)
+        });
+      } catch (e) { /* a redraw raced us; the next hover fixes it */ }
+    }, 60);
+  }
+  function onHeatUnhover() {
+    if (_hoverTimer) clearTimeout(_hoverTimer);
+    _hoverTimer = null;
+    _hoverKey = '';
+    try {
+      Plotly.relayout('tl-heat-plot', { shapes: _heatBaseShapes,
+                                        annotations: _heatBaseAnns });
+    } catch (e) { /* nothing drawn yet */ }
   }
   function clampIdx(v) { return Math.max(0, Math.min(N - 1, v)); }
   function applyHeatRelayout(ev) {
@@ -1255,6 +1377,351 @@
       + ' ' + FOCAL + '-vs-' + OPP + ' matchups; the full panels (coverage, '
       + 'Pareto, '
       + 'drill-down, mechanism) are further down.');
+  }
+
+  // ---- SP-breakpoint classes (the cliff / frontier colouring) ----
+  // Three states a spread can be in against the analyzed opponent:
+  // it reaches the higher Sucker Punch damage tier against EVERY opponent
+  // spread, against the rank-1 one only, or against neither. All three
+  // come from the closed-form layer's own arrays.
+  var CLIFF_COLORS = ['#2563eb', '#0d9488', '#d97706'];
+  function spClasses() {
+    var bp = D.breakpoints || {}, sp = null;
+    try { sp = bp.thievul_offense.moves.SUCKER_PUNCH; } catch (e) { sp = null; }
+    if (!sp) return null;
+    var tier = sp.tier_vs_rank1_licki_by_spread;
+    var geAll = (sp.ge_hi_tier_count_by_spread || {}).all;
+    var bpk = sp.breakpoint_vs_rank1_licki || {};
+    var hi = bpk.hi_tier;
+    if (!tier || hi === undefined || hi === null) return null;
+    var nAll = ((bp.meta || {}).cohort_sizes || {}).all || N;
+    var cls = new Uint8Array(N);
+    for (var i = 0; i < N; i++) {
+      cls[i] = (geAll && geAll[i] >= nAll) ? 2 : ((tier[i] >= hi) ? 1 : 0);
+    }
+    var fc = sp.full_coverage_vs_all_licki || {};
+    return {
+      cls: cls, hi: hi, tier: tier,
+      groups: [
+        { k: 2, name: 'clears the SP breakpoint vs EVERY ' + OPP,
+          color: CLIFF_COLORS[0] },
+        { k: 1, name: 'clears it vs the rank-1 ' + OPP + ' only',
+          color: CLIFF_COLORS[1] },
+        { k: 0, name: 'misses the SP breakpoint', color: CLIFF_COLORS[2] }
+      ],
+      thresholds: [
+        { x: bpk.min_thievul_atk_for_hi_tier,
+          label: 'clears vs rank-1 ' + OPP },
+        { x: fc.min_thievul_atk_for_hi_tier_vs_every_licki,
+          label: 'clears vs every ' + OPP }
+      ].filter(function (o) { return typeof o.x === 'number'; })
+    };
+  }
+  // Label placement that cannot run off the plot: points near the top get
+  // their label BELOW, and labels that would collide horizontally are
+  // staggered across left/centre/right anchors.
+  function labelPositions(xs, ys, yTop) {
+    var order = xs.map(function (x, i) { return i; }).sort(function (a, b) {
+      return xs[a] - xs[b];
+    });
+    var pos = new Array(xs.length);
+    var span = Math.max.apply(null, xs) - Math.min.apply(null, xs) || 1;
+    var lastX = -Infinity, slot = 0;
+    order.forEach(function (i) {
+      if ((xs[i] - lastX) / span < 0.06) {
+        slot = (slot + 1) % 3;
+      } else {
+        slot = 0;
+      }
+      lastX = xs[i];
+      var vert = (ys[i] >= yTop) ? 'bottom' : 'top';
+      pos[i] = vert + [' center', ' right', ' left'][slot];
+    });
+    return pos;
+  }
+  function thresholdShapes(sc, c) {
+    return (sc.thresholds || []).map(function (th) {
+      return {
+        type: 'line', yref: 'paper', y0: 0, y1: 1, xref: 'x',
+        x0: th.x, x1: th.x,
+        line: { color: c.muted, width: 1, dash: 'dash' }
+      };
+    });
+  }
+  function thresholdAnnotations(sc, c, light) {
+    // Pinned to the very top INSIDE edge. On the cliff the points reach
+    // every height, so the chips are small and unbacked there; elsewhere a
+    // faint plate keeps them readable.
+    return (sc.thresholds || []).map(function (th, i) {
+      var a = {
+        xref: 'x', x: th.x, yref: 'paper', y: 1,
+        xanchor: 'left', yanchor: 'top', showarrow: false,
+        text: ' ' + th.label + ' (atk ' + th.x + ')',
+        font: { color: c.muted, size: light ? 9 : 10 }
+      };
+      if (light) {
+        a.bgcolor = hexToRgba(themeColor('--surface-2'), 0.55);
+        a.borderpad = 1;
+        a.y = 1 - i * 0.045;
+      } else {
+        a.bgcolor = c.legendBg;
+        a.borderpad = 2;
+        a.opacity = 0.9;
+        a.y = 0.97 - i * 0.07;
+      }
+      return a;
+    });
+  }
+
+  // ---- does the SP breakpoint actually explain the current view? ----
+  // Mean coverage per breakpoint class, for whatever grid/scenario/cohort
+  // is selected. The classes are ordered misses -> rank-1-only -> all, so
+  // if the breakpoint drives the outcome the means rise across them. When
+  // they do not, the colouring would quietly imply an explanation the data
+  // does not support -- so the panel says so instead.
+  var CLIFF_EXPLAIN_GAP = 20;   // percentage points
+  function cliffExplanation(sc, cov) {
+    var sums = [0, 0, 0], counts = [0, 0, 0];
+    for (var i = 0; i < N; i++) {
+      var k = sc.cls[i];
+      sums[k] += cov.pct[i];
+      counts[k] += 1;
+    }
+    var means = sums.map(function (s, k) {
+      return counts[k] ? s / counts[k] : null;
+    });
+    var present = [0, 1, 2].filter(function (k) { return counts[k] > 0; });
+    var vals = present.map(function (k) { return means[k]; });
+    var monotone = true;
+    for (var j = 1; j < vals.length; j++) {
+      if (vals[j] < vals[j - 1] - 1e-9) monotone = false;
+    }
+    var gap = vals.length > 1 ? (vals[vals.length - 1] - vals[0]) : 0;
+    var txt = present.map(function (k) {
+      return ['misses', 'rank-1 only', 'clears vs all'][k] + ' '
+        + fmt(means[k], 1) + '%';
+    }).join(' / ');
+    var verdict, drives;
+    if (monotone && gap >= CLIFF_EXPLAIN_GAP) {
+      verdict = 'The Sucker Punch breakpoint largely explains this view';
+      drives = true;
+    } else if (monotone) {
+      verdict = 'The Sucker Punch breakpoint only partially explains this '
+        + 'view (the spread between classes is under '
+        + CLIFF_EXPLAIN_GAP + ' points)';
+      drives = false;
+    } else {
+      verdict = 'The Sucker Punch breakpoint does NOT drive this view -- '
+        + 'spreads that MISS it score at least as well as spreads that '
+        + 'clear it';
+      drives = false;
+    }
+    return {
+      text: verdict + ' (mean coverage by class: ' + txt + ').'
+        + (drives ? ''
+          : ' Bulk is doing the work here: switch the colour control to '
+            + 'defense or HP to see it.'),
+      means: means, monotone: monotone, gap: gap, drives: drives
+    };
+  }
+
+  // ---- panel: the cliff (coverage vs attack) ----
+  // Single-hue sequential ramp for the continuous colourings, same blue
+  // family as the "clears vs every" class so the panel reads as one system.
+  var CLIFF_RAMP = [[0, '#eff6ff'], [0.25, '#93c5fd'], [0.5, '#3b82f6'],
+                    [0.75, '#1d4ed8'], [1, '#1e3a8a']];
+  function renderCliff(cov) {
+    var host = $('tl-cliff');
+    if (!host) return;
+    if (cov.missing) { showMissing('tl-cliff', cov.missing); return; }
+    var sc = spClasses();
+    if (!sc) {
+      showMissing('tl-cliff', 'the closed-form breakpoint layer is not '
+        + 'embedded in this page, so Sucker Punch breakpoint classes '
+        + 'cannot be computed.');
+      return;
+    }
+    host.innerHTML = '<div id="tl-cliff-plot" class="tl-plot"></div>';
+    var T = D.thievul, c = plotChrome();
+    var mode = state.cliffColor || 'sp';
+    var traces = [];
+    if (mode === 'sp') {
+      traces = sc.groups.map(function (g) {
+        var xs = [], ys = [], hv = [];
+        for (var i = 0; i < N; i++) {
+          if (sc.cls[i] !== g.k) continue;
+          xs.push(T.atk[i]);
+          ys.push(cov.pct[i]);
+          hv.push(cliffHover(i, cov, sc));
+        }
+        return {
+          type: 'scattergl', mode: 'markers', name: g.name,
+          x: xs, y: ys, hovertext: hv,
+          hovertemplate: '%{hovertext}<extra></extra>',
+          marker: { size: 4, color: g.color, opacity: 0.65 }
+        };
+      });
+    } else {
+      var vals = (mode === 'def') ? T.def : T.hp;
+      var xs2 = [], ys2 = [], hv2 = [], cv = [];
+      for (var i2 = 0; i2 < N; i2++) {
+        xs2.push(T.atk[i2]);
+        ys2.push(cov.pct[i2]);
+        cv.push(vals[i2]);
+        hv2.push(cliffHover(i2, cov, sc));
+      }
+      traces.push({
+        type: 'scattergl', mode: 'markers',
+        name: (mode === 'def') ? 'defense' : 'HP',
+        x: xs2, y: ys2, hovertext: hv2,
+        hovertemplate: '%{hovertext}<extra></extra>',
+        marker: {
+          size: 4, opacity: 0.7, color: cv, colorscale: CLIFF_RAMP,
+          colorbar: { title: { text: (mode === 'def') ? 'defense' : 'HP',
+                               side: 'right' }, thickness: 12 }
+        }
+      });
+    }
+    addMarkerOverlays(traces, function (i) { return T.atk[i]; },
+                      function (i) { return cov.pct[i]; }, cov, c, false);
+    var layout = baseLayout(
+      gridPretty(state.label) + ' - ' + scenarioText(),
+      FOCAL + ' effective attack',
+      OPP + ' spreads beaten (%)');
+    layout.yaxis.range = COV_Y_RANGE;
+    layout.margin = { r: 190, t: 70, b: 60 };
+    layout.shapes = thresholdShapes(sc, c);
+    var sat = coverageSaturation(cov.pct);
+    layout.annotations = thresholdAnnotations(sc, c, true)
+      .concat(sat.note ? [satAnnotation(sat.text, c)] : []);
+    Plotly.react('tl-cliff-plot', traces, layout, { responsive: true });
+    var ex = cliffExplanation(sc, cov);
+    setHtml('tl-cliff-note',
+      '<strong>' + esc(ex.text) + '</strong> '
+      + 'Each dot is one of the 4096 ' + esc(FOCAL) + ' IV spreads: x is '
+      + 'its effective attack, y is the share of the selected ' + esc(OPP)
+      + ' cohort it beats. Dashed lines are the attack values where the '
+      + 'Sucker Punch breakpoint starts clearing. Follows the controls '
+      + 'above: ' + esc(gridPretty(state.label)) + ', '
+      + esc(scenarioText()) + ', cohort ' + esc(cohortLabel()) + '.'
+      + esc(sat.note)
+      + ' Diamonds are named builds, gold stars your own spreads (hover '
+      + 'for names).');
+  }
+  function cliffHover(i, cov, sc) {
+    return statLine('thievul', i)
+      + '<br>attack ' + fmt(D.thievul.atk[i], 2)
+      + ' def ' + fmt(D.thievul.def[i], 2) + ' hp ' + D.thievul.hp[i]
+      + '<br>coverage ' + fmt(cov.pct[i], 1) + '%'
+      + '<br>SP vs rank-1 ' + OPP + ': ' + sc.tier[i] + ' dmg ('
+      + sc.hi + ' clears)';
+  }
+
+  // ---- panel: off the frontier (attack vs stat-product rank) ----
+  function renderFrontier() {
+    var host = $('tl-frontier');
+    if (!host) return;
+    var sc = spClasses();
+    if (!sc) {
+      showMissing('tl-frontier', 'the closed-form breakpoint layer is not '
+        + 'embedded in this page, so this panel cannot be drawn.');
+      return;
+    }
+    host.innerHTML = '<div id="tl-frontier-plot" class="tl-plot"></div>';
+    var T = D.thievul, c = plotChrome();
+    var traces = sc.groups.map(function (g) {
+      var xs = [], ys = [], hv = [];
+      for (var i = 0; i < N; i++) {
+        if (sc.cls[i] !== g.k) continue;
+        xs.push(T.atk[i]);
+        ys.push(i + 1);
+        hv.push(statLine('thievul', i) + '<br>attack ' + fmt(T.atk[i], 2)
+          + '<br>SP vs rank-1 ' + OPP + ': ' + sc.tier[i] + ' dmg ('
+          + sc.hi + ' clears)');
+      }
+      return {
+        type: 'scattergl', mode: 'markers', name: g.name,
+        x: xs, y: ys, hovertext: hv,
+        hovertemplate: '%{hovertext}<extra></extra>',
+        marker: { size: 4, color: g.color, opacity: 0.65 }
+      };
+    });
+    addMarkerOverlays(traces, function (i) { return T.atk[i]; },
+                      function (i) { return i + 1; }, null, c, true);
+    var layout = baseLayout(
+      'Attack vs stat product (all 4096 spreads)',
+      FOCAL + ' effective attack',
+      FOCAL + ' stat-product rank (1 = best, log scale)');
+    layout.yaxis.type = 'log';
+    layout.yaxis.range = [Math.log(N + 200) / Math.LN10, -0.02];
+    layout.yaxis.autorange = false;
+    layout.margin = { r: 190, t: 90, b: 60 };
+    layout.shapes = thresholdShapes(sc, c);
+    layout.annotations = thresholdAnnotations(sc, c);
+    Plotly.react('tl-frontier-plot', traces, layout, { responsive: true });
+    setHtml('tl-frontier-note',
+      'Reading guide: UP is a better stat-product rank, RIGHT is more '
+      + 'attack, and the frontier -- the upper-right edge -- is where IV '
+      + 'tech lives, because those spreads buy attack without giving up '
+      + 'rank. Colour and the dashed lines are the same Sucker Punch '
+      + 'breakpoint classes as the panel above. This panel does not depend '
+      + 'on the shield scenario or cohort: it is the IV space itself.');
+  }
+
+  // Named builds (deduped) + your own spreads, as overlay traces on any
+  // x/y projection of the 4096 spreads.
+  function addMarkerOverlays(traces, xOf, yOf, cov, c, withText) {
+    var nb = namedBuilds();
+    if (nb.length && withText === false) {
+      traces.push({
+        type: 'scatter', mode: 'markers', name: 'named builds',
+        x: nb.map(function (b) { return xOf(b.idx); }),
+        y: nb.map(function (b) { return yOf(b.idx); }),
+        hovertext: nb.map(function (b) {
+          return b.label + '<br>' + statLine('thievul', b.idx)
+            + (cov ? '<br>coverage ' + fmt(cov.pct[b.idx], 1) + '%' : '');
+        }),
+        hovertemplate: '%{hovertext}<extra></extra>',
+        marker: { size: 9, color: c.ink, symbol: 'diamond-open',
+                  line: { width: 2, color: c.ink } }
+      });
+    } else if (nb.length) {
+      var xs = nb.map(function (b) { return xOf(b.idx); });
+      var ys = nb.map(function (b) { return yOf(b.idx); });
+      var yTop = Math.max.apply(null, ys)
+        - 0.12 * (Math.max.apply(null, ys) - Math.min.apply(null, ys));
+      traces.push({
+        type: 'scatter', mode: 'markers+text', name: 'named builds',
+        x: xs, y: ys,
+        text: nb.map(function (b) { return b.tag; }),
+        textposition: labelPositions(xs, ys, yTop),
+        textfont: { color: c.ink, size: 9 },
+        cliponaxis: false,
+        hovertext: nb.map(function (b) {
+          return b.label + '<br>' + statLine('thievul', b.idx)
+            + (cov ? '<br>coverage ' + fmt(cov.pct[b.idx], 1) + '%' : '');
+        }),
+        hovertemplate: '%{hovertext}<extra></extra>',
+        marker: { size: 9, color: c.ink, symbol: 'diamond-open',
+                  line: { width: 2, color: c.ink } }
+      });
+    }
+    var mine = state.user.filter(function (u) { return u.side === 'thievul'; });
+    if (mine.length) {
+      traces.push({
+        type: 'scatter', mode: 'markers', name: 'your spreads',
+        x: mine.map(function (u) { return xOf(u.idx); }),
+        y: mine.map(function (u) { return yOf(u.idx); }),
+        hovertext: mine.map(function (u) {
+          return 'YOURS: ' + u.label + '<br>' + statLine('thievul', u.idx)
+            + (typeof u.cp === 'number' ? '<br>your CP ' + u.cp : '')
+            + (cov ? '<br>coverage ' + fmt(cov.pct[u.idx], 1) + '%' : '');
+        }),
+        hovertemplate: '%{hovertext}<extra></extra>',
+        marker: { size: 12, color: c.gold, symbol: 'star',
+                  line: { width: 1, color: c.ink } }
+      });
+    }
   }
 
   // ---- main scatter ----
@@ -2861,7 +3328,9 @@
     coverage().then(function (cov) {
       renderScatter(cov);
       renderPareto(cov);
+      renderCliff(cov);
     });
+    renderFrontier();
   }
 
   // ---- init ----
@@ -2927,6 +3396,21 @@
     if (cc) {
       cc.addEventListener('change', function () {
         state.customText = cc.value; refresh();
+      });
+    }
+    var cc = $('tl-cliff-color');
+    if (cc) {
+      [['sp', 'colour: SP breakpoint class'], ['def', 'colour: defense'],
+       ['hp', 'colour: HP']].forEach(function (pair) {
+        var o = document.createElement('option');
+        o.value = pair[0];
+        o.textContent = pair[1];
+        cc.appendChild(o);
+      });
+      cc.value = state.cliffColor;
+      cc.addEventListener('change', function () {
+        state.cliffColor = cc.value;
+        coverage().then(renderCliff);
       });
     }
     var bs = $('tl-basis');
