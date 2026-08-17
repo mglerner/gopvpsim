@@ -143,6 +143,36 @@ handful of Tier-2 deep dives per week fits the machine. The funnel
 also naturally re-runs after balance patches (gamemaster-delta
 migration rules in CLAUDE.md apply).
 
+## 3b. Caching (adopt existing patterns, don't invent)
+
+The expensive artifacts are the joint grids (40-95 min/pair) and, at
+fleet scale, the Tier-1 probe planes (re-screened after every patch).
+Policy per artifact:
+
+- **Joint grids**: the npz + stamped manifest already IS the cache;
+  add the invalidation policy. Default: stamp mismatch = stale = back
+  on the bake queue (a stale stamp is a safe miss, never served —
+  sweep-cache discipline). Warm paths: (a) gamemaster patches bless
+  automatically via the `migrate_cache.py` delta computation — a
+  grid's manifest records both species and every move used, so
+  "untouched by this patch" is a computable predicate, no hand proof
+  (v7 sweep-cache precedent); (b) engine bumps default to re-bake,
+  with the CLAUDE.md one-localized-fix-per-bump migration escape
+  hatch when justified.
+- **Tier-1 probe planes**: ride the Worlds planes pattern (or its
+  literal storage layer): per-pair `entry_sim_digest` over species +
+  moveset identity, stamp checks, manifest-delta invalidation. This is
+  where caching pays most — 870 pairs x every balance patch.
+- **NOT the sweep cache**: joint grids are pair-planes, not
+  per-opponent columns over dive pools; separate namespace. Bonus: the
+  engine-iteration `--no-sweep-cache` discipline stays irrelevant to
+  this pipeline.
+- **GC**: fold the new namespace into the standing "gc_cache.py should
+  cover every namespace" TODO; the readable stamps in the manifest
+  make grid-level reclaim straightforward from day one.
+- **Cheap derived blobs** (meta-wins extraction, breakpoints, denial,
+  reco): recompute-on-demand, inputs already stamped; no machinery.
+
 ## 4. Open decisions (Michael)
 
 - Kit naming + where configs live (`pairs/*.toml` vs entries in one
