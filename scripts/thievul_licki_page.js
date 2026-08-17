@@ -158,13 +158,24 @@
   }
 
   // ---- state ----
+  // Default grid: PvPoke's own default moveset when it is embedded, so the
+  // page opens on the build most readers actually run rather than on
+  // whichever grid happens to be first in the manifest.
+  var DEFAULT_GRID = (function () {
+    if (!HAS_GRIDS) return null;
+    var want = META.default_moveset_label;
+    if (want && (D.cov || {})[want]) return want;
+    if (GRID_LABELS.indexOf('nsiw_bait') >= 0) return 'nsiw_bait';
+    return GRID_LABELS[0];
+  })();
   var state = {
-    label: HAS_GRIDS ? GRID_LABELS[0] : null,
-    // si = sf*3+so. Default 0 (0-0), NOT the usual 1-1: on this matchup
-    // 1-1 is saturated (every Thievul spread beats every Lickitung), so a
-    // 1-1 first paint shows a flat wall of green on every panel. 0-0 is
-    // the IV-sensitive slice, which is what the page is about.
-    si: 0,
+    label: DEFAULT_GRID,
+    // si = sf*3+so. 1-1 is the scenario people plan around, and on the
+    // DEFAULT grid it is IV-sensitive rather than saturated, so the first
+    // paint shows real structure. Saturation is detected from the data, so
+    // if a grid ever makes 1-1 flat the panels say so instead of showing
+    // a blank wall.
+    si: 4,
     scenarioAll: false,
     cohort: 'all',
     customText: '',
@@ -176,6 +187,9 @@
     heatRange: null,  // null = whole 4096x4096; else {i0,i1,j0,j1} indices
     heatNamed: true
   };
+  // The ranked table follows the selected grid's moveset, and that must
+  // hold on the FIRST paint too -- no change event fires at startup.
+  state.basis = basisForMoveset(msKeyOf(state.label));
 
   // ---- won_b64 decode (gzip via DecompressionStream; file:// safe) ----
   var _wonCache = {};
@@ -2529,10 +2543,81 @@
   // leaking a literal key like `max_lickitung_cmp_atk` into the page.
   function answerLabel(k) {
     if (ANSWER_LABELS[k]) return ANSWER_LABELS[k];
-    return String(k).replace(/_/g, ' ')
+    var s = String(k).replace(/_/g, ' ')
       .replace(/\blickitung\b/gi, OPP)
       .replace(/\blicki\b/gi, OPP)
       .replace(/\bthievul\b/gi, FOCAL);
+    // The key names the SLOT ("power whip" = second charged move), not the
+    // move: on this dataset that slot may be something else entirely.
+    // Species substitution runs first, so "lick" here can only be the
+    // fast-move slot, never the tail of Lickitung/Lickilicky.
+    var sn = slotNames();
+    s = s.replace(/\bpower whips\b/gi, sn.c2 + ' hits')
+      .replace(/\bpower whip\b/gi, sn.c2)
+      .replace(/\bbody slams\b/gi, sn.c1 + ' hits')
+      .replace(/\bbody slam\b/gi, sn.c1)
+      .replace(/\blicks\b/gi, sn.fast + ' hits')
+      .replace(/\blick\b/gi, sn.fast)
+      .replace(/\bto ko\b/g, 'to KO')
+      .replace(/\bstage0\b/g, 'stage 0');
+    return s;
+  }
+  // A histogram is {bucket: count} with numeric keys and numeric values.
+  function isHistogram(v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+    var keys = Object.keys(v);
+    if (!keys.length) return false;
+    for (var i = 0; i < keys.length; i++) {
+      if (!/^-?\d+$/.test(keys[i])) return false;
+      if (typeof v[keys[i]] !== 'number') return false;
+    }
+    return true;
+  }
+  // "never actually thrown" adjacency, straight from the probe block.
+  function neverThrownNote(moveName) {
+    var rc = ((D.breakpoints || {}).verification || {})
+      .resisted_charged_sim_checks || [];
+    for (var i = 0; i < rc.length; i++) {
+      if (rc[i].thrown_with_default_moveset === false
+          && prettyMove(rc[i].move) === moveName) {
+        return ' Note: the engine never throws ' + moveName + ' with the '
+          + 'default moveset (see the resisted-charged probe below), so '
+          + 'this is a bulk reference rather than damage you routinely '
+          + 'take.';
+      }
+    }
+    return '';
+  }
+  // A one-bucket histogram is a SENTENCE, not a table.
+  function histogramHtml(label, v, key) {
+    var keys = Object.keys(v);
+    var total = 0;
+    keys.forEach(function (k) { total += v[k]; });
+    // "Shadow Ball hits to KO stage 0 histogram" -> subject "Shadow Ball",
+    // measure "hits to KO", so the sentence reads like a sentence.
+    var subject = label.replace(/\s*histogram\s*/i, ' ')
+      .replace(/\s*stage 0\s*/i, ' ').replace(/\s+/g, ' ').trim();
+    var parts = subject.match(/^(.*?)\s+(hits? .*)$/);
+    var moveName = parts ? parts[1] : subject.split(' ')[0];
+    var measure = parts ? parts[2] : subject;
+    var note = neverThrownNote(moveName);
+    var atStage = /stage\s*0/i.test(String(key || label))
+      ? 'attack stage 0, ' : '';
+    if (keys.length === 1) {
+      return '<p class="tl-note"><strong>' + esc(moveName) + ': '
+        + esc(keys[0]) + ' ' + esc(measure) + '</strong> - identical for '
+        + 'all ' + commas(total) + ' ' + esc(FOCAL) + ' spreads ('
+        + atStage + 'additive model).' + esc(note) + '</p>';
+    }
+    var rows = keys.map(function (k) {
+      return '<tr><td>' + esc(k) + '</td><td>' + commas(v[k]) + '</td></tr>';
+    }).join('');
+    return '<p class="tl-note"><strong>' + esc(moveName) + ' ' + esc(measure)
+      + '</strong>, over all ' + commas(total) + ' ' + esc(FOCAL)
+      + ' spreads (' + atStage + 'additive model):' + esc(note) + '</p>'
+      + '<div class="tl-scroll"><table class="tl"><tr><th>value</th>'
+      + '<th>' + esc(FOCAL) + ' spreads</th></tr>' + rows
+      + '</table></div>';
   }
   function answersHtml(o, depth) {
     var rows = [], sub = [];
@@ -2564,6 +2649,8 @@
         } else {
           rows.push([label, v.length + ' values']);
         }
+      } else if (isHistogram(v)) {
+        sub.push(histogramHtml(label, v, k));
       } else if (depth >= 3) {
         rows.push([label, JSON.stringify(v).slice(0, 300)]);
       } else {
