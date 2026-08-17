@@ -155,10 +155,13 @@ def main():
     def metrics(i):
         out = {'sp_tier_vs_rank1_licki': int(sp_tier[i]),
                'meta_wins_11': {ms: int(meta[ms][i]) for ms in meta}}
+        # ALL nine scenarios per grid, not just the primary grid's pick
+        # list: a card that states its own tiebreak chain (the NS+IW card
+        # ranks on 1-1 first) must be able to show the number it ranked on.
         for label in won:
             out[label] = {
                 SCEN[si]: round(float(cov512[label][si][i]) * 100, 2)
-                for si in pick_sis}
+                for si in range(len(SCEN))}
             out[label]['pretty'] = grid_pretty(label)
         return out
 

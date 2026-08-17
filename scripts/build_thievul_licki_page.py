@@ -615,6 +615,10 @@ PAGE_CSS = """
   .tl-satblock strong { color: var(--text); }
   .tl-satblock ul { margin: 4px 0 0; padding-left: 18px; }
   .tl-satblock li.tl-sat-current { color: var(--text); }
+  .tl-verdict-denial { background: var(--surface);
+       border: 1px solid var(--border); border-left: 4px solid var(--accent);
+       border-radius: 4px; padding: 10px 14px; margin: 12px 0; }
+  .tl-verdict-denial h4 { margin: 0 0 4px; }
   .tl-chip { display: inline-block; padding: 1px 7px; border-radius: 9px;
        font-size: 11.5px; white-space: nowrap; border: 1px solid; }
   .tl-chip-ok { color: var(--win); border-color: var(--win);
@@ -693,10 +697,11 @@ disclosures</a>.</div>
 Paste your Poke Genie CSV (or pick the file) and your mons are ranked
 below. Only {collection_species} rows are read.</p>
 <div class="tl-ctl">
-  <div><label for="tl-manual-species">Species</label>
+  <div><label for="tl-manual-species">Species (what each one feeds)</label>
     <select id="tl-manual-species">
-      <option value="thievul">{focal}</option>
-      <option value="licki">{opponent}</option>
+      <option value="thievul">{focal} - ranked in the table below</option>
+      <option value="licki">{opponent} - heatmap overlay, drill-down and
+        the anti-{focal} section</option>
     </select></div>
   <div><label for="tl-manual-a">Atk IV</label>
     <select id="tl-manual-a"></select></div>
@@ -771,6 +776,9 @@ here"></textarea>
 
 <h2>Recommendations</h2>
 <div id="tl-reco" class="tl-cards"></div>
+
+<h2>The other side: anti-{focal} {opponent} tech</h2>
+<div id="tl-denial"></div>
 
 <details id="tl-methodology" class="tl-methodology">
 <summary>Methodology, honesty notes and disclosures</summary>
@@ -878,6 +886,7 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
         missing.append('breakpoints.json (closed-form damage/bulk layer) -- '
                        'the mechanism section and the damage-tier coloring '
                        'need it')
+    denial = load_json(data_dir / 'licki_denial.json')
     reco = load_json(reco_path)
     if reco is None:
         missing.append('reco.json (recommendation blob, computed in the '
@@ -922,8 +931,12 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             'IDENTICAL GRIDS: ' + ' and '.join(spec['pretty'][g] for g in grp)
             + ' produced BYTE-IDENTICAL win data, so they are one grid, not '
             'two independent ones. Agreement between them is not evidence of '
-            'moveset/bait robustness; switching between them in the dropdown '
-            'will not change a single number.')
+            'moveset/bait robustness: no matchup outcome changes when you '
+            'switch between them. (The meta-wins axis is a different '
+            'measurement -- it is computed per grid against the dive pool '
+            'and DOES differ between the two labels -- so the Pareto x '
+            'axis and the meta column can move even though every '
+            'win/loss in this analysis is identical.)')
 
     # Diagnostic only -- printed for the operator, never rendered, and no
     # longer part of TL_DATA, so the published bytes do not depend on which
@@ -940,7 +953,8 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
     if uses_cd_move:
         notes.append(CD_MOVE_NOTE)
     notes.append(
-        'CLIFF PANEL RULE: the line above that panel is computed, not '
+        'CLIFF PANEL RULE (as implemented): the line above that panel is '
+        'computed, not '
         'authored. The page takes the mean coverage of each Sucker Punch '
         'breakpoint class (misses / clears vs the rank-1 opponent only / '
         'clears vs every opponent) for the selected grid, scenario and '
@@ -948,7 +962,12 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
         'bottom gap is at least 20 percentage points, it says the '
         'breakpoint largely explains the view; if they rise by less it '
         'says partially; if they do not rise at all it says the '
-        'breakpoint does not drive the view and points at bulk instead. '
+        'breakpoint does not drive the view. In BOTH of those weaker '
+        'cases it also points at bulk. Before any of that it checks '
+        'whether the view varies at all: if the whole 4096-spread '
+        'coverage range spans one percentage point or less, it says '
+        'nothing separates the spreads and makes NO causal claim in '
+        'either direction. '
         'The breakpoint colouring is therefore not a claim that the '
         'breakpoint matters in every view -- the note says when it does '
         'not.')
@@ -1011,6 +1030,10 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
         'reco': reco,
         'collection': build_collection(spec),
     }
+    # Only datasets with a denial analysis carry the key at all, so the
+    # archived page's blob does not gain a null it never uses.
+    if denial is not None:
+        data['licki_denial'] = denial
     return data, missing, spec
 
 
@@ -1030,7 +1053,11 @@ def render_page(data, missing, spec):
     if dups and cells:
         dup_cells = sum(len(g) - 1 for g in dups) * N_IV * N_IV * N_SCEN
         pct = 100.0 * dup_cells / cells
-        dup_txt = (' -- but ' + '; '.join('/'.join(g) for g in dups)
+        pretty = {k: v.get('pretty', k) for k, v in
+                  (m.get('grids') or {}).items()}
+        dup_txt = (' -- but '
+                   + '; '.join(' and '.join(pretty.get(x, x) for x in g)
+                               for g in dups)
                    + f' are byte-identical, so {pct:.0f}% of those cells '
                      f'are duplicates of another grid')
     prov = (f"generated {m['generated']} | engine {m['engine'] or 'n/a'} | "
@@ -1057,9 +1084,12 @@ def render_page(data, missing, spec):
     duplicates = m.get('duplicate_grids') or []
     n_distinct = n_grids - sum(len(g) - 1 for g in duplicates)
     distinct_cells = n_distinct * N_IV * N_IV * N_SCEN
+    pretty_of = {k: v.get('pretty', k) for k, v in
+                 (m.get('grids') or {}).items()}
     dup_clause = (
         f" ({n_grids} grids were baked, but "
-        + '/'.join('+'.join(g) for g in duplicates)
+        + '; '.join(' and '.join(pretty_of.get(x, x) for x in g)
+                    for g in duplicates)
         + " are byte-identical, so they count once)"
         if duplicates else "")
     intro = (
