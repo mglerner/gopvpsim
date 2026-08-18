@@ -20,6 +20,7 @@ Exits 0 quiet-ish on success, 1 with the failure list otherwise.
 ``--quiet`` prints only failures.
 """
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -131,8 +132,23 @@ def main():
                       f'<strong>{fn["fn"]}</strong> show' in hub_text
                       and f'of {fn["n"]} sampled clean' in hub_text,
                       'hub FN block does not match a fresh fn_rate()')
+        # The hub's dimmed-cell popover carries its cheat-sheet deep
+        # link in a data- attribute, which verify_article_links does not
+        # (and should not) follow. Resolve them here instead, so a
+        # renamed anchor cannot silently ship a dead affordance.
+        deep = set(re.findall(r'data-sheet="([^"]+)"', hub_text))
+        bad_deep = []
+        for ref in sorted(deep):
+            fname, _, frag = ref.partition('#')
+            tgt = website / fname
+            if not tgt.exists() or (frag and f'id="{frag}"'
+                                    not in tgt.read_text()):
+                bad_deep.append(ref)
+        check(failures, not bad_deep,
+              f'hub popover data-sheet refs unresolved: {bad_deep[:3]} '
+              f'({len(bad_deep)} of {len(deep)})')
         say(f'[3] surfaces: hub + {len(entries)} sheets + cmp + explorer '
-            f'+ {len(on_disk)} pair pages')
+            f'+ {len(on_disk)} pair pages, {len(deep)} popover deep links')
 
     # [4] bundler-collision glob
     bad = list(REPO.glob('worlds/**/*_great.toml'))
