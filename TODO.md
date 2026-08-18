@@ -109,6 +109,43 @@ re-rendering any Worlds surface pre-Worlds. REMAINING (all
 non-gating): (a) a11y polish: badge text 4.36:1 in pokemon-dark, hub
 matrix mini-grids color-only (cheat sheets are the text alternative);
 (b) optional session-6 survival strip (scoped above).
+
+**THIEVUL ADDED POST-PUBLISH (2026-08-18).** The Icy Wind Community Day
+(08-16) made a Worlds-legal Thievul, so the meta grew 31 -> 33: Thievul
+enters as a MOVESET FORK, two FORCED entries sharing Sucker Punch + Icy
+Wind and differing on the second charged move -- `thievul` (NS+IW,
+PvPoke's post-CD default) and `thievul_iw_pr` (IW+PR, the CD dive's
+build). Rationale, mechanism and the scoped NS-vs-PR claims are in
+`docs/worlds_prep_plan.md` ("The meta"). Highlights:
+
+- **Icy Wind is INJECTED.** The pinned gamemaster 8f1d6cca5c0f predates
+  the CD; upstream pvpoke `f754cd6fc` already lists it as an eliteMove,
+  so the lag is proven (CLAUDE.md's cd_prep rule), not inferred. A
+  per-entry `injected_move_ids` list in meta.toml is honored by
+  `worlds_bake.preflight_moveset_legality` for the declaring entry only.
+  Disclosed on both cheat sheets, the hub moveset cells, and the
+  provenance line every Worlds page carries. **Retire the table (and its
+  disclosures) once the un-pinned gamemaster stably lists the move.**
+- **Two `worlds_code` bumps, both blessed forward, no cold re-bake.**
+  `worlds_bake.WORLDS_CODE_LINEAGE` holds the one-shot written proofs;
+  `--bless-worlds-code` is the explicit operator opt-in and the manifest
+  records each blessing. All three Tier-1 bakes were verified additive:
+  0 pre-existing manifest entries changed, 0 pre-existing npz touched.
+- Tier-1 coverage 1,860 -> 2,112 (= C(33,2)*4). Amber pairs 401 -> 455.
+  Tier-2: 432/455 fully baked; **23 deferred**, all Thievul pairs, all
+  in the low-usage tail, listed on the hub by the standing mechanism.
+  Extend by re-running `worlds_tier2.py` (idempotent) -- the cross-arm
+  pair `thievul,thievul_iw_pr` is among them and needs
+  `--include-pair` to jump the queue.
+- **Operational lesson: run long bakes DETACHED.** Two harness-managed
+  background bakes were killed mid-run. `os.fork`/`os.setsid` double-fork
+  survives (macOS has no `setsid` binary). Per-grid manifest keying meant
+  nothing was lost either time -- restarts resume.
+- The FN-rate block still reports 4/21 from the ORIGINAL clean sample;
+  that sample was drawn from the 31-entry meta and was deliberately not
+  redrawn (redrawing would retag existing grids). The hub's wording is
+  literally true; if a wider FN claim is ever wanted, re-sample
+  explicitly.
 Session-4 carry-in status (2026-08-10): rebalance date RESOLVED
 (Forever Forward live in-game 2026-06-02 1pm PDT; Turin was
 post-rebalance -- pages state the split; plan doc corrected).

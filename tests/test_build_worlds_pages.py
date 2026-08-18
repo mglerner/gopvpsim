@@ -429,7 +429,134 @@ def test_injection_disclosure_survives_on_the_real_meta():
     for e in inj:
         block = bwp.injection_html(e)
         assert '<strong>Move injection:' in block
-        assert e['injection_note'] in block
+        # the block escapes for HTML, so compare against the escaped form
+        assert bwp.esc(e['injection_note']) in block
         for name in e['injected_moves']:
             assert name in block
         assert bwp.injection_chip(e).count(name) == 1
+
+
+# ---------------------------------------------------------------------------
+# Moveset-fork cross-links (2026-08-18: Thievul NS+IW / IW+PR)
+# ---------------------------------------------------------------------------
+
+def _meta_with_fork():
+    """META with a second arm of entry 0's species -- same species and
+    shadow flag, different second charged move."""
+    import copy
+    m = copy.deepcopy(META)
+    arm = copy.deepcopy(m['entries'][0])
+    m['entries'][0]['name'] = 'Alpha (One)'
+    m['entries'][0]['gamemaster_name'] = 'Alpha'
+    arm.update({'name': 'Alpha (Two)', 'gamemaster_name': 'Alpha',
+                'species_id': 'alpha_two',
+                'charged_move_ids': ['CM_ONE', 'CM_FOUR'],
+                'charged_moves': ['CM One', 'CM Four'],
+                'moveset_source': 'variant', 'default_disagrees': True})
+    m['entries'].append(arm)
+    return m
+
+
+def test_no_fork_block_without_a_sibling(cells):
+    """Positive control: with no same-species sibling the block is empty
+    on every entry, so the assertions below are not vacuous."""
+    for e in META['entries']:
+        assert bwp.fork_siblings(e, META['entries']) == []
+        assert bwp.fork_html(e, META['entries']) == ''
+
+
+def test_fork_arms_cross_link_each_other_and_name_the_fork():
+    m = _meta_with_fork()
+    a, b = m['entries'][0], m['entries'][-1]
+    assert [s['species_id'] for s in bwp.fork_siblings(a, m['entries'])] \
+        == ['alpha_two']
+    for mine, other, other_file in ((a, b, 'worlds-alpha_two.html'),
+                                    (b, a, 'worlds-alpha.html')):
+        block = bwp.fork_html(mine, m['entries'])
+        assert 'one arm of a 2-way moveset fork' in block
+        assert f'href="{other_file}"' in block
+        assert other['name'] in block
+        # the block must state what each arm actually runs, or "fork" is
+        # an unexplained label
+        for name in other['charged_moves']:
+            assert name in block
+
+
+def test_fork_deep_analysis_link_only_when_the_page_exists(tmp_path):
+    m = _meta_with_fork()
+    m['entries'][0]['species'] = 'Thievul'
+    m['entries'][-1]['species'] = 'Thievul'
+    page, _label = bwp.DEEP_ANALYSIS_PAGES['Thievul']
+    missing = bwp.fork_html(m['entries'][0], m['entries'],
+                            website_dir=tmp_path)
+    assert page not in missing                       # never a dead link
+    (tmp_path / page).write_text('x')
+    present = bwp.fork_html(m['entries'][0], m['entries'],
+                            website_dir=tmp_path)
+    assert f'href="{page}"' in present
+
+
+def test_real_meta_fork_arms_link_each_other():
+    """Boundary pin against the SHIPPED meta."""
+    import tomllib
+    meta = tomllib.load(open(wp.META_TOML, 'rb'))
+    arms = [e for e in meta['entries'] if e['species'] == 'Thievul']
+    assert len(arms) == 2
+    for e in arms:
+        block = bwp.fork_html(e, meta['entries'])
+        other, = bwp.fork_siblings(e, meta['entries'])
+        assert f'href="worlds-{other["species_id"]}.html"' in block
+
+
+# ---------------------------------------------------------------------------
+# badge_rule divergence (2026-08-18: an EMPTY rule was silently hidden)
+# ---------------------------------------------------------------------------
+
+def test_rule_divergence_cases():
+    """PRE-FIX VALUE: `if rule and rule != badge` rendered nothing for an
+    empty rule, so an entry whose mechanical rule stopped awarding its
+    badge kept asserting that badge with no caveat. FORCED is the one
+    badge classify_badge never returns, so its always-empty rule is not
+    a divergence."""
+    assert bwp.rule_divergence('MODEL', 'MODEL') == ''      # agreement
+    assert bwp.rule_divergence('PLAYED', 'MODEL') == 'MODEL'
+    # the case the old guard dropped
+    assert bwp.rule_divergence('MODEL', '') == 'no badge'
+    assert bwp.rule_divergence('PLAYED*', '') == 'no badge'
+    # editorial includes: empty rule is definitional, not a divergence
+    assert bwp.rule_divergence('FORCED', '') == ''
+    assert bwp.rule_divergence('FORCED', 'MODEL') == ''
+
+
+def test_empty_rule_is_shown_on_badge_and_cheat_sheet(cells):
+    """Both surfaces that print the divergence must show it."""
+    import copy
+    m = copy.deepcopy(META)
+    e = m['entries'][0]
+    e['badge'], e['badge_rule'] = 'MODEL', ''
+    assert '(rule: no badge)' in bwp.badge_html(e)
+    sheet = bwp.render_cheat_sheet(e, m, cells, MANIFEST, slug_map={})
+    assert 'the mechanical rule says no badge' in sheet
+    # a FORCED entry with the same empty rule stays quiet
+    f = m['entries'][1]
+    assert f['badge'] == 'FORCED'
+    f['badge_rule'] = ''
+    assert '(rule:' not in bwp.badge_html(f)
+    assert 'the mechanical rule says' not in bwp.render_cheat_sheet(
+        f, m, cells, MANIFEST, slug_map={})
+
+
+def test_shipped_meta_badge_divergences_are_all_rendered():
+    """Boundary pin: every shipped entry whose rule disagrees with its
+    badge must produce visible text (or be FORCED)."""
+    import tomllib
+    meta = tomllib.load(open(wp.META_TOML, 'rb'))
+    shown = 0
+    for e in meta['entries']:
+        div = bwp.rule_divergence(e['badge'], e.get('badge_rule', e['badge']))
+        if div:
+            assert f'(rule: {div})' in bwp.badge_html(e), e['name']
+            shown += 1
+        if e['badge'] == 'FORCED':
+            assert div == '', e['name']
+    assert shown >= 1                       # scanner self-test

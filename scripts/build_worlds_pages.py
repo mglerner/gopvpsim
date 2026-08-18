@@ -161,6 +161,28 @@ def esc(s):
     return html.escape(str(s), quote=True)
 
 
+def rule_divergence(badge, rule):
+    """How a badge_rule disagrees with the literal badge, as display
+    text, or '' when there is nothing to say.
+
+    Two cases the old ``if rule and rule != badge`` guard got wrong:
+
+    * FORCED is editorial BY DEFINITION -- classify_badge never returns
+      it, so a FORCED entry's rule is always empty. That is not a
+      divergence and printing one would be noise on every FORCED row.
+    * an empty rule under any OTHER badge means the mechanical rule no
+      longer awards it, which is exactly what must be SHOWN -- and the
+      old guard silently hid it, because '' is falsy. Live PvPoke ranks
+      move: on 2026-08-18 a rankings refresh pushed Sableye (Shadow)
+      from rank 30 to 31, so its rule went MODEL -> '' while its literal
+      badge stayed MODEL, and the page would have kept asserting MODEL
+      with no caveat.
+    """
+    if badge == 'FORCED' or rule == badge:
+        return ''
+    return rule or 'no badge'
+
+
 def badge_html(entry_or_badge):
     """Badge span. Given a full entry, a badge_rule that disagrees with
     the literal badge is SHOWN (the plan records both precisely so the
@@ -174,8 +196,9 @@ def badge_html(entry_or_badge):
         badge, rule = entry_or_badge, entry_or_badge
     cls = BADGE_CLASS.get(badge, 'badge-model')
     label = esc(badge)
-    if rule and rule != badge:
-        label += f' <small>(rule: {esc(rule)})</small>'
+    div = rule_divergence(badge, rule)
+    if div:
+        label += f' <small>(rule: {esc(div)})</small>'
     return f'<span class="badge {cls}">{label}</span>'
 
 
@@ -431,6 +454,53 @@ def injection_chip(entry):
                        or entry['injected_move_ids'])
     return (f' <span class="mband">({moves} injected: the pinned sim '
             'gamemaster predates the CD)</span>')
+
+
+DEEP_ANALYSIS_PAGES = {
+    # (species, "which fork is this") -> a root-level page carrying the
+    # full treatment of that fork. Linked only if the file exists.
+    'Thievul': ('thievul-lickilicky-robustness.html',
+                'the full Night Slash vs Play Rough treatment'),
+}
+
+
+def fork_siblings(entry, entries):
+    """Other meta entries that are the SAME species+shadow as this one --
+    i.e. the other arms of a moveset fork. Empty for every unforked
+    entry, which is all of them until 2026-08-18."""
+    return [e for e in entries
+            if e['species'] == entry['species']
+            and bool(e['shadow']) == bool(entry['shadow'])
+            and e['species_id'] != entry['species_id']]
+
+
+def fork_html(entry, entries, website_dir=WEBSITE_DIR):
+    """Cross-link block for a fork arm: names the fork axis in one line,
+    links every sibling arm's cheat sheet, and links the deep-analysis
+    page when one exists on disk (ship-gate rule: never link a file we
+    have not checked for)."""
+    sibs = fork_siblings(entry, entries)
+    if not sibs:
+        return ''
+    mine = ' + '.join(esc(m) for m in display_moveset(entry)[1])
+    links = []
+    for s in sibs:
+        theirs = ' + '.join(esc(m) for m in display_moveset(s)[1])
+        links.append(f'<a href="{sheet_filename(s["species_id"])}">'
+                     f'{esc(s["name"])}</a> ({theirs})')
+    deep = DEEP_ANALYSIS_PAGES.get(entry['species'])
+    deep_html = ''
+    if deep and (Path(website_dir) / deep[0]).exists():
+        deep_html = (f' For {esc(deep[1])}, see '
+                     f'<a href="{esc(deep[0])}">{esc(deep[0])}</a>.')
+    return ('<p class="section-intro"><strong>This is one arm of a '
+            f'{len(sibs) + 1}-way moveset fork.</strong> '
+            f'{esc(entry["name"])} runs {mine}; the other '
+            f'{"arm is" if len(sibs) == 1 else "arms are"} '
+            + ', '.join(links) + '. Same species, same fast move, same '
+            'stats and same IV ladder - only the second charged move '
+            'differs, so every row below is directly comparable between '
+            f'the arms.{deep_html}</p>')
 
 
 def injection_html(entry):
@@ -788,7 +858,8 @@ shown as data; we do not claim nerf vs model error.</p>
         extra_css=WORLDS_CSS)
 
 
-def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None):
+def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None,
+                       website_dir=WEBSITE_DIR):
     entries = meta['entries']
     names = {e['species_id']: e['name'] for e in entries}
     links = links or {}
@@ -871,9 +942,10 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None):
     # badge display and legend.
     own_badge = entry['badge']
     rule = entry.get('badge_rule', own_badge)
-    rule_note = (f' (the mechanical rule says {esc(rule)}; the divergence '
+    _div = rule_divergence(own_badge, rule)
+    rule_note = (f' (the mechanical rule says {esc(_div)}; the divergence '
                  'is deliberate and explained on the hub)'
-                 if rule and rule != own_badge else '')
+                 if _div else '')
     provenance_tail = (
         '<p class="section-intro">Selection provenance: this entry is '
         f'badged <strong>{esc(own_badge)}</strong>{rule_note}. Badges '
@@ -894,6 +966,7 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None):
     if entry['default_disagrees'] else ''}){injection_chip(entry)}.
 Focal spread: its rank-1 stat-product spread (hover cells for cohort
 sizes and margins).{dive_html}</p>
+{fork_html(entry, entries, website_dir)}
 {injection_html(entry)}
 {forced_html}
 {LEGEND}
@@ -958,7 +1031,8 @@ def build(website_dir=WEBSITE_DIR, planes_dir=wp.PLANES_DIR,
         render_hub(meta, cells, manifest, slug_map, links, fn, deferred))
     for e in entries:
         (website_dir / sheet_filename(e['species_id'])).write_text(
-            render_cheat_sheet(e, meta, cells, manifest, slug_map, links))
+            render_cheat_sheet(e, meta, cells, manifest, slug_map, links,
+                               website_dir))
     print(f'Wrote worlds.html + {len(entries)} cheat sheets to '
           f'{website_dir} ({len(cells)} cells, '
           f'{sum(1 for c in cells.values() if c.amber)} IV-decided '
