@@ -380,9 +380,12 @@ def test_shipped_meta_declares_the_injection_it_needs():
                 for e in entries}
     assert declared.get('thievul') == {'ICY_WIND'}, \
         'the Thievul Icy Wind injection is the reason this exists'
+    # Both arms of the moveset fork declare it independently -- the
+    # carve-out is per ENTRY, not per species.
+    assert declared.get('thievul_iw_pr') == {'ICY_WIND'}
     n_declared = 0
     for e in entries:
-        fast, charged = wb.legal_move_ids(e['name'])
+        fast, charged = wb.legal_move_ids(e.get('gamemaster_name') or e['name'])
         assert fast is not None, e['name']
         outside = ({e['fast_move_id']} - fast) | (
             set(e['charged_move_ids']) - charged)

@@ -57,7 +57,7 @@ the **"Worlds 2026 robustness analysis"** — never "deep dives".
   original "all usage evidence predates the June rebalance" claim here was
   WRONG for Turin; the shipped pages state the split explicitly.
 
-## The meta: 32 entries (31 at planning time + Thievul, added 2026-08-18)
+## The meta: 33 entries (31 at planning time + both Thievul arms, added 2026-08-18)
 
 Badges: **PLAYED** = top-25 recent usage AND top-30 current rank; **PLAYED**\*
 = top-25 usage, current rank sank below 30; **MODEL** = current top-30 rank,
@@ -100,7 +100,8 @@ Switch). Moveset rule: per-variant modal when modal% >= 60, else
 | 29  | Grumpig             | PLAYED* | 7.3%  | 43   | Psywave / Dynamic Punch / Shadow Ball     |
 | 30  | Diggersby           | PLAYED* | 8.3%  | 41   | Mud Shot / Fire Punch / Scorching Sands   |
 | 31  | Mantine             | FORCED  | 0.6%  | 53   | Wing Attack / Twister / Water Pulse       |
-| 32  | Thievul             | FORCED  | 0.1%  | 41   | Sucker Punch / Night Slash / Icy Wind     |
+| 32  | Thievul (NS+IW)     | FORCED  | 0.1%  | 41   | Sucker Punch / Night Slash / Icy Wind     |
+| 33  | Thievul (IW+PR)     | FORCED  | 0.1%  | 41   | Sucker Punch / Icy Wind / Play Rough      |
 
 Convention note (locked at meta.toml generation, 2026-08-10): the Usage
 column above mixes conventions — split species (Quagsire, Forretress) show
@@ -156,8 +157,8 @@ residual is the anchor-spread difference under their stat model. The
 model differs); no further action planned — the pair pages print OUR
 anchors explicitly.]
 
-Thievul (#32) is the third FORCED entry, added 2026-08-18 — the only
-entry added AFTER the meta table was first baked, and the reason the
+Thievul (#32 and #33) is the third and fourth FORCED entry, added
+2026-08-18 — the only entries added AFTER the meta table was first baked, and the reason the
 late-add path in the Guardrails section got exercised for real. It is a
 post-Community-Day editorial include (Michael): Icy Wind Thievul is
 Worlds-legal (the Nickit Community Day ran 2026-08-16, before Worlds Aug
@@ -167,6 +168,33 @@ post-CD PvPoke open-GL rank is ~41. It earns no badge on our axes —
 and all six corpus appearances predate the CD, when Thievul had no Icy
 Wind and sat at rank 122. Moveset is PvPoke's post-CD default, Sucker
 Punch / Night Slash + Icy Wind.
+
+**Thievul enters as TWO builds, a MOVESET FORK** (Michael, 2026-08-18).
+Both arms run Sucker Punch + Icy Wind and fork only on the second charged
+move: **NS+IW** (`thievul`, PvPoke's post-CD default, Night Slash) and
+**IW+PR** (`thievul_iw_pr`, the build the CD dive landed on, Play Rough).
+The reason is that the choice is genuinely contested and IV-CONDITIONAL
+per our own robustness analysis — Night Slash is better for
+top-stat-product spreads and is the more bait-robust arm, Icy Wind + Play
+Rough wins more matchups on breakpoint-clearing spreads — so a single row
+would take a side the data does not support. The full Night-Slash-vs-Play-
+Rough treatment is the root-level `thievul-lickilicky-robustness.html`,
+which both cheat sheets link.
+
+Mechanics of the fork (new schema, `worlds_meta.MovesetFork`): shadow
+variants already split a species into two entries, but they get a real
+gamemaster speciesId each; a moveset fork does not, so an arm carries an
+explicit made-up `species_id` plus a `gamemaster_name` for the real
+lookup. Two consequences worth stating: (a) the NS+IW arm keeps the bare
+`thievul` id it was first baked under rather than gaining a tidier
+symmetric suffix, because a changed/removed `species_id` fails
+`meta_delta` and forces a full re-bake — display labels are free to
+change, identities are not; (b) both arms are ordinary entries, so every
+pair between them and the rest of the meta is baked INCLUDING the
+cross-arm pair, and only the true self-mirror is excluded (which
+`itertools.combinations` already does by identity). Usage and rank are
+species-level facts the corpus cannot split, so both arms print the same
+figures rather than a fabricated per-arm share.
 
 **Icy Wind is INJECTED, and the pages say so.** We sim on the pinned
 pre-Worlds gamemaster 8f1d6cca5c0f (pvpoke f60a41199), which predates
