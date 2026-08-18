@@ -122,15 +122,17 @@ def test_is_baked_requires_entry_AND_file(tmp_path):
 
 
 def test_expected_tier1_keys_from_real_meta():
-    """C(31,2)=465 pairs x 2 directions x 2 bait modes. == is legitimate
-    here: the expectation derives from the same meta the driver bakes
-    from (testing-policy exception)."""
+    """C(n,2) pairs x 2 directions x 2 bait modes. == is legitimate here:
+    the expectation derives from the same meta the driver bakes from
+    (testing-policy exception). n is NOT pinned -- the meta grows
+    (31 -> 32 when Thievul was added 2026-08-18)."""
     import tomllib
+    import worlds_meta as wm
     entries = tomllib.load(open(wp.META_TOML, 'rb'))['entries']
     keys = wp.expected_tier1_keys(entries)
     n = len(entries)
-    assert n == 31
-    assert len(keys) == (n * (n - 1) // 2) * 2 * 2 == 1860
+    assert n == len(wm.META) >= 31
+    assert len(keys) == (n * (n - 1) // 2) * 2 * 2
     assert wp.pair_key('tinkaton', 'mantine', True) in keys
     assert wp.pair_key('mantine', 'tinkaton', False) in keys
     assert not any('aegislash_blade' in k for k in keys)

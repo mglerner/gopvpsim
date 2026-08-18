@@ -41,7 +41,7 @@ our engine reproduces both to <0.1 under the minimal ENERGY-LEGAL plan
 Stage axes: stage-0 reach cutoffs are conservative (safe) but stage-0
 DENY cutoffs are optimistic whenever the attacker carries an
 opponent-def debuff (Bulldoze: "denies at 170.36 def" becomes ~213 once
-one lands). 10 of the 31 meta entries carry a stage-moving move, so
+one lands). A third of the meta entries carry a stage-moving move, so
 every cutoff function takes explicit ``stage_atk`` / ``stage_def`` and
 ``movable_stage_axes`` reports which axes a pair can move (delegating
 to deep_dive_signature.movable_axes -- the audited superset of the

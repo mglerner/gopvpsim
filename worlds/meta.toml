@@ -11,7 +11,7 @@
 format_confirmed = true
 format = "open GL 1500 + Play! banned list"
 mechanics = "legacy (old system; Worlds-confirmed)"
-generated = "2026-08-14"
+generated = "2026-08-18"
 
 usage_source = "docs/tournament_data/cs_2026_*.json (Dracoviz)"
 usage_recent_cutoff = "2026-03"
@@ -809,6 +809,35 @@ moveset_n = 11
 default_disagrees = false
 default_fast_move_id = "WING_ATTACK"
 default_charged_move_ids = ["TWISTER", "WATER_PULSE"]
+
+[[entries]]
+name = "Thievul"
+species = "Thievul"
+species_id = "thievul"
+shadow = false
+badge = "FORCED"
+badge_rule = ""
+forced_reason = "post-CD editorial include (Michael, 2026-08-18): Icy Wind Thievul is Worlds-legal (CD 08-16 precedes Worlds; not on the Play! banned list); PvPoke GL rank ~41; no tournament footprint yet. Exact corpus figures: 1 of 1,801 recent open-GL teams (0.06%), 6 of 3,649 across the whole corpus, 0 of 128 top-cut teams -- and every one of those predates the Community Day, when Thievul had no Icy Wind and sat at PvPoke GL rank 122."
+current_rank = 41
+usage_rank = 480
+usage_recent_pct = 0.06
+usage_recent_pooled_pct = 0.06
+usage_all_pct = 0.16
+usage_old_pct = 0.27
+usage_topcut_pct = 0.00
+fast_move = "Sucker Punch"
+charged_moves = ["Icy Wind", "Night Slash"]
+fast_move_id = "SUCKER_PUNCH"
+charged_move_ids = ["ICY_WIND", "NIGHT_SLASH"]
+moveset_source = "default"
+moveset_modal_pct = 100.00
+moveset_n = 1
+default_disagrees = false
+default_fast_move_id = "SUCKER_PUNCH"
+default_charged_move_ids = ["ICY_WIND", "NIGHT_SLASH"]
+injected_move_ids = ["ICY_WIND"]
+injected_moves = ["Icy Wind"]
+injection_note = "Icy Wind injected: the pinned sim gamemaster predates the Community Day. We sim on pvpoke f60a41199 (gamemaster 8f1d6cca5c0f), the pre-Worlds vintage every other number on this site was baked at, and it still lists Thievul without Icy Wind. Upstream pvpoke added Icy Wind to Thievul as an elite charged move on 2026-08-14 (commit f754cd6fc), so the injected move pool matches current pvpoke exactly -- but the move data itself comes from the pinned gamemaster, where Icy Wind already exists (other species learn it). Nothing else about Thievul is injected."
 
 [[rejects]]
 name = "Cradily"

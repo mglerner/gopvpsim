@@ -303,3 +303,121 @@ def test_cohort_indices_shape():
     union_a, _, a_mask_a = wb.cohort_indices('Aegislash (Shield)', False)
     beyond = [i for i, m in zip(union_a, a_mask_a) if m and i >= 512]
     assert beyond, 'atk-band cohort never left top-512 -- fixture stale?'
+
+
+# ---------------------------------------------------------------------------
+# CD-move injection carve-out (2026-08-18, Thievul / Icy Wind)
+# ---------------------------------------------------------------------------
+
+def _thievul_entry(**over):
+    """A Thievul meta entry shaped like worlds_meta emits it."""
+    e = {
+        'name': 'Thievul', 'species': 'Thievul', 'species_id': 'thievul',
+        'shadow': False,
+        'fast_move_id': 'SUCKER_PUNCH',
+        'charged_move_ids': ['ICY_WIND', 'NIGHT_SLASH'],
+        'injected_move_ids': ['ICY_WIND'],
+    }
+    e.update(over)
+    return e
+
+
+def test_icy_wind_is_absent_from_thievul_pinned_pool():
+    """The premise of the whole carve-out, pinned: our gamemaster really
+    does lag. If this ever fails the gamemaster has moved off the Worlds
+    pin (or upstream landed), and the injection must be retired, not
+    kept -- CLAUDE.md's cd_prep rule."""
+    fast, charged = wb.legal_move_ids('Thievul')
+    assert fast is not None, 'Thievul missing from the gamemaster'
+    assert 'ICY_WIND' not in charged
+    assert 'ICY_WIND' not in fast
+    # ... while the move itself exists in the global moves db, so the
+    # injected move DATA is the pinned vintage's, not invented.
+    assert 'ICY_WIND' in wb.all_move_ids()
+
+
+def test_injection_admits_the_declared_move():
+    """PRE-FIX VALUE: without injected_move_ids this entry hard-exits
+    ('charged ICY_WIND not legal') -- that was the behavior before
+    2026-08-18 and is what the carve-out changes."""
+    with pytest.raises(SystemExit, match='ICY_WIND'):
+        wb.preflight_moveset_legality([_thievul_entry(injected_move_ids=[])])
+    wb.preflight_moveset_legality([_thievul_entry()])      # no exit
+
+
+def test_injection_is_per_entry_and_never_widens_a_neighbour():
+    """The widening must not leak: a second entry in the SAME call that
+    does not declare the injection still fails on the same move id."""
+    other = _thievul_entry(name='Thievul', species_id='thievul_copy',
+                           injected_move_ids=[])
+    with pytest.raises(SystemExit, match='ICY_WIND'):
+        wb.preflight_moveset_legality([_thievul_entry(), other])
+
+
+def test_dead_injection_is_an_error():
+    """Declaring a move the entry does not run would widen the legality
+    check for nothing -- exactly the silent hole the preflight exists to
+    close."""
+    dead = _thievul_entry(charged_move_ids=['NIGHT_SLASH', 'PLAY_ROUGH'])
+    with pytest.raises(SystemExit, match='dead injection'):
+        wb.preflight_moveset_legality([dead])
+
+
+def test_injection_of_an_unknown_move_id_is_an_error():
+    bogus = _thievul_entry(charged_move_ids=['NOT_A_MOVE', 'NIGHT_SLASH'],
+                           injected_move_ids=['NOT_A_MOVE'])
+    with pytest.raises(SystemExit, match='not in the gamemaster moves db'):
+        wb.preflight_moveset_legality([bogus])
+
+
+def test_shipped_meta_declares_the_injection_it_needs():
+    """Contract at the boundary: every meta entry whose moveset leaves
+    the species' pinned pool must declare it, and every declared
+    injection must be genuinely outside the pool (a stale declaration
+    after the gamemaster catches up is dead weight worth catching)."""
+    entries = tomllib.load(open(wp.META_TOML, 'rb'))['entries']
+    declared = {e['species_id']: set(e.get('injected_move_ids') or [])
+                for e in entries}
+    assert declared.get('thievul') == {'ICY_WIND'}, \
+        'the Thievul Icy Wind injection is the reason this exists'
+    n_declared = 0
+    for e in entries:
+        fast, charged = wb.legal_move_ids(e['name'])
+        assert fast is not None, e['name']
+        outside = ({e['fast_move_id']} - fast) | (
+            set(e['charged_move_ids']) - charged)
+        assert outside == declared[e['species_id']], (
+            f"{e['name']}: moveset leaves the pinned pool on {sorted(outside)} "
+            f"but declares {sorted(declared[e['species_id']])}")
+        n_declared += bool(declared[e['species_id']])
+    assert n_declared >= 1                     # scanner self-test
+
+
+# ---------------------------------------------------------------------------
+# worlds_code lineage blessing
+# ---------------------------------------------------------------------------
+
+def test_bless_refuses_unproven_or_mismatched_predecessors():
+    """Default-deny: blessing needs BOTH a written proof (a lineage key)
+    and agreement with what the planes were actually baked under."""
+    known = next(iter(wb.WORLDS_CODE_LINEAGE))
+    with pytest.raises(SystemExit, match='not in WORLDS_CODE_LINEAGE'):
+        wb.bless_worlds_code({'worlds_code': 'deadbeef0000', 'entries': {}},
+                             'deadbeef0000')
+    with pytest.raises(SystemExit, match='refusing to bless'):
+        wb.bless_worlds_code({'worlds_code': 'somethingelse', 'entries': {}},
+                             known)
+
+
+def test_bless_restamps_and_records_the_lineage():
+    known = next(iter(wb.WORLDS_CODE_LINEAGE))
+    m = {'worlds_code': known, 'entries': {'a|b|bait': {}}}
+    out = wb.bless_worlds_code(m, known)
+    assert out['worlds_code'] == wp.worlds_code_hash()
+    rec, = out['worlds_code_lineage']
+    assert rec['from'] == known and rec['to'] == wp.worlds_code_hash()
+    assert wb.WORLDS_CODE_LINEAGE[known] in rec['reason']
+    # One-shot: the predecessor is no longer the stamp, so a second
+    # blessing of the same hash cannot fire.
+    with pytest.raises(SystemExit, match='refusing to bless'):
+        wb.bless_worlds_code(out, known)
