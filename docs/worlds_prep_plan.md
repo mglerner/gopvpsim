@@ -57,7 +57,7 @@ the **"Worlds 2026 robustness analysis"** — never "deep dives".
   original "all usage evidence predates the June rebalance" claim here was
   WRONG for Turin; the shipped pages state the split explicitly.
 
-## The meta: 31 entries
+## The meta: 32 entries (31 at planning time + Thievul, added 2026-08-18)
 
 Badges: **PLAYED** = top-25 recent usage AND top-30 current rank; **PLAYED**\*
 = top-25 usage, current rank sank below 30; **MODEL** = current top-30 rank,
@@ -100,6 +100,7 @@ Switch). Moveset rule: per-variant modal when modal% >= 60, else
 | 29  | Grumpig             | PLAYED* | 7.3%  | 43   | Psywave / Dynamic Punch / Shadow Ball     |
 | 30  | Diggersby           | PLAYED* | 8.3%  | 41   | Mud Shot / Fire Punch / Scorching Sands   |
 | 31  | Mantine             | FORCED  | 0.6%  | 53   | Wing Attack / Twister / Water Pulse       |
+| 32  | Thievul             | FORCED  | 0.1%  | 41   | Sucker Punch / Night Slash / Icy Wind     |
 
 Convention note (locked at meta.toml generation, 2026-08-10): the Usage
 column above mixes conventions — split species (Quagsire, Forretress) show
@@ -154,6 +155,46 @@ residual is the anchor-spread difference under their stat model. The
 165.73 deny and the 4/1/12 anchor identity remain unmapped (their stat
 model differs); no further action planned — the pair pages print OUR
 anchors explicitly.]
+
+Thievul (#32) is the third FORCED entry, added 2026-08-18 — the only
+entry added AFTER the meta table was first baked, and the reason the
+late-add path in the Guardrails section got exercised for real. It is a
+post-Community-Day editorial include (Michael): Icy Wind Thievul is
+Worlds-legal (the Nickit Community Day ran 2026-08-16, before Worlds Aug
+28-30, and Thievul is absent from the Play! banned list), and the
+post-CD PvPoke open-GL rank is ~41. It earns no badge on our axes —
+0.06% recent open-GL usage (1 of 1,801 teams), 0 of 128 top-cut teams,
+and all six corpus appearances predate the CD, when Thievul had no Icy
+Wind and sat at rank 122. Moveset is PvPoke's post-CD default, Sucker
+Punch / Night Slash + Icy Wind.
+
+**Icy Wind is INJECTED, and the pages say so.** We sim on the pinned
+pre-Worlds gamemaster 8f1d6cca5c0f (pvpoke f60a41199), which predates
+the CD: it lists Thievul with chargedMoves [NIGHT_SLASH, PLAY_ROUGH] and
+no eliteMoves. Upstream pvpoke f754cd6fc ("Icy Wind Thievul",
+2026-08-14) adds ICY_WIND to BOTH chargedMoves and eliteMoves, so the
+lag is PROVEN, not inferred from absence — CLAUDE.md's Baxcalibur trap
+avoided — and the injected pool equals current pvpoke's pool exactly.
+Mechanism: a per-entry `injected_move_ids` list in `worlds/meta.toml`
+(from `worlds_meta.INJECTED_MOVES`), honored by
+`worlds_bake.preflight_moveset_legality` only for the declaring entry
+and only for ids that exist in the pinned gamemaster's global moves db;
+a DEAD injection (declared but not run) is an error at both generation
+and preflight time. Disclosure: the full note on Thievul's cheat sheet,
+a chip on the hub's moveset cell, and one sentence in the provenance
+line every Worlds page carries. Retire the table (and this paragraph)
+once the un-pinned gamemaster stably lists the move.
+
+The late add cost one `worlds_code` bump (the preflight edit), which
+would normally force a cold re-bake of all 1,860 Tier-1 planes. Per
+CLAUDE.md's migration doctrine it was blessed forward instead:
+`worlds_bake.WORLDS_CODE_LINEAGE` carries a written proof that the FULL
+producer delta since 653d776f9028 cannot change any baked plane,
+consumed once via an explicit `--bless-worlds-code` flag that records
+the blessing in the manifest. Verified after the bake: 0 of the 1,860
+pre-existing manifest entries changed and 0 pre-existing npz files were
+touched; the 124 new planes (31 new pairs x 2 directions x 2 bait modes)
+took 10.2 s.
 
 Runner-ups that stay OUT but render as rejects on the candidate page:
 Cradily (biggest faller, -34.6pp old->recent), Talonflame, Annihilape (rank
