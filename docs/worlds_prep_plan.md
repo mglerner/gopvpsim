@@ -178,12 +178,26 @@ would take a side. The full Night-Slash-vs-Play-Rough treatment is the
 root-level `thievul-lickilicky-robustness.html`, which both cheat sheets
 link.
 
-**One clause of the going characterization does NOT reproduce on this
-matrix, and the shipped prose says so.** The framing carried in was
-"Night Slash is better for top-stat-product spreads and is the more
-bait-robust arm; Icy Wind + Play Rough wins more matchups on
-breakpoint-clearing spreads." Summed over all 9 scenarios and the 31
-shared opponents (279 cells per slice), the Worlds planes give:
+**The fork rationale, scoped -- and cross-checked against these planes.**
+The one-line framing that came in ("NS better for top-stat-product
+spreads, IW+PR better for breakpoint-clearing spreads, NS more
+bait-robust") dropped a scope qualifier and, taken meta-wide,
+is contradicted by the two rows now rendering side by side. Resolved
+2026-08-18 (coordinator relay error, not an error in the deep analysis).
+The verified, scoped claims and how this matrix bears on each:
+
+1. **"NS better for top-stat-product spreads" is a LICKILICKY claim, not
+   a meta-wide one** -- and our planes reproduce the deep analysis's own
+   number exactly. At 1-1 vs the top-512 Lickilicky cohort, the rank-1 SP
+   Thievul spread beats 512/512 with Night Slash and 373/512 (72.9%) with
+   Play Rough. The same matchup flips on the max-attack probe spread
+   (83/512 NS vs 512/512 PR), and at 2-2 (66.8% NS vs 100% PR) -- which
+   is precisely the IV-conditionality the fork exists to avoid papering
+   over.
+2. **Meta-wide on win count with baiting, IW+PR leads on every slice**,
+   including top-SP. Deep analysis (88-mon pool, 1-1): top-SP-10 mean
+   62.1W vs 49.0W. This matrix, summed over 9 scenarios x 31 shared
+   opponents (279 cells per slice):
 
 | slice (probe spread / cohort / mode) | NS+IW  | IW+PR  | delta |
 | ------------------------------------ | ------ | ------ | ----- |
@@ -196,18 +210,19 @@ shared opponents (279 cells per slice), the Worlds planes give:
 | max-atk / atk-band / bait            | 150.69 | 159.62 | +8.94 |
 | max-atk / atk-band / no-bait         | 152.25 | 153.31 | +1.06 |
 
-So Play Rough is ahead on BOTH probe spreads here, including the
-top-stat-product one — the opposite of the carried-in clause. The
-bait-robustness half DOES reproduce, and strongly: switching the focal
-side to no-bait moves IW+PR by 8.11 and NS+IW by 0.72 (rank-1/top-512),
-so nearly all of Play Rough's margin is bait-dependent. Every gap is
-small against 279 (3.4% at most), and these are single-slice win COUNTS
-on our cohort convention, not a verdict. The discrepancy is most likely
-a difference of pool and convention (the deep analysis runs an 88-mon
-pool at 1-1; this matrix runs 31 opponents x 9 scenarios x two cohorts),
-NOT a contradiction of the deep analysis on its own terms -- but it is
-recorded here and in the shipped forced_reason rather than papered over,
-because both rows render side by side on the hub.
+   Same direction as the deep analysis, independently.
+3. **NS's bait-robustness is general**, and the no-bait columns above
+   measure it: switching the focal side to no-bait moves IW+PR by 8.11
+   and NS+IW by 0.72 (rank-1/top-512), so nearly all of Play Rough's
+   margin is bait-dependent.
+4. **NS also led on MEAN BATTLE RATING** (PvPoke's metric) and at 2-2 on
+   the 88-mon pool -- a different metric from win count, which is why the
+   two analyses can both be right.
+
+The shipped forced_reason states all four scoped, attributes the 88-pool
+figures to the linked analysis rather than to this matrix, and names the
+matrix's own convention -- so no claim on the page is contradicted by the
+data beside it.
 
 Mechanics of the fork (new schema, `worlds_meta.MovesetFork`): shadow
 variants already split a species into two entries, but they get a real

@@ -7,11 +7,11 @@ the {layer} x {lens} rule (the layer that RUNS and the lens that asks
 "does it survive"):
 
 [1] Tier-1 manifest present, stamps CURRENT (engine/gamemaster/
-    producer), coverage exactly the 1,860-key worklist (== is the
+    producer), coverage exactly the expected_tier1_keys worklist (== is the
     documented testing-policy exception: derived from the same meta).
 [2] Tier-2 manifest (when present) stamps current; every entry's file
     exists; deferred list == amber pairs without full grids.
-[3] Rendered surfaces exist and agree: hub + 31 cheat sheets +
+[3] Rendered surfaces exist and agree: hub + one cheat sheet per entry +
     worlds-cmp + worlds-explorer; one pair page per fully-baked amber
     pair, no orphans; hub FN numbers match a fresh worlds_fn.fn_rate().
 [4] No artifact matches *_great.toml (iOS bundler collision).
