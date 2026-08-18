@@ -31,6 +31,7 @@ the first (Lickitung) page:
   sensitive scenarios -- not a hidden optimization choice.
 """
 import argparse
+import decimal
 import hashlib
 import json
 import pathlib
@@ -66,6 +67,19 @@ OPPONENTS = {
         'moveset_of': {'iwpr': 'SP/IW+PR', 'nsiw': 'SP/NS+IW'},
     },
 }
+
+
+def pct1(v):
+    """One decimal, rounded the way the page's JS rounds it.
+
+    Python's format() rounds half-to-even and JS toFixed rounds half-up,
+    which disagree on the 8 attainable coverage values that land exactly on
+    x.x5 (6.25 -> "6.2" vs "6.3"). The page renders the same quantity from
+    the raw counts, so this side must follow ITS rule or the two print
+    different numbers for one value.
+    """
+    return str(decimal.Decimal(repr(float(v))).quantize(
+        decimal.Decimal('0.1'), rounding=decimal.ROUND_HALF_UP))
 
 
 def fmt_ivs(ivs):
@@ -160,8 +174,13 @@ def main():
         # list: a card that states its own tiebreak chain (the NS+IW card
         # ranks on 1-1 first) must be able to show the number it ranked on.
         for label in won:
+            # Rounded ONCE, at render time. Storing 2dp here and printing
+            # 1dp downstream is a double round: 72.8515625 -> 72.85 ->
+            # "72.8%", while the page's own 1dp render of the raw value is
+            # "72.9%". 6dp is exact enough for the 1/512 and 1/4096 steps
+            # to round identically on both sides.
             out[label] = {
-                SCEN[si]: round(float(cov512[label][si][i]) * 100, 2)
+                SCEN[si]: round(float(cov512[label][si][i]) * 100, 6)
                 for si in range(len(SCEN))}
             out[label]['pretty'] = grid_pretty(label)
         return out
@@ -232,7 +251,10 @@ def main():
                    f'{ns_tiebreak}', i_ns,
                    [f'{n_tied_ns} spread{"" if n_tied_ns == 1 else "s"} '
                     f'tie on {ns_scens[0]} coverage under NS+IW'], [],
-                   'nsiw_bait', ns_scens)
+                   'nsiw_bait', ns_scens,
+                   {'n_tied': n_tied_ns,
+                    'metric': f'{ns_scens[0]} coverage under NS+IW',
+                    'tiebreak': ns_tiebreak})
 
     named = [
         ('The Licki smasher', f'Best {", ".join(pick_scens)} record vs '
@@ -242,7 +264,10 @@ def main():
           f'on the primary metric '
           f'({pick_scens[0]} top-512 coverage); tiebreak chain: {tiebreak}'],
          ['Optimized purely for this matchup; check the meta line before '
-          'committing dust.']),
+          'committing dust.'], primary, pick_scens,
+         {'n_tied': n_tied_smash,
+          'metric': f'{pick_scens[0]} top-512 coverage',
+          'tiebreak': tiebreak}),
         ('IV tech without meta cost', bal_note, i_bal, [], []),
         ('Max meta wins', f'Best overall-meta spread -- one of '
          f'{len(at_max)} tied at {max_meta}W (SP/IW+PR, 1-1); among the '
@@ -277,7 +302,7 @@ def main():
             _seen[key] = len(grid_groups)
             grid_groups.append([label])
 
-    def card(title, subtitle, i, extra, caveats, scens=None):
+    def card(title, subtitle, i, extra, caveats, scens=None, tie=None):
         # A card prints the SAME scenarios its own tiebreak chain ranked
         # on -- the NS+IW card is chosen on the NS+IW grid's sensitive
         # scenarios, so printing the primary grid's set underneath it
@@ -300,7 +325,7 @@ def main():
             # ONE decimal, matching the page's COV_DP: the band and the
             # verdict table render these same stored values, and the 2dp
             # repr here made one quantity print two ways.
-            covs = ', '.join(f'{s}: {m[group[0]][s]:.1f}%' for s in scens)
+            covs = ', '.join(f'{s}: {pct1(m[group[0]][s])}%' for s in scens)
             pretty = ' = '.join(m[la]['pretty'] for la in group)
             lines.append(f'[{pretty}] top-512 coverage -- {covs}')
         mw_line = ' / '.join(
@@ -315,10 +340,16 @@ def main():
                 'spread': spread_row(i), 'rank': i + 1,
                 'lines': lines + extra, 'metrics': m,
                 'scenarios': scens,
+                # STRUCTURED tie facts. The page used to recover these by
+                # regex from the prose line below, which broke the moment
+                # the sentence was pluralised; the prose stays for the
+                # card body, but the band reads these fields.
+                'tie': tie,
                 'caveats': caveats}
 
     def card_with_grid(spec):
-        c = card(*spec[:5], scens=(spec[6] if len(spec) > 6 else None))
+        c = card(*spec[:5], scens=(spec[6] if len(spec) > 6 else None),
+                 tie=(spec[7] if len(spec) > 7 else None))
         # Every card states the grid it was computed on, structurally --
         # the page no longer has to guess it from the subtitle.
         c['grid'] = spec[5] if len(spec) > 5 else primary

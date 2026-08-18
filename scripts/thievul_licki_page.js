@@ -64,8 +64,10 @@
     var head = (kind === 'browser') ? 'This browser cannot read the data.'
       : (kind === 'input') ? 'Nothing to show for that input.'
       : 'Data not baked yet.';
+    // The message is a full sentence following a full stop, so it is
+    // capitalised here rather than at each of the ~12 call sites.
     return '<div class="tl-missing"><strong>' + head + '</strong> '
-      + esc(msg) + '</div>';
+      + esc(capFirst(msg)) + '</div>';
   }
   function showMissing(id, msg, kind) {
     setHtml(id, missingBox(msg, kind));
@@ -621,10 +623,16 @@
   // and quoting what it actually says. Hand-written parallel prose drifted
   // from the code inside a single batch; this cannot.
   function cliffRuleText() {
+    // A FIXED pointer, so the disclosure is state-free: the live pointer
+    // varies with the grid dropdown, which made an "exactly these four"
+    // enumeration change under the reader.
+    var FIXED_PTR = 'switch the shield scenario (the caption names the '
+      + 'ones this page computes as still IV-decidable) to see where it '
+      + 'does.';
     function probe(pcts, clsPattern) {
       var fakeCov = { pct: pcts };
       var fakeSc = { cls: clsPattern, hi: 7, tier: [] };
-      return cliffExplanation(fakeSc, fakeCov).text;
+      return cliffExplanation(fakeSc, fakeCov, FIXED_PTR).text;
     }
     var n = N;
     function build(vals) {
@@ -1215,7 +1223,20 @@
   // how much they do. "Not saturated" was too weak a test: 1-0 varies by
   // 5 spreads out of 4096, so sending a reader there was sending them to
   // another flat wall.
-  function sensitivePointer(label) {
+  // The pointer is computed from the per-scenario coverage table, which
+  // exists for the all-4096 and top-512 cohorts only. Printed inside a
+  // cohort-scoped sentence under a NARROW cohort it could send the reader
+  // to another flat panel, so under those cohorts it is not printed at all
+  // (fixedPtr lets the rule disclosure quote a state-free version).
+  function pointerAvailable() {
+    return state.cohort === 'all' || state.cohort === 'top512';
+  }
+  function sensitivePointer(label, fixedPtr) {
+    if (fixedPtr) return fixedPtr;
+    if (!pointerAvailable()) {
+      return 'try the all-4096 or top-512 cohort, or another shield '
+        + 'scenario.';
+    }
     var s = saturationForGrid(label);
     if (!s) return 'try another shield scenario.';
     var nearly = (s.nearly || []).map(function (x) {
@@ -1224,7 +1245,9 @@
     var rest = scenarioComplement(
       (s.all || []).concat(s.hopeless || []).concat(nearly));
     var tbl = (D.cov || {})[label] || {};
-    var arr = tbl.all;
+    // The SAME cohort the sentence is scoped to.
+    var arr = (state.cohort === 'top512') ? tbl.top512 : tbl.all;
+    var cDenom = (state.cohort === 'top512') ? 512 : N;
     var scored = rest.map(function (sc) {
       var si = (META.scenarios || []).indexOf(sc);
       if (!arr || si < 0) return { sc: sc, range: Infinity };
@@ -1234,7 +1257,7 @@
         if (v < mn) mn = v;
         if (v > mx) mx = v;
       }
-      return { sc: sc, range: 100 * (mx - mn) / N };
+      return { sc: sc, range: 100 * (mx - mn) / cDenom };
     }).filter(function (o) { return o.range >= FLAT_RANGE_PP; })
       .sort(function (a, b) { return b.range - a.range; });
     if (!scored.length) {
@@ -1451,17 +1474,22 @@
     if (ti && typeof ti === 'object') {
       var n = ti.n_tied !== undefined ? ti.n_tied : ti.n;
       var tb = ti.tiebreak || ti.tie_break || '';
+      var mt = ti.metric || '';
       if (n !== undefined || tb) {
         return (n !== undefined ? 'one of ' + n + ' tied' : 'tied')
+          + (mt ? ' on ' + mt : '')
           + (tb ? '; tiebreak: ' + tb : '');
       }
     }
-    // Fall back to the assembly's own generated sentence, matched with a
-    // strict pattern -- if it does not match exactly, nothing is claimed.
+    // Fall back to the assembly's own generated sentence. This is a
+    // CROSS-FILE contract: pluralising the assembler's string silently
+    // broke this parser once, so the pattern accepts either spelling and
+    // a round-trip assert (assemble emits -> this parses) guards it. The
+    // structured `tie` field above is the primary path.
     var out = '';
     (c.lines || []).forEach(function (l) {
       var m2 = String(l).match(
-        /^(\d+) spread\(s\) tie on ([^;]+); tiebreak chain: (.+)$/);
+        /^(\d+) spreads?(?:\(s\))? tie on ([^;]+); tiebreak chain: (.+)$/);
       if (m2) out = 'one of ' + m2[1] + ' tied on ' + m2[2]
         + '; tiebreak: ' + m2[3];
     });
@@ -1884,7 +1912,6 @@
   // if the breakpoint drives the outcome the means rise across them. When
   // they do not, the colouring would quietly imply an explanation the data
   // does not support -- so the panel says so instead.
-  var CLIFF_EXPLAIN_GAP = 20;   // percentage points
   // Coverage range (percentage points) below which a view counts as flat:
   // no causal claim is made about it in either direction.
   var FLAT_RANGE_PP = 1.0;
@@ -1895,7 +1922,9 @@
     s = String(s || '');
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   }
-  function cliffExplanation(sc, cov) {
+  // ptrOverride: a FIXED pointer string, used only by the rule disclosure
+  // so its quoted examples do not vary with the grid dropdown.
+  function cliffExplanation(sc, cov, ptrOverride) {
     var sums = [0, 0, 0], counts = [0, 0, 0];
     for (var i = 0; i < N; i++) {
       var k = sc.cls[i];
@@ -1933,8 +1962,11 @@
           + commas(cov.pct.length) + ' ' + FOCAL + ' spreads sit '
           + (same ? 'at ' + fmt(cmn, 1) + '%'
             : 'between ' + fmt(cmn, 1) + '% and ' + fmt(cmx, 1) + '% (a '
-              + fmt(cmx - cmn, 2) + '-point spread)') + '. '
-          + capFirst(sensitivePointer(state.label)),
+              + fmt(cmx - cmn, 2) + '-point spread)') + '.'
+          // No pointer here: the ALREADY WON / UNWINNABLE / FLAT banner
+          // appended to this same caption carries it, and printing both
+          // repeated one sentence verbatim inside one caption.
+          + (ptrOverride ? ' ' + capFirst(ptrOverride) : ''),
         means: means, monotone: true, gap: 0, flat: true
       };
     }
@@ -2108,21 +2140,21 @@
     layout.shapes = thresholdShapes(sc, c);
     layout.annotations = thresholdAnnotations(sc, c);
     Plotly.react('tl-frontier-plot', traces, layout, { responsive: true });
+    // STATIC. This caption claimed control-independence in a sentence
+    // that itself tracked the colour control -- two rounds running. The
+    // colour here is fixed by construction, so the sentence has no state
+    // to read and cannot drift again.
     setHtml('tl-frontier-note',
       'Reading guide: UP is a better stat-product rank, RIGHT is more '
       + 'attack, and the frontier -- the upper-right edge -- is where IV '
       + 'tech lives, because those spreads buy attack without giving up '
-      + 'rank. Colour here is always the Sucker Punch breakpoint class'
-      + (state.cliffColor === 'sp'
-        ? ' (the same as the panel above).'
-        : ', which is NOT what the panel above is currently showing - that '
-          + 'one is coloured by '
-          + (state.cliffColor === 'def' ? 'defense' : 'HP') + '.')
-      + ' The dashed lines are the same breakpoint thresholds. This panel '
-      + 'does not depend on ANY of the controls -- not the moveset/bait '
-      + 'grid, not the shield scenario, not the ' + esc(OPP) + ' cohort: '
-      + 'it is the IV space itself, which is the same picture for every '
-      + 'grid.');
+      + 'rank. Colour here is ALWAYS the Sucker Punch breakpoint class '
+      + '(fixed for this panel; the colour control above applies to the '
+      + 'cliff panel only), and the dashed lines are the same breakpoint '
+      + 'thresholds. The picture itself is the IV space: it does not '
+      + 'change with the moveset/bait grid, the shield scenario or the '
+      + esc(OPP) + ' cohort. Only your own spreads (gold stars) and the '
+      + 'named builds are overlaid on it.');
   }
 
   // Named builds (deduped) + your own spreads, as overlay traces on any
@@ -2634,14 +2666,19 @@
       // defined, the tradeoff named, and its size stated -- three green
       // dots with no caption look equally like the finding and like a
       // broken render.
+      // The DEFINITION is the one renderPareto actually computes (the
+      // upper-right staircase, one point per step), so the printed size is
+      // the size of the set the sentence describes. The old wording
+      // defined a different set and printed this count beside it, off by
+      // up to 4,095. The trade-off claim is gone: it was asserted in every
+      // state, including the flat ones where no trade-off exists.
       'Reading guide: RIGHT is more meta wins, UP is more ' + esc(OPP)
-      + ' beaten, and the two trade off -- attack-heavy spreads take the '
-      + 'matchup, balanced spreads take the meta. The '
-      + '<strong>frontier</strong> (highlighted) is every spread that no '
-      + 'other spread beats on BOTH axes at once: '
+      + ' beaten. The <strong>frontier</strong> (highlighted) is the '
+      + 'upper-right staircase: a spread is on it when no other spread has '
+      + 'at least as many meta wins AND at least as much coverage; exact '
+      + 'ties are drawn once. That is '
       + esc(fmt(front.length, 0)) + ' of ' + esc(commas(N))
-      + ' here; the remaining ' + esc(commas(N - front.length))
-      + ' are dominated (some other spread is at least as good on both). '
+      + ' spreads here - every other point is at or behind a step of it. '
       + 'Meta axis: ' + esc(mw.note) + '. ' + esc(D.meta_wins.note || '')
       + ' ' + esc(OPP) + ' cohort: ' + esc(cohortLabel()) + '.'
       + esc(cohortWarnText())
@@ -2743,7 +2780,11 @@
           wonScen[f] = { won: wl, lost: ll };
         }
         // Panel B: which opponents beat the chosen focal (current scenario).
-        var scIdx = sis.indexOf(state.si);
+        // Under "all 9 (mean)" the table cannot average, so it shows ONE
+        // scenario -- deterministically the first embedded one, not
+        // whatever the reader happened to select before switching. Two
+        // readers in the same state must see the same table.
+        var scIdx = state.scenarioAll ? 0 : sis.indexOf(state.si);
         var useIdx = scIdx >= 0 ? scIdx : 0;
         var scUsed = sis[useIdx];
         var losses = [];
@@ -2830,13 +2871,12 @@
           + 'of those ' + denom + ' shield scenarios it wins against this '
           + OPP + ' (hover lists which). ' + esc(dcg.note)
           + ' Ties (score == 500) count as losses.'
-          // The shield dropdown moves the TABLE below and leaves this plot
-          // alone. That is by design (the y axis already IS the count over
-          // scenarios), but a reader watching one half of the section move
-          // has no way to know that without being told.
+          // STATIC and true in every state: this sentence was wrong under
+          // "all 9 (mean)" when it promised the table follows the
+          // dropdown. The table names its own scenario in its heading.
           + ' This plot does NOT follow the shield-scenario dropdown -- it '
-          + 'shows all ' + denom + ' at once, by construction. The table '
-          + 'below it does follow the dropdown.');
+          + 'shows all ' + denom + ' scenarios at once, by construction. '
+          + 'The table below shows ONE scenario, named in its heading.');
         var rows = losses.slice(0, 40).map(function (o2) {
           var L = D.licki;
           return '<tr><td>' + (o2 + 1) + '</td><td>' + ivStr('licki', o2)
@@ -2856,7 +2896,7 @@
           + FOCAL + ' win", so ties and losses are indistinguishable in it)'
           + (state.scenarioAll
             ? ' (the dropdown is on "all 9 (mean)", which this table cannot '
-              + 'average - it lists one concrete scenario, '
+              + 'average - it lists the first embedded scenario, '
               + esc(scenarioLabel(scUsed)) + ')'
             : (scUsed !== state.si
               ? ' (shown for ' + esc(scenarioLabel(scUsed))
@@ -3019,7 +3059,13 @@
       + 'boundary, NOT a defense any real spread has)',
     min_thievul_atk_for_hi_tier:
       'attack needed for the higher damage tier (continuous tier '
-      + 'boundary, NOT a realized spread stat)'
+      + 'boundary, NOT a realized spread stat)',
+    // The shipped blob spells this one with a "_vs_every_licki" tail, so
+    // the exact-key lookup above never fired and the unattainable cutoff
+    // printed bare beside a sibling that DID carry the caveat.
+    min_thievul_atk_for_hi_tier_vs_every_licki:
+      'attack needed for the higher damage tier against every opponent '
+      + '(continuous tier boundary, NOT a realized spread stat)'
   };
   // Keys in the breakpoint layer are spelled for the original opponent
   // ("lickitung"/"licki") and focal ("thievul"); the SPECIES they name is
@@ -3132,8 +3178,12 @@
     return String(label).replace(/\s*histogram\s*/ig, ' ')
       .replace(/\s*stage 0\s*/i, ' ')
       // The callers append "by <opponent> attack stage" themselves, so a
-      // label that already carries "by stage" doubled the phrase.
+      // label that already carries the phrase -- in either the bare "by
+      // stage" form or the key-derived "by <opponent> atk stage" form --
+      // doubled it.
       .replace(/\s*\bby stage\b\s*/ig, ' ')
+      .replace(new RegExp('\\s*by (?:' + OPP + '|' + FOCAL
+        + ') atk stage\\s*', 'ig'), ' ')
       .replace(/\s+/g, ' ').trim();
   }
   // What is being counted? A key naming PAIRS counts focal x opponent
@@ -3736,7 +3786,12 @@
         + commas(bpPop) + ' breakpoint-clearing ' + esc(FOCAL)
         + ' spreads -- there is no ' + esc(OPP) + ' answer:</strong> the '
         + 'best defense step denies ' + best.denies.bp2992 + ' of them. '
-        + (sameGrid ? 'That is the grid selected above.'
+        // LATENT-BUG GUARD: "selected above" is a claim about the
+        // dropdown, and sameGrid compares against the STATIC default --
+        // the same binding mismatch that was a blocker in the sibling
+        // branch. It is unreachable on both shipped pages; fixed here so
+        // the next opponent page cannot inherit it.
+        + (sameGrid ? 'That is also the grid this page defaults to.'
           : 'On ' + esc(gridAbbrev(defGrid)) + ', the grid this page '
             + 'defaults to, the picture differs -- see the ranked table '
             + 'below, where several builds deny most or all of that same '
@@ -4194,6 +4249,37 @@
     return bits.length
       ? ' Not shown as ranking columns: ' + bits.join('; ') + '.' : '';
   }
+  // The visible reason beside a chip. Three cases, one template each:
+  //   over cap  -- SAME sentence for focal and opponent rows (a focal
+  //                over-cap row used to get the chip and nothing else),
+  //                stating the criterion that was actually CHECKED: the
+  //                scanned level is above the analyzed build's level. The
+  //                old wording asserted a CP fact nobody computed and the
+  //                adjacent "CP now" cell contradicted it.
+  //   opponent  -- what the spread is used for, as a properly conjoined
+  //                list (the optional third item used to land after an
+  //                existing "and").
+  //   focal     -- nothing; the row's numbers ARE the verdict.
+  function verdictNote(r) {
+    if (r.overCap) {
+      var lv = (r.u.level !== undefined && r.u.level !== null)
+        ? 'L' + r.u.level : 'its scanned level';
+      var gl = (r.u.gridLevel !== undefined && r.u.gridLevel !== null)
+        ? 'L' + r.u.gridLevel : 'the analyzed build\'s level';
+      return ' <span class="tl-note">scanned at ' + esc(lv) + ', above the '
+        + esc(LEAGUE_CAP_TEXT) + '-capped build for these IVs (' + esc(gl)
+        + '), and power-ups are one-way - so this one can no longer BE that '
+        + 'build. It is not fed to the other panels.</span>';
+    }
+    if (r.focal) return '';
+    var uses = ['the heatmap overlay', 'the drill-down picker'];
+    if (D.licki_denial) uses.push('the anti-' + FOCAL + ' section');
+    var list = uses.length > 1
+      ? uses.slice(0, -1).join(', ') + ' and ' + uses[uses.length - 1]
+      : uses[0];
+    return ' <span class="tl-note">not ranked here - this ' + esc(OPP)
+      + ' spread feeds ' + esc(list) + '.</span>';
+  }
   // A ranked verdict table, not a matching log: every column is a number
   // you would use to decide which of YOUR mons to build, and the row order
   // IS the recommendation (the reco blob's own tiebreak chain).
@@ -4343,19 +4429,7 @@
         + cells + otherCell
         + '<td>' + (r.tier === null ? '-' : esc(r.tier)) + '</td>'
         + '<td>' + (r.wins === null ? '-' : esc(fmt(r.wins, 0))) + '</td>'
-        + '<td>' + chips
-          + (r.focal ? ''
-            : ' <span class="tl-note">'
-              + (r.overCap
-                ? 'over the ' + esc(LEAGUE_CAP_TEXT) + ' cap at its '
-                  + 'scanned level, so it is not usable at this league and '
-                  + 'is NOT fed to the other panels.'
-                : 'not ranked here - this ' + esc(OPP) + ' spread feeds '
-                  + 'the heatmap overlay and the drill-down picker'
-                  + (D.licki_denial ? ' and the anti-' + esc(FOCAL)
-                    + ' section' : '') + '.')
-              + '</span>')
-        + '</td>'
+        + '<td>' + chips + verdictNote(r) + '</td>'
         + '<td>' + (r.i >= 0
           ? '<button data-drop="' + r.i + '">remove</button>' : '')
         + '</td></tr>';
@@ -4518,15 +4592,25 @@
     // one-way -- so there is no legal build. We compute that CP and say so
     // rather than dropping the row in silence.
     var dropped = [];
-    // ANALYZED species only. C.collectionSpecies is the wider read set
-    // (the whole evolution line on both sides); a row of a species this
-    // page reads but never ranks is already reported in the "does not
-    // analyze" clause above, and must not be repeated here as an
-    // "analyzed species" that produced no build.
-    var relevant = C.analyzedSpecies || C.collectionSpecies || [];
+    // EVERY parsed row must land in exactly one bucket. Round 4 narrowed
+    // this loop to the analyzed species to fix a mislabelled report, and
+    // thereby dropped unbuildable rows of a merely-READ species in total
+    // silence. The species list decides the WORDING, never whether the
+    // row is reported.
+    var analyzed = C.analyzedSpecies || C.collectionSpecies || [];
+    var known = C.collectionSpecies || [];
+    var notRead = 0;
     mons.forEach(function (mon) {
-      if (relevant.indexOf(mon.name) < 0) return;
       if (matchedMons.indexOf(mon) >= 0) return;
+      if (known.indexOf(mon.name) < 0) { notRead++; return; }
+      if (analyzed.indexOf(mon.name) < 0) {
+        // Read but not ranked (a Lickilicky on the Lickitung page). It
+        // belongs in the "related species" bucket, with the reason when
+        // there is one, NOT in the analyzed-species footnote.
+        other.push(mon.name + ' ' + mon.atk_iv + '/' + mon.def_iv + '/'
+          + mon.sta_iv + ' (no usable build at L' + mon.level + ')');
+        return;
+      }
       // The species ITSELF comes first: on the Lickitung page a scanned
       // Lickitung IS the analyzed species, and looking only at what it
       // evolves into classified it as an over-cap Lickilicky -- so it fell
@@ -4566,6 +4650,7 @@
             break;
           }
         }
+        if (dup) { dupes++; }
         if (!dup) {
           state.overCap.push({
             side: oside, idx: oidx,
@@ -4597,6 +4682,12 @@
         + mon.sta_iv + ' (L' + mon.level + ')'
         + (why ? ' - ' + why : ' - no build in the analyzed grid'));
     });
+    // CLOSURE: the buckets must add up to what was parsed. This is a
+    // visible statement, not a silent invariant -- the last two rounds
+    // both lost rows in a bucket that stopped being reached.
+    var accounted = added + dupes + overCapN + offGrid + other.length
+      + dropped.length + notRead;
+    var unaccounted = mons.length - accounted;
     setHtml('tl-csv-status',
       '<p class="tl-note">Parsed ' + plural(mons.length, 'row') + '; added '
       + plural(added, 'new spread') + ' to the table'
@@ -4610,6 +4701,16 @@
         ? '; ' + plural(other.length, 'row') + ' of a related species this page '
           + 'reads but does not analyze, so they are listed here rather '
           + 'than ranked (' + esc(other.slice(0, 6).join(', ')) + ')'
+        : '')
+      + (notRead
+        ? '; ' + plural(notRead, 'row') + ' of a species this page does '
+          + 'not read (a full export lists your whole collection; only '
+          + esc(known.join(', ')) + ' are read here)'
+        : '')
+      + (unaccounted
+        ? '; ' + plural(unaccounted, 'row') + ' this page could not '
+          + 'classify (report this - every row should fall in one of the '
+          + 'categories above)'
         : '')
       + '. Nothing leaves your browser.</p>'
       + (dropped.length
