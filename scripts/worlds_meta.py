@@ -45,6 +45,7 @@ import json
 import os
 import re
 import sys
+from typing import NamedTuple
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, 'src'))
@@ -102,8 +103,45 @@ _FORM_DEFAULTS = {
 # ---------------------------------------------------------------------------
 # THE HUMAN DECISION: the entries, their badges, and forced provenance.
 # Order is the plan table's order (docs/worlds_prep_plan.md "The meta").
-# Fields: (species display name, shadow, badge, forced provenance or None).
+# Fields: (species display name, shadow, badge, forced provenance or None)
+# plus an OPTIONAL 5th element, a MovesetFork, for the rows that enter the
+# meta twice on the same species with different charged moves. Rows without
+# a fork stay 4-tuples so the 31 original decisions are untouched.
 # ---------------------------------------------------------------------------
+
+
+class MovesetFork(NamedTuple):
+    """One arm of a same-species moveset fork.
+
+    Shadow variants already split one species into two entries, and the
+    schema handles that with a real gamemaster speciesId per variant
+    (``quagsire`` / ``quagsire_shadow``). A MOVESET fork has no such
+    speciesId, so:
+
+    * ``species_id`` is an explicit, made-up identity. It is the entry's
+      key EVERYWHERE downstream -- plane filenames, manifest pair keys,
+      cheat-sheet filenames -- so it must never change once baked (a
+      changed/removed species_id fails worlds_planes.meta_delta and
+      forces a full re-bake). That is why the Night Slash arm keeps the
+      bare ``thievul`` it was first baked under rather than gaining a
+      tidier symmetric suffix.
+    * ``gamemaster_name`` is therefore emitted alongside, because
+      ``name`` is no longer a gamemaster-resolvable species name and the
+      bake's legality preflight needs the real one.
+    * both arms are real, distinct entries, so every pair between them
+      and the rest of the meta is baked -- INCLUDING the cross-arm pair.
+      Only the true self-mirror (an entry against itself) is excluded,
+      which itertools.combinations already does by identity.
+
+    ``label`` is the display suffix; it must name this arm's own fork
+    axis, because the arms share the rest of the moveset and a label
+    like "Thievul" vs "Thievul (Play Rough)" would read as "the real one
+    and a footnote".
+    """
+    label: str
+    species_id: str
+    fast_move_id: str
+    charged_move_ids: tuple
 
 AEGISLASH_REASON = (
     'Editorial include. Ships as aegislash_shield -- the real, '
@@ -130,6 +168,35 @@ THIEVUL_REASON = (
     'one of those predates the Community Day, when Thievul had no Icy '
     'Wind and sat at PvPoke GL rank 122.'
 )
+
+# The fork rationale, shared by both arms (Michael, 2026-08-18). It is a
+# refusal to take a side, not a recommendation: the two arms genuinely win
+# on different axes, and which one is better is IV-CONDITIONAL, so a single
+# row would silently pick for the reader.
+THIEVUL_FORK_REASON = (
+    ' Thievul enters the matrix as TWO builds, not one. Both run Sucker '
+    'Punch + Icy Wind and fork only on the second charged move: Night Slash '
+    "(PvPoke's post-CD default) or Play Rough (the build the Community Day "
+    'dive landed on). The choice is genuinely contested and, per our own '
+    'robustness analysis, IV-CONDITIONAL rather than settled: Night Slash '
+    'is the better arm for top-stat-product spreads and is the more '
+    'bait-robust of the two, while Icy Wind + Play Rough wins more '
+    'matchups on breakpoint-clearing spreads. Shipping one row would take '
+    'a side the data does not support, so both are baked as full entries '
+    'and every pair between them and the rest of the meta -- including the '
+    'pair BETWEEN the two arms -- is simmed. Full Night-Slash-vs-Play-Rough '
+    'treatment: thievul-lickilicky-robustness.html.'
+)
+
+THIEVUL_NS_FORK = MovesetFork(
+    label='NS+IW', species_id='thievul',
+    fast_move_id='SUCKER_PUNCH',
+    charged_move_ids=('ICY_WIND', 'NIGHT_SLASH'))
+
+THIEVUL_PR_FORK = MovesetFork(
+    label='IW+PR', species_id='thievul_iw_pr',
+    fast_move_id='SUCKER_PUNCH',
+    charged_move_ids=('ICY_WIND', 'PLAY_ROUGH'))
 
 MANTINE_REASON = (
     'Editorial include (added 2026-08-10 at Michael\'s request). '
@@ -174,7 +241,10 @@ META = [
     ('Grumpig',            False, 'PLAYED*', None),
     ('Diggersby',          False, 'PLAYED*', None),
     ('Mantine',            False, 'FORCED',  MANTINE_REASON),
-    ('Thievul',            False, 'FORCED',  THIEVUL_REASON),
+    ('Thievul',            False, 'FORCED',  THIEVUL_REASON + THIEVUL_FORK_REASON,
+     THIEVUL_NS_FORK),
+    ('Thievul',            False, 'FORCED',  THIEVUL_REASON + THIEVUL_FORK_REASON,
+     THIEVUL_PR_FORK),
 ]
 
 # --- Community-Day move injection (the meta.toml half) ----------------------
@@ -195,22 +265,30 @@ META = [
 # injected pool is exactly current pvpoke's pool: the lag is real and the
 # injection is vintage-equivalent, not a guess. Retire this table once the
 # un-pinned gamemaster stably lists the move.
+#
+# Keyed by species_id (not display name) so a moveset fork's arms each
+# declare their own injection explicitly.
 INJECTED_MOVES = {
-    'Thievul': ['ICY_WIND'],
+    'thievul': ['ICY_WIND'],
+    'thievul_iw_pr': ['ICY_WIND'],
 }
 
+_ICY_WIND_NOTE = (
+    'Icy Wind injected: the pinned sim gamemaster predates the Community '
+    'Day. We sim on pvpoke f60a41199 (gamemaster 8f1d6cca5c0f), the '
+    'pre-Worlds vintage every other number on this site was baked at, and '
+    'it still lists Thievul without Icy Wind. Upstream pvpoke added Icy '
+    'Wind to Thievul as an elite charged move on 2026-08-14 (commit '
+    'f754cd6fc), so the injected move pool matches current pvpoke exactly '
+    '-- but the move data itself comes from the pinned gamemaster, where '
+    'Icy Wind already exists (other species learn it). Nothing else about '
+    'Thievul is injected: Sucker Punch, Night Slash and Play Rough are all '
+    "in Thievul's pinned legal pool."
+)
+
 INJECTION_NOTES = {
-    'Thievul': (
-        'Icy Wind injected: the pinned sim gamemaster predates the Community '
-        'Day. We sim on pvpoke f60a41199 (gamemaster 8f1d6cca5c0f), the '
-        'pre-Worlds vintage every other number on this site was baked at, '
-        'and it still lists Thievul without Icy Wind. Upstream pvpoke added '
-        'Icy Wind to Thievul as an elite charged move on 2026-08-14 (commit '
-        'f754cd6fc), so the injected move pool matches current pvpoke '
-        'exactly -- but the move data itself comes from the pinned '
-        'gamemaster, where Icy Wind already exists (other species learn it). '
-        'Nothing else about Thievul is injected.'
-    ),
+    'thievul': _ICY_WIND_NOTE,
+    'thievul_iw_pr': _ICY_WIND_NOTE,
 }
 
 # Reasons for the named runner-ups (plan: "Runner-ups that stay OUT but
@@ -547,16 +625,51 @@ def choose_moveset(display_name, species_name, shadow, usage, resolver):
 # Build
 # ---------------------------------------------------------------------------
 
+def fork_moveset(fork, species_name, shadow, resolver):
+    """choose_moveset's counterpart for a fork arm: the moveset is the
+    human decision in the MovesetFork itself, not a corpus/default
+    lookup. ``moveset_source`` still tells the truth about how it
+    relates to PvPoke -- 'default' when this arm IS PvPoke's pick, so
+    the arm that happens to match renders identically to a normal
+    default row, and 'variant' when it deliberately diverges."""
+    default_fast, default_charged = get_default_moveset(
+        species_name, 'great', shadow=shadow)
+    fast_id = fork.fast_move_id
+    charged_ids = sorted(fork.charged_move_ids)
+    is_default = (fast_id == default_fast
+                  and charged_ids == sorted(default_charged))
+    return {
+        'fast_move_id': fast_id,
+        'charged_move_ids': charged_ids,
+        'fast_move': resolver.move_name(fast_id),
+        'charged_moves': [resolver.move_name(m) for m in charged_ids],
+        'moveset_source': 'default' if is_default else 'variant',
+        'default_disagrees': not is_default,
+        'default_fast_move_id': default_fast,
+        'default_charged_move_ids': sorted(default_charged),
+    }
+
+
 def build_entries(usage, resolver):
     """The meta entries, in plan-table order."""
     entries = []
-    for species_name, shadow, badge, forced_reason in META:
-        display = f'{species_name} (Shadow)' if shadow else species_name
-        sid = resolver.species_id(display)
-        if sid is None:
-            raise SystemExit(f'error: {display!r} is not in the gamemaster')
-        usage_rank = usage.usage_rank(display)
-        current_rank = resolver.current_rank(display)
+    for row_spec in META:
+        species_name, shadow, badge, forced_reason = row_spec[:4]
+        # 5th element is optional: only moveset-fork rows carry one.
+        fork = row_spec[4] if len(row_spec) > 4 else None
+        # gm_name is the gamemaster/corpus-resolvable species name; display
+        # is what readers see. They differ ONLY for fork arms, so every
+        # non-fork row resolves exactly as it always did.
+        gm_name = f'{species_name} (Shadow)' if shadow else species_name
+        display = f'{species_name} ({fork.label})' if fork else gm_name
+        if resolver.species_id(gm_name) is None:
+            raise SystemExit(f'error: {gm_name!r} is not in the gamemaster')
+        sid = fork.species_id if fork else resolver.species_id(gm_name)
+        # Usage and rank are SPECIES-level facts: the corpus and PvPoke's
+        # rankings do not distinguish fork arms, so both arms show the same
+        # figures rather than a fabricated split.
+        usage_rank = usage.usage_rank(gm_name)
+        current_rank = resolver.current_rank(gm_name)
         row = {
             'name': display,
             'species': species_name,
@@ -566,17 +679,22 @@ def build_entries(usage, resolver):
             'badge_rule': classify_badge(usage_rank, current_rank),
             'current_rank': current_rank,
             'usage_rank': usage_rank,
-            'usage_recent_pct': usage.recent_pct(display),
+            'usage_recent_pct': usage.recent_pct(gm_name),
             'usage_recent_pooled_pct': usage.recent_pooled_pct(species_name),
-            'usage_all_pct': usage.all_pct(display),
-            'usage_old_pct': usage.old_pct(display),
-            'usage_topcut_pct': usage.topcut_pct(display),
+            'usage_all_pct': usage.all_pct(gm_name),
+            'usage_old_pct': usage.old_pct(gm_name),
+            'usage_topcut_pct': usage.topcut_pct(gm_name),
         }
-        row.update(choose_moveset(display, species_name, shadow,
-                                  usage, resolver))
+        if display != gm_name:
+            row['gamemaster_name'] = gm_name
+        if fork:
+            row.update(fork_moveset(fork, species_name, shadow, resolver))
+        else:
+            row.update(choose_moveset(gm_name, species_name, shadow,
+                                      usage, resolver))
         if forced_reason is not None:
             row['forced_reason'] = forced_reason
-        injected = INJECTED_MOVES.get(display)
+        injected = INJECTED_MOVES.get(sid)
         if injected:
             # A DEAD injection is a silent legality hole: it would widen
             # worlds_bake's preflight for a move the entry never runs. The
@@ -594,8 +712,12 @@ def build_entries(usage, resolver):
             row['injected_move_ids'] = sorted(injected)
             row['injected_moves'] = [resolver.move_name(m)
                                      for m in sorted(injected)]
-            row['injection_note'] = INJECTION_NOTES[display]
+            row['injection_note'] = INJECTION_NOTES[sid]
         entries.append(row)
+    ids = [e['species_id'] for e in entries]
+    if len(set(ids)) != len(ids):
+        raise SystemExit(f'error: duplicate species_id in META: '
+                         f'{sorted({i for i in ids if ids.count(i) > 1})}')
     return entries
 
 
@@ -663,7 +785,7 @@ def _emit_table(lines, header, row, keys):
 
 
 ENTRY_KEYS = [
-    'name', 'species', 'species_id', 'shadow',
+    'name', 'gamemaster_name', 'species', 'species_id', 'shadow',
     'badge', 'badge_rule', 'forced_reason',
     'current_rank', 'usage_rank',
     'usage_recent_pct', 'usage_recent_pooled_pct', 'usage_all_pct',
@@ -684,7 +806,12 @@ REJECT_KEYS = [
 def render(usage, resolver, generated):
     """Render the whole file as text. No narrative prose, no authored_by."""
     entries = build_entries(usage, resolver)
-    rejects = build_rejects(usage, resolver, {e['name'] for e in entries})
+    # Exclude by the GAMEMASTER name: a fork arm's display name ("Thievul
+    # (NS+IW)") never matches a corpus row, so filtering on display alone
+    # would let an in-meta species reappear as its own reject.
+    rejects = build_rejects(
+        usage, resolver,
+        {e.get('gamemaster_name', e['name']) for e in entries})
 
     lines = [
         '# Worlds 2026 robustness analysis -- meta of record.',

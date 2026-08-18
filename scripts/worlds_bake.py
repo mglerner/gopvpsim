@@ -122,6 +122,27 @@ WORLDS_CODE_LINEAGE = {
         'them; (b) only affects stamp comparison. Every one of the 1,860 '
         'planes baked under 653d776f9028 is therefore bit-identical under '
         'the new hash.'),
+    'e8a362c4dcc7': (
+        '2026-08-18, Thievul moveset fork (Michael: Thievul enters as TWO '
+        'builds, NS+IW and IW+PR). FULL producer delta since e8a362c4dcc7 '
+        '(git diff 2c8816d..HEAD over the four _WORLDS_SOURCE_FILES): '
+        'worlds_bake.py only -- (a) preflight_moveset_legality now resolves '
+        'the gamemaster entry via e.get("gamemaster_name") or e["name"], '
+        'because a fork arm\'s display name is not a speciesName, (b) this '
+        'lineage entry. worlds_planes.py, deep_dive_lib/robustness.py and '
+        'deep_dive_lib/sweep.py are byte-unchanged. (a) is again a pre-bake '
+        'CHECK that reads no plane input, and it resolves IDENTICALLY for '
+        'all 32 already-baked entries: 31 of them have no gamemaster_name '
+        'field at all (so the expression is literally e["name"]), and the '
+        'thievul entry\'s new gamemaster_name is "Thievul" -- exactly the '
+        'name it was looked up under when its 124 planes were baked. Every '
+        'one of the 1,984 planes baked under e8a362c4dcc7 is therefore '
+        'bit-identical under the new hash. NB the display-name and '
+        'usage-lookup changes live in worlds_meta.py, which is NOT a '
+        'producer source and cannot affect a plane; the sim-relevant meta '
+        'fields (species_id, species, shadow, fast_move_id, '
+        'charged_move_ids) of all 32 existing entries are unchanged, which '
+        'worlds_planes.meta_delta re-checks independently at bake time.'),
 }
 
 
@@ -213,9 +234,15 @@ def preflight_moveset_legality(entries):
     errors = []
     moves_db = None
     for e in entries:
-        fast, charged = legal_move_ids(e['name'])
+        # ``name`` is the DISPLAY label and is only gamemaster-resolvable
+        # for entries whose identity is a real speciesId. A moveset-fork
+        # arm ("Thievul (NS+IW)") carries the resolvable name separately;
+        # every other entry has no such field, so this is byte-identical
+        # to looking up e['name'] for all of them.
+        gm_name = e.get('gamemaster_name') or e['name']
+        fast, charged = legal_move_ids(gm_name)
         if fast is None:
-            errors.append(f"{e['name']}: not in the gamemaster")
+            errors.append(f"{e['name']}: {gm_name!r} is not in the gamemaster")
             continue
         injected = list(e.get('injected_move_ids') or [])
         if injected:

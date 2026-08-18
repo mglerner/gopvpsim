@@ -329,8 +329,14 @@ def test_meta_badges_are_the_planned_ones(meta):
     # FORCED is editorial: derive both the count and the names from the
     # generator's own literal rather than pinning them (Thievul joined
     # Aegislash + Mantine 2026-08-18).
-    expected_forced = {f'{n} (Shadow)' if sh else n
-                       for n, sh, badge, _r in wm.META if badge == 'FORCED'}
+    expected_forced = set()
+    for row in wm.META:
+        n, sh, badge, _r = row[:4]
+        fork = row[4] if len(row) > 4 else None
+        if badge != 'FORCED':
+            continue
+        expected_forced.add(f'{n} ({fork.label})' if fork
+                            else f'{n} (Shadow)' if sh else n)
     assert counts['FORCED'] == len(expected_forced) >= 2
     forced = [e for e in meta['entries'] if e['badge'] == 'FORCED']
     assert {e['name'] for e in forced} == expected_forced
@@ -429,3 +435,89 @@ def test_recent_bucket_denominators_match_the_committed_file(meta):
     # The three limited-meta Internationals are excluded entirely.
     assert not ({slug for slug, _m, _r in usage.events}
                 & wm.LIMITED_META_EVENTS)
+
+
+# ---------------------------------------------------------------------------
+# Moveset forks (2026-08-18: Thievul enters as NS+IW and IW+PR)
+# ---------------------------------------------------------------------------
+
+def _forks(meta):
+    """Shipped entries grouped by (species, shadow) where more than one
+    entry shares a species -- i.e. the moveset-fork arms."""
+    import collections
+    by_species = collections.defaultdict(list)
+    for e in meta['entries']:
+        by_species[(e['species'], e['shadow'])].append(e)
+    return {k: v for k, v in by_species.items() if len(v) > 1}
+
+
+def test_fork_arms_share_a_species_and_differ_only_on_the_moveset(meta):
+    forks = _forks(meta)
+    assert forks, 'no moveset fork shipped -- retire this test with the fork'
+    for (species, shadow), arms in forks.items():
+        ids = [e['species_id'] for e in arms]
+        assert len(set(ids)) == len(ids), f'{species}: duplicate species_id'
+        movesets = {(e['fast_move_id'], tuple(e['charged_move_ids']))
+                    for e in arms}
+        assert len(movesets) == len(arms), \
+            f'{species}: two arms with the SAME moveset is not a fork'
+        for e in arms:
+            # The display label must name the fork axis: arms share a
+            # species, so a bare species name on one arm would read as
+            # "the real one" and demote the other to a footnote.
+            assert e['name'] != species, f'{species}: unlabeled fork arm'
+            assert e['name'].startswith(f'{species} ('), e['name']
+            # ... and the gamemaster-resolvable name must be carried,
+            # because the display label is no longer a speciesName.
+            assert e['gamemaster_name'] == (f'{species} (Shadow)' if shadow
+                                            else species)
+
+
+def test_fork_arms_carry_species_level_usage_not_a_fabricated_split(meta):
+    """The corpus and PvPoke's rankings do not distinguish fork arms, so
+    both arms must report the SAME species-level figures rather than an
+    invented per-arm share."""
+    for arms in _forks(meta).values():
+        for key in ('usage_rank', 'current_rank', 'usage_recent_pct',
+                    'usage_all_pct', 'usage_old_pct', 'usage_topcut_pct'):
+            assert len({e[key] for e in arms}) == 1, key
+
+
+def test_fork_moveset_source_tells_the_truth_about_pvpoke(meta):
+    """The arm that happens to BE PvPoke's default says 'default'; an arm
+    that deliberately diverges says 'variant' and sets default_disagrees.
+    (Calling both 'variant' would misreport the default arm; calling both
+    'default' would hide the divergence.)"""
+    n_variant = 0
+    for arms in _forks(meta).values():
+        for e in arms:
+            expected = (e['fast_move_id'] == e['default_fast_move_id']
+                        and e['charged_move_ids']
+                        == e['default_charged_move_ids'])
+            assert e['default_disagrees'] is (not expected), e['name']
+            assert e['moveset_source'] == ('default' if expected
+                                           else 'variant'), e['name']
+            n_variant += not expected
+    assert n_variant >= 1                      # scanner self-test
+
+
+def test_non_fork_entries_carry_no_gamemaster_name(meta):
+    """The field exists ONLY where display and speciesName diverge -- the
+    31 original entries must be byte-untouched by the fork schema."""
+    forked_ids = {e['species_id']
+                  for arms in _forks(meta).values() for e in arms}
+    plain = [e for e in meta['entries'] if e['species_id'] not in forked_ids]
+    assert len(plain) >= 31
+    for e in plain:
+        assert 'gamemaster_name' not in e, e['name']
+
+
+def test_duplicate_species_ids_are_rejected(monkeypatch):
+    """A fork arm reusing another entry's species_id would silently alias
+    two entries onto one set of planes."""
+    bad = list(wm.META) + [('Thievul', False, 'FORCED', 'dupe',
+                            wm.THIEVUL_NS_FORK)]
+    monkeypatch.setattr(wm, 'META', bad)
+    usage = wm.Usage(wm.load_events())
+    with pytest.raises(SystemExit, match='duplicate species_id'):
+        wm.build_entries(usage, wm.Resolver())

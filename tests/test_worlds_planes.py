@@ -222,3 +222,24 @@ def test_plane_npz_gitignored_but_manifest_tracked():
         cwd=REPO_ROOT)
     assert man.returncode == 1, 'the manifest is the provenance record ' \
                                 'and must stay tracked'
+
+
+def test_fork_arms_pair_with_each_other_but_never_with_themselves():
+    """Mirror-exclusion contract for moveset forks (2026-08-18): the two
+    Thievul arms are distinct entries, so the CROSS-ARM pair is a real,
+    baked matchup -- only the true self-mirror is excluded. The pair
+    count must also grow by exactly n-1 pairs per added entry."""
+    import tomllib
+    entries = tomllib.load(open(wp.META_TOML, 'rb'))['entries']
+    keys = wp.expected_tier1_keys(entries)
+    arms = [e['species_id'] for e in entries if e['species'] == 'Thievul']
+    assert len(arms) == 2, arms
+    a, b = arms
+    for focal, opp in ((a, b), (b, a)):
+        for bait in (True, False):
+            assert wp.pair_key(focal, opp, bait) in keys
+    for sid in arms:                       # no self-mirror in either mode
+        for bait in (True, False):
+            assert wp.pair_key(sid, sid, bait) not in keys
+    n = len(entries)
+    assert len(keys) == (n * (n - 1) // 2) * 2 * 2
