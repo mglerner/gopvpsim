@@ -1483,15 +1483,18 @@
     }
     // Fall back to the assembly's own generated sentence. This is a
     // CROSS-FILE contract: pluralising the assembler's string silently
-    // broke this parser once, so the pattern accepts either spelling and
-    // a round-trip assert (assemble emits -> this parses) guards it. The
-    // structured `tie` field above is the primary path.
+    // broke this parser once, so the pattern accepts either spelling AND
+    // makes the tiebreak clause optional (the NS+IW card emits none, and
+    // requiring it dropped that card's count too). The producing side is
+    // thievul_licki_assemble.tie_line(); the guard that runs one through
+    // the other is tests/test_thievul_tie_roundtrip.py. The structured
+    // `tie` field above is the primary path.
     var out = '';
     (c.lines || []).forEach(function (l) {
       var m2 = String(l).match(
-        /^(\d+) spreads?(?:\(s\))? tie on ([^;]+); tiebreak chain: (.+)$/);
+        /^(\d+) spreads?(?:\(s\))? tie on ([^;]+)(?:; tiebreak chain: (.+))?$/);
       if (m2) out = 'one of ' + m2[1] + ' tied on ' + m2[2]
-        + '; tiebreak: ' + m2[3];
+        + (m2[3] ? '; tiebreak: ' + m2[3] : '');
     });
     if (!out && typeof c.subtitle === 'string') {
       var m3 = c.subtitle.match(/tiebreak:\s*(.+)$/i);
@@ -4277,8 +4280,14 @@
     var list = uses.length > 1
       ? uses.slice(0, -1).join(', ') + ' and ' + uses[uses.length - 1]
       : uses[0];
-    return ' <span class="tl-note">not ranked here - this ' + esc(OPP)
-      + ' spread feeds ' + esc(list) + '.</span>';
+    // The row's species cell shows the species AS SCANNED, so this
+    // sentence names that species and adds the analyzed form the same way
+    // the "Build this one:" line does ("scored as the X it becomes").
+    var scanned = r.u.label || OPP;
+    var asWhat = (scanned !== OPP)
+      ? ' (scored as the ' + esc(OPP) + ' it becomes)' : '';
+    return ' <span class="tl-note">not ranked here - this ' + esc(scanned)
+      + asWhat + ' spread feeds ' + esc(list) + '.</span>';
   }
   // A ranked verdict table, not a matching log: every column is a number
   // you would use to decide which of YOUR mons to build, and the row order
@@ -4607,8 +4616,12 @@
         // Read but not ranked (a Lickilicky on the Lickitung page). It
         // belongs in the "related species" bucket, with the reason when
         // there is one, NOT in the analyzed-species footnote.
+        // NEUTRAL wording, the same string the sibling `dropped` path
+        // uses: "no usable build at L20" claims a level-based reason,
+        // which is false for a shadow row (the real reason is that this
+        // page analyzes no shadow forms).
         other.push(mon.name + ' ' + mon.atk_iv + '/' + mon.def_iv + '/'
-          + mon.sta_iv + ' (no usable build at L' + mon.level + ')');
+          + mon.sta_iv + ' - no build in the analyzed grid');
         return;
       }
       // The species ITSELF comes first: on the Lickitung page a scanned
@@ -4700,7 +4713,9 @@
       + (other.length
         ? '; ' + plural(other.length, 'row') + ' of a related species this page '
           + 'reads but does not analyze, so they are listed here rather '
-          + 'than ranked (' + esc(other.slice(0, 6).join(', ')) + ')'
+          + 'than ranked (' + esc(other.slice(0, 6).join(', '))
+          + (other.length > 6 ? '; and ' + (other.length - 6) + ' more' : '')
+          + ')'
         : '')
       + (notRead
         ? '; ' + plural(notRead, 'row') + ' of a species this page does '
@@ -4708,9 +4723,12 @@
           + esc(known.join(', ')) + ' are read here)'
         : '')
       + (unaccounted
-        ? '; ' + plural(unaccounted, 'row') + ' this page could not '
-          + 'classify (report this - every row should fall in one of the '
-          + 'categories above)'
+        ? '; INTERNAL ACCOUNTING ERROR - the categories above '
+          + (unaccounted > 0
+            ? 'leave ' + plural(unaccounted, 'row') + ' unclassified'
+            : 'count ' + plural(-unaccounted, 'row') + ' twice')
+          + ' (please report this; every row should fall in exactly one '
+          + 'category)'
         : '')
       + '. Nothing leaves your browser.</p>'
       + (dropped.length

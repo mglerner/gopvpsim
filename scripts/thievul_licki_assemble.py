@@ -69,6 +69,19 @@ OPPONENTS = {
 }
 
 
+def tie_line(n, metric, tiebreak=None):
+    """The 'N spreads tie on ...' line, in ONE place.
+
+    The page recovers these facts by regex when a card ships no structured
+    ``tie`` block (thievul_licki_page.js ``tieText``), so this string is a
+    cross-file contract: pluralising it once silently cost the TL;DR band
+    its 'one of N tied' caveat. tests/test_thievul_tie_roundtrip.py feeds
+    this function's output through the real JS parser.
+    """
+    return (f'{n} spread{"" if n == 1 else "s"} tie on {metric}'
+            + (f'; tiebreak chain: {tiebreak}' if tiebreak else ''))
+
+
 def pct1(v):
     """One decimal, rounded the way the page's JS rounds it.
 
@@ -249,8 +262,8 @@ def main():
                    f'scenarios ({", ".join(ns_scens)}); for readers '
                    f'following PvPoke\'s default moveset. Tiebreak: '
                    f'{ns_tiebreak}', i_ns,
-                   [f'{n_tied_ns} spread{"" if n_tied_ns == 1 else "s"} '
-                    f'tie on {ns_scens[0]} coverage under NS+IW'], [],
+                   [tie_line(n_tied_ns,
+                             f'{ns_scens[0]} coverage under NS+IW')], [],
                    'nsiw_bait', ns_scens,
                    {'n_tied': n_tied_ns,
                     'metric': f'{ns_scens[0]} coverage under NS+IW',
@@ -260,18 +273,24 @@ def main():
         ('The Licki smasher', f'Best {", ".join(pick_scens)} record vs '
          f'{opp_name} ({grid_pretty(primary)}); tiebreak: {tiebreak}',
          i_smash,
-         [f'{n_tied_smash} spread{"" if n_tied_smash == 1 else "s"} tie '
-          f'on the primary metric '
-          f'({pick_scens[0]} top-512 coverage); tiebreak chain: {tiebreak}'],
+         [tie_line(n_tied_smash,
+                   f'the primary metric ({pick_scens[0]} top-512 '
+                   f'coverage)', tiebreak)],
          ['Optimized purely for this matchup; check the meta line before '
           'committing dust.'], primary, pick_scens,
          {'n_tied': n_tied_smash,
           'metric': f'{pick_scens[0]} top-512 coverage',
           'tiebreak': tiebreak}),
         ('IV tech without meta cost', bal_note, i_bal, [], []),
+        # The tie count is in this card's subtitle prose too; it also
+        # travels STRUCTURALLY so the band never has to parse it (the one
+        # card that shipped without a tie block).
         ('Max meta wins', f'Best overall-meta spread -- one of '
-         f'{len(at_max)} tied at {max_meta}W (SP/IW+PR, 1-1); among the '
-         f'tie, best {pick_scens[0]} coverage shown', i_meta_best, [], []),
+         f'{len(at_max)} tied at {max_meta}W ({grid_pretty(primary)}, '
+         f'1-1); among the tie, best {pick_scens[0]} coverage shown',
+         i_meta_best, [], [], primary, None,
+         {'n_tied': int(len(at_max)),
+          'metric': f'meta wins ({grid_pretty(primary)}, 1-1)'}),
     ]
     if ns_card:
         named.insert(3, ns_card)
