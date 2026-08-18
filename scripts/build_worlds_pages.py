@@ -9,7 +9,7 @@ by ship_surfaces.py, and the whole product retires by deleting
 
 READ-ONLY consumer of ``worlds/planes/`` via worlds_render_data --
 deliberately OUTSIDE worlds_planes._WORLDS_SOURCE_FILES (a renderer edit
-must not cold the 1,860-plane bake).
+must not cold the Tier-1 plane bake).
 
 Honesty rules baked in (never-present-known-wrong):
 
@@ -18,9 +18,11 @@ Honesty rules baked in (never-present-known-wrong):
   engine/gamemaster -- a partial or mixed-vintage page must not ship;
 * every page carries the provenance line (engine/gamemaster/worlds_code
   stamps, bake date) and the usage-predates-rebalance flag;
-* amber (IV-decided) cells are flagged but NOT linked -- the per-pair
-  detail pages are session-4 products and a dead link fails the ship
-  gate (verify_article_links);
+* every link is emitted only against a file that EXISTS on disk (pair
+  pages, dive slugs) -- a dead link fails the ship gate
+  (verify_article_links). The hub's dimmed-cell popover carries its
+  cheat-sheet deep link in a data- attribute, which that gate cannot
+  follow, so verify_worlds resolves those refs instead;
 * prose is auto-gen structure from meta.toml data only (ship-mode
   narrative policy); the "deliberately not built" block states the
   non-expert constraint.
@@ -29,6 +31,7 @@ Run before build_website_index.py (publish_website.sh ordering) so the
 index card sees worlds.html.
 """
 import html
+import re
 import sys
 from pathlib import Path
 
@@ -84,8 +87,22 @@ WORLDS_CSS = """
   .sc-red { background: var(--loss); }
   .sc-amber { background: var(--flip); }
   .sc-miss { background: var(--border-2); }
-  .matrix-scroll { overflow-x: auto; border: 1px solid var(--border);
+  /* Full-width matrix breakout (Michael 2026-08-18): the matrix is
+     allowed OUT of the 760px text column so a wide window shows the
+     whole grid without scrolling. width:max-content shrink-wraps the
+     table; the viewport cap (minus a gutter wider than any scrollbar)
+     keeps the PAGE body from ever scrolling horizontally and falls
+     back to in-container scrolling on narrow viewports. left/transform
+     centers it on the body's center, which is the viewport center. */
+  figure.matrix-fig { margin: 0 0 10px; }
+  .matrix-scroll { position: relative; left: 50%;
+                   transform: translateX(-50%);
+                   width: max-content; max-width: calc(100vw - 34px);
+                   overflow-x: auto; border: 1px solid var(--border);
                    border-radius: 4px; }
+  figcaption.matrix-cap { color: var(--text-muted); font-size: 13px;
+                   margin: 0 0 18px; }
+  figcaption.matrix-cap p { margin: 0 0 8px; }
   table.matrix { border-collapse: collapse; }
   table.matrix th { font-size: 11px; padding: 2px 3px;
                     color: var(--text-muted); font-weight: 600; }
@@ -100,7 +117,30 @@ WORLDS_CSS = """
   .mini i { border-radius: 1px; }
   .mini .g { background: var(--win); } .mini .r { background: var(--loss); }
   .mini .a { background: var(--flip); }
-  td.pair-amber { outline: 2px solid var(--flip); outline-offset: -2px; }
+  /* Emphasis is INVERTED vs the 2026-08-11 scheme (Michael 2026-08-18):
+     the IV-decided cells are the punchline, so they render at full
+     strength with no border, and the settled cells are dimmed back.
+     Hover/focus restores a dimmed cell to full strength so nothing is
+     permanently hard to read. */
+  td.pair-dim .mini { opacity: 0.45; filter: saturate(0.55); }
+  td.pair-dim:hover .mini, td.pair-dim:focus-within .mini { opacity: 1;
+          filter: none; }
+  .ndbtn { background: none; border: 0; padding: 0; margin: 0;
+           display: block; cursor: pointer; }
+  .ndbtn:focus-visible { outline: 2px solid var(--accent);
+           outline-offset: 1px; }
+  .ndpop { position: absolute; z-index: 30; max-width: 340px;
+           background: var(--surface-2); color: var(--text);
+           border: 1px solid var(--border-2); border-radius: 6px;
+           padding: 10px 26px 10px 12px; font-size: 13px;
+           line-height: 1.45; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
+  .ndpop[hidden] { display: none; }
+  .ndpop p { margin: 0 0 6px; }
+  .ndpop a { display: block; margin-top: 5px; }
+  .ndpop button.ndpop-x { position: absolute; top: 2px; right: 4px;
+           background: none; border: 0; color: var(--text-muted);
+           font-size: 15px; line-height: 1; cursor: pointer;
+           padding: 2px 5px; }
   .legend { color: var(--text-muted); font-size: 13px; margin: 8px 0 16px; }
   .legend .sc { width: 12px; height: 12px; vertical-align: -1px; }
   table.sheet { border-collapse: collapse; width: 100%; font-size: 14px; }
@@ -153,6 +193,34 @@ def display_moveset(entry):
 
 def sheet_filename(species_id):
     return f'worlds-{species_id}.html'
+
+
+def sheet_row_id(opp_species_id):
+    """Anchor id of a cheat sheet's row for ``opp_species_id``. ONE
+    definition, used both to stamp the row (render_cheat_sheet) and to
+    aim the hub popover at it, so the two cannot drift."""
+    return f'vs-{opp_species_id}'
+
+
+# PvPoke's own rewrite for the short battle path accepts only
+# [a-zA-Z_]+ for the two species segments (pvpoke src/.htaccess rule
+# "battle/([\\d-]+)/([a-zA-Z_]+)/([a-zA-Z_]+)/(\\d+)"). Any id outside
+# that charset would 404, so we emit NO link rather than a broken one.
+_PVPOKE_ID_OK = re.compile(r'[A-Za-z_]+\Z')
+
+
+def pvpoke_battle_url(focal_id, opp_id, cp=1500, shields='11'):
+    """PvPoke single-battle URL at BOTH sides' PvPoke defaults.
+
+    Deliberately the bare-speciesId form (no level/IV/moveset segments):
+    PvPoke's parser takes a one-segment poke string as "just select this
+    species" and applies its own default IVs, level and moveset
+    (Interface.js: ``if(arr.length == 1) setPokemon(val)``). That is
+    what the popover advertises -- it is NOT our probe spread, and the
+    label says so. Returns None when either id is unlinkable."""
+    if not (_PVPOKE_ID_OK.match(focal_id) and _PVPOKE_ID_OK.match(opp_id)):
+        return None
+    return f'https://pvpoke.com/battle/{cp}/{focal_id}/{opp_id}/{shields}/'
 
 
 def dive_slug_map(entries, website_dir=WEBSITE_DIR):
@@ -304,9 +372,20 @@ def _digin(cell, opp_name, pair_link=None, pair_amber=False):
             f'Highlighted = IV-decided.{link_html}</p></details>')
 
 
-def _mini_cell(row, focal_name, opp_name, pair_link=None):
-    """Matrix cell: 3x3 mini-grid of headline per-scenario status. An
-    IV-decided cell whose pair page exists links to it."""
+def _mini_cell(row, focal_name, opp_name, pair_link=None,
+               focal_id=None, opp_id=None):
+    """Matrix cell: 3x3 mini-grid of headline per-scenario status.
+
+    Emphasis (Michael 2026-08-18, inverting the 2026-08-11 scheme): an
+    IV-DECIDED direction renders at full strength and unadorned; a
+    direction that is settled in every tested slice is dimmed back
+    (``pair-dim``), so the punchline cells pop instead of the settled
+    ones carrying the loud outline.
+
+    An IV-decided cell whose pair page exists links to it (unchanged).
+    A cell with NO pair page used to be inert; it now opens the
+    dismissible not-IV-decided popover, whose text/links the hub script
+    builds from these data attributes."""
     if row.get('missing'):
         return '<td title="missing plane">?</td>'
     cls = {'green': 'g', 'red': 'r', 'amber': 'a'}
@@ -314,19 +393,81 @@ def _mini_cell(row, focal_name, opp_name, pair_link=None):
     tips = ', '.join(f'{SCEN_LABELS[i]} {_pct(f)}'
                      for i, f in enumerate(row['frac']))
     tip = f'{focal_name} vs {opp_name} (rank-1 spread, top-512, bait): {tips}'
-    td_cls = ' class="pair-amber"' if row['amber'] else ''
+    td_cls = '' if row['amber'] else ' class="pair-dim"'
     mini = f'<span class="mini">{boxes}</span>'
     # Link whenever the pair page EXISTS -- gating on this direction's
     # amber flag left 8 pairs linked from only one matrix cell while
     # both cheat sheets linked them (verify catch, 2026-08-11).
     if pair_link:
         mini = f'<a href="{esc(pair_link)}">{mini}</a>'
+    elif focal_id and opp_id:
+        # No detail page for this pair. Two honest cases, and the
+        # popover must not conflate them: settled-in-every-slice (no
+        # page was ever owed) vs IV-decided-but-Tier-2-deferred.
+        kind = 'deferred' if row['amber'] else 'clean'
+        pv = pvpoke_battle_url(focal_id, opp_id)
+        pv_attr = f' data-pv="{esc(pv)}"' if pv else ''
+        mini = (f'<button type="button" class="ndbtn" data-kind="{kind}" '
+                f'data-f="{esc(focal_name)}" data-o="{esc(opp_name)}" '
+                f'data-sheet="{sheet_filename(focal_id)}'
+                f'#{sheet_row_id(opp_id)}"{pv_attr}>{mini}</button>')
     return f'<td{td_cls} title="{esc(tip)}">{mini}</td>'
+
+
+def injected_entries(meta):
+    """Meta entries running a move the PINNED sim gamemaster does not
+    list in their species pool (meta.toml ``injected_move_ids``; see
+    worlds_bake.preflight_moveset_legality). Data-driven, so the
+    disclosure appears and disappears with the declaration."""
+    return [e for e in meta['entries'] if e.get('injected_move_ids')]
+
+
+def injection_chip(entry):
+    """Short inline marker for a moveset cell. Empty for entries with no
+    injection, so nothing is claimed about the other 31."""
+    if not entry.get('injected_move_ids'):
+        return ''
+    moves = ' + '.join(esc(m) for m in entry.get('injected_moves')
+                       or entry['injected_move_ids'])
+    return (f' <span class="mband">({moves} injected: the pinned sim '
+            'gamemaster predates the CD)</span>')
+
+
+def injection_html(entry):
+    """The full, unabbreviated disclosure block for an entry's own cheat
+    sheet. Prints meta.toml's authored injection_note verbatim -- the
+    reader is entitled to the whole provenance on the page whose numbers
+    depend on it, not a summary of it."""
+    if not entry.get('injected_move_ids'):
+        return ''
+    moves = ' + '.join(esc(m) for m in entry.get('injected_moves')
+                       or entry['injected_move_ids'])
+    note = entry.get('injection_note', '')
+    return ('<div class="prov"><strong>Move injection: '
+            f'{moves}.</strong> {esc(note)} Every number on this page was '
+            'simmed with that move; the rest of the moveset, and both '
+            "sides' stats, come from the pinned gamemaster unchanged.</div>")
 
 
 def provenance_html(meta, manifest):
     baked = sorted({e.get('baked', '?')
                     for e in manifest.get('entries', {}).values()})
+    # Site-wide disclosure: an injected move changes the numbers on every
+    # surface that pair touches, not just its own cheat sheet, so it
+    # rides the provenance line every Worlds page already carries.
+    inj = injected_entries(meta)
+    inj_html = ''
+    if inj:
+        parts = ', '.join(
+            f'{esc(e["name"])} ({" + ".join(esc(m) for m in (e.get("injected_moves") or e["injected_move_ids"]))})'
+            for e in inj)
+        inj_html = (
+            f'<strong>Community Day move injected for {parts}:</strong> the '
+            'pinned sim gamemaster predates that Community Day, so the move '
+            'was admitted into the species pool deliberately; upstream '
+            'PvPoke already lists it. Full provenance on the affected '
+            f'{"entry\'s" if len(inj) == 1 else "entries\'"} cheat '
+            f'{"sheet" if len(inj) == 1 else "sheets"}. ')
     return (
         '<div class="prov">'
         f'Format: <strong>{esc(meta["format"])}</strong>, '
@@ -348,7 +489,8 @@ def provenance_html(meta, manifest):
         f'<code>{esc(manifest["worlds_code"])}</code>. '
         'Cohorts: opponent top-512 by stat product, plus best-SP-per-'
         'attack-IV band (labeled separately, never pooled). Focal probe '
-        'spreads: rank-1 SP and max-attack within top-512.</div>')
+        'spreads: rank-1 SP and max-attack within top-512. '
+        + inj_html + '</div>')
 
 
 LEGEND = ('<p class="legend"><span class="sc sc-green">W</span> beats every '
@@ -371,6 +513,81 @@ LEGEND = ('<p class="legend"><span class="sc sc-green">W</span> beats every '
           'per-pair detail page -- click the 3x3 grid itself (cheat '
           'sheets), the matrix cell (hub), or the details expander; any '
           'budget-deferred pairs are listed on the hub.</p>')
+
+# One shared popover element + one delegated listener for the whole
+# matrix: ~130 inert cells would otherwise need ~130 hidden divs. All
+# reader-visible strings are ASCII (verify_no_unicode_dashes does not
+# see inside <script>; see the TODO ship-gate-gap note).
+POPOVER_HTML = """
+<div class="ndpop" id="ndpop" hidden role="dialog" aria-live="polite"
+     aria-labelledby="ndpop-msg">
+  <button type="button" class="ndpop-x" id="ndpop-x"
+          aria-label="Close">x</button>
+  <p id="ndpop-msg"></p>
+  <a id="ndpop-sheet"></a>
+  <a id="ndpop-pv" target="_blank"
+     rel="noopener">PvPoke default-vs-default battle</a>
+</div>
+<script>
+(function () {
+  var pop = document.getElementById('ndpop');
+  if (!pop) { return; }
+  var msg = document.getElementById('ndpop-msg');
+  var sheet = document.getElementById('ndpop-sheet');
+  var pv = document.getElementById('ndpop-pv');
+  var opener = null;
+  function hide() { pop.hidden = true; opener = null; }
+  function show(btn) {
+    var f = btn.getAttribute('data-f');
+    var o = btn.getAttribute('data-o');
+    msg.textContent = btn.getAttribute('data-kind') === 'deferred'
+      ? f + ' vs ' + o + ': IV-decided, but the full-grid detail page'
+        + ' for this pair is deferred by the Tier-2 bake budget. The'
+        + ' cheat sheet still carries the full Tier-1 data.'
+      : f + ' vs ' + o + ': not IV-decided in any tested slice. Every'
+        + ' probe spread, opponent cohort and bait mode gives the same'
+        + ' outcome in all 9 shield scenarios, so there is no per-pair'
+        + ' detail page for it.';
+    sheet.href = btn.getAttribute('data-sheet');
+    sheet.textContent = 'Cheat sheet row: ' + f + ' vs ' + o;
+    var url = btn.getAttribute('data-pv');
+    if (url) { pv.href = url; pv.hidden = false; }
+    else { pv.removeAttribute('href'); pv.hidden = true; }
+    pop.hidden = false;
+    var r = btn.getBoundingClientRect();
+    var left = r.left + window.pageXOffset + (r.width / 2)
+               - (pop.offsetWidth / 2);
+    var max = document.documentElement.clientWidth - pop.offsetWidth - 8;
+    if (left > max) { left = max; }
+    if (left < 8) { left = 8; }
+    pop.style.left = left + 'px';
+    pop.style.top = (r.bottom + window.pageYOffset + 6) + 'px';
+    opener = btn;
+  }
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest ? ev.target.closest('.ndbtn') : null;
+    if (btn) {
+      ev.preventDefault();
+      if (opener === btn) { hide(); } else { show(btn); }
+      return;
+    }
+    if (!pop.hidden && !pop.contains(ev.target)) { hide(); }
+  });
+  document.getElementById('ndpop-x').addEventListener('click', function () {
+    var b = opener;
+    hide();
+    if (b) { b.focus(); }
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && !pop.hidden) {
+      var b = opener;
+      hide();
+      if (b) { b.focus(); }
+    }
+  });
+}());
+</script>
+"""
 
 NOT_BUILT = (
     '<div class="notbuilt"><p><strong>Deliberately not built:</strong> '
@@ -400,7 +617,7 @@ def render_meta_table(entries, slug_map):
             f'<tr><td>{name}{badge_html(e)}{dive_html}</td>'
             f'<td class="num">{e["usage_recent_pct"]:.1f}%</td>'
             f'<td class="num">{e["current_rank"]}</td>'
-            f'<td>{moves}{mv_note}</td></tr>')
+            f'<td>{moves}{mv_note}{injection_chip(e)}</td></tr>')
     return ('<div class="table-scroll"><table class="meta">'
             '<tr><th>Entry (cheat sheet)</th><th class="num">recent '
             'usage</th><th class="num">rank</th><th>moveset</th></tr>'
@@ -438,7 +655,8 @@ def render_matrix(entries, cells, links=None):
                 tds.append('<td></td>')
             else:
                 tds.append(_mini_cell(summary[(f, o)], names[f], names[o],
-                                      links.get(frozenset((f, o)))))
+                                      links.get(frozenset((f, o))),
+                                      focal_id=f, opp_id=o))
         rows_html.append(
             f'<tr><th class="rowhead"><a href="{sheet_filename(f)}">'
             f'{esc(names[f])}</a></th>' + ''.join(tds) + '</tr>')
@@ -491,7 +709,7 @@ def tier2_status_html(entries, fn, deferred, n_pages):
         cmp_html += ('<p class="section-intro"><a href="worlds-explorer'
                      '.html">IV explorer</a>: enter your IVs and level, '
                      'see the breakpoints you reach and the bulkpoints '
-                     'you hold vs all 31 entries.</p>')
+                     f'you hold vs all {len(entries)} entries.</p>')
     return (f'<h2>Per-pair detail pages ({n_pages} baked)</h2>'
             f'{fn_html}{def_html}{cmp_html}')
 
@@ -500,7 +718,38 @@ def render_hub(meta, cells, manifest, slug_map, links=None, fn=None,
                deferred=None):
     entries = meta['entries']
     n_amber = sum(1 for c in cells.values() if not c.missing and c.amber)
+    # Order (Michael 2026-08-18): matrix FIRST -- it is the punchline --
+    # then the meta table, then the candidates, with format/provenance
+    # last. The matrix's reading instructions moved from above the grid
+    # to a figcaption below it, so the picture is the first thing on
+    # screen.
     body = f"""
+<h2>Robustness matrix</h2>
+<figure class="matrix-fig">
+{render_matrix(entries, cells, links)}
+<figcaption class="matrix-cap">
+<p>Row = the focal Pokemon (its rank-1-SP spread), column = the opponent
+(its top-512 SP spreads). Each cell shows all 9 shield scenarios.
+<strong>IV-decided cells are drawn at full strength</strong>; a cell whose
+outcome is settled in every tested slice (either probe spread, either
+cohort, either bait mode) is dimmed back - {n_amber} of {len(cells)}
+directions are IV-decided. Never aggregated to one number.</p>
+<p>Click any cell that has a per-pair detail page to open it - a pair earns
+one by being IV-decided in EITHER direction, so a dimmed cell can still be
+a link. A cell with no detail page opens a short note instead, with links
+to that pair's cheat sheet row and to the equivalent battle on pvpoke.com
+at PvPoke's own default IVs and movesets (not our probe spread). Hover or
+keyboard-focus restores a dimmed cell to full strength.</p>
+{LEGEND}
+<p>Accessibility note: the dimmed fills carry less contrast than the
+full-strength ones, and dimmed cells are exactly the settled ones, so
+nothing on this page depends on reading them. The hub matrix stays a
+color-only overview either way; the text alternative is the cheat sheet,
+reachable from each row label, from the dimmed-cell note, and from the
+meta table below.</p>
+</figcaption>
+</figure>
+{tier2_status_html(entries, fn, deferred or [], len(links or {}))}
 <h2>The meta ({len(entries)} entries)</h2>
 <p class="section-intro">Badge rules (mechanical): PLAYED = top-{meta["badge_usage_top"]}
 recent usage AND top-{meta["badge_rank_top"]} current rank; PLAYED* = top-usage but
@@ -515,32 +764,26 @@ current top-{meta["badge_rank_top"]}-rank species stayed out (they appear
 in the candidates table below). Moveset slot order shown is the order the
 sims ran under (PvPoke default order when the sets agree).</p>
 {render_meta_table(entries, slug_map)}
-<h2>Robustness matrix</h2>
-<p class="section-intro">Row = the focal Pokemon (its rank-1-SP spread),
-column = the opponent (its top-512 SP spreads). Each cell shows all 9
-shield scenarios; an outlined cell is IV-decided somewhere in ANY slice
-(either probe spread, either cohort, either bait mode) -
-{n_amber} of {len(cells)} directions qualify. Never aggregated to one
-number.</p>
-{LEGEND}
-{render_matrix(entries, cells, links)}
-{tier2_status_html(entries, fn, deferred or [], len(links or {}))}
 <h2>Candidates that stayed out</h2>
 <p class="section-intro">The usage top-{meta["reject_top_n"]} that did not
 make the meta, plus the banned row. Collapsed-rank PLAYED* entries above are
 shown as data; we do not claim nerf vs model error.</p>
 {render_rejects_table(meta['rejects'])}
 {NOT_BUILT}
+<h2>Format and provenance</h2>
+{provenance_html(meta, manifest)}
 <p><a href="index.html">Back to all dives</a></p>
+{POPOVER_HTML}
 """
     return _page_shell(
         title='Worlds 2026 - Great League IV robustness',
         heading='Worlds 2026: open Great League robustness',
-        intro_html=('<p>Which meta matchups are decided by IVs? Per-species '
-                    'cheat sheets (click a name), a 9-scenario robustness '
-                    'matrix, and the candidate table for the Worlds 2026 '
-                    'open Great League meta.</p>'
-                    + provenance_html(meta, manifest)),
+        intro_html=('<p>Which meta matchups are decided by IVs? A 9-scenario '
+                    'robustness matrix, per-species cheat sheets (click a '
+                    'row label or a name in the meta table), and the '
+                    'candidate table for the Worlds 2026 open Great League '
+                    'meta. Format, usage corpus and sim provenance are at '
+                    'the foot of the page.</p>'),
         body_html=body,
         extra_css=WORLDS_CSS)
 
@@ -610,8 +853,11 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None):
         # rule), same as _mini_cell.
         if plink:
             grids = f'<a class="gridlink" href="{esc(plink)}">{grids}</a>'
+        # Row anchor: the hub's dimmed-cell popover deep-links here
+        # (sheet_row_id is the single definition of the id).
         rows.append(
-            f'<tr><td><a href="{sheet_filename(oid)}">{esc(oname)}</a><br>'
+            f'<tr id="{sheet_row_id(oid)}">'
+            f'<td><a href="{sheet_filename(oid)}">{esc(oname)}</a><br>'
             f'{_digin(cell, oname, plink, pair_amber)}</td>'
             f'<td>{grids}</td>'
             f'<td>{flag_html}</td><td>{mband}</td></tr>')
@@ -645,9 +891,10 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None):
     body = f"""
 <p class="section-intro">Moveset: <strong>{moves}</strong>
 ({esc(entry['moveset_source'])}{'; differs from PvPoke default'
-    if entry['default_disagrees'] else ''}).
+    if entry['default_disagrees'] else ''}){injection_chip(entry)}.
 Focal spread: its rank-1 stat-product spread (hover cells for cohort
 sizes and margins).{dive_html}</p>
+{injection_html(entry)}
 {forced_html}
 {LEGEND}
 <div class="table-scroll"><table class="sheet">
