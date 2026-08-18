@@ -2363,6 +2363,11 @@
   // spread wins / no spread wins) are drawn as a flat labelled panel
   // instead of a dot cloud, so the eye goes straight to the scenarios
   // where IVs actually change something.
+  // 3x3 small-multiples geometry, in paper coords. GRID_TOP leaves room
+  // under the chart title for the top row's scenario labels; the gap
+  // between rows (GRID_PITCH - GRID_H) has to hold one label line.
+  var GRID_TOP = 0.955, GRID_PITCH = 0.325, GRID_H = 0.27;
+  var GRID_LABEL_SHIFT = 3;   // pixels above its own subplot's top edge
   function renderScatterGrid(covs) {
     var host = $('tl-scatter');
     if (!host) return;
@@ -2384,14 +2389,17 @@
       var sf = Math.floor(si / 3), so = si % 3;
       var suffix = si === 0 ? '' : String(si + 1);
       var xa = 'x' + suffix, ya = 'y' + suffix;
-      var x0 = so * 0.345, y1 = 1 - sf * 0.335;
+      // Rows start BELOW paper-top: each subplot carries a scenario label
+      // just above it, and the top row previously ran to y=1.0, which
+      // pushed its label out of the plotting area and into the title.
+      var x0 = so * 0.345, y1 = GRID_TOP - sf * GRID_PITCH;
       layout['xaxis' + suffix] = {
         domain: [x0, x0 + 0.30], anchor: ya,
         range: [N + 60, -60], gridcolor: c.grid, zerolinecolor: c.grid,
         showticklabels: (sf === 2), tickfont: { size: 9 }
       };
       layout['yaxis' + suffix] = {
-        domain: [Math.max(0, y1 - 0.28), y1], anchor: xa,
+        domain: [Math.max(0, y1 - GRID_H), y1], anchor: xa,
         range: COV_Y_RANGE, gridcolor: c.grid, zerolinecolor: c.grid,
         showticklabels: (so === 0), tickfont: { size: 9 }
       };
@@ -2401,8 +2409,15 @@
         if (pct[i] < mn) mn = pct[i];
         if (pct[i] > mx) mx = pct[i];
       }
+      // The label sits ON its own subplot's top edge (y = 1 in that
+      // subplot's domain) and is nudged up a few PIXELS, so it is
+      // attached to its tile at any plot height. The old y = 1.13 was 13%
+      // of the tile height above the tile -- most of the inter-row gap --
+      // so every label floated against the tile ABOVE it, and the top
+      // row's labels collided with the chart title.
       anns.push({
-        xref: xa + ' domain', yref: ya + ' domain', x: 0.5, y: 1.13,
+        xref: xa + ' domain', yref: ya + ' domain', x: 0.5, y: 1,
+        yshift: GRID_LABEL_SHIFT,
         xanchor: 'center', yanchor: 'bottom', showarrow: false,
         text: '<b>' + scenarioLabel(si) + '</b>',
         font: { color: c.ink, size: 11 }
