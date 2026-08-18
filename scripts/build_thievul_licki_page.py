@@ -800,7 +800,7 @@ here"></textarea>
 <div id="tl-reco" class="tl-cards"></div>
 
 {denial_section}
-<details id="tl-methodology" class="tl-methodology">
+<details id="tl-methodology" class="tl-methodology" open>
 <summary>Methodology, honesty notes and disclosures</summary>
 <p class="tl-prov">{provenance}</p>
 {missing_block}
