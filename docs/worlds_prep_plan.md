@@ -173,13 +173,41 @@ Punch / Night Slash + Icy Wind.
 Both arms run Sucker Punch + Icy Wind and fork only on the second charged
 move: **NS+IW** (`thievul`, PvPoke's post-CD default, Night Slash) and
 **IW+PR** (`thievul_iw_pr`, the build the CD dive landed on, Play Rough).
-The reason is that the choice is genuinely contested and IV-CONDITIONAL
-per our own robustness analysis — Night Slash is better for
-top-stat-product spreads and is the more bait-robust arm, Icy Wind + Play
-Rough wins more matchups on breakpoint-clearing spreads — so a single row
-would take a side the data does not support. The full Night-Slash-vs-Play-
-Rough treatment is the root-level `thievul-lickilicky-robustness.html`,
-which both cheat sheets link.
+The reason is that the choice is genuinely contested, so a single row
+would take a side. The full Night-Slash-vs-Play-Rough treatment is the
+root-level `thievul-lickilicky-robustness.html`, which both cheat sheets
+link.
+
+**One clause of the going characterization does NOT reproduce on this
+matrix, and the shipped prose says so.** The framing carried in was
+"Night Slash is better for top-stat-product spreads and is the more
+bait-robust arm; Icy Wind + Play Rough wins more matchups on
+breakpoint-clearing spreads." Summed over all 9 scenarios and the 31
+shared opponents (279 cells per slice), the Worlds planes give:
+
+| slice (probe spread / cohort / mode) | NS+IW  | IW+PR  | delta |
+| ------------------------------------ | ------ | ------ | ----- |
+| rank-1 SP / top-512 / bait           | 157.85 | 167.30 | +9.45 |
+| rank-1 SP / top-512 / no-bait        | 157.12 | 159.19 | +2.07 |
+| rank-1 SP / atk-band / bait          | 160.12 | 168.75 | +8.62 |
+| rank-1 SP / atk-band / no-bait       | 160.12 | 160.31 | +0.19 |
+| max-atk / top-512 / bait             | 149.48 | 158.56 | +9.08 |
+| max-atk / top-512 / no-bait          | 150.89 | 152.53 | +1.64 |
+| max-atk / atk-band / bait            | 150.69 | 159.62 | +8.94 |
+| max-atk / atk-band / no-bait         | 152.25 | 153.31 | +1.06 |
+
+So Play Rough is ahead on BOTH probe spreads here, including the
+top-stat-product one — the opposite of the carried-in clause. The
+bait-robustness half DOES reproduce, and strongly: switching the focal
+side to no-bait moves IW+PR by 8.11 and NS+IW by 0.72 (rank-1/top-512),
+so nearly all of Play Rough's margin is bait-dependent. Every gap is
+small against 279 (3.4% at most), and these are single-slice win COUNTS
+on our cohort convention, not a verdict. The discrepancy is most likely
+a difference of pool and convention (the deep analysis runs an 88-mon
+pool at 1-1; this matrix runs 31 opponents x 9 scenarios x two cohorts),
+NOT a contradiction of the deep analysis on its own terms -- but it is
+recorded here and in the shipped forced_reason rather than papered over,
+because both rows render side by side on the hub.
 
 Mechanics of the fork (new schema, `worlds_meta.MovesetFork`): shadow
 variants already split a species into two entries, but they get a real

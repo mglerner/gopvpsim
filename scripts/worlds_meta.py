@@ -177,15 +177,33 @@ THIEVUL_FORK_REASON = (
     ' Thievul enters the matrix as TWO builds, not one. Both run Sucker '
     'Punch + Icy Wind and fork only on the second charged move: Night Slash '
     "(PvPoke's post-CD default) or Play Rough (the build the Community Day "
-    'dive landed on). The choice is genuinely contested and, per our own '
-    'robustness analysis, IV-CONDITIONAL rather than settled: Night Slash '
-    'is the better arm for top-stat-product spreads and is the more '
-    'bait-robust of the two, while Icy Wind + Play Rough wins more '
-    'matchups on breakpoint-clearing spreads. Shipping one row would take '
-    'a side the data does not support, so both are baked as full entries '
-    'and every pair between them and the rest of the meta -- including the '
-    'pair BETWEEN the two arms -- is simmed. Full Night-Slash-vs-Play-Rough '
-    'treatment: thievul-lickilicky-robustness.html.'
+    'dive landed on). The choice is genuinely contested, so shipping one '
+    'row would take a side; both are baked as full entries and every pair '
+    'between them and the rest of the meta -- including the pair BETWEEN '
+    'the two arms -- is simmed. Full Night-Slash-vs-Play-Rough treatment: '
+    'thievul-lickilicky-robustness.html.'
+    # What THIS matrix measures, stated because the reader can see these
+    # two rows side by side and is entitled to the comparison rather than
+    # an unsourced verdict. The bait-robustness half of the going
+    # characterization reproduces cleanly here; the "Night Slash is better
+    # for top-stat-product spreads" half does NOT, so it is reported as
+    # what it is instead of repeated as fact (never-present-known-wrong).
+    ' What the Worlds matrix itself shows, summed over all 9 shield '
+    'scenarios and the 31 shared opponents (279 cells per slice, each '
+    'cell the fraction of the opponent cohort beaten): at the rank-1 '
+    'stat-product spread vs the top-512 cohort, Icy Wind + Play Rough is '
+    'AHEAD with baiting on (167.30 vs 157.85) and only narrowly ahead in '
+    'the no-bait line (159.19 vs 157.12); at the max-attack probe spread '
+    'the same pattern holds (158.56 vs 149.48 with bait, 152.53 vs 150.89 '
+    'without). So on these planes Play Rough wins more matchups on BOTH '
+    'probe spreads, not only the breakpoint-chasing one -- but almost all '
+    'of its margin is bait-dependent: switching the focal side to no-bait '
+    'moves Icy Wind + Play Rough by 8.11 and Night Slash by 0.72, which '
+    'is the sense in which Night Slash is the more bait-robust arm. Every '
+    'gap here is small against 279 (3.4% at most). These are single-slice '
+    'win COUNTS on our cohort convention and they do not settle the '
+    'question; the per-scenario grids below, and the linked deep analysis '
+    'on its own pool, are the actual evidence.'
 )
 
 THIEVUL_NS_FORK = MovesetFork(
