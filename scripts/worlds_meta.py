@@ -3,9 +3,9 @@
 Generate ``worlds/meta.toml`` -- the Worlds 2026 robustness-analysis meta.
 
 Plan of record: ``docs/worlds_prep_plan.md`` (decided 2026-08-10). The
-31-entry LIST is a human decision and lives here as a literal (``META``):
-speciesId-resolvable display name, shadow flag, badge, and for the two
-FORCED entries their provenance reason. Everything AROUND that decision is
+entry LIST is a human decision and lives here as a literal (``META``):
+speciesId-resolvable display name, shadow flag, badge, and for the FORCED
+entries their provenance reason. Everything AROUND that decision is
 COMPUTED and refreshable:
 
 * usage stats from ``docs/tournament_data/cs_2026_*.json`` (Dracoviz), team
@@ -100,7 +100,7 @@ _FORM_DEFAULTS = {
 
 
 # ---------------------------------------------------------------------------
-# THE HUMAN DECISION: the 31 entries, their badges, and forced provenance.
+# THE HUMAN DECISION: the entries, their badges, and forced provenance.
 # Order is the plan table's order (docs/worlds_prep_plan.md "The meta").
 # Fields: (species display name, shadow, badge, forced provenance or None).
 # ---------------------------------------------------------------------------
@@ -114,6 +114,21 @@ AEGISLASH_REASON = (
     'and Blade attack is non-monotone in the Shield attack IV, so it is '
     'budgeted as the expensive pair-family and footnoted out of the '
     'closed-form pages.'
+)
+
+THIEVUL_REASON = (
+    'post-CD editorial include (Michael, 2026-08-18): Icy Wind Thievul is '
+    'Worlds-legal (CD 08-16 precedes Worlds; not on the Play! banned list); '
+    'PvPoke GL rank ~41; no tournament footprint yet. '
+    # The corpus figure is appended so the reason cannot read as
+    # contradicting the usage column beside it (never-present-known-wrong):
+    # "no footprint" means no MEANINGFUL one, and the corpus says exactly
+    # how little there is -- all of it pre-CD, i.e. a different Pokemon
+    # competitively (Night Slash / Play Rough, PvPoke GL rank 122).
+    'Exact corpus figures: 1 of 1,801 recent open-GL teams (0.06%), 6 of '
+    '3,649 across the whole corpus, 0 of 128 top-cut teams -- and every '
+    'one of those predates the Community Day, when Thievul had no Icy '
+    'Wind and sat at PvPoke GL rank 122.'
 )
 
 MANTINE_REASON = (
@@ -159,7 +174,44 @@ META = [
     ('Grumpig',            False, 'PLAYED*', None),
     ('Diggersby',          False, 'PLAYED*', None),
     ('Mantine',            False, 'FORCED',  MANTINE_REASON),
+    ('Thievul',            False, 'FORCED',  THIEVUL_REASON),
 ]
+
+# --- Community-Day move injection (the meta.toml half) ----------------------
+#
+# Move ids an entry is allowed to run even though the PINNED sim gamemaster
+# (8f1d6cca5c0f, pvpoke f60a41199) does not list them in that species' legal
+# pool. This mirrors the `[Species.cd_prep]` table in thresholds/*.toml and
+# obeys CLAUDE.md's rule for it: NEVER infer "the CD move is the one missing
+# from the pool" -- prove the gamemaster lags with eliteMoves + the pvpoke
+# commit history before adding a row here.
+#
+# Thievul / ICY_WIND, proven 2026-08-14 and re-verified 2026-08-18
+# (docs/thievul_cd_plan.md): our pinned gamemaster gives Thievul
+# chargedMoves = [NIGHT_SLASH, PLAY_ROUGH] and NO eliteMoves, while upstream
+# pvpoke commit f754cd6fc ("Icy Wind Thievul", 2026-08-14) adds ICY_WIND to
+# BOTH chargedMoves and eliteMoves, and the refreshed rankings default
+# Thievul to Sucker Punch / Night Slash + Icy Wind (GL rank ~41). So the
+# injected pool is exactly current pvpoke's pool: the lag is real and the
+# injection is vintage-equivalent, not a guess. Retire this table once the
+# un-pinned gamemaster stably lists the move.
+INJECTED_MOVES = {
+    'Thievul': ['ICY_WIND'],
+}
+
+INJECTION_NOTES = {
+    'Thievul': (
+        'Icy Wind injected: the pinned sim gamemaster predates the Community '
+        'Day. We sim on pvpoke f60a41199 (gamemaster 8f1d6cca5c0f), the '
+        'pre-Worlds vintage every other number on this site was baked at, '
+        'and it still lists Thievul without Icy Wind. Upstream pvpoke added '
+        'Icy Wind to Thievul as an elite charged move on 2026-08-14 (commit '
+        'f754cd6fc), so the injected move pool matches current pvpoke '
+        'exactly -- but the move data itself comes from the pinned '
+        'gamemaster, where Icy Wind already exists (other species learn it). '
+        'Nothing else about Thievul is injected.'
+    ),
+}
 
 # Reasons for the named runner-ups (plan: "Runner-ups that stay OUT but
 # render as rejects on the candidate page"). Everything else in the usage
@@ -496,7 +548,7 @@ def choose_moveset(display_name, species_name, shadow, usage, resolver):
 # ---------------------------------------------------------------------------
 
 def build_entries(usage, resolver):
-    """The 31 meta entries, in plan-table order."""
+    """The meta entries, in plan-table order."""
     entries = []
     for species_name, shadow, badge, forced_reason in META:
         display = f'{species_name} (Shadow)' if shadow else species_name
@@ -524,6 +576,25 @@ def build_entries(usage, resolver):
                                   usage, resolver))
         if forced_reason is not None:
             row['forced_reason'] = forced_reason
+        injected = INJECTED_MOVES.get(display)
+        if injected:
+            # A DEAD injection is a silent legality hole: it would widen
+            # worlds_bake's preflight for a move the entry never runs. The
+            # injected ids must (a) exist in the gamemaster moves db and
+            # (b) actually appear in this entry's chosen moveset.
+            chosen = {row['fast_move_id'], *row['charged_move_ids']}
+            for mid in injected:
+                resolver.move_name(mid)   # hard-fails on an unknown moveId
+                if mid not in chosen:
+                    raise SystemExit(
+                        f'error: {display} declares injected move {mid!r} '
+                        f'but its chosen moveset is {sorted(chosen)} -- a '
+                        'dead injection must not ship (drop the '
+                        'INJECTED_MOVES row or fix the moveset)')
+            row['injected_move_ids'] = sorted(injected)
+            row['injected_moves'] = [resolver.move_name(m)
+                                     for m in sorted(injected)]
+            row['injection_note'] = INJECTION_NOTES[display]
         entries.append(row)
     return entries
 
@@ -600,6 +671,7 @@ ENTRY_KEYS = [
     'fast_move', 'charged_moves', 'fast_move_id', 'charged_move_ids',
     'moveset_source', 'moveset_modal_pct', 'moveset_n',
     'default_disagrees', 'default_fast_move_id', 'default_charged_move_ids',
+    'injected_move_ids', 'injected_moves', 'injection_note',
 ]
 
 REJECT_KEYS = [

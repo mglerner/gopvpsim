@@ -33,7 +33,14 @@ tests/test_worlds_bake_guards.py):
 * every meta moveset id is validated against the species' legal
   gamemaster pool first -- make_battle_pokemon has no legality guard,
   and an Aegislash form-move mixup builds a plausible-looking inverted
-  monster instead of crashing (2026-08-10 audit);
+  monster instead of crashing (2026-08-10 audit). The ONE documented
+  hole is the per-entry ``injected_move_ids`` CD carve-out (see
+  preflight_moveset_legality): declared in meta.toml, proven against
+  upstream eliteMoves + the pvpoke commit log, and disclosed on the
+  rendered pages;
+* a producer-code edit refuses to extend an existing manifest, with
+  ``--bless-worlds-code`` as the audited, one-shot, operator-opt-in
+  alternative to a cold re-bake (see WORLDS_CODE_LINEAGE);
 * stamp mismatches REFUSE (worlds_planes.stamp_mismatches); charged-move
   order follows the shipped dive (get_default_moveset order) whenever
   the chosen set equals the default set, because meta.toml's sorted ids
@@ -55,7 +62,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / 'src'))
 sys.path.insert(0, str(REPO / 'scripts'))
 
-from gopvpsim.data import get_default_moveset
+from gopvpsim.data import get_default_moveset, load_gamemaster
 from gopvpsim.pokemon import iv_rank, find_pokemon_entry
 
 import worlds_planes as wp
@@ -73,6 +80,49 @@ ENGINE_TREE = ('src/gopvpsim', 'scripts/deep_dive_signature.py',
                  for p in wp._WORLDS_SOURCE_FILES))
 _ENGINE_SRC_FILES = ('battle.py', '_dp_jit.py', 'moves.py', 'formchange.py',
                      'pokemon.py')
+
+# --- One-shot blessed worlds_code predecessors ------------------------------
+#
+# A producer-code edit normally REFUSES to extend an existing manifest
+# (worlds_planes module docstring), and the only escape is --rebake-all.
+# CLAUDE.md's migration doctrine ("before a cold re-dive, check for a
+# tractable migration first") applies here exactly as it does to the sweep
+# cache: when the ENTIRE producer delta since a given worlds_code hash
+# provably cannot change any already-baked plane, the old stamp may be
+# blessed forward instead of cold re-baking.
+#
+# Same two soundness guards as migrate_cache's predicates, plus a third:
+#
+#  1. the reason must cover the FULL delta since that hash, not just the
+#     fix that motivated it -- so bless only alongside ONE localized change;
+#  2. entries are one-shot: pinned to a single predecessor hash, consumed by
+#     the bake that re-stamps the manifest, never re-applied afterwards;
+#  3. blessing NEVER happens implicitly -- it requires the operator to pass
+#     --bless-worlds-code <predecessor hash> on the command line, and the
+#     manifest permanently records the blessing in `worlds_code_lineage`.
+#
+# `git diff <the commit that produced the predecessor hash>..HEAD --
+#  scripts/worlds_planes.py scripts/worlds_bake.py
+#  scripts/deep_dive_lib/robustness.py scripts/deep_dive_lib/sweep.py`
+# is the mechanical check that a reason below is complete.
+WORLDS_CODE_LINEAGE = {
+    '653d776f9028': (
+        '2026-08-18, Thievul Icy Wind. FULL producer delta since '
+        '653d776f9028 (git diff 157bf71..HEAD over the four '
+        '_WORLDS_SOURCE_FILES): worlds_bake.py only -- (a) the '
+        'injected_move_ids carve-out in preflight_moveset_legality plus its '
+        'load_gamemaster import and all_move_ids helper, (b) this lineage '
+        'block and its --bless-worlds-code plumbing. worlds_planes.py, '
+        'deep_dive_lib/robustness.py and deep_dive_lib/sweep.py are '
+        'byte-unchanged. Neither (a) nor (b) executes inside a sim: (a) is a '
+        'pre-bake legality CHECK whose only behavior change is to widen the '
+        'accepted pool for entries carrying a non-empty injected_move_ids '
+        'list -- no pre-Thievul meta entry has that field, so the check '
+        'still accepts and rejects exactly what it did before for all 31 of '
+        'them; (b) only affects stamp comparison. Every one of the 1,860 '
+        'planes baked under 653d776f9028 is therefore bit-identical under '
+        'the new hash.'),
+}
 
 
 def fresh_engine_digest():
@@ -127,16 +177,66 @@ def legal_move_ids(entry_name):
     return fast, charged
 
 
+def all_move_ids():
+    """Every moveId in the gamemaster's global moves db (NOT any one
+    species' pool) -- the same validation surface deep_dive.py uses for
+    its ``[Species.cd_prep]`` injections."""
+    return {m['moveId'] for m in load_gamemaster()['moves']}
+
+
 def preflight_moveset_legality(entries):
     """Every meta moveset id must be in the species' legal gamemaster
     pool. make_battle_pokemon builds ANY id it can look up, and the
-    Aegislash form-move mixup is silent, not a crash."""
+    Aegislash form-move mixup is silent, not a crash.
+
+    NARROW CD CARVE-OUT (2026-08-18, Thievul / Icy Wind). An entry may
+    carry ``injected_move_ids``: ids admitted for THAT entry only, even
+    though the PINNED sim gamemaster does not list them in the species'
+    pool. This is the Worlds-side twin of the ``[Species.cd_prep]``
+    table in ``thresholds/*.toml``, and it inherits that convention's
+    guards, tightened:
+
+    * the injection is DECLARED per entry in ``worlds/meta.toml`` (from
+      ``worlds_meta.INJECTED_MOVES``), never inferred here from "the
+      move is missing from the pool" -- CLAUDE.md's Baxcalibur trap;
+    * ``worlds_meta`` only emits the field after proving the gamemaster
+      lags via upstream ``eliteMoves`` + the pvpoke commit history, and
+      hard-fails on a DEAD injection (one the entry does not run);
+    * each injected id must still exist in the gamemaster's global moves
+      db, so the move DATA is the pinned vintage's, not invented;
+    * the widening is per-entry and per-id -- no other entry's pool
+      moves, and an injected id that this entry does not use is an
+      error, not a silently wider pool;
+    * it is disclosed to readers (``injection_note`` -> the cheat sheet
+      and the hub moveset cell), and printed loudly here.
+    """
     errors = []
+    moves_db = None
     for e in entries:
         fast, charged = legal_move_ids(e['name'])
         if fast is None:
             errors.append(f"{e['name']}: not in the gamemaster")
             continue
+        injected = list(e.get('injected_move_ids') or [])
+        if injected:
+            if moves_db is None:
+                moves_db = all_move_ids()
+            used = {e['fast_move_id'], *e['charged_move_ids']}
+            for mid in injected:
+                if mid not in moves_db:
+                    errors.append(f"{e['name']}: injected {mid} is not in "
+                                  'the gamemaster moves db')
+                    continue
+                if mid not in used:
+                    errors.append(f"{e['name']}: injected {mid} is not used "
+                                  'by this entry -- a dead injection must '
+                                  'not widen the legality check')
+                    continue
+                fast = fast | {mid}
+                charged = charged | {mid}
+                print(f'  cd injection: {e["name"]} admits {mid} (absent '
+                      f'from the pinned gamemaster pool; see meta.toml '
+                      f'injection_note)')
         if e['fast_move_id'] not in fast:
             errors.append(f"{e['name']}: fast {e['fast_move_id']} not in "
                           f"legal pool {sorted(fast)}")
@@ -306,8 +406,44 @@ def _finish_task(task, result, manifest, planes_dir):
     wp.save_manifest(manifest, planes_dir)
 
 
+def bless_worlds_code(manifest, predecessor):
+    """Re-stamp a manifest's worlds_code from a blessed predecessor.
+
+    Refuses unless ``predecessor`` is BOTH the manifest's current stamp
+    and a key of WORLDS_CODE_LINEAGE (so a typo, a stale flag left in a
+    script, or a second unrelated producer edit all fail loudly rather
+    than blessing something unproven). The blessing is written into the
+    manifest as a permanent record, then consumed: the predecessor hash
+    is no longer any manifest's stamp, so the entry cannot fire again.
+    """
+    stamped = manifest.get('worlds_code')
+    current = wp.worlds_code_hash()
+    if stamped != predecessor:
+        sys.exit(f'ABORT: --bless-worlds-code {predecessor} but the manifest '
+                 f'is stamped {stamped!r} -- refusing to bless a hash the '
+                 'planes were not baked under.')
+    if predecessor not in WORLDS_CODE_LINEAGE:
+        sys.exit(f'ABORT: {predecessor} is not in WORLDS_CODE_LINEAGE. A '
+                 'blessing needs a written proof that the FULL producer '
+                 'delta since that hash cannot change any baked plane; '
+                 'without one, re-bake (--rebake-all).')
+    if stamped == current:
+        print(f'worlds_code already {current}; nothing to bless.')
+        return manifest
+    reason = WORLDS_CODE_LINEAGE[predecessor]
+    manifest.setdefault('worlds_code_lineage', []).append({
+        'from': predecessor, 'to': current,
+        'blessed': date.today().isoformat(), 'reason': reason,
+    })
+    manifest['worlds_code'] = current
+    print(f'Blessed worlds_code {predecessor} -> {current} '
+          f'({len(manifest["entries"])} existing planes kept).\n  {reason}')
+    return manifest
+
+
 def bake(entries, planes_dir=wp.PLANES_DIR, k=TOP_K, scenarios=SCENARIOS,
-         pair_limit=None, workers=0, rebake_all=False, dry_run=False):
+         pair_limit=None, workers=0, rebake_all=False, dry_run=False,
+         bless=None):
     """The guarded bake. Returns (n_baked, n_skipped)."""
     old_manifest = wp.load_manifest(planes_dir)
     # Plan first, destroy later: --rebake-all plans against a FRESH
@@ -320,6 +456,8 @@ def bake(entries, planes_dir=wp.PLANES_DIR, k=TOP_K, scenarios=SCENARIOS,
         manifest = {**wp.fresh_stamps(), 'created': date.today().isoformat(),
                     'meta_entries': {}, 'entries': {}}
     else:
+        if bless:
+            manifest = bless_worlds_code(manifest, bless)
         mismatches = wp.stamp_mismatches(manifest)
         if mismatches:
             lines = [f'  {k}: manifest {a!r} != current {b!r}'
@@ -416,6 +554,12 @@ def main():
                         help='DELETE all planes + manifest and start fresh '
                              '(the only deletion path)')
     parser.add_argument('--allow-dirty-engine', action='store_true')
+    parser.add_argument('--bless-worlds-code', metavar='HASH', default=None,
+                        help='re-stamp the manifest from this blessed '
+                             'predecessor worlds_code hash instead of '
+                             'refusing (must be a WORLDS_CODE_LINEAGE key '
+                             'AND the manifest\'s current stamp); the '
+                             'blessing is recorded in the manifest')
     args = parser.parse_args()
 
     install_sweep_cache_poison()
@@ -423,7 +567,8 @@ def main():
     entries = load_meta()
     preflight_moveset_legality(entries)
     bake(entries, pair_limit=args.pair_limit, workers=args.workers,
-         rebake_all=args.rebake_all, dry_run=args.dry_run)
+         rebake_all=args.rebake_all, dry_run=args.dry_run,
+         bless=args.bless_worlds_code)
     return 0
 
 

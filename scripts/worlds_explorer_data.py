@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""IV-explorer DATA blob: closed-form cutoffs + stat bases for the 31
+"""IV-explorer DATA blob: closed-form cutoffs + stat bases for the
 meta entries (plan product 5).
 
 Design decision (2026-08-11, session 5): the browser receives BAKED

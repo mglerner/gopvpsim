@@ -289,10 +289,15 @@ def meta():
         return tomllib.load(f)
 
 
-def test_meta_parses_with_31_entries(meta):
-    assert len(meta['entries']) == 31
+def test_meta_entry_list_matches_the_generator(meta):
+    """The shipped entry count is DERIVED from wm.META (the human
+    decision), never pinned to a literal -- the meta grows (31 -> 32 when
+    Thievul was added 2026-08-18). The floor guards against a truncated
+    or empty regeneration."""
+    n = len(meta['entries'])
+    assert n == len(wm.META) >= 31
     names = [e['name'] for e in meta['entries']]
-    assert len(set(names)) == 31, 'duplicate entry names'
+    assert len(set(names)) == n, 'duplicate entry names'
 
 
 def test_meta_has_no_mimikyu_entry(meta):
@@ -321,9 +326,14 @@ def test_meta_badges_are_the_planned_ones(meta):
     """Badge vocabulary is closed; FORCED entries carry their provenance."""
     counts = collections.Counter(e['badge'] for e in meta['entries'])
     assert set(counts) == {'PLAYED', 'PLAYED*', 'MODEL', 'FORCED'}
-    assert counts['FORCED'] == 2
+    # FORCED is editorial: derive both the count and the names from the
+    # generator's own literal rather than pinning them (Thievul joined
+    # Aegislash + Mantine 2026-08-18).
+    expected_forced = {f'{n} (Shadow)' if sh else n
+                       for n, sh, badge, _r in wm.META if badge == 'FORCED'}
+    assert counts['FORCED'] == len(expected_forced) >= 2
     forced = [e for e in meta['entries'] if e['badge'] == 'FORCED']
-    assert {e['name'] for e in forced} == {'Aegislash (Shield)', 'Mantine'}
+    assert {e['name'] for e in forced} == expected_forced
     for e in forced:
         assert len(e['forced_reason']) > 80, e['name']
     for e in meta['entries']:

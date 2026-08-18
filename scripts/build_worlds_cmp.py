@@ -177,7 +177,8 @@ rank-1 ties.</p>
 <th class="num">cohort range</th><th>range</th></tr>
 {order_rows}
 </table></div>
-<h2>Contested pairs ({len(pairs)} of 465, usage-ranked)</h2>
+<h2>Contested pairs ({len(pairs)} of {len(data) * (len(data) - 1) // 2},
+usage-ranked)</h2>
 <p class="section-intro">For each direction: how many of the first
 species' cohort spreads Win / exactly Tie / Lose CMP against the
 SECOND species' rank-1 spread. The two threshold columns give A's and

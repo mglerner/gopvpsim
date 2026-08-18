@@ -176,6 +176,16 @@ UI_JS = r"""
 def render_explorer(meta, manifest):
     data = wed.build_data()
     blob = json.dumps(data, separators=(',', ':'))
+    # Counts are DERIVED, never literals: the meta grows (Thievul added
+    # 2026-08-18) and a stale "vs the 30 entries" would be a wrong number
+    # in reader-visible prose.
+    excluded = sorted(v['name'] for v in data['entries'].values()
+                      if v.get('excluded'))
+    n_closed_form = len(data['entries']) - len(excluded)
+    excl_note = (f'{", ".join(excluded)} '
+                 f'{"is" if len(excluded) == 1 else "are"} form-change '
+                 'excluded and shown as such'
+                 if excluded else 'none are form-change excluded')
     pogo_js = (REPO / 'scripts' / 'deep_dive_user_collection.js').read_text()
     wx_js = (REPO / 'scripts' / 'worlds_iv_explorer.js').read_text()
     body = f"""
@@ -209,9 +219,9 @@ sheets and grids answer.</p>
         title='Worlds 2026 - IV explorer',
         heading='Worlds 2026: IV explorer',
         intro_html=('<p>What do YOUR IVs reach and hold against the '
-                    'Worlds meta? Breakpoints and bulkpoints vs the 30 '
-                    'closed-form entries (Aegislash is form-change '
-                    'excluded and shown as such), from exact cutoffs; '
+                    f'Worlds meta? Breakpoints and bulkpoints vs the '
+                    f'{n_closed_form} closed-form entries ({excl_note}), '
+                    'from exact cutoffs; '
                     'displayed cutoffs are rounded UP so reaching the '
                     'printed number always suffices.</p>'
                     + provenance_html(meta, manifest)),

@@ -4,7 +4,7 @@
 Plan: docs/worlds_prep_plan.md (products 2 + 3). This module is a
 READ-ONLY consumer of ``worlds/planes/`` -- it is deliberately OUTSIDE
 ``worlds_planes._WORLDS_SOURCE_FILES`` (a renderer edit must not cold a
-1,860-plane bake; same boundary as worlds_tier0.py).
+Tier-1 plane bake; same boundary as worlds_tier0.py).
 
 Vocabulary (docs/concepts.md + the plan):
 
