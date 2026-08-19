@@ -116,6 +116,17 @@ def emit(focal_id, opp_id, force=False):
         sys.exit(f'ABORT: opponent {opp_id} declares injected moves '
                  f'{o["injected_move_ids"]}; opponent-side injection is '
                  'not supported by the kit bake')
+    lines += [
+        '',
+        '# FROZEN SLOT KEYS -- the page JS locates the breakpoints layer by',
+        '# these historical spellings (thievul=focal slot, lickitung=opp',
+        '# slot, licki=opp shorthand); they are slot names, not species.',
+        '# The page builder hard-aborts when breakpoints.json lacks them.',
+        '[breakpoints]',
+        'focal_key = "thievul"',
+        'opp_key = "lickitung"',
+        'opp_short = "licki"',
+    ]
     for bait in (True, False):
         lines += [
             '',

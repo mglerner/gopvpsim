@@ -944,6 +944,18 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
         missing.append('breakpoints.json (closed-form damage/bulk layer) -- '
                        'the mechanism section and the damage-tier coloring '
                        'need it')
+    elif 'thievul_offense' not in breakpoints:
+        # The page JS locates the breakpoints layer by the FROZEN slot
+        # spellings (thievul_offense / lickitung_offense / *_licki_*) --
+        # historical slot names, not species. A breakpoints.json built
+        # without pinning [breakpoints] focal_key/opp_key/opp_short would
+        # make every mechanism panel silently find nothing (caught as a
+        # designed trap, 2026-08-19).
+        raise SystemExit(
+            'ABORT: breakpoints.json lacks the frozen slot key '
+            "'thievul_offense' the page JS reads. Pin [breakpoints] "
+            'focal_key="thievul", opp_key="lickitung", opp_short="licki" '
+            'in the pair config and re-run joint_iv_breakpoints.py.')
     denial = load_json(data_dir / DENIAL_FILENAME)
     reco = load_json(reco_path)
     if reco is None:
