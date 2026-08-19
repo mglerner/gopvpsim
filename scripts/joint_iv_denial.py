@@ -184,7 +184,7 @@ def main(argv=None):
                          f'not a configured grid label')
     sp_move = den_cfg.get('focal_bp_move', by_label[primary_grid].focal_fast)
     roll_move = den_cfg.get('opp_pressure_move', cfg.opp_fast)
-    sp_name, roll_name = pretty_move(sp_move), pretty_move(roll_move)
+    roll_name = pretty_move(roll_move)
 
     manifest = json.loads((data / 'manifest.json').read_text())
     bp = json.loads((data / 'breakpoints.json').read_text())
@@ -232,6 +232,10 @@ def main(argv=None):
     # keys derive from the RESOLVED move (the structural
     # re-resolution above may have replaced sp_move)
     sp_key, roll_key = sp_move.lower(), roll_move.lower()
+    # ...and so does the display name: freezing it before the
+    # re-resolution labeled Payback's wall "Sand Attack" (2026-08-19
+    # verify high).
+    sp_name = pretty_move(sp_move)
     if tier_key not in sp or bp_key not in sp:
         raise SystemExit(
             f'ABORT: breakpoints.json {focal_key}.moves.{sp_move} has no '
@@ -453,10 +457,18 @@ def main(argv=None):
             'K': r(k_roll), 'tiers': [roll_lo, roll_hi],
             'identity': (f'{OPPONENT} {roll_name} damage = floor(K * '
                          f'{OPPONENT.lower()}_atk / {FOCAL.lower()}_def) + 1'),
-            'top_tier_condition': (f'{OPPONENT.lower()}_atk >= '
-                                   f'{r(roll_factor, 5)} x '
-                                   f'{FOCAL.lower()}_def lands '
-                                   f'{roll_hi} instead of {roll_lo}'),
+            'top_tier_condition': (
+                # A single reachable tier makes the ladder degenerate
+                # ("lands 4 instead of 4" -- 2026-08-19 verify); say the
+                # true thing instead.
+                f'{roll_name} is tier-flat in this matchup: every '
+                f'{OPPONENT} spread deals exactly {roll_hi} per hit to '
+                f'every {FOCAL} spread'
+                if roll_hi == roll_lo else
+                f'{OPPONENT.lower()}_atk >= '
+                f'{r(roll_factor, 5)} x '
+                f'{FOCAL.lower()}_def lands '
+                f'{roll_hi} instead of {roll_lo}'),
             'factor': r(roll_factor, 6),
             'opponent_atk_range': [r(o_atk.min(), 3), r(o_atk.max(), 3)],
         },

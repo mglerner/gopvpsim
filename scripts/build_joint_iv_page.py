@@ -212,7 +212,13 @@ def dataset_spec(manifest, data_dir=None):
     # grid can never be silently absent from the page's own label list.
     known = set(grids) | set(man.get('planned_grids') or [])
     if data_dir is not None:
-        prefix, suffix = f'{focal.lower()}_', f'__vs__{opponent.lower()}.npz'
+        # Prefix from the pair config's SLUG, not focal.lower(): shadow
+        # pairs write quagsire_shadow_<label>__vs__..., and stripping
+        # 'quagsire_' minted phantom 'shadow_<label>' grids that inflated
+        # the footer and faked a robustness claim (2026-08-19 verify).
+        slug = CFG.focal_slug if CFG is not None else focal.lower()
+        opp_slug = CFG.opp_slug if CFG is not None else opponent.lower()
+        prefix, suffix = f'{slug}_', f'__vs__{opp_slug}.npz'
         for f in pathlib.Path(data_dir).glob(f'{prefix}*{suffix}'):
             known.add(f.name[len(prefix):-len(suffix)])
     if not known:
@@ -224,6 +230,7 @@ def dataset_spec(manifest, data_dir=None):
     for label in labels:
         g = grids.get(label) or {}
         files[label] = g.get('file') or (
+            CFG.grid_filename(label) if CFG is not None else
             f'{focal.lower()}_{label}__vs__{opponent.lower()}.npz')
         pretty[label] = (_grid_pretty(g) if g.get('focal_fast')
                          else PRETTY_FALLBACK.get(label, label))
@@ -983,13 +990,15 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
                        'assembly phase)')
 
     scenarios = [f'{sf}-{so}' for sf in range(3) for so in range(3)]
-    notes = [
-        'meta_wins is measured against the shipped dive pool at the dive\'s '
-        'own opponent IVs and movesets -- it is not a full-meta ladder '
-        'simulation. Which shield scenario it reports FOLLOWS the controls; '
-        'the meta-wins rail below states the binding actually in effect.',
-        f"Every {spec['opponent']} here is {spec['opp_moveset']}.",
-    ]
+    notes = []
+    if meta_wins is not None:
+        notes.append(
+            'meta_wins is measured against the shipped dive pool at the '
+            'dive\'s own opponent IVs and movesets -- it is not a '
+            'full-meta ladder simulation. Which shield scenario it reports '
+            'FOLLOWS the controls; the meta-wins rail below states the '
+            'binding actually in effect.')
+    notes.append(f"Every {spec['opponent']} here is {spec['opp_moveset']}.")
     if gm_now and gm_baked and gm_now != gm_baked:
         notes.append(
             f'GAMEMASTER DRIFT: the grids were baked against gamemaster '
@@ -1020,8 +1029,10 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
     for grp in duplicates:
         notes.append(
             'IDENTICAL GRIDS: ' + ' and '.join(spec['pretty'][g] for g in grp)
-            + ' produced BYTE-IDENTICAL win data, so they are one grid, not '
-            'two independent ones. Agreement between them is not evidence of '
+            + ' produced BYTE-IDENTICAL win data, so they are one grid, '
+            + ('not two independent ones'
+               if len(grp) == 2 else f'not {len(grp)} independent ones')
+            + '. Agreement between them is not evidence of '
             'moveset/bait robustness: no matchup outcome changes when you '
             'switch between them. (The meta-wins axis is a different '
             'measurement -- it is computed per grid against the dive pool '

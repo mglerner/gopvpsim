@@ -628,7 +628,23 @@
       + ((s.nearly || []).length
         ? '. The recommendation blob also treats ' + s.nearly.join('; ')
           + ' as unwinnable' : '')
-      + (rest.length ? '. IV choice can still decide ' + rest.join(', ')
+      + (rest.length ? '. IV choice can still decide '
+          // Each undecided scenario carries its measured CEILING --
+          // grouping a 28%-max scenario with two 100% ones under one
+          // clause read as equally winnable (2026-08-19 verify).
+          + rest.map(function (lbl) {
+              var si2 = (META.scenarios || []).indexOf(lbl);
+              var top = (dig(D, 'cov.' + label + '.top512') || []);
+              var bestN = 0;
+              if (si2 >= 0 && top.length) {
+                for (var ii = si2; ii < top.length; ii += NS) {
+                  if (top[ii] > bestN) { bestN = top[ii]; }
+                }
+              }
+              return lbl + (top.length && si2 >= 0
+                ? ' (best spread ' + fmt(100 * bestN / 512, 1) + '%)'
+                : '');
+            }).join(', ')
           + '.'
         : '. No scenario is left for IV choice to decide.')
       + (cohortOnly.length
@@ -2731,7 +2747,16 @@
       + 'upper-right staircase: a spread is on it when no other spread has '
       + 'at least as many meta wins AND at least as much coverage; exact '
       + 'ties are drawn once. That is '
-      + esc(fmt(front.length, 0)) + ' of ' + esc(commas(N))
+      // Count SPREADS whose (wins, coverage) sits on a frontier step,
+      // not the steps themselves (678 spreads rendered as "1" --
+      // 2026-08-19 verify medium).
+      + esc(fmt((function () {
+          var steps = {};
+          front.forEach(function (f) { steps[f.w + '|' + f.c] = true; });
+          return pts.filter(function (p) {
+            return steps[p.w + '|' + p.c];
+          }).length;
+        })(), 0)) + ' of ' + esc(commas(N))
       + ' spreads here - every other point is at or behind a step of it. '
       + 'Meta axis: ' + esc(mw.note) + '. ' + esc(D.meta_wins.note || '')
       + ' ' + esc(OPP) + ' cohort: ' + esc(cohortLabel()) + '.'
@@ -3972,19 +3997,25 @@
     }
     if (best) {
       // Rank is INTERPOLATED (the original hardcoded "rank-1" while
-      // naming the rank-2 build -- 2026-08-19 review), and the cost
-      // adjective follows the actual rank.
-      var costTxt = (best.rank === 1 ? 'zero'
-        : best.rank <= 50 ? 'near-zero' : 'a real');
+      // naming the rank-2 build -- 2026-08-19 review), the cost
+      // adjective follows the actual rank, and the build NAMED for the
+      // top-512 sentence is picked BY top-512 denial (SP rank as
+      // tiebreak) -- the all-4096 argmax merely reported its top-512
+      // number, naming rank 2 where rank 1 ties (2026-08-19 verify).
+      var best512 = wallRows.slice().sort(function (a, b) {
+        return (b.denies.top512 - a.denies.top512) || (a.rank - b.rank);
+      })[0] || best;
+      var costTxt = (best512.rank === 1 ? 'zero'
+        : best512.rank <= 50 ? 'near-zero' : 'a real');
       vparts.push('<li><strong>Against the top-512 ' + esc(FOCAL)
         + ' spreads in that same cell (' + esc(gridAbbrev(wallGrid)) + ' '
-        + esc(wallScen) + '), rank ' + best.rank
+        + esc(wallScen) + '), rank ' + best512.rank
         + ' is the best answer:</strong> '
-        + esc(best.ivs.join('/')) + ' (defense '
-        + best.def + ') denies '
-        + denialPct(best.denies.top512, pops.top512) + ' of them, at '
+        + esc(best512.ivs.join('/')) + ' (defense '
+        + best512.def + ') denies '
+        + denialPct(best512.denies.top512, pops.top512) + ' of them, at '
         + costTxt + ' stat-product '
-        + 'cost' + (best.rank > 50 ? ' (rank ' + best.rank + ')' : '')
+        + 'cost' + (best512.rank > 50 ? ' (rank ' + best512.rank + ')' : '')
         + '.</li>');
     }
     // The bait lever is per moveset: on a grid whose bait/no-bait pair is
@@ -4012,6 +4043,28 @@
     dupPairs.forEach(function (g) {
       if (g.length > 1) noopGrids.push(msAbbrev(g[0]));
     });
+    if (bGrid && nGrid && !!baited !== !!unbaited) {
+      // One side of the bait pair has no sensitive cell at this scenario
+      // (it is saturated or hopeless there) -- that IS the lever, and
+      // silence hid it on the bait-dependent Corviknight page
+      // (2026-08-19 verify). State it from the reco classification.
+      var clsOf = function (lb) {
+        var pg = dig(D, 'reco.per_grid_scenarios') || {};
+        var e = pg[lb] || {};
+        if ((e.saturated_win || []).indexOf(BAIT_SCEN) >= 0) {
+          return 'a ' + FOCAL + ' sweep regardless of IVs';
+        }
+        if ((e.hopeless || []).indexOf(BAIT_SCEN) >= 0) {
+          return 'hopeless for ' + FOCAL + ' regardless of IVs';
+        }
+        return 'IV-decided';
+      };
+      vparts.push('<li><strong>Whether ' + esc(FOCAL) + ' baits is a '
+        + 'bigger lever than any IV at ' + esc(BAIT_SCEN)
+        + ':</strong> with baiting the cell is '
+        + esc(clsOf(bGrid)) + '; without, it is '
+        + esc(clsOf(nGrid)) + '.</li>');
+    }
     if (baited && unbaited) {
       vparts.push('<li><strong>Whether ' + esc(FOCAL) + ' baits is a '
         + 'bigger lever than any ' + esc(OPP) + ' IV -- on the '
@@ -4038,7 +4091,7 @@
         + ' defense in the species is ' + esc(sp.max_opponent_def)
         + ', which walls ' + commas(sp.max_def_walls_n_focal) + ' of '
         + commas(N) + ' ' + esc(FOCAL) + ' spreads ('
-        + fmt(100 * sp.max_def_walls_frac, 1) + '%) and '
+        + fmt(100 * sp.max_def_walls_n_focal / N, 1) + '%) and '
         + (sp.walls_median_focal ? 'does' : 'does NOT')
         + ' wall a median-attack ' + esc(FOCAL) + '. Closed form and grid '
         + 'agree: at the rank-1 ' + esc(OPP) + ' defense ('
@@ -4101,8 +4154,13 @@
             + '%</td>'
             + cells.map(function (c) {
               var v = (b.per_cell || {})[c] || {};
-              return '<td>' + fmt(v.all4096, 0) + ' / ' + fmt(v.top512, 0)
-                + ' / ' + fmt(v[BP_KEY], 0) + '</td>';
+              // sub-1% non-zero denial reads as exactly zero when
+              // truncated (2026-08-19 verify)
+              var f1 = function (x) {
+                return (x > 0 && x < 1) ? '&lt;1' : fmt(x, 0);
+              };
+              return '<td>' + f1(v.all4096) + ' / ' + f1(v.top512)
+                + ' / ' + f1(v[BP_KEY]) + '</td>';
             }).join('')
             + (withNote ? '<td>' + esc(b.note || '') + '</td>' : '')
             + '</tr>';
@@ -5211,7 +5269,12 @@
       });
       bs.value = state.basis;
       bs.addEventListener('change', function () {
-        state.basis = bs.value;
+        // Accept only the values this select actually offers; anything
+        // else (programmatic writes, stale restores) falls back to the
+        // moveset-derived default instead of rendering a
+        // self-contradicting override banner (2026-08-19 verify).
+        state.basis = (bs.value === 'primary' || bs.value === 'other')
+          ? bs.value : basisForMoveset(msKeyOf(state.label));
         renderUser();
       });
     }
