@@ -169,11 +169,13 @@ headline_abbr = "SP"
 # names the tiers. The prose is formatted from the computed tiers; this
 # asserts they are still the ones the page was written against.
 expected_tiers = [6, 7, 8]
-# The focal arms are DELIBERATELY off-meta -- PvPoke's Thievul is
-# SP/NS+IW while the dive's landing build is SP/IW+PR -- so the
-# get_default_moveset assertion the opponent side always gets is opted
-# out of here rather than silently absent.
-assert_focal_default_moveset = false
+# The focal equivalent of the opponent's get_default_moveset check,
+# asserted as "SOME arm is PvPoke's rankings default". Left ON: the
+# LANDING build (iwpr = SP/IW+PR) is deliberately off-meta, but the nsiw
+# arm IS PvPoke's Thievul default (SP/NS+IW), so the check is live and
+# passing here. Set false only for a pair whose every arm is off-meta --
+# an explicit opt-out, never a silently absent check.
+assert_focal_default_moveset = true
 
 # The two HSH-discord claims this page answers. `slug` is the key
 # spelling (a human shorthand: "615" for 6/15/5, not a formatting of the
