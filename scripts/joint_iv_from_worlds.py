@@ -127,6 +127,13 @@ def emit(focal_id, opp_id, force=False):
         'opp_key = "lickitung"',
         'opp_short = "licki"',
     ]
+    if o.get('default_disagrees'):
+        lines += [
+            '# The OPPONENT worlds modal moveset deliberately differs from',
+            '# PvPoke\'s rankings default (see the focal note above for the',
+            '# same rule).',
+            'assert_opponent_default_moveset = false',
+        ]
     if f.get('default_disagrees'):
         lines += [
             '# The Worlds MODAL moveset (what the field actually runs, '
