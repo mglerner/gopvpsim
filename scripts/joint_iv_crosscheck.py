@@ -44,6 +44,17 @@ def main():
     args = ap.parse_args()
     cfg = load_pair(args.pair)
 
+    if cfg.focal_slug == cfg.opp_slug:
+        # Mirrors were structurally excluded from the Worlds Tier-1/2
+        # machinery (itertools.combinations), so no independent reference
+        # grid EXISTS -- this is not a checked-nothing failure but a
+        # documented absence; the kit's own --check-rows re-sim is the
+        # remaining independent verification for mirror bakes.
+        print('mirror pair: no Worlds Tier-2 reference exists by '
+              'construction; cross-check not applicable (use '
+              'joint_iv_bake.py --check-rows for the re-sim check).')
+        return
+
     manifest_path = cfg.data_dir / 'manifest.json'
     if not manifest_path.exists():
         sys.exit(f'ABORT: no kit manifest at {manifest_path}')
