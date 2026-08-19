@@ -1,6 +1,7 @@
 # Thievul vs Licki IV-robustness analysis (2026-08-16 CD)
 
-Contract + runbook for the `thievul_licki_*` one-off pipeline: full
+Contract + runbook for what is now the generic `joint_iv_*` kit
+(renamed 2026-08-19, S1 of docs/joint_iv_reuse_plan.md: thievul_licki_{bake,meta,breakpoints,assemble,denial}.py + build_thievul_licki_page.py + thievul_licki_page.js became joint_iv_{bake,meta,breakpoints,assemble,denial}.py + build_joint_iv_page.py + joint_iv_page.js, driven by pairs/*.toml; the shipped artifacts rebuild byte-identically from pairs/thievul_{lickilicky,lickitung}.toml). Originally the one-off pipeline: full
 4096x4096 IV joint grids of Thievul vs the Licki line, built for the
 Nickit Community Day "IV tech" question from the HSH discord ("is
 6/15/5 the best spread for the Sucker Punch bp on Licki?" / "do you not
@@ -33,11 +34,12 @@ wins source) and the PINNED gamemaster in `~/Documents/gopvpsim_cache/`
 (hash `8f1d6cca5c0f`; the grids were baked against it -- a TTL refetch
 pulls a drifted blob and the builder aborts on axis mismatch).
 
-    direnv exec . python scripts/thievul_licki_bake.py --opponent lickilicky --workers 14
-    direnv exec . python scripts/thievul_licki_meta.py            # + --verify
-    direnv exec . python scripts/thievul_licki_breakpoints.py --opponent lickilicky
-    direnv exec . python scripts/thievul_licki_assemble.py --opponent lickilicky
-    direnv exec . python scripts/build_thievul_licki_page.py --data-dir userdata/thievul_lickilicky
+    direnv exec . python scripts/joint_iv_bake.py pairs/thievul_lickilicky.toml --workers 14
+    direnv exec . python scripts/joint_iv_meta.py pairs/thievul_lickitung.toml --verify
+    direnv exec . python scripts/joint_iv_breakpoints.py pairs/thievul_lickilicky.toml
+    direnv exec . python scripts/joint_iv_assemble.py pairs/thievul_lickilicky.toml
+    direnv exec . python scripts/joint_iv_denial.py pairs/thievul_lickilicky.toml
+    direnv exec . python scripts/build_joint_iv_page.py pairs/thievul_lickilicky.toml
 
 Same commands with `--opponent lickitung` / the lickitung data dir for
 the secondary page. `meta_wins.npz` is opponent-independent and lives

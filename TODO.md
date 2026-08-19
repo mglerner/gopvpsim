@@ -19,7 +19,7 @@ analysis SHIPPED** -- full 4096x4096 joint IV grids vs Lickilicky
 (primary; 4 moveset/bait grids) and Lickitung (secondary), published as
 `thievul-lickilicky-robustness.html` + `thievul-lickitung-robustness.html`
 with an index card. Pipeline + contract: `docs/thievul_licki_analysis.md`
-(scripts `thievul_licki_*`, data in gitignored `userdata/thievul_lick*`).
+(pipeline: the generic `joint_iv_*` kit since 2026-08-19 -- `pairs/thievul_*.toml`; data in gitignored `userdata/thievul_lick*`).
 Post-publish residue: (a) tests/fixtures/poke_genie_export.csv is
 locally modified with Michael's real CD-day export -- decide keep vs
 revert (it is NOT committed and NOT embedded in the pages); (b) the

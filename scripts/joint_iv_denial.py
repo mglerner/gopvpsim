@@ -77,7 +77,7 @@ def r(x, n=4):
 
 
 def pretty_move(move_id):
-    """Display name for a move id (mirrors build_thievul_licki_page's
+    """Display name for a move id (mirrors build_joint_iv_page's
     _pretty_move, so the page and this blob spell moves the same way)."""
     return ' '.join(w.capitalize() for w in str(move_id).split('_'))
 

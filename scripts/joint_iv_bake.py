@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Bake full 4096x4096 IV joint grids for one joint-IV pair config.
 
-Config-driven generalization of scripts/thievul_licki_bake.py (S1 of
+Config-driven generalization of the retired scripts/thievul_licki_bake.py (S1 of
 docs/joint_iv_reuse_plan.md): every focal-vs-opponent identity, moveset,
 shadow flag, grid label and output path comes from a pairs/*.toml file
 (see scripts/joint_iv_config.py for the schema). The Thievul configs
