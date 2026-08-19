@@ -1283,9 +1283,10 @@
         + FLAT_RANGE_PP + ' point.';
     }
     var names = scored.map(function (o) { return o.sc; });
-    return 'switch the shield scenario (' + names.slice(0, 2).join(', ')
-      + (names.length > 2 ? ', and ' + (names.length - 2) + ' more'
-        : '') + ') to see where it does.';
+    // List every IV-decidable scenario -- 'and 1 more' hid one of three
+    // (2026-08-19 review note); there are at most nine.
+    return 'switch the shield scenario (' + names.join(', ')
+      + ') to see where it does.';
   }
   // ---- hover stripes ----
   // Hovering a cell outlines the ENTIRE row (that focal spread against
@@ -3639,6 +3640,18 @@
 
     // -- per-move breakpoint mechanics --
     var mv = dig(bp, 'thievul_offense.moves') || {};
+    // Focal moves the producer PROVED never fly in this matchup (the
+    // stage probe's debuff_unreachable record) get the same never-thrown
+    // disclosure the opponent's unused moves already get -- a tier table
+    // with no caveat reads as damage you actually deal (2026-08-19
+    // review).
+    var neverThrown = {};
+    Object.keys(dig(bp, 'verification') || {}).forEach(function (k) {
+      var m2 = /^(.*)_stage_check$/.exec(k);
+      if (m2 && (dig(bp, 'verification')[k] || {}).debuff_unreachable) {
+        neverThrown[m2[1].toUpperCase()] = true;
+      }
+    });
     Object.keys(mv).forEach(function (name) {
       var m = mv[name];
       var rows = (m.tier_boundaries || []).map(function (t) {
@@ -3648,6 +3661,13 @@
       var bpk = m.breakpoint_vs_rank1_licki;
       P.push('<h4>' + esc(prettyMove(name)) + ' (' + esc(FOCAL) + ' -> '
         + esc(dig(bp, 'thievul_offense.defender') || OPP) + ')</h4>'
+        + (neverThrown[name.toUpperCase()]
+          ? '<p class="tl-note"><strong>Note:</strong> the engine never '
+            + 'threw ' + esc(prettyMove(name)) + ' in any probe fight of '
+            + 'this matchup (see the verification block), so these tiers '
+            + 'are a reference, not damage you routinely deal here -- '
+            + 'and they are why the bait and no-bait grids can be '
+            + 'byte-identical.</p>' : '')
         + '<p class="tl-note">' + esc(m.damage_identity || '') + ', K = '
         + esc(m.damage_constant_K) + '. Damage tiers reachable: '
         + esc((m.tiers || []).join(', ')) + '.</p>'
@@ -3745,7 +3765,15 @@
         + (fs.length - bad) + '/' + fs.length + ' samples match. '
         + 'Closed-form vs the battle engine: ' + (sc.length - scBad) + '/'
         + sc.length + ' checks match.'
-        + (stKey
+        + (stKey && ver[stKey].debuff_unreachable
+          // Honest-absence branch: the producer recorded WHY the check
+          // could not run; rendering the missing verdict key as "-"
+          // suppressed that explanation (2026-08-19 review blocker).
+          ? ' ' + esc(prettyMove(stKey.replace(/_stage_check$/, '')))
+            + ' stage check: NOT TESTABLE in this matchup -- '
+            + esc(ver[stKey].note || 'the debuff move was never thrown in '
+              + 'any probe fight') : '')
+        + (stKey && !ver[stKey].debuff_unreachable
           ? ' ' + esc(prettyMove(stKey.replace(/_stage_check$/, '')))
             + ' stage check: observed ' + esc(slotNames().c1)
             + ' damages all found in '
@@ -3911,10 +3939,19 @@
     var defGrid = DEFAULT_GRID;
     var sameGrid = (wallGrid === defGrid);
     if (bpPop && best) {
+      // The verdict adjective is DERIVED from the denial fraction; the
+      // original hardcoded "there is no <opp> answer", which was true for
+      // Thievul (a handful of 2992) and the exact opposite on Wigglytuff
+      // (435/435 denied -- 2026-08-19 review blocker).
+      var bpFrac = best.denies[BP_KEY] / bpPop;
+      var bpVerdict = (bpFrac >= 1 ? 'the ' + esc(OPP) + ' answer is total:'
+        : bpFrac >= 0.75 ? 'the ' + esc(OPP) + ' answer is near-total:'
+        : bpFrac >= 0.25 ? 'the ' + esc(OPP) + ' answer is partial:'
+        : 'there is no real ' + esc(OPP) + ' answer:');
       vparts.push('<li><strong>In one cell -- ' + esc(gridAbbrev(wallGrid))
         + ' ' + esc(wallScen) + ', against the '
         + commas(bpPop) + ' breakpoint-clearing ' + esc(FOCAL)
-        + ' spreads -- there is no ' + esc(OPP) + ' answer:</strong> the '
+        + ' spreads -- ' + bpVerdict + '</strong> the '
         + 'best defense step denies ' + best.denies[BP_KEY] + ' of them. '
         // LATENT-BUG GUARD: "selected above" is a claim about the
         // dropdown, and sameGrid compares against the STATIC default --
@@ -3928,14 +3965,21 @@
             + 'population.') + '</li>');
     }
     if (best) {
+      // Rank is INTERPOLATED (the original hardcoded "rank-1" while
+      // naming the rank-2 build -- 2026-08-19 review), and the cost
+      // adjective follows the actual rank.
+      var costTxt = (best.rank === 1 ? 'zero'
+        : best.rank <= 50 ? 'near-zero' : 'a real');
       vparts.push('<li><strong>Against the top-512 ' + esc(FOCAL)
         + ' spreads in that same cell (' + esc(gridAbbrev(wallGrid)) + ' '
-        + esc(wallScen) + '), rank-1 is already the answer:</strong> '
-        + esc(best.ivs.join('/')) + ' (rank ' + best.rank + ', defense '
+        + esc(wallScen) + '), rank ' + best.rank
+        + ' is the best answer:</strong> '
+        + esc(best.ivs.join('/')) + ' (defense '
         + best.def + ') denies '
         + denialPct(best.denies.top512, pops.top512) + ' of them, at '
-        + (best.rank === 1 ? 'zero' : 'near-zero') + ' stat-product '
-        + 'cost.</li>');
+        + costTxt + ' stat-product '
+        + 'cost' + (best.rank > 50 ? ' (rank ' + best.rank + ')' : '')
+        + '.</li>');
     }
     // The bait lever is per moveset: on a grid whose bait/no-bait pair is
     // byte-identical it is provably a no-op, and saying otherwise would

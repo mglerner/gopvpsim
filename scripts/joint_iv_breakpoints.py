@@ -244,6 +244,13 @@ def main():
     assert FK != OK, (FK, OK)
     OS_NICE = OS[:1].upper() + OS[1:]
 
+    # PROSE names: reader-visible sentences name the real species
+    # (lowercased), never the frozen slot prefixes -- 'thievul_atk' on a
+    # Wigglytuff page was a 2026-08-19 review major. JSON KEYS keep the
+    # frozen slots.
+    PROSE_F = cfg.focal.lower()
+    PROSE_O = cfg.opponent.lower()
+
     # The headline move is resolved AFTER the spread tables exist (its
     # auto-pick needs the focal atk range vs the rank-1 opponent def);
     # a configured [breakpoints] headline_move is authoritative.
@@ -608,7 +615,7 @@ def main():
     survival = {'model': ('additive, no shields, no healing: hits = '
                           'ceil(%s_hp / per-hit damage). Real fights '
                           'mix moves and shields -- this isolates the bulk '
-                          'tiers only.' % FK),
+                          'tiers only.' % PROSE_F),
                 'refs': {}}
     for ref_name, ref_idx in ((f'{OS}_rank1', 0), (f'{OS}_max_atk', None)):
         if ref_idx is None:
@@ -951,7 +958,7 @@ def main():
                           'spreads reach against the frailest %s '
                           '-- it is a rounding curiosity, not a target. '
                           'The bp everyone means is %d -> %d.'
-                          % (sp_tiers[-1], FK, OS,
+                          % (sp_tiers[-1], PROSE_F, PROSE_O,
                              r4((sp_tiers[-1] - 1) / K_sp), FOCAL, OPPONENT,
                              base_tier, hi_tier))
     else:
@@ -964,7 +971,8 @@ def main():
         f'{HEAD_KEY}_tier_boundary': {
             'tiers': sp_tiers,
             'K': K_sp,
-            'identity': 'dmg = floor(K * %s_atk / %s_def) + 1' % (FK, OS),
+            'identity': 'dmg = floor(K * %s_atk / %s_def) + 1'
+                        % (PROSE_F, PROSE_O),
             'hi_tier': hi_tier,
             f'vs_rank1_{OS}': {
                 f'{OS}_def': r4(rank1_def),
@@ -1284,12 +1292,12 @@ def main():
             ver[f'{debuff_mid.lower()}_stage_check'] = {
                 'debuff_unreachable': True,
                 'note': (f'{_dbf["name"]} was never thrown in any of '
-                         f'{len(candidates)} probe fights (extreme '
-                         'spread/shield candidates): the focal cannot fund '
-                         'it in this matchup, so the stage ladder has no '
-                         'in-matchup consequence and cannot be exercised. '
-                         'Recorded, not silently skipped; set '
-                         '[breakpoints] stage_probe to override.'),
+                         f'the {len(candidates)} probe fights tried '
+                         '(extreme spread/shield candidates), so the '
+                         'stage ladder could not be exercised in this '
+                         'matchup and has no observed in-matchup '
+                         'consequence. Recorded, not silently skipped; '
+                         'set [breakpoints] stage_probe to override.'),
                 'candidates_tried': len(candidates),
             }
         elif chosen is None:
