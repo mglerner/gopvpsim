@@ -34,20 +34,51 @@ beats PvPoke's NS+IW default by ~14 wins; PvPoke overall GL rank
 (`docs/hsh_message_notes.md`); (c) post-CD cleanup: delete the
 `[cd_prep]` table once the un-pinned gamemaster stably lists Icy Wind.
 
-## NEXT SESSION (queued 2026-08-19): Worlds robustness deep dives
+## Worlds robustness deep dives -- IN PROGRESS (session started 2026-08-19)
 
-Michael's stated next session: robustness analysis of IV-dependent,
-interesting, common WORLDS matchups. Entry points, in order:
-(1) shortlist = rank the 455 amber pairs by combined usage (all data
-exists: worlds/meta.toml usage + tier2 manifest amber set; ~10-min
-script, no bakes); (2) implement reuse-plan Session S1 FIRST if
-Thievul-grade deep-dive pages are wanted for the picks
-(docs/joint_iv_reuse_plan.md: generic kit, focal-side generalization,
-byte-identical Thievul-page rebuild as acceptance); (3) standing
-constraints: re-pin the gamemaster from pvpoke f60a41199 before ANY
-Worlds render (TTL drifts daily), publish only with Michael's explicit
-per-instance go, long bakes detached + run-to-completion (memory:
-feedback-long-compute-supervision).
+The queued session ran 2026-08-19: shortlist SHIPPED
+(`scripts/worlds_shortlist.py`, 455 amber pairs by combined usage, full
+table `userdata/worlds_shortlist.md`); reuse-plan S1 COMPLETE (the
+`joint_iv_*` kit replaced `thievul_licki_*`; acceptance record at
+commit 8feec47, honesty-delta wording changes documented at 319c8a2;
+memory: project-joint-iv-kit); pair pages baking/building through the
+day via detached chains (`userdata/joint_iv/bake_chain*.log`), each
+bake cross-checked exact vs the Worlds Tier-2 grids. Pages land in
+`userdata/dives/<focal>_vs_<opp>_iv_robustness.html` -- LOCAL ONLY,
+nothing published.
+
+**DECISIONS FOR MICHAEL (2026-08-19 EOD):**
+
+- **FN audit of the hub's green/red cells.** The probe-expansion screen
+  (`scripts/worlds_probe_expand.py`,
+  `userdata/worlds_probe_expand/results.json`) shows 45 of the 73
+  non-amber pairs are IV-dependent under extra extreme probes -- 41 of
+  them on the max-attack probe (realistic breakpoint-chaser corner),
+  not junk-spread noise. The EXACT fix is one overnight bake:
+  `direnv exec . python scripts/worlds_tier2.py --clean-sample 73
+  --budget-minutes 720 --workers 14` (detached; idempotent; the 21
+  already-baked clean pairs skip). Then the amber set is exact at
+  cohort level and the hub's FN block can be retired/re-measured.
+  Hub re-render = a Worlds render (gamemaster is pinned at 8f1d6cca5c0f
+  and verified current, so safe today).
+- **Shipped thievul pages carry two wording issues found by the pair-1
+  review**: the 'IV tech without meta cost' card costs 5W on the
+  lickilicky page (its own max-meta card shows 63W vs 58W), and the
+  debuff-stage cross-check ladder was built from the rank-1 opponent
+  instead of the simulated probe (stage -3 renders 21; correct is 22;
+  `stage_ladder_from_rank1` in pairs/thievul_lickilicky.toml preserves
+  the shipped bytes and documents it). Rebuilding with the current kit
+  fixes both -- republishing is your call.
+- **Deferred review minors** (all in the 319c8a2 commit message):
+  duplicate-grid double embedding (~826KB/page), pareto-axis
+  self-inclusion, one-option basis dropdown, wall-table 25-vs-12
+  wording, CSV dropped-row accounting, raw key fragments in the
+  answers dump, sim-count phrasing.
+
+Standing constraints unchanged: publish only with Michael's explicit
+per-instance go; long bakes detached + run-to-completion; re-pin the
+gamemaster from pvpoke f60a41199 before any Worlds render (verified at
+the pin 2026-08-19 morning).
 
 ## Ship-gate gap (found by the 2026-08-17 thievul pre-publish review)
 
