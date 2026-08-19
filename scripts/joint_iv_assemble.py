@@ -365,6 +365,7 @@ def main():
                         'stat-product rank among them')
     else:
         i_bal, bal_note = i_smash, 'no spread is full-coverage at all pick scenarios'
+    bal_is_real = bool(full_mask.any())
 
     if has_meta:
         max_meta = int(meta_pri.max())
@@ -431,16 +432,32 @@ def main():
          [tie_line(n_tied_smash,
                    f'the primary metric ({pick_scens[0]} top-512 '
                    f'coverage)', tiebreak)],
-         ['Optimized purely for this matchup; check the meta line before '
-          'committing dust.'], primary, pick_scens,
+         (['Optimized purely for this matchup; check the meta line before '
+           'committing dust.']
+          + ([] if full_mask.any() else
+             ['No spread reaches full top-512 coverage at every pick '
+              'scenario -- even the best build loses winnable-looking '
+              'cells here.'])
+          + ([f'Beats only {pct1(float(pick_cols[0][i_smash]) * 100)}% of '
+              f'the top-512 at {pick_scens[0]} -- a contested-at-best '
+              'scenario, not a farm.']
+             if float(pick_cols[0][i_smash]) <= 0.40 else [])),
+         primary, pick_scens,
          {'n_tied': n_tied_smash,
           'metric': f'{pick_scens[0]} top-512 coverage',
           'tiebreak': tiebreak}),
-        (('IV tech without meta cost'
-          if int(meta_pri[i_bal]) == int(meta_pri.max())
-          else 'Full coverage, best meta record') if has_meta
-         else 'Full coverage, cheapest build', bal_note, i_bal, [], []),
     ]
+    if bal_is_real:
+        # Only when a full-coverage set actually exists -- the fallback
+        # (i_bal == i_smash) made the merged card claim 'Full coverage'
+        # for a 28%-coverage spread (2026-08-19 verify high). The
+        # fallback's information (no spread is full-coverage) travels as
+        # a smasher caveat instead.
+        named.append(
+            (('IV tech without meta cost'
+              if int(meta_pri[i_bal]) == int(meta_pri.max())
+              else 'Full coverage, best meta record') if has_meta
+             else 'Full coverage, cheapest build', bal_note, i_bal, [], []))
     if has_meta:
         # The tie count is in this card's subtitle prose too; it also
         # travels STRUCTURALLY so the band never has to parse it (the one
@@ -655,9 +672,11 @@ def main():
         'named_builds': [
             {'label': f'#{i + 1} {fmt_ivs(spread_row(i)["ivs"])} ({t})',
              'rank': i + 1}
-            for t, i in ([('smasher', i_smash),
-                          ('no-meta-cost' if has_meta else 'full-coverage',
-                           i_bal)]
+            for t, i in ([('smasher', i_smash)]
+                         + ([(('no-meta-cost' if int(meta_pri[i_bal])
+                               == int(meta_pri.max()) else 'full-coverage')
+                              if has_meta else 'full-coverage', i_bal)]
+                            if bal_is_real else [])
                          + ([('max meta', i_meta_best)] if has_meta else [])
                          + [(f'{arm_short(arm_of(c[5]))} pick', c[2])
                             for c in sec_cards]
