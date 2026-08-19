@@ -38,12 +38,12 @@ def load_entries():
 
 
 def move_short(move_id):
-    """Charged-move label shorthand: initials of each word, first two
-    letters for single-word ids (ICY_WIND -> iw, SWIFT -> sw)."""
-    words = move_id.split('_')
-    if len(words) == 1:
-        return words[0][:2].lower()
-    return ''.join(w[0] for w in words).lower()
+    """Charged-move label shorthand: THE move_abbr rule, lowercased
+    (SHADOW_SNEAK -> ss, SWIFT -> swi). Labels are permanent baked
+    identifiers; two early pairs (iwsw/acpa) predate the move_abbr
+    routing and keep their committed labels."""
+    from deep_dive_analysis import move_abbr
+    return move_abbr(move_id).lower()
 
 
 def grid_label(charged_ids, bait):
