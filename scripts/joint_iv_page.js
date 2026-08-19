@@ -157,6 +157,12 @@
   var HAS_BP = !!D.breakpoints;
   var HAS_RECO = !!D.reco;
   var WON = D.won_b64 || {};
+  // Byte-identical grids embed ONCE; the alias map points the duplicate
+  // label at the stored copy (see the IDENTICAL GRIDS rail).
+  var WON_ALIAS = D.won_b64_alias || {};
+  Object.keys(WON_ALIAS).forEach(function (lb) {
+    if (!WON[lb] && WON[WON_ALIAS[lb]]) { WON[lb] = WON[WON_ALIAS[lb]]; }
+  });
   var LEAGUE_CAP_TEXT = (D.collection && D.collection.leagueCap)
     ? ('CP ' + D.collection.leagueCap) : 'league CP';
 
