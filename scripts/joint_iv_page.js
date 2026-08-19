@@ -3892,7 +3892,13 @@
       }).join('; ') + ').</p>');
 
     // (a) verdict box -- three computed read-outs
-    var bpPop = pops.bp2992;
+    // The breakpoint-clearing population key carries its own count
+    // (bp2992 for Thievul, bp435 for Wigglytuff, ...) -- derive it
+    // from the populations map instead of a frozen spelling.
+    var BP_KEY = Object.keys(pops).filter(function (k) {
+      return k !== 'all4096' && k !== 'top512';
+    })[0] || 'bp2992';
+    var bpPop = pops[BP_KEY];
     var wallCell = (DEN.wall_table || {}).cell || '';
     var wallRows = (DEN.wall_table || {}).rows || [];
     var best = wallRows[0];
@@ -3909,7 +3915,7 @@
         + ' ' + esc(wallScen) + ', against the '
         + commas(bpPop) + ' breakpoint-clearing ' + esc(FOCAL)
         + ' spreads -- there is no ' + esc(OPP) + ' answer:</strong> the '
-        + 'best defense step denies ' + best.denies.bp2992 + ' of them. '
+        + 'best defense step denies ' + best.denies[BP_KEY] + ' of them. '
         // LATENT-BUG GUARD: "selected above" is a claim about the
         // dropdown, and sameGrid compares against the STATIC default --
         // the same binding mismatch that was a blocker in the sibling
@@ -4000,7 +4006,7 @@
             + '</td><td>' + w.level + '</td><td>' + w.cp + '</td><td>'
             + w.def + '</td><td>' + commas(w.denies.all4096) + '</td><td>'
             + commas(w.denies.top512) + '</td><td>'
-            + commas(w.denies.bp2992) + '</td></tr>';
+            + commas(w.denies[BP_KEY]) + '</td></tr>';
         }).join('') + '</table></div>');
     }
 
@@ -4046,7 +4052,7 @@
             + cells.map(function (c) {
               var v = (b.per_cell || {})[c] || {};
               return '<td>' + fmt(v.all4096, 0) + ' / ' + fmt(v.top512, 0)
-                + ' / ' + fmt(v.bp2992, 0) + '</td>';
+                + ' / ' + fmt(v[BP_KEY], 0) + '</td>';
             }).join('')
             + (withNote ? '<td>' + esc(b.note || '') + '</td>' : '')
             + '</tr>';
@@ -4064,7 +4070,7 @@
         + '<th>rank (stat product)</th><th>CP</th><th>stat product</th>'
         + cellHead + '</tr>' + buildRows(ranked, false) + '</table></div>'
         + '<p class="tl-note">Cells are % of (all ' + commas(N)
-        + ' / top 512 / breakpoint-clearing ' + commas(pops.bp2992 || 0)
+        + ' / top 512 / breakpoint-clearing ' + commas(bpPop || 0)
         + ') ' + esc(FOCAL) + ' spreads denied.</p>');
       if (named.length) {
         P.push('<h4>Named ' + esc(OPP) + ' builds</h4>'
@@ -4126,7 +4132,7 @@
         + cells.map(function (c) {
           var v = b ? ((b.per_cell || {})[c] || {}) : null;
           return '<td>' + (v ? fmt(v.all4096, 0) + ' / ' + fmt(v.top512, 0)
-            + ' / ' + fmt(v.bp2992, 0) : '-') + '</td>';
+            + ' / ' + fmt(v[BP_KEY], 0) : '-') + '</td>';
         }).join('')
         + '<td>' + (b ? esc(b.note || '') + (b.composite_rank
           ? ' (composite rank ' + b.composite_rank + ')' : '')
