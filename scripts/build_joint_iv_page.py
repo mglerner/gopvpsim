@@ -895,6 +895,7 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
 
     cov = {}
     won_b64 = {}
+    won_alias = {}
     grids_meta = {}
     grid_hashes = {}
     total_sims = manifest.get('total_sims') if manifest else None
@@ -925,12 +926,24 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             'shape': list(won.shape),
         }
         if label in won_labels:
-            won_b64[label] = {}
-            for si in won_scenarios:
-                won_b64[label][str(si)] = won_slice_b64(won, si)
-            nbytes = sum(len(v) for v in won_b64[label].values())
-            print(f'  {label}: {len(won_b64[label])} win-bitmap slice(s), '
-                  f'{nbytes / 1e6:.1f} MB base64')
+            # A grid byte-identical to an already-embedded one is stored
+            # as an ALIAS, not a second copy -- the duplicate cost ~826KB
+            # of pure repetition per page (2026-08-19 review minor). The
+            # JS follows won_b64_alias before reading won_b64.
+            dup_of = next((lb for lb, h in grid_hashes.items()
+                           if lb != label and h == grid_hashes[label]
+                           and lb in won_b64), None)
+            if dup_of is not None:
+                won_alias[label] = dup_of
+                print(f'  {label}: byte-identical to {dup_of}; embedded '
+                      'as an alias, not a second copy')
+            else:
+                won_b64[label] = {}
+                for si in won_scenarios:
+                    won_b64[label][str(si)] = won_slice_b64(won, si)
+                nbytes = sum(len(v) for v in won_b64[label].values())
+                print(f'  {label}: {len(won_b64[label])} win-bitmap '
+                      f'slice(s), {nbytes / 1e6:.1f} MB base64')
         del won
 
     dup_groups = {}
@@ -1087,6 +1100,7 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
         'cov': cov,
         'meta_wins': meta_wins,
         'won_b64': won_b64,
+        'won_b64_alias': won_alias,
         'breakpoints': breakpoints,
         'reco': reco,
         'collection': build_collection(spec),
