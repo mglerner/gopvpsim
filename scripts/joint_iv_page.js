@@ -222,7 +222,9 @@
     overCap: [],      // scanned mons that can no longer BE the analyzed build
     basis: 'primary', // which moveset the ranked table ranks FOR
     cliffColor: 'sp', // cliff panel colouring: sp | def | hp
-    covView: 'single',// coverage panel: single | grid (3x3 scenarios)
+    // coverage panel: grid (3x3, DEFAULT -- the all-9 view is the
+    // discoverable one; Michael 2026-08-19) | single
+    covView: 'grid',
     heatRange: null,  // null = whole 4096x4096; else {i0,i1,j0,j1} indices
     heatNamed: true
   };
