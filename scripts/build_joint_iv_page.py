@@ -519,7 +519,9 @@ def load_meta_wins(data_dir, focal_tbl, grid_labels, *, oppiv='pvpoke'):
             'always baiting; ties (score exactly 500) are not counted as '
             'wins. NOTE the two sides: the "baiting / no bait" in a GRID '
             'label is the ' + focal_name + '\'s policy, while the opponent '
-            'in every grid always baits.'),
+            'in every grid always baits. The meta layer comes from the '
+            + focal_name + ' dive replay -- its own bake vintage, distinct '
+            'from these grids\' (full provenance embedded below).'),
     }
 
 
@@ -837,7 +839,7 @@ here"></textarea>
 </div>
 <div id="tl-drill-out"></div>
 
-<h2>Mechanism: breakpoints, bulk, and the two claims</h2>
+<h2>{mech_heading}</h2>
 <div id="tl-mech"></div>
 
 <h2>Recommendations</h2>
@@ -855,8 +857,7 @@ here"></textarea>
 <p>{attribution}</p>
 <p>{occasion_footer}Built by
 <code>scripts/{builder_name}</code> from
-<code>{data_dir}</code>; contract in
-<code>{design_doc}</code>{design_note}.</p>
+<code>{data_dir}</code>{contract_clause}.</p>
 </footer>
 """
 
@@ -1135,12 +1136,17 @@ def render_page(data, missing, spec):
         pass
     design = rel + 'DESIGN.md'
     design_note = ''
-    if not (pathlib.Path(spec['data_dir']) / 'DESIGN.md').exists() \
-            and DESIGN_DOC_FALLBACK:
-        # The annotation goes NEXT TO the <code> path, never inside it --
-        # inside, "(shared contract)" reads as part of the filename.
-        design = DESIGN_DOC_FALLBACK
-        design_note = ' (shared contract)'
+    if not (pathlib.Path(spec['data_dir']) / 'DESIGN.md').exists():
+        if DESIGN_DOC_FALLBACK:
+            # The annotation goes NEXT TO the <code> path, never inside
+            # it -- inside, "(shared contract)" reads as part of the
+            # filename.
+            design = DESIGN_DOC_FALLBACK
+            design_note = ' (shared contract)'
+        else:
+            # No contract doc exists for this dataset; a dead path in the
+            # footer is a broken promise (2026-08-19 review minor).
+            design = None
     n_grids = len(data['cov'])
     cells = m.get('matchup_cells') or 0
     # ONE line. Everything else that used to live up here now sits in the
@@ -1191,8 +1197,8 @@ def render_page(data, missing, spec):
         focal=spec['focal_display'],
         opponent=spec['opp_display'],
         data_dir=rel,
-        design_doc=design,
-        design_note=design_note,
+        contract_clause=(f'; contract in\n<code>{design}</code>'
+                         f'{design_note}' if design else ''),
         intro=intro,
         archive_block=archive_block,
         denial_section=denial_section,
@@ -1201,6 +1207,10 @@ def render_page(data, missing, spec):
                      else 'heatmap overlay and drill-down'),
         attribution=PVPOKE_ATTRIBUTION_HTML,
         builder_name=pathlib.Path(__file__).name,
+        mech_heading=('Mechanism: breakpoints, bulk, and the community '
+                      'claims' if (data.get('breakpoints') or {}).get(
+                          'claims') else
+                      'Mechanism: breakpoints and bulk'),
         occasion_footer=(f'One-off analysis page, generated for '
                          f'{OCCASION}. ' if OCCASION else ''),
     )

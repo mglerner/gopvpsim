@@ -349,11 +349,14 @@ def main():
         cand = np.flatnonzero(full_mask)
         if has_meta:
             i_bal = int(cand[np.argmax(meta_pri[cand])])
+            _cost = int(meta_pri.max()) - int(meta_pri[i_bal])
             bal_note = (f'{len(cand)} spreads have 100% top-512 coverage '
                         f'at {", ".join(pick_scens)}; this is the best '
                         f'meta record among them '
                         f'({int((meta_pri[cand] == meta_pri[i_bal]).sum())} '
-                        f'tied at that record)')
+                        f'tied at that record'
+                        + (f'; {_cost}W below the max-meta pick' if _cost
+                           else '') + ')')
         else:
             i_bal = int(cand[0])
             bal_note = (f'{len(cand)} spreads have 100% top-512 coverage '
@@ -418,8 +421,12 @@ def main():
 
     named = [
         (f'The {opp_display_short} smasher',
-         f'Best {", ".join(pick_scens)} record vs '
-         f'{opp_name} ({grid_pretty(primary)}); tiebreak: {tiebreak}',
+         # "Best X, Y, Z record" implied best at ALL THREE; the pick is
+         # lexicographic and can be 0% on a later scenario (Wigglytuff
+         # smasher: 92% at 1-1, 0% at 2-2 -- 2026-08-19 review blocker).
+         f'Best record vs {opp_name} in priority order '
+         f'{" > ".join(pick_scens)} '
+         f'({grid_pretty(primary)}); tiebreak: {tiebreak}',
          i_smash,
          [tie_line(n_tied_smash,
                    f'the primary metric ({pick_scens[0]} top-512 '
@@ -429,7 +436,9 @@ def main():
          {'n_tied': n_tied_smash,
           'metric': f'{pick_scens[0]} top-512 coverage',
           'tiebreak': tiebreak}),
-        ('IV tech without meta cost' if has_meta
+        (('IV tech without meta cost'
+          if int(meta_pri[i_bal]) == int(meta_pri.max())
+          else 'Full coverage, best meta record') if has_meta
          else 'Full coverage, cheapest build', bal_note, i_bal, [], []),
     ]
     if has_meta:
