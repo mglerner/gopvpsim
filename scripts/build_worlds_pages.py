@@ -411,6 +411,12 @@ def _digin(cell, opp_name, pair_link=None, pair_amber=False, deep=None):
         link_html += (f' <a href="{esc(deep[0])}">Deep joint-IV analysis '
                       f'({esc(deep[1])}: every spread of both sides, '
                       'breakpoints, denial)</a>.')
+    if getattr(cell, 'probe_missed', lambda: False)():
+        link_html += (
+            ' NOTE: the probe slices above look settled -- the '
+            'IV-dependence here was found by the FULL Tier-2 grid (all '
+            '4096 focal spreads), which the two-probe screen missed; '
+            'the detail page shows where.')
     return (f'<details class="digin"><summary>details</summary>'
             f'<div class="table-scroll"><table>'
             f'<tr><th>scen</th>{heads}</tr>{"".join(rows)}</table></div>'
