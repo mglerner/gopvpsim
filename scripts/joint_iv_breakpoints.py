@@ -51,6 +51,59 @@ from joint_iv_config import load_pair  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
+# Independent transcription of the Pokemon GO type chart for the
+# verification block's independent() damage formula -- deliberately NOT
+# moves.py's chart (the check must not compare the engine to itself).
+# Non-neutral entries only: attacker type -> {defender type: multiplier},
+# super-effective float32(1.6) per the engine-constant sourcing rule
+# (the game computes in float32; 0.625 and 0.390625 = 0.625^2 are exact
+# in binary already). Hand-typed from the standard chart; any typo aborts
+# the verification loudly against engine damage (PvPoke-pinned, 324 cells).
+_SE, _NV, _IM = 1.600000023841858, 0.625, 0.390625
+_INDEP_CHART = {
+    'normal': {'rock': _NV, 'steel': _NV, 'ghost': _IM},
+    'fire': {'grass': _SE, 'ice': _SE, 'bug': _SE, 'steel': _SE,
+             'fire': _NV, 'water': _NV, 'rock': _NV, 'dragon': _NV},
+    'water': {'fire': _SE, 'ground': _SE, 'rock': _SE,
+              'water': _NV, 'grass': _NV, 'dragon': _NV},
+    'electric': {'water': _SE, 'flying': _SE,
+                 'electric': _NV, 'grass': _NV, 'dragon': _NV,
+                 'ground': _IM},
+    'grass': {'water': _SE, 'ground': _SE, 'rock': _SE,
+              'fire': _NV, 'grass': _NV, 'poison': _NV, 'flying': _NV,
+              'bug': _NV, 'dragon': _NV, 'steel': _NV},
+    'ice': {'grass': _SE, 'ground': _SE, 'flying': _SE, 'dragon': _SE,
+            'fire': _NV, 'water': _NV, 'ice': _NV, 'steel': _NV},
+    'fighting': {'normal': _SE, 'ice': _SE, 'rock': _SE, 'dark': _SE,
+                 'steel': _SE,
+                 'poison': _NV, 'flying': _NV, 'psychic': _NV, 'bug': _NV,
+                 'fairy': _NV, 'ghost': _IM},
+    'poison': {'grass': _SE, 'fairy': _SE,
+               'poison': _NV, 'ground': _NV, 'rock': _NV, 'ghost': _NV,
+               'steel': _IM},
+    'ground': {'fire': _SE, 'electric': _SE, 'poison': _SE, 'rock': _SE,
+               'steel': _SE,
+               'grass': _NV, 'bug': _NV, 'flying': _IM},
+    'flying': {'grass': _SE, 'fighting': _SE, 'bug': _SE,
+               'electric': _NV, 'rock': _NV, 'steel': _NV},
+    'psychic': {'fighting': _SE, 'poison': _SE,
+                'psychic': _NV, 'steel': _NV, 'dark': _IM},
+    'bug': {'grass': _SE, 'psychic': _SE, 'dark': _SE,
+            'fire': _NV, 'fighting': _NV, 'poison': _NV, 'flying': _NV,
+            'ghost': _NV, 'steel': _NV, 'fairy': _NV},
+    'rock': {'fire': _SE, 'ice': _SE, 'flying': _SE, 'bug': _SE,
+             'fighting': _NV, 'ground': _NV, 'steel': _NV},
+    'ghost': {'psychic': _SE, 'ghost': _SE,
+              'dark': _NV, 'normal': _IM},
+    'dragon': {'dragon': _SE, 'steel': _NV, 'fairy': _IM},
+    'dark': {'psychic': _SE, 'ghost': _SE,
+             'fighting': _NV, 'dark': _NV, 'fairy': _NV},
+    'steel': {'ice': _SE, 'rock': _SE, 'fairy': _SE,
+              'fire': _NV, 'water': _NV, 'electric': _NV, 'steel': _NV},
+    'fairy': {'fighting': _SE, 'dragon': _SE, 'dark': _SE,
+              'fire': _NV, 'poison': _NV, 'steel': _NV},
+}
+
 # Charged-move debuffs on the opponent's ATTACK open an extra axis; the
 # ladder floors at -4 (the game's cap), and collapses to [0] for a focal
 # kit that carries no such move.
@@ -60,7 +113,7 @@ COHORTS = {'all': 4096, 'top512': 512, 'top100': 100, 'rank1': 1}
 _BP_KNOWN = {'focal_key', 'opp_key', 'opp_short', 'headline_move',
              'headline_abbr', 'expected_tiers', 'assert_focal_default_moveset',
              'claim_a', 'claim_b', 'named_spreads', 'sim_probes',
-             'stage_probe', 'resisted_probe'}
+             'stage_probe', 'resisted_probe', 'stage_ladder_from_rank1'}
 _CLAIM_KNOWN = {'key', 'answer_key', 'slug', 'ivs', 'claim'}
 _PROBE_KNOWN = {'focal_ivs', 'opp_ivs', 'arm', 'shields'}
 
@@ -985,18 +1038,18 @@ def main():
         """Formula re-implemented here from the spec in CLAUDE.md, so the
         check is not just moves.damage compared to itself.
 
-        The type chart is a deliberate literal: calling type_effectiveness()
-        would make the check compare moves.damage to itself. It covers only
-        the (move type, defender type) pairs the Thievul-vs-Licki configs
-        reach; a new pair raises KeyError, which is the intended LOUD
-        failure -- extend the table (by hand, from the type chart) rather
-        than routing it through moves.py."""
+        The type chart is a deliberate INDEPENDENT literal: calling
+        type_effectiveness() would make the check compare moves.damage to
+        itself. _INDEP_CHART below is a hand transcription of the full GO
+        chart (non-neutral entries only; 1.6 / 0.625 / 0.390625) -- the
+        original 7-pair table covered only the Thievul-vs-Licki type
+        combos and KeyError'd on the first generic pair (Rollout vs
+        Wigglytuff, 2026-08-19). A transcription error here fails LOUDLY:
+        every sample is compared against the engine's damage, whose own
+        chart is pinned by the 324-cell PvPoke test."""
         eff = 1.0
         for t in dtypes:
-            eff *= {('dark', 'normal'): 1.0, ('ice', 'normal'): 1.0,
-                    ('fairy', 'normal'): 1.0, ('normal', 'dark'): 1.0,
-                    ('grass', 'dark'): 1.0, ('ghost', 'dark'): 0.625,
-                    ('rock', 'dark'): 1.0}[(mtype, t)]
+            eff *= _INDEP_CHART.get(mtype, {}).get(t, 1.0)
         st = STAB_MULTIPLIER if mtype in atypes else 1.0
         return math.floor(0.5 * BONUS * power * atk / def_ * eff * st) + 1
 
@@ -1107,36 +1160,98 @@ def main():
     # charged-slot-1 damage exactly as the closed form says. Skipped (and
     # therefore absent from the JSON) when the focal kit has no debuff move.
     if debuff_mid:
-        st_ivs, sl_ivs, st_fast, st_charged, st_shields = _probe(
-            bp_cfg.get('stage_probe', {}), ARMS, rank1_t_ivs, rank1_l_ivs, 0)
-        if debuff_mid not in st_charged:
-            raise SystemExit('ABORT: [breakpoints] stage_probe arm does not '
-                             f'carry the debuff move {debuff_mid}')
-        tp = make_battle_pokemon(FOCAL, st_fast, st_charged,
-                                 LEAGUE, st_shields, *st_ivs)
-        lp = make_battle_pokemon(OPPONENT, L_FAST, [L_CH1, L_CH2],
-                                 LEAGUE, st_shields, *sl_ivs)
-        res = simulate(tp, lp, log=True)
-        bs_hits = [int(l.split('→')[1].split('dmg')[0])
-                   for l in res.timeline if bs['name'] + ' →' in l]
-        iw_count = sum(1 for l in res.timeline
-                       if 'uses ' + _dbf['name'] in l)
-        ti = iv_to_rank_t[tuple(st_ivs)]
-        # KNOWN DEVIATION, preserved deliberately: the closed-form ladder is
-        # built from the RANK-1 opponent's attack (l_rows[0]), not from the
-        # probe opponent actually simulated above. The two coincide whenever
-        # stage_probe.opp_ivs IS the rank-1 spread (the Lickitung pair), and
-        # differ for Lickilicky, whose shipped file therefore compares real
-        # (8,14,15) hits against a (0,15,10) ladder -- the check still passes
-        # there because the observed values land in both sets. Kept as-is so
-        # the shipped artifacts rebuild byte-identically; using
-        # l_rows[<probe>] instead is the strictly correct reference and is
-        # the one-line change if the pin is ever re-baked.
-        pred_by_stage = {st: damage(bs['power'],
-                                    l_rows[0]['atk'] * _stat_stage_mult(st),
-                                    t_rows[ti]['def_'], bs['type'], l_types,
-                                    t_types)
-                         for st in STAGES}
+        iv_to_rank_l = {(e['atk_iv'], e['def_iv'], e['sta_iv']): i
+                        for i, e in enumerate(l_rows)}
+        # Probe selection: a configured stage_probe is authoritative (the
+        # thievul pins). Without one, the rank1-vs-rank1 default cannot be
+        # assumed to exercise the debuff (Wigglytuff-vs-Lickilicky never
+        # throws Icy Wind in that fight, 2026-08-19), so candidates are
+        # tried in order until one OBSERVES the ladder: longer fights via
+        # shields, then a max-def focal (survives longer), then a min-atk
+        # opponent (kills slower).
+        if 'stage_probe' in bp_cfg:
+            candidates = [bp_cfg['stage_probe']]
+        else:
+            maxdef_t = max(t_rows, key=lambda e: e['def_'])
+            minatk_l = min(l_rows, key=lambda e: e['atk'])
+            md = [maxdef_t['atk_iv'], maxdef_t['def_iv'], maxdef_t['sta_iv']]
+            ma = [minatk_l['atk_iv'], minatk_l['def_iv'], minatk_l['sta_iv']]
+            candidates = [{}, {'shields': 1}, {'shields': 2},
+                          {'focal_ivs': md, 'shields': 2},
+                          {'focal_ivs': md, 'opp_ivs': ma, 'shields': 2},
+                          {'focal_ivs': md, 'opp_ivs': ma, 'shields': 0}]
+        # LADDER SOURCE. The strictly correct reference is the PROBE
+        # opponent actually simulated. stage_ladder_from_rank1=true
+        # preserves the SHIPPED thievul_lickilicky behavior instead: its
+        # ladder was built from the rank-1 opponent (l_rows[0]) while the
+        # probe simulated (8,14,15) -- a documented latent bug kept only
+        # for byte-identical rebuilds (the check passed there because the
+        # observed values land in both ladders; the correct ladder differs
+        # at stage -3: 22, not 21). Flip the flag off and re-bake to fix.
+        ladder_from_rank1 = bool(bp_cfg.get('stage_ladder_from_rank1'))
+
+        chosen = None
+        any_thrown = False
+        for ci, pc in enumerate(candidates):
+            st_ivs, sl_ivs, st_fast, st_charged, st_shields = _probe(
+                pc, ARMS, rank1_t_ivs, rank1_l_ivs, 0)
+            if debuff_mid not in st_charged:
+                raise SystemExit('ABORT: [breakpoints] stage_probe arm does '
+                                 f'not carry the debuff move {debuff_mid}')
+            tp = make_battle_pokemon(FOCAL, st_fast, st_charged,
+                                     LEAGUE, st_shields, *st_ivs)
+            lp = make_battle_pokemon(OPPONENT, L_FAST, [L_CH1, L_CH2],
+                                     LEAGUE, st_shields, *sl_ivs)
+            res = simulate(tp, lp, log=True)
+            # Shielded throws land 1 damage regardless of stage ("→
+            # SHIELDED (1 dmg)") and carry no stage information -- skip
+            # them; only unshielded hits test the ladder.
+            bs_hits = [int(l.split('→')[1].split('dmg')[0])
+                       for l in res.timeline
+                       if bs['name'] + ' →' in l and 'SHIELDED' not in l]
+            iw_count = sum(1 for l in res.timeline
+                           if 'uses ' + _dbf['name'] in l)
+            any_thrown = any_thrown or iw_count > 0
+            ti = iv_to_rank_t[tuple(st_ivs)]
+            ladder_atk = (l_rows[0]['atk'] if ladder_from_rank1
+                          else l_rows[iv_to_rank_l[tuple(sl_ivs)]]['atk'])
+            pred_by_stage = {st: damage(bs['power'],
+                                        ladder_atk * _stat_stage_mult(st),
+                                        t_rows[ti]['def_'], bs['type'],
+                                        l_types, t_types)
+                             for st in STAGES}
+            flat = len(set(pred_by_stage.values())) == 1
+            observed = bool(bs_hits) and (
+                flat or any(v != pred_by_stage[0] for v in bs_hits))
+            if observed:
+                chosen = ci
+                break
+        if chosen is None and not any_thrown and 'stage_probe' not in bp_cfg:
+            # The focal never FUNDED the debuff move in any candidate fight
+            # (first case: Charm-Wigglytuff never reaches Icy Wind vs
+            # Lickilicky, 0 throws in 36 extreme spread/shield combos,
+            # 2026-08-19). The ladder describes a move that does not fly in
+            # this matchup, so there is nothing to cross-check -- a TRUE,
+            # recorded finding, not a skipped one.
+            ver[f'{debuff_mid.lower()}_stage_check'] = {
+                'debuff_unreachable': True,
+                'note': (f'{_dbf["name"]} was never thrown in any of '
+                         f'{len(candidates)} probe fights (extreme '
+                         'spread/shield candidates): the focal cannot fund '
+                         'it in this matchup, so the stage ladder has no '
+                         'in-matchup consequence and cannot be exercised. '
+                         'Recorded, not silently skipped; set '
+                         '[breakpoints] stage_probe to override.'),
+                'candidates_tried': len(candidates),
+            }
+        elif chosen is None:
+            raise SystemExit(
+                'ABORT: no stage probe observed the %s debuff (tried %d '
+                'candidate fights; the move WAS thrown in at least one, so '
+                'it is reachable); set [breakpoints] stage_probe by hand '
+                'to a fight that exercises it' % (_dbf['name'],
+                                                  len(candidates)))
+    if debuff_mid and chosen is not None:
         ver[f'{debuff_mid.lower()}_stage_check'] = {
             f'{FK}_ivs': list(st_ivs), f'{OK}_ivs': list(sl_ivs),
             'shields': st_shields,
@@ -1150,15 +1265,41 @@ def main():
             'all_observed_in_closed_form_set': all(
                 v in set(pred_by_stage.values()) for v in bs_hits),
         }
+        if chosen > 0:
+            # New-pair auto-search only; a configured probe is candidate 0,
+            # so the thievul payloads never gain this field.
+            ver[f'{debuff_mid.lower()}_stage_check']['auto_probe'] = (
+                'default rank1-vs-rank1 fight never exercised the debuff; '
+                f'auto-probe candidate {chosen} (of {len(candidates)}) '
+                'was the first to observe it')
         assert bs_hits, 'no charged-slot-1 hit landed; the stage check would pass vacuously'
-        assert any(v != pred_by_stage[0] for v in bs_hits), (
-            'every observed hit is the stage-0 value, so the %s debuff '
-            'itself is untested' % _dbf['name'])
-        # the timeline parse for iw_count is on the move's DISPLAY name; a
-        # miss would read 0 silently, and the stage evidence above proves at
-        # least one landed.
-        assert iw_count, ('the "%s" timeline parse found no throw although '
-                          'the damage drop proves one landed' % _dbf['name'])
+        ladder_is_flat = flat
+        if ladder_is_flat:
+            # The closed form itself says the debuff CANNOT change this
+            # damage (tier boundaries too coarse for this power/def pair --
+            # first hit generically: Body Slam vs Wigglytuff, 2026-08-19).
+            # Nothing to observe, so the non-stage-0 assert would demand
+            # the impossible; record the flatness instead of skipping
+            # silently.
+            ver[f'{debuff_mid.lower()}_stage_check']['note'] += (
+                ' LADDER IS FLAT: the closed form predicts the same '
+                'damage at every stage 0..%d, so the debuff cannot be '
+                'observed in this quantity and the non-stage-0 assert is '
+                'vacuously untestable (recorded, not skipped silently).'
+                % STAGES[-1])
+        else:
+            assert any(v != pred_by_stage[0] for v in bs_hits), (
+                'every observed hit is the stage-0 value although the '
+                'ladder is non-flat, so the %s debuff itself is untested '
+                '-- set [breakpoints] stage_probe to a longer fight (more '
+                'shields / bulkier spreads)' % _dbf['name'])
+            # the timeline parse for iw_count is on the move's DISPLAY
+            # name; a miss would read 0 silently, and the stage evidence
+            # above proves at least one landed. (Only assertable when the
+            # ladder is non-flat -- a flat ladder carries no such proof.)
+            assert iw_count, ('the "%s" timeline parse found no throw '
+                              'although the damage drop proves one landed'
+                              % _dbf['name'])
         assert ver[f'{debuff_mid.lower()}_stage_check'][
             'all_observed_in_closed_form_set']
 
