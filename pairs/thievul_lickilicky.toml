@@ -1,0 +1,48 @@
+# Thievul vs Lickilicky (GL #1) -- the PRIMARY Thievul CD page's pair.
+# First config instance of the joint IV robustness kit; reproduces
+# scripts/thievul_licki_bake.py's 'lickilicky' OPPONENTS entry exactly
+# (grid labels, order, npz names), so the shipped artifacts rebuild
+# byte-identically (S1 acceptance, docs/joint_iv_reuse_plan.md).
+
+[pair]
+league = "great"
+focal = "Thievul"
+focal_shadow = false
+focal_slug = "thievul"
+opponent = "Lickilicky"
+opponent_shadow = false
+opponent_slug = "lickilicky"
+opponent_fast = "ROLLOUT"
+opponent_charged = ["BODY_SLAM", "SHADOW_BALL"]
+data_dir = "userdata/thievul_lickilicky"
+# ICY_WIND is the 2026-08-16 CD move; the pinned gamemaster predates it
+# (pvpoke upstream added it 2026-08-14 as an elite move). Retire with
+# the [cd_prep] table once the un-pinned gamemaster stably lists it.
+injected_moves = ["ICY_WIND"]
+replay_blob = "userdata/replay/20260815_183454_Thievul_great.replay.pkl.gz"
+
+# Bait-on grids first: npz files are written per-grid as they complete,
+# so analysis starts on them while the no-bait grids bake.
+[[grids]]
+label = "iwpr_bait"
+focal_fast = "SUCKER_PUNCH"
+focal_charged = ["ICY_WIND", "PLAY_ROUGH"]
+bait = true
+
+[[grids]]
+label = "nsiw_bait"
+focal_fast = "SUCKER_PUNCH"
+focal_charged = ["NIGHT_SLASH", "ICY_WIND"]
+bait = true
+
+[[grids]]
+label = "iwpr_nobait"
+focal_fast = "SUCKER_PUNCH"
+focal_charged = ["ICY_WIND", "PLAY_ROUGH"]
+bait = false
+
+[[grids]]
+label = "nsiw_nobait"
+focal_fast = "SUCKER_PUNCH"
+focal_charged = ["NIGHT_SLASH", "ICY_WIND"]
+bait = false

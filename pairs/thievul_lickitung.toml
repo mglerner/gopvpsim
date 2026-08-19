@@ -1,0 +1,37 @@
+# Thievul vs Lickitung (GL ~#124, XL spreads) -- the SECONDARY Thievul
+# CD page's pair (the community's "Licki" turned out to mean Lickilicky;
+# this was the first bake). Reproduces scripts/thievul_licki_bake.py's
+# 'lickitung' OPPONENTS entry exactly: 3 grids, no nsiw_nobait.
+# The canonical meta_wins.npz lives in this pair's data_dir.
+
+[pair]
+league = "great"
+focal = "Thievul"
+focal_shadow = false
+focal_slug = "thievul"
+opponent = "Lickitung"
+opponent_shadow = false
+opponent_slug = "lickitung"
+opponent_fast = "LICK"
+opponent_charged = ["BODY_SLAM", "POWER_WHIP"]
+data_dir = "userdata/thievul_licki"
+injected_moves = ["ICY_WIND"]
+replay_blob = "userdata/replay/20260815_183454_Thievul_great.replay.pkl.gz"
+
+[[grids]]
+label = "iwpr_bait"
+focal_fast = "SUCKER_PUNCH"
+focal_charged = ["ICY_WIND", "PLAY_ROUGH"]
+bait = true
+
+[[grids]]
+label = "iwpr_nobait"
+focal_fast = "SUCKER_PUNCH"
+focal_charged = ["ICY_WIND", "PLAY_ROUGH"]
+bait = false
+
+[[grids]]
+label = "nsiw_bait"
+focal_fast = "SUCKER_PUNCH"
+focal_charged = ["NIGHT_SLASH", "ICY_WIND"]
+bait = true
