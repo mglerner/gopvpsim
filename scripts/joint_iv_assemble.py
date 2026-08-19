@@ -98,7 +98,7 @@ def tie_line(n, metric, tiebreak=None):
     """The 'N spreads tie on ...' line, in ONE place.
 
     The page recovers these facts by regex when a card ships no structured
-    ``tie`` block (thievul_licki_page.js ``tieText``), so this string is a
+    ``tie`` block (joint_iv_page.js ``tieText``), so this string is a
     cross-file contract: pluralising it once silently cost the TL;DR band
     its 'one of N tied' caveat. tests/test_thievul_tie_roundtrip.py feeds
     this function's output through the real JS parser.

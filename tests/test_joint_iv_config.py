@@ -1,7 +1,7 @@
 """joint_iv_config loader: schema validation + shipped-name reproduction.
 
 The thievul pair configs are the kit's S1 acceptance anchors: their
-grid_filename() outputs must equal the npz names the original
+grid_filename() outputs must equal the npz names the retired
 thievul_licki_bake.py wrote, or the byte-identical rebuild target is
 unreachable before any pipeline step even runs.
 """
