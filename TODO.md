@@ -75,6 +75,22 @@ nothing published.
   wording, CSV dropped-row accounting, raw key fragments in the
   answers dump, sim-count phrasing.
 
+## Condensed-meta funnel bundle (queued 2026-08-19, Michael)
+
+Bundle the whole Worlds chain for reuse on future condensed metas
+(limited cups with ~20 real picks): meta table -> Tier-0/1 planes ->
+amber screen -> Tier-2 grids -> hub/matrix/cheat sheets -> joint-IV
+deep pages. Do it AFTER tonight's run proves the chain end-to-end
+("when we're confident"). Inventory: `worlds_bake/planes/tier0/tier2/
+render_data/build_worlds_pages/verify_worlds` are already meta.toml-
+driven; the Worlds-hardcoded parts are `worlds_meta.py` (entry list +
+badges are literals; needs a cup-roster config + a usage source that
+isn't the Worlds Dracoviz corpus), the `worlds/` output paths + page
+copy, and the `worlds_`-prefixed naming. `joint_iv_from_worlds.py` +
+`worlds_shortlist.py` bridge to the deep-page kit and generalize with
+the same meta-config handle. PvPoke publishes per-cup rankings
+(topn_cup_filter_plan.md), so cup default movesets have a source.
+
 Standing constraints unchanged: publish only with Michael's explicit
 per-instance go; long bakes detached + run-to-completion; re-pin the
 gamemaster from pvpoke f60a41199 before any Worlds render (verified at
