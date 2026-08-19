@@ -162,9 +162,11 @@ def main():
     # Lickitung-dir blob).
     mw_path = (REPO / asm['meta_wins']) if 'meta_wins' in asm \
         else data / 'meta_wins.npz'
-    if not mw_path.exists():
-        raise SystemExit(f'ABORT: meta_wins blob {mw_path} not found')
-    mw = np.load(mw_path)
+    # ABSENT meta_wins is an honest state (the focal's dive replay may
+    # not contain this arm's moveset cube -- Quagsire (Shadow) 2026-08-19,
+    # exit-3 skip in joint_iv_run): the reco degrades to MATCHUP-ONLY
+    # picks and says so, rather than inventing a meta axis.
+    mw = np.load(mw_path) if mw_path.exists() else None
     ranked = iv_rank(cfg.focal, league=cfg.league, shadow=cfg.focal_shadow)
 
     won = {}
@@ -244,18 +246,20 @@ def main():
     cov512 = {label: {si: won[label][:, :512, si].mean(axis=1)
                       for si in range(9)} for label in won}
     meta = {}
-    for ms in arms:
-        key = f'wins__{ms}__pvpoke__bait__{META_SCEN}'
-        if key in mw:
-            meta[ms] = mw[key].astype(int)
-    if 'pool_n' not in mw:
-        raise SystemExit(f'ABORT: {mw_path} has no pool_n; the meta line '
-                         'would have to invent a denominator')
-    pool_n = int(mw['pool_n'])
-    if primary_arm not in meta:
-        raise SystemExit(f'ABORT: no meta wins for the primary arm '
-                         f'{primary_arm} in {mw_path}')
-    meta_pri = meta[primary_arm]
+    if mw is not None:
+        for ms in arms:
+            key = f'wins__{ms}__pvpoke__bait__{META_SCEN}'
+            if key in mw:
+                meta[ms] = mw[key].astype(int)
+        if 'pool_n' not in mw:
+            raise SystemExit(f'ABORT: {mw_path} has no pool_n; the meta '
+                             'line would have to invent a denominator')
+        if primary_arm not in meta:
+            raise SystemExit(f'ABORT: no meta wins for the primary arm '
+                             f'{primary_arm} in {mw_path}')
+    has_meta = primary_arm in meta
+    pool_n = int(mw['pool_n']) if has_meta else None
+    meta_pri = meta[primary_arm] if has_meta else None
 
     # Breakpoint slot keys, spelled the same way joint_iv_breakpoints.py
     # spells them when it WRITES the blob (focal_key/opp_short are slug
@@ -326,10 +330,12 @@ def main():
     # Picks, with disclosed tiebreaks ---------------------------------
     pick_cols = [cov512[primary][si] for si in pick_sis]
     tiebreak = (' > '.join(f'{s} coverage' for s in pick_scens)
-                + f' > meta wins ({arm_pretty(primary_arm)}, {META_SCEN})'
+                + (f' > meta wins ({arm_pretty(primary_arm)}, {META_SCEN})'
+                   if has_meta else '')
                 + ' > stat-product rank')
     # np.lexsort: LAST key is primary, so list from weakest to strongest.
-    keys = [np.arange(4096), -meta_pri] + [-c for c in reversed(pick_cols)]
+    keys = ([np.arange(4096)] + ([-meta_pri] if has_meta else [])
+            + [-c for c in reversed(pick_cols)])
     order = np.lexsort(tuple(keys))
     i_smash = int(order[0])
     n_tied_smash = int((pick_cols[0] >= pick_cols[0][i_smash] - 1e-12).sum())
@@ -341,18 +347,26 @@ def main():
         full_mask &= (c == 1.0)
     if full_mask.any():
         cand = np.flatnonzero(full_mask)
-        i_bal = int(cand[np.argmax(meta_pri[cand])])
-        bal_note = (f'{len(cand)} spreads have 100% top-512 coverage at '
-                    f'{", ".join(pick_scens)}; this is the best meta '
-                    f'record among them '
-                    f'({int((meta_pri[cand] == meta_pri[i_bal]).sum())} '
-                    f'tied at that record)')
+        if has_meta:
+            i_bal = int(cand[np.argmax(meta_pri[cand])])
+            bal_note = (f'{len(cand)} spreads have 100% top-512 coverage '
+                        f'at {", ".join(pick_scens)}; this is the best '
+                        f'meta record among them '
+                        f'({int((meta_pri[cand] == meta_pri[i_bal]).sum())} '
+                        f'tied at that record)')
+        else:
+            i_bal = int(cand[0])
+            bal_note = (f'{len(cand)} spreads have 100% top-512 coverage '
+                        f'at {", ".join(pick_scens)}; no dive-derived meta '
+                        'data exists for this arm, so this is the best '
+                        'stat-product rank among them')
     else:
         i_bal, bal_note = i_smash, 'no spread is full-coverage at all pick scenarios'
 
-    max_meta = int(meta_pri.max())
-    at_max = np.flatnonzero(meta_pri == max_meta)
-    i_meta_best = int(at_max[np.argmax(pick_cols[0][at_max])])
+    if has_meta:
+        max_meta = int(meta_pri.max())
+        at_max = np.flatnonzero(meta_pri == max_meta)
+        i_meta_best = int(at_max[np.argmax(pick_cols[0][at_max])])
 
     # Best build under each OTHER arm, judged on ITS OWN sensitive
     # scenarios -- readers running a different moveset deserve a pick
@@ -415,17 +429,22 @@ def main():
          {'n_tied': n_tied_smash,
           'metric': f'{pick_scens[0]} top-512 coverage',
           'tiebreak': tiebreak}),
-        ('IV tech without meta cost', bal_note, i_bal, [], []),
+        ('IV tech without meta cost' if has_meta
+         else 'Full coverage, cheapest build', bal_note, i_bal, [], []),
+    ]
+    if has_meta:
         # The tie count is in this card's subtitle prose too; it also
         # travels STRUCTURALLY so the band never has to parse it (the one
         # card that shipped without a tie block).
-        ('Max meta wins', f'Best overall-meta spread -- one of '
-         f'{len(at_max)} tied at {max_meta}W ({grid_pretty(primary)}, '
-         f'{META_SCEN}); among the tie, best {pick_scens[0]} coverage shown',
-         i_meta_best, [], [], primary, None,
-         {'n_tied': int(len(at_max)),
-          'metric': f'meta wins ({grid_pretty(primary)}, {META_SCEN})'}),
-    ]
+        named.append(
+            ('Max meta wins', f'Best overall-meta spread -- one of '
+             f'{len(at_max)} tied at {max_meta}W ({grid_pretty(primary)}, '
+             f'{META_SCEN}); among the tie, best {pick_scens[0]} coverage '
+             'shown',
+             i_meta_best, [], [], primary, None,
+             {'n_tied': int(len(at_max)),
+              'metric': f'meta wins ({grid_pretty(primary)}, '
+                        f'{META_SCEN})'}))
     for k, sec_card in enumerate(sec_cards):
         named.insert(3 + k, sec_card)
     # Named-spread cards (community questions, the shipped landing build,
@@ -474,11 +493,16 @@ def main():
             covs = ', '.join(f'{s}: {pct1(m[group[0]][s])}%' for s in scens)
             pretty = ' = '.join(m[la]['pretty'] for la in group)
             lines.append(f'[{pretty}] top-512 coverage -- {covs}')
-        mw_line = ' / '.join(
-            f'{arm_pretty(ms)} {m[MW_KEY][ms]}W'
-            for ms in sorted(m[MW_KEY]))
-        lines.append(f'Meta at {META_SCEN}, of {pool_n} dive-pool matchups '
-                     f'(baiting): {mw_line}')
+        if m[MW_KEY]:
+            mw_line = ' / '.join(
+                f'{arm_pretty(ms)} {m[MW_KEY][ms]}W'
+                for ms in sorted(m[MW_KEY]))
+            lines.append(f'Meta at {META_SCEN}, of {pool_n} dive-pool '
+                         f'matchups (baiting): {mw_line}')
+        else:
+            lines.append('No dive-derived meta data for this arm (the '
+                         'focal dive replay lacks this moveset cube); '
+                         'matchup-only pick.')
         lines.append(f'{pretty_name(fast_id)} does {m[tier_key]} '
                      f'damage vs the rank-1 {opp_name} ({hi_tier} = clears '
                      'the breakpoint)')
@@ -554,9 +578,13 @@ def main():
         'Human-guided, AI-generated; no hand-authored numbers.',
         'A "win" is pvpoke score > 500 strict; ties count as losses.',
         cohort_note,
-        f'Meta wins are vs the shipped dive pool ({pool_n} matchups incl. '
-        'counter-slayers and the mirror) with PvPoke opponent IVs, focal '
-        f'baiting, at {META_SCEN} shields.',
+        (f'Meta wins are vs the shipped dive pool ({pool_n} matchups '
+         'incl. counter-slayers and the mirror) with PvPoke opponent IVs, '
+         f'focal baiting, at {META_SCEN} shields.') if has_meta else
+        ('NO dive-derived meta data exists for this pair (the focal dive '
+         'replay lacks this moveset cube), so every pick here is '
+         'MATCHUP-ONLY: nothing on this page weighs performance against '
+         'the rest of the meta.'),
     ]
     if cfg.injected_moves:
         notes.append(asm.get('injection_note') or (
@@ -618,8 +646,10 @@ def main():
         'named_builds': [
             {'label': f'#{i + 1} {fmt_ivs(spread_row(i)["ivs"])} ({t})',
              'rank': i + 1}
-            for t, i in ([('smasher', i_smash), ('no-meta-cost', i_bal),
-                          ('max meta', i_meta_best)]
+            for t, i in ([('smasher', i_smash),
+                          ('no-meta-cost' if has_meta else 'full-coverage',
+                           i_bal)]
+                         + ([('max meta', i_meta_best)] if has_meta else [])
                          + [(f'{arm_short(arm_of(c[5]))} pick', c[2])
                             for c in sec_cards]
                          + [(spec.get('label', fmt_ivs(spec['ivs'])),
@@ -628,15 +658,18 @@ def main():
     }
 
     # Pareto on (meta, primary pick-scenario coverage) -----------------
-    pts = np.stack([meta_pri, pick_cols[0]], axis=1)
-    for i in range(4096):
-        dominated = ((pts[:, 0] >= pts[i, 0]) & (pts[:, 1] >= pts[i, 1]) &
-                     ((pts[:, 0] > pts[i, 0]) | (pts[:, 1] > pts[i, 1])))
-        if not dominated.any():
-            reco['pareto'].append(
-                {**spread_row(i), MW_KEY: int(meta_pri[i]),
-                 'primary_cov512': round(float(pick_cols[0][i]) * 100, 2)})
-    reco['pareto'].sort(key=lambda e: -e[MW_KEY])
+    if has_meta:
+        pts = np.stack([meta_pri, pick_cols[0]], axis=1)
+        for i in range(4096):
+            dominated = ((pts[:, 0] >= pts[i, 0]) & (pts[:, 1] >= pts[i, 1])
+                         & ((pts[:, 0] > pts[i, 0])
+                            | (pts[:, 1] > pts[i, 1])))
+            if not dominated.any():
+                reco['pareto'].append(
+                    {**spread_row(i), MW_KEY: int(meta_pri[i]),
+                     'primary_cov512': round(float(pick_cols[0][i]) * 100,
+                                             2)})
+        reco['pareto'].sort(key=lambda e: -e[MW_KEY])
 
     out = pathlib.Path(args.out) if args.out else data / 'reco.json'
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -90,10 +90,16 @@ def arm_of(label):
     return label
 
 
-def stats_from(entry, ivs, levels):
+def stats_from(entry, ivs, levels, shadow=False):
     cpm = np.array([CPM[float(v)] for v in levels])
     atk = (entry['atk'] + ivs[:, 0]) * cpm
     dfn = (entry['def'] + ivs[:, 1]) * cpm
+    if shadow:
+        # effective_stats scalar path, vectorized: raw * MULT in that
+        # order (HP is never shadow-adjusted)
+        from gopvpsim.pokemon import SHADOW_ATK_BONUS, SHADOW_DEF_MULT
+        atk = atk * SHADOW_ATK_BONUS
+        dfn = dfn * SHADOW_DEF_MULT
     hp = np.floor((entry['hp'] + ivs[:, 2]) * cpm).astype(int)
     return atk, dfn, hp
 
@@ -254,8 +260,8 @@ def main(argv=None):
     z0 = np.load(data / manifest['grids'][grids[0]]['file'])
     o_ivs, o_lv = np.asarray(z0['opp_ivs']), np.asarray(z0['opp_levels'])
     t_ivs, t_lv = np.asarray(z0['focal_ivs']), np.asarray(z0['focal_levels'])
-    o_atk, o_def, o_hp = stats_from(o_entry, o_ivs, o_lv)
-    t_atk, t_def, t_hp = stats_from(t_entry, t_ivs, t_lv)
+    o_atk, o_def, o_hp = stats_from(o_entry, o_ivs, o_lv, cfg.opp_shadow)
+    t_atk, t_def, t_hp = stats_from(t_entry, t_ivs, t_lv, cfg.focal_shadow)
 
     N = int(t_ivs.shape[0])
     if sp_tier.shape[0] != N:

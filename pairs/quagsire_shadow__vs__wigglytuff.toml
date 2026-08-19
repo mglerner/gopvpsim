@@ -37,3 +37,7 @@ bait = false
 focal_key = "thievul"
 opp_key = "lickitung"
 opp_short = "licki"
+# The Worlds MODAL moveset (what the field actually runs, 62.4% of n=473)
+# deliberately differs from PvPoke's rankings default -- an
+# explicit opt-out of the default-moveset check.
+assert_focal_default_moveset = false

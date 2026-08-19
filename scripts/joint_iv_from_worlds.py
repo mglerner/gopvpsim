@@ -127,6 +127,15 @@ def emit(focal_id, opp_id, force=False):
         'opp_key = "lickitung"',
         'opp_short = "licki"',
     ]
+    if f.get('default_disagrees'):
+        lines += [
+            '# The Worlds MODAL moveset (what the field actually runs, '
+            f"{f.get('moveset_modal_pct', '?')}% of n={f.get('moveset_n', '?')})",
+            '# deliberately differs from PvPoke\'s rankings default -- an',
+            '# explicit opt-out of the default-moveset check, never a',
+            '# silently absent one.',
+            'assert_focal_default_moveset = false',
+        ]
     for bait in (True, False):
         lines += [
             '',

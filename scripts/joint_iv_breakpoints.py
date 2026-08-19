@@ -130,7 +130,7 @@ def r4(x):
 # Spread tables
 # ---------------------------------------------------------------------------
 
-def spread_table(species, league):
+def spread_table(species, league, shadow=False):
     """iv_rank rows plus value/index compaction for atk, def, hp.
 
     Damage is a function of the *stat value*, and a species has far fewer
@@ -139,7 +139,7 @@ def spread_table(species, league):
     is indexed by stat value, and `*_index` maps rank order -> value
     index.
     """
-    rows = iv_rank(species, league=league)
+    rows = iv_rank(species, league=league, shadow=shadow)
     assert len(rows) == 4096, (species, len(rows))
     out = {'rows': rows}
     for key, field in (('atk', 'atk'), ('def', 'def_'), ('hp', 'hp')):
@@ -218,12 +218,12 @@ def main():
     unknown = set(bp_cfg) - _BP_KNOWN
     if unknown:
         raise SystemExit(f'ABORT: [breakpoints] unknown keys {sorted(unknown)}')
-    # iv_rank() and make_battle_pokemon() are both called without a shadow
-    # flag here, so a shadow pair would silently get non-shadow stats.
-    if cfg.focal_shadow or cfg.opp_shadow:
-        raise SystemExit('ABORT: shadow pairs are not supported by the '
-                         'breakpoints step (iv_rank/make_battle_pokemon are '
-                         'called non-shadow)')
+    # Shadow sides: iv_rank(shadow=True) returns EFFECTIVE (multiplied)
+    # atk/def, which is what every closed form here wants; the sim probes
+    # pass shadow through make_battle_pokemon; CMP strips the x1.2 like
+    # battle.cmp_atk does. First shadow pair: Quagsire (Shadow) vs
+    # Lickilicky, 2026-08-19.
+    F_SHADOW, O_SHADOW = cfg.focal_shadow, cfg.opp_shadow
 
     FOCAL = cfg.focal
     OPPONENT = cfg.opponent
@@ -255,7 +255,8 @@ def main():
     gm = load_gamemaster()
     # The opponent kit must BE PvPoke's rankings default, never a guess
     # from the gamemaster's legal-move pool (CLAUDE.md testing note).
-    _d_fast, _d_charged = get_default_moveset(OPPONENT, LEAGUE, shadow=False)
+    _d_fast, _d_charged = get_default_moveset(OPPONENT, LEAGUE,
+                                               shadow=O_SHADOW)
     assert [_d_fast] + list(_d_charged) == [m[0] for m in L_MOVES], (
         OPPONENT, _d_fast, _d_charged, L_MOVES)
     # Same rule for the focal side, but relaxed to "SOME arm is the
@@ -265,9 +266,15 @@ def main():
     # is off-meta sets assert_focal_default_moveset = false -- an explicit
     # opt-out, never a silently absent check.
     if bp_cfg.get('assert_focal_default_moveset', True):
-        _f_fast, _f_charged = get_default_moveset(FOCAL, LEAGUE, shadow=False)
-        _default_arm = (_f_fast, tuple(_f_charged))
-        assert _default_arm in ARMS, (FOCAL, _default_arm, ARMS)
+        _f_fast, _f_charged = get_default_moveset(FOCAL, LEAGUE,
+                                                   shadow=cfg.focal_shadow)
+        # Charged ORDER is sim-irrelevant (pinned by the meta step's [b2]
+        # order-independence check), and the worlds meta stores its own
+        # order -- compare as a set (Altaria: SKY_ATTACK,FLAMETHROWER vs
+        # FLAMETHROWER,SKY_ATTACK, 2026-08-19).
+        _default_arm = (_f_fast, frozenset(_f_charged))
+        _arm_sets = {(f, frozenset(c)) for f, c in ARMS}
+        assert _default_arm in _arm_sets, (FOCAL, _default_arm, ARMS)
     sp_index = {p['speciesName']: p for p in gm['pokemon']}
     t_types = parse_types(sp_index[FOCAL])
     l_types = parse_types(sp_index[OPPONENT])
@@ -287,8 +294,8 @@ def main():
             break
     STAGES = list(FULL_STAGES) if debuff_mid else [0]
 
-    T = spread_table(FOCAL, LEAGUE)
-    L = spread_table(OPPONENT, LEAGUE)
+    T = spread_table(FOCAL, LEAGUE, F_SHADOW)
+    L = spread_table(OPPONENT, LEAGUE, O_SHADOW)
     t_rows, l_rows = T['rows'], L['rows']
     iv_to_rank_t = {(e['atk_iv'], e['def_iv'], e['sta_iv']): i
                     for i, e in enumerate(t_rows)}
@@ -721,14 +728,25 @@ def main():
     survival['mean_body_slams_to_ko_by_def_index_x_hp_index'] = cohort_bs
 
     # ------------------------------------------------------------ 3. CMP
-    max_l_cmp = max(e['atk'] for e in l_rows)
-    min_t_cmp = min(e['atk'] for e in t_rows)
-    argmax_l = max(range(4096), key=lambda i: l_rows[i]['atk'])
-    argmin_t = min(range(4096), key=lambda i: t_rows[i]['atk'])
+    from gopvpsim.pokemon import SHADOW_ATK_BONUS
+
+    def _cmp_of(row, shadow):
+        # battle.cmp_atk: shadow's x1.2 boosts damage, not priority
+        return row['atk'] / SHADOW_ATK_BONUS if shadow else row['atk']
+    max_l_cmp = max(_cmp_of(e, O_SHADOW) for e in l_rows)
+    min_t_cmp = min(_cmp_of(e, F_SHADOW) for e in t_rows)
+    argmax_l = max(range(4096), key=lambda i: _cmp_of(l_rows[i], O_SHADOW))
+    argmin_t = min(range(4096), key=lambda i: _cmp_of(t_rows[i], F_SHADOW))
     cmp_block = {
-        'definition': ('BattlePokemon.cmp_atk == atk (neither side is shadow, '
-                       'so no x1.2 strip applies); higher cmp_atk resolves '
-                       'simultaneous charged moves first',),
+        'definition': (('BattlePokemon.cmp_atk == atk (neither side is '
+                        'shadow, so no x1.2 strip applies); higher cmp_atk '
+                        'resolves simultaneous charged moves first'
+                        if not (F_SHADOW or O_SHADOW) else
+                        'BattlePokemon.cmp_atk: the shadow side\'s x1.2 '
+                        'atk bonus boosts damage, NOT priority, so it is '
+                        'stripped here exactly as battle.cmp_atk strips '
+                        'it; higher cmp_atk resolves simultaneous charged '
+                        'moves first'),),
         f'max_{OK}_cmp_atk': r4(max_l_cmp),
         f'max_{OK}_spread': [l_rows[argmax_l]['atk_iv'],
                              l_rows[argmax_l]['def_iv'],
@@ -1129,9 +1147,9 @@ def main():
 
     def sim_check(t_ivs, l_ivs, t_fast, t_charged, shields):
         tp = make_battle_pokemon(FOCAL, t_fast, t_charged, LEAGUE,
-                                 shields, *t_ivs)
+                                 shields, *t_ivs, shadow=F_SHADOW)
         lp = make_battle_pokemon(OPPONENT, L_FAST, [L_CH1, L_CH2],
-                                 LEAGUE, shields, *l_ivs)
+                                 LEAGUE, shields, *l_ivs, shadow=O_SHADOW)
         t_atk_engine, t_def_engine, t_hp_engine = tp.atk, tp.def_, tp.hp
         l_atk_engine = lp.atk
         res = simulate(tp, lp, log=True)   # mutates tp/lp (hp, energy, stages)
@@ -1227,9 +1245,11 @@ def main():
                 raise SystemExit('ABORT: [breakpoints] stage_probe arm does '
                                  f'not carry the debuff move {debuff_mid}')
             tp = make_battle_pokemon(FOCAL, st_fast, st_charged,
-                                     LEAGUE, st_shields, *st_ivs)
+                                     LEAGUE, st_shields, *st_ivs,
+                                     shadow=F_SHADOW)
             lp = make_battle_pokemon(OPPONENT, L_FAST, [L_CH1, L_CH2],
-                                     LEAGUE, st_shields, *sl_ivs)
+                                     LEAGUE, st_shields, *sl_ivs,
+                                     shadow=O_SHADOW)
             res = simulate(tp, lp, log=True)
             # Shielded throws land 1 damage regardless of stage ("→
             # SHIELDED (1 dmg)") and carry no stage information -- skip
@@ -1353,9 +1373,10 @@ def main():
             for cand in ([L_CH1, L_CH2], [mid]):
                 tp = make_battle_pokemon(FOCAL, rt_fast,
                                          rt_charged, LEAGUE,
-                                         shields, *t_ivs)
+                                         shields, *t_ivs, shadow=F_SHADOW)
                 lp = make_battle_pokemon(OPPONENT, L_FAST, cand,
-                                         LEAGUE, shields, *l_ivs)
+                                         LEAGUE, shields, *l_ivs,
+                                         shadow=O_SHADOW)
                 res = simulate(tp, lp, log=True)
                 obs = [int(l.split('→')[1].split('dmg')[0])
                        for l in res.timeline
