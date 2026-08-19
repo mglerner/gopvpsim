@@ -177,12 +177,12 @@ expected_tiers = [6, 7, 8]
 # an explicit opt-out, never a silently absent check.
 assert_focal_default_moveset = true
 
-# Preserve the SHIPPED stage-check ladder source: built from the rank-1
-# opponent while the probe simulated (8,14,15) -- a documented latent
-# bug kept only so the shipped breakpoints.json rebuilds byte-identically
-# (the correct probe-opponent ladder differs at stage -3: 22, not 21).
-# Flip to false (or delete) and re-bake to fix the shipped number.
-stage_ladder_from_rank1 = true
+# stage_ladder_from_rank1 = true preserved the SHIPPED (buggy) ladder
+# source for the S1 byte-identity pin (rank-1 opponent instead of the
+# simulated probe; stage -3 read 21 where the correct ladder says 22).
+# FLIPPED OFF 2026-08-19 evening for the corrected republish; the pin
+# record lives at commit 8feec47.
+stage_ladder_from_rank1 = false
 
 # The two HSH-discord claims this page answers. `slug` is the key
 # spelling (a human shorthand: "615" for 6/15/5, not a formatting of the
