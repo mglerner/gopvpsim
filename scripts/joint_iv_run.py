@@ -61,22 +61,34 @@ def main():
         log.write(f'== {time.strftime("%F %T")} {" ".join(cmd)}\n')
         log.flush()
         r = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT)
+        if r.returncode == 3 and step == 'joint_iv_meta.py':
+            # Distinct code: the replay blob has no cube for this pair's
+            # moveset -- an honest absence (page panels render absent),
+            # not a failure. The reason is in the pipeline log.
+            print(f'== {step} SKIPPED: no matching moveset cube in the '
+                  f'replay blob (see {log_path})', flush=True)
+            return False
         if r.returncode != 0:
             print(f'ABORT: {step} failed (exit {r.returncode}); see '
                   f'{log_path}', flush=True)
             sys.exit(r.returncode)
+        return True
 
+    have_meta = False
     if args.skip_meta or cfg.replay_blob is None:
         why = ('--skip-meta' if args.skip_meta
                else 'no replay_blob in the pair config')
         print(f'== joint_iv_meta.py SKIPPED ({why}); the page renders the '
               'meta panels honest-absent', flush=True)
     else:
-        run('joint_iv_meta.py', ('--verify',))
+        have_meta = run('joint_iv_meta.py', ('--verify',))
     run('joint_iv_breakpoints.py')
     run('joint_iv_assemble.py')
     run('joint_iv_denial.py')
-    run('build_joint_iv_page.py')
+    # An honestly-absent meta_wins is the one input the page may build
+    # without; --allow-missing renders those panels as visible absences.
+    run('build_joint_iv_page.py',
+        () if have_meta else ('--allow-missing',))
     print(f'pipeline complete; log at {log_path}', flush=True)
 
 

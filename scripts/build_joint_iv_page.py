@@ -140,7 +140,9 @@ def _configure(cfg, data_dir_override=None):
             'STATIC, date-anchored sentence (see the thievul configs).')
     MAIN_DIVE_URL = page.get('main_dive_url')
     PUBLISH_SLUG_NAME = page.get('publish_slug') or (
-        f'{cfg.focal.lower()}-{cfg.opponent.lower()}-robustness.html')
+        f'{cfg.focal.lower()}{"-shadow" if cfg.focal_shadow else ""}'
+        f'-{cfg.opponent.lower()}'
+        f'{"-shadow" if cfg.opp_shadow else ""}-robustness.html')
     CROSSLINK_HTML = page.get('crosslink_html', '')
     OCCASION = page.get('occasion')
     MOTIVATION = page.get('motivating_question')
@@ -295,7 +297,11 @@ def dataset_spec(manifest, data_dir=None):
         'threshold_species': threshold_species,
         'grid_species': [focal, opponent],
         'opp_moveset': opp_moveset,
-        'out_name': (f'{focal.lower()}_vs_{opponent.lower()}'
+        # shadow carries into the FILENAME too, or a later non-shadow pair
+        # of the same species would overwrite this page
+        'out_name': (f'{focal.lower()}{"_shadow" if FOCAL_SHADOW else ""}'
+                     f'_vs_{opponent.lower()}'
+                     f'{"_shadow" if OPP_SHADOW else ""}'
                      f'_iv_robustness.html'),
     }
 

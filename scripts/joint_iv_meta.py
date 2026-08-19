@@ -112,6 +112,16 @@ def match_blob_moveset(labels, fast, charged):
         bfast, bcharged = parse_blob_label(lab)
         if bfast == fast and frozenset(bcharged) == frozenset(charged):
             hits.append(i)
+    if not hits:
+        # The dive simmed different movesets than this pair config (the
+        # Quagsire (Shadow) dive has no Aqua Tail + Stone Edge cube,
+        # 2026-08-19). A DISTINCT exit code so joint_iv_run can skip the
+        # meta step honestly (the page renders those panels absent)
+        # instead of treating it as a pipeline failure.
+        print(f'NO-MATCHING-BLOB-MOVESET: the replay blob has no '
+              f'{fast} / {sorted(charged)} cube (blob movesets: {labels}); '
+              'meta-wins cannot be extracted for this pair from this dive.')
+        sys.exit(3)
     assert len(hits) == 1, (fast, charged, hits, labels)
     return hits[0]
 
