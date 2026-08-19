@@ -35,3 +35,234 @@ label = "nsiw_bait"
 focal_fast = "SUCKER_PUNCH"
 focal_charged = ["NIGHT_SLASH", "ICY_WIND"]
 bait = true
+
+# scripts/joint_iv_meta.py -- per-IV meta win counts for the FOCAL, pulled
+# out of [pair].replay_blob. The payload depends only on (focal, league,
+# blob), so it is baked ONCE here (the lickilicky pair reuses this copy via
+# the page builder's fallback dir) and lands at <data_dir>/meta_wins.npz.
+[meta]
+# The dive's --opponents-file, restated for provenance (falls back to
+# parsing [pair].replay_blob's own cli_args_str when absent).
+pool_file = "opponent_pools/gl_top50_plus_cs.txt"
+
+# The shipped landing-page W/L/T claim for this focal, at the rank-1 spread.
+# This is the only tie between meta_wins.npz and published output; without
+# it verify()'s [a] check skips loudly.
+[meta.oracle]
+arm = "iwpr"
+oppiv = "pvpoke"
+bait = true
+scenario = [1, 1]
+rank = 1
+want_w = 62
+want_l = 25
+want_t = 1
+
+# Spreads fresh-re-simmed by verify()'s [b] block and compared against the
+# extracted counts (blob-vs-engine cross-check). (6,15,5) is the community
+# claim spread; (15,15,15) is the hundo.
+[[meta.verify_spreads]]
+arm = "iwpr"
+ivs = [6, 15, 5]
+oppiv = "pvpoke"
+bait = true
+scenario = [1, 1]
+
+[[meta.verify_spreads]]
+arm = "iwpr"
+ivs = [6, 15, 5]
+oppiv = "pvpoke"
+bait = false
+scenario = [0, 0]
+
+[[meta.verify_spreads]]
+arm = "nsiw"
+ivs = [15, 15, 15]
+oppiv = "rank1"
+bait = true
+scenario = [1, 1]
+
+[[meta.verify_spreads]]
+arm = "nsiw"
+ivs = [15, 15, 15]
+oppiv = "rank1"
+bait = true
+scenario = [2, 2]
+
+# scripts/joint_iv_assemble.py. Every value here is frozen at what the
+# shipped reco.json says, so the rebuild is byte-identical; the script's
+# generic defaults (initials-derived moveset labels, the first grid as
+# primary, <data_dir>/meta_wins.npz, no extra cards) would otherwise
+# apply. meta_wins is left at the default -- the canonical focal-only
+# blob lives in THIS pair's data_dir.
+[assemble]
+primary_grid = "iwpr_bait"
+moveset_pretty = { iwpr = "SP/IW+PR", nsiw = "SP/NS+IW" }
+# "Licki" is the community short form, not a species name -- it is what
+# the card title says on both Thievul pages.
+opp_display_short = "Licki"
+pvpoke_default_arm = "nsiw"
+pvpoke_default_ivs = [4, 15, 15]
+# OFF for this pair: the shipped page carries the IV-conditional moveset
+# finding only on the Lickilicky side.
+cross_moveset_note = false
+injection_note = "ICY_WIND is the 2026-08-16 CD move, injected for the sim (the pinned gamemaster predates it; pvpoke upstream added it 2026-08-14 as an elite move). Mechanics: legacy."
+
+# Named-spread cards: authored titles/subtitles (community claims and
+# editorial framing), computed bodies. `label` is the short form used in
+# named_builds.
+[[assemble.extra_cards]]
+title = "What about the 6/15/5 spread?"
+subtitle = "The spread discussed in the community as the Sucker Punch breakpoint pick"
+ivs = [6, 15, 5]
+label = "6/15/5"
+
+[[assemble.extra_cards]]
+title = "What about 15 HP? (6/15/15)"
+subtitle = 'The "do you not want 15 hp" question applied to 6/15/x'
+ivs = [6, 15, 15]
+label = "6/15/15"
+
+[[assemble.extra_cards]]
+title = "Shipped dive rank 1: 0/15/11"
+subtitle = "The published dive landing build"
+ivs = [0, 15, 11]
+label = "rank1"
+
+[[assemble.extra_cards]]
+title = "PvPoke default IVs: 4/15/15"
+subtitle = "The spread PvPoke's own matchup page simulates -- it misses the SP breakpoint, which is why PvPoke prefers Night Slash in this matchup"
+ivs = [4, 15, 15]
+label = "pvpoke default"
+
+[[assemble.extra_cards]]
+title = "Hundo 15/15/15"
+subtitle = "For CD day: what the hundo actually does"
+ivs = [15, 15, 15]
+label = "hundo"
+
+# scripts/build_joint_iv_page.py -- page editorial (see the lickilicky
+# config's [page] comment; same byte-identity contract).
+[page]
+label_order = ["iwpr_bait", "iwpr_nobait", "nsiw_bait", "nsiw_nobait"]
+claim = { ivs = [6, 15, 5], label = "6/15/5 (discord claim)" }
+occasion = "the Thievul Community Day"
+main_dive_url = "thievul-great-league/index.html"
+archive_note = "Archived 2026-08-17: Lickitung is out of the current Great League meta; this analysis is kept for reference and will not be updated."
+motivating_question = 'HSH discord 2026-08-14/16 ("thievul iv tech? it seems very sensitive"; "6/15/5" as the best Sucker Punch breakpoint spread on "Licki"; "do you not want 15 hp").'
+crosslink_html = ' This analyzes <strong>Lickitung</strong> (Lick / Body Slam + Power Whip); "Licki" in the Great League meta usually means <a href="thievul-lickilicky-robustness.html">Lickilicky</a>.'
+injected_note = 'MOVE LEGALITY: Icy Wind is the 2026-08-16 Community Day exclusive (elite move; not obtainable by regular TM). The pinned bake gamemaster predates the CD, so the move was injected for simulation; PvPoke upstream added it as an elite move on 2026-08-14.'
+
+# scripts/joint_iv_breakpoints.py -- the closed-form breakpoint /
+# mechanism layer. focal_key/opp_key/opp_short pin the FROZEN JSON slot
+# names of the shipped breakpoints.json: the generic defaults are the
+# [pair] slugs, which for the lickilicky pair would spell "lickilicky"
+# and break every renderer that reads the Lickitung-era names. The rest
+# of the block is pair EDITORIAL (which community claims the page
+# answers, which spreads it names, which probes verification runs).
+[breakpoints]
+focal_key = "thievul"
+opp_key = "lickitung"
+opp_short = "licki"
+# Derivable (the arms' shared fast move; initials give "SP"); restated
+# so the headline is readable in the config.
+headline_move = "SUCKER_PUNCH"
+headline_abbr = "SP"
+# Drift pin for the prose in answers.sucker_punch_tier_boundary, which
+# names the tiers. The prose is formatted from the computed tiers; this
+# asserts they are still the ones the page was written against.
+expected_tiers = [6, 7, 8]
+# The focal arms are DELIBERATELY off-meta -- PvPoke's Thievul is
+# SP/NS+IW while the dive's landing build is SP/IW+PR -- so the
+# get_default_moveset assertion the opponent side always gets is opted
+# out of here rather than silently absent.
+assert_focal_default_moveset = false
+
+# The two HSH-discord claims this page answers. `slug` is the key
+# spelling (a human shorthand: "615" for 6/15/5, not a formatting of the
+# IVs); `key` / `answer_key` are the frozen claims/answers key names.
+[breakpoints.claim_a]
+key = "a_615_best_for_sp_bp"
+answer_key = "claim_a_615"
+slug = "615"
+ivs = [6, 15, 5]
+claim = '"6/15/5 is the best possible spread for the Sucker Punch bp on Licki" (community discussion around the CD)'
+
+[breakpoints.claim_b]
+key = "b_15_hp"
+answer_key = "claim_b_15hp"
+slug = "61515"
+ivs = [6, 15, 15]
+claim = '"do you not want 15 hp" (community discussion) -- i.e. prefer sta_iv 15 over the low-sta stat-product-optimal spreads'
+
+# named_spreads: editorial, emitted in this order. rank-1 and the hundo
+# are DERIVED -- labelling a literal IV triple "rank-1 stat product" is
+# true for Thievul in GL and a mislabel waiting to happen for anyone
+# else.
+[[breakpoints.named_spreads]]
+ivs = [6, 15, 5]
+label = "6/15/5"
+
+[[breakpoints.named_spreads]]
+ivs = [6, 15, 15]
+label = "6/15/15 (15 hp variant)"
+
+[[breakpoints.named_spreads]]
+derived = "rank1"
+label = "rank-1 stat product"
+
+[[breakpoints.named_spreads]]
+ivs = [0, 15, 15]
+label = "0/15/15"
+
+[[breakpoints.named_spreads]]
+derived = "hundo"
+label = "hundo"
+
+# "max atk IV", not "max atk": effective attack depends on the CP-capped
+# level too, and 15/15/0 is NOT the highest-attack spread in the 4096.
+[[breakpoints.named_spreads]]
+ivs = [15, 15, 0]
+label = "max atk IV, min sta IV"
+
+[[breakpoints.named_spreads]]
+ivs = [10, 15, 15]
+label = "10/15/15"
+
+# Verification probes. `arm` indexes the moveset arms in grid order
+# (0 = iwpr, 1 = nsiw). The opponent probe IVs are the shipped ones and
+# are deliberately NOT derived: (8,14,15) is Lickitung's rank-1 spread
+# and was reused verbatim as an arbitrary probe on the Lickilicky side.
+[[breakpoints.sim_probes]]
+focal_ivs = [6, 15, 5]
+opp_ivs = [8, 14, 15]
+arm = 0
+shields = 1
+
+[[breakpoints.sim_probes]]
+focal_ivs = [0, 15, 11]
+opp_ivs = [8, 14, 15]
+arm = 1
+shields = 0
+
+[[breakpoints.sim_probes]]
+focal_ivs = [15, 15, 0]
+opp_ivs = [15, 15, 15]
+arm = 0
+shields = 2
+
+# The Icy-Wind-debuff stage cross-check (the arm must carry the debuff
+# move).
+[breakpoints.stage_probe]
+focal_ivs = [6, 15, 5]
+opp_ivs = [8, 14, 15]
+arm = 0
+shields = 0
+
+# The resisted-opponent-charged-move cross-check; unused for the
+# Lickitung pair, whose only resisted move is the FAST one.
+[breakpoints.resisted_probe]
+focal_ivs = [6, 15, 5]
+opp_ivs = [0, 15, 10]
+arm = 0
+shields = 0
