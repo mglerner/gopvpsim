@@ -79,6 +79,11 @@ class Cell:
     slices: dict = field(default_factory=dict)      # (spread, cohort, bait) ->
                                                     # CellSlice
     missing: bool = False
+    # Scenario indices proven IV-decided by a FULL Tier-2 grid (any
+    # non-constant scenario over all 4096 focal spreads x the opponent
+    # cohort) on a pair the two-probe Tier-1 screen called clean -- the
+    # 2026-08-19 FN audit's ground truth. Filled by _apply_grid_amber.
+    grid_scenarios: list = field(default_factory=list)
 
     @property
     def headline(self):
@@ -93,7 +98,8 @@ class Cell:
         though each slice alone looks settled; gap found designing the
         Tier-2 screen, 2026-08-10)."""
         return (any('amber' in s.status for s in self.slices.values())
-                or bool(self.spread_flip_scenarios()))
+                or bool(self.spread_flip_scenarios())
+                or bool(self.grid_scenarios))
 
     def spread_flip_scenarios(self):
         """Scenario indices where, for some (cohort, bait), the rank1
@@ -125,7 +131,16 @@ class Cell:
                 if st == 'amber':
                     idx.add(i)
         idx.update(self.spread_flip_scenarios())
+        idx.update(self.grid_scenarios)
         return sorted(idx)
+
+    def probe_missed(self):
+        """True when this direction is amber ONLY through full-grid
+        evidence -- the probe screen alone called it settled."""
+        return (bool(self.grid_scenarios)
+                and not any('amber' in s.status
+                            for s in self.slices.values())
+                and not self.spread_flip_scenarios())
 
 
 def _cell_from_plane(plane, focal_id, opp_id):
@@ -166,14 +181,51 @@ def build_cell(focal_id, opp_id, planes_dir=wp.PLANES_DIR):
 
 
 def build_all_cells(entries, planes_dir=wp.PLANES_DIR):
-    """{(focal_id, opp_id): Cell} for every ordered direction."""
+    """{(focal_id, opp_id): Cell} for every ordered direction, with
+    full-grid amber evidence folded in (_apply_grid_amber) so every
+    consumer -- hub, cheat sheets, pair pages, worklists, verify --
+    agrees on ONE amber set."""
     ids = [e['species_id'] for e in entries]
     cells = {}
     for i, a in enumerate(ids):
         for b in ids[i + 1:]:
             for focal, opp in ((a, b), (b, a)):
                 cells[(focal, opp)] = build_cell(focal, opp, planes_dir)
+    _apply_grid_amber(cells)
     return cells
+
+
+def _apply_grid_amber(cells):
+    """Fold FULL-grid IV-decidedness into cells the probe screen called
+    clean. Only grids for non-Tier-1-amber pairs are read (the audit's
+    73-pair set), so the pass costs ~seconds, not a 1,900-grid sweep. A
+    scenario counts when its outcome is non-constant over ALL 4096
+    focal spreads x the opponent cohort -- the widest honest reading,
+    and the one that catches the max-attack breakpoint chasers the
+    2026-08-19 probe expansion flagged."""
+    import numpy as np
+    import worlds_tier2 as t2
+    manifest = t2.load_manifest()
+    if manifest is None:
+        return
+    tier1_amber = {tuple(sorted(k)) for k, c in cells.items()
+                   if not c.missing and c.amber}
+    for key, ent in manifest.get('entries', {}).items():
+        focal, opp, _bait = key.rsplit('|', 2)
+        cell = cells.get((focal, opp))
+        if cell is None or cell.missing:
+            continue
+        if tuple(sorted((focal, opp))) in tier1_amber:
+            continue
+        grid = t2.read_grid(ent['file'])
+        if grid is None:
+            continue
+        won = grid['won']
+        for si in range(won.shape[2]):
+            sl = won[:, :, si]
+            if sl.any() and not sl.all() and si not in cell.grid_scenarios:
+                cell.grid_scenarios.append(si)
+        cell.grid_scenarios.sort()
 
 
 def matrix_summary(cells, entries):

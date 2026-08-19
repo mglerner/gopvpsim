@@ -438,13 +438,15 @@ def direction_section(focal_entry, opp_entry, cell, grid_bait, grid_nobait):
     for si in sorted(mixed | probe_only):
         if si in probe_only:
             parts.append(
-                f'<h3>{SCEN_LABELS[si]} (IV-decided in probe slices '
-                'only)</h3>'
-                '<p class="counts">Flagged by the Tier-1 screen via the '
-                'attack-band cohort or a probe spread, but the full '
-                'top-512 x top-512 block is uniform for this scenario -- '
-                'the IV-dependence lives outside it (see the cheat-sheet '
-                'dig-in for the flagged slice).</p>')
+                f'<h3>{SCEN_LABELS[si]} (IV-decided outside the '
+                'top-512 x top-512 block)</h3>'
+                '<p class="counts">Flagged by the Tier-1 screen (an '
+                'attack-band cohort or probe-spread slice) or by the '
+                'full-grid audit over all 4096 focal spreads, but the '
+                'top-512 x top-512 block itself is uniform for this '
+                'scenario -- the IV-dependence lives outside it, i.e. '
+                'among off-meta or breakpoint-chaser builds (see the '
+                'cheat-sheet dig-in and the curves below).</p>')
             continue
         w = won[:, mask, si]                    # (4096, 512)
         frac = w.mean(axis=1)
