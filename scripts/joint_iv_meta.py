@@ -203,13 +203,19 @@ def extract(cfg, state):
         oppiv, bait = parse_mode(mode)
         modes.append((mode, oppiv, bait))
 
+    bb_live = []
     for short, mi in ms_idx.items():
         md = state['moveset_data'][mi]
-        # best-buddy is a no-op for this focal/league (blob's best_buddy.noop);
-        # assert the L51 cube is identical rather than silently picking one.
-        # A focal where this fires is a real finding, not a kit bug.
+        # When the L51 (best-buddy) cube differs, best-buddy is LIVE for
+        # this focal (GL Medicham, 2026-08-19 -- low-IV spreads stay
+        # under the cap at L51). The kit's grids are L<=50 builds
+        # (LEAGUE_MAX_LEVEL axes), so the extraction uses the
+        # NON-best-buddy cube to describe the same builds, and the
+        # divergence is RECORDED in provenance rather than silently
+        # picked or fatally asserted.
         for mode, _, _ in modes:
-            assert md['scores'][mode] == md['scores_l51'][mode], (short, mode)
+            if md['scores'][mode] != md['scores_l51'][mode]:
+                bb_live.append((short, mode))
         for mode, oppiv, bait in modes:
             flat = np.asarray(md['scores'][mode], dtype=np.int32)
             assert flat.size == 4096 * nS * nO, flat.size
@@ -246,9 +252,18 @@ def extract(cfg, state):
             f'mirror_win__* (4096 x {nS}) lets a consumer subtract it.')
     bb = state.get('best_buddy') or {}
 
+    bb_note = (
+        'best-buddy is a NO-OP for this focal (scores_l51 == scores for '
+        'every cube).' if not bb_live else
+        f'best-buddy is LIVE for this focal: scores_l51 differs from '
+        f'scores for {len(bb_live)} (arm, mode) cube(s) '
+        f'({sorted(set(s for s, _ in bb_live))}). This extraction uses '
+        'the NON-best-buddy cube to match the kit grids\' L<=50 axes; '
+        'best-buddy meta performance is NOT represented here.')
     prov = {
         'blob': str(cfg.replay_blob.relative_to(REPO)),
         'species': cfg.focal, 'league': cfg.league,
+        'best_buddy': bb_note,
         'cli_args_str': state['cli_args_str'],
         'opponent_label': state['opponent_label'],
         'pool_file': meta_cfg.get('pool_file') or pool_file_from_state(state),
