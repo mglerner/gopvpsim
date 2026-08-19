@@ -113,7 +113,8 @@ COHORTS = {'all': 4096, 'top512': 512, 'top100': 100, 'rank1': 1}
 _BP_KNOWN = {'focal_key', 'opp_key', 'opp_short', 'headline_move',
              'headline_abbr', 'expected_tiers', 'assert_focal_default_moveset',
              'claim_a', 'claim_b', 'named_spreads', 'sim_probes',
-             'stage_probe', 'resisted_probe', 'stage_ladder_from_rank1'}
+             'stage_probe', 'resisted_probe', 'stage_ladder_from_rank1',
+             'assert_opponent_default_moveset'}
 _CLAIM_KNOWN = {'key', 'answer_key', 'slug', 'ivs', 'claim'}
 _PROBE_KNOWN = {'focal_ivs', 'opp_ivs', 'arm', 'shields'}
 
@@ -262,10 +263,17 @@ def main():
     gm = load_gamemaster()
     # The opponent kit must BE PvPoke's rankings default, never a guess
     # from the gamemaster's legal-move pool (CLAUDE.md testing note).
-    _d_fast, _d_charged = get_default_moveset(OPPONENT, LEAGUE,
-                                               shadow=O_SHADOW)
-    assert [_d_fast] + list(_d_charged) == [m[0] for m in L_MOVES], (
-        OPPONENT, _d_fast, _d_charged, L_MOVES)
+    if bp_cfg.get('assert_opponent_default_moveset', True):
+        _d_fast, _d_charged = get_default_moveset(OPPONENT, LEAGUE,
+                                                  shadow=O_SHADOW)
+        # Order-insensitive (charged order is sim-irrelevant); the
+        # worlds MODAL moveset can deliberately differ from PvPoke's
+        # default (Quagsire (Shadow) runs Stone Edge, 62.4% of the
+        # field) -- an explicit config opt-out, never a silent absence.
+        assert (_d_fast == L_MOVES[0][0]
+                and frozenset(_d_charged)
+                == frozenset(m[0] for m in L_MOVES[1:])), (
+            OPPONENT, _d_fast, _d_charged, L_MOVES)
     # Same rule for the focal side, but relaxed to "SOME arm is the
     # default": a focal kit's LANDING build is often deliberately off-meta
     # (the Thievul pages ship SP/IW+PR while PvPoke recommends SP/NS+IW,
@@ -977,11 +985,16 @@ def main():
             f'vs_rank1_{OS}': {
                 f'{OS}_def': r4(rank1_def),
                 f'{FK}_atk_needed': r4(sp_thr_hi),
-                'highest_atk_value_below': r4(max(
+                # None = the set is EMPTY (every spread clears, or none
+                # does) -- a real state, not a crash (Altaria vs
+                # Corviknight clears with all 4096, 2026-08-19).
+                'highest_atk_value_below': (r4(max(
                     t_atk_vals[t_atk_idx[i]] for i in range(4096)
-                    if sp_tier_vs_rank1_spread[i] < hi_tier)),
-                'lowest_atk_value_at_or_above': r4(min(
-                    t_atk_vals[t_atk_idx[i]] for i in clearing)),
+                    if sp_tier_vs_rank1_spread[i] < hi_tier))
+                    if len(clearing) < 4096 else None),
+                'lowest_atk_value_at_or_above': (r4(min(
+                    t_atk_vals[t_atk_idx[i]] for i in clearing))
+                    if clearing else None),
                 'n_spreads_clearing': len(clearing),
                 'n_spreads_failing': 4096 - len(clearing),
             },
@@ -1136,8 +1149,14 @@ def main():
     # unstaged sample. (For Lickitung the only resisted move is the FAST one,
     # Lick/ghost, which the opponent-fast sample already covers -- so this
     # adds nothing there and the Lickitung output is unchanged.)
+    # RESISTED means the damage is materially reduced (x0.625 or the
+    # x0.390625 double), not any float-noise deviation from 1.0: a
+    # super-effective x resisted dual type multiplies to 1.0000000149
+    # under the float32 constants (Stone Edge vs flying/steel,
+    # 2026-08-19) and is NEUTRAL for every damage purpose.
     resisted_charged = [m for m, k in L_MOVES if k == 'charged'
-                        and type_effectiveness(move(m, k)['type'], t_types) != 1.0]
+                        and type_effectiveness(move(m, k)['type'],
+                                               t_types) < 0.99]
     samples += [(m, 'charged', l_types, t_types, l_rows[0]['atk'],
                  t_rows[i_a]['def_'], 1.0) for m in resisted_charged]
     for mid, kind, atypes, dtypes, a, d, m in samples:

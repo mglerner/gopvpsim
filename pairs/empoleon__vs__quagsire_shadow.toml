@@ -25,6 +25,9 @@ replay_blob = "userdata/replay/20260807_003714_Empoleon_great.replay.pkl.gz"
 focal_key = "thievul"
 opp_key = "lickitung"
 opp_short = "licki"
+# The OPPONENT worlds modal moveset deliberately differs from
+# PvPoke's rankings default (Stone Edge, 62.4% of the field).
+assert_opponent_default_moveset = false
 
 [[grids]]
 label = "dphc_bait"
