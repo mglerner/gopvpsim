@@ -244,21 +244,13 @@ def main():
     assert FK != OK, (FK, OK)
     OS_NICE = OS[:1].upper() + OS[1:]
 
-    # The headline move: the one whose tier boundary the page is about.
-    # Default = the fast move the arms share (the usual case).
-    _fasts = {a[0] for a in ARMS}
-    HEADLINE = bp_cfg.get('headline_move') or (
-        sorted(_fasts)[0] if len(_fasts) == 1 else None)
-    if HEADLINE is None:
-        raise SystemExit('ABORT: the arms do not share one fast move, so '
-                         '[breakpoints] headline_move must be set explicitly')
-    if HEADLINE not in dict(T_MOVES):
-        raise SystemExit(f'ABORT: headline_move {HEADLINE} is not in the '
-                         "focal arms' move union")
-    HA = bp_cfg.get('headline_abbr') or move_abbr(HEADLINE)
-    ha = HA.lower()
-    HEAD_KEY = HEADLINE.lower()
-    HEAD_KIND = dict(T_MOVES)[HEADLINE]
+    # The headline move is resolved AFTER the spread tables exist (its
+    # auto-pick needs the focal atk range vs the rank-1 opponent def);
+    # a configured [breakpoints] headline_move is authoritative.
+    _cfg_headline = bp_cfg.get('headline_move')
+    if _cfg_headline is not None and _cfg_headline not in dict(T_MOVES):
+        raise SystemExit(f'ABORT: headline_move {_cfg_headline} is not in '
+                         "the focal arms' move union")
 
     gm = load_gamemaster()
     # The opponent kit must BE PvPoke's rankings default, never a guess
@@ -294,13 +286,49 @@ def main():
             debuff_mid = mid
             break
     STAGES = list(FULL_STAGES) if debuff_mid else [0]
-    HEAD_NAME = move(HEADLINE, HEAD_KIND)['name']
 
     T = spread_table(FOCAL, LEAGUE)
     L = spread_table(OPPONENT, LEAGUE)
     t_rows, l_rows = T['rows'], L['rows']
     iv_to_rank_t = {(e['atk_iv'], e['def_iv'], e['sta_iv']): i
                     for i, e in enumerate(t_rows)}
+
+    # Headline move resolution. Config wins; the auto-pick prefers the
+    # arms' shared FAST move (it always flies) whenever its damage vs the
+    # rank-1 opponent actually VARIES across the focal atk range, else
+    # the charged move with the most distinct tiers -- a flat-tier
+    # headline has no breakpoint story (Corviknight's Sand Attack is
+    # damage 2 vs Lickilicky for every one of the 4096 spreads,
+    # 2026-08-19; the >=2-tiers floor below still guards the pick).
+    def _tiers_of(mid, kind):
+        mv = move(mid, kind)
+        r1_def = l_rows[0]['def_']
+        return {damage(mv['power'], e['atk'], r1_def, mv['type'],
+                       t_types, l_types) for e in t_rows}
+
+    if _cfg_headline is not None:
+        HEADLINE = _cfg_headline
+    else:
+        _fasts = sorted({a[0] for a in ARMS})
+        if len(_fasts) != 1:
+            raise SystemExit('ABORT: the arms do not share one fast move, '
+                             'so [breakpoints] headline_move must be set '
+                             'explicitly')
+        if len(_tiers_of(_fasts[0], 'fast')) >= 2:
+            HEADLINE = _fasts[0]
+        else:
+            _charged = [(mid, len(_tiers_of(mid, 'charged')))
+                        for mid, kind in T_MOVES if kind == 'charged']
+            _charged.sort(key=lambda x: (-x[1], x[0]))
+            HEADLINE = _charged[0][0]
+            print(f'headline auto-pick: fast move {_fasts[0]} is '
+                  f'tier-flat vs the rank-1 {OPPONENT}; using '
+                  f'{HEADLINE} ({_charged[0][1]} tiers)')
+    HA = bp_cfg.get('headline_abbr') or move_abbr(HEADLINE)
+    ha = HA.lower()
+    HEAD_KEY = HEADLINE.lower()
+    HEAD_KIND = dict(T_MOVES)[HEADLINE]
+    HEAD_NAME = move(HEADLINE, HEAD_KIND)['name']
 
     # ---------------------------------------------------------------- meta
     meta = {
@@ -1350,11 +1378,32 @@ def main():
                                l_rows[li]['atk'] * _stat_stage_mult(st),
                                t_rows[ti]['def_'], mv['type'], l_types, t_types)
                     for st in STAGES}
-            neutral = {st: damage(mv['power'],
-                                  l_rows[li]['atk'] * _stat_stage_mult(st),
-                                  t_rows[ti]['def_'], 'normal', l_types,
-                                  t_types) for st in STAGES}
-            checks.append(dict(
+            # The neutral baseline: what the same-power move would do with
+            # effectiveness 1.0. The shipped (thievul) computation modeled
+            # it as a literal normal-TYPE move, which only works when the
+            # focal takes normal neutrally -- vs a steel focal the baseline
+            # is itself resisted and the visibility check self-defeats
+            # (Corviknight, 2026-08-19). When normal is not neutral vs the
+            # focal, compute the eff=1.0 closed form with the move's OWN
+            # stab instead (byte-identical path kept for the shipped pins).
+            baseline_note = None
+            if type_effectiveness('normal', t_types) == 1.0:
+                neutral = {st: damage(mv['power'],
+                                      l_rows[li]['atk'] * _stat_stage_mult(st),
+                                      t_rows[ti]['def_'], 'normal', l_types,
+                                      t_types) for st in STAGES}
+            else:
+                _stab_m = (STAB_MULTIPLIER if mv['type'] in l_types else 1.0)
+                neutral = {st: math.floor(
+                    0.5 * BONUS * mv['power']
+                    * (l_rows[li]['atk'] * _stat_stage_mult(st))
+                    / t_rows[ti]['def_'] * 1.0 * _stab_m) + 1
+                    for st in STAGES}
+                baseline_note = (
+                    'the focal resists normal, so the baseline is the '
+                    'eff=1.0 closed form with the move\'s own stab, not a '
+                    'literal normal-type move')
+            check = dict(
                 used, move=mid, move_type=mv['type'],
                 **{f'effectiveness_vs_{FK}': r4(type_effectiveness(mv['type'],
                                                                    t_types))},
@@ -1365,7 +1414,10 @@ def main():
                 resistance_is_visible=all(pred[st] < neutral[st]
                                           for st in STAGES),
                 all_observed_in_closed_form_set=all(
-                    v in set(pred.values()) for v in hits)))
+                    v in set(pred.values()) for v in hits))
+            if baseline_note:
+                check['neutral_baseline_note'] = baseline_note
+            checks.append(check)
         ver['resisted_charged_sim_checks'] = checks
         ver['resisted_charged_note'] = (
             'each observed damage must equal the closed-form value at some '

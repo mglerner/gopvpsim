@@ -178,7 +178,6 @@ def main(argv=None):
                          f'not a configured grid label')
     sp_move = den_cfg.get('focal_bp_move', by_label[primary_grid].focal_fast)
     roll_move = den_cfg.get('opp_pressure_move', cfg.opp_fast)
-    sp_key, roll_key = sp_move.lower(), roll_move.lower()
     sp_name, roll_name = pretty_move(sp_move), pretty_move(roll_move)
 
     manifest = json.loads((data / 'manifest.json').read_text())
@@ -201,13 +200,32 @@ def main(argv=None):
             f'ABORT: breakpoints.json has no {focal_key!r} block (has '
             f'{sorted(k for k in bp if k.endswith("_offense"))}); set '
             f'[breakpoints] focal_key in {cfg.path.name}')
-    if sp_move not in bp[focal_key]['moves']:
-        raise SystemExit(
-            f'ABORT: breakpoints.json {focal_key} has no {sp_move} block; '
-            f'set [denial] focal_bp_move in {cfg.path.name}')
-    sp = bp[focal_key]['moves'][sp_move]
     tier_key = f'tier_vs_rank1_{opp_short}_by_spread'
     bp_key = f'breakpoint_vs_rank1_{opp_short}'
+    if sp_move not in bp[focal_key]['moves'] \
+            or tier_key not in bp[focal_key]['moves'][sp_move]:
+        # The breakpoints step may have auto-picked a different headline
+        # (a tier-flat fast move, e.g. Corviknight's Sand Attack,
+        # 2026-08-19). Locate the move that actually carries the tier
+        # table, exactly the way the assemble step and the page JS do,
+        # unless the config named one explicitly.
+        if 'focal_bp_move' in den_cfg:
+            raise SystemExit(
+                f'ABORT: breakpoints.json {focal_key} has no usable '
+                f'{sp_move} block; fix [denial] focal_bp_move in '
+                f'{cfg.path.name}')
+        hits = [mid for mid, entry in bp[focal_key]['moves'].items()
+                if tier_key in entry]
+        if len(hits) != 1:
+            raise SystemExit(
+                f'ABORT: expected exactly one {focal_key} move carrying '
+                f'{tier_key!r}, found {hits}; set [breakpoints] opp_short '
+                f'in {cfg.path.name}')
+        sp_move = hits[0]
+    sp = bp[focal_key]['moves'][sp_move]
+    # keys derive from the RESOLVED move (the structural
+    # re-resolution above may have replaced sp_move)
+    sp_key, roll_key = sp_move.lower(), roll_move.lower()
     if tier_key not in sp or bp_key not in sp:
         raise SystemExit(
             f'ABORT: breakpoints.json {focal_key}.moves.{sp_move} has no '
