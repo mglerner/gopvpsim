@@ -487,6 +487,14 @@ def render_pair_page(a_entry, b_entry, meta, cells, manifest, t2_manifest,
         return out
     a, b = a_entry['species_id'], b_entry['species_id']
     ga, gb = grids(a, b), grids(b, a)
+    from build_worlds_pages import joint_iv_link_map
+    _deep = joint_iv_link_map().get(frozenset((a, b)))
+    deep_html = (
+        f'<p class="section-intro"><strong>This pair has a deep joint-IV '
+        f'analysis:</strong> <a href="{esc(_deep[0])}">{esc(_deep[1])}</a> '
+        '-- every spread of BOTH sides (4096 x 4096 per moveset/bait '
+        'grid), closed-form breakpoints, denial tech, and a '
+        'paste-your-collection checker.</p>' if _deep else '')
     body = (direction_section(a_entry, b_entry, cells[(a, b)],
                               ga[True], ga[False])
             + direction_section(b_entry, a_entry, cells[(b, a)],
@@ -504,6 +512,7 @@ def render_pair_page(a_entry, b_entry, meta, cells, manifest, t2_manifest,
                     'IV spread (all 4096, stat-product order) against the '
                     'opponent\'s top-512 spreads, per shield scenario, '
                     'plus closed-form reach/deny cutoffs.</p>'
+                    + deep_html
                     + provenance_html(meta, manifest)),
         body_html=body,
         extra_css=PAIR_CSS)

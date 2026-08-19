@@ -353,7 +353,29 @@ def pair_link_map(website_dir=WEBSITE_DIR):
     return out
 
 
-def _digin(cell, opp_name, pair_link=None, pair_amber=False):
+def joint_iv_link_map(website_dir=WEBSITE_DIR):
+    """{frozenset({focal_slug, opp_slug}): (filename, display)} for
+    PUBLISHED joint-IV robustness deep pages -- pairs/*.toml whose
+    publish slug exists on disk (links only against real files, the
+    ship-gate rule pair_link_map follows)."""
+    from joint_iv_config import default_publish_slug, load_pair
+    out = {}
+    for toml in sorted((REPO / 'pairs').glob('*.toml')):
+        try:
+            cfg = load_pair(toml)
+        except Exception:
+            continue
+        slug = default_publish_slug(cfg)
+        if not (Path(website_dir) / slug).exists():
+            continue
+        focal = cfg.focal + (' (Shadow)' if cfg.focal_shadow else '')
+        opp = cfg.opponent + (' (Shadow)' if cfg.opp_shadow else '')
+        out[frozenset((cfg.focal_slug, cfg.opp_slug))] = (
+            slug, f'{focal} vs {opp}')
+    return out
+
+
+def _digin(cell, opp_name, pair_link=None, pair_amber=False, deep=None):
     """Per-row expansion: the FULL Tier-1 data for this direction as
     exact beats-N counts -- every probe spread x cohort x bait slice,
     per scenario. This is the interim dig-in for IV-decided cells until
@@ -385,6 +407,10 @@ def _digin(cell, opp_name, pair_link=None, pair_amber=False):
         # 2026-08-11).
         link_html = (' No detail page: this pair is not flagged '
                      'IV-decided.')
+    if deep:
+        link_html += (f' <a href="{esc(deep[0])}">Deep joint-IV analysis '
+                      f'({esc(deep[1])}: every spread of both sides, '
+                      'breakpoints, denial)</a>.')
     return (f'<details class="digin"><summary>details</summary>'
             f'<div class="table-scroll"><table>'
             f'<tr><th>scen</th>{heads}</tr>{"".join(rows)}</table></div>'
@@ -793,9 +819,23 @@ def tier2_status_html(entries, fn, deferred, n_pages):
 
 
 def render_hub(meta, cells, manifest, slug_map, links=None, fn=None,
-               deferred=None):
+               deferred=None, jmap=None):
     entries = meta['entries']
     n_amber = sum(1 for c in cells.values() if not c.missing and c.amber)
+    deep_html = ''
+    if jmap:
+        items = ''.join(
+            f'<li><a href="{esc(slug)}">{esc(label)}</a></li>'
+            for slug, label in sorted(jmap.values(), key=lambda v: v[1]))
+        deep_html = (
+            '<h2>Deep joint-IV analyses</h2>'
+            '<p class="section-intro">Hand-picked high-usage IV-decided '
+            'pairs get the full treatment: every spread of BOTH sides '
+            f'(4096 x 4096 x 9 shield scenarios per moveset/bait grid), '
+            'closed-form breakpoints, denial tech for the other side, and '
+            'a paste-your-collection checker. The cheat-sheet rows for '
+            'these pairs link the same pages.</p>'
+            f'<ul class="deeplist">{items}</ul>')
     # Order (Michael 2026-08-18): matrix FIRST -- it is the punchline --
     # then the meta table, then the candidates, with format/provenance
     # last. The matrix's reading instructions moved from above the grid
@@ -828,6 +868,7 @@ meta table below.</p>
 </figcaption>
 </figure>
 {tier2_status_html(entries, fn, deferred or [], len(links or {}))}
+{deep_html}
 <h2>The meta ({len(entries)} entries)</h2>
 <p class="section-intro">Badge rules (mechanical): PLAYED = top-{meta["badge_usage_top"]}
 recent usage AND top-{meta["badge_rank_top"]} current rank; PLAYED* = top-usage but
@@ -867,7 +908,7 @@ shown as data; we do not claim nerf vs model error.</p>
 
 
 def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None,
-                       website_dir=WEBSITE_DIR):
+                       website_dir=WEBSITE_DIR, jmap=None):
     entries = meta['entries']
     names = {e['species_id']: e['name'] for e in entries}
     links = links or {}
@@ -932,12 +973,13 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None,
         # rule), same as _mini_cell.
         if plink:
             grids = f'<a class="gridlink" href="{esc(plink)}">{grids}</a>'
+        _deep = (jmap or {}).get(frozenset((sid, oid)))
         # Row anchor: the hub's dimmed-cell popover deep-links here
         # (sheet_row_id is the single definition of the id).
         rows.append(
             f'<tr id="{sheet_row_id(oid)}">'
             f'<td><a href="{sheet_filename(oid)}">{esc(oname)}</a><br>'
-            f'{_digin(cell, oname, plink, pair_amber)}</td>'
+            f'{_digin(cell, oname, plink, pair_amber, _deep)}</td>'
             f'<td>{grids}</td>'
             f'<td>{flag_html}</td><td>{mband}</td></tr>')
     forced = entry.get('forced_reason')
@@ -1035,12 +1077,14 @@ def build(website_dir=WEBSITE_DIR, planes_dir=wp.PLANES_DIR,
             deferred = [tuple(p) for p in t2m.get('deferred', [])]
     except ImportError:
         pass
+    jmap = joint_iv_link_map(website_dir)
     (website_dir / 'worlds.html').write_text(
-        render_hub(meta, cells, manifest, slug_map, links, fn, deferred))
+        render_hub(meta, cells, manifest, slug_map, links, fn, deferred,
+                   jmap))
     for e in entries:
         (website_dir / sheet_filename(e['species_id'])).write_text(
             render_cheat_sheet(e, meta, cells, manifest, slug_map, links,
-                               website_dir))
+                               website_dir, jmap))
     print(f'Wrote worlds.html + {len(entries)} cheat sheets to '
           f'{website_dir} ({len(cells)} cells, '
           f'{sum(1 for c in cells.values() if c.amber)} IV-decided '
