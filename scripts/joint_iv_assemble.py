@@ -265,17 +265,25 @@ def main():
     bp_sec = cfg.section('breakpoints')
     focal_key = f"{bp_sec.get('focal_key', cfg.focal_slug)}_offense"
     opp_short = bp_sec.get('opp_short', cfg.opp_slug)
-    fast_id = arm_grid[primary_arm].focal_fast
     if focal_key not in bp:
         raise SystemExit(f'ABORT: breakpoints.json has no {focal_key!r} '
                          'table; set [breakpoints].focal_key (present: '
                          f'{sorted(k for k in bp if k.endswith("_offense"))})')
-    fast_bp = bp[focal_key]['moves'][fast_id]
+    # The HEADLINE move is whichever entry the breakpoint layer built the
+    # per-spread tier table for (the breakpoints step may auto-pick a
+    # charged move when the fast move is tier-flat -- Corviknight's Sand
+    # Attack, 2026-08-19). Located structurally, exactly the way the page
+    # JS locates it, so the two layers can never disagree.
     tier_field = f'tier_vs_rank1_{opp_short}_by_spread'
-    if tier_field not in fast_bp:
-        raise SystemExit(f'ABORT: {focal_key}/{fast_id} has no {tier_field!r};'
-                         ' set [breakpoints].opp_short to the slot spelling '
+    headline_ids = [mid for mid, entry in bp[focal_key]['moves'].items()
+                    if tier_field in entry]
+    if len(headline_ids) != 1:
+        raise SystemExit(f'ABORT: expected exactly one {focal_key} move '
+                         f'carrying {tier_field!r}, found {headline_ids}; '
+                         'set [breakpoints].opp_short to the slot spelling '
                          'the blob actually uses')
+    fast_id = headline_ids[0]
+    fast_bp = bp[focal_key]['moves'][fast_id]
     sp_tier = np.array(fast_bp[tier_field])
     # The tier that "clears the breakpoint", from the breakpoint layer --
     # a literal here would render a false claim on any other pair.
