@@ -560,3 +560,30 @@ def test_shipped_meta_badge_divergences_are_all_rendered():
         if e['badge'] == 'FORCED':
             assert div == '', e['name']
     assert shown >= 1                       # scanner self-test
+
+
+def test_deferred_block_states_its_zero_state(cells):
+    """PRE-FIX VALUE: an empty deferred list rendered '' -- the block had
+    said "N pairs are deferred", so silence could not be told apart from
+    the section disappearing. Both states must be readable."""
+    some = bwp.tier2_status_html(META['entries'], None,
+                                 [('alpha', 'beta_shadow')], 1)
+    assert '1 IV-decided' in some and 'deferred by the Tier-2 bake' in some
+    none = bwp.tier2_status_html(META['entries'], None, [], 1)
+    assert 'Nothing is deferred' in none
+    assert 'deferred by the Tier-2 bake budget' not in none
+
+
+@pytest.mark.local_artifacts
+def test_hub_zero_deferred_state_is_live():
+    """Boundary pin against the SHIPPED hub: the Tier-2 backlog is clear,
+    so the hub must say so rather than omit the block."""
+    from pathlib import Path as _P
+    hub = (_P('userdata/website') / 'worlds.html')
+    if not hub.exists():                       # unrendered checkout
+        pytest.skip('worlds.html not rendered')
+    import worlds_tier2 as _t2
+    m = _t2.load_manifest()
+    if m is None or m.get('deferred'):
+        pytest.skip('pairs are currently deferred; the other branch applies')
+    assert 'Nothing is deferred' in hub.read_text()

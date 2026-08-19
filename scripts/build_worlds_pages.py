@@ -768,7 +768,15 @@ def tier2_status_html(entries, fn, deferred, n_pages):
                     f'ranked worklist): {listed}{more}. A deferred pair '
                     'still has full Tier-1 data on the cheat sheets.</p>')
     else:
-        def_html = ''
+        # The zero state is STATED, not silent. This block previously
+        # read "N IV-decided pairs are deferred by the Tier-2 bake
+        # budget", so rendering nothing when the backlog clears would
+        # leave a reader unable to tell complete coverage from a section
+        # that quietly disappeared (2026-08-19, when the last 22 were
+        # baked and the deferred list hit zero).
+        def_html = ('<p class="section-intro">Nothing is deferred: every '
+                    'IV-decided pair in the meta has a full-grid detail '
+                    'page.</p>')
     cmp_html = ''
     if (Path(WEBSITE_DIR) / 'worlds-cmp.html').exists():
         cmp_html = ('<p class="section-intro"><a href="worlds-cmp.html">'

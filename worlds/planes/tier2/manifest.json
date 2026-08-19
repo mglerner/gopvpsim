@@ -1,95 +1,6 @@
 {
  "created": "2026-08-10",
- "deferred": [
-  [
-   "furret",
-   "thievul_iw_pr"
-  ],
-  [
-   "clodsire",
-   "thievul"
-  ],
-  [
-   "clodsire",
-   "thievul_iw_pr"
-  ],
-  [
-   "diggersby",
-   "thievul"
-  ],
-  [
-   "diggersby",
-   "thievul_iw_pr"
-  ],
-  [
-   "quagsire",
-   "thievul"
-  ],
-  [
-   "quagsire",
-   "thievul_iw_pr"
-  ],
-  [
-   "sableye_shadow",
-   "thievul"
-  ],
-  [
-   "altaria_shadow",
-   "thievul"
-  ],
-  [
-   "altaria_shadow",
-   "thievul_iw_pr"
-  ],
-  [
-   "aegislash_shield",
-   "thievul"
-  ],
-  [
-   "aegislash_shield",
-   "thievul_iw_pr"
-  ],
-  [
-   "fearow",
-   "thievul"
-  ],
-  [
-   "fearow",
-   "thievul_iw_pr"
-  ],
-  [
-   "ninetales",
-   "thievul"
-  ],
-  [
-   "ninetales",
-   "thievul_iw_pr"
-  ],
-  [
-   "jumpluff",
-   "thievul"
-  ],
-  [
-   "jumpluff",
-   "thievul_iw_pr"
-  ],
-  [
-   "kingdra",
-   "thievul"
-  ],
-  [
-   "kingdra",
-   "thievul_iw_pr"
-  ],
-  [
-   "mantine",
-   "thievul"
-  ],
-  [
-   "mantine",
-   "thievul_iw_pr"
-  ]
- ],
+ "deferred": [],
  "engine": "5839391a7596",
  "entries": {
   "aegislash_shield|altaria_shadow|bait": {
@@ -664,6 +575,50 @@
     9
    ]
   },
+  "aegislash_shield|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "aegislash_shield__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 19058688,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "aegislash_shield|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "aegislash_shield__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 19058688,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "aegislash_shield|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "aegislash_shield__vs__thievul__bait__t2.npz",
+   "n_sims": 19058688,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "aegislash_shield|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "aegislash_shield__vs__thievul__nobait__t2.npz",
+   "n_sims": 19058688,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "aegislash_shield|tinkaton|bait": {
    "baked": "2026-08-14",
    "clean_sample": false,
@@ -1233,6 +1188,50 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "altaria_shadow|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "altaria_shadow__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 5916735,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "altaria_shadow|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "altaria_shadow__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 5916735,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "altaria_shadow|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "altaria_shadow__vs__thievul__bait__t2.npz",
+   "n_sims": 11535894,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "altaria_shadow|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "altaria_shadow__vs__thievul__nobait__t2.npz",
+   "n_sims": 11535894,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -3172,6 +3171,50 @@
     9
    ]
   },
+  "clodsire|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "clodsire__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 7249869,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "clodsire|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "clodsire__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 7249869,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "clodsire|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "clodsire__vs__thievul__bait__t2.npz",
+   "n_sims": 13585527,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "clodsire|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "clodsire__vs__thievul__nobait__t2.npz",
+   "n_sims": 13585527,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "clodsire|tinkaton|bait": {
    "baked": "2026-08-14",
    "clean_sample": false,
@@ -5064,6 +5107,50 @@
     9
    ]
   },
+  "diggersby|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "diggersby__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 11769885,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "diggersby|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "diggersby__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 11769885,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "diggersby|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "diggersby__vs__thievul__bait__t2.npz",
+   "n_sims": 11390355,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "diggersby|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "diggersby__vs__thievul__nobait__t2.npz",
+   "n_sims": 11390355,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "diggersby|tinkaton|bait": {
    "baked": "2026-08-14",
    "clean_sample": false,
@@ -6359,6 +6446,50 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "fearow|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "fearow__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 7350813,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "fearow|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "fearow__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 7350813,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "fearow|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "fearow__vs__thievul__bait__t2.npz",
+   "n_sims": 12241566,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "fearow|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "fearow__vs__thievul__nobait__t2.npz",
+   "n_sims": 12241566,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -8911,6 +9042,28 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "furret|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "furret__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 5239269,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "furret|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "furret__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 5239269,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -11884,6 +12037,50 @@
     9
    ]
   },
+  "jumpluff|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "jumpluff__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 9567189,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "jumpluff|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "jumpluff__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 9567189,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "jumpluff|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "jumpluff__vs__thievul__bait__t2.npz",
+   "n_sims": 15046380,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "jumpluff|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "jumpluff__vs__thievul__nobait__t2.npz",
+   "n_sims": 15046380,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "jumpluff|tinkaton|bait": {
    "baked": "2026-08-10",
    "clean_sample": true,
@@ -12541,6 +12738,50 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "kingdra|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "kingdra__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 5408622,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "kingdra|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "kingdra__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 5408622,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "kingdra|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "kingdra__vs__thievul__bait__t2.npz",
+   "n_sims": 8333397,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "kingdra|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "kingdra__vs__thievul__nobait__t2.npz",
+   "n_sims": 8333397,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -13748,6 +13989,50 @@
    "clean_sample": false,
    "file": "mantine__vs__sableye_shadow__nobait__t2.npz",
    "n_sims": 9770031,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "mantine|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "mantine__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 3178989,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "mantine|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "mantine__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 3178989,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "mantine|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "mantine__vs__thievul__bait__t2.npz",
+   "n_sims": 7198272,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "mantine|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "mantine__vs__thievul__nobait__t2.npz",
+   "n_sims": 7198272,
    "won_shape": [
     4096,
     517,
@@ -15008,6 +15293,50 @@
     9
    ]
   },
+  "ninetales|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "ninetales__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 4558284,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "ninetales|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "ninetales__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 4558284,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "ninetales|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "ninetales__vs__thievul__bait__t2.npz",
+   "n_sims": 12060612,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "ninetales|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "ninetales__vs__thievul__nobait__t2.npz",
+   "n_sims": 12060612,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "ninetales|tinkaton|bait": {
    "baked": "2026-08-14",
    "clean_sample": false,
@@ -16196,6 +16525,50 @@
     9
    ]
   },
+  "quagsire|thievul_iw_pr|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "quagsire__vs__thievul_iw_pr__bait__t2.npz",
+   "n_sims": 6155991,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "quagsire|thievul_iw_pr|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "quagsire__vs__thievul_iw_pr__nobait__t2.npz",
+   "n_sims": 6155991,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "quagsire|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "quagsire__vs__thievul__bait__t2.npz",
+   "n_sims": 9769968,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "quagsire|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "quagsire__vs__thievul__nobait__t2.npz",
+   "n_sims": 9769968,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "quagsire|tinkaton|bait": {
    "baked": "2026-08-14",
    "clean_sample": false,
@@ -16809,6 +17182,28 @@
    "won_shape": [
     4096,
     518,
+    9
+   ]
+  },
+  "sableye_shadow|thievul|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "sableye_shadow__vs__thievul__bait__t2.npz",
+   "n_sims": 16146909,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "sableye_shadow|thievul|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "sableye_shadow__vs__thievul__nobait__t2.npz",
+   "n_sims": 16146909,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
@@ -17494,6 +17889,50 @@
     9
    ]
   },
+  "thievul_iw_pr|aegislash_shield|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__aegislash_shield__bait__t2.npz",
+   "n_sims": 8741223,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "thievul_iw_pr|aegislash_shield|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__aegislash_shield__nobait__t2.npz",
+   "n_sims": 8741223,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "thievul_iw_pr|altaria_shadow|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__altaria_shadow__bait__t2.npz",
+   "n_sims": 5917545,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "thievul_iw_pr|altaria_shadow|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__altaria_shadow__nobait__t2.npz",
+   "n_sims": 5917545,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "thievul_iw_pr|altaria|bait": {
    "baked": "2026-08-18",
    "clean_sample": false,
@@ -17535,6 +17974,28 @@
    "won_shape": [
     4096,
     521,
+    9
+   ]
+  },
+  "thievul_iw_pr|clodsire|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__clodsire__bait__t2.npz",
+   "n_sims": 6630831,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "thievul_iw_pr|clodsire|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__clodsire__nobait__t2.npz",
+   "n_sims": 6630831,
+   "won_shape": [
+    4096,
+    520,
     9
    ]
   },
@@ -17582,6 +18043,28 @@
     9
    ]
   },
+  "thievul_iw_pr|diggersby|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__diggersby__bait__t2.npz",
+   "n_sims": 10212417,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "thievul_iw_pr|diggersby|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__diggersby__nobait__t2.npz",
+   "n_sims": 10212417,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "thievul_iw_pr|empoleon|bait": {
    "baked": "2026-08-18",
    "clean_sample": false,
@@ -17604,6 +18087,28 @@
     9
    ]
   },
+  "thievul_iw_pr|fearow|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__fearow__bait__t2.npz",
+   "n_sims": 7235469,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "thievul_iw_pr|fearow|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__fearow__nobait__t2.npz",
+   "n_sims": 7235469,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
   "thievul_iw_pr|forretress|bait": {
    "baked": "2026-08-18",
    "clean_sample": false,
@@ -17620,6 +18125,28 @@
    "clean_sample": false,
    "file": "thievul_iw_pr__vs__forretress__nobait__t2.npz",
    "n_sims": 11905659,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "thievul_iw_pr|furret|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__furret__bait__t2.npz",
+   "n_sims": 5774562,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "thievul_iw_pr|furret|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__furret__nobait__t2.npz",
+   "n_sims": 5774562,
    "won_shape": [
     4096,
     518,
@@ -17692,6 +18219,50 @@
     9
    ]
   },
+  "thievul_iw_pr|jumpluff|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__jumpluff__bait__t2.npz",
+   "n_sims": 9451521,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "thievul_iw_pr|jumpluff|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__jumpluff__nobait__t2.npz",
+   "n_sims": 9451521,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "thievul_iw_pr|kingdra|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__kingdra__bait__t2.npz",
+   "n_sims": 6892101,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "thievul_iw_pr|kingdra|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__kingdra__nobait__t2.npz",
+   "n_sims": 6892101,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
   "thievul_iw_pr|lickilicky|bait": {
    "baked": "2026-08-18",
    "clean_sample": false,
@@ -17711,6 +18282,28 @@
    "won_shape": [
     4096,
     517,
+    9
+   ]
+  },
+  "thievul_iw_pr|mantine|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__mantine__bait__t2.npz",
+   "n_sims": 4668561,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "thievul_iw_pr|mantine|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__mantine__nobait__t2.npz",
+   "n_sims": 4668561,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -17736,6 +18329,28 @@
     9
    ]
   },
+  "thievul_iw_pr|ninetales|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__ninetales__bait__t2.npz",
+   "n_sims": 6094296,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "thievul_iw_pr|ninetales|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__ninetales__nobait__t2.npz",
+   "n_sims": 6094296,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "thievul_iw_pr|quagsire_shadow|bait": {
    "baked": "2026-08-18",
    "clean_sample": false,
@@ -17752,6 +18367,28 @@
    "clean_sample": false,
    "file": "thievul_iw_pr__vs__quagsire_shadow__nobait__t2.npz",
    "n_sims": 6788484,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "thievul_iw_pr|quagsire|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__quagsire__bait__t2.npz",
+   "n_sims": 5885478,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "thievul_iw_pr|quagsire|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul_iw_pr__vs__quagsire__nobait__t2.npz",
+   "n_sims": 5885478,
    "won_shape": [
     4096,
     519,
@@ -17846,6 +18483,50 @@
     9
    ]
   },
+  "thievul|aegislash_shield|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__aegislash_shield__bait__t2.npz",
+   "n_sims": 13584681,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "thievul|aegislash_shield|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__aegislash_shield__nobait__t2.npz",
+   "n_sims": 13584681,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "thievul|altaria_shadow|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__altaria_shadow__bait__t2.npz",
+   "n_sims": 11123577,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "thievul|altaria_shadow|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__altaria_shadow__nobait__t2.npz",
+   "n_sims": 11123577,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "thievul|altaria|bait": {
    "baked": "2026-08-18",
    "clean_sample": false,
@@ -17890,6 +18571,28 @@
     9
    ]
   },
+  "thievul|clodsire|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__clodsire__bait__t2.npz",
+   "n_sims": 12229137,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
+  "thievul|clodsire|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__clodsire__nobait__t2.npz",
+   "n_sims": 12229137,
+   "won_shape": [
+    4096,
+    520,
+    9
+   ]
+  },
   "thievul|corviknight|bait": {
    "baked": "2026-08-18",
    "clean_sample": false,
@@ -17912,6 +18615,28 @@
     9
    ]
   },
+  "thievul|diggersby|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__diggersby__bait__t2.npz",
+   "n_sims": 9756999,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "thievul|diggersby|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__diggersby__nobait__t2.npz",
+   "n_sims": 9756999,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
   "thievul|empoleon|bait": {
    "baked": "2026-08-18",
    "clean_sample": false,
@@ -17931,6 +18656,28 @@
    "won_shape": [
     4096,
     514,
+    9
+   ]
+  },
+  "thievul|fearow|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__fearow__bait__t2.npz",
+   "n_sims": 11808252,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "thievul|fearow|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__fearow__nobait__t2.npz",
+   "n_sims": 11808252,
+   "won_shape": [
+    4096,
+    516,
     9
    ]
   },
@@ -18044,6 +18791,50 @@
     9
    ]
   },
+  "thievul|jumpluff|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__jumpluff__bait__t2.npz",
+   "n_sims": 13725009,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "thievul|jumpluff|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__jumpluff__nobait__t2.npz",
+   "n_sims": 13725009,
+   "won_shape": [
+    4096,
+    521,
+    9
+   ]
+  },
+  "thievul|kingdra|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__kingdra__bait__t2.npz",
+   "n_sims": 9418302,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
+  "thievul|kingdra|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__kingdra__nobait__t2.npz",
+   "n_sims": 9418302,
+   "won_shape": [
+    4096,
+    516,
+    9
+   ]
+  },
   "thievul|lickilicky|bait": {
    "baked": "2026-08-18",
    "clean_sample": false,
@@ -18063,6 +18854,28 @@
    "won_shape": [
     4096,
     517,
+    9
+   ]
+  },
+  "thievul|mantine|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__mantine__bait__t2.npz",
+   "n_sims": 8362872,
+   "won_shape": [
+    4096,
+    518,
+    9
+   ]
+  },
+  "thievul|mantine|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__mantine__nobait__t2.npz",
+   "n_sims": 8362872,
+   "won_shape": [
+    4096,
+    518,
     9
    ]
   },
@@ -18088,6 +18901,28 @@
     9
    ]
   },
+  "thievul|ninetales|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__ninetales__bait__t2.npz",
+   "n_sims": 12595185,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "thievul|ninetales|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__ninetales__nobait__t2.npz",
+   "n_sims": 12595185,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
   "thievul|quagsire_shadow|bait": {
    "baked": "2026-08-18",
    "clean_sample": false,
@@ -18107,6 +18942,50 @@
    "won_shape": [
     4096,
     519,
+    9
+   ]
+  },
+  "thievul|quagsire|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__quagsire__bait__t2.npz",
+   "n_sims": 9006390,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "thievul|quagsire|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__quagsire__nobait__t2.npz",
+   "n_sims": 9006390,
+   "won_shape": [
+    4096,
+    519,
+    9
+   ]
+  },
+  "thievul|sableye_shadow|bait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__sableye_shadow__bait__t2.npz",
+   "n_sims": 13849974,
+   "won_shape": [
+    4096,
+    517,
+    9
+   ]
+  },
+  "thievul|sableye_shadow|nobait": {
+   "baked": "2026-08-18",
+   "clean_sample": false,
+   "file": "thievul__vs__sableye_shadow__nobait__t2.npz",
+   "n_sims": 13849974,
+   "won_shape": [
+    4096,
+    517,
     9
    ]
   },
