@@ -34,6 +34,21 @@ beats PvPoke's NS+IW default by ~14 wins; PvPoke overall GL rank
 (`docs/hsh_message_notes.md`); (c) post-CD cleanup: delete the
 `[cd_prep]` table once the un-pinned gamemaster stably lists Icy Wind.
 
+## NEXT SESSION (queued 2026-08-19): Worlds robustness deep dives
+
+Michael's stated next session: robustness analysis of IV-dependent,
+interesting, common WORLDS matchups. Entry points, in order:
+(1) shortlist = rank the 455 amber pairs by combined usage (all data
+exists: worlds/meta.toml usage + tier2 manifest amber set; ~10-min
+script, no bakes); (2) implement reuse-plan Session S1 FIRST if
+Thievul-grade deep-dive pages are wanted for the picks
+(docs/joint_iv_reuse_plan.md: generic kit, focal-side generalization,
+byte-identical Thievul-page rebuild as acceptance); (3) standing
+constraints: re-pin the gamemaster from pvpoke f60a41199 before ANY
+Worlds render (TTL drifts daily), publish only with Michael's explicit
+per-instance go, long bakes detached + run-to-completion (memory:
+feedback-long-compute-supervision).
+
 ## Ship-gate gap (found by the 2026-08-17 thievul pre-publish review)
 
 `verify_no_unicode_dashes.py --ship` scans page HTML but is blind to
