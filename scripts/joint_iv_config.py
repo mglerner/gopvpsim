@@ -193,3 +193,13 @@ def preflight_moveset_legality(cfg):
                          f'{sorted(opp_illegal)} not in the pinned '
                          'gamemaster pool (opponent-side injection is not '
                          'supported)')
+
+
+def default_publish_slug(cfg):
+    """The website filename a pair's page publishes under (the [page]
+    publish_slug override wins; shadow carries into the name)."""
+    page = cfg.raw.get('page', {})
+    return page.get('publish_slug') or (
+        f'{cfg.focal.lower()}{"-shadow" if cfg.focal_shadow else ""}'
+        f'-{cfg.opponent.lower()}'
+        f'{"-shadow" if cfg.opp_shadow else ""}-robustness.html')

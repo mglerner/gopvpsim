@@ -20,9 +20,8 @@ analysis SHIPPED** -- full 4096x4096 joint IV grids vs Lickilicky
 `thievul-lickilicky-robustness.html` + `thievul-lickitung-robustness.html`
 with an index card. Pipeline + contract: `docs/thievul_licki_analysis.md`
 (pipeline: the generic `joint_iv_*` kit since 2026-08-19 -- `pairs/thievul_*.toml`; data in gitignored `userdata/thievul_lick*`).
-Post-publish residue: (a) tests/fixtures/poke_genie_export.csv is
-locally modified with Michael's real CD-day export -- decide keep vs
-revert (it is NOT committed and NOT embedded in the pages); (b) the
+Post-publish residue: (a) RESOLVED 2026-08-19: Michael okayed
+committing the CD-day poke_genie fixture (commit 1b5ce69); (b) the
 pinned gamemaster cache TTL-refreshed to `e6050f77bf06` during the
 session (disclosed on-page; re-pin from pvpoke `f60a41199` before any
 Worlds re-render, per the Worlds NOTE above).

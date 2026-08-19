@@ -67,6 +67,14 @@ def main():
             # not a failure. The reason is in the pipeline log.
             print(f'== {step} SKIPPED: no matching moveset cube in the '
                   f'replay blob (see {log_path})', flush=True)
+            # Durable marker: this absence is a verified property of the
+            # dive replay, not a still-baking input -- the page builder
+            # treats it as a DISCLOSED state instead of refusing to
+            # publish a "placeholder".
+            (cfg.data_dir / 'meta_wins.ABSENT').write_text(
+                'joint_iv_meta exit 3: the replay blob contains no cube '
+                'for this pair\'s moveset (see pipeline.log). The page '
+                'renders the meta panels as honest absences.\n')
             return False
         if r.returncode != 0:
             print(f'ABORT: {step} failed (exit {r.returncode}); see '

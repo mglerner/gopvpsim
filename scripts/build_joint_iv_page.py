@@ -139,10 +139,8 @@ def _configure(cfg, data_dir_override=None):
             'injected_note -- the page must disclose the injection with a '
             'STATIC, date-anchored sentence (see the thievul configs).')
     MAIN_DIVE_URL = page.get('main_dive_url')
-    PUBLISH_SLUG_NAME = page.get('publish_slug') or (
-        f'{cfg.focal.lower()}{"-shadow" if cfg.focal_shadow else ""}'
-        f'-{cfg.opponent.lower()}'
-        f'{"-shadow" if cfg.opp_shadow else ""}-robustness.html')
+    from joint_iv_config import default_publish_slug
+    PUBLISH_SLUG_NAME = default_publish_slug(cfg)
     CROSSLINK_HTML = page.get('crosslink_html', '')
     OCCASION = page.get('occasion')
     MOTIVATION = page.get('motivating_question')
@@ -963,9 +961,18 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
                          'build a placeholder page anyway)')
 
     meta_wins = load_meta_wins(data_dir, focal_tbl, spec['labels'])
-    if meta_wins is None:
-        missing.append('meta_wins.npz (per-IV meta wins vs the dive pool) '
-                       '-- the Pareto panel needs it')
+    meta_absent_marker = data_dir / 'meta_wins.ABSENT'
+    if meta_wins is None and meta_absent_marker.exists():
+        # A VERIFIED permanent absence (the focal's dive replay has no
+        # cube for this pair's moveset; joint_iv_run wrote the marker),
+        # not a still-baking input: disclosed as a note, and it does not
+        # block publishing the way a placeholder would.
+        notes_meta_absent = True
+    else:
+        notes_meta_absent = False
+        if meta_wins is None:
+            missing.append('meta_wins.npz (per-IV meta wins vs the dive '
+                           'pool) -- the Pareto panel needs it')
     breakpoints = load_json(breakpoints_path)
     if breakpoints is None:
         missing.append('breakpoints.json (closed-form damage/bulk layer) -- '
@@ -998,6 +1005,13 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             'full-meta ladder simulation. Which shield scenario it reports '
             'FOLLOWS the controls; the meta-wins rail below states the '
             'binding actually in effect.')
+    if notes_meta_absent:
+        notes.append(
+            'NO dive-derived meta data exists for this pair: the '
+            f"{spec['focal_display']} dive replay contains no cube for "
+            'this moveset, so every pick on this page is MATCHUP-ONLY '
+            '(nothing here weighs performance against the rest of the '
+            'meta). Verified at build time, not a missing input.')
     notes.append(f"Every {spec['opponent']} here is {spec['opp_moveset']}.")
     if gm_now and gm_baked and gm_now != gm_baked:
         notes.append(

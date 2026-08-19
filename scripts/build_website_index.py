@@ -712,7 +712,10 @@ def render_index(dives: list[dict],
             '  <li class="dive"><a href="'
             + iv_robustness['href'] + '">'
             + iv_robustness['title'] + '</a></li>\n'
-            '</ul>\n')
+            + ''.join('  <li class="dive"><a href="' + o['href'] + '">'
+                      + o['title'] + '</a></li>\n'
+                      for o in iv_robustness.get('others', []))
+            + '</ul>\n')
 
     cups_section = ''
     if cups:
@@ -1060,6 +1063,21 @@ def main() -> int:
             'title': ('Thievul vs Lickilicky: how much do IVs matter? '
                       '(4096 x 4096 matchups, Community Day)'),
         }
+        # Every OTHER published joint-IV page is listed too (the kit
+        # generalized 2026-08-19); links only against files on disk.
+        try:
+            import sys as _sys
+            _sys.path.insert(0, str(REPO_ROOT / 'scripts'))
+            from build_worlds_pages import joint_iv_link_map
+            _others = sorted(
+                (slug, label)
+                for slug, label in joint_iv_link_map(WEBSITE_DIR).values()
+                if slug != _iv_rob_page.name)
+            iv_rob['others'] = [
+                {'href': s, 'title': f'{t}: the same full joint-IV '
+                                     'treatment'} for s, t in _others]
+        except Exception:
+            iv_rob['others'] = []
 
     index_html = render_index(dives, articles, comparisons,
                               matchup_web=matchup_web,
