@@ -1005,6 +1005,15 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             'full-meta ladder simulation. Which shield scenario it reports '
             'FOLLOWS the controls; the meta-wins rail below states the '
             'binding actually in effect.')
+    if spec['focal'] == spec['opponent'] and FOCAL_SHADOW == OPP_SHADOW:
+        notes.insert(0, (
+            'MIRROR MATCH. Two conventions to read the grids by: (1) the '
+            'DIAGONAL (the same spread on both sides) is decided by the '
+            'engine\'s documented exact-CMP-tie rule -- player 1\'s '
+            'charged move resolves first -- so treat diagonal cells as a '
+            'coin flip in reality, not a win; (2) cell (i, j) and cell '
+            '(j, i) are the same fight read from the two seats, so the '
+            'grid is one triangle mirrored, up to that same tie rule.'))
     if notes_meta_absent:
         notes.append(
             'NO dive-derived meta data exists for this pair: the '
