@@ -3923,6 +3923,17 @@
   // scripts/joint_iv_denial.py recomputes from the same baked grids
   // and cross-checks against the research run. Nothing is authored.
   function denialPct(v, n) { return fmt(100 * v / n, 1) + '%'; }
+  // The breakpoint-clearing population key carries its own count
+  // (bp2992 for Thievul, bp435 for Wigglytuff, ...). Module scope: it
+  // is read by the verdict, the wall table, the ranked table AND
+  // renderYourDenial -- a function-local var crashed the last of those
+  // the first time a reader added opponent-side spreads (2026-08-20).
+  function denBpKey() {
+    var pops = dig(D, 'licki_denial.meta.populations') || {};
+    return Object.keys(pops).filter(function (k) {
+      return k !== 'all4096' && k !== 'top512';
+    })[0] || 'bp2992';
+  }
   function renderDenial() {
     var host = $('tl-denial');
     if (!host) return;
@@ -3961,12 +3972,7 @@
       }).join('; ') + ').</p>');
 
     // (a) verdict box -- three computed read-outs
-    // The breakpoint-clearing population key carries its own count
-    // (bp2992 for Thievul, bp435 for Wigglytuff, ...) -- derive it
-    // from the populations map instead of a frozen spelling.
-    var BP_KEY = Object.keys(pops).filter(function (k) {
-      return k !== 'all4096' && k !== 'top512';
-    })[0] || 'bp2992';
+    var BP_KEY = denBpKey();
     var bpPop = pops[BP_KEY];
     var wallCell = (DEN.wall_table || {}).cell || '';
     var wallRows = (DEN.wall_table || {}).rows || [];
@@ -4142,7 +4148,7 @@
             + '</td><td>' + w.level + '</td><td>' + w.cp + '</td><td>'
             + w.def + '</td><td>' + commas(w.denies.all4096) + '</td><td>'
             + commas(w.denies.top512) + '</td><td>'
-            + commas(w.denies[BP_KEY]) + '</td></tr>';
+            + commas(w.denies[denBpKey()]) + '</td></tr>';
         }).join('') + '</table></div>');
     }
 
@@ -4193,7 +4199,7 @@
                 return (x > 0 && x < 1) ? '&lt;1' : fmt(x, 0);
               };
               return '<td>' + f1(v.all4096) + ' / ' + f1(v.top512)
-                + ' / ' + f1(v[BP_KEY]) + '</td>';
+                + ' / ' + f1(v[denBpKey()]) + '</td>';
             }).join('')
             + (withNote ? '<td>' + esc(b.note || '') + '</td>' : '')
             + '</tr>';
@@ -4273,7 +4279,7 @@
         + cells.map(function (c) {
           var v = b ? ((b.per_cell || {})[c] || {}) : null;
           return '<td>' + (v ? fmt(v.all4096, 0) + ' / ' + fmt(v.top512, 0)
-            + ' / ' + fmt(v[BP_KEY], 0) : '-') + '</td>';
+            + ' / ' + fmt(v[denBpKey()], 0) : '-') + '</td>';
         }).join('')
         + '<td>' + (b ? esc(b.note || '') + (b.composite_rank
           ? ' (composite rank ' + b.composite_rank + ')' : '')

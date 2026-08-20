@@ -1397,9 +1397,26 @@ def main():
             # engine prefers the other charged move every time, fall back to a
             # single-charged-move build so the damage still gets pinned
             # against a real timeline (and record that it took a forced build).
+            # MIRROR seat ambiguity: the timeline line '<species> uses
+            # <move>' cannot tell the two seats apart, so on a mirror the
+            # FOCAL's probe kit must exclude the probed move (else its own
+            # throws pollute the observed set -- Corviknight, 2026-08-20).
+            focal_kit = list(rt_charged)
+            if FOCAL == OPPONENT and F_SHADOW == O_SHADOW:
+                focal_kit = [c for c in rt_charged if c != mid]
+            if not focal_kit:
+                checks.append(dict(
+                    used={f'{FK}_ivs': list(t_ivs),
+                          'opponent_ivs': list(l_ivs)},
+                    move=mid, skipped=(
+                        'mirror pair and the probed move is the focal\'s '
+                        'only charged move: the timeline cannot attribute '
+                        'throws to a seat, so this check is not runnable '
+                        '-- recorded, not silent')))
+                continue
             for cand in ([L_CH1, L_CH2], [mid]):
                 tp = make_battle_pokemon(FOCAL, rt_fast,
-                                         rt_charged, LEAGUE,
+                                         focal_kit, LEAGUE,
                                          shields, *t_ivs, shadow=F_SHADOW)
                 lp = make_battle_pokemon(OPPONENT, L_FAST, cand,
                                          LEAGUE, shields, *l_ivs,
@@ -1422,10 +1439,24 @@ def main():
                     'thrown_with_default_moveset': thrown_by_default}
             assert hits, ('%s never landed in any probe matchup; the check '
                           'would pass vacuously' % mid)
+            # The OPPONENT's own atk-raising moves (Air Cutter's chance
+            # buff fires deterministically via the sim's buffApplyMeter)
+            # push observed damage ABOVE the stage-0 value -- the
+            # closed-form set must span the reachable positive stages
+            # too, not only the focal-debuff negatives (Corviknight
+            # mirror, 2026-08-20).
+            _opp_kit_moves = [move(L_FAST, 'fast')] + [
+                move(c, 'charged') for c in (probe_set or [mid])]
+            _opp_self_buffs = any(
+                (mv2.get('buffTarget') == 'self' and mv2.get('buffs')
+                 and mv2['buffs'][0] > 0) for mv2 in _opp_kit_moves)
+            _stages_r = sorted(set(STAGES)
+                               | (set(range(0, 5)) if _opp_self_buffs
+                                  else {0}))
             pred = {st: damage(mv['power'],
                                l_rows[li]['atk'] * _stat_stage_mult(st),
                                t_rows[ti]['def_'], mv['type'], l_types, t_types)
-                    for st in STAGES}
+                    for st in _stages_r}
             # The neutral baseline: what the same-power move would do with
             # effectiveness 1.0. The shipped (thievul) computation modeled
             # it as a literal normal-TYPE move, which only works when the
@@ -1439,14 +1470,14 @@ def main():
                 neutral = {st: damage(mv['power'],
                                       l_rows[li]['atk'] * _stat_stage_mult(st),
                                       t_rows[ti]['def_'], 'normal', l_types,
-                                      t_types) for st in STAGES}
+                                      t_types) for st in _stages_r}
             else:
                 _stab_m = (STAB_MULTIPLIER if mv['type'] in l_types else 1.0)
                 neutral = {st: math.floor(
                     0.5 * BONUS * mv['power']
                     * (l_rows[li]['atk'] * _stat_stage_mult(st))
                     / t_rows[ti]['def_'] * 1.0 * _stab_m) + 1
-                    for st in STAGES}
+                    for st in _stages_r}
                 baseline_note = (
                     'the focal resists normal, so the baseline is the '
                     'eff=1.0 closed form with the move\'s own stab, not a '
@@ -1478,7 +1509,8 @@ def main():
             'are still real engine output, but in the default matchup the '
             'move simply never fires.' % STAGES[-1])
         assert all(c['all_observed_in_closed_form_set']
-                   and c['resistance_is_visible'] for c in checks)
+                   and c['resistance_is_visible']
+                   for c in checks if 'skipped' not in c)
 
     # ---------------------------------------------------------------- emit
     out = {

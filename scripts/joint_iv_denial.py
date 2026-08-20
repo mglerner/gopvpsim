@@ -429,6 +429,13 @@ def main(argv=None):
     n_by_closed_form = int((rank1_def > wall_factor * t_atk).sum())
     best_step = float(o_def.max())
     n_at_best_step = int((best_step > wall_factor * t_atk).sum())
+    # On a MIRROR the headline move and the opponent's pressure move can
+    # be the SAME move (Wigglytuff: Charm both roles, 2026-08-20) -- one
+    # dict key would silently overwrite the wall block with the ladder
+    # block. The page JS locates blocks structurally (wall_condition vs
+    # top_tier_condition), so a role suffix is safe.
+    roll_out_key = (roll_key if roll_key != sp_key
+                    else f'{roll_key}_incoming')
     closed = {
         sp_key: {
             'K': r(k_sp), 'hi_tier': int(hi_tier), 'base_tier': int(base_tier),
@@ -453,7 +460,7 @@ def main(argv=None):
             'max_def_walls_n_focal': n_at_best_step,
             'max_def_walls_frac': r(n_at_best_step / N, 4),
         },
-        roll_key: {
+        roll_out_key: {
             'K': r(k_roll), 'tiers': [roll_lo, roll_hi],
             'identity': (f'{OPPONENT} {roll_name} damage = floor(K * '
                          f'{OPPONENT.lower()}_atk / {FOCAL.lower()}_def) + 1'),
