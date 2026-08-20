@@ -1064,17 +1064,25 @@
         colorscale: heatScale(), zmin: 0, zmax: 1, zsmooth: false,
         xgap: 0, ygap: 0,
         colorbar: {
-          title: { text: FOCAL + ' win %', side: 'right' },
+          // On a MIRROR both names collapse; seat labels keep the two
+          // ends and the two axes distinguishable (2026-08-20 review M4).
+          title: { text: (FOCAL === OPP ? 'row-seat win %'
+                          : FOCAL + ' win %'), side: 'right' },
           thickness: 12, tickmode: 'array',
           tickvals: [0, 0.25, 0.5, 0.75, 1],
-          ticktext: ['0 (' + OPP + ' wins)', '25', '50', '75',
-                     '100 (' + FOCAL + ' wins)']
+          ticktext: (FOCAL === OPP
+            ? ['0 (column seat wins)', '25', '50', '75',
+               '100 (row seat wins)']
+            : ['0 (' + OPP + ' wins)', '25', '50', '75',
+               '100 (' + FOCAL + ' wins)'])
         }
       }];
       var layout = baseLayout(
         gridPretty(state.label) + ' - ' + scenarioText(),
-        OPP + ' stat-product rank (1 = best)',
-        FOCAL + ' stat-product rank (1 = best)');
+        OPP + ' stat-product rank (1 = best)'
+          + (FOCAL === OPP ? ' - opponent seat (columns)' : ''),
+        FOCAL + ' stat-product rank (1 = best)'
+          + (FOCAL === OPP ? ' - your seat (rows)' : ''));
       layout.xaxis.range = [r.j0 + 0.5, r.j1 + 1.5];
       layout.yaxis.range = [r.i1 + 1.5, r.i0 + 0.5];   // rank 1 at the top
       layout.hovermode = 'closest';
@@ -4045,7 +4053,23 @@
     dupPairs.forEach(function (g) {
       if (g.length > 1) noopGrids.push(msAbbrev(g[0]));
     });
-    if (bGrid && nGrid && !!baited !== !!unbaited) {
+    // Are the bait/no-bait grids of the primary arm byte-identical?
+    // Then denial.json only carries ONE of them, byCell has a single
+    // entry, and the !=-presence fallback below would fabricate a
+    // 'lever' sentence that contradicts the IDENTICAL GRIDS banner
+    // (fired on the Lickilicky mirror, 2026-08-20 review M2). The
+    // truthful bullet is 'baiting changes nothing'.
+    var baitPairIsDup = dupPairs.some(function (g) {
+      return g.indexOf(bGrid) >= 0 && g.indexOf(nGrid) >= 0;
+    });
+    if (bGrid && nGrid && baitPairIsDup) {
+      vparts.push('<li><strong>Whether ' + esc(FOCAL) + ' baits changes '
+        + 'nothing on ' + esc(msAbbrev(bGrid)) + ':</strong> the bait '
+        + 'and no-bait grids are byte-identical, so the bait lever does '
+        + 'not exist in this matchup (see the IDENTICAL GRIDS note '
+        + 'below).</li>');
+    }
+    if (bGrid && nGrid && !baitPairIsDup && !!baited !== !!unbaited) {
       // One side of the bait pair has no sensitive cell at this scenario
       // (it is saturated or hopeless there) -- that IS the lever, and
       // silence hid it on the bait-dependent Corviknight page
@@ -4081,6 +4105,13 @@
             + 'nothing at all: those bait and no-bait grids are '
             + 'byte-identical, so the lever does not exist there.'
           : '') + '</li>');
+    }
+    if (FOCAL === OPP) {
+      vparts.push('<li><strong>Mirror note:</strong> on a mirror, denial '
+        + 'is the coverage measurement read from the opposite seat (plus '
+        + 'ties), so this section and the coverage panels must -- and do '
+        + '-- agree; they are one measurement, not two independent '
+        + 'analyses.</li>');
     }
     P.push('<div class="tl-verdict-denial"><h4>Verdict</h4><ul>'
       + vparts.join('') + '</ul></div>');
@@ -4855,6 +4886,20 @@
         }
       });
     });
+    if (C.focalSpecies === C.oppSpecies) {
+      // MIRROR: the side router above can only ever hit the focal slot
+      // (sp === C.focalSpecies wins first -- 2026-08-20 review M3), so
+      // the denial panel's 'or paste a CSV' promise was inert. A scanned
+      // mon on a mirror is both 'your build' and 'opponent tech':
+      // propagate CSV-added focal entries to the opponent slot too.
+      // addUser dedups, and the counters deliberately keep counting each
+      // physical mon once.
+      state.user.filter(function (u) { return u.side === 'thievul'; })
+        .forEach(function (u) {
+          addUser('licki', u.idx, u.label,
+                  {cp: (typeof u.cp === 'number') ? u.cp : null});
+        });
+    }
     // Rows of an analyzed species that the matcher produced nothing for.
     // The usual cause is mechanical and checkable: at the scanned level the
     // FINAL form is already over the league CP cap, and power-ups are
