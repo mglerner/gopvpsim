@@ -46,6 +46,21 @@ bake cross-checked exact vs the Worlds Tier-2 grids. Pages land in
 `userdata/dives/<focal>_vs_<opp>_iv_robustness.html` -- LOCAL ONLY,
 nothing published.
 
+**OVERNIGHT OUTCOME (2026-08-20, pushed by ~03:35):** three site
+pushes shipped -- (1) evening: 11 deep pages + links + 16 grid-amber
+squares; (2) ~00:55: the 73-clean-pair audit landed (1.36B sims), FINAL
+amber = 505/528 pairs (23 truly settled), 50 squares recolored from
+grids with auto-generated detail pages; (3) ~03:35: three MIRROR pages
+(lickilicky/wigglytuff/corviknight -- mirrors were an accidental
+combinations() exclusion; all three are heavily IV-decided, e.g. the
+Licki mirror's best build is rank-3182 15/3/3) + a fix for a latent
+renderYourDenial crash. Mirror review round fixed 1 blocker + 3 majors
+(the corrected MIRROR MATCH note is seat-verified at build time).
+OPEN mirror minors (review m6-m10, deferred): tl-hardest anchor row
+mirror caveat, static '; selected' grid label, dropdown species-name
+disambiguation wording, [meta.oracle] tables for first-publish pairs,
+degenerate rollout-ladder rows.
+
 **DECISIONS FOR MICHAEL (2026-08-19 EOD):**
 
 - **FN audit of the hub's green/red cells.** The probe-expansion screen
