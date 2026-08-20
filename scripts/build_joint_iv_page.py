@@ -913,6 +913,25 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             continue
         won, z = loaded
         check_axis_order(z, focal_tbl, opp_tbl, label)
+        if spec['focal'] == spec['opponent'] and FOCAL_SHADOW == OPP_SHADOW:
+            # The MIRROR MATCH note claims seat-consistency; verify it
+            # here rather than asserting from theory. The seat swap of
+            # cell (i, j, sf-so) is (j, i, so-sf) -- the SHIELD COUNTS
+            # swap with the seats (the first draft of this check kept
+            # the scenario fixed and 'found' 49.6M violations that were
+            # just the asymmetric-shield scenarios read wrong,
+            # 2026-08-20). A fight recorded as a win from both seats is
+            # a bookkeeping bug.
+            for si in range(9):
+                sf, so = divmod(si, 3)
+                sj = so * 3 + sf
+                both = won[:, :, si] & won[:, :, sj].T
+                if both.any():
+                    raise SystemExit(
+                        f'ABORT: {label} scenario {sf}-{so}: '
+                        f'{int(both.sum())} mirror cell(s) won from BOTH '
+                        'seats -- seat bookkeeping bug; the MIRROR MATCH '
+                        'note would be false.')
         # Two grids can come out BYTE-IDENTICAL for a real reason (e.g. when
         # the cheaper charged move is also the higher-DPE one, baiting and
         # not baiting pick the same move every time). That is fine, but the
@@ -1006,14 +1025,26 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             'FOLLOWS the controls; the meta-wins rail below states the '
             'binding actually in effect.')
     if spec['focal'] == spec['opponent'] and FOCAL_SHADOW == OPP_SHADOW:
+        # Wording corrected by the 2026-08-20 mirror review (the first
+        # draft claimed the diagonal was CMP-decided and named the wrong
+        # player index): identical builds at EVEN shields fight to an
+        # exact 500 tie, which the page's standing convention counts as
+        # a loss for BOTH seats; with a shield advantage the diagonal is
+        # a real asymmetric fight. Seat-consistency is VERIFIED at build
+        # time below, not asserted from theory.
         notes.insert(0, (
-            'MIRROR MATCH. Two conventions to read the grids by: (1) the '
-            'DIAGONAL (the same spread on both sides) is decided by the '
-            'engine\'s documented exact-CMP-tie rule -- player 1\'s '
-            'charged move resolves first -- so treat diagonal cells as a '
-            'coin flip in reality, not a win; (2) cell (i, j) and cell '
-            '(j, i) are the same fight read from the two seats, so the '
-            'grid is one triangle mirrored, up to that same tie rule.'))
+            'MIRROR MATCH. Reading rules: (1) identical builds -- the '
+            'diagonal, and any two spreads with byte-identical stats -- '
+            'fight to an exact 500 tie at even shields, which this page '
+            'counts as a LOSS for both seats (the standing tie '
+            'convention); with a shield advantage the diagonal is a '
+            'real, asymmetric fight, not a coin flip. (2) Cell (i, j) '
+            'and cell (j, i) are one fight read from the two seats; '
+            'this build verified no cell is a win from both seats. '
+            '(3) Exact charge-priority ties (equal attack values) '
+            'resolve charged-move ORDER by seat -- player 0 first, the '
+            'engine\'s documented PROP-1 rule; on this data that '
+            'ordering produced only ties, never a seat-dependent win.'))
     if notes_meta_absent:
         notes.append(
             'NO dive-derived meta data exists for this pair: the '
