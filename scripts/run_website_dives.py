@@ -130,6 +130,27 @@ DIVES = [
         'opponents_file': 'opponent_pools/ul_top60.txt',
         'no_thresholds': True,
     },
+    # Cramorant GL + UL -- added 2026-08-24 with the Gulp Missile engine
+    # port (pvpoke 78c64048a; see DEVELOPER_NOTES form-change gotcha 5).
+    # PvPoke default moveset Peck / Dive + Fly (GL rank 13, UL rank 27);
+    # form change -> per-IV sims (no dedup), so these run Aegislash-slow.
+    # No hand-authored thresholds yet.
+    {
+        'species': 'Cramorant',
+        'league': 'great',
+        'slug': 'cramorant-great-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
+        'no_thresholds': True,
+    },
+    {
+        'species': 'Cramorant',
+        'league': 'ultra',
+        'slug': 'cramorant-ultra-league',
+        'html_base': 'index.html',
+        'opponents_file': 'opponent_pools/ul_top60.txt',
+        'no_thresholds': True,
+    },
     # Aegislash (Blade) isn't in PvPoke rankings; pass --fast / --charged
     # explicitly via extra_args and --no-thresholds so the auto-loader
     # doesn't search for aegislash_blade.toml in the ranking-keyed paths.
