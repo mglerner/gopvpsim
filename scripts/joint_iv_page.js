@@ -42,8 +42,21 @@
   // species. No fallback name: a missing identity is shown as missing
   // (the HARD RULE above), because a confidently wrong species name is a
   // made-up number's twin.
-  var FOCAL = META.focal || '[focal species missing from meta]';
-  var OPP = META.opponent || '[opponent species missing from meta]';
+  // Review minor 4 (2026-08-26): FOCAL/OPP are the reader-facing arm
+  // LABELS (display names), so a same-species page ("Thievul (NS+IW)
+  // vs Thievul (IW+PR)") names its arms everywhere instead of saying
+  // bare "Thievul" for both. The label pipeline (key->name renames,
+  // cleanSubject/countedUnit strips) builds and parses from the same
+  // two vars, so it stays internally consistent; the one regex built
+  // from them escapes its input (labels can contain "(NS+IW)"). On a
+  // true mirror the labels are equal, so FOCAL === OPP seat-wording
+  // branches still fire; on the cross-arm the distinct labels
+  // disambiguate natively. Non-shadow, non-mirror pages are unchanged
+  // (display label == species name). Data keys never come from these.
+  var FOCAL = META.focal_display || META.focal
+    || '[focal species missing from meta]';
+  var OPP = META.opp_display || META.opponent
+    || '[opponent species missing from meta]';
 
   // ---- tiny DOM helpers ----
   function $(id) { return document.getElementById(id); }
@@ -3343,6 +3356,11 @@
     }
     return '';
   }
+  // Display labels can contain regex metacharacters ("Thievul (NS+IW)"),
+  // so anything built into a RegExp from them must be escaped.
+  function reEsc(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
   // A one-bucket histogram is a SENTENCE, not a table.
   function cleanSubject(label) {
     return String(label).replace(/\s*histogram\s*/ig, ' ')
@@ -3352,7 +3370,7 @@
       // stage" form or the key-derived "by <opponent> atk stage" form --
       // doubled it.
       .replace(/\s*\bby stage\b\s*/ig, ' ')
-      .replace(new RegExp('\\s*by (?:' + OPP + '|' + FOCAL
+      .replace(new RegExp('\\s*by (?:' + reEsc(OPP) + '|' + reEsc(FOCAL)
         + ') atk stage\\s*', 'ig'), ' ')
       .replace(/\s+/g, ' ').trim();
   }
