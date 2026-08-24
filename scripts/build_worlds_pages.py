@@ -715,8 +715,12 @@ def render_meta_table(entries, slug_map):
                      if dive else '')
         name = (f'<a href="{sheet_filename(e["species_id"])}">'
                 f'{esc(e["name"])}</a>')
+        # Badge chips moved OFF the table rows (Michael 2026-08-24:
+        # they lengthen the list without adding much here); the full
+        # badge/inclusion rationale renders at the foot of the page
+        # (render_inclusion_table).
         rows.append(
-            f'<tr><td>{name}{badge_html(e)}{dive_html}</td>'
+            f'<tr><td>{name}{dive_html}</td>'
             f'<td class="num">{e["usage_recent_pct"]:.1f}%</td>'
             f'<td class="num">{e["current_rank"]}</td>'
             f'<td>{moves}{mv_note}{injection_chip(e)}</td></tr>')
@@ -724,6 +728,43 @@ def render_meta_table(entries, slug_map):
             '<tr><th>Entry (cheat sheet)</th><th class="num">recent '
             'usage</th><th class="num">rank</th><th>moveset</th></tr>'
             + ''.join(rows) + '</table></div>')
+
+
+def render_inclusion_table(entries, meta):
+    """Foot-of-page 'why each entry is included': badge, mechanical
+    rule, and any divergence -- moved off the meta-table rows
+    (2026-08-24). The divergence display stays: an editorial badge that
+    the mechanical rule no longer awards must never be silent."""
+    rows = []
+    for e in entries:
+        div = rule_divergence(e.get('badge'), e.get('badge_rule'))
+        div_html = (f' <span class="mband">(rule: {esc(div)})</span>'
+                    if div else '')
+        why = ('editorial include; reason on its cheat sheet'
+               if e.get('forced_reason') else '')
+        rows.append(
+            f'<tr><td>{esc(e["name"])}</td>'
+            f'<td>{badge_html(e)}{div_html}</td>'
+            f'<td>{esc(why)}</td></tr>')
+    return (
+        '<h2 id="badges">Why each entry is included</h2>'
+        '<p class="section-intro">Badge rules (mechanical): PLAYED = '
+        f'top-{meta["badge_usage_top"]} recent usage AND '
+        f'top-{meta["badge_rank_top"]} current rank; PLAYED* = top-usage '
+        f'but current rank sank below {meta["badge_rank_top"]}; MODEL = '
+        f'current top-{meta["badge_rank_top"]} rank with no meaningful '
+        'tournament footprint; FORCED = editorial include. A "(rule: X)" '
+        'annotation means the literal badge and the mechanical rule '
+        'disagree -- live PvPoke ranks move, and an editorial badge the '
+        'rule no longer awards is shown, never hidden. <strong>The '
+        'entry list itself is a human decision</strong> (recorded in '
+        'scripts/worlds_meta.py), not rule-derived: the badges label the '
+        'chosen list mechanically, and some current '
+        f'top-{meta["badge_rank_top"]}-rank species stayed out (see the '
+        'candidates table above).</p>'
+        '<div class="table-scroll"><table class="meta">'
+        '<tr><th>Entry</th><th>badge</th><th>note</th></tr>'
+        + ''.join(rows) + '</table></div>')
 
 
 def render_rejects_table(rejects):
@@ -876,24 +917,20 @@ meta table below.</p>
 {tier2_status_html(entries, fn, deferred or [], len(links or {}))}
 {deep_html}
 <h2>The meta ({len(entries)} entries)</h2>
-<p class="section-intro">Badge rules (mechanical): PLAYED = top-{meta["badge_usage_top"]}
-recent usage AND top-{meta["badge_rank_top"]} current rank; PLAYED* = top-usage but
-current rank sank below {meta["badge_rank_top"]}; MODEL = current top-{meta["badge_rank_top"]}
-rank with no meaningful tournament footprint; FORCED = editorial include
-(reason shown on its cheat sheet). Movesets are the field-modal set when
+<p class="section-intro">Movesets are the field-modal set when
 modal share >= {meta["moveset_modal_min_pct"]:.0f}%, else the PvPoke default;
-disagreements are shown as data. <strong>The {len(entries)}-entry list
-itself is a human decision</strong> (recorded in scripts/worlds_meta.py),
-not rule-derived: the badges label the chosen list mechanically, and some
-current top-{meta["badge_rank_top"]}-rank species stayed out (they appear
-in the candidates table below). Moveset slot order shown is the order the
-sims ran under (PvPoke default order when the sets agree).</p>
+disagreements are shown as data. Moveset slot order shown is the order the
+sims ran under (PvPoke default order when the sets agree). Why each entry
+is in the list -- the badge system -- is <a href="#badges">at the foot of
+the page</a>.</p>
 {render_meta_table(entries, slug_map)}
 <h2>Candidates that stayed out</h2>
 <p class="section-intro">The usage top-{meta["reject_top_n"]} that did not
-make the meta, plus the banned row. Collapsed-rank PLAYED* entries above are
+make the meta, plus the banned row. Collapsed-rank PLAYED* entries (see the badge
+section at the foot) are
 shown as data; we do not claim nerf vs model error.</p>
 {render_rejects_table(meta['rejects'])}
+{render_inclusion_table(entries, meta)}
 {NOT_BUILT}
 <h2>Format and provenance</h2>
 {provenance_html(meta, manifest)}
