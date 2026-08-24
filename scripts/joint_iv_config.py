@@ -48,7 +48,7 @@ _PAIR_REQUIRED = {
     'opponent_shadow', 'opponent_slug', 'opponent_fast', 'opponent_charged',
     'data_dir', 'injected_moves',
 }
-_PAIR_OPTIONAL = {'replay_blob'}
+_PAIR_OPTIONAL = {'replay_blob', 'opponent_injected_moves'}
 _GRID_REQUIRED = {'label', 'focal_fast', 'focal_charged', 'bait'}
 _KNOWN_SECTIONS = {'pair', 'grids', 'meta', 'breakpoints', 'assemble',
                    'denial', 'page'}
@@ -186,20 +186,31 @@ def preflight_moveset_legality(cfg):
         raise SystemExit(f'ABORT: injected_moves {sorted(dead)} declared '
                          'but not used by any grid (dead injection)')
 
+    opp_injected = tuple(cfg.raw['pair'].get('opponent_injected_moves', []))
+    for mid in opp_injected:
+        if mid not in fast_db and mid not in charged_db:
+            raise SystemExit(f'ABORT: opponent injected move {mid} not in '
+                             'the gamemaster moves db at all')
     opp_used = {cfg.opp_fast} | set(cfg.opp_charged)
-    opp_illegal = opp_used - pool(cfg.opponent)
+    opp_illegal = opp_used - pool(cfg.opponent) - set(opp_injected)
     if opp_illegal:
         raise SystemExit(f'ABORT: opponent {cfg.opponent} moves '
-                         f'{sorted(opp_illegal)} not in the pinned '
-                         'gamemaster pool (opponent-side injection is not '
-                         'supported)')
+                         f'{sorted(opp_illegal)} are neither in the pinned '
+                         'gamemaster pool nor declared '
+                         'opponent_injected_moves')
+    opp_dead = set(opp_injected) - opp_used
+    if opp_dead:
+        raise SystemExit(f'ABORT: opponent_injected_moves {sorted(opp_dead)} '
+                         'declared but unused (dead injection)')
 
 
 def default_publish_slug(cfg):
     """The website filename a pair's page publishes under (the [page]
     publish_slug override wins; shadow carries into the name)."""
     page = cfg.raw.get('page', {})
+    # Slug-based: identical to the old species.lower()+-shadow form for
+    # every existing pair, and unique for same-species pairs (the
+    # Thievul cross-arm vs the true mirror).
     return page.get('publish_slug') or (
-        f'{cfg.focal.lower()}{"-shadow" if cfg.focal_shadow else ""}'
-        f'-{cfg.opponent.lower()}'
-        f'{"-shadow" if cfg.opp_shadow else ""}-robustness.html')
+        f'{cfg.focal_slug.replace("_", "-")}'
+        f'-{cfg.opp_slug.replace("_", "-")}-robustness.html')

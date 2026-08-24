@@ -148,6 +148,19 @@ def _configure(cfg, data_dir_override=None):
     DENIAL_FILENAME = cfg.section('denial').get('out_name', 'denial.json')
 
 
+def _is_true_mirror(cfg):
+    """Same species, same shadow, AND every focal arm equals the
+    opponent's moveset -- the cross-arm pair (Thievul NS+IW vs IW+PR) is
+    same-species but NOT a mirror: its diagonal cells are real fights,
+    so the MIRROR MATCH note and the seat-consistency check must not
+    fire there (2026-08-24)."""
+    if cfg.focal != cfg.opponent or cfg.focal_shadow != cfg.opp_shadow:
+        return False
+    return all(g.focal_fast == cfg.opp_fast
+               and frozenset(g.focal_charged) == frozenset(cfg.opp_charged)
+               for g in cfg.grids)
+
+
 def grid_to_metawins(label):
     """Grid label -> (A1 moveset key, A1 focal-bait key) in meta_wins.npz.
 
@@ -276,8 +289,11 @@ def dataset_spec(manifest, data_dir=None):
     # Display names carry the shadow suffix; every filename / gamemaster /
     # collection lookup keeps the plain species name. For non-shadow pairs
     # (both thievul pages) display == species, byte-identical.
-    focal_display = f'{focal} (Shadow)' if FOCAL_SHADOW else focal
-    opp_display = f'{opponent} (Shadow)' if OPP_SHADOW else opponent
+    _page = CFG.section('page') if CFG is not None else {}
+    focal_display = _page.get('focal_display') or (
+        f'{focal} (Shadow)' if FOCAL_SHADOW else focal)
+    opp_display = _page.get('opp_display') or (
+        f'{opponent} (Shadow)' if OPP_SHADOW else opponent)
 
     opp_fast = man.get('opp_fast')
     opp_charged = man.get('opp_charged') or []
@@ -302,12 +318,16 @@ def dataset_spec(manifest, data_dir=None):
         'threshold_species': threshold_species,
         'grid_species': [focal, opponent],
         'opp_moveset': opp_moveset,
-        # shadow carries into the FILENAME too, or a later non-shadow pair
-        # of the same species would overwrite this page
-        'out_name': (f'{focal.lower()}{"_shadow" if FOCAL_SHADOW else ""}'
-                     f'_vs_{opponent.lower()}'
-                     f'{"_shadow" if OPP_SHADOW else ""}'
-                     f'_iv_robustness.html'),
+        # SLUG-based filename: byte-identical to the old species.lower()
+        # + _shadow form for every existing pair, and it disambiguates
+        # same-species pairs (the Thievul cross-arm vs the true mirror,
+        # 2026-08-24).
+        'out_name': ((f'{CFG.focal_slug}_vs_{CFG.opp_slug}'
+                      if CFG is not None else
+                      f'{focal.lower()}{"_shadow" if FOCAL_SHADOW else ""}'
+                      f'_vs_{opponent.lower()}'
+                      f'{"_shadow" if OPP_SHADOW else ""}')
+                     + '_iv_robustness.html'),
     }
 
 
@@ -913,7 +933,7 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             continue
         won, z = loaded
         check_axis_order(z, focal_tbl, opp_tbl, label)
-        if spec['focal'] == spec['opponent'] and FOCAL_SHADOW == OPP_SHADOW:
+        if _is_true_mirror(CFG):
             # The MIRROR MATCH note claims seat-consistency; verify it
             # here rather than asserting from theory. The seat swap of
             # cell (i, j, sf-so) is (j, i, so-sf) -- the SHIELD COUNTS
@@ -1024,7 +1044,7 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             'full-meta ladder simulation. Which shield scenario it reports '
             'FOLLOWS the controls; the meta-wins rail below states the '
             'binding actually in effect.')
-    if spec['focal'] == spec['opponent'] and FOCAL_SHADOW == OPP_SHADOW:
+    if _is_true_mirror(CFG):
         # Wording corrected by the 2026-08-20 mirror review (the first
         # draft claimed the diagonal was CMP-decided and named the wrong
         # player index): identical builds at EVEN shields fight to an
