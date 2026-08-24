@@ -368,8 +368,11 @@ def joint_iv_link_map(website_dir=WEBSITE_DIR):
         slug = default_publish_slug(cfg)
         if not (Path(website_dir) / slug).exists():
             continue
-        focal = cfg.focal + (' (Shadow)' if cfg.focal_shadow else '')
-        opp = cfg.opponent + (' (Shadow)' if cfg.opp_shadow else '')
+        page = cfg.section('page')
+        focal = page.get('focal_display') or (
+            cfg.focal + (' (Shadow)' if cfg.focal_shadow else ''))
+        opp = page.get('opp_display') or (
+            cfg.opponent + (' (Shadow)' if cfg.opp_shadow else ''))
         out[frozenset((cfg.focal_slug, cfg.opp_slug))] = (
             slug, f'{focal} vs {opp}')
     return out
