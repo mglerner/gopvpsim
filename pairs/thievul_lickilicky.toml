@@ -184,6 +184,16 @@ assert_focal_default_moveset = true
 # record lives at commit 8feec47.
 stage_ladder_from_rank1 = false
 
+# Pins the stage probe's ORIGINAL engine policy (simulate() defaults,
+# bait_with_cheapest) for stable rebuilds of this shipped page. The
+# kit default since 2026-08-24 is GRID conditions (pvpoke_dp both
+# seats); this page's stage check is an existence-proof observation
+# that stays true under either policy, so the pin is cosmetic-stable,
+# not a preserved falsehood. Flip off + re-run breakpoints to adopt
+# grid-condition probes (may need a new [breakpoints.stage_probe]
+# fight if pvpoke_dp does not throw Icy Wind in the pinned one).
+stage_probe_engine_default_policy = true
+
 # The two HSH-discord claims this page answers. `slug` is the key
 # spelling (a human shorthand: "615" for 6/15/5, not a formatting of the
 # IVs); `key` / `answer_key` are the frozen claims/answers key names.

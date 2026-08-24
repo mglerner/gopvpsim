@@ -41,7 +41,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gopvpsim.battle import _stat_stage_mult, simulate  # noqa: E402
+from gopvpsim.battle import _stat_stage_mult, pvpoke_dp, simulate  # noqa: E402
 from gopvpsim.data import get_default_moveset, load_gamemaster  # noqa: E402
 from gopvpsim.moves import (BONUS, STAB_MULTIPLIER, damage, get_moves,  # noqa: E402
                             parse_types, stab, type_effectiveness)
@@ -1341,6 +1341,7 @@ def main():
 
         chosen = None
         any_thrown = False
+        any_slot1_unshielded = False
         n_skipped = 0
         for ci, pc in enumerate(candidates):
             st_ivs, sl_ivs, st_fast, st_charged, st_shields = _probe(
@@ -1354,7 +1355,21 @@ def main():
             lp = make_battle_pokemon(OPPONENT, L_FAST, [L_CH1, L_CH2],
                                      LEAGUE, st_shields, *sl_ivs,
                                      shadow=O_SHADOW)
-            res = simulate(tp, lp, log=True)
+            # GRID CONDITIONS, not simulate()'s defaults. The grids run
+            # pvpoke_dp on both seats (deep_dive_lib/robustness.py
+            # opp_plane); simulate()'s default bait_with_cheapest never
+            # banks NS+IW Thievul to 45 energy, so the old probe declared
+            # Icy Wind "never thrown" while the grids throw it in ~70-85%
+            # of fights (2026-08-24 mirror review, blocker 1). The
+            # stage_probe_engine_default_policy flag pins the OLD probe
+            # policy for byte-identical rebuilds of the shipped
+            # thievul_lickilicky/lickitung pages only.
+            if bp_cfg.get('stage_probe_engine_default_policy'):
+                res = simulate(tp, lp, log=True)
+            else:
+                res = simulate(tp, lp, log=True,
+                               charged_policy_0=pvpoke_dp,
+                               charged_policy_1=pvpoke_dp)
             # Shielded throws land 1 damage regardless of stage ("→
             # SHIELDED (1 dmg)") and carry no stage information -- skip
             # them; only unshielded hits test the ladder.
@@ -1404,6 +1419,7 @@ def main():
             else:
                 thrown_here = iw_count > 0
             any_thrown = any_thrown or thrown_here
+            any_slot1_unshielded = (any_slot1_unshielded or bool(bs_hits))
             ti = iv_to_rank_t[tuple(st_ivs)]
             ladder_atk = (l_rows[0]['atk'] if ladder_from_rank1
                           else l_rows[iv_to_rank_l[tuple(sl_ivs)]]['atk'])
@@ -1438,6 +1454,30 @@ def main():
                          'matchup and has no observed in-matchup '
                          'consequence. Recorded, not silently skipped; '
                          'set [breakpoints] stage_probe to override.'),
+                'candidates_tried': len(candidates) - n_skipped,
+            }
+        elif (chosen is None and any_thrown and not any_slot1_unshielded
+                and 'stage_probe' not in bp_cfg):
+            # Third honest outcome (first case: the Thievul IW+PR mirror
+            # under grid-policy probes, 2026-08-24): the debuff move DOES
+            # fly, but no unshielded slot-1 hit landed in any candidate
+            # fight -- here the DP throws Icy Wind only as shield bait,
+            # so the unshielded damage ladder has no observable instance
+            # in this matchup even though the debuff itself still applies
+            # through shields (visible in the decaying slot-2 damage). A
+            # TRUE, recorded finding, not a skipped check.
+            ver[f'{debuff_mid.lower()}_stage_check'] = {
+                'debuff_thrown_only_shielded': True,
+                'note': (f'{_dbf["name"]} WAS thrown in the probe fights, '
+                         f'but no unshielded {bs["name"]} hit landed in '
+                         f'any of the {len(candidates) - n_skipped} '
+                         'candidate fights (every throw was shielded or '
+                         'the slot never fired), so the attack-stage '
+                         'damage ladder has no observable instance in '
+                         'this matchup under grid conditions. The debuff '
+                         'itself still applies through shields. Recorded, '
+                         'not silently skipped; set [breakpoints] '
+                         'stage_probe to override.'),
                 'candidates_tried': len(candidates) - n_skipped,
             }
         elif chosen is None:

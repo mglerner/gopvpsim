@@ -77,6 +77,10 @@
   function missingBox(msg, kind) {
     var head = (kind === 'browser') ? 'This browser cannot read the data.'
       : (kind === 'input') ? 'Nothing to show for that input.'
+      // 'absent' = a VERIFIED permanent absence (meta_wins.ABSENT); the
+      // default headline promised data that will never come (2026-08-24
+      // review minor 3).
+      : (kind === 'absent') ? 'No such data exists for this pair.'
       : 'Data not baked yet.';
     // The message is a full sentence following a full stop, so it is
     // capitalised here rather than at each of the ~12 call sites.
@@ -2655,8 +2659,14 @@
     if (!HAS_META_WINS) {
       setHtml('tl-pareto-note', '');
       showMissing('tl-pareto',
-        'meta_wins (per-IV wins vs the dive pool at 1-1) is not embedded '
-        + 'in this page, so the Pareto panel cannot be drawn.');
+        META.meta_wins_absent
+          ? 'no dive-derived meta data exists for this pair (verified at '
+            + 'build time -- see the methodology notes), so the Pareto '
+            + 'panel cannot be drawn.'
+          : 'meta_wins (per-IV wins vs the dive pool at 1-1) is not '
+            + 'embedded in this page, so the Pareto panel cannot be '
+            + 'drawn.',
+        META.meta_wins_absent ? 'absent' : undefined);
       return;
     }
     if (cov.missing) {
@@ -3707,10 +3717,15 @@
     // with no caveat reads as damage you actually deal (2026-08-19
     // review).
     var neverThrown = {};
+    var baitOnly = {};
     Object.keys(dig(bp, 'verification') || {}).forEach(function (k) {
       var m2 = /^(.*)_stage_check$/.exec(k);
       if (m2 && (dig(bp, 'verification')[k] || {}).debuff_unreachable) {
         neverThrown[m2[1].toUpperCase()] = true;
+      }
+      if (m2 && (dig(bp, 'verification')[k] || {})
+            .debuff_thrown_only_shielded) {
+        baitOnly[m2[1].toUpperCase()] = true;
       }
     });
     Object.keys(mv).forEach(function (name) {
@@ -3726,9 +3741,24 @@
           ? '<p class="tl-note"><strong>Note:</strong> the engine never '
             + 'threw ' + esc(prettyMove(name)) + ' in any probe fight of '
             + 'this matchup (see the verification block), so these tiers '
-            + 'are a reference, not damage you routinely deal here -- '
-            + 'and they are why the bait and no-bait grids can be '
-            + 'byte-identical.</p>' : '')
+            + 'are a reference, not damage you routinely deal here'
+            // The byte-identical clause is a claim about THIS page's
+            // grids; state it only when they really are duplicates
+            // (2026-08-24 review: the old unconditional tail was false
+            // on pages whose grids differ).
+            + ((META.duplicate_grids || []).length
+              ? ' -- and they are why the bait and no-bait grids can '
+                + 'be byte-identical.'
+              : '.')
+            + '</p>' : '')
+        + (baitOnly[name.toUpperCase()]
+          ? '<p class="tl-note"><strong>Note:</strong> in the probe '
+            + 'fights of this matchup the engine throws '
+            + esc(prettyMove(name)) + ' only into shields (as bait; see '
+            + 'the verification block) -- the attack debuff still '
+            + 'applies through the shield, but these unshielded damage '
+            + 'tiers are a reference, not damage that routinely lands '
+            + 'here.</p>' : '')
         + '<p class="tl-note">' + esc(m.damage_identity || '') + ', K = '
         + esc(m.damage_constant_K) + '. Damage tiers reachable: '
         + esc((m.tiers || []).join(', ')) + '.</p>'
@@ -3834,13 +3864,28 @@
             + ' stage check: NOT TESTABLE in this matchup -- '
             + esc(ver[stKey].note || 'the debuff move was never thrown in '
               + 'any probe fight') : '')
+        + (stKey && ver[stKey].debuff_thrown_only_shielded
+          // Second honest-absence flavor: the debuff flies but only into
+          // shields, so the unshielded ladder has no observable instance.
+          ? ' ' + esc(prettyMove(stKey.replace(/_stage_check$/, '')))
+            + ' stage check: NOT OBSERVABLE in this matchup -- '
+            + esc(ver[stKey].note || 'every throw was shielded') : '')
         + (stKey && !ver[stKey].debuff_unreachable
+            && !ver[stKey].debuff_thrown_only_shielded
           ? ' ' + esc(prettyMove(stKey.replace(/_stage_check$/, '')))
             + ' stage check: observed ' + esc(slotNames().c1)
             + ' damages all found in '
             + 'the closed-form stage set: '
             + cellText(ver[stKey].all_observed_in_closed_form_set)
-            + '.' : '')
+            + '.'
+            // A producer-recorded SEAT-AMBIGUOUS caveat must reach the
+            // reader too, not just the JSON (2026-08-24 review minor 2:
+            // the observed branch silently dropped it).
+            + (function () {
+              var n = ver[stKey].note || '';
+              var i = n.indexOf('SEAT-AMBIGUOUS PARSE:');
+              return i >= 0 ? ' ' + esc(n.slice(i)) : '';
+            })() : '')
         + '</p>'
         + ((bad || scBad)
           ? '<div class="tl-missing"><strong>Verification mismatch.</strong> '
