@@ -215,6 +215,27 @@ MATCHUPS = [
          p1=P('Lapras', 'PSYWAVE', ['SPARKLING_ARIA', 'ICE_BEAM'], (0, 15, 15), 'lapras'),
          p2=P('Moltres (Galarian)', 'SUCKER_PUNCH', ['FLY', 'BRAVE_BIRD'], (1, 15, 15), 'moltres_galarian'),
          xfail_cells={(1, 2)}),
+    # Cramorant form change + Gulp Missile (ported from pvpoke 78c64048a,
+    # 2026-08-24; fixtures also pinned in tests/test_cramorant.py).
+    # Gulping cycle + re-prey after the missile revert:
+    dict(label='cramorant_vs_registeel',
+         p1=P('Cramorant', 'PECK', ['DIVE', 'HYDRO_PUMP'], (5, 15, 15), 'cramorant'),
+         p2=P('Registeel', 'LOCK_ON', ['FLASH_CANNON', 'FOCUS_BLAST'], (15, 15, 15), 'registeel')),
+    # Gorging branch + ignoresFaint (missile fires after Wild Charge KO):
+    dict(label='cramorant_vs_raichu_alolan',
+         p1=P('Cramorant', 'PECK', ['DIVE', 'HYDRO_PUMP'], (5, 15, 15), 'cramorant'),
+         p2=P('Raichu (Alolan)', 'VOLT_SWITCH', ['WILD_CHARGE', 'PSYCHIC'], (15, 15, 15), 'raichu_alolan')),
+    # Mirror: usePriority forced true on equal atk; missile never
+    # triggers a counter-missile; prey lock:
+    dict(label='cramorant_mirror',
+         p1=P('Cramorant', 'PECK', ['DIVE', 'HYDRO_PUMP'], (5, 15, 15), 'cramorant'),
+         p2=P('Cramorant', 'PECK', ['DIVE', 'HYDRO_PUMP'], (5, 15, 15), 'cramorant')),
+    # Mimikyu interplay: Dive busts the disguise normally; the missile
+    # fires THROUGH an intact disguise without busting it (1v2 logs an
+    # unbusted post-missile Shadow Sneak); 1v0 is a simultaneous-KO draw:
+    dict(label='cramorant_vs_mimikyu',
+         p1=P('Cramorant', 'PECK', ['DIVE', 'HYDRO_PUMP'], (5, 15, 15), 'cramorant'),
+         p2=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (5, 13, 15), 'mimikyu')),
 ]
 
 from gopvpsim.pokemon import LEAGUE_CP as _CANON_LEAGUE_CP  # noqa: E402

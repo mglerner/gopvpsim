@@ -81,6 +81,27 @@ def _form_dict(types, fast_move, charged_moves, atk, def_):
     }
 
 
+def _extra_charged_moves(mon):
+    """Auto-fired extra charged moves (Cramorant's Gulp Missiles) the
+    battle can use even though no moveset lists them (they live in
+    BattlePokemon._extra_charged, keyed off the prey form's exit move).
+
+    Included in the form-changer's alt-form charged lists for SIGNATURE
+    purposes: their opponent-debuffs make the OTHER side's stage axes
+    movable (movable_axes reads them from oth_all), and the extra
+    damage_vec rows they add to the key are conservative -- a
+    deterministic extra key component can only SPLIT dedup groups, never
+    merge them. (The missile's true flat damage is floor(15% of the
+    target's max_hp)+1, and max_hp is already a key component, so no
+    real dimension is missing either way.)
+    """
+    if mon.get('formChange') is None:
+        return []
+    from gopvpsim.moves import get_moves
+    _, all_charged = get_moves()
+    return [all_charged[mid] for mid in mon.get('extraChargedMoves') or []]
+
+
 def _native_movability(cfgs):
     """(atk_movable, def_movable) from nativeStatBuffs across form configs."""
     atk_mov = def_mov = False
@@ -109,7 +130,8 @@ def build_focal_side(focal_mon, focal_types, fm_template, cms_template,
     forms = [_form_dict(focal_types, fm_template, cms_template, atk, def_)]
     cfg0 = None
     if focal_mon.get('formChange') is not None:
-        alt_atks, alt_defs = [], []
+        extras = _extra_charged_moves(focal_mon)
+        alt_atks, alt_defs = {}, {}   # form idx -> per-profile stat lists
         base_atks, base_defs = [], []
         for p in profile_list:
             cfg = build_form_change_state(
@@ -118,16 +140,19 @@ def build_focal_side(focal_mon, focal_types, fm_template, cms_template,
             if cfg is None:
                 break
             cfg0 = cfg
-            alt_atks.append(cfg.forms[1].atk)
-            alt_defs.append(cfg.forms[1].def_)
+            # EVERY alt form (Cramorant has two: Gulping and Gorging).
+            for fi in range(1, len(cfg.forms)):
+                alt_atks.setdefault(fi, []).append(cfg.forms[fi].atk)
+                alt_defs.setdefault(fi, []).append(cfg.forms[fi].def_)
             base_atks.append(cfg.forms[0].atk)
             base_defs.append(cfg.forms[0].def_)
         if cfg0 is not None:
-            f1 = cfg0.forms[1]
-            forms.append(_form_dict(
-                f1.types, f1.fast_move, f1.charged_moves,
-                np.array(alt_atks, dtype=np.float64),
-                np.array(alt_defs, dtype=np.float64)))
+            for fi in range(1, len(cfg0.forms)):
+                f = cfg0.forms[fi]
+                forms.append(_form_dict(
+                    f.types, f.fast_move, list(f.charged_moves) + extras,
+                    np.array(alt_atks[fi], dtype=np.float64),
+                    np.array(alt_defs[fi], dtype=np.float64)))
             # apply_form_change restores the base form from FormData's
             # recomputed stats; if those ever drift bitwise from the
             # construction-time stats, treat the recomputation as a
@@ -156,9 +181,12 @@ def build_opp_side(opp, league_cp):
             opp['mon'], *opp['ivs'], opp['level'], league_cp,
             opp['shadow'], opp['fm'], opp['cms'])
         if cfg is not None:
-            f1 = cfg.forms[1]
-            forms.append(_form_dict(f1.types, f1.fast_move,
-                                    f1.charged_moves, f1.atk, f1.def_))
+            extras = _extra_charged_moves(opp['mon'])
+            for fi in range(1, len(cfg.forms)):
+                f = cfg.forms[fi]
+                forms.append(_form_dict(f.types, f.fast_move,
+                                        list(f.charged_moves) + extras,
+                                        f.atk, f.def_))
             f0 = cfg.forms[0]
             if f0.atk != opp['atk'] or f0.def_ != opp['def_']:
                 forms.append(_form_dict(f0.types, f0.fast_move,

@@ -36,12 +36,31 @@ class FormData:
     trigger: str | None       # what triggers change FROM this form
     move_id: str | None       # constraint on triggering move ("ANY" or specific moveId)
     native_stat_buffs: tuple[int, int] | None  # buffs applied when ENTERING this form
+    # Multi-id constraint (gamemaster `moveIDs`, plural -- Cramorant's
+    # DIVE/SURF list). Empty for single-moveId forms; matches_move checks both.
+    move_ids: tuple = ()
+    # Index (into FormChangeConfig.forms) of the form this changes INTO when
+    # the trigger fires. None means "resolve dynamically" (gamemaster
+    # alternativeFormId 'variable' -- Cramorant's HP-conditional prey pick,
+    # resolved at the battle.py charged_move trigger site).
+    target_idx: "int | None" = None
+
+    def matches_move(self, move_id: str) -> bool:
+        """True when ``move_id`` satisfies this form's trigger constraint
+        (PvPoke Battle.js:1609-1610: moveId == 'ANY', exact moveId match,
+        or membership in the plural moveIDs list)."""
+        return (self.move_id == 'ANY'
+                or self.move_id == move_id
+                or move_id in self.move_ids)
 
 
 @dataclass(frozen=True, slots=True)
 class FormChangeConfig:
     """Precomputed form-change state for a BattlePokemon."""
-    forms: tuple              # (FormData, FormData) — [0]=default, [1]=alt
+    forms: tuple              # FormData per form -- [0]=starting form; 2 for
+                              # toggle/one-way species, 3 for Cramorant
+                              # ([0]=base, [1]=Gulping, [2]=Gorging; the
+                              # variable-target resolution depends on that order)
     reset_on_switch: bool
     effect: str | None        # "protect" for Mimikyu, None otherwise
 
@@ -71,6 +90,18 @@ _MORPEKO_CHARGED_MOVE_MAP = {
 # battle reads" set (see form_change_swapped_moves).
 _FORM_CHANGE_MOVE_SWAPS = {**_AEGISLASH_FAST_MOVE_MAP, **_MORPEKO_CHARGED_MOVE_MAP}
 
+# Moves a form change can cause the battle to READ without any swap: a
+# Cramorant moveset listing DIVE or SURF makes the battle read the Gulp
+# Missile entries (fired from the extra-charged registry, never in the
+# stored moveset). Keyed by trigger move so form_change_swapped_moves can
+# stay a pure function of move ids; unioning these for a NON-Cramorant
+# DIVE/SURF user is over-broad in the safe direction (cache invalidation
+# re-sims a column it didn't need to, never serves a stale one).
+_FORM_CHANGE_TRIGGERED_MOVES = {
+    'DIVE': ('GULP_MISSILE_ARROKUDA', 'GULP_MISSILE_PIKACHU'),
+    'SURF': ('GULP_MISSILE_ARROKUDA', 'GULP_MISSILE_PIKACHU'),
+}
+
 
 def form_change_swapped_moves(move_ids):
     """Return the ADDITIONAL move ids a form change could swap in for ``move_ids``.
@@ -80,10 +111,17 @@ def form_change_swapped_moves(move_ids):
     it reverts to; Morpeko stores one Aura Wheel). Battle code reads the mapped
     counterpart at form-change time, so a consumer reasoning about "which move
     entries this battle reads" (e.g. gamemaster-delta cache invalidation) must
-    union in these. Returns an empty set when nothing is swappable.
+    union in these. Cramorant's Gulp Missiles are the no-swap case of the same
+    contract: DIVE/SURF in a moveset make the battle read the missile entries.
+    Returns an empty set when nothing is swappable.
     """
-    return {_FORM_CHANGE_MOVE_SWAPS[m] for m in move_ids
-            if m in _FORM_CHANGE_MOVE_SWAPS}
+    move_ids = tuple(move_ids)   # callers pass generators (migrate_cache);
+                                 # we iterate twice
+    extra = {_FORM_CHANGE_MOVE_SWAPS[m] for m in move_ids
+             if m in _FORM_CHANGE_MOVE_SWAPS}
+    for m in move_ids:
+        extra.update(_FORM_CHANGE_TRIGGERED_MOVES.get(m, ()))
+    return extra
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +209,68 @@ def _aegislash_shield_level(blade_level, league_cp):
     return min(float(start), max(CPM))
 
 
+def _build_variable_form_change(mon_entry, fc, atk_iv, def_iv, level, shadow,
+                                fast_move, charged_moves):
+    """Build the 3-form FormChangeConfig for a 'variable' form change (Cramorant).
+
+    forms = (base, Gulping, Gorging) -- battle.py's variable-target
+    resolution (prey pick by HP fraction, PvPoke Battle.js:1611-1623)
+    depends on that order. All three Cramorant forms share base stats,
+    types, level, and move pools; the real deltas are the display name,
+    species_id (the AI/shield gates key on it), and the exit trigger
+    (DIVE/SURF from base via the plural moveIDs list; the form's own Gulp
+    Missile from a prey form, which reverts to base). The prey form ids
+    are hardcoded exactly like PvPoke's switch(attacker.speciesId)
+    (Battle.js:1613-1622) -- the gamemaster does not enumerate the
+    'variable' options anywhere.
+    """
+    species_id = mon_entry['speciesId']
+    if species_id != 'cramorant':
+        raise ValueError(
+            f"alternativeFormId 'variable' is only implemented for cramorant "
+            f"(got {species_id!r}); mirror PvPoke's Battle.js switch when a "
+            f"new variable form-changer ships")
+
+    cm_tuple = tuple(charged_moves)
+    cpm = CPM[level]
+
+    def _fd(entry, trigger, move_id, move_ids, target_idx):
+        base = entry['baseStats']
+        atk, def_ = effective_stats((base['atk'] + atk_iv) * cpm,
+                                    (base['def'] + def_iv) * cpm, shadow)
+        raw = entry.get('nativeStatBuffs')
+        native = tuple(raw) if raw and any(b != 0 for b in raw) else None
+        return FormData(
+            species=entry['speciesName'],
+            species_id=entry['speciesId'],
+            types=tuple(parse_types(entry)),
+            atk=atk,
+            def_=def_,
+            fast_move=fast_move,
+            charged_moves=cm_tuple,
+            trigger=trigger,
+            move_id=move_id,
+            native_stat_buffs=native,
+            move_ids=move_ids,
+            target_idx=target_idx,
+        )
+
+    base_fd = _fd(mon_entry, fc.get('trigger'), fc.get('moveId'),
+                  tuple(fc.get('moveIDs', ())), None)
+    prey_fds = []
+    for prey_id in ('cramorant_gulping', 'cramorant_gorging'):
+        entry = get_pokemon_entry_by_id(prey_id)
+        pfc = entry.get('formChange', {})
+        prey_fds.append(_fd(entry, pfc.get('trigger'), pfc.get('moveId'),
+                            (), 0))
+
+    return FormChangeConfig(
+        forms=(base_fd, *prey_fds),
+        reset_on_switch=fc.get('resetOnSwitch', True),
+        effect=fc.get('effect'),
+    )
+
+
 def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
                             level, league_cp, shadow,
                             fast_move, charged_moves):
@@ -200,6 +300,13 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
     alt_id = fc.get('alternativeFormId')
     if alt_id is None:
         return None
+
+    # Cramorant: alternativeFormId 'variable' -- the target form is resolved
+    # at battle time (HP-conditional prey pick), and there are THREE forms.
+    if alt_id == 'variable':
+        return _build_variable_form_change(
+            mon_entry, fc, atk_iv, def_iv, level, shadow,
+            fast_move, charged_moves)
 
     alt_entry = get_pokemon_entry_by_id(alt_id)
     alt_fc = alt_entry.get('formChange', {})
@@ -277,6 +384,7 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         trigger=trigger,
         move_id=fc.get('moveId'),
         native_stat_buffs=default_native_buffs,
+        target_idx=1,
     )
 
     alt_trigger = alt_fc.get('trigger')
@@ -297,6 +405,7 @@ def build_form_change_state(mon_entry, atk_iv, def_iv, sta_iv,
         trigger=alt_trigger if alt_trigger != 'none' else None,
         move_id=fc.get('moveId') if form_type == 'toggle' and alt_fc.get('moveId') is None else alt_fc.get('moveId'),
         native_stat_buffs=alt_native_buffs,
+        target_idx=0,
     )
 
     reset_on_switch = fc.get('resetOnSwitch', True)
@@ -329,6 +438,19 @@ def attach_form_change(bp, mon_entry, atk_iv, def_iv, sta_iv,
         bp._form_change = fc
         if fc.effect == 'protect':
             bp._form_disguise_active = True
+        # Extra-charged registry (PvPoke's extraChargedMovePool): moves the
+        # battle can fire that are never in the selectable moveset -- today
+        # only Cramorant's Gulp Missiles. Keyed by moveId; per-instance dict
+        # COPIES because battle code mutates move dicts in place (same
+        # aliasing hazard as _swap_charged_move). Built from the STARTING
+        # entry's list, like PvPoke's constructor. Mewtwo megas also carry
+        # extraChargedMoves but have no formChange, so they never get here
+        # (their pool is inert in PvPoke too -- hasThirdChargedMove()
+        # hard-returns false).
+        extra = mon_entry.get('extraChargedMoves')
+        if extra:
+            _, all_charged = get_moves()
+            bp._extra_charged = {mid: dict(all_charged[mid]) for mid in extra}
     # A focal that STARTS in a natively stat-buffed form (currently only
     # Mimikyu (Busted), nativeStatBuffs [0,-1]) carries those stages from
     # turn one. This must run even when fc is None: a terminal alt form has
@@ -348,7 +470,7 @@ def attach_form_change(bp, mon_entry, atk_iv, def_iv, sta_iv,
 # Runtime form change
 # ---------------------------------------------------------------------------
 
-def apply_form_change(bp, opponent):
+def apply_form_change(bp, opponent, target_idx=None):
     """Apply a form change to a BattlePokemon. Mutates bp in place.
 
     Swaps species, types, atk, def_, fast_move, charged_moves to the
@@ -359,9 +481,20 @@ def apply_form_change(bp, opponent):
     Args:
         bp: the BattlePokemon changing forms
         opponent: the opposing BattlePokemon (for cache invalidation)
+        target_idx: index into cfg.forms of the form to enter. None (the
+            default) is the 2-form toggle -- the other form -- and is
+            only valid for 2-form configs; multi-form species (Cramorant)
+            must pass the resolved target explicitly.
     """
     cfg = bp._form_change
-    target_idx = 1 if not bp._form_is_alt else 0
+    if target_idx is None:
+        if len(cfg.forms) != 2:
+            raise ValueError(
+                'apply_form_change default toggle is only valid for 2-form '
+                f'configs; this one has {len(cfg.forms)} forms -- pass '
+                'target_idx explicitly (guard from the 2026-08-24 review: '
+                '1 - _form_idx would index -1 from a third form)')
+        target_idx = 1 - bp._form_idx
     fd = cfg.forms[target_idx]
 
     bp.species = fd.species
@@ -401,4 +534,4 @@ def apply_form_change(bp, opponent):
     # BattlePokemon._ensure_dp_init_cache.
     bp._dp_init_cache = None
 
-    bp._form_is_alt = not bp._form_is_alt
+    bp._form_idx = target_idx

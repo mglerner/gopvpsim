@@ -126,17 +126,27 @@ def test_neutral_batch_20260810_predicate():
     assert p({}, {'species': 'X'}) is False
 
 
-def _delta_gm(**move_powers):
+def _delta_gm(gulping_marker=None, **move_powers):
     """Minimal gamemaster for the form-change-swap delta test. Overriding a move
-    power lets a caller build an old/new pair differing in exactly one move.
-    Aegislash (Shield/Blade) + Morpeko (Full Belly/Hangry) carry the formChange
-    links the delta expands through; only speciesId/speciesName/formChange and
-    moveId/power are read by build_gamemaster_delta."""
+    power lets a caller build an old/new pair differing in exactly one move;
+    ``gulping_marker`` stamps an extra key onto the cramorant_gulping entry so
+    a species-entry-only delta can be expressed. Aegislash (Shield/Blade) +
+    Morpeko (Full Belly/Hangry) + Cramorant (base/Gulping/Gorging, the
+    'variable' shape) carry the formChange links the delta expands through;
+    only speciesId/speciesName/formChange and moveId/power are read by
+    build_gamemaster_delta."""
     powers = {'PSYCHO_CUT': 30, 'AEGISLASH_CHARGE_PSYCHO_CUT': 0,
               'SHADOW_BALL': 100, 'AURA_WHEEL_ELECTRIC': 45,
               'AURA_WHEEL_DARK': 45, 'PSYCHIC_FANGS': 40,
-              'THUNDER_SHOCK': 3, 'BUBBLE': 7, 'ICE_BEAM': 90}
+              'THUNDER_SHOCK': 3, 'BUBBLE': 7, 'ICE_BEAM': 90,
+              'PECK': 6, 'DIVE': 50, 'FLY': 80,
+              'GULP_MISSILE_ARROKUDA': 15, 'GULP_MISSILE_PIKACHU': 15}
     powers.update(move_powers)
+    gulping = {'speciesId': 'cramorant_gulping',
+               'speciesName': 'Cramorant (Gulping)',
+               'formChange': {'alternativeFormId': 'cramorant'}}
+    if gulping_marker is not None:
+        gulping['marker'] = gulping_marker
     return {
         'pokemon': [
             {'speciesId': 'aegislash_shield', 'speciesName': 'Aegislash (Shield)',
@@ -146,6 +156,13 @@ def _delta_gm(**move_powers):
             {'speciesId': 'morpeko_full_belly', 'speciesName': 'Morpeko (Full Belly)',
              'formChange': {'alternativeFormId': 'morpeko_hangry'}},
             {'speciesId': 'morpeko_hangry', 'speciesName': 'Morpeko (Hangry)'},
+            {'speciesId': 'cramorant', 'speciesName': 'Cramorant',
+             'formChange': {'alternativeFormId': 'variable',
+                            'moveIDs': ['DIVE', 'SURF']}},
+            gulping,
+            {'speciesId': 'cramorant_gorging',
+             'speciesName': 'Cramorant (Gorging)',
+             'formChange': {'alternativeFormId': 'cramorant'}},
             {'speciesId': 'azumarill', 'speciesName': 'Azumarill'},
             {'speciesId': 'medicham', 'speciesName': 'Medicham'},
         ],
@@ -186,6 +203,43 @@ def test_gamemaster_delta_form_change_swapped_moves():
             'charged': ['AURA_WHEEL_ELECTRIC', 'PSYCHIC_FANGS']}
     assert affected(morp, azu) is True    # reads AURA_WHEEL_DARK after toggle
     assert affected(azu, morp) is True
+
+
+def test_gamemaster_delta_variable_form_and_gulp_missiles():
+    """Cramorant extension of the F1 contract (2026-08-24 port review
+    findings): (a) a species patch touching ONLY a prey form must mark
+    Cramorant columns AFFECTED -- pre-fix, _form_expand dead-ended on
+    alternativeFormId 'variable', so cramorant_gulping/gorging sat outside
+    the read set and such columns BLESSED; (b) a move patch touching ONLY a
+    Gulp Missile must mark them AFFECTED -- pre-fix,
+    form_change_swapped_moves consumed its generator argument before the
+    missile union ran, so the union was dead in this, its only production
+    consumer, and such columns BLESSED."""
+    azu = {'species': 'Azumarill', 'shadow': False,
+           'fast': 'BUBBLE', 'charged': ['ICE_BEAM']}
+    med = {'species': 'Medicham', 'shadow': False,
+           'fast': 'COUNTER', 'charged': ['PSYCHIC']}
+    cram = {'species': 'Cramorant', 'shadow': False,
+            'fast': 'PECK', 'charged': ['DIVE', 'FLY']}
+
+    # (a) prey-form-only species delta.
+    affected, info = migrate_cache.build_gamemaster_delta(
+        _delta_gm(), _delta_gm(gulping_marker=1))
+    assert info['touched_species'] == ['cramorant_gulping']
+    assert info['touched_moves'] == []
+    assert affected(cram, azu) is True    # focal reads the prey form
+    assert affected(azu, cram) is True    # Cramorant as opponent column
+    assert affected(azu, med) is False    # control: unrelated column blessed
+
+    # (b) Gulp-Missile-only move delta (the missile is in NO stored moveset;
+    # it is reached via form_change_swapped_moves on DIVE).
+    affected, info = migrate_cache.build_gamemaster_delta(
+        _delta_gm(), _delta_gm(GULP_MISSILE_PIKACHU=20))
+    assert info['touched_moves'] == ['GULP_MISSILE_PIKACHU']
+    assert info['touched_species'] == []
+    assert affected(cram, azu) is True
+    assert affected(azu, cram) is True
+    assert affected(azu, med) is False
 
 
 def test_migrate_blesses_unaffected_deletes_affected(tmp_path, monkeypatch):
@@ -390,3 +444,22 @@ def test_gm_delta_unresolvable_species_is_affected():
     # And the removed species itself (still resolvable via the OLD index):
     oldmon = {'species': 'OldMon', 'shadow': False, 'fast': 'X', 'charged': []}
     assert affected(oldmon, a) is True
+
+
+def test_cramorant_port_20260824_predicate():
+    """The Cramorant-port engine predicate: affected iff either side is a
+    Cramorant (any form) or an Aegislash (any form); fail-safe on missing
+    metadata. See the predicate docstring for the delta proof."""
+    p = migrate_cache.PREDICATES['cramorant_port_20260824']
+    azu = {'species': 'Azumarill', 'charged': ['ICE_BEAM']}
+    lick = {'species': 'Lickitung', 'charged': ['BODY_SLAM']}
+    assert p(azu, lick) is False
+    assert p(lick, azu) is False
+    for sp in ('Cramorant', 'Cramorant (Gulping)', 'Cramorant (Gorging)',
+               'Aegislash (Shield)', 'Aegislash (Blade)'):
+        assert p({'species': sp}, azu) is True, sp
+        assert p(azu, {'species': sp}) is True, sp
+    # Fail-safe: never bless blind.
+    assert p(None, azu) is True
+    assert p(azu, {}) is True
+    assert p({'species': ''}, azu) is True

@@ -2422,9 +2422,13 @@ def test_disguise_break_uses_only_pre_shuffle_cheapest_move():
         att = make_bp(charged=[cheap, pricey])
         att.energy = 60   # both affordable
         dfn = make_bp(hp=200, shields=0)
-        # Minimal protect-form stub: the disguise branch reads only
-        # _form_change.effect and _form_disguise_active.
-        dfn._form_change = SimpleNamespace(effect='protect')
+        # Minimal protect-form stub: the disguise branch reads
+        # _form_change.effect and _form_disguise_active; since the
+        # Cramorant port, _holding_prey also reads forms[_form_idx]
+        # .species_id on any defender carrying a _form_change.
+        dfn._form_change = SimpleNamespace(
+            effect='protect',
+            forms=(SimpleNamespace(species_id='mimikyu'),))
         dfn._form_disguise_active = True
         return att, dfn
 

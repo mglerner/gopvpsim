@@ -452,18 +452,23 @@ def get_default_moveset(species_name, league='great', shadow=False, cup=None):
     # species raised KeyError despite being ranked).
     sid = species_id(species_name, shadow=shadow)
 
+    def _split(moveset):
+        # pvpoke 78c64048a: Ranker.js pads a missing second charged move
+        # with the literal string "none" (Unown is the only species today,
+        # but every regenerated rankings file gains the padding). Treat it
+        # as absent -- it is not a move id.
+        return moveset[0], [m for m in moveset[1:] if m != 'none']
+
     # Cup moveset wins; fall through to the overall-league moveset when the
     # species is unranked in the cup (decided policy, plan Decision 6).
     if cup is not None:
         cup_index = _get_rankings_index(league, cup=cup)
         if sid in cup_index:
-            moveset = cup_index[sid]['moveset']
-            return moveset[0], moveset[1:]
+            return _split(cup_index[sid]['moveset'])
 
     index = _get_rankings_index(league)
     if sid in index:
-        moveset = index[sid]['moveset']
-        return moveset[0], moveset[1:]
+        return _split(index[sid]['moveset'])
 
     # Primary lookup missed — try the explicit-fallback dict before raising.
     fallback = _DEFAULT_MOVESET_FALLBACK.get((sid, league))

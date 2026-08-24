@@ -32,6 +32,52 @@ beats PvPoke's NS+IW default by ~14 wins; PvPoke overall GL rank
 122 -> 41); (b) Michael's HSH discord message
 (`docs/hsh_message_notes.md`); (c) post-CD cleanup: delete the
 `[cd_prep]` table once the un-pinned gamemaster stably lists Icy Wind.
+CONFIRMED CAUGHT UP 2026-08-24 (live gamemaster lists Icy Wind for
+Thievul; the 4 injection guards in test_worlds_bake_guards.py now
+auto-skip on a caught-up gamemaster and re-arm under the Worlds pin).
+POST-WORLDS (after 08-30): retire cd_prep + the worlds_meta
+`injected_move_ids` declarations + those 4 guards together.
+
+## Cramorant (engine port SHIPPED 2026-08-24; dives + policy campaign queued)
+
+The Gulp Missile engine port (pvpoke 78c64048a) landed 2026-08-24 with
+81 oracle-exact fixture cells + a 36-cell audit extension and a 52-agent
+adversarial review (all 19 confirmed findings fixed same-day; record in
+DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
+
+1. **Sweep-cache migrations** (recipe per the Worlds precedent): the
+   gamemaster leg runs from the PRE-port engine tree (`--from-gamemaster
+   8f1d6cca5c0f --old-gamemaster-file
+   userdata/gamemaster_vintages/gamemaster_8f1d6cca5c0f.json`, ~147k
+   blessed / ~2k re-sim), then the engine leg (`--from-engine
+   5839391a7596 --predicate cramorant_port_20260824`).
+2. **GL + UL dives**: `run_website_dives.py cramorant` (registry entries
+   added; detached; form change -> per-IV sims, Aegislash-slow). LOCAL
+   render only -- publishing needs Michael's explicit go, as always.
+3. **Policy campaign** (Michael 2026-08-24, standing resource
+   authorization): three tiers -- PvPoke default (shipped), never-bait
+   (the dives' standard `--bait both` axis), and the **"PoGoDives
+   strat"** overlay (`pogodives_dp`/`pogodives_shield`: tuned Cramorant
+   cases, byte-identical `pvpoke_dp` fallback for every non-Cram
+   situation, test-pinned; future non-Cram cases land one evidenced
+   entry at a time). Full plan: `docs/cramorant_policy_plan.md` (knob
+   globals, lab script, grid sweep, agent analysis panel, adversarial
+   robustness round incl. the opponent-withholds counter and the
+   lethal-Dive-shield-bug-fixed opponent, synthesis writeup).
+4. **Upstream bug-report candidates** (pvpoke): the two `move.moveID`
+   typos (ActionLogic.js:368, :1239 -- the latter makes opponents never
+   shield a lethal Dive, plausibly inflating published Cramorant
+   scores; H4 in the plan doc measures it). Draft after the campaign's
+   H4 numbers exist; follows the docs/pvpoke_bug_reports.md conventions.
+
+ACCEPTED TEST DEBT (per policy, recorded): (a) the dive-ASAP gate's
+fresh-vs-frozen `move.damage` divergence (documented at the rule in
+battle.py) has no discriminating test -- needs a post-missile-debuff
+re-dive scenario where the two damage bases differ; write it if such an
+oracle cell ever drifts. (b) The opponent-pool question -- whether
+Cramorant (GL rank 13) enters `gl_top50_plus_cs.txt` / `ul_top60.txt`
+as an OPPONENT for other species' dives -- is a Michael curation call;
+until then no shipped dive sims against it.
 
 ## Worlds robustness deep dives -- IN PROGRESS (session started 2026-08-19)
 
@@ -163,7 +209,12 @@ the same meta-config handle. PvPoke publishes per-cup rankings
 Standing constraints unchanged: publish only with Michael's explicit
 per-instance go; long bakes detached + run-to-completion; re-pin the
 gamemaster from pvpoke f60a41199 before any Worlds render (verified at
-the pin 2026-08-19 morning).
+the pin 2026-08-19 morning). **NOTE 2026-08-24: the data-cache
+gamemaster was UN-pinned to the Cramorant vintage (pvpoke 78c64048a,
+timestamp 2026-08-21) by the Cramorant session -- any Worlds render
+(incl. the deferred empoleon/feraligatr mirror bakes) must first
+re-pin: `git -C ../pvpoke show f60a41199:src/data/gamemaster.json >
+~/Documents/gopvpsim_cache/gamemaster.json`.**
 
 ## Ship-gate gap (found by the 2026-08-17 thievul pre-publish review)
 
