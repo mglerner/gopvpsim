@@ -155,12 +155,54 @@ def _neutral_batch_20260810(f, c):
     return False
 
 
+def _cramorant_port_20260824(f, c):
+    """Cramorant / Gulp Missile engine port (pin --from-engine 5839391a7596).
+
+    The port's hashed engine delta (battle.py + formchange.py +
+    deep_dive_signature.py) changes a column's scores ONLY when:
+      (a) a Cramorant (any form) participates -- every new mechanic is
+          species-gated: the 'variable' formchange branch, the
+          _holding_prey / _base_species_id gates on missile insertion,
+          the Dive/Surf-ASAP rule, the [918] widening, would_shield tail
+          rules 2-4, both pvpoke_simulate_shield gates, and the mirror
+          use_priority rule; or
+      (b) an Aegislash participates -- would_shield tail rule 1 (the
+          upstream 78c64048a relocation into wouldShield) changes the
+          ATTACKER's model of an aegislash_shield defender at DP sites.
+    For every other battle the refactor is behavior-identical:
+    _form_idx == int(_form_is_alt) for 2-form configs, matches_move
+    preserves the ANY/exact semantics, the index-driven _resolve_charged
+    iterates exactly like the for-loop it replaced when nothing is
+    inserted (insertion requires a prey-holding Cramorant), the
+    used_shield hoisting is an exact refactor, the instant/ignoresFaint
+    tag guards are vacuous for every non-missile move, and the signature
+    changes only append moves for entries carrying extraChargedMoves +
+    formChange (Cramorant alone). data.py's rankings-'none' fix is NOT
+    part of the hashed delta, and a changed moveset resolution produces a
+    different column KEY (clean miss), never stale content. Evidence:
+    the full suite, the 243-cell oracle audit with all 207 pre-existing
+    cells unchanged, a flat perf A/B, and the 2026-08-24 adversarial
+    review -- see DEVELOPER_NOTES "Form change gotchas" item 5.
+
+    Fail-safe: missing species metadata -> AFFECTED.
+    """
+    def _hit(side):
+        if not side:
+            return True
+        sp = side.get('species')
+        if not sp:
+            return True
+        return sp.startswith(('Cramorant', 'Aegislash'))
+    return _hit(f) or _hit(c)
+
+
 # affected(focal_fields, col_fields) -> True if the engine change changed
 # this column's scores (must be re-simmed); False if provably unchanged.
 PREDICATES = {
     'shadow_xor': lambda f, c: bool(f.get('shadow')) != bool(c.get('shadow')),
     'self_debuff_either_side': _self_debuff_either_side,
     'neutral_batch_20260810': _neutral_batch_20260810,
+    'cramorant_port_20260824': _cramorant_port_20260824,
 }
 
 
@@ -229,7 +271,15 @@ def build_gamemaster_delta(old_gm, new_gm):
     def _form_expand(ids):
         """Transitively add formChange.alternativeFormId targets (read at
         battle time), using both gms so a form relationship present in either
-        vintage is honored."""
+        vintage is honored. alternativeFormId 'variable' is not a real id --
+        its target set is species-specific (mirrors formchange.
+        _build_variable_form_change / PvPoke Battle.js's switch); without the
+        mapping the prey forms fall out of the read set and a prey-form-only
+        gamemaster patch would wrongly bless Cramorant columns (F1-class
+        hole, found by the 2026-08-24 port review)."""
+        variable_targets = {
+            'cramorant': ('cramorant_gulping', 'cramorant_gorging'),
+        }
         out, stack = set(), list(ids)
         while stack:
             sid = stack.pop()
@@ -242,7 +292,16 @@ def build_gamemaster_delta(old_gm, new_gm):
                     continue
                 fc = e.get('formChange') or {}
                 alt = fc.get('alternativeFormId')
-                if alt and alt not in out:
+                if alt == 'variable':
+                    targets = variable_targets.get(sid)
+                    if targets is None:
+                        # A NEW variable form-changer this table doesn't
+                        # know: we cannot enumerate its read set, so fail
+                        # safe -- the caller treats None as unresolvable
+                        # and marks the column AFFECTED (re-sim).
+                        return None
+                    stack.extend(t for t in targets if t not in out)
+                elif alt and alt not in out:
                     stack.append(alt)
         return out
 

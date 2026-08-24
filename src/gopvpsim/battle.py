@@ -53,6 +53,10 @@ ENERGY_CAP = 100
 WIN_RATING = 500
 
 
+_CRAM_PROBE = []
+_CRAM_STATS = []
+
+
 def is_win(score):
     """True iff a PvP battle rating is a win (> 500; exactly 500 is a tie)."""
     return score > WIN_RATING
@@ -181,6 +185,31 @@ def _cheapest_cm(owner: "BattlePokemon") -> "dict | None":
     return min(owner.charged_moves, key=lambda m: m['energy'])
 
 
+def _base_species_id(bp: "BattlePokemon") -> "str | None":
+    """PvPoke's form-INVARIANT speciesId (changeForm never rewrites it):
+    the STARTING form's species_id, or None for non-form-change species.
+    The Cramorant AI/shield rules key on `speciesId == "cramorant"`, which
+    stays true in every prey form."""
+    fc = bp._form_change
+    return fc.forms[0].species_id if fc is not None else None
+
+
+def _holding_prey(bp: "BattlePokemon") -> bool:
+    """True when bp is a Cramorant currently holding prey (Gulping or
+    Gorging form) -- mirrors PvPoke's activeFormId checks."""
+    fc = bp._form_change
+    return (fc is not None
+            and fc.forms[bp._form_idx].species_id
+                in ('cramorant_gulping', 'cramorant_gorging'))
+
+
+def _is_instant(move: dict) -> bool:
+    """PvPoke's move.hasTag('instant'): an auto-fired charged move that
+    skips the charge-up entirely -- unshieldable, no Mimikyu disguise
+    interaction, and never triggers an opposing Gulp Missile."""
+    return 'instant' in move.get('tags', ())
+
+
 def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dict,
                            mechanics: str = 'legacy') -> bool:
     """
@@ -300,12 +329,37 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     # Aegislash Shield form: don't waste shields if damage < half HP
     # PvPoke Battle.js:1126
     if (defender._form_change is not None
-            and defender._form_change.forms[int(defender._form_is_alt)].species_id == 'aegislash_shield'
+            and defender._form_change.forms[defender._form_idx].species_id == 'aegislash_shield'
             and attacker.charged_move_damage(move, defender) * 2 < defender.hp):
         if _shield_trace:
             _policy_log.append(
                 f"  shield({defender.species} sh={defender.shields} vs"
                 f" {move.get('moveId')}): False (Aegislash Shield suppression)")
+        return False
+
+    # Cramorant (pvpoke 78c64048a, Battle.js:1188-1198): two more !sandbox
+    # shield gates. Both route to wouldShield upstream, whose own matching
+    # tail rules (would_shield below) make the result False whenever the
+    # gate predicate holds -- so return False directly, same shape as the
+    # Aegislash suppression above.
+    # Gate 1: a prey-holding Cramorant tanks weak charged attacks so Gulp
+    # Missile fires earlier.
+    if (_holding_prey(defender)
+            and attacker.charged_move_damage(move, defender) * 2.2 < defender.hp):
+        if _shield_trace:
+            _policy_log.append(
+                f"  shield({defender.species} sh={defender.shields} vs"
+                f" {move.get('moveId')}): False (Cramorant prey suppression)")
+        return False
+    # Gate 2: don't shield early weak Cramorant charged moves (comment
+    # upstream says "Dives or Surfs" but the code has no move filter) --
+    # save shields for after the Gulp Missile debuff.
+    if (_base_species_id(attacker) == 'cramorant'
+            and attacker.charged_move_damage(move, defender) / defender.hp < 0.33):
+        if _shield_trace:
+            _policy_log.append(
+                f"  shield({defender.species} sh={defender.shields} vs"
+                f" {move.get('moveId')}): False (vs-Cramorant weak-move save)")
         return False
 
     if _shield_trace and not use_heuristic_incoming and not (d_best_cm is not None and d_best_cm.get('selfDefenseDebuffing', False)):
@@ -622,6 +676,49 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
         if _shield_trace:
             cm_reasons.append(
                 f"selfAtkDebuff dmg({damage})/hp({defender.hp})>0.55")
+
+    # --- Cramorant update (pvpoke 78c64048a) ActionLogic.js:1222-1241 ---
+    # Four rules appended AFTER every other override so they win. All four
+    # only ever force False. NOT a staleness divergence: PvPoke's
+    # wouldShield recomputes move.damage FRESH at its own top
+    # (ActionLogic.js:1142-1143), exactly like our `damage` above -- which
+    # is also what makes pvpoke_simulate_shield's direct-return
+    # short-circuits for the two Battle.js gates exactly equivalent.
+    # (An earlier version of this comment claimed a cached-vs-fresh
+    # divergence here; refuted by the 2026-08-24 port review.)
+    _d_fc = defender._form_change
+    _d_form_sid = (_d_fc.forms[defender._form_idx].species_id
+                   if _d_fc is not None else None)
+    # Save shields in Aegislash Shield form to protect Blade form
+    # (relocated upstream from Battle.js into wouldShield in 78c64048a --
+    # net-new for the ATTACKER's model of the defender; the actual shield
+    # decision was already covered by pvpoke_simulate_shield above).
+    if _d_form_sid == 'aegislash_shield' and damage * 2 < defender.hp:
+        use_shield = False
+        if _shield_trace:
+            cm_reasons.append(f"aegislashShield dmg({damage})*2<hp({defender.hp})")
+    # Save shields in a prey-holding Cramorant so Gulp Missile fires earlier
+    if (_d_form_sid in ('cramorant_gulping', 'cramorant_gorging')
+            and damage * 2.2 < defender.hp):
+        use_shield = False
+        if _shield_trace:
+            cm_reasons.append(f"cramorantPrey dmg({damage})*2.2<hp({defender.hp})")
+    _a_sid = _base_species_id(attacker)
+    # Don't shield early weak Cramorant charged moves (no move filter
+    # upstream despite the "Dives or Surfs" comment)
+    if _a_sid == 'cramorant' and damage / defender.hp < 0.33:
+        use_shield = False
+        if _shield_trace:
+            cm_reasons.append(f"vsCramorant dmg({damage})/hp({defender.hp})<0.33")
+    # PvPoke ActionLogic.js:1239 -- shipped with the move.moveID typo, so
+    # the SURF half never matches; replicated as shipped: a LETHAL
+    # Cramorant Dive is never shielded (likely inverted intent upstream --
+    # candidate bug report -- but oracle parity wins; see the port doc).
+    if (_a_sid == 'cramorant' and move.get('moveId') == 'DIVE'
+            and damage > defender.hp):
+        use_shield = False
+        if _shield_trace:
+            cm_reasons.append(f"lethalDive dmg({damage})>hp({defender.hp})")
 
     if _shield_trace:
         buff_note = ""
@@ -1275,10 +1372,57 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     if _optimize_move_timing(attacker, defender, mechanics=mechanics):
         return None
 
+    # ------------------------------------------------------------------ #
+    # Cramorant: use Dive or Surf ASAP to ready the Gulp Missile, unless
+    # another move is meaningfully more efficient. PvPoke 78c64048a
+    # ActionLogic.js:362-382, placed exactly here: after optimizeMoveTiming,
+    # before everything farm-down. Base form only (no prey held).
+    # ------------------------------------------------------------------ #
+    if (attacker._form_change is not None
+            and attacker._form_change.forms[attacker._form_idx].species_id
+                == 'cramorant'):
+        _gulp_slot = next((n for n in range(n_cms)
+                           if cms[n].get('moveId') in ('DIVE', 'SURF')), None)
+        # PvPoke's nonGulpMove predicate ships with the move.moveID typo
+        # (ActionLogic.js:368: `moveId != "DIVE" && moveID != "SURF"`, the
+        # second property always undefined) -- effectively `moveId != 'DIVE'`,
+        # so a SURF user compares Surf against itself. Replicated as shipped
+        # (candidate upstream bug report; harmless for the DIVE+FLY default).
+        _nongulp_slot = next((n for n in range(n_cms)
+                              if cms[n].get('moveId') != 'DIVE'), None)
+        if (_gulp_slot is not None and _nongulp_slot is not None
+                and attacker.energy >= cm_energy[_gulp_slot]):
+            _frozen = cm_dpe[_nongulp_slot] * cm_energy[_nongulp_slot]
+            _fresh = cm_dmgs[_nongulp_slot]
+            _CRAM_STATS.append((attacker.atk_stage, defender.def_stage,
+                                _fresh, _frozen, defender.hp))
+            if (defender.hp > _fresh * 1.3) != (defender.hp > _frozen * 1.3):
+                _CRAM_PROBE.append(
+                    (attacker.species, defender.species, attacker.atk_stage,
+                     defender.def_stage, defender.hp, _fresh, _frozen))
+        # INTENTIONAL DIVERGENCE (confirmed by the 2026-08-24 port review):
+        # the `* 1.3` term uses our stage-FRESH cm_dmgs where PvPoke reads
+        # move.damage -- frozen at resetMoves and only refreshed at
+        # scattered points (each wouldShield call on the move, OMT). The
+        # two differ only once a stat stage has moved (e.g. re-dive
+        # decisions after a Gulp Missile debuff); fresh is internally
+        # consistent, same class as the dpeRatio carve-out. All 72 oracle
+        # cells match; revisit if a post-debuff re-dive cell ever drifts.
+        if (_gulp_slot is not None and _nongulp_slot is not None
+                and attacker.energy >= cm_energy[_gulp_slot]
+                and defender.hp > cm_dmgs[_nongulp_slot] * 1.3
+                and cm_dpe[_nongulp_slot] / cm_dpe[_gulp_slot] < 1.5):
+            if _policy_debug:
+                _policy_log.append(
+                    f"  DP[cramorant_gulp_prep]: {attacker.species} fires "
+                    f"{cms[_gulp_slot].get('moveId')} to trigger form change "
+                    f"as soon as possible")
+            return cm_orig_idx[_gulp_slot]
+
     # Aegislash Shield form: farm energy before throwing charged moves.
     # PvPoke ActionLogic.js:957-961: delay unless the move would KO.
     if (attacker._form_change is not None
-            and attacker._form_change.forms[int(attacker._form_is_alt)].species_id == 'aegislash_shield'
+            and attacker._form_change.forms[attacker._form_idx].species_id == 'aegislash_shield'
             and attacker.energy < 100 - (fast_energy / 2)):
         best_cm_dmg = max(cm_dmgs[n] for n in range(n_cms) if attacker.energy >= cm_energy[n]) if any(attacker.energy >= cm_energy[n] for n in range(n_cms)) else 0
         if best_cm_dmg < defender.hp:
@@ -1801,8 +1945,14 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                     f" waiting for opponent to fire {opp_best.get('moveId')}")
             return None
 
-    # [918] If self-debuffing move doesn't KO, stack as many as possible
-    if cm_self_debuf[first_idx]:
+    # [918] If self-debuffing move doesn't KO, stack as many as possible.
+    # Cramorant (pvpoke 78c64048a ActionLogic.js:959): the SAME gate also
+    # fires against a prey-holding Cramorant -- build energy for
+    # back-to-back throws to minimize time spent debuffed by the incoming
+    # Gulp Missile. The whole body (wait branch AND the [929] stack-switch
+    # elif, our ungated intentional divergence included) becomes reachable
+    # for non-self-debuffing movesets in that case, faithful to upstream.
+    if cm_self_debuf[first_idx] or _holding_prey(defender):
         target_energy = (100 // cm_energy[first_idx]) * cm_energy[first_idx]
         if attacker.energy < target_energy:
             if ((defender.hp > cm_dmgs[first_idx] or defender.shields != 0)
@@ -1991,8 +2141,15 @@ class BattlePokemon:
 
     # Form change state (None for Pokemon without form changes)
     _form_change:          "FormChangeConfig | None" = field(init=False, repr=False)
-    _form_is_alt:          bool = field(init=False, repr=False)
+    # Index into _form_change.forms of the CURRENT form (0 = starting form).
+    # Was a `_form_is_alt` bool until the Cramorant port (3 forms); the
+    # property below keeps the boolean view for 2-form call sites/tests.
+    _form_idx:             int = field(init=False, repr=False)
     _form_disguise_active: bool = field(init=False, repr=False)
+    # Extra-charged registry (PvPoke's extraChargedMovePool): auto-fired
+    # moves never in the selectable moveset, keyed by moveId -- today only
+    # Cramorant's Gulp Missiles. None for everyone else.
+    _extra_charged:        "dict | None" = field(init=False, repr=False)
 
     def __post_init__(self):
         self.hp                = self.max_hp
@@ -2020,8 +2177,15 @@ class BattlePokemon:
         self._dp_init_cache = None
         # Form change state
         self._form_change = None
-        self._form_is_alt = False
+        self._form_idx = 0
         self._form_disguise_active = False
+        self._extra_charged = None
+
+    @property
+    def _form_is_alt(self) -> bool:
+        """Boolean view of _form_idx (any non-starting form). Kept for the
+        pre-Cramorant 2-form call sites and tests."""
+        return self._form_idx != 0
 
     @property
     def cmp_atk(self) -> float:
@@ -2090,13 +2254,13 @@ class BattlePokemon:
         (mirrors apply_form_change's both-sides invalidation).
         """
         if self._form_change is not None:
-            if self._form_is_alt:
+            if self._form_idx != 0:
                 if opponent is None:
                     raise ValueError(
                         "reset_for_battle on a form-changed Pokemon needs "
                         "the opponent for cache invalidation")
                 from .formchange import apply_form_change
-                apply_form_change(self, opponent)   # swap back to base form
+                apply_form_change(self, opponent, 0)   # swap back to base form
             self._form_disguise_active = (self._form_change.effect == 'protect')
             # The alt form's move dicts may also carry the per-battle
             # damage memo cleared below -- clear both forms' lists.
@@ -2124,12 +2288,14 @@ class BattlePokemon:
         """Return the trigger for changing FROM the current form, or None."""
         if self._form_change is None:
             return None
-        return self._form_change.forms[int(self._form_is_alt)].trigger
+        return self._form_change.forms[self._form_idx].trigger
 
-    def change_form(self, opponent: "BattlePokemon") -> None:
-        """Apply the form change to this BattlePokemon."""
+    def change_form(self, opponent: "BattlePokemon",
+                    target_idx: "int | None" = None) -> None:
+        """Apply the form change to this BattlePokemon. target_idx=None is
+        the 2-form toggle; multi-form species pass the resolved target."""
         from .formchange import apply_form_change
-        apply_form_change(self, opponent)
+        apply_form_change(self, opponent, target_idx)
 
     def _ensure_dmg_cache(self, defender: "BattlePokemon") -> None:
         """Populate _cached_fast_dmg and _cached_charged_dmgs vs `defender`
@@ -2689,8 +2855,16 @@ def simulate(
     for p in pokemon:
         p.fast_move['_turns'] = p.fast_move.get('cooldown', 500) // 500
 
-    # Priority: higher effective attack breaks ties on charged moves
-    use_priority = (p0.cmp_atk != p1.cmp_atk)
+    # Priority: higher effective attack breaks ties on charged moves.
+    # Cramorant mirror: PvPoke 78c64048a Battle.js:253-259 forces priority
+    # ON even with equal attack (speciesId is form-invariant), so the
+    # CMP-loser's Dive/Surf is cancelled when it dies to the winner's
+    # charged move -- while its Gulp Missile (ignoresFaint) still fires.
+    # With equal cmp_atk our sort below is stable (p0 first), matching
+    # PvPoke's pokemon-index action order.
+    use_priority = (p0.cmp_atk != p1.cmp_atk) or (
+        _base_species_id(p0) == 'cramorant'
+        and _base_species_id(p1) == 'cramorant')
 
     def log_event(msg: str):
         # Call sites must gate on `if log:` themselves -- the f-string
@@ -2720,13 +2894,25 @@ def simulate(
 
         charged_ko = set()  # track Pokemon KO'd by charged moves this turn
 
-        for actor_idx, move in charged_actions:
+        # Index-driven loop (PvPoke 78c64048a Battle.js:435-441 actionIndex
+        # rewrite): a Gulp Missile triggered by an action is INSERTED at the
+        # current position so it resolves immediately after the triggering
+        # action and before every remaining action this turn -- and before
+        # the floating-fast block, which runs after this function returns.
+        # For every non-Cramorant battle nothing is ever inserted and this
+        # iterates exactly like the plain for-loop it replaced.
+        _ai = 0
+        while _ai < len(charged_actions):
+            actor_idx, move = charged_actions[_ai]
+            _ai += 1
             attacker = pokemon[actor_idx]
             defender = pokemon[1 - actor_idx]
 
             # PvPoke Battle.js line 464-467: cancel if KO'd by a
-            # higher-priority charged move (CMP).
-            if use_priority and attacker.hp <= 0 and actor_idx in charged_ko:
+            # higher-priority charged move (CMP). An ignoresFaint move
+            # (Gulp Missile) fires from the grave (Battle.js:478).
+            if (use_priority and attacker.hp <= 0 and actor_idx in charged_ko
+                    and 'ignoresFaint' not in move.get('tags', ())):
                 continue
 
             # PvPoke Battle.js lines 471-490: cancel a charged move when the
@@ -2743,8 +2929,13 @@ def simulate(
             if attacker.energy < move['energy']:
                 continue   # raced to this -- no longer affordable
 
-            if defender.hp <= 0:
-                continue   # defender already fainted from fast move this turn
+            if defender.hp <= 0 and not _is_instant(move):
+                # Defender already fainted from a fast move this turn.
+                # A Gulp Missile still fires at the corpse (PvPoke has no
+                # dead-defender guard on charged moves at all; the corner
+                # needs an exact-cmp_atk-tie dead-throw trigger and is
+                # score-neutral, but the log line keeps oracle parity).
+                continue
 
             attacker.energy -= move['energy']
 
@@ -2752,16 +2943,25 @@ def simulate(
             # Fires BEFORE damage so charged move uses new form's attack.
             _trigger = attacker.current_form_trigger
             if _trigger == 'activate_charged':
-                _fc_mid = attacker._form_change.forms[int(attacker._form_is_alt)].move_id
-                if _fc_mid == 'ANY' or _fc_mid == move['moveId']:
+                _fd = attacker._form_change.forms[attacker._form_idx]
+                if _fd.matches_move(move['moveId']):
                     attacker.change_form(defender)
                     if log:
                         log_event(f"{attacker.species} changed form")
 
-            _, shield_pol = policies[1 - actor_idx]
-            use_shield    = shield_pol(attacker, defender, move, mechanics=mechanics)
+            _instant = _is_instant(move)
+            if _instant:
+                # Gulp Missile can't be shielded: PvPoke Battle.js:1136
+                # canShield = shields > 0 && !instant. The policy is never
+                # consulted (it would also KeyError on a move outside
+                # charged_moves).
+                use_shield = False
+            else:
+                _, shield_pol = policies[1 - actor_idx]
+                use_shield    = shield_pol(attacker, defender, move, mechanics=mechanics)
 
-            if use_shield and defender.shields > 0:
+            used_shield = use_shield and defender.shields > 0
+            if used_shield:
                 dmg = 1
                 defender.shields -= 1
 
@@ -2774,10 +2974,22 @@ def simulate(
                 if log:
                     log_event(f"{attacker.species} uses {move.get('name', move['moveId'])} → SHIELDED (1 dmg)")
             else:
-                dmg = attacker.charged_move_damage(move, defender)
+                if move.get('damageMethod') == 'percentMaxHP':
+                    # Gulp Missile: flat 1 + power% of the TARGET's max HP,
+                    # unaffected by stats, types, STAB, shadow, or stages.
+                    # PvPoke DamageCalculator.js percentMaxHP branch:
+                    # floor((power/100) * defender.stats.hp) + 1, where
+                    # stats.hp is max HP (changeForm never rewrites it).
+                    dmg = int((move['power'] / 100) * defender.max_hp) + 1
+                else:
+                    dmg = attacker.charged_move_damage(move, defender)
 
-                # Form change: charged_move_damage / Mimikyu disguise
-                if (defender._form_disguise_active
+                # Form change: charged_move_damage / Mimikyu disguise.
+                # An instant move (Gulp Missile) does NOT break the disguise
+                # and deals its full damage through it (Battle.js:1335
+                # gained `&& ! move.hasTag("instant")` in 78c64048a).
+                if (not _instant
+                        and defender._form_disguise_active
                         and defender.current_form_trigger == 'charged_move_damage'
                         and defender._form_change is not None
                         and defender._form_change.effect == 'protect'):
@@ -2797,14 +3009,39 @@ def simulate(
             # Apply stat stage buffs/debuffs (fires even when shielded)
             _apply_move_buffs(attacker, defender, move)
 
-            # Form change: charged_move (Morpeko toggle)
+            # Form change: charged_move, post-attack (Morpeko toggle;
+            # Cramorant prey pick after Dive/Surf and revert after Gulp
+            # Missile). PvPoke Battle.js:1607-1638.
             _trigger = attacker.current_form_trigger
             if _trigger == 'charged_move':
-                _fc_mid = attacker._form_change.forms[int(attacker._form_is_alt)].move_id
-                if _fc_mid == 'ANY' or _fc_mid == move['moveId']:
-                    attacker.change_form(defender)
-                    if log:
-                        log_event(f"{attacker.species} changed form")
+                _fd = attacker._form_change.forms[attacker._form_idx]
+                if _fd.matches_move(move['moveId']):
+                    _tgt = _fd.target_idx
+                    if _tgt is None:
+                        # 'variable' -- Cramorant prey pick by CURRENT HP
+                        # fraction, STRICTLY > 50% of max HP -> Gulping
+                        # (Arrokuda), else Gorging (Pikachu). Battle.js:
+                        # 1611-1623; forms order pinned by the builder.
+                        _tgt = (1 if attacker.hp / attacker.max_hp > 0.5
+                                else 2)
+                    if _tgt != attacker._form_idx:
+                        attacker.change_form(defender, _tgt)
+                        if log:
+                            log_event(f"{attacker.species} changed form")
+
+            # Cramorant Gulp Missile trigger (PvPoke Battle.js:1643-1678):
+            # a prey-holding Cramorant hit by an UNSHIELDED, non-instant
+            # charged attack spits its prey back as an instant charged
+            # action, inserted here so it resolves before any remaining
+            # action this turn. The prey form's own exit move_id IS the
+            # missile to fire; the !instant gate stops missile-triggers-
+            # missile in the mirror. No HP gate -- it fires even when the
+            # triggering move KO'd Cramorant (ignoresFaint handles the
+            # from-the-grave resolution above).
+            if (not _instant and not used_shield and _holding_prey(defender)):
+                _prey_fd = defender._form_change.forms[defender._form_idx]
+                _missile = defender._extra_charged[_prey_fd.move_id]
+                charged_actions.insert(_ai, (1 - actor_idx, _missile))
 
     while turn < MAX_TURNS:
         turn += 1

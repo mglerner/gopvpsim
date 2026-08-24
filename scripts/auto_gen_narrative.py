@@ -637,6 +637,19 @@ def render_form_change(species: str, gm: Optional[dict]) -> str:
     if fc_info is None:
         return ''
     target_id, trigger = fc_info
+    if target_id == 'variable':
+        # Cramorant: all forms share stats, so the generic stat-transform
+        # sentence below would be wrong -- the mechanic is the prey /
+        # Gulp Missile cycle. Emit an accurate note instead.
+        return (
+            f'**{species}** is a form-change Pokemon: after Dive or Surf '
+            f'it surfaces holding prey (Gulping form above 50% HP, '
+            f'Gorging at 50% or less), and an unshielded charged attack '
+            f'against it while it holds prey triggers Gulp Missile -- an '
+            f'automatic, unshieldable counter dealing 1 + 15% of the '
+            f"attacker's maximum HP that also debuffs the attacker "
+            f'(-1 DEF from Arrokuda, -2 ATK from Pikachu) and returns '
+            f'{species} to base form.')
     start_stats = _gm_species_base_stats(gm, species)
     if start_stats is None:
         return ''

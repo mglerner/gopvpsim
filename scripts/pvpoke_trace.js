@@ -451,7 +451,12 @@ function main() {
   // use with the defender's immediate "blocks with a shield" if any.
   const chargedNames = new Set();
   for (const p of poke) {
-    for (const m of (p.chargedMoves || [])) chargedNames.add(m.name);
+    // chargedMoves is a static-size-3 array since pvpoke 78c64048a and can
+    // hold nulls; extraChargedMovePool carries the auto-fired moves (Gulp
+    // Missile) that never sit in chargedMoves but do appear in the
+    // decision log as charged uses.
+    for (const m of (p.chargedMoves || [])) { if (m) chargedNames.add(m.name); }
+    for (const m of (p.extraChargedMovePool || [])) { if (m) chargedNames.add(m.name); }
   }
   // Pair each charged "uses X" with the immediate "blocks with a shield"
   // entry from the OPPOSITE pokemon. Track consumed shield-block indices so

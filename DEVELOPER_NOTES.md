@@ -32,15 +32,17 @@ Morpeko test + known-divergence marks in the audit script.
 
 ## Current status (updated 2026-06-12)
 
-<!-- sync:test_count -->1942<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
+<!-- sync:test_count -->2019<!-- /sync --> tests collected (canonical bump: `scripts/verify_dev_counts.py
 --update` rewrites the derivable sentinels in place -- do not hand-edit
 this number). The original PvPoke battle-correctness
 core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
-against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->23<!-- /sync --> matchups
-(<!-- sync:pvpoke_cells_verified -->207<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->172<!-- /sync --> exact on score+winner+chargedLog, 35 cells =
-documented divergences (172+35 re-audited 2026-08-06 at BOTH origin/main
+against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->27<!-- /sync --> matchups
+(<!-- sync:pvpoke_cells_verified -->243<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->208<!-- /sync --> exact on score+winner+chargedLog, 35 cells =
+documented divergences (the 2026-08-24 Cramorant port added 4 matchups /
+36 cells, all exact, and re-verified the prior 207 unchanged at pvpoke
+78c64048a; 172+35 re-audited 2026-08-06 at BOTH origin/main
 and the entry-13 engine batch -- identical counts, so the batch moved
 nothing; the old 170+37 had been stale since the hunt2 merge), each
 traced to a mechanism: the near-KO
@@ -564,29 +566,16 @@ correct; PvPoke's own engine agrees with us.
 **Impact**: display-only — no effect on sims, scores, or rankings.
 Not filed upstream yet.
 
-**Related non-bug (stat display convention)**: PvPoke truncates
-displayed atk/def to 1 decimal (`PokeSelect.js:75`,
-`Math.floor(stat*10)/10`) while our cards round
-(`deep_dive_engine.js:3838`, `toFixed(1)`). Same underlying stat:
-0/8/14 Mimikyu's exact atk 120.5661873 renders as their 120.5 vs our
-120.6. Divergence is cosmetic; no action needed unless we want
-pixel-parity, in which case switch our display to floor.
+**Related non-bug (stat display convention)**: PvPoke floors displayed
+atk/def to 1 decimal (`PokeSelect.js:75`), our cards round
+(`deep_dive_engine.js:3838`). Cosmetic only (120.5 vs 120.6).
 
 ### 4. Mimikyu SS timing — RETRACTED 2026-04-15
 
-This was a phantom bug. We thought our Mimi threw Shadow Sneak one
-turn earlier than PvPoke (363 vs 350), but harness localization
-revealed the divergence was in our timeline OUTPUT, not behavior.
-Our `simulate()` disguise-bust branch logged only "disguise busted"
-without emitting the standard `X uses Y → Z dmg` line for the
-throw that triggered it. So `_extract_battle_log` saw N-1 entries
-where PvPoke's harness saw N — making it look like PvPoke threw an
-"extra" opening Ice Beam. Once the missing log line was added, our
-chargedLog matches PvPoke's exactly across all 9 Mimi vs Azu shield
-combos. Mimi's actual SS timing was correct all along; the
-"363 vs 350" score difference came from earlier raw_dpe issues
-(also fixed 2026-04-15), not from SS timing. See the 2026-04-15
-"Localization meta-finding" entry below for the broader lesson.
+Phantom bug: the divergence was a missing timeline log line in our
+disguise-bust branch (fixed then), not a behavior difference. Full
+writeup in git history (pre-2026-08-24 DEVELOPER_NOTES) and the
+2026-04-15 "Localization meta-finding" entry.
 
 ## Resolved engine divergences (historical index)
 
@@ -987,6 +976,43 @@ the current move for both (hard-coding 6 in shield form). Fixed at both
 battle.py landing sites; pinned by
 `tests/test_fc1_aegislash_revert_energy.py` (oracle-equal, incl. a
 corrected winner flip).
+
+**5. Cramorant is the first MULTI-form / variable-target changer
+(ported 2026-08-24 from pvpoke 78c64048a).** `FormChangeConfig.forms` is
+now N-length (3 for Cramorant: base/Gulping/Gorging, order pinned) and
+`BattlePokemon._form_idx` replaced the old `_form_is_alt` bool (a compat
+property remains). The gamemaster's `alternativeFormId: "variable"` +
+plural `moveIDs: [DIVE, SURF]` resolve at the battle.py charged_move
+trigger site: prey = Gulping iff hp/max_hp is STRICTLY > 0.5 post-attack.
+Gulp Missile is NEVER in `charged_moves` (a 0-energy charged move would
+break ~30 affordability/DPE sites) -- it lives in the per-instance
+`_extra_charged` registry and is inserted into the (now index-driven)
+`_resolve_charged` action list when a prey-holder takes an unshielded,
+non-instant charged hit. Damage is flat `floor(0.15*target_max_hp)+1`
+computed inline (`damageMethod: percentMaxHP`). Tags drive three guards:
+`instant` (unshieldable, no Mimikyu-disguise interaction, no
+counter-missile), `ignoresFaint` (fires from the grave; lethal missile +
+lethal trigger = 500/500 draw). `use_priority` is forced True in the
+Cramorant mirror (PvPoke Battle.js:253-259). AI adds: Dive/Surf-ASAP
+pre-farm-down rule, prey-holder energy stacking (piggybacks bandaid
+[918]'s gate), and four wouldShield tail rules -- two of which replicate
+PvPoke's shipped `move.moveID` TYPOS as-is for oracle parity (SURF
+branches dead; a lethal Dive is never shielded -- likely inverted intent
+upstream, candidate bug report; harmless for the Peck/Dive+Fly default).
+Oracle: 4 matchups x 9 cells exact (audit; incl. Mimikyu disguise
+interplay + a simultaneous-KO draw) + 81 fixture cells
+(tests/test_cramorant.py). The wouldShield tail also ports upstream's
+new Aegislash-shield-form rule (attacker-model side only; audit-clean).
+A 52-agent adversarial review (2026-08-24) confirmed 19 findings, all
+fixed same-day with failing-first tests (highlights: migrate_cache's
+'variable' dead-end + a generator-consumption bug made the
+missile/prey-form cache invalidation silently dead; the missile now
+fires at a corpse for log parity; would_shield tail rules, [918]
+widening, and the signature movable-axes widening are all unit-pinned).
+Engine migration predicate: `cramorant_port_20260824` (Cramorant or
+Aegislash either side). The three-tier policy campaign (PvPoke default /
+never-bait / the "PoGoDives strat" overlay) is planned in
+docs/cramorant_policy_plan.md.
 
 ## Active alt-moveset opponent variants
 

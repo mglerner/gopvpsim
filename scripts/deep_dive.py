@@ -166,6 +166,19 @@ _FORM_CHANGE_NOTES = {
         'the post-bust state -- a starting state you cannot reach in an '
         'actual battle. For the realistic Disguise-intact start, see the '
         'Mimikyu dive.'),
+    'Cramorant': _form_change_callout(
+        'After using <b>Dive</b> or <b>Surf</b>, Cramorant surfaces holding '
+        'prey: <b>Gulping</b> form (Arrokuda) above 50% HP, <b>Gorging</b> '
+        'form (Pikachu) at 50% or less; it cannot change prey while already '
+        'holding one. While it holds prey, any <em>unshielded</em> charged '
+        'attack against it triggers <b>Gulp Missile</b>: an automatic, '
+        'unshieldable counterattack dealing flat damage equal to 1 + 15% of '
+        'the attacker&#39;s maximum HP (unaffected by stats or typing), '
+        'debuffing the attacker (-1 defense from Arrokuda, -2 attack from '
+        'Pikachu), and returning Cramorant to base form. It fires even if '
+        'the triggering attack knocks Cramorant out -- which can turn a '
+        'loss into a simultaneous-KO tie. The sim models all of this '
+        'natively from the gamemaster form-change data, mirroring PvPoke.'),
 }
 
 
