@@ -466,7 +466,8 @@ def won_slice_b64(won, si):
         gzip.compress(packed.tobytes(), 6, mtime=0)).decode('ascii')
 
 
-def load_meta_wins(data_dir, focal_tbl, grid_labels, *, oppiv='pvpoke'):
+def load_meta_wins(data_dir, focal_tbl, grid_labels, *, oppiv='pvpoke',
+                   opp_pool_name=None):
     """Read A1's meta_wins.npz into the page's meta_wins blob.
 
     A1 emits ``wins__<moveset>__<oppiv>__<bait>__<scenario>`` arrays (plus
@@ -526,8 +527,15 @@ def load_meta_wins(data_dir, focal_tbl, grid_labels, *, oppiv='pvpoke'):
     has_mirror = any(str(k).startswith('mirror_win__') for k in z.files)
     mirror_txt = (f' entries, {focal_name} mirror included)' if has_mirror
                   else f' entries; no {focal_name} mirror in the pool)')
+    opp_in_pool = bool(opp_pool_name and 'opponent_names' in z and
+                       any(str(n) == opp_pool_name
+                           for n in z['opponent_names']))
     return {
         'pool_n': int(z['pool_n']) if 'pool_n' in z else None,
+        # The dive pool usually contains this page's own opponent; the
+        # Pareto x axis then counts that matchup inside 'meta wins'
+        # (2026-08-19 review minor -- the page discloses it).
+        'pool_has_opponent': opp_in_pool,
         'oppiv': oppiv,
         'scenario_labels': scen_labels,
         'wins': wins,
@@ -999,7 +1007,8 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
         raise SystemExit('ABORT: no grids found (pass --allow-missing to '
                          'build a placeholder page anyway)')
 
-    meta_wins = load_meta_wins(data_dir, focal_tbl, spec['labels'])
+    meta_wins = load_meta_wins(data_dir, focal_tbl, spec['labels'],
+                               opp_pool_name=spec['opp_display'])
     meta_absent_marker = data_dir / 'meta_wins.ABSENT'
     if meta_wins is None and meta_absent_marker.exists():
         # A VERIFIED permanent absence (the focal's dive replay has no
@@ -1269,10 +1278,13 @@ def render_page(data, missing, spec):
     main_dive_clause = (
         f" <a href=\"{MAIN_DIVE_URL}\">{spec['focal_display']}'s main "
         f"{LEAGUE_LABEL} League dive</a>." if MAIN_DIVE_URL else '')
+    sims = m.get('total_sims')
+    sims_clause = (f" ({sims:,} deduplicated engine calls -- IV-identical "
+                   "cells share one sim)" if sims else "")
     intro = (
         f"{N_IV:,} x {N_IV:,} IV spreads x {N_SCEN} shield scenarios x "
         f"{n_distinct} distinct moveset/bait {grid_word} = "
-        f"{distinct_cells:,} simulated matchups{dup_clause}"
+        f"{distinct_cells:,} simulated matchups{sims_clause}{dup_clause}"
         f"{occasion_clause}."
         + main_dive_clause
         + CROSSLINK_HTML

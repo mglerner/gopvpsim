@@ -527,6 +527,23 @@ def main(argv=None):
             'opponent_atk_needed': r(need, 3),
             'n_opponent_qualifying': int((o_atk >= need).sum()),
         })
+    # Zero-qualifying rows are filler ('0 spreads reach the higher tier'
+    # three times over -- 2026-08-20 review m10). Keep the qualifying
+    # rows; when NONE qualify, replace the table with one true sentence
+    # the page renders as a note.
+    ladder_note = None
+    if all(row['n_opponent_qualifying'] == 0 for row in rollout_rows):
+        _min_need = min(row['opponent_atk_needed'] for row in rollout_rows)
+        ladder_note = (
+            f'No {OPPONENT} spread reaches the higher {roll_name} tier '
+            f'against ANY {FOCAL} bulk level (max species attack '
+            f'{r(o_atk.max(), 3)} < the {r(_min_need, 3)} needed even vs '
+            'the frailest target) -- the attack route does not exist in '
+            'this matchup.')
+        rollout_rows = []
+    else:
+        rollout_rows = [row for row in rollout_rows
+                        if row['n_opponent_qualifying'] > 0] or rollout_rows
 
     # ---- ranked builds: composite over the sensitive cells ----
     frac = {p: np.zeros(N) for p in POPS}
@@ -619,6 +636,7 @@ def main(argv=None):
                                 if wall_cell else None),
                        'rows': wall_rows},
         f'{roll_key}_ladder': rollout_rows,
+        **({f'{roll_key}_ladder_note': ladder_note} if ladder_note else {}),
         'ranked_builds': ranked,
         'named_builds': named_rows,
         'composite_rule': {
