@@ -932,6 +932,9 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
     grids_meta = {}
     grid_hashes = {}
     total_sims = manifest.get('total_sims') if manifest else None
+    mirror_diag_even_wins = 0
+    mirror_diag_even_cells = 0
+    mirror_both_won = 0
     for label in spec['labels']:
         loaded = load_grid(data_dir, label, spec)
         if loaded is None:
@@ -942,24 +945,32 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
         won, z = loaded
         check_axis_order(z, focal_tbl, opp_tbl, label)
         if _is_true_mirror(CFG):
-            # The MIRROR MATCH note claims seat-consistency; verify it
-            # here rather than asserting from theory. The seat swap of
-            # cell (i, j, sf-so) is (j, i, so-sf) -- the SHIELD COUNTS
-            # swap with the seats (the first draft of this check kept
-            # the scenario fixed and 'found' 49.6M violations that were
-            # just the asymmetric-shield scenarios read wrong,
-            # 2026-08-20). A fight recorded as a win from both seats is
-            # a bookkeeping bug.
+            # Same-species grids are NOT seat-symmetric: the ROW seat
+            # plays this page's optimized line (the grid's bait flag)
+            # while the COLUMN seat plays the standard dive convention
+            # (always-baits opponent AI) -- see joint_iv_bake.py. The
+            # 2026-08-20 check asserted seat-antisymmetry here, and a
+            # 2026-08-24 relaxation asserted only exact-attack-tie
+            # violations; the Thievul mirrors refuted both (the
+            # optimized row seat wins 6,814/12,288 identical-build
+            # even-shield fights in the true mirror's bait grid alone,
+            # and no-bait grids pit two DIFFERENT policies against each
+            # other by construction, 13.6M both-seat wins there). No
+            # antisymmetry invariant exists, so the asymmetry is
+            # MEASURED here and disclosed in the MIRROR MATCH note; the
+            # round-1 mirrors (Lickilicky, Wigglytuff, Corviknight,
+            # Quagsire-Shadow) all measure zero and keep the shipped
+            # wording byte-identically.
+            di = np.arange(won.shape[0])
+            diag = won[di, di, :]
+            mirror_diag_even_wins += int(diag[:, [0, 4, 8]].sum())
+            mirror_diag_even_cells += 3 * won.shape[0]
             for si in range(9):
                 sf, so = divmod(si, 3)
                 sj = so * 3 + sf
                 both = won[:, :, si] & won[:, :, sj].T
-                if both.any():
-                    raise SystemExit(
-                        f'ABORT: {label} scenario {sf}-{so}: '
-                        f'{int(both.sum())} mirror cell(s) won from BOTH '
-                        'seats -- seat bookkeeping bug; the MIRROR MATCH '
-                        'note would be false.')
+                np.fill_diagonal(both, False)
+                mirror_both_won += int(both.sum())
         # Two grids can come out BYTE-IDENTICAL for a real reason (e.g. when
         # the cheaper charged move is also the higher-DPE one, baiting and
         # not baiting pick the same move every time). That is fine, but the
@@ -1054,26 +1065,53 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             'FOLLOWS the controls; the meta-wins rail below states the '
             'binding actually in effect.')
     if _is_true_mirror(CFG):
-        # Wording corrected by the 2026-08-20 mirror review (the first
-        # draft claimed the diagonal was CMP-decided and named the wrong
-        # player index): identical builds at EVEN shields fight to an
-        # exact 500 tie, which the page's standing convention counts as
-        # a loss for BOTH seats; with a shield advantage the diagonal is
-        # a real asymmetric fight. Seat-consistency is VERIFIED at build
-        # time below, not asserted from theory.
-        notes.insert(0, (
-            'MIRROR MATCH. Reading rules: (1) identical builds -- the '
-            'diagonal, and any two spreads with byte-identical stats -- '
-            'fight to an exact 500 tie at even shields, which this page '
-            'counts as a LOSS for both seats (the standing tie '
-            'convention); with a shield advantage the diagonal is a '
-            'real, asymmetric fight, not a coin flip. (2) Cell (i, j) '
-            'and cell (j, i) are one fight read from the two seats; '
-            'this build verified no cell is a win from both seats. '
-            '(3) Exact charge-priority ties (equal attack values) '
-            'resolve charged-move ORDER by seat -- player 0 first, the '
-            'engine\'s documented PROP-1 rule; on this data that '
-            'ordering produced only ties, never a seat-dependent win.'))
+        # Two wordings, chosen by MEASURED data (the counters above):
+        # the zero branch is the 2026-08-20 round-1 wording, kept
+        # byte-for-byte because the shipped Lickilicky / Wigglytuff /
+        # Corviknight / Quagsire-Shadow mirror pages pin it and all
+        # measure zero seat asymmetry; the asymmetric branch (first
+        # hit: the Thievul Icy Wind mirrors, 2026-08-24) states the
+        # real reading -- the row seat plays this page's optimized
+        # line, the column seat plays the always-baiting dive
+        # convention, so the seats are not interchangeable and the
+        # diagonal is a real fight.
+        if mirror_diag_even_wins or mirror_both_won:
+            notes.insert(0, (
+                'MIRROR MATCH -- read this before trusting any cell. '
+                'Every grid on this page puts the ROW seat on the '
+                "page's optimized line (with the grid's stated bait "
+                'setting) and the COLUMN seat on the standard dive '
+                'convention (an always-baiting opponent AI). In a '
+                'mirror the two seats are therefore NOT '
+                'interchangeable: cell (i, j) and cell (j, i) are two '
+                'DIFFERENT fights, and the diagonal -- identical '
+                'builds -- is a real fight, not a guaranteed tie: at '
+                "even shields the row seat's line wins "
+                f'{mirror_diag_even_wins:,} of {mirror_diag_even_cells:,} '
+                'identical-build fights on this page (a tie counts as '
+                'a loss for both seats). Exact charge-priority ties '
+                '(equal attack values) additionally resolve '
+                'charged-move ORDER by seat -- player 0 first, the '
+                "engine's documented PROP-1 rule -- which matters "
+                'whenever landing a debuff first decides the fight; in '
+                'real play that order is a coin flip, so treat '
+                'equal-attack cells as toss-ups. Read a cell as "my '
+                'build on my line vs their build on the standard '
+                'line", not as a symmetric duel.'))
+        else:
+            notes.insert(0, (
+                'MIRROR MATCH. Reading rules: (1) identical builds -- the '
+                'diagonal, and any two spreads with byte-identical stats -- '
+                'fight to an exact 500 tie at even shields, which this page '
+                'counts as a LOSS for both seats (the standing tie '
+                'convention); with a shield advantage the diagonal is a '
+                'real, asymmetric fight, not a coin flip. (2) Cell (i, j) '
+                'and cell (j, i) are one fight read from the two seats; '
+                'this build verified no cell is a win from both seats. '
+                '(3) Exact charge-priority ties (equal attack values) '
+                'resolve charged-move ORDER by seat -- player 0 first, the '
+                'engine\'s documented PROP-1 rule; on this data that '
+                'ordering produced only ties, never a seat-dependent win.'))
     if notes_meta_absent:
         notes.append(
             'NO dive-derived meta data exists for this pair: the '
