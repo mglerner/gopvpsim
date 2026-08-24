@@ -336,7 +336,19 @@ def _grid9(slice_, opp_name, bait_label, alt_slice=None):
             band = f'margin {lo:+d}..{hi:+d}'
         tip = (f'{bait_label} {SCEN_LABELS[i]} vs {opp_name}: beats '
                f'{int(slice_.wins[i])} of {slice_.n} spreads ({band})')
-        parts.append(f'<span class="sc sc-{st}" title="{esc(tip)}">'
+        # GTO-chart-style proportional fill (Michael 2026-08-25): a mixed
+        # cell's green width = the win share, so 93/7 no longer looks
+        # like 50/50. The sc-amber class stays as the no-inline-style
+        # fallback and the test/gate anchor; the '?' letter stays so the
+        # outcome is never color-alone. Visibility floor: each side of
+        # the split keeps >= 1px of the 20px box (5%), so "barely any"
+        # renders as a sliver, never as solid.
+        style = ''
+        if st == 'amber':
+            p = 100 * min(0.95, max(0.05, float(slice_.frac[i])))
+            style = (' style="background:linear-gradient(90deg,'
+                     f'var(--win) {p:.1f}%,var(--loss) {p:.1f}%)"')
+        parts.append(f'<span class="sc sc-{st}"{style} title="{esc(tip)}">'
                      f'{_LETTER[st]}</span>')
     return (f'<span class="g9">{"".join(parts)}</span>'
             f'<span class="gcap">{esc(bait_label)}</span>')
@@ -455,7 +467,21 @@ def _mini_cell(row, focal_name, opp_name, pair_link=None,
     if row.get('missing'):
         return '<td title="missing plane">?</td>'
     cls = {'green': 'g', 'red': 'r', 'amber': 'a'}
-    boxes = ''.join(f'<i class="{cls[s]}"></i>' for s in row['status'])
+
+    def _box(s, f):
+        # GTO-chart-style proportional fill (Michael 2026-08-25): a
+        # mixed sub-square splits green/red at the win share instead of
+        # rendering flat amber. The 7px box gets pixel stops with a 1px
+        # floor per side, so a 99% cell shows a sliver rather than
+        # passing as solid; class "a" stays as the no-inline-style
+        # fallback (flat amber) and the scanner anchor.
+        if s != 'amber':
+            return f'<i class="{cls[s]}"></i>'
+        x = min(6, max(1, round(float(f) * 7)))
+        return (f'<i class="a" style="background:linear-gradient(90deg,'
+                f'var(--win) {x}px,var(--loss) {x}px)"></i>')
+
+    boxes = ''.join(_box(s, f) for s, f in zip(row['status'], row['frac']))
     tips = ', '.join(f'{SCEN_LABELS[i]} {_pct(f)}'
                      for i, f in enumerate(row['frac']))
     tip = f'{focal_name} vs {opp_name} (rank-1 spread, top-512, bait): {tips}'
@@ -608,8 +634,13 @@ def provenance_html(meta, manifest):
 
 
 LEGEND = ('<p class="legend"><span class="sc sc-green">W</span> beats every '
-          'cohort spread &nbsp; <span class="sc sc-amber">?</span> '
-          'IV-decided (some spreads win, some lose) &nbsp; <span class="sc '
+          'cohort spread &nbsp; <span class="sc sc-amber" '
+          'style="background:linear-gradient(90deg,var(--win) 65%,'
+          'var(--loss) 65%)">?</span> '
+          'IV-decided: the green width is the share of cohort spreads '
+          'beaten (uniform over the tested cohort, not a matchmaking '
+          'distribution; each side keeps a minimum 1px sliver, so '
+          'near-solid means "flips only in a corner") &nbsp; <span class="sc '
           'sc-red">L</span> beats no cohort spread (an exact 500-500 tie '
           'counts as not beaten). Every 3x3 grid uses PvPoke\'s '
           'battle-matrix layout: rows = own shields 0/1/2 top to bottom, '
