@@ -54,12 +54,22 @@ grids with auto-generated detail pages; (3) ~03:35: three MIRROR pages
 (lickilicky/wigglytuff/corviknight -- mirrors were an accidental
 combinations() exclusion; all three are heavily IV-decided, e.g. the
 Licki mirror's best build is rank-3182 15/3/3) + a fix for a latent
-renderYourDenial crash. Mirror review round fixed 1 blocker + 3 majors
-(the corrected MIRROR MATCH note is seat-verified at build time).
-OPEN mirror minors (review m6-m10, deferred): tl-hardest anchor row
-mirror caveat, static '; selected' grid label, dropdown species-name
-disambiguation wording, [meta.oracle] tables for first-publish pairs,
-degenerate rollout-ladder rows.
+renderYourDenial crash. Mirror review round fixed 1 blocker + 3 majors.
+All 11 deferred review minors shipped 2026-08-24 (28f2a4d) and
+[meta.oracle] pins landed on all 18 eligible pairs (7360eb2).
+
+**Round-2 mirrors (2026-08-24):** thievul x3 (true NS+IW mirror, IW+PR
+mirror, NS+IW-vs-IW+PR cross-arm), quagsire-shadow, altaria -- built +
+published-copy ready. DEFERRED to a later push (Michael-approved):
+empoleon__vs__empoleon and feraligatr__vs__feraligatr mirror bakes.
+Key finding baked into the kit (8ebb642): mirror grids are
+seat-ASYMMETRIC by construction (row = optimized line, column =
+always-baits dive convention), so there is NO antisymmetry invariant;
+the MIRROR MATCH note is now data-driven (measured diagonal even-shield
+wins). TEST DEBT: the new guards (measured mirror note branches in
+build_joint_iv_page.py, seat-ambiguous stage attribution + buff-meter
+bound in joint_iv_breakpoints.py) shipped without failing-first tests
+(publish-day time box); pin them per testing policy next session.
 
 **DECISIONS FOR MICHAEL (2026-08-19 EOD):**
 
