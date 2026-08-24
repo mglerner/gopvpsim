@@ -134,6 +134,42 @@ class Cell:
         idx.update(self.grid_scenarios)
         return sorted(idx)
 
+    def amber_origins(self):
+        """{scenario index: sorted origin tags} for every flagged
+        scenario -- WHICH corner of the tested IV space makes it
+        IV-decided (Michael 2026-08-26, so a flag that disagrees with
+        the displayed strip can explain itself). Tags:
+
+          'headline'        mixed in a displayed rank1/top512 slice
+                            (either bait mode -- the strip shows it)
+          'atkband'         mixed vs the high-attack cohort (rank1 probe)
+          'maxatk'          mixed under the max-attack probe (top512)
+          'maxatk+atkband'  mixed only with both deviations at once
+          'spread-flip'     the two probe spreads land on OPPOSITE
+                            uniform outcomes (see spread_flip_scenarios)
+          'grid'            full-grid Tier-2 evidence on a probe-clean
+                            pair (see grid_scenarios)
+        """
+        out = {}
+        for (spread, cohort, _bait), s in self.slices.items():
+            for i, st in enumerate(s.status):
+                if st != 'amber':
+                    continue
+                if spread == 'rank1' and cohort == 'top512':
+                    tag = 'headline'
+                elif spread == 'rank1':
+                    tag = 'atkband'
+                elif cohort == 'top512':
+                    tag = 'maxatk'
+                else:
+                    tag = 'maxatk+atkband'
+                out.setdefault(i, set()).add(tag)
+        for i in self.spread_flip_scenarios():
+            out.setdefault(i, set()).add('spread-flip')
+        for i in self.grid_scenarios:
+            out.setdefault(i, set()).add('grid')
+        return {i: sorted(v) for i, v in out.items()}
+
     def probe_missed(self):
         """True when this direction is amber ONLY through full-grid
         evidence -- the probe screen alone called it settled."""

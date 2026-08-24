@@ -117,6 +117,11 @@ WORLDS_CSS = """
   .mini i { border-radius: 1px; }
   .mini .g { background: var(--win); } .mini .r { background: var(--loss); }
   .mini .a { background: var(--flip); }
+  /* Solid in the headline slice, IV-contested in a corner slice.
+     var(--flip) is AA-solved per theme, so the ring survives all four
+     palettes. */
+  .mini i.u { box-shadow: inset 0 0 0 1.5px var(--flip); }
+  .g9 .sc.sc-u { box-shadow: inset 0 0 0 2px var(--flip); }
   /* Emphasis is INVERTED vs the 2026-08-11 scheme (Michael 2026-08-18):
      the IV-decided cells are the punchline, so they render at full
      strength with no border, and the settled cells are dimmed back.
@@ -290,6 +295,32 @@ def dive_slug_map(entries, website_dir=WEBSITE_DIR):
 
 _LETTER = {'green': 'W', 'red': 'L', 'amber': '?'}
 
+# "IVs decide" flag-origin annotations (Michael 2026-08-26): when a
+# flagged scenario is NOT mixed in the displayed rank1/top512 slice,
+# the flag names the nearest corner of the tested IV space that flips
+# it, so a flag that disagrees with the strip explains itself. Order =
+# fewest deviations from the headline slice first; the annotation is an
+# "at least here" statement, not an exhaustive list.
+_ORIGIN_LABEL = {
+    'atkband': 'high-atk opp',
+    'maxatk': 'max-atk probe',
+    'maxatk+atkband': 'max-atk probe vs high-atk opp',
+    'spread-flip': 'probe-spread flip',
+    'grid': 'full grid only',
+}
+_ORIGIN_NEAREST = ['atkband', 'maxatk', 'maxatk+atkband', 'spread-flip',
+                   'grid']
+
+
+def _flag_label(i, origins):
+    tags = origins.get(i, [])
+    if 'headline' in tags:
+        return SCEN_LABELS[i]
+    for t in _ORIGIN_NEAREST:
+        if t in tags:
+            return f'{SCEN_LABELS[i]} ({_ORIGIN_LABEL[t]})'
+    return SCEN_LABELS[i]
+
 
 def _pct(f):
     """Exact-honest percentage: only true 0/1 print as 0%/100%; an
@@ -301,7 +332,7 @@ def _pct(f):
     return f'{100 * f:.1f}%'
 
 
-def _grid9(slice_, opp_name, bait_label, alt_slice=None):
+def _grid9(slice_, opp_name, bait_label, alt_slice=None, union_flags=None):
     """One 3x3 scenario grid in PvPoke's battle-matrix layout (rows =
     own shields top to bottom, columns = opponent shields left to
     right -- Michael 2026-08-10, for visual consistency with PvPoke's
@@ -348,8 +379,17 @@ def _grid9(slice_, opp_name, bait_label, alt_slice=None):
             p = 100 * min(0.95, max(0.05, float(slice_.frac[i])))
             style = (' style="background:linear-gradient(90deg,'
                      f'var(--win) {p:.1f}%,var(--loss) {p:.1f}%)"')
-        parts.append(f'<span class="sc sc-{st}"{style} title="{esc(tip)}">'
-                     f'{_LETTER[st]}</span>')
+        # Amber outline (Michael 2026-08-26): solid in THIS slice but
+        # union-flagged -- some corner of the tested IV space flips it.
+        # A separate channel, never a widened sliver: the fill must
+        # keep meaning "share of THIS cohort beaten by THIS spread".
+        extra = ''
+        if st != 'amber' and union_flags is not None and i in union_flags:
+            extra = ' sc-u'
+            tip += ('; settled in this slice, IV-contested in another '
+                    '(the IVs-decide flags name the corner)')
+        parts.append(f'<span class="sc sc-{st}{extra}"{style} '
+                     f'title="{esc(tip)}">{_LETTER[st]}</span>')
     return (f'<span class="g9">{"".join(parts)}</span>'
             f'<span class="gcap">{esc(bait_label)}</span>')
 
@@ -468,23 +508,41 @@ def _mini_cell(row, focal_name, opp_name, pair_link=None,
         return '<td title="missing plane">?</td>'
     cls = {'green': 'g', 'red': 'r', 'amber': 'a'}
 
-    def _box(s, f):
+    union = set(row.get('amber_scenarios') or [])
+
+    def _box(i, s, f):
         # GTO-chart-style proportional fill (Michael 2026-08-25): a
         # mixed sub-square splits green/red at the win share instead of
         # rendering flat amber. The 7px box gets pixel stops with a 1px
         # floor per side, so a 99% cell shows a sliver rather than
         # passing as solid; class "a" stays as the no-inline-style
         # fallback (flat amber) and the scanner anchor.
+        # Amber outline (Michael 2026-08-26): a sub-square that is
+        # SOLID in the headline slice but union-flagged gets a flip-
+        # colored inset ring -- settled for the standard build, but
+        # some corner of the tested IV space (max-attack probe,
+        # high-attack cohort, probe-spread flip, full-grid evidence)
+        # flips it. Separate channel; the fill's denominator stays pure.
         if s != 'amber':
-            return f'<i class="{cls[s]}"></i>'
+            return (f'<i class="{cls[s]} u"></i>' if i in union
+                    else f'<i class="{cls[s]}"></i>')
         x = min(6, max(1, round(float(f) * 7)))
         return (f'<i class="a" style="background:linear-gradient(90deg,'
                 f'var(--win) {x}px,var(--loss) {x}px)"></i>')
 
-    boxes = ''.join(_box(s, f) for s, f in zip(row['status'], row['frac']))
+    boxes = ''.join(_box(i, s, f)
+                    for i, (s, f) in enumerate(zip(row['status'],
+                                                   row['frac'])))
     tips = ', '.join(f'{SCEN_LABELS[i]} {_pct(f)}'
                      for i, f in enumerate(row['frac']))
     tip = f'{focal_name} vs {opp_name} (rank-1 spread, top-512, bait): {tips}'
+    outlined = set(row.get('amber_scenarios') or []) - {
+        i for i, s in enumerate(row['status']) if s == 'amber'}
+    if outlined:
+        tip += ('; outlined ' + ', '.join(SCEN_LABELS[i]
+                                          for i in sorted(outlined))
+                + ' = settled here, IV-contested in a corner slice (the '
+                'cheat sheet names it)')
     td_cls = '' if row['amber'] else ' class="pair-dim"'
     mini = f'<span class="mini">{boxes}</span>'
     # Link whenever the pair page EXISTS -- gating on this direction's
@@ -642,7 +700,12 @@ LEGEND = ('<p class="legend"><span class="sc sc-green">W</span> beats every '
           'distribution; each side keeps a minimum 1px sliver, so '
           'near-solid means "flips only in a corner") &nbsp; <span class="sc '
           'sc-red">L</span> beats no cohort spread (an exact 500-500 tie '
-          'counts as not beaten). Every 3x3 grid uses PvPoke\'s '
+          'counts as not beaten) &nbsp; <span class="sc sc-green sc-u">'
+          'W</span> outlined = settled in the displayed slice but '
+          'IV-contested in a corner of the tested space (max-attack '
+          'probe, high-attack cohort, probe-spread flip, or full-grid '
+          'evidence) -- the "IVs decide" flags name the corner. '
+          'Every 3x3 grid uses PvPoke\'s '
           'battle-matrix layout: rows = own shields 0/1/2 top to bottom, '
           'columns = opponent shields left to right (scenario labels read '
           'own-opp, e.g. 2-1 = you keep two shields, they keep one). '
@@ -1024,8 +1087,10 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None,
         bait = cell.slices.get(('rank1', 'top512', True))
         nobait = cell.slices.get(('rank1', 'top512', False))
         flags = cell.amber_scenarios()
+        origins = cell.amber_origins()
         flag_html = ('<span class="flags">IVs decide: '
-                     + ', '.join(SCEN_LABELS[i] for i in flags) + '</span>'
+                     + ', '.join(_flag_label(i, origins) for i in flags)
+                     + '</span>'
                      if flags else '')
         # Closest-scenario readout (Michael 2026-08-11, replacing the
         # cross-scenario min..max band: 94% of those bands straddled
@@ -1063,13 +1128,14 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None,
                       and (bait.wins == nobait.wins).all())
         if bait_indep:
             grids = (f'<span style="display:inline-block">'
-                     f'{_grid9(bait, oname, "bait-independent", nobait)}'
+                     f'{_grid9(bait, oname, "bait-independent", nobait, flags)}'
                      '</span>')
         else:
             grids = (f'<span style="display:inline-block">'
-                     f'{_grid9(bait, oname, "bait")}</span>'
+                     f'{_grid9(bait, oname, "bait", union_flags=flags)}</span>'
                      f'<span style="display:inline-block">'
-                     f'{_grid9(nobait, oname, "no-bait")}</span>')
+                     f'{_grid9(nobait, oname, "no-bait", union_flags=flags)}'
+                     '</span>')
         # The 3x3 grids click through to the pair detail page (Michael
         # 2026-08-14); link only against a file that exists (ship-gate
         # rule), same as _mini_cell.

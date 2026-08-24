@@ -1231,6 +1231,11 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
         'movesets': dict(spec['pretty']),
         'opp_moveset': spec['opp_moveset'],
         'focal': spec['focal'], 'opponent': spec['opponent'],
+        # Display labels for the JS panels (review minor 4: the
+        # cross-arm page's panels said bare "Thievul" for both arms).
+        # FOCAL/OPP stay the species names -- they are data keys.
+        'focal_display': spec['focal_display'],
+        'opp_display': spec['opp_display'],
         'league': LEAGUE,
         'provenance': (
             'Human-guided, AI-generated (Claude). '
