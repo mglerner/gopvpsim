@@ -527,7 +527,8 @@ def fork_html(entry, entries, website_dir=WEBSITE_DIR):
     deep_html = ''
     if deep and (Path(website_dir) / deep[0]).exists():
         deep_html = (f' For {esc(deep[1])}, see '
-                     f'<a href="{esc(deep[0])}">{esc(deep[0])}</a>.')
+                     f'<a href="{esc(deep[0])}">the deep robustness '
+                     'page</a>.')
     return ('<p class="section-intro"><strong>This is one arm of a '
             f'{len(sibs) + 1}-way moveset fork.</strong> '
             f'{esc(entry["name"])} runs {mine}; the other '
@@ -740,14 +741,13 @@ def render_inclusion_table(entries, meta):
     the mechanical rule no longer awards must never be silent."""
     rows = []
     for e in entries:
-        div = rule_divergence(e.get('badge'), e.get('badge_rule'))
-        div_html = (f' <span class="mband">(rule: {esc(div)})</span>'
-                    if div else '')
+        # badge_html() already renders any badge-vs-rule divergence
+        # inline (the "(rule: X)" small tag), so nothing extra here.
         why = ('editorial include; reason on its cheat sheet'
                if e.get('forced_reason') else '')
         rows.append(
             f'<tr><td>{esc(e["name"])}</td>'
-            f'<td>{badge_html(e)}{div_html}</td>'
+            f'<td>{badge_html(e)}</td>'
             f'<td>{esc(why)}</td></tr>')
     return (
         '<h2 id="badges">Why each entry is included</h2>'
@@ -929,8 +929,8 @@ the page</a>.</p>
 {render_meta_table(entries, slug_map)}
 <h2>Candidates that stayed out</h2>
 <p class="section-intro">The usage top-{meta["reject_top_n"]} that did not
-make the meta, plus the banned row. Collapsed-rank PLAYED* entries (see the badge
-section at the foot) are
+make the meta, plus the banned row. Collapsed-rank PLAYED* entries (see the
+<a href="#badges">badge section at the foot</a>) are
 shown as data; we do not claim nerf vs model error.</p>
 {render_rejects_table(meta['rejects'])}
 {render_inclusion_table(entries, meta)}
@@ -1049,8 +1049,8 @@ def render_cheat_sheet(entry, meta, cells, manifest, slug_map, links=None,
         'tournament usage + current rank; PLAYED* = usage but rank '
         'collapsed post-rebalance; MODEL = rank only, no tournament '
         'footprint; FORCED = editorial include) -- definitions and '
-        'per-entry data in the <a href="worlds.html">hub meta '
-        'table</a>.</p>')
+        'per-entry data in the <a href="worlds.html#badges">badge '
+        'section at the foot of the hub</a>.</p>')
     fast, charged = display_moveset(entry)
     moves = f'{esc(fast)} / ' + ' + '.join(esc(m) for m in charged)
     dive = slug_map.get(sid)
