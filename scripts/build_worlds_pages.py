@@ -125,6 +125,14 @@ WORLDS_CSS = """
   td.pair-dim .mini { opacity: 0.45; filter: saturate(0.55); }
   td.pair-dim:hover .mini, td.pair-dim:focus-within .mini { opacity: 1;
           filter: none; }
+  /* Diagonal mirror-dive links: no Tier-1 colors exist for mirrors, so
+     the cell carries a small text link instead of a mini-grid. */
+  td.diag { text-align: center; }
+  td.diag a { font-size: 9px; text-decoration: none;
+              color: var(--text-muted);
+              writing-mode: vertical-rl; transform: rotate(180deg); }
+  td.diag a:hover, td.diag a:focus-visible { color: var(--accent);
+              text-decoration: underline; }
   .ndbtn { background: none; border: 0; padding: 0; margin: 0;
            display: block; cursor: pointer; }
   .ndbtn:focus-visible { outline: 2px solid var(--accent);
@@ -787,10 +795,11 @@ def render_rejects_table(rejects):
             + ''.join(rows) + '</table></div>')
 
 
-def render_matrix(entries, cells, links=None):
+def render_matrix(entries, cells, links=None, jmap=None):
     ids = [e['species_id'] for e in entries]
     names = {e['species_id']: e['name'] for e in entries}
     links = links or {}
+    jmap = jmap or {}
     rows_html = ['<tr><th></th>' + ''.join(
         f'<th class="colhead">{esc(names[o])}</th>' for o in ids) + '</tr>']
     summary = wrd.matrix_summary(cells, entries)
@@ -798,7 +807,20 @@ def render_matrix(entries, cells, links=None):
         tds = []
         for o in ids:
             if f == o:
-                tds.append('<td></td>')
+                # The Tier-1/Tier-2 pipeline never baked mirror planes,
+                # so a diagonal cell has no green/red/amber status. But
+                # 7 mirrors DO have full joint-IV deep pages (singleton
+                # keys in jmap); link those instead of rendering a dead
+                # cell (Michael 2026-08-25).
+                mirror = jmap.get(frozenset((f,)))
+                if mirror:
+                    tds.append(
+                        f'<td class="diag"><a href="{esc(mirror[0])}" '
+                        f'title="{esc(names[f])} mirror match -- full '
+                        '4096x4096 joint-IV deep dive (no Tier-1 colors: '
+                        'mirror planes were never baked)">mirror</a></td>')
+                else:
+                    tds.append('<td></td>')
             else:
                 tds.append(_mini_cell(summary[(f, o)], names[f], names[o],
                                       links.get(frozenset((f, o))),
@@ -894,7 +916,7 @@ def render_hub(meta, cells, manifest, slug_map, links=None, fn=None,
     body = f"""
 <h2>Robustness matrix</h2>
 <figure class="matrix-fig">
-{render_matrix(entries, cells, links)}
+{render_matrix(entries, cells, links, jmap)}
 <figcaption class="matrix-cap">
 <p>Row = the focal Pokemon (its rank-1-SP spread), column = the opponent
 (its top-512 SP spreads). Each cell shows all 9 shield scenarios.
@@ -907,7 +929,10 @@ one by being IV-decided in EITHER direction, so a dimmed cell can still be
 a link. A cell with no detail page opens a short note instead, with links
 to that pair's cheat sheet row and to the equivalent battle on pvpoke.com
 at PvPoke's own default IVs and movesets (not our probe spread). Hover or
-keyboard-focus restores a dimmed cell to full strength.</p>
+keyboard-focus restores a dimmed cell to full strength. Diagonal cells
+have no colors -- the Tier-1/Tier-2 screen never baked mirror planes --
+but where a full mirror deep dive exists the cell links it (marked
+"mirror"; also listed under Deep joint-IV analyses below).</p>
 {LEGEND}
 <p>Accessibility note: the dimmed fills carry less contrast than the
 full-strength ones, and dimmed cells are exactly the settled ones, so
