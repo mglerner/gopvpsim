@@ -68,8 +68,12 @@ always-baits dive convention), so there is NO antisymmetry invariant;
 the MIRROR MATCH note is now data-driven (measured diagonal even-shield
 wins). TEST DEBT: the new guards (measured mirror note branches in
 build_joint_iv_page.py, seat-ambiguous stage attribution + buff-meter
-bound in joint_iv_breakpoints.py) shipped without failing-first tests
-(publish-day time box); pin them per testing policy next session.
+bound in joint_iv_breakpoints.py, grid-condition stage probes +
+debuff_thrown_only_shielded recording, f47e87f) shipped without
+failing-first tests (publish-day time box); pin them per testing
+policy next session. Also deferred (review minor 4, cosmetic): the
+cross-arm page's JS panels say bare "Thievul" for both arms (TL_DATA
+lacks focal_display/opp_display; the static headings do use them).
 
 **DECISIONS FOR MICHAEL (2026-08-19 EOD):**
 
