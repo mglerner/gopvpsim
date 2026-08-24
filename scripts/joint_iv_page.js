@@ -1655,9 +1655,12 @@
           // followed as a second bare aside.
           + (also.length || isCur
             ? ' <em>(' + [].concat(
+                // 'selected' FIRST: trailing it after 'byte-identical
+                // to X, no bait' read as marking no-bait selected
+                // (2026-08-20 review m7)
+                isCur ? ['currently selected in Controls'] : [],
                 also.length ? ['byte-identical to ' + esc(also.join(', '))]
-                  : [],
-                isCur ? ['selected'] : []).join('; ') + ')</em>'
+                  : []).join('; ') + ')</em>'
             : '') + '</li>';
       }).filter(Boolean).join('');
     if (!rows) return '';
@@ -2768,7 +2771,13 @@
           }).length;
         })(), 0)) + ' of ' + esc(commas(N))
       + ' spreads here - every other point is at or behind a step of it. '
-      + 'Meta axis: ' + esc(mw.note) + '. ' + esc(D.meta_wins.note || '')
+      + 'Meta axis: ' + esc(mw.note) + '. '
+      + (D.meta_wins && D.meta_wins.pool_has_opponent
+        ? 'NOTE: the meta-wins axis counts the whole dive pool, which '
+          + 'INCLUDES this page\'s own ' + esc(OPP) + ' matchup -- the '
+          + 'two axes are not fully independent. '
+        : '')
+      + esc(D.meta_wins.note || '')
       + ' ' + esc(OPP) + ' cohort: ' + esc(cohortLabel()) + '.'
       + esc(cohortWarnText())
       + esc(psat.note)
@@ -2983,6 +2992,10 @@
           + ' ' + esc(OPP) + ' spreads are not beaten (a tie, score '
           + 'exactly 500, is counted here too - the win grid records "did '
           + FOCAL + ' win", so ties and losses are indistinguishable in it)'
+          + (FOCAL === OPP
+            ? '. MIRROR NOTE: the anchor spread itself appears in this '
+              + 'list - that row is its own diagonal tie, not a loss'
+            : '')
           + (state.scenarioAll
             ? ' (the dropdown is on "all 9 (mean)", which this table cannot '
               + 'average - it lists the first embedded scenario, '
@@ -3251,7 +3264,14 @@
       .replace(/\bge\b/g, 'at or above')
       .replace(/\ble\b/g, 'at or below')
       .replace(/\btier hi\b/g, 'the high tier')
-      .replace(/\bstage0\b/g, 'stage 0');
+      .replace(/\bstage0\b/g, 'stage 0')
+      // raw key fragments that read as typos in prose (2026-08-19
+      // review): the headline-move abbreviation, compaction shorthands
+      .replace(new RegExp('\\b' + focalMoveAbbr().toLowerCase()
+        + '\\b', 'g'), focalMove().toLowerCase())
+      .replace(/\bsta15\b/g, 'sta-15')
+      .replace(/\btop512\b/g, 'top-512')
+      .replace(/\bfrac\b/g, 'fraction');
     return s;
   }
   // A STAGE MAP is {attack stage: value} -- keys 0,-1,-2,... Its values are
@@ -4158,6 +4178,12 @@
       return /_ladder$/.test(k) && Array.isArray(DEN[k]);
     })[0];
     var ladder = (ladderKey ? DEN[ladderKey] : null) || [];
+    var ladderNote = ladderKey ? DEN[ladderKey + '_note'] : null;
+    if (!ladder.length && ladderNote) {
+      P.push('<h3>The attack route: the ' + esc(slotNames().fast)
+        + ' ladder</h3>'
+        + '<p class="tl-note">' + esc(ladderNote) + '</p>');
+    }
     if (ladder.length) {
       P.push('<h3>The attack route: the ' + esc(slotNames().fast)
         + ' ladder</h3>'
@@ -4177,7 +4203,10 @@
     }
 
     // (d) ranked builds + the rule and the caveat, adjacent
-    var ranked = (DEN.ranked_builds || []).slice(0, 12);
+    // Render EVERY shipped ranked build (the table scrolls); the old
+    // 12-row slice contradicted prose citing the top-25
+    // (2026-08-19 review).
+    var ranked = (DEN.ranked_builds || []);
     var named = DEN.named_builds || [];
     var rule = DEN.composite_rule || {};
     if (ranked.length) {
@@ -4258,8 +4287,10 @@
     if (!mine.length) {
       return '<h3>Your ' + esc(OPP) + '</h3>'
         + '<p class="tl-note tl-user-empty">Add your own ' + esc(OPP)
-        + ' spreads under "Your IVs" (pick ' + esc(OPP) + ' in the species '
-        + 'dropdown, or paste a Poke Genie CSV) and they are ranked here by '
+        + ' spreads under "Your IVs" (pick the ' + esc(OPP) + ' option '
+        + 'whose label mentions the heatmap overlay and this section -- '
+        + 'the second one in the species dropdown -- or paste a Poke '
+        + 'Genie CSV) and they are ranked here by '
         + 'the same denial metrics.</p>';
     }
     var cells = rule.cells || [];
@@ -4283,7 +4314,11 @@
         }).join('')
         + '<td>' + (b ? esc(b.note || '') + (b.composite_rank
           ? ' (composite rank ' + b.composite_rank + ')' : '')
-          : 'outside the top-25 / named set shipped with this page')
+          : 'outside the ' + ((DEN.ranked_builds || []).length
+              ? 'top-' + (DEN.ranked_builds || []).length + ' ranked'
+              : 'ranked')
+            + ((DEN.named_builds || []).length ? ' / named' : '')
+            + ' set shipped with this page')
         + '</td></tr>';
     }).join('');
     return '<h3>Your ' + esc(OPP) + '</h3>'
@@ -4822,6 +4857,13 @@
         shadowDefMult: C.shadowDefMult
       });
       mons = POGOCollection.parseCsvText(text);
+      // Raw data lines the parser produced nothing for (blank/unreadable)
+      // -- 'Parsed 2,524 rows' from a 2,526-row export left 2 rows
+      // unaccounted (2026-08-19 review).
+      var rawDataLines = text.split(/\r?\n/).filter(function (l) {
+        return l.trim() !== '';
+      }).length - 1;   // minus the header
+      var unparsed = Math.max(0, rawDataLines - mons.length);
       res = POGOCollection.matchMons(mons, C.thresholds, {
         league: C.league, maxLevel: C.maxLevel,
         pokemonIndex: C.pokemonIndex, preToFinals: C.preToFinals,
@@ -5015,7 +5057,9 @@
       + dropped.length + notRead;
     var unaccounted = mons.length - accounted;
     setHtml('tl-csv-status',
-      '<p class="tl-note">Parsed ' + plural(mons.length, 'row') + '; added '
+      '<p class="tl-note">Parsed ' + plural(mons.length, 'row')
+      + (unparsed ? ' (' + plural(unparsed, 'raw line')
+        + ' not readable as a row)' : '') + '; added '
       + plural(added, 'new spread') + ' to the table'
       + (dupes ? '; ' + plural(dupes, 'row') + ' collapsed into a spread already '
         + 'listed, keeping the highest scanned CP (duplicate IVs in your '
@@ -5320,6 +5364,12 @@
         o.textContent = 'rank for ' + msAbbrev(pair[1]);
         bs.appendChild(o);
       });
+      if (bs.children.length < 2 && bs.parentNode
+          && bs.parentNode.style) {
+        // A one-option dropdown is a dead control (single-arm pairs --
+        // 2026-08-19 review); the basis is unambiguous, so hide it.
+        bs.parentNode.style.display = 'none';
+      }
       bs.value = state.basis;
       bs.addEventListener('change', function () {
         // Accept only the values this select actually offers; anything
