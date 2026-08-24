@@ -1242,6 +1242,68 @@ def main():
         # tried in order until one OBSERVES the ladder: longer fights via
         # shields, then a max-def focal (survives longer), then a min-atk
         # opponent (kills slower).
+        # SEAT AMBIGUITY (same-species pairs whose opponent also carries
+        # the debuff move, first hit: the Thievul cross-arm mirror,
+        # 2026-08-24): timeline lines carry only the species name, so
+        # 'uses <debuff>' cannot be attributed by seat -- the opponent's
+        # own throws made any_thrown a false positive there, masking an
+        # honest debuff_unreachable (the NS+IW arm never throws Icy Wind
+        # vs the IW+PR arm). In that case the focal's throws are counted
+        # from the OPPONENT's post-fight attack stage instead (simulate
+        # mutates lp), which is sound only when no OTHER move in either
+        # kit can touch the opponent's attack stage -- verified here.
+        ambiguous_seat = (FOCAL == OPPONENT
+                          and debuff_mid in (L_FAST, L_CH1, L_CH2))
+        if ambiguous_seat:
+            if F_SHADOW != O_SHADOW:
+                raise SystemExit(
+                    'ABORT: the stage probe is seat-ambiguous (both seats '
+                    f'are {FOCAL}) but the shadow flags differ, so the two '
+                    'seats cannot be given identical stats and the '
+                    'name-ambiguous ladder parse is unsound -- the parser '
+                    'needs per-seat move logs before this pair can be '
+                    'checked')
+            # Moves that could confound lp.atk_stage. A CHANCE self-buff
+            # (e.g. Night Slash, 12.5%) is applied by the engine's
+            # deterministic meter (battle.py _buff_apply_meters: starts
+            # at the chance -- 0.0 for exactly 0.5 -- accumulates per
+            # throw, fires on an integer crossing), so it is harmless in
+            # any fight whose pooled throw count of that move stays below
+            # the meter's first firing; that is checked PER PROBE FIGHT
+            # in the candidate loop below. Guaranteed movers make the
+            # attribution unsound outright.
+            def _meter_can_fire(chance, n_throws):
+                meter = 0.0 if chance == 0.5 else chance
+                for _ in range(n_throws):
+                    if math.floor(meter + chance) > math.floor(meter):
+                        return True
+                    meter += chance
+                return False
+
+            opp_chance_atk_buffs = []
+            hard_movers = [
+                mid for mid, kind in T_MOVES
+                if mid != debuff_mid
+                and (mv := move(mid, kind)).get('buffTarget') == 'opponent'
+                and mv.get('buffs') and mv['buffs'][0] != 0]
+            for mid, kind in ((L_FAST, 'fast'), (L_CH1, 'charged'),
+                              (L_CH2, 'charged')):
+                mv = move(mid, kind)
+                if (mv.get('buffTarget') == 'self' and mv.get('buffs')
+                        and mv['buffs'][0] != 0):
+                    ch = float(mv.get('buffApplyChance', 0) or 0)
+                    if ch >= 1:
+                        hard_movers.append(mid)
+                    elif ch > 0:
+                        opp_chance_atk_buffs.append((mv['name'], ch))
+            if hard_movers:
+                raise SystemExit(
+                    'ABORT: the stage probe is seat-ambiguous (both seats '
+                    f'are {FOCAL} and both carry {debuff_mid}) and '
+                    f'{sorted(set(hard_movers))} can also move the '
+                    "opponent's attack stage, so the stage-based throw "
+                    'attribution is unsound -- the parser needs per-seat '
+                    'move logs before this pair can be checked')
         if 'stage_probe' in bp_cfg:
             candidates = [bp_cfg['stage_probe']]
         else:
@@ -1249,10 +1311,24 @@ def main():
             minatk_l = min(l_rows, key=lambda e: e['atk'])
             md = [maxdef_t['atk_iv'], maxdef_t['def_iv'], maxdef_t['sta_iv']]
             ma = [minatk_l['atk_iv'], minatk_l['def_iv'], minatk_l['sta_iv']]
-            candidates = [{}, {'shields': 1}, {'shields': 2},
-                          {'focal_ivs': md, 'shields': 2},
-                          {'focal_ivs': md, 'opp_ivs': ma, 'shields': 2},
-                          {'focal_ivs': md, 'opp_ivs': ma, 'shields': 0}]
+            if ambiguous_seat:
+                # Same-species/same-stats probes keep the ladder readable
+                # under the name-ambiguous parse (either seat's unshielded
+                # hit of the move is a sample of the SAME damage ladder),
+                # so the long-fight candidates use IDENTICAL builds on
+                # both seats instead of max-def-vs-min-atk.
+                candidates = [{}, {'shields': 1}, {'shields': 2},
+                              {'focal_ivs': md, 'opp_ivs': md,
+                               'shields': 2},
+                              {'focal_ivs': ma, 'opp_ivs': ma,
+                               'shields': 2},
+                              {'focal_ivs': md, 'opp_ivs': md,
+                               'shields': 0}]
+            else:
+                candidates = [{}, {'shields': 1}, {'shields': 2},
+                              {'focal_ivs': md, 'shields': 2},
+                              {'focal_ivs': md, 'opp_ivs': ma, 'shields': 2},
+                              {'focal_ivs': md, 'opp_ivs': ma, 'shields': 0}]
         # LADDER SOURCE. The strictly correct reference is the PROBE
         # opponent actually simulated. stage_ladder_from_rank1=true
         # preserves the SHIPPED thievul_lickilicky behavior instead: its
@@ -1265,6 +1341,7 @@ def main():
 
         chosen = None
         any_thrown = False
+        n_skipped = 0
         for ci, pc in enumerate(candidates):
             st_ivs, sl_ivs, st_fast, st_charged, st_shields = _probe(
                 pc, ARMS, rank1_t_ivs, rank1_l_ivs, 0)
@@ -1286,7 +1363,47 @@ def main():
                        if bs['name'] + ' →' in l and 'SHIELDED' not in l]
             iw_count = sum(1 for l in res.timeline
                            if 'uses ' + _dbf['name'] in l)
-            any_thrown = any_thrown or iw_count > 0
+            if ambiguous_seat:
+                if (tuple(st_ivs) != tuple(sl_ivs)):
+                    raise SystemExit(
+                        'ABORT: [breakpoints] stage_probe gives the two '
+                        f'seats different builds, but both seats are {FOCAL} '
+                        'and the timeline parse cannot attribute hits by '
+                        'name -- a seat-ambiguous probe must use IDENTICAL '
+                        'builds so either seat samples the same ladder')
+                # Chance self-buffs in the opponent's kit are harmless
+                # only while the buff meter cannot have fired; the pooled
+                # (both-seat) throw count bounds either single seat's. A
+                # fight where the meter COULD have fired is unsound for
+                # this candidate both ways (a buffed seat's hit would sit
+                # at a positive stage, outside the 0..-4 ladder), so the
+                # candidate is skipped, not fatal -- another candidate
+                # may still observe the ladder cleanly.
+                meter_unsound = False
+                for mv_name, ch in opp_chance_atk_buffs:
+                    n = sum(1 for l in res.timeline
+                            if 'uses ' + mv_name in l)
+                    if _meter_can_fire(ch, n):
+                        print(f'NOTE: stage-probe candidate {ci} skipped: '
+                              f'{mv_name} (chance self-buff, {ch:g}) was '
+                              f'thrown {n} times pooled across the two '
+                              'seats, enough for the engine buff meter to '
+                              'fire, so neither the throw attribution nor '
+                              'the observed ladder is sound in this fight')
+                        meter_unsound = True
+                        break
+                if meter_unsound:
+                    n_skipped += 1
+                    continue
+                # lp is mutated by simulate; with the sole-mover guard
+                # above, a negative opponent attack stage can only come
+                # from the FOCAL's debuff throws. (A debuff throw that
+                # faints the opponent may not register a stage; such a
+                # fight ends before the ladder is observable anyway.)
+                thrown_here = lp.atk_stage < 0
+            else:
+                thrown_here = iw_count > 0
+            any_thrown = any_thrown or thrown_here
             ti = iv_to_rank_t[tuple(st_ivs)]
             ladder_atk = (l_rows[0]['atk'] if ladder_from_rank1
                           else l_rows[iv_to_rank_l[tuple(sl_ivs)]]['atk'])
@@ -1311,13 +1428,17 @@ def main():
             ver[f'{debuff_mid.lower()}_stage_check'] = {
                 'debuff_unreachable': True,
                 'note': (f'{_dbf["name"]} was never thrown in any of '
-                         f'the {len(candidates)} probe fights tried '
-                         '(extreme spread/shield candidates), so the '
+                         f'the {len(candidates) - n_skipped} probe fights '
+                         'tried (extreme spread/shield candidates'
+                         + (f'; {n_skipped} further candidate(s) skipped '
+                            'as unsound for the seat-ambiguous parse'
+                            if n_skipped else '')
+                         + '), so the '
                          'stage ladder could not be exercised in this '
                          'matchup and has no observed in-matchup '
                          'consequence. Recorded, not silently skipped; '
                          'set [breakpoints] stage_probe to override.'),
-                'candidates_tried': len(candidates),
+                'candidates_tried': len(candidates) - n_skipped,
             }
         elif chosen is None:
             raise SystemExit(
@@ -1336,7 +1457,14 @@ def main():
                                                for k, v in pred_by_stage.items()},
             'note': ('each observed %s damage must equal the closed-form '
                      'value at some attack stage 0..%d'
-                     % (bs['name'], STAGES[-1])),
+                     % (bs['name'], STAGES[-1]))
+                    + (' SEAT-AMBIGUOUS PARSE: both seats are %s and both '
+                       'carry %s, so the thrown count and the observed '
+                       'damages pool the two seats; the probe builds are '
+                       'identical, so either seat samples the same ladder, '
+                       "and the focal's own throws were confirmed from the "
+                       "opponent's post-fight attack stage."
+                       % (FOCAL, _dbf['name']) if ambiguous_seat else ''),
             'all_observed_in_closed_form_set': all(
                 v in set(pred_by_stage.values()) for v in bs_hits),
         }
