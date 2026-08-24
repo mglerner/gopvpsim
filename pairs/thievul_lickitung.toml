@@ -164,6 +164,11 @@ injected_note = 'MOVE LEGALITY: Icy Wind is the 2026-08-16 Community Day exclusi
 focal_key = "thievul"
 opp_key = "lickitung"
 opp_short = "licki"
+# Pins the stage probe's ORIGINAL engine policy (simulate() defaults)
+# for stable rebuilds of this shipped page; kit default since
+# 2026-08-24 is grid conditions (pvpoke_dp both seats). See the same
+# flag in thievul_lickilicky.toml for the full rationale.
+stage_probe_engine_default_policy = true
 # Derivable (the arms' shared fast move; initials give "SP"); restated
 # so the headline is readable in the config.
 headline_move = "SUCKER_PUNCH"

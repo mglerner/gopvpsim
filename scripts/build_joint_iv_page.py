@@ -1119,7 +1119,19 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
             'this moveset, so every pick on this page is MATCHUP-ONLY '
             '(nothing here weighs performance against the rest of the '
             'meta). Verified at build time, not a missing input.')
-    notes.append(f"Every {spec['opponent']} here is {spec['opp_moveset']}.")
+    # The COLUMN seat's build. The display label (not the bare species)
+    # keeps this true on same-species pages, and true mirrors scope it
+    # to the column seat explicitly -- the blanket "Every <species>"
+    # asserted the opponent's moveset over BOTH seats of the Thievul
+    # cross-arm page (2026-08-24 mirror review, blocker 2 / minor 1).
+    if FOCAL == DEFAULT_OPPONENT:
+        notes.append(
+            f"Every COLUMN-seat {spec['opp_display']} here is "
+            f"{spec['opp_moveset']}; the ROW seat plays each grid's own "
+            'moveset and stated bait setting.')
+    else:
+        notes.append(
+            f"Every {spec['opp_display']} here is {spec['opp_moveset']}.")
     if gm_now and gm_baked and gm_now != gm_baked:
         notes.append(
             f'GAMEMASTER DRIFT: the grids were baked against gamemaster '
@@ -1207,6 +1219,10 @@ def build_data(data_dir, *, allow_missing, won_labels, won_scenarios,
         'matchup_cells': len(cov) * N_IV * N_IV * N_SCEN,
         'grid_hashes': grid_hashes,
         'duplicate_grids': duplicates,
+        # True only for the VERIFIED permanent absence (meta_wins.ABSENT
+        # marker); lets the page distinguish "no meta data exists" from
+        # "not baked yet" in the missing-data boxes.
+        'meta_wins_absent': notes_meta_absent,
         'default_moveset_label': dm_label,
         'default_moveset': dm_moves,
         'wall_seconds': (manifest or {}).get('wall_seconds'),
