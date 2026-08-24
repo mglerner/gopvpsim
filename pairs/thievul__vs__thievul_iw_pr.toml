@@ -49,3 +49,18 @@ bait = false
 [page]
 focal_display = "Thievul (NS+IW)"
 opp_display = "Thievul (IW+PR)"
+injected_note = 'MOVE LEGALITY: Icy Wind is the 2026-08-16 Community Day exclusive (elite move; not obtainable by regular TM). The pinned bake gamemaster predates the CD, so the move was injected for simulation; PvPoke upstream added it as an elite move on 2026-08-14.'
+
+# Regression pin (review m9): the rank-1 spread's published headline
+# W/L/T for the primary arm at pvpoke-IVs / bait / 1-1, read from the
+# meta_wins.npz current at first publish. joint_iv_meta --verify fails
+# if a re-extraction drifts from this claim.
+[meta.oracle]
+arm = "iwns"
+oppiv = "pvpoke"
+bait = true
+scenario = [1, 1]
+rank = 1
+want_w = 48
+want_l = 40
+want_t = 0

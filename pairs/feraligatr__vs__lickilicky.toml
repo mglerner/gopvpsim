@@ -37,3 +37,17 @@ label = "hcib_nobait"
 focal_fast = "SHADOW_CLAW"
 focal_charged = ["HYDRO_CANNON", "ICE_BEAM"]
 bait = false
+
+# Regression pin (review m9): the rank-1 spread's published headline
+# W/L/T for the primary arm at pvpoke-IVs / bait / 1-1, read from the
+# meta_wins.npz current at first publish. joint_iv_meta --verify fails
+# if a re-extraction drifts from this claim.
+[meta.oracle]
+arm = "hcib"
+oppiv = "pvpoke"
+bait = true
+scenario = [1, 1]
+rank = 1
+want_w = 35
+want_l = 51
+want_t = 0
