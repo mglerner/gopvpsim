@@ -113,9 +113,9 @@ def emit(focal_id, opp_id, force=False):
         lines.append('# replay_blob: none found for this focal '
                      '(meta panels render honest-absent)')
     if o.get('injected_move_ids'):
-        sys.exit(f'ABORT: opponent {opp_id} declares injected moves '
-                 f'{o["injected_move_ids"]}; opponent-side injection is '
-                 'not supported by the kit bake')
+        lines.append('opponent_injected_moves = ['
+                     + ', '.join(f'"{m}"' for m in o['injected_move_ids'])
+                     + ']')
     lines += [
         '',
         '# FROZEN SLOT KEYS -- the page JS locates the breakpoints layer by',
