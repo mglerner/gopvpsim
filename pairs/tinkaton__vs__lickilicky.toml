@@ -37,3 +37,17 @@ label = "bulgh_nobait"
 focal_fast = "FAIRY_WIND"
 focal_charged = ["BULLDOZE", "GIGATON_HAMMER"]
 bait = false
+
+# Regression pin (review m9): the rank-1 spread's published headline
+# W/L/T for the primary arm at pvpoke-IVs / bait / 1-1, read from the
+# meta_wins.npz current at first publish. joint_iv_meta --verify fails
+# if a re-extraction drifts from this claim.
+[meta.oracle]
+arm = "bulgh"
+oppiv = "pvpoke"
+bait = true
+scenario = [1, 1]
+rank = 1
+want_w = 52
+want_l = 37
+want_t = 0
