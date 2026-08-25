@@ -119,7 +119,8 @@ def make_withhold_policy():
 
 def run_variant(name, knobs, league, pool, opponent_counter=None,
                 progress=None, focal_ivs=None,
-                focal_moveset=('PECK', ['DIVE', 'FLY'])):
+                focal_moveset=('PECK', ['DIVE', 'FLY']),
+                focal_shield_policy=None):
     """All cells for one variant. Returns list of cell dicts."""
     for k, v in knobs.items():
         setattr(B, k, v)
@@ -140,9 +141,12 @@ def run_variant(name, knobs, league, pool, opponent_counter=None,
             for s1, s2 in SCENARIOS:
                 cram.reset_for_battle(s1, opp)
                 opp.reset_for_battle(s2, cram)
+                sim_kw = {}
+                if focal_shield_policy is not None:
+                    sim_kw['shield_policy_0'] = focal_shield_policy
                 r = simulate(cram, opp,
                              charged_policy_0=focal_policy,
-                             charged_policy_1=opp_policy)
+                             charged_policy_1=opp_policy, **sim_kw)
                 cells.append({'variant': name, 'league': league,
                               'opp': display, 's1': s1, 's2': s2,
                               'bait': bait_label,
@@ -154,6 +158,56 @@ def run_variant(name, knobs, league, pool, opponent_counter=None,
     for k, v in PVPOKE_DEFAULTS.items():
         setattr(B, k, v)
     return cells
+
+
+
+# ---------------------------------------------------------------------------
+# Round 5: ADAPTIVE tank rules (Michael 2026-08-25) -- state-aware tank
+# thresholds, implemented as focal-side shield-policy WRAPPERS (no engine
+# change; the global is swapped around the delegated call, single-process
+# only). CAVEAT: the wrapper adapts the ACTUAL shield decision; the DP's
+# would_shield MODEL of it still sees whatever _CRAM_TANK_MULT holds
+# (PvPoke default) -- a model/actual mismatch of the same class PvPoke
+# itself carries. Good enough for A/B evidence; the shippable overlay
+# would thread the rule into both sites.
+# ---------------------------------------------------------------------------
+
+def make_adaptive_shield_policy(choose_mult):
+    """Focal-side shield policy: pick a tank multiplier from battle state,
+    then delegate to pvpoke_simulate_shield under it."""
+    from gopvpsim.battle import pvpoke_simulate_shield
+
+    def policy(attacker, defender, move, mechanics='legacy'):
+        old = B._CRAM_TANK_MULT
+        B._CRAM_TANK_MULT = choose_mult(attacker, defender, move)
+        try:
+            return pvpoke_simulate_shield(attacker, defender, move,
+                                          mechanics=mechanics)
+        finally:
+            B._CRAM_TANK_MULT = old
+    return policy
+
+
+def _lead(attacker, defender):
+    """Cramorant's HP-fraction lead (defender = the shield-deciding cram)."""
+    return defender.hp / defender.max_hp - attacker.hp / attacker.max_hp
+
+
+ADAPTIVE_RULES = {
+    # A: tank hard unless clearly ahead (then PvPoke's own 2.2).
+    'adaptA_lead25': lambda a, d, m: 2.2 if _lead(a, d) > 0.25 else 1.4,
+    'adaptA_lead33': lambda a, d, m: 2.2 if _lead(a, d) > 0.33 else 1.4,
+    'adaptA_lead40': lambda a, d, m: 2.2 if _lead(a, d) > 0.40 else 1.4,
+    'adaptA_lead50': lambda a, d, m: 2.2 if _lead(a, d) > 0.50 else 1.4,
+    # B: tank hard unless eating THIS hit would leave cram under a floor
+    # (then always-shield).
+    'adaptB_floor20': lambda a, d, m: (
+        1.4 if (d.hp - a.charged_move_damage(m, d)) / d.max_hp >= 0.20
+        else 1e9),
+    'adaptB_floor30': lambda a, d, m: (
+        1.4 if (d.hp - a.charged_move_damage(m, d)) / d.max_hp >= 0.30
+        else 1e9),
+}
 
 
 def summarize(cells_by_variant):
@@ -195,6 +249,10 @@ def main():
                          'lab_<timestamp>.json)')
     ap.add_argument('--variants', default=None,
                     help='comma-separated variant-name filter over the grid')
+    ap.add_argument('--adaptive', action='store_true',
+                    help='round 5: run the ADAPTIVE_RULES wrappers (plus '
+                         'baseline and the two fixed-tank finalists at '
+                         'dive gate 3.0) instead of the full grid')
     ap.add_argument('--opponent-counter', default=None,
                     choices=['withhold'],
                     help='robustness round: opponent counter-policy')
@@ -216,6 +274,13 @@ def main():
         assert getattr(B, k) == v, f'knob {k} not at PvPoke default at start'
 
     variants = build_grid()
+    if args.adaptive:
+        keep = {'baseline', 'dpe3_hp1.3_tank1.4', 'dpe3_hp1.3_tank1.8'}
+        variants = {k: v for k, v in variants.items() if k in keep}
+        for rule_name in ADAPTIVE_RULES:
+            v = dict(PVPOKE_DEFAULTS)
+            v['_CRAM_DIVE_GATE_DPE'] = 3.0
+            variants[rule_name] = v
     if args.variants:
         keep = set(args.variants.split(',')) | {'baseline'}
         variants = {k: v for k, v in variants.items() if k in keep}
@@ -240,10 +305,13 @@ def main():
         print(f'[{league}] pool: {len(pool)} opponents'
               + (f' (skipped: {skipped})' if skipped else ''), flush=True)
         for i, (name, knobs) in enumerate(variants.items()):
+            wrapper = (make_adaptive_shield_policy(ADAPTIVE_RULES[name])
+                       if name in ADAPTIVE_RULES else None)
             cells = run_variant(name, knobs, league, pool,
                                 opponent_counter=args.opponent_counter,
                                 focal_ivs=focal_ivs,
-                                focal_moveset=focal_moveset)
+                                focal_moveset=focal_moveset,
+                                focal_shield_policy=wrapper)
             cells_by_variant.setdefault(name, []).extend(cells)
             print(f'[{league}] {i + 1}/{len(variants)} {name} '
                   f'({time.time() - t0:.0f}s)', flush=True)
