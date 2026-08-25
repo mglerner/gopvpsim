@@ -86,6 +86,14 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    evidenced refinement, which re-bakes the pogodives columns, or a
    confirmed-final lead40, which unblocks publish + article). Inside
    the pinned dedup-input fence; publish/article wait on this verdict.
+   ROUND 6 CLOSED 2026-08-25 (writeup addendum 4): nothing ships;
+   lead40 stands as the chosen frontier point. PUBLISH/ARTICLE
+   UNBLOCKED. Before any public surface carries a "hard counters"
+   list: use the LEAD40-derived set (UL Giratina-A both flavors, UL
+   Shadow Hydreigon, GL Shadow Lapras; + persistent GL Sliggoo/
+   Grumpig, UL Shadow Feraligatr/Walrein, GL Jumpluff) -- the old
+   "five losers" roster was static-tank-era and names a species that
+   does not lose under the shipped rule.
    REBALANCE NOTE (Michael 2026-08-25): a big move rebalance is
    expected ~2 weeks out (post-Worlds, the usual pattern). When it
    lands: gamemaster-delta migration as usual, PLUS re-run the

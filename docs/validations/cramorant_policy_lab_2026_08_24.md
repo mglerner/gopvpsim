@@ -226,3 +226,59 @@ now in code: tests/test_pogodives.py (fallback invariant on
 non-Cramorant pairs incl. Aegislash, per-side marking semantics, the
 three-way adaptive discrimination, cache key normalization + the
 registry-lives-in-a-hashed-module pin).
+
+## Addendum 4: round-6 discriminator discovery -- CLOSED, nothing ships
+(2026-08-25 evening; 2 skeptics, both UPHELD-WITH-CHANGES; full reports
+userdata/cramorant_lab/reports/r6_sk{1,2}.md; data r6_*.json)
+
+Tested inside the pinned fence: D1 "never tank a hit > frac*max_hp"
+(frac 35/45/55) and D3 "when max_hp < h0, never go conservative"
+(h0 110/120/125). All decision-only wrappers (the DP model did not see
+the rules -- caveat on every conclusion below).
+
+- **D1 REFUTED at the trigger level**: frac45/55 never fire on the
+  shipped rule's loser cells at all; frac35 fires broadly and is
+  flip-negative in 5 of 6 conditions while RAISING aggregate score
+  (+1652..+6595) -- all of it padded onto already-won fights (the
+  wins-bought-with-rating pattern running backwards). frac45's lone +4
+  fails holdout WITHIN its fitted league (UL nets -2/-4/-6/+4 across
+  spreads, and it gains and loses on the same opponents).
+- **D3@125 KILLED, harder than drafted**: it is not a mechanism
+  (max_hp is a battle constant -- it is a per-spread re-tune of the
+  lead threshold wearing a rule's clothing), not a strict improvement
+  (+3 flips at 5/5/5 but 17 cells lose rating, sum -1631), and not a
+  rare corner: max_hp < 125 covers 71.9% of the GL IV space (0% of
+  UL), so it would change most GL spreads' behavior on the evidence of
+  ONE tested spread. The hp110/120 "+0" results were a probe-coverage
+  artifact (no probed spread fires them), not inertness.
+- **THE LOSER ROSTER WAS STALE (correction required before any public
+  surface)**: the "five deterministic losers" were derived against the
+  superseded STATIC-tank family. Against the shipped lead40 rule:
+  GL Shadow Shelgon does NOT lose (the 2 GL cells are PLAIN Shelgon);
+  the all-spread-negative set is FOUR (UL Giratina-A both flavors,
+  UL Shadow Hydreigon, GL Shadow Lapras), collapsing toward ONE
+  (UL Giratina-A) across all conditions -- while persistent losers
+  GL Sliggoo (all 4 conditions), GL Grumpig, UL Shadow Feraligatr,
+  UL Shadow Walrein and GL Jumpluff were undisclosed. Any shipped
+  disclosure must be re-derived against lead40 (or phrased as a rate,
+  not a roster). Recovery calibration: median rating drop on loss
+  cells is 130 -- real outcome changes, not coin flips; no tested
+  mechanism recovers them.
+- **"lead40 FINAL" is a CHOICE ON A FRONTIER, not an optimality
+  claim** (skeptic 2's strongest point): static-1.4 tanking weakly
+  dominates every lead threshold on WINNER FLIPS (never worse in a
+  single cell anywhere in rounds 5-7; +2/+5 at the off-default
+  spreads); the lead rule's whole benefit is battle rating, which
+  pvpoke_score measures without charging for shields spent. The
+  frontier at 5/5/5: lead40 (93 flips / ~0 rating cost) -- D3@125
+  (96 / -1631) -- static14 (98 / -4474). Michael chose the rating-
+  preserving end (consistent with the project's post-KO-carry-over
+  precedent); that choice STANDS, recorded as a tradeoff pick.
+- Skeptic proposals recorded for a possible future pass (not run:
+  new fits, diminishing prize): D1-lethal ("never tank a hit that
+  KOs"), shield-count-conditioned tanking (frac55's UL Clefable
+  signal flips on Cramorant's shield count).
+
+VERDICT: the PoGoDives strat ships as-is (gate 3.0 + adaptive tank
+lead40). Round 6 confirms no tested refinement clears the bar. The
+publish/article path is UNBLOCKED.
