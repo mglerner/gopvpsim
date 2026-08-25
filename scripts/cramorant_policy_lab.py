@@ -222,6 +222,64 @@ ADAPTIVE_RULES = {
 }
 
 
+
+# ---------------------------------------------------------------------------
+# Round 6: mechanism-derived discriminator DISCOVERY (docs/
+# cramorant_policy_plan.md round-6 fence; Michael's go 2026-08-25).
+# Decision-only wrappers over the shipped pogodives rule (round-5
+# precedent: wrapper results reproduced almost exactly after threading);
+# any survivor gets threaded + re-verified before shipping. All inputs
+# are dedup-signature functions (damages, max_hp) per the pinned
+# constraint. Holdout protocol: tune-on-one-league / validate-on-the-
+# other happens in the ANALYSIS, so run leagues separately.
+# ---------------------------------------------------------------------------
+
+def make_round6_shield_policy(rule):
+    """Focal shield wrapper: adjust the _POGODIVES_* constants per-call
+    from battle state, delegate to the real pogodives_shield."""
+    from gopvpsim.battle import pogodives_shield
+
+    def policy(attacker, defender, move, mechanics='legacy'):
+        saved = (B._POGODIVES_TANK_AGGRESSIVE, B._POGODIVES_TANK_LEAD)
+        try:
+            rule(attacker, defender, move)
+            return pogodives_shield(attacker, defender, move,
+                                    mechanics=mechanics)
+        finally:
+            (B._POGODIVES_TANK_AGGRESSIVE, B._POGODIVES_TANK_LEAD) = saved
+    policy._pogodives_marker = True
+    return policy
+
+
+def _d1_rule(frac):
+    """D1: never tank a hit bigger than frac * max_hp (the big-hit
+    mechanism hypothesized behind the five deterministic losers)."""
+    def rule(attacker, defender, move):
+        dmg = attacker.charged_move_damage(move, defender)
+        if dmg > frac * defender.max_hp:
+            # Force conservative for THIS decision.
+            B._POGODIVES_TANK_AGGRESSIVE = B._POGODIVES_TANK_CONSERVATIVE
+    return rule
+
+
+def _d3_rule(h0):
+    """D3: when frail (max_hp < h0), never switch to conservative (the
+    5/5/5 give-back mechanism -- frail spreads under-lead)."""
+    def rule(attacker, defender, move):
+        if defender.max_hp < h0:
+            B._POGODIVES_TANK_LEAD = 10.0   # never conservative
+    return rule
+
+
+ROUND6_RULES = {
+    'pg_d1_frac35': _d1_rule(0.35),
+    'pg_d1_frac45': _d1_rule(0.45),
+    'pg_d1_frac55': _d1_rule(0.55),
+    'pg_d3_hp110': _d3_rule(110),
+    'pg_d3_hp120': _d3_rule(120),
+}
+
+
 def summarize(cells_by_variant):
     """Per-variant W/D/L + flips vs baseline."""
     def key(c):
@@ -261,6 +319,11 @@ def main():
                          'lab_<timestamp>.json)')
     ap.add_argument('--variants', default=None,
                     help='comma-separated variant-name filter over the grid')
+    ap.add_argument('--round6', action='store_true',
+                    help='round-6 discriminator discovery: baseline + the '
+                         'shipped pg_lead40 reference + the ROUND6_RULES '
+                         'wrappers (run leagues separately for the '
+                         'holdout analysis)')
     ap.add_argument('--pogodives-verify', action='store_true',
                     help='re-verification mode for the THREADED overlay: '
                          'baseline (plain pvpoke) + pogodives at lead '
@@ -291,6 +354,12 @@ def main():
         assert getattr(B, k) == v, f'knob {k} not at PvPoke default at start'
 
     variants = build_grid()
+    if args.round6:
+        variants = {'baseline': dict(PVPOKE_DEFAULTS)}
+        v = dict(PVPOKE_DEFAULTS)
+        variants['pg_lead40'] = v          # the shipped rule, as reference
+        for rule_name in ROUND6_RULES:
+            variants[rule_name] = dict(PVPOKE_DEFAULTS)
     if args.pogodives_verify:
         variants = {'baseline': dict(PVPOKE_DEFAULTS)}
         for lead in (0.30, 0.35, 0.40, 0.45):
@@ -331,8 +400,12 @@ def main():
         print(f'[{league}] pool: {len(pool)} opponents'
               + (f' (skipped: {skipped})' if skipped else ''), flush=True)
         for i, (name, knobs) in enumerate(variants.items()):
-            wrapper = (make_adaptive_shield_policy(ADAPTIVE_RULES[name])
-                       if name in ADAPTIVE_RULES else None)
+            if name in ROUND6_RULES:
+                wrapper = make_round6_shield_policy(ROUND6_RULES[name])
+            elif name in ADAPTIVE_RULES:
+                wrapper = make_adaptive_shield_policy(ADAPTIVE_RULES[name])
+            else:
+                wrapper = None
             cells = run_variant(name, knobs, league, pool,
                                 opponent_counter=args.opponent_counter,
                                 focal_ivs=focal_ivs,
