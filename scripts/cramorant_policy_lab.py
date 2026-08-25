@@ -121,7 +121,7 @@ def run_variant(name, knobs, league, pool, opponent_counter=None,
                 progress=None, focal_ivs=None,
                 focal_moveset=('PECK', ['DIVE', 'FLY']),
                 focal_shield_policy=None, pogodives_focal=False,
-                focal_charged_policy=None):
+                focal_charged_policy=None, pvpoke_scenarios=None):
     """All cells for one variant. Returns list of cell dicts."""
     for k, v in knobs.items():
         setattr(B, k, v)
@@ -157,10 +157,20 @@ def run_variant(name, knobs, league, pool, opponent_counter=None,
                 cram.reset_for_battle(s1, opp)
                 opp.reset_for_battle(s2, cram)
                 sim_kw = {}
+                _pol = focal_policy
                 if focal_shield_policy is not None:
                     sim_kw['shield_policy_0'] = focal_shield_policy
+                if pvpoke_scenarios and (s1, s2) in pvpoke_scenarios:
+                    # Scenario-START conditioning: play plain PvPoke in
+                    # these cells (the whole point -- a per-scenario
+                    # strategy sheet is playable and cannot touch the
+                    # other cells' lines).
+                    _pol = (pvpoke_dp if bait_label == 'bait'
+                            else functools.partial(pvpoke_dp,
+                                                   bait_shields=False))
+                    sim_kw.pop('shield_policy_0', None)
                 r = simulate(cram, opp,
-                             charged_policy_0=focal_policy,
+                             charged_policy_0=_pol,
                              charged_policy_1=opp_policy, **sim_kw)
                 cells.append({'variant': name, 'league': league,
                               'opp': display, 's1': s1, 's2': s2,
@@ -428,6 +438,7 @@ def main():
                     'pg_lead40': dict(PVPOKE_DEFAULTS)}
         for vname in ROUND7_VARIANTS:
             variants[vname] = dict(PVPOKE_DEFAULTS)
+        variants['pgS_start_ahead'] = dict(PVPOKE_DEFAULTS)
     if args.round6:
         variants = {'baseline': dict(PVPOKE_DEFAULTS)}
         v = dict(PVPOKE_DEFAULTS)
@@ -475,6 +486,8 @@ def main():
               + (f' (skipped: {skipped})' if skipped else ''), flush=True)
         for i, (name, knobs) in enumerate(variants.items()):
             _r7_charged = None
+            _pv_scen = ({(1, 0), (2, 0), (2, 1)}
+                        if name == 'pgS_start_ahead' else None)
             if name in ROUND7_VARIANTS:
                 _r7_charged, wrapper = make_round7_policies(
                     **ROUND7_VARIANTS[name])
@@ -490,7 +503,8 @@ def main():
                                 focal_moveset=focal_moveset,
                                 focal_shield_policy=wrapper,
                                 pogodives_focal=name.startswith('pg'),
-                                focal_charged_policy=_r7_charged)
+                                focal_charged_policy=_r7_charged,
+                                pvpoke_scenarios=_pv_scen)
             cells_by_variant.setdefault(name, []).extend(cells)
             print(f'[{league}] {i + 1}/{len(variants)} {name} '
                   f'({time.time() - t0:.0f}s)', flush=True)
