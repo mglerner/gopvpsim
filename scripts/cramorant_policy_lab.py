@@ -120,14 +120,18 @@ def make_withhold_policy():
 def run_variant(name, knobs, league, pool, opponent_counter=None,
                 progress=None, focal_ivs=None,
                 focal_moveset=('PECK', ['DIVE', 'FLY']),
-                focal_shield_policy=None, pogodives_focal=False):
+                focal_shield_policy=None, pogodives_focal=False,
+                focal_charged_policy=None):
     """All cells for one variant. Returns list of cell dicts."""
     for k, v in knobs.items():
         setattr(B, k, v)
     cells = []
     opp_policy = (make_withhold_policy() if opponent_counter == 'withhold'
                   else pvpoke_dp)
-    if pogodives_focal:
+    if focal_charged_policy is not None:
+        focal_bait = focal_charged_policy
+        nobait = functools.partial(focal_charged_policy, bait_shields=False)
+    elif pogodives_focal:
         from gopvpsim.battle import pogodives_dp, pogodives_shield
         focal_bait = pogodives_dp
         nobait = functools.partial(pogodives_dp, bait_shields=False)
@@ -281,6 +285,64 @@ ROUND6_RULES = {
     'pg_d1_frac55': _d1_rule(0.55),
     'pg_d3_hp110': _d3_rule(110),
     'pg_d3_hp120': _d3_rule(120),
+    # 110/120 sit BELOW GL 5/5/5's 122 max HP -- the rule never fired
+    # (2026-08-25 first pass). 125 splits frail 122 from default 126.
+    'pg_d3_hp125': _d3_rule(125),
+}
+
+
+
+# ---------------------------------------------------------------------------
+# Round 7: SHIELD-STATE conditioning (Michael 2026-08-25, from the per-IV
+# delta report: the strat is uniformly better behind/even on shields and
+# uniformly worse when shield-ahead). Live-state rule -- reads BOTH sides'
+# current shields (in-battle observable; constant across IV spreads within
+# a cell, so trivially inside the dedup fence). Decision-only wrappers;
+# a survivor gets threaded + re-verified like lead40.
+# ---------------------------------------------------------------------------
+
+def make_round7_policies(tank_revert=True, gate_revert=True,
+                         gate_off_at_00=False):
+    """(charged_policy, shield_policy) pair implementing the shield-state
+    switch over the shipped pogodives rule."""
+    from gopvpsim.battle import pogodives_dp, pogodives_shield
+
+    def ahead(cram, opp):
+        return cram.shields > opp.shields
+
+    def charged(attacker, defender, *, bait_shields=True, mechanics='legacy'):
+        saved = B._POGODIVES_DIVE_GATE_DPE
+        try:
+            if gate_revert and ahead(attacker, defender):
+                B._POGODIVES_DIVE_GATE_DPE = B._CRAM_DIVE_GATE_DPE
+            if (gate_off_at_00 and attacker.shields == 0
+                    and defender.shields == 0):
+                B._POGODIVES_DIVE_GATE_DPE = B._CRAM_DIVE_GATE_DPE
+            return pogodives_dp(attacker, defender,
+                                bait_shields=bait_shields,
+                                mechanics=mechanics)
+        finally:
+            B._POGODIVES_DIVE_GATE_DPE = saved
+    charged._pogodives_marker = True
+
+    def shield(attacker, defender, move, mechanics='legacy'):
+        saved = B._POGODIVES_TANK_AGGRESSIVE
+        try:
+            if tank_revert and ahead(defender, attacker):
+                B._POGODIVES_TANK_AGGRESSIVE = B._POGODIVES_TANK_CONSERVATIVE
+            return pogodives_shield(attacker, defender, move,
+                                    mechanics=mechanics)
+        finally:
+            B._POGODIVES_TANK_AGGRESSIVE = saved
+    shield._pogodives_marker = True
+    return charged, shield
+
+
+ROUND7_VARIANTS = {
+    'pgS_ahead_full': dict(tank_revert=True, gate_revert=True),
+    'pgS_ahead_tankonly': dict(tank_revert=True, gate_revert=False),
+    'pgS_ahead_full_00gate': dict(tank_revert=True, gate_revert=True,
+                                  gate_off_at_00=True),
 }
 
 
@@ -323,6 +385,9 @@ def main():
                          'lab_<timestamp>.json)')
     ap.add_argument('--variants', default=None,
                     help='comma-separated variant-name filter over the grid')
+    ap.add_argument('--round7', action='store_true',
+                    help='round-7 shield-state conditioning: baseline + '
+                         'pg_lead40 reference + ROUND7_VARIANTS')
     ap.add_argument('--round6', action='store_true',
                     help='round-6 discriminator discovery: baseline + the '
                          'shipped pg_lead40 reference + the ROUND6_RULES '
@@ -358,6 +423,11 @@ def main():
         assert getattr(B, k) == v, f'knob {k} not at PvPoke default at start'
 
     variants = build_grid()
+    if args.round7:
+        variants = {'baseline': dict(PVPOKE_DEFAULTS),
+                    'pg_lead40': dict(PVPOKE_DEFAULTS)}
+        for vname in ROUND7_VARIANTS:
+            variants[vname] = dict(PVPOKE_DEFAULTS)
     if args.round6:
         variants = {'baseline': dict(PVPOKE_DEFAULTS)}
         v = dict(PVPOKE_DEFAULTS)
@@ -404,7 +474,11 @@ def main():
         print(f'[{league}] pool: {len(pool)} opponents'
               + (f' (skipped: {skipped})' if skipped else ''), flush=True)
         for i, (name, knobs) in enumerate(variants.items()):
-            if name in ROUND6_RULES:
+            _r7_charged = None
+            if name in ROUND7_VARIANTS:
+                _r7_charged, wrapper = make_round7_policies(
+                    **ROUND7_VARIANTS[name])
+            elif name in ROUND6_RULES:
                 wrapper = make_round6_shield_policy(ROUND6_RULES[name])
             elif name in ADAPTIVE_RULES:
                 wrapper = make_adaptive_shield_policy(ADAPTIVE_RULES[name])
@@ -415,7 +489,8 @@ def main():
                                 focal_ivs=focal_ivs,
                                 focal_moveset=focal_moveset,
                                 focal_shield_policy=wrapper,
-                                pogodives_focal=name.startswith('pg_'))
+                                pogodives_focal=name.startswith('pg'),
+                                focal_charged_policy=_r7_charged)
             cells_by_variant.setdefault(name, []).extend(cells)
             print(f'[{league}] {i + 1}/{len(variants)} {name} '
                   f'({time.time() - t0:.0f}s)', flush=True)
