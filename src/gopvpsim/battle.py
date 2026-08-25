@@ -2968,9 +2968,20 @@ def simulate(
     # side's shielding via would_shield, so first-decision marking would
     # race. Assigned (not or-ed) every call: reusing a BattlePokemon
     # under plain policies clears the flag.
+    #
+    # 2-0 START EXEMPTION (round-7 verdict, 2026-08-25): a side that
+    # STARTS with 2 shields against 0 plays plain PvPoke -- the one
+    # start cell where the tuned rules are pure rating cost (negative in
+    # 8/8 verification panels, mean -38/cell; the only atom stable
+    # across both league crossings). Start-scenario, not live-state:
+    # the live-state version cannibalizes even-start fights through
+    # transient shield leads (-117..-160 wins). Evaluated here at
+    # battle start, before any shield is consumed.
     for _i, (_cp, _sp) in enumerate(policies):
-        pokemon[_i]._pogodives = (_has_pogodives_marker(_cp)
-                                  or _has_pogodives_marker(_sp))
+        pokemon[_i]._pogodives = (
+            (_has_pogodives_marker(_cp) or _has_pogodives_marker(_sp))
+            and not (pokemon[_i].shields == 2
+                     and pokemon[1 - _i].shields == 0))
     timeline  = []
     turn      = 0
 

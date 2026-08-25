@@ -499,6 +499,93 @@ window.updateOppFilterBanner = updateOppFilterBanner;
 // Wins modes ignore state.oppIvMode and state.scenarioMode for source
 // selection (winsPvpoke always reads pvpoke scores, etc.) but do
 // honor scenarioMode for which scenarios contribute to the count.
+// ---- All-scenarios small-multiples (2026-08-25) ----
+// Pure per-scenario pool-average -- reads the embedded score arrays
+// directly; deliberately ignores opponent filters and yAxis modes so the
+// minis are a stable, simple reference view (the main plot is the rich
+// one). No state is touched: toggling the grid never re-renders the page.
+function computeScenarioAvgPure(mi, si) {
+  var scores = getScores(mi, state.oppIvMode);
+  if (!scores) return null;
+  var avgs = new Float64Array(nIvs);
+  for (var iv = 0; iv < nIvs; iv++) {
+    var base = iv * nS * nO + si * nO, sum = 0;
+    for (var oi = 0; oi < nO; oi++) sum += scores[base + oi];
+    avgs[iv] = sum / nO;
+  }
+  return avgs;
+}
+
+var _allscenRendered = false;
+var _allscenKey = null;   // (movesetIdx, oppIvMode) the minis were built for
+function toggleAllScenarios() {
+  var box = document.getElementById('allscen-toggle');
+  var grid = document.getElementById('allscen-grid');
+  if (!box || !grid) return;
+  if (!box.checked) { grid.style.display = 'none'; return; }
+  grid.style.display = 'grid';
+  var key = state.movesetIdx + '|' + state.oppIvMode;
+  if (!_allscenRendered || key !== _allscenKey) {
+    var g2 = document.getElementById('allscen-grid');
+    g2.innerHTML = '';
+    renderAllScenarios();
+    _allscenRendered = true;
+    _allscenKey = key;
+  }
+  syncAllScenHighlight();
+}
+function renderAllScenarios() {
+  var grid = document.getElementById('allscen-grid');
+  var labels = DATA.scenarioLabels || [];
+  for (var si = 0; si < nS; si++) {
+    (function(si) {
+      var d = document.createElement('div');
+      d.id = 'allscen-p' + si;
+      d.style.height = '220px';
+      d.style.cursor = 'pointer';
+      d.style.border = '2px solid transparent';
+      grid.appendChild(d);
+      var y = computeScenarioAvgPure(state.movesetIdx, si);
+      if (!y) return;
+      Plotly.newPlot(d, [{x: Array.prototype.slice.call(DATA.spRanks),
+        y: Array.prototype.slice.call(y), mode: 'markers', type: 'scatter',
+        marker: {size: 2, opacity: 0.5}}],
+        {title: {text: labels[si] || ('scenario ' + si), font: {size: 12}},
+         margin: {l: 40, r: 6, t: 26, b: 28}, showlegend: false,
+         xaxis: {autorange: 'reversed', title: {text: 'SP rank', font: {size: 9}}},
+         font: {size: 9}},
+        {displayModeBar: false, responsive: true, staticPlot: false});
+      d.addEventListener('click', function() {
+        var ssel = document.getElementById('scenario-sel');
+        if (ssel) { ssel.value = String(si); updateView(); }
+      });
+    })(si);
+  }
+}
+function refreshAllScenarios() {
+  // Rebuild minis only when their inputs changed (moveset or mode); a
+  // scenario-dropdown change costs just the highlight sync.
+  var box = document.getElementById('allscen-toggle');
+  var grid = document.getElementById('allscen-grid');
+  if (!box || !box.checked || !grid) { _allscenRendered = false; _allscenKey = null; return; }
+  var key = state.movesetIdx + '|' + state.oppIvMode;
+  if (key !== _allscenKey) {
+    grid.innerHTML = '';
+    renderAllScenarios();
+    _allscenKey = key;
+  }
+  syncAllScenHighlight();
+}
+function syncAllScenHighlight() {
+  var ssel = document.getElementById('scenario-sel');
+  var cur = ssel ? ssel.value : 'avg';
+  for (var si = 0; si < nS; si++) {
+    var d = document.getElementById('allscen-p' + si);
+    if (d) d.style.border = (String(si) === cur)
+      ? '2px solid #000' : '2px solid transparent';
+  }
+}
+
 function computeYValues(mi) {
   var mode = state.yAxisMode || 'avgScore';
   var sis = getActiveScenarioIndices();
@@ -3315,6 +3402,10 @@ function updateView() {
     var pol = psel ? psel.value : 'pvpoke';
     state.oppIvMode = composeMode(base, bait, elead > 0 ? elead : 0, pol);
   }
+  // All-scenarios grid: keep the minis in sync with moveset/mode and the
+  // highlight in sync with the Shields dropdown (cheap; no-op when the
+  // grid is closed).
+  if (typeof refreshAllScenarios === 'function') refreshAllScenarios();
   var csel = document.getElementById('color-sel');
   if (csel) state.colorMode = csel.value;
   var ysel = document.getElementById('yaxis-sel');
