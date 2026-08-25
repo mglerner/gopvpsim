@@ -472,3 +472,11 @@ def test_pogodives_overlay_20260825_predicate():
     p = migrate_cache.PREDICATES['pogodives_overlay_20260825']
     assert p({'species': 'Cramorant'}, {'species': 'Azumarill'}) is False
     assert p(None, None) is False
+
+
+def test_pogodives_2_0_exemption_predicate():
+    p = migrate_cache.PREDICATES['pogodives_2_0_exemption_20260825']
+    assert p({'species': 'X'}, {'species': 'Medicham', 'policy': 'pogodives'}) is True
+    assert p({'species': 'X'}, {'species': 'Medicham'}) is False
+    assert p({'species': 'Cramorant'}, {'species': 'Azumarill'}) is False
+    assert p(None, None) is True   # fail-safe
