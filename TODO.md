@@ -69,11 +69,16 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    dominated both static tank picks; writeup addendum 2). The old
    1.4-vs-1.8 fork is superseded. Adaptive-rule inputs are
    constrained to dedup-signature functions (pinned in the plan doc).
-   The overlay lands in a SUPERVISED session (per-side knob threading -- the globals would
-   leak to Cramorant opponents/mirrors -- plus the cache key
-   normalization; own hash bump + migration predicate). A Dive+Surf
-   moveset grid (our dives rank that build #1) ran overnight too --
-   results in userdata/cramorant_lab/round4_divesurf.json.
+   **OVERLAY LANDED 2026-08-25** (pogodives_dp/pogodives_shield,
+   per-side marking, adaptive rule threaded into decision AND model,
+   lead40 CONFIRMED on the threaded engine -- writeup addendum 3;
+   cache key normalization primitives in sweep_cache with the registry
+   pinned to the engine-hashed battle.py). REMAINING: the render side
+   -- Strategy dropdown on the Cramorant dive pages + the pogodives
+   bake (consumer wiring of column_key_fields(policy=...) +
+   normalize_policy_for_pair through deep_dive_lib/sweep.py) -- its
+   own scoped session. Round-6 discovery (IV-/opponent-dependent
+   thresholds) stays post-render, inside the pinned dedup-input fence.
 4. **Upstream bug-report candidates** (pvpoke): the two `move.moveID`
    typos (ActionLogic.js:368, :1239 -- the latter makes opponents never
    shield a lethal Dive, plausibly inflating published Cramorant

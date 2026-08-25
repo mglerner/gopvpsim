@@ -200,6 +200,61 @@ _CRAM_DELAY_GORGING = False  # skip dive-ASAP while hp > 50% (choose Pikachu)
 _CRAM_LETHAL_DIVE_SHIELD_FIX = False  # opponent-side: shield a lethal Dive
                                       # (PvPoke's shipped rule never does)
 
+# --- The "PoGoDives strat" overlay (docs/cramorant_policy_plan.md;
+# evidence: docs/validations/cramorant_policy_lab_2026_08_24.md). A side
+# whose policies carry the pogodives marker (see pogodives_dp /
+# pogodives_shield and the marking loop in simulate()) gets the tuned
+# Cramorant rules; every other side -- and every battle with the flag
+# unset -- runs byte-identical PvPoke behavior through the same helpers.
+_POGODIVES_DIVE_GATE_DPE = 3.0     # retuned from PvPoke's 1.5 (plateau [2.3, 3.5])
+_POGODIVES_TANK_AGGRESSIVE = 1.4   # tank hard while holding prey...
+_POGODIVES_TANK_CONSERVATIVE = 2.2  # ...unless clearly ahead, then PvPoke's 2.2
+_POGODIVES_TANK_LEAD = 0.40        # "clearly ahead" = HP-fraction lead > this
+                                   # (Michael 2026-08-25; lead 33-45 is a plateau)
+
+# The pogodives case REGISTRY, cache-facing form: a battle can differ from
+# PvPoke-default under pogodives policies ONLY when a species matching one
+# of these display-name prefixes is on either side. sweep_cache's key
+# normalization aliases every other pair to the base-tier cache columns.
+# DELIBERATELY in battle.py (an engine-hashed file): growing this registry
+# bumps the engine hash, stale-stamping every cached column, so a lagging
+# aliasing rule can never serve stale results -- re-validation flows
+# through the standard migration machinery.
+POGODIVES_CASE_SPECIES_PREFIXES = ('Cramorant',)
+
+
+def _cram_dive_gate_dpe(attacker):
+    """Dive/Surf-ASAP DPE gate for the deciding attacker's policy tier."""
+    if getattr(attacker, '_pogodives', False):
+        return _POGODIVES_DIVE_GATE_DPE
+    return _CRAM_DIVE_GATE_DPE
+
+
+def _cram_tank_mult(attacker, defender):
+    """Prey-holder tank threshold for the DEFENDER's shield decision --
+    used both at the actual decision (pvpoke_simulate_shield) and in the
+    attacker's would_shield MODEL of it (perfect-information convention,
+    like the rest of PvPoke's shared heuristics). Under pogodives: the
+    adaptive lead rule. PINNED CONSTRAINT (plan doc 2026-08-25): inputs
+    must be functions of the dedup-signature components -- hp/max_hp on
+    both sides qualify; adding anything else requires re-proving
+    signature-dedup soundness (tests/test_signature_cramorant.py)."""
+    if getattr(defender, '_pogodives', False):
+        lead = (defender.hp / defender.max_hp
+                - attacker.hp / attacker.max_hp)
+        return (_POGODIVES_TANK_CONSERVATIVE
+                if lead > _POGODIVES_TANK_LEAD
+                else _POGODIVES_TANK_AGGRESSIVE)
+    return _CRAM_TANK_MULT
+
+
+def _has_pogodives_marker(policy):
+    """True when a policy callable (or a functools.partial over one)
+    carries the pogodives marker."""
+    return bool(getattr(policy, '_pogodives_marker', False)
+                or getattr(getattr(policy, 'func', None),
+                           '_pogodives_marker', False))
+
 
 def _base_species_id(bp: "BattlePokemon") -> "str | None":
     """PvPoke's form-INVARIANT speciesId (changeForm never rewrites it):
@@ -361,8 +416,8 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     # Gate 1: a prey-holding Cramorant tanks weak charged attacks so Gulp
     # Missile fires earlier.
     if (_holding_prey(defender)
-            and attacker.charged_move_damage(move, defender) * _CRAM_TANK_MULT
-                < defender.hp):
+            and attacker.charged_move_damage(move, defender)
+                * _cram_tank_mult(attacker, defender) < defender.hp):
         if _shield_trace:
             _policy_log.append(
                 f"  shield({defender.species} sh={defender.shields} vs"
@@ -384,6 +439,36 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
             f"  shield({defender.species} sh={defender.shields} vs"
             f" {move.get('moveId')}): True (always shield)")
     return use_shield
+
+def pogodives_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
+                 *, bait_shields: bool = True,
+                 mechanics: str = 'legacy') -> "int | None":
+    """The "PoGoDives strat" charged policy (tier 3): pvpoke_dp with the
+    tuned Cramorant rules active for the side it is passed for.
+
+    The function itself just delegates -- the behavior change rides the
+    `_pogodives_marker` attribute, which simulate() reads at battle
+    start to set the side's `_pogodives` flag (per-side semantics: a
+    Cramorant OPPONENT keeps playing pure PvPoke unless its own
+    policies carry the marker). For every non-Cramorant situation the
+    output is byte-identical to pvpoke_dp (the fallback invariant,
+    pinned in tests/test_pogodives.py)."""
+    return pvpoke_dp(attacker, defender, bait_shields=bait_shields,
+                     mechanics=mechanics)
+
+
+pogodives_dp._pogodives_marker = True
+
+
+def pogodives_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
+                     move: dict, mechanics: str = 'legacy') -> bool:
+    """The "PoGoDives strat" shield policy (tier 3) -- see pogodives_dp."""
+    return pvpoke_simulate_shield(attacker, defender, move,
+                                  mechanics=mechanics)
+
+
+pogodives_shield._pogodives_marker = True
+
 
 def use_first_available(attacker: "BattlePokemon", defender: "BattlePokemon",
                         mechanics: str = 'legacy') -> "int | None":
@@ -715,12 +800,13 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
         if _shield_trace:
             cm_reasons.append(f"aegislashShield dmg({damage})*2<hp({defender.hp})")
     # Save shields in a prey-holding Cramorant so Gulp Missile fires earlier
+    _tank_mult = _cram_tank_mult(attacker, defender)
     if (_d_form_sid in ('cramorant_gulping', 'cramorant_gorging')
-            and damage * _CRAM_TANK_MULT < defender.hp):
+            and damage * _tank_mult < defender.hp):
         use_shield = False
         if _shield_trace:
             cm_reasons.append(
-                f"cramorantPrey dmg({damage})*{_CRAM_TANK_MULT}<hp({defender.hp})")
+                f"cramorantPrey dmg({damage})*{_tank_mult}<hp({defender.hp})")
     _a_sid = _base_species_id(attacker)
     # Don't shield early weak Cramorant charged moves (no move filter
     # upstream despite the "Dives or Surfs" comment)
@@ -1433,7 +1519,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 and attacker.energy >= cm_energy[_gulp_slot]
                 and defender.hp > cm_dmgs[_nongulp_slot] * _CRAM_DIVE_GATE_HP
                 and (cm_dpe[_nongulp_slot] / cm_dpe[_gulp_slot]
-                     < _CRAM_DIVE_GATE_DPE)
+                     < _cram_dive_gate_dpe(attacker))
                 and not (_CRAM_DELAY_GORGING
                          and attacker.hp / attacker.max_hp > 0.5)):
             if _policy_debug:
@@ -2174,6 +2260,10 @@ class BattlePokemon:
     # moves never in the selectable moveset, keyed by moveId -- today only
     # Cramorant's Gulp Missiles. None for everyone else.
     _extra_charged:        "dict | None" = field(init=False, repr=False)
+    # PoGoDives-strat flag: set by simulate() at battle start from the
+    # policies passed for THIS side (re-derived every simulate call, so
+    # policy tiers cannot leak across battles or reused objects).
+    _pogodives:            bool = field(init=False, repr=False)
 
     def __post_init__(self):
         self.hp                = self.max_hp
@@ -2204,6 +2294,7 @@ class BattlePokemon:
         self._form_idx = 0
         self._form_disguise_active = False
         self._extra_charged = None
+        self._pogodives = False
 
     @property
     def _form_is_alt(self) -> bool:
@@ -2872,6 +2963,14 @@ def simulate(
         (charged_policy_0, shield_policy_0),
         (charged_policy_1, shield_policy_1),
     ]
+    # PoGoDives overlay: mark each side per ITS OWN policies, before any
+    # decision runs -- the opponent's very first DP call may model this
+    # side's shielding via would_shield, so first-decision marking would
+    # race. Assigned (not or-ed) every call: reusing a BattlePokemon
+    # under plain policies clears the flag.
+    for _i, (_cp, _sp) in enumerate(policies):
+        pokemon[_i]._pogodives = (_has_pogodives_marker(_cp)
+                                  or _has_pogodives_marker(_sp))
     timeline  = []
     turn      = 0
 

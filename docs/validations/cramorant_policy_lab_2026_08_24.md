@@ -209,3 +209,20 @@ after threading (the model/actual mismatch could shift cells).
 mission, strictly better economy than the old max-wins pick); lead33
 stays the named alternative. Final confirmation rides the overlay's
 post-threading re-verification.
+
+## Addendum 3: threaded-engine confirmation (overlay session, 2026-08-25)
+
+The overlay landed (`pogodives_dp`/`pogodives_shield`, per-side
+`_pogodives` marking at simulate() start, the adaptive rule threaded
+into BOTH the actual shield decision and would_shield's model). The
+round-7 re-verification (`userdata/cramorant_lab/round7_threaded_*`)
+reproduces the wrapper-based results almost exactly (model threading
+moved one cell at IVs 0/15/14): lead40 matches static-1.4's flips on
+default/Dive+Surf/withhold (+109/+102/+139), gives back 2-5 flips on
+the two probe spreads, and keeps the ~15-20% won-cell rating advantage
+(-17.3 vs -20.2 default; -19.6 vs -24.2 at 5/5/5). The 35-45 plateau
+holds; lead30 is too conservative. **lead40 is FINAL.** Enforcement
+now in code: tests/test_pogodives.py (fallback invariant on
+non-Cramorant pairs incl. Aegislash, per-side marking semantics, the
+three-way adaptive discrimination, cache key normalization + the
+registry-lives-in-a-hashed-module pin).
