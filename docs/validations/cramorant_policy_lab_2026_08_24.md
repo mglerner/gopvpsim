@@ -282,3 +282,49 @@ the rules -- caveat on every conclusion below).
 VERDICT: the PoGoDives strat ships as-is (gate 3.0 + adaptive tank
 lead40). Round 6 confirms no tested refinement clears the bar. The
 publish/article path is UNBLOCKED.
+
+## Addendum 5: shield-scenario conditioning -- the FINAL shipped rule
+(round 7, 2026-08-25 evening; Michael's refinement from the per-IV
+delta report; analyst + skeptic verdict SUPPORTED-WITH-CHANGES; reports
+userdata/cramorant_lab/reports/r7_verdict_*.md, data r7*/r8*.json)
+
+The per-IV delta report (reports repo:
+gopvpsim-cramorant-pogodives-vs-pvpoke-2026-08-25.html) showed the
+strat's rating cost concentrated in the shield-ahead start cells.
+Tested: LIVE-state reverting ("ahead on shields -> play standard") is
+DEAD (-117..-160 wins -- even-start fights pass through transient
+leads and the revert switches the strat off inside its own winning
+lines); start-scenario reverting composes exactly (a reverted cell IS
+the baseline cell; 0 mismatches / 10,368 verification cells) and the
+subset search over {1-0, 2-0, 2-1}(+0-0) under league-crossed holdout
+leaves exactly ONE stable atom:
+
+**FINAL RULE: PoGoDives everywhere except a 2-0 START (you hold 2
+shields, they hold 0) -- there, play plain PvPoke.** Threaded into
+simulate()'s marking loop (start-of-battle, before any shield is
+consumed; per-side; test-pinned incl. the behind-side keeping the
+strat). Honest framing per the skeptic: this is a RATING repair at one
+scenario (2-0 was -38/cell in 8/8 panels; 25 opponents better vs 1
+worse), NOT a win-count claim (the +4 aggregate wins are 5 fights,
+UL-only). 0-0 stays PoGoDives (win-non-negative 8/8 -- the earlier
+lean toward reverting it was wrong on the full ledger); 1-0/2-1
+reverts fail holdout (the Dive+Surf tank value lives at 2-1).
+
+Threaded verification (r8, incl. the previously-unprobed 15/15/15):
+
+| corpus | net flips | W | mean dScore |
+| ------------- | ----- | ----- | ------ |
+| default D+F | +111 | 1440 | +9.21 |
+| Dive+Surf | +102 | 1382 | +0.41 |
+| IVs 15/15/15 | +100 | 1413 | +7.92 |
+| IVs 5/5/5 | +93 | 1207 | +9.29 |
+
+Equal-or-better flips than the pre-exemption rule everywhere tested,
+with the rating bill largely recovered (Dive+Surf swings from negative
+to positive). Disclosure carried forward: Regidrago D+S UL is a W->D
+under the exemption -- flag wherever that cell renders.
+
+The one-breath version of the shipped strat: "Dive early unless the
+other move is 3x more efficient; while holding prey, tank charged hits
+unless you are 40 points ahead on health; if you START two shields to
+none, just play standard."
