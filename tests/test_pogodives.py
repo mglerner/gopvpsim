@@ -209,3 +209,55 @@ def test_cache_policy_normalization_and_key_compat():
     # (d) the registry's home is hashed: battle.py is in _ENGINE_FILES.
     assert 'battle.py' in swc._ENGINE_FILES
     assert B.POGODIVES_CASE_SPECIES_PREFIXES == ('Cramorant',)
+
+
+def test_sweep_policy_tier_aliasing_and_liveness(tmp_path, monkeypatch):
+    """End-to-end cache semantics of the strategy tier through iv_sweep:
+    (a) a NON-Cramorant focal swept under the pogodives tier aliases to
+    the base-tier columns -- the second sweep sims NOTHING and returns
+    bit-identical scores; (b) a Cramorant focal under pogodives gets
+    DISTINCT columns (re-simmed) and genuinely different scores."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+    import sweep_cache as swc
+    from deep_dive_lib.sweep import iv_sweep
+    monkeypatch.setattr(swc, 'CACHE_DIR', tmp_path)
+
+    opp = ['Medicham']
+    movesets = [('COUNTER', ['DYNAMIC_PUNCH', 'ICE_PUNCH'])]
+    scen = [(1, 1)]
+
+    # (a) Non-Cramorant focal: base-tier sweep populates the cache...
+    r1 = iv_sweep('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+                  'great', False, opp, movesets, scen,
+                  opp_iv_mode='pvpoke', use_sweep_cache=True)
+    assert r1[1] > 0
+    # ...and the pogodives-tier sweep serves ENTIRELY warm via aliasing.
+    r2 = iv_sweep('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'],
+                  'great', False, opp, movesets, scen,
+                  opp_iv_mode='pvpoke:pogodives', use_sweep_cache=True)
+    assert r2[1] == 0, 'aliasing failed: non-Cram pogodives sweep re-simmed'
+    assert r1[2] == r2[2]
+
+    # (b) Cramorant focal: the tiers are distinct columns AND distinct
+    # results.
+    c1 = iv_sweep('Cramorant', 'PECK', ['DIVE', 'FLY'],
+                  'great', False, opp, movesets, scen,
+                  opp_iv_mode='pvpoke', use_sweep_cache=True)
+    c2 = iv_sweep('Cramorant', 'PECK', ['DIVE', 'FLY'],
+                  'great', False, opp, movesets, scen,
+                  opp_iv_mode='pvpoke:pogodives', use_sweep_cache=True)
+    assert c2[1] > 0, 'Cram pogodives sweep wrongly aliased to base tier'
+    assert c1[2] != c2[2], (
+        'pogodives tier produced identical Cramorant scores -- the tier '
+        'is not live through the sweep path')
+    # And both tiers now serve warm from their own columns.
+    c1b = iv_sweep('Cramorant', 'PECK', ['DIVE', 'FLY'],
+                   'great', False, opp, movesets, scen,
+                   opp_iv_mode='pvpoke', use_sweep_cache=True)
+    c2b = iv_sweep('Cramorant', 'PECK', ['DIVE', 'FLY'],
+                   'great', False, opp, movesets, scen,
+                   opp_iv_mode='pvpoke:pogodives', use_sweep_cache=True)
+    assert c1b[1] == 0 and c2b[1] == 0
+    assert c1b[2] == c1[2] and c2b[2] == c2[2]
