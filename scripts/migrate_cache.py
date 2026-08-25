@@ -219,6 +219,14 @@ PREDICATES = {
     # non-Cram fallback-invariant tests), and NO cached column was ever
     # simmed with the flag set -- fully-blessing.
     'pogodives_overlay_20260825': lambda f, c: False,
+    # 2026-08-25 late: the 2-0 start exemption (round-7 verdict) changes
+    # ONLY pogodives-tier behavior -- the flag gate in simulate()'s
+    # marking loop is inert for unmarked battles (full suite + the
+    # 36-cell oracle audit unchanged). Affected = columns simmed under
+    # the pogodives tier (the 'policy' column-key field); everything
+    # else blesses. Fail-safe: unreadable column fields -> affected.
+    'pogodives_2_0_exemption_20260825': lambda f, c: (
+        c is None or c.get('policy') == 'pogodives'),
 }
 
 
