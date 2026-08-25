@@ -585,6 +585,9 @@ function syncAllScenHighlight() {
       ? '2px solid #000' : '2px solid transparent';
   }
 }
+// The engine body is scope-wrapped at embed time; inline handlers only
+// see explicit window exports (same pattern as updateView below).
+window.toggleAllScenarios = toggleAllScenarios;
 
 function computeYValues(mi) {
   var mode = state.yAxisMode || 'avgScore';
