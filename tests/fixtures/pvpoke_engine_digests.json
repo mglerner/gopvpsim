@@ -1,0 +1,11 @@
+{
+ "digests": {
+  "../pokemon/Pokemon.js": "3c03042c1f9672d8243e1638f83cd0b7522ddf2b0581511fe5a4ec059c836706",
+  "Battle.js": "cf2bfbbfd5e769549a3427733f3006f2cad115aa58711553bb16f22e075bd825",
+  "DamageCalculator.js": "453c2e2bfa4ae87fc991abc7b8e689faaad4c27ab1636c0c4b13e1911c178a3c",
+  "actions/ActionLogic.js": "c0d7d0a58ed9ce68858ccb2b2fe236712ce5890c5374c90a15e64dd1335f9266"
+ },
+ "note": "sha256 of the battle-engine JS at the last vetted commit; see tests/test_rebalance_tripwire.py",
+ "pinned_at": "2026-08-25",
+ "pvpoke_commit": "78c64048a"
+}
