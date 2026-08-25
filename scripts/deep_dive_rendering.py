@@ -626,15 +626,29 @@ def parse_energy(composite_mode):
     return 0
 
 
-def compose_mode(opp_iv_mode, bait_mode='bait', energy_lead=0):
-    """Inverse of ``parse_mode``/``parse_energy``. Bait-on and energy-0
-    collapse to the bare opp-iv form so existing keys (e.g.
-    ``f'{mi}_pvpoke'``) stay unchanged when those axes aren't swept."""
+def parse_policy(composite_mode):
+    """Strategy-tier axis from a composite mode string: ':pogodives' ->
+    'pogodives' (the tier-3 overlay, docs/cramorant_policy_plan.md),
+    else 'pvpoke' (the default tier). Parsed separately like
+    ``parse_energy`` so the existing 2-tuple ``parse_mode`` call sites
+    stay unchanged."""
+    return ('pogodives' if 'pogodives' in composite_mode.split(':')[1:]
+            else 'pvpoke')
+
+
+def compose_mode(opp_iv_mode, bait_mode='bait', energy_lead=0,
+                 policy='pvpoke'):
+    """Inverse of ``parse_mode``/``parse_energy``/``parse_policy``.
+    Bait-on, energy-0 and the pvpoke tier collapse to the bare opp-iv
+    form so existing keys (e.g. ``f'{mi}_pvpoke'``) stay unchanged when
+    those axes aren't swept."""
     mode = opp_iv_mode
     if bait_mode == 'nobait':
         mode += ':nobait'
     if energy_lead:
         mode += f':e{energy_lead}'
+    if policy != 'pvpoke':
+        mode += f':{policy}'
     return mode
 
 

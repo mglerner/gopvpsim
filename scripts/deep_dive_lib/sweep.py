@@ -27,7 +27,8 @@ from gopvpsim.pokemon import (
 )
 from gopvpsim.moves import get_moves
 from gopvpsim.moves import parse_types
-from gopvpsim.battle import BattlePokemon, simulate, pvpoke_dp, ENERGY_CAP
+from gopvpsim.battle import (BattlePokemon, simulate, pvpoke_dp,
+                             pogodives_dp, ENERGY_CAP)
 from gopvpsim.formchange import attach_form_change
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,6 +44,7 @@ logger = get_logger()
 _pretty_name = analysis.pretty_name
 parse_mode = rendering.parse_mode
 parse_energy = rendering.parse_energy
+parse_policy = rendering.parse_policy
 
 
 def make_battle_pokemon(species, fast_id, charged_ids, league, shields,
@@ -402,7 +404,8 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
                        opp_cache, shield_scenarios, focal_bait=True,
                        log_path=None, verbose=False,
                        focal_mon=None, league_cp=1500, focal_shadow=False,
-                       focal_energy=0, mechanics='legacy', capture_metrics=False):
+                       focal_energy=0, mechanics='legacy',
+                       capture_metrics=False, policy_tier='pvpoke'):
     """Initialize shared state in each sweep worker process."""
     # Spawn-mode workers (default on macOS) do not inherit the parent
     # logger's handlers; re-attach a FileHandler so any worker-side
@@ -421,12 +424,16 @@ def _sweep_worker_init(species, focal_types, fm_template, cms_template,
     _worker_state['focal_energy'] = focal_energy
     _worker_state['mechanics'] = mechanics
     _worker_state['capture_metrics'] = capture_metrics
+    # Strategy tier: the pogodives CHARGED policy alone suffices --
+    # simulate() marks the focal side from either policy's marker, and
+    # the default shield policy reads the flag via _cram_tank_mult.
+    _base_dp = pogodives_dp if policy_tier == 'pogodives' else pvpoke_dp
     if focal_bait:
-        _worker_state['focal_policy'] = pvpoke_dp
+        _worker_state['focal_policy'] = _base_dp
     else:
         import functools
         _worker_state['focal_policy'] = functools.partial(
-            pvpoke_dp, bait_shields=False)
+            _base_dp, bait_shields=False)
 
 
 def _sweep_worker(pair_chunk):
@@ -623,6 +630,7 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     opp_iv_mode_simple, bait_mode = parse_mode(opp_iv_mode)
     focal_bait = (bait_mode == 'bait')
     energy_mult = parse_energy(opp_iv_mode)
+    policy_tier = parse_policy(opp_iv_mode)
     import multiprocessing
 
     fast_moves_db, charged_moves_db = get_moves()
@@ -725,9 +733,12 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
             energy_lead=focal_energy, focal_max_level=_eff_focal_cap))
         for oi, opp in enumerate(opp_cache):
             col = sweep_cache.get_column(
-                swc.column_key_fields(opp['species'], opp['shadow'],
-                                      opp['ivs'], opp['level'],
-                                      opp['fast_id'], opp['charged_ids']),
+                swc.column_key_fields(
+                    opp['species'], opp['shadow'],
+                    opp['ivs'], opp['level'],
+                    opp['fast_id'], opp['charged_ids'],
+                    policy=swc.normalize_policy_for_pair(
+                        policy_tier, species, opp['species'])),
                 n_ivs_total, len(shield_scenarios),
                 required_planes=req_planes)
             if col is not None:
@@ -793,7 +804,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                       opp_cache, shield_scenarios, focal_bait,
                       log_path, verbose,
                       focal_mon, LEAGUE_CAPS[league], shadow,
-                      focal_energy, mechanics, capture_metrics),
+                      focal_energy, mechanics, capture_metrics,
+                      policy_tier),
         ) as pool:
             last_print = sim_start
             completed = 0
@@ -896,9 +908,12 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
                             profile_metrics_per_opp[pk][(si, oi)][mi]
                             for si in range(n_sc)]
             sweep_cache.put_column(
-                swc.column_key_fields(opp['species'], opp['shadow'],
-                                      opp['ivs'], opp['level'],
-                                      opp['fast_id'], opp['charged_ids']),
+                swc.column_key_fields(
+                    opp['species'], opp['shadow'],
+                    opp['ivs'], opp['level'],
+                    opp['fast_id'], opp['charged_ids'],
+                    policy=swc.normalize_policy_for_pair(
+                        policy_tier, species, opp['species'])),
                 {'score': score_col, 'energy': energy_col, **metric_planes})
 
     # Build per-IV results by expanding profile sims to all matching IVs.
