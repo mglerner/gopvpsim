@@ -26,6 +26,22 @@ authorization for a large multi-agent campaign.)*
    - The special-case registry is the future home for beefed-up
      strategy in OTHER cases — additions land one evidenced case at a
      time, each with its own corpus proof, never by drift.
+   - **Cache reuse via key normalization (Michael 2026-08-24).** Each
+     registered case carries a machine-readable applicability predicate
+     over (focal, opponent) species. When a sweep runs under the
+     pogodives policy and NO registered case can fire for the pair, the
+     cache layer NORMALIZES the column key to the base policy
+     (`'bait'`/`'nobait'` per the bait axis) — the column IS the
+     existing PvPoke-DP entry, so reuse is automatic, bidirectional,
+     and storage-free. Applicable pairs get distinct
+     `'pogodives'`/`'pogodives:nobait'` keys and sim fresh. Soundness =
+     the test-pinned fallback invariant (pogodives == pvpoke_dp when no
+     case applies), which this design promotes to a load-bearing cache
+     guard; the applicability check derives FROM the registry so a new
+     case automatically stops aliasing its pairs (fail-safe: when
+     unsure, don't alias — re-sim). Engine-hash discipline unchanged:
+     tuning a pogodives rule bumps the hash, and its migration
+     predicate is the "no registered case applies" complement.
    - It SHIPS VISIBLY on the dive surfaces (decided in principle;
      exact UI — a policy toggle alongside the bait dropdown, or a
      separately rendered line — is settled when we build the render
