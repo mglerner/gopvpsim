@@ -64,11 +64,12 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    **ROUND 1 RAN 2026-08-24 overnight** -- 80-variant grid x 4 opponent
    models x 4 IV spreads, 4-analyst + 2-skeptic adversarial workflow;
    synthesis: `docs/validations/cramorant_policy_lab_2026_08_24.md`.
-   Frozen (provisional): dive gate 1.5 -> 3.0, HP gate stays 1.3,
-   delay-Gorging off. **DECISION FOR MICHAEL: tank 1.4 (max wins,
-   +111 net) vs 1.8 (provisional pick: 84% of the wins, uniformly
-   positive rating, half the HP cost).** THEN the overlay lands in a
-   SUPERVISED session (per-side knob threading -- the globals would
+   FROZEN (Michael 2026-08-25): dive gate 1.5 -> 3.0, HP gate 1.3,
+   delay-Gorging off, ADAPTIVE tank lead40 (the round-5 rule that
+   dominated both static tank picks; writeup addendum 2). The old
+   1.4-vs-1.8 fork is superseded. Adaptive-rule inputs are
+   constrained to dedup-signature functions (pinned in the plan doc).
+   The overlay lands in a SUPERVISED session (per-side knob threading -- the globals would
    leak to Cramorant opponents/mirrors -- plus the cache key
    normalization; own hash bump + migration predicate). A Dive+Surf
    moveset grid (our dives rank that build #1) ran overnight too --

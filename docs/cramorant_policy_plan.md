@@ -42,6 +42,27 @@ authorization for a large multi-agent campaign.)*
      unsure, don't alias — re-sim). Engine-hash discipline unchanged:
      tuning a pogodives rule bumps the hash, and its migration
      predicate is the "no registered case applies" complement.
+   - **DECIDED (Michael 2026-08-25): the shipped rule is dive gate 3.0
+     + ADAPTIVE tank, lead40** (tank at 1.4 while holding prey unless
+     Cramorant's HP-fraction lead exceeds 40 points, then PvPoke's 2.2);
+     HP gate stays 1.3, delay-Gorging off. Finalized during the
+     overlay's post-threading re-verification (a 30/35/40/45 mini-sweep
+     rides along; the 33-45 plateau is expected to hold).
+   - **PINNED CONSTRAINT -- adaptive-rule inputs vs dedup soundness
+     (Michael 2026-08-25):** any policy rule (the lead rule today, any
+     future f(spread, opponent) refinement) may only read battle-state
+     inputs that are FUNCTIONS OF THE DEDUP-SIGNATURE COMPONENTS
+     (deep_dive_signature.py: damage rows, CMP sign, integer max HP,
+     stat stages). max_hp-derived quantities qualify; stat-product RANK
+     does not (two spreads can share a signature but differ in rank --
+     conditioning on it would silently merge profiles that fight
+     different battles). Opponent-side conditioning is dedup-free (the
+     opponent is fixed per column). The overlay ships a dedup-invariant
+     test enforcing this mechanically; round-6 discovery (IV- or
+     opponent-dependent thresholds -- both signals exist: the 5/5/5
+     frail-spread give-back and the five deterministic losers) starts
+     inside this fence, post-overlay, with mechanism-derived
+     discriminators validated on held-out opponents.
    - It SHIPS VISIBLY on the dive surfaces (decided in principle;
      exact UI — a policy toggle alongside the bait dropdown, or a
      separately rendered line — is settled when we build the render
