@@ -86,6 +86,13 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    evidenced refinement, which re-bakes the pogodives columns, or a
    confirmed-final lead40, which unblocks publish + article). Inside
    the pinned dedup-input fence; publish/article wait on this verdict.
+   REBALANCE NOTE (Michael 2026-08-25): a big move rebalance is
+   expected ~2 weeks out (post-Worlds, the usual pattern). When it
+   lands: gamemaster-delta migration as usual, PLUS re-run the
+   policy-lab verification corpus (~10 min) -- the strat's fitted
+   constants were tuned on pre-rebalance move data. This is also the
+   standing argument for mechanism-not-names round-6 discriminators
+   (they re-derive from the new numbers at battle time).
 4. **Upstream bug-report candidates** (pvpoke): the two `move.moveID`
    typos (ActionLogic.js:368, :1239 -- the latter makes opponents never
    shield a lethal Dive, plausibly inflating published Cramorant
