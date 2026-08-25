@@ -139,3 +139,25 @@ flips; it flips only under withhold, 0-shield cells only).
   inversion) can now cite round-3/2b measurements. Also worth an
   upstream note: PvPoke's own 1.5 gate and 2.2 tank constants are
   measurably dominated within its own opponent model.
+
+## Addendum: the Dive+Surf build (round 4, 2026-08-24 late)
+
+Our shipped dives rank Peck / Dive + Surf as Cramorant's #1 build in
+both leagues, so the grid was re-run on it
+(`userdata/cramorant_lab/round4_divesurf.json`). Results:
+
+- **The dive gate is inert on this build** (Surf/Dive DPE ratio ~1.33
+  sits below 1.5 and 3.0 alike; dpe 1.5/3/inf produce identical
+  cells). The gate knob only matters for builds carrying a non-gulp
+  charged move — consistent with A4's semantics.
+- **The tank knob is the entire effect, and the 1.4-vs-1.8 gap WIDENS:
+  +108 vs +48 net** (baseline 1310W/174D/1108L). On the build we
+  actually showcase, tank 1.8 keeps well under half of the ordinal
+  gain — material input for the pending tank decision (the rating/HP
+  ledger for Dive+Surf has NOT yet been run; do that before deciding).
+- Delay-for-Gorging is only mildly negative here (both charged moves
+  are prey triggers, so the delay semantics differ) — still no reason
+  to ship it.
+- Baseline W-L: Dive+Surf 1310/1108 vs Dive+Fly 1360/1127 against the
+  same pools — the dive's avg-score ranking of Dive+Surf as #1 is not
+  a raw-win-count claim; worth a look when reviewing the dive pages.
