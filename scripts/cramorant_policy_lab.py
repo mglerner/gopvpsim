@@ -118,7 +118,7 @@ def make_withhold_policy():
 
 
 def run_variant(name, knobs, league, pool, opponent_counter=None,
-                progress=None):
+                progress=None, focal_ivs=None):
     """All cells for one variant. Returns list of cell dicts."""
     for k, v in knobs.items():
         setattr(B, k, v)
@@ -129,7 +129,7 @@ def run_variant(name, knobs, league, pool, opponent_counter=None,
     for display, species, shadow, fast_id, charged_ids in pool:
         try:
             cram = make_bp('Cramorant', league, False, 'PECK',
-                           ['DIVE', 'FLY'])
+                           ['DIVE', 'FLY'], ivs=focal_ivs)
             opp = make_bp(species, league, shadow, fast_id, charged_ids)
         except KeyError as e:
             cells.append({'opp': display, 'error': str(e)})
@@ -197,6 +197,10 @@ def main():
     ap.add_argument('--opponent-counter', default=None,
                     choices=['withhold'],
                     help='robustness round: opponent counter-policy')
+    ap.add_argument('--focal-ivs', default=None, metavar='A/D/S',
+                    help='override the Cramorant focal IVs (default: PvPoke '
+                         'default IVs), e.g. 0/15/14 -- for the IV-spread '
+                         'robustness round')
     ap.add_argument('--lethal-dive-fix', action='store_true',
                     help='robustness round: opponents shield lethal Dives '
                          '(the fixed upstream rule) in EVERY variant')
@@ -213,6 +217,8 @@ def main():
         for v in variants.values():
             v['_CRAM_LETHAL_DIVE_SHIELD_FIX'] = True
 
+    focal_ivs = (tuple(int(x) for x in args.focal_ivs.split('/'))
+                 if args.focal_ivs else None)
     leagues = ['great', 'ultra'] if args.league == 'both' else [args.league]
     out_path = Path(args.out) if args.out else (
         REPO / 'userdata' / 'cramorant_lab' /
@@ -227,7 +233,8 @@ def main():
               + (f' (skipped: {skipped})' if skipped else ''), flush=True)
         for i, (name, knobs) in enumerate(variants.items()):
             cells = run_variant(name, knobs, league, pool,
-                                opponent_counter=args.opponent_counter)
+                                opponent_counter=args.opponent_counter,
+                                focal_ivs=focal_ivs)
             cells_by_variant.setdefault(name, []).extend(cells)
             print(f'[{league}] {i + 1}/{len(variants)} {name} '
                   f'({time.time() - t0:.0f}s)', flush=True)
@@ -237,7 +244,8 @@ def main():
     pool, _ = load_pool(league)
     sample = run_variant('baseline_recheck', dict(PVPOKE_DEFAULTS),
                          league, pool[:3],
-                         opponent_counter=args.opponent_counter)
+                         opponent_counter=args.opponent_counter,
+                         focal_ivs=focal_ivs)
     orig = [c for c in cells_by_variant['baseline']
             if c.get('league') == league
             and c.get('opp') in {p[0] for p in pool[:3]}]
@@ -250,7 +258,9 @@ def main():
         'meta': {'leagues': leagues, 'n_variants': len(variants),
                  'opponent_counter': args.opponent_counter,
                  'lethal_dive_fix': args.lethal_dive_fix,
-                 'focal': 'Cramorant PECK/DIVE+FLY, PvPoke default IVs',
+                 'focal': 'Cramorant PECK/DIVE+FLY, '
+                          + (f'IVs {args.focal_ivs}' if args.focal_ivs
+                             else 'PvPoke default IVs'),
                  'elapsed_s': round(time.time() - t0, 1)},
         'summary': summary,
         'cells': [c for cells in cells_by_variant.values() for c in cells],
