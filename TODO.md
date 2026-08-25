@@ -78,7 +78,14 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    bake (consumer wiring of column_key_fields(policy=...) +
    normalize_policy_for_pair through deep_dive_lib/sweep.py) -- its
    own scoped session. Round-6 discovery (IV-/opponent-dependent
-   thresholds) stays post-render, inside the pinned dedup-input fence.
+   thresholds) is QUEUED FOR THE NIGHT OF 2026-08-25 (Michael's go):
+   chain = current policy-both bake finishes -> GL replay re-render ->
+   build mechanism-derived discriminator variants in the lab ->
+   league-crossed holdout runs (tune GL/validate UL and vice versa, +
+   IV spreads) -> adversarial analysis workflow -> verdict (either an
+   evidenced refinement, which re-bakes the pogodives columns, or a
+   confirmed-final lead40, which unblocks publish + article). Inside
+   the pinned dedup-input fence; publish/article wait on this verdict.
 4. **Upstream bug-report candidates** (pvpoke): the two `move.moveID`
    typos (ActionLogic.js:368, :1239 -- the latter makes opponents never
    shield a lethal Dive, plausibly inflating published Cramorant
