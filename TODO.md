@@ -107,7 +107,23 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    scores; H4 in the plan doc measures it). Draft after the campaign's
    H4 numbers exist; follows the docs/pvpoke_bug_reports.md conventions.
 
-5. **Cramorant strategy article pair (Michael 2026-08-25, queued
+5. **Dive-page all-scenarios grid (Michael 2026-08-25, design
+   agreed, timing open):** a "Show all shield scenarios" checkbox after
+   the moveset title on dive pages -- default off; on first toggle,
+   lazily render a 3x3 small-multiples grid of the main scatter (one
+   panel per shield scenario) from the ALREADY-EMBEDDED per-scenario
+   SCORES arrays (no resim, no state change -- the main plot/cards/
+   analysis do NOT re-render). Simplified panels (category colors, no
+   anchor overlays/tooltips). The panel matching the scenario dropdown
+   gets a black-border highlight (CSS toggle synced to the dropdown);
+   clicking a panel sets the dropdown (user-initiated full re-render,
+   acceptable). Precedent: the joint-IV grid9 views; motivation: the
+   2-2 Peck/Dive+Fly spread-fan is invisible without clicking through
+   scenarios. Render-side only; independent of the strat work; its own
+   small session (touches deep_dive.py control markup +
+   deep_dive_engine.js -- keep outside the gives-up REGION_SHA pin).
+
+6. **Cramorant strategy article pair (Michael 2026-08-25, queued
    post-sim-work):** a short article on (1) playing Cramorant and (2)
    playing AGAINST Cramorant. The lab campaign is the evidence base --
    candidate data-backed content: dive-early evidence (the 1.5-vs-3.0
