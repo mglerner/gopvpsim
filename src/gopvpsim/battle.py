@@ -185,6 +185,22 @@ def _cheapest_cm(owner: "BattlePokemon") -> "dict | None":
     return min(owner.charged_moves, key=lambda m: m['energy'])
 
 
+# --- Cramorant policy-lab knobs (docs/cramorant_policy_plan.md) -----------
+# Module globals so scripts/cramorant_policy_lab.py can A/B candidate
+# "PoGoDives strat" rules without forking the engine. The DEFAULTS are
+# PvPoke's shipped literals -- the engine is byte-identical unless a lab
+# process overrides them. WARNING (sweep-cache discipline): the sweep
+# cache does NOT key on these; never run a cache-backed sweep/dive with
+# non-default values. The lab calls simulate() directly and never
+# touches the cache.
+_CRAM_DIVE_GATE_DPE = 1.5    # dive-ASAP fires iff nonGulp.dpe/gulp.dpe < this
+_CRAM_DIVE_GATE_HP = 1.3     # ... and opp.hp > nonGulp.damage * this
+_CRAM_TANK_MULT = 2.2        # prey-holder tanks charged hits < hp/this
+_CRAM_DELAY_GORGING = False  # skip dive-ASAP while hp > 50% (choose Pikachu)
+_CRAM_LETHAL_DIVE_SHIELD_FIX = False  # opponent-side: shield a lethal Dive
+                                      # (PvPoke's shipped rule never does)
+
+
 def _base_species_id(bp: "BattlePokemon") -> "str | None":
     """PvPoke's form-INVARIANT speciesId (changeForm never rewrites it):
     the STARTING form's species_id, or None for non-form-change species.
@@ -345,7 +361,8 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     # Gate 1: a prey-holding Cramorant tanks weak charged attacks so Gulp
     # Missile fires earlier.
     if (_holding_prey(defender)
-            and attacker.charged_move_damage(move, defender) * 2.2 < defender.hp):
+            and attacker.charged_move_damage(move, defender) * _CRAM_TANK_MULT
+                < defender.hp):
         if _shield_trace:
             _policy_log.append(
                 f"  shield({defender.species} sh={defender.shields} vs"
@@ -699,10 +716,11 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
             cm_reasons.append(f"aegislashShield dmg({damage})*2<hp({defender.hp})")
     # Save shields in a prey-holding Cramorant so Gulp Missile fires earlier
     if (_d_form_sid in ('cramorant_gulping', 'cramorant_gorging')
-            and damage * 2.2 < defender.hp):
+            and damage * _CRAM_TANK_MULT < defender.hp):
         use_shield = False
         if _shield_trace:
-            cm_reasons.append(f"cramorantPrey dmg({damage})*2.2<hp({defender.hp})")
+            cm_reasons.append(
+                f"cramorantPrey dmg({damage})*{_CRAM_TANK_MULT}<hp({defender.hp})")
     _a_sid = _base_species_id(attacker)
     # Don't shield early weak Cramorant charged moves (no move filter
     # upstream despite the "Dives or Surfs" comment)
@@ -716,7 +734,10 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
     # candidate bug report -- but oracle parity wins; see the port doc).
     if (_a_sid == 'cramorant' and move.get('moveId') == 'DIVE'
             and damage > defender.hp):
-        use_shield = False
+        # _CRAM_LETHAL_DIVE_SHIELD_FIX=True models the presumed INTENDED
+        # behavior (shield the lethal Dive) for the policy lab's H4
+        # robustness round; default replicates PvPoke as shipped.
+        use_shield = bool(_CRAM_LETHAL_DIVE_SHIELD_FIX)
         if _shield_trace:
             cm_reasons.append(f"lethalDive dmg({damage})>hp({defender.hp})")
 
@@ -1410,8 +1431,11 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         # cells match; revisit if a post-debuff re-dive cell ever drifts.
         if (_gulp_slot is not None and _nongulp_slot is not None
                 and attacker.energy >= cm_energy[_gulp_slot]
-                and defender.hp > cm_dmgs[_nongulp_slot] * 1.3
-                and cm_dpe[_nongulp_slot] / cm_dpe[_gulp_slot] < 1.5):
+                and defender.hp > cm_dmgs[_nongulp_slot] * _CRAM_DIVE_GATE_HP
+                and (cm_dpe[_nongulp_slot] / cm_dpe[_gulp_slot]
+                     < _CRAM_DIVE_GATE_DPE)
+                and not (_CRAM_DELAY_GORGING
+                         and attacker.hp / attacker.max_hp > 0.5)):
             if _policy_debug:
                 _policy_log.append(
                     f"  DP[cramorant_gulp_prep]: {attacker.species} fires "

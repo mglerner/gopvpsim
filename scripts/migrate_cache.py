@@ -203,6 +203,15 @@ PREDICATES = {
     'self_debuff_either_side': _self_debuff_either_side,
     'neutral_batch_20260810': _neutral_batch_20260810,
     'cramorant_port_20260824': _cramorant_port_20260824,
+    # 2026-08-24 policy-lab knob plumbing (pin --from-engine bf1601ae0dc1):
+    # module globals defaulting to the exact literals they replaced
+    # (_CRAM_DIVE_GATE_DPE 1.5, _CRAM_DIVE_GATE_HP 1.3, _CRAM_TANK_MULT 2.2,
+    # _CRAM_DELAY_GORGING/False adds a vacuous `not False and ...` clause,
+    # _CRAM_LETHAL_DIVE_SHIELD_FIX/False makes `use_shield = bool(False)`).
+    # Behavior-identical for EVERY column (knob-liveness + default pins in
+    # tests/test_cramorant.py; the 36 Cramorant oracle cells re-verified
+    # exact post-plumbing) -- fully-blessing, like neutral_batch_20260810.
+    'cramorant_knobs_20260824': lambda f, c: False,
 }
 
 
