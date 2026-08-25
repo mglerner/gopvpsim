@@ -662,6 +662,8 @@ def mode_pretty_label(composite_mode):
     if energy:
         plural = 's' if energy > 1 else ''
         opp_label = f'{opp_label}, +{energy} fast move{plural} energy'
+    if parse_policy(composite_mode) == 'pogodives':
+        opp_label = f'{opp_label}, PoGoDives strat'
     return opp_label
 
 

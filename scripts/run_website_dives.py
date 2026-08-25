@@ -132,9 +132,10 @@ DIVES = [
     },
     # Cramorant GL + UL -- added 2026-08-24 with the Gulp Missile engine
     # port (pvpoke 78c64048a; see DEVELOPER_NOTES form-change gotcha 5).
-    # PvPoke default moveset Peck / Dive + Fly (GL rank 13, UL rank 27);
-    # form change -> per-IV sims (no dedup), so these run Aegislash-slow.
-    # No hand-authored thresholds yet.
+    # PvPoke default moveset Peck / Dive + Fly (GL rank 13, UL rank 27).
+    # policy 'both' (2026-08-25): the PoGoDives-strat tier
+    # (docs/cramorant_policy_plan.md) sims alongside the PvPoke default
+    # and renders a Strategy selector. No hand-authored thresholds yet.
     {
         'species': 'Cramorant',
         'league': 'great',
@@ -142,6 +143,7 @@ DIVES = [
         'html_base': 'index.html',
         'opponents_file': 'opponent_pools/gl_top50_plus_cs.txt',
         'no_thresholds': True,
+        'policy': 'both',
     },
     {
         'species': 'Cramorant',
@@ -150,6 +152,7 @@ DIVES = [
         'html_base': 'index.html',
         'opponents_file': 'opponent_pools/ul_top60.txt',
         'no_thresholds': True,
+        'policy': 'both',
     },
     # Aegislash (Blade) isn't in PvPoke rankings; pass --fast / --charged
     # explicitly via extra_args and --no-thresholds so the auto-loader
@@ -1017,6 +1020,8 @@ def build_command(dive):
     cmd += ['--top-movesets', str(dive.get('top_movesets', 5))]
     cmd += ['--opp-ivs', dive.get('opp_ivs', 'both')]
     cmd += ['--bait', dive.get('bait', 'both')]
+    if dive.get('policy', 'pvpoke') != 'pvpoke':
+        cmd += ['--policy', dive['policy']]
     cmd += ['--reference', dive.get('reference', 'auto')]
 
     if dive.get('no_thresholds'):

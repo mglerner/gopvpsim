@@ -70,6 +70,11 @@ def load_deep_dive():
 #   --opp-ivs both     -> >1 opponent-IV mode, so 'oppiv-sel' renders
 #   --energy-lead on   -> >1 energy value, so 'energy-sel' renders
 #   (--bait both, the default) -> both bait modes, so 'bait-sel' renders
+#   --policy both      -> both strategy tiers, so 'policy-sel' renders
+#                         (Bastiodon is a non-case species, so the
+#                         pogodives tier is byte-identical pvpoke sims --
+#                         cheap, and it exercises the fallback invariant
+#                         through a real render)
 #   (best-buddy auto on Great) -> the sidenav's 'dd-bb-toggle' renders
 #   (shield scenarios) -> --html implies --interactive, which expands 1,1 to
 #                         all nine, so 'scenario-sel' renders
@@ -83,6 +88,7 @@ SMALL_DIVE_ARGS = [
     'Bastiodon', '--league', 'great',
     '--opponents', '2', '--species-iv-floor', '14,14,14',
     '--top-movesets', '2', '--opp-ivs', 'both', '--energy-lead', 'on',
+    '--policy', 'both',
     '--no-thresholds', '--no-mirror-slayer',
     '--no-cache', '--no-sweep-cache', '--no-replay-dump',
     '--quiet', '--log-file', '/dev/null',
