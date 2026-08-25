@@ -236,7 +236,8 @@ def main():
     league = leagues[0]
     pool, _ = load_pool(league)
     sample = run_variant('baseline_recheck', dict(PVPOKE_DEFAULTS),
-                         league, pool[:3])
+                         league, pool[:3],
+                         opponent_counter=args.opponent_counter)
     orig = [c for c in cells_by_variant['baseline']
             if c.get('league') == league
             and c.get('opp') in {p[0] for p in pool[:3]}]
