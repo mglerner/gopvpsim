@@ -45,9 +45,10 @@ authorization for a large multi-agent campaign.)*
    - **DECIDED (Michael 2026-08-25): the shipped rule is dive gate 3.0
      + ADAPTIVE tank, lead40** (tank at 1.4 while holding prey unless
      Cramorant's HP-fraction lead exceeds 40 points, then PvPoke's 2.2);
-     HP gate stays 1.3, delay-Gorging off. Finalized during the
-     overlay's post-threading re-verification (a 30/35/40/45 mini-sweep
-     rides along; the 33-45 plateau is expected to hold).
+     HP gate stays 1.3, delay-Gorging off. CONFIRMED FINAL 2026-08-25
+     on the threaded engine (round-7 re-verification: the 35-45 plateau
+     held exactly; model threading moved one cell). The overlay is
+     LIVE in the engine; the render side remains.
    - **PINNED CONSTRAINT -- adaptive-rule inputs vs dedup soundness
      (Michael 2026-08-25):** any policy rule (the lead rule today, any
      future f(spread, opponent) refinement) may only read battle-state

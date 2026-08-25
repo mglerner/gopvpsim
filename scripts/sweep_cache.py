@@ -270,9 +270,19 @@ def focal_key_fields(species, league, shadow, fast_id, charged_ids,
 
 
 def column_key_fields(opp_species, opp_shadow, opp_ivs, opp_level,
-                      opp_fast_id, opp_charged_ids):
-    """Column-side key dict for one resolved opponent."""
-    return {
+                      opp_fast_id, opp_charged_ids, policy='pvpoke'):
+    """Column-side key dict for one resolved opponent.
+
+    ``policy`` is the strategy tier the column was simmed under. The
+    base tier ('pvpoke') adds NO key -- the dict is byte-identical to
+    the pre-tier format, so every existing column stays valid. A
+    non-base tier ('pogodives') adds a 'policy' key and therefore a
+    distinct column. Callers must first run the tier through
+    ``normalize_policy_for_pair`` so non-applicable pairs alias to the
+    base-tier column (the whole point of the tier design -- see
+    docs/cramorant_policy_plan.md "Cache reuse via key normalization").
+    """
+    fields = {
         'species': opp_species,
         'shadow': bool(opp_shadow),
         'ivs': list(opp_ivs),
@@ -280,6 +290,31 @@ def column_key_fields(opp_species, opp_shadow, opp_ivs, opp_level,
         'fast': opp_fast_id,
         'charged': list(opp_charged_ids),
     }
+    if policy not in (None, 'pvpoke'):
+        fields['policy'] = policy
+    return fields
+
+
+def normalize_policy_for_pair(policy, focal_species, opp_species):
+    """Collapse a strategy tier to 'pvpoke' when it provably cannot
+    change this pair's battles.
+
+    The applicability registry lives in gopvpsim.battle
+    (POGODIVES_CASE_SPECIES_PREFIXES) -- an ENGINE-HASHED file, so
+    growing the registry stale-stamps every cached column and a lagging
+    aliasing rule can never serve stale results. Fail-safe: an unknown
+    tier string never aliases (distinct columns, re-simmed).
+    """
+    if policy in (None, 'pvpoke'):
+        return 'pvpoke'
+    if policy == 'pogodives':
+        from gopvpsim.battle import POGODIVES_CASE_SPECIES_PREFIXES
+        if (str(focal_species).startswith(POGODIVES_CASE_SPECIES_PREFIXES)
+                or str(opp_species).startswith(
+                    POGODIVES_CASE_SPECIES_PREFIXES)):
+            return 'pogodives'
+        return 'pvpoke'
+    return policy
 
 
 class SweepCache:

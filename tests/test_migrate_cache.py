@@ -463,3 +463,12 @@ def test_cramorant_port_20260824_predicate():
     assert p(None, azu) is True
     assert p(azu, {}) is True
     assert p({'species': ''}, azu) is True
+
+
+def test_pogodives_overlay_20260825_predicate():
+    """Fully-blessing neutral bump: the overlay is behavior-identical
+    without the _pogodives flag (suite + audit + fallback-invariant
+    tests), and no cached column was ever simmed with it set."""
+    p = migrate_cache.PREDICATES['pogodives_overlay_20260825']
+    assert p({'species': 'Cramorant'}, {'species': 'Azumarill'}) is False
+    assert p(None, None) is False

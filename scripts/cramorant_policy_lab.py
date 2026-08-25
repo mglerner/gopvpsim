@@ -120,14 +120,21 @@ def make_withhold_policy():
 def run_variant(name, knobs, league, pool, opponent_counter=None,
                 progress=None, focal_ivs=None,
                 focal_moveset=('PECK', ['DIVE', 'FLY']),
-                focal_shield_policy=None):
+                focal_shield_policy=None, pogodives_focal=False):
     """All cells for one variant. Returns list of cell dicts."""
     for k, v in knobs.items():
         setattr(B, k, v)
     cells = []
     opp_policy = (make_withhold_policy() if opponent_counter == 'withhold'
                   else pvpoke_dp)
-    nobait = functools.partial(pvpoke_dp, bait_shields=False)
+    if pogodives_focal:
+        from gopvpsim.battle import pogodives_dp, pogodives_shield
+        focal_bait = pogodives_dp
+        nobait = functools.partial(pogodives_dp, bait_shields=False)
+        focal_shield_policy = pogodives_shield
+    else:
+        focal_bait = pvpoke_dp
+        nobait = functools.partial(pvpoke_dp, bait_shields=False)
     for display, species, shadow, fast_id, charged_ids in pool:
         try:
             cram = make_bp('Cramorant', league, False, focal_moveset[0],
@@ -136,7 +143,7 @@ def run_variant(name, knobs, league, pool, opponent_counter=None,
         except KeyError as e:
             cells.append({'opp': display, 'error': str(e)})
             continue
-        for bait_label, focal_policy in (('bait', pvpoke_dp),
+        for bait_label, focal_policy in (('bait', focal_bait),
                                          ('nobait', nobait)):
             for s1, s2 in SCENARIOS:
                 cram.reset_for_battle(s1, opp)
@@ -154,7 +161,12 @@ def run_variant(name, knobs, league, pool, opponent_counter=None,
                               'winner': r.winner})
         if progress:
             progress()
-    # Restore defaults so variants can't leak into each other.
+    # Restore defaults so variants can't leak into each other (covers
+    # the _POGODIVES_* constants too -- restore whatever was set).
+    _restore = dict(PVPOKE_DEFAULTS)
+    _restore['_POGODIVES_TANK_LEAD'] = 0.40
+    for k in knobs:
+        setattr(B, k, _restore.get(k, PVPOKE_DEFAULTS.get(k)))
     for k, v in PVPOKE_DEFAULTS.items():
         setattr(B, k, v)
     return cells
@@ -249,6 +261,11 @@ def main():
                          'lab_<timestamp>.json)')
     ap.add_argument('--variants', default=None,
                     help='comma-separated variant-name filter over the grid')
+    ap.add_argument('--pogodives-verify', action='store_true',
+                    help='re-verification mode for the THREADED overlay: '
+                         'baseline (plain pvpoke) + pogodives at lead '
+                         '30/35/40/45 + never-conservative, using the real '
+                         'pogodives_dp/pogodives_shield policies')
     ap.add_argument('--adaptive', action='store_true',
                     help='round 5: run the ADAPTIVE_RULES wrappers (plus '
                          'baseline and the two fixed-tank finalists at '
@@ -274,6 +291,15 @@ def main():
         assert getattr(B, k) == v, f'knob {k} not at PvPoke default at start'
 
     variants = build_grid()
+    if args.pogodives_verify:
+        variants = {'baseline': dict(PVPOKE_DEFAULTS)}
+        for lead in (0.30, 0.35, 0.40, 0.45):
+            v = dict(PVPOKE_DEFAULTS)
+            v['_POGODIVES_TANK_LEAD'] = lead
+            variants[f'pg_lead{int(lead * 100)}'] = v
+        v = dict(PVPOKE_DEFAULTS)
+        v['_POGODIVES_TANK_LEAD'] = 10.0   # never conservative == static 1.4
+        variants['pg_static14'] = v
     if args.adaptive:
         keep = {'baseline', 'dpe3_hp1.3_tank1.4', 'dpe3_hp1.3_tank1.8'}
         variants = {k: v for k, v in variants.items() if k in keep}
@@ -311,7 +337,8 @@ def main():
                                 opponent_counter=args.opponent_counter,
                                 focal_ivs=focal_ivs,
                                 focal_moveset=focal_moveset,
-                                focal_shield_policy=wrapper)
+                                focal_shield_policy=wrapper,
+                                pogodives_focal=name.startswith('pg_'))
             cells_by_variant.setdefault(name, []).extend(cells)
             print(f'[{league}] {i + 1}/{len(variants)} {name} '
                   f'({time.time() - t0:.0f}s)', flush=True)
