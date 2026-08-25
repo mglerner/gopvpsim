@@ -2258,6 +2258,14 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             html += (f'    <option value="{si}"{sel}>'
                      f'{scenario_label(scen)}</option>\n')
         html += '  </select></label>\n'
+        # All-scenarios small-multiples toggle (Michael 2026-08-25): a
+        # lazily-rendered 3x3 grid of simplified per-scenario scatters
+        # built from the ALREADY-EMBEDDED score arrays -- no page
+        # re-render, no state change; the panel matching the Shields
+        # dropdown gets a highlight, and clicking a panel selects it.
+        html += ('  <label class="dd-allscen"><input type="checkbox" '
+                 'id="allscen-toggle" onchange="toggleAllScenarios()"> '
+                 'All scenarios</label>\n')
 
     if len(opp_iv_modes) > 1:
         _base_modes = list(dict.fromkeys(
@@ -2474,6 +2482,9 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 
     # Plot first, then summary table below
     html += '<div id="plot" class="plot-container" style="height:550px;"></div>\n'
+    html += ('<div id="allscen-grid" style="display:none;'
+             'grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;">'
+             '</div>\n')
     # Highlight-IVs strip, right-aligned directly below the plot so it
     # sits under the legend column visually. Enter applies, Escape
     # clears (keydown handler on the input); buttons are mouse-friendly
