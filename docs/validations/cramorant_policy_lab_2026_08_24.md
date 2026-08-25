@@ -153,8 +153,12 @@ both leagues, so the grid was re-run on it
 - **The tank knob is the entire effect, and the 1.4-vs-1.8 gap WIDENS:
   +108 vs +48 net** (baseline 1310W/174D/1108L). On the build we
   actually showcase, tank 1.8 keeps well under half of the ordinal
-  gain — material input for the pending tank decision (the rating/HP
-  ledger for Dive+Surf has NOT yet been run; do that before deciding).
+  gain — material input for the pending tank decision. The Dive+Surf
+  rating ledger (mean dScore vs baseline): tank 1.4 GL -2.66 / UL
+  -2.14, tank 1.8 GL -0.53 / UL -0.07 — the same wins-bought-with-
+  rating shape as Dive+Fly, but on this build BOTH variants are
+  rating-negative and 1.4's bill is ~4x. The fork sharpens: on the
+  showcased build, 1.4 buys 2.2x the flips at 4x the rating cost.
 - Delay-for-Gorging is only mildly negative here (both charged moves
   are prey triggers, so the delay semantics differ) — still no reason
   to ship it.
