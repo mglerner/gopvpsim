@@ -85,6 +85,25 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    scores; H4 in the plan doc measures it). Draft after the campaign's
    H4 numbers exist; follows the docs/pvpoke_bug_reports.md conventions.
 
+5. **Cramorant strategy article pair (Michael 2026-08-25, queued
+   post-sim-work):** a short article on (1) playing Cramorant and (2)
+   playing AGAINST Cramorant. The lab campaign is the evidence base --
+   candidate data-backed content: dive-early evidence (the 1.5-vs-3.0
+   gate numbers, the Kingdra exception), the prey-tank rule + the
+   "tank unless clearly ahead" adaptive result, the shield-economy
+   structure (better with shields on the board, the shield-ahead tax),
+   missile HP-breakpoint family (floor(15%*maxHP)+1 steps); vs-side:
+   energy stacking, don't-shield-weak-hits, the five hard counters
+   (Shadow Shelgon / Giratina-A / Shadow Hydreigon / Shadow Lapras),
+   and the CAREFULLY-CAVEATED withhold finding (our crude withhold
+   counter-policy BACKFIRED -- baseline Cramorant won MORE vs
+   withholding opponents, +628 vs +233 W-L -- interesting but the
+   policy was simple, don't oversell). SHIP-MODE POLICY applies:
+   narrative TOML blocks are Michael's prose (or honest auto-gen
+   templates); Claude supplies verified bullets + data sections only,
+   like the Discord-bullets pattern. Vehicle: the standard
+   articles/*.toml + render_article.py pipeline.
+
 ACCEPTED TEST DEBT (per policy, recorded): (a) the dive-ASAP gate's
 fresh-vs-frozen `move.damage` divergence (documented at the rule in
 battle.py) has no discriminating test -- needs a post-missile-debuff
