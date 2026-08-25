@@ -205,6 +205,7 @@ runs adapt the ACTUAL shield decision only; the shipped overlay
 threads the rule into would_shield's model too and MUST re-verify
 after threading (the model/actual mismatch could shift cells).
 
-PROVISIONAL ship candidate: **adaptA lead40** (max-wins tier mission,
-strictly better economy than the old max-wins pick); lead33 the named
-alternative. Michael picks the dial point.
+**DECIDED (Michael 2026-08-25): adaptA lead40 ships** (max-wins tier
+mission, strictly better economy than the old max-wins pick); lead33
+stays the named alternative. Final confirmation rides the overlay's
+post-threading re-verification.
