@@ -2258,14 +2258,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             html += (f'    <option value="{si}"{sel}>'
                      f'{scenario_label(scen)}</option>\n')
         html += '  </select></label>\n'
-        # All-scenarios small-multiples toggle (Michael 2026-08-25): a
-        # lazily-rendered 3x3 grid of simplified per-scenario scatters
-        # built from the ALREADY-EMBEDDED score arrays -- no page
-        # re-render, no state change; the panel matching the Shields
-        # dropdown gets a highlight, and clicking a panel selects it.
-        html += ('  <label class="dd-allscen"><input type="checkbox" '
-                 'id="allscen-toggle" onchange="toggleAllScenarios()"> '
-                 'All scenarios</label>\n')
 
     if len(opp_iv_modes) > 1:
         _base_modes = list(dict.fromkeys(
@@ -2482,9 +2474,6 @@ def generate_interactive_html(species, league, moveset_data, html_path,
 
     # Plot first, then summary table below
     html += '<div id="plot" class="plot-container" style="height:550px;"></div>\n'
-    html += ('<div id="allscen-grid" style="display:none;'
-             'grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;">'
-             '</div>\n')
     # Highlight-IVs strip, right-aligned directly below the plot so it
     # sits under the legend column visually. Enter applies, Escape
     # clears (keydown handler on the input); buttons are mouse-friendly
@@ -2497,6 +2486,22 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         '<div class="highlight-strip" '
         'style="display:flex;justify-content:flex-end;align-items:center;'
         'gap:4px;margin:6px 20px 0 0;font-size:12px;color:var(--text)">\n'
+    )
+    # All-scenarios small-multiples toggle (Michael 2026-08-25): a
+    # lazily-rendered 3x3 grid of simplified per-scenario scatters built
+    # from the ALREADY-EMBEDDED score arrays -- no page re-render, no
+    # state change; the panel matching the Shields dropdown gets a
+    # highlight, and clicking a panel selects it. Lives left-aligned in
+    # the strip under the plot (before Highlight IVs), with the grid
+    # container BELOW the strip so the checkbox doesn't jump when the
+    # grid opens.
+    if n_scenarios > 1:
+        html += ('  <label class="dd-allscen" style="display:flex;'
+                 'align-items:center;gap:4px;margin-right:auto">'
+                 '<input type="checkbox" id="allscen-toggle" '
+                 'onchange="toggleAllScenarios()"> '
+                 'Show all shield scenarios</label>\n')
+    html += (
         '  <label style="display:flex;align-items:center;gap:4px">'
         'Highlight IVs: '
         '<input id="highlight-input" type="text" '
@@ -2513,6 +2518,10 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         'style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>\n'
         '</div>\n'
     )
+    if n_scenarios > 1:
+        html += ('<div id="allscen-grid" style="display:none;'
+                 'grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;">'
+                 '</div>\n')
     # Top-IVs table controls. Sit immediately above the table they
     # affect (the #summary div). The "Sort by" UX is column-header
     # clicks (see _summarySortClick in deep_dive_engine.js); only the
