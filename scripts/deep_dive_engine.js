@@ -171,7 +171,7 @@ function atL51View() { return state.levelMode === '51' && !!DATA.ivL51; }
 function getScoreKey(mi, mode) { return getScoreKeyAt(mi, mode, atL51View()); }
 function getScores(mi, mode) { return SCORES[getScoreKey(mi, mode)]; }
 
-// ---- Composite mode grammar: base[:nobait][:eN] ----
+// ---- Composite mode grammar: base[:nobait][:eN][:pogodives] ----
 // Mirrors deep_dive_rendering.parse_mode / parse_energy / compose_mode. These
 // strings are the score-lookup keys, so a divergence lands in the silent
 // fallback path and renders a different mode than the dropdowns show; the
@@ -192,10 +192,15 @@ function parseModeEnergy(mode) {
   }
   return 0;
 }
-function composeMode(base, bait, energyLead) {
+function parseModePolicy(mode) {
+  return (String(mode || '').split(':').slice(1).indexOf('pogodives') >= 0)
+    ? 'pogodives' : 'pvpoke';
+}
+function composeMode(base, bait, energyLead, policy) {
   var mode = base;
   if (bait === 'nobait') mode += ':nobait';
   if (energyLead) mode += ':e' + energyLead;
+  if (policy && policy !== 'pvpoke') mode += ':' + policy;
   return mode;
 }
 
@@ -630,6 +635,8 @@ function computeView() {
       if (_bsel) _bsel.value = parseModeBait(_fallback);
       var _esel = document.getElementById('energy-sel');
       if (_esel) _esel.value = String(parseModeEnergy(_fallback));
+      var _psel = document.getElementById('policy-sel');
+      if (_psel) _psel.value = parseModePolicy(_fallback);
       yValues = computeYValues(state.movesetIdx);
     }
     if (!yValues) {
@@ -3300,11 +3307,13 @@ function updateView() {
   var osel = document.getElementById('oppiv-sel');
   var bsel = document.getElementById('bait-sel');
   var esel = document.getElementById('energy-sel');
-  if (osel || bsel || esel) {
+  var psel = document.getElementById('policy-sel');
+  if (osel || bsel || esel || psel) {
     var base = osel ? osel.value : parseModeBase(DATA.oppIvModes[0] || 'pvpoke');
     var bait = bsel ? bsel.value : 'bait';
     var elead = esel ? parseInt(esel.value) : 0;
-    state.oppIvMode = composeMode(base, bait, elead > 0 ? elead : 0);
+    var pol = psel ? psel.value : 'pvpoke';
+    state.oppIvMode = composeMode(base, bait, elead > 0 ? elead : 0, pol);
   }
   var csel = document.getElementById('color-sel');
   if (csel) state.colorMode = csel.value;

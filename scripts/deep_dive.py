@@ -253,6 +253,7 @@ build_slayer_archetypes = slayer.build_slayer_archetypes
 IVCategory = rendering.IVCategory
 parse_mode = rendering.parse_mode
 parse_energy = rendering.parse_energy
+parse_policy = rendering.parse_policy
 compose_mode = rendering.compose_mode
 mode_pretty_label = rendering.mode_pretty_label
 # Py<->JS wire strings (DRY review 2026-08-05 entry 5): written once in
@@ -2279,6 +2280,13 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             html += '    <option value="bait">Selective</option>\n'
             html += '    <option value="nobait">Never</option>\n'
             html += '  </select></label>\n'
+        _policy_values = {parse_policy(m) for m in opp_iv_modes}
+        if 'pogodives' in _policy_values and 'pvpoke' in _policy_values:
+            html += ('  <label>Strategy: '
+                     '<select id="policy-sel" onchange="updateView()">\n')
+            html += '    <option value="pvpoke">PvPoke default</option>\n'
+            html += '    <option value="pogodives">PoGoDives</option>\n'
+            html += '  </select></label>\n'
         _energy_values = sorted({parse_energy(m) for m in opp_iv_modes})
         if len(_energy_values) > 1:
             html += ('  <label>Energy lead: '
@@ -3578,6 +3586,19 @@ def main():
                              "HTML, and annotates bait-dependent matchup "
                              "flips. Doubles compute time. "
                              "Interactive mode only.")
+    parser.add_argument('--policy', default='pvpoke',
+                        choices=['pvpoke', 'pogodives', 'both'],
+                        help="Strategy tier for the FOCAL side: 'pvpoke' "
+                             "(default) is PvPoke's simulate-mode DP; "
+                             "'pogodives' is the PoGoDives-strat overlay "
+                             "(tuned rules where a registered case applies "
+                             "-- today Cramorant only -- byte-identical "
+                             "pvpoke_dp elsewhere, so non-case sweeps "
+                             "alias to the base-tier cache for free); "
+                             "'both' runs both tiers and adds a Strategy "
+                             "selector to the interactive HTML. See "
+                             "docs/cramorant_policy_plan.md. "
+                             "Interactive mode only.")
     parser.add_argument('--energy-lead', default='off',
                         choices=['off', 'on'],
                         help="Energy-lead sim axis (safe-switch / closer "
@@ -4647,11 +4668,20 @@ def main():
         # reachable bound, so the mode strings stay uniform across
         # movesets with different fast moves.
         _energy_leads = [0, 1, 2] if args.energy_lead == 'on' else [0]
+        if args.policy == 'both':
+            _policy_tiers = ['pvpoke', 'pogodives']
+        else:
+            _policy_tiers = [args.policy]
+        # Policy tier is the INNERMOST loop and the pvpoke tier collapses
+        # in compose_mode, so opp_iv_modes_to_run[0] stays the bare base
+        # mode -- load-bearing: analysis sections, the anchor overlay and
+        # the JS default all read modes[0].
         opp_iv_modes_to_run = [
-            compose_mode(om, bm, el)
+            compose_mode(om, bm, el, pol)
             for om in _base_opp_modes
             for bm in _bait_modes
             for el in _energy_leads
+            for pol in _policy_tiers
         ]
 
         # Scenario expansion for interactive mode happens BEFORE Phase 2

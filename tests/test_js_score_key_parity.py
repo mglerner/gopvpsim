@@ -133,6 +133,9 @@ _MODES = [
     "pvpoke:nobait:e1",
     "rank1:nobait:e3",
     "pvpoke:bait",
+    "pvpoke:pogodives",
+    "pvpoke:nobait:pogodives",
+    "rank1:nobait:e1:pogodives",
     "",
 ]
 
@@ -141,7 +144,7 @@ def _js_grammar_source():
     text = _JS.read_text()
     out = []
     for fn in ("parseModeBase", "parseModeBait", "parseModeEnergy",
-               "composeMode"):
+               "parseModePolicy", "composeMode"):
         m = re.search(r"function %s\([^)]*\)\s*\{.*?\n\}" % fn, text, re.S)
         assert m, f"{fn} not found in {_JS.name}"
         out.append(m.group(0))
@@ -153,7 +156,7 @@ def test_mode_grammar_defined_once_and_used():
     legacy parse_oppiv_base, and the W3 fallback all route through these."""
     text = _JS.read_text()
     for fn in ("parseModeBase", "parseModeBait", "parseModeEnergy",
-               "composeMode"):
+               "parseModePolicy", "composeMode"):
         assert len(re.findall(r"function %s\(" % fn, text)) == 1
     assert "state.oppIvMode = composeMode(" in text
     assert re.search(
@@ -172,9 +175,9 @@ def test_mode_grammar_round_trips_against_python():
 const modes = %s;
 const out = modes.map(function(m) {
   return { base: parseModeBase(m), bait: parseModeBait(m),
-           energy: parseModeEnergy(m),
+           energy: parseModeEnergy(m), policy: parseModePolicy(m),
            round: composeMode(parseModeBase(m), parseModeBait(m),
-                              parseModeEnergy(m)) };
+                              parseModeEnergy(m), parseModePolicy(m)) };
 });
 console.log(JSON.stringify(out));
 """ % json.dumps(_MODES)
@@ -192,5 +195,6 @@ console.log(JSON.stringify(out));
             assert js["base"] == py_base, mode
         assert js["bait"] == py_bait, mode
         assert js["energy"] == py_energy, mode
+        assert js["policy"] == rendering.parse_policy(mode), mode
         assert js["round"] == rendering.compose_mode(
-            js["base"], js["bait"], js["energy"]), mode
+            js["base"], js["bait"], js["energy"], js["policy"]), mode
