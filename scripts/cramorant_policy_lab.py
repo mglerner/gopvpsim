@@ -131,7 +131,11 @@ def run_variant(name, knobs, league, pool, opponent_counter=None,
         from gopvpsim.battle import pogodives_dp, pogodives_shield
         focal_bait = pogodives_dp
         nobait = functools.partial(pogodives_dp, bait_shields=False)
-        focal_shield_policy = pogodives_shield
+        if focal_shield_policy is None:
+            # Round-6 wrappers arrive via focal_shield_policy and must
+            # NOT be overwritten (the 2026-08-25 inert-wrapper bug:
+            # every discriminator scored identical to the reference).
+            focal_shield_policy = pogodives_shield
     else:
         focal_bait = pvpoke_dp
         nobait = functools.partial(pvpoke_dp, bait_shields=False)
