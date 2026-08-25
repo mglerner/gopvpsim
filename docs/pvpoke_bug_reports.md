@@ -442,3 +442,63 @@ walk-down) was also wrong: an out-of-range level would give
 loop, and `changeForm` would throw a TypeError - no NaN path exists.
 DEVELOPER_NOTES "Known divergences" item 3 has been corrected to
 match.
+
+---
+
+## Drafted 2026-08-24, NOT YET FILED - Report 8 - two `move.moveID` typos in the Cramorant logic (one likely intent-inverted)
+
+Found during our port of the Cramorant update (commit `78c64048a`,
+master tip at draft time); every line number below is from that commit.
+Verified by dead-branch analysis + A/B measurement in our harness (see
+caveat at the end). File AFTER Michael reviews; adjust the "today"
+framing if other reports ship in the same batch.
+
+**Title:** Two `move.moveID` (capital D) typos dead-branch the SURF
+half of the Cramorant logic; the ActionLogic.js:1239 rule also looks
+intent-inverted
+
+**Body draft:**
+
+While porting the Cramorant mechanics (78c64048a - thanks for the
+detailed update notes!) we hit two places where `move.moveID` is read
+instead of `moveId`. Since `moveID` is always `undefined`, the SURF
+comparisons silently degenerate:
+
+1. `ActionLogic.js:368` (the Dive/Surf-ASAP rule):
+   `poke.activeChargedMoves.find(move => move.moveId != "DIVE" &&
+   move.moveID != "SURF")` - the second clause is always true, so
+   `nonGulpMove` is just "first move that isn't DIVE". For a SURF+FLY
+   or SURF+HYDRO_PUMP Cramorant, `nonGulpMove` can be SURF itself, so
+   the `nonGulpMove.dpe / gulpMove.dpe < 1.5` gate compares Surf
+   against itself (ratio 1.0) and the rule fires unconditionally; for
+   DIVE+SURF the find returns SURF and the rule's damage/DPE terms use
+   the wrong move. (Harmless for the default Peck/Dive+Fly ranking
+   build, which is presumably why it wasn't visible.)
+
+2. `ActionLogic.js:1239`:
+   `if(attacker.speciesId == "cramorant" && (move.moveId == "DIVE" ||
+   move.moveID == "SURF") && move.damage > defender.hp){ useShield =
+   false; }` - the SURF clause never matches, so the rule is DIVE-only.
+   Separately from the typo: as written this makes defenders NEVER
+   shield a *lethal* Cramorant Dive (it is the last statement before
+   the return, so it overrides the lethal-hit shielding logic above
+   it). Was the intent `useShield = true` (shield the lethal
+   Dive/Surf)? As shipped it hands Cramorant free KOs through held
+   shields.
+
+Measured effect of fixing the :1239 rule (our PvPoke-port harness,
+GL top-50-style + UL top-60 pools, default IVs, all 9 shield cells x
+both bait modes): exactly 5 cells change, all Cramorant-worse -
+Galarian Moltres GL (1v1 bait) W->L; Talonflame UL (0v2, both baits)
+W->L; Talonflame UL (1v1, both baits) W->D. Small but strictly
+score-inflating for published Cramorant results wherever it fires.
+(Numbers are from our harness over our pools, not pvpoke.com's ranking
+pool - the mechanism is the shipped code either way.)
+
+Happy to PR either fix if useful - the minimal patch is `moveID ->
+moveId` twice, plus (if the intent read is right) `false -> true` at
+:1239.
+
+**Pre-filing checklist:** re-run `git log 78c64048a..master -- src/js/`
+for upstream fixes; search the issue tracker for "moveID"/"Cramorant"
+duplicates; re-verify both line numbers against master tip.
