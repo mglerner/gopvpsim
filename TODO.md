@@ -98,7 +98,11 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    and the CAREFULLY-CAVEATED withhold finding (our crude withhold
    counter-policy BACKFIRED -- baseline Cramorant won MORE vs
    withholding opponents, +628 vs +233 W-L -- interesting but the
-   policy was simple, don't oversell). SHIP-MODE POLICY applies:
+   policy was simple, don't oversell). TONE (Michael 2026-08-25, saved
+   as feedback-pvpoke-tone): warm toward PvPoke on all public surfaces
+   -- present our strat on its own merits with a small, kind "how this
+   differs from PvPoke's sims" section; no "wrong/bug/beats" framing
+   (internal docs stay precise). SHIP-MODE POLICY applies:
    narrative TOML blocks are Michael's prose (or honest auto-gen
    templates); Claude supplies verified bullets + data sections only,
    like the Discord-bullets pattern. Vehicle: the standard
