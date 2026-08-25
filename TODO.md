@@ -60,10 +60,19 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    strat"** overlay (`pogodives_dp`/`pogodives_shield`: tuned Cramorant
    cases, byte-identical `pvpoke_dp` fallback for every non-Cram
    situation, test-pinned; future non-Cram cases land one evidenced
-   entry at a time). Full plan: `docs/cramorant_policy_plan.md` (knob
-   globals, lab script, grid sweep, agent analysis panel, adversarial
-   robustness round incl. the opponent-withholds counter and the
-   lethal-Dive-shield-bug-fixed opponent, synthesis writeup).
+   entry at a time). Full plan: `docs/cramorant_policy_plan.md`.
+   **ROUND 1 RAN 2026-08-24 overnight** -- 80-variant grid x 4 opponent
+   models x 4 IV spreads, 4-analyst + 2-skeptic adversarial workflow;
+   synthesis: `docs/validations/cramorant_policy_lab_2026_08_24.md`.
+   Frozen (provisional): dive gate 1.5 -> 3.0, HP gate stays 1.3,
+   delay-Gorging off. **DECISION FOR MICHAEL: tank 1.4 (max wins,
+   +111 net) vs 1.8 (provisional pick: 84% of the wins, uniformly
+   positive rating, half the HP cost).** THEN the overlay lands in a
+   SUPERVISED session (per-side knob threading -- the globals would
+   leak to Cramorant opponents/mirrors -- plus the cache key
+   normalization; own hash bump + migration predicate). A Dive+Surf
+   moveset grid (our dives rank that build #1) ran overnight too --
+   results in userdata/cramorant_lab/round4_divesurf.json.
 4. **Upstream bug-report candidates** (pvpoke): the two `move.moveID`
    typos (ActionLogic.js:368, :1239 -- the latter makes opponents never
    shield a lethal Dive, plausibly inflating published Cramorant

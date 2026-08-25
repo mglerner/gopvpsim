@@ -118,7 +118,8 @@ def make_withhold_policy():
 
 
 def run_variant(name, knobs, league, pool, opponent_counter=None,
-                progress=None, focal_ivs=None):
+                progress=None, focal_ivs=None,
+                focal_moveset=('PECK', ['DIVE', 'FLY'])):
     """All cells for one variant. Returns list of cell dicts."""
     for k, v in knobs.items():
         setattr(B, k, v)
@@ -128,8 +129,8 @@ def run_variant(name, knobs, league, pool, opponent_counter=None,
     nobait = functools.partial(pvpoke_dp, bait_shields=False)
     for display, species, shadow, fast_id, charged_ids in pool:
         try:
-            cram = make_bp('Cramorant', league, False, 'PECK',
-                           ['DIVE', 'FLY'], ivs=focal_ivs)
+            cram = make_bp('Cramorant', league, False, focal_moveset[0],
+                           list(focal_moveset[1]), ivs=focal_ivs)
             opp = make_bp(species, league, shadow, fast_id, charged_ids)
         except KeyError as e:
             cells.append({'opp': display, 'error': str(e)})
@@ -197,6 +198,11 @@ def main():
     ap.add_argument('--opponent-counter', default=None,
                     choices=['withhold'],
                     help='robustness round: opponent counter-policy')
+    ap.add_argument('--focal-moveset', default='PECK:DIVE,FLY',
+                    metavar='FAST:CM1,CM2',
+                    help='focal Cramorant moveset (default: PvPoke default '
+                         'Peck / Dive + Fly); e.g. PECK:DIVE,SURF for the '
+                         'build our dives rank #1')
     ap.add_argument('--focal-ivs', default=None, metavar='A/D/S',
                     help='override the Cramorant focal IVs (default: PvPoke '
                          'default IVs), e.g. 0/15/14 -- for the IV-spread '
@@ -219,6 +225,8 @@ def main():
 
     focal_ivs = (tuple(int(x) for x in args.focal_ivs.split('/'))
                  if args.focal_ivs else None)
+    _fm_part, _cm_part = args.focal_moveset.split(':')
+    focal_moveset = (_fm_part, [c.strip() for c in _cm_part.split(',')])
     leagues = ['great', 'ultra'] if args.league == 'both' else [args.league]
     out_path = Path(args.out) if args.out else (
         REPO / 'userdata' / 'cramorant_lab' /
@@ -234,7 +242,8 @@ def main():
         for i, (name, knobs) in enumerate(variants.items()):
             cells = run_variant(name, knobs, league, pool,
                                 opponent_counter=args.opponent_counter,
-                                focal_ivs=focal_ivs)
+                                focal_ivs=focal_ivs,
+                                focal_moveset=focal_moveset)
             cells_by_variant.setdefault(name, []).extend(cells)
             print(f'[{league}] {i + 1}/{len(variants)} {name} '
                   f'({time.time() - t0:.0f}s)', flush=True)
@@ -245,7 +254,8 @@ def main():
     sample = run_variant('baseline_recheck', dict(PVPOKE_DEFAULTS),
                          league, pool[:3],
                          opponent_counter=args.opponent_counter,
-                         focal_ivs=focal_ivs)
+                         focal_ivs=focal_ivs,
+                         focal_moveset=focal_moveset)
     orig = [c for c in cells_by_variant['baseline']
             if c.get('league') == league
             and c.get('opp') in {p[0] for p in pool[:3]}]
@@ -258,7 +268,7 @@ def main():
         'meta': {'leagues': leagues, 'n_variants': len(variants),
                  'opponent_counter': args.opponent_counter,
                  'lethal_dive_fix': args.lethal_dive_fix,
-                 'focal': 'Cramorant PECK/DIVE+FLY, '
+                 'focal': f'Cramorant {args.focal_moveset}, '
                           + (f'IVs {args.focal_ivs}' if args.focal_ivs
                              else 'PvPoke default IVs'),
                  'elapsed_s': round(time.time() - t0, 1)},
