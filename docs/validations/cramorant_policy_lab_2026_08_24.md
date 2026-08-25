@@ -165,3 +165,46 @@ both leagues, so the grid was re-run on it
 - Baseline W-L: Dive+Surf 1310/1108 vs Dive+Fly 1360/1127 against the
   same pools — the dive's avg-score ranking of Dive+Surf as #1 is not
   a raw-win-count claim; worth a look when reviewing the dive pages.
+
+## Addendum 2: the adaptive tank rule dissolves the 1.4-vs-1.8 fork
+(round 5, 2026-08-25 morning; Michael's state-aware suggestion)
+
+Rule A ("tank at 1.4 unless Cramorant's HP-fraction lead exceeds a
+threshold, then PvPoke's 2.2") was swept at lead thresholds
+25/33/40/50% and verified across the withhold+ldfix round, the
+Dive+Surf build, and IV spreads 0/15/14 + 5/5/5
+(`userdata/cramorant_lab/round5*.json`). Rule B (post-hit HP floor)
+is dominated and dropped; lead25 gives up too many flips on Dive+Surf.
+
+Net flips (vs each round's own baseline):
+
+| round             | tank1.4 | lead33 | lead40 | lead50 | tank1.8 |
+| ----------------- | ------- | ------ | ------ | ------ | ------- |
+| default D+F       | +109    | +109   | +109   | +109   | +78     |
+| withhold+ldfix    | +139    | +139   | +139   | +139   | +139    |
+| Dive+Surf         | +102    | +102   | +102   | +102   | +48     |
+| IVs 0/15/14       | +113    | +111   | +113   | +115   | +85     |
+| IVs 5/5/5         | +98     | +89    | +93    | +95    | +54     |
+
+Won-cell dScore (HP-economy proxy; higher = less rating spent in
+matchups both win): lead33 is ~25% cheaper than tank1.4 in every
+normal round (-15.5/-10.0/-14.0/-17.5 vs -20.2/-14.5/-19.0/-24.2);
+lead40 sits between lead33 and 1.4.
+
+**Both lead33 and lead40 DOMINATE static tank1.4** (equal or
+near-equal flips, strictly better economy) and beat tank1.8's flips
+massively (esp. Dive+Surf +102 vs +48) at modest economy cost. The
+old fork is superseded; the remaining choice (lead33 = economy lean,
+lead40 = flips lean) is soft -- every point on the dial beats both
+static options on at least one axis.
+
+Caveats for the overlay build: (a) the only flip give-back is the
+frail 5/5/5 spread (lead proxy is HP-fraction-based; -4..-9 flips
+there) -- disclose, or revisit the proxy if it ever matters; (b) these
+runs adapt the ACTUAL shield decision only; the shipped overlay
+threads the rule into would_shield's model too and MUST re-verify
+after threading (the model/actual mismatch could shift cells).
+
+PROVISIONAL ship candidate: **adaptA lead40** (max-wins tier mission,
+strictly better economy than the old max-wins pick); lead33 the named
+alternative. Michael picks the dial point.
