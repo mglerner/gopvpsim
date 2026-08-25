@@ -59,11 +59,12 @@ authorization for a large multi-agent campaign.)*
      conditioning on it would silently merge profiles that fight
      different battles). Opponent-side conditioning is dedup-free (the
      opponent is fixed per column). The overlay ships a dedup-invariant
-     test enforcing this mechanically; round-6 discovery (IV- or
-     opponent-dependent thresholds -- both signals exist: the 5/5/5
-     frail-spread give-back and the five deterministic losers) starts
-     inside this fence, post-overlay, with mechanism-derived
-     discriminators validated on held-out opponents.
+     test enforcing this mechanically; round-6 discovery RAN
+     2026-08-25 and CLOSED with nothing shipping (writeup addendum 4:
+     D1 refuted at the trigger, D3 was a per-spread re-tune with a
+     71.9%-of-GL blast radius, the loser roster was re-derived against
+     lead40, and "final" is recorded as a rating-preferring choice on
+     a frontier where static-1.4 weakly dominates on raw flips).
    - It SHIPS VISIBLY on the dive surfaces (decided in principle;
      exact UI — a policy toggle alongside the bait dropdown, or a
      separately rendered line — is settled when we build the render
