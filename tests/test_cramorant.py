@@ -575,3 +575,52 @@ def test_918_stacking_fires_against_prey_holder():
 
     assert decide(prey=False) == 0     # throws Body Slam
     assert decide(prey=True) is None   # stacks toward 70 first
+
+
+def test_policy_lab_knob_defaults_are_pvpoke(monkeypatch):
+    """The policy-lab knobs default to PvPoke's shipped literals (the
+    engine is byte-identical unless a lab process overrides them), and
+    each knob is actually LIVE -- overriding it changes the decision the
+    matching rule produces."""
+    import gopvpsim.battle as B
+    assert B._CRAM_DIVE_GATE_DPE == 1.5
+    assert B._CRAM_DIVE_GATE_HP == 1.3
+    assert B._CRAM_TANK_MULT == 2.2
+    assert B._CRAM_DELAY_GORGING is False
+    assert B._CRAM_LETHAL_DIVE_SHIELD_FIX is False
+
+    # Tank knob is live: the prey-holder tank scenario flips back to
+    # shielding when the threshold is squeezed to nothing.
+    from .test_battle import make_bp, make_charged, make_fast
+    cram = _cramorant('PECK', ['DIVE', 'HYDRO_PUMP'], 2)
+    striker = make_bp(atk=110.0, fast=make_fast(power=10, energy_gain=5),
+                      charged=[make_charged(power=45, energy=45)])
+    mv = striker.charged_moves[0]
+    cram.change_form(striker, 1)
+    assert B.would_shield(striker, cram, mv) is False        # default 2.2
+    monkeypatch.setattr(B, '_CRAM_TANK_MULT', 1000.0)
+    assert B.would_shield(striker, cram, mv) is True
+
+    # Lethal-Dive fix knob is live: the shipped never-shield pin inverts.
+    monkeypatch.setattr(B, '_CRAM_LETHAL_DIVE_SHIELD_FIX', True)
+    cram2 = _make_battle_pokemon('Cramorant', 'WATER_GUN', ['DIVE', 'FLY'],
+                                 'great', 0, 5, 15, 15)
+    frail = _make_battle_pokemon('Medicham', 'COUNTER',
+                                 ['DYNAMIC_PUNCH', 'ICE_PUNCH'],
+                                 'great', 1, 7, 15, 14)
+    frail.hp = 5
+    assert B.would_shield(cram2, frail, cram2.charged_moves[0]) is True
+
+    # Dive-gate DPE knob is live: vs Azumarill the default gate blocks
+    # the dive (Fly's dpe ratio >= 1.5); widening it makes the ASAP rule
+    # fire.
+    azu = _make_battle_pokemon('Azumarill', 'BUBBLE',
+                               ['ICE_BEAM', 'PLAY_ROUGH'], 'great', 1, 4, 15, 13)
+    cram3 = _cramorant('PECK', ['DIVE', 'FLY'], 1)
+    cram3.energy = 40
+    azu.cooldown = 1
+    dive_idx = next(i for i, m in enumerate(cram3.charged_moves)
+                    if m['moveId'] == 'DIVE')
+    assert pvpoke_dp(cram3, azu) != dive_idx   # default: never dives here
+    monkeypatch.setattr(B, '_CRAM_DIVE_GATE_DPE', 100.0)
+    assert pvpoke_dp(cram3, azu) == dive_idx   # widened gate: dives ASAP
