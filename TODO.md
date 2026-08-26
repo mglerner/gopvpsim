@@ -115,6 +115,16 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    one-opponent patch) are disclosed in the validation doc and on the
    rebalance re-verify list -- re-verify at FULL resolution with a
    worst-slice margin target of +0.5.
+   STRATEGY ARTICLE (Michael 2026-08-26): rendered by
+   `scripts/render_pogodives_strategy_article.py` (AI-drafted at
+   Michael's direction, meta.toml authorship="ai"; REVIEW BEFORE
+   PUBLISH) to userdata/website/articles/cramorant-pogodives-strategy/,
+   linked from both dives via replay-rendered article_slug injection.
+   DEBT: the slug's durable home is a thresholds/cramorant.toml
+   [Cramorant.article] table -- until that file exists, a from-CLI
+   rebake drops the dive->article link and the replay-injection step
+   must be re-run (the scratchpad wrapper is trivial to recreate: load
+   blob, set state['article_slug'], render_dive_html).
    REBALANCE NOTE (Michael 2026-08-25): a big move rebalance is
    expected ~2 weeks out (post-Worlds, the usual pattern). When it
    lands: gamemaster-delta migration as usual, PLUS re-run the
