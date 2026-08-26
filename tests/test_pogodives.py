@@ -343,8 +343,10 @@ def test_sheet_gate_conditions():
 def test_sheet_tank_rules():
     """Per-start-scenario tank rules (2026-08-26 sheet). Direct unit
     probes of _cram_tank_mult: (1,0) uses the lead rule at aggressive
-    2.0 (pre-sheet: 1.4); (2,2) uses the 'cheap' rule -- aggressive 1.8
-    only for hits <= 15% of max HP, conservative above."""
+    2.0 (pre-sheet: 1.4); (2,2) is tank-PLAIN (aggr 2.2 both branches,
+    v3 -- the v1 cheap tank was vacuous and the v2 cheap_frac 0.30
+    broke Dive+Surf); the 'cheap' rule mechanism itself is probed via
+    a synthetic sheet row."""
     import gopvpsim.battle as B
 
     def mults(start, damage):
@@ -360,9 +362,20 @@ def test_sheet_tank_rules():
 
     assert mults((1, 0), 30) == 2.0               # lead rule, aggr 2.0
     assert mults((1, 1), 30) == B._POGODIVES_TANK_AGGRESSIVE   # default 1.4
-    cheap = int(0.30 * 130)                       # 39 <= the row's 30% cap
-    assert mults((2, 2), cheap) == 1.8            # cheap hit: tank at 1.8
-    assert mults((2, 2), cheap + 5) == B._POGODIVES_TANK_CONSERVATIVE
+    assert mults((2, 2), 20) == 2.2               # v3: tank plain PvPoke
+    assert mults((2, 2), 60) == 2.2
+    # The 'cheap' tank mechanism (kept for future rows): synthetic row.
+    saved = B._POGODIVES_SHEET
+    try:
+        B._POGODIVES_SHEET = dict(saved)
+        B._POGODIVES_SHEET[(2, 2)] = {'gate': 'always', 'tank_aggr': 1.8,
+                                      'tank_rule': 'cheap',
+                                      'cheap_frac': 0.30}
+        cap = int(0.30 * 130)
+        assert mults((2, 2), cap) == 1.8
+        assert mults((2, 2), cap + 5) == B._POGODIVES_TANK_CONSERVATIVE
+    finally:
+        B._POGODIVES_SHEET = saved
 
 
 def test_sheet_2v1_ready_nuke_gate():
@@ -402,19 +415,3 @@ def test_sheet_2v1_ready_nuke_gate():
     cram._pogodives = True
     cram._start_shields = (2, 1)
     assert B._cram_tank_mult(opp, cram, 30) == B._CRAM_TANK_MULT
-
-
-def test_sheet_2v2_cheap_frac_override():
-    """The 2v2 row's cheap_frac 0.30 override (batch-10 verdict): hits
-    up to 30% of max HP tank at 1.8; above that, conservative."""
-    import gopvpsim.battle as B
-    cram = make_bp(atk=110, hp=130, fast=make_fast(power=6, energy_gain=8),
-                   charged=[make_charged(power=65, energy=40)])
-    opp = make_bp(atk=110, hp=140, fast=make_fast(power=6, energy_gain=8),
-                  charged=[make_charged(power=90, energy=45)])
-    cram._pogodives = True
-    cram._start_shields = (2, 2)
-    mid = int(0.30 * 130)          # 39 <= 30% of 130
-    assert B._cram_tank_mult(opp, cram, mid) == 1.8
-    assert B._cram_tank_mult(opp, cram, mid + 5) == \
-        B._POGODIVES_TANK_CONSERVATIVE

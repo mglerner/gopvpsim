@@ -236,6 +236,11 @@ PREDICATES = {
     # pogodives-tier columns only; fail-safe on unreadable fields.
     'pogodives_sheet_20260826': lambda f, c: (
         c is None or c.get('policy') == 'pogodives'),
+    # 2026-08-26 sheet v3 (skeptic round): 2v2 row goes gate-only, the
+    # 2v1 ready-nuke row and gate hooks land. Same shape: every change
+    # is _pogodives-gated; affected = pogodives-tier columns only.
+    'pogodives_sheet_v3_20260826': lambda f, c: (
+        c is None or c.get('policy') == 'pogodives'),
 }
 
 
