@@ -72,3 +72,35 @@ Grid rounds run in ~minutes (the whole 80-variant x 4-round campaign
 was ~1.5M sims); the analysis/verdict workflows are the slow part
 (~10-30 min each). Rendering the delta report costs zero sims when
 both tiers are cache-warm.
+
+## Additions from the strict-bar campaign (2026-08-26)
+
+- **Compute the oracle first, from data in hand.** Per-(scenario,
+  opponent) "choose the better policy" bounds from the existing
+  tensors cost zero sims and tell you exactly where value exists and
+  how much a mechanism rule can hope to capture (the per-opponent
+  oracle fixed the whole night's agenda in one pass).
+- **The mini-sweep instrument**: a targeted tensor-slice re-sim
+  (one scenario x all opponents x sampled IVs) through the SAME
+  construction path as the production sweep, verified INTEGER-EXACT
+  against the baked tensors at shipped knobs before first use.
+  Candidate evaluation drops from a 2.5h rebake to ~1-4 minutes.
+- **Strided-IV sampling aliases the sta axis**: iv index =
+  atk*256 + def*16 + sta, so range(0, 4096, 8) covers sta {0, 8}
+  only and stride 64 covers sta=0 only. Screen strided, but treat
+  the full bake as the only complete bar check (or stratify
+  per-axis explicitly).
+- **Check for cross-league sign flips before hand-crafting features**:
+  the same species flipping sign between leagues under the same rule
+  (Lapras at 2v1) proves the discriminator is pair-dynamic (level-
+  dependent breakpoints), not static typing/stats -- a static-feature
+  threshold search will plateau below the oracle and waste hours.
+- **Decompose, then compose**: component-isolated variants (gate-only,
+  tank-only, re-grades) + the start-scenario composition theorem turn
+  one 9-cell coupled problem into 9 independent ones; each global
+  variant run prices every per-scenario assignment offline.
+- **A strict per-cell bar changes the game**: with "no negative
+  cells", per-scenario exemption (= the baseline) is a guaranteed
+  floor, so the campaign is always shippable and every discovery is
+  pure upside. Freeze the safe sheet early, bake, and keep discovery
+  running in parallel.
