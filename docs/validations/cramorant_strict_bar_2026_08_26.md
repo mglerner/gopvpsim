@@ -143,6 +143,44 @@ campaign): UL Dive+Surf 2v2 under the OLD tank was +15-21k flips at
 passing rating -- a per-build tank discriminator would recover it;
 the sheet takes zero there instead.
 
+## Sheet v4 (the final overnight iteration, commit bac20cd)
+
+Two more agent campaigns ran after v3 shipped, and their results
+merged into one final change:
+
+- **2v2 = the LOADED-OPPONENT tank** (discovery agent, full-4096
+  certified on all ten pages): decline the shield at multiplier 1.6
+  only while the opponent's post-throw energy still covers another
+  charged move -- if the throw empties their bar, take the shield
+  (nothing punishes them for many turns). Worst slice +7,116 net /
+  +1.14 mean; total 2v2 value +662k win-cells vs v3's +101k; the UL
+  Dive+Surf open value is recovered at 80-85% with its old rating
+  cost flipped positive. With this tank EVERY gate variant passes,
+  so the fitted cmp/dpt/55-energy gate conditions were deleted
+  (gate back to 'always'). Plateaus: aggr [1.55, 2.0], lead
+  [0.30, 0.45] (shipped 0.40 inside).
+- **Margin survey** (full-4096 certified): the 0v0 DPT condition's
+  pass region never closes upward, and deleting it GAINS flips
+  (GL 0v0 +6,768 -> +10,495) -- deleted; 0v0/0v1 rows are now the
+  identical plain-CMP gate. 1v0 tank aggressive 2.0 -> 1.9 (margin
+  +1.00 -> +1.31 GL; certified incl. the binding ultra_m4). 2v1
+  dpt_max 0.0155 -> 0.0150 (was 2.6% below a cliff; now
+  mid-plateau). Structural finding: there are no DPT "plateaus" --
+  realized values are ~0.5% apart, so any threshold move crosses
+  behavior; what matters is the bar+margin, certified at full
+  resolution. The binding margin cell of the whole sheet is UL 0v0
+  at +0.558, which no constant can move.
+- **Certification: 160/160 changed-row cells at full 4096 across
+  all ten pages (+873,964 net win-cells on the changed rows); the
+  other 200 cells are unchanged from the v3 certification.** The
+  v4 sheet is SIMPLER than v3 (two fitted gate constants deleted,
+  0v0/0v1 unified) and strictly more valuable.
+- Also recorded: the 2v1-style single-divergence attribution probe
+  is INVALID at 2v2 (only 28% of touched cells have one divergent
+  decision; it nominated a rule that predicted 0.000 and measured
+  -3.27). Direct re-simulation at coprime stride, then full
+  resolution, is the search that works.
+
 ## Overfit disclosures (flagged for the skeptic pass + rebalance)
 
 - `0.022` (DPT gate) and `55` (cheap-energy gate) are fitted
