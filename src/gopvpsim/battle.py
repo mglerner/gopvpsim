@@ -241,27 +241,38 @@ _POGODIVES_TANK_CHEAP_FRAC = 0.15  # 'cheap' tank default: hit <= this * maxHP.
 # missile's ~15%-of-bar value, so hits above that are never worth
 # eating when shield-ahead.
 _POGODIVES_SHEET = {
-    (0, 0): {'gate': 'cmp_dpt', 'tank_aggr': None, 'tank_rule': 'lead'},
+    # v4 (margin survey 2026-08-26): the 0v0 DPT condition deleted --
+    # its pass region never closes upward (vacuous by 0.03) and dropping
+    # it GAINS flips (GL +6,768 -> +10,495 at full 4096, both cells
+    # certified). 0v0 and 0v1 now share the plain CMP gate.
+    (0, 0): {'gate': 'cmp', 'tank_aggr': None, 'tank_rule': 'lead'},
     (0, 1): {'gate': 'cmp', 'tank_aggr': None, 'tank_rule': 'lead'},
     (0, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
-    (1, 0): {'gate': 'off', 'tank_aggr': 2.0, 'tank_rule': 'lead'},
+    # v4: aggressive 2.0 -> 1.9 (wider margin: GL +1.00 -> +1.31, UL
+    # +1.12 -> +1.03..+1.36; certified on all ten pages incl. the
+    # binding ultra_m4).
+    (1, 0): {'gate': 'off', 'tank_aggr': 1.9, 'tank_rule': 'lead'},
     (1, 1): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     (1, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     (2, 0): None,
     # 2v1 discovery rule (agent campaign 2026-08-26, full-4096-IV
     # verified: worst slice +2220 net / +1.17 mean): gate-only with the
     # ready-nuke condition, tank plain PvPoke (aggr 2.2 = both branches
-    # 2.2). Tighter DPT cap than the 0v0 row (plateau 0.0141-0.0168).
+    # 2.2). v4: dpt_max recentered 0.0155 -> 0.0150 (0.0155 sat 2.6%
+    # from a cliff; 0.0150 is mid-plateau).
     (2, 1): {'gate': 'cmp_ready_dpt', 'tank_aggr': 2.2, 'tank_rule': 'lead',
-             'dpt_max': 0.0155},
-    # 2v2 v3 (skeptic convergence 2026-08-26): GATE-ONLY, tank plain
-    # PvPoke. The v1 'cheap'/0.15 tank was proven vacuous (byte-identical
-    # to PvPoke in GL), so v1's passing 2v2 behavior was the gate alone;
-    # the v2 cheap_frac=0.30 tank that replaced it broke the strict bar
-    # on the gate-inert Dive+Surf build (UL -1.5..-1.9 at full 4096).
-    # Gate-only passes everywhere: gate-live builds keep the v1 gains,
-    # gate-inert builds are exactly zero.
-    (2, 2): {'gate': 'cmp_dpt_e', 'tank_aggr': 2.2, 'tank_rule': 'lead'},
+             'dpt_max': 0.0150},
+    # 2v2 v4 (discovery 2026-08-26): the LOADED-OPPONENT tank -- decline
+    # the shield at 1.6 only while the opponent's post-throw energy
+    # still covers another charged move (else nothing punishes them for
+    # many turns; take the shield). Full-4096 certified on all ten
+    # pages: worst slice +7,116 net / +1.14 mean, +662k total 2v2
+    # win-cells (v3 gate-only was +101k); recovers 80-85% of the old
+    # tank's UL Dive+Surf value with its rating cost flipped positive.
+    # Gate 'always': with this tank every gate variant passes, so the
+    # fitted cmp/dpt/energy gate conditions are dropped (plateaus:
+    # aggr [1.55, 2.0], lead [0.30, 0.45]).
+    (2, 2): {'gate': 'always', 'tank_aggr': 1.6, 'tank_rule': 'lead_ready'},
 }
 
 # The pogodives case REGISTRY, cache-facing form: a battle can differ from
@@ -321,17 +332,21 @@ def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None):
     return _CRAM_DIVE_GATE_DPE
 
 
-def _cram_tank_mult(attacker, defender, damage):
+def _cram_tank_mult(attacker, defender, damage, attacker_energy_after=None):
     """Prey-holder tank threshold for the DEFENDER's shield decision --
     used both at the actual decision (pvpoke_simulate_shield) and in the
     attacker's would_shield MODEL of it (perfect-information convention,
     like the rest of PvPoke's shared heuristics). Under pogodives: the
     per-start-scenario sheet's tank rule. ``damage`` is the incoming
-    charged hit being tanked/shielded. PINNED CONSTRAINT (plan doc
-    2026-08-25): inputs must be functions of the dedup-signature
-    components -- hp/max_hp/atk/moves on both sides and the start
-    scenario qualify; adding anything else requires re-proving
-    signature-dedup soundness (tests/test_signature_cramorant.py)."""
+    charged hit being tanked/shielded; ``attacker_energy_after`` is the
+    attacker's energy AFTER paying for this throw (at the real decision
+    the main loop has already deducted it, so callers pass
+    attacker.energy; the would_shield model subtracts the move cost).
+    PINNED CONSTRAINT (plan doc 2026-08-25): inputs must be functions
+    of the dedup-signature components -- hp/max_hp/atk/moves/energy on
+    both sides and the start scenario qualify; adding anything else
+    requires re-proving signature-dedup soundness
+    (tests/test_signature_cramorant.py)."""
     if getattr(defender, '_pogodives', False):
         entry = _POGODIVES_SHEET.get(getattr(defender, '_start_shields', None))
         if entry is None:
@@ -339,15 +354,27 @@ def _cram_tank_mult(attacker, defender, damage):
         aggr = entry['tank_aggr']
         if aggr is None:
             aggr = _POGODIVES_TANK_AGGRESSIVE
-        if entry['tank_rule'] == 'cheap':
+        rule = entry['tank_rule']
+        if rule == 'cheap':
             frac = entry.get('cheap_frac', _POGODIVES_TANK_CHEAP_FRAC)
             return (aggr if damage <= frac * defender.max_hp
                     else _POGODIVES_TANK_CONSERVATIVE)
         lead = (defender.hp / defender.max_hp
                 - attacker.hp / attacker.max_hp)
-        return (_POGODIVES_TANK_CONSERVATIVE
-                if lead > _POGODIVES_TANK_LEAD
-                else aggr)
+        if lead > _POGODIVES_TANK_LEAD:
+            return _POGODIVES_TANK_CONSERVATIVE
+        if rule == 'lead_ready':
+            # Decline the shield only while the opponent stays LOADED:
+            # if this throw empties their bar below their cheapest
+            # charged move, take the shield -- the HP buys a missile
+            # now but nothing punishes them for many turns (2v2
+            # discovery, 2026-08-26).
+            cheapest = min((c.get('energy', 100)
+                            for c in attacker.charged_moves), default=100)
+            if (attacker_energy_after is None
+                    or attacker_energy_after < cheapest):
+                return _POGODIVES_TANK_CONSERVATIVE
+        return aggr
     return _CRAM_TANK_MULT
 
 
@@ -521,7 +548,8 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     _prey_dmg = (attacker.charged_move_damage(move, defender)
                  if _holding_prey(defender) else None)
     if (_prey_dmg is not None
-            and _prey_dmg * _cram_tank_mult(attacker, defender, _prey_dmg)
+            and _prey_dmg * _cram_tank_mult(attacker, defender, _prey_dmg,
+                                            attacker.energy)
                 < defender.hp):
         if _shield_trace:
             _policy_log.append(
@@ -905,7 +933,8 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
         if _shield_trace:
             cm_reasons.append(f"aegislashShield dmg({damage})*2<hp({defender.hp})")
     # Save shields in a prey-holding Cramorant so Gulp Missile fires earlier
-    _tank_mult = _cram_tank_mult(attacker, defender, damage)
+    _tank_mult = _cram_tank_mult(attacker, defender, damage,
+                                 attacker.energy - move.get('energy', 0))
     if (_d_form_sid in ('cramorant_gulping', 'cramorant_gorging')
             and damage * _tank_mult < defender.hp):
         use_shield = False
