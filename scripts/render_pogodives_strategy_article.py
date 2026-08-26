@@ -7,10 +7,12 @@ standard related-article box (slug injected at render time -- see
 docs/article_schema.md and the TODO note about a future
 thresholds/cramorant.toml [Cramorant.article] entry).
 
-AUTHORSHIP: prose drafted by Claude at Michael's explicit direction
-(2026-08-26 overnight session); meta.toml carries authorship = "ai"
-and the page banners the provenance. Michael reviews before any
-publish (publishing always needs his explicit go).
+AUTHORSHIP: AI + human (Michael's decision 2026-08-26) -- prose
+drafted by Claude under Michael's direction and editorial guidance;
+meta.toml carries authorship = "both" and the page banners the
+provenance. Michael reviews/edits before any publish (publishing
+always needs his explicit go). Writing guidelines: ASCII glyphs only
+(no em/en dashes, arrows, curly quotes) per Michael's standing rule.
 
 Page chrome (theme CSS, theme picker, footers) is lifted at render
 time from a rendered ML-guide article so the styling never drifts
@@ -231,7 +233,7 @@ def build():
                 f'<tr><td>{lab}</td>'
                 f'<td class="num">{p["net"]:+,}</td>'
                 f'<td class="num">{p["mr"]:+.2f}</td>'
-                f'<td class="num">{p["wr_a"] * 100:.1f} &rarr; '
+                f'<td class="num">{p["wr_a"] * 100:.1f} -> '
                 f'{p["wr_b"] * 100:.1f}%</td>'
                 f'<td class="num">{n["net"]:+,}</td>'
                 f'<td class="num">{n["mr"]:+.2f}</td></tr>')
@@ -277,12 +279,12 @@ h2 {{ margin-top: 1.6em; }}
 <p class="sub">A shield-scenario-by-shield-scenario battle plan for
 Cramorant's Gulp Missile, tuned and verified across every IV spread and
 the full Great and Ultra League metas.</p>
-<div class="banner"><strong>AI-drafted at the developer's direction,
-pending human review.</strong> Every number is recomputed from the same
+<div class="banner"><strong>AI + human:</strong> drafted by the lab
+AI under the developer's direction and editorial guidance. Every number is recomputed from the same
 simulations that power the <a href="../../cramorant-great-league/">Great
 League</a> and <a href="../../cramorant-ultra-league/">Ultra League</a>
-dives; the strategy itself is what the dives' &ldquo;PoGoDives
-strat&rdquo; dropdown simulates.</div>
+dives; the strategy itself is what the dives' "PoGoDives
+strat" dropdown simulates.</div>
 </div>
 <main class="article-main">
 
@@ -290,30 +292,30 @@ strat&rdquo; dropdown simulates.</div>
 <b>What you get.</b> Followed as written, this plan wins
 <b>{hero['pv_gl_net']:+,}</b> extra (IV &times; opponent &times; shield
 scenario) matchups in Great League and <b>{hero['pv_ul_net']:+,}</b> in
-Ultra League versus playing PvPoke's default battle plan &mdash; about
+Ultra League versus playing PvPoke's default battle plan - about
 <b>+{hero['pv_gl_pts']:.1f} / +{hero['pv_ul_pts']:.1f} points of
-absolute win rate</b> overall, rising to <b>+10&ndash;12 points in the
+absolute win rate</b> overall, rising to <b>+10-12 points in the
 even-shield endgames</b> (1-1, 1-2, 2-2). Versus a never-bait plan it
 is worth <b>{hero['nb_gl_net']:+,} / {hero['nb_ul_net']:+,}</b>
 (+{hero['nb_gl_pts']:.1f} points in each league). And it is certified
 never worse than PvPoke's plan in <em>any</em> of the nine shield
 scenarios, in either league, on any of the five movesets the dives
-carry &mdash; on both win rate and average battle rating.</div>
+carry - on both win rate and average battle rating.</div>
 
 <div class="note">Baseline credit where it is due: the comparison line
 here is <a href="https://pvpoke.com">PvPoke</a>'s battle AI, which is an
 excellent general-purpose player and the engine this whole project is
 built on. This page describes a Cramorant-specialized refinement of that
-plan, not a replacement for it &mdash; in most scenarios most of what
+plan, not a replacement for it - in most scenarios most of what
 you do is exactly what PvPoke would do.</div>
 
 <h2>The cheat sheet</h2>
-<p>Scenarios are written <b>your shields &ndash; their shields</b> at
+<p>Scenarios are written <b>your shields - their shields</b> at
 the moment the fight starts. Two moves matter: your <b>prey move</b>
 (Dive, or Surf) which loads a fish and arms the free, unshieldable Gulp
 Missile, and your <b>banked move</b> (Fly on the standard build).
-&ldquo;Dive-rush&rdquo; means throwing the prey move the moment you have
-the energy, even though Fly hits harder. &ldquo;Tanking&rdquo; means
+"Dive-rush" means throwing the prey move the moment you have
+the energy, even though Fly hits harder. "Tanking" means
 deliberately <em>not shielding</em> while you hold a fish, so their hit
 triggers your missile.</p>
 
@@ -321,21 +323,21 @@ triggers your missile.</p>
 <tr><th>Start</th><th>Move choice</th><th>Shielding</th></tr>
 <tr><td class="sc">0-0, 0-1</td>
 <td>Dive-rush <b>only if you win CMP</b> (your Attack stat is higher
-&mdash; the dive pages mark this per IV). If you lose CMP, play normal
+ -  the dive pages mark this per IV). If you lose CMP, play normal
 PvPoke move choices: bank Fly.</td>
 <td>You have no shields; nothing to decide.</td></tr>
 <tr><td class="sc">0-2</td>
 <td>Dive-rush always.</td>
 <td>Nothing to decide.</td></tr>
 <tr><td class="sc">1-0</td>
-<td>No dive-rush &mdash; normal PvPoke move choices.</td>
+<td>No dive-rush - normal PvPoke move choices.</td>
 <td>Tank a little more bravely than usual while holding a fish: eat any
 hit that leaves you above roughly half your current HP. Shield the big
 stuff.</td></tr>
 <tr><td class="sc">1-1, 1-2</td>
 <td>Dive-rush always.</td>
 <td>Tank hard while holding a fish: eat anything that won't take you
-below about 30% of your current HP &mdash; <em>unless</em> you are far
+below about 30% of your current HP - <em>unless</em> you are far
 ahead on HP (a lead of 40+ percentage points), in which case shield
 normally and bank the win.</td></tr>
 <tr><td class="sc">2-0</td>
@@ -351,7 +353,7 @@ dents you. Otherwise: normal move choices.</td>
 <td>Dive-rush always.</td>
 <td>The <b>loaded-opponent rule</b>: while holding a fish, refuse the
 shield (eat hits up to about 60% of your current HP) <em>only while the
-opponent stays loaded</em> &mdash; that is, only if the move they are
+opponent stays loaded</em> - that is, only if the move they are
 throwing still leaves them enough energy for another charged move. If
 this throw empties their bar, take the shield: nothing will punish them
 for a long time, so the HP buys you nothing.</td></tr>
@@ -362,7 +364,7 @@ for a long time, so the HP buys you nothing.</td></tr>
 Dive-rushing trades your efficient Fly for tempo: a fish in the mouth
 and an unshieldable ~15%-of-their-bar missile with a guaranteed debuff.
 That trade goes bad exactly when the opponent's own charged move crosses
-yours &mdash; which is why every dive-rush rule above is gated on
+yours - which is why every dive-rush rule above is gated on
 <b>winning CMP</b>. This is also why the per-IV plots on the dive show
 two sharp populations: whole IV blocks flip behavior at an Attack
 breakpoint.</p>
@@ -375,18 +377,18 @@ opponent (2-0, and most of 2-1).</p>
 <p><b>3. Only feed on a loaded opponent.</b> The 2-2 discovery that
 closed out the tuning campaign: refusing a shield is only profitable
 while the opponent still has another charged move behind the one you're
-eating. If their bar is emptying, shield it &mdash; you keep the HP and
+eating. If their bar is emptying, shield it - you keep the HP and
 lose nothing, because the missile can wait.</p>
 
 <h2>How this relates to PvPoke's plan</h2>
-<p>We love PvPoke &mdash; this project is a Python port of its
+<p>We love PvPoke - this project is a Python port of its
 open-source engine, its data, and its rankings, and its battle AI is
 the reference we verify against, cell by cell. PvPoke's plan for
 Cramorant already includes a dive-rush rule and a fish-tanking rule;
 what this page adds is <em>conditioning</em>: the same two levers,
 switched per shield scenario, per CMP, and per the opponent's energy
-state. Where our conditions say &ldquo;don't&rdquo;, the plan
-<em>is</em> PvPoke's, unchanged &mdash; and in the two scenarios where
+state. Where our conditions say "don't", the plan
+<em>is</em> PvPoke's, unchanged - and in the two scenarios where
 we couldn't beat it cleanly for every spread (2-0, and most 2-1
 situations), the plan simply defers to PvPoke entirely. The one
 philosophical difference is small and honest: PvPoke optimizes each
@@ -400,7 +402,7 @@ League passes it everywhere: {ul_full_total:+,} net wins overall, with
 the even-shield endgames carrying most of it. Measured against a
 per-opponent selection ceiling (the best any opponent-conditioned rule
 could do with the plans we tested), the shipped plan captures
-97&ndash;100% of the available value in 1-1 and 1-2, and 100% in 0-1
+97-100% of the available value in 1-1 and 1-2, and 100% in 0-1
 and 0-2.</p>
 <p>Because Ultra League Cramorants are usually built from good IVs, the
 table below also restricts to the top-100 stat-product spreads:</p>
@@ -412,12 +414,12 @@ table below also restricts to the top-100 stat-product spreads:</p>
 <p class="note"><b>Two honest flags for Ultra League.</b> First: on the
 top-100 stat-product builds specifically, the 0-0 row is a small net
 <em>negative</em> on wins ({ul_top_00_net:+} over 7,200 cells, with
-rating still positive) &mdash; the 0-0 dive-rush's certified gains
+rating still positive) - the 0-0 dive-rush's certified gains
 concentrate in high-attack spreads, and a bulky rank-1-style build that
 wins CMP only narrowly occasionally rushes into a bad trade. If you run
 a max-bulk UL Cramorant, treat the 0-0 dive-rush as roughly a wash.
 Second: the 2-1 and 1-0 rows sit near zero for high-SP builds while a
-per-opponent ceiling of roughly +10 rating exists there &mdash; that
+per-opponent ceiling of roughly +10 rating exists there - that
 headroom needs finer conditioning than we could certify league-blind,
 and it is the flagged target for the next tuning round.</p>
 <h2>Caveats</h2>
@@ -425,13 +427,13 @@ and it is the flagged target for the next tuning round.</p>
 bound, the tank thresholds, the fast-move-chip bound). They were fitted
 on the current Great and Ultra metas and verified at full resolution
 across every IV spread, all nine scenarios, both leagues, and all five
-dive movesets &mdash; but a move rebalance can move them, and this
+dive movesets - but a move rebalance can move them, and this
 project's tripwires re-open the verification when that happens. Details
 and the full disclosure list live in the repo's validation docs.</p>
 
 <h2>Methods: how the strategy was built</h2>
 <p>The tuning bar, set by the developer, was strict: <b>the plan had to
-be at-or-above PvPoke's in every single shield scenario</b> &mdash; on
+be at-or-above PvPoke's in every single shield scenario</b> - on
 both net wins and average battle rating, in each league, each opponent
 IV mode, each bait mode, and each of the five movesets the dives carry
 (360 cells in total), with no negative cell shipped. The loop that got
@@ -441,7 +443,7 @@ there:</p>
 cell of the uniform starting rule against PvPoke's plan, from the dive
 pages' own score tensors, and list the failing cells.</li>
 <li><b>Per-opponent oracle.</b> Compute the ceiling a perfect
-opponent-conditioned rule could reach &mdash; this said the failing
+opponent-conditioned rule could reach - this said the failing
 scenarios were fixable before any search began.</li>
 <li><b>Trace the losses.</b> Agents re-ran individual losing fights
 under both plans and diffed the decision logs; the CMP mechanism, the
@@ -451,12 +453,12 @@ reading actual fights, not from curve-fitting.</li>
 re-simulating exact tensor slices (one scenario &times; all opponents
 &times; sampled IVs) through the production battle path, verified
 integer-exact against the shipped pages before use. Final candidates
-were certified at full 4096-IV resolution &mdash; sampled screens
+were certified at full 4096-IV resolution - sampled screens
 turned out to alias the HP-IV axis.</li>
 <li><b>Adversarial review.</b> Independent skeptic agents attacked the
 result twice, and both mattered: one caught a rule that failed the bar
 on a moveset outside the original test set; the other proved one
-&ldquo;load-bearing&rdquo; constant was dead code. The shipped plan is
+"load-bearing" constant was dead code. The shipped plan is
 what survived them.</li>
 </ol>
 
@@ -484,18 +486,18 @@ tread of the staircase projected sideways. Two different mechanisms cut
 the steps:</p>
 <p><b>CMP boundaries (rule-driven).</b> Twenty of the Great League
 pool's opponents have an attack stat that falls <em>inside</em>
-Cramorant's own IV attack range (118.5&ndash;129.3). For the
+Cramorant's own IV attack range (118.5-129.3). For the
 CMP-conditioned scenarios (0-0, 0-1, 2-1), crossing one opponent's
 attack value switches the dive-rush rule on against exactly that
-opponent &mdash; a discrete step in the pool-averaged delta. In the 0-0
+opponent - a discrete step in the pool-averaged delta. In the 0-0
 panel below, the four largest steps land, to the decimal, on Shadow
 Dusclops (122.9), Shadow Lapras (125.6), the
-Feraligatr&thinsp;/&thinsp;Shadow Altaria pair (123.9&ndash;124.1), and
+Feraligatr/Shadow Altaria pair (123.9-124.1), and
 Sableye (119.7). A step can go either way: winning CMP against
 Feraligatr makes the dive-rush profitable there (step up); winning it
 against Shadow Dusclops turns the rule on in a fight where the rush
 doesn't pay (step down). This is also why the shadow variants behave
-differently from their normal forms &mdash; the shadow attack bonus
+differently from their normal forms - the shadow attack bonus
 moves the boundary.</p>
 <p><b>Damage breakpoints (fight-driven).</b> The 2-2 scenario's gate
 has no CMP condition, yet its staircase has steps too (and 0-1 has
@@ -503,7 +505,7 @@ steps at attack values matching no opponent). Those treads are ordinary
 damage tiers: an attack threshold where Peck, Dive, Fly, or an
 opponent's answer changes by one damage point, shifting how a whole
 block of IV spreads experiences the missile trade. The strategy's
-value is piecewise-constant over breakpoint cells &mdash; which is
+value is piecewise-constant over breakpoint cells - which is
 exactly why the dives report per-IV numbers rather than one average.</p>
 <p>Practical upshot: <b>which hump your Cramorant sits in is knowable
 before you queue</b>. Check your IVs' attack stat on the dive page; the
@@ -517,7 +519,7 @@ flip for your spread.</p>
   <div class="panel wide" id="hump-22" style="grid-column:span 3;height:380px"></div>
 </div>
 <h3>The ledger</h3>
-<p>Net wins, mean rating delta, and win rate (PvPoke &rarr; PoGoDives)
+<p>Net wins, mean rating delta, and win rate (PvPoke -> PoGoDives)
 per start scenario versus PvPoke's plan, plus the same net/rating
 versus the never-bait plan. Counts are over all 4096 IVs &times; the
 full opponent pool.</p>
@@ -534,7 +536,7 @@ full opponent pool.</p>
 {ledger_rows(vs_pv_ul, vs_nb_ul)}
 </table>
 <p class="note">Versus never-bait, two Great League cells (0-2, 2-1)
-trade a few hundred net wins for large rating gains &mdash; the
+trade a few hundred net wins for large rating gains - the
 certified no-negative-cells guarantee is versus PvPoke's plan, which is
 the baseline both this plan and never-bait should be judged against.</p>
 
@@ -606,14 +608,14 @@ mkAtkPlot('hump-22', 8, '2-2 delta vs attack -- no CMP condition; steps are dama
     (OUT_DIR / 'index.html').write_text(html)
     (OUT_DIR / 'meta.toml').write_text(
         'title       = "Playing Cramorant: The PoGoDives Strategy"\n'
-        'description = "AI-drafted at the developer\'s direction '
-        '(2026-08-26), pending human review before publish. The '
+        'description = "AI + human (drafted by the lab AI under the '
+        'developer\'s direction and editorial guidance, 2026-08-26). The '
         'per-shield-scenario Cramorant battle plan behind the dives\' '
         'PoGoDives strat dropdown, written for human players: cheat '
         'sheet, mechanisms, and a methods section with the per-IV delta '
         'plots. All numbers recomputed from the dive tensors at render '
         'time."\n'
-        'authorship  = "ai"\n'
+        'authorship  = "both"\n'
         'landing     = "index.html"\n')
     print(f'wrote {OUT_DIR}/index.html ({len(html):,} chars) + meta.toml')
 
