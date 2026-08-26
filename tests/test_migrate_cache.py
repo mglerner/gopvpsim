@@ -490,3 +490,10 @@ def test_pogodives_sheet_predicate():
     assert p({'species': 'X'}, {'species': 'Medicham'}) is False
     assert p({'species': 'Cramorant'}, {'species': 'Azumarill'}) is False
     assert p(None, None) is True   # fail-safe
+
+
+def test_pogodives_sheet_v5_predicate():
+    p = migrate_cache.PREDICATES['pogodives_sheet_v5_20260826']
+    assert p({'species': 'X'}, {'species': 'Medicham', 'policy': 'pogodives'}) is True
+    assert p({'species': 'X'}, {'species': 'Medicham'}) is False
+    assert p(None, None) is True

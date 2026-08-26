@@ -374,7 +374,10 @@ def test_sheet_tank_rules():
         cram._start_shields = start
         return B._cram_tank_mult(opp, cram, damage)
 
-    assert mults((1, 0), 30) == 1.9               # lead rule, aggr 1.9 (v4)
+    # v5: 1v0 uses the loaded-opponent rule -- without energy info the
+    # fail-safe is conservative; the loaded/unloaded split is probed in
+    # test_sheet_2v2_loaded_tank (same mechanism).
+    assert mults((1, 0), 30) == B._POGODIVES_TANK_CONSERVATIVE
     assert mults((1, 1), 30) == B._POGODIVES_TANK_AGGRESSIVE   # default 1.4
     # v4 2v2 'lead_ready': without the energy argument the rule is
     # conservative (fail-safe); the loaded/unloaded split is probed in
@@ -453,3 +456,49 @@ def test_sheet_2v2_loaded_tank():
     assert mult(45) == 1.6      # still loaded: tank
     assert mult(44) == 2.2      # emptied below their cheapest: shield
     assert mult(None) == 2.2    # no energy info: fail-safe conservative
+
+
+def test_sheet_0v0_cmp_e_or_dive_gate():
+    """v5 0v0 gate: (CMP won AND opp charged all >= 40 energy) OR
+    (Dive missile-sized AND missile worth >= 4.2 fast moves). The
+    second branch needs the caller's gulp damage (the DP site passes
+    it); without it only the first branch can fire (fail-safe)."""
+    import gopvpsim.battle as B
+
+    def probe(cram_atk=120, opp_atk=100, opp_cost=45, gulp_dmg=None,
+              opp_hp=140, cram_fast_power=6):
+        cram = make_bp(atk=cram_atk, hp=130,
+                       fast=make_fast(power=cram_fast_power, energy_gain=8),
+                       charged=[make_charged(power=65, energy=40)])
+        opp = make_bp(atk=opp_atk, hp=opp_hp,
+                      fast=make_fast(power=3, energy_gain=8),
+                      charged=[make_charged(power=90, energy=opp_cost)])
+        cram._pogodives = True
+        cram._start_shields = (0, 0)
+        opp.fast_move['_turns'] = 2
+        return B._cram_dive_gate_dpe(cram, opp, gulp_dmg=gulp_dmg)
+
+    PG, PV = B._POGODIVES_DIVE_GATE_DPE, B._CRAM_DIVE_GATE_DPE
+    assert probe() == PG                          # cmp + expensive
+    assert probe(opp_cost=35) == PV               # cheap moves, no gulp info
+    assert probe(cram_atk=90) == PV               # cmp lost, no gulp info
+    # Second branch: missile-sized Dive + missile >= 4.2 * fast damage.
+    # opp_hp=140 -> threshold dmg 21, missile = int(21)+1 = 22.
+    big = probe(cram_atk=90, gulp_dmg=25, cram_fast_power=1)
+    assert big == PG                              # low fast dmg -> ratio ok
+    assert probe(cram_atk=90, gulp_dmg=15, cram_fast_power=1) == PV  # small dive
+    assert probe(cram_atk=90, gulp_dmg=25, cram_fast_power=20) == PV  # big fast
+
+
+def test_missile_frac_matches_gamemaster():
+    """Change-propagation guard (skeptic 2026-08-26): the 0v0 gate's
+    _POGODIVES_GATE_MISSILE_FRAC doubles as the Gulp Missile damage
+    model, so it must track the gamemaster's percentMaxHP payload."""
+    import gopvpsim.battle as B
+    from gopvpsim.moves import get_moves
+    _, charged = get_moves()
+    missiles = [m for mid, m in charged.items() if 'GULP_MISSILE' in mid]
+    assert missiles, 'no Gulp Missile moves in the gamemaster'
+    for m in missiles:
+        assert m.get('damageMethod') == 'percentMaxHP'
+        assert m.get('power') == B._POGODIVES_GATE_MISSILE_FRAC * 100

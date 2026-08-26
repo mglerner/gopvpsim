@@ -212,6 +212,25 @@ _POGODIVES_TANK_CONSERVATIVE = 2.2  # ...unless clearly ahead, then PvPoke's 2.2
 _POGODIVES_TANK_LEAD = 0.40        # "clearly ahead" = HP-fraction lead > this
                                    # (Michael 2026-08-25; lead 33-45 is a plateau)
 _POGODIVES_GATE_DPT_MAX = 0.022    # 'cmp_dpt' gate: opp fast DPT / our maxHP cap
+_POGODIVES_GATE_MIN_ENERGY = 40    # 2v1 ready-nuke gate's 'expensive charged
+                                   # moves' bound (row-owned; certified there)
+_POGODIVES_GATE_0V0_MIN_ENERGY = 40  # 0v0 gate's bound -- SAME VALUE, OWN
+                                     # constant on purpose: both are EDGE
+                                     # constants and each row's certification
+                                     # must not be silently invalidated by
+                                     # retuning the other (skeptic 2026-08-26)
+_POGODIVES_GATE_MISSILE_FRAC = 0.15  # the Gulp Missile's percentMaxHP payload
+                                     # (gamemaster GULP missiles: power 15,
+                                     # percentMaxHP). NOT a free threshold --
+                                     # the 0v0 gate's second branch uses it
+                                     # both as the missile damage model
+                                     # (int(frac*maxHP)+1) and as the
+                                     # missile-sized-Dive bound; a rebalance
+                                     # of the missile payload must update it
+                                     # (pinned by test_missile_frac_matches_
+                                     # gamemaster).
+_POGODIVES_GATE_MISSILE_FAST = 4.2  # ...and the missile worth this many of
+                                    # our fast moves (fitted; plateau 3.8-5.4)
 _POGODIVES_TANK_CHEAP_FRAC = 0.15  # 'cheap' tank default: hit <= this * maxHP.
                                    # NOTE: no shipped sheet row uses 'cheap'
                                    # today (v3 made 2v2 gate-only); the rule
@@ -241,17 +260,20 @@ _POGODIVES_TANK_CHEAP_FRAC = 0.15  # 'cheap' tank default: hit <= this * maxHP.
 # missile's ~15%-of-bar value, so hits above that are never worth
 # eating when shield-ahead.
 _POGODIVES_SHEET = {
-    # v4 (margin survey 2026-08-26): the 0v0 DPT condition deleted --
-    # its pass region never closes upward (vacuous by 0.03) and dropping
-    # it GAINS flips (GL +6,768 -> +10,495 at full 4096, both cells
-    # certified). 0v0 and 0v1 now share the plain CMP gate.
-    (0, 0): {'gate': 'cmp', 'tank_aggr': None, 'tank_rule': 'lead'},
+    # v5 (0v0 discovery 2026-08-26): (CMP AND expensive charged) OR
+    # (missile-sized Dive worth >= 4.2 fast moves). Captures 99.8% of
+    # the UL 0v0 per-opponent oracle (+1,014 -> +8,258), fixes the
+    # UL top-100-SP net-negative (-48 -> +30), GL not regressed.
+    (0, 0): {'gate': 'cmp_e_or_dive', 'tank_aggr': None,
+             'tank_rule': 'lead'},
     (0, 1): {'gate': 'cmp', 'tank_aggr': None, 'tank_rule': 'lead'},
     (0, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
-    # v4: aggressive 2.0 -> 1.9 (wider margin: GL +1.00 -> +1.31, UL
-    # +1.12 -> +1.03..+1.36; certified on all ten pages incl. the
-    # binding ultra_m4).
-    (1, 0): {'gate': 'off', 'tank_aggr': 1.9, 'tank_rule': 'lead'},
+    # v5: the loaded-opponent tank ported from 2v2, at aggressive 1.9
+    # (probe + skeptic 2026-08-26): the loaded condition separates the
+    # UL-cheap-hit wins from the GL-nuke drains; 1.4 was BROKEN on the
+    # top-100-SP lens in both leagues (skeptic), while 1.9 passes both
+    # lenses on all ten pages AND beats 1.4 on global rating.
+    (1, 0): {'gate': 'off', 'tank_aggr': 1.9, 'tank_rule': 'lead_ready'},
     (1, 1): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     (1, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     (2, 0): None,
@@ -289,9 +311,10 @@ POGODIVES_CASE_SPECIES_PREFIXES = ('Cramorant',)
 def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None):
     """Dive/Surf-ASAP DPE gate for the deciding attacker's policy tier.
     Under pogodives: the per-start-scenario sheet's gate condition.
-    ``gulp_dmg``/``nongulp_dmg`` (the caller's stage-fresh charged
-    damages) are accepted for future gate modes; no current mode reads
-    them (the 'draw' candidate was measured and rejected 2026-08-26).
+    ``gulp_dmg``/``nongulp_dmg`` are the caller's stage-fresh charged
+    damages; the 0v0 'cmp_e_or_dive' mode reads ``gulp_dmg`` (the
+    'draw' candidate that read both was measured and rejected
+    2026-08-26).
     All inputs (both sides' stats, moves, max HP, start shields, and
     live in-fight state like defender.energy) are dedup-signature
     functions per the pinned constraint below."""
@@ -303,6 +326,27 @@ def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None):
         if gate == 'always':
             return _POGODIVES_DIVE_GATE_DPE
         if gate == 'off':
+            return _CRAM_DIVE_GATE_DPE
+        if gate == 'cmp_e_or_dive':
+            # 0v0 discovery rule (2026-08-26, 99.8% of the UL oracle):
+            # dive-rush iff (CMP won AND the opponent's charged moves
+            # are all expensive) OR (the Dive itself is missile-sized
+            # against them AND the missile is worth >= 4.2 of our fast
+            # moves) -- the second branch recovers the low-attack
+            # spreads' wins the plain CMP condition discarded.
+            cheapest = min((c.get('energy', 100)
+                            for c in defender.charged_moves), default=100)
+            if (attacker.atk >= defender.atk
+                    and cheapest >= _POGODIVES_GATE_0V0_MIN_ENERGY):
+                return _POGODIVES_DIVE_GATE_DPE
+            if gulp_dmg is not None:
+                missile = int(_POGODIVES_GATE_MISSILE_FRAC
+                              * defender.max_hp) + 1
+                fast = attacker.fast_move_damage(defender)
+                if (gulp_dmg >= _POGODIVES_GATE_MISSILE_FRAC
+                        * defender.max_hp
+                        and missile >= _POGODIVES_GATE_MISSILE_FAST * fast):
+                    return _POGODIVES_DIVE_GATE_DPE
             return _CRAM_DIVE_GATE_DPE
         # cmp family: the forced early Dive only pays when we win CMP.
         if attacker.atk < defender.atk:
@@ -319,14 +363,15 @@ def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None):
                 return _CRAM_DIVE_GATE_DPE
         if gate == 'cmp_ready_dpt':
             # 2v1 discovery rule (2026-08-26): additionally require the
-            # opponent's charged moves to be EXPENSIVE (>= 40 energy)
-            # and THROWABLE RIGHT NOW (they hold the energy) -- the
-            # forced Dive converts only when it trades into a live
-            # nuke threat rather than feeding a bait cycle. Live-state
-            # energy read: same class as the lead rule's hp read.
+            # opponent's charged moves to be EXPENSIVE and THROWABLE
+            # RIGHT NOW (they hold the energy) -- the forced Dive
+            # converts only when it trades into a live nuke threat
+            # rather than feeding a bait cycle. Live-state energy read:
+            # same class as the lead rule's hp read.
             cheapest = min((c.get('energy', 100)
                             for c in defender.charged_moves), default=100)
-            if cheapest < 40 or defender.energy < cheapest:
+            if (cheapest < _POGODIVES_GATE_MIN_ENERGY
+                    or defender.energy < cheapest):
                 return _CRAM_DIVE_GATE_DPE
         return _POGODIVES_DIVE_GATE_DPE
     return _CRAM_DIVE_GATE_DPE
