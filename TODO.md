@@ -124,7 +124,13 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    [Cramorant.article] table -- until that file exists, a from-CLI
    rebake drops the dive->article link and the replay-injection step
    must be re-run (the scratchpad wrapper is trivial to recreate: load
-   blob, set state['article_slug'], render_dive_html).
+   blob, set state['article_slug'], render_dive_html). TRAP (hit
+   2026-08-26 ~05:10): the wrapper must use the NEWEST replay blobs --
+   an older-vintage blob silently regresses the rendered tensors to
+   the earlier engine's scores (the v3-blob slug render overwrote the
+   certified v4 pages and contaminated the article's numbers until
+   caught by a hero-number diff). Pick blobs by mtime, or assert the
+   blob postdates the last bake.
    REBALANCE NOTE (Michael 2026-08-25): a big move rebalance is
    expected ~2 weeks out (post-Worlds, the usual pattern). When it
    lands: gamemaster-delta migration as usual, PLUS re-run the
