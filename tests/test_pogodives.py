@@ -273,11 +273,12 @@ def test_start_scenario_sheet_exemptions():
     """Start-scenario SHEET (2026-08-26 strict-bar campaign, generalizing
     the round-7 2-0 exemption): a side whose _POGODIVES_SHEET row is None
     plays plain PvPoke (the flag stays False); every other start keeps
-    the strat. Exempt today: (2, 0) (round 7) and (2, 1) (no rule beat
-    plain PvPoke in both leagues; pre-sheet this cell was strat-on and
-    net-NEGATIVE: GL -1175 win-cells / -27.6 rating). Start-scenario,
-    not live-state -- the flag is set at battle start and does NOT flip
-    when shields are consumed mid-fight."""
+    the strat. Exempt today: (2, 0) only (round 7). The (2, 1) row was
+    briefly exempt mid-campaign (pre-sheet it was strat-on and
+    net-NEGATIVE: GL -1175 win-cells / -27.6 rating) until the
+    ready-nuke gate rule was discovered and full-tensor verified.
+    Start-scenario, not live-state -- the flag is set at battle start
+    and does NOT flip when shields are consumed mid-fight."""
     def flags_for(s1, s2):
         c1 = _make_battle_pokemon('Cramorant', 'PECK', ['DIVE', 'HYDRO_PUMP'],
                                   'great', s1, 5, 15, 15)
@@ -292,7 +293,7 @@ def test_start_scenario_sheet_exemptions():
 
     import gopvpsim.battle as B
     exempt = {s for s, row in B._POGODIVES_SHEET.items() if row is None}
-    assert exempt == {(2, 0), (2, 1)}
+    assert exempt == {(2, 0)}
     for s1 in (0, 1, 2):
         for s2 in (0, 1, 2):
             expected = (s1, s2) not in exempt
@@ -359,6 +360,61 @@ def test_sheet_tank_rules():
 
     assert mults((1, 0), 30) == 2.0               # lead rule, aggr 2.0
     assert mults((1, 1), 30) == B._POGODIVES_TANK_AGGRESSIVE   # default 1.4
-    cheap = int(0.15 * 130)                       # 19 <= 15% of 130
+    cheap = int(0.30 * 130)                       # 39 <= the row's 30% cap
     assert mults((2, 2), cheap) == 1.8            # cheap hit: tank at 1.8
-    assert mults((2, 2), cheap + 10) == B._POGODIVES_TANK_CONSERVATIVE
+    assert mults((2, 2), cheap + 5) == B._POGODIVES_TANK_CONSERVATIVE
+
+
+def test_sheet_2v1_ready_nuke_gate():
+    """The 2v1 'cmp_ready_dpt' gate (discovery rule 2026-08-26): fires
+    only when CMP is won AND the opponent's cheapest charged move costs
+    >= 40 energy AND they hold that energy RIGHT NOW AND their fast DPT
+    is under the row's tighter 0.0155 cap. Pre-rule this start was a
+    full exemption (delta exactly 0)."""
+    import gopvpsim.battle as B
+
+    def probe(cram_atk=120, opp_atk=100, opp_energy=45, opp_cost=45,
+              opp_fast_power=4):
+        cram = make_bp(atk=cram_atk, hp=130,
+                       fast=make_fast(power=6, energy_gain=8),
+                       charged=[make_charged(power=65, energy=40)])
+        opp = make_bp(atk=opp_atk, hp=140,
+                      fast=make_fast(power=opp_fast_power, energy_gain=8),
+                      charged=[make_charged(power=90, energy=opp_cost)])
+        opp.energy = opp_energy
+        cram._pogodives = True
+        cram._start_shields = (2, 1)
+        opp.fast_move['_turns'] = 2
+        return B._cram_dive_gate_dpe(cram, opp)
+
+    PG, PV = B._POGODIVES_DIVE_GATE_DPE, B._CRAM_DIVE_GATE_DPE
+    assert probe() == PG                              # all conditions met
+    assert probe(cram_atk=90) == PV                   # cmp lost
+    assert probe(opp_cost=35, opp_energy=45) == PV    # cheap moves
+    assert probe(opp_energy=30) == PV                 # not ready to throw
+    assert probe(opp_fast_power=30) == PV             # dpt over the cap
+    # The tank side of the 2v1 row is plain PvPoke: aggr 2.2 == both
+    # branches == the PvPoke multiplier.
+    cram = make_bp(atk=110, hp=130, fast=make_fast(power=6, energy_gain=8),
+                   charged=[make_charged(power=65, energy=40)])
+    opp = make_bp(atk=110, hp=140, fast=make_fast(power=6, energy_gain=8),
+                  charged=[make_charged(power=90, energy=45)])
+    cram._pogodives = True
+    cram._start_shields = (2, 1)
+    assert B._cram_tank_mult(opp, cram, 30) == B._CRAM_TANK_MULT
+
+
+def test_sheet_2v2_cheap_frac_override():
+    """The 2v2 row's cheap_frac 0.30 override (batch-10 verdict): hits
+    up to 30% of max HP tank at 1.8; above that, conservative."""
+    import gopvpsim.battle as B
+    cram = make_bp(atk=110, hp=130, fast=make_fast(power=6, energy_gain=8),
+                   charged=[make_charged(power=65, energy=40)])
+    opp = make_bp(atk=110, hp=140, fast=make_fast(power=6, energy_gain=8),
+                  charged=[make_charged(power=90, energy=45)])
+    cram._pogodives = True
+    cram._start_shields = (2, 2)
+    mid = int(0.30 * 130)          # 39 <= 30% of 130
+    assert B._cram_tank_mult(opp, cram, mid) == 1.8
+    assert B._cram_tank_mult(opp, cram, mid + 5) == \
+        B._POGODIVES_TANK_CONSERVATIVE

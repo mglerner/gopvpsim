@@ -243,8 +243,14 @@ _POGODIVES_SHEET = {
     (1, 1): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     (1, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
     (2, 0): None,
-    (2, 1): None,   # no rule beat plain PvPoke in BOTH leagues yet
-    (2, 2): {'gate': 'cmp_dpt_e', 'tank_aggr': 1.8, 'tank_rule': 'cheap'},
+    # 2v1 discovery rule (agent campaign 2026-08-26, full-4096-IV
+    # verified: worst slice +2220 net / +1.17 mean): gate-only with the
+    # ready-nuke condition, tank plain PvPoke (aggr 2.2 = both branches
+    # 2.2). Tighter DPT cap than the 0v0 row (plateau 0.0141-0.0168).
+    (2, 1): {'gate': 'cmp_ready_dpt', 'tank_aggr': 2.2, 'tank_rule': 'lead',
+             'dpt_max': 0.0155},
+    (2, 2): {'gate': 'cmp_dpt_e', 'tank_aggr': 1.8, 'tank_rule': 'cheap',
+             'cheap_frac': 0.30},
 }
 
 # The pogodives case REGISTRY, cache-facing form: a battle can differ from
@@ -258,11 +264,15 @@ _POGODIVES_SHEET = {
 POGODIVES_CASE_SPECIES_PREFIXES = ('Cramorant',)
 
 
-def _cram_dive_gate_dpe(attacker, defender):
+def _cram_dive_gate_dpe(attacker, defender, gulp_dmg=None, nongulp_dmg=None):
     """Dive/Surf-ASAP DPE gate for the deciding attacker's policy tier.
     Under pogodives: the per-start-scenario sheet's gate condition.
-    All inputs (both sides' stats, moves, max HP, start shields) are
-    dedup-signature functions per the pinned constraint below."""
+    ``gulp_dmg``/``nongulp_dmg`` (the caller's stage-fresh charged
+    damages) are accepted for future gate modes; no current mode reads
+    them (the 'draw' candidate was measured and rejected 2026-08-26).
+    All inputs (both sides' stats, moves, max HP, start shields, and
+    live in-fight state like defender.energy) are dedup-signature
+    functions per the pinned constraint below."""
     if getattr(attacker, '_pogodives', False):
         entry = _POGODIVES_SHEET.get(getattr(attacker, '_start_shields', None))
         if entry is None:
@@ -275,15 +285,26 @@ def _cram_dive_gate_dpe(attacker, defender):
         # cmp family: the forced early Dive only pays when we win CMP.
         if attacker.atk < defender.atk:
             return _CRAM_DIVE_GATE_DPE
-        if gate in ('cmp_dpt', 'cmp_dpt_e'):
+        if gate in ('cmp_dpt', 'cmp_dpt_e', 'cmp_ready_dpt'):
             turns = defender.fast_move.get('_turns', 1)
             dpt = (defender.fast_move_damage(attacker) / turns
                    / attacker.max_hp)
-            if dpt >= _POGODIVES_GATE_DPT_MAX:
+            if dpt >= entry.get('dpt_max', _POGODIVES_GATE_DPT_MAX):
                 return _CRAM_DIVE_GATE_DPE
         if gate == 'cmp_dpt_e':
             if min((c.get('energy', 100) for c in defender.charged_moves),
                    default=100) >= 55:
+                return _CRAM_DIVE_GATE_DPE
+        if gate == 'cmp_ready_dpt':
+            # 2v1 discovery rule (2026-08-26): additionally require the
+            # opponent's charged moves to be EXPENSIVE (>= 40 energy)
+            # and THROWABLE RIGHT NOW (they hold the energy) -- the
+            # forced Dive converts only when it trades into a live
+            # nuke threat rather than feeding a bait cycle. Live-state
+            # energy read: same class as the lead rule's hp read.
+            cheapest = min((c.get('energy', 100)
+                            for c in defender.charged_moves), default=100)
+            if cheapest < 40 or defender.energy < cheapest:
                 return _CRAM_DIVE_GATE_DPE
         return _POGODIVES_DIVE_GATE_DPE
     return _CRAM_DIVE_GATE_DPE
@@ -308,8 +329,8 @@ def _cram_tank_mult(attacker, defender, damage):
         if aggr is None:
             aggr = _POGODIVES_TANK_AGGRESSIVE
         if entry['tank_rule'] == 'cheap':
-            return (aggr if damage <= _POGODIVES_TANK_CHEAP_FRAC
-                    * defender.max_hp
+            frac = entry.get('cheap_frac', _POGODIVES_TANK_CHEAP_FRAC)
+            return (aggr if damage <= frac * defender.max_hp
                     else _POGODIVES_TANK_CONSERVATIVE)
         lead = (defender.hp / defender.max_hp
                 - attacker.hp / attacker.max_hp)
@@ -1592,7 +1613,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 and attacker.energy >= cm_energy[_gulp_slot]
                 and defender.hp > cm_dmgs[_nongulp_slot] * _CRAM_DIVE_GATE_HP
                 and (cm_dpe[_nongulp_slot] / cm_dpe[_gulp_slot]
-                     < _cram_dive_gate_dpe(attacker, defender))
+                     < _cram_dive_gate_dpe(attacker, defender,
+                                           gulp_dmg=cm_dmgs[_gulp_slot],
+                                           nongulp_dmg=cm_dmgs[_nongulp_slot]))
                 and not (_CRAM_DELAY_GORGING
                          and attacker.hp / attacker.max_hp > 0.5)):
             if _policy_debug:

@@ -64,7 +64,32 @@ PvPoke's 2.2 threshold.
    tank cost is `500*dmg/our_maxHP` vs gain `~500*0.15`. Hits above
    ~15% of max HP are never worth eating when shield-ahead.
 
-## The 2v1 hole (exempt, discovery ongoing)
+## Sheet v2 amendments (later the same night)
+
+After the v1 freeze, the parallel discovery campaign closed the 2v1
+hole and batch-10 measurements upgraded 2v2:
+
+- **2v1 = the ready-nuke gate** (gate-only; tank plain PvPoke): fire
+  the 3.0 gate iff CMP won AND the opponent's cheapest charged move
+  costs >= 40 energy AND they hold that energy RIGHT NOW
+  (`defender.energy >= cheapest` -- live-state, same class as the
+  lead rule's hp read) AND their fast DPT < 0.0155 (tighter than the
+  0v0 row's 0.022; plateau 0.0141-0.0168). Full-4096-IV verified:
+  worst slice +2,220 net / +1.17 mean; total +22,840 net win-cells
+  vs the v1 exemption's zero. CAVEAT (disclosed): in Great the rule
+  fires materially against ONE opponent (Jellicent); the constants
+  are meta-fitted and go on the rebalance re-verify list.
+- **2v2 cheap_frac 0.15 -> 0.30** (batch-10, stride-13): flips up
+  ~15-35% in every slice (GL +860..+1042, UL +934..+1259) at ~1 point
+  of UL rating; all slices still pass.
+- **Measured and REJECTED**: the 'draw' gate for 0v1 (zeroes GL 0v1
+  entirely, worse than 'cmp' in UL) and cheap-cap tanking at 1v0
+  (frac 0.30 goes rating-negative in GL). Both were mechanism-
+  plausible candidates from the 1v0/0v1 trace agent; measurement
+  overruled them. The independent stride-13 all-72-cell audit by that
+  agent confirmed the v1 sheet passes everywhere before v2 landed.
+
+## The 2v1 hole (CLOSED by v2 -- history)
 
 No rule found tonight beats plain PvPoke at 2v1 in BOTH leagues:
 Great wants the gate off (every gated variant bleeds -3.5..-32
