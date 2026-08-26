@@ -177,6 +177,8 @@ def build():
     vs_nb_ul = _scenario_stats(nb_ul, pg_ul, n_ul)
     scen_deltas, avg_deltas = _per_iv_deltas(pv_gl, pg_gl, n_gl)
     cram_atk, cmp_bounds = _cmp_boundaries(data_gl, 'great')
+    scen_deltas_ul, avg_deltas_ul = _per_iv_deltas(pv_ul, pg_ul, n_ul)
+    cram_atk_ul, cmp_bounds_ul = _cmp_boundaries(data_ul, 'ultra')
 
     def total(rows):
         return sum(r['net'] for r in rows)
@@ -411,6 +413,25 @@ table below also restricts to the top-100 stat-product spreads:</p>
 <th>net (top-100 SP)</th><th>&Delta;rating</th></tr>
 {ul_rows_html}
 </table>
+<h3>The Ultra League graphs</h3>
+<p>The same views as the Great League showpiece, for the Ultra League
+Peck / Dive + Fly page: per-scenario per-IV deltas, their histograms,
+the scenario average, and the two attack-staircase panels (the CMP
+boundary lines are Ultra League opponents here).</p>
+<div class="grid3" id="scatters-ul"></div>
+<h4>Delta histograms</h4>
+<div class="grid3" id="histos-ul"></div>
+<h4>Scenario-averaged</h4>
+<div class="grid3">
+  <div class="panel wide" id="avg-scatter-ul" style="grid-column:span 2"></div>
+  <div class="panel wide" id="avg-histo-ul"></div>
+</div>
+<div class="grid3">
+  <div class="panel wide" id="hump-00-ul" style="grid-column:span 3;height:380px"></div>
+</div>
+<div class="grid3">
+  <div class="panel wide" id="hump-22-ul" style="grid-column:span 3;height:380px"></div>
+</div>
 <p class="note"><b>Two honest flags for Ultra League.</b> First: on the
 top-100 stat-product builds specifically, the 0-0 row is a small net
 <em>negative</em> on wins ({ul_top_00_net:+} over 7,200 cells, with
@@ -549,8 +570,13 @@ var D = {json.dumps({'labels': SCEN_LABELS, 'ranks': data_gl['spRanks'],
                      'scen': scen_deltas, 'avg': avg_deltas,
                      'atk': [round(a, 2) for a in cram_atk],
                      'bounds': cmp_bounds})};
-function mkScatter(el, y, title) {{
-  Plotly.newPlot(el, [{{x: D.ranks, y: y, mode: 'markers', type: 'scattergl',
+var DU = {json.dumps({'labels': SCEN_LABELS, 'ranks': data_ul['spRanks'],
+                      'scen': scen_deltas_ul, 'avg': avg_deltas_ul,
+                      'atk': [round(a, 2) for a in cram_atk_ul],
+                      'bounds': cmp_bounds_ul})};
+function mkScatter(el, y, title, DD) {{
+  DD = DD || D;
+  Plotly.newPlot(el, [{{x: DD.ranks, y: y, mode: 'markers', type: 'scattergl',
     marker: {{size: 3, opacity: 0.45}}}}],
     {{title: {{text: title, font: {{size: 13}}}},
      margin: {{l: 42, r: 8, t: 30, b: 30}}, showlegend: false,
@@ -577,18 +603,19 @@ D.labels.forEach(function(lab, si) {{
 }});
 mkScatter(document.getElementById('avg-scatter'), D.avg, 'Scenario-averaged delta');
 mkHisto(document.getElementById('avg-histo'), D.avg, 'Scenario-averaged delta');
-function mkAtkPlot(elId, si, title) {{
-  var shapes = D.bounds.map(function(b) {{
+function mkAtkPlot(elId, si, title, DD) {{
+  DD = DD || D;
+  var shapes = DD.bounds.map(function(b) {{
     return {{type: 'line', x0: b.atk, x1: b.atk, yref: 'paper', y0: 0, y1: 1,
             line: {{width: 1, dash: 'dot', color: '#999'}}}};
   }});
-  var ann = D.bounds.map(function(b, i) {{
+  var ann = DD.bounds.map(function(b, i) {{
     return {{x: b.atk, yref: 'paper', y: (i % 2 ? 1.0 : 0.94), text: b.name,
             showarrow: false, font: {{size: 8}}, textangle: -60,
             xanchor: 'left'}};
   }});
   Plotly.newPlot(document.getElementById(elId),
-    [{{x: D.atk, y: D.scen[si], mode: 'markers', type: 'scattergl',
+    [{{x: DD.atk, y: DD.scen[si], mode: 'markers', type: 'scattergl',
       marker: {{size: 3, opacity: 0.4}}, name: 'per-IV delta'}}],
     {{title: {{text: title, font: {{size: 13}}}},
      margin: {{l: 46, r: 8, t: 60, b: 34}}, showlegend: false,
@@ -600,6 +627,18 @@ function mkAtkPlot(elId, si, title) {{
 }}
 mkAtkPlot('hump-00', 0, '0-0 delta vs attack -- steps land on CMP boundaries (dotted lines, labeled)');
 mkAtkPlot('hump-22', 8, '2-2 delta vs attack -- no CMP condition; steps are damage breakpoints');
+DU.labels.forEach(function(lab, si) {{
+  var s = document.createElement('div'); s.className = 'panel';
+  document.getElementById('scatters-ul').appendChild(s);
+  mkScatter(s, DU.scen[si], lab, DU);
+  var h = document.createElement('div'); h.className = 'panel';
+  document.getElementById('histos-ul').appendChild(h);
+  mkHisto(h, DU.scen[si], lab);
+}});
+mkScatter(document.getElementById('avg-scatter-ul'), DU.avg, 'UL scenario-averaged delta', DU);
+mkHisto(document.getElementById('avg-histo-ul'), DU.avg, 'UL scenario-averaged delta');
+mkAtkPlot('hump-00-ul', 0, 'UL 0-0 delta vs attack (CMP boundaries labeled)', DU);
+mkAtkPlot('hump-22-ul', 8, 'UL 2-2 delta vs attack', DU);
 </script>
 </body>
 </html>
