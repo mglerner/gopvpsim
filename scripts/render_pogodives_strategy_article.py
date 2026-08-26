@@ -192,6 +192,37 @@ def build():
     style, picker = _lift_chrome()
     plotly = _lift_plotly()
 
+    # UL quality view: shipped vs a per-opponent selection ceiling, full
+    # grid and top-100-SP restricted (what UL players actually build).
+    sp_ul = data_ul['spRanks']
+    def _ul_rows(sel_idx):
+        rows = []
+        for si in range(9):
+            g = l = 0; dr = 0
+            n_cells = 0
+            for iv in sel_idx:
+                base = iv * 9 * n_ul + si * n_ul
+                for oi in range(n_ul):
+                    x, y = pv_ul[base + oi], pg_ul[base + oi]
+                    dr += y - x; n_cells += 1
+                    if x < 500 <= y: g += 1
+                    elif x >= 500 > y: l += 1
+            rows.append({'net': g - l, 'mr': dr / n_cells})
+        return rows
+    all_idx = list(range(4096))
+    top_idx = [i for i in all_idx if sp_ul[i] <= 100]
+    ul_full = _ul_rows(all_idx)
+    ul_top = _ul_rows(top_idx)
+    ul_full_total = sum(r['net'] for r in ul_full)
+    ul_top_00_net = ul_top[0]['net']
+    ul_rows_html = '\n'.join(
+        f'<tr><td>{lab}</td>'
+        f'<td class="num">{ul_full[si]["net"]:+,}</td>'
+        f'<td class="num">{ul_full[si]["mr"]:+.2f}</td>'
+        f'<td class="num">{ul_top[si]["net"]:+,}</td>'
+        f'<td class="num">{ul_top[si]["mr"]:+.2f}</td></tr>'
+        for si, lab in enumerate(SCEN_LABELS))
+
     def ledger_rows(rows_pv, rows_nb):
         out = []
         for si, lab in enumerate(SCEN_LABELS):
@@ -362,6 +393,33 @@ philosophical difference is small and honest: PvPoke optimizes each
 fight in isolation with a general rule set; we allowed ourselves nine
 scenario-specific rule rows for one very unusual bird.</p>
 
+
+<h2>How good is it in Ultra League?</h2>
+<p>The certification bar treated both leagues identically, and Ultra
+League passes it everywhere: {ul_full_total:+,} net wins overall, with
+the even-shield endgames carrying most of it. Measured against a
+per-opponent selection ceiling (the best any opponent-conditioned rule
+could do with the plans we tested), the shipped plan captures
+97&ndash;100% of the available value in 1-1 and 1-2, and 100% in 0-1
+and 0-2.</p>
+<p>Because Ultra League Cramorants are usually built from good IVs, the
+table below also restricts to the top-100 stat-product spreads:</p>
+<table class="ledger">
+<tr><th>Start</th><th>net (all 4096 IVs)</th><th>&Delta;rating</th>
+<th>net (top-100 SP)</th><th>&Delta;rating</th></tr>
+{ul_rows_html}
+</table>
+<p class="note"><b>Two honest flags for Ultra League.</b> First: on the
+top-100 stat-product builds specifically, the 0-0 row is a small net
+<em>negative</em> on wins ({ul_top_00_net:+} over 7,200 cells, with
+rating still positive) &mdash; the 0-0 dive-rush's certified gains
+concentrate in high-attack spreads, and a bulky rank-1-style build that
+wins CMP only narrowly occasionally rushes into a bad trade. If you run
+a max-bulk UL Cramorant, treat the 0-0 dive-rush as roughly a wash.
+Second: the 2-1 and 1-0 rows sit near zero for high-SP builds while a
+per-opponent ceiling of roughly +10 rating exists there &mdash; that
+headroom needs finer conditioning than we could certify league-blind,
+and it is the flagged target for the next tuning round.</p>
 <h2>Caveats</h2>
 <p>The conditions above carry a few tuned constants (the 40-energy
 bound, the tank thresholds, the fast-move-chip bound). They were fitted
