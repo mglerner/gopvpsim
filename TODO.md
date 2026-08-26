@@ -94,6 +94,19 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    Grumpig, UL Shadow Feraligatr/Walrein, GL Jumpluff) -- the old
    "five losers" roster was static-tank-era and names a species that
    does not lose under the shipped rule.
+   **STRICT-BAR SHEET 2026-08-26 (supersedes the uniform lead40 rule;
+   commit 8fc5764)**: Michael's overnight bar -- every start scenario
+   `>= 0` on BOTH mean rating delta and net flips vs plain PvPoke, per
+   league x opp-IV mode x bait. The uniform rule failed 5 scenario
+   cells; `_POGODIVES_SHEET` (per-START-scenario rows: CMP/DPT/
+   cheap-energy gate conditions, lead/cheap tank rules, 2v0 + 2v1
+   exempt) passes everywhere -- full record:
+   `docs/validations/cramorant_strict_bar_2026_08_26.md`. Any
+   counters list derived pre-sheet needs re-deriving from the
+   rebaked tensors. OPEN: the 2v1 cell is exempt (GL and UL want
+   opposite gate settings; pair-dynamic discriminator not found
+   yet -- discovery notes in the validation doc); finding it
+   recovers ~+7-19k win-cells.
    REBALANCE NOTE (Michael 2026-08-25): a big move rebalance is
    expected ~2 weeks out (post-Worlds, the usual pattern). When it
    lands: gamemaster-delta migration as usual, PLUS re-run the
