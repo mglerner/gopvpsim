@@ -539,7 +539,7 @@ certified no-negative-cells guarantee is versus PvPoke's plan, which is
 the baseline both this plan and never-bait should be judged against.</p>
 
 <footer style="margin-top:30px;border-top:1px solid var(--border);padding-top:12px;font-size:0.85rem;color:var(--text-muted)">{PVPOKE_ATTRIBUTION_SHORT}</footer>
-{support_footer_html('../../support.html')}
+{support_footer_html('../../')}
 </main>
 {plotly}
 <script>
