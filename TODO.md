@@ -103,10 +103,18 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    exempt) passes everywhere -- full record:
    `docs/validations/cramorant_strict_bar_2026_08_26.md`. Any
    counters list derived pre-sheet needs re-deriving from the
-   rebaked tensors. OPEN: the 2v1 cell is exempt (GL and UL want
-   opposite gate settings; pair-dynamic discriminator not found
-   yet -- discovery notes in the validation doc); finding it
-   recovers ~+7-19k win-cells.
+   rebaked tensors. SHEET v3 FINAL (commit 90d8811, certified
+   360/360 cells at full 4096-IV resolution over ALL 5 movesets x 2
+   leagues): the 2v1 hole was closed by the ready-nuke gate (worst
+   slice +2,220 net / +1.17); the skeptic round then caught a v2
+   violation on the gate-inert Dive+Surf build and v3 made 2v2
+   gate-only. OPEN VALUE (next campaign): UL Dive+Surf 2v2 under the
+   OLD tank was +15-21k flips at passing rating; a per-build tank
+   discriminator would recover it (sheet ships zero there). EDGE
+   constants (0.022 DPT, 1v0 aggr 2.0, 2v1 dpt_max 0.0155, 55-energy
+   one-opponent patch) are disclosed in the validation doc and on the
+   rebalance re-verify list -- re-verify at FULL resolution with a
+   worst-slice margin target of +0.5.
    REBALANCE NOTE (Michael 2026-08-25): a big move rebalance is
    expected ~2 weeks out (post-Worlds, the usual pattern). When it
    lands: gamemaster-delta migration as usual, PLUS re-run the
