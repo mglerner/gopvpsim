@@ -139,9 +139,12 @@ def test_adaptive_tank_rule_three_way():
     assert would_shield(striker, cram, mv) is True
 
     # PoGoDives at even HP (lead 0): tanks (1.4 threshold), in both the
-    # actual decision and the model.
+    # actual decision and the model. Since the start-scenario sheet
+    # (2026-08-26) the tank rule row is selected by _start_shields;
+    # (1, 1) is a 'lead'-rule row with the default 1.4 aggressive.
     cram, striker, mv = setup()
     cram._pogodives = True
+    cram._start_shields = (1, 1)
     assert pvpoke_simulate_shield(striker, cram, mv) is False
     assert would_shield(striker, cram, mv) is False
 
@@ -149,6 +152,7 @@ def test_adaptive_tank_rule_three_way():
     # back to conservative -- shields.
     cram, striker, mv = setup(striker_hp_frac=0.30)
     cram._pogodives = True
+    cram._start_shields = (1, 1)
     assert pvpoke_simulate_shield(striker, cram, mv) is True
     assert would_shield(striker, cram, mv) is True
 
@@ -167,6 +171,8 @@ def test_dive_gate_reads_attacker_tier():
                     if m['moveId'] == 'DIVE')
     assert pvpoke_dp(cram, azu) != dive_idx      # PvPoke tier: no dive
     cram._pogodives = True
+    # Sheet row (1, 1) has gate 'always' -> the plain 3.0 gate.
+    cram._start_shields = (1, 1)
     cram._dp_cache = None                        # decision-state reset
     assert pvpoke_dp(cram, azu) == dive_idx      # pogodives tier: dives
 
@@ -263,11 +269,15 @@ def test_sweep_policy_tier_aliasing_and_liveness(tmp_path, monkeypatch):
     assert c1b[2] == c1[2] and c2b[2] == c2[2]
 
 
-def test_two_zero_start_exemption():
-    """Round-7 verdict (2026-08-25): a side STARTING 2 shields vs 0 plays
-    plain PvPoke (the flag stays False); every other start cell keeps the
-    strat. Start-scenario, not live-state -- the flag is set at battle
-    start and does NOT flip when shields are consumed mid-fight."""
+def test_start_scenario_sheet_exemptions():
+    """Start-scenario SHEET (2026-08-26 strict-bar campaign, generalizing
+    the round-7 2-0 exemption): a side whose _POGODIVES_SHEET row is None
+    plays plain PvPoke (the flag stays False); every other start keeps
+    the strat. Exempt today: (2, 0) (round 7) and (2, 1) (no rule beat
+    plain PvPoke in both leagues; pre-sheet this cell was strat-on and
+    net-NEGATIVE: GL -1175 win-cells / -27.6 rating). Start-scenario,
+    not live-state -- the flag is set at battle start and does NOT flip
+    when shields are consumed mid-fight."""
     def flags_for(s1, s2):
         c1 = _make_battle_pokemon('Cramorant', 'PECK', ['DIVE', 'HYDRO_PUMP'],
                                   'great', s1, 5, 15, 15)
@@ -277,12 +287,16 @@ def test_two_zero_start_exemption():
         simulate(c1, c2, charged_policy_0=pogodives_dp,
                  charged_policy_1=pvpoke_dp,
                  shield_policy_0=pogodives_shield)
+        assert c1._start_shields == (s1, s2)
         return c1._pogodives
 
-    assert flags_for(2, 0) is False      # THE exemption
-    for s1, s2 in ((0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2),
-                   (2, 1), (2, 2)):
-        assert flags_for(s1, s2) is True, (s1, s2)
+    import gopvpsim.battle as B
+    exempt = {s for s, row in B._POGODIVES_SHEET.items() if row is None}
+    assert exempt == {(2, 0), (2, 1)}
+    for s1 in (0, 1, 2):
+        for s2 in (0, 1, 2):
+            expected = (s1, s2) not in exempt
+            assert flags_for(s1, s2) is expected, (s1, s2)
     # The exemption is per-SIDE: a pogodives side starting 0 shields vs a
     # 2-shield opponent keeps the strat (it is BEHIND, not ahead).
     c1 = _make_battle_pokemon('Cramorant', 'PECK', ['DIVE', 'HYDRO_PUMP'],
@@ -292,3 +306,59 @@ def test_two_zero_start_exemption():
     simulate(c1, c2, charged_policy_0=pogodives_dp, charged_policy_1=pogodives_dp)
     assert c1._pogodives is True
     assert c2._pogodives is False        # the 2-0 side reverts
+
+
+def test_sheet_gate_conditions():
+    """Per-start-scenario gate conditions (2026-08-26 sheet). Direct unit
+    probes of _cram_dive_gate_dpe: at (1,0) the gate is OFF (pre-sheet:
+    3.0 fired and 1v0 ran GL -15.8 rating); at (0,0) it needs CMP won
+    AND low opponent fast DPT; at (0,1) CMP alone; at (2,2) additionally
+    the opponent's cheapest charged move under 55 energy."""
+    import gopvpsim.battle as B
+
+    def probe(start, cram_atk, opp_atk, opp_fast_power=6, opp_cheapest=45):
+        cram = make_bp(atk=cram_atk, hp=130,
+                       fast=make_fast(power=6, energy_gain=8),
+                       charged=[make_charged(power=65, energy=40)])
+        opp = make_bp(atk=opp_atk, hp=140,
+                      fast=make_fast(power=opp_fast_power, energy_gain=8),
+                      charged=[make_charged(power=90, energy=opp_cheapest)])
+        cram._pogodives = True
+        cram._start_shields = start
+        opp.fast_move['_turns'] = 2
+        return B._cram_dive_gate_dpe(cram, opp)
+
+    PG, PV = B._POGODIVES_DIVE_GATE_DPE, B._CRAM_DIVE_GATE_DPE
+    assert probe((1, 0), 120, 100) == PV          # gate off at 1v0
+    assert probe((1, 1), 100, 120) == PG          # 'always' ignores cmp
+    assert probe((0, 0), 120, 100) == PG          # cmp won, low dpt
+    assert probe((0, 0), 100, 120) == PV          # cmp lost
+    assert probe((0, 0), 120, 100, opp_fast_power=40) == PV   # high dpt
+    assert probe((0, 1), 120, 100, opp_fast_power=40) == PG   # 0v1: cmp only
+    assert probe((2, 2), 120, 100, opp_cheapest=45) == PG
+    assert probe((2, 2), 120, 100, opp_cheapest=55) == PV     # nuke moves
+
+
+def test_sheet_tank_rules():
+    """Per-start-scenario tank rules (2026-08-26 sheet). Direct unit
+    probes of _cram_tank_mult: (1,0) uses the lead rule at aggressive
+    2.0 (pre-sheet: 1.4); (2,2) uses the 'cheap' rule -- aggressive 1.8
+    only for hits <= 15% of max HP, conservative above."""
+    import gopvpsim.battle as B
+
+    def mults(start, damage):
+        cram = make_bp(atk=110, hp=130,
+                       fast=make_fast(power=6, energy_gain=8),
+                       charged=[make_charged(power=65, energy=40)])
+        opp = make_bp(atk=110, hp=140,
+                      fast=make_fast(power=6, energy_gain=8),
+                      charged=[make_charged(power=90, energy=45)])
+        cram._pogodives = True
+        cram._start_shields = start
+        return B._cram_tank_mult(opp, cram, damage)
+
+    assert mults((1, 0), 30) == 2.0               # lead rule, aggr 2.0
+    assert mults((1, 1), 30) == B._POGODIVES_TANK_AGGRESSIVE   # default 1.4
+    cheap = int(0.15 * 130)                       # 19 <= 15% of 130
+    assert mults((2, 2), cheap) == 1.8            # cheap hit: tank at 1.8
+    assert mults((2, 2), cheap + 10) == B._POGODIVES_TANK_CONSERVATIVE

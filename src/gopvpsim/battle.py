@@ -211,6 +211,41 @@ _POGODIVES_TANK_AGGRESSIVE = 1.4   # tank hard while holding prey...
 _POGODIVES_TANK_CONSERVATIVE = 2.2  # ...unless clearly ahead, then PvPoke's 2.2
 _POGODIVES_TANK_LEAD = 0.40        # "clearly ahead" = HP-fraction lead > this
                                    # (Michael 2026-08-25; lead 33-45 is a plateau)
+_POGODIVES_GATE_DPT_MAX = 0.022    # 'cmp_dpt' gate: opp fast DPT / our maxHP cap
+_POGODIVES_TANK_CHEAP_FRAC = 0.15  # 'cheap' tank: hit <= this * maxHP (the
+                                   # Gulp Missile's ~15%-of-bar worth; tanking
+                                   # a bigger hit buys less than it costs)
+
+# Per-START-scenario strategy sheet (overnight strict-bar campaign,
+# 2026-08-25/26: every start scenario must be >= 0 on BOTH mean rating
+# delta and net win flips vs plain PvPoke, per league / opp-IV mode /
+# bait mode -- docs/validations/cramorant_strict_bar_2026_08_26.md).
+# Key: (my_start_shields, opp_start_shields). None = play plain PvPoke
+# from this start (full exemption; generalizes the 2-0 rule).
+#   gate: 'always' (3.0) | 'cmp' (3.0 iff we win CMP) | 'cmp_dpt' (cmp
+#         AND opp fast DPT below _POGODIVES_GATE_DPT_MAX) | 'cmp_dpt_e'
+#         (cmp_dpt AND opp's cheapest charged < 55 energy) | 'off' (1.5)
+#   tank_aggr: aggressive multiplier for this start (None = the
+#         _POGODIVES_TANK_AGGRESSIVE global, keeping the lab knob live)
+#   tank_rule: 'lead' (aggressive unless HP lead > _POGODIVES_TANK_LEAD)
+#         | 'cheap' (aggressive only for hits <= _POGODIVES_TANK_CHEAP_FRAC)
+# Mechanism notes: the gate's value needs the opponent able to shield
+# (it trades a blankable Fly for an unshieldable missile) and CMP won
+# (a forced early Dive that eats the opponent's simultaneous charged
+# move loses the tempo it buys); the tank's worth is bounded by the
+# missile's ~15%-of-bar value, so hits above that are never worth
+# eating when shield-ahead.
+_POGODIVES_SHEET = {
+    (0, 0): {'gate': 'cmp_dpt', 'tank_aggr': None, 'tank_rule': 'lead'},
+    (0, 1): {'gate': 'cmp', 'tank_aggr': None, 'tank_rule': 'lead'},
+    (0, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
+    (1, 0): {'gate': 'off', 'tank_aggr': 2.0, 'tank_rule': 'lead'},
+    (1, 1): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
+    (1, 2): {'gate': 'always', 'tank_aggr': None, 'tank_rule': 'lead'},
+    (2, 0): None,
+    (2, 1): None,   # no rule beat plain PvPoke in BOTH leagues yet
+    (2, 2): {'gate': 'cmp_dpt_e', 'tank_aggr': 1.8, 'tank_rule': 'cheap'},
+}
 
 # The pogodives case REGISTRY, cache-facing form: a battle can differ from
 # PvPoke-default under pogodives policies ONLY when a species matching one
@@ -223,28 +258,64 @@ _POGODIVES_TANK_LEAD = 0.40        # "clearly ahead" = HP-fraction lead > this
 POGODIVES_CASE_SPECIES_PREFIXES = ('Cramorant',)
 
 
-def _cram_dive_gate_dpe(attacker):
-    """Dive/Surf-ASAP DPE gate for the deciding attacker's policy tier."""
+def _cram_dive_gate_dpe(attacker, defender):
+    """Dive/Surf-ASAP DPE gate for the deciding attacker's policy tier.
+    Under pogodives: the per-start-scenario sheet's gate condition.
+    All inputs (both sides' stats, moves, max HP, start shields) are
+    dedup-signature functions per the pinned constraint below."""
     if getattr(attacker, '_pogodives', False):
+        entry = _POGODIVES_SHEET.get(getattr(attacker, '_start_shields', None))
+        if entry is None:
+            return _CRAM_DIVE_GATE_DPE
+        gate = entry['gate']
+        if gate == 'always':
+            return _POGODIVES_DIVE_GATE_DPE
+        if gate == 'off':
+            return _CRAM_DIVE_GATE_DPE
+        # cmp family: the forced early Dive only pays when we win CMP.
+        if attacker.atk < defender.atk:
+            return _CRAM_DIVE_GATE_DPE
+        if gate in ('cmp_dpt', 'cmp_dpt_e'):
+            turns = defender.fast_move.get('_turns', 1)
+            dpt = (defender.fast_move_damage(attacker) / turns
+                   / attacker.max_hp)
+            if dpt >= _POGODIVES_GATE_DPT_MAX:
+                return _CRAM_DIVE_GATE_DPE
+        if gate == 'cmp_dpt_e':
+            if min((c.get('energy', 100) for c in defender.charged_moves),
+                   default=100) >= 55:
+                return _CRAM_DIVE_GATE_DPE
         return _POGODIVES_DIVE_GATE_DPE
     return _CRAM_DIVE_GATE_DPE
 
 
-def _cram_tank_mult(attacker, defender):
+def _cram_tank_mult(attacker, defender, damage):
     """Prey-holder tank threshold for the DEFENDER's shield decision --
     used both at the actual decision (pvpoke_simulate_shield) and in the
     attacker's would_shield MODEL of it (perfect-information convention,
     like the rest of PvPoke's shared heuristics). Under pogodives: the
-    adaptive lead rule. PINNED CONSTRAINT (plan doc 2026-08-25): inputs
-    must be functions of the dedup-signature components -- hp/max_hp on
-    both sides qualify; adding anything else requires re-proving
+    per-start-scenario sheet's tank rule. ``damage`` is the incoming
+    charged hit being tanked/shielded. PINNED CONSTRAINT (plan doc
+    2026-08-25): inputs must be functions of the dedup-signature
+    components -- hp/max_hp/atk/moves on both sides and the start
+    scenario qualify; adding anything else requires re-proving
     signature-dedup soundness (tests/test_signature_cramorant.py)."""
     if getattr(defender, '_pogodives', False):
+        entry = _POGODIVES_SHEET.get(getattr(defender, '_start_shields', None))
+        if entry is None:
+            return _CRAM_TANK_MULT
+        aggr = entry['tank_aggr']
+        if aggr is None:
+            aggr = _POGODIVES_TANK_AGGRESSIVE
+        if entry['tank_rule'] == 'cheap':
+            return (aggr if damage <= _POGODIVES_TANK_CHEAP_FRAC
+                    * defender.max_hp
+                    else _POGODIVES_TANK_CONSERVATIVE)
         lead = (defender.hp / defender.max_hp
                 - attacker.hp / attacker.max_hp)
         return (_POGODIVES_TANK_CONSERVATIVE
                 if lead > _POGODIVES_TANK_LEAD
-                else _POGODIVES_TANK_AGGRESSIVE)
+                else aggr)
     return _CRAM_TANK_MULT
 
 
@@ -415,9 +486,11 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
     # Aegislash suppression above.
     # Gate 1: a prey-holding Cramorant tanks weak charged attacks so Gulp
     # Missile fires earlier.
-    if (_holding_prey(defender)
-            and attacker.charged_move_damage(move, defender)
-                * _cram_tank_mult(attacker, defender) < defender.hp):
+    _prey_dmg = (attacker.charged_move_damage(move, defender)
+                 if _holding_prey(defender) else None)
+    if (_prey_dmg is not None
+            and _prey_dmg * _cram_tank_mult(attacker, defender, _prey_dmg)
+                < defender.hp):
         if _shield_trace:
             _policy_log.append(
                 f"  shield({defender.species} sh={defender.shields} vs"
@@ -800,7 +873,7 @@ def would_shield(attacker: "BattlePokemon", defender: "BattlePokemon", move: dic
         if _shield_trace:
             cm_reasons.append(f"aegislashShield dmg({damage})*2<hp({defender.hp})")
     # Save shields in a prey-holding Cramorant so Gulp Missile fires earlier
-    _tank_mult = _cram_tank_mult(attacker, defender)
+    _tank_mult = _cram_tank_mult(attacker, defender, damage)
     if (_d_form_sid in ('cramorant_gulping', 'cramorant_gorging')
             and damage * _tank_mult < defender.hp):
         use_shield = False
@@ -1519,7 +1592,7 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 and attacker.energy >= cm_energy[_gulp_slot]
                 and defender.hp > cm_dmgs[_nongulp_slot] * _CRAM_DIVE_GATE_HP
                 and (cm_dpe[_nongulp_slot] / cm_dpe[_gulp_slot]
-                     < _cram_dive_gate_dpe(attacker))
+                     < _cram_dive_gate_dpe(attacker, defender))
                 and not (_CRAM_DELAY_GORGING
                          and attacker.hp / attacker.max_hp > 0.5)):
             if _policy_debug:
@@ -2264,6 +2337,10 @@ class BattlePokemon:
     # policies passed for THIS side (re-derived every simulate call, so
     # policy tiers cannot leak across battles or reused objects).
     _pogodives:            bool = field(init=False, repr=False)
+    # Start scenario (my shields, opp shields) recorded by simulate()
+    # at battle start; the _POGODIVES_SHEET row key. Re-derived every
+    # simulate call alongside _pogodives.
+    _start_shields:        "tuple | None" = field(init=False, repr=False)
 
     def __post_init__(self):
         self.hp                = self.max_hp
@@ -2295,6 +2372,7 @@ class BattlePokemon:
         self._form_disguise_active = False
         self._extra_charged = None
         self._pogodives = False
+        self._start_shields = None
 
     @property
     def _form_is_alt(self) -> bool:
@@ -2969,19 +3047,20 @@ def simulate(
     # race. Assigned (not or-ed) every call: reusing a BattlePokemon
     # under plain policies clears the flag.
     #
-    # 2-0 START EXEMPTION (round-7 verdict, 2026-08-25): a side that
-    # STARTS with 2 shields against 0 plays plain PvPoke -- the one
-    # start cell where the tuned rules are pure rating cost (negative in
-    # 8/8 verification panels, mean -38/cell; the only atom stable
-    # across both league crossings). Start-scenario, not live-state:
-    # the live-state version cannibalizes even-start fights through
-    # transient shield leads (-117..-160 wins). Evaluated here at
-    # battle start, before any shield is consumed.
+    # START-SCENARIO SHEET (strict-bar campaign 2026-08-25/26,
+    # generalizing the round-7 2-0 exemption): each side's start
+    # scenario (its shields, opponent's shields) selects its rule row
+    # from _POGODIVES_SHEET; a None row means plain PvPoke from that
+    # start. Start-scenario, not live-state: the live-state version
+    # cannibalizes even-start fights through transient shield leads
+    # (-117..-160 wins, round 7). Recorded here at battle start,
+    # before any shield is consumed.
     for _i, (_cp, _sp) in enumerate(policies):
+        _start = (pokemon[_i].shields, pokemon[1 - _i].shields)
+        pokemon[_i]._start_shields = _start
         pokemon[_i]._pogodives = (
             (_has_pogodives_marker(_cp) or _has_pogodives_marker(_sp))
-            and not (pokemon[_i].shields == 2
-                     and pokemon[1 - _i].shields == 0))
+            and _POGODIVES_SHEET.get(_start) is not None)
     timeline  = []
     turn      = 0
 
