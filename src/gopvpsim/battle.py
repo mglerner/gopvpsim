@@ -212,9 +212,14 @@ _POGODIVES_TANK_CONSERVATIVE = 2.2  # ...unless clearly ahead, then PvPoke's 2.2
 _POGODIVES_TANK_LEAD = 0.40        # "clearly ahead" = HP-fraction lead > this
                                    # (Michael 2026-08-25; lead 33-45 is a plateau)
 _POGODIVES_GATE_DPT_MAX = 0.022    # 'cmp_dpt' gate: opp fast DPT / our maxHP cap
-_POGODIVES_TANK_CHEAP_FRAC = 0.15  # 'cheap' tank: hit <= this * maxHP (the
-                                   # Gulp Missile's ~15%-of-bar worth; tanking
-                                   # a bigger hit buys less than it costs)
+_POGODIVES_TANK_CHEAP_FRAC = 0.15  # 'cheap' tank default: hit <= this * maxHP.
+                                   # NOTE: no shipped sheet row uses 'cheap'
+                                   # today (v3 made 2v2 gate-only); the rule
+                                   # and this default are kept for future
+                                   # rows, and at 0.15 the rule is provably
+                                   # vacuous vs PvPoke's 2.2 in GL (threshold
+                                   # skeptic 2026-08-26) -- a live row should
+                                   # override via the row's 'cheap_frac'.
 
 # Per-START-scenario strategy sheet (overnight strict-bar campaign,
 # 2026-08-25/26: every start scenario must be >= 0 on BOTH mean rating
@@ -249,8 +254,14 @@ _POGODIVES_SHEET = {
     # 2.2). Tighter DPT cap than the 0v0 row (plateau 0.0141-0.0168).
     (2, 1): {'gate': 'cmp_ready_dpt', 'tank_aggr': 2.2, 'tank_rule': 'lead',
              'dpt_max': 0.0155},
-    (2, 2): {'gate': 'cmp_dpt_e', 'tank_aggr': 1.8, 'tank_rule': 'cheap',
-             'cheap_frac': 0.30},
+    # 2v2 v3 (skeptic convergence 2026-08-26): GATE-ONLY, tank plain
+    # PvPoke. The v1 'cheap'/0.15 tank was proven vacuous (byte-identical
+    # to PvPoke in GL), so v1's passing 2v2 behavior was the gate alone;
+    # the v2 cheap_frac=0.30 tank that replaced it broke the strict bar
+    # on the gate-inert Dive+Surf build (UL -1.5..-1.9 at full 4096).
+    # Gate-only passes everywhere: gate-live builds keep the v1 gains,
+    # gate-inert builds are exactly zero.
+    (2, 2): {'gate': 'cmp_dpt_e', 'tank_aggr': 2.2, 'tank_rule': 'lead'},
 }
 
 # The pogodives case REGISTRY, cache-facing form: a battle can differ from
