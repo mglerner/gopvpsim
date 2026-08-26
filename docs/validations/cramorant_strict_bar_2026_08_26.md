@@ -107,6 +107,42 @@ was +11.4k flips (at -11 rating); the exemption gives those up until
 the 2v1 discriminator is found. 1v0's UL value also shrank (+88..+99
 flips vs the old +203 peak) to buy GL's rating fix.
 
+## Sheet v3 and the skeptic round (the decisive correction)
+
+Two adversarial audits ran against v1/v2 and changed the outcome:
+
+- **Methodology audit (CONFIRMED violation):** the v1/v2 bar quantifier
+  covered moveset 0 only -- 16 of the 72 cells the OLD rule failed
+  across all ten dive pages (5 movesets x 2 leagues). The v2 sheet
+  VIOLATED the bar on the gate-inert Dive+Surf build (UL 2v2
+  -1.5..-1.9 at full 4096, all four modes) -- the dives' own #1 pick,
+  and the exact build the playbook's holdout step names as mandatory.
+  It also proved the stride-8/stride-64 screens alias the sta IV axis
+  (iv index = atk*256 + def*16 + sta), a systematic league-signed
+  bias (UL margins inflated 5-67%) -- one old-rule cell sign-flips
+  between stride-8 and full tensor.
+- **Threshold audit:** v1's 'cheap'/0.15 tank was VACUOUS (byte-
+  identical to PvPoke in GL) -- v1's passing 2v2 was the gate alone;
+  the 55-energy bound is a one-opponent (Azumarill) patch carrying
+  ~91% of one slice's margin; 0.022 DPT and the 1v0 aggressive 2.0
+  are EDGE constants (a -10..-20% perturbation fails a slice); the
+  2v1 dpt_max 0.0155 is an edge by its own plateau. Recommendation
+  adopted for the rebalance checklist: re-verify at FULL resolution
+  and prefer a worst-slice margin >= +0.5, not bare >= 0.
+
+**v3** makes the 2v2 row gate-only (tank plain PvPoke): gate-live
+builds keep the gains, gate-inert builds are exactly zero.
+
+**Final certification (v3, commit 90d8811): 360/360 cells pass the
+strict bar at FULL 4096-IV resolution** -- all 5 movesets x 2 leagues
+x 9 start scenarios x 2 opp-IV modes x 2 bait modes. The 200
+changed-row cells were re-simmed live; the 160 unchanged-row cells
+are byte-equal to the old rule by construction and verified offline
+from the baked tensors. Value left on the table (documented, next
+campaign): UL Dive+Surf 2v2 under the OLD tank was +15-21k flips at
+passing rating -- a per-build tank discriminator would recover it;
+the sheet takes zero there instead.
+
 ## Overfit disclosures (flagged for the skeptic pass + rebalance)
 
 - `0.022` (DPT gate) and `55` (cheap-energy gate) are fitted
