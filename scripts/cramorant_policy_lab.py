@@ -356,6 +356,50 @@ ROUND7_VARIANTS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Round 8: COMPONENT DECOMPOSITION (Michael's overnight strict-bar directive
+# 2026-08-25: every start scenario must be >= 0 on BOTH mean rating delta and
+# net win flips). Knob-only variants -- each isolates or re-grades one
+# component of the shipped rule. Per-START-scenario composition happens
+# OFFLINE in the analysis (round-7 theorem: a per-start-scenario policy
+# sheet composes exactly; a reverted cell IS the baseline cell), so one
+# global run of each configuration prices EVERY per-scenario assignment.
+# 'Tank off' = both multipliers at PvPoke's 2.2; 'gate off' = PvPoke's 1.5.
+# The shieldier>2.2 variants test whether shield-AHEAD starts want MORE
+# shielding than PvPoke, not less (the 2v1 failure direction).
+# ---------------------------------------------------------------------------
+
+def _round8_variants():
+    G, A, C, L = ('_POGODIVES_DIVE_GATE_DPE', '_POGODIVES_TANK_AGGRESSIVE',
+                  '_POGODIVES_TANK_CONSERVATIVE', '_POGODIVES_TANK_LEAD')
+
+    def v(**over):
+        # Carry the engine defaults for ALL pogodives knobs in every
+        # variant: run_variant's restore maps knobs absent from
+        # PVPOKE_DEFAULTS to None, so each variant must fully re-set
+        # them or the next pg variant crashes on a None multiplier.
+        d = dict(PVPOKE_DEFAULTS)
+        d.update({G: 3.0, A: 1.4, C: 2.2, L: 0.40})
+        d.update(over)
+        return d
+    return {
+        'baseline': v(),
+        'pg_ref': v(),                       # shipped: 3.0 / 1.4|2.2 lead40
+        'pg8_gateonly': v(**{A: 2.2}),       # gate 3.0, tank off
+        'pg8_gateonly20': v(**{G: 2.0, A: 2.2}),
+        'pg8_tankonly': v(**{G: 1.5}),       # gate off, tank 1.4|2.2 lead40
+        'pg8_tankonly18': v(**{G: 1.5, A: 1.8}),
+        'pg8_tank18': v(**{A: 1.8}),
+        'pg8_gate20': v(**{G: 2.0}),
+        'pg8_gate25': v(**{G: 2.5}),
+        'pg8_lead25': v(**{L: 0.25}),
+        'pg8_lead15': v(**{L: 0.15}),
+        'pg8_shieldy': v(**{A: 3.5, C: 3.5}),          # shield MORE than pvpoke
+        'pg8_shieldy_gateoff': v(**{G: 1.5, A: 3.5, C: 3.5}),
+        'pg8_shieldy28': v(**{A: 2.8, C: 2.8}),
+    }
+
+
 def summarize(cells_by_variant):
     """Per-variant W/D/L + flips vs baseline."""
     def key(c):
@@ -395,6 +439,10 @@ def main():
                          'lab_<timestamp>.json)')
     ap.add_argument('--variants', default=None,
                     help='comma-separated variant-name filter over the grid')
+    ap.add_argument('--round8', action='store_true',
+                    help='round-8 component decomposition for the per-start-'
+                         'scenario strict-bar composition (baseline + shipped '
+                         'reference + gate/tank isolations and re-grades)')
     ap.add_argument('--round7', action='store_true',
                     help='round-7 shield-state conditioning: baseline + '
                          'pg_lead40 reference + ROUND7_VARIANTS')
@@ -433,6 +481,8 @@ def main():
         assert getattr(B, k) == v, f'knob {k} not at PvPoke default at start'
 
     variants = build_grid()
+    if args.round8:
+        variants = _round8_variants()
     if args.round7:
         variants = {'baseline': dict(PVPOKE_DEFAULTS),
                     'pg_lead40': dict(PVPOKE_DEFAULTS)}
