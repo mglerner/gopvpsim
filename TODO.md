@@ -194,6 +194,21 @@ until then no shipped dive sims against it.
 
 ## Worlds robustness deep dives -- IN PROGRESS (session started 2026-08-19)
 
+**QUEUED (Michael 2026-08-26, after cram/rerender, BEFORE Worlds Aug
+28-30):** HSH posted a Worlds-predictions video; one call is Greninja
+making day 2 as a core breaker (breaks Shadow K9 / G-Corsola /
+Lickilicky / Tinkaton / Thievul cores; main meta weakness Mantine; an
+energy lead lets it run away with games). Tasks: (1) add Greninja to
+the Worlds matrix; (2) add Annihilape (likely meta); (3) run our own
+core-breaker scan -- do WE have HSH-style predictions (species that
+break several popular cores at once)? The matrix + shortlist tooling
+(`worlds_shortlist.py`, joint_iv kit) is the machinery. Reminders:
+community-claim discipline (pin HSH's exact movesets/IVs and reproduce
+his claim before heavy compute) and the standing Worlds gamemaster
+re-pin (pvpoke f60a41199) before ANY Worlds render -- the cache is on
+the Cramorant vintage.
+
+
 The queued session ran 2026-08-19: shortlist SHIPPED
 (`scripts/worlds_shortlist.py`, 455 amber pairs by combined usage, full
 table `userdata/worlds_shortlist.md`); reuse-plan S1 COMPLETE (the
