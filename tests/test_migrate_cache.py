@@ -480,3 +480,13 @@ def test_pogodives_2_0_exemption_predicate():
     assert p({'species': 'X'}, {'species': 'Medicham'}) is False
     assert p({'species': 'Cramorant'}, {'species': 'Azumarill'}) is False
     assert p(None, None) is True   # fail-safe
+
+
+def test_pogodives_sheet_predicate():
+    """2026-08-26 sheet threading: affected = pogodives-tier columns
+    only, same shape as the 2-0 exemption predicate."""
+    p = migrate_cache.PREDICATES['pogodives_sheet_20260826']
+    assert p({'species': 'X'}, {'species': 'Medicham', 'policy': 'pogodives'}) is True
+    assert p({'species': 'X'}, {'species': 'Medicham'}) is False
+    assert p({'species': 'Cramorant'}, {'species': 'Azumarill'}) is False
+    assert p(None, None) is True   # fail-safe

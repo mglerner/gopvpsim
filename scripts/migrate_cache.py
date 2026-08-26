@@ -227,6 +227,15 @@ PREDICATES = {
     # else blesses. Fail-safe: unreadable column fields -> affected.
     'pogodives_2_0_exemption_20260825': lambda f, c: (
         c is None or c.get('policy') == 'pogodives'),
+    # 2026-08-26 overnight strict-bar campaign: the per-start-scenario
+    # strategy sheet (_POGODIVES_SHEET + sheet-conditioned gate/tank
+    # helpers + _start_shields threading). Every change is inside
+    # `_pogodives`-gated branches or the marking loop; unmarked battles
+    # are byte-identical (full suite incl. the non-Cram fallback
+    # invariant + 319-test battle tier green post-thread). Affected =
+    # pogodives-tier columns only; fail-safe on unreadable fields.
+    'pogodives_sheet_20260826': lambda f, c: (
+        c is None or c.get('policy') == 'pogodives'),
 }
 
 
