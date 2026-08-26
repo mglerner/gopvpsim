@@ -241,6 +241,10 @@ PREDICATES = {
     # is _pogodives-gated; affected = pogodives-tier columns only.
     'pogodives_sheet_v3_20260826': lambda f, c: (
         c is None or c.get('policy') == 'pogodives'),
+    # 2026-08-26 sheet v4 (margin survey + 2v2 loaded-tank discovery):
+    # same shape again -- every change _pogodives-gated.
+    'pogodives_sheet_v4_20260826': lambda f, c: (
+        c is None or c.get('policy') == 'pogodives'),
 }
 
 

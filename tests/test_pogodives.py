@@ -332,12 +332,26 @@ def test_sheet_gate_conditions():
     PG, PV = B._POGODIVES_DIVE_GATE_DPE, B._CRAM_DIVE_GATE_DPE
     assert probe((1, 0), 120, 100) == PV          # gate off at 1v0
     assert probe((1, 1), 100, 120) == PG          # 'always' ignores cmp
-    assert probe((0, 0), 120, 100) == PG          # cmp won, low dpt
+    assert probe((0, 0), 120, 100) == PG          # cmp won
     assert probe((0, 0), 100, 120) == PV          # cmp lost
-    assert probe((0, 0), 120, 100, opp_fast_power=40) == PV   # high dpt
+    # v4: 0v0's DPT term was deleted -- high opp DPT no longer reverts.
+    assert probe((0, 0), 120, 100, opp_fast_power=40) == PG
     assert probe((0, 1), 120, 100, opp_fast_power=40) == PG   # 0v1: cmp only
-    assert probe((2, 2), 120, 100, opp_cheapest=45) == PG
-    assert probe((2, 2), 120, 100, opp_cheapest=55) == PV     # nuke moves
+    assert probe((2, 2), 100, 120, opp_cheapest=55) == PG     # v4: 'always'
+    # The retired cmp_dpt / cmp_dpt_e modes stay available: synthetic rows.
+    saved = B._POGODIVES_SHEET
+    try:
+        B._POGODIVES_SHEET = dict(saved)
+        B._POGODIVES_SHEET[(0, 0)] = {'gate': 'cmp_dpt', 'tank_aggr': None,
+                                      'tank_rule': 'lead'}
+        B._POGODIVES_SHEET[(2, 2)] = {'gate': 'cmp_dpt_e', 'tank_aggr': None,
+                                      'tank_rule': 'lead'}
+        assert probe((0, 0), 120, 100, opp_fast_power=40) == PV   # high dpt
+        assert probe((0, 0), 120, 100) == PG
+        assert probe((2, 2), 120, 100, opp_cheapest=55) == PV     # nuke moves
+        assert probe((2, 2), 120, 100, opp_cheapest=45) == PG
+    finally:
+        B._POGODIVES_SHEET = saved
 
 
 def test_sheet_tank_rules():
@@ -360,10 +374,12 @@ def test_sheet_tank_rules():
         cram._start_shields = start
         return B._cram_tank_mult(opp, cram, damage)
 
-    assert mults((1, 0), 30) == 2.0               # lead rule, aggr 2.0
+    assert mults((1, 0), 30) == 1.9               # lead rule, aggr 1.9 (v4)
     assert mults((1, 1), 30) == B._POGODIVES_TANK_AGGRESSIVE   # default 1.4
-    assert mults((2, 2), 20) == 2.2               # v3: tank plain PvPoke
-    assert mults((2, 2), 60) == 2.2
+    # v4 2v2 'lead_ready': without the energy argument the rule is
+    # conservative (fail-safe); the loaded/unloaded split is probed in
+    # test_sheet_2v2_loaded_tank.
+    assert mults((2, 2), 20) == 2.2
     # The 'cheap' tank mechanism (kept for future rows): synthetic row.
     saved = B._POGODIVES_SHEET
     try:
@@ -387,7 +403,7 @@ def test_sheet_2v1_ready_nuke_gate():
     import gopvpsim.battle as B
 
     def probe(cram_atk=120, opp_atk=100, opp_energy=45, opp_cost=45,
-              opp_fast_power=4):
+              opp_fast_power=3):
         cram = make_bp(atk=cram_atk, hp=130,
                        fast=make_fast(power=6, energy_gain=8),
                        charged=[make_charged(power=65, energy=40)])
@@ -406,6 +422,8 @@ def test_sheet_2v1_ready_nuke_gate():
     assert probe(opp_cost=35, opp_energy=45) == PV    # cheap moves
     assert probe(opp_energy=30) == PV                 # not ready to throw
     assert probe(opp_fast_power=30) == PV             # dpt over the cap
+    # v4 recentered the cap to 0.0150 (mid-plateau; 0.0155 sat 2.6%
+    # from a cliff)
     # The tank side of the 2v1 row is plain PvPoke: aggr 2.2 == both
     # branches == the PvPoke multiplier.
     cram = make_bp(atk=110, hp=130, fast=make_fast(power=6, energy_gain=8),
@@ -415,3 +433,23 @@ def test_sheet_2v1_ready_nuke_gate():
     cram._pogodives = True
     cram._start_shields = (2, 1)
     assert B._cram_tank_mult(opp, cram, 30) == B._CRAM_TANK_MULT
+
+
+def test_sheet_2v2_loaded_tank():
+    """v4 2v2 'lead_ready' tank: decline the shield at 1.6 only while
+    the opponent's POST-THROW energy still covers another charged move;
+    if the throw empties their bar, take the shield (2.2)."""
+    import gopvpsim.battle as B
+
+    def mult(energy_after):
+        cram = make_bp(atk=110, hp=130, fast=make_fast(power=6, energy_gain=8),
+                       charged=[make_charged(power=65, energy=40)])
+        opp = make_bp(atk=110, hp=140, fast=make_fast(power=6, energy_gain=8),
+                      charged=[make_charged(power=90, energy=45)])
+        cram._pogodives = True
+        cram._start_shields = (2, 2)
+        return B._cram_tank_mult(opp, cram, 30, energy_after)
+
+    assert mult(45) == 1.6      # still loaded: tank
+    assert mult(44) == 2.2      # emptied below their cheapest: shield
+    assert mult(None) == 2.2    # no energy info: fail-safe conservative
