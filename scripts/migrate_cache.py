@@ -245,6 +245,10 @@ PREDICATES = {
     # same shape again -- every change _pogodives-gated.
     'pogodives_sheet_v4_20260826': lambda f, c: (
         c is None or c.get('policy') == 'pogodives'),
+    # 2026-08-26 sheet v5 (0v0 cmp_e_or_dive gate + 1v0 loaded-tank at
+    # 1.9, post-skeptic): same shape -- _pogodives-gated only.
+    'pogodives_sheet_v5_20260826': lambda f, c: (
+        c is None or c.get('policy') == 'pogodives'),
 }
 
 
