@@ -235,7 +235,6 @@ his claim before heavy compute) and the standing Worlds gamemaster
 re-pin (pvpoke f60a41199) before ANY Worlds render -- the cache is on
 the Cramorant vintage.
 
-
 The queued session ran 2026-08-19: shortlist SHIPPED
 (`scripts/worlds_shortlist.py`, 455 amber pairs by combined usage, full
 table `userdata/worlds_shortlist.md`); reuse-plan S1 COMPLETE (the
@@ -715,6 +714,13 @@ audit when Eternatus returns (Niantic announced it will).
 
 The 2026-04/06 pre-ship arc shipped (site published 2026-06-07; see
 CHANGELOG.md). The minor polish residue:
+
+- **Favicon.** pogodives.com has never had one (the 2026-08-27 publish
+  removed DreamHost's 0-byte placeholder `favicon.ico`/`favicon.gif`,
+  provisioned 08-24 -- we never made a real one). To add: drop
+  `favicon.ico` (or PNG + `<link rel="icon">` in the templates) into
+  `userdata/website/`; it then rides every publish. Candidate art: the
+  Cramorant HOME sprite / a dive-flag glyph.
 
 - **G16 — methodology-details guide pointers (remaining half).** The
   comparison-page block shipped `95fcf74` (wrong win-rate boundary
