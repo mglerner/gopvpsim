@@ -2,6 +2,63 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-27 -- Article-slug durable home (thresholds/cramorant.toml)
+
+The Cramorant dive->article link no longer depends on a
+replay-injection wrapper (83cc3c0): `[Cramorant.article] slug` lives
+in a structural-minimum thresholds/cramorant.toml; deep_dive.py
+resolves it on the --no-thresholds path AND as a render-time fallback
+when a replay blob carries an empty slug, so both a plain CLI rebake
+and a blob re-render emit the link (gated, as before, on the built
+article dir existing). The registry entries deliberately keep
+no_thresholds -- dropping it would auto-merge _shared.toml
+spreads/anchors and change the dive content. Verified with real
+scratch replay renders of the newest Cramorant GL blob and the
+Thievul precedent; 8 tests in tests/test_article_slug_wiring.py.
+
+## 2026-08-27 -- Unicode-dash ship gate now reads inlined app JS
+
+Closes the TODO "Ship-gate gap" (725734d) opened by the 2026-08-17 thievul
+pre-publish review. `verify_no_unicode_dashes.py` parsed page HTML and
+skipped `<script>` wholesale, so any page that RENDERS its prose from
+an inlined bundle -- the joint-IV robustness pages are ~100% that --
+got a clean bill regardless of content. The gate was passing on pages
+it could not see.
+
+`js_string_literals()` (scripts/verify_no_unicode_dashes.py) is the
+inverse of `tests/test_win_boundary.strip_js`: strip_js blanks literals
+to leave code, this keeps literals and drops code. It handles
+single/double-quoted strings with escapes, template literals (text
+parts, with `${...}` scanned recursively), `//` and `/* */` comments,
+and regex-vs-division disambiguation, and it tracks the innermost
+enclosing callee so a carve-out can key on it. Every literal is decoded
+through the render-equivalent dash spellings (`—`, `&mdash;`,
+`&#8212;`, `&#x2014;` and the en-dash forms) before the same em/en-dash
+policy is applied -- the HTML-text side gets that free from
+`convert_charrefs=True`, script bodies do not.
+
+Scope line: string/template literals IN, code + comments + regex
+sources OUT. Two named carve-outs, both with a negative AND a positive
+half in the tests so neither can silently widen:
+
+- Vendored third-party bundles (`VENDOR_SCRIPT_MARKERS`): the inlined
+  Plotly 2.35.2 bundle carries genuine dashes in its i18n table and a
+  GLSL shader comment (3 distinct literals across 232 shipped pages).
+  Matched on the bundle banner, not on "big minified script", so an
+  unrecognized bundle still FIRES.
+- `console.*` arguments: developer-console output, never rendered.
+  One such string in the tree today
+  (`scripts/deep_dive_engine.js:984`, on 210 shipped pages); the
+  identical sentence assigned to `innerHTML` still fires.
+
+Verified clean across the full 1,035-file `userdata/website/` ship
+surface; the script pass costs ~30s on top of the gate's ~117s
+(117s -> 148s). Nine new tests in `tests/test_ship_gate_detectors.py`
+including an extractor self-test; 8 of the 9 proven to FAIL against
+the pre-change gate (the ninth is a pure negative control, which must
+pass both ways). No interface change: `run_ship_gates.py` and
+`publish_website.sh` call it exactly as before.
+
 ## 2026-08-27 -- Sweep cache fully warm: sheet-v5 engine bless
 
 Migration record (the runs themselves were never logged; state
