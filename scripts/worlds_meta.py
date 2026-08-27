@@ -232,6 +232,30 @@ MANTINE_REASON = (
     '(x.com/DragapultSim/status/2083251310996939262).'
 )
 
+GRENINJA_REASON = (
+    "Editorial include (Michael, 2026-08-26): HSH's Worlds-predictions video "
+    "calls Greninja a day-2 core breaker (his list: 'shadow K9' [our "
+    "verification reads this as Shadow Ninetales -- both Alolan and Kanto "
+    "readings CONFIRMED], Corsola (Galarian), Lickilicky, Tinkaton, and "
+    "Thievul; main meta answer Mantine; an energy lead lets it snowball). "
+    "Our reproduction confirmed 5 of 6 breaks and the Mantine weakness; the "
+    "Tinkaton break is REFUTED at even shields without an energy lead. It "
+    "earns no badge on our axes -- PvPoke open-GL rank 187, 0.72% recent "
+    "open-GL usage (usage rank 91), 0.78% of top-cut teams. Moveset is "
+    "PvPoke's default (Water Shuriken / Hydro Cannon + Night Slash), which "
+    "is also the corpus modal (6 of 13 entries) but below the n>=20 modal "
+    "bar, so the default rule applies."
+)
+
+ANNIHILAPE_REASON = (
+    "Editorial include (Michael, 2026-08-26): likely meta at Worlds. Recent "
+    "open-GL usage 5.00% (usage rank 26 -- one place outside the PLAYED "
+    "cutoff), 6.25% of top-cut teams, PvPoke open-GL rank 151. Moveset is "
+    "the corpus MODAL (Low Kick / Close Combat + Rage Fist, 60 of 90 "
+    "entries = 66.7%), which disagrees with PvPoke's default (Ice Punch in "
+    "place of Close Combat) -- shown on the page as data."
+)
+
 META = [
     ('Lickilicky',         False, 'PLAYED',  None),
     ('Quagsire',           True,  'PLAYED',  None),
@@ -268,6 +292,8 @@ META = [
      THIEVUL_NS_FORK),
     ('Thievul',            False, 'FORCED',  THIEVUL_REASON + THIEVUL_FORK_REASON,
      THIEVUL_PR_FORK),
+    ('Greninja',           False, 'FORCED',  GRENINJA_REASON),
+    ('Annihilape',         False, 'FORCED',  ANNIHILAPE_REASON),
 ]
 
 # --- Community-Day move injection (the meta.toml half) ----------------------
@@ -320,7 +346,6 @@ INJECTION_NOTES = {
 REJECT_REASONS = {
     'Cradily':            'runner-up: biggest old->recent faller',
     'Talonflame':         'runner-up: stays out',
-    'Annihilape':         'runner-up: stays out, current rank 146',
     'Lapras':             'runner-up: stays out, 0% of top cuts',
     'Moltres (Galarian)': 'runner-up: stays out',
 }
