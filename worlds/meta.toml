@@ -11,7 +11,7 @@
 format_confirmed = true
 format = "open GL 1500 + Play! banned list"
 mechanics = "legacy (old system; Worlds-confirmed)"
-generated = "2026-08-24"
+generated = "2026-08-26"
 
 usage_source = "docs/tournament_data/cs_2026_*.json (Dracoviz)"
 usage_recent_cutoff = "2026-03"
@@ -866,6 +866,58 @@ injected_move_ids = ["ICY_WIND"]
 injected_moves = ["Icy Wind"]
 injection_note = "Icy Wind injected: the pinned sim gamemaster predates the Community Day. We sim on pvpoke f60a41199 (gamemaster 8f1d6cca5c0f), the pre-Worlds vintage every other number on this site was baked at, and it still lists Thievul without Icy Wind. Upstream pvpoke added Icy Wind to Thievul as an elite charged move on 2026-08-14 (commit f754cd6fc), so the injected move pool matches current pvpoke exactly -- but the move data itself comes from the pinned gamemaster, where Icy Wind already exists (other species learn it). Nothing else about Thievul is injected: Sucker Punch, Night Slash and Play Rough are all in Thievul's pinned legal pool."
 
+[[entries]]
+name = "Greninja"
+species = "Greninja"
+species_id = "greninja"
+shadow = false
+badge = "FORCED"
+badge_rule = ""
+forced_reason = "Editorial include (Michael, 2026-08-26): HSH's Worlds-predictions video calls Greninja a day-2 core breaker (his list: 'shadow K9' [our verification reads this as Shadow Ninetales -- both Alolan and Kanto readings CONFIRMED], Corsola (Galarian), Lickilicky, Tinkaton, and Thievul; main meta answer Mantine; an energy lead lets it snowball). Our reproduction confirmed 5 of 6 breaks and the Mantine weakness; the Tinkaton break is REFUTED at even shields without an energy lead. It earns no badge on our axes -- PvPoke open-GL rank 187, 0.72% recent open-GL usage (usage rank 91), 0.78% of top-cut teams. Moveset is PvPoke's default (Water Shuriken / Hydro Cannon + Night Slash), which is also the corpus modal (6 of 13 entries) but below the n>=20 modal bar, so the default rule applies."
+current_rank = 187
+usage_rank = 91
+usage_recent_pct = 0.72
+usage_recent_pooled_pct = 0.89
+usage_all_pct = 0.96
+usage_old_pct = 1.19
+usage_topcut_pct = 0.78
+fast_move = "Water Shuriken"
+charged_moves = ["Hydro Cannon", "Night Slash"]
+fast_move_id = "WATER_SHURIKEN"
+charged_move_ids = ["HYDRO_CANNON", "NIGHT_SLASH"]
+moveset_source = "default"
+moveset_modal_pct = 46.20
+moveset_n = 13
+default_disagrees = false
+default_fast_move_id = "WATER_SHURIKEN"
+default_charged_move_ids = ["HYDRO_CANNON", "NIGHT_SLASH"]
+
+[[entries]]
+name = "Annihilape"
+species = "Annihilape"
+species_id = "annihilape"
+shadow = false
+badge = "FORCED"
+badge_rule = ""
+forced_reason = "Editorial include (Michael, 2026-08-26): likely meta at Worlds. Recent open-GL usage 5.00% (usage rank 26 -- one place outside the PLAYED cutoff), 6.25% of top-cut teams, PvPoke open-GL rank 151. Moveset is the corpus MODAL (Low Kick / Close Combat + Rage Fist, 60 of 90 entries = 66.7%), which disagrees with PvPoke's default (Ice Punch in place of Close Combat) -- shown on the page as data."
+current_rank = 151
+usage_rank = 26
+usage_recent_pct = 5.00
+usage_recent_pooled_pct = 7.22
+usage_all_pct = 4.52
+usage_old_pct = 4.06
+usage_topcut_pct = 6.25
+fast_move = "Low Kick"
+charged_moves = ["Close Combat", "Rage Fist"]
+fast_move_id = "LOW_KICK"
+charged_move_ids = ["CLOSE_COMBAT", "RAGE_FIST"]
+moveset_source = "modal"
+moveset_modal_pct = 66.70
+moveset_n = 90
+default_disagrees = true
+default_fast_move_id = "LOW_KICK"
+default_charged_move_ids = ["ICE_PUNCH", "RAGE_FIST"]
+
 [[rejects]]
 name = "Cradily"
 species_id = "cradily"
@@ -889,18 +941,6 @@ usage_all_pct = 11.10
 usage_old_pct = 15.26
 usage_topcut_pct = 6.25
 reason = "below cut"
-
-[[rejects]]
-name = "Annihilape"
-species_id = "annihilape"
-banned = false
-usage_rank = 26
-current_rank = 151
-usage_recent_pct = 5.00
-usage_all_pct = 4.52
-usage_old_pct = 4.06
-usage_topcut_pct = 6.25
-reason = "runner-up: stays out, current rank 146"
 
 [[rejects]]
 name = "Talonflame"
