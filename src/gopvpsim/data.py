@@ -262,6 +262,16 @@ def sprite_data_uri(species_name, shadow=False):
         f"https://img.pokemondb.net/sprites/go/normal/{slug}.png",
     )
     if not data:
+        # pokemondb's GO set lags new-to-GO species (Cramorant 2026-08:
+        # 404 in go/normal, present in home/normal). Fall back to the
+        # HOME render -- different art style, far better than the
+        # letter-block degradation. Cached under a distinct name so a
+        # later GO-set addition can supersede it by cache expiry.
+        data = _fetch_bytes(
+            f"{slug}-home.png",
+            f"https://img.pokemondb.net/sprites/home/normal/{slug}.png",
+        )
+    if not data:
         return None
     import base64
     return "data:image/png;base64," + base64.b64encode(data).decode('ascii')
