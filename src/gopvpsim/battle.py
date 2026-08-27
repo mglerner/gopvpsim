@@ -3195,6 +3195,29 @@ def simulate(
         if log:
             timeline.append(f"T{turn:>3}: {msg}")
 
+    def log_cancel(attacker, move, reason: str):
+        # A charged move that was DECIDED this turn but never resolved.
+        #
+        # Display-only, but load-bearing for scripts/pvpoke_sandbox.py: a
+        # cancelled decision used to leave no trace at all, so
+        # timeline_to_actions emitted no action for that turn and PvPoke's
+        # sandbox substituted a phantom naturally-due fast move -- a
+        # replay link for a slightly different fight (resolved 2026-08-27;
+        # see TODO "KO-EDGE").  PvPoke cancels the same action for the same
+        # reasons (Battle.js:462-490), so scripting it replays faithfully.
+        #
+        # WORDING IS PARSED.  It deliberately contains neither " uses " nor
+        # the U+2192 arrow nor "dmg", because every existing timeline
+        # consumer keys on one of those (pvpoke_sandbox._CHARGED_RE,
+        # joint_iv_breakpoints' "uses <move>" / "<move> <arrow>" counts,
+        # test_battle._extract_battle_log, test_cramorant's missile
+        # assertions).  Keep it that way, and keep the reason tags in sync
+        # with pvpoke_sandbox._CANCEL_RE / _CANCEL_REPLAYABLE.
+        if log:
+            name = move.get('name', move['moveId'])
+            timeline.append(f"T{turn:>3}: {attacker.species} {name} "
+                            f"CANCELLED ({reason})")
+
     def _resolve_charged(charged_actions, allow_dead_attacker=False):
         # Resolve a list of (actor_index, move_dict) charged moves in CMP
         # order. Extracted verbatim from the former inline step 4 so that
@@ -3234,6 +3257,8 @@ def simulate(
             # (Gulp Missile) fires from the grave (Battle.js:478).
             if (use_priority and attacker.hp <= 0 and actor_idx in charged_ko
                     and 'ignoresFaint' not in move.get('tags', ())):
+                if log:
+                    log_cancel(attacker, move, 'cmp_ko')
                 continue
 
             # PvPoke Battle.js lines 471-490: cancel a charged move when the
@@ -3245,9 +3270,13 @@ def simulate(
                 opponent_also_charged = any(ai == 1 - actor_idx
                                             for ai, _ in charged_actions)
                 if not opponent_also_charged:
+                    if log:
+                        log_cancel(attacker, move, 'attacker_ko')
                     continue
 
             if attacker.energy < move['energy']:
+                if log:
+                    log_cancel(attacker, move, 'no_energy')
                 continue   # raced to this -- no longer affordable
 
             if defender.hp <= 0 and not _is_instant(move):
@@ -3256,6 +3285,8 @@ def simulate(
                 # dead-defender guard on charged moves at all; the corner
                 # needs an exact-cmp_atk-tie dead-throw trigger and is
                 # score-neutral, but the log line keeps oracle parity).
+                if log:
+                    log_cancel(attacker, move, 'defender_ko')
                 continue
 
             attacker.energy -= move['energy']

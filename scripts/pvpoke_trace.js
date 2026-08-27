@@ -307,12 +307,18 @@ function buildPokemon(battle, spec) {
   return poke;
 }
 
-// ---------- Score (mirrors Ranker.js:325-332) ----------
+// ---------- Score (mirrors Pokemon.js:2124 getBattleRating, via Battle.js:665) ----------
+//
+// The battle page's number, and the one BattleResult.pvpoke_score mirrors:
+// scale EACH ratio by 500 and then sum. Ranker.js:329 uses
+// floor((health + damage) * 500) instead -- sum-then-scale, which lands 1 low
+// on exact fractions (e.g. 46/125 + 1 -> 683 instead of 684) and is NOT what
+// the battle page reports.
 
 function pvpokeScore(poke, opp) {
   const health = poke.hp / poke.stats.hp;
   const damage = (opp.stats.hp - opp.hp) / opp.stats.hp;
-  return Math.floor((health + damage) * 500);
+  return Math.floor((500 * damage) + (500 * health));
 }
 
 // ---------- Main ----------

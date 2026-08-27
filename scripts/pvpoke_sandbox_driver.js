@@ -115,9 +115,13 @@ function applyStartState(poke, spec) {
   if (spec.cooldown !== undefined) poke.startCooldown = spec.cooldown;
 }
 
-// Ranker.js:325-332
+// Pokemon.js:2124 getBattleRating (via Battle.js:665) -- the number the battle
+// page shows and the one BattleResult.pvpoke_score mirrors. Scale EACH ratio by
+// 500 and then sum; do NOT use Ranker.js:329's floor((health + damage) * 500),
+// which sums first and lands 1 low on exact fractions (e.g. 46/125 + 1 -> 683
+// instead of 684).
 function score(poke, opp) {
-  return Math.floor(((poke.hp / poke.stats.hp) + ((opp.stats.hp - opp.hp) / opp.stats.hp)) * 500);
+  return Math.floor((500 * ((opp.stats.hp - opp.hp) / opp.stats.hp)) + (500 * (poke.hp / poke.stats.hp)));
 }
 
 function parseActionStr(actionStr) {

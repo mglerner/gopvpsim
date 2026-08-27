@@ -171,7 +171,12 @@ function main() {
   };
   battle.simulate();
   const pk = battle.getPokemon();
-  const score = (a, b) => Math.floor(((a.hp / a.stats.hp) + ((b.stats.hp - b.hp) / b.stats.hp)) * 500);
+  // Pokemon.js:2124 getBattleRating (via Battle.js:665) -- the number the
+  // battle page shows and the one BattleResult.pvpoke_score mirrors. Scale
+  // EACH ratio by 500 and then sum; do NOT use Ranker.js:329's
+  // floor((health + damage) * 500), which sums first and lands 1 low on
+  // exact fractions (e.g. 46/125 + 1 -> 683 instead of 684).
+  const score = (a, b) => Math.floor((500 * ((b.stats.hp - b.hp) / b.stats.hp)) + (500 * (a.hp / a.stats.hp)));
   const winner = (pk[0].hp > 0 && pk[1].hp <= 0) ? 0 : ((pk[1].hp > 0 && pk[0].hp <= 0) ? 1 : null);
   process.stdout.write(JSON.stringify({
     rule: get.rule, get, defaultIVs, resolved,

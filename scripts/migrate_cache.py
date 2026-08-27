@@ -249,6 +249,20 @@ PREDICATES = {
     # 1.9, post-skeptic): same shape -- _pogodives-gated only.
     'pogodives_sheet_v5_20260826': lambda f, c: (
         c is None or c.get('policy') == 'pogodives'),
+    # 2026-08-27 cancelled-charged timeline logging (pin --from-engine
+    # bff4191c3cfe). The ENTIRE
+    # delta since that hash is display-only: a new log_cancel() closure
+    # plus four `if log: log_cancel(...)` statements added INSIDE the four
+    # existing charged-move cancel branches in _resolve_charged, each
+    # immediately before a `continue` that is unchanged. No stat, energy,
+    # HP, shield, buff or control-flow value is read or written, and the
+    # timeline is not consulted by simulate(); with log=False (how every
+    # sweep column is simmed) nothing is even formatted. Fully-blessing,
+    # like neutral_batch_20260810 / cramorant_knobs_20260824. Evidence:
+    # the fast tier + the battle/cramorant/pogodives oracle tiers green,
+    # a flat 3x3 perf A/B (5,973 -> 5,947 sims/s, 0.4% = noise), and the
+    # UL Cramorant-vs-Lapras 1-1 reference cell unchanged at 662.
+    'cancelled_charged_log_20260827': lambda f, c: False,
 }
 
 
