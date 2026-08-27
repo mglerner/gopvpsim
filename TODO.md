@@ -194,8 +194,26 @@ until then no shipped dive sims against it.
 
 ## Worlds robustness deep dives -- IN PROGRESS (session started 2026-08-19)
 
-**QUEUED (Michael 2026-08-26, after cram/rerender, BEFORE Worlds Aug
-28-30):** HSH posted a Worlds-predictions video; one call is Greninja
+**DONE 2026-08-27 (~04:30): Greninja + Annihilape are in the matrix,
+verify_worlds fully GREEN** (555 pair pages, 0 deferred; commit
+31a7361). Executed from a vintage-pinned worktree at 6a7e534
+(gopvpsim-worlds; engine 5839391a7596 / gm 8f1d6cca5c0f) -- the
+Worlds surface is deliberately FROZEN at the pre-Cramorant engine
+until after Aug 30 (the port changes aegislash_shield modeling; 161
+measured cell flips vs Shadow Sableye; cold rebake = 57h). WHILE THE
+GAMEMASTER PIN IS UP (~/Documents/gopvpsim_cache, 24h TTL -- re-cp
+from userdata/gamemaster_vintages/ each session): no Cramorant sims,
+and 63 Cramorant-family test failures are expected pin artifacts.
+POST-WORLDS: restore the live gamemaster, remove the worktree,
+re-green the fast tier, and decide whether to fold Aegislash's
+engine-fix into a Worlds rebake. Findings for editorial use:
+scratchpad core_breaker_scan.md (top-5: Medicham, Azumarill,
+Guzzlord, Aegislash-S, Mantine -- Mantine is the HSH-shaped headline,
+out-breaking Greninja 2:1 IV-robustly; Greninja ranks 27/35 as a
+core breaker, its case is the energy-lead snowball; Annihilape 9th,
+#1 on the strict tier) + hsh_greninja_verification.md (5/6 breaks
+confirmed, Tinkaton refuted, energy leads convert losses).
+ORIGINAL BRIEF (Michael 2026-08-26): HSH posted a Worlds-predictions video; one call is Greninja
 making day 2 as a core breaker (breaks Shadow K9 / G-Corsola /
 Lickilicky / Tinkaton / Thievul cores; main meta weakness Mantine; an
 energy lead lets it run away with games). Tasks: (1) add Greninja to
