@@ -1,0 +1,21 @@
+# Cramorant -- article registration only.
+#
+# No hand-authored spreads/anchors yet: the Cramorant dives run with
+# --no-thresholds (scripts/run_website_dives.py) and this file exists
+# solely to carry the [Cramorant.article] table below, which is the
+# DURABLE home of the dive->article link (docs/article_schema.md,
+# "Bidirectional link contract").
+#
+# Dives: userdata/website/cramorant-great-league/,
+#        userdata/website/cramorant-ultra-league/
+# Article: userdata/website/articles/cramorant-pogodives-strategy/
+#
+# deep_dive.py resolves this slug on the thresholds auto-discover path,
+# on the --no-thresholds path, and as a replay/rebake fallback in
+# render_dive_html -- so a plain CLI rebake or blob re-render emits the
+# link with no hand-injected state['article_slug'].  The renderer only
+# emits the link when the built article dir exists, so a retired
+# article can't leave a dead link behind.
+
+[Cramorant.article]
+slug = "cramorant-pogodives-strategy"
