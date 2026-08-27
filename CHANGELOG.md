@@ -2,6 +2,29 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-27 -- Sweep cache fully warm: sheet-v5 engine bless
+
+Migration record (the runs themselves were never logged; state
+verified via `migrate_cache.py --list-stamps` + sidecar scans):
+
+- The Cramorant-port legs (TODO item queued 2026-08-24) had ALREADY
+  run by 2026-08-26: zero columns remained at gamemaster 8f1d6cca5c0f
+  or engine 5839391a7596, and the `cramorant_port_20260824`
+  predicate's deletion footprint is present (the 6 Aegislash_*_great_*
+  focal dirs hold only meta.json — next Aegislash dive is a cold
+  bake). Sidecar mtimes show bless-not-resim (npz 2026-08-06..08, json
+  rewritten 2026-08-26 02:15 by the sheet-v4 bless).
+- The final leg ran today: `migrate_cache.py --from-engine
+  03aff90d1e71 --predicate pogodives_sheet_v5_20260826 --apply` —
+  144,336 blessed / 0 re-sim / 9,040 already-current. Soundness: the
+  entire v4->v5 engine delta is one commit (`56a68b3`, battle.py
+  only, gated on `policy == 'pogodives'`), and every stale column was
+  pvpoke-default tier (no `policy` key).
+- End state: all 153,376 columns stamp engine bff4191c3cfe +
+  gamemaster 1398b001cf86 (both current). Slayer cache remains
+  effectively cold (96/99 entries at two-generations-stale stamps;
+  no migration path for its opaque keys — re-bakes on demand).
+
 ## 2026-08-14 -- Worlds 2026 PUBLISHED (pogodives.com)
 
 Full amber coverage shipped: 401/401 IV-decided pairs baked
