@@ -35,6 +35,15 @@ beats PvPoke's NS+IW default by ~14 wins; PvPoke overall GL rank
 CONFIRMED CAUGHT UP 2026-08-24 (live gamemaster lists Icy Wind for
 Thievul; the 4 injection guards in test_worlds_bake_guards.py now
 auto-skip on a caught-up gamemaster and re-arm under the Worlds pin).
+ENGINE EDGE TO INVESTIGATE (found by sandbox-link validation
+2026-08-27): fast-move-on-the-killing-blow divergence vs PvPoke -- when
+a lethal charged move and an opponent fast move land on the same turn,
+PvPoke resolves the naturally-due fast move first (priority +20) while
+we cancel it on the KO; UL Cramorant/Lapras 1-1 scores 668 (ours) vs
+662 (theirs), same winner. Small, but it is a genuine timing-model
+difference in the KO edge -- decide: match PvPoke, or document as an
+intentional divergence (the usual three-question test). Surfaced
+because a showcase link failed validation on exactly this cell.
 POST-WORLDS (after 08-30): retire cd_prep + the worlds_meta
 `injected_move_ids` declarations + those 4 guards together.
 
