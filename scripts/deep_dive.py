@@ -1161,6 +1161,158 @@ def log_run_start_fingerprint(league):
 _pack_u16 = score_pack.pack_u16
 
 
+def build_collection_data(species, league, shadow, tier_info, best_buddy):
+    """Build the ``DATA.collection`` support blob for the in-page IV scanner.
+
+    Returns the dict that gets attached as ``data_obj['collection']`` (and
+    emitted verbatim into the page's ``var DATA = ...``), or ``None`` when
+    the focal species isn't in the pokemon index.
+
+    Extracted from ``generate_interactive_html`` so the league-capped
+    ``maxLevel`` single-source can be unit-tested without a full render
+    (see tests/test_collection_data.py). Two properties are load-bearing:
+
+    * The returned dict's literal key order is part of the rendered bytes
+      (replay-vs-original diffing is byte-for-byte) -- don't reorder.
+    * ``LEAGUE_MAX_LEVEL`` must be read HERE, at call time: ``main()``
+      mutates it in place for ``--max-level``.
+    """
+    # Everything the browser-side JS port of user_collection.py needs to
+    # parse the user's Poke Genie CSV and match it against this dive's
+    # auto-derived tiers - without any server round-trip and without
+    # loading the full gamemaster on the client. The JS module lives at
+    # scripts/deep_dive_user_collection.js and is injected into the HTML
+    # alongside the engine JS. Keys mirror the Python API 1:1.
+    #
+    # The shadow flag controls three things:
+    #   * speciesKey: 'Tinkaton' vs 'Tinkaton (Shadow)' - this is the
+    #     threshold-dict key the JS builds on CSV load. A user's shadow
+    #     Tinkaton in the CSV resolves via get_species_name to
+    #     'Tinkaton (Shadow)', which must match the speciesKey we picked
+    #     for the dive.
+    #   * which gamemaster entry supplies base stats (non-shadow and
+    #     shadow share base stats in PvPoke's gamemaster, but we key on
+    #     the same name consistently so the matcher's dict lookups work).
+    #   * which shadow branch of the rank lookup we precompute.
+    from gopvpsim.evolution_lines import _load_pre_to_finals
+    from gopvpsim.pokemon import (
+        CPM as _CPM, SHADOW_ATK_BONUS as _SAB, SHADOW_DEF_MULT as _SDM,
+        get_pokemon_index as _get_pkidx,
+    )
+    from gopvpsim.user_collection import compute_rank_lookup as _rank_lookup
+    _collection_species_key = f'{species} (Shadow)' if shadow else species
+    _collection_data = None
+    _pkidx = _get_pkidx()
+    # Gender filter: when the focal species is gender-differentiated
+    # (Oinkologne / Meowstic / Indeedee), CSV mons that resolve to a
+    # final form via evolution walkup (e.g. Lechonk → Oinkologne or
+    # Oinkologne (Female)) need to be filtered by their CSV-recorded
+    # gender so the wrong-gender form doesn't false-positive on the
+    # focal dive. PvPoke's gamemaster ships Lechonk's evolutions list
+    # as ['oinkologne', 'oinkologne'] (both Male) so the female form
+    # only reaches the matcher via the sibling-form pass in
+    # evolution_lines._build_evolution_lines.
+    _require_gender = None
+    if _collection_species_key.endswith(' (Female)'):
+        _require_gender = 'female'
+    elif f'{_collection_species_key} (Female)' in _pkidx:
+        _require_gender = 'male'
+    if _collection_species_key in _pkidx:
+        _base = _pkidx[_collection_species_key]
+        # Pre-evo subset: only keys whose list of possible final forms
+        # includes THIS dive's species. For a Tinkaton dive, that gives
+        # {Tinkatink: [Tinkaton], Tinkatuff: [Tinkaton], Tinkaton: [Tinkaton]}.
+        # Branching pre-evos (Eevee → 8 eeveelutions) contribute only if
+        # the dive is one of the branches - e.g. an Umbreon dive gets
+        # {Eevee: [Umbreon], Umbreon: [Umbreon]} rather than the full 8.
+        _pre_to_finals_full = _load_pre_to_finals()
+        _pre_to_finals_subset = {}
+        for _pre, _finals in _pre_to_finals_full.items():
+            _relevant = [_f for _f in _finals if _f == _collection_species_key]
+            if _relevant:
+                _pre_to_finals_subset[_pre] = _relevant
+        # Rank lookup: {'normal' or 'shadow' → {ivKey → rank}}. The JS
+        # matcher reads from this to populate stats.rank, which in turn
+        # powers the hover display and any 'onlytop' target in the
+        # future. Scope is small (one species, 4096 IVs).
+        _ranked = _rank_lookup(
+            _collection_species_key, league=league,
+            max_level=LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL), shadow=shadow)
+        _rank_shadow_key = 'shadow' if shadow else 'normal'
+        _rank_table = {f'{a},{d},{s}': r for (a, d, s), r in _ranked.items()}
+        # Best-buddy: an off-grid mon's stat-product rank differs at the alt cap
+        # (level-capped IVs climb past the default), so bake a parallel alt-cap
+        # table the JS uses in the L51 view. On-grid mons already read the
+        # toggle-aware DATA.spRanks; this only matters for OFF-grid mons (IV
+        # triples this dive didn't simulate -- only possible on a --species-iv-
+        # floor dive), e.g. a raid-only mon dived with a floor, later scanned
+        # from a wild-release event with low IVs, before a re-dive.
+        _rank_table_alt = None
+        if best_buddy and best_buddy.get('active') and best_buddy.get('alt_cap'):
+            if best_buddy.get('noop'):
+                # No-op best-buddy: the alt-cap stat-product ranks are provably
+                # identical to the default-cap ones (no IV's level changes), so
+                # alias rather than re-rank at the alt cap (no extra compute).
+                _rank_table_alt = _rank_table
+            else:
+                _ranked_alt = _rank_lookup(
+                    _collection_species_key, league=league,
+                    max_level=best_buddy['alt_cap'], shadow=shadow)
+                _rank_table_alt = {f'{a},{d},{s}': r
+                                   for (a, d, s), r in _ranked_alt.items()}
+        # Build the threshold dict in the same shape Python's match_mons
+        # expects, from the tier info already computed above. This is
+        # the dict the JS constructs at CSV-load time; we could build
+        # it in JS instead but pre-baking here keeps the JS simpler and
+        # guarantees identical behavior to match_mons' dict-schema path.
+        _league_label = league.capitalize()
+        _collection_thresholds = {
+            _collection_species_key: {
+                _league_label: {
+                    t['name']: {
+                        'attack':  t['attack'],
+                        'defense': t['defense'],
+                        'stamina': t['stamina'],
+                    }
+                    for t in tier_info
+                }
+            }
+        }
+        _collection_data = {
+            'speciesKey':      _collection_species_key,
+            'isShadow':        shadow,
+            'leagueLabel':     _league_label,
+            'leagueCap':       LEAGUE_CAPS[league],
+            # Single-source the scanner's level ceiling from the canonical
+            # per-league table -- gopvpsim.pokemon.LEAGUES is the one place
+            # the numbers live (LEAGUE_MAX_LEVEL is its derived view), so
+            # don't restate them here. A bare 51.0 showed GL/UL owned mons
+            # one level too high in the IV scanner (best-buddy override only
+            # uses this as a fallback, so that path is unaffected).
+            'maxLevel':        LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL),
+            'shadowAtkBonus':  _SAB,
+            'shadowDefMult':   _SDM,
+            # CPM table: keys are stringified floats so json.dumps emits
+            # a regular JS object. The JS module's cpmAt() handles both
+            # '50' and '50.0' key variants.
+            'cpm':             {str(k): v for k, v in _CPM.items()},
+            'pokemonIndex': {
+                _collection_species_key: {
+                    'atk': _base['atk'], 'def': _base['def'], 'hp': _base['hp'],
+                }
+            },
+            'preToFinals':     _pre_to_finals_subset,
+            'rankLookup':      {_collection_species_key: {_rank_shadow_key: _rank_table}},
+            'thresholds':      _collection_thresholds,
+            'tierNames':       [t['name'] for t in tier_info],
+            'requireGender':   _require_gender,
+        }
+        if _rank_table_alt is not None:
+            _collection_data['rankLookupAlt'] = {
+                _collection_species_key: {_rank_shadow_key: _rank_table_alt}}
+    return _collection_data
+
+
 def generate_interactive_html(species, league, moveset_data, html_path,
                               thresholds=None, opponent_label=None,
                               shield_scenarios=None, opponent_names=None,
@@ -1746,140 +1898,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         _bait_meta = ''
 
     # ---- User-collection support data ----
-    #
-    # Everything the browser-side JS port of user_collection.py needs to
-    # parse the user's Poke Genie CSV and match it against this dive's
-    # auto-derived tiers - without any server round-trip and without
-    # loading the full gamemaster on the client. The JS module lives at
-    # scripts/deep_dive_user_collection.js and is injected into the HTML
-    # alongside the engine JS. Keys mirror the Python API 1:1.
-    #
-    # The shadow flag controls three things:
-    #   * speciesKey: 'Tinkaton' vs 'Tinkaton (Shadow)' - this is the
-    #     threshold-dict key the JS builds on CSV load. A user's shadow
-    #     Tinkaton in the CSV resolves via get_species_name to
-    #     'Tinkaton (Shadow)', which must match the speciesKey we picked
-    #     for the dive.
-    #   * which gamemaster entry supplies base stats (non-shadow and
-    #     shadow share base stats in PvPoke's gamemaster, but we key on
-    #     the same name consistently so the matcher's dict lookups work).
-    #   * which shadow branch of the rank lookup we precompute.
-    from gopvpsim.evolution_lines import _load_pre_to_finals
-    from gopvpsim.pokemon import (
-        CPM as _CPM, SHADOW_ATK_BONUS as _SAB, SHADOW_DEF_MULT as _SDM,
-        get_pokemon_index as _get_pkidx,
-    )
-    from gopvpsim.user_collection import compute_rank_lookup as _rank_lookup
-    _collection_species_key = f'{species} (Shadow)' if shadow else species
-    _collection_data = None
-    _pkidx = _get_pkidx()
-    # Gender filter: when the focal species is gender-differentiated
-    # (Oinkologne / Meowstic / Indeedee), CSV mons that resolve to a
-    # final form via evolution walkup (e.g. Lechonk → Oinkologne or
-    # Oinkologne (Female)) need to be filtered by their CSV-recorded
-    # gender so the wrong-gender form doesn't false-positive on the
-    # focal dive. PvPoke's gamemaster ships Lechonk's evolutions list
-    # as ['oinkologne', 'oinkologne'] (both Male) so the female form
-    # only reaches the matcher via the sibling-form pass in
-    # evolution_lines._build_evolution_lines.
-    _require_gender = None
-    if _collection_species_key.endswith(' (Female)'):
-        _require_gender = 'female'
-    elif f'{_collection_species_key} (Female)' in _pkidx:
-        _require_gender = 'male'
-    if _collection_species_key in _pkidx:
-        _base = _pkidx[_collection_species_key]
-        # Pre-evo subset: only keys whose list of possible final forms
-        # includes THIS dive's species. For a Tinkaton dive, that gives
-        # {Tinkatink: [Tinkaton], Tinkatuff: [Tinkaton], Tinkaton: [Tinkaton]}.
-        # Branching pre-evos (Eevee → 8 eeveelutions) contribute only if
-        # the dive is one of the branches - e.g. an Umbreon dive gets
-        # {Eevee: [Umbreon], Umbreon: [Umbreon]} rather than the full 8.
-        _pre_to_finals_full = _load_pre_to_finals()
-        _pre_to_finals_subset = {}
-        for _pre, _finals in _pre_to_finals_full.items():
-            _relevant = [_f for _f in _finals if _f == _collection_species_key]
-            if _relevant:
-                _pre_to_finals_subset[_pre] = _relevant
-        # Rank lookup: {'normal' or 'shadow' → {ivKey → rank}}. The JS
-        # matcher reads from this to populate stats.rank, which in turn
-        # powers the hover display and any 'onlytop' target in the
-        # future. Scope is small (one species, 4096 IVs).
-        _ranked = _rank_lookup(
-            _collection_species_key, league=league,
-            max_level=LEAGUE_MAX_LEVEL.get(league, 51.0), shadow=shadow)
-        _rank_shadow_key = 'shadow' if shadow else 'normal'
-        _rank_table = {f'{a},{d},{s}': r for (a, d, s), r in _ranked.items()}
-        # Best-buddy: an off-grid mon's stat-product rank differs at the alt cap
-        # (level-capped IVs climb past the default), so bake a parallel alt-cap
-        # table the JS uses in the L51 view. On-grid mons already read the
-        # toggle-aware DATA.spRanks; this only matters for OFF-grid mons (IV
-        # triples this dive didn't simulate -- only possible on a --species-iv-
-        # floor dive), e.g. a raid-only mon dived with a floor, later scanned
-        # from a wild-release event with low IVs, before a re-dive.
-        _rank_table_alt = None
-        if best_buddy and best_buddy.get('active') and best_buddy.get('alt_cap'):
-            if best_buddy.get('noop'):
-                # No-op best-buddy: the alt-cap stat-product ranks are provably
-                # identical to the default-cap ones (no IV's level changes), so
-                # alias rather than re-rank at the alt cap (no extra compute).
-                _rank_table_alt = _rank_table
-            else:
-                _ranked_alt = _rank_lookup(
-                    _collection_species_key, league=league,
-                    max_level=best_buddy['alt_cap'], shadow=shadow)
-                _rank_table_alt = {f'{a},{d},{s}': r
-                                   for (a, d, s), r in _ranked_alt.items()}
-        # Build the threshold dict in the same shape Python's match_mons
-        # expects, from the tier info already computed above. This is
-        # the dict the JS constructs at CSV-load time; we could build
-        # it in JS instead but pre-baking here keeps the JS simpler and
-        # guarantees identical behavior to match_mons' dict-schema path.
-        _league_label = league.capitalize()
-        _collection_thresholds = {
-            _collection_species_key: {
-                _league_label: {
-                    t['name']: {
-                        'attack':  t['attack'],
-                        'defense': t['defense'],
-                        'stamina': t['stamina'],
-                    }
-                    for t in tier_info
-                }
-            }
-        }
-        _collection_data = {
-            'speciesKey':      _collection_species_key,
-            'isShadow':        shadow,
-            'leagueLabel':     _league_label,
-            'leagueCap':       LEAGUE_CAPS[league],
-            # Single-source the scanner's level ceiling from the canonical
-            # per-league table -- gopvpsim.pokemon.LEAGUES is the one place
-            # the numbers live (LEAGUE_MAX_LEVEL is its derived view), so
-            # don't restate them here. A bare 51.0 showed GL/UL owned mons
-            # one level too high in the IV scanner (best-buddy override only
-            # uses this as a fallback, so that path is unaffected).
-            'maxLevel':        LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL),
-            'shadowAtkBonus':  _SAB,
-            'shadowDefMult':   _SDM,
-            # CPM table: keys are stringified floats so json.dumps emits
-            # a regular JS object. The JS module's cpmAt() handles both
-            # '50' and '50.0' key variants.
-            'cpm':             {str(k): v for k, v in _CPM.items()},
-            'pokemonIndex': {
-                _collection_species_key: {
-                    'atk': _base['atk'], 'def': _base['def'], 'hp': _base['hp'],
-                }
-            },
-            'preToFinals':     _pre_to_finals_subset,
-            'rankLookup':      {_collection_species_key: {_rank_shadow_key: _rank_table}},
-            'thresholds':      _collection_thresholds,
-            'tierNames':       [t['name'] for t in tier_info],
-            'requireGender':   _require_gender,
-        }
-        if _rank_table_alt is not None:
-            _collection_data['rankLookupAlt'] = {
-                _collection_species_key: {_rank_shadow_key: _rank_table_alt}}
+    # Built by the module-level build_collection_data() helper so the
+    # league-capped maxLevel single-source is unit-testable without a
+    # render (tests/test_collection_data.py).
+    _collection_data = build_collection_data(
+        species, league, shadow, tier_info, best_buddy)
     data_obj['collection'] = _collection_data
 
     # --- Build HTML ---
@@ -4441,7 +4464,7 @@ def main():
             # global — which --max-level mutates at parse time). Key on it so
             # two runs at different --max-level can't serve each other's stale
             # scores (bug #4, 2026-06-27).
-            _slayer_focal_cap = LEAGUE_MAX_LEVEL.get(args.league, 51.0)
+            _slayer_focal_cap = LEAGUE_MAX_LEVEL.get(args.league, MAX_CPM_LEVEL)
             cache_key = compute_cache_key(
                 args.species, args.league, args.shadow,
                 fast_moves_db.get(fast_id, {}),
