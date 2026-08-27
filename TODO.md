@@ -35,15 +35,38 @@ beats PvPoke's NS+IW default by ~14 wins; PvPoke overall GL rank
 CONFIRMED CAUGHT UP 2026-08-24 (live gamemaster lists Icy Wind for
 Thievul; the 4 injection guards in test_worlds_bake_guards.py now
 auto-skip on a caught-up gamemaster and re-arm under the Worlds pin).
-ENGINE EDGE TO INVESTIGATE (found by sandbox-link validation
-2026-08-27): fast-move-on-the-killing-blow divergence vs PvPoke -- when
-a lethal charged move and an opponent fast move land on the same turn,
-PvPoke resolves the naturally-due fast move first (priority +20) while
-we cancel it on the KO; UL Cramorant/Lapras 1-1 scores 668 (ours) vs
-662 (theirs), same winner. Small, but it is a genuine timing-model
-difference in the KO edge -- decide: match PvPoke, or document as an
-intentional divergence (the usual three-question test). Surfaced
-because a showcase link failed validation on exactly this cell.
+KO-EDGE "DIVERGENCE" RESOLVED 2026-08-27 (adversarial
+investigation): NOT an engine divergence. Our step-3-before-step-4
+ordering IS PvPoke's priority scheme (due fast +20 > charged 10-15 >
+floating fast -20; Battle.js:388-408/834-843), and given the same
+action set the engines agree cell-for-cell (1,089 verified cells,
+GL+UL top-16 x 9 shields). The 668-vs-662 gap is a sandbox-link
+ENCODER artifact: timeline_to_actions (scripts/pvpoke_sandbox.py)
+only emits charged moves that RESOLVE, so a decided-then-CANCELLED
+charged move (CMP loser KO'd, etc.) leaves no action and PvPoke's
+sandbox substitutes a phantom due fast on the KO turn. Scripting the
+cancelled move (or a `wait`) makes PvPoke reproduce our score exactly
+-- 7/7 mismatch cells. The 4 shipped showcase links are clean
+(cancel_gap 0, byte-exact). No engine change; three-question test
+moot. TWO TOOL-LAYER FIXES QUEUED:
+(a) encoder blind spot -- either log cancelled charged decisions in
+the timeline (display-only battle.py edit; the engine-hash bump
+migrates via a lambda-False fully-blessing predicate, precedent
+neutral_batch_20260810) or emit a final-turn `wait` in
+timeline_to_actions. This is a verify_url publish-gate soundness
+issue, not just cosmetics: 101 gap-cells matched by luck and would
+ship links replaying a slightly different fight. Pin Cramorant/
+Lapras UL 1-1 at 662 in tests/test_pvpoke_sandbox.py (no
+cancelled-charged coverage today).
+(b) rating-formula bug in all three Node harnesses
+(pvpoke_url_run.js:174, pvpoke_sandbox_driver.js:120,
+pvpoke_trace.js:315): they use the Ranker.js formula
+floor((health+damage)*500) where the battle page (and our
+pvpoke_score) uses floor(500*damage + 500*health) (Pokemon.js:2124);
+sum-then-scale lands 1 low on exact fractions and produced the only
+2 non-encoder mismatches in the sample (Forretress vs Corsola-G /
+Clodsire 2-0, spurious 1-point oracle "divergences"). Fix the
+formula + the misleading Ranker.js comments.
 POST-WORLDS (after 08-30): retire cd_prep + the worlds_meta
 `injected_move_ids` declarations + those 4 guards together.
 
@@ -217,7 +240,8 @@ Sheet v5 is now recorded in the validation doc, incl. the
 blob-vintage rule that caught a same-day v4 rollback. Remaining
 Cramorant work is only what the lists above already carry: rebalance
 re-verify, the UL Dive+Surf 2v2 open value, the article-slug durable
-home, and the KO-edge divergence note.
+home, and the KO-edge tool-layer fixes (encoder + Node rating
+formula; see the resolved note above -- not an engine divergence).
 
 ## Worlds robustness deep dives -- IN PROGRESS (session started 2026-08-19)
 
