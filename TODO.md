@@ -111,6 +111,10 @@ POST-WORLDS checklist (after 08-30):
   surfaces are retired from the publish path or rebaked. The pinned
   worktree (gopvpsim-worlds at 6a7e534) is currently the only tree
   that greens the gate.
+  NB the next publish should also carry a full dive-page re-render:
+  the shipped pages have dead tooltips on their best-buddy L51 half
+  (hydration bug fixed 061d93c; render-only, no sim cost -- neither
+  touched file is engine-hashed).
 - Remove the worktree (AFTER the decision above). It is dirty --
   needs `git worktree remove --force`; its worlds/, userdata/ and
   .venv entries are symlinks into the main repo, so never `rm -r` it
@@ -253,11 +257,6 @@ below later found one on a wider grid.)
   (argsort over the 2dp display arrays); it now diverges from the
   unified three post-`8c1f98e`. Fixing changes rendered cluster
   "SP #a-#b" labels.
-- **[render, unchecked] L51 tooltip registry:**
-  `reset_tooltip_registry()` runs once per file (`deep_dive.py:~1336`)
-  -- the same bug class as the L51 opp-anchor registry fixed in
-  `b43bd2d`. Nobody has checked whether the best-buddy template loses
-  tooltip entries.
 
 ## Top-N opponent filter + limited-cup dives (planned 2026-07-02)
 
@@ -561,46 +560,6 @@ here 2026-06-12; these are the remaining seams.)*
   tripwire.
 
 ## Tests to add
-
-* **Guard for the IV-scanner `maxLevel` single-source (fixed `725c184`).**
-  **A full implementable design now exists:**
-  `docs/reviews/2026-06-28_iv_scanner_maxlevel_strong_pin_design.md` (the
-  cheap Option-1 pin: extract `build_collection_data()` from deep_dive.py +
-  a 4-league unit test; supersedes this entry's "Heavy / needs a dive render
-  + CSV fixture" framing, and refreshes this entry's stale SHA/line numbers).
-  The `verify_js_parser.py` league-blindness half was fixed 2026-07-03
-  (`c20071e`); the deep_dive.py extraction was waiting on the top-N/cup
-  session (file conflict) -- that session LANDED (Phase 1 + Equinox Phase 2
-  shipped; unblocked 2026-08-05), so the extraction is now schedulable.
-  Original context: no test pins
-  `_collection_data['maxLevel']` to `LEAGUE_MAX_LEVEL.get(league)`, so a
-  future re-hardcode could silently re-introduce the GL/UL "owned mons one
-  level too high" bug. **The whole 51.0 cluster half of this entry was
-  FIXED 2026-08-05** (DRY review entries 9+10, `c956ed7`):
-  `user_collection.py`'s four defaults are None-means-derive via
-  `league_max_level`/`max_level_for_cap`, the
-  `deep_dive_user_collection.js` mirrors derive from the league, and the
-  `verify_js_parser.py` fixture is league-aware with Oinkologne +
-  requireGender coverage. gobattlekit PORTS the module (its own copy still
-  defaults 51 -- noted in the module docstring; pass caps explicitly when
-  comparing). STILL OPEN here: only the `build_collection_data()`
-  extraction + the 4-league unit test (the strong pin). The split
-  session LANDED 2026-08-06/08 without touching this block, so it is
-  unblocked and schedulable on its own. The design doc's Option 1 still
-  applies but **every line number in it has drifted** — current anchors:
-  dict built at `deep_dive.py:1937-1968` inside
-  `generate_interactive_html`, target line `:1948` (`'maxLevel':
-  LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL)`), attached `:1969`,
-  guarded at `:1875`, emitted `:2909`, consumed by
-  `deep_dive_engine.js:961`. Two of the doc's three side-fixes already
-  shipped (`verify_js_parser.py` league-aware `c20071e`;
-  `user_collection.py` None-means-derive `c956ed7`). Traps: preserve
-  the emitted dict's literal key order exactly (replay-vs-original
-  diffing is byte-for-byte), and the helper must read `LEAGUE_MAX_LEVEL`
-  at call time (main() MUTATES it for `--max-level`, `deep_dive.py:
-  ~3796`). Fold in while there: `:1896` and `:4433` still pass a
-  literal `LEAGUE_MAX_LEVEL.get(league, 51.0)` into
-  `compute_rank_lookup`, restating the single source inconsistently.
 
 * **pvpoke.com/battle browser round-trip for the iv-tech oracles**
   (the one human step left from the old "No-bait oracle tests" entry;

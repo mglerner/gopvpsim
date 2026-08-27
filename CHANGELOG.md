@@ -2,6 +2,24 @@
 
 Completed/shipped work, reverse chronological.
 
+## 2026-08-27 -- L51 dead-tooltip fix + build_collection_data() strong pin
+
+Closing the "[render, unchecked] L51 tooltip registry" follow-up
+found the suspected bug class absent (the registry is text-keyed and
+dumped after the L51 render -- now pinned by a completeness test) but
+a REAL adjacent bug present: the tooltip hydration pass cannot see
+into inert <template> content, and setBestBuddyLevel swapped
+templates in without re-running it, so EVERY tooltip on the
+best-buddy L51 half of every shipped dive page was dead (760 on the
+Cramorant dive). Fixed 061d93c (window.ddPopulateTooltips re-run
+after the swap; render-only, no engine-hash impact); shipped pages
+need a re-render at the next publish. Same day (7c7d5ab): the
+2026-06-28 Option-1 maxLevel strong pin landed --
+build_collection_data() extracted with 4-league / call-time /
+key-order pins, byte-identical replay-render verified, and the two
+remaining literal 51.0 ceilings in deep_dive.py routed through the
+single source.
+
 ## 2026-08-27 -- Article-slug durable home (thresholds/cramorant.toml)
 
 The Cramorant dive->article link no longer depends on a
