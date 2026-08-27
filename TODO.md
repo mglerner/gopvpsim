@@ -226,10 +226,19 @@ measured cell flips vs Shadow Sableye; cold rebake = 57h). WHILE THE
 GAMEMASTER PIN IS UP (~/Documents/gopvpsim_cache, 24h TTL -- re-cp
 from userdata/gamemaster_vintages/ each session): no Cramorant sims,
 and 63 Cramorant-family test failures are expected pin artifacts.
-POST-WORLDS: restore the live gamemaster, remove the worktree,
-re-green the fast tier, and decide whether to fold Aegislash's
-engine-fix into a Worlds rebake. Findings for editorial use:
-scratchpad core_breaker_scan.md (top-5: Medicham, Azumarill,
+POST-WORLDS: restore the live gamemaster [DONE 2026-08-27, hash
+1398b001cf86 verified], remove the worktree, re-green the fast tier
+[fast tier green 2026-08-27 under the live gamemaster], and decide
+whether to fold Aegislash's engine-fix into a Worlds rebake.
+LEGALITY INPUT for that decision (verified 2026-08-27, Play!
+handbook rule: new species/moves eligible the second Tuesday after
+release): Cramorant debuted Tue 08-18 (Water Festival) -> eligible
+09-01 -> NOT Worlds-legal, so it can never enter the Worlds meta and
+the rebake question is purely Aegislash sim fidelity; if the surface
+retires after 08-30 the rebake case is weak. Thievul's Icy Wind
+(08-16) -> eligible 08-25 -> legal, meta.toml's conclusion stands. Findings for editorial use (durable copy:
+~/coding/reports/gopvpsim-worlds-2026-refresh-2026-08-27.html; the
+scratchpad originals are session-lived): core_breaker_scan.md (top-5: Medicham, Azumarill,
 Guzzlord, Aegislash-S, Mantine -- Mantine is the HSH-shaped headline,
 out-breaking Greninja 2:1 IV-robustly; Greninja ranks 27/35 as a
 core breaker, its case is the energy-lead snowball; Annihilape 9th,
