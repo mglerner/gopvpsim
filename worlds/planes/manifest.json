@@ -62,6 +62,36 @@
     9
    ]
   },
+  "aegislash_shield|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "4e3f09273cb89da2841c495b66baa991",
+   "file": "aegislash_shield__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "aegislash_shield|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "4e3f09273cb89da2841c495b66baa991",
+   "file": "aegislash_shield__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "aegislash_shield|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "5ab12540912bec301f2c6976095f80e1",
@@ -419,6 +449,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "aegislash_shield|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "f86b22bfd88d0a97c3ce0e8eb32b2280",
+   "file": "aegislash_shield__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5355,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "aegislash_shield|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "f86b22bfd88d0a97c3ce0e8eb32b2280",
+   "file": "aegislash_shield__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5355,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -1022,6 +1082,36 @@
     9
    ]
   },
+  "altaria_shadow|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "e785e375ccfdf4ee64467e79c6ae66cf",
+   "file": "altaria_shadow__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5805,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "altaria_shadow|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "e785e375ccfdf4ee64467e79c6ae66cf",
+   "file": "altaria_shadow__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5805,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "altaria_shadow|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "892be347239e33483b0097c100f3db43",
@@ -1379,6 +1469,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "altaria_shadow|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "71781630f08e3be64467a5cebcde9b3d",
+   "file": "altaria_shadow__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2646,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "altaria_shadow|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "71781630f08e3be64467a5cebcde9b3d",
+   "file": "altaria_shadow__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2646,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -1982,6 +2102,36 @@
     9
    ]
   },
+  "altaria|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "8f75b3721bb17058e63b58426467b61a",
+   "file": "altaria__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5751,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "altaria|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "8f75b3721bb17058e63b58426467b61a",
+   "file": "altaria__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5751,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "altaria|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "248d1be374fe92c24738ddb042458cca",
@@ -2339,6 +2489,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "altaria|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "88ded7352927508f7a325820d8b64656",
+   "file": "altaria__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2394,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "altaria|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "88ded7352927508f7a325820d8b64656",
+   "file": "altaria__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2394,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -2882,6 +3062,1026 @@
     9
    ]
   },
+  "annihilape|aegislash_shield|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "6f661632885fd9d3f3c8002992eb37c2",
+   "file": "annihilape__vs__aegislash_shield__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 9360,
+   "won_shape": [
+    2,
+    520,
+    9
+   ]
+  },
+  "annihilape|aegislash_shield|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "6f661632885fd9d3f3c8002992eb37c2",
+   "file": "annihilape__vs__aegislash_shield__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 9360,
+   "won_shape": [
+    2,
+    520,
+    9
+   ]
+  },
+  "annihilape|altaria_shadow|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "c79be29794a9bc20f2e2e4daa5e9b100",
+   "file": "annihilape__vs__altaria_shadow__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7488,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "annihilape|altaria_shadow|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "c79be29794a9bc20f2e2e4daa5e9b100",
+   "file": "annihilape__vs__altaria_shadow__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7488,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "annihilape|altaria|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "baf91a62d624311b9f139a97e456a95c",
+   "file": "annihilape__vs__altaria__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7335,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "annihilape|altaria|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "baf91a62d624311b9f139a97e456a95c",
+   "file": "annihilape__vs__altaria__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7335,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "annihilape|azumarill|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "7c07a116d73223432d317cdd25b32d8f",
+   "file": "annihilape__vs__azumarill__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7767,
+   "won_shape": [
+    2,
+    521,
+    9
+   ]
+  },
+  "annihilape|azumarill|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "7c07a116d73223432d317cdd25b32d8f",
+   "file": "annihilape__vs__azumarill__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7767,
+   "won_shape": [
+    2,
+    521,
+    9
+   ]
+  },
+  "annihilape|clodsire|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "02320c5045b6ab652adecb1be824c429",
+   "file": "annihilape__vs__clodsire__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7362,
+   "won_shape": [
+    2,
+    520,
+    9
+   ]
+  },
+  "annihilape|clodsire|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "02320c5045b6ab652adecb1be824c429",
+   "file": "annihilape__vs__clodsire__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7362,
+   "won_shape": [
+    2,
+    520,
+    9
+   ]
+  },
+  "annihilape|corsola_galarian|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "f583e9a7cb3a3e0079021fc36bb70b08",
+   "file": "annihilape__vs__corsola_galarian__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 8100,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|corsola_galarian|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "f583e9a7cb3a3e0079021fc36bb70b08",
+   "file": "annihilape__vs__corsola_galarian__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 8100,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|corviknight|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "74298a8515deb2ffbafcfbebebf5d21f",
+   "file": "annihilape__vs__corviknight__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6750,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|corviknight|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "5cba5e972d772f49b615b5c708c56219",
+   "file": "annihilape__vs__corviknight__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6750,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|diggersby|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "516c334b2f5447463eecd3d7875011b9",
+   "file": "annihilape__vs__diggersby__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7587,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "annihilape|diggersby|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "0f7574a9e698106d79734b584babc495",
+   "file": "annihilape__vs__diggersby__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7587,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "annihilape|empoleon|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "0824b9fa7485155fdb752b9725fdd227",
+   "file": "annihilape__vs__empoleon__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6624,
+   "won_shape": [
+    2,
+    514,
+    9
+   ]
+  },
+  "annihilape|empoleon|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "84b5821aba6da35ee184292e57086778",
+   "file": "annihilape__vs__empoleon__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6624,
+   "won_shape": [
+    2,
+    514,
+    9
+   ]
+  },
+  "annihilape|fearow|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "ac6f9ebe13496b3bae776b5d888174b0",
+   "file": "annihilape__vs__fearow__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7344,
+   "won_shape": [
+    2,
+    516,
+    9
+   ]
+  },
+  "annihilape|fearow|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "f761d4ac0e238b03841f5ef532941894",
+   "file": "annihilape__vs__fearow__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7344,
+   "won_shape": [
+    2,
+    516,
+    9
+   ]
+  },
+  "annihilape|feraligatr|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "65f628b65efacf41a9d940f704a574e1",
+   "file": "annihilape__vs__feraligatr__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6237,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "annihilape|feraligatr|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "a0b63a22f3c88aed262af8bdbcea75a8",
+   "file": "annihilape__vs__feraligatr__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6237,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "annihilape|forretress_shadow|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "0ce1dc3d0ffa8c5c477fd13c202bc133",
+   "file": "annihilape__vs__forretress_shadow__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6327,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|forretress_shadow|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "d6ba751e299895733c810cdc057f9c7f",
+   "file": "annihilape__vs__forretress_shadow__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6327,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|forretress|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "26e5287a3d5dfb45deaf6514a54a385b",
+   "file": "annihilape__vs__forretress__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6183,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|forretress|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "bd68540d81ef341314fe35c3e687d5d5",
+   "file": "annihilape__vs__forretress__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6183,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|furret|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "f20f80f73e722961ab120436689886e3",
+   "file": "annihilape__vs__furret__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7551,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|furret|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "f7e5d4c80c6fd9a2cbf07c2c348fb52e",
+   "file": "annihilape__vs__furret__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7551,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|gourgeist_super|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "9d03a56963065dabc562d48f9394aacb",
+   "file": "annihilape__vs__gourgeist_super__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6507,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "annihilape|gourgeist_super|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "9d03a56963065dabc562d48f9394aacb",
+   "file": "annihilape__vs__gourgeist_super__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6507,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "annihilape|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "44844fae1f7e4dff57c35d6647447607",
+   "file": "annihilape__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6435,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "annihilape|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "3618e726016c83cc6327a5e5d311684a",
+   "file": "annihilape__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6435,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "annihilape|grumpig|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "7af34fafbc65297b3f6b7369f820f046",
+   "file": "annihilape__vs__grumpig__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6615,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|grumpig|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "7af34fafbc65297b3f6b7369f820f046",
+   "file": "annihilape__vs__grumpig__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6615,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|guzzlord|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "4903477e04aa42d70c9723bf29b7f731",
+   "file": "annihilape__vs__guzzlord__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5958,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "annihilape|guzzlord|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "e90ce6387553fd5f6a68b9cf5284e83e",
+   "file": "annihilape__vs__guzzlord__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5958,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "annihilape|jellicent|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "5462488976666e1c5727727ee8b8fb7a",
+   "file": "annihilape__vs__jellicent__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6921,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|jellicent|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "5462488976666e1c5727727ee8b8fb7a",
+   "file": "annihilape__vs__jellicent__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6921,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|jumpluff|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "3d4610e5c0cb1bb21cffb2d422b52fd9",
+   "file": "annihilape__vs__jumpluff__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7875,
+   "won_shape": [
+    2,
+    521,
+    9
+   ]
+  },
+  "annihilape|jumpluff|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "3d4610e5c0cb1bb21cffb2d422b52fd9",
+   "file": "annihilape__vs__jumpluff__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7875,
+   "won_shape": [
+    2,
+    521,
+    9
+   ]
+  },
+  "annihilape|kingdra|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "96cc3d9c1614baf74417999c29aac7da",
+   "file": "annihilape__vs__kingdra__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6273,
+   "won_shape": [
+    2,
+    516,
+    9
+   ]
+  },
+  "annihilape|kingdra|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "902a21730cdb9f2132aab7cb5c9d67fa",
+   "file": "annihilape__vs__kingdra__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6273,
+   "won_shape": [
+    2,
+    516,
+    9
+   ]
+  },
+  "annihilape|lickilicky|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "5a29071617019187583030e3d6dfd626",
+   "file": "annihilape__vs__lickilicky__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6408,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|lickilicky|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "c3496a953156f8132a3cc4efd4ec6efc",
+   "file": "annihilape__vs__lickilicky__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6408,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|mantine|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "b1759dad33fe30e82ac364299fc22bf6",
+   "file": "annihilape__vs__mantine__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6921,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|mantine|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "b1759dad33fe30e82ac364299fc22bf6",
+   "file": "annihilape__vs__mantine__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6921,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|medicham|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "33ad7c99f8ce20da377940610923c431",
+   "file": "annihilape__vs__medicham__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6813,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "annihilape|medicham|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "33ad7c99f8ce20da377940610923c431",
+   "file": "annihilape__vs__medicham__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6813,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "annihilape|ninetales|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "97cade7e8915e0cdce3b94506797491a",
+   "file": "annihilape__vs__ninetales__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6453,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|ninetales|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "b045dac8799ec7e6ffb152ebe2d06af5",
+   "file": "annihilape__vs__ninetales__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6453,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|quagsire_shadow|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "f78c59b22d603e5db7942f6a39bd0162",
+   "file": "annihilape__vs__quagsire_shadow__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7263,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "annihilape|quagsire_shadow|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "65f1242f80f9ca8b7163fd536951ca2c",
+   "file": "annihilape__vs__quagsire_shadow__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7263,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "annihilape|quagsire|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "33981012293e7f2fddbba74f5d7a418f",
+   "file": "annihilape__vs__quagsire__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6957,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "annihilape|quagsire|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "9f9cabcae1efe142bab84e407bdb302b",
+   "file": "annihilape__vs__quagsire__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6957,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "annihilape|sableye_shadow|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "1dcf6b5fe365f28e4355a0c5f1804760",
+   "file": "annihilape__vs__sableye_shadow__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7911,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|sableye_shadow|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "1dcf6b5fe365f28e4355a0c5f1804760",
+   "file": "annihilape__vs__sableye_shadow__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7911,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|stunfisk|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "2fdae795d9359ecac5a1b7afbdb4d31e",
+   "file": "annihilape__vs__stunfisk__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7083,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|stunfisk|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "59ca0fb9fbdc33ca05a58f4c6457072f",
+   "file": "annihilape__vs__stunfisk__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7083,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|thievul_iw_pr|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "2842b00ade3f319a8526b676125f735f",
+   "file": "annihilape__vs__thievul_iw_pr__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7182,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|thievul_iw_pr|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "523154932eef8abf5e8e4172447dd6ca",
+   "file": "annihilape__vs__thievul_iw_pr__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7182,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|thievul|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "c0b7c1838a76f14592225df27d8e1f2d",
+   "file": "annihilape__vs__thievul__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7191,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|thievul|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "75528b4950adb530a7ea4cfaca0933db",
+   "file": "annihilape__vs__thievul__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7191,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "annihilape|tinkaton|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "bd59f03669076bf7eb41dc9d5fb273f7",
+   "file": "annihilape__vs__tinkaton__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6723,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|tinkaton|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "e98f249745308eeb62350079a244537e",
+   "file": "annihilape__vs__tinkaton__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6723,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|togekiss|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "412ec89bbfd394633cd55984000e84ea",
+   "file": "annihilape__vs__togekiss__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6102,
+   "won_shape": [
+    2,
+    514,
+    9
+   ]
+  },
+  "annihilape|togekiss|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "412ec89bbfd394633cd55984000e84ea",
+   "file": "annihilape__vs__togekiss__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6102,
+   "won_shape": [
+    2,
+    514,
+    9
+   ]
+  },
+  "annihilape|wigglytuff|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "abdd6610699eb19d8c2ca5ad78ee7498",
+   "file": "annihilape__vs__wigglytuff__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7317,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "annihilape|wigglytuff|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "c3af68c11295de38858c14fad75e3906",
+   "file": "annihilape__vs__wigglytuff__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 7317,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
   "azumarill|aegislash_shield|bait": {
    "baked": "2026-08-10",
    "content_md5": "1b87388082e2dee19acf58336707daac",
@@ -2969,6 +4169,36 @@
    "won_shape": [
     2,
     519,
+    9
+   ]
+  },
+  "azumarill|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "a06df2e78dffb259266640e84a3c7a58",
+   "file": "azumarill__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5850,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "azumarill|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "6cb3008508dd105863ce420f7e12a99a",
+   "file": "azumarill__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5850,
+   "won_shape": [
+    2,
+    515,
     9
    ]
   },
@@ -3299,6 +4529,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "azumarill|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "dfb6c677fb9922d4cbf7d4b56a82317a",
+   "file": "azumarill__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3456,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "azumarill|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "d0aad7f0ea5ad5474a8e5e6eb895aa15",
+   "file": "azumarill__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3456,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -3932,6 +5192,36 @@
     9
    ]
   },
+  "clodsire|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "83c60bbc06275f9237538a26661b5d45",
+   "file": "clodsire__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5859,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "clodsire|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "83c60bbc06275f9237538a26661b5d45",
+   "file": "clodsire__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5859,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "clodsire|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "75864b0e646f402aac34991a068992d5",
@@ -4259,6 +5549,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "clodsire|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "dc2ba4752ebb64ac04cef67bfb07d681",
+   "file": "clodsire__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4383,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "clodsire|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "29ca00d35458cbfa2365dde8038c0531",
+   "file": "clodsire__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4383,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -4892,6 +6212,36 @@
     9
    ]
   },
+  "corsola_galarian|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "41ce33c49affa477d08a93b2ef64ea86",
+   "file": "corsola_galarian__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5787,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "corsola_galarian|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "41ce33c49affa477d08a93b2ef64ea86",
+   "file": "corsola_galarian__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5787,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "corsola_galarian|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "decb1edc283be4068d79af9018d01848",
@@ -5219,6 +6569,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "corsola_galarian|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "d35a70fad63d1c4f6cfd77422828e2f4",
+   "file": "corsola_galarian__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2853,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "corsola_galarian|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "738367bacd0cd02a37df2d431d637c65",
+   "file": "corsola_galarian__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2853,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -5852,6 +7232,36 @@
     9
    ]
   },
+  "corviknight|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "4ce7ff72e4ff9e53ccd05549979c7e92",
+   "file": "corviknight__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "corviknight|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "4ce7ff72e4ff9e53ccd05549979c7e92",
+   "file": "corviknight__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "corviknight|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "a2a167e327dfd37bc98685e3f376dc31",
@@ -6179,6 +7589,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "corviknight|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "02fb2921ef9d96efb7585da50978e364",
+   "file": "corviknight__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5724,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "corviknight|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "02fb2921ef9d96efb7585da50978e364",
+   "file": "corviknight__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5724,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -6812,6 +8252,36 @@
     9
    ]
   },
+  "diggersby|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "923c5f5b53d4b86cfb4e2ada4b57b394",
+   "file": "diggersby__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "diggersby|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "4fe8e35a70e2fd2362511387d57023cd",
+   "file": "diggersby__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "diggersby|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "115beee02001bcb5ecc84a1f8bcce0de",
@@ -7139,6 +8609,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "diggersby|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "fd4a961f2e5a60173a4b51bf71cd4928",
+   "file": "diggersby__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3807,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "diggersby|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "806e08b4b2a45647e1bc3f2313f1bf8d",
+   "file": "diggersby__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3807,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -7772,6 +9272,36 @@
     9
    ]
   },
+  "empoleon|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "5350f6cacd63db885ca0c1ebe425bf2f",
+   "file": "empoleon__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5805,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "empoleon|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "5350f6cacd63db885ca0c1ebe425bf2f",
+   "file": "empoleon__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5805,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "empoleon|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "a7d151770825013004127d6ce074938e",
@@ -8099,6 +9629,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "empoleon|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "9de6ec9b433b0eb9b3271027d5926175",
+   "file": "empoleon__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2394,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "empoleon|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "9de6ec9b433b0eb9b3271027d5926175",
+   "file": "empoleon__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2394,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -8732,6 +10292,36 @@
     9
    ]
   },
+  "fearow|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "f42aa923ceaf39e3a3aafbad372be2a9",
+   "file": "fearow__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5850,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "fearow|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "f42aa923ceaf39e3a3aafbad372be2a9",
+   "file": "fearow__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5850,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "fearow|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "75ab67f8555ff008a0ab4f0d5f7cb9f7",
@@ -9059,6 +10649,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "fearow|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "7f36118861a778ccb6fc5caec9af0709",
+   "file": "fearow__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4194,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "fearow|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "7f36118861a778ccb6fc5caec9af0709",
+   "file": "fearow__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4194,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -9692,6 +11312,36 @@
     9
    ]
   },
+  "feraligatr|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "2e4ab1eb7ee225e4cd676b47b8f28e2e",
+   "file": "feraligatr__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5850,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "feraligatr|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "2e4ab1eb7ee225e4cd676b47b8f28e2e",
+   "file": "feraligatr__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5850,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "feraligatr|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "23076d8aee899f1b6f775032ef364200",
@@ -10019,6 +11669,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "feraligatr|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "d097e3542d4c7549f0cc4e3fdaef0a74",
+   "file": "feraligatr__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2205,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "feraligatr|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "d097e3542d4c7549f0cc4e3fdaef0a74",
+   "file": "feraligatr__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2205,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -10652,6 +12332,36 @@
     9
    ]
   },
+  "forretress_shadow|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "89bb832b6337277c9f45adfb231f649d",
+   "file": "forretress_shadow__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5562,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "forretress_shadow|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "89bb832b6337277c9f45adfb231f649d",
+   "file": "forretress_shadow__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5562,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "forretress_shadow|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "7e1533e0721263fda4c23a61bf3b4a09",
@@ -10979,6 +12689,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "forretress_shadow|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "96e3e5198b63995309e5248592187b74",
+   "file": "forretress_shadow__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5229,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "forretress_shadow|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "0dbc3105bc21fa2a6a0724d4338c050a",
+   "file": "forretress_shadow__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5229,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -11612,6 +13352,36 @@
     9
    ]
   },
+  "forretress|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "f6add182ad102a34d59165c05aad56f0",
+   "file": "forretress__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5688,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "forretress|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "f6add182ad102a34d59165c05aad56f0",
+   "file": "forretress__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5688,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "forretress|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "d9feb43f4bcfacb20256e28578b4a926",
@@ -11939,6 +13709,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "forretress|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "a830aac2f9f4715ca32a2bc854d89948",
+   "file": "forretress__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5085,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "forretress|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "a830aac2f9f4715ca32a2bc854d89948",
+   "file": "forretress__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5085,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -12572,6 +14372,36 @@
     9
    ]
   },
+  "furret|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "eb4489380a5ce055bd5e2dd91deadf62",
+   "file": "furret__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "furret|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "f7c862bc8d49eb289d5ce70430accf97",
+   "file": "furret__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "furret|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "a47ddfd0108223671cec2de69315493c",
@@ -12899,6 +14729,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "furret|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "29fff9eede9e710032450abdb8b0d632",
+   "file": "furret__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5940,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "furret|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "8840f2041d5c4f9259b7a831741e5467",
+   "file": "furret__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5940,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -13532,6 +15392,36 @@
     9
    ]
   },
+  "gourgeist_super|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "00f4d1bed1252d4e6b0e642a4e2de141",
+   "file": "gourgeist_super__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "gourgeist_super|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "00f4d1bed1252d4e6b0e642a4e2de141",
+   "file": "gourgeist_super__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "gourgeist_super|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "c69f4decc32d860eb83b3f858db1f567",
@@ -13859,6 +15749,36 @@
    "won_shape": [
     2,
     518,
+    9
+   ]
+  },
+  "gourgeist_super|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "480aebf4258fda92243303b1bac51b96",
+   "file": "gourgeist_super__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4257,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "gourgeist_super|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "480aebf4258fda92243303b1bac51b96",
+   "file": "gourgeist_super__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4257,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -14402,6 +16322,1026 @@
     9
    ]
   },
+  "greninja|aegislash_shield|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "64166f32e7b49abcdc30a57c78b5a221",
+   "file": "greninja__vs__aegislash_shield__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 9360,
+   "won_shape": [
+    2,
+    520,
+    9
+   ]
+  },
+  "greninja|aegislash_shield|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "64166f32e7b49abcdc30a57c78b5a221",
+   "file": "greninja__vs__aegislash_shield__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 9360,
+   "won_shape": [
+    2,
+    520,
+    9
+   ]
+  },
+  "greninja|altaria_shadow|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "b2fdc37ac3f67257077cd45da0a061ba",
+   "file": "greninja__vs__altaria_shadow__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3411,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "greninja|altaria_shadow|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "b2fdc37ac3f67257077cd45da0a061ba",
+   "file": "greninja__vs__altaria_shadow__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3411,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "greninja|altaria|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "14d18ed873e75ccd5ef5dab11e27e23c",
+   "file": "greninja__vs__altaria__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2718,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "greninja|altaria|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "14d18ed873e75ccd5ef5dab11e27e23c",
+   "file": "greninja__vs__altaria__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2718,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "greninja|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "8bad04721ea146b4b47b931d61ce705f",
+   "file": "greninja__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "greninja|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "fcee49b76c8b9ef1ad06a94db9eb2e03",
+   "file": "greninja__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "greninja|azumarill|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "1c1946b9d6a197f22e1f9e736e6fb7d1",
+   "file": "greninja__vs__azumarill__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3870,
+   "won_shape": [
+    2,
+    521,
+    9
+   ]
+  },
+  "greninja|azumarill|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "1c1946b9d6a197f22e1f9e736e6fb7d1",
+   "file": "greninja__vs__azumarill__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3870,
+   "won_shape": [
+    2,
+    521,
+    9
+   ]
+  },
+  "greninja|clodsire|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "01c6ff6e6e286b669b275a7f7eb0baff",
+   "file": "greninja__vs__clodsire__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6120,
+   "won_shape": [
+    2,
+    520,
+    9
+   ]
+  },
+  "greninja|clodsire|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "c0aec19574c3d534c98e7e2d895186d0",
+   "file": "greninja__vs__clodsire__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6120,
+   "won_shape": [
+    2,
+    520,
+    9
+   ]
+  },
+  "greninja|corsola_galarian|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "da8ecca9e8ef5015e983bd7bd819dd04",
+   "file": "greninja__vs__corsola_galarian__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3717,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|corsola_galarian|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "da8ecca9e8ef5015e983bd7bd819dd04",
+   "file": "greninja__vs__corsola_galarian__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3717,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|corviknight|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "498a80173fb5202f8429790461b4b331",
+   "file": "greninja__vs__corviknight__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6219,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|corviknight|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "a814890ccee911c3a42ea001d69f2cc5",
+   "file": "greninja__vs__corviknight__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6219,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|diggersby|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "09c59e95ef29e01ab7130ccdbdb995f8",
+   "file": "greninja__vs__diggersby__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4977,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "greninja|diggersby|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "76d0b9e4c9696efc48903a1a21df7131",
+   "file": "greninja__vs__diggersby__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4977,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "greninja|empoleon|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "e4a25d306e2365eaef3467dbd187d071",
+   "file": "greninja__vs__empoleon__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2682,
+   "won_shape": [
+    2,
+    514,
+    9
+   ]
+  },
+  "greninja|empoleon|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "e4a25d306e2365eaef3467dbd187d071",
+   "file": "greninja__vs__empoleon__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2682,
+   "won_shape": [
+    2,
+    514,
+    9
+   ]
+  },
+  "greninja|fearow|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "9fd7134c47b2b3c35522a54cef8ba7b6",
+   "file": "greninja__vs__fearow__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5409,
+   "won_shape": [
+    2,
+    516,
+    9
+   ]
+  },
+  "greninja|fearow|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "207abb26d1dacc631bc428c460de99e4",
+   "file": "greninja__vs__fearow__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5409,
+   "won_shape": [
+    2,
+    516,
+    9
+   ]
+  },
+  "greninja|feraligatr|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "c2aca7aea0eb2401bff2c12e3e67481c",
+   "file": "greninja__vs__feraligatr__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2925,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "greninja|feraligatr|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "c2aca7aea0eb2401bff2c12e3e67481c",
+   "file": "greninja__vs__feraligatr__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2925,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "greninja|forretress_shadow|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "5102d895649e8579d2cea3a82da4361e",
+   "file": "greninja__vs__forretress_shadow__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6264,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|forretress_shadow|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "4730837f258bbd4d106787bdde458e5c",
+   "file": "greninja__vs__forretress_shadow__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6264,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|forretress|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "9d572925f9432cc4c0079e6d3eb47c4a",
+   "file": "greninja__vs__forretress__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5454,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|forretress|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "438623ebbce4dc947ce998bd44a0db0d",
+   "file": "greninja__vs__forretress__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5454,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|furret|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "ac9a4becada604be99eebb54349e2d9f",
+   "file": "greninja__vs__furret__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6498,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|furret|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "ed9d42b42f0151be2ccf25e9a216bf9f",
+   "file": "greninja__vs__furret__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6498,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|gourgeist_super|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "4ad55548ada2658bf7c32303d0fc37e1",
+   "file": "greninja__vs__gourgeist_super__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4392,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "greninja|gourgeist_super|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "4ad55548ada2658bf7c32303d0fc37e1",
+   "file": "greninja__vs__gourgeist_super__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4392,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "greninja|grumpig|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "51febf431dd8cf4f8a8354c9127ba4dc",
+   "file": "greninja__vs__grumpig__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3555,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|grumpig|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "51febf431dd8cf4f8a8354c9127ba4dc",
+   "file": "greninja__vs__grumpig__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3555,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|guzzlord|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "91f51aa4d896b3eb23fa33674316a5f4",
+   "file": "greninja__vs__guzzlord__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4329,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "greninja|guzzlord|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "91f51aa4d896b3eb23fa33674316a5f4",
+   "file": "greninja__vs__guzzlord__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4329,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "greninja|jellicent|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "cd668284be7114e8ccc84c48c708fb41",
+   "file": "greninja__vs__jellicent__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3969,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|jellicent|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "cd668284be7114e8ccc84c48c708fb41",
+   "file": "greninja__vs__jellicent__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3969,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|jumpluff|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "4985168854d45d9f5000e924f4e69328",
+   "file": "greninja__vs__jumpluff__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6201,
+   "won_shape": [
+    2,
+    521,
+    9
+   ]
+  },
+  "greninja|jumpluff|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "4985168854d45d9f5000e924f4e69328",
+   "file": "greninja__vs__jumpluff__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6201,
+   "won_shape": [
+    2,
+    521,
+    9
+   ]
+  },
+  "greninja|kingdra|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "17d360e4446cd9eb55e8d3b0d57a95a3",
+   "file": "greninja__vs__kingdra__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2547,
+   "won_shape": [
+    2,
+    516,
+    9
+   ]
+  },
+  "greninja|kingdra|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "17d360e4446cd9eb55e8d3b0d57a95a3",
+   "file": "greninja__vs__kingdra__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2547,
+   "won_shape": [
+    2,
+    516,
+    9
+   ]
+  },
+  "greninja|lickilicky|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "02beb893e2dc4fc9aabbeed7b8ace76f",
+   "file": "greninja__vs__lickilicky__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3456,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|lickilicky|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "5d6553c669049dfb3328b953ac4690d4",
+   "file": "greninja__vs__lickilicky__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3456,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|mantine|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "ee7a1c7c16ead9d132b213c4048fdab5",
+   "file": "greninja__vs__mantine__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2349,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|mantine|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "ee7a1c7c16ead9d132b213c4048fdab5",
+   "file": "greninja__vs__mantine__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2349,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|medicham|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "e3e56760005d3df6541b0bc5545f8b0e",
+   "file": "greninja__vs__medicham__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5364,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "greninja|medicham|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "e33856ee8ea9779c71b72756a1aae5d9",
+   "file": "greninja__vs__medicham__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5364,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "greninja|ninetales|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "dd9d6bc59b59677011b5933d71a4ee50",
+   "file": "greninja__vs__ninetales__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6687,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|ninetales|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "524df0e3f20cb493ccc89fdebf40d04e",
+   "file": "greninja__vs__ninetales__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6687,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|quagsire_shadow|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "26a7a4530109a5d127c4ef21ab54407e",
+   "file": "greninja__vs__quagsire_shadow__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5931,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "greninja|quagsire_shadow|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "ba5c1eeb72b9c2b6d4eb112f971a3c54",
+   "file": "greninja__vs__quagsire_shadow__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5931,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "greninja|quagsire|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "3cfb782217b16c47b45a05d63d9c2e22",
+   "file": "greninja__vs__quagsire__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4968,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "greninja|quagsire|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "23d40a8a2593e2d095aee1fd97e0795a",
+   "file": "greninja__vs__quagsire__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4968,
+   "won_shape": [
+    2,
+    519,
+    9
+   ]
+  },
+  "greninja|sableye_shadow|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "bffa42145258851e6ebf7966cd1f6e3d",
+   "file": "greninja__vs__sableye_shadow__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 8127,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|sableye_shadow|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "31c2744fec9d88677d8bdb866af2f7eb",
+   "file": "greninja__vs__sableye_shadow__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 8127,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|stunfisk|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "e22dbae5e9665215bdf5fc1634113203",
+   "file": "greninja__vs__stunfisk__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5625,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|stunfisk|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "1a97c03343c8a7277ec8b7c50caa1754",
+   "file": "greninja__vs__stunfisk__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5625,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|thievul_iw_pr|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "f189d21dc03b425673bb89b920f8e2be",
+   "file": "greninja__vs__thievul_iw_pr__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4761,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|thievul_iw_pr|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "c6816aa2f97251e710d824f09c9095f7",
+   "file": "greninja__vs__thievul_iw_pr__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4761,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|thievul|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "2924a7578ec840bd11a4a04f74d48655",
+   "file": "greninja__vs__thievul__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5247,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|thievul|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "89685c455530bf598dd80b00de2ee504",
+   "file": "greninja__vs__thievul__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5247,
+   "won_shape": [
+    2,
+    517,
+    9
+   ]
+  },
+  "greninja|tinkaton|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "015d482035ffe3ab9ea7f9bee625c497",
+   "file": "greninja__vs__tinkaton__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5985,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|tinkaton|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "015d482035ffe3ab9ea7f9bee625c497",
+   "file": "greninja__vs__tinkaton__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5985,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|togekiss|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "2c4bd33373cf0c53b3a17c7af73d93d3",
+   "file": "greninja__vs__togekiss__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3978,
+   "won_shape": [
+    2,
+    514,
+    9
+   ]
+  },
+  "greninja|togekiss|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "0d529084cb8b0873b1c73802a6560086",
+   "file": "greninja__vs__togekiss__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3978,
+   "won_shape": [
+    2,
+    514,
+    9
+   ]
+  },
+  "greninja|wigglytuff|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "e323966d8efdbdf1c26f12161011a6bd",
+   "file": "greninja__vs__wigglytuff__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5841,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
+  "greninja|wigglytuff|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "f3885ea914e81b0fe5034756763e4d96",
+   "file": "greninja__vs__wigglytuff__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5841,
+   "won_shape": [
+    2,
+    518,
+    9
+   ]
+  },
   "grumpig|aegislash_shield|bait": {
    "baked": "2026-08-10",
    "content_md5": "a25dc07fb8be385caeda420490e4c195",
@@ -14489,6 +17429,36 @@
    "won_shape": [
     2,
     519,
+    9
+   ]
+  },
+  "grumpig|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "229c3d0e32202a30cfa1786352b64d97",
+   "file": "grumpig__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5850,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "grumpig|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "229c3d0e32202a30cfa1786352b64d97",
+   "file": "grumpig__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5850,
+   "won_shape": [
+    2,
+    515,
     9
    ]
   },
@@ -14849,6 +17819,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "grumpig|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "32d5c5bfdc52ec83a0557967f9790e4a",
+   "file": "grumpig__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4023,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "grumpig|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "32d5c5bfdc52ec83a0557967f9790e4a",
+   "file": "grumpig__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4023,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -15452,6 +18452,36 @@
     9
    ]
   },
+  "guzzlord|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "20e4fc7b8f8a108479d11b4490ef1833",
+   "file": "guzzlord__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5778,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "guzzlord|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "20e4fc7b8f8a108479d11b4490ef1833",
+   "file": "guzzlord__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5778,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "guzzlord|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "e50824fbb936128508e8ca540dcd2981",
@@ -15809,6 +18839,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "guzzlord|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "60d3aedb7116c941a64840b9fa50357e",
+   "file": "guzzlord__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4131,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "guzzlord|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "0330879791af7745d90e9403068fe582",
+   "file": "guzzlord__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4131,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -16412,6 +19472,36 @@
     9
    ]
   },
+  "jellicent|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "606405d2cd72feda71cddd8799b5fea8",
+   "file": "jellicent__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "jellicent|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "fd0181b33f84216e6d933fff151d174d",
+   "file": "jellicent__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "jellicent|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "fdd55e63d65f797fef670845de3377f8",
@@ -16769,6 +19859,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "jellicent|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "f548addcf11277e50c3472b553160b60",
+   "file": "jellicent__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3456,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "jellicent|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "adad75ddd66f92a66c5b8e17f6e75d71",
+   "file": "jellicent__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3456,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -17372,6 +20492,36 @@
     9
    ]
   },
+  "jumpluff|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "bf250eac820f64933b5366199ee70de3",
+   "file": "jumpluff__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5823,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "jumpluff|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "9ecbe41a5f527b61573a5a0046b9fe08",
+   "file": "jumpluff__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5823,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "jumpluff|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "4fc1c34ca36b50ab7174751a86514114",
@@ -17729,6 +20879,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "jumpluff|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "16017ea593cd2226e602a3e98e041a93",
+   "file": "jumpluff__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4527,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "jumpluff|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "16017ea593cd2226e602a3e98e041a93",
+   "file": "jumpluff__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4527,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -18332,6 +21512,36 @@
     9
    ]
   },
+  "kingdra|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "7b0a28fe49e271f5e0f648ca34099efe",
+   "file": "kingdra__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5634,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "kingdra|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "d69bd66cb49884bd8615f4fbb5e22e59",
+   "file": "kingdra__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5634,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "kingdra|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "e142e350e361a58d649bd53271d3ed01",
@@ -18689,6 +21899,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "kingdra|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "a328a80b97c6b0bac149ae8cc9f09e0d",
+   "file": "kingdra__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2286,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "kingdra|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "a328a80b97c6b0bac149ae8cc9f09e0d",
+   "file": "kingdra__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 2286,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -19292,6 +22532,36 @@
     9
    ]
   },
+  "lickilicky|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "3389530298d307941611cad5cd0ad224",
+   "file": "lickilicky__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "lickilicky|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "68110d54507f8b6fd2a08c92a26a4aff",
+   "file": "lickilicky__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "lickilicky|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "c179b5597c1dc3583893903636ff7c59",
@@ -19649,6 +22919,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "lickilicky|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "1dcfa320afcd63d0fd283f63bb96cef1",
+   "file": "lickilicky__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3825,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "lickilicky|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "1dcfa320afcd63d0fd283f63bb96cef1",
+   "file": "lickilicky__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3825,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -20252,6 +23552,36 @@
     9
    ]
   },
+  "mantine|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "119d247eaf8ed833a40d7abef0e57781",
+   "file": "mantine__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5706,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "mantine|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "beebb1886cfb82c4eece3def974a72fe",
+   "file": "mantine__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5706,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "mantine|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "cef5d313dcd41da6b6e50701b370cee1",
@@ -20609,6 +23939,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "mantine|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "4ca020588e9e4020d5f217043aaa7f09",
+   "file": "mantine__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 1755,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "mantine|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "4ca020588e9e4020d5f217043aaa7f09",
+   "file": "mantine__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 1755,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -21212,6 +24572,36 @@
     9
    ]
   },
+  "medicham|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "61bdf552e44efa7e61b00fa4f01b5a7c",
+   "file": "medicham__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5697,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "medicham|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "61bdf552e44efa7e61b00fa4f01b5a7c",
+   "file": "medicham__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5697,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "medicham|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "55410b24725e124e16ed0d140c804147",
@@ -21569,6 +24959,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "medicham|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "ff39234fabd43ab75315c2fc78b506bd",
+   "file": "medicham__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4815,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "medicham|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "bb6b22175d8e1b999d0ddbf0b60c3534",
+   "file": "medicham__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4815,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -22172,6 +25592,36 @@
     9
    ]
   },
+  "ninetales|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "3a89972354a32265e563740b29fac3cf",
+   "file": "ninetales__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5796,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "ninetales|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "3a89972354a32265e563740b29fac3cf",
+   "file": "ninetales__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5796,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "ninetales|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "e8b5fc4de834e7c2e9d2b3c9754900c2",
@@ -22529,6 +25979,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "ninetales|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "5ca1654fc894f42ddfe6b443473e8520",
+   "file": "ninetales__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5931,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "ninetales|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "2f6fa96d1f9b26ac54efb28d1028b872",
+   "file": "ninetales__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5931,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -23132,6 +26612,36 @@
     9
    ]
   },
+  "quagsire_shadow|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "b066e74122b66881ea9c8b55a544b4fe",
+   "file": "quagsire_shadow__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "quagsire_shadow|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "b066e74122b66881ea9c8b55a544b4fe",
+   "file": "quagsire_shadow__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "quagsire_shadow|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "f7c48b0df300698e8f75ce7dedc5fccc",
@@ -23489,6 +26999,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "quagsire_shadow|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "e01fa13ff21273f25c6c669972eb1631",
+   "file": "quagsire_shadow__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4473,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "quagsire_shadow|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "87d0efabc6308110cf3b3e663ec274c4",
+   "file": "quagsire_shadow__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4473,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -24092,6 +27632,36 @@
     9
    ]
   },
+  "quagsire|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "2afd2e0d0a5c4ecabda492374814eabe",
+   "file": "quagsire__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5616,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "quagsire|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "2afd2e0d0a5c4ecabda492374814eabe",
+   "file": "quagsire__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5616,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "quagsire|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "4559e055e71e3c203e94b2bdb6c12a32",
@@ -24449,6 +28019,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "quagsire|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "c5f984b54a1a03749995fd0b9733a818",
+   "file": "quagsire__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3933,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "quagsire|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "00df5ffc43733aa385670ea33a86f2f2",
+   "file": "quagsire__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 3933,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -25052,6 +28652,36 @@
     9
    ]
   },
+  "sableye_shadow|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "b4673530f6212a11dc656b6db00c61fe",
+   "file": "sableye_shadow__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5823,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "sableye_shadow|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "7d2fdc32d04fbae95910d944802109b9",
+   "file": "sableye_shadow__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5823,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "sableye_shadow|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "266ccd381ed9ae5ec14f6f694e3f7279",
@@ -25409,6 +29039,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "sableye_shadow|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "91055471f8f803cbc5bb2819b0817f83",
+   "file": "sableye_shadow__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6372,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "sableye_shadow|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "91055471f8f803cbc5bb2819b0817f83",
+   "file": "sableye_shadow__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 6372,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -26012,6 +29672,36 @@
     9
    ]
   },
+  "stunfisk|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "fddcc010c83e00764a6495ba73566b31",
+   "file": "stunfisk__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5832,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "stunfisk|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "195338a1d18de0a5f6d5583b8ecb6e49",
+   "file": "stunfisk__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5832,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "stunfisk|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "f570ccb566c98f8cb7a38eaf8c06d7d3",
@@ -26369,6 +30059,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "stunfisk|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "c5e7d7d7e460e3eae80a7891ab962b68",
+   "file": "stunfisk__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4869,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "stunfisk|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "c5e7d7d7e460e3eae80a7891ab962b68",
+   "file": "stunfisk__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4869,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -26972,6 +30692,36 @@
     9
    ]
   },
+  "thievul_iw_pr|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "0c9135634b4d91603f60cc3c0d4f482a",
+   "file": "thievul_iw_pr__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "thievul_iw_pr|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "559f4d79ba8aab9e54f0a1884406dcaf",
+   "file": "thievul_iw_pr__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "thievul_iw_pr|azumarill|bait": {
    "baked": "2026-08-18",
    "content_md5": "867d90358b0908bbfbd6508842073cfa",
@@ -27329,6 +31079,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "thievul_iw_pr|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "8db5efbb8bb71feb54736e6e372c487c",
+   "file": "thievul_iw_pr__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4383,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "thievul_iw_pr|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "df414f57fc69777ead062756b1db95e5",
+   "file": "thievul_iw_pr__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4383,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -27932,6 +31712,36 @@
     9
    ]
   },
+  "thievul|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "dc650b0a6328165ecf9b60e335a9777c",
+   "file": "thievul__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "thievul|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "dc650b0a6328165ecf9b60e335a9777c",
+   "file": "thievul__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "thievul|azumarill|bait": {
    "baked": "2026-08-18",
    "content_md5": "98fe9109f71872c55147ad18a0abaa40",
@@ -28289,6 +32099,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "thievul|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "e39495d299020f7e64e3743057bf3626",
+   "file": "thievul__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4815,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "thievul|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "e39495d299020f7e64e3743057bf3626",
+   "file": "thievul__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4815,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -28892,6 +32732,36 @@
     9
    ]
   },
+  "tinkaton|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "d187b3b95966b11453a613b4f1616849",
+   "file": "tinkaton__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5796,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "tinkaton|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "bed27f5708d0629e25c79143f7837d9e",
+   "file": "tinkaton__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5796,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "tinkaton|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "a91d1cae784a96775b6ba7735f81c14f",
@@ -29249,6 +33119,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "tinkaton|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "10ce91e515f5f039f1274b3275be6cc0",
+   "file": "tinkaton__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5463,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "tinkaton|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "0d6aaa5a58dd278c39164d7231d3051a",
+   "file": "tinkaton__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5463,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -29852,6 +33752,36 @@
     9
    ]
   },
+  "togekiss|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "02e4ad3bee70adc06ed4f4235fab6b07",
+   "file": "togekiss__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5742,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "togekiss|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "02e4ad3bee70adc06ed4f4235fab6b07",
+   "file": "togekiss__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5742,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "togekiss|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "55817fc42ad2420e365cd39836bd754f",
@@ -30209,6 +34139,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "togekiss|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "30ae29a96c19f7b03a099b8848c008de",
+   "file": "togekiss__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4311,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "togekiss|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "30ae29a96c19f7b03a099b8848c008de",
+   "file": "togekiss__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4311,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -30812,6 +34772,36 @@
     9
    ]
   },
+  "wigglytuff|annihilape|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "d177ad2ff024d66c36fe7ec0da014309",
+   "file": "wigglytuff__vs__annihilape__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
+  "wigglytuff|annihilape|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "d177ad2ff024d66c36fe7ec0da014309",
+   "file": "wigglytuff__vs__annihilape__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 5868,
+   "won_shape": [
+    2,
+    515,
+    9
+   ]
+  },
   "wigglytuff|azumarill|bait": {
    "baked": "2026-08-10",
    "content_md5": "1e51ebab78802e5eae223634a04ddbfa",
@@ -31169,6 +35159,36 @@
    "won_shape": [
     2,
     515,
+    9
+   ]
+  },
+  "wigglytuff|greninja|bait": {
+   "baked": "2026-08-26",
+   "content_md5": "0763a7c2c37b3c4e23ec8a99d0788185",
+   "file": "wigglytuff__vs__greninja__bait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4104,
+   "won_shape": [
+    2,
+    513,
+    9
+   ]
+  },
+  "wigglytuff|greninja|nobait": {
+   "baked": "2026-08-26",
+   "content_md5": "0763a7c2c37b3c4e23ec8a99d0788185",
+   "file": "wigglytuff__vs__greninja__nobait.npz",
+   "focal_tags": [
+    "rank1",
+    "maxatk512"
+   ],
+   "n_sims": 4104,
+   "won_shape": [
+    2,
+    513,
     9
    ]
   },
@@ -31689,6 +35709,7 @@
   "aegislash_shield": "fd0bfa705ddf",
   "altaria": "fdd12f5de0e6",
   "altaria_shadow": "d8c466d21232",
+  "annihilape": "9b3cdb3b4348",
   "azumarill": "f090a60750af",
   "clodsire": "0f991abb3968",
   "corsola_galarian": "fd185f01a1cc",
@@ -31701,6 +35722,7 @@
   "forretress_shadow": "f65f976c16e9",
   "furret": "7d479b5e5dd7",
   "gourgeist_super": "296df5fb2ded",
+  "greninja": "527d0408e9e3",
   "grumpig": "66e898abdccd",
   "guzzlord": "136115165b56",
   "jellicent": "8a90ae092e64",
