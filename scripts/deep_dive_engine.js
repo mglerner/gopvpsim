@@ -277,6 +277,13 @@ function setBestBuddyLevel(mode) {
     var host = document.getElementById(hid);
     if (host && _bbHostHTML[hid][mode] != null) host.innerHTML = _bbHostHTML[hid][mode];
   }
+  // Re-hydrate title= from DATA.tooltips on whatever we just swapped in. The
+  // <template> halves carry data-t="" but never title=: the DOMContentLoaded
+  // tooltip pass uses document.querySelectorAll, which does not descend into
+  // <template> content, so without this every tooltip on the L51 prose/card
+  // is silently missing after a toggle (and from page load when
+  // defaultDisplay is 51).
+  if (window.ddPopulateTooltips) window.ddPopulateTooltips();
   // If a collection is loaded, re-run it so each owned mon's stats / level /
   // CP / power-up recompute at the toggled cap (loadCollection ends with its
   // own updateView, so the scatter refreshes too). Otherwise refresh directly.
