@@ -177,6 +177,47 @@ def build():
     vs_nb_ul = _scenario_stats(nb_ul, pg_ul, n_ul)
     scen_deltas, avg_deltas = _per_iv_deltas(pv_gl, pg_gl, n_gl)
     cram_atk, cmp_bounds = _cmp_boundaries(data_gl, 'great')
+
+    # IV-build analysis (GL): scenario-averaged absolute score per IV
+    # under the strat; rank-1 SP vs the best mirror-CMP build.
+    ivmeta_gl = compute_iv_metadata('Cramorant', 'great')
+    sp_gl = data_gl['spRanks']
+    mi = data_gl['opponents'].index('Cramorant')
+    overall = [0.0] * 4096
+    for iv in range(4096):
+        s = 0
+        for si in range(9):
+            b = iv * 9 * n_gl + si * n_gl
+            for oi in range(n_gl):
+                s += pg_gl[b + oi]
+        overall[iv] = s / (9 * n_gl)
+    import statistics as _st
+    iv_corr_sp = _st.correlation(overall, [-r for r in sp_gl])
+    iv_corr_atk = _st.correlation(overall, [x['atk'] for x in ivmeta_gl])
+    rank1 = sp_gl.index(1)
+    mirror_atk = next(b['atk'] for b in cmp_bounds
+                      if b['name'] == 'Cramorant')
+    mirror_build = max((i for i in range(4096)
+                        if ivmeta_gl[i]['atk'] >= mirror_atk),
+                       key=lambda i: overall[i])
+    def _wins(i):
+        return sum(1 for si in range(9)
+                   if pg_gl[i * 9 * n_gl + si * n_gl + mi] >= 500)
+    def _spread(i):
+        mv = ivmeta_gl[i]
+        return f"{mv['atk_iv']}/{mv['def_iv']}/{mv['sta_iv']}"
+    ivsec = {
+        'corr_sp': iv_corr_sp, 'corr_atk': iv_corr_atk,
+        'r1': _spread(rank1), 'r1_score': overall[rank1],
+        'r1_wins': _wins(rank1), 'r1_atk': ivmeta_gl[rank1]['atk'],
+        'mb': _spread(mirror_build), 'mb_rank': sp_gl[mirror_build],
+        'mb_score': overall[mirror_build], 'mb_wins': _wins(mirror_build),
+        'mb_atk': ivmeta_gl[mirror_build]['atk'],
+        'mirror_atk': mirror_atk,
+    }
+    assert sp_gl[rank1] == 1
+    r1_minus_mb = ivsec['r1_score'] - ivsec['mb_score']
+    pct_cost = r1_minus_mb / ivsec['r1_score'] * 100
     scen_deltas_ul, avg_deltas_ul = _per_iv_deltas(pv_ul, pg_ul, n_ul)
     cram_atk_ul, cmp_bounds_ul = _cmp_boundaries(data_ul, 'ultra')
 
@@ -361,6 +402,28 @@ this throw empties their bar, take the shield: nothing will punish them
 for a long time, so the HP buys you nothing.</td></tr>
 </table>
 
+
+<h2>Which IVs to build</h2>
+<p><b>The short answer: max stat product.</b> Under this plan, the
+scenario-averaged battle score across all 4096 Great League spreads
+correlates with stat product at <b>{ivsec['corr_sp']:.2f}</b> (and
+negatively with attack, {ivsec['corr_atk']:.2f}), and the rank-1
+stat-product spread <b>{ivsec['r1']}</b> is the outright best build
+(average score {ivsec['r1_score']:.1f}). The plan's biggest-value
+scenarios are tank-driven, and tanking loves bulk.</p>
+<p><b>The one tech option: the mirror build.</b> The CMP staircase
+(next section's plots) means specific attack thresholds buy discrete
+wins in the CMP-gated scenarios, and the most interesting threshold is
+the mirror's own attack stat ({ivsec['mirror_atk']:.2f}): rank-1 sits
+just below it. <b>{ivsec['mb']}</b> (stat-product rank
+{ivsec['mb_rank']}, attack {ivsec['mb_atk']:.2f}) clears it for about
+{r1_minus_mb:.1f} points of overall average ({pct_cost:.1f}%) and
+converts the Cramorant mirror from {ivsec['r1_wins']}/9 scenarios won
+to <b>{ivsec['mb_wins']}/9</b> - flipping the 0-0 and 2-1 starts
+outright - and picks up the Talonflame boundary on the way. Pushing
+attack higher buys nothing more in the mirror while steadily bleeding
+bulk, so this is the optimum, not a compromise. Build rank-1 by
+default; build the mirror tech if you expect Cramorant mirrors.</p>
 <h2>Why this works (the three mechanisms)</h2>
 <p><b>1. The missile is only free if your Dive isn't punished.</b>
 Dive-rushing trades your efficient Fly for tempo: a fish in the mouth
