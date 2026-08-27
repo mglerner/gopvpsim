@@ -47,7 +47,7 @@ because a showcase link failed validation on exactly this cell.
 POST-WORLDS (after 08-30): retire cd_prep + the worlds_meta
 `injected_move_ids` declarations + those 4 guards together.
 
-## Cramorant (engine port SHIPPED 2026-08-24; dives + policy campaign queued)
+## Cramorant (PUBLISHED 2026-08-27; residue on the rebalance + post-Worlds lists)
 
 The Gulp Missile engine port (pvpoke 78c64048a) landed 2026-08-24 with
 81 oracle-exact fixture cells + a 36-cell audit extension and a 52-agent
@@ -200,6 +200,19 @@ oracle cell ever drifts. (b) The opponent-pool question -- whether
 Cramorant (GL rank 13) enters `gl_top50_plus_cs.txt` / `ul_top60.txt`
 as an OPPONENT for other species' dives -- is a Michael curation call;
 until then no shipped dive sims against it.
+
+**PUBLISHED 2026-08-27 (Michael's explicit go)**: full site push to
+pogodives.com -- both Cramorant dives (sheet v5 tensors, blobs
+20260826_124234/140322), the strategy article (final authorship
+"both" after Michael's review; 4 verify_url-gated sandbox showcases),
+the site-wide all-scenarios checkbox, and the frozen Worlds surfaces.
+Ship gates all green (verify_worlds run from the worktree under the
+pinned gamemaster; live gamemaster restored + hash-verified after).
+Sheet v5 is now recorded in the validation doc, incl. the
+blob-vintage rule that caught a same-day v4 rollback. Remaining
+Cramorant work is only what the lists above already carry: rebalance
+re-verify, the UL Dive+Surf 2v2 open value, the article-slug durable
+home, and the KO-edge divergence note.
 
 ## Worlds robustness deep dives -- IN PROGRESS (session started 2026-08-19)
 
