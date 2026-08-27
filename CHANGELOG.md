@@ -25,6 +25,114 @@ verified via `migrate_cache.py --list-stamps` + sidecar scans):
   effectively cold (96/99 entries at two-generations-stale stamps;
   no migration path for its opaque keys — re-bakes on demand).
 
+## 2026-08-27 -- KO-edge "divergence": not an engine bug (investigation record)
+
+The fast-move-on-the-killing-blow divergence logged from sandbox-link
+validation (UL Cramorant/Lapras 1-1: ours 668 vs sandbox 662) was
+adversarially investigated and is NOT an engine divergence. Our
+step-3-before-step-4 ordering IS PvPoke's priority scheme (due fast
++20 > charged 10-15 > floating fast -20; Battle.js:388-408/834-843);
+given the same action set the engines agree cell-for-cell (1,089
+verified cells, GL+UL top-16 x 9 shields). The gap is a sandbox-link
+ENCODER artifact: `timeline_to_actions` (scripts/pvpoke_sandbox.py)
+only emits charged moves that RESOLVE, so a decided-then-CANCELLED
+charged move (CMP loser KO'd, etc.) leaves no action and PvPoke's
+sandbox substitutes a phantom due fast on the KO turn; scripting the
+cancelled move (or a `wait`) reproduces our score exactly (7/7
+mismatch cells). The 4 shipped showcase links verified clean
+(cancel_gap 0, byte-exact). Bonus find: all three Node harnesses
+(pvpoke_url_run.js / pvpoke_sandbox_driver.js / pvpoke_trace.js) used
+the Ranker.js rating formula `floor((health+damage)*500)` where the
+battle page uses `floor(500*damage + 500*health)` (Pokemon.js:2124) --
+sum-then-scale lands 1 low on exact fractions, the only 2 non-encoder
+mismatches in the sample. Tool-layer fixes tracked in TODO (Thievul
+residue).
+
+## 2026-08-27 -- Cramorant dives + strategy article + Worlds refresh PUBLISHED
+
+Full site push to pogodives.com (Michael's explicit go): both
+Cramorant dives (sheet v5 tensors, blobs 20260826_124234/140322), the
+strategy article (final authorship "both" after Michael's review; 4
+verify_url-gated sandbox showcases, 8fc7ec4/96acaba), the site-wide
+all-scenarios 3x3 checkbox grid, and the frozen Worlds surfaces. Ship
+gates all green (verify_worlds run from the pinned worktree; live
+gamemaster restored + hash-verified 1398b001cf86 after). Same
+morning (~04:30): Greninja + Annihilape entered the Worlds matrix (35
+entries, 555 pair pages, 0 deferred; 31a7361), executed from the
+vintage-pinned worktree gopvpsim-worlds at 6a7e534 -- the Worlds
+surface stays FROZEN at the pre-Cramorant engine until after Aug 30.
+Core-breaker scan + HSH Greninja verification findings:
+~/coding/reports/gopvpsim-worlds-2026-refresh-2026-08-27.html.
+Worlds Discord post SKIPPED by Michael's decision (draft header-marked;
+the Corvi/Quag scatter lead moved to a possible Reddit post, TODO).
+
+## 2026-08-24..26 -- Cramorant arc: Gulp Missile port, policy campaign, pogodives sheet
+
+Engine port of the first multi-form/variable-target changer (pvpoke
+78c64048a) landed 2026-08-24: 81 oracle-exact fixture cells + 36-cell
+audit extension, 52-agent adversarial review, all 19 confirmed
+findings fixed same-day (mechanics record: DEVELOPER_NOTES "Form
+change gotchas" item 5; migration predicate cramorant_port_20260824).
+Policy campaign (standing resource authorization): round 1 overnight
+lab (80 variants x 4 opponent models x 4 IV spreads; synthesis
+docs/validations/cramorant_policy_lab_2026_08_24.md), lead40 adaptive
+tank frozen 08-25, pogodives_dp/pogodives_shield overlay landed
+08-25 (byte-identical pvpoke_dp fallback for every non-Cram
+situation, test-pinned), render side same day (b67b8d4 policy tier
+through sweep/cache + 744c4a5 --policy axis & Strategy dropdown).
+Round 6 closed 08-25: nothing ships, lead40 stands. Michael's
+strict bar 08-26 (every start scenario >= 0 on BOTH mean rating delta
+and net flips vs plain PvPoke) superseded uniform lead40:
+_POGODIVES_SHEET landed (8fc5764), v3 certified 360/360 cells at full
+4096-IV resolution (90d8811), v5 shipped (56a68b3) after the 0v0
+oracle capture + 1v0 loaded-tank skeptic round; full record incl. the
+blob-vintage rule: docs/validations/cramorant_strict_bar_2026_08_26.md.
+GL + UL dives baked --policy both --bait both; published 08-27
+(entry above). Sweep-cache migrations for the arc all ran (recorded
+in the 2026-08-27 cache entry above).
+
+## 2026-08-18..20 -- Worlds: Thievul fork + IV-robustness deep pages
+
+Thievul entered the published Worlds matrix post-publish (08-18) as a
+two-entry moveset fork (NS+IW / IW+PR) with Icy Wind INJECTED under
+the pinned gamemaster (lag proven via upstream eliteMoves, CLAUDE.md
+cd_prep rule; per-entry injected_move_ids honored by
+worlds_bake.preflight_moveset_legality, disclosed on every Worlds
+page; two worlds_code bumps blessed forward with written proofs,
+verified additive). Tier-1 grew to 2,112 keys / amber 455.
+2026-08-19: worlds_shortlist.py shipped (455 amber pairs by combined
+usage); the joint_iv_* kit replaced thievul_licki_* (8feec47,
+319c8a2). Overnight into 08-20, three site pushes: 11 deep pages +
+grid-amber squares; the 73-clean-pair audit (1.36B sims, FINAL amber
+505/528, 50 squares recolored -- the hub FN block now reports 11/73,
+retiring the 4/21 original-sample figure); three MIRROR pages
+(lickilicky/wigglytuff/corviknight; mirrors had been an accidental
+combinations() exclusion; heavily IV-decided, e.g. Licki mirror best
+build rank-3182 15/3/3) + a latent renderYourDenial crash fix.
+Round-2 mirrors built 08-24 (thievul x3 incl. the cross-arm,
+quagsire-shadow, altaria); the 11 deferred review minors shipped
+28f2a4d, [meta.oracle] pins on all 18 eligible pairs 7360eb2; mirror
+seat-asymmetry finding baked into the kit (8ebb642). The kit's
+untested-guard debt was closed 2026-08-27 (37ccc01 + 93b6d91).
+Operational lesson: run long bakes DETACHED (os.fork/os.setsid
+double-fork; two harness-managed bakes were killed mid-run, per-grid
+manifest keying lost nothing).
+
+## 2026-08-15/16 -- Thievul CD: dive published + Licki robustness pages
+
+Dive live at pogodives.com/thievul-great-league/ (4 pages; landing SP
+/ Icy Wind + Play Rough, the 62W-25L 1-1 build; pre-CD reference
+NS+PR as m3; plan + verified numbers docs/thievul_cd_plan.md). The CD
+article was DROPPED by Michael's decision; the thresholds/thievul.toml
+article slug stays pre-registered but inert (renderer emits the link
+only when the article dir exists). CD-day addendum (08-16): the
+Thievul-vs-Licki IV-robustness analysis shipped -- full 4096x4096
+joint IV grids vs Lickilicky (4 moveset/bait grids) + Lickitung,
+published as thievul-lickilicky-robustness.html +
+thievul-lickitung-robustness.html with an index card (pipeline
+contract docs/thievul_licki_analysis.md). CD-day poke_genie fixture
+committed 1b5ce69 (Michael's ok, 2026-08-19).
+
 ## 2026-08-14 -- Worlds 2026 PUBLISHED (pogodives.com)
 
 Full amber coverage shipped: 401/401 IV-decided pairs baked
