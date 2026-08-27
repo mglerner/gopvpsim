@@ -181,6 +181,43 @@ merged into one final change:
   -3.27). Direct re-simulation at coprime stride, then full
   resolution, is the search that works.
 
+## Sheet v5 (daytime 2026-08-26, commit 56a68b3 -- the SHIPPED sheet)
+
+Two more campaigns ran the next day (0v0 oracle capture + 1v0
+loaded-tank, both post-skeptic); v5 is the sheet actually committed
+in `battle.py` (engine hash `bff4191c3cfe`) and baked onto the site:
+
+- **0v0 gate `cmp_e_or_dive`**: (CMP won AND opponent's cheapest
+  charged is expensive) OR (a missile-sized Dive worth >= 4.2 of our
+  fast moves). Captures 99.8% of the UL 0v0 per-opponent oracle
+  (+1,014 -> +8,258 net), fixes the UL top-100-SP net-negative
+  (-48 -> +30), GL not regressed. The 'draw' candidate that read
+  both charged damages was measured and rejected.
+- **1v0 loaded-opponent tank** ported from 2v2, at aggressive 1.9 +
+  `lead_ready`: the loaded condition separates the UL-cheap-hit wins
+  from the GL-nuke drains. The skeptic round killed aggressive 1.4
+  (BROKEN on the top-100-SP lens in both leagues); 1.9 passes both
+  lenses on all ten pages AND beats 1.4 on global rating.
+
+**v5 certification (the canonical shipped numbers):** full-4096
+bake from replay blobs `20260826_124234_Cramorant_great` /
+`20260826_140322_Cramorant_ultra`; 720/720 (league x moveset x
+opp-IV mode x bait x scenario, incl. @51 twins) cells pass the
+strict bar. Headline ledger (landing page, pvpoke-IV bait mode,
+L50): **GL +106,600 net wins (0-0 +10,509), UL +101,039** vs plain
+PvPoke. The v4 numbers earlier in this doc (GL +106,586 / 0-0
++10,495 / UL +93,795, also in the reports-repo writeup dated
+2026-08-25) are the v4 bake -- history, not the shipped state.
+
+**Blob-vintage discipline (near-miss 2026-08-27):** a re-render from
+blobs `20260826_023003/031609` silently rolled the pages back to v4;
+it passed the strict-bar verifier (both vintages pass) and matched
+this doc's then-final numbers (the doc stopped at v4), so it looked
+certified. A replay blob's vintage is the newest sheet commit BEFORE
+its bake timestamp (`git log -- src/gopvpsim/battle.py`); check that,
+not just the verifier, before re-rendering, and always pick the
+newest blobs by mtime.
+
 ## Overfit disclosures (flagged for the skeptic pass + rebalance)
 
 - `0.022` (DPT gate) and `55` (cheap-energy gate) are fitted
