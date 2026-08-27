@@ -155,10 +155,14 @@ Coupling to watch
 -----------------
 :func:`timeline_to_actions` parses ``BattleResult.timeline``, which is a
 *human-readable display log* with no stability contract -- a wording
-change silently yields zero actions.  Two guards: the parse asserts it
-found at least one action whenever the timeline contains ``" uses "``,
-and the pre-publish gate is :func:`verify_url`, which would catch a
-truncated action list as a score mismatch.  If ``BattleResult`` ever
+change silently yields zero actions.  Two patterns are pinned:
+``_CHARGED_RE`` (resolved charged moves) and ``_CANCEL_RE`` (charged
+moves decided then cancelled, which must ALSO be scripted -- see
+:func:`timeline_to_actions`).  Three guards: the parse asserts it found
+at least one action whenever the timeline contains ``" uses "``; a line
+containing ``" CANCELLED ("`` that ``_CANCEL_RE`` cannot parse is a hard
+error; and the pre-publish gate is :func:`verify_url`, which would catch
+a truncated action list as a score mismatch.  If ``BattleResult`` ever
 grows a structured per-event list (actor index, turn, move id, shielded),
 switch to it -- that would also make mirror matchups transcribable, which
 the string log fundamentally is not (see :func:`timeline_to_actions`).
@@ -349,6 +353,30 @@ def action_str(actions) -> str:
 #   "T 19: Jellicent uses Surf → SHIELDED (1 dmg)"
 _CHARGED_RE = re.compile(r'^T\s*(\d+): (.+?) uses (.+?) → (SHIELDED|\d+) ')
 
+# gopvpsim BattleResult.timeline cancelled-charged lines (battle.py
+# log_cancel), e.g.
+#   "T 37: Lapras Sparkling Aria CANCELLED (cmp_ko)"
+# The body is "<species> <move name>" and BOTH halves can contain spaces
+# ("Cramorant (Gulping) Sparkling Aria"), so the split is done by matching
+# the tail against the acting player's selected charged-move names rather
+# than by a regex group boundary.
+_CANCEL_RE = re.compile(r'^T\s*(\d+): (.+) CANCELLED \((\w+)\)$')
+
+#: Cancel reasons that PvPoke's Battle.js applies to a SCRIPTED action for
+#: the same reason (Battle.js:462-490: the priority-KO check, the lethal-fast
+#: check, and the ``poke.energy >= move.energy`` validity test).  Emitting the
+#: action for these makes the sandbox replay our fight exactly: PvPoke queues
+#: a charged action, cancels it, and -- crucially -- does NOT substitute the
+#: naturally-due fast move it would otherwise throw on that turn.
+#:
+#: ``defender_ko`` is deliberately NOT here.  There the ATTACKER is alive and
+#: PvPoke has no dead-defender guard on charged actions at all, so a scripted
+#: action would fire at the corpse (spending energy and possibly landing a
+#: debuff) where we skip it.  Omitting it is already faithful: PvPoke's
+#: substituted fast is itself invalidated by ``opponent.hp < 1``
+#: (Battle.js:452-454), so that turn is a no-op on both sides.
+_CANCEL_REPLAYABLE = frozenset({'cmp_ko', 'attacker_ko', 'no_energy'})
+
 #: Charged moves Battle.js injects itself and that must NOT be encoded as
 #: actions.  The Gulp Missile splice at Battle.js:1658 / :1673 is the only
 #: ``turnActions.splice`` site at pvpoke 78c64048a; add here if that changes.
@@ -433,10 +461,20 @@ def timeline_to_actions(result, p0, p1, *, actors=None,
     score/HP/shields, so a proc that fired in one engine and not the
     other is observable, not merely improbable.
 
+    Cancelled decisions.  A charged move our engine DECIDED and then
+    cancelled (CMP loser KO'd, attacker killed by a lethal fast, ...)
+    is encoded too, for the reasons in :data:`_CANCEL_REPLAYABLE`.  It
+    never resolves in either engine, but PvPoke's sandbox throws that
+    Pokemon's naturally-due FAST move on any turn with no listed action,
+    so omitting it silently replays a different fight -- the KO-edge
+    encoder gap resolved 2026-08-27 (UL Cramorant vs Lapras 1-1 read 656
+    through the link against 662 in the sim, exactly one phantom Psywave).
+
     Pass ``actors=[...]`` (one player index per charged line, in timeline
-    order, excluding auto-fired moves) to supply the true indices from a
-    caller that has them; that is the supported route for mirrors until
-    ``BattleResult`` exposes a structured event list.
+    order, excluding auto-fired moves and non-replayable cancels) to
+    supply the true indices from a caller that has them; that is the
+    supported route for mirrors until ``BattleResult`` exposes a
+    structured event list.
     """
     if not result.timeline:
         raise ValueError('empty timeline: re-run simulate() with log=True')
@@ -467,18 +505,49 @@ def timeline_to_actions(result, p0, p1, *, actors=None,
             'species. Pass actors=[...] with the true player index per charged '
             'line, in timeline order.')
 
+    # Longest-first so "Ice Beam" never eats the tail of a longer name.
+    _move_names = sorted(set(slots[0]) | set(slots[1]), key=len, reverse=True)
+
     parsed, auto, saw_uses = [], [], False
     for line in result.timeline:
         if ' uses ' in line:
             saw_uses = True
         m = _CHARGED_RE.match(line)
-        if not m:
+        if m:
+            turn, who, move, tail = (int(m.group(1)), m.group(2),
+                                     m.group(3), m.group(4))
+            if move.startswith(AUTO_FIRED_PREFIXES):
+                auto.append((turn, move))
+                continue
+            parsed.append((turn, who, move, tail == 'SHIELDED'))
             continue
-        turn, who, move, tail = int(m.group(1)), m.group(2), m.group(3), m.group(4)
+
+        # A charged move that was DECIDED and then cancelled.  It must still
+        # be scripted, or PvPoke throws a naturally-due fast move on that
+        # turn instead and replays a different fight (see _CANCEL_REPLAYABLE).
+        m = _CANCEL_RE.match(line)
+        if not m:
+            if ' CANCELLED (' in line:
+                raise ValueError(
+                    f'unparseable cancelled-charged line {line!r} -- '
+                    'battle.py log_cancel\'s wording has probably changed '
+                    'and _CANCEL_RE needs updating (see module docstring, '
+                    '"Coupling to watch")')
+            continue
+        turn, body, reason = int(m.group(1)), m.group(2), m.group(3)
+        move = next((nm for nm in _move_names if body.endswith(' ' + nm)), None)
+        if move is None:
+            raise ValueError(
+                f'turn {turn}: cancelled-charged line {line!r} names no '
+                f'selected charged move of either player ({slots[0]} / '
+                f'{slots[1]}); it cannot be encoded')
+        who = body[:-(len(move) + 1)]
         if move.startswith(AUTO_FIRED_PREFIXES):
             auto.append((turn, move))
             continue
-        parsed.append((turn, who, move, tail == 'SHIELDED'))
+        if reason not in _CANCEL_REPLAYABLE:
+            continue
+        parsed.append((turn, who, move, False))
 
     if saw_uses and not parsed and not auto:
         raise ValueError(

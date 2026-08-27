@@ -100,3 +100,133 @@ def test_verify_url_reproduces_showcase_and_start_state():
     hurt = verify_url(url.replace('/15.100000',
                                   '/60-191/0-0/15.100000'))
     assert round(hurt['score'][0]) != 674
+
+
+# ---------------------------------------------------------------------------
+# Cancelled charged decisions (KO-edge encoder gap, resolved 2026-08-27)
+# ---------------------------------------------------------------------------
+
+def _cramorant_lapras_ul_1_1():
+    """The KO-edge reference cell: UL Cramorant (L50 15/15/15, PECK /
+    Dive+Fly, PoGoDives tier) vs Lapras (L36 15/15/15, PSYWAVE /
+    Sparkling Aria+Ice Beam), 1-1 shields. Cramorant's Fly KOs Lapras on
+    turn 37 while Lapras has Sparkling Aria decided, so the CMP loser's
+    charged move is cancelled."""
+    from gopvpsim.battle import (pogodives_dp, pogodives_shield, pvpoke_dp,
+                                 simulate)
+    from cramorant_policy_lab import make_bp
+    a = make_bp('Cramorant', 'ultra', False, 'PECK', ['DIVE', 'FLY'],
+                ivs=(15, 15, 15))
+    b = make_bp('Lapras', 'ultra', False, 'PSYWAVE',
+                ['SPARKLING_ARIA', 'ICE_BEAM'], ivs=(15, 15, 15))
+    a.reset_for_battle(1, b)
+    b.reset_for_battle(1, a)
+    r = simulate(a, b, charged_policy_0=pogodives_dp,
+                 charged_policy_1=pvpoke_dp,
+                 shield_policy_0=pogodives_shield, log=True)
+    return a, b, r
+
+
+def test_cancelled_charged_is_logged_only_under_log():
+    """battle.py log_cancel: a charged move that was DECIDED and then
+    cancelled leaves a timeline line, gated on log=True like every other
+    timeline append. Pre-fix the cancel was silent, which is what left
+    timeline_to_actions with nothing to encode (test below)."""
+    from gopvpsim.battle import (pogodives_dp, pogodives_shield, pvpoke_dp,
+                                 simulate)
+    from cramorant_policy_lab import make_bp
+    _a, _b, r = _cramorant_lapras_ul_1_1()
+    assert r.pvpoke_score(0) == 662 and r.hp_remaining == [51, 0]
+    cancels = [ln for ln in r.timeline if 'CANCELLED' in ln]
+    assert cancels == ['T 37: Lapras Sparkling Aria CANCELLED (cmp_ko)'], (
+        f'expected exactly the turn-37 CMP cancel, got {cancels}')
+    # The wording is parsed by pvpoke_sandbox._CANCEL_RE and must stay
+    # clear of every OTHER timeline consumer's key (see log_cancel's
+    # comment): no " uses ", no U+2192, no "dmg".
+    line, = cancels
+    assert ' uses ' not in line and '→' not in line and 'dmg' not in line
+
+    # log=False: same fight, no timeline at all.
+    a = make_bp('Cramorant', 'ultra', False, 'PECK', ['DIVE', 'FLY'],
+                ivs=(15, 15, 15))
+    b = make_bp('Lapras', 'ultra', False, 'PSYWAVE',
+                ['SPARKLING_ARIA', 'ICE_BEAM'], ivs=(15, 15, 15))
+    a.reset_for_battle(1, b)
+    b.reset_for_battle(1, a)
+    quiet = simulate(a, b, charged_policy_0=pogodives_dp,
+                     charged_policy_1=pvpoke_dp,
+                     shield_policy_0=pogodives_shield, log=False)
+    assert quiet.pvpoke_score(0) == 662, 'logging must not change the fight'
+    assert not any('CANCELLED' in ln for ln in quiet.timeline)
+
+
+def test_cancelled_charged_is_encoded_as_an_action():
+    """KO-edge encoder gap: timeline_to_actions only emitted charged moves
+    that RESOLVED, so the turn-37 Sparkling Aria left no action and
+    PvPoke's sandbox threw Lapras' naturally-due Psywave instead --
+    replaying a fight 2 damage different from ours (link read 656 / HP
+    [49, 0] against the sim's 662 / HP [51, 0]).
+
+    Encoder-level pin (pure Python, no node): the cancelled decision must
+    be encoded as player 1's charged move 0 on turn 37. PvPoke cancels the
+    same action for the same reason (Battle.js:462-490), so the link is a
+    faithful replay; the round-trip through Battle.js is pinned by
+    test_cancelled_charged_sandbox_replays_the_same_fight below."""
+    a, b, r = _cramorant_lapras_ul_1_1()
+    acts, auto = timeline_to_actions(r, a, b)
+    tokens = [x.token() for x in acts]
+    assert '37.110000' in tokens, (
+        f'the cancelled turn-37 Sparkling Aria was not encoded: {tokens}')
+    # ... alongside the Fly that caused the KO, on the same turn.
+    assert '37.101000' in tokens, f'{tokens}'
+    assert auto == [(26, 'Gulp Missile (Arrokuda)')], auto
+
+
+def test_cancelled_charged_sandbox_replays_the_same_fight():
+    """The publish gate, end to end through the real URL: the link built
+    from timeline_to_actions' OWN output must make PvPoke's Battle.js
+    reproduce the sim exactly (662, HP [51, 0], shields [0, 0]).
+
+    Pre-fix the encoder emitted the action list without the turn-37
+    Sparkling Aria and the same link read 656 / HP [49, 0] -- PvPoke
+    threw Lapras' naturally-due Psywave on the KO turn instead. That
+    exact pre-fix script is re-run below as a control, so this test
+    fails if the fix regresses AND if the reference cell drifts."""
+    from gopvpsim.pokemon import Pokemon
+    a, b, r = _cramorant_lapras_ul_1_1()
+    acts, _auto = timeline_to_actions(r, a, b)
+    pa = Pokemon.at_best_level('Cramorant', 15, 15, 15, league='ultra')
+    pb = Pokemon.at_best_level('Lapras', 15, 15, 15, league='ultra')
+    s0 = PokeSpec('cramorant', level=pa.level, ivs=(15, 15, 15),
+                  fast='PECK', charged=['DIVE', 'FLY'])
+    s1 = PokeSpec('lapras', level=pb.level, ivs=(15, 15, 15),
+                  fast='PSYWAVE', charged=['SPARKLING_ARIA', 'ICE_BEAM'])
+    url = sandbox_url(2500, s0, s1, (1, 1), acts)
+    got = verify_url(url)
+    assert (round(got['score'][0]), got['hp'], got['shields']) == (
+        662, [51, 0], [0, 0]), (
+        f'the link does not replay the sim (662 / [51, 0]): {url}')
+    assert round(got['score'][0]) == r.pvpoke_score(0)
+
+    # Control: the pre-fix action script (identical but for the missing
+    # cancelled action) replays a DIFFERENT fight.
+    pre = url.replace('-37.110000/', '/')
+    assert pre != url, f'the cancelled action is missing from {url}'
+    was = verify_url(pre)
+    assert (round(was['score'][0]), was['hp']) == (656, [49, 0]), (
+        'the pre-fix control no longer reproduces the encoder gap; the '
+        'reference cell has drifted and this pin needs re-deriving')
+
+
+def test_cancel_line_wording_change_is_a_hard_error():
+    """Coupling guard: _CANCEL_RE is pinned to battle.py's wording, and a
+    line that says CANCELLED but does not parse must raise rather than
+    silently drop the action (the failure mode this whole fix removes)."""
+    import types
+    a, b, r = _cramorant_lapras_ul_1_1()
+    broken = types.SimpleNamespace(timeline=[
+        ln.replace('CANCELLED (cmp_ko)', 'CANCELLED (cmp_ko) [reworded]')
+        if 'CANCELLED' in ln else ln
+        for ln in r.timeline])
+    with pytest.raises(ValueError, match='unparseable cancelled-charged'):
+        timeline_to_actions(broken, a, b)
