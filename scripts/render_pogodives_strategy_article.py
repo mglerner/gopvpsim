@@ -461,6 +461,61 @@ fight in isolation with a general rule set; we allowed ourselves nine
 scenario-specific rule rows for one very unusual bird.</p>
 
 
+
+<h2>See it for yourself, on PvPoke</h2>
+<p>PvPoke's Sandbox mode replays an exact scripted line instead of its
+AI - which makes it the perfect neutral referee. For each battle below,
+the first link is the plain matchup (PvPoke's own plan plays it, and
+loses); the second is a sandbox link that forces <em>our</em> line,
+turn for turn. Every link pins the exact IVs and was machine-verified:
+we decoded each URL the way pvpoke.com's own interface does and ran it
+through PvPoke's engine, confirming it reproduces our simulator's
+score, ending HP, shields, and stat stages exactly.</p>
+
+<h3>1. Great League vs Azumarill, no shields (494 -> 674)</h3>
+<p>PvPoke's Cramorant banks to 45 and throws Fly, twice, and loses the
+race by two HP. The PoGoDives line spends its first 40 energy on Dive
+instead - Azumarill resists it, so it only chips 22 - but that Dive
+loads Gulp Missile. Azumarill's Ice Beam then fires the missile for
+free, and the defense drop it leaves behind turns the closing Fly from
+57 damage into 71. Same energy, same number of throws, and Cramorant
+finishes with 44 HP instead of fainting.</p>
+<p><a href="https://pvpoke.com/battle/1500/cramorant-26-5-15-13-4-4-1-1/azumarill-43-4-15-13-4-4-1-1/00/0-1-2/0-2-3/">PvPoke's plan (loses, 494)</a>
+&middot; <a href="https://pvpoke.com/battle/sandbox/1500/cramorant-26-5-15-13-4-4-1-1/azumarill-43-4-15-13-4-4-1-1/00/0-1-2/0-2-3/15.100000-19.110000-28.101000/">our line (wins, 674)</a></p>
+
+<h3>2. Great League vs Jellicent, 2-1 (467 -> 666)</h3>
+<p>PvPoke feeds its first Fly straight into Jellicent's shield, then
+loses the long game to Shadow Ball. PoGoDives opens with Dive instead:
+Jellicent has no reason to spend its one shield on a 24-damage throw,
+so Cramorant gets the gulping form for free. Jellicent's Surf then
+triggers the missile, and from there Cramorant is throwing cheap Dives
+that arrive with a defense drop attached while its own two shields
+cover the answers. It wins with a shield still in hand.</p>
+<p><a href="https://pvpoke.com/battle/1500/cramorant-26-5-15-13-4-4-1-1/jellicent-24-4-15-14-4-4-1-1/21/0-1-2/1-4-3/">PvPoke's plan (loses, 467)</a>
+&middot; <a href="https://pvpoke.com/battle/sandbox/1500/cramorant-26-5-15-13-4-4-1-1/jellicent-24-4-15-14-4-4-1-1/21/0-1-2/1-4-3/15.100000-22.110000-25.100100-29.111100-32.100000/">our line (wins, 666)</a></p>
+
+<h3>3. Ultra League vs Blastoise, 2-2 (427 -> 541)</h3>
+<p>The shield-heavy version. PvPoke pumps both of Cramorant's Flys into
+Blastoise's shields, runs out of resources, and gets closed out by
+Skull Bash. PoGoDives never offers Blastoise a big hit to shield: it
+dives, deliberately takes the Hydro Cannon in gulping form to fire the
+missile, and then spends the rest of the fight making Blastoise burn
+both shields on 22-damage Dives. The last Dive lands for the KO with
+13 HP to spare.</p>
+<p><a href="https://pvpoke.com/battle/2500/cramorant-50-15-15-15-4-4-1-1/blastoise-45.5-5-15-15-4-4-1-1/22/0-1-2/1-2-6/">PvPoke's plan (loses, 427)</a>
+&middot; <a href="https://pvpoke.com/battle/sandbox/2500/cramorant-50-15-15-15-4-4-1-1/blastoise-45.5-5-15-15-4-4-1-1/22/0-1-2/1-2-6/15.100000-22.110000-25.100100-32.110100-35.100100-39.111100-42.100000/">our line (wins, 541)</a></p>
+
+<h3>4. Ultra League vs Talonflame, 1-2 (297 -> 573)</h3>
+<p>The biggest swing in the set, and the difference is a single shield
+decision. Both plans open the same way - Dive, Talonflame shields,
+Dive again, Talonflame shields again. Then PvPoke shields Talonflame's
+Fly, which leaves Cramorant holding a loaded Gulp Missile it never
+gets to fire, and Brave Bird kills it for 109. PoGoDives
+<em>declines</em> that shield, eats 67, and the missile fires
+immediately - so the shield is still there for Brave Bird, and the
+follow-up Dive lands for 139 into the defense drop.</p>
+<p><a href="https://pvpoke.com/battle/2500/cramorant-50-15-15-15-4-4-1-1/talonflame-50-15-15-15-4-4-1-1/12/0-1-2/1-4-1/">PvPoke's plan (loses, 297)</a>
+&middot; <a href="https://pvpoke.com/battle/sandbox/2500/cramorant-50-15-15-15-4-4-1-1/talonflame-50-15-15-15-4-4-1-1/12/0-1-2/1-4-1/15.100100-24.100100-25.110000-31.111100-32.100000/">our line (wins, 573)</a></p>
 <h2>Caveats</h2>
 <p>The conditions above carry a few tuned constants (the 40-energy
 bound, the tank thresholds, the fast-move-chip bound). They were fitted
