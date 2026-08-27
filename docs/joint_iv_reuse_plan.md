@@ -227,4 +227,8 @@ Policy per artifact:
 - Known gate gap: `verify_no_unicode_dashes` cannot see
   script-generated prose (TODO.md entry, 2026-08-17); the kit's page
   suite must keep carrying its own ASCII assert until the gate learns
-  to read inlined app JS.
+  to read inlined app JS. **CLOSED 2026-08-27**: the gate now extracts
+  string literals from inlined `<script>` bodies and applies the same
+  em/en-dash policy, so `joint_iv_page.js`'s generated prose is gated
+  like any other page text. Keeping the kit's own ASCII discipline is
+  still cheap belt-and-braces (it covers glyphs beyond em/en dash).
