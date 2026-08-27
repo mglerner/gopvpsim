@@ -59,19 +59,22 @@ def _loadout(label, species, fast, charged, win_rate, n_ivs, scenarios,
     }
 
 
-def _fragment():
-    scenarios = ['0-0', '1-1', '2-2']
-    loadouts = [
-        _loadout('Blade', 'Aegislash (Blade)', 'PSYCHO_CUT',
-                 ('AERIAL_ACE', 'SHADOW_BALL'), 0.611, 1234, scenarios,
-                 ['Azumarill', 'Mimikyu', 'Registeel']),
-        _loadout('Shield', 'Aegislash (Shield)', 'PSYCHO_CUT',
-                 ('AERIAL_ACE', 'SHADOW_BALL'), 0.484, 1234, scenarios,
-                 ['Azumarill', 'Mimikyu']),
-    ]
+SCENARIOS = ['0-0', '1-1', '2-2']
+
+
+def _fragment(loadouts=None, include_matchup_delta=False):
+    if loadouts is None:
+        loadouts = [
+            _loadout('Blade', 'Aegislash (Blade)', 'PSYCHO_CUT',
+                     ('AERIAL_ACE', 'SHADOW_BALL'), 0.611, 1234, SCENARIOS,
+                     ['Azumarill', 'Mimikyu', 'Registeel']),
+            _loadout('Shield', 'Aegislash (Shield)', 'PSYCHO_CUT',
+                     ('AERIAL_ACE', 'SHADOW_BALL'), 0.484, 1234, SCENARIOS,
+                     ['Azumarill', 'Mimikyu']),
+        ]
     return cl.build_comparison_fragment(
         loadouts_data=loadouts, league='great', gm=cl.load_gamemaster(),
-        title='t', include_matchup_delta=False)
+        title='t', include_matchup_delta=include_matchup_delta)
 
 
 def test_methodology_counts_come_from_the_parsed_dive():
@@ -107,3 +110,66 @@ def test_methodology_guide_anchor_exists_in_the_guide_body():
         GUIDE_BODY.read_text(),
         extensions=['extra', 'sane_lists', 'smarty', 'toc'])
     assert f'id="{anchor}"' in rendered, anchor
+
+
+# --- the OTHER three places the page names the sweep dimensions ----------
+# 95fcf74 taught the methodology block to derive them but left the pairwise
+# table's two column tooltips and the 3+-loadout abbreviation note spelling
+# "4096 focal IVs x 9 shield scenarios" by hand -- so a non-4096 dive would
+# have rendered two contradictory counts on one page.
+
+
+def test_pairwise_column_tooltips_derive_their_own_loadouts_dims():
+    """Each column's tooltip describes ITS OWN loadout's sweep.
+
+    The two loadouts here sweep different IV counts (1234 vs 999), which no
+    real dive does -- that is the point: it fails both if the counts go back
+    to a constant and if one column borrows the other's dims.
+    """
+    loadouts = [
+        _loadout('Blade', 'Aegislash (Blade)', 'PSYCHO_CUT',
+                 ('AERIAL_ACE', 'SHADOW_BALL'), 0.611, 1234, SCENARIOS,
+                 ['Azumarill', 'Mimikyu']),
+        _loadout('Shield', 'Aegislash (Shield)', 'PSYCHO_CUT',
+                 ('AERIAL_ACE', 'SHADOW_BALL'), 0.484, 999, SCENARIOS,
+                 ['Azumarill', 'Mimikyu']),
+    ]
+    frag = _fragment(loadouts, include_matchup_delta=True)
+    titles = re.findall(r'title="Win rate with ([^"]*)"', frag)
+    assert len(titles) == 2, titles
+    assert 'Varies all 1,234 focal IVs x 3 shield scenarios;' in titles[0]
+    assert 'Varies all 999 focal IVs x 3 shield scenarios;' in titles[1]
+
+
+def test_abbreviation_note_derives_the_sweep_dims():
+    """The 3+-loadout WR legend, the third hand-typed site."""
+    loadouts = [
+        _loadout(lbl, 'Aegislash (Blade)', 'PSYCHO_CUT',
+                 ('AERIAL_ACE', 'SHADOW_BALL'), wr, 1234, SCENARIOS,
+                 ['Azumarill', 'Mimikyu'])
+        for lbl, wr in (('Blade', 0.61), ('Shield', 0.48), ('Shadow', 0.55))
+    ]
+    frag = _fragment(loadouts, include_matchup_delta=True)
+    note = re.search(r'<details class="abbrev-note">.*?</details>', frag, re.S)
+    assert note, 'the 3+-loadout comparison should still render the note'
+    assert ('fraction of 1,234 focal IVs x 3 shield scenarios where'
+            in note.group(0))
+
+
+def test_no_rendered_surface_still_hardcodes_4096_x_9():
+    """Whole-page pin: the number the fixture never sweeps must not appear.
+
+    Covers both branches (N=2 pairwise and N>=3 all-in-row) so a fourth
+    hand-typed site added later trips here rather than shipping.
+    """
+    three = [
+        _loadout(lbl, 'Aegislash (Blade)', 'PSYCHO_CUT',
+                 ('AERIAL_ACE', 'SHADOW_BALL'), wr, 1234, SCENARIOS,
+                 ['Azumarill', 'Mimikyu'])
+        for lbl, wr in (('Blade', 0.61), ('Shield', 0.48), ('Shadow', 0.55))
+    ]
+    for frag in (_fragment(include_matchup_delta=True),
+                 _fragment(three, include_matchup_delta=True)):
+        assert '4096' not in frag and '4,096' not in frag
+        # ...and the scenario count too: the fixture sweeps 3, not 9.
+        assert 'x 9 shield scenarios' not in frag

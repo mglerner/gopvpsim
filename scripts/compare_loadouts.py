@@ -221,6 +221,20 @@ def _align_opponents(loadouts_data: list[dict]) -> list[str]:
     return [name for name in first if name in shared]
 
 
+def _sweep_dims_phrase(ld: dict) -> str:
+    """"N focal IVs x M shield scenarios" for one parsed dive.
+
+    Every rendered mention of the sweep dimensions goes through here, so
+    the page can't carry a stale hardcoded "4096 x 9" in a tooltip next
+    to the real numbers in the methodology block. Same derivation the
+    methodology block has used since 95fcf74: ``n_ivs`` and the parsed
+    ``scenarios`` list, both filled in by load_loadout_data.
+    """
+    n_ivs = ld.get('n_ivs', 0)
+    n_scenarios = len(ld.get('scenarios') or [])
+    return f'{n_ivs:,} focal IVs x {n_scenarios} shield scenarios'
+
+
 def _moveset_fast_move(label: str) -> str:
     return label.split('/', 1)[0].strip()
 
@@ -536,11 +550,17 @@ def _loadout_abbrev(label: str) -> str:
     return ''.join(w[:1].upper() for w in words)
 
 
-def _render_abbreviation_note(labels: list[str], abbrevs: list[str]) -> str:
+def _render_abbreviation_note(labels: list[str], abbrevs: list[str],
+                              sweep_phrase: str) -> str:
     """Collapsible explainer for the all-in-row table's abbreviations.
 
     Lists each loadout label with its abbreviation, plus the standing
     abbreviations the table header uses (``WR``, ``Flip``).
+
+    ``sweep_phrase`` comes from ``_sweep_dims_phrase`` -- this note has no
+    loadout dicts of its own, and spelling the dimensions by hand here is
+    how the page ended up claiming 4096 x 9 beside a methodology block
+    that had already been taught to derive them.
     """
     pairs = []
     seen = set()
@@ -559,8 +579,8 @@ def _render_abbreviation_note(labels: list[str], abbrevs: list[str]) -> str:
         '<summary>Abbreviations used in the table below</summary>'
         '<ul class="abbrev-list">'
         f'{items}'
-        '<li><strong>WR</strong> = win rate (fraction of 4096 focal IVs '
-        'x 9 shield scenarios where the loadout scores &gt; 500; 500 = tie)</li>'
+        f'<li><strong>WR</strong> = win rate (fraction of {sweep_phrase} '
+        'where the loadout scores &gt; 500; 500 = tie)</li>'
         '<li><strong>Flip</strong> = loadouts disagree on win/loss for '
         'this opponent. "No flip (W)" or "No flip (L)" = all loadouts '
         'land on the same side of the 50% line.</li>'
@@ -801,12 +821,12 @@ def _render_pairwise_table(a: dict, b: dict, shared_opponents: list[str],
         '<thead><tr>'
         '<th scope="col" data-sort="str">Opponent</th>'
         f'<th scope="col" data-sort="pct" '
-        f'title="Win rate with {a_label}. Varies all 4096 focal IVs x 9 shield '
-        f'scenarios; opponent fixed at PvPoke-default IVs. Win = battle rating '
+        f'title="Win rate with {a_label}. Varies all {_sweep_dims_phrase(a)}; '
+        f'opponent fixed at PvPoke-default IVs. Win = battle rating '
         f'&gt; 500 (500 = tie).">{a_label} Win Rate</th>'
         f'<th scope="col" data-sort="pct" '
-        f'title="Win rate with {b_label}. Varies all 4096 focal IVs x 9 shield '
-        f'scenarios; opponent fixed at PvPoke-default IVs.">{b_label} Win Rate</th>'
+        f'title="Win rate with {b_label}. Varies all {_sweep_dims_phrase(b)}; '
+        f'opponent fixed at PvPoke-default IVs.">{b_label} Win Rate</th>'
         '<th scope="col" data-sort="num" '
         'title="Change in win rate in percentage points (first column minus second).'
         '">&#916; (pp)</th>'
@@ -904,12 +924,10 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
     # would otherwise be described by a stale constant. The win boundary
     # is battle rating > 500 (500 = tie), matching the aggregation at
     # load_loadout_data and src/gopvpsim/battle.py WIN_RATING.
-    n_ivs = loadouts_data[0].get('n_ivs', 0)
-    n_scenarios = len(loadouts_data[0].get('scenarios') or [])
     bits.append(
         f'<details class="methodology-details compare-lead-details">'
         f'<summary>About these numbers</summary>'
-        f'<p>{n_ivs:,} focal IVs x {n_scenarios} shield scenarios per '
+        f'<p>{_sweep_dims_phrase(loadouts_data[0])} per '
         f'loadout; {len(shared)} opponents are common to all loadouts. '
         f'Win rate = fraction of those simulations with a battle rating '
         f'above 500 (500 is a tie). Methodology: '
@@ -963,7 +981,8 @@ def build_comparison_fragment(loadouts_data: list[dict], league: str,
             bits.append('<h3>Matchup Delta</h3>')
             labels = [ld['spec'].label for ld in loadouts_data]
             abbrevs = [_loadout_abbrev(lbl) for lbl in labels]
-            bits.append(_render_abbreviation_note(labels, abbrevs))
+            bits.append(_render_abbreviation_note(
+                labels, abbrevs, _sweep_dims_phrase(loadouts_data[0])))
             table, disagree = _render_all_in_row_matchup_table(
                 loadouts_data, shared, gm, league)
             bits.append(table)
