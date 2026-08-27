@@ -3295,10 +3295,51 @@ def load_replay_state(path):
     return state
 
 
+def article_slug_from_thresholds(species, shadow=False, thresholds_dir=None):
+    """Resolve a species' related-article slug from its thresholds TOML.
+
+    `[<Species>.article] slug` in `thresholds/<species>.toml` is the DURABLE
+    home of the dive->article link (docs/article_schema.md, "Bidirectional
+    link contract"). It is dive metadata, not threshold data, so it is read
+    even when no threshold registry is loaded (--no-thresholds) and when
+    re-rendering a replay blob baked before the article existed. Returns ''
+    when the file, the table, or the key is absent; the renderer separately
+    gates emission on the built article dir existing, so a stale slug can
+    never produce a dead link.
+
+    (main()'s thresholds auto-discover path reads the same table inline off
+    its already-parsed TOML, alongside cd_prep / narrative.)
+    """
+    _dir = (Path(thresholds_dir) if thresholds_dir
+            else Path(__file__).resolve().parent.parent / 'thresholds')
+    _stem = species.lower().replace(' ', '_').replace('(', '').replace(')', '')
+    if shadow:
+        _stem += '_shadow'
+    _path = _dir / f'{_stem}.toml'
+    if not _path.exists():
+        return ''
+    try:
+        import tomllib as _tomllib
+        with open(_path, 'rb') as _f:
+            _raw = _tomllib.load(_f)
+    except Exception:
+        return ''
+    _key = species + (' (Shadow)' if shadow else '')
+    return _raw.get(_key, {}).get('article', {}).get('slug', '')
+
+
 def render_dive_html(state):
     """Render the interactive HTML output (split or single) from a
     replayable state dict. Keys mirror generate_interactive_html's
     kwargs plus the few main()/CLI fields the tail needs."""
+    # Replay / rebake fallback: a blob baked before its species' article was
+    # registered carries article_slug=''. The slug's durable home is the
+    # thresholds TOML, so re-resolve it here instead of requiring a
+    # hand-injected state['article_slug'] before every re-render
+    # (Cramorant, 2026-08-27). Dir-existence gating still applies downstream.
+    if not state.get('article_slug'):
+        state['article_slug'] = article_slug_from_thresholds(
+            state['species'], state.get('shadow', False))
     moveset_data = state['moveset_data']
     reference_idx = state['reference_idx']
     if state['split_movesets'] and len(moveset_data) > 1:
@@ -3868,7 +3909,11 @@ def main():
         # TOML prose extracted alongside, not threshold data - so the
         # --no-thresholds opt-out should NOT suppress them. Read the
         # same file the auto-discover path would find, extract just
-        # narrative, leave threshold_registry None.
+        # narrative, leave threshold_registry None. The [article] slug is
+        # orthogonal for the same reason (it's the dive->article link's
+        # durable home, not threshold data), so it's read here too - a
+        # --no-thresholds dive still gets its article link on a plain CLI
+        # rebake (Cramorant, 2026-08-27).
         logger.info('  --no-thresholds: skipping threshold registry load')
         _species_lower = args.species.lower().replace(' ', '_').replace('(', '').replace(')', '')
         if args.shadow:
@@ -3888,6 +3933,9 @@ def main():
                     logger.info(f"  Species narrative blocks: {_nkeys}")
             except Exception as _e:
                 logger.warning(f"narrative load from {_narr_toml.name} failed: {_e}")
+        _article_slug = article_slug_from_thresholds(args.species, args.shadow)
+        if _article_slug:
+            logger.info(f"  Article link: articles/{_article_slug}/")
     else:
         # Auto-discover: look for thresholds/<species>.toml (case-insensitive)
         # so the user doesn't have to remember --thresholds every run. A

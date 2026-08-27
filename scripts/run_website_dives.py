@@ -135,7 +135,12 @@ DIVES = [
     # PvPoke default moveset Peck / Dive + Fly (GL rank 13, UL rank 27).
     # policy 'both' (2026-08-25): the PoGoDives-strat tier
     # (docs/cramorant_policy_plan.md) sims alongside the PvPoke default
-    # and renders a Strategy selector. No hand-authored thresholds yet.
+    # and renders a Strategy selector. No hand-authored thresholds yet --
+    # thresholds/cramorant.toml exists only to carry the
+    # [Cramorant.article] slug, which deep_dive.py reads on the
+    # --no-thresholds path too, so these entries stay no_thresholds
+    # (unlike Thievul, which needs the auto-discover path for cd_prep)
+    # and a plain rebake still emits the article link.
     {
         'species': 'Cramorant',
         'league': 'great',
