@@ -2948,6 +2948,14 @@ _energyReady.then(function() { if (window.cmpRender) window.cmpRender(); });
       if (tip) nodes[i].setAttribute('title', tip);
     }
   };
+  // Exposed so anything that injects data-t markup into the document AFTER
+  // load can re-hydrate it. document.querySelectorAll does NOT descend into
+  // <template> content (it is an inert DocumentFragment, not part of the
+  // document tree), so the best-buddy L51 prose/card templates are invisible
+  // to the pass below; setBestBuddyLevel calls this right after it swaps a
+  // template into its host. Idempotent -- re-setting an already-correct
+  // title is a no-op.
+  window.ddPopulateTooltips = populate;
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', populate);
   } else {
