@@ -114,7 +114,8 @@ _BP_KNOWN = {'focal_key', 'opp_key', 'opp_short', 'headline_move',
              'headline_abbr', 'expected_tiers', 'assert_focal_default_moveset',
              'claim_a', 'claim_b', 'named_spreads', 'sim_probes',
              'stage_probe', 'resisted_probe', 'stage_ladder_from_rank1',
-             'assert_opponent_default_moveset'}
+             'assert_opponent_default_moveset',
+             'stage_probe_engine_default_policy'}
 _CLAIM_KNOWN = {'key', 'answer_key', 'slug', 'ivs', 'claim'}
 _PROBE_KNOWN = {'focal_ivs', 'opp_ivs', 'arm', 'shields'}
 

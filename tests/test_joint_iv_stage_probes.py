@@ -97,17 +97,22 @@ def _load():
     return mod
 
 
-def _allow_policy_flag(mod):
-    """Let ``stage_probe_engine_default_policy`` through the key check.
+def test_shipped_anchor_configs_pass_key_validation():
+    """Every ``[breakpoints]`` key the shipped thievul anchors set is
+    declared in ``_BP_KNOWN``.
 
-    NOTE (2026-08-27): the flag is READ at the probe but was never added
-    to ``_BP_KNOWN``, so the shipped thievul configs that set it abort
-    with "unknown keys" before any of this runs.  That is a separate,
-    real bug in the producer; this test widens the set so the flag's
-    behavior can be pinned at all.  Drop this helper once the key is
-    declared.
+    Pre-fix observed value: ``stage_probe_engine_default_policy`` was
+    READ at the probe (f47e87f) but never added to ``_BP_KNOWN``, so
+    both shipped anchor pages died at startup with ``ABORT:
+    [breakpoints] unknown keys ['stage_probe_engine_default_policy']``
+    and could not be rebuilt at all (found by the 2026-08-27
+    adversarial test review).
     """
-    mod._BP_KNOWN = set(mod._BP_KNOWN) | {'stage_probe_engine_default_policy'}
+    mod = _load()
+    for pair_path in (_SHIPPED, _PAIRS / 'thievul_lickitung.toml'):
+        bp_cfg = mod.load_pair(pair_path).section('breakpoints')
+        unknown = set(bp_cfg) - mod._BP_KNOWN
+        assert not unknown, (pair_path.name, sorted(unknown))
 
 
 def _n_presim_calls(mod, pair_path):
@@ -226,7 +231,6 @@ def test_engine_default_policy_flag_pins_the_shipped_probe(tmp_path,
     """
     out = tmp_path / 'shipped.json'
     mod = _load()
-    _allow_policy_flag(mod)
     rec = _install_spy(mod)
     _run(mod, _SHIPPED, out, monkeypatch)
 
@@ -253,7 +257,6 @@ def test_engine_default_policy_flag_pins_the_shipped_probe(tmp_path,
         flag_on, 'stage_probe_engine_default_policy = false'))
 
     mod2 = _load()
-    _allow_policy_flag(mod2)
     rec2 = _install_spy(mod2)
     _run(mod2, off, tmp_path / 'flag_off.json', monkeypatch)
     with_policy = [kwargs for kwargs in rec2.kwargs
