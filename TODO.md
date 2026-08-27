@@ -335,55 +335,13 @@ Key finding baked into the kit (8ebb642): mirror grids are
 seat-ASYMMETRIC by construction (row = optimized line, column =
 always-baits dive convention), so there is NO antisymmetry invariant;
 the MIRROR MATCH note is now data-driven (measured diagonal even-shield
-wins). TEST DEBT: the new guards (measured mirror note branches in
-build_joint_iv_page.py, seat-ambiguous stage attribution + buff-meter
-bound in joint_iv_breakpoints.py, grid-condition stage probes +
-debuff_thrown_only_shielded recording, f47e87f) shipped without
-failing-first tests (publish-day time box). Review minor 4 (cross-arm
+wins). TEST DEBT CLOSED 2026-08-27 (37ccc01 + 93b6d91): all 7 planned guard
+tests landed, each proven failing against its pre-guard commit
+(writer + independent skeptic + mutation probes); the review also
+caught and fixed a real producer bug -- _BP_KNOWN was missing
+stage_probe_engine_default_policy, so the shipped thievul anchor
+pages could not be rebuilt. Review minor 4 (cross-arm
 panel labels) shipped 2026-08-26 with the GTO-fill/outline bundle.
-
-**TEST PLAN for the untested guards (write these; each test must FAIL
-against the pre-guard commit named, per the testing policy; follow the
-suite's scan rules -- floors below today's counts, positive controls
-for absence pins):**
-
-1. Mirror seat-asymmetry measurement (build_joint_iv_page.py, 8ebb642):
-   unit-test the counting on tiny synthetic won arrays -- a 2x2x9 grid
-   with a diagonal even-shield win must select the asymmetric MIRROR
-   MATCH wording with the right count; an all-zero one must reproduce
-   the round-1 wording BYTE-identically (pin the exact string -- the
-   shipped licki/wiggly/corvi/quag-S pages depend on it).
-2. Seat-ambiguous stage attribution (joint_iv_breakpoints.py, 373bae8):
-   monkeypatch simulate to return a canned timeline + lp.atk_stage;
-   assert (a) opponent-only throws with atk_stage==0 record
-   debuff_unreachable (the pre-fix false positive: name-count > 0 must
-   NOT count as thrown), (b) lp.atk_stage<0 counts as thrown, (c) a
-   guaranteed opponent self-atk-buff aborts, (d) the Night Slash meter
-   bound skips a candidate at 7 pooled throws (chance 0.125) and not
-   at 6 (test _meter_can_fire directly for the c==0.5 special case
-   too).
-3. Grid-condition probes (f47e87f): capture simulate() kwargs via
-   monkeypatch; assert charged_policy_0/1 are pvpoke_dp by default and
-   ABSENT when stage_probe_engine_default_policy=true (byte-pin
-   protection for thievul_lickilicky/lickitung).
-4. debuff_thrown_only_shielded (f47e87f): canned fights where the
-   debuff flies but every slot-1 hit is shielded must record the new
-   key, not abort; a fight with an unshielded stage-0-only hit must
-   still abort (stage_probe fixable).
-5. Proportional fill + sliver floor (GTO fills): render a synthetic
-   matrix row/grid9 slice and scan the HTML -- every amber gradient
-   stop is within [1px,6px] (hub) / [5%,95%] (sheets); positive
-   control: frac=0.999 must NOT render as a solid class (the floor is
-   the whole point).
-6. Amber outline channel: a cell solid in the headline slice with a
-   corner-slice mix must render class "u"/"sc-u" and the origin
-   annotation ('high-atk opp' etc. from Cell.amber_origins); negative
-   control: headline-mixed cells never get the outline. Also pin
-   amber_origins() keys == amber_scenarios() on a fixture cell.
-7. JS side (joint_iv_page.js display labels, reEsc): stub-DOM harness
-   render of the cross-arm page must contain both arm labels and no
-   'by Thievul (NS+IW) atk stage' residue (the unescaped-regex failure
-   mode reEsc exists for).
 
 **DECISIONS FOR MICHAEL (2026-08-19 EOD):**
 
