@@ -165,8 +165,11 @@ def missing_pool_entries(opponents: list[str], pool_path: Path) -> list[str]:
     pool file fresh is the pool-refresh workflow's job (see the header of
     opponent_pools/ul_top60.txt), not this gate's.
 
-    Raises ValueError (from the parser) on a malformed pool line; the
-    caller reports that as its own error rather than swallowing it.
+    Raises ValueError (from the parser) on a malformed pool line, or
+    OSError (from read_text) when the declared pool file is unreadable --
+    a renamed/moved opponents_file is exactly the drift this check exists
+    to notice. The caller reports either as its own error rather than
+    swallowing it, and rather than letting it abort the gate mid-step.
     """
     from deep_dive_lib.opponents import _parse_opponent_pool_line
     have = set(opponents)
@@ -334,9 +337,14 @@ def main() -> int:
         else:
             try:
                 gone = missing_pool_entries(opps, pool)
-            except ValueError as e:
-                errors.append(f'{d.name}: malformed line in {pool.name}: {e}')
-                print(f'  ERR {d.name}: malformed line in {pool.name}: {e}')
+            # OSError as well as ValueError: a renamed/moved opponents_file
+            # is drift this step should REPORT, not die on -- an uncaught
+            # FileNotFoundError here aborts the whole gate mid-step, so
+            # steps 4 and 5 never run and the morning check reports nothing.
+            except (ValueError, OSError) as e:
+                msg = f'{d.name}: pool {pool.name} unusable: {e}'
+                errors.append(msg)
+                print(f'  ERR {msg}')
             else:
                 if gone:
                     msg = f'{d.name}: pool entries missing from dive: {gone}'
