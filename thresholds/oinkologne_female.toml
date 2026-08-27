@@ -29,10 +29,3 @@ body = ""
 good_at = ""
 bad_at = ""
 body = ""
-
-# See thresholds/oinkologne.toml cd_prep for the shared rationale.
-# Female and Male share the same incoming CD move.
-["Oinkologne (Female)".cd_prep]
-event = "Mud Slap Community Day 2026-05"
-fast_moves = ["MUD_SLAP"]
-notes = "Must pass --fast MUD_SLAP to deep_dive.py until cd_prep auto-injection lands; otherwise the dive enumerates only Tackle/Take Down variants."
