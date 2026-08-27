@@ -54,12 +54,17 @@ The Gulp Missile engine port (pvpoke 78c64048a) landed 2026-08-24 with
 adversarial review (all 19 confirmed findings fixed same-day; record in
 DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
 
-1. **Sweep-cache migrations** (recipe per the Worlds precedent): the
-   gamemaster leg runs from the PRE-port engine tree (`--from-gamemaster
-   8f1d6cca5c0f --old-gamemaster-file
-   userdata/gamemaster_vintages/gamemaster_8f1d6cca5c0f.json`, ~147k
-   blessed / ~2k re-sim), then the engine leg (`--from-engine
-   5839391a7596 --predicate cramorant_port_20260824`).
+1. **Sweep-cache migrations — DONE, cache fully warm 2026-08-27.**
+   Both port legs ran (verified 2026-08-27 from cache-state footprint:
+   zero columns at the old stamps + the port predicate's exact
+   Aegislash deletion pattern; the invocations themselves were never
+   logged), the sheet-v4 bless ran 08-26 02:15, and the final leg
+   (`--from-engine 03aff90d1e71 --predicate
+   pogodives_sheet_v5_20260826`) was applied 2026-08-27: 144,336
+   blessed / 0 re-sim. All 153,376 columns now stamp engine
+   bff4191c3cfe + gamemaster 1398b001cf86. NB the port predicate
+   emptied the 6 Aegislash focal dirs (meta.json only) — the next
+   Aegislash dive is a cold bake.
 2. **GL + UL dives**: `run_website_dives.py cramorant` (registry entries
    added; detached; form change -> per-IV sims, Aegislash-slow). LOCAL
    render only -- publishing needs Michael's explicit go, as always.
@@ -82,11 +87,11 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    per-side marking, adaptive rule threaded into decision AND model,
    lead40 CONFIRMED on the threaded engine -- writeup addendum 3;
    cache key normalization primitives in sweep_cache with the registry
-   pinned to the engine-hashed battle.py). REMAINING: the render side
-   -- Strategy dropdown on the Cramorant dive pages + the pogodives
-   bake (consumer wiring of column_key_fields(policy=...) +
-   normalize_policy_for_pair through deep_dive_lib/sweep.py) -- its
-   own scoped session. Round-6 discovery (IV-/opponent-dependent
+   pinned to the engine-hashed battle.py). RENDER SIDE SHIPPED
+   2026-08-25 (b67b8d4 sweep/cache consumer wiring + 744c4a5 --policy
+   axis & Strategy dropdown; verified 2026-08-27 live on the published
+   pages — both tiers baked, PvPoke tier is the JS default).
+   Round-6 discovery (IV-/opponent-dependent
    thresholds) is QUEUED FOR THE NIGHT OF 2026-08-25 (Michael's go):
    chain = current policy-both bake finishes -> GL replay re-render ->
    build mechanism-derived discriminator variants in the lab ->
@@ -126,8 +131,8 @@ DEVELOPER_NOTES "Form change gotchas" item 5). Queued next, in order:
    worst-slice margin target of +0.5.
    STRATEGY ARTICLE (Michael 2026-08-26): rendered by
    `scripts/render_pogodives_strategy_article.py` (AI-drafted at
-   Michael's direction, meta.toml authorship="ai"; REVIEW BEFORE
-   PUBLISH) to userdata/website/articles/cramorant-pogodives-strategy/,
+   Michael's direction; reviewed — final authorship "both", published
+   2026-08-27) to userdata/website/articles/cramorant-pogodives-strategy/,
    linked from both dives via replay-rendered article_slug injection.
    DEBT: the slug's durable home is a thresholds/cramorant.toml
    [Cramorant.article] table -- until that file exists, a from-CLI
@@ -230,6 +235,14 @@ POST-WORLDS: restore the live gamemaster [DONE 2026-08-27, hash
 1398b001cf86 verified], remove the worktree, re-green the fast tier
 [fast tier green 2026-08-27 under the live gamemaster], and decide
 whether to fold Aegislash's engine-fix into a Worlds rebake.
+SEQUENCING NOTE (found 2026-08-27): `verify_worlds.py` FAILS from
+main on all six stamps (engine, gamemaster, and both code stamps
+drifted) and is ship gate #5 inside `publish_website.sh`, which
+re-renders every Worlds surface before rsync — so ANY site publish
+from main is gate-blocked until the Worlds surfaces are retired from
+the publish path or rebaked; the pinned worktree is currently the
+only tree that greens the gate, so remove it only AFTER that
+decision.
 LEGALITY INPUT for that decision (verified 2026-08-27, Play!
 handbook rule: new species/moves eligible the second Tuesday after
 release): Cramorant debuted Tue 08-18 (Water Festival) -> eligible
@@ -244,6 +257,16 @@ out-breaking Greninja 2:1 IV-robustly; Greninja ranks 27/35 as a
 core breaker, its case is the energy-lead snowball; Annihilape 9th,
 #1 on the strict tier) + hsh_greninja_verification.md (5/6 breaks
 confirmed, Tinkaton refuted, energy leads convert losses).
+EDITORIAL DECISION (Michael 2026-08-27, recorded here from session
+memory): the Worlds Discord post is SKIPPED — do not re-pitch
+`docs/worlds_discord_bullets_draft.md` (header-marked SKIPPED; its
+33-entry/528-pair numbers predate the 35-entry matrix anyway). The
+surviving lead is a Corviknight vs Shadow Quagsire per-spread scatter
+for r/TheSilphArena — OPEN QUESTION for Michael before drafting:
+which scenario? (memory says the 2-2 scatter; the original reminder
+pointed at 0-shield; re-verified data shows real structure in both
+0-0, win_frac_all 0.809, and 2-2, 0.86, while 1-1 is near-hopeless
+at 0.004).
 ORIGINAL BRIEF (Michael 2026-08-26): HSH posted a Worlds-predictions video; one call is Greninja
 making day 2 as a core breaker (breaks Shadow K9 / G-Corsola /
 Lickilicky / Tinkaton / Thievul cores; main meta weakness Mantine; an
@@ -340,18 +363,14 @@ for absence pins):**
 
 **DECISIONS FOR MICHAEL (2026-08-19 EOD):**
 
-- **FN audit of the hub's green/red cells.** The probe-expansion screen
-  (`scripts/worlds_probe_expand.py`,
-  `userdata/worlds_probe_expand/results.json`) shows 45 of the 73
-  non-amber pairs are IV-dependent under extra extreme probes -- 41 of
-  them on the max-attack probe (realistic breakpoint-chaser corner),
-  not junk-spread noise. The EXACT fix is one overnight bake:
-  `direnv exec . python scripts/worlds_tier2.py --clean-sample 73
-  --budget-minutes 720 --workers 14` (detached; idempotent; the 21
-  already-baked clean pairs skip). Then the amber set is exact at
-  cohort level and the hub's FN block can be retired/re-measured.
-  Hub re-render = a Worlds render (gamemaster is pinned at 8f1d6cca5c0f
-  and verified current, so safe today).
+- **FN audit of the hub's green/red cells — RESOLVED (the bake ran
+  2026-08-19/20).** The 73-pair clean-sample bake completed (tier2
+  manifest: 292 clean_sample entries = 73 pairs, 0 deferred) and the
+  shipped hub reports the full-grid ground truth: 11 of 73 clean pairs
+  show IV-dependence in the top-512 x top-512 block (supersedes both
+  the 45/73 extra-probe screen and the original 4/21 sample figure).
+  Grid-amber is folded into the hub's amber set via
+  Cell.grid_scenarios/_apply_grid_amber.
 - **Shipped thievul pages carry two wording issues found by the pair-1
   review**: the 'IV tech without meta cost' card costs 5W on the
   lickilicky page (its own max-meta card shows 63W vs 58W), and the
@@ -432,8 +451,8 @@ FN samples (87 pairs, 348 grids, ~2.1B sims; 335 amber pairs deferred
 by budget, listed on the hub -- extend by re-running
 `worlds_tier2.py`, idempotent), 66 per-pair detail pages
 (grid-selected scenarios, SVG robustness curves, boundary-confirmed
-reach-or-deny with deny counts), measured FN-rate on the hub (4/21
-clean pairs show IV-dependence; worst spread-impact printed), all
+reach-or-deny with deny counts), measured FN-rate on the hub (then
+4/21; superseded 2026-08-19/20 by the full 73-pair bake: 11/73), all
 adversarially verified twice (second round forced the grid-based
 scenario selector + wording fixes). Session 5 DONE 2026-08-11 except the publish itself: IV explorer
 (worlds-explorer.html; baked closed-form ladders, zero damage
@@ -499,11 +518,9 @@ build). Rationale, mechanism and the scoped NS-vs-PR claims are in
   background bakes were killed mid-run. `os.fork`/`os.setsid` double-fork
   survives (macOS has no `setsid` binary). Per-grid manifest keying meant
   nothing was lost either time -- restarts resume.
-- The FN-rate block still reports 4/21 from the ORIGINAL clean sample;
-  that sample was drawn from the 31-entry meta and was deliberately not
-  redrawn (redrawing would retag existing grids). The hub's wording is
-  literally true; if a wider FN claim is ever wanted, re-sample
-  explicitly.
+- The hub's FN block now reports 11/73 (the full 73-pair clean-sample
+  bake of 2026-08-19/20, folded in as grid-amber); the old 4/21
+  original-sample figure is retired.
 Session-4 carry-in status (2026-08-10): rebalance date RESOLVED
 (Forever Forward live in-game 2026-06-02 1pm PDT; Turin was
 post-rebalance -- pages state the split; plan doc corrected).
@@ -1042,13 +1059,11 @@ The Reader's Guide arc shipped 2026-04-23/24 — infrastructure
 guide bodies, ALL at `authorship=both` as of 2026-07 (the old
 "pending review" note here was stale). A 56-agent staleness audit ran
 2026-07-07 (43 findings applied; detail in TODO_archive). An eighth
-guide, **Matchup Clusters**
-(`guides/matchup-clusters/`), was drafted at `authorship=ai` for the
-new dive section — MICHAEL: review + promote to `both`.
+guide, **Matchup Clusters** (`guides/matchup-clusters/`), was drafted
+at `authorship=ai` and promoted to `both` 2026-07-07 (`1368bce`).
 
 Open follow-ups:
 
-- **Review the Matchup Clusters guide** (`authorship=ai` -> `both`).
 - **Review the IV Robustness guide** (`guides/iv-robustness/`,
   published 2026-08-15 at `authorship=ai` -> promote to `both`).
   General robustness methodology (planes, cohorts/probes, W/L/? grids,
@@ -1072,8 +1087,11 @@ Open follow-ups:
   confusion, (c) decide whether related topics merge.
 
 The IV Flavor Guide write-up is owed to an HSH Discord member per
-`project_acidic_arisen_writeup_commitment.md` — promoting that
-guide from `ai` to `expert` is the closing of that commitment.
+`project_acidic_arisen_writeup_commitment.md` (NB: that memory file
+lives in the retired pogo-simulator project's memory dir,
+`~/.claude/projects/-Users-mglerner-coding-MGLPoGo-pogo-simulator/memory/`,
+not this project's) — the guide sits at `both` today; promoting it to
+`expert` is the closing of that commitment.
 
 ## Low priority
 

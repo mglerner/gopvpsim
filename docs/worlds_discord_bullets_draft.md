@@ -1,5 +1,11 @@
 # Worlds-dive Discord post — bullet draft (prepared overnight 2026-08-24)
 
+**SKIPPED (Michael, 2026-08-27): this post is not happening — do not
+re-pitch.** Kept for reference only; the numbers below predate the
+35-entry matrix (they say 33 entries / 528 pairings / 505 amber). The
+surviving editorial lead is a Corviknight vs Shadow Quagsire
+per-spread scatter for r/TheSilphArena (see TODO.md, Worlds section).
+
 Draft material for Michael's 2026-08-25 Discord post about the Worlds
 robustness pages (pogodives.com). Chat-draft, exploration-mode — edit
 freely, numbers verified against the shipped pages as noted.
