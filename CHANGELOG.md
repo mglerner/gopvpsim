@@ -45,8 +45,12 @@ mismatch cells). The 4 shipped showcase links verified clean
 the Ranker.js rating formula `floor((health+damage)*500)` where the
 battle page uses `floor(500*damage + 500*health)` (Pokemon.js:2124) --
 sum-then-scale lands 1 low on exact fractions, the only 2 non-encoder
-mismatches in the sample. Tool-layer fixes tracked in TODO (Thievul
-residue).
+mismatches in the sample. Both tool-layer fixes SHIPPED same day
+(3a041cb): cancelled charged decisions are now logged + encoded (the
+reference cell round-trips 662 exact), the three Node harnesses use
+the battle-page formula, and the log-only engine bump (bff4191c3cfe
+-> 515a0a95171b) was fully blessed via the
+cancelled_charged_log_20260827 predicate (153,376/153,376 warm).
 
 ## 2026-08-27 -- Cramorant dives + strategy article + Worlds refresh PUBLISHED
 

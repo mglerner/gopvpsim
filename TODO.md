@@ -29,10 +29,6 @@ lines of mostly-completed chronological batches. -->
   current kit fixes both -- republishing is Michael's call.
 - `thresholds/thievul.toml` [cd_prep] retirement rides the
   post-Worlds bundle (see the Worlds checklist below).
-- KO-edge tool-layer fixes -- IN PROGRESS 2026-08-27 (encoder blind
-  spot in scripts/pvpoke_sandbox.py + the Node harness rating-formula
-  bug). The investigation record (NOT an engine divergence; sandbox
-  encoder artifact) is in CHANGELOG 2026-08-27.
 
 ## Cramorant -- open items (port/campaign/publish record: CHANGELOG 2026-08-24..27 + TODO_archive)
 
