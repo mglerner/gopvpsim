@@ -8,25 +8,42 @@ steps make either event a procedure instead of a scramble.
 
 ## A. When the MOVE-DATA tripwire fires (existing move changed/removed)
 
-1. **Cache migration (gamemaster leg):** keep the OLD gamemaster blob
-   (`git -C ../pvpoke show <old>:src/data/gamemaster.json`, or the
-   copy in `userdata/gamemaster_vintages/`), then
+1. **Snapshot the sweep cache BEFORE any `--apply`** -- the one
+   irreversible step in this procedure, and a one-shot window:
+
+       cp -al ~/.cache/gopvpsim/sweep ~/.cache/gopvpsim/sweep_pre_<season>
+
+   `migrate_cache.py` unlinks the `.npz` **score planes**, not just the
+   `.json` sidecars (`scripts/migrate_cache.py:604-612`), and those
+   planes ARE the per-spread pre-rebalance scores. Blessed columns are
+   untouched; the *affected* ones are deleted -- and those are exactly
+   the columns a before/after "who won and lost" comparison needs.
+   Hardlinks, so it costs seconds and near-zero disk. The window exists
+   only between "the rebalanced gamemaster is fetched" and "`--apply`
+   runs"; after the unlink, recovering those numbers means re-simming
+   the pre-rebalance meta from the archived blob (hours).
+2. **Cache migration (gamemaster leg):** recover the OLD gamemaster
+   blob from the pvpoke checkout -- `git -C ../pvpoke show
+   <old>:src/data/gamemaster.json`. No local copy is kept: the live
+   cache blobs are content-identical to committed pvpoke objects, so
+   git IS the archive (DEVELOPER_NOTES "Pre-rebalance data vintage
+   pin" records the current baseline commit + stamp). Then
    `migrate_cache.py --from-gamemaster <old stamp>
    --old-gamemaster-file <old blob> --apply`. The affected set is
    COMPUTED from the delta -- most columns bless.
-2. **Re-verify the PoGoDives strat's fitted constants** (they were
+3. **Re-verify the PoGoDives strat's fitted constants** (they were
    tuned on pre-rebalance move data -- re-confirm, never assume):
    `cramorant_policy_lab.py --pogodives-verify` across the round-7
    file set (~10 min; both leagues, Dive+Surf, withhold, IV spreads).
    If the plateau moved: re-tune per the campaign discipline
    (docs/cramorant_policy_plan.md) before any re-publish.
-3. **Spot-check round-6 discriminators** (if any shipped): they are
+4. **Spot-check round-6 discriminators** (if any shipped): they are
    mechanism-derived and re-derive at battle time by design, but their
    holdout evidence was pre-rebalance -- one lab pass to confirm.
-4. **Refresh oracle fixtures if their cells moved** (a data change
+5. **Refresh oracle fixtures if their cells moved** (a data change
    shifts both sims identically, so usually nothing moves; the audit
    says for sure): `audit_oracle_harness.py`.
-5. **Re-pin the tripwire fixture** to the new vintage
+6. **Re-pin the tripwire fixture** to the new vintage
    (`tests/fixtures/strat_vintage_moves.json` -- regenerate with the
    snippet in the test's docstring) in the SAME commit as the
    re-verification results, so the guard re-arms at the new baseline.
