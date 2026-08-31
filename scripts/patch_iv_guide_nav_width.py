@@ -24,8 +24,13 @@ NEW = 'flex:0 0 260px'
 def targets(argv):
     if argv:
         return argv
-    return glob.glob(os.path.join(
-        ROOT, 'userdata', 'website', 'articles', '*-ml-iv-guide*', 'index.html'))
+    # Exact suffixes only. A bare '*-ml-iv-guide*' also matches the dated
+    # archive snapshots ('florges-ml-iv-guide-2026-08-31'), and this script
+    # is documented as safe to run any time -- it must not rewrite HTML that
+    # is frozen by design. See docs/article_archive_plan.md.
+    base = os.path.join(ROOT, 'userdata', 'website', 'articles')
+    return (glob.glob(os.path.join(base, '*-ml-iv-guide', 'index.html'))
+            + glob.glob(os.path.join(base, '*-ml-iv-guide-even', 'index.html')))
 
 
 def main():

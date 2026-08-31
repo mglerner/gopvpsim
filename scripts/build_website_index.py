@@ -276,6 +276,10 @@ def load_entries(base_dir: Path, *, href_prefix: str = '',
             # fallback). Drives whether the grouped dives list surfaces
             # the description as a hover tooltip.
             'curated': meta_path.exists(),
+            # Frozen dated snapshot written by scripts/archive_article.py
+            # ({of, vintage, stamp?}), or None for a live entry. See
+            # docs/article_archive_plan.md.
+            'archive': (meta.get('archive') or None) if meta else None,
         })
     entries.sort(key=lambda d: d['title'].lower())
     return entries
@@ -288,6 +292,71 @@ def _empty_placeholder_card() -> str:
     return ('  <li class="dive empty">'
             '<i>Nothing here yet.</i>'
             '</li>')
+
+
+def split_articles(articles: list[dict]) -> tuple[list, list, list]:
+    """Split loaded article entries into (archived, iv_guides, live).
+
+    ORDER MATTERS and is the whole point of this function existing at
+    module scope: the IV-guide split matches ``-ml-iv-guide`` as a
+    SUBSTRING, so an archived guide ("florges-ml-iv-guide-2026-08-31")
+    matches it too. Archived entries must come out FIRST or every
+    snapshot floods the live chip row. Pinned by
+    tests/test_article_archive.py.
+    """
+    archived = [a for a in articles if a.get('archive')]
+    live = [a for a in articles if not a.get('archive')]
+    iv_guides = [a for a in live if '-ml-iv-guide' in a['slug']]
+    live = [a for a in live if '-ml-iv-guide' not in a['slug']]
+    return archived, iv_guides, live
+
+
+def _render_archive_block(entries: list[dict],
+                          live_slugs: frozenset[str] = frozenset()) -> str:
+    """Collapsed <details> listing of archived article snapshots.
+
+    Archived entries stay REACHABLE from the index on purpose: a rendered
+    page with an index.html that no nav links to trips load_entries'
+    dropped_pages hard-fail. Collapsed, so N seasons of snapshots do not
+    swamp the live listing.
+    """
+    if not entries:
+        return ''
+    # Newest vintage first, then title A-Z within a vintage. Sorting once
+    # with reverse=True would reverse the TITLE too, and at a rebalance every
+    # snapshot shares one vintage -- so the whole block would read Z-A.
+    ordered = sorted(entries, key=lambda e: e['title'].lower())
+    ordered.sort(key=lambda e: str(e['archive'].get('vintage', '')),
+                 reverse=True)
+    items = []
+    for d in ordered:
+        vintage = html.escape(str(d['archive'].get('vintage', 'undated')))
+        stamp = d['archive'].get('stamp')
+        stamp_html = (f' <span class="stamp">gamemaster '
+                      f'{html.escape(str(stamp))}</span>') if stamp else ''
+        # Deleting the bare slug is a supported outcome of the regen triage,
+        # so "see the current version above" must not be asserted blindly --
+        # that would be a known-wrong claim on a public page.
+        supersede = ('Superseded - see the current version above.'
+                     if d['archive'].get('of') in live_slugs
+                     else 'Retired - no current version.')
+        items.append(
+            '  <li class="dive">\n'
+            f'    <a href="{html.escape(d["href"])}">'
+            f'<b>{html.escape(d["title"])}</b></a>\n'
+            f'    <p>Snapshot of the {vintage} data.{stamp_html} '
+            f'{supersede}</p>\n'
+            '  </li>')
+    return (
+        '<details class="archive">\n'
+        f'<summary>Archive ({len(entries)} superseded '
+        f'{"snapshot" if len(entries) == 1 else "snapshots"})</summary>\n'
+        '<p class="section-intro">Frozen copies kept for reference after a '
+        'move rebalance or meta shift. Their numbers were correct for the '
+        'data vintage named on each; the live article above supersedes '
+        'them.</p>\n'
+        f'<ul>\n{chr(10).join(items)}\n</ul>\n'
+        '</details>\n')
 
 
 def _render_entry_list(entries: list[dict]) -> str:
@@ -553,6 +622,13 @@ def _index_css() -> str:
   h2 { color: var(--heading); border-bottom: 1px solid var(--border);
         padding-bottom: 6px; font-size: 1.15em; font-weight: 700;
         letter-spacing: .02em; }
+  details.archive { margin: 18px 0 6px; border-top: 1px solid var(--border);
+        padding-top: 10px; }
+  details.archive > summary { color: var(--heading); font-size: 1.08rem;
+        font-weight: 600; cursor: pointer; padding: 4px 0; }
+  details.archive > summary:hover { color: var(--title); }
+  details.archive .stamp { font-family: ui-monospace, SFMono-Regular,
+        Menlo, monospace; font-size: .85em; opacity: .75; }
   h3 { color: var(--heading); margin: 20px 0 6px; font-size: 1.08rem;
         font-weight: 700; }
   a { color: var(--accent); text-decoration: none; }
@@ -622,6 +698,7 @@ def render_index(dives: list[dict],
                  guides_landing: dict | None = None,
                  cups: list[dict] | None = None,
                  worlds: dict | None = None,
+                 archived: list[dict] | None = None,
                  iv_robustness: dict | None = None) -> str:
     dives_html = _render_dives_grouped(dives)
     articles_html = _render_entry_list(articles)
@@ -665,6 +742,13 @@ def render_index(dives: list[dict],
             f'<p>{_render_iv_guides(iv_guides)}</p>\n')
     if not articles and not iv_guides:
         parts.append(f'<ul>\n{articles_html}\n</ul>\n')
+    # Superseded snapshots (scripts/archive_article.py) render last, inside a
+    # collapsed <details>, so they stay reachable from nav without swamping
+    # the live listing. See docs/article_archive_plan.md.
+    parts.append(_render_archive_block(
+        archived or [],
+        live_slugs=frozenset(a['slug'] for a in articles)
+        | frozenset(g['slug'] for g in (iv_guides or []))))
     articles_section = ''.join(parts)
 
     comparisons_section = (
@@ -1006,11 +1090,10 @@ def main() -> int:
     dives = [d for d in dives if not _dive_cup(d['slug'])]
     articles = load_entries(ARTICLES_DIR, href_prefix='articles/',
                             dropped_pages=dropped_pages)
-    # Split the ML IV guides (slug "<species>-ml-iv-guide[-even]") out from the
-    # editorial articles so they render as a labeled chip-row sub-group under
-    # the single "Articles" section (rather than a separate top-level section).
-    iv_guides = [a for a in articles if '-ml-iv-guide' in a['slug']]
-    articles = [a for a in articles if '-ml-iv-guide' not in a['slug']]
+    # Archived snapshots, ML IV guides, and editorial articles. The split
+    # ORDER is load-bearing and lives in split_articles() so a test can pin
+    # it -- see that docstring.
+    archived, iv_guides, articles = split_articles(articles)
     comparisons = load_entries(COMPARISONS_DIR, href_prefix='comparisons/',
                                dropped_pages=dropped_pages)
 
@@ -1085,6 +1168,7 @@ def main() -> int:
                               guides_landing=guides_landing,
                               cups=cup_dives,
                               worlds=worlds_info,
+                              archived=archived,
                               iv_robustness=iv_rob)
     INDEX_PATH.write_text(index_html)
 
