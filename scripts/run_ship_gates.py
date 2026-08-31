@@ -36,11 +36,15 @@ SHIP_GATES = (
     # sentinel is a public wrong number. Wired in 2026-08-06 after the
     # final gate found it uncalled anywhere and a month stale.
     ('verify_dev_counts.py', ('--quiet',)),
-    # Worlds 2026 surfaces (season-scoped; retires with worlds/):
-    # manifest stamps + coverage, pair-page/deferred agreement, hub FN
-    # numbers fresh, *_great.toml collision glob. Wired 2026-08-11
-    # (session 5).
-    ('verify_worlds.py', ('--quiet',)),
+    # Worlds 2026 surfaces: gate REMOVED from the roster 2026-08-31.
+    # Worlds ran 2026-08-28..30. The shipped pages are frozen at engine
+    # 5839391a7596 / gamemaster 8f1d6cca5c0f / worlds_code c1395dfa10b9,
+    # so verify_worlds fails on all six stamps from main -- and because
+    # this roster is shared by all four entry points, it blocked EVERY
+    # publish path, not just a Worlds one. Michael's call (2026-08-31):
+    # the surfaces RETIRE at the Twilight Trails site update; until then
+    # they stay published exactly as shipped. scripts/verify_worlds.py
+    # is unchanged -- run it by hand if the surfaces are ever rebaked.
 )
 
 

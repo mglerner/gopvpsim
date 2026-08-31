@@ -65,8 +65,14 @@ echo "Regenerating reader guides..."
 python "${REPO_ROOT}/scripts/build_guides.py"
 echo
 
-if [ -f "${REPO_ROOT}/worlds/planes/manifest.json" ]; then
-  echo "Regenerating Worlds 2026 pages..."
+# Worlds 2026 re-render is OPT-IN as of 2026-08-31. The shipped pages are
+# frozen at a Worlds-era engine/gamemaster; re-rendering them from main would
+# restamp them against current data without re-simming, i.e. publish pages that
+# claim a vintage they were not baked at. Set WORLDS_RERENDER=1 to force it
+# (only meaningful with the gamemaster re-pinned per TODO.md). The surfaces
+# retire at the Twilight Trails site update -- see scripts/run_ship_gates.py.
+if [ "${WORLDS_RERENDER:-0}" = "1" ] && [ -f "${REPO_ROOT}/worlds/planes/manifest.json" ]; then
+  echo "Regenerating Worlds 2026 pages (WORLDS_RERENDER=1)..."
   if [ -f "${REPO_ROOT}/worlds/planes/tier2/manifest.json" ]; then
     python "${REPO_ROOT}/scripts/build_worlds_pair_pages.py"
   fi
