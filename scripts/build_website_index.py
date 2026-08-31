@@ -905,8 +905,12 @@ def _cup_status_line(cup_key: str, active_formats: dict) -> str:
                  "gamemaster pull).")
     else:
         avail = "Not in PvPoke's current active formats - archived snapshot."
-    return (f'{avail} Dated snapshots kept as an archive; open a dive for its '
-            f'exact rankings snapshot date and cup movesets.')
+    # NB: no retention promise here. We do NOT keep multiple dated snapshots
+    # of a cup -- a recurring cup's dive is regenerated in place, overwriting
+    # the previous one. The claim that we did was removed 2026-08-31; the
+    # per-dive snapshot DATE below is real and rendered by deep_dive.py.
+    return (f'{avail} Open a dive for its exact rankings snapshot date and '
+            f'cup movesets.')
 
 
 def render_cup_index(cup_dives: list[dict]) -> str:
