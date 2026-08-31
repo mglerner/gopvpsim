@@ -224,7 +224,16 @@ the site rather than left up with a caveat. This satisfies the
 never-ship-unflagged-known-wrong rule by not shipping the wrong page at
 all, which is stronger than flagging it.
 
-Mechanism (no new tooling needed): delete the rendered dir from
+TOOLING READY (built 2026-08-31, ahead of the rebalance):
+`scripts/archive_article.py --slug <slug> --vintage YYYY-MM-DD [--stamp
+<hash>]` copies a live article to a dated snapshot slug and marks the
+copy; the index renders snapshots in a collapsed Archive block. Design
++ rationale: `docs/article_archive_plan.md`. `--vintage` is deliberately
+REQUIRED -- archiving happens after the new data lands, so the live
+gamemaster stamp at that moment is the NEW one and defaulting to it
+would mislabel the snapshot.
+
+Mechanism if you instead DELETE outright: remove the rendered dir from
 `userdata/website/articles/`, then re-run `build_website_index.py`.
 The index discovers articles by scanning
 `userdata/website/articles/*/meta.toml`
