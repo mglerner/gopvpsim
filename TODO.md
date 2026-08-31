@@ -194,6 +194,38 @@ the same meta-config handle. PvPoke publishes per-cup rankings
 (topn_cup_filter_plan.md), so cup default movesets have a source.
 Standing publish/bake/pin constraints: see the Worlds section above.
 
+## Article regen triage (Twilight Trails, post-2026-09-08)
+
+Michael, 2026-08-31: once the full move-update data is live, **every
+article gets a per-article regen / no-regen decision** -- we do not
+blanket-regenerate. The gate is meta relevance in **open + cups**: an
+article about a species that is far out of the meta on both does not
+earn a regen, however stale its numbers.
+
+The surface (62 rendered dirs under `userdata/website/articles/`):
+
+- **61 `*-ml-iv-guide`** dirs, driven by `opponent_pools/master_top60.txt`
+  (`run_iv_guides.py`). ML is where Lugia's new Earth Power lands, so
+  this is not a low-churn surface.
+- **`cramorant-pogodives-strategy`** -- couples to the fitted-constant
+  re-verification already in `docs/rebalance_checklist.md` section A
+  step 3; don't regen it before that passes.
+- **`articles/oinkologne-cd-2026-05.toml`** -- still all PLACEHOLDER
+  bodies, so nothing is shipped and nothing is wrong today. Worth
+  knowing before anyone picks it up: its comparison axis is Mud Slap
+  vs Tackle/Take Down, and **Take Down goes 5->14 power with increased
+  energy gain**, which can invert the article's thesis. Decide
+  regen-vs-drop on the meta test above before spending an authoring
+  session on it.
+
+Two decisions this triage needs, both Michael's: (a) what counts as
+"in the meta" for the cups half, given the season ships eight of them
+(Willpower, Retro, Mega Color, Little, Fantasy, Halloween, GO LAIC,
+Mega Catch); (b) whether a no-regen article gets a staleness marker on
+the page or is simply left alone -- the never-ship-unflagged-known-wrong
+rule points at the former, since a no-regen page keeps asserting
+pre-rebalance numbers with no visible vintage.
+
 ## Re-dive runbook
 
 **Twilight Trails (2026-09-08) one-shot gate:** before any

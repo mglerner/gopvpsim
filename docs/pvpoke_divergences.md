@@ -56,9 +56,15 @@ upstream and never runs, so copying it would make us diverge from PvPoke's
 actual behavior rather than match it.
 
 The experimental `mechanics='new'` mode (the 2026-06-23 in-game turn changes)
-is OFF by default. PvPoke has not implemented those changes, so there is no
-reference to validate it against; everything above and every published score
-uses the legacy turn system, which is what matches PvPoke.
+is OFF by default, and everything above and every published score uses the
+legacy turn system.
+
+A reference DOES now exist (corrected 2026-08-31): PvPoke implemented the new
+turn system on `origin/new-mechanics` (`041d8c722`..`a1b3ebd95`, 2026-08-23..26),
+merged into `origin/twilight-trails` but not into `origin/master`. Our `'new'`
+branch has not been cross-checked against it. Note the consequence for the
+sentence above: legacy matches *PvPoke master*, and matched the live game only
+through 2026-08-30 -- the old battle system was retired at the end of Worlds.
 
 ## Keeping this list current
 
