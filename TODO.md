@@ -103,22 +103,29 @@ pin artifacts).
 
 POST-WORLDS checklist (after 08-30):
 
-- Decide the Worlds surfaces' publish-path future FIRST:
-  `verify_worlds.py` FAILS from main on all six stamps (engine,
-  gamemaster, both code stamps) and is ship gate #5 inside
-  `publish_website.sh`, which re-renders every Worlds surface before
-  rsync -- so ANY site publish from main is gate-blocked until the
-  surfaces are retired from the publish path or rebaked. The pinned
-  worktree (gopvpsim-worlds at 6a7e534) is currently the only tree
-  that greens the gate.
+- DECIDED (Michael, 2026-08-31): the Worlds surfaces **RETIRE at the
+  Twilight Trails site update** -- "I don't think anyone will ever look
+  at it post-Worlds." Publish-path unblocking is DONE ahead of that:
+  `verify_worlds.py` is out of the `run_ship_gates.py` roster (it
+  failed from main on all six stamps, and because the roster is shared
+  by all four entry points it blocked EVERY publish path, not just a
+  Worlds one), and the `publish_website.sh` Worlds re-render is now
+  opt-in behind `WORLDS_RERENDER=1`. The 593 pages stay published
+  exactly as shipped until the retire lands; `scripts/verify_worlds.py`
+  is unchanged, so a rebake can still run it by hand.
+  Correction to the old note here: the pinned worktree did NOT green
+  the gate either -- the gamemaster stamp reads the machine-level
+  cache, which holds the live blob. There was no clean publish path
+  from any tree.
   NB the next publish should also carry a full dive-page re-render:
   the shipped pages have dead tooltips on their best-buddy L51 half
   (hydration bug fixed 061d93c; render-only, no sim cost -- neither
   touched file is engine-hashed).
-- Remove the worktree (AFTER the decision above). It is dirty --
-  needs `git worktree remove --force`; its worlds/, userdata/ and
-  .venv entries are symlinks into the main repo, so never `rm -r` it
-  in a way that follows symlinks.
+- Worktree `gopvpsim-worlds`: REMOVED 2026-08-31. Its only working-tree
+  delta was `scripts/worlds_meta.py`, verified byte-identical to
+  `main` before removal (the Greninja/Annihilape editorial was already
+  committed); the three symlinks were unlinked individually first so
+  nothing could follow them into the main repo.
 - Retire together: `thresholds/thievul.toml` [Thievul.cd_prep], the
   worlds/meta.toml `injected_move_ids` declarations + their on-page
   disclosures (build_worlds_pages.py:569-660), and the 4 injection
@@ -188,6 +195,16 @@ the same meta-config handle. PvPoke publishes per-cup rankings
 Standing publish/bake/pin constraints: see the Worlds section above.
 
 ## Re-dive runbook
+
+**Twilight Trails (2026-09-08) one-shot gate:** before any
+`migrate_cache.py --apply`, hardlink-snapshot the sweep cache --
+`cp -al ~/.cache/gopvpsim/sweep ~/.cache/gopvpsim/sweep_pre_twilight`.
+The migration unlinks the `.npz` score planes of the affected columns,
+which ARE the pre-rebalance per-spread scores a before/after comparison
+needs. Full rationale + the rest of the sequence:
+`docs/rebalance_checklist.md` section A step 1. Baseline vintage pin
+(pvpoke 46bd08a77 / stamp c431557dcc76): DEVELOPER_NOTES
+"Pre-rebalance data vintage pin".
 
 For the next cold re-dive: `docs/predive_checklist.md` is the STANDING
 pre-cold-dive gate; run `overnight_redive.sh` and watch with
