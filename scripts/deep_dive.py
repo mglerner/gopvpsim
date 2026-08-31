@@ -1935,10 +1935,11 @@ def generate_interactive_html(species, league, moveset_data, html_path,
         cup_label, f'{league.title()} League',
         rankings_snapshot_date(league, cup=cup) if cup_label else None)
 
-    # Prominent cup banner (archive policy): the cup name + the rankings
-    # snapshot date, and an explicit "kept as a dated archive" note so a reader
-    # landing on an ended cup's page isn't misled into thinking it's live. Empty
-    # string for a normal league dive.
+    # Prominent cup banner: the cup name + the rankings snapshot date, so a
+    # reader landing on an ended cup's page isn't misled into thinking it's
+    # live. It used to also promise the dive was "kept as a dated archive";
+    # that was false (a recurring cup regenerates its dive in place) and was
+    # removed 2026-08-31. Empty string for a normal league dive.
     _cup_banner_html = ''
     if cup_label:
         _cup_banner_html = (
@@ -1947,8 +1948,8 @@ def generate_interactive_html(species, league, moveset_data, html_path,
             'margin: 0 0 15px; border-radius: 2px; font-size: 13px; '
             'color: var(--text);">'
             f'<b>{cup_label}</b> &middot; {_snap_txt}. '
-            'Limited-time cup meta - this dive is kept as a dated '
-            'archive and the cup may not be currently playable. Opponents '
+            'Limited-time cup meta - the cup may not be currently '
+            'playable. Opponents '
             'use their cup movesets; meta ranks and the Top-N opponent '
             'filter reflect the cup rankings.</div>\n')
 

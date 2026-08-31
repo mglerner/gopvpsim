@@ -117,10 +117,18 @@ POST-WORLDS checklist (after 08-30):
   the gate either -- the gamemaster stamp reads the machine-level
   cache, which holds the live blob. There was no clean publish path
   from any tree.
-  NB the next publish should also carry a full dive-page re-render:
-  the shipped pages have dead tooltips on their best-buddy L51 half
-  (hydration bug fixed 061d93c; render-only, no sim cost -- neither
-  touched file is engine-hashed).
+  NB the next publish must carry a full dive-page re-render -- the
+  publish gate sentinel `userdata/.cards_rerender_pending` is SET as of
+  2026-08-31 and blocks it until then. Two render-only fixes are
+  waiting: (a) dead tooltips on the shipped pages' best-buddy L51 half
+  (hydration bug fixed 061d93c); (b) the cup dive banner's false "this
+  dive is kept as a dated archive" claim, removed from deep_dive.py
+  2026-08-31 -- the 5 shipped *-equinox-cup pages still render it.
+  Neither touched file is engine-hashed, so there is no sim cost.
+  BEFORE re-rendering, settle the vintage question: the render path
+  reads LIVE gamemaster/rankings while scores come frozen from the
+  blob, so re-rendering a page that advertises "snapshot as of
+  2026-08-26" against today's gamemaster mixes vintages.
 - Worktree `gopvpsim-worlds`: REMOVED 2026-08-31. Its only working-tree
   delta was `scripts/worlds_meta.py`, verified byte-identical to
   `main` before removal (the Greninja/Annihilape editorial was already
