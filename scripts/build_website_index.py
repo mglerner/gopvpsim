@@ -1186,12 +1186,21 @@ def main() -> int:
     if stale_cups_dir.is_dir():
         import shutil
         shutil.rmtree(stale_cups_dir)
+    cups_path = WEBSITE_DIR / 'cups.html'
     if cup_dives:
-        cups_path = WEBSITE_DIR / 'cups.html'
         cups_path.write_text(render_cup_index(cup_dives))
         print(f"Wrote {cups_path} ({len(cup_dives)} cup dive(s))")
         for d in cup_dives:
             print(f"  - [cup-dive] {d['title']} -> {d['href']}")
+    elif cups_path.exists():
+        # Every cup dive was retired. cups.html links its dives as
+        # same-directory <slug>/index.html paths, so leaving the file behind
+        # publishes a page of dead links -- rsync --delete mirrors the tree,
+        # it does not know the file is orphaned. The index drops its "Limited
+        # Cups" card in the same build (cups_section is '' when empty), so
+        # nothing links here either. Remove it. (2026-08-31)
+        cups_path.unlink()
+        print(f"Removed {cups_path} (no cup dives remain)")
     # SUPPORT_PAGE_HTML is a plain (non-f) string with literal CSS braces,
     # so theme output is spliced in via inert HTML-comment sentinels rather
     # than f-string / .format() (which would require escaping every brace).
