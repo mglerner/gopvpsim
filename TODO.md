@@ -218,13 +218,30 @@ The surface (62 rendered dirs under `userdata/website/articles/`):
   regen-vs-drop on the meta test above before spending an authoring
   session on it.
 
-Two decisions this triage needs, both Michael's: (a) what counts as
-"in the meta" for the cups half, given the season ships eight of them
-(Willpower, Retro, Mega Color, Little, Fantasy, Halloween, GO LAIC,
-Mega Catch); (b) whether a no-regen article gets a staleness marker on
-the page or is simply left alone -- the never-ship-unflagged-known-wrong
-rule points at the former, since a no-regen page keeps asserting
-pre-rebalance numbers with no visible vintage.
+DECIDED (Michael, 2026-08-31) -- **no staleness markers; the live site
+is centered on current live stuff.** A no-regen article is REMOVED from
+the site rather than left up with a caveat. This satisfies the
+never-ship-unflagged-known-wrong rule by not shipping the wrong page at
+all, which is stronger than flagging it.
+
+Mechanism (no new tooling needed): delete the rendered dir from
+`userdata/website/articles/`, then re-run `build_website_index.py`.
+The index discovers articles by scanning
+`userdata/website/articles/*/meta.toml`
+(`build_website_index.py:49,1007`), so the card disappears on its own,
+and `publish_website.sh` rsyncs with `--delete` (:105), so the live
+page goes with it. No hand-editing of index.html.
+
+If a removed article is worth keeping, it archives in the **git repo**,
+not on the site. Wrinkle to solve when it first comes up: `userdata/`
+is gitignored (`.gitignore:43`), so archiving a *rendered* page needs a
+tracked path -- the cheap alternative is to keep only the source
+(`articles/*.toml` is already tracked) and re-render from it if ever
+wanted.
+
+Still open, Michael's: what counts as "in the meta" for the cups half,
+given the season ships eight of them (Willpower, Retro, Mega Color,
+Little, Fantasy, Halloween, GO LAIC, Mega Catch).
 
 ## Re-dive runbook
 
