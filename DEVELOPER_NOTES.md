@@ -191,6 +191,42 @@ since arc S4, `deep_dive.py` serves IV sweeps from the per-opponent-
 column disk cache by default, so a repeated dive command reports 0
 sims. Pass `--no-sweep-cache` for timing runs.
 
+## Pre-rebalance data vintage pin (Twilight Trails baseline, 2026-08-31)
+
+Recorded so the pre-rebalance numbers stay reproducible after PvPoke's
+gamemaster moves. The GBL: Twilight Trails move rebalance lands
+2026-09-08; PvPoke has merged its season branch into master on
+season-start day, 0 days lag, for six consecutive seasons, and
+`data.py` refetches on a 24 h TTL -- so the live cache will roll to
+post-rebalance data within a day of the merge.
+
+    pvpoke commit      7b96d91fb   (origin/master, clean tree, verified 2026-08-31)
+    gamemaster source  46bd08a77:src/data/gamemaster.json
+    gamemaster stamp   c431557dcc76   (sweep_cache v7 narrow hash, VERIFIED equal
+                                       to the live cache's gamemaster_hash())
+    cached columns     153,376 at gamemaster 1398b001cf86 / engine 515a0a95171b
+                       (i.e. the cache was ALREADY gamemaster-stale before the
+                       rebalance -- a migration was pending independent of it)
+
+Recovery (the `--old-gamemaster-file` input for
+`migrate_cache.py --from-gamemaster`):
+
+    git -C ../pvpoke show 46bd08a77:src/data/gamemaster.json > /tmp/gm_prerebalance.json
+    git -C ../pvpoke show 7b96d91fb:src/data/rankings/all/overall/rankings-1500.json   # -> great.json
+    git -C ../pvpoke show 7b96d91fb:src/data/rankings/all/overall/rankings-2500.json   # -> ultra.json
+    git -C ../pvpoke show 7b96d91fb:src/data/rankings/all/overall/rankings-10000.json  # -> master.json
+
+**Never compare these by raw file md5.** `_fetch_json` re-serializes with
+`json.dumps` before writing (`src/gopvpsim/data.py:183`), so the cache
+file's bytes never equal the git blob's even when the content is
+identical. Compare after `json.load`, or via
+`sweep_cache.gamemaster_hash()`. (This trips people: the raw md5s here
+are `bdafb91f...` for the cache vs `e99c66e3...` for the blob, which
+looks like a mismatch and is not one.)
+
+No file copies are kept: all four live cache blobs were verified
+content-identical to committed pvpoke objects, so git IS the archive.
+
 ## Sweep disk cache + replay-from-saved-state (arc S4)
 
 Two iteration-speed layers shipped 2026-06-10; full design rationale
