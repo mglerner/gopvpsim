@@ -84,12 +84,27 @@ ordering and CMP cancellation fixes. Full root-cause writeup in
 `'legacy'`). The `'new'` model implements the in-game PvP turn changes
 that went live 2026-06-23 (spec: pokemongo.com/news/pvp-updates2026).
 
-**UNVALIDATED.** PvPoke has *not* implemented these changes (it still
-runs the legacy turn system), so there is **no reference implementation
-to cross-check against**. The `'new'` branch is coded from the published
-spec alone and pinned only by our own spec-derived unit tests
-(`tests/test_new_turn_mechanics.py`). Treat all `'new'`-mode
+**UNVALIDATED, but a reference now EXISTS (updated 2026-08-31).** Our
+`'new'` branch was coded from the published spec alone and is still
+pinned only by our own spec-derived unit tests
+(`tests/test_new_turn_mechanics.py`) -- so treat all `'new'`-mode
 breakpoint/bulkpoint/CMP output as experimental.
+
+What changed: PvPoke has now implemented the new turn system, on
+branch `origin/new-mechanics` (five commits, 2026-08-23..26:
+`041d8c722` "Updated action priority order", `71ab81008`, `442a4afe8`
+"Timing updates", `a2685efe6`, `a1b3ebd95` "0 turn switches after
+Charged Attack"; +29/-91 in `src/js/battle/Battle.js`). It is merged
+into `origin/twilight-trails` but **not** into `origin/master`. So the
+old claim here -- "no reference implementation to cross-check against"
+-- has been false since 2026-08-23.
+
+Cross-checking our `'new'` branch against it is real, unscheduled work
+(not yet done, no oracle cells captured). Route it through
+`docs/rebalance_checklist.md` section B when picked up: PvPoke's
+in-game turn model becomes the live one at the 09-08 merge, at which
+point `'legacy'` stops matching the game even though it still matches
+`origin/master`.
 
 `'legacy'` stays the default everywhere and is byte-for-byte
 behavior-identical to the pre-change engine: the oracle harness and the
