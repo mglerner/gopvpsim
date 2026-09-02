@@ -1099,6 +1099,53 @@ def check_cup_slugs(dives):
                          + "\n  ".join(problems))
 
 
+def check_opponent_pools(*, allow_stale=False):
+    """Preflight: committed opponent pools must match live rankings.
+
+    Pools are the INPUT to every dive here. Until 2026-09-02 nothing
+    regenerated or checked them -- build_opponent_pool.py appeared in ZERO of
+    overnight_redive.sh / run_website_dives.py / publish_website.sh /
+    phase2_preship.sh -- so a season-start bake against stale pools was wrong
+    everywhere at once, silently, with the chain exiting SUCCESS.
+
+    It bites hardest at a REBALANCE: new rankings change pool MEMBERSHIP, not
+    just order, and a new opponent is a new cache column, so it is not
+    migrate-able either. Hours of sim, all against the wrong meta.
+
+    Fails on live species MISSING from a pool (opponents every dive would be
+    blind to). Deliberate hand-extensions and recorded curation calls do not
+    fail -- see scripts/verify_opponent_pools.py.
+
+    ``allow_stale`` (CLI ``--allow-stale-pools``) is the deliberate override
+    for re-running a dive against a PINNED historical pool; it prints what it
+    is ignoring rather than staying quiet.
+    """
+    import verify_opponent_pools as vp
+    rows = vp.run()
+    bad = [r for r in rows if r['status'] in ('DRIFT', 'MISSING', 'ERROR')]
+    if not bad:
+        return
+    lines = []
+    for r in bad:
+        lines.append(f"{r['pool']}: {r['status']}")
+        for sp in r.get('added') or []:
+            lines.append(f"    live now, missing from pool: {sp}")
+        if r.get('detail'):
+            lines.append(f"    {r['detail']}")
+    msg = ("Opponent-pool preflight failed:\n  " + "\n  ".join(lines)
+           + "\n\nPools are the INPUT to every dive; baking against these "
+             "produces wrong scores everywhere at once, and new opponents are "
+             "new cache columns (not migrate-able).\n"
+             "Regenerate:  python scripts/build_opponent_pool.py <recipe>\n"
+             "Inspect:     python scripts/verify_opponent_pools.py\n"
+             "Override:    --allow-stale-pools (only for a deliberate "
+             "re-dive against a pinned historical pool)")
+    if allow_stale:
+        print("WARNING: --allow-stale-pools set; proceeding despite:\n" + msg)
+        return
+    raise ValueError(msg)
+
+
 def main():
     check_cup_slugs(DIVES)
 
@@ -1109,11 +1156,19 @@ def main():
                         help='Substring filter on slug (e.g. "tinkaton", "ultra")')
     parser.add_argument('--dry-run', action='store_true',
                         help='Print commands without running them')
+    parser.add_argument('--allow-stale-pools', action='store_true',
+                        help='Proceed even when opponent pools have drifted '
+                             'from live rankings. Only for a deliberate '
+                             're-dive against a pinned historical pool.')
     parser.add_argument('--reserve-cpus', type=int, default=None,
                         help='Override every dive\'s --reserve-cpus (e.g. 0 to '
                              'use all cores for an unattended run; default keeps '
                              'each dive\'s per-entry value, normally 1)')
     args = parser.parse_args()
+
+    # After argparse so --help works without a network fetch, but BEFORE any
+    # dive runs: the whole point is to fail in seconds rather than hours.
+    check_opponent_pools(allow_stale=args.allow_stale_pools)
 
     global _RESERVE_OVERRIDE
     _RESERVE_OVERRIDE = args.reserve_cpus
