@@ -889,3 +889,41 @@ shot). All still open — detail preserved verbatim there. Index of what's there
 
 Historical/shipped work lives in `CHANGELOG.md`; long-tail open backlog in
 `docs/TODO_backlog.md`.
+
+## Turn system: WAITING on PvPoke to merge new-mechanics (decided 2026-09-02)
+
+The legacy turn system is **gone from the live game** as of 2026-09-02
+(Michael). Our default is `mechanics='legacy'`, so the default path now models
+a ruleset the game no longer runs; `--mechanics new` is our reading of the
+spec and disagrees with PvPoke's implementation on **104 of 243** oracle
+cells. Full measurement + per-commit attribution:
+`docs/validations/2026-09-02_new_mechanics_oracle_ab.md`.
+
+**DECISION (Michael): wait.** Do not chase `origin/twilight-trails`. Its
+author reverted the charged-attack timing rule we implement and marked it
+"for now"; if it does not match the live game he will notice and fix it
+quickly. Chasing a moving, self-described-provisional branch costs more than
+it buys.
+
+What is already in place so the wait is safe:
+
+- BOTH `--mechanics` settings print a caveat at every CLI entry point
+  (`scripts/mechanics_notice.py`). Legacy is the dangerous one -- it is the
+  default and nobody opts into it.
+- Both disk caches key on `mechanics`, so a future new-mechanics bake is
+  cacheable and does not collide with legacy columns.
+- `audit_oracle_harness.py --mechanics new --pvpoke-root <root>` is the
+  measuring instrument, with the shadow-root recipe in the writeup.
+- The PVPOKE-ENGINE tripwire fires on the merge and its message now names
+  these follow-ups.
+
+WHEN THE MERGE LANDS:
+
+1. Re-port the turn loop against the merged reference (port, do not infer --
+   spec-first is exactly how we ended up 104 cells out).
+2. Drive `audit_oracle_harness.py --mechanics new` to zero.
+3. Flip the default to `new`; re-vet per `docs/rebalance_checklist.md`
+   section B.
+4. Delete `scripts/mechanics_notice.py` and its call sites.
+5. Only then bake. Note the bake also wants the move rebalance public --
+   17 of 27 changed moves carry PvPoke-guessed energies today.

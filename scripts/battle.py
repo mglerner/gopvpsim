@@ -134,7 +134,9 @@ def main():
                         help='Charged move policy for both sides (default: pvpoke_ai)')
     parser.add_argument('--mechanics', choices=['legacy', 'new'], default='legacy',
                         help='Turn-resolution model. legacy (default) = pre-2026-06-23. '
-                             'new = 2026-06-23 PvP turn system (EXPERIMENTAL, no PvPoke reference)')
+                             'new = the post-2026-06-23 PvP turn system. NEITHER is '
+                             'simply correct as of 2026-09-02 -- both print a caveat; '
+                             'see scripts/mechanics_notice.py')
     parser.add_argument('--shadow1', action='store_true', help='Pokemon 1 is shadow')
     parser.add_argument('--shadow2', action='store_true', help='Pokemon 2 is shadow')
     parser.add_argument('--pvpoke-scores', action='store_true',
@@ -162,11 +164,10 @@ def main():
 
     args = parser.parse_args()
 
-    if args.mechanics == 'new':
-        import sys
-        print('WARNING: --mechanics new is EXPERIMENTAL / UNVALIDATED -- it models the '
-              '2026-06-23 PvP turn system, which PvPoke has not implemented, so there is '
-              'no reference to cross-check against.', file=sys.stderr)
+    import sys as _sys
+    from mechanics_notice import warn_mechanics
+    warn_mechanics(args.mechanics,
+                   lambda m: print(f'WARNING: {m}', file=_sys.stderr))
 
     # Parse positional args: accept 2, 4, 5, or 6 positional args.
     #   2: species1 species2                    (both use default moves)

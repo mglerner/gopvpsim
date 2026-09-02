@@ -100,4 +100,13 @@ def test_pvpoke_engine_matches_last_vetted_commit():
         f"docs/rebalance_checklist.md section B -- read the upstream "
         f"commits, re-run the oracle audit, and check whether PvPoke's "
         f"AI/strategy changed (our PoGoDives tier is defined relative "
-        f"to pvpoke_dp). Re-pin the digest fixture with the re-vet.")
+        f"to pvpoke_dp). Re-pin the digest fixture with the re-vet.\n\n"
+        f"IF THIS FIRED BECAUSE THE TURN SYSTEM MERGED (check: does "
+        f"Battle.js now contain 'chargedMoveLastTurn'?), that is the "
+        f"signal the 2026-09-02 WAIT is over. Decision then was to wait "
+        f"for PvPoke to settle its new-mechanics work rather than chase "
+        f"a branch its author marked 'for now'. Next steps are in "
+        f"docs/validations/2026-09-02_new_mechanics_oracle_ab.md: re-port "
+        f"the turn loop against the merged reference, drive "
+        f"`audit_oracle_harness.py --mechanics new` to zero, then flip "
+        f"the default and delete scripts/mechanics_notice.py.")
