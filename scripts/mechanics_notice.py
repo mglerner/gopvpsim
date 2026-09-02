@@ -1,17 +1,23 @@
 """The one place the turn-model caveat is worded.
 
 As of 2026-09-02 there is no `--mechanics` setting that is simply correct, and
-BOTH need saying out loud at the point of use:
+BOTH need saying out loud at the point of use.
 
-* ``legacy`` is the default everywhere, and it models the pre-2026-09-02 turn
-  system. Michael reported that system is gone from the live game as of
-  2026-09-02. So the default path now describes a ruleset the game no longer
-  runs -- and it says so nowhere, which is the more dangerous of the two
-  because nobody has to opt into it.
-* ``new`` is our reading of the published spec. It has now been measured
-  against PvPoke's implementation for the first time and disagrees on 104 of
-  243 oracle cells; the two models depart from legacy in different directions
-  (docs/validations/2026-09-02_new_mechanics_oracle_ab.md).
+The product CLIs default to ``new`` (changed 2026-09-02, Michael): the legacy
+turn system is gone from the live game, so a dive that models it describes a
+game nobody can play. Modelling the current ruleset approximately beats
+modelling a dead one exactly.
+
+* ``new`` is our reading of the published spec, and it is UNVALIDATED. Measured
+  2026-09-02 against PvPoke's implementation for the first time: 104 of 243
+  oracle cells disagree, and the two models depart from legacy in different
+  directions, so it is not a one-constant fix
+  (docs/validations/2026-09-02_new_mechanics_oracle_ab.md). This is now the
+  DEFAULT, which makes the caveat more important, not less.
+* ``legacy`` models the pre-2026-09-02 turn system. It is no longer the
+  product default, but it is NOT dead code: it is what the port-fidelity suite
+  checks against PvPoke master (0/243 mismatches), and that is what proves our
+  port is faithful. Keep it until PvPoke's turn-system work merges.
 
 Project rule (CLAUDE.md): a known-wrong result must be fixed, flagged where it
 appears, or not produced. Neither setting can be fixed today -- the decision
@@ -30,20 +36,23 @@ every cached column for a docs change.
 """
 
 _LEGACY = (
-    "mechanics=legacy models the PRE-2026-09-02 turn system, which the live "
-    "game no longer runs (reported 2026-09-02). It still matches PvPoke "
-    "master, so the oracle stays green -- that certifies agreement with "
-    "PvPoke's legacy model, NOT with the game. Do not publish spreads from "
-    "this without saying so."
+    "mechanics=legacy is NOT the default any more and models the "
+    "PRE-2026-09-02 turn system, which the live game no longer runs. It still "
+    "matches PvPoke master exactly (0/243), which is why the port-fidelity "
+    "suite uses it -- but that certifies agreement with PvPoke's legacy "
+    "model, NOT with the game. Do not publish spreads from this."
 )
 
 _NEW = (
-    "mechanics=new is UNVALIDATED. Measured 2026-09-02 against PvPoke's "
-    "new-mechanics branch (the first reference that has ever existed for it): "
-    "104 of 243 oracle cells disagree, and the two models depart from legacy "
-    "in different directions, so this is not a one-constant fix. PvPoke's own "
-    "branch is unmerged and its author reverted the charged-attack timing "
-    "rule we implement, marking it 'for now'. See "
+    "mechanics=new is the default as of 2026-09-02 because the legacy turn "
+    "system is gone from the live game -- but it is UNVALIDATED. Measured "
+    "against PvPoke's new-mechanics branch (the first reference that has ever "
+    "existed for it): 104 of 243 oracle cells disagree, and the two models "
+    "depart from legacy in different directions, so this is not a "
+    "one-constant fix. PvPoke's branch is unmerged and its author reverted "
+    "the charged-attack timing rule we implement, marking it 'for now'. "
+    "Numbers from this model the right ruleset approximately; they are not "
+    "cross-checked against anything. See "
     "docs/validations/2026-09-02_new_mechanics_oracle_ab.md."
 )
 
