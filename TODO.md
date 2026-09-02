@@ -260,6 +260,50 @@ Still open, Michael's: what counts as "in the meta" for the cups half,
 given the season ships eight of them (Willpower, Retro, Mega Color,
 Little, Fantasy, Halloween, GO LAIC, Mega Catch).
 
+## Site lifecycle policy (Michael, 2026-09-02)
+
+Standing shape, seasons repeat:
+
+1. A new season is announced.
+2. Things get added to the site progressively through the season
+   (cups, event/CD articles, condensed-meta surfaces).
+3. **At the start of the next season, ALL of it comes down**, and the
+   new season's surfaces get added as needed. Rinse, repeat.
+
+The live site is centered on current live content; nothing is left up
+carrying a staleness caveat (see "Article regen triage"). Retired
+surfaces are re-renderable from their replay blobs, and articles worth
+keeping archive as dated snapshots via
+`scripts/archive_article.py` (docs/article_archive_plan.md).
+
+**What a season-start bake actually covers.** The chain
+(`overnight_redive.sh`) already does more than "GL/UL/ML dives":
+
+- `run_website_dives.py` -- 100 dive entries (GL + UL + ML)
+- `run_iv_guides.py` over `master_top60` -- 61 ML IV guides, a separate
+  multi-hour job and ~60% of the article surface
+- 4 comparison renders + the GL matchup web (need sims)
+- Reader's guides, index rebuild, ship gates (render-only)
+
+**The gap: opponent pools are NOT in any chain.** Verified 2026-09-02:
+`build_opponent_pool.py` appears in ZERO of overnight_redive.sh /
+run_website_dives.py / publish_website.sh / phase2_preship.sh, and
+`opponent_pools/gl_top50_plus_cs.txt` is still stamped "Generated
+2026-06-10". The pools are the INPUT to every dive, so a season-start
+bake against stale pools is wrong everywhere at once -- silently, with
+the chain exiting SUCCESS. It is not a step anyone forgets; there is no
+step.
+
+This bites hardest at a rebalance, because new rankings change pool
+MEMBERSHIP, not just order (the pool header records the June 2026
+rebalance pulling in Umbreon, Milotic, Dondozo, Primeape). New
+opponents are new columns, so they are not cache-migrate-able either.
+
+TODO: make pool regeneration step 0 of the chain, or add a preflight
+that hard-fails when the pools' recorded rankings vintage does not
+match live (per the lens-grid rule: a cheap lens becomes a code-level
+guard, not a checklist sentence).
+
 ## Re-dive runbook
 
 **Twilight Trails (2026-09-08) one-shot gate:** before any
