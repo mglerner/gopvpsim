@@ -160,9 +160,27 @@ def test_build_move_tuples_keeps_fast_first_then_charged_in_order():
                   'ICE_BEAM': {'power': 90, 'type': 'ice'}}
     got = analysis.build_move_tuples('COUNTER / ICE_BEAM, DYNAMIC_PUNCH',
                                      fast_db, charged_db)
-    assert got == [('COUNTER', 8, 'fighting'),
-                   ('ICE_BEAM', 90, 'ice'),
-                   ('DYNAMIC_PUNCH', 90, 'fighting')]
+    # 4th element is the per-move Mega Bonus factor (added 2026-09-02); it is
+    # exactly 1.0 for every non-mega, which is an exact float identity in the
+    # damage product.
+    assert got == [('COUNTER', 8, 'fighting', 1.0),
+                   ('ICE_BEAM', 90, 'ice', 1.0),
+                   ('DYNAMIC_PUNCH', 90, 'fighting', 1.0)]
+
+
+def test_build_move_tuples_carries_the_mega_bonus_for_a_supermega():
+    """Positive control for the 4th element: without it the tuple shape
+    would look right while the factor silently never landed."""
+    fast_db = {'DRAGON_BREATH': {'power': 3, 'type': 'dragon'}}
+    charged_db = {'OUTRAGE': {'power': 110, 'type': 'dragon'},
+                  'OUTRAGE_PLUS': {'power': 80, 'type': 'dragon',
+                                   'isMegaMove': True}}
+    got = analysis.build_move_tuples('DRAGON_BREATH / OUTRAGE, OUTRAGE_PLUS',
+                                     fast_db, charged_db, mega_level=4)
+    from gopvpsim.moves import MEGA_BONUS
+    assert got == [('DRAGON_BREATH', 3, 'dragon', 1.0),
+                   ('OUTRAGE', 110, 'dragon', 1.0),
+                   ('OUTRAGE_PLUS', 80, 'dragon', MEGA_BONUS[3])]
 
 
 # ---------------------------------------------------------------------------

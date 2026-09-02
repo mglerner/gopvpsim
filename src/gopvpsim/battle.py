@@ -23,8 +23,9 @@ import math
 from dataclasses import dataclass, field
 from typing import Callable
 
-from .moves import damage as calc_damage, type_effectiveness, stab, parse_types
-from .pokemon import SHADOW_ATK_BONUS
+from .moves import (damage as calc_damage, type_effectiveness, stab,
+                    parse_types, mega_multiplier)
+from .pokemon import SHADOW_ATK_BONUS, mega_level as _mega_level
 
 # Optional numba JIT for the near-KO DP loop and the turnsToLive sub-DP.
 # If unavailable (numba not installed, LLVM mismatch, etc.), pvpoke_dp and
@@ -2368,6 +2369,12 @@ class BattlePokemon:
     # shield-scenario axis (which otherwise re-zeros the live stages).
     initial_atk_stage: int = 0
     initial_def_stage: int = 0
+    # Mega Level (1-4) when this species is mega-tagged, else None. Left as
+    # None by every caller; __post_init__ resolves it from the gamemaster
+    # tags. Present as an init field only so a test can pin a specific level
+    # -- PvPoke exposes a 1-4 UI toggle but encodes it in no URL, ranking or
+    # override, so every capturable oracle sits at the tag-derived default.
+    mega_level:        "int | None" = None
 
     # Mutable battle state
     hp:                 int   = field(init=False)
@@ -2401,6 +2408,11 @@ class BattlePokemon:
     _cached_fast_dmg:     int       = field(init=False, repr=False)
     _cached_charged_dmgs: list      = field(init=False, repr=False)
     _cm_id_to_idx:        dict      = field(init=False, repr=False)
+    # Mega Bonus factor per move (exactly 1.0 for every non-mega, which makes
+    # the multiply an exact float identity). Derived from mega_level + each
+    # move's isMegaMove flag; rebuilt by _refresh_mega_mults on any rebind.
+    _fm_mega_mult:        float     = field(init=False, repr=False)
+    _cm_mega_mults:       list      = field(init=False, repr=False)
     # int64 numpy views of the charged-move damages/energies (natural
     # order), consumed by the turnsToLive JIT. Rebuilt with the damage
     # cache so per-call np.asarray conversion is never needed (the
@@ -2472,6 +2484,15 @@ class BattlePokemon:
         # its precomputed entry even when the policy passes a sorted copy
         # of self.charged_moves (same dict objects, different order).
         self._cm_id_to_idx = {id(cm): i for i, cm in enumerate(self.charged_moves)}
+        # Mega Level, resolved from the species' gamemaster tags. Done HERE
+        # rather than in from_pokemon() so that the direct-construction call
+        # sites (scripts/battle.py, the sweep workers, tests) cannot silently
+        # produce a mega that deals un-boosted damage -- a wrong number that
+        # looks entirely plausible. None for every non-mega, which makes
+        # mega_multiplier() an exact 1.0 no-op.
+        if self.mega_level is None:
+            self.mega_level = _mega_level(self.species)
+        self._refresh_mega_mults()
         self._dp_cache = None
         self._dp_init_cache = None
         # Form change state
@@ -2598,6 +2619,19 @@ class BattlePokemon:
         from .formchange import apply_form_change
         apply_form_change(self, opponent, target_idx)
 
+    def _refresh_mega_mults(self) -> None:
+        """Recompute the per-move Mega Bonus factors.
+
+        Must be re-run whenever ``fast_move``/``charged_moves`` are rebound
+        (form change, move swap), since the factor is a property of the move
+        dict. Fast moves are included for completeness only -- no
+        ``isMegaMove`` move is a fast move today, so this is always 1.0 there.
+        """
+        lvl = self.mega_level
+        self._fm_mega_mult = mega_multiplier(self.fast_move, lvl)
+        self._cm_mega_mults = [mega_multiplier(cm, lvl)
+                               for cm in self.charged_moves]
+
     def _ensure_dmg_cache(self, defender: "BattlePokemon") -> None:
         """Populate _cached_fast_dmg and _cached_charged_dmgs vs `defender`
         at the current stat stages, if not already valid."""
@@ -2612,12 +2646,12 @@ class BattlePokemon:
         fm = self.fast_move
         self._cached_fast_dmg = calc_damage(
             fm['power'], atk_eff, def_eff,
-            fm['type'], my_types, opp_types,
+            fm['type'], my_types, opp_types, self._fm_mega_mult,
         )
         self._cached_charged_dmgs = [
             calc_damage(cm['power'], atk_eff, def_eff,
-                        cm['type'], my_types, opp_types)
-            for cm in self.charged_moves
+                        cm['type'], my_types, opp_types, mm)
+            for cm, mm in zip(self.charged_moves, self._cm_mega_mults)
         ]
         if _CALC_TTL_JIT is not None:
             # Prebuilt buffers for the turnsToLive JIT. Energies are
@@ -2681,8 +2715,9 @@ class BattlePokemon:
         atk_init = self.atk * _stat_stage_mult(self.atk_stage)
         def_init = defender.def_ * _stat_stage_mult(defender.def_stage)
         dmg_init = [calc_damage(cm['power'], atk_init, def_init,
-                                cm['type'], my_types, opp_types)
-                    for cm in self.charged_moves]   # original charged order
+                                cm['type'], my_types, opp_types, mm)
+                    for cm, mm in zip(self.charged_moves,
+                                      self._cm_mega_mults)]  # original charged order
 
         # PvPoke's activeChargedMoves is sorted by energy (cheapest first),
         # then reordered by the priority-shuffle (Pokemon.js lines 711-787)
@@ -2861,6 +2896,11 @@ class BattlePokemon:
             def_types = defender.types
             fm_power = self.fast_move['power']
             fm_type  = self.fast_move['type']
+            # Mega Bonus in the SHUFFLED order `cms` runs in -- _cm_mega_mults
+            # is indexed by the original charged order, so route through the
+            # identity map like every other per-move quantity here.
+            cms_mega = [self._cm_mega_mults[self._cm_id_to_idx[id(cm)]]
+                        for cm in cms]
             cm_dmgs_by_stage = []
             fast_dmg_by_stage = []
             for _s_off in range(9):         # stage -4 .. +4
@@ -2874,12 +2914,13 @@ class BattlePokemon:
                 _atk_eff = atk_base * _stat_stage_mult(_s)
                 cm_dmgs_by_stage.append([
                     calc_damage(cm['power'], _atk_eff, def_eff_val,
-                                cm['type'], atk_types, def_types)
-                    for cm in cms
+                                cm['type'], atk_types, def_types, mm)
+                    for cm, mm in zip(cms, cms_mega)
                 ])
                 fast_dmg_by_stage.append(
                     calc_damage(fm_power, _atk_eff, def_eff_val,
-                                fm_type, atk_types, def_types)
+                                fm_type, atk_types, def_types,
+                                self._fm_mega_mult)
                 )
 
         # bestCycleDamage (ActionLogic.js:367-368): FRESH bestChargedDamage +

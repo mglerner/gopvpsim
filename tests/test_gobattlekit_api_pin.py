@@ -35,6 +35,11 @@ PINNED = {
         ('defender_types', 'POSITIONAL_OR_KEYWORD', False),
         ('atk_min', 'POSITIONAL_OR_KEYWORD', False),
         ('atk_max', 'POSITIONAL_OR_KEYWORD', False),
+        # Added 2026-09-02 for the Mega Bonus. KEYWORD_ONLY with a default,
+        # so the export tool's 6 positional args cannot collide with it and
+        # omitting it reproduces the pre-mega behavior exactly. No
+        # ../gobattlekit change was required.
+        ('mega_level', 'KEYWORD_ONLY', True),
     ),
     ('gopvpsim.breakpoints', 'bulkpoints'): (
         ('move', 'POSITIONAL_OR_KEYWORD', False),
@@ -43,6 +48,7 @@ PINNED = {
         ('defender_types', 'POSITIONAL_OR_KEYWORD', False),
         ('def_min', 'POSITIONAL_OR_KEYWORD', False),
         ('def_max', 'POSITIONAL_OR_KEYWORD', False),
+        ('mega_level', 'KEYWORD_ONLY', True),   # see breakpoints() above
     ),
     ('gopvpsim.data', 'load_gamemaster'): (),
     ('gopvpsim.data', 'parse_types'): (

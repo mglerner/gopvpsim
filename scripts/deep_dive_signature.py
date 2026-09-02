@@ -42,33 +42,46 @@ only carries the stage-0 damage row; a movable axis carries the full
 -4..+4 range (a reachable superset — over-inclusion can only reduce
 dedup, never correctness).
 
-Floating-point exactness: damage_vec mirrors moves.damage's operand
-order exactly (left-to-right ``0.5 * BONUS * power * atk / def_ *
-eff * stab``), and stage-adjusted stats are computed as
+Floating-point exactness: damage_vec and moves.damage now share ONE
+spelling of the formula's constant half (``moves.damage_constant``,
+``0.5 * BONUS * power * stab * eff * mega``) and both then apply
+``* atk / def_`` inside the floor, so the operand order cannot drift
+between them. Stage-adjusted stats are computed as
 ``stat * _stat_stage_mult(s)`` exactly like the engine. IEEE-754
 float64 elementwise ops in numpy are bit-identical to Python scalar
 float ops, so vectorized floors match math.floor per element
-(pinned by tests/test_signature_dedup.py).
+(pinned by tests/test_signature_dedup.py and
+tests/test_damage_formula_parity.py).
 """
 import numpy as np
 
 from gopvpsim.battle import _stat_stage_mult
 from gopvpsim.formchange import build_form_change_state
-from gopvpsim.moves import BONUS, stab, type_effectiveness
+from gopvpsim.moves import damage_constant, mega_multiplier
+from gopvpsim.pokemon import mega_level_from_tags
 
 FULL_STAGES = tuple(range(-4, 5))
 ZERO_STAGE = (0,)
 
 
-def damage_vec(power, atk, def_, move_type, attacker_types, defender_types):
+def damage_vec(power, atk, def_, move_type, attacker_types, defender_types,
+               mega_mult=1.0):
     """Vectorized bit-exact mirror of gopvpsim.moves.damage.
 
     ``atk`` / ``def_`` may be scalars or float64 arrays (at least one
     should be an array). Returns an int64 array.
+
+    This is a DELIBERATE duplicate of the scalar ``moves.damage``: it
+    evaluates the formula across whole 4096-IV arrays at once, and calling
+    the scalar form per element is not viable at sweep scale. What it must
+    NOT duplicate is the formula's constant half -- that comes from
+    ``moves.damage_constant``, so the operand order cannot drift out from
+    under it. Bit-exactness against the scalar form (mega path included) is
+    pinned by tests/test_damage_formula_parity.py.
     """
-    eff = type_effectiveness(move_type, defender_types)
-    stab_ = stab(move_type, attacker_types)
-    return np.floor(0.5 * BONUS * power * atk / def_ * eff * stab_).astype(np.int64) + 1
+    k = damage_constant(power, move_type, attacker_types, defender_types,
+                        mega_mult)
+    return np.floor(k * atk / def_).astype(np.int64) + 1
 
 
 def _form_dict(types, fast_move, charged_moves, atk, def_):
@@ -166,7 +179,13 @@ def build_focal_side(focal_mon, focal_types, fm_template, cms_template,
                     cfg0.forms[0].types, cfg0.forms[0].fast_move,
                     cfg0.forms[0].charged_moves, b_atk, b_def))
     native_atk, native_def = _native_movability([cfg0])
+    # Mega Level is a property of the SPECIES, not the form: no mega has a
+    # formChange today, so one value per side is exact. (If one ever gains
+    # one, apply_form_change re-resolves the level per form and this would
+    # become conservative -- an over-broad key can only split dedup groups,
+    # never merge them, so it stays sound.)
     return {'forms': forms, 'hp': hp, 'shadow': bool(shadow),
+            'mega_level': mega_level_from_tags(focal_mon.get('tags')),
             'native_atk': native_atk, 'native_def': native_def}
 
 
@@ -193,6 +212,7 @@ def build_opp_side(opp, league_cp):
                                         f0.charged_moves, f0.atk, f0.def_))
     native_atk, native_def = _native_movability([cfg])
     return {'forms': forms, 'shadow': bool(opp['shadow']),
+            'mega_level': mega_level_from_tags(opp['mon'].get('tags')),
             'native_atk': native_atk, 'native_def': native_def}
 
 
@@ -282,21 +302,23 @@ def signature_groups(focal_side, opp_side):
             cols.append(np.sign(
                 ff['atk'] / f_cmp_div - of['atk'] / o_cmp_div).astype(np.int64))
             for m in [ff['fast'], *ff['charged']]:
+                f_mega = mega_multiplier(m, focal_side['mega_level'])
                 for a_s in a_f:
                     atk_eff = ff['atk'] * _stat_stage_mult(a_s)
                     for d_s in d_o:
                         def_eff = of['def_'] * _stat_stage_mult(d_s)
                         cols.append(damage_vec(
                             m['power'], atk_eff, def_eff, m['type'],
-                            ff['types'], of['types']))
+                            ff['types'], of['types'], f_mega))
             for m in [of['fast'], *of['charged']]:
+                o_mega = mega_multiplier(m, opp_side['mega_level'])
                 for a_s in a_o:
                     atk_eff = of['atk'] * _stat_stage_mult(a_s)
                     for d_s in d_f:
                         def_eff = ff['def_'] * _stat_stage_mult(d_s)
                         cols.append(damage_vec(
                             m['power'], atk_eff, def_eff, m['type'],
-                            of['types'], ff['types']))
+                            of['types'], ff['types'], o_mega))
 
     mat = np.column_stack(cols)
     groups = {}

@@ -28,11 +28,12 @@ from typing import NamedTuple
 from .moves import (
     damage as calc_damage,
     type_effectiveness, stab as calc_stab,
-    BONUS,
+    BONUS, mega_multiplier, damage_constant,
 )
 from .pokemon import (
     get_species, best_level, CPM, LEAGUE_CAPS,
     battle_stats, effective_stats, find_pokemon_entry,
+    mega_level as _species_mega_level,
 )
 
 
@@ -40,35 +41,53 @@ from .pokemon import (
 # Pure-math helpers
 # ---------------------------------------------------------------------------
 
-def _K(power: float, move_type: str, attacker_types: list[str],
-       defender_types: list[str]) -> float:
-    """The constant part of the damage formula: 0.5 * BONUS * power * stab * eff."""
-    eff   = type_effectiveness(move_type, defender_types)
-    stab_ = calc_stab(move_type, attacker_types)
-    return 0.5 * BONUS * power * stab_ * eff
+# _K is now a thin alias for the shared constant -- kept as a name because
+# the module docstring's algebra (and the tests) refer to "K". The formula
+# itself lives in ONE place, gopvpsim.moves.damage_constant.
+_K = damage_constant
 
 
+# NOTE (deliberate divergence from PvPoke, 2026-09-02). PvPoke added the Mega
+# Bonus to DamageCalculator.damage() and damageByStats() but NOT to its own
+# breakpoint() / bulkpoint() solvers (DamageCalculator.js:117-136), so upstream
+# a supermega's `*_PLUS` breakpoint table disagrees with the damage numbers
+# printed either side of it, by the full 1.3x. We apply the factor here.
+#
+# This fails CLAUDE.md's "don't diverge unless PvPoke is worse" gate in
+# PvPoke's favour on all three questions: its solver is internally
+# inconsistent with its own damage function, breakpoints ARE this project's
+# deliverable, and matching the inconsistency would ship a knowingly wrong
+# threshold. Recorded in DEVELOPER_NOTES "PvPoke bugs found".
 def atk_for_damage(dmg: int, def_: float, move: dict,
-                   attacker_types: list[str], defender_types: list[str]) -> float:
+                   attacker_types: list[str], defender_types: list[str],
+                   mega_level: "int | None" = None) -> float:
     """Minimum effective attack stat that deals `dmg` damage with `move`.
 
     This is the breakpoint threshold — any atk >= this value deals at least `dmg`.
+
+    ``mega_level`` is the ATTACKER's Mega Level (None when it is not a mega);
+    it only bites for a mega-exclusive ``isMegaMove`` move.
     """
-    k = _K(move['power'], move['type'], attacker_types, defender_types)
+    k = _K(move['power'], move['type'], attacker_types, defender_types,
+           mega_multiplier(move, mega_level))
     return (dmg - 1) * def_ / k
 
 
 def def_for_damage(dmg: int, atk: float, move: dict,
-                   attacker_types: list[str], defender_types: list[str]) -> float:
+                   attacker_types: list[str], defender_types: list[str],
+                   mega_level: "int | None" = None) -> float:
     """The critical defense threshold at which incoming damage drops from dmg+1 to dmg.
 
     A defender with def > this threshold takes dmg damage.
     A defender with def <= this threshold takes dmg+1 damage.
     At exactly this value, damage is still dmg+1 (the threshold is exclusive).
 
-    This matches PvPoke's DamageCalculator.bulkpoint formula.
+    This matches PvPoke's DamageCalculator.bulkpoint formula, EXCEPT that we
+    apply the Mega Bonus and PvPoke does not -- see the note above
+    :func:`atk_for_damage`. ``mega_level`` is the ATTACKER's.
     """
-    k = _K(move['power'], move['type'], attacker_types, defender_types)
+    k = _K(move['power'], move['type'], attacker_types, defender_types,
+           mega_multiplier(move, mega_level))
     return k * atk / dmg
 
 
@@ -93,28 +112,37 @@ def breakpoints(
     defender_types: list[str],
     atk_min: float,
     atk_max: float,
+    *,
+    mega_level: "int | None" = None,
 ) -> list[Breakpoint]:
     """All attack breakpoints in [atk_min, atk_max].
 
     Returns a list of Breakpoint(atk_threshold, damage) sorted by atk_threshold.
     Each entry is the minimum attack that first achieves `damage` against this defender.
+
+    ``mega_level`` is the ATTACKER's Mega Level, or None when it is not a
+    mega. It must be threaded here as well as into the solver: the loop
+    bounds come from :func:`calc_damage`, so a mismatch between the two would
+    scan the wrong damage range.
     """
+    mm = mega_multiplier(move, mega_level)
     # Power-0 moves (SPLASH, YAWN, TRANSFORM, the AEGISLASH_CHARGE_* fast moves)
     # deal a flat 1 damage at every attack, so there is no breakpoint. Guard the
     # K==0 case: atk_for_damage would compute (dmg-1)*def/0 -> ZeroDivisionError,
     # which the deep-dive pipeline swallows into a warning and drops EVERY anchor
     # for the whole dive (Aegislash Shield's canonical fast move is power 0).
-    if _K(move['power'], move['type'], attacker_types, defender_types) == 0:
+    if _K(move['power'], move['type'], attacker_types, defender_types, mm) == 0:
         return []
 
     d_min = calc_damage(move['power'], atk_min, defender_def,
-                        move['type'], attacker_types, defender_types)
+                        move['type'], attacker_types, defender_types, mm)
     d_max = calc_damage(move['power'], atk_max, defender_def,
-                        move['type'], attacker_types, defender_types)
+                        move['type'], attacker_types, defender_types, mm)
 
     result = []
     for dmg in range(d_min, d_max + 1):
-        thresh = atk_for_damage(dmg, defender_def, move, attacker_types, defender_types)
+        thresh = atk_for_damage(dmg, defender_def, move, attacker_types,
+                                defender_types, mega_level)
         if atk_min <= thresh <= atk_max:
             result.append(Breakpoint(thresh, dmg))
 
@@ -128,20 +156,27 @@ def bulkpoints(
     defender_types: list[str],
     def_min: float,
     def_max: float,
+    *,
+    mega_level: "int | None" = None,
 ) -> list[Bulkpoint]:
     """All defense bulkpoints in [def_min, def_max].
 
     Returns a list of Bulkpoint(def_threshold, damage) sorted by def_threshold.
     Each entry is the minimum defense at which incoming damage is reduced to `damage`.
+
+    ``mega_level`` is the ATTACKER's (the mon whose move we are bulking
+    against), or None when it is not a mega.
     """
+    mm = mega_multiplier(move, mega_level)
     d_at_min = calc_damage(move['power'], attacker_atk, def_min,
-                           move['type'], attacker_types, defender_types)
+                           move['type'], attacker_types, defender_types, mm)
     d_at_max = calc_damage(move['power'], attacker_atk, def_max,
-                           move['type'], attacker_types, defender_types)
+                           move['type'], attacker_types, defender_types, mm)
 
     result = []
     for dmg in range(d_at_max, d_at_min + 1):
-        thresh = def_for_damage(dmg, attacker_atk, move, attacker_types, defender_types)
+        thresh = def_for_damage(dmg, attacker_atk, move, attacker_types,
+                                defender_types, mega_level)
         if def_min <= thresh <= def_max:
             result.append(Bulkpoint(thresh, dmg))
 
@@ -225,6 +260,10 @@ def iv_breakpoints(
     attacker_types  = _get_types(attacker_species)
     defender_types  = _get_types(defender_species)
     max_cp          = LEAGUE_CAPS[league]
+    # Mega Bonus rides on the ATTACKER in both directions -- for a bulkpoint
+    # the attacker is the fixed side whose move we are bulking against.
+    _attacker_mega_mult = mega_multiplier(
+        move, _species_mega_level(attacker_species))
 
     a_base  = get_species(attacker_species)
     d_base  = get_species(defender_species)
@@ -267,6 +306,7 @@ def iv_breakpoints(
                 dmg      = calc_damage(
                     move['power'], atk_stat, defender_def,
                     move['type'], attacker_types, defender_types,
+                    _attacker_mega_mult,
                 )
                 sp = atk_stat * stats['def'] * stats['hp']
                 results.append({
@@ -310,6 +350,10 @@ def iv_bulkpoints(
     attacker_types  = _get_types(attacker_species)
     defender_types  = _get_types(defender_species)
     max_cp          = LEAGUE_CAPS[league]
+    # Mega Bonus rides on the ATTACKER in both directions -- for a bulkpoint
+    # the attacker is the fixed side whose move we are bulking against.
+    _attacker_mega_mult = mega_multiplier(
+        move, _species_mega_level(attacker_species))
 
     a_base = get_species(attacker_species)
     d_base = get_species(defender_species)
@@ -352,6 +396,7 @@ def iv_bulkpoints(
                 dmg = calc_damage(
                     move['power'], attacker_atk, def_stat,
                     move['type'], attacker_types, defender_types,
+                    _attacker_mega_mult,
                 )
                 sp = stats['atk'] * def_stat * stats['hp']
                 results.append({

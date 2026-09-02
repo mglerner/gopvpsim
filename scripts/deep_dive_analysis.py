@@ -11,7 +11,7 @@ import sys
 
 import numpy as np
 
-from gopvpsim.moves import BONUS, STAB_MULTIPLIER, type_effectiveness
+from gopvpsim.moves import damage as calc_damage, mega_multiplier
 from gopvpsim.battle import WIN_RATING
 
 # Sibling scripts/ modules are imported by bare name (deep_dive.py does the
@@ -157,19 +157,36 @@ def pretty_moveset(label):
     return f'{pretty_name(fast_id)} / {charged}'
 
 
-def pvp_damage(power, atk, def_, effectiveness, stab_mult):
-    """PvP damage formula: floor(0.5 * BONUS * power * atk/def * eff * stab) + 1
+# NOTE: this module used to carry its own `pvp_damage()` re-spelling of the
+# damage formula. It now calls gopvpsim.moves.damage directly -- the callers
+# below already derived `eff` and `stab_mult` from moves.type_effectiveness /
+# moves.STAB_MULTIPLIER, so the re-spelling bought nothing and was one more
+# place for a constant (most recently the Mega Bonus) to fail to land.
 
-    Uses the canonical float32-truncated BONUS from moves.py (not a literal
-    1.3) so per-hit damage agrees with the engine bit-for-bit at floor()
-    boundaries. Callers must build stab_mult from moves.STAB_MULTIPLIER and
-    effectiveness from moves.type_effectiveness for the match to hold.
+
+def move_tuples_from_ids(fast_id, charged_ids, fast_db, charged_db,
+                         mega_level=None):
+    """Build narration move tuples from resolved move ids.
+
+    Returns ``[(move_id, power, type, mega_mult), ...]``. ``mega_mult`` is
+    baked in per move so downstream narration never has to know whose move
+    it is holding -- it only ever needs the number.
     """
-    return math.floor(0.5 * BONUS * power * atk / def_ * effectiveness * stab_mult) + 1
+    moves = []
+    if fast_id in fast_db:
+        m = fast_db[fast_id]
+        moves.append((fast_id, m['power'], m['type'],
+                      mega_multiplier(m, mega_level)))
+    for cid in charged_ids:
+        if cid in charged_db:
+            m = charged_db[cid]
+            moves.append((cid, m['power'], m['type'],
+                          mega_multiplier(m, mega_level)))
+    return moves
 
 
-def build_move_tuples(moveset_label, fast_db, charged_db):
-    """Parse moveset label into list of (move_id, power, type) tuples.
+def build_move_tuples(moveset_label, fast_db, charged_db, mega_level=None):
+    """Parse moveset label into list of (move_id, power, type, mega_mult) tuples.
 
     An all-fast label (no charged moves) yields no tuples, same as before
     the split was routed through ``parse_moveset_label``.
@@ -177,15 +194,8 @@ def build_move_tuples(moveset_label, fast_db, charged_db):
     fast_id, charged_ids = parse_moveset_label(moveset_label)
     if not charged_ids:
         return []
-    moves = []
-    if fast_id in fast_db:
-        m = fast_db[fast_id]
-        moves.append((fast_id, m['power'], m['type']))
-    for cid in charged_ids:
-        if cid in charged_db:
-            m = charged_db[cid]
-            moves.append((cid, m['power'], m['type']))
-    return moves
+    return move_tuples_from_ids(fast_id, charged_ids, fast_db, charged_db,
+                                mega_level)
 
 
 def stat_cutoffs_from_anchors(anchor_objs):
@@ -301,11 +311,11 @@ def narrate_flip(focal_atk, focal_def, focal_hp, ref_atk, ref_def, ref_hp,
 
     # Opponent's moves hitting focal at focal_def vs ref_def (bulkpoints)
     if focal_def != ref_def:
-        for move_id, power, mtype in opp_moves:
-            eff = type_effectiveness(mtype, focal_types)
-            stab_mult = STAB_MULTIPLIER if mtype in opp_types else 1.0
-            dmg_ref = pvp_damage(power, opp_atk, ref_def, eff, stab_mult)
-            dmg_focal = pvp_damage(power, opp_atk, focal_def, eff, stab_mult)
+        for move_id, power, mtype, mega_mult in opp_moves:
+            dmg_ref = calc_damage(power, opp_atk, ref_def, mtype,
+                                  opp_types, focal_types, mega_mult)
+            dmg_focal = calc_damage(power, opp_atk, focal_def, mtype,
+                                    opp_types, focal_types, mega_mult)
             if dmg_ref != dmg_focal:
                 takes_less = dmg_focal < dmg_ref
                 entry = (move_id, opp_name, dmg_focal, dmg_ref, 'Def',
@@ -317,11 +327,11 @@ def narrate_flip(focal_atk, focal_def, focal_hp, ref_atk, ref_def, ref_hp,
 
     # Focal's moves hitting opp at focal_atk vs ref_atk (breakpoints)
     if focal_atk != ref_atk:
-        for move_id, power, mtype in focal_moves:
-            eff = type_effectiveness(mtype, opp_types)
-            stab_mult = STAB_MULTIPLIER if mtype in focal_types else 1.0
-            dmg_ref = pvp_damage(power, ref_atk, opp_def, eff, stab_mult)
-            dmg_focal = pvp_damage(power, focal_atk, opp_def, eff, stab_mult)
+        for move_id, power, mtype, mega_mult in focal_moves:
+            dmg_ref = calc_damage(power, ref_atk, opp_def, mtype,
+                                  focal_types, opp_types, mega_mult)
+            dmg_focal = calc_damage(power, focal_atk, opp_def, mtype,
+                                    focal_types, opp_types, mega_mult)
             if dmg_ref != dmg_focal:
                 deals_more = dmg_focal > dmg_ref
                 entry = (move_id, None, dmg_focal, dmg_ref, 'Atk',

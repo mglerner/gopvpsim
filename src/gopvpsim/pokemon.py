@@ -234,6 +234,46 @@ def get_species(name):
     return get_pokemon_index()[name]
 
 
+# Mega Level is NOT a gamemaster field -- PvPoke derives it entirely from
+# tags (Pokemon.js:63 sets 3 for every Pokemon; :145-146 raises it to 4 when
+# the `supermega` tag is present). It lives here rather than in data.py
+# because data.py is allowlisted OUT of the sweep-cache engine hash on the
+# grounds that nothing it defines feeds a damage calculation -- and this
+# does. See tests/test_engine_files_closure.py.
+MEGA_LEVEL_DEFAULT   = 3   # Pokemon.js:63
+MEGA_LEVEL_SUPERMEGA = 4   # Pokemon.js:145-146 ("Super Max")
+
+
+def mega_level_from_tags(tags):
+    """Return the Mega Level for a species' gamemaster ``tags``, or None.
+
+    None means "not a mega", which is what gates the bonus off entirely --
+    PvPoke's damage gate is ``attacker.hasTag("mega") && move.isMegaMove``,
+    so a non-mega never reaches the MEGA_BONUS table regardless of level.
+
+    Derive from tags only. Do NOT infer mega-ness from ``extraChargedMoves``
+    -- the three Cramorant forms carry that field with non-mega Gulp Missile
+    moves (16 entries hold it; only 13 are megas).
+    """
+    if not tags or 'mega' not in tags:
+        return None
+    return (MEGA_LEVEL_SUPERMEGA if 'supermega' in tags
+            else MEGA_LEVEL_DEFAULT)
+
+
+def mega_level(species_name):
+    """Mega Level for a species by speciesName, or None if it is not a mega.
+
+    Returns None for a species absent from the gamemaster rather than
+    raising: every caller is asking "does this attacker get the bonus?",
+    and the answer for an unknown species is "no".
+    """
+    entry = find_pokemon_entry(species_name)
+    if entry is None:
+        return None
+    return mega_level_from_tags(entry.get('tags'))
+
+
 # ---------------------------------------------------------------------------
 # Pokemon dataclass
 # ---------------------------------------------------------------------------
