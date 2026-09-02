@@ -1255,7 +1255,15 @@ def _cm_buff_delta(m: dict) -> int:
     return 0
 
 
-def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict) -> None:
+# PvPoke's clause-4 buffTarget is the Pokemon instance (Pokemon.js:793).
+# What matters is only that it equals none of 'self'/'opponent'/'both',
+# so a named string is a clearer stand-in than an opaque object and
+# survives being copied into a move dict.
+AEGISLASH_SHIELD_BUFF_TARGET = '_aegislash_shield_energy_farm'
+
+
+def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict,
+                      active_form_sid: "str | None" = None) -> None:
     """PvPoke's activeChargedMoves priority-shuffle (Pokemon.js:752-833).
 
     Reorders the energy-sorted ``cms`` list in place based on buff/debuff
@@ -1351,10 +1359,26 @@ def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict) -> None:
                 cms[0].pop('buffTarget', None)
                 cms[0].pop('selfDebuffing', None)
 
-        # Clause 4 (Pokemon.js:790) is the aegislash_shield forEach and is
-        # NOT implemented here yet -- it changes n=2 Aegislash behavior, so
-        # it lands in its own commit. The numbering gap is deliberate; see
-        # DEVELOPER_NOTES "activeChargedMoves shuffle".
+        # Clause 4 (Pokemon.js:790): Aegislash Shield builds energy.
+        # Marks EVERY charged move self-debuffing so the whole downstream
+        # gate chain (ActionLogic.js:221/407/411/421/850/905-926/954/968/976,
+        # our bandaids) treats throwing as costly and Shield farms instead.
+        # No reorder. Runs inside the loop upstream, so at n>=3 it executes
+        # more than once -- it is a fixed point, so that is harmless.
+        #
+        # buffTarget: PvPoke assigns the POKEMON OBJECT here, not the string
+        # 'self' (verified at runtime). Every consumer -- ours and PvPoke's --
+        # compares against 'self'/'opponent'/'both', so the object matches
+        # none of them. Writing 'self' would newly enable the self-buff dpe
+        # multiplier and the buff application; DELETING the key would be
+        # worse still, because _apply_move_buffs defaults a missing
+        # buffTarget to 'opponent' (battle.py:3106) and would debuff the
+        # DEFENDER. Hence a sentinel that is none of the three.
+        if active_form_sid == 'aegislash_shield':
+            for _m in cms:
+                _m['buffs'] = [0, 0]
+                _m['buffTarget'] = AEGISLASH_SHIELD_BUFF_TARGET
+                _m['selfDebuffing'] = True
 
         # Clause 5 (Pokemon.js:800): similar energy -- promote selfBuffing move
         if (cms[i]['energy'] - cms[0]['energy'] <= 10
@@ -2545,6 +2569,18 @@ class BattlePokemon:
         self._start_shields = None
 
     @property
+    def active_form_sid(self) -> "str | None":
+        """PvPoke's ``activeFormId``: the current form's speciesId, or None.
+
+        None for a mon with no form change attached. (The same expression is
+        spelled inline at battle.py:579, :971 and :1758, which predate this
+        property; they are candidates to route through it, but doing so is
+        not part of the change that introduced it.)
+        """
+        fc = self._form_change
+        return None if fc is None else fc.forms[self._form_idx].species_id
+
+    @property
     def _form_is_alt(self) -> bool:
         """Boolean view of _form_idx (any non-starting form). Kept for the
         pre-Cramorant 2-form call sites and tests."""
@@ -2765,7 +2801,8 @@ class BattlePokemon:
         # using the init-stage damage.
         cms = sorted(self.charged_moves, key=lambda m: m['energy'])
         if len(cms) > 1:
-            _priority_shuffle(cms, dmg_init, idx_map)
+            _priority_shuffle(cms, dmg_init, idx_map,
+                              self.active_form_sid)
 
         order = [idx_map[id(m)] for m in cms]
         n = len(cms)

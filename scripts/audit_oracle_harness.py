@@ -91,7 +91,14 @@ MATCHUPS = [
     dict(label='aegislash_vs_azumarill_form_change',
          p1=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_shield'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
-         xfail_cells={(0, 1), (0, 2), (1, 1), (1, 2), (2, 1), (2, 2)}),
+         # 2026-09-02: (0,1),(0,2),(1,1),(2,1) became exact when PVPOKE
+         # fixed ITS side -- ActionLogic.js:954 flipped the shields-up
+         # prefer-non-debuffing predicate from `!acm[i].selfBuffing` to
+         # `!acm[i].selfDebuffing` in 574aeb0da, which stops its Aegislash
+         # picking Gyro Ball over Shadow Ball. That is the move-selection
+         # half of the bug we filed as pvpoke/pvpoke#378. We did not change.
+         # (1,2) and (2,2) remain: the deeper near-KO plan-choice half.
+         xfail_cells={(1, 2), (2, 2)}),
     dict(label='mimikyu_vs_azumarill_form_change',
          p1=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (5, 13, 15), 'mimikyu'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill')),
@@ -140,7 +147,12 @@ MATCHUPS = [
     dict(label='azumarill_vs_aegislash_shield_form_change',
          p1=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
          p2=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_shield'),
-         xfail_cells={(1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)}),
+         # 2026-09-02 (shuffle clause 4): the 1s row and (2,0) became exact.
+         # (2,1)/(2,2) now match on SCORE AND WINNER -- they used to be a
+         # winner flip (489/510 w1 vs 623/376 w0) -- and retain a
+         # chargedLog-only difference on the 2nd throw (PvPoke Shadow Ball,
+         # ours Gyro Ball; both shielded, so score-neutral).
+         xfail_cells={(2, 1), (2, 2)}),
     # Disguise vs fast-move pressure (Azumarill's Bubble is slow; Counter
     # chips the disguise differently and CMP differs).
     dict(label='mimikyu_vs_medicham_form_change',
@@ -180,7 +192,10 @@ MATCHUPS = [
     dict(label='tinkaton_vs_aegislash_shield_form_change', league='ultra',
          p1=P('Tinkaton', 'FAIRY_WIND', ['GIGATON_HAMMER', 'BULLDOZE'], (12, 15, 15), 'tinkaton', level=50),
          p2=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (15, 15, 15), 'aegislash_shield', level=50),
-         xfail_cells={(1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2)}),
+         # All nine cells EXACT as of 2026-09-02: the six 1s/2s divergences
+         # were the missing aegislash_shield shuffle clause (Pokemon.js:790),
+         # not PvPoke bug #3 as previously annotated.
+         xfail_cells=set()),
     # buffTarget='both' (Obstruct) fixture, added 2026-06-11 with the E1 fix.
     dict(label='obstagoon_obstruct_vs_azumarill',
          p1=P('Obstagoon', 'COUNTER', ['OBSTRUCT', 'NIGHT_SLASH'], (5, 15, 12), 'obstagoon'),

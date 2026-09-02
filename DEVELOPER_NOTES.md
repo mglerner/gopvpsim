@@ -39,18 +39,39 @@ core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
 against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->27<!-- /sync --> matchups
-(<!-- sync:pvpoke_cells_verified -->243<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->208<!-- /sync --> exact on score+winner+chargedLog, 35 cells =
-documented divergences (the 2026-08-24 Cramorant port added 4 matchups /
-36 cells, all exact, and re-verified the prior 207 unchanged at pvpoke
-78c64048a; 172+35 re-audited 2026-08-06 at BOTH origin/main
-and the entry-13 engine batch -- identical counts, so the batch moved
-nothing; the old 170+37 had been stale since the hunt2 merge), each
-traced to a mechanism: the near-KO
-plan-choice cluster, PvPoke bug #3 Gyro-Ball-over-Shadow-Ball — both
-sides of it, and bug #8 Hangry stickiness; per-cell reasons live on
-the MATCHUPS entries in the audit script). Historical
+(<!-- sync:pvpoke_cells_verified -->243<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->222<!-- /sync --> exact on score+winner+chargedLog, 21 cells =
+documented divergences, each traced to a mechanism: the near-KO
+plan-choice cluster, the deeper half of PvPoke bug #3, and bug #8 Hangry
+stickiness; per-cell reasons live on the MATCHUPS entries in the audit
+script). Historical
 note: the 3 original 2026-04-06 failures were all Mienfoo vs Medicham
 (`bestChargedMove` selection, resolved then).
+
+**2026-09-02: 208+35 -> 222+21**, from two independent causes, neither of
+them a rebalance:
+
+- **+6 (ours).** We were missing clause 4 of the activeChargedMoves shuffle
+  (`Pokemon.js:790`, the `aegislash_shield` forEach that marks every charged
+  move self-debuffing so Shield farms energy). Adding it made all six
+  divergent `tinkaton_vs_aegislash_shield` cells EXACT on score, winner AND
+  chargedLog, and turned `azumarill_vs_aegislash_shield` (2,1)/(2,2) from a
+  winner flip into a score+winner match with a chargedLog-only residual.
+  These had been annotated as "PvPoke bug #3" for months; they were our bug.
+- **+8 (theirs).** PvPoke fixed the move-SELECTION half of bug #3 itself in
+  `574aeb0da`: `ActionLogic.js:954` flipped the shields-up
+  prefer-non-debuffing predicate from `!acm[i].selfBuffing` to
+  `!acm[i].selfDebuffing`, which stops its Aegislash Shield (whose moves
+  clause 4 marks self-debuffing) picking Gyro Ball over Shadow Ball. That is
+  what we filed as pvpoke/pvpoke#378. We did not change to earn these; PvPoke
+  came to us. Attribution was measured, not inferred: reverting that one
+  predicate in a shadow copy of PvPoke's JS restores all 8 cells, while
+  reverting blocks (a) and (e) changes nothing.
+
+The prior history: the 2026-08-24 Cramorant port added 4 matchups / 36 cells,
+all exact, and re-verified the prior 207 unchanged at pvpoke 78c64048a;
+172+35 re-audited 2026-08-06 at BOTH origin/main and the entry-13 engine
+batch -- identical counts, so the batch moved nothing; the old 170+37 had
+been stale since the hunt2 merge.
 
 ### Verified correct
 - **Type effectiveness**: All <!-- sync:type_chart_cells_verified -->324<!-- /sync --> matchups match PvPoke exactly
