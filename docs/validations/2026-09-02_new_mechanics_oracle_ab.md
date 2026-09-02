@@ -124,3 +124,101 @@ defensible basis for published spreads, and the gap needs closing before a
 season bake rather than after.
 
 Raw per-cell output: `2026-09-02_new_mechanics_oracle_ab_raw.txt`.
+
+
+---
+
+# Addendum: per-commit attribution, and what it found
+
+Run 2026-09-02, following the 104/243 result above.
+
+## Method
+
+Peel the five `origin/new-mechanics` commits off `origin/twilight-trails`'s
+`src/js` **from the tip, in reverse order**, so each revert applies cleanly and
+the delta between consecutive roots attributes to exactly one commit.
+(Reverting an individual commit out of the middle of the stack does NOT apply
+-- later commits touch the same lines. That was tried first and failed.)
+
+Roots must be peeled off twilight-trails, not built up from
+`origin/new-mechanics`'s base: that base is `78c64048a`, which is PRE-mega, so
+building up from it would drag the ActionLogic block (e)/(f) differences back
+in and confound them with the turn model.
+
+`src/data` is master's for every root, so move data is constant throughout.
+
+## Result
+
+| PvPoke JS root                            | ours=`new` | ours=`legacy` |
+| ----------------------------------------- | ---------- | ------------- |
+| all 5 applied (= twilight-trails)         | 104        | 72            |
+| minus `a1b3ebd95` 0 turn switches         | 104        | 72            |
+| minus `a2685efe6` fast display time       | 104        | 72            |
+| minus `442a4afe8` timing updates          | **59**     | **8**         |
+| minus `71ab81008` Update Battle.js        | 59         | 8             |
+| minus `041d8c722` action priority (legacy)| 57         | **0**         |
+
+**The control is the bottom-right cell: our `legacy` against fully-peeled
+legacy JS gives 0 mismatches.** The harness, the roots and the data are sound,
+so every other number is attributable.
+
+`442a4afe8` alone accounts for 45 of the 104 (and 64 of the 72 on the legacy
+axis). The other four commits move nothing measurable on this grid.
+
+## What `442a4afe8` actually did
+
+Its own message: *"Reverted Charged Attack delay for now, added one turn delay
+after Charged Attacks to resolve Fast Attack damage."* Three edits:
+
+- commented OUT "Don't allow any inputs on the same turn that a Charged
+  Attack resolves";
+- `requiredTimeToPass` for a charged action: `500` -> **`0`**;
+- `poke.cooldown` after a charged move: `0` -> **`1000`**.
+
+**Our `mechanics='new'` implements the rule PvPoke reverted.** Our model
+stamps `_pending_charged` and resolves it at the TOP of the following turn --
+spec change 5, "charged begins at the start of the next turn". PvPoke
+implemented exactly that in `041d8c722`, then backed it out here in favour of
+immediate resolution plus a 1000 ms post-charge cooldown. Those are
+observationally different models of the same published sentence.
+
+## The finding that matters more than the attribution
+
+Read the columns, not just the rows:
+
+    our legacy  vs their legacy    0     (identical engines)
+    our new     vs their legacy   57     (how far OUR new model moves)
+    our legacy  vs their new      72     (how far THEIR new model moves)
+    our new     vs their new     104     (how far apart the two new models are)
+
+If the two `new` models were the same rules with one constant off, the last
+number would be small relative to the middle two. It is larger than either.
+**The two implementations depart from legacy in largely different
+directions**, and the 45-cell swing from `442a4afe8` is that commit moving
+THEM, not moving us toward them.
+
+So this is not a one-constant timing fix. It is two independent readings of
+the same published spec, neither validated against the live game.
+
+## Open judgment call
+
+PvPoke's own commit message says **"for now"**. The branch is unmerged,
+unreleased, carries a stray `console.log(turns, turnActions)` in the turn
+loop, and its author has already reverted this exact rule once. Re-porting our
+turn loop to match it would mean adopting a model its author has flagged as
+provisional -- and it would have to be redone if they revert again.
+
+Options, none obviously right:
+
+1. **Port to match PvPoke as-is.** Restores our normal methodology (port, do
+   not infer) and makes the oracle meaningful again. Cost: chasing a moving
+   target, and inheriting a decision its author is unsure about.
+2. **Wait for the branch to merge to master.** A merge is the signal that
+   PvPoke considers it settled. Cost: no validated new-mechanics numbers
+   until then, and the game is already running the new system.
+3. **Determine the truth in-game.** The only way to know which model is right.
+   Expensive, and the discriminator would need designing -- but it is the only
+   option that does not end with "we match PvPoke and both of us are wrong."
+
+Raw per-cell output for the all-5 root:
+`2026-09-02_new_mechanics_attribution_raw.txt`.
