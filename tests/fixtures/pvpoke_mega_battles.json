@@ -1,0 +1,1430 @@
+{
+ "_meta": {
+  "captured": "2026-09-02",
+  "harness": "scripts/pvpoke_trace.js",
+  "levels_pinned_because": "PvPoke mega GL/UL defaults sit far below the level cap (Mega Skarmory GL is level 14.5), so an unpinned level compares different Pokemon.",
+  "purpose": "Full 9-shield-cell PvPoke ground truth for three-charged-move mega battles. Two ROTATE DISCRIMINATORS fail loudly if the activeChargedMoves shuffle regresses to a swap primitive (raichu_mega_y 2-2: 205 real vs 662 swap; victreebel_mega 1-1: 163 real vs 361 swap). Two 2-MOVE CONTROLS are byte-identical builds minus the *_PLUS move and must be asserted as a PAIR with their 3-move twin -- if the pair converges, slot 2 is being dropped somewhere.",
+  "pvpoke_head": "56bc6a8b1"
+ },
+ "matchups": {
+  "dragonite_mega_vs_altaria": {
+   "cells": {
+    "0-0": {
+     "chargedLog": [
+      "Dragonite (Mega): Outrage+"
+     ],
+     "score": [
+      740,
+      260
+     ],
+     "winner": 0
+    },
+    "0-1": {
+     "chargedLog": [
+      "Dragonite (Mega): Thunder Punch (shielded)",
+      "Altaria: Sky Attack"
+     ],
+     "score": [
+      192,
+      807
+     ],
+     "winner": 1
+    },
+    "0-2": {
+     "chargedLog": [
+      "Dragonite (Mega): Thunder Punch (shielded)",
+      "Altaria: Sky Attack"
+     ],
+     "score": [
+      192,
+      807
+     ],
+     "winner": 1
+    },
+    "1-0": {
+     "chargedLog": [
+      "Dragonite (Mega): Outrage+"
+     ],
+     "score": [
+      740,
+      260
+     ],
+     "winner": 0
+    },
+    "1-1": {
+     "chargedLog": [
+      "Dragonite (Mega): Thunder Punch (shielded)",
+      "Altaria: Sky Attack (shielded)",
+      "Dragonite (Mega): Outrage+"
+     ],
+     "score": [
+      515,
+      485
+     ],
+     "winner": 0
+    },
+    "1-2": {
+     "chargedLog": [
+      "Dragonite (Mega): Thunder Punch (shielded)"
+     ],
+     "score": [
+      336,
+      663
+     ],
+     "winner": 1
+    },
+    "2-0": {
+     "chargedLog": [
+      "Dragonite (Mega): Outrage+"
+     ],
+     "score": [
+      740,
+      260
+     ],
+     "winner": 0
+    },
+    "2-1": {
+     "chargedLog": [
+      "Dragonite (Mega): Thunder Punch (shielded)",
+      "Altaria: Sky Attack (shielded)",
+      "Dragonite (Mega): Outrage+"
+     ],
+     "score": [
+      515,
+      485
+     ],
+     "winner": 0
+    },
+    "2-2": {
+     "chargedLog": [
+      "Dragonite (Mega): Thunder Punch (shielded)"
+     ],
+     "score": [
+      336,
+      663
+     ],
+     "winner": 1
+    }
+   },
+   "league": "great",
+   "p1": {
+    "charged": [
+     "SUPER_POWER",
+     "THUNDER_PUNCH",
+     "OUTRAGE_PLUS"
+    ],
+    "fast": "DRAGON_BREATH",
+    "ivs": [
+     4,
+     8,
+     12
+    ],
+    "level": 11.5,
+    "species": "dragonite_mega"
+   },
+   "p2": {
+    "charged": [
+     "SKY_ATTACK",
+     "FLAMETHROWER"
+    ],
+    "fast": "DRAGON_BREATH",
+    "ivs": [
+     4,
+     12,
+     13
+    ],
+    "level": 28.5,
+    "species": "altaria"
+   }
+  },
+  "mewtwo_mega_x_vs_metagross": {
+   "cells": {
+    "0-0": {
+     "chargedLog": [
+      "Metagross: Meteor Mash",
+      "Mewtwo (Mega X): Dynamic Punch+"
+     ],
+     "score": [
+      615,
+      384
+     ],
+     "winner": 0
+    },
+    "0-1": {
+     "chargedLog": [
+      "Metagross: Meteor Mash",
+      "Mewtwo (Mega X): Psystrike (shielded)",
+      "Metagross: Meteor Mash"
+     ],
+     "score": [
+      107,
+      892
+     ],
+     "winner": 1
+    },
+    "0-2": {
+     "chargedLog": [
+      "Metagross: Meteor Mash",
+      "Mewtwo (Mega X): Psystrike (shielded)",
+      "Metagross: Meteor Mash"
+     ],
+     "score": [
+      107,
+      892
+     ],
+     "winner": 1
+    },
+    "1-0": {
+     "chargedLog": [
+      "Metagross: Meteor Mash (shielded)",
+      "Mewtwo (Mega X): Dynamic Punch+"
+     ],
+     "score": [
+      840,
+      159
+     ],
+     "winner": 0
+    },
+    "1-1": {
+     "chargedLog": [
+      "Metagross: Meteor Mash (shielded)",
+      "Mewtwo (Mega X): Psystrike (shielded)",
+      "Metagross: Meteor Mash",
+      "Mewtwo (Mega X): Dynamic Punch+"
+     ],
+     "score": [
+      514,
+      485
+     ],
+     "winner": 0
+    },
+    "1-2": {
+     "chargedLog": [
+      "Metagross: Meteor Mash (shielded)",
+      "Mewtwo (Mega X): Psystrike (shielded)",
+      "Mewtwo (Mega X): Psystrike (shielded)",
+      "Metagross: Meteor Mash"
+     ],
+     "score": [
+      127,
+      872
+     ],
+     "winner": 1
+    },
+    "2-0": {
+     "chargedLog": [
+      "Metagross: Meteor Mash (shielded)",
+      "Mewtwo (Mega X): Dynamic Punch+"
+     ],
+     "score": [
+      840,
+      159
+     ],
+     "winner": 0
+    },
+    "2-1": {
+     "chargedLog": [
+      "Metagross: Meteor Mash (shielded)",
+      "Mewtwo (Mega X): Psystrike (shielded)",
+      "Metagross: Meteor Mash (shielded)",
+      "Mewtwo (Mega X): Dynamic Punch+"
+     ],
+     "score": [
+      740,
+      259
+     ],
+     "winner": 0
+    },
+    "2-2": {
+     "chargedLog": [
+      "Metagross: Meteor Mash (shielded)",
+      "Mewtwo (Mega X): Psystrike (shielded)",
+      "Metagross: Meteor Mash (shielded)",
+      "Mewtwo (Mega X): Psystrike (shielded)",
+      "Metagross: Meteor Mash"
+     ],
+     "score": [
+      154,
+      845
+     ],
+     "winner": 1
+    }
+   },
+   "league": "master",
+   "p1": {
+    "charged": [
+     "PSYSTRIKE",
+     "THUNDERBOLT",
+     "DYNAMIC_PUNCH_PLUS"
+    ],
+    "fast": "PSYCHO_CUT",
+    "ivs": [
+     15,
+     15,
+     15
+    ],
+    "level": 50.0,
+    "species": "mewtwo_mega_x"
+   },
+   "p2": {
+    "charged": [
+     "METEOR_MASH",
+     "EARTHQUAKE"
+    ],
+    "fast": "SHADOW_CLAW",
+    "ivs": [
+     15,
+     15,
+     15
+    ],
+    "level": 50.0,
+    "species": "metagross"
+   }
+  },
+  "raichu_mega_x_vs_azumarill": {
+   "cells": {
+    "0-0": {
+     "chargedLog": [
+      "Azumarill: Ice Beam",
+      "Raichu (Mega X): Volt Tackle+"
+     ],
+     "score": [
+      561,
+      438
+     ],
+     "winner": 0
+    },
+    "0-1": {
+     "chargedLog": [
+      "Raichu (Mega X): Volt Tackle+ (shielded)",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      212,
+      787
+     ],
+     "winner": 1
+    },
+    "0-2": {
+     "chargedLog": [
+      "Raichu (Mega X): Volt Tackle+ (shielded)",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      212,
+      787
+     ],
+     "winner": 1
+    },
+    "1-0": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Raichu (Mega X): Volt Tackle+"
+     ],
+     "score": [
+      825,
+      174
+     ],
+     "winner": 0
+    },
+    "1-1": {
+     "chargedLog": [
+      "Azumarill: Play Rough (shielded)",
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Raichu (Mega X): Trailblaze"
+     ],
+     "score": [
+      724,
+      275
+     ],
+     "winner": 0
+    },
+    "1-2": {
+     "chargedLog": [
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Azumarill: Ice Beam (shielded)",
+      "Raichu (Mega X): Volt Tackle+ (shielded)",
+      "Raichu (Mega X): Volt Tackle+"
+     ],
+     "score": [
+      657,
+      342
+     ],
+     "winner": 0
+    },
+    "2-0": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Raichu (Mega X): Volt Tackle+"
+     ],
+     "score": [
+      825,
+      174
+     ],
+     "winner": 0
+    },
+    "2-1": {
+     "chargedLog": [
+      "Azumarill: Play Rough (shielded)",
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Raichu (Mega X): Trailblaze"
+     ],
+     "score": [
+      724,
+      275
+     ],
+     "winner": 0
+    },
+    "2-2": {
+     "chargedLog": [
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Raichu (Mega X): Brick Break"
+     ],
+     "score": [
+      595,
+      404
+     ],
+     "winner": 0
+    }
+   },
+   "league": "great",
+   "p1": {
+    "charged": [
+     "BRICK_BREAK",
+     "TRAILBLAZE",
+     "VOLT_TACKLE_PLUS"
+    ],
+    "fast": "VOLT_SWITCH",
+    "ivs": [
+     5,
+     14,
+     15
+    ],
+    "level": 15.5,
+    "species": "raichu_mega_x"
+   },
+   "p2": {
+    "charged": [
+     "ICE_BEAM",
+     "PLAY_ROUGH"
+    ],
+    "fast": "BUBBLE",
+    "ivs": [
+     4,
+     15,
+     13
+    ],
+    "level": 43.0,
+    "species": "azumarill"
+   }
+  },
+  "raichu_mega_x_vs_azumarill_2MOVE_CONTROL": {
+   "cells": {
+    "0-0": {
+     "chargedLog": [
+      "Raichu (Mega X): Trailblaze",
+      "Azumarill: Play Rough"
+     ],
+     "score": [
+      405,
+      594
+     ],
+     "winner": 1
+    },
+    "0-1": {
+     "chargedLog": [
+      "Raichu (Mega X): Trailblaze (shielded)",
+      "Azumarill: Play Rough"
+     ],
+     "score": [
+      212,
+      787
+     ],
+     "winner": 1
+    },
+    "0-2": {
+     "chargedLog": [
+      "Raichu (Mega X): Trailblaze (shielded)",
+      "Azumarill: Play Rough"
+     ],
+     "score": [
+      212,
+      787
+     ],
+     "winner": 1
+    },
+    "1-0": {
+     "chargedLog": [
+      "Raichu (Mega X): Trailblaze",
+      "Azumarill: Ice Beam (shielded)"
+     ],
+     "score": [
+      724,
+      275
+     ],
+     "winner": 0
+    },
+    "1-1": {
+     "chargedLog": [
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Azumarill: Ice Beam (shielded)",
+      "Raichu (Mega X): Trailblaze"
+     ],
+     "score": [
+      724,
+      275
+     ],
+     "winner": 0
+    },
+    "1-2": {
+     "chargedLog": [
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Azumarill: Ice Beam (shielded)",
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      421,
+      578
+     ],
+     "winner": 1
+    },
+    "2-0": {
+     "chargedLog": [
+      "Raichu (Mega X): Trailblaze",
+      "Azumarill: Play Rough (shielded)"
+     ],
+     "score": [
+      724,
+      275
+     ],
+     "winner": 0
+    },
+    "2-1": {
+     "chargedLog": [
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Azumarill: Play Rough (shielded)",
+      "Raichu (Mega X): Trailblaze"
+     ],
+     "score": [
+      724,
+      275
+     ],
+     "winner": 0
+    },
+    "2-2": {
+     "chargedLog": [
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Raichu (Mega X): Brick Break (shielded)",
+      "Azumarill: Play Rough (shielded)",
+      "Raichu (Mega X): Brick Break"
+     ],
+     "score": [
+      623,
+      376
+     ],
+     "winner": 0
+    }
+   },
+   "league": "great",
+   "p1": {
+    "charged": [
+     "BRICK_BREAK",
+     "TRAILBLAZE"
+    ],
+    "fast": "VOLT_SWITCH",
+    "ivs": [
+     5,
+     14,
+     15
+    ],
+    "level": 15.5,
+    "species": "raichu_mega_x"
+   },
+   "p2": {
+    "charged": [
+     "ICE_BEAM",
+     "PLAY_ROUGH"
+    ],
+    "fast": "BUBBLE",
+    "ivs": [
+     4,
+     15,
+     13
+    ],
+    "level": 43.0,
+    "species": "azumarill"
+   }
+  },
+  "raichu_mega_y_vs_medicham": {
+   "cells": {
+    "0-0": {
+     "chargedLog": [
+      "Raichu (Mega Y): Zap Cannon+",
+      "Medicham: Dynamic Punch"
+     ],
+     "score": [
+      386,
+      613
+     ],
+     "winner": 1
+    },
+    "0-1": {
+     "chargedLog": [
+      "Raichu (Mega Y): Zap Cannon+ (shielded)",
+      "Medicham: Dynamic Punch"
+     ],
+     "score": [
+      74,
+      925
+     ],
+     "winner": 1
+    },
+    "0-2": {
+     "chargedLog": [
+      "Raichu (Mega Y): Zap Cannon+ (shielded)",
+      "Medicham: Dynamic Punch"
+     ],
+     "score": [
+      74,
+      925
+     ],
+     "winner": 1
+    },
+    "1-0": {
+     "chargedLog": [
+      "Raichu (Mega Y): Zap Cannon+",
+      "Medicham: Ice Punch (shielded)",
+      "Medicham: Ice Punch",
+      "Raichu (Mega Y): Zap Cannon+"
+     ],
+     "score": [
+      552,
+      447
+     ],
+     "winner": 0
+    },
+    "1-1": {
+     "chargedLog": [
+      "Raichu (Mega Y): Zap Cannon+ (shielded)",
+      "Medicham: Ice Punch (shielded)",
+      "Raichu (Mega Y): Zap Cannon+",
+      "Medicham: Dynamic Punch"
+     ],
+     "score": [
+      460,
+      539
+     ],
+     "winner": 1
+    },
+    "1-2": {
+     "chargedLog": [
+      "Raichu (Mega Y): Zap Cannon+ (shielded)",
+      "Medicham: Ice Punch (shielded)",
+      "Raichu (Mega Y): Zap Cannon+ (shielded)",
+      "Medicham: Dynamic Punch"
+     ],
+     "score": [
+      148,
+      851
+     ],
+     "winner": 1
+    },
+    "2-0": {
+     "chargedLog": [
+      "Raichu (Mega Y): Zap Cannon+",
+      "Medicham: Ice Punch (shielded)",
+      "Medicham: Ice Punch (shielded)",
+      "Raichu (Mega Y): Zap Cannon+"
+     ],
+     "score": [
+      779,
+      220
+     ],
+     "winner": 0
+    },
+    "2-1": {
+     "chargedLog": [
+      "Raichu (Mega Y): Zap Cannon+ (shielded)",
+      "Medicham: Ice Punch (shielded)",
+      "Raichu (Mega Y): Zap Cannon+",
+      "Medicham: Ice Punch (shielded)"
+     ],
+     "score": [
+      703,
+      296
+     ],
+     "winner": 0
+    },
+    "2-2": {
+     "chargedLog": [
+      "Raichu (Mega Y): Zap Cannon+ (shielded)",
+      "Medicham: Ice Punch (shielded)",
+      "Raichu (Mega Y): Zap Cannon+ (shielded)",
+      "Medicham: Ice Punch (shielded)",
+      "Medicham: Dynamic Punch"
+     ],
+     "score": [
+      205,
+      794
+     ],
+     "winner": 1
+    }
+   },
+   "league": "great",
+   "p1": {
+    "charged": [
+     "BRICK_BREAK",
+     "TRAILBLAZE",
+     "ZAP_CANNON_PLUS"
+    ],
+    "fast": "THUNDER_SHOCK",
+    "ivs": [
+     4,
+     11,
+     15
+    ],
+    "level": 14.5,
+    "species": "raichu_mega_y"
+   },
+   "p2": {
+    "charged": [
+     "ICE_PUNCH",
+     "DYNAMIC_PUNCH"
+    ],
+    "fast": "PSYCHO_CUT",
+    "ivs": [
+     7,
+     15,
+     14
+    ],
+    "level": 49.0,
+    "species": "medicham"
+   }
+  },
+  "skarmory_mega_vs_azumarill": {
+   "cells": {
+    "0-0": {
+     "chargedLog": [
+      "Skarmory (Mega): Drill Peck+",
+      "Azumarill: Ice Beam",
+      "Skarmory (Mega): Drill Peck+"
+     ],
+     "score": [
+      527,
+      472
+     ],
+     "winner": 0
+    },
+    "0-1": {
+     "chargedLog": [
+      "Azumarill: Ice Beam",
+      "Skarmory (Mega): Drill Peck+ (shielded)",
+      "Skarmory (Mega): Drill Peck+"
+     ],
+     "score": [
+      340,
+      659
+     ],
+     "winner": 1
+    },
+    "0-2": {
+     "chargedLog": [
+      "Azumarill: Ice Beam",
+      "Skarmory (Mega): Drill Peck+ (shielded)",
+      "Skarmory (Mega): Drill Peck+ (shielded)"
+     ],
+     "score": [
+      172,
+      827
+     ],
+     "winner": 1
+    },
+    "1-0": {
+     "chargedLog": [
+      "Skarmory (Mega): Drill Peck+",
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Drill Peck+"
+     ],
+     "score": [
+      772,
+      227
+     ],
+     "winner": 0
+    },
+    "1-1": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Drill Peck+ (shielded)",
+      "Skarmory (Mega): Brave Bird",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      494,
+      505
+     ],
+     "winner": 1
+    },
+    "1-2": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Drill Peck+ (shielded)",
+      "Skarmory (Mega): Brave Bird (shielded)",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      214,
+      785
+     ],
+     "winner": 1
+    },
+    "2-0": {
+     "chargedLog": [
+      "Skarmory (Mega): Drill Peck+",
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Drill Peck+"
+     ],
+     "score": [
+      772,
+      227
+     ],
+     "winner": 0
+    },
+    "2-1": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Drill Peck+ (shielded)",
+      "Skarmory (Mega): Brave Bird",
+      "Azumarill: Ice Beam (shielded)"
+     ],
+     "score": [
+      661,
+      338
+     ],
+     "winner": 0
+    },
+    "2-2": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Drill Peck+ (shielded)",
+      "Skarmory (Mega): Drill Peck+ (shielded)",
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Brave Bird"
+     ],
+     "score": [
+      600,
+      400
+     ],
+     "winner": 0
+    }
+   },
+   "league": "great",
+   "p1": {
+    "charged": [
+     "BRAVE_BIRD",
+     "FLASH_CANNON",
+     "DRILL_PECK_PLUS"
+    ],
+    "fast": "AIR_SLASH",
+    "ivs": [
+     7,
+     14,
+     14
+    ],
+    "level": 14.5,
+    "species": "skarmory_mega"
+   },
+   "p2": {
+    "charged": [
+     "ICE_BEAM",
+     "PLAY_ROUGH"
+    ],
+    "fast": "BUBBLE",
+    "ivs": [
+     4,
+     15,
+     13
+    ],
+    "level": 43.0,
+    "species": "azumarill"
+   }
+  },
+  "skarmory_mega_vs_azumarill_2MOVE_CONTROL": {
+   "cells": {
+    "0-0": {
+     "chargedLog": [
+      "Azumarill: Ice Beam",
+      "Skarmory (Mega): Brave Bird"
+     ],
+     "score": [
+      450,
+      549
+     ],
+     "winner": 1
+    },
+    "0-1": {
+     "chargedLog": [
+      "Azumarill: Ice Beam",
+      "Skarmory (Mega): Flash Cannon (shielded)"
+     ],
+     "score": [
+      191,
+      808
+     ],
+     "winner": 1
+    },
+    "0-2": {
+     "chargedLog": [
+      "Azumarill: Ice Beam",
+      "Skarmory (Mega): Flash Cannon (shielded)"
+     ],
+     "score": [
+      191,
+      808
+     ],
+     "winner": 1
+    },
+    "1-0": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Brave Bird",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      492,
+      507
+     ],
+     "winner": 1
+    },
+    "1-1": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Flash Cannon (shielded)",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      212,
+      787
+     ],
+     "winner": 1
+    },
+    "1-2": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Flash Cannon (shielded)",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      212,
+      787
+     ],
+     "winner": 1
+    },
+    "2-0": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Brave Bird",
+      "Azumarill: Ice Beam (shielded)"
+     ],
+     "score": [
+      622,
+      377
+     ],
+     "winner": 0
+    },
+    "2-1": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Flash Cannon (shielded)",
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Brave Bird"
+     ],
+     "score": [
+      627,
+      372
+     ],
+     "winner": 0
+    },
+    "2-2": {
+     "chargedLog": [
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Flash Cannon (shielded)",
+      "Azumarill: Ice Beam (shielded)",
+      "Skarmory (Mega): Flash Cannon (shielded)",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      319,
+      680
+     ],
+     "winner": 1
+    }
+   },
+   "league": "great",
+   "p1": {
+    "charged": [
+     "BRAVE_BIRD",
+     "FLASH_CANNON"
+    ],
+    "fast": "AIR_SLASH",
+    "ivs": [
+     7,
+     14,
+     14
+    ],
+    "level": 14.5,
+    "species": "skarmory_mega"
+   },
+   "p2": {
+    "charged": [
+     "ICE_BEAM",
+     "PLAY_ROUGH"
+    ],
+    "fast": "BUBBLE",
+    "ivs": [
+     4,
+     15,
+     13
+    ],
+    "level": 43.0,
+    "species": "azumarill"
+   }
+  },
+  "victreebel_mega_vs_azumarill": {
+   "cells": {
+    "0-0": {
+     "chargedLog": [
+      "Victreebel (Mega): Leaf Blade",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      431,
+      568
+     ],
+     "winner": 1
+    },
+    "0-1": {
+     "chargedLog": [
+      "Victreebel (Mega): Acid Spray+ (shielded)",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      212,
+      787
+     ],
+     "winner": 1
+    },
+    "0-2": {
+     "chargedLog": [
+      "Victreebel (Mega): Acid Spray+ (shielded)",
+      "Azumarill: Ice Beam"
+     ],
+     "score": [
+      212,
+      787
+     ],
+     "winner": 1
+    },
+    "1-0": {
+     "chargedLog": [
+      "Victreebel (Mega): Leaf Blade",
+      "Azumarill: Ice Beam (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      883,
+      116
+     ],
+     "winner": 0
+    },
+    "1-1": {
+     "chargedLog": [
+      "Victreebel (Mega): Acid Spray+ (shielded)",
+      "Azumarill: Ice Beam (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      864,
+      135
+     ],
+     "winner": 0
+    },
+    "1-2": {
+     "chargedLog": [
+      "Victreebel (Mega): Acid Spray+ (shielded)",
+      "Azumarill: Ice Beam (shielded)",
+      "Victreebel (Mega): Leaf Blade (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      808,
+      191
+     ],
+     "winner": 0
+    },
+    "2-0": {
+     "chargedLog": [
+      "Victreebel (Mega): Leaf Blade",
+      "Azumarill: Ice Beam (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      883,
+      116
+     ],
+     "winner": 0
+    },
+    "2-1": {
+     "chargedLog": [
+      "Victreebel (Mega): Acid Spray+ (shielded)",
+      "Azumarill: Ice Beam (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      864,
+      135
+     ],
+     "winner": 0
+    },
+    "2-2": {
+     "chargedLog": [
+      "Victreebel (Mega): Acid Spray+ (shielded)",
+      "Azumarill: Ice Beam (shielded)",
+      "Victreebel (Mega): Leaf Blade (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      808,
+      191
+     ],
+     "winner": 0
+    }
+   },
+   "league": "great",
+   "p1": {
+    "charged": [
+     "LEAF_BLADE",
+     "SLUDGE_BOMB",
+     "ACID_SPRAY_PLUS"
+    ],
+    "fast": "ACID",
+    "ivs": [
+     7,
+     14,
+     14
+    ],
+    "level": 15.5,
+    "species": "victreebel_mega"
+   },
+   "p2": {
+    "charged": [
+     "ICE_BEAM",
+     "PLAY_ROUGH"
+    ],
+    "fast": "BUBBLE",
+    "ivs": [
+     4,
+     15,
+     13
+    ],
+    "level": 43.0,
+    "species": "azumarill"
+   }
+  },
+  "victreebel_mega_vs_lickilicky": {
+   "cells": {
+    "0-0": {
+     "chargedLog": [
+      "Lickilicky: Body Slam",
+      "Victreebel (Mega): Leaf Blade",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      649,
+      350
+     ],
+     "winner": 0
+    },
+    "0-1": {
+     "chargedLog": [
+      "Lickilicky: Body Slam",
+      "Victreebel (Mega): Leaf Blade (shielded)",
+      "Victreebel (Mega): Leaf Blade",
+      "Lickilicky: Body Slam"
+     ],
+     "score": [
+      368,
+      631
+     ],
+     "winner": 1
+    },
+    "0-2": {
+     "chargedLog": [
+      "Lickilicky: Body Slam",
+      "Victreebel (Mega): Leaf Blade (shielded)",
+      "Victreebel (Mega): Leaf Blade (shielded)",
+      "Lickilicky: Body Slam"
+     ],
+     "score": [
+      175,
+      825
+     ],
+     "winner": 1
+    },
+    "1-0": {
+     "chargedLog": [
+      "Victreebel (Mega): Leaf Blade",
+      "Lickilicky: Body Slam (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      855,
+      144
+     ],
+     "winner": 0
+    },
+    "1-1": {
+     "chargedLog": [
+      "Victreebel (Mega): Sludge Bomb (shielded)",
+      "Lickilicky: Body Slam (shielded)",
+      "Lickilicky: Shadow Ball",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      406,
+      593
+     ],
+     "winner": 1
+    },
+    "1-2": {
+     "chargedLog": [
+      "Victreebel (Mega): Leaf Blade (shielded)",
+      "Lickilicky: Body Slam (shielded)",
+      "Lickilicky: Shadow Ball",
+      "Victreebel (Mega): Sludge Bomb (shielded)"
+     ],
+     "score": [
+      212,
+      787
+     ],
+     "winner": 1
+    },
+    "2-0": {
+     "chargedLog": [
+      "Victreebel (Mega): Leaf Blade",
+      "Lickilicky: Body Slam (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      855,
+      144
+     ],
+     "winner": 0
+    },
+    "2-1": {
+     "chargedLog": [
+      "Victreebel (Mega): Sludge Bomb (shielded)",
+      "Lickilicky: Body Slam (shielded)",
+      "Lickilicky: Body Slam (shielded)",
+      "Lickilicky: Body Slam",
+      "Victreebel (Mega): Sludge Bomb"
+     ],
+     "score": [
+      570,
+      429
+     ],
+     "winner": 0
+    },
+    "2-2": {
+     "chargedLog": [
+      "Victreebel (Mega): Leaf Blade (shielded)",
+      "Lickilicky: Body Slam (shielded)",
+      "Lickilicky: Body Slam (shielded)",
+      "Victreebel (Mega): Acid Spray+ (shielded)",
+      "Lickilicky: Body Slam",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      570,
+      429
+     ],
+     "winner": 0
+    }
+   },
+   "league": "great",
+   "p1": {
+    "charged": [
+     "LEAF_BLADE",
+     "SLUDGE_BOMB",
+     "ACID_SPRAY_PLUS"
+    ],
+    "fast": "ACID",
+    "ivs": [
+     7,
+     14,
+     14
+    ],
+    "level": 15.5,
+    "species": "victreebel_mega"
+   },
+   "p2": {
+    "charged": [
+     "BODY_SLAM",
+     "SHADOW_BALL"
+    ],
+    "fast": "ROLLOUT",
+    "ivs": [
+     4,
+     15,
+     8
+    ],
+    "level": 23.0,
+    "species": "lickilicky"
+   }
+  },
+  "victreebel_mega_vs_medicham": {
+   "cells": {
+    "0-0": {
+     "chargedLog": [
+      "Victreebel (Mega): Leaf Blade",
+      "Medicham: Ice Punch"
+     ],
+     "score": [
+      322,
+      677
+     ],
+     "winner": 1
+    },
+    "0-1": {
+     "chargedLog": [
+      "Medicham: Ice Punch",
+      "Victreebel (Mega): Sludge Bomb (shielded)"
+     ],
+     "score": [
+      127,
+      872
+     ],
+     "winner": 1
+    },
+    "0-2": {
+     "chargedLog": [
+      "Medicham: Ice Punch",
+      "Victreebel (Mega): Sludge Bomb (shielded)"
+     ],
+     "score": [
+      127,
+      872
+     ],
+     "winner": 1
+    },
+    "1-0": {
+     "chargedLog": [
+      "Victreebel (Mega): Leaf Blade",
+      "Medicham: Ice Punch (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      742,
+      257
+     ],
+     "winner": 0
+    },
+    "1-1": {
+     "chargedLog": [
+      "Medicham: Ice Punch (shielded)",
+      "Victreebel (Mega): Sludge Bomb (shielded)",
+      "Medicham: Ice Punch"
+     ],
+     "score": [
+      163,
+      836
+     ],
+     "winner": 1
+    },
+    "1-2": {
+     "chargedLog": [
+      "Medicham: Ice Punch (shielded)",
+      "Victreebel (Mega): Leaf Blade (shielded)",
+      "Medicham: Ice Punch"
+     ],
+     "score": [
+      163,
+      836
+     ],
+     "winner": 1
+    },
+    "2-0": {
+     "chargedLog": [
+      "Victreebel (Mega): Leaf Blade",
+      "Medicham: Ice Punch (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      742,
+      257
+     ],
+     "winner": 0
+    },
+    "2-1": {
+     "chargedLog": [
+      "Medicham: Ice Punch (shielded)",
+      "Victreebel (Mega): Sludge Bomb (shielded)",
+      "Medicham: Ice Punch (shielded)",
+      "Victreebel (Mega): Leaf Blade",
+      "Medicham: Ice Punch"
+     ],
+     "score": [
+      450,
+      549
+     ],
+     "winner": 1
+    },
+    "2-2": {
+     "chargedLog": [
+      "Medicham: Ice Punch (shielded)",
+      "Victreebel (Mega): Leaf Blade (shielded)",
+      "Medicham: Ice Punch (shielded)",
+      "Victreebel (Mega): Acid Spray+ (shielded)",
+      "Victreebel (Mega): Leaf Blade"
+     ],
+     "score": [
+      598,
+      401
+     ],
+     "winner": 0
+    }
+   },
+   "league": "great",
+   "p1": {
+    "charged": [
+     "LEAF_BLADE",
+     "SLUDGE_BOMB",
+     "ACID_SPRAY_PLUS"
+    ],
+    "fast": "ACID",
+    "ivs": [
+     7,
+     14,
+     14
+    ],
+    "level": 15.5,
+    "species": "victreebel_mega"
+   },
+   "p2": {
+    "charged": [
+     "ICE_PUNCH",
+     "DYNAMIC_PUNCH"
+    ],
+    "fast": "PSYCHO_CUT",
+    "ivs": [
+     7,
+     15,
+     14
+    ],
+    "level": 49.0,
+    "species": "medicham"
+   }
+  }
+ }
+}
