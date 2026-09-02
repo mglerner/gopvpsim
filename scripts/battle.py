@@ -132,7 +132,7 @@ def main():
                         metavar='a/d/s', help='IVs for pokemon 2 (default 15/15/15)')
     parser.add_argument('--policy', default='pvpoke_dp', choices=list(POLICIES),
                         help='Charged move policy for both sides (default: pvpoke_ai)')
-    parser.add_argument('--mechanics', choices=['legacy', 'new'], default='legacy',
+    parser.add_argument('--mechanics', choices=['legacy', 'new'], default='new',
                         help='Turn-resolution model. legacy (default) = pre-2026-06-23. '
                              'new = the post-2026-06-23 PvP turn system. NEITHER is '
                              'simply correct as of 2026-09-02 -- both print a caveat; '

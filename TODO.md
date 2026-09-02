@@ -905,6 +905,25 @@ author reverted the charged-attack timing rule we implement and marked it
 quickly. Chasing a moving, self-described-provisional branch costs more than
 it buys.
 
+**DEFAULT FLIPPED to `new` (Michael, 2026-09-02):** "It is literally
+impossible to play an actual game with the old turn system now." The product
+CLIs (`deep_dive.py`, `battle.py`, and `run_website_dives.py` which inherits
+them) now default to `--mechanics new`. Modelling the current ruleset
+approximately beats modelling a dead one exactly.
+
+Two things deliberately did NOT follow the flip, and both are pinned by
+`tests/test_mechanics_default.py`:
+
+- `audit_oracle_harness.py` stays on legacy. It answers "is our PORT
+  faithful?", and PvPoke master still runs the legacy turn system; flipping it
+  goes from 0 mismatches to 57 (measured) and makes the audit
+  self-referential.
+- `gopvpsim.battle.simulate`'s signature default stays legacy. The ~92
+  legacy-pinned assertions across tests/ check us against PvPoke ground truth;
+  re-baselining them to `new` would make them pin OUR OWN unvalidated output
+  with no oracle behind it -- a suite that can only confirm we still do
+  whatever we currently do. Both flip together when the re-port lands.
+
 What is already in place so the wait is safe:
 
 - BOTH `--mechanics` settings print a caveat at every CLI entry point

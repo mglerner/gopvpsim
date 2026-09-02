@@ -3774,14 +3774,16 @@ def main():
                              '(userdata/replay/) that lets '
                              'scripts/replay_analysis.py re-render this '
                              'dive\'s HTML without re-simming.')
-    parser.add_argument('--mechanics', choices=['legacy', 'new'], default='legacy',
-                        help='Turn-resolution model. NEITHER setting is '
-                             'simply correct as of 2026-09-02: legacy '
-                             '(default) models the pre-2026-09-02 system, '
-                             'which the live game no longer runs, and new is '
-                             'unvalidated (104/243 oracle cells disagree with '
-                             "PvPoke's new-mechanics branch). Both print a "
-                             'caveat; see scripts/mechanics_notice.py.')
+    parser.add_argument('--mechanics', choices=['legacy', 'new'], default='new',
+                        help='Turn-resolution model. DEFAULT IS new as of '
+                             '2026-09-02: the legacy turn system is gone from '
+                             'the live game, so a dive must model the system '
+                             'people actually play. new is still UNVALIDATED '
+                             '(104/243 oracle cells disagree with PvPoke\'s '
+                             'unmerged new-mechanics branch) and says so at '
+                             'runtime. legacy remains available and is what '
+                             'the port-fidelity suite checks against PvPoke '
+                             'master. See scripts/mechanics_notice.py.')
 
     args = parser.parse_args()
 
