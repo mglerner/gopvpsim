@@ -45,6 +45,17 @@ CPM = {
     47.0: 0.82529999, 47.5: 0.82779999,   48.0: 0.83029999, 48.5: 0.83279999,
     49.0: 0.83529999, 49.5: 0.83779999,   50.0: 0.84029999, 50.5: 0.84279999,
     51.0: 0.84529999,
+    # Levels above 51 are NOT reachable by an ordinary Pokemon -- the game
+    # tops out at 50, +1 for best buddy. They exist here only because PvPoke
+    # models Mega Level 4 ("Super Max") as raising the level cap to 52
+    # (Pokemon.js:294-297, commit 82a974ffa, 2026-09-02), its reading of
+    # Niantic's unquantified "greatly enhanced CP".
+    #
+    # SOURCE DIFFERS from every entry above. The rest of this table is the
+    # GAME's published 8-decimal CPM; Niantic has published no CPM above 51,
+    # so these two are PvPoke's values (its `cpms` array, indices 101/102).
+    # Interpretation, not ground truth -- see MEGA_LEVEL_4_MAX_LEVEL.
+    51.5: 0.847803702398935, 52.0: 0.850300014019012,
 }
 
 # ---------------------------------------------------------------------------
@@ -96,9 +107,27 @@ LEAGUE_CAPS = {name: lg.cp for name, lg in LEAGUES.items()}
 LEAGUE_CP = LEAGUE_CAPS
 LEAGUE_MAX_LEVEL = {name: lg.max_level for name, lg in LEAGUES.items()}
 
-# Highest level that exists in the CPM table (the hard ceiling — best-buddy
-# can never push past this).
-MAX_CPM_LEVEL = max(CPM)
+# Highest level an ORDINARY Pokemon can reach: 50, +1 for best buddy.
+#
+# Deliberately NOT `max(CPM)` any more. The table now carries 51.5/52.0 for
+# PvPoke's Mega Level 4 cap, and every consumer of this constant --
+# bestbuddy_caps, the dive page's JS level ceilings, user_collection -- means
+# "the ceiling a normal build can hit". Deriving it from the table would
+# silently let every Master/Little mon best-buddy to 52.
+MAX_CPM_LEVEL = 51.0
+
+# The Mega Level 4 ceiling (PvPoke Pokemon.js:294-297). Applied FLAT: PvPoke
+# sets baseLevelCap AND levelCap to 52 after the battle's own cap, and
+# setLevelCap clamps with min(levelCap, baseLevelCap), so best buddy does not
+# stack on top of it.
+#
+# UNVERIFIED MECHANIC. Niantic said only that a higher Mega Level "greatly
+# enhances CP"; +2 levels is PvPoke's quantification, published 2026-09-02.
+# It only bites where a CP cap does not already bind -- i.e. Master League;
+# a GL/UL mega sits far below any cap already.
+MEGA_LEVEL_4_MAX_LEVEL = 52.0
+
+assert MAX_CPM_LEVEL in CPM and MEGA_LEVEL_4_MAX_LEVEL in CPM
 
 
 def bestbuddy_caps(league):
@@ -379,6 +408,16 @@ class Pokemon:
         max_cp = LEAGUE_CAPS[league]
         if max_level is None:
             max_level = LEAGUE_MAX_LEVEL.get(league, MAX_CPM_LEVEL)
+            # Mega Level 4 raises the ceiling to 52 (PvPoke Pokemon.js:294-297,
+            # applied AFTER the battle's own cap and clamped flat). Only
+            # relevant where a CP cap does not already bind -- in GL/UL a mega
+            # sits far below 50 anyway, so this changes nothing there.
+            #
+            # Skipped when the caller pinned an explicit max_level: an oracle
+            # fixture or a re-dive against a historical build must be able to
+            # ask for the level it actually means.
+            if mega_level(species_name) == MEGA_LEVEL_SUPERMEGA:
+                max_level = max(max_level, MEGA_LEVEL_4_MAX_LEVEL)
         level = best_level(base_atk, base_def, base_sta,
                            atk_iv, def_iv, sta_iv,
                            max_cp=max_cp, max_level=max_level)
