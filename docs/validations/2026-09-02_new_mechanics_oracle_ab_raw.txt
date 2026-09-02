@@ -1,0 +1,429 @@
+[0mdirenv: loading ~/coding/gopvpsim/.envrc
+*** OUR SIDE RUNS mechanics='new'; PvPoke side is whatever JS lives in /private/tmp/claude-1976725803/-Users-mglerner-coding-gopvpsim/adc564a8-3421-4f9a-aedb-9009c5133888/scratchpad/pv_newmech. The xfail sets below were derived under LEGACY and may not apply. ***
+
+
+medicham_vs_azumarill
+  [0v0] MISMATCH    sim(391/608,w1)  pvpoke(383/616,w1)  log_ok=True   <<<
+  [0v1] MISMATCH    sim(269/730,w1)  pvpoke(261/738,w1)  log_ok=True   <<<
+  [0v2] MISMATCH    sim(148/851,w1)  pvpoke(140/859,w1)  log_ok=True   <<<
+  [1v0] MISMATCH    sim(524/475,w0)  pvpoke(542/457,w0)  log_ok=True   <<<
+  [1v1] OK          sim(396/603,w1)  pvpoke(396/603,w1)  log_ok=True
+  [1v2] OK          sim(275/724,w1)  pvpoke(275/724,w1)  log_ok=True
+  [2v0] MISMATCH    sim(764/235,w0)  pvpoke(781/218,w0)  log_ok=True   <<<
+  [2v1] OK          sim(588/411,w0)  pvpoke(588/411,w0)  log_ok=True
+  [2v2] MISMATCH    sim(394/605,w1)  pvpoke(386/613,w1)  log_ok=True   <<<
+
+azumarill_vs_forretress_sand_rock
+  [0v0] OK          sim(472/527,w1)  pvpoke(472/527,w1)  log_ok=True
+  [0v1] OK          sim(312/687,w1)  pvpoke(312/687,w1)  log_ok=True
+  [0v2] OK          sim(222/777,w1)  pvpoke(222/777,w1)  log_ok=True
+  [1v0] MISMATCH    sim(617/382,w0)  pvpoke(657/342,w0)  log_ok=True   <<<
+  [1v1] MISMATCH    sim(433/566,w1)  pvpoke(429/570,w1)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(230/769,w1)  pvpoke(226/773,w1)  log_ok=True   <<<
+  [2v0] MISMATCH    sim(620/379,w0)  pvpoke(612/387,w0)  log_ok=True   <<<
+  [2v1] OK          sim(496/503,w1)  pvpoke(496/503,w1)  log_ok=True
+  [2v2] OK          sim(242/757,w1)  pvpoke(242/757,w1)  log_ok=True
+
+azumarill_vs_forretress_rt_only
+  [0v0] OK          sim(476/523,w1)  pvpoke(476/523,w1)  log_ok=True
+  [0v1] OK          sim(273/726,w1)  pvpoke(273/726,w1)  log_ok=True
+  [0v2] OK          sim(214/785,w1)  pvpoke(214/785,w1)  log_ok=True
+  [1v0] OK          sim(476/523,w1)  pvpoke(476/523,w1)  log_ok=True
+  [1v1] OK          sim(273/726,w1)  pvpoke(273/726,w1)  log_ok=True
+  [1v2] OK          sim(214/785,w1)  pvpoke(214/785,w1)  log_ok=True
+  [2v0] OK          sim(575/424,w0)  pvpoke(575/424,w0)  log_ok=True
+  [2v1] MISMATCH    sim(406/593,w1)  pvpoke(441/558,w1)  log_ok=False   <<<
+  [2v2] OK          sim(316/683,w1)  pvpoke(316/683,w1)  log_ok=True
+
+beedrill_vs_medicham_fell_stinger
+  [0v0] OK          sim(707/292,w0)  pvpoke(707/292,w0)  log_ok=True
+  [0v1] OK          sim(471/528,w1)  pvpoke(471/528,w1)  log_ok=True
+  [0v2] OK          sim(507/492,w0)  pvpoke(507/492,w0)  log_ok=True
+  [1v0] OK          sim(857/142,w0)  pvpoke(857/142,w0)  log_ok=True
+  [1v1] OK          sim(646/353,w0)  pvpoke(646/353,w0)  log_ok=True
+  [1v2] OK          sim(657/342,w0)  pvpoke(657/342,w0)  log_ok=True
+  [2v0] OK          sim(857/142,w0)  pvpoke(857/142,w0)  log_ok=True
+  [2v1] OK          sim(796/203,w0)  pvpoke(796/203,w0)  log_ok=True
+  [2v2] OK          sim(807/192,w0)  pvpoke(807/192,w0)  log_ok=True
+
+corviknight_vs_medicham_air_cutter
+  [0v0] OK          sim(566/433,w0)  pvpoke(566/433,w0)  log_ok=True
+  [0v1] OK          sim(478/521,w1)  pvpoke(478/521,w1)  log_ok=True
+  [0v2] MISMATCH    sim(326/673,w1)  pvpoke(294/705,w1)  log_ok=True   <<<
+  [1v0] OK          sim(756/243,w0)  pvpoke(756/243,w0)  log_ok=True
+  [1v1] OK          sim(478/521,w1)  pvpoke(478/521,w1)  log_ok=True
+  [1v2] OK          sim(326/673,w1)  pvpoke(326/673,w1)  log_ok=True
+  [2v0] OK          sim(756/243,w0)  pvpoke(756/243,w0)  log_ok=True
+  [2v1] MISMATCH    sim(673/326,w0)  pvpoke(693/306,w0)  log_ok=True   <<<
+  [2v2] OK          sim(633/366,w0)  pvpoke(633/366,w0)  log_ok=True
+
+mienfoo_vs_medicham_high_jump_kick
+  [0v0] MISMATCH    sim(280/719,w1)  pvpoke(269/730,w1)  log_ok=True   <<<
+  [0v1] MISMATCH    sim(88/911,w1)  pvpoke(78/921,w1)  log_ok=True   <<<
+  [0v2] MISMATCH    sim(88/911,w1)  pvpoke(78/921,w1)  log_ok=True   <<<
+  [1v0] OK          sim(521/478,w0)  pvpoke(521/478,w0)  log_ok=True
+  [1v1] OK          sim(347/652,w1)  pvpoke(347/652,w1)  log_ok=True
+  [1v2] MISMATCH    sim(156/843,w1)  pvpoke(145/854,w1)  log_ok=True   <<<
+  [2v0] MISMATCH    sim(521/478,w0)  pvpoke(414/585,w1)  log_ok=False   <<<
+  [2v1] MISMATCH    sim(347/652,w1)  pvpoke(212/787,w1)  log_ok=False   <<<
+  [2v2] MISMATCH    sim(156/843,w1)  pvpoke(145/854,w1)  log_ok=True   <<<
+
+corviknight_vs_azumarill_air_cutter_buff
+  [0v0] OK          sim(426/573,w1)  pvpoke(426/573,w1)  log_ok=True
+  [0v1] OK          sim(356/643,w1)  pvpoke(356/643,w1)  log_ok=True
+  [0v2] OK          sim(285/714,w1)  pvpoke(285/714,w1)  log_ok=True
+  [1v0] MISMATCH    sim(463/536,w1)  pvpoke(445/554,w1)  log_ok=True   <<<
+  [1v1] MISMATCH    sim(392/607,w1)  pvpoke(374/625,w1)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(321/678,w1)  pvpoke(303/696,w1)  log_ok=True   <<<
+  [2v0] OK          sim(586/413,w0)  pvpoke(586/413,w0)  log_ok=True
+  [2v1] OK          sim(586/413,w0)  pvpoke(586/413,w0)  log_ok=True
+  [2v2] OK          sim(536/463,w0)  pvpoke(536/463,w0)  log_ok=True
+
+shadow_swampert_vs_registeel
+  [0v0] MISMATCH    sim(720/279,w0)  pvpoke(723/276,w0)  log_ok=True   <<<
+  [0v1] MISMATCH    sim(686/313,w0)  pvpoke(690/309,w0)  log_ok=True   <<<
+  [0v2] MISMATCH    sim(216/784,w1)  pvpoke(200/800,w1)  log_ok=True   <<<
+  [1v0] MISMATCH    sim(936/63,w0)  pvpoke(940/59,w0)  log_ok=True   <<<
+  [1v1] MISMATCH    sim(902/97,w0)  pvpoke(906/93,w0)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(232/768,w1)  pvpoke(216/784,w1)  log_ok=True   <<<
+  [2v0] MISMATCH    sim(936/63,w0)  pvpoke(940/59,w0)  log_ok=True   <<<
+  [2v1] MISMATCH    sim(902/97,w0)  pvpoke(906/93,w0)  log_ok=True   <<<
+  [2v2] MISMATCH    sim(861/138,w0)  pvpoke(865/134,w0)  log_ok=True   <<<
+
+corviknight_mirror_both_buff
+  [0v0] OK          sim(500/500,wNone)  pvpoke(500/500,wNone)  log_ok=True
+  [0v1] OK          sim(443/556,w1)  pvpoke(443/556,w1)  log_ok=True
+  [0v2] OK          sim(386/613,w1)  pvpoke(386/613,w1)  log_ok=True
+  [1v0] OK          sim(556/443,w0)  pvpoke(556/443,w0)  log_ok=True
+  [1v1] OK          sim(500/500,wNone)  pvpoke(500/500,wNone)  log_ok=True
+  [1v2] OK          sim(500/500,wNone)  pvpoke(500/500,wNone)  log_ok=True
+  [2v0] OK          sim(613/386,w0)  pvpoke(613/386,w0)  log_ok=True
+  [2v1] OK          sim(500/500,wNone)  pvpoke(500/500,wNone)  log_ok=True
+  [2v2] OK          sim(500/500,wNone)  pvpoke(500/500,wNone)  log_ok=True
+
+morpeko_vs_azumarill_form_change
+  [0v0] MISMATCH    sim(489/510,w1)  pvpoke(471/528,w1)  log_ok=True   <<<
+  [0v1] OK          sim(219/780,w1)  pvpoke(219/780,w1)  log_ok=True
+  [0v2] OK          sim(219/780,w1)  pvpoke(219/780,w1)  log_ok=True
+  [1v0] OK          sim(817/182,w0)  pvpoke(817/182,w0)  log_ok=True
+  [1v1] div(known)  sim(728/271,w0)  pvpoke(728/271,w0)  log_ok=False
+  [1v2] div(known)  sim(348/651,w1)  pvpoke(348/651,w1)  log_ok=False
+  [2v0] OK          sim(817/182,w0)  pvpoke(817/182,w0)  log_ok=True
+  [2v1] div(known)  sim(728/271,w0)  pvpoke(728/271,w0)  log_ok=False
+  [2v2] div(known)  sim(665/334,w0)  pvpoke(665/334,w0)  log_ok=False
+
+aegislash_vs_azumarill_form_change
+  [0v0] MISMATCH    sim(773/226,w0)  pvpoke(751/248,w0)  log_ok=True   <<<
+  [0v1] OK          sim(374/625,w1)  pvpoke(374/625,w1)  log_ok=True
+  [0v2] OK          sim(112/887,w1)  pvpoke(112/887,w1)  log_ok=True
+  [1v0] MISMATCH    sim(773/226,w0)  pvpoke(751/248,w0)  log_ok=True   <<<
+  [1v1] MISMATCH    sim(640/359,w0)  pvpoke(618/381,w0)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(510/489,w0)  pvpoke(408/591,w1)  log_ok=False   <<<
+  [2v0] MISMATCH    sim(773/226,w0)  pvpoke(751/248,w0)  log_ok=True   <<<
+  [2v1] MISMATCH    sim(640/359,w0)  pvpoke(618/381,w0)  log_ok=True   <<<
+  [2v2] MISMATCH    sim(510/489,w0)  pvpoke(408/591,w1)  log_ok=False   <<<
+
+mimikyu_vs_azumarill_form_change
+  [0v0] OK          sim(738/261,w0)  pvpoke(738/261,w0)  log_ok=True
+  [0v1] OK          sim(350/649,w1)  pvpoke(350/649,w1)  log_ok=True
+  [0v2] OK          sim(214/785,w1)  pvpoke(214/785,w1)  log_ok=True
+  [1v0] OK          sim(761/238,w0)  pvpoke(761/238,w0)  log_ok=True
+  [1v1] MISMATCH    sim(672/327,w0)  pvpoke(700/299,w0)  log_ok=True   <<<
+  [1v2] OK          sim(460/539,w1)  pvpoke(460/539,w1)  log_ok=True
+  [2v0] OK          sim(761/238,w0)  pvpoke(761/238,w0)  log_ok=True
+  [2v1] MISMATCH    sim(686/313,w0)  pvpoke(710/289,w0)  log_ok=True   <<<
+  [2v2] OK          sim(607/392,w0)  pvpoke(607/392,w0)  log_ok=True
+
+azumarill_vs_mimikyu_form_change
+  [0v0] OK          sim(261/738,w1)  pvpoke(261/738,w1)  log_ok=True
+  [0v1] OK          sim(238/761,w1)  pvpoke(238/761,w1)  log_ok=True
+  [0v2] OK          sim(238/761,w1)  pvpoke(238/761,w1)  log_ok=True
+  [1v0] OK          sim(649/350,w0)  pvpoke(649/350,w0)  log_ok=True
+  [1v1] MISMATCH    sim(327/672,w1)  pvpoke(299/700,w1)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(313/686,w1)  pvpoke(289/710,w1)  log_ok=True   <<<
+  [2v0] OK          sim(785/214,w0)  pvpoke(785/214,w0)  log_ok=True
+  [2v1] OK          sim(539/460,w0)  pvpoke(539/460,w0)  log_ok=True
+  [2v2] OK          sim(392/607,w1)  pvpoke(392/607,w1)  log_ok=True
+
+aegislash_blade_vs_azumarill_form_change
+  [0v0] MISMATCH    sim(358/641,w1)  pvpoke(348/651,w1)  log_ok=True   <<<
+  [0v1] MISMATCH    sim(96/903,w1)  pvpoke(86/913,w1)  log_ok=True   <<<
+  [0v2] MISMATCH    sim(96/903,w1)  pvpoke(86/913,w1)  log_ok=True   <<<
+  [1v0] MISMATCH    sim(698/301,w0)  pvpoke(712/287,w0)  log_ok=True   <<<
+  [1v1] VANISHED    sim(528/471,w0)  pvpoke(528/471,w0)  log_ok=True
+  [1v2] div(known)  sim(413/586,w1)  pvpoke(387/612,w1)  log_ok=True
+  [2v0] OK          sim(655/344,w0)  pvpoke(655/344,w0)  log_ok=True
+  [2v1] OK          sim(514/485,w0)  pvpoke(514/485,w0)  log_ok=True
+  [2v2] OK          sim(183/816,w1)  pvpoke(183/816,w1)  log_ok=True
+
+azumarill_vs_aegislash_shield_form_change
+  [0v0] MISMATCH    sim(226/773,w1)  pvpoke(248/751,w1)  log_ok=True   <<<
+  [0v1] MISMATCH    sim(226/773,w1)  pvpoke(248/751,w1)  log_ok=True   <<<
+  [0v2] MISMATCH    sim(226/773,w1)  pvpoke(248/751,w1)  log_ok=True   <<<
+  [1v0] OK          sim(625/374,w0)  pvpoke(625/374,w0)  log_ok=True
+  [1v1] MISMATCH    sim(359/640,w1)  pvpoke(381/618,w1)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(359/640,w1)  pvpoke(381/618,w1)  log_ok=True   <<<
+  [2v0] OK          sim(887/112,w0)  pvpoke(887/112,w0)  log_ok=True
+  [2v1] MISMATCH    sim(489/510,w1)  pvpoke(591/408,w0)  log_ok=False   <<<
+  [2v2] MISMATCH    sim(489/510,w1)  pvpoke(591/408,w0)  log_ok=False   <<<
+
+mimikyu_vs_medicham_form_change
+  [0v0] MISMATCH    sim(920/79,w0)  pvpoke(929/70,w0)  log_ok=True   <<<
+  [0v1] OK          sim(873/126,w0)  pvpoke(873/126,w0)  log_ok=True
+  [0v2] OK          sim(644/355,w0)  pvpoke(644/355,w0)  log_ok=True
+  [1v0] MISMATCH    sim(920/79,w0)  pvpoke(929/70,w0)  log_ok=True   <<<
+  [1v1] OK          sim(873/126,w0)  pvpoke(873/126,w0)  log_ok=True
+  [1v2] OK          sim(813/186,w0)  pvpoke(813/186,w0)  log_ok=True
+  [2v0] MISMATCH    sim(920/79,w0)  pvpoke(929/70,w0)  log_ok=True   <<<
+  [2v1] OK          sim(873/126,w0)  pvpoke(873/126,w0)  log_ok=True
+  [2v2] OK          sim(813/186,w0)  pvpoke(813/186,w0)  log_ok=True
+
+morpeko_vs_stunfisk_galarian_form_change
+  [0v0] MISMATCH    sim(101/898,w1)  pvpoke(95/904,w1)  log_ok=True   <<<
+  [0v1] MISMATCH    sim(101/898,w1)  pvpoke(95/904,w1)  log_ok=True   <<<
+  [0v2] MISMATCH    sim(101/898,w1)  pvpoke(95/904,w1)  log_ok=True   <<<
+  [1v0] MISMATCH    sim(459/540,w1)  pvpoke(450/549,w1)  log_ok=True   <<<
+  [1v1] MISMATCH    sim(459/540,w1)  pvpoke(450/549,w1)  log_ok=True   <<<
+  [1v2] div(known)  sim(218/781,w1)  pvpoke(136/863,w1)  log_ok=False
+  [2v0] div(known)  sim(771/228,w0)  pvpoke(771/228,w0)  log_ok=False
+  [2v1] div(known)  sim(488/511,w1)  pvpoke(488/511,w1)  log_ok=False
+  [2v2] div(known)  sim(252/747,w1)  pvpoke(174/825,w1)  log_ok=False
+
+tinkaton_vs_aegislash_shield_form_change
+  [0v0] MISMATCH    sim(323/676,w1)  pvpoke(316/683,w1)  log_ok=True   <<<
+  [0v1] MISMATCH    sim(313/686,w1)  pvpoke(306/693,w1)  log_ok=True   <<<
+  [0v2] MISMATCH    sim(313/686,w1)  pvpoke(306/693,w1)  log_ok=True   <<<
+  [1v0] MISMATCH    sim(941/58,w0)  pvpoke(949/50,w0)  log_ok=True   <<<
+  [1v1] MISMATCH    sim(915/84,w0)  pvpoke(907/92,w0)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(404/595,w1)  pvpoke(397/602,w1)  log_ok=True   <<<
+  [2v0] MISMATCH    sim(941/58,w0)  pvpoke(949/50,w0)  log_ok=True   <<<
+  [2v1] MISMATCH    sim(915/84,w0)  pvpoke(907/92,w0)  log_ok=True   <<<
+  [2v2] MISMATCH    sim(882/117,w0)  pvpoke(646/353,w0)  log_ok=False   <<<
+
+obstagoon_obstruct_vs_azumarill
+  [0v0] OK          sim(235/764,w1)  pvpoke(235/764,w1)  log_ok=True
+  [0v1] OK          sim(170/829,w1)  pvpoke(170/829,w1)  log_ok=True
+  [0v2] OK          sim(170/829,w1)  pvpoke(170/829,w1)  log_ok=True
+  [1v0] MISMATCH    sim(374/625,w1)  pvpoke(361/638,w1)  log_ok=True   <<<
+  [1v1] MISMATCH    sim(295/704,w1)  pvpoke(282/717,w1)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(295/704,w1)  pvpoke(282/717,w1)  log_ok=True   <<<
+  [2v0] OK          sim(500/500,wNone)  pvpoke(500/500,wNone)  log_ok=True
+  [2v1] OK          sim(429/570,w1)  pvpoke(429/570,w1)  log_ok=True
+  [2v2] OK          sim(350/649,w1)  pvpoke(350/649,w1)  log_ok=True
+
+moltres_galarian_vs_florges
+  [0v0] OK          sim(318/681,w1)  pvpoke(318/681,w1)  log_ok=True
+  [0v1] OK          sim(143/856,w1)  pvpoke(143/856,w1)  log_ok=True
+  [0v2] OK          sim(143/856,w1)  pvpoke(143/856,w1)  log_ok=True
+  [1v0] MISMATCH    sim(547/452,w0)  pvpoke(563/436,w0)  log_ok=True   <<<
+  [1v1] OK          sim(339/660,w1)  pvpoke(339/660,w1)  log_ok=True
+  [1v2] OK          sim(199/800,w1)  pvpoke(199/800,w1)  log_ok=True
+  [2v0] MISMATCH    sim(756/243,w0)  pvpoke(772/227,w0)  log_ok=True   <<<
+  [2v1] MISMATCH    sim(307/692,w1)  pvpoke(318/681,w1)  log_ok=True   <<<
+  [2v2] MISMATCH    sim(192/807,w1)  pvpoke(202/797,w1)  log_ok=True   <<<
+
+jellicent_vs_moltres_galarian
+  [0v0] div(known)  sim(462/537,w1)  pvpoke(360/639,w1)  log_ok=False
+  [0v1] div(known)  sim(322/677,w1)  pvpoke(220/779,w1)  log_ok=False
+  [0v2] div(known)  sim(77/922,w1)  pvpoke(220/779,w1)  log_ok=False
+  [1v0] MISMATCH    sim(378/621,w1)  pvpoke(369/630,w1)  log_ok=True   <<<
+  [1v1] MISMATCH    sim(239/760,w1)  pvpoke(229/770,w1)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(239/760,w1)  pvpoke(229/770,w1)  log_ok=True   <<<
+  [2v0] OK          sim(572/427,w0)  pvpoke(572/427,w0)  log_ok=True
+  [2v1] OK          sim(400/599,w1)  pvpoke(400/599,w1)  log_ok=True
+  [2v2] OK          sim(400/599,w1)  pvpoke(400/599,w1)  log_ok=True
+
+corviknight_vs_moltres_galarian
+  [0v0] div(known)  sim(360/639,w1)  pvpoke(475/524,w1)  log_ok=False
+  [0v1] div(known)  sim(279/720,w1)  pvpoke(394/605,w1)  log_ok=False
+  [0v2] div(known)  sim(198/801,w1)  pvpoke(313/686,w1)  log_ok=False
+  [1v0] MISMATCH    sim(484/515,w1)  pvpoke(481/518,w1)  log_ok=True   <<<
+  [1v1] MISMATCH    sim(403/596,w1)  pvpoke(400/599,w1)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(301/698,w1)  pvpoke(298/701,w1)  log_ok=True   <<<
+  [2v0] OK          sim(533/466,w0)  pvpoke(533/466,w0)  log_ok=True
+  [2v1] MISMATCH    sim(502/497,w0)  pvpoke(517/482,w0)  log_ok=True   <<<
+  [2v2] OK          sim(500/500,wNone)  pvpoke(500/500,wNone)  log_ok=True
+
+lapras_vs_moltres_galarian
+  [0v0] OK          sim(529/470,w0)  pvpoke(529/470,w0)  log_ok=True
+  [0v1] MISMATCH    sim(242/757,w1)  pvpoke(239/760,w1)  log_ok=True   <<<
+  [0v2] MISMATCH    sim(242/757,w1)  pvpoke(239/760,w1)  log_ok=True   <<<
+  [1v0] OK          sim(658/341,w0)  pvpoke(658/341,w0)  log_ok=True
+  [1v1] MISMATCH    sim(502/497,w0)  pvpoke(517/482,w0)  log_ok=True   <<<
+  [1v2] div(known)  sim(502/497,w0)  pvpoke(388/611,w1)  log_ok=False
+  [2v0] OK          sim(786/213,w0)  pvpoke(786/213,w0)  log_ok=True
+  [2v1] MISMATCH    sim(711/288,w0)  pvpoke(726/273,w0)  log_ok=True   <<<
+  [2v2] MISMATCH    sim(282/717,w1)  pvpoke(279/720,w1)  log_ok=True   <<<
+
+cramorant_vs_registeel
+  [0v0] MISMATCH    sim(507/492,w0)  pvpoke(511/488,w0)  log_ok=True   <<<
+  [0v1] MISMATCH    sim(332/668,w1)  pvpoke(336/664,w1)  log_ok=True   <<<
+  [0v2] MISMATCH    sim(332/668,w1)  pvpoke(336/664,w1)  log_ok=True   <<<
+  [1v0] MISMATCH    sim(702/297,w0)  pvpoke(706/293,w0)  log_ok=True   <<<
+  [1v1] OK          sim(674/325,w0)  pvpoke(674/325,w0)  log_ok=True
+  [1v2] MISMATCH    sim(464/536,w1)  pvpoke(468/532,w1)  log_ok=True   <<<
+  [2v0] MISMATCH    sim(702/297,w0)  pvpoke(706/293,w0)  log_ok=True   <<<
+  [2v1] OK          sim(674/325,w0)  pvpoke(674/325,w0)  log_ok=True
+  [2v2] MISMATCH    sim(654/345,w0)  pvpoke(658/341,w0)  log_ok=True   <<<
+
+cramorant_vs_raichu_alolan
+  [0v0] MISMATCH    sim(397/602,w1)  pvpoke(378/621,w1)  log_ok=True   <<<
+  [0v1] MISMATCH    sim(196/803,w1)  pvpoke(177/822,w1)  log_ok=True   <<<
+  [0v2] MISMATCH    sim(196/803,w1)  pvpoke(177/822,w1)  log_ok=True   <<<
+  [1v0] OK          sim(336/663,w1)  pvpoke(336/663,w1)  log_ok=True
+  [1v1] OK          sim(135/864,w1)  pvpoke(135/864,w1)  log_ok=True
+  [1v2] OK          sim(135/864,w1)  pvpoke(135/864,w1)  log_ok=True
+  [2v0] OK          sim(336/663,w1)  pvpoke(336/663,w1)  log_ok=True
+  [2v1] OK          sim(135/864,w1)  pvpoke(135/864,w1)  log_ok=True
+  [2v2] OK          sim(135/864,w1)  pvpoke(135/864,w1)  log_ok=True
+
+cramorant_mirror
+  [0v0] OK          sim(626/373,w0)  pvpoke(626/373,w0)  log_ok=True
+  [0v1] OK          sim(523/476,w0)  pvpoke(523/476,w0)  log_ok=True
+  [0v2] OK          sim(523/476,w0)  pvpoke(523/476,w0)  log_ok=True
+  [1v0] OK          sim(626/373,w0)  pvpoke(626/373,w0)  log_ok=True
+  [1v1] OK          sim(619/380,w0)  pvpoke(619/380,w0)  log_ok=True
+  [1v2] OK          sim(619/380,w0)  pvpoke(619/380,w0)  log_ok=True
+  [2v0] OK          sim(626/373,w0)  pvpoke(626/373,w0)  log_ok=True
+  [2v1] OK          sim(619/380,w0)  pvpoke(619/380,w0)  log_ok=True
+  [2v2] OK          sim(619/380,w0)  pvpoke(619/380,w0)  log_ok=True
+
+cramorant_vs_mimikyu
+  [0v0] OK          sim(515/484,w0)  pvpoke(515/484,w0)  log_ok=True
+  [0v1] OK          sim(196/803,w1)  pvpoke(196/803,w1)  log_ok=True
+  [0v2] OK          sim(196/803,w1)  pvpoke(196/803,w1)  log_ok=True
+  [1v0] OK          sim(500/500,wNone)  pvpoke(500/500,wNone)  log_ok=True
+  [1v1] MISMATCH    sim(345/654,w1)  pvpoke(322/677,w1)  log_ok=True   <<<
+  [1v2] MISMATCH    sim(331/668,w1)  pvpoke(313/686,w1)  log_ok=True   <<<
+  [2v0] OK          sim(714/285,w0)  pvpoke(714/285,w0)  log_ok=True
+  [2v1] OK          sim(678/321,w0)  pvpoke(678/321,w0)  log_ok=True
+  [2v2] MISMATCH    sim(467/532,w1)  pvpoke(443/556,w1)  log_ok=True   <<<
+
+======================================================================
+cells checked: 243
+confirmed documented divergences: 16
+    morpeko_vs_azumarill_form_change (1, 1)
+    morpeko_vs_azumarill_form_change (1, 2)
+    morpeko_vs_azumarill_form_change (2, 1)
+    morpeko_vs_azumarill_form_change (2, 2)
+    aegislash_blade_vs_azumarill_form_change (1, 2)
+    morpeko_vs_stunfisk_galarian_form_change (1, 2)
+    morpeko_vs_stunfisk_galarian_form_change (2, 0)
+    morpeko_vs_stunfisk_galarian_form_change (2, 1)
+    morpeko_vs_stunfisk_galarian_form_change (2, 2)
+    jellicent_vs_moltres_galarian (0, 0)
+    jellicent_vs_moltres_galarian (0, 1)
+    jellicent_vs_moltres_galarian (0, 2)
+    corviknight_vs_moltres_galarian (0, 0)
+    corviknight_vs_moltres_galarian (0, 1)
+    corviknight_vs_moltres_galarian (0, 2)
+    lapras_vs_moltres_galarian (1, 2)
+
+DIVERGENCES THAT VANISHED (consider un-xfail): 1
+    aegislash_blade_vs_azumarill_form_change (1, 1)
+
+NEW / UNDOCUMENTED MISMATCHES: 104
+    medicham_vs_azumarill (0, 0): sim s0/s1=391/608 win=1; harness s0/s1=383/616 win=1; log_ok=True
+    medicham_vs_azumarill (0, 1): sim s0/s1=269/730 win=1; harness s0/s1=261/738 win=1; log_ok=True
+    medicham_vs_azumarill (0, 2): sim s0/s1=148/851 win=1; harness s0/s1=140/859 win=1; log_ok=True
+    medicham_vs_azumarill (1, 0): sim s0/s1=524/475 win=0; harness s0/s1=542/457 win=0; log_ok=True
+    medicham_vs_azumarill (2, 0): sim s0/s1=764/235 win=0; harness s0/s1=781/218 win=0; log_ok=True
+    medicham_vs_azumarill (2, 2): sim s0/s1=394/605 win=1; harness s0/s1=386/613 win=1; log_ok=True
+    azumarill_vs_forretress_sand_rock (1, 0): sim s0/s1=617/382 win=0; harness s0/s1=657/342 win=0; log_ok=True
+    azumarill_vs_forretress_sand_rock (1, 1): sim s0/s1=433/566 win=1; harness s0/s1=429/570 win=1; log_ok=True
+    azumarill_vs_forretress_sand_rock (1, 2): sim s0/s1=230/769 win=1; harness s0/s1=226/773 win=1; log_ok=True
+    azumarill_vs_forretress_sand_rock (2, 0): sim s0/s1=620/379 win=0; harness s0/s1=612/387 win=0; log_ok=True
+    azumarill_vs_forretress_rt_only (2, 1): sim s0/s1=406/593 win=1; harness s0/s1=441/558 win=1; log_ok=False
+    corviknight_vs_medicham_air_cutter (0, 2): sim s0/s1=326/673 win=1; harness s0/s1=294/705 win=1; log_ok=True
+    corviknight_vs_medicham_air_cutter (2, 1): sim s0/s1=673/326 win=0; harness s0/s1=693/306 win=0; log_ok=True
+    mienfoo_vs_medicham_high_jump_kick (0, 0): sim s0/s1=280/719 win=1; harness s0/s1=269/730 win=1; log_ok=True
+    mienfoo_vs_medicham_high_jump_kick (0, 1): sim s0/s1=88/911 win=1; harness s0/s1=78/921 win=1; log_ok=True
+    mienfoo_vs_medicham_high_jump_kick (0, 2): sim s0/s1=88/911 win=1; harness s0/s1=78/921 win=1; log_ok=True
+    mienfoo_vs_medicham_high_jump_kick (1, 2): sim s0/s1=156/843 win=1; harness s0/s1=145/854 win=1; log_ok=True
+    mienfoo_vs_medicham_high_jump_kick (2, 0): sim s0/s1=521/478 win=0; harness s0/s1=414/585 win=1; log_ok=False
+    mienfoo_vs_medicham_high_jump_kick (2, 1): sim s0/s1=347/652 win=1; harness s0/s1=212/787 win=1; log_ok=False
+    mienfoo_vs_medicham_high_jump_kick (2, 2): sim s0/s1=156/843 win=1; harness s0/s1=145/854 win=1; log_ok=True
+    corviknight_vs_azumarill_air_cutter_buff (1, 0): sim s0/s1=463/536 win=1; harness s0/s1=445/554 win=1; log_ok=True
+    corviknight_vs_azumarill_air_cutter_buff (1, 1): sim s0/s1=392/607 win=1; harness s0/s1=374/625 win=1; log_ok=True
+    corviknight_vs_azumarill_air_cutter_buff (1, 2): sim s0/s1=321/678 win=1; harness s0/s1=303/696 win=1; log_ok=True
+    shadow_swampert_vs_registeel (0, 0): sim s0/s1=720/279 win=0; harness s0/s1=723/276 win=0; log_ok=True
+    shadow_swampert_vs_registeel (0, 1): sim s0/s1=686/313 win=0; harness s0/s1=690/309 win=0; log_ok=True
+    shadow_swampert_vs_registeel (0, 2): sim s0/s1=216/784 win=1; harness s0/s1=200/800 win=1; log_ok=True
+    shadow_swampert_vs_registeel (1, 0): sim s0/s1=936/63 win=0; harness s0/s1=940/59 win=0; log_ok=True
+    shadow_swampert_vs_registeel (1, 1): sim s0/s1=902/97 win=0; harness s0/s1=906/93 win=0; log_ok=True
+    shadow_swampert_vs_registeel (1, 2): sim s0/s1=232/768 win=1; harness s0/s1=216/784 win=1; log_ok=True
+    shadow_swampert_vs_registeel (2, 0): sim s0/s1=936/63 win=0; harness s0/s1=940/59 win=0; log_ok=True
+    shadow_swampert_vs_registeel (2, 1): sim s0/s1=902/97 win=0; harness s0/s1=906/93 win=0; log_ok=True
+    shadow_swampert_vs_registeel (2, 2): sim s0/s1=861/138 win=0; harness s0/s1=865/134 win=0; log_ok=True
+    morpeko_vs_azumarill_form_change (0, 0): sim s0/s1=489/510 win=1; harness s0/s1=471/528 win=1; log_ok=True
+    aegislash_vs_azumarill_form_change (0, 0): sim s0/s1=773/226 win=0; harness s0/s1=751/248 win=0; log_ok=True
+    aegislash_vs_azumarill_form_change (1, 0): sim s0/s1=773/226 win=0; harness s0/s1=751/248 win=0; log_ok=True
+    aegislash_vs_azumarill_form_change (1, 1): sim s0/s1=640/359 win=0; harness s0/s1=618/381 win=0; log_ok=True
+    aegislash_vs_azumarill_form_change (1, 2): sim s0/s1=510/489 win=0; harness s0/s1=408/591 win=1; log_ok=False
+    aegislash_vs_azumarill_form_change (2, 0): sim s0/s1=773/226 win=0; harness s0/s1=751/248 win=0; log_ok=True
+    aegislash_vs_azumarill_form_change (2, 1): sim s0/s1=640/359 win=0; harness s0/s1=618/381 win=0; log_ok=True
+    aegislash_vs_azumarill_form_change (2, 2): sim s0/s1=510/489 win=0; harness s0/s1=408/591 win=1; log_ok=False
+    mimikyu_vs_azumarill_form_change (1, 1): sim s0/s1=672/327 win=0; harness s0/s1=700/299 win=0; log_ok=True
+    mimikyu_vs_azumarill_form_change (2, 1): sim s0/s1=686/313 win=0; harness s0/s1=710/289 win=0; log_ok=True
+    azumarill_vs_mimikyu_form_change (1, 1): sim s0/s1=327/672 win=1; harness s0/s1=299/700 win=1; log_ok=True
+    azumarill_vs_mimikyu_form_change (1, 2): sim s0/s1=313/686 win=1; harness s0/s1=289/710 win=1; log_ok=True
+    aegislash_blade_vs_azumarill_form_change (0, 0): sim s0/s1=358/641 win=1; harness s0/s1=348/651 win=1; log_ok=True
+    aegislash_blade_vs_azumarill_form_change (0, 1): sim s0/s1=96/903 win=1; harness s0/s1=86/913 win=1; log_ok=True
+    aegislash_blade_vs_azumarill_form_change (0, 2): sim s0/s1=96/903 win=1; harness s0/s1=86/913 win=1; log_ok=True
+    aegislash_blade_vs_azumarill_form_change (1, 0): sim s0/s1=698/301 win=0; harness s0/s1=712/287 win=0; log_ok=True
+    azumarill_vs_aegislash_shield_form_change (0, 0): sim s0/s1=226/773 win=1; harness s0/s1=248/751 win=1; log_ok=True
+    azumarill_vs_aegislash_shield_form_change (0, 1): sim s0/s1=226/773 win=1; harness s0/s1=248/751 win=1; log_ok=True
+    azumarill_vs_aegislash_shield_form_change (0, 2): sim s0/s1=226/773 win=1; harness s0/s1=248/751 win=1; log_ok=True
+    azumarill_vs_aegislash_shield_form_change (1, 1): sim s0/s1=359/640 win=1; harness s0/s1=381/618 win=1; log_ok=True
+    azumarill_vs_aegislash_shield_form_change (1, 2): sim s0/s1=359/640 win=1; harness s0/s1=381/618 win=1; log_ok=True
+    azumarill_vs_aegislash_shield_form_change (2, 1): sim s0/s1=489/510 win=1; harness s0/s1=591/408 win=0; log_ok=False
+    azumarill_vs_aegislash_shield_form_change (2, 2): sim s0/s1=489/510 win=1; harness s0/s1=591/408 win=0; log_ok=False
+    mimikyu_vs_medicham_form_change (0, 0): sim s0/s1=920/79 win=0; harness s0/s1=929/70 win=0; log_ok=True
+    mimikyu_vs_medicham_form_change (1, 0): sim s0/s1=920/79 win=0; harness s0/s1=929/70 win=0; log_ok=True
+    mimikyu_vs_medicham_form_change (2, 0): sim s0/s1=920/79 win=0; harness s0/s1=929/70 win=0; log_ok=True
+    morpeko_vs_stunfisk_galarian_form_change (0, 0): sim s0/s1=101/898 win=1; harness s0/s1=95/904 win=1; log_ok=True
+    morpeko_vs_stunfisk_galarian_form_change (0, 1): sim s0/s1=101/898 win=1; harness s0/s1=95/904 win=1; log_ok=True
+    morpeko_vs_stunfisk_galarian_form_change (0, 2): sim s0/s1=101/898 win=1; harness s0/s1=95/904 win=1; log_ok=True
+    morpeko_vs_stunfisk_galarian_form_change (1, 0): sim s0/s1=459/540 win=1; harness s0/s1=450/549 win=1; log_ok=True
+    morpeko_vs_stunfisk_galarian_form_change (1, 1): sim s0/s1=459/540 win=1; harness s0/s1=450/549 win=1; log_ok=True
+    tinkaton_vs_aegislash_shield_form_change (0, 0): sim s0/s1=323/676 win=1; harness s0/s1=316/683 win=1; log_ok=True
+    tinkaton_vs_aegislash_shield_form_change (0, 1): sim s0/s1=313/686 win=1; harness s0/s1=306/693 win=1; log_ok=True
+    tinkaton_vs_aegislash_shield_form_change (0, 2): sim s0/s1=313/686 win=1; harness s0/s1=306/693 win=1; log_ok=True
+    tinkaton_vs_aegislash_shield_form_change (1, 0): sim s0/s1=941/58 win=0; harness s0/s1=949/50 win=0; log_ok=True
+    tinkaton_vs_aegislash_shield_form_change (1, 1): sim s0/s1=915/84 win=0; harness s0/s1=907/92 win=0; log_ok=True
+    tinkaton_vs_aegislash_shield_form_change (1, 2): sim s0/s1=404/595 win=1; harness s0/s1=397/602 win=1; log_ok=True
+    tinkaton_vs_aegislash_shield_form_change (2, 0): sim s0/s1=941/58 win=0; harness s0/s1=949/50 win=0; log_ok=True
+    tinkaton_vs_aegislash_shield_form_change (2, 1): sim s0/s1=915/84 win=0; harness s0/s1=907/92 win=0; log_ok=True
+    tinkaton_vs_aegislash_shield_form_change (2, 2): sim s0/s1=882/117 win=0; harness s0/s1=646/353 win=0; log_ok=False
+    obstagoon_obstruct_vs_azumarill (1, 0): sim s0/s1=374/625 win=1; harness s0/s1=361/638 win=1; log_ok=True
+    obstagoon_obstruct_vs_azumarill (1, 1): sim s0/s1=295/704 win=1; harness s0/s1=282/717 win=1; log_ok=True
+    obstagoon_obstruct_vs_azumarill (1, 2): sim s0/s1=295/704 win=1; harness s0/s1=282/717 win=1; log_ok=True
+    moltres_galarian_vs_florges (1, 0): sim s0/s1=547/452 win=0; harness s0/s1=563/436 win=0; log_ok=True
+    moltres_galarian_vs_florges (2, 0): sim s0/s1=756/243 win=0; harness s0/s1=772/227 win=0; log_ok=True
+    moltres_galarian_vs_florges (2, 1): sim s0/s1=307/692 win=1; harness s0/s1=318/681 win=1; log_ok=True
+    moltres_galarian_vs_florges (2, 2): sim s0/s1=192/807 win=1; harness s0/s1=202/797 win=1; log_ok=True
+    jellicent_vs_moltres_galarian (1, 0): sim s0/s1=378/621 win=1; harness s0/s1=369/630 win=1; log_ok=True
+    jellicent_vs_moltres_galarian (1, 1): sim s0/s1=239/760 win=1; harness s0/s1=229/770 win=1; log_ok=True
+    jellicent_vs_moltres_galarian (1, 2): sim s0/s1=239/760 win=1; harness s0/s1=229/770 win=1; log_ok=True
+    corviknight_vs_moltres_galarian (1, 0): sim s0/s1=484/515 win=1; harness s0/s1=481/518 win=1; log_ok=True
+    corviknight_vs_moltres_galarian (1, 1): sim s0/s1=403/596 win=1; harness s0/s1=400/599 win=1; log_ok=True
+    corviknight_vs_moltres_galarian (1, 2): sim s0/s1=301/698 win=1; harness s0/s1=298/701 win=1; log_ok=True
+    corviknight_vs_moltres_galarian (2, 1): sim s0/s1=502/497 win=0; harness s0/s1=517/482 win=0; log_ok=True
+    lapras_vs_moltres_galarian (0, 1): sim s0/s1=242/757 win=1; harness s0/s1=239/760 win=1; log_ok=True
+    lapras_vs_moltres_galarian (0, 2): sim s0/s1=242/757 win=1; harness s0/s1=239/760 win=1; log_ok=True
+    lapras_vs_moltres_galarian (1, 1): sim s0/s1=502/497 win=0; harness s0/s1=517/482 win=0; log_ok=True
+    lapras_vs_moltres_galarian (2, 1): sim s0/s1=711/288 win=0; harness s0/s1=726/273 win=0; log_ok=True
+    lapras_vs_moltres_galarian (2, 2): sim s0/s1=282/717 win=1; harness s0/s1=279/720 win=1; log_ok=True
+    cramorant_vs_registeel (0, 0): sim s0/s1=507/492 win=0; harness s0/s1=511/488 win=0; log_ok=True
+    cramorant_vs_registeel (0, 1): sim s0/s1=332/668 win=1; harness s0/s1=336/664 win=1; log_ok=True
+    cramorant_vs_registeel (0, 2): sim s0/s1=332/668 win=1; harness s0/s1=336/664 win=1; log_ok=True
+    cramorant_vs_registeel (1, 0): sim s0/s1=702/297 win=0; harness s0/s1=706/293 win=0; log_ok=True
+    cramorant_vs_registeel (1, 2): sim s0/s1=464/536 win=1; harness s0/s1=468/532 win=1; log_ok=True
+    cramorant_vs_registeel (2, 0): sim s0/s1=702/297 win=0; harness s0/s1=706/293 win=0; log_ok=True
+    cramorant_vs_registeel (2, 2): sim s0/s1=654/345 win=0; harness s0/s1=658/341 win=0; log_ok=True
+    cramorant_vs_raichu_alolan (0, 0): sim s0/s1=397/602 win=1; harness s0/s1=378/621 win=1; log_ok=True
+    cramorant_vs_raichu_alolan (0, 1): sim s0/s1=196/803 win=1; harness s0/s1=177/822 win=1; log_ok=True
+    cramorant_vs_raichu_alolan (0, 2): sim s0/s1=196/803 win=1; harness s0/s1=177/822 win=1; log_ok=True
+    cramorant_vs_mimikyu (1, 1): sim s0/s1=345/654 win=1; harness s0/s1=322/677 win=1; log_ok=True
+    cramorant_vs_mimikyu (1, 2): sim s0/s1=331/668 win=1; harness s0/s1=313/686 win=1; log_ok=True
+    cramorant_vs_mimikyu (2, 2): sim s0/s1=467/532 win=1; harness s0/s1=443/556 win=1; log_ok=True
