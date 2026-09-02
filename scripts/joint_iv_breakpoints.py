@@ -43,7 +43,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from gopvpsim.battle import _stat_stage_mult, pvpoke_dp, simulate  # noqa: E402
 from gopvpsim.data import get_default_moveset, load_gamemaster  # noqa: E402
-from gopvpsim.moves import (BONUS, STAB_MULTIPLIER, damage, get_moves,  # noqa: E402
+from gopvpsim.moves import (BONUS, STAB_MULTIPLIER, damage,  # noqa: E402
+                            damage_constant, get_moves, mega_multiplier,
                             parse_types, stab, type_effectiveness)
 from gopvpsim.pokemon import iv_rank  # noqa: E402
 from deep_dive_analysis import move_abbr  # noqa: E402
@@ -444,9 +445,7 @@ def main():
                          t_types, l_types)
         tiers = sorted({v for row in mat for v in row})
         # closed-form ratio thresholds: dmg >= tier iff K*atk/def >= tier-1
-        K = (0.5 * BONUS * mv['power']
-             * type_effectiveness(mv['type'], l_types)
-             * stab(mv['type'], t_types))
+        K = damage_constant(mv['power'], mv['type'], t_types, l_types)
         k_by_move[mid] = K
         bounds = [{'tier_from': tiers[i], 'tier_to': tiers[i + 1],
                    'min_atk_over_def': r4((tiers[i + 1] - 1) / K)}
@@ -643,9 +642,8 @@ def main():
                 dmg_by_def = [damage(mv['power'], lr['atk'] * m, dv,
                                      mv['type'], l_types, t_types)
                               for dv in t_def_vals]
-                K = (0.5 * BONUS * mv['power']
-                     * type_effectiveness(mv['type'], t_types)
-                     * stab(mv['type'], l_types))
+                K = damage_constant(mv['power'], mv['type'], l_types,
+                                    t_types)
                 tiers = sorted(set(dmg_by_def))
                 # d >= t  iff  focal_def <= K * opp_atk / (t - 1);
                 # so "def strictly above that value" drops you to tier t-1.
@@ -1102,7 +1100,7 @@ def main():
     # ------------------------------------------------------- VERIFICATION
     ver = {'formula_samples': [], 'sim_checks': []}
 
-    def independent(power, atk, def_, mtype, atypes, dtypes):
+    def independent(power, atk, def_, mtype, atypes, dtypes, mega_mult=1.0):
         """Formula re-implemented here from the spec in CLAUDE.md, so the
         check is not just moves.damage compared to itself.
 
@@ -1119,7 +1117,12 @@ def main():
         for t in dtypes:
             eff *= _INDEP_CHART.get(mtype, {}).get(t, 1.0)
         st = STAB_MULTIPLIER if mtype in atypes else 1.0
-        return math.floor(0.5 * BONUS * power * atk / def_ * eff * st) + 1
+        # The Mega Bonus is passed IN rather than re-derived, so this stays
+        # an independent check of the FORMULA without also re-implementing
+        # the mega gate (which would just be moves.mega_multiplier compared
+        # to itself). mega_mult is 1.0 for every non-mega.
+        return math.floor(
+            0.5 * BONUS * power * atk / def_ * eff * st * mega_mult) + 1
 
     # Every focal move in the config's arm union gets a sample: the headline
     # move at three probe points (rank-1 atk, claim-spread atk, and the

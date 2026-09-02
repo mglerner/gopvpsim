@@ -517,6 +517,12 @@ def apply_form_change(bp, opponent, target_idx=None):
 
     # Rebuild charged move identity index
     bp._cm_id_to_idx = {id(cm): i for i, cm in enumerate(bp.charged_moves)}
+    # The Mega Bonus factors are per-move-dict, and the moves were just
+    # rebound; the SPECIES also changed, so re-resolve the Mega Level too
+    # (no mega has a formChange today, but nothing here depends on that).
+    from .pokemon import mega_level as _ml
+    bp.mega_level = _ml(bp.species)
+    bp._refresh_mega_mults()
 
     # Invalidate damage + DP setup caches on both sides
     bp._dmg_cache_opp = None

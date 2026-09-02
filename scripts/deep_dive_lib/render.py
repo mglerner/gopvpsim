@@ -15,7 +15,8 @@ against the pre-split output.
 import os
 import sys
 
-from gopvpsim.pokemon import Pokemon, get_species, find_pokemon_entry
+from gopvpsim.pokemon import (Pokemon, get_species, find_pokemon_entry,
+                              mega_level_from_tags)
 from gopvpsim.moves import get_moves
 from gopvpsim.data import get_default_moveset
 from gopvpsim.moves import parse_types
@@ -560,7 +561,9 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
     # (DRY review 2026-08-05 entry 12 / L11).
     focal_entry = find_pokemon_entry(data_obj.get('species', ''))
     focal_types = parse_types(focal_entry) if focal_entry else []
-    focal_moves = _build_move_tuples(moveset_label, fast_db, charged_db)
+    focal_moves = _build_move_tuples(
+        moveset_label, fast_db, charged_db,
+        mega_level_from_tags((focal_entry or {}).get('tags')))
 
     # Cache opponent info for narration: {name: (atk, def, types, moves)}
     opp_info_cache = {}
@@ -581,14 +584,13 @@ def generate_analysis_sections(data_obj, score_arrays, moveset_idx, opp_iv_mode,
             try:
                 opp_fast, opp_charged = get_default_moveset(opp_clean, league=league,
                                                             shadow=opp_is_shadow)
-                opp_moves_list = []
-                if opp_fast in fast_db:
-                    fm = fast_db[opp_fast]
-                    opp_moves_list.append((opp_fast, fm['power'], fm['type']))
-                for cid in opp_charged:
-                    if cid in charged_db:
-                        cm = charged_db[cid]
-                        opp_moves_list.append((cid, cm['power'], cm['type']))
+                # Same tuple grammar as the focal side -- built by the one
+                # helper rather than re-spelled here, so a per-move field
+                # (the Mega Bonus is the first) cannot land on one side only.
+                opp_moves_list = analysis.move_tuples_from_ids(
+                    opp_fast, opp_charged, fast_db, charged_db,
+                    mega_level_from_tags(
+                        (opp_entry or {}).get('tags')))
             except (KeyError, ValueError):
                 opp_moves_list = []
             opp_info_cache[opp_name] = {
