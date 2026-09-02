@@ -269,6 +269,9 @@ def norm_log(entries):
     return [e.replace(' (Shadow)', '') for e in entries]
 
 
+MECHANICS = 'legacy'   # set from --mechanics; see main()
+
+
 def run_sim(m, s1, s2):
     league = m.get('league', 'great')
     a = _make_battle_pokemon(m['p1']['species'], m['p1']['fast'], m['p1']['charged'],
@@ -277,7 +280,8 @@ def run_sim(m, s1, s2):
     d = _make_battle_pokemon(m['p2']['species'], m['p2']['fast'], m['p2']['charged'],
                              league, s2, *m['p2']['ivs'], shadow=m['p2']['shadow'],
                              max_level=m['p2'].get('level') or 51.0)
-    r = simulate(a, d, charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp, log=True)
+    r = simulate(a, d, charged_policy_0=pvpoke_dp, charged_policy_1=pvpoke_dp,
+                 log=True, mechanics=MECHANICS)
     return (round(r.pvpoke_score(0)), round(r.pvpoke_score(1)),
             r.winner, _extract_battle_log(r))
 
@@ -305,10 +309,24 @@ def run_harness(m, s1, s2, root):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--pvpoke-root', type=Path, default=DEFAULT_PVPOKE_ROOT)
+    ap.add_argument('--mechanics', choices=('legacy', 'new'), default='legacy',
+                    help="Turn-resolution model for OUR side. Pair 'new' with "
+                         "a --pvpoke-root whose src/js comes from PvPoke's "
+                         "new-mechanics branch, or the comparison is "
+                         "meaningless. Use that branch's JS with MASTER's "
+                         "src/data: origin/twilight-trails also carries the "
+                         "move rebalance, which would confound the turn model "
+                         "with move-data changes.")
     ap.add_argument('--only', metavar='SUBSTR',
                     help='audit only matchups whose label contains SUBSTR '
                          '(triage helper; the full run is the gate)')
     args = ap.parse_args()
+    global MECHANICS
+    MECHANICS = args.mechanics
+    if MECHANICS != 'legacy':
+        print(f"*** OUR SIDE RUNS mechanics={MECHANICS!r}; PvPoke side is "
+              f"whatever JS lives in {args.pvpoke_root}. The xfail sets below "
+              f"were derived under LEGACY and may not apply. ***\n")
     if not args.pvpoke_root.exists():
         sys.stderr.write(f'PvPoke root not found: {args.pvpoke_root}\n')
         return 2
