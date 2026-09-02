@@ -233,7 +233,8 @@ def bless_sidecar(json_path, *, engine=None, gamemaster=None):
 
 def focal_key_fields(species, league, shadow, fast_id, charged_ids,
                      iv_floor, shield_scenarios, bait_mode,
-                     energy_lead=0, focal_max_level=None):
+                     energy_lead=0, focal_max_level=None,
+                     mechanics='legacy'):
     """Focal-side key dict shared by every column of one sweep.
 
     ``energy_lead`` is the focal's starting energy in RAW energy points
@@ -248,8 +249,20 @@ def focal_key_fields(species, league, shadow, fast_id, charged_ids,
     an L50 and an L51 sweep of the same species/moveset MUST NOT share columns.
     (Opponent column keys carry ``opp_level`` separately, so an over-leveled
     opponent already keys distinctly with no change here.)
+
+    ``mechanics`` is the turn-resolution model ('legacy' | 'new'). It changes
+    scores, so a 'new' column MUST NOT be served to a 'legacy' sweep or vice
+    versa. Keyed the same way as ``policy`` on the column side: the base value
+    adds NO field, so the dict stays byte-identical for every legacy sweep and
+    no existing cached column is invalidated by this being introduced.
+
+    Before 2026-09-02 the turn model was absent from the key entirely, and
+    ``deep_dive.py`` compensated by FORCE-DISABLING the disk cache under
+    ``--mechanics new``. That was safe but meant a new-mechanics dive could
+    never be warm -- every re-dive cold, forever, with no migration path.
+    Keying it properly is what makes a new-mechanics season bake affordable.
     """
-    return {
+    fields = {
         'v': CACHE_VERSION,
         'species': species,
         'league': league,
@@ -267,6 +280,9 @@ def focal_key_fields(species, league, shadow, fast_id, charged_ids,
         # focal dir can therefore hold columns of mixed engine/gamemaster
         # vintages, each self-identifying by its sidecar stamp.
     }
+    if mechanics not in (None, 'legacy'):
+        fields['mechanics'] = mechanics
+    return fields
 
 
 def column_key_fields(opp_species, opp_shadow, opp_ivs, opp_level,

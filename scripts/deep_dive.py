@@ -4503,14 +4503,17 @@ def main():
                 shield_scenarios=shield_scenarios,
                 iv_floor=args.iv_floor,
                 focal_max_level=_slayer_focal_cap,
+                mechanics=args.mechanics,
             )
-            # The slayer cache_key (compute_cache_key) does NOT include the
-            # turn-mechanics model, so a 'new'-mechanics run would collide with
-            # legacy-cached columns. Mirror the sweep cache's new-mode disable
-            # (see iv_sweep, mechanics != 'legacy') rather than widen the key.
+            # The turn-mechanics model is part of cache_key as of 2026-09-02
+            # (compute_cache_key, keyed so 'legacy' contributes nothing and no
+            # existing file was invalidated), so a 'new'-mechanics run keys
+            # distinctly and can be cached like any other. This used to
+            # force-disable the disk cache under --mechanics new, which made
+            # every new-mechanics re-dive cold forever.
             slayer_cache = SlayerCache(
                 cache_key=cache_key,
-                disk=not args.no_cache and args.mechanics == 'legacy',
+                disk=not args.no_cache,
                 # Scenario fields for the v5 sidecar -> let migrate_cache apply
                 # a predicate (e.g. bandaid[910] self-debuff) without unpickling.
                 # Slayer is a MIRROR, so the focal moveset IS both sides.
