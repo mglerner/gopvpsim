@@ -1,0 +1,6439 @@
+{
+ "_meta": {
+  "captured": "2026-09-02",
+  "final_is": "activeChargedMoves AFTER the shuffle (Pokemon.js:752-833)",
+  "input_is": "the energy-sorted list BEFORE the shuffle (Pokemon.js:748)",
+  "pvpoke_commit": "56bc6a8b1",
+  "swap_final_is": "what a swap-primitive port would have produced -- stored so the test can assert we are NOT that.",
+  "what": "activeChargedMoves ordering captured from a RUNNING PvPoke (master 56bc6a8b1) for all 13 supermega species at their mega-rankings default 3-charged-move movesets, x 3 CP caps x 3 opponents.",
+  "why": "PvPoke reorders with splice(0,1)+push -- a ROTATE-LEFT, not a swap of slots 0 and i. The two are indistinguishable at n=2 (which is why our pre-2026-09-02 swap port was correct) and diverge at n>=3. These rows are the discriminator."
+ },
+ "cases": [
+  {
+   "best": "VOLT_TACKLE_PLUS",
+   "cp": 1500,
+   "fastest": "VOLT_TACKLE_PLUS",
+   "final": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "input": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 41,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 21,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "VOLT_TACKLE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 52,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "registeel",
+   "species": "raichu_mega_x",
+   "swap_final": [
+    "TRAILBLAZE",
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK"
+   ]
+  },
+  {
+   "best": "VOLT_TACKLE_PLUS",
+   "cp": 1500,
+   "fastest": "VOLT_TACKLE_PLUS",
+   "final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "VOLT_TACKLE_PLUS"
+   ],
+   "input": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 23,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 75,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "VOLT_TACKLE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 117,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "azumarill",
+   "species": "raichu_mega_x",
+   "swap_final": [
+    "BRICK_BREAK",
+    "VOLT_TACKLE_PLUS",
+    "TRAILBLAZE"
+   ]
+  },
+  {
+   "best": "VOLT_TACKLE_PLUS",
+   "cp": 1500,
+   "fastest": "VOLT_TACKLE_PLUS",
+   "final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "VOLT_TACKLE_PLUS"
+   ],
+   "input": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 22,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 45,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "VOLT_TACKLE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 71,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "medicham",
+   "species": "raichu_mega_x",
+   "swap_final": [
+    "BRICK_BREAK",
+    "VOLT_TACKLE_PLUS",
+    "TRAILBLAZE"
+   ]
+  },
+  {
+   "best": "BRICK_BREAK",
+   "cp": 1500,
+   "fastest": "BRICK_BREAK",
+   "final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "input": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 48,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 25,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "ZAP_CANNON_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 66,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "registeel",
+   "species": "raichu_mega_y",
+   "swap_final": [
+    "TRAILBLAZE",
+    "BRICK_BREAK",
+    "ZAP_CANNON_PLUS"
+   ]
+  },
+  {
+   "best": "ZAP_CANNON_PLUS",
+   "cp": 1500,
+   "fastest": "BRICK_BREAK",
+   "final": [
+    "ZAP_CANNON_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "input": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 27,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 88,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "ZAP_CANNON_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 148,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "azumarill",
+   "species": "raichu_mega_y",
+   "swap_final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ]
+  },
+  {
+   "best": "ZAP_CANNON_PLUS",
+   "cp": 1500,
+   "fastest": "BRICK_BREAK",
+   "final": [
+    "ZAP_CANNON_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "input": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 26,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 53,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "ZAP_CANNON_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 89,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "medicham",
+   "species": "raichu_mega_y",
+   "swap_final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ]
+  },
+  {
+   "best": "LEAF_BLADE",
+   "cp": 1500,
+   "fastest": "LEAF_BLADE",
+   "final": [
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB",
+    "LEAF_BLADE"
+   ],
+   "input": [
+    "LEAF_BLADE",
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB"
+   ],
+   "moves": {
+    "ACID_SPRAY_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -2
+     ],
+     "damage": 6,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "LEAF_BLADE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 26,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SLUDGE_BOMB": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 19,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "registeel",
+   "species": "victreebel_mega",
+   "swap_final": [
+    "ACID_SPRAY_PLUS",
+    "LEAF_BLADE",
+    "SLUDGE_BOMB"
+   ]
+  },
+  {
+   "best": "LEAF_BLADE",
+   "cp": 1500,
+   "fastest": "LEAF_BLADE",
+   "final": [
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB",
+    "LEAF_BLADE"
+   ],
+   "input": [
+    "LEAF_BLADE",
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB"
+   ],
+   "moves": {
+    "ACID_SPRAY_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -2
+     ],
+     "damage": 35,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "LEAF_BLADE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 93,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SLUDGE_BOMB": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 107,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "azumarill",
+   "species": "victreebel_mega",
+   "swap_final": [
+    "ACID_SPRAY_PLUS",
+    "LEAF_BLADE",
+    "SLUDGE_BOMB"
+   ]
+  },
+  {
+   "best": "LEAF_BLADE",
+   "cp": 1500,
+   "fastest": "LEAF_BLADE",
+   "final": [
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB",
+    "LEAF_BLADE"
+   ],
+   "input": [
+    "LEAF_BLADE",
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB"
+   ],
+   "moves": {
+    "ACID_SPRAY_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -2
+     ],
+     "damage": 21,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "LEAF_BLADE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 56,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SLUDGE_BOMB": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 64,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "medicham",
+   "species": "victreebel_mega",
+   "swap_final": [
+    "ACID_SPRAY_PLUS",
+    "LEAF_BLADE",
+    "SLUDGE_BOMB"
+   ]
+  },
+  {
+   "best": "LIQUIDATION_PLUS",
+   "cp": 1500,
+   "fastest": "LIQUIDATION_PLUS",
+   "final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "input": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "moves": {
+    "ICE_BEAM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 28,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "LIQUIDATION_PLUS": {
+     "buffApplyChance": 0.3,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 43,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "POWER_GEM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 27,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "registeel",
+   "species": "starmie_mega",
+   "swap_final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ]
+  },
+  {
+   "best": "POWER_GEM",
+   "cp": 1500,
+   "fastest": "LIQUIDATION_PLUS",
+   "final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "input": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "moves": {
+    "ICE_BEAM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 40,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "LIQUIDATION_PLUS": {
+     "buffApplyChance": 0.3,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 38,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "POWER_GEM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 60,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "azumarill",
+   "species": "starmie_mega",
+   "swap_final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ]
+  },
+  {
+   "best": "LIQUIDATION_PLUS",
+   "cp": 1500,
+   "fastest": "LIQUIDATION_PLUS",
+   "final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "input": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "moves": {
+    "ICE_BEAM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 61,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "LIQUIDATION_PLUS": {
+     "buffApplyChance": 0.3,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 58,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "POWER_GEM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 36,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "medicham",
+   "species": "starmie_mega",
+   "swap_final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 1500,
+   "fastest": "SUPER_POWER",
+   "final": [
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "SUPER_POWER",
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS"
+   ],
+   "moves": {
+    "OUTRAGE_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 37,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 64,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 29,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "registeel",
+   "species": "dragonite_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ]
+  },
+  {
+   "best": "THUNDER_PUNCH",
+   "cp": 1500,
+   "fastest": "SUPER_POWER",
+   "final": [
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "SUPER_POWER",
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS"
+   ],
+   "moves": {
+    "OUTRAGE_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 33,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 36,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 64,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "azumarill",
+   "species": "dragonite_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ]
+  },
+  {
+   "best": "OUTRAGE_PLUS",
+   "cp": 1500,
+   "fastest": "SUPER_POWER",
+   "final": [
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "SUPER_POWER",
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS"
+   ],
+   "moves": {
+    "OUTRAGE_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 80,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 34,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 39,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "medicham",
+   "species": "dragonite_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ]
+  },
+  {
+   "best": "BRAVE_BIRD",
+   "cp": 1500,
+   "fastest": "DRILL_PECK_PLUS",
+   "final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "input": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "moves": {
+    "BRAVE_BIRD": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -3
+     ],
+     "damage": 48,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "DRILL_PECK_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 29,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "FLASH_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 41,
+     "energy": 65,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "registeel",
+   "species": "skarmory_mega",
+   "swap_final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ]
+  },
+  {
+   "best": "BRAVE_BIRD",
+   "cp": 1500,
+   "fastest": "DRILL_PECK_PLUS",
+   "final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "input": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "moves": {
+    "BRAVE_BIRD": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -3
+     ],
+     "damage": 108,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "DRILL_PECK_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 65,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "FLASH_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 91,
+     "energy": 65,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "azumarill",
+   "species": "skarmory_mega",
+   "swap_final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ]
+  },
+  {
+   "best": "BRAVE_BIRD",
+   "cp": 1500,
+   "fastest": "DRILL_PECK_PLUS",
+   "final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "input": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "moves": {
+    "BRAVE_BIRD": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -3
+     ],
+     "damage": 166,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "DRILL_PECK_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 100,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "FLASH_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 88,
+     "energy": 65,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "medicham",
+   "species": "skarmory_mega",
+   "swap_final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 1500,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "moves": {
+    "SEED_BOMB_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 25,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 68,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 25,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "registeel",
+   "species": "chesnaught_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ]
+  },
+  {
+   "best": "SEED_BOMB_PLUS",
+   "cp": 1500,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "SEED_BOMB_PLUS",
+    "THUNDER_PUNCH",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "moves": {
+    "SEED_BOMB_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 88,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 38,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 57,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "azumarill",
+   "species": "chesnaught_mega",
+   "swap_final": [
+    "SEED_BOMB_PLUS",
+    "SUPER_POWER",
+    "THUNDER_PUNCH"
+   ]
+  },
+  {
+   "best": "SEED_BOMB_PLUS",
+   "cp": 1500,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "SEED_BOMB_PLUS",
+    "THUNDER_PUNCH",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "moves": {
+    "SEED_BOMB_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 53,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 36,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 34,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "medicham",
+   "species": "chesnaught_mega",
+   "swap_final": [
+    "SEED_BOMB_PLUS",
+    "SUPER_POWER",
+    "THUNDER_PUNCH"
+   ]
+  },
+  {
+   "best": "BLAST_BURN",
+   "cp": 1500,
+   "fastest": "PSYSHOCK",
+   "final": [
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN",
+    "PSYSHOCK"
+   ],
+   "input": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "moves": {
+    "BLAST_BURN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 110,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "MYSTICAL_FIRE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 65,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "PSYSHOCK": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 28,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "registeel",
+   "species": "delphox_mega",
+   "swap_final": [
+    "MYSTICAL_FIRE_PLUS",
+    "PSYSHOCK",
+    "BLAST_BURN"
+   ]
+  },
+  {
+   "best": "PSYSHOCK",
+   "cp": 1500,
+   "fastest": "PSYSHOCK",
+   "final": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "input": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "moves": {
+    "BLAST_BURN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 61,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "MYSTICAL_FIRE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 36,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "PSYSHOCK": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 62,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "azumarill",
+   "species": "delphox_mega",
+   "swap_final": [
+    "MYSTICAL_FIRE_PLUS",
+    "PSYSHOCK",
+    "BLAST_BURN"
+   ]
+  },
+  {
+   "best": "BLAST_BURN",
+   "cp": 1500,
+   "fastest": "PSYSHOCK",
+   "final": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "input": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "moves": {
+    "BLAST_BURN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 94,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "MYSTICAL_FIRE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 56,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "PSYSHOCK": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 60,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "medicham",
+   "species": "delphox_mega",
+   "swap_final": [
+    "MYSTICAL_FIRE_PLUS",
+    "PSYSHOCK",
+    "BLAST_BURN"
+   ]
+  },
+  {
+   "best": "SURF_PLUS",
+   "cp": 1500,
+   "fastest": "NIGHT_SLASH",
+   "final": [
+    "HYDRO_CANNON",
+    "NIGHT_SLASH",
+    "SURF_PLUS"
+   ],
+   "input": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "HYDRO_CANNON"
+   ],
+   "moves": {
+    "HYDRO_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 51,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "NIGHT_SLASH": {
+     "buffApplyChance": 0.125,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 32,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SURF_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 46,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "registeel",
+   "species": "greninja_mega",
+   "swap_final": [
+    "SURF_PLUS",
+    "NIGHT_SLASH",
+    "HYDRO_CANNON"
+   ]
+  },
+  {
+   "best": "HYDRO_CANNON",
+   "cp": 1500,
+   "fastest": "NIGHT_SLASH",
+   "final": [
+    "HYDRO_CANNON",
+    "NIGHT_SLASH",
+    "SURF_PLUS"
+   ],
+   "input": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "HYDRO_CANNON"
+   ],
+   "moves": {
+    "HYDRO_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 45,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "NIGHT_SLASH": {
+     "buffApplyChance": 0.125,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 28,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SURF_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 40,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "azumarill",
+   "species": "greninja_mega",
+   "swap_final": [
+    "SURF_PLUS",
+    "NIGHT_SLASH",
+    "HYDRO_CANNON"
+   ]
+  },
+  {
+   "best": "SURF_PLUS",
+   "cp": 1500,
+   "fastest": "NIGHT_SLASH",
+   "final": [
+    "HYDRO_CANNON",
+    "NIGHT_SLASH",
+    "SURF_PLUS"
+   ],
+   "input": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "HYDRO_CANNON"
+   ],
+   "moves": {
+    "HYDRO_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 69,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "NIGHT_SLASH": {
+     "buffApplyChance": 0.125,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 44,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SURF_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 62,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "medicham",
+   "species": "greninja_mega",
+   "swap_final": [
+    "SURF_PLUS",
+    "NIGHT_SLASH",
+    "HYDRO_CANNON"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 1500,
+   "fastest": "FOUL_PLAY",
+   "final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "input": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "moves": {
+    "FOUL_PLAY": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 32,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYBEAM_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 24,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 56,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "registeel",
+   "species": "malamar_mega",
+   "swap_final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ]
+  },
+  {
+   "best": "PSYBEAM_PLUS",
+   "cp": 1500,
+   "fastest": "FOUL_PLAY",
+   "final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "input": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "moves": {
+    "FOUL_PLAY": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 28,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYBEAM_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 54,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 31,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "azumarill",
+   "species": "malamar_mega",
+   "swap_final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ]
+  },
+  {
+   "best": "PSYBEAM_PLUS",
+   "cp": 1500,
+   "fastest": "FOUL_PLAY",
+   "final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "input": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "moves": {
+    "FOUL_PLAY": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 44,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYBEAM_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 52,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 30,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "medicham",
+   "species": "malamar_mega",
+   "swap_final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 1500,
+   "fastest": "BRICK_BREAK_PLUS",
+   "final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "input": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "moves": {
+    "BRICK_BREAK_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 48,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "MEGAHORN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 33,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 79,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "registeel",
+   "species": "falinks_mega",
+   "swap_final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 1500,
+   "fastest": "BRICK_BREAK_PLUS",
+   "final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "input": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "moves": {
+    "BRICK_BREAK_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 27,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "MEGAHORN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 47,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 44,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "azumarill",
+   "species": "falinks_mega",
+   "swap_final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ]
+  },
+  {
+   "best": "MEGAHORN",
+   "cp": 1500,
+   "fastest": "BRICK_BREAK_PLUS",
+   "final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "input": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "moves": {
+    "BRICK_BREAK_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 26,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "MEGAHORN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 72,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 42,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "medicham",
+   "species": "falinks_mega",
+   "swap_final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ]
+  },
+  {
+   "best": "VOLT_TACKLE_PLUS",
+   "cp": 2500,
+   "fastest": "VOLT_TACKLE_PLUS",
+   "final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "VOLT_TACKLE_PLUS"
+   ],
+   "input": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 15,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 31,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "VOLT_TACKLE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 48,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "raichu_mega_x",
+   "swap_final": [
+    "BRICK_BREAK",
+    "VOLT_TACKLE_PLUS",
+    "TRAILBLAZE"
+   ]
+  },
+  {
+   "best": "TRAILBLAZE",
+   "cp": 2500,
+   "fastest": "VOLT_TACKLE_PLUS",
+   "final": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "input": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 45,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 148,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "VOLT_TACKLE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 56,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "swampert",
+   "species": "raichu_mega_x",
+   "swap_final": [
+    "BRICK_BREAK",
+    "VOLT_TACKLE_PLUS",
+    "TRAILBLAZE"
+   ]
+  },
+  {
+   "best": "VOLT_TACKLE_PLUS",
+   "cp": 2500,
+   "fastest": "VOLT_TACKLE_PLUS",
+   "final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "VOLT_TACKLE_PLUS"
+   ],
+   "input": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 19,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 40,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "VOLT_TACKLE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 62,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "cresselia",
+   "species": "raichu_mega_x",
+   "swap_final": [
+    "BRICK_BREAK",
+    "VOLT_TACKLE_PLUS",
+    "TRAILBLAZE"
+   ]
+  },
+  {
+   "best": "ZAP_CANNON_PLUS",
+   "cp": 2500,
+   "fastest": "BRICK_BREAK",
+   "final": [
+    "ZAP_CANNON_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "input": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 17,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 36,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "ZAP_CANNON_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 60,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "raichu_mega_y",
+   "swap_final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ]
+  },
+  {
+   "best": "TRAILBLAZE",
+   "cp": 2500,
+   "fastest": "BRICK_BREAK",
+   "final": [
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS",
+    "BRICK_BREAK"
+   ],
+   "input": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 52,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 173,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "ZAP_CANNON_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 71,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "swampert",
+   "species": "raichu_mega_y",
+   "swap_final": [
+    "ZAP_CANNON_PLUS",
+    "TRAILBLAZE",
+    "BRICK_BREAK"
+   ]
+  },
+  {
+   "best": "ZAP_CANNON_PLUS",
+   "cp": 2500,
+   "fastest": "BRICK_BREAK",
+   "final": [
+    "ZAP_CANNON_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "input": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 23,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 46,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "ZAP_CANNON_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 78,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "cresselia",
+   "species": "raichu_mega_y",
+   "swap_final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ]
+  },
+  {
+   "best": "LEAF_BLADE",
+   "cp": 2500,
+   "fastest": "LEAF_BLADE",
+   "final": [
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB",
+    "LEAF_BLADE"
+   ],
+   "input": [
+    "LEAF_BLADE",
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB"
+   ],
+   "moves": {
+    "ACID_SPRAY_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -2
+     ],
+     "damage": 14,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "LEAF_BLADE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 38,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SLUDGE_BOMB": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 43,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "victreebel_mega",
+   "swap_final": [
+    "ACID_SPRAY_PLUS",
+    "LEAF_BLADE",
+    "SLUDGE_BOMB"
+   ]
+  },
+  {
+   "best": "LEAF_BLADE",
+   "cp": 2500,
+   "fastest": "LEAF_BLADE",
+   "final": [
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB",
+    "LEAF_BLADE"
+   ],
+   "input": [
+    "LEAF_BLADE",
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB"
+   ],
+   "moves": {
+    "ACID_SPRAY_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -2
+     ],
+     "damage": 17,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "LEAF_BLADE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 182,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SLUDGE_BOMB": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 51,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "swampert",
+   "species": "victreebel_mega",
+   "swap_final": [
+    "ACID_SPRAY_PLUS",
+    "LEAF_BLADE",
+    "SLUDGE_BOMB"
+   ]
+  },
+  {
+   "best": "LEAF_BLADE",
+   "cp": 2500,
+   "fastest": "LEAF_BLADE",
+   "final": [
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB",
+    "LEAF_BLADE"
+   ],
+   "input": [
+    "LEAF_BLADE",
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB"
+   ],
+   "moves": {
+    "ACID_SPRAY_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -2
+     ],
+     "damage": 18,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "LEAF_BLADE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 49,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SLUDGE_BOMB": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 56,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "cresselia",
+   "species": "victreebel_mega",
+   "swap_final": [
+    "ACID_SPRAY_PLUS",
+    "LEAF_BLADE",
+    "SLUDGE_BOMB"
+   ]
+  },
+  {
+   "best": "POWER_GEM",
+   "cp": 2500,
+   "fastest": "LIQUIDATION_PLUS",
+   "final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "THUNDER"
+   ],
+   "input": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "THUNDER"
+   ],
+   "moves": {
+    "LIQUIDATION_PLUS": {
+     "buffApplyChance": 0.3,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 39,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "POWER_GEM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 62,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "THUNDER": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 45,
+     "energy": 60,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "starmie_mega",
+   "swap_final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "THUNDER"
+   ]
+  },
+  {
+   "best": "LIQUIDATION_PLUS",
+   "cp": 2500,
+   "fastest": "LIQUIDATION_PLUS",
+   "final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "THUNDER"
+   ],
+   "input": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "THUNDER"
+   ],
+   "moves": {
+    "LIQUIDATION_PLUS": {
+     "buffApplyChance": 0.3,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 74,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "POWER_GEM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 46,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "THUNDER": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 54,
+     "energy": 60,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "swampert",
+   "species": "starmie_mega",
+   "swap_final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "THUNDER"
+   ]
+  },
+  {
+   "best": "LIQUIDATION_PLUS",
+   "cp": 2500,
+   "fastest": "LIQUIDATION_PLUS",
+   "final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "THUNDER"
+   ],
+   "input": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "THUNDER"
+   ],
+   "moves": {
+    "LIQUIDATION_PLUS": {
+     "buffApplyChance": 0.3,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 51,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "POWER_GEM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 50,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "THUNDER": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 59,
+     "energy": 60,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "cresselia",
+   "species": "starmie_mega",
+   "swap_final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "THUNDER"
+   ]
+  },
+  {
+   "best": "OUTRAGE_PLUS",
+   "cp": 2500,
+   "fastest": "SUPER_POWER",
+   "final": [
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "SUPER_POWER",
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS"
+   ],
+   "moves": {
+    "OUTRAGE_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 137,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 23,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 26,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "dragonite_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ]
+  },
+  {
+   "best": "OUTRAGE_PLUS",
+   "cp": 2500,
+   "fastest": "SUPER_POWER",
+   "final": [
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "SUPER_POWER",
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS"
+   ],
+   "moves": {
+    "OUTRAGE_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 102,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 69,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 31,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "swampert",
+   "species": "dragonite_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ]
+  },
+  {
+   "best": "OUTRAGE_PLUS",
+   "cp": 2500,
+   "fastest": "SUPER_POWER",
+   "final": [
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "SUPER_POWER",
+    "THUNDER_PUNCH",
+    "OUTRAGE_PLUS"
+   ],
+   "moves": {
+    "OUTRAGE_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 70,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 30,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 34,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "cresselia",
+   "species": "dragonite_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ]
+  },
+  {
+   "best": "SHADOW_BALL",
+   "cp": 2500,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "moves": {
+    "DYNAMIC_PUNCH_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 64,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 88,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SHADOW_BALL": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 129,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "mewtwo_mega_x",
+   "swap_final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "DYNAMIC_PUNCH_PLUS"
+   ]
+  },
+  {
+   "best": "DYNAMIC_PUNCH_PLUS",
+   "cp": 2500,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "moves": {
+    "DYNAMIC_PUNCH_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 195,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 104,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SHADOW_BALL": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 96,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "swampert",
+   "species": "mewtwo_mega_x",
+   "swap_final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "DYNAMIC_PUNCH_PLUS"
+   ]
+  },
+  {
+   "best": "SHADOW_BALL",
+   "cp": 2500,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "moves": {
+    "DYNAMIC_PUNCH_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 83,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 45,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SHADOW_BALL": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 105,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "cresselia",
+   "species": "mewtwo_mega_x",
+   "swap_final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "DYNAMIC_PUNCH_PLUS"
+   ]
+  },
+  {
+   "best": "SHADOW_BALL",
+   "cp": 2500,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "moves": {
+    "FUTURE_SIGHT_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 164,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 88,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SHADOW_BALL": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 129,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "mewtwo_mega_y",
+   "swap_final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "FUTURE_SIGHT_PLUS"
+   ]
+  },
+  {
+   "best": "FUTURE_SIGHT_PLUS",
+   "cp": 2500,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "moves": {
+    "FUTURE_SIGHT_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 195,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 104,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SHADOW_BALL": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 96,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "swampert",
+   "species": "mewtwo_mega_y",
+   "swap_final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "FUTURE_SIGHT_PLUS"
+   ]
+  },
+  {
+   "best": "SHADOW_BALL",
+   "cp": 2500,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "moves": {
+    "FUTURE_SIGHT_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 83,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 45,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SHADOW_BALL": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 105,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "cresselia",
+   "species": "mewtwo_mega_y",
+   "swap_final": [
+    "PSYSTRIKE",
+    "SHADOW_BALL",
+    "FUTURE_SIGHT_PLUS"
+   ]
+  },
+  {
+   "best": "BRAVE_BIRD",
+   "cp": 2500,
+   "fastest": "DRILL_PECK_PLUS",
+   "final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "input": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "moves": {
+    "BRAVE_BIRD": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -3
+     ],
+     "damage": 111,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "DRILL_PECK_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 67,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "FLASH_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 94,
+     "energy": 65,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "skarmory_mega",
+   "swap_final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ]
+  },
+  {
+   "best": "BRAVE_BIRD",
+   "cp": 2500,
+   "fastest": "DRILL_PECK_PLUS",
+   "final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "input": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "moves": {
+    "BRAVE_BIRD": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -3
+     ],
+     "damage": 132,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "DRILL_PECK_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 79,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "FLASH_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 70,
+     "energy": 65,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "swampert",
+   "species": "skarmory_mega",
+   "swap_final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ]
+  },
+  {
+   "best": "BRAVE_BIRD",
+   "cp": 2500,
+   "fastest": "DRILL_PECK_PLUS",
+   "final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "input": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "moves": {
+    "BRAVE_BIRD": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -3
+     ],
+     "damage": 90,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "DRILL_PECK_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 54,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "FLASH_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 76,
+     "energy": 65,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "cresselia",
+   "species": "skarmory_mega",
+   "swap_final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ]
+  },
+  {
+   "best": "SEED_BOMB_PLUS",
+   "cp": 2500,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "SEED_BOMB_PLUS",
+    "THUNDER_PUNCH",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "moves": {
+    "SEED_BOMB_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 36,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 25,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 23,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "chesnaught_mega",
+   "swap_final": [
+    "SEED_BOMB_PLUS",
+    "SUPER_POWER",
+    "THUNDER_PUNCH"
+   ]
+  },
+  {
+   "best": "SEED_BOMB_PLUS",
+   "cp": 2500,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "SEED_BOMB_PLUS",
+    "THUNDER_PUNCH",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "moves": {
+    "SEED_BOMB_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 172,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 74,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 27,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "swampert",
+   "species": "chesnaught_mega",
+   "swap_final": [
+    "SEED_BOMB_PLUS",
+    "SUPER_POWER",
+    "THUNDER_PUNCH"
+   ]
+  },
+  {
+   "best": "SEED_BOMB_PLUS",
+   "cp": 2500,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "SEED_BOMB_PLUS",
+    "THUNDER_PUNCH",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "moves": {
+    "SEED_BOMB_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 46,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 32,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 30,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "cresselia",
+   "species": "chesnaught_mega",
+   "swap_final": [
+    "SEED_BOMB_PLUS",
+    "SUPER_POWER",
+    "THUNDER_PUNCH"
+   ]
+  },
+  {
+   "best": "PSYSHOCK",
+   "cp": 2500,
+   "fastest": "PSYSHOCK",
+   "final": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "input": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "moves": {
+    "BLAST_BURN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 63,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "MYSTICAL_FIRE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 37,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "PSYSHOCK": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 64,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "delphox_mega",
+   "swap_final": [
+    "MYSTICAL_FIRE_PLUS",
+    "PSYSHOCK",
+    "BLAST_BURN"
+   ]
+  },
+  {
+   "best": "PSYSHOCK",
+   "cp": 2500,
+   "fastest": "PSYSHOCK",
+   "final": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "input": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "moves": {
+    "BLAST_BURN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 75,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "MYSTICAL_FIRE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 44,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "PSYSHOCK": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 76,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "swampert",
+   "species": "delphox_mega",
+   "swap_final": [
+    "MYSTICAL_FIRE_PLUS",
+    "PSYSHOCK",
+    "BLAST_BURN"
+   ]
+  },
+  {
+   "best": "BLAST_BURN",
+   "cp": 2500,
+   "fastest": "PSYSHOCK",
+   "final": [
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN",
+    "PSYSHOCK"
+   ],
+   "input": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "moves": {
+    "BLAST_BURN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 81,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "MYSTICAL_FIRE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 48,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "PSYSHOCK": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 33,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "cresselia",
+   "species": "delphox_mega",
+   "swap_final": [
+    "MYSTICAL_FIRE_PLUS",
+    "PSYSHOCK",
+    "BLAST_BURN"
+   ]
+  },
+  {
+   "best": "NIGHT_SLASH",
+   "cp": 2500,
+   "fastest": "NIGHT_SLASH",
+   "final": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "HYDRO_CANNON"
+   ],
+   "input": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "HYDRO_CANNON"
+   ],
+   "moves": {
+    "HYDRO_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 47,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "NIGHT_SLASH": {
+     "buffApplyChance": 0.125,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 74,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SURF_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 42,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "greninja_mega",
+   "swap_final": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "HYDRO_CANNON"
+   ]
+  },
+  {
+   "best": "SURF_PLUS",
+   "cp": 2500,
+   "fastest": "NIGHT_SLASH",
+   "final": [
+    "HYDRO_CANNON",
+    "NIGHT_SLASH",
+    "SURF_PLUS"
+   ],
+   "input": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "HYDRO_CANNON"
+   ],
+   "moves": {
+    "HYDRO_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 88,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "NIGHT_SLASH": {
+     "buffApplyChance": 0.125,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 55,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SURF_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 79,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "swampert",
+   "species": "greninja_mega",
+   "swap_final": [
+    "SURF_PLUS",
+    "NIGHT_SLASH",
+    "HYDRO_CANNON"
+   ]
+  },
+  {
+   "best": "NIGHT_SLASH",
+   "cp": 2500,
+   "fastest": "NIGHT_SLASH",
+   "final": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "HYDRO_CANNON"
+   ],
+   "input": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "HYDRO_CANNON"
+   ],
+   "moves": {
+    "HYDRO_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 60,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "NIGHT_SLASH": {
+     "buffApplyChance": 0.125,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 60,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SURF_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 54,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "cresselia",
+   "species": "greninja_mega",
+   "swap_final": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "HYDRO_CANNON"
+   ]
+  },
+  {
+   "best": "FOUL_PLAY",
+   "cp": 2500,
+   "fastest": "FOUL_PLAY",
+   "final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "input": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "moves": {
+    "FOUL_PLAY": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 75,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYBEAM_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 56,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 20,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "malamar_mega",
+   "swap_final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ]
+  },
+  {
+   "best": "PSYBEAM_PLUS",
+   "cp": 2500,
+   "fastest": "FOUL_PLAY",
+   "final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "input": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "moves": {
+    "FOUL_PLAY": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 56,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYBEAM_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 67,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 61,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "swampert",
+   "species": "malamar_mega",
+   "swap_final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ]
+  },
+  {
+   "best": "FOUL_PLAY",
+   "cp": 2500,
+   "fastest": "FOUL_PLAY",
+   "final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "input": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "moves": {
+    "FOUL_PLAY": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 61,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYBEAM_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 29,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 26,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "cresselia",
+   "species": "malamar_mega",
+   "swap_final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ]
+  },
+  {
+   "best": "MEGAHORN",
+   "cp": 2500,
+   "fastest": "BRICK_BREAK_PLUS",
+   "final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "input": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "moves": {
+    "BRICK_BREAK_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 18,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "MEGAHORN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 49,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 28,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "giratina_altered",
+   "species": "falinks_mega",
+   "swap_final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 2500,
+   "fastest": "BRICK_BREAK_PLUS",
+   "final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "input": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "moves": {
+    "BRICK_BREAK_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 52,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "MEGAHORN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 92,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 85,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "swampert",
+   "species": "falinks_mega",
+   "swap_final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ]
+  },
+  {
+   "best": "MEGAHORN",
+   "cp": 2500,
+   "fastest": "BRICK_BREAK_PLUS",
+   "final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "input": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "moves": {
+    "BRICK_BREAK_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 23,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "MEGAHORN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 100,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 37,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "cresselia",
+   "species": "falinks_mega",
+   "swap_final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ]
+  },
+  {
+   "best": "BRICK_BREAK",
+   "cp": 10000,
+   "fastest": "VOLT_TACKLE_PLUS",
+   "final": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "input": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 68,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 22,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "VOLT_TACKLE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 54,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "dialga",
+   "species": "raichu_mega_x",
+   "swap_final": [
+    "TRAILBLAZE",
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK"
+   ]
+  },
+  {
+   "best": "VOLT_TACKLE_PLUS",
+   "cp": 10000,
+   "fastest": "VOLT_TACKLE_PLUS",
+   "final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "VOLT_TACKLE_PLUS"
+   ],
+   "input": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 19,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 39,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "VOLT_TACKLE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 60,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "raichu_mega_x",
+   "swap_final": [
+    "BRICK_BREAK",
+    "VOLT_TACKLE_PLUS",
+    "TRAILBLAZE"
+   ]
+  },
+  {
+   "best": "TRAILBLAZE",
+   "cp": 10000,
+   "fastest": "VOLT_TACKLE_PLUS",
+   "final": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "input": [
+    "VOLT_TACKLE_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 40,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 82,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "VOLT_TACKLE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 31,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "groudon",
+   "species": "raichu_mega_x",
+   "swap_final": [
+    "BRICK_BREAK",
+    "VOLT_TACKLE_PLUS",
+    "TRAILBLAZE"
+   ]
+  },
+  {
+   "best": "BRICK_BREAK",
+   "cp": 10000,
+   "fastest": "BRICK_BREAK",
+   "final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "input": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 82,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 26,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "ZAP_CANNON_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 70,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "dialga",
+   "species": "raichu_mega_y",
+   "swap_final": [
+    "TRAILBLAZE",
+    "BRICK_BREAK",
+    "ZAP_CANNON_PLUS"
+   ]
+  },
+  {
+   "best": "ZAP_CANNON_PLUS",
+   "cp": 10000,
+   "fastest": "BRICK_BREAK",
+   "final": [
+    "ZAP_CANNON_PLUS",
+    "BRICK_BREAK",
+    "TRAILBLAZE"
+   ],
+   "input": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 23,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 47,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "ZAP_CANNON_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 78,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "raichu_mega_y",
+   "swap_final": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ]
+  },
+  {
+   "best": "TRAILBLAZE",
+   "cp": 10000,
+   "fastest": "BRICK_BREAK",
+   "final": [
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS",
+    "BRICK_BREAK"
+   ],
+   "input": [
+    "BRICK_BREAK",
+    "TRAILBLAZE",
+    "ZAP_CANNON_PLUS"
+   ],
+   "moves": {
+    "BRICK_BREAK": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 48,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "TRAILBLAZE": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 99,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "ZAP_CANNON_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 41,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "groudon",
+   "species": "raichu_mega_y",
+   "swap_final": [
+    "ZAP_CANNON_PLUS",
+    "TRAILBLAZE",
+    "BRICK_BREAK"
+   ]
+  },
+  {
+   "best": "LEAF_BLADE",
+   "cp": 10000,
+   "fastest": "LEAF_BLADE",
+   "final": [
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB",
+    "LEAF_BLADE"
+   ],
+   "input": [
+    "LEAF_BLADE",
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB"
+   ],
+   "moves": {
+    "ACID_SPRAY_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -2
+     ],
+     "damage": 10,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "LEAF_BLADE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 27,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SLUDGE_BOMB": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 31,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "dialga",
+   "species": "victreebel_mega",
+   "swap_final": [
+    "ACID_SPRAY_PLUS",
+    "LEAF_BLADE",
+    "SLUDGE_BOMB"
+   ]
+  },
+  {
+   "best": "LEAF_BLADE",
+   "cp": 10000,
+   "fastest": "LEAF_BLADE",
+   "final": [
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB",
+    "LEAF_BLADE"
+   ],
+   "input": [
+    "LEAF_BLADE",
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB"
+   ],
+   "moves": {
+    "ACID_SPRAY_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -2
+     ],
+     "damage": 18,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "LEAF_BLADE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 48,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SLUDGE_BOMB": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 55,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "victreebel_mega",
+   "swap_final": [
+    "ACID_SPRAY_PLUS",
+    "LEAF_BLADE",
+    "SLUDGE_BOMB"
+   ]
+  },
+  {
+   "best": "LEAF_BLADE",
+   "cp": 10000,
+   "fastest": "LEAF_BLADE",
+   "final": [
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB",
+    "LEAF_BLADE"
+   ],
+   "input": [
+    "LEAF_BLADE",
+    "ACID_SPRAY_PLUS",
+    "SLUDGE_BOMB"
+   ],
+   "moves": {
+    "ACID_SPRAY_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -2
+     ],
+     "damage": 15,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "LEAF_BLADE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 101,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SLUDGE_BOMB": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 45,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "groudon",
+   "species": "victreebel_mega",
+   "swap_final": [
+    "ACID_SPRAY_PLUS",
+    "LEAF_BLADE",
+    "SLUDGE_BOMB"
+   ]
+  },
+  {
+   "best": "ICE_BEAM",
+   "cp": 10000,
+   "fastest": "LIQUIDATION_PLUS",
+   "final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "input": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "moves": {
+    "ICE_BEAM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 76,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "LIQUIDATION_PLUS": {
+     "buffApplyChance": 0.3,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 45,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "POWER_GEM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 45,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "dialga",
+   "species": "starmie_mega",
+   "swap_final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ]
+  },
+  {
+   "best": "ICE_BEAM",
+   "cp": 10000,
+   "fastest": "LIQUIDATION_PLUS",
+   "final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "input": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "moves": {
+    "ICE_BEAM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 135,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "LIQUIDATION_PLUS": {
+     "buffApplyChance": 0.3,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 51,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "POWER_GEM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 80,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "starmie_mega",
+   "swap_final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ]
+  },
+  {
+   "best": "LIQUIDATION_PLUS",
+   "cp": 10000,
+   "fastest": "LIQUIDATION_PLUS",
+   "final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "input": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ],
+   "moves": {
+    "ICE_BEAM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 113,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "LIQUIDATION_PLUS": {
+     "buffApplyChance": 0.3,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 107,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "POWER_GEM": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 42,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "groudon",
+   "species": "starmie_mega",
+   "swap_final": [
+    "LIQUIDATION_PLUS",
+    "POWER_GEM",
+    "ICE_BEAM"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 10000,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ],
+   "moves": {
+    "OUTRAGE_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 113,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 123,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 34,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "dialga",
+   "species": "dragonite_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ]
+  },
+  {
+   "best": "OUTRAGE_PLUS",
+   "cp": 10000,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ],
+   "moves": {
+    "OUTRAGE_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 202,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 34,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 38,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "dragonite_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ]
+  },
+  {
+   "best": "OUTRAGE_PLUS",
+   "cp": 10000,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ],
+   "moves": {
+    "OUTRAGE_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 105,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 72,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 20,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "groudon",
+   "species": "dragonite_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "OUTRAGE_PLUS"
+   ]
+  },
+  {
+   "best": "DYNAMIC_PUNCH_PLUS",
+   "cp": 10000,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "moves": {
+    "DYNAMIC_PUNCH_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 387,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 81,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "THUNDERBOLT": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 67,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "dialga",
+   "species": "mewtwo_mega_x",
+   "swap_final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "DYNAMIC_PUNCH_PLUS"
+   ]
+  },
+  {
+   "best": "PSYSTRIKE",
+   "cp": 10000,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "moves": {
+    "DYNAMIC_PUNCH_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 106,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 144,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "THUNDERBOLT": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 75,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "mewtwo_mega_x",
+   "swap_final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "DYNAMIC_PUNCH_PLUS"
+   ]
+  },
+  {
+   "best": "DYNAMIC_PUNCH_PLUS",
+   "cp": 10000,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "DYNAMIC_PUNCH_PLUS"
+   ],
+   "moves": {
+    "DYNAMIC_PUNCH_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 225,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 120,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "THUNDERBOLT": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 39,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "groudon",
+   "species": "mewtwo_mega_x",
+   "swap_final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "DYNAMIC_PUNCH_PLUS"
+   ]
+  },
+  {
+   "best": "FUTURE_SIGHT_PLUS",
+   "cp": 10000,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "moves": {
+    "FUTURE_SIGHT_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 157,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 84,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "THUNDERBOLT": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 70,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "dialga",
+   "species": "mewtwo_mega_y",
+   "swap_final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "FUTURE_SIGHT_PLUS"
+   ]
+  },
+  {
+   "best": "FUTURE_SIGHT_PLUS",
+   "cp": 10000,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "moves": {
+    "FUTURE_SIGHT_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 280,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 149,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "THUNDERBOLT": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 78,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "mewtwo_mega_y",
+   "swap_final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "FUTURE_SIGHT_PLUS"
+   ]
+  },
+  {
+   "best": "FUTURE_SIGHT_PLUS",
+   "cp": 10000,
+   "fastest": "PSYSTRIKE",
+   "final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "input": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "FUTURE_SIGHT_PLUS"
+   ],
+   "moves": {
+    "FUTURE_SIGHT_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 233,
+     "energy": 80,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYSTRIKE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 124,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "THUNDERBOLT": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 41,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "groudon",
+   "species": "mewtwo_mega_y",
+   "swap_final": [
+    "PSYSTRIKE",
+    "THUNDERBOLT",
+    "FUTURE_SIGHT_PLUS"
+   ]
+  },
+  {
+   "best": "BRAVE_BIRD",
+   "cp": 10000,
+   "fastest": "DRILL_PECK_PLUS",
+   "final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "input": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "moves": {
+    "BRAVE_BIRD": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -3
+     ],
+     "damage": 81,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "DRILL_PECK_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 49,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "FLASH_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 69,
+     "energy": 65,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "dialga",
+   "species": "skarmory_mega",
+   "swap_final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ]
+  },
+  {
+   "best": "BRAVE_BIRD",
+   "cp": 10000,
+   "fastest": "DRILL_PECK_PLUS",
+   "final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "input": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "moves": {
+    "BRAVE_BIRD": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -3
+     ],
+     "damage": 145,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "DRILL_PECK_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 87,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "FLASH_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 123,
+     "energy": 65,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "skarmory_mega",
+   "swap_final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ]
+  },
+  {
+   "best": "BRAVE_BIRD",
+   "cp": 10000,
+   "fastest": "DRILL_PECK_PLUS",
+   "final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "input": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ],
+   "moves": {
+    "BRAVE_BIRD": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      0,
+      -3
+     ],
+     "damage": 121,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "DRILL_PECK_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 73,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "FLASH_CANNON": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 102,
+     "energy": 65,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "groudon",
+   "species": "skarmory_mega",
+   "swap_final": [
+    "DRILL_PECK_PLUS",
+    "BRAVE_BIRD",
+    "FLASH_CANNON"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 10000,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "moves": {
+    "SEED_BOMB_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 28,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 121,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 28,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "dialga",
+   "species": "chesnaught_mega",
+   "swap_final": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ]
+  },
+  {
+   "best": "SEED_BOMB_PLUS",
+   "cp": 10000,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "SEED_BOMB_PLUS",
+    "THUNDER_PUNCH",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "moves": {
+    "SEED_BOMB_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 49,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 33,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 32,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "chesnaught_mega",
+   "swap_final": [
+    "SEED_BOMB_PLUS",
+    "SUPER_POWER",
+    "THUNDER_PUNCH"
+   ]
+  },
+  {
+   "best": "SEED_BOMB_PLUS",
+   "cp": 10000,
+   "fastest": "THUNDER_PUNCH",
+   "final": [
+    "SEED_BOMB_PLUS",
+    "THUNDER_PUNCH",
+    "SUPER_POWER"
+   ],
+   "input": [
+    "THUNDER_PUNCH",
+    "SUPER_POWER",
+    "SEED_BOMB_PLUS"
+   ],
+   "moves": {
+    "SEED_BOMB_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 103,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 71,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    },
+    "THUNDER_PUNCH": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 17,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "groudon",
+   "species": "chesnaught_mega",
+   "swap_final": [
+    "SEED_BOMB_PLUS",
+    "SUPER_POWER",
+    "THUNDER_PUNCH"
+   ]
+  },
+  {
+   "best": "BLAST_BURN",
+   "cp": 10000,
+   "fastest": "PSYSHOCK",
+   "final": [
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN",
+    "PSYSHOCK"
+   ],
+   "input": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "moves": {
+    "BLAST_BURN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 132,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "MYSTICAL_FIRE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 78,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "PSYSHOCK": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 53,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "dialga",
+   "species": "delphox_mega",
+   "swap_final": [
+    "MYSTICAL_FIRE_PLUS",
+    "PSYSHOCK",
+    "BLAST_BURN"
+   ]
+  },
+  {
+   "best": "PSYSHOCK",
+   "cp": 10000,
+   "fastest": "PSYSHOCK",
+   "final": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "input": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "moves": {
+    "BLAST_BURN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 92,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "MYSTICAL_FIRE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 55,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "PSYSHOCK": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 94,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "delphox_mega",
+   "swap_final": [
+    "MYSTICAL_FIRE_PLUS",
+    "PSYSHOCK",
+    "BLAST_BURN"
+   ]
+  },
+  {
+   "best": "BLAST_BURN",
+   "cp": 10000,
+   "fastest": "PSYSHOCK",
+   "final": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "input": [
+    "PSYSHOCK",
+    "MYSTICAL_FIRE_PLUS",
+    "BLAST_BURN"
+   ],
+   "moves": {
+    "BLAST_BURN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 123,
+     "energy": 50,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "MYSTICAL_FIRE_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      -1,
+      0
+     ],
+     "damage": 73,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "PSYSHOCK": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 78,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "groudon",
+   "species": "delphox_mega",
+   "swap_final": [
+    "MYSTICAL_FIRE_PLUS",
+    "PSYSHOCK",
+    "BLAST_BURN"
+   ]
+  },
+  {
+   "best": "NIGHT_SLASH",
+   "cp": 10000,
+   "fastest": "NIGHT_SLASH",
+   "final": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "AERIAL_ACE"
+   ],
+   "input": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "AERIAL_ACE"
+   ],
+   "moves": {
+    "AERIAL_ACE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 34,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "NIGHT_SLASH": {
+     "buffApplyChance": 0.125,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 55,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SURF_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 49,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "dialga",
+   "species": "greninja_mega",
+   "swap_final": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "AERIAL_ACE"
+   ]
+  },
+  {
+   "best": "NIGHT_SLASH",
+   "cp": 10000,
+   "fastest": "NIGHT_SLASH",
+   "final": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "AERIAL_ACE"
+   ],
+   "input": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "AERIAL_ACE"
+   ],
+   "moves": {
+    "AERIAL_ACE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 61,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "NIGHT_SLASH": {
+     "buffApplyChance": 0.125,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 97,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SURF_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 55,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "greninja_mega",
+   "swap_final": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "AERIAL_ACE"
+   ]
+  },
+  {
+   "best": "SURF_PLUS",
+   "cp": 10000,
+   "fastest": "NIGHT_SLASH",
+   "final": [
+    "AERIAL_ACE",
+    "NIGHT_SLASH",
+    "SURF_PLUS"
+   ],
+   "input": [
+    "NIGHT_SLASH",
+    "SURF_PLUS",
+    "AERIAL_ACE"
+   ],
+   "moves": {
+    "AERIAL_ACE": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 51,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "NIGHT_SLASH": {
+     "buffApplyChance": 0.125,
+     "buffTarget": "self",
+     "buffs": [
+      1,
+      0
+     ],
+     "damage": 51,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SURF_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 116,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    }
+   },
+   "opponent": "groudon",
+   "species": "greninja_mega",
+   "swap_final": [
+    "SURF_PLUS",
+    "NIGHT_SLASH",
+    "AERIAL_ACE"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 10000,
+   "fastest": "FOUL_PLAY",
+   "final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "input": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "moves": {
+    "FOUL_PLAY": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 51,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYBEAM_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 38,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 88,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "dialga",
+   "species": "malamar_mega",
+   "swap_final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ]
+  },
+  {
+   "best": "FOUL_PLAY",
+   "cp": 10000,
+   "fastest": "FOUL_PLAY",
+   "final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "input": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "moves": {
+    "FOUL_PLAY": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 90,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYBEAM_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 68,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 24,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "malamar_mega",
+   "swap_final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ]
+  },
+  {
+   "best": "PSYBEAM_PLUS",
+   "cp": 10000,
+   "fastest": "FOUL_PLAY",
+   "final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "input": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ],
+   "moves": {
+    "FOUL_PLAY": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 47,
+     "energy": 40,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "PSYBEAM_PLUS": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 56,
+     "energy": 45,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 51,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "groudon",
+   "species": "malamar_mega",
+   "swap_final": [
+    "FOUL_PLAY",
+    "SUPER_POWER",
+    "PSYBEAM_PLUS"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 10000,
+   "fastest": "BRICK_BREAK_PLUS",
+   "final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "input": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "moves": {
+    "BRICK_BREAK_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 81,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "MEGAHORN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 56,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 133,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "dialga",
+   "species": "falinks_mega",
+   "swap_final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ]
+  },
+  {
+   "best": "MEGAHORN",
+   "cp": 10000,
+   "fastest": "BRICK_BREAK_PLUS",
+   "final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "input": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "moves": {
+    "BRICK_BREAK_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 23,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "MEGAHORN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 63,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 37,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "giratina_origin",
+   "species": "falinks_mega",
+   "swap_final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ]
+  },
+  {
+   "best": "SUPER_POWER",
+   "cp": 10000,
+   "fastest": "BRICK_BREAK_PLUS",
+   "final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "input": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ],
+   "moves": {
+    "BRICK_BREAK_PLUS": {
+     "buffApplyChance": 1,
+     "buffTarget": "opponent",
+     "buffs": [
+      0,
+      -1
+     ],
+     "damage": 48,
+     "energy": 35,
+     "selfAttackDebuffing": false,
+     "selfBuffing": true,
+     "selfDebuffing": false
+    },
+    "MEGAHORN": {
+     "buffApplyChance": null,
+     "buffTarget": null,
+     "buffs": null,
+     "damage": 83,
+     "energy": 55,
+     "selfAttackDebuffing": false,
+     "selfBuffing": false,
+     "selfDebuffing": false
+    },
+    "SUPER_POWER": {
+     "buffApplyChance": 1,
+     "buffTarget": "self",
+     "buffs": [
+      -1,
+      -1
+     ],
+     "damage": 77,
+     "energy": 40,
+     "selfAttackDebuffing": true,
+     "selfBuffing": false,
+     "selfDebuffing": true
+    }
+   },
+   "opponent": "groudon",
+   "species": "falinks_mega",
+   "swap_final": [
+    "BRICK_BREAK_PLUS",
+    "SUPER_POWER",
+    "MEGAHORN"
+   ]
+  }
+ ]
+}

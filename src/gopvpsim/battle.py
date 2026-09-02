@@ -1256,18 +1256,25 @@ def _cm_buff_delta(m: dict) -> int:
 
 
 def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict) -> None:
-    """PvPoke's activeChargedMoves priority-shuffle (Pokemon.js lines 711-787).
+    """PvPoke's activeChargedMoves priority-shuffle (Pokemon.js:752-833).
 
     Reorders the energy-sorted ``cms`` list in place based on buff/debuff
     properties. PvPoke runs this once at init (stage (0,0)); we mirror that,
     running it once per battle in _ensure_dp_init_cache from the stage-(0,0)
     damages (before 2026-07-03 we re-ran it per stat stage from current-stage
     damage -- the NB-1 selection-freeze fix). Uses buff-adjusted DPE for the
-    selfBuffing-promotion clause (line 758). Verified 2026-04-15 to affect
-    153/378 matchups in a 7x6x9 differential grid.
+    Zap-Cannon and selfBuffing-promotion clauses only. Verified 2026-04-15 to
+    affect 153/378 matchups in a 7x6x9 differential grid.
 
     ``cm_dmgs`` is indexed by original charged_moves position via
-    ``idx_map`` (id(move) -> original index).
+    ``idx_map`` (id(move) -> original index). Keying on identity is what lets
+    it survive the rotations below.
+
+    Rewritten 2026-09-02 for three charged moves (megas). PvPoke generalized
+    this from a straight line of ``activeChargedMoves[1]`` tests to a loop in
+    574aeb0da; at n=2 the two forms are behavior-identical, which the oracle
+    audit pins. See the loop comment for the two things that are easy to get
+    wrong (rotate-vs-swap, and the mutating index).
     """
     def _get_dmg(m):
         return cm_dmgs[idx_map[id(m)]]
@@ -1290,55 +1297,89 @@ def _priority_shuffle(cms: list, cm_dmgs: list, idx_map: dict) -> None:
             return raw * (4 + eff * chance) / 4
         return raw
 
-    # Line 715-722: same energy -- prefer buff or higher damage
-    if (cms[1]['energy'] == cms[0]['energy']
-            and not cms[1].get('selfDebuffing', False)):
-        if cms[1].get('buffs') or _get_dmg(cms[1]) > _get_dmg(cms[0]):
-            cms[0], cms[1] = cms[1], cms[0]
+    def _rotate():
+        # PvPoke's reorder primitive, verbatim (Pokemon.js:760-762 and the
+        # four sibling sites): splice(0,1) + push -- a ROTATE-LEFT of the
+        # whole array, NOT a swap of slots 0 and i.
+        #   n=2: [a,b] -> [b,a]      (indistinguishable from a swap)
+        #   n=3: [a,b,c] -> [b,c,a]  (a swap would give [c,b,a] or [b,a,c])
+        # Confirmed against a running PvPoke over 111 real supermega
+        # orderings: a swap interpretation reproduces the full order in only
+        # 57/111, and disagrees on SLOT 0 -- the slot every bandaid routes
+        # to -- in 24/111.
+        cms.append(cms.pop(0))
 
-    # Line 726-730: same energy -- prefer higher buffApplyChance
-    if (cms[1]['energy'] == cms[0]['energy']
-            and cms[0].get('buffs') and cms[1].get('buffs')
-            and not cms[1].get('selfDebuffing', False)
-            and float(cms[1].get('buffApplyChance', 0) or 0) > float(cms[0].get('buffApplyChance', 0) or 0)):
-        cms[0], cms[1] = cms[1], cms[0]
+    # PvPoke wraps every clause below in `for(var i = 1; i < len; i++)`
+    # (Pokemon.js:753). `i` is a plain `var`, fixed for the iteration, while
+    # the array is MUTATED underneath it -- so after a rotation, `cms[i]`
+    # names a DIFFERENT move for the clauses that follow, within the same
+    # iteration. That is load-bearing, not incidental: measured on real
+    # supermega movesets, 26/111 cases rotate twice in one iteration and
+    # 41/111 see cms[i] change identity mid-iteration. Each clause therefore
+    # re-reads cms[0] and cms[i] from the live list; do not hoist them.
+    #
+    # We replicate this quirk deliberately. It contradicts PvPoke's own
+    # clause comments and can leave the most expensive move in slot 0, but
+    # deviating would make every n>=3 oracle comparison a known mismatch and
+    # destroy our ability to tell a port bug from an intentional deviation.
+    # At n=2 the loop body runs exactly once (i=1) and rotate == swap, so
+    # this is behavior-identical to the pre-2026-09-02 straight-line port.
+    for i in range(1, len(cms)):
+        # Clause 1 (Pokemon.js:757): same energy -- prefer buff or higher damage
+        if (cms[i]['energy'] == cms[0]['energy']
+                and not cms[i].get('selfDebuffing', False)):
+            if cms[i].get('buffs') or _get_dmg(cms[i]) > _get_dmg(cms[0]):
+                _rotate()
 
-    # Line 734-744: Zap Cannon / Registeel clause
-    if (cms[0].get('moveId') == 'FOCUS_BLAST'
-            and cms[1].get('moveId') == 'ZAP_CANNON'):
-        if _buff_adj_dpe(cms[1]) - _buff_adj_dpe(cms[0]) > -0.3:
-            cms[0]['buffs'] = [0, 0]
-            cms[0]['buffTarget'] = 'self'
-            cms[0]['selfDebuffing'] = True
-        else:
-            cms[0].pop('buffs', None)
-            cms[0].pop('buffTarget', None)
-            cms[0].pop('selfDebuffing', None)
+        # Clause 2 (Pokemon.js:768): same energy -- prefer higher buffApplyChance
+        if (cms[i]['energy'] == cms[0]['energy']
+                and cms[0].get('buffs') and cms[i].get('buffs')
+                and not cms[i].get('selfDebuffing', False)
+                and float(cms[i].get('buffApplyChance', 0) or 0) > float(cms[0].get('buffApplyChance', 0) or 0)):
+            _rotate()
 
-    # Line 756-762: similar energy -- promote selfBuffing move
-    if (cms[1]['energy'] - cms[0]['energy'] <= 10
-            and not cms[1].get('selfDebuffing', False)
-            and cms[1].get('selfBuffing', False)
-            and _buff_adj_dpe(cms[0]) - _buff_adj_dpe(cms[1]) < 0.3):
-        cms[0], cms[1] = cms[1], cms[0]
+        # Clause 3 (Pokemon.js:776): Zap Cannon / Registeel clause.
+        # Mutates cms[0] in place; never reorders.
+        if (cms[0].get('moveId') == 'FOCUS_BLAST'
+                and cms[i].get('moveId') == 'ZAP_CANNON'):
+            if _buff_adj_dpe(cms[i]) - _buff_adj_dpe(cms[0]) > -0.3:
+                cms[0]['buffs'] = [0, 0]
+                cms[0]['buffTarget'] = 'self'
+                cms[0]['selfDebuffing'] = True
+            else:
+                cms[0].pop('buffs', None)
+                cms[0].pop('buffTarget', None)
+                cms[0].pop('selfDebuffing', None)
 
-    # Line 767-771: demote selfAttackDebuffing
-    if (cms[1]['energy'] - cms[0]['energy'] <= 10
-            and cms[0].get('selfAttackDebuffing', False)
-            and not cms[1].get('selfDebuffing', False)):
-        cms[0], cms[1] = cms[1], cms[0]
+        # Clause 4 (Pokemon.js:790) is the aegislash_shield forEach and is
+        # NOT implemented here yet -- it changes n=2 Aegislash behavior, so
+        # it lands in its own commit. The numbering gap is deliberate; see
+        # DEVELOPER_NOTES "activeChargedMoves shuffle".
 
-    # Line 775-779: demote expensive (>50 energy) selfDebuffing
-    if (cms[1]['energy'] - cms[0]['energy'] <= 10
-            and cms[0].get('selfDebuffing', False)
-            and cms[0]['energy'] > 50
-            and not cms[1].get('selfDebuffing', False)):
-        cms[0], cms[1] = cms[1], cms[0]
+        # Clause 5 (Pokemon.js:800): similar energy -- promote selfBuffing move
+        if (cms[i]['energy'] - cms[0]['energy'] <= 10
+                and not cms[i].get('selfDebuffing', False)
+                and cms[i].get('selfBuffing', False)
+                and _buff_adj_dpe(cms[0]) - _buff_adj_dpe(cms[i]) < 0.3):
+            _rotate()
 
-    # Line 783-787: promote close-energy selfBuffing as bait
-    if (cms[1]['energy'] - cms[0]['energy'] <= 5
-            and cms[1].get('selfBuffing', False)):
-        cms[0], cms[1] = cms[1], cms[0]
+        # Clause 6 (Pokemon.js:811): demote selfAttackDebuffing
+        if (cms[i]['energy'] - cms[0]['energy'] <= 10
+                and cms[0].get('selfAttackDebuffing', False)
+                and not cms[i].get('selfDebuffing', False)):
+            _rotate()
+
+        # Clause 7 (Pokemon.js:819): demote expensive (>50 energy) selfDebuffing
+        if (cms[i]['energy'] - cms[0]['energy'] <= 10
+                and cms[0].get('selfDebuffing', False)
+                and cms[0]['energy'] > 50
+                and not cms[i].get('selfDebuffing', False)):
+            _rotate()
+
+        # Clause 8 (Pokemon.js:827): promote close-energy selfBuffing as bait
+        if (cms[i]['energy'] - cms[0]['energy'] <= 5
+                and cms[i].get('selfBuffing', False)):
+            _rotate()
 
 
 # ---------------------------------------------------------------------------
