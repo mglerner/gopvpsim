@@ -3907,8 +3907,13 @@ window.cmpBattleUrl = function(oi, si, build) {
   if (!om) return null;
   var p1 = fl.id + '-' + flv + '-' + build.a + '-' + build.d + '-' + build.s + '-4-4-1-1';
   var p2 = ol.id + '-' + om.lvl + '-' + om.ivs[0] + '-' + om.ivs[1] + '-' + om.ivs[2] + '-4-4-1-1';
+  // A mega's THIRD charged move gets a 4th part; PvPoke's parser routes any
+  // alphabetic part through addNewMove(..., moveIndex = i-1), and a 4-part
+  // segment also suppresses its "deselect the 3rd charged move" branch
+  // (Interface.js:1959-1967, :1995). Mirrors pvpoke_links.moveset_segment.
+  var seg = fast + '-' + chg[0] + '-' + chg[1] + (chg[2] ? '-' + chg[2] : '');
   return 'https://pvpoke.com/battle/' + DATA.cpCap + '/' + p1 + '/' + p2 + '/'
-    + sc[0] + '' + sc[1] + '/' + fast + '-' + chg[0] + '-' + chg[1] + '/' + ol.moves + '/';
+    + sc[0] + '' + sc[1] + '/' + seg + '/' + ol.moves + '/';
 };
 
 function cmpRender() {

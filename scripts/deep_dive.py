@@ -58,7 +58,7 @@ from gopvpsim.pokemon import (
     Pokemon, find_pokemon_entry, get_pokemon_entry, get_species, iv_rank,
     CPM, best_level,
     LEAGUE_CAPS, LEAGUE_MAX_LEVEL, MAX_CPM_LEVEL, bestbuddy_caps,
-    cp as calc_cp, pvpoke_default_ivs,
+    cp as calc_cp, pvpoke_default_ivs, mega_level,
 )
 from gopvpsim.moves import get_moves, type_effectiveness, stab
 from gopvpsim.attribution import PVPOKE_ATTRIBUTION_HTML, support_footer_html
@@ -192,6 +192,7 @@ KNOWN_GROUPS = [
     'battlefrontiermaster', 'bayou', 'bfretro', 'catch', 'championshipseries',
     'chrono', 'electric', 'equinox', 'fantasy', 'great', 'jungle',
     'laic2025remix', 'little', 'littlegeneral', 'maelstrom', 'master', 'mega',
+    'megagreat', 'megaultra',
     'premiermaster', 'premierultra', 'remix', 'retro', 'spellcraft', 'spring',
     'ultra',
 ]
@@ -426,9 +427,17 @@ def sp_rank_array(meta):
 # ---------------------------------------------------------------------------
 
 def get_legal_moves(species_name):
-    """Return (fast_move_ids, charged_move_ids) that a species can learn."""
+    """Return (fast_move_ids, charged_move_ids) that a species can learn.
+
+    ``extraChargedMoves`` is part of the legal charged pool, not a curiosity:
+    it is where a mega's mega-EXCLUSIVE attack lives (the 13 ``*_PLUS`` ids),
+    and where Cramorant's Gulp Missiles live. Reading only ``chargedMoves``
+    made ``--charged OUTRAGE_PLUS,X`` merely warn "not in the move pool" and
+    then run a full dive anyway.
+    """
     entry = get_pokemon_entry(species_name)
-    return entry['fastMoves'], entry['chargedMoves']
+    return (entry['fastMoves'],
+            list(entry['chargedMoves']) + list(entry.get('extraChargedMoves') or []))
 
 
 def enumerate_movesets(species_name, user_fast=None, user_charged=None,
@@ -489,8 +498,17 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None,
         fast_candidates = list(legal_fast)
 
     # Determine charged move candidates
-    if user_charged and len(user_charged) == 2:
-        # Full charged moveset specified - validate against gamemaster, not species
+    if user_charged and len(user_charged) in (2, 3):
+        # Full charged moveset specified - validate against gamemaster, not species.
+        # THREE is legal only for a mega: PvPoke's hasThirdChargedMove() is
+        # `hasTag("mega")` (Pokemon.js:2593, flipped in 574aeb0da), and the
+        # third slot is filled from extraChargedMovePool. Before 2026-09-02 a
+        # 3-element --charged fell through to the all-pairs `else` below and
+        # silently ran hours of unrequested enumeration.
+        if len(user_charged) == 3 and mega_level(species_name) is None:
+            sys.exit(f"{species_name} cannot hold three charged moves: only "
+                     f"mega-tagged species have a third slot "
+                     f"(PvPoke hasThirdChargedMove()). Got {user_charged!r}.")
         for cm in user_charged:
             if cm not in charged_moves_db:
                 sys.exit(f"Unknown charged move {cm!r} (not in gamemaster)")
@@ -498,6 +516,9 @@ def enumerate_movesets(species_name, user_fast=None, user_charged=None,
                 logger.warning(f"{cm} is not in {species_name}'s current move pool "
                                f"(CD/legacy move?)")
         charged_pairs = [tuple(sorted(user_charged))]
+    elif user_charged and len(user_charged) > 3:
+        sys.exit(f"--charged takes at most 3 moves (3 only for a mega); got "
+                 f"{len(user_charged)}: {user_charged!r}")
     elif user_charged and len(user_charged) == 1:
         # One charged move specified - pair it with all legal partners
         fixed = user_charged[0]

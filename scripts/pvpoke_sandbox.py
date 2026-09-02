@@ -104,9 +104,9 @@ Both link forms are positional paths, produced by PvPoke's
                 such field -- + ``FRUSTRATION`` for a ``_shadow`` entry),
                 **sorted by moveId**.  See :func:`move_pools`.
                 A third charged slot indexes a *different* pool
-                (``extraChargedMovePool``) and is unreachable at this
-                vintage (``hasThirdChargedMove()`` returns false), so
-                ``charged`` is limited to 1 or 2 moves.
+                (``extraChargedMovePool``); since pvpoke 574aeb0da
+                ``hasThirdChargedMove()`` is ``hasTag("mega")``, so it is
+                reachable for a mega and ``charged`` takes 1-3 moves.
 ``{hp}``        OPTIONAL pair ``p1hp-p2hp`` -- starting HP.
 ``{energy}``    OPTIONAL pair ``p1e-p2e`` -- **starting energy**.  These
                 two segments are emitted together, both or neither, and
@@ -257,12 +257,13 @@ class PokeSpec:
     start_cooldown: "int | None" = None            # ms, e.g. 1000
 
     def __post_init__(self):
-        if len(self.charged) not in (1, 2):
+        if len(self.charged) not in (1, 2, 3):
             raise ValueError(
-                f'{self.species_id}: charged must hold 1 or 2 moves, got '
-                f'{self.charged!r}. A third slot indexes extraChargedMovePool, '
-                'which Pokemon.hasThirdChargedMove() disables at this vintage, '
-                'so it silently decodes back to two moves.')
+                f'{self.species_id}: charged must hold 1-3 moves, got '
+                f'{self.charged!r}. The third slot indexes '
+                'extraChargedMovePool and exists only for a mega '
+                '(Pokemon.hasThirdChargedMove() == hasTag("mega"), pvpoke '
+                '574aeb0da).')
         if self.shadow_type not in SHADOW_TYPES:
             raise ValueError(f'shadow_type must be one of {SHADOW_TYPES}')
         for i, stage in enumerate(self.start_buffs):
@@ -602,10 +603,12 @@ def move_pools(species_id, cp, gamemaster=None, *, pvpoke_root=None):
     steelix_mega) must NOT get one -- a phantom RETURN shifts the index of
     every charged move sorting after it.
 
-    ``extraChargedMoves`` (Cramorant's Gulp Missiles, mega extras) are
-    deliberately excluded: they live in a separate dropdown that
-    ``hasThirdChargedMove()`` disables at this vintage, and they do not
-    shift the main pool's indices.
+    ``extraChargedMoves`` (Cramorant's Gulp Missiles, the 13 mega-exclusive
+    ``*_PLUS`` attacks) are deliberately excluded from THIS pool: they live
+    in a separate dropdown indexed by its own ``extraChargedMovePool``, and
+    they do not shift the main pool's indices. That separation is why a mega's
+    third slot is encoded as a 4th move-segment part, not as another index
+    here.
     """
     gm = _resolve_gamemaster(gamemaster, pvpoke_root)
     entry = next((p for p in gm['pokemon'] if p['speciesId'] == species_id), None)
@@ -631,19 +634,54 @@ def move_index_str(spec: PokeSpec, cp, gamemaster=None, *, pvpoke_root=None):
     ("None") exactly as PvPoke's own generator does -- the parser loops
     over whatever elements are present, so a missing slot leaves the
     auto-selected move in place.
+
+    A THIRD charged move adds a 4th part, which indexes a DIFFERENT pool:
+    Interface.js:1986-1992 sends parts 1-2 to the ``.move-select.charged``
+    options and part 3 to ``.move-select.extra-charged``, whose option list is
+    "None" followed by ``extraChargedMovePool`` (PokeSelect.js:229-238) --
+    hence the same ``+ 1`` convention against a different list.
+
+    Emitting only 3 parts for a mega is NOT neutral: Interface.js:1995-1998
+    actively deselects slot 2 when the segment has fewer than 4 parts, so a
+    3-part link opens a two-move fight and returns HTTP 200 while doing it.
     """
     fast, charged = move_pools(spec.species_id, cp, gamemaster,
                               pvpoke_root=pvpoke_root)
     if spec.fast not in fast:
         raise ValueError(f'{spec.fast} not in {spec.species_id} fast pool {fast}')
     parts = [str(fast.index(spec.fast))]
-    for c in spec.charged:
+    for c in spec.charged[:2]:
         if c not in charged:
             raise ValueError(f'{c} not in {spec.species_id} charged pool {charged}')
         parts.append(str(charged.index(c) + 1))
     while len(parts) < 3:
         parts.append('0')
+    if len(spec.charged) > 2:
+        extra = extra_charged_pool(spec.species_id, gamemaster,
+                                   pvpoke_root=pvpoke_root)
+        third = spec.charged[2]
+        if third not in extra:
+            raise ValueError(
+                f'{third} not in {spec.species_id} extraChargedMovePool '
+                f'{extra}; the third slot indexes that pool, not the main '
+                f'charged pool')
+        parts.append(str(extra.index(third) + 1))
     return '-'.join(parts)
+
+
+def extra_charged_pool(species_id, gamemaster=None, *, pvpoke_root=None):
+    """The species' ``extraChargedMovePool`` move ids, in gamemaster order.
+
+    This is the pool the 4th move-segment part indexes. Only mega-tagged
+    species have a usable one (``hasThirdChargedMove()`` gates the dropdown),
+    though the gamemaster field itself is also present on Cramorant's forms.
+    """
+    gm = _resolve_gamemaster(gamemaster, pvpoke_root)
+    entry = next((p for p in gm['pokemon'] if p['speciesId'] == species_id), None)
+    if entry is None:
+        raise ValueError(f'unknown speciesId {species_id!r} in the gamemaster')
+    known = {m['moveId'] for m in gm['moves']}
+    return [m for m in (entry.get('extraChargedMoves') or []) if m in known]
 
 
 # ---------------------------------------------------------------------------

@@ -883,10 +883,33 @@ def _cup_active_formats() -> dict:
         for f in load_gamemaster().get('formats', []):
             cup = f.get('cup')
             if cup and f.get('showFormat'):
-                out[cup] = f.get('title') or cup
+                # Keyed by (cup, cp), NOT cup alone: PvPoke's cup <-> format
+                # cardinality is not 1:1. The "mega" cup carries THREE live
+                # formats (Mega Great/Ultra/Master League at 1500/2500/10000);
+                # keying by cup alone kept only the last and made the other two
+                # look archived.
+                out[(cup, f.get('cp'))] = f.get('title') or cup
         return out
     except Exception:
         return {}
+
+
+def _format_key(cup_key: str):
+    """Our registry key -> the (cup, cp) pair PvPoke's formats array uses.
+
+    Two indirections at once: our key may differ from PvPoke's rankings cup
+    (the three mega editions all map to "mega"), and the CP cap comes from the
+    cup's registered dive_league. Returns (cup_key, None) when the cup has no
+    registered league, which matches nothing -- the correct answer for a cup
+    we do not dive.
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(REPO_ROOT / 'src'))
+    from gopvpsim.data import cup_rankings_key, cup_dive_league
+    from gopvpsim.pokemon import LEAGUE_CP
+    league = cup_dive_league(cup_key)
+    return (cup_rankings_key(cup_key),
+            LEAGUE_CP[league] if league else None)
 
 
 def _cup_status_line(cup_key: str, active_formats: dict) -> str:
@@ -900,7 +923,7 @@ def _cup_status_line(cup_key: str, active_formats: dict) -> str:
     if not active_formats:
         avail = ('Availability tracks PvPoke\'s active formats (could not be '
                  'checked at build time).')
-    elif cup_key in active_formats:
+    elif _format_key(cup_key) in active_formats:
         avail = ("Currently active in PvPoke's Rankings (as of this build's "
                  "gamemaster pull).")
     else:

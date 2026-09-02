@@ -443,10 +443,15 @@ def attach_form_change(bp, mon_entry, atk_iv, def_iv, sta_iv,
         # only Cramorant's Gulp Missiles. Keyed by moveId; per-instance dict
         # COPIES because battle code mutates move dicts in place (same
         # aliasing hazard as _swap_charged_move). Built from the STARTING
-        # entry's list, like PvPoke's constructor. Mewtwo megas also carry
-        # extraChargedMoves but have no formChange, so they never get here
-        # (their pool is inert in PvPoke too -- hasThirdChargedMove()
-        # hard-returns false).
+        # entry's list, like PvPoke's constructor. The 13 supermegas also
+        # carry extraChargedMoves but have no formChange, so they never get
+        # here -- their third move is selected into the moveset instead (the
+        # dive/oracle paths pass it in `charged_moves`), which is why this
+        # registry stays Cramorant-only.
+        #
+        # NB the reason this comment used to give was that
+        # hasThirdChargedMove() "hard-returns false". That stopped being true
+        # at pvpoke 574aeb0da, where it became `self.hasTag("mega")`.
         extra = mon_entry.get('extraChargedMoves')
         if extra:
             _, all_charged = get_moves()
