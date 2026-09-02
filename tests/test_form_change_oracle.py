@@ -91,8 +91,8 @@ def test_aegislash_blade_focal_vs_azumarill(s1, s2, score0, score1,
     (1, 1, 359, 640, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
     (1, 2, 359, 640, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
     (2, 0, 887, 112, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam']),  # PvPoke-divergent cell (see audit harness)
-    (2, 1, 623, 376, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Gyro Ball (shielded)', 'Aegislash (Blade): Gyro Ball']),  # score+winner now EXACT vs PvPoke (was a winner flip: 489/510 w1 vs 623/376 w0). ChargedLog-only residual: PvPoke's 2nd throw is Shadow Ball, ours Gyro Ball -- both shielded, so score-neutral.
-    (2, 2, 623, 376, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Gyro Ball (shielded)', 'Aegislash (Blade): Gyro Ball']),  # as (2,1)
+    (2, 1, 623, 376, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Gyro Ball']),
+    (2, 2, 623, 376, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Gyro Ball']),
 ])
 def test_azumarill_vs_aegislash_shield_opponent_side(s1, s2, score0,
                                                      score1, winner, log):

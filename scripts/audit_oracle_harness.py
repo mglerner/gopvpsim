@@ -91,14 +91,16 @@ MATCHUPS = [
     dict(label='aegislash_vs_azumarill_form_change',
          p1=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_shield'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
-         # 2026-09-02: (0,1),(0,2),(1,1),(2,1) became exact when PVPOKE
-         # fixed ITS side -- ActionLogic.js:954 flipped the shields-up
-         # prefer-non-debuffing predicate from `!acm[i].selfBuffing` to
-         # `!acm[i].selfDebuffing` in 574aeb0da, which stops its Aegislash
-         # picking Gyro Ball over Shadow Ball. That is the move-selection
-         # half of the bug we filed as pvpoke/pvpoke#378. We did not change.
-         # (1,2) and (2,2) remain: the deeper near-KO plan-choice half.
-         xfail_cells={(1, 2), (2, 2)}),
+         # 2026-09-02: ALL NINE cells exact. Two steps, both traced:
+         # (0,1),(0,2),(1,1),(2,1) became exact when PVPOKE fixed ITS side
+         # (ActionLogic.js:954, `!selfBuffing` -> `!selfDebuffing` in
+         # 574aeb0da -- the move-selection half of pvpoke/pvpoke#378, which
+         # stops its Aegislash picking Gyro Ball over Shadow Ball); then
+         # (1,2),(2,2) -- annotated here for months as the "deeper near-KO
+         # plan-choice half" -- closed when we ADOPTED that predicate plus
+         # the new shields-down anti-self-debuff block. So the plan-choice
+         # cluster was never the cause for these two.
+         xfail_cells=set()),
     dict(label='mimikyu_vs_azumarill_form_change',
          p1=P('Mimikyu', 'SHADOW_CLAW', ['SHADOW_SNEAK', 'PLAY_ROUGH'], (5, 13, 15), 'mimikyu'),
          p2=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill')),
@@ -147,12 +149,12 @@ MATCHUPS = [
     dict(label='azumarill_vs_aegislash_shield_form_change',
          p1=P('Azumarill', 'BUBBLE', ['ICE_BEAM', 'PLAY_ROUGH'], (4, 15, 13), 'azumarill'),
          p2=P('Aegislash (Shield)', 'AEGISLASH_CHARGE_PSYCHO_CUT', ['SHADOW_BALL', 'GYRO_BALL'], (4, 14, 15), 'aegislash_shield'),
-         # 2026-09-02 (shuffle clause 4): the 1s row and (2,0) became exact.
-         # (2,1)/(2,2) now match on SCORE AND WINNER -- they used to be a
-         # winner flip (489/510 w1 vs 623/376 w0) -- and retain a
-         # chargedLog-only difference on the 2nd throw (PvPoke Shadow Ball,
-         # ours Gyro Ball; both shielded, so score-neutral).
-         xfail_cells={(2, 1), (2, 2)}),
+         # 2026-09-02: ALL NINE cells exact. Shuffle clause 4 fixed the 1s
+         # row and (2,0); adopting the (f) predicate then closed the
+         # chargedLog-only residual on (2,1)/(2,2) (our 2nd throw was Gyro
+         # Ball where PvPoke's was Shadow Ball -- both shielded, hence
+         # score-neutral and invisible to a score-only oracle).
+         xfail_cells=set()),
     # Disguise vs fast-move pressure (Azumarill's Bubble is slow; Counter
     # chips the disguise differently and CMP differs).
     dict(label='mimikyu_vs_medicham_form_change',

@@ -41,7 +41,13 @@ CRESSELIA = ('Cresselia', 'PSYCHO_CUT', ['GRASS_KNOT', 'MOONBLAST'], 'great')
     (1, 2, 351, 648, 1),
     (2, 0, 813, 186, 0),
     (2, 1, 757, 242, 0),
-    (2, 2, 681, 318, 0),
+    # 2026-09-02: 681 -> 707 when we adopted upstream's (f) predicate
+    # (`!acm[i].selfDebuffing`). Pinsir carries TWO self-debuffing moves,
+    # so the old `!acm[i].selfBuffing` test fired the shields-up swap and
+    # the new one correctly does not. All 9 cells now match PvPoke
+    # exactly (was 8/9); 707 is PvPoke's own value, captured via
+    # scripts/pvpoke_trace.js at 56bc6a8b1.
+    (2, 2, 707, 292, 0),
 ])
 def test_pinsir_vs_cresselia_farm_stack(s1, s2, score0, score1, winner):
     a = _make_battle_pokemon(*PINSIR, s1, 15, 15, 15)

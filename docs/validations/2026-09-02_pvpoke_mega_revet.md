@@ -84,8 +84,8 @@ line-by-line read of the diff plus executed 2-move and 3-move traces:
 the (g) rotate. All are provably no-ops at n=2, which the bit-identical oracle
 grid confirms at each step.
 
-**Deferred, pending the Phase 4 decision:** the n=2 semantic changes in (a),
-(e) and (f)'s predicate. All three are implemented behind module knobs
+**DECIDED 2026-09-02 (Michael): (e) and (f) ON, (a) OFF.** The n=2 semantic
+changes in (a), (e) and (f)'s predicate. All three are implemented behind module knobs
 (`_AL_FARM_BAIT_MERGE`, `_AL_SHIELDS_DOWN_ANTI_DEBUFF`,
 `_AL_PREFER_NON_DEBUFFING`), defaulting to our pre-update behaviour, so the
 decision is a one-line change and could be MEASURED rather than argued.
@@ -103,6 +103,33 @@ Block (e)'s Master cells concentrate on Xerneas (10), Togekiss (6), Zygarde
 Complete (5), Florges (5), Sylveon (5), Zacian Crowned Sword (4) -- i.e.
 species pairing a self-debuffing cheapest move with a non-debuffing
 alternative, which is exactly its trigger shape.
+
+### Outcome of the decision
+
+Turning (e) and (f) on took the oracle grid from **222+21 to 226+17**, closing
+the last four Aegislash cells:
+
+  aegislash_vs_azumarill          (1,2) (2,2)   annotated for months as "the
+                                                deeper near-KO plan-choice
+                                                half of bug #3" -- they were
+                                                not that
+  azumarill_vs_aegislash_shield   (2,1) (2,2)   the chargedLog-only residual
+                                                clause 4 had left behind
+
+Both matchups now carry an EMPTY xfail set: all 18 cells exact on score,
+winner AND chargedLog. The whole Aegislash divergence cluster is closed.
+
+One test fixture moved outside the grid, and it also improved:
+`test_bug3_farm_stack`'s Pinsir vs Cresselia (2,2), 681 -> 707. Pinsir carries
+TWO self-debuffing moves (Close Combat + Superpower), so the OLD
+`!acm[i].selfBuffing` test fired the shields-up swap and the new
+`!acm[i].selfDebuffing` correctly does not. Re-captured against PvPoke: that
+matchup went from 8/9 to **9/9 exact**, and 707 is PvPoke's own number.
+
+So the corpus A/B *understated* the case for adopting: it measured 0/9,918 GL
+and 0/9,747 UL for both knobs because its corpus used meta default movesets at
+top-60 x top-20, which does not reach Aegislash Shield or Pinsir. Every cell
+that actually moved, moved toward PvPoke.
 
 Earlier, broader measurements from the n>=3 spec work (different corpus, incl.
 randomized and non-default movesets) found (a) 0/135,000, (e) 60/1080 with a
