@@ -91,8 +91,8 @@ def test_aegislash_blade_focal_vs_azumarill(s1, s2, score0, score1,
     (1, 1, 359, 640, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
     (1, 2, 359, 640, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Ice Beam (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
     (2, 0, 887, 112, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Azumarill: Ice Beam']),  # PvPoke-divergent cell (see audit harness)
-    (2, 1, 489, 510, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
-    (2, 2, 489, 510, 1, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Azumarill: Play Rough (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (see audit harness)
+    (2, 1, 623, 376, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Gyro Ball (shielded)', 'Aegislash (Blade): Gyro Ball']),  # score+winner now EXACT vs PvPoke (was a winner flip: 489/510 w1 vs 623/376 w0). ChargedLog-only residual: PvPoke's 2nd throw is Shadow Ball, ours Gyro Ball -- both shielded, so score-neutral.
+    (2, 2, 623, 376, 0, ['Azumarill: Ice Beam', 'Azumarill: Ice Beam', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Gyro Ball (shielded)', 'Aegislash (Blade): Gyro Ball']),  # as (2,1)
 ])
 def test_azumarill_vs_aegislash_shield_opponent_side(s1, s2, score0,
                                                      score1, winner, log):
@@ -158,12 +158,18 @@ def test_morpeko_vs_gfisk_aura_wheel_type_flip(s1, s2, score0, score1,
     # divergence annotation was removed.
     (0, 1, 306, 693, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
     (0, 2, 306, 693, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
-    (1, 0, 671, 328, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (see audit harness)
-    (1, 1, 637, 362, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (bug #3 Gyro-Ball; shifted by 2026-07-03 NB-1 freeze, oracle winner 0 still matches)
-    (1, 2, 408, 591, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball']),  # PvPoke-divergent cell (shifted by 2026-07-03 NB-1 freeze; oracle winner 1 still matches)
-    (2, 0, 946, 53, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (see audit harness)
-    (2, 1, 912, 87, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (bug #3; shifted by 2026-07-03 NB-1 freeze, oracle winner 0 still matches)
-    (2, 2, 620, 379, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Tinkaton: Bulldoze']),  # PvPoke-divergent cell (shifted by 2026-07-03 NB-1 freeze; oracle winner 0 still matches)
+    # The six 1s/2s cells below were PvPoke-divergent for months and are now
+    # EXACT on score, winner AND chargedLog. Root cause was the missing
+    # aegislash_shield clause of the activeChargedMoves shuffle
+    # (Pokemon.js:790), added 2026-09-02 with the n>=3 rewrite. Values below
+    # are PvPoke ground truth re-captured via scripts/pvpoke_trace.js at
+    # pvpoke 56bc6a8b1, NOT our own output.
+    (1, 0, 949, 50, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
+    (1, 1, 907, 92, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
+    (1, 2, 397, 602, 1, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball', 'Aegislash (Blade): Shadow Ball']),
+    (2, 0, 949, 50, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
+    (2, 1, 907, 92, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze']),
+    (2, 2, 646, 353, 0, ['Tinkaton: Bulldoze', 'Tinkaton: Bulldoze', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Tinkaton: Bulldoze (shielded)', 'Aegislash (Blade): Shadow Ball (shielded)', 'Aegislash (Blade): Gyro Ball', 'Tinkaton: Bulldoze']),
 ])
 def test_tinkaton_ul_vs_aegislash_shield(s1, s2, score0, score1,
                                          winner, log):
