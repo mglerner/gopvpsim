@@ -1,8 +1,9 @@
-# PvPoke re-vet: the Mega Evolution update (7b96d91fb..56bc6a8b1)
+# PvPoke re-vet: the Mega Evolution update (7b96d91fb..79d04af74)
 
 Record for `docs/rebalance_checklist.md` **section B**, run 2026-09-02. This
 is the document `tests/fixtures/pvpoke_engine_digests.json` points at; the pin
-moved `78c64048a -> 56bc6a8b1` in the same commit as this file.
+moved `78c64048a -> 56bc6a8b1`, then `-> 79d04af74` when upstream shipped a
+second mega mechanic the same day (section 7).
 
 ## 1. The commits, classified
 
@@ -209,3 +210,62 @@ exactly the "input-freshness" cell of the pre-dive lens grid.
   editions is published in wording only -- no formula, no granularity, no stat
   basis. PvPoke models the mega formats as ordinary CP-capped cups. Any GL/UL
   mega spread we publish rests on that unpublished rule and must say so.
+
+
+## 7. Addendum: Mega Level 4 raises the level cap to 52 (`82a974ffa`)
+
+Two commits landed upstream while this re-vet was being written, and the first
+is a mechanic, not a UI change:
+
+    82a974ffa  Mega Level 4 CP Boost      Pokemon.js +13/-1
+    79d04af74  Color for Mega CP boost    CSS/UI only
+
+`Pokemon.js:294-297` now sets `baseLevelCap = 52` and `levelCap = 52` when
+`megaLevel == 4`, applied AFTER the battle's own cap. `setLevelCap` clamps
+with `min(levelCap, baseLevelCap)`, so best buddy does NOT stack past it.
+
+**This answers a question that was open and explicitly unverifiable.** The
+`project_mega_league_sims` memory recorded "Super Max grants +2 Pokemon levels
+of stats" as Bulbapedia's reading of Niantic's "greatly enhanced CP", and
+noted that **PvPoke models no stat effect of Mega Level at all, so
+cross-checking against PvPoke cannot catch this**. PvPoke now models exactly
++2 levels. It is still an INTERPRETATION -- Niantic has published no number --
+but it is now the oracle, and our numbers must follow it or diverge knowingly.
+
+Impact is Master League only: in GL/UL a mega's huge base stats put it far
+below level 50 under the CP cap, so a higher ceiling changes nothing.
+
+What we did:
+
+- Extended the CPM table with 51.5 and 52.0. **Source differs from every
+  other entry**: the rest of the table is the game's published 8-decimal CPM,
+  and Niantic has published nothing above 51, so these two are PvPoke's own
+  full-precision values. Flagged at the table.
+- **Decoupled `MAX_CPM_LEVEL` from `max(CPM)`.** It is consumed as "the
+  ceiling a normal build can reach" by `bestbuddy_caps`, the dive page's JS
+  level ceilings and `user_collection`. Extending the table without this
+  would silently have let EVERY Master and Little mon best-buddy to 52. It is
+  now the explicit constant 51.0, with `MEGA_LEVEL_4_MAX_LEVEL = 52.0`
+  separate.
+- `at_best_level` raises the ceiling for a supermega, but only when the caller
+  did not pin `max_level` -- the raise is a CEILING, not a forced level, and
+  oracle fixtures must still be able to ask for the level they mean.
+
+Verified against a probe that instantiates PvPoke's `Pokemon.js` directly:
+
+| species          | level | CP   | atk / def / hp                  |
+| ---------------- | ----- | ---- | ------------------------------- |
+| Mewtwo (Mega X)  | 52    | 7076 | 352.024205803871 / 195.569003224 / 206 |
+| Dragonite (Mega) | 52    | 5583 | 266.994204401970 / 229.581003785 / 190 |
+
+Ours match **exactly** on all three stats, because the mega-only CPM entries
+are PvPoke's own values. An ordinary mon still differs by ~3e-8 at level 50
+(our published 0.84029999 vs PvPoke's full expansion) -- pre-existing,
+documented, changes no cell.
+
+Oracle grid unchanged at 226+17: it is GL+UL, which this mechanic cannot
+reach.
+
+**Still not settled:** whether +2 levels is what the GAME does. Niantic
+published a qualitative claim only. Any Master League mega number we publish
+now rests on PvPoke's quantification and should say so.
