@@ -2112,20 +2112,26 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # big move under TTL pressure -- our fire_now path supplies the same
     # escape). PvPoke's only self-debuff consideration here is cm0's
     # selfBuffing exemption below.
+    # ActionLogic.js:861 loops i in 1..n-1 and RETURNS from inside the loop,
+    # so the FIRST qualifying i wins -- but a VETOED i does not terminate the
+    # loop, and a later i can still return. The veto's denominator is always
+    # activeChargedMoves[0], never the running i (ActionLogic.js:866).
     if bait_shields and defender.shields > 0 and n_cms > 1:
-        if (attacker.energy < cm_energy[1]
-                and cm_dpe[1] > cm_dpe[final_first_thrown]):
+        for _i in range(1, n_cms):
+            if not (attacker.energy < cm_energy[_i]
+                    and cm_dpe[_i] > cm_dpe[final_first_thrown]):
+                continue
             bait = True
-            # Don't bait if an effective self-buffing move exists (line 826).
+            # Don't bait if an effective self-buffing move exists (line 866).
             # PvPoke also uses raw damage/energy here (selectBestChargedMove
             # overwrites initializeMove's buff-adjusted dpe).
-            if (cm_dpe[1] / max(cm_dpe[0], 0.001) <= 1.5
+            if (cm_dpe[_i] / max(cm_dpe[0], 0.001) <= 1.5
                     and cm_self_buff[0]):
                 bait = False
             if bait:
                 if _dp_trace:
                     _policy_log.append(
-                        f"  DP-trace[{attacker.species}]: bait-wait for {cms[1].get('moveId')}")
+                        f"  DP-trace[{attacker.species}]: bait-wait for {cms[_i].get('moveId')}")
                 return None
 
     # PvPoke sorts plan by damage descending only when baitShields is falsy or
@@ -2179,13 +2185,22 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # because its cache mixes a fresh EP.damage (refreshed on use at T12,
     # 50) with a still-init-stale IW.damage (35), yielding 1.2857 < 1.5.
     # Pinned as tests/test_nb1_selection_freeze.py Group C test_group_c10.
+    # ActionLogic.js:880 loops i in 1..n-1 with NO break, so the LAST
+    # qualifying i wins -- and the ratio's denominator is the RUNNING
+    # finalState.moves[0] (line 881), which moves after each assignment.
+    # Entering this block first_idx == final_first_thrown (the gate above
+    # forces the else branch at :2143), so iteration 1 is unchanged and only
+    # n>=3 can see the chaining.
     if bait_shields and defender.shields > 0 and n_cms > 1:
-        fm0_dpe = cm_dmgs[final_first_thrown] / cm_energy[final_first_thrown]
-        if fm0_dpe > 0 and attacker.energy >= cm_energy[1]:
-            dpe_ratio = (cm_dmgs[1] / cm_energy[1]) / fm0_dpe
-            if dpe_ratio > 1.5 and not would_shield(attacker, defender, cms[1],
-                                                     mechanics=mechanics):
-                first_idx = 1
+        for _i in range(1, n_cms):
+            fm0_dpe = cm_dmgs[first_idx] / cm_energy[first_idx]
+            if not (fm0_dpe > 0 and attacker.energy >= cm_energy[_i]):
+                continue
+            dpe_ratio = (cm_dmgs[_i] / cm_energy[_i]) / fm0_dpe
+            if dpe_ratio > 1.5 and not would_shield(attacker, defender,
+                                                    cms[_i],
+                                                    mechanics=mechanics):
+                first_idx = _i
 
     first_move = cms[first_idx]
 
@@ -2263,33 +2278,50 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # [886] Don't bait with self-debuffing moves (raw dpe)
     # Gated on bait_shields -- the whole bandaid is about rerouting a bait
     # choice, which is a no-op in no-bait mode.
+    # ActionLogic.js:931 loops i in 1..n-1 with no break. Re-testing
+    # cm_self_debuf[first_idx] each iteration reproduces upstream's
+    # self-disabling for free: the guard requires the RUNNING pick to be
+    # self-debuffing while the assignment requires cms[i] not to be, so the
+    # first successful assignment falsifies the guard forever (confirmed
+    # upstream: the assign count was never >= 2 across 200k+ traced
+    # decisions).
     if bait_shields and defender.shields > 0 and n_cms > 1:
-        if (attacker.energy >= cm_energy[1]
-                and cm_dpe[1] > cm_dpe[first_idx]
-                and cm_self_debuf[first_idx]
-                and not cm_self_debuf[1]):
-            if _dp_trace:
-                _policy_log.append(
-                    f"  DP-trace[{attacker.species}]: bandaid[886] no-debuff-bait:"
-                    f" {first_move.get('moveId')} → {cms[1].get('moveId')}")
-            first_idx  = 1
-            first_move = cms[first_idx]
+        for _i in range(1, n_cms):
+            if (attacker.energy >= cm_energy[_i]
+                    and cm_dpe[_i] > cm_dpe[first_idx]
+                    and cm_self_debuf[first_idx]
+                    and not cm_self_debuf[_i]):
+                if _dp_trace:
+                    _policy_log.append(
+                        f"  DP-trace[{attacker.species}]: bandaid[886] no-debuff-bait:"
+                        f" {first_move.get('moveId')} → {cms[_i].get('moveId')}")
+                first_idx  = _i
+                first_move = cms[first_idx]
 
     # [895] While shields up, prefer close non-debuffing when debuffing won't KO
+    # ActionLogic.js:953 loops i in 1..n-1 with no break -> LAST qualifying i
+    # wins, and the predicate never references the running first_idx (it is
+    # always slot 0 vs slot i). NB the PREDICATE below is still upstream's
+    # OLD `not cm_self_buff[_i]`; 574aeb0da changed it to
+    # `not cm_self_debuf[_i]`, which is a different test rather than a loop
+    # generalization and is a separate, measured decision -- see
+    # DEVELOPER_NOTES "ActionLogic n=2 semantic changes".
     if defender.shields > 0 and n_cms > 1:
-        if cm_self_debuf[0] and not cm_self_buff[1]:
+        for _i in range(1, n_cms):
+            if not (cm_self_debuf[0] and not cm_self_buff[_i]):
+                continue
             # Is attacker baiting or will debuffing move not come close to KO?
             if (bait_shields
                     or defender.hp - cm_dmgs[0] > 10):
                 # Is the second move close in energy and DPE? (raw dpe)
-                if (cm_energy[1] - cm_energy[0] <= 10
-                        and cm_dpe[1] / cm_dpe[0] > 0.7):
+                if (cm_energy[_i] - cm_energy[0] <= 10
+                        and cm_dpe[_i] / cm_dpe[0] > 0.7):
                     if _dp_trace:
                         _policy_log.append(
                             f"  DP-trace[{attacker.species}]: bandaid[895] shields-up-prefer-non-debuff:"
-                            f" {first_move.get('moveId')} → {cms[1].get('moveId')}")
-                    first_idx  = 1
-                    first_move = cms[1]
+                            f" {first_move.get('moveId')} → {cms[_i].get('moveId')}")
+                    first_idx  = _i
+                    first_move = cms[_i]
 
     # [910] Defer self-debuffing until after survivable charged moves
     if (cm_self_debuf[first_idx]
