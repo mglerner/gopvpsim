@@ -85,7 +85,32 @@ the (g) rotate. All are provably no-ops at n=2, which the bit-identical oracle
 grid confirms at each step.
 
 **Deferred, pending the Phase 4 decision:** the n=2 semantic changes in (a),
-(e) and (f)'s predicate. Measured impact, so the decision is not a guess:
+(e) and (f)'s predicate. All three are implemented behind module knobs
+(`_AL_FARM_BAIT_MERGE`, `_AL_SHIELDS_DOWN_ANTI_DEBUFF`,
+`_AL_PREFER_NON_DEBUFFING`), defaulting to our pre-update behaviour, so the
+decision is a one-line change and could be MEASURED rather than argued.
+
+**A/B on our own engine**, top-60 focal x top-20 opponents x 9 shield cells
+per league, PvPoke default movesets, 30,285 cells total:
+
+| block | Great       | Ultra       | Master                          |
+| ----- | ----------- | ----------- | ------------------------------- |
+| (a)   | 0/9,918     | 0/9,747     | 0/10,620                        |
+| (e)   | 0/9,918     | 0/9,747     | **76/10,620 (0.72%)**, 2 winner flips, worst delta 208 |
+| (f)   | 0/9,918     | 0/9,747     | 0/10,620                        |
+
+Block (e)'s Master cells concentrate on Xerneas (10), Togekiss (6), Zygarde
+Complete (5), Florges (5), Sylveon (5), Zacian Crowned Sword (4) -- i.e.
+species pairing a self-debuffing cheapest move with a non-debuffing
+alternative, which is exactly its trigger shape.
+
+Earlier, broader measurements from the n>=3 spec work (different corpus, incl.
+randomized and non-default movesets) found (a) 0/135,000, (e) 60/1080 with a
+610 max delta concentrated on Gigalith, and (f) 9/80,000 on Staraptor /
+Galarian Zapdos / Shadow Hariyama. The two corpora agree on the ordering --
+(a) is inert, (f) nearly so, (e) is the one with real reach -- and disagree on
+which species surface it, which is a corpus-composition artifact (this one uses
+meta default movesets only). Summary of both:
 
 | block | our 243-cell grid | broader corpus                                                                         |
 | ----- | ----------------- | -------------------------------------------------------------------------------------- |

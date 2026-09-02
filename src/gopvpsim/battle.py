@@ -194,6 +194,31 @@ def _priority_cm(owner: "BattlePokemon",
     return owner._ensure_dp_init_cache(opponent)['cms'][0]
 
 
+# --- ActionLogic n=2 semantic changes from pvpoke 574aeb0da / feba66f47 ---
+# Three upstream blocks changed behaviour for ORDINARY two-charged-move
+# Pokemon, riding in on the commits that added mega third-move support. They
+# are NOT loop generalizations (those are adopted unconditionally and are
+# no-ops at n=2); each is a real decision under CLAUDE.md "When our sim
+# diverges from PvPoke", so each gets a knob instead of a silent choice.
+#
+# DEFAULT False = our pre-2026-09-02 behaviour, which is what every cached
+# sweep column and every shipped dive was simmed under. Flipping any of these
+# changes n=2 scores and therefore forces a cold re-dive.
+#
+# WARNING (sweep-cache discipline), same as the Cramorant knobs above: the
+# sweep cache does NOT key on these. Never run a cache-backed sweep or dive
+# with non-default values.
+#
+# Measured impact -- see docs/validations/2026-09-02_pvpoke_mega_revet.md:
+#   (a) 0 decisions changed in 135,000 n=2 samples; 0 cells on the oracle grid
+#   (e) 60/1080 sims differ, max |delta| 610, concentrated on Gigalith
+#   (f) 9/80,000 randomized n=2 decisions; PvPoke's own move to this predicate
+#       is what fixed 8 of our documented divergences, so on the grid we
+#       already AGREE with new-PvPoke without flipping ours
+_AL_FARM_BAIT_MERGE = False       # (a) ActionLogic.js:405-415
+_AL_SHIELDS_DOWN_ANTI_DEBUFF = False   # (e) ActionLogic.js:940-947 (new block)
+_AL_PREFER_NON_DEBUFFING = False  # (f) ActionLogic.js:954 predicate
+
 # --- Cramorant policy-lab knobs (docs/cramorant_policy_plan.md) -----------
 # Module globals so scripts/cramorant_policy_lab.py can A/B candidate
 # "PoGoDives strat" rules without forking the engine. The DEFAULTS are
@@ -1844,7 +1869,18 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
         # NB this bait/swap is mutually exclusive where PvPoke runs them
         # sequentially (bait then debuf-swap, ActionLogic.js:383-393); the two
         # forms agree for n_cms <= 2, which is all legal PvP allows.
-        if (bait_shields
+        if _AL_FARM_BAIT_MERGE:
+            # HEAD form (574aeb0da): one loop i=0..n-1 running the debuff swap
+            # and then the bait test, so bait now WINS where the two disagree,
+            # and wouldShield(acm[0]) is evaluated -- a probe the old code
+            # never made. The bait branch assigns acm[0] regardless of which i
+            # matched, which is the tell that `i` was never meant to index it.
+            selected_idx = dp_cache['farm_swap_idx']
+            if bait_shields and defender.shields > 0 and not cm_self_debuf[0]:
+                for _i in range(n_cms):
+                    if would_shield(attacker, defender, cms[_i]):
+                        selected_idx = 0
+        elif (bait_shields
                 and defender.shields > 0 and n_cms > 1
                 and not cm_self_debuf[0]
                 and would_shield(attacker, defender, cms[1])):
@@ -2299,6 +2335,29 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
                 first_move = cms[first_idx]
 
     # [895] While shields up, prefer close non-debuffing when debuffing won't KO
+    # [940] NEW upstream block (feba66f47): when shields are DOWN, do not use
+    # a self-debuffing move that is significantly less efficient.
+    #   if (opponent.shields == 0 && acm.length > 1 && moves[0].selfDebuffing)
+    #     for i in 1..n-1:
+    #       if (acm[i].dpe > moves[0].dpe && !acm[i].selfDebuffing)
+    #         moves[0] = acm[i]
+    # No energy, HP, damage or bait gate -- the broadest of the three n=2
+    # changes. It moves PvPoke TOWARD our own documented position (we already
+    # throw self-debuffing moves only when a fast KO will not do -- see
+    # _optimize_move_timing), which is the argument for adopting it.
+    # Knob-gated: see _AL_SHIELDS_DOWN_ANTI_DEBUFF.
+    if (_AL_SHIELDS_DOWN_ANTI_DEBUFF
+            and defender.shields == 0 and n_cms > 1
+            and cm_self_debuf[first_idx]):
+        for _i in range(1, n_cms):
+            if cm_dpe[_i] > cm_dpe[first_idx] and not cm_self_debuf[_i]:
+                if _dp_trace:
+                    _policy_log.append(
+                        f"  DP-trace[{attacker.species}]: bandaid[940] shields-down-anti-debuff:"
+                        f" {first_move.get('moveId')} → {cms[_i].get('moveId')}")
+                first_idx  = _i
+                first_move = cms[_i]
+
     # ActionLogic.js:953 loops i in 1..n-1 with no break -> LAST qualifying i
     # wins, and the predicate never references the running first_idx (it is
     # always slot 0 vs slot i). NB the PREDICATE below is still upstream's
@@ -2308,7 +2367,9 @@ def pvpoke_dp(attacker: "BattlePokemon", defender: "BattlePokemon",
     # DEVELOPER_NOTES "ActionLogic n=2 semantic changes".
     if defender.shields > 0 and n_cms > 1:
         for _i in range(1, n_cms):
-            if not (cm_self_debuf[0] and not cm_self_buff[_i]):
+            _other_ok = (not cm_self_debuf[_i]) if _AL_PREFER_NON_DEBUFFING \
+                else (not cm_self_buff[_i])
+            if not (cm_self_debuf[0] and _other_ok):
                 continue
             # Is attacker baiting or will debuffing move not come close to KO?
             if (bait_shields
