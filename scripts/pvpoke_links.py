@@ -72,7 +72,7 @@ def _lv(level):
 
 
 def moveset_segment(fast, charged):
-    """'FAST-CHARGED1-CHARGED2' move-id segment, or None if under-specified.
+    """'FAST-CHARGED1-CHARGED2[-CHARGED3]' move-id segment, or None.
 
     Public on purpose: every builder of a hard-moveset battle link (the focal
     and opponent blobs here, and deep_dive's sim-resolved opponent blob, which
@@ -82,7 +82,13 @@ def moveset_segment(fast, charged):
     """
     if not fast or len(charged) < 2:
         return None
-    return f"{fast}-{charged[0]}-{charged[1]}"
+    # A mega's THIRD charged move gets a 4th part. PvPoke's parser sends any
+    # alphabetic part through addNewMove(..., moveIndex = i-1)
+    # (Interface.js:1959-1967), so part 3 lands in chargedMoves[2]; and a
+    # 4-part segment also suppresses the "deselect the 3rd charged move"
+    # branch at Interface.js:1995. Emitting only two parts for a 3-move mega
+    # therefore opens a DIFFERENT fight and still returns HTTP 200.
+    return "-".join([fast, *charged[:3]])
 
 
 def focal_link_data(display, shadow, fast, charged):

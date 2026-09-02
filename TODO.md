@@ -279,9 +279,10 @@ Headlines (these resolve BOTH open caveats in the
 upstream implementation to read):
 
 - `574aeb0da` Updated Action Logic for **third charged attacks**, +
-  **Mega Bonus damage multiplier**. Our engine has an `n_cms > 2`
-  guard, and a Mega bonus damage multiplier is a mechanic we do not
-  model at all.
+  **Mega Bonus damage multiplier**. (NB an earlier version of this note
+  claimed "our engine has an `n_cms > 2` guard" -- it does not, and never
+  did: every occurrence in `battle.py` is `n_cms > 1`, which is exactly
+  why a 3-move build used to run silently wrong.)
 - `bd8c5d889` **Mega Level select** for Pokemon.
 - `feba66f47` **Super Mega tag, default Mega Level to 4**, fixed battle
   logic. The memory noted that nothing in our data model or PvPoke's

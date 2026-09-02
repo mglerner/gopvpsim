@@ -91,11 +91,40 @@ CUP_RANKINGS_URL_TEMPLATE = (
 class CupInfo(NamedTuple):
     dive_league: str | None
     display_name: str | None
+    # PvPoke's RANKINGS cup key, when it differs from our registry key.
+    # Needed because PvPoke's cup <-> format cardinality is not 1:1: the
+    # gamemaster has ONE cup named "mega" (title "All Pokemon") and THREE
+    # formats over it (Mega Great/Ultra/Master League, cp 1500/2500/10000),
+    # with rankings at rankings/mega/overall/rankings-<cp>.json. Our registry
+    # key has to be per-league -- `dive_league` is one league and
+    # `cup_slug_suffix` would otherwise collide across the three -- so the
+    # three mega keys all point their rankings back at the single "mega" cup.
+    # None means "the registry key IS the rankings key" (every other cup).
+    rankings_cup: str | None = None
 
 
 CUP_REGISTRY = {
     # Cups with dive plumbing (league + verified display name).
     "equinox": CupInfo("great", "Equinox Cup"),
+    # Mega editions. Display names and CP caps are the gamemaster's own
+    # format titles, not derived: "Mega Great League" / "Mega Ultra League" /
+    # "Mega Master League". All three read the single "mega" rankings cup.
+    #
+    # TWO THINGS TO KNOW BEFORE DIVING THESE:
+    #  1. The cup's roster is NOT restricted to megas -- its title is
+    #     literally "All Pokemon", and rankings-1500.json carries 1198
+    #     entries of which only ~58 are megas. So a mega dive's OPPONENTS are
+    #     the ordinary meta, and reading movesets from the mega rankings
+    #     rewrites non-mega opponents' movesets too. Measured drift vs the
+    #     open-meta rankings: 0 species through GL top-200, 11 through UL
+    #     top-100, 13 through ML top-100. GL can safely reuse the existing
+    #     open-meta opponent pool; UL/ML need their own.
+    #  2. mewtwo_mega_x, mewtwo_mega_y, kyogre_primal, groudon_primal and
+    #     rayquaza_mega are excluded at 1500 ONLY (gamemaster cup exclude
+    #     list, leagues:[1500]).
+    "megagreat":  CupInfo("great",  "Mega Great League",  rankings_cup="mega"),
+    "megaultra":  CupInfo("ultra",  "Mega Ultra League",  rankings_cup="mega"),
+    "megamaster": CupInfo("master", "Mega Master League", rankings_cup="mega"),
     # Cups PvPoke publishes rankings for, with no dive plumbing here.
     **{c: CupInfo(None, None) for c in (
         "bastille", "bayou", "bfretro", "battlefrontiermaster", "catch",
@@ -124,6 +153,20 @@ def cup_pretty_name(cup):
     if info is not None and info.display_name:
         return info.display_name
     return f"{cup.capitalize()} Cup"
+
+
+def cup_rankings_key(cup):
+    """PvPoke's rankings cup name for one of our registry keys.
+
+    Identity for every cup whose key matches PvPoke's; the three mega
+    editions map back onto the single "mega" cup. Unregistered cups pass
+    through unchanged so the caller still gets load_cup_rankings' loud error
+    rather than a KeyError here.
+    """
+    info = CUP_REGISTRY.get(cup)
+    if info is not None and info.rankings_cup:
+        return info.rankings_cup
+    return cup
 
 
 def cup_dive_league(cup):
@@ -312,6 +355,7 @@ def load_cup_rankings(cup, cp):
         raise ValueError(
             f"No published rankings for cup {cup!r}. "
             f"Known cups: {', '.join(sorted(_CUPS_WITH_RANKINGS))}.")
+    cup = cup_rankings_key(cup)
     return _fetch_json(
         f"rankings_{cup}_{cp}",
         url=CUP_RANKINGS_URL_TEMPLATE.format(cup=cup, cp=cp))
@@ -340,7 +384,11 @@ def rankings_cache_path(league, cup=None):
     handle. Raises KeyError for an unknown league.
     """
     if cup is not None:
-        return CACHE_DIR / f"rankings_{cup}_{_league_cp(league)}.json"
+        # Must apply the same indirection load_cup_rankings does, or the three
+        # mega keys would each claim a different cache path while sharing one
+        # underlying file -- and a renderer would stat a path that never exists.
+        return (CACHE_DIR /
+                f"rankings_{cup_rankings_key(cup)}_{_league_cp(league)}.json")
     return CACHE_DIR / f"{league}.json"
 
 
@@ -436,8 +484,11 @@ def get_default_moveset(species_name, league='great', shadow=False, cup=None):
     """Return (fast_move_id, [charged_move_ids]) from PvPoke's rankings.
 
     PvPoke's rankings files contain a 'moveset' field for each species:
-    [FAST_MOVE, CHARGED1, CHARGED2].  This is the default moveset shown
-    on pvpoke.com/battle/ when no moves are specified.
+    [FAST_MOVE, CHARGED1, CHARGED2] -- and, for a mega with a
+    mega-exclusive attack, a FOURTH element (its ``*_PLUS`` move), since
+    PvPoke's ranker fills a third charged slot for `hasTag("mega")` species
+    from ``extraChargedMoves``.  This function returns every charged move
+    the entry lists, so such a species yields THREE.
 
     Args:
         species_name: e.g. 'Medicham', 'Azumarill'
