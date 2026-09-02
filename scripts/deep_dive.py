@@ -3775,22 +3775,20 @@ def main():
                              'scripts/replay_analysis.py re-render this '
                              'dive\'s HTML without re-simming.')
     parser.add_argument('--mechanics', choices=['legacy', 'new'], default='legacy',
-                        help='Turn-resolution model. legacy (default) = the '
-                             'pre-2026-06-23 system used for all published '
-                             'dives. new = the 2026-06-23 PvP turn system '
-                             '(EXPERIMENTAL / UNVALIDATED: PvPoke has not '
-                             'implemented it, so there is no reference to '
-                             'cross-check against, and the sweep disk cache '
-                             'is disabled for it).')
+                        help='Turn-resolution model. NEITHER setting is '
+                             'simply correct as of 2026-09-02: legacy '
+                             '(default) models the pre-2026-09-02 system, '
+                             'which the live game no longer runs, and new is '
+                             'unvalidated (104/243 oracle cells disagree with '
+                             "PvPoke's new-mechanics branch). Both print a "
+                             'caveat; see scripts/mechanics_notice.py.')
 
     args = parser.parse_args()
 
-    if args.mechanics == 'new':
-        logger.warning(
-            'mechanics=new is EXPERIMENTAL / UNVALIDATED -- it models the '
-            '2026-06-23 PvP turn system, which PvPoke has not implemented. '
-            'There is no reference to cross-check against; treat the output '
-            'as experimental.')
+    # BOTH settings carry a caveat as of 2026-09-02 -- legacy is the more
+    # dangerous one because it is the default and nobody opts into it.
+    from mechanics_notice import warn_mechanics
+    warn_mechanics(args.mechanics, logger.warning)
 
     # Fail-fast: ensure --html output directory exists (and is writable)
     # BEFORE running any simulation. Without this, a fresh dive slug
