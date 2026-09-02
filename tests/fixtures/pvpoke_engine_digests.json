@@ -1,11 +1,11 @@
 {
  "digests": {
-  "../pokemon/Pokemon.js": "3c03042c1f9672d8243e1638f83cd0b7522ddf2b0581511fe5a4ec059c836706",
+  "../pokemon/Pokemon.js": "f55a496919a1901007170f3a4390c6d3f24cf001d1585e8f9d625f7afb16199e",
   "Battle.js": "cf2bfbbfd5e769549a3427733f3006f2cad115aa58711553bb16f22e075bd825",
-  "DamageCalculator.js": "453c2e2bfa4ae87fc991abc7b8e689faaad4c27ab1636c0c4b13e1911c178a3c",
-  "actions/ActionLogic.js": "c0d7d0a58ed9ce68858ccb2b2fe236712ce5890c5374c90a15e64dd1335f9266"
+  "DamageCalculator.js": "557b9345367a272e7822b47d346b67ae05d4124050e9d3876fb2446246915f31",
+  "actions/ActionLogic.js": "3847c2329c86b6bfe843f06d4b1c3b680155eb2ef8bdce65706727712cdf94e4"
  },
- "note": "sha256 of the battle-engine JS at the last vetted commit; see tests/test_rebalance_tripwire.py",
- "pinned_at": "2026-08-25",
- "pvpoke_commit": "78c64048a"
+ "note": "sha256 of the battle-engine JS at the last vetted commit; see tests/test_rebalance_tripwire.py. Re-vet record for this pin: docs/validations/2026-09-02_pvpoke_mega_revet.md",
+ "pinned_at": "2026-09-02",
+ "pvpoke_commit": "56bc6a8b1"
 }
