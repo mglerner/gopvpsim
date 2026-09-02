@@ -215,9 +215,28 @@ def _priority_cm(owner: "BattlePokemon",
 #   (f) 9/80,000 randomized n=2 decisions; PvPoke's own move to this predicate
 #       is what fixed 8 of our documented divergences, so on the grid we
 #       already AGREE with new-PvPoke without flipping ours
+# DECIDED 2026-09-02 (Michael), on the A/B above:
+#   (a) OFF  -- inert on every corpus measured (0/30,285 cells, 0/135,000
+#              decisions, 0 oracle cells) AND it reads as an accidental side
+#              effect of upstream's loop merge: the bait branch assigns
+#              acm[0] regardless of which i matched. It also adds a
+#              wouldShield() probe, which upstream mutates move.damage
+#              through -- a coupling we deliberately do not replicate. No
+#              upside, real downside.
+#   (e) ON   -- the one with real reach (76/10,620 ML cells, 2 winner flips),
+#              and it moves PvPoke TOWARD our own long-standing position that
+#              self-debuffing moves are for when a fast KO will not do
+#              (_optimize_move_timing). Adopting means agreeing with PvPoke
+#              AND with ourselves; declining would leave us alone.
+#   (f) ON   -- PvPoke's own switch to this predicate is what fixed 8 of our
+#              documented divergences (the move-selection half of
+#              pvpoke#378), and its new form matches the comment above it,
+#              which the old one never did. Inert on our side (0/30,285), so
+#              adopting costs nothing and stops us carrying a predicate
+#              upstream has abandoned.
 _AL_FARM_BAIT_MERGE = False       # (a) ActionLogic.js:405-415
-_AL_SHIELDS_DOWN_ANTI_DEBUFF = False   # (e) ActionLogic.js:940-947 (new block)
-_AL_PREFER_NON_DEBUFFING = False  # (f) ActionLogic.js:954 predicate
+_AL_SHIELDS_DOWN_ANTI_DEBUFF = True    # (e) ActionLogic.js:940-947 (new block)
+_AL_PREFER_NON_DEBUFFING = True   # (f) ActionLogic.js:954 predicate
 
 # --- Cramorant policy-lab knobs (docs/cramorant_policy_plan.md) -----------
 # Module globals so scripts/cramorant_policy_lab.py can A/B candidate

@@ -39,7 +39,7 @@ core was 102 + 9 shadow + 9 Corviknight mirror = 120; the remainder are
 unit and integration tests added since. The oracle audit
 (`scripts/audit_oracle_harness.py`, GL + UL) verifies the simulator
 against PvPoke's live engine for <!-- sync:pvpoke_matchups_verified -->27<!-- /sync --> matchups
-(<!-- sync:pvpoke_cells_verified -->243<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->222<!-- /sync --> exact on score+winner+chargedLog, 21 cells =
+(<!-- sync:pvpoke_cells_verified -->243<!-- /sync --> cells: <!-- sync:pvpoke_cells_exact -->226<!-- /sync --> exact on score+winner+chargedLog, 17 cells =
 documented divergences, each traced to a mechanism: the near-KO
 plan-choice cluster, the deeper half of PvPoke bug #3, and bug #8 Hangry
 stickiness; per-cell reasons live on the MATCHUPS entries in the audit
@@ -47,8 +47,10 @@ script). Historical
 note: the 3 original 2026-04-06 failures were all Mienfoo vs Medicham
 (`bestChargedMove` selection, resolved then).
 
-**2026-09-02: 208+35 -> 222+21**, from two independent causes, neither of
-them a rebalance:
+**2026-09-02: 208+35 -> 226+17**, in three steps, none of them a rebalance.
+The whole Aegislash divergence cluster is now closed -- all 18 cells across
+`aegislash_vs_azumarill` and `azumarill_vs_aegislash_shield` are exact on
+score, winner AND chargedLog, and both matchups carry an empty xfail set:
 
 - **+6 (ours).** We were missing clause 4 of the activeChargedMoves shuffle
   (`Pokemon.js:790`, the `aegislash_shield` forEach that marks every charged
@@ -66,6 +68,14 @@ them a rebalance:
   came to us. Attribution was measured, not inferred: reverting that one
   predicate in a shadow copy of PvPoke's JS restores all 8 cells, while
   reverting blocks (a) and (e) changes nothing.
+- **+4 (adopting theirs).** Turning our own `_AL_PREFER_NON_DEBUFFING` and
+  `_AL_SHIELDS_DOWN_ANTI_DEBUFF` knobs ON (decision + corpus A/B in
+  `docs/validations/2026-09-02_pvpoke_mega_revet.md`) closed the last four:
+  `aegislash_vs_azumarill` (1,2)/(2,2) -- annotated for months as "the deeper
+  near-KO plan-choice half of bug #3", which they turn out not to be -- and
+  `azumarill_vs_aegislash_shield` (2,1)/(2,2)'s chargedLog-only residual. The
+  same flip moved `test_bug3_farm_stack`'s Pinsir vs Cresselia (2,2) from 681
+  to PvPoke's 707, taking that matchup from 8/9 to 9/9. Block (a) stays OFF.
 
 The prior history: the 2026-08-24 Cramorant port added 4 matchups / 36 cells,
 all exact, and re-verified the prior 207 unchanged at pvpoke 78c64048a;

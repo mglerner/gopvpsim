@@ -44,12 +44,26 @@ def knob():
         setattr(B, k, v)
 
 
-def test_all_three_default_to_our_pre_update_behaviour():
+# The DECIDED defaults (Michael, 2026-09-02), after the corpus A/B recorded in
+# docs/validations/2026-09-02_pvpoke_mega_revet.md. Pinned as values rather
+# than "all False" because a change here is a cold re-dive and a score change
+# on shipped surfaces -- it must be a deliberate edit to this line, never a
+# drive-by flip in battle.py.
+DECIDED = {
+    '_AL_FARM_BAIT_MERGE': False,          # (a) inert everywhere; reads accidental
+    '_AL_SHIELDS_DOWN_ANTI_DEBUFF': True,  # (e) real reach; agrees with our own stance
+    '_AL_PREFER_NON_DEBUFFING': True,      # (f) upstream's fix to our bug report
+}
+
+
+def test_knob_defaults_match_the_recorded_decision():
     """A flipped default is a cold re-dive; it must never happen by accident."""
-    for k in KNOBS:
-        assert getattr(B, k) is False, (
-            f'{k} is True. These knobs change n=2 scores, so every cached '
-            f'sweep column and shipped dive was simmed under False.')
+    assert set(DECIDED) == set(KNOBS)
+    for k, want in DECIDED.items():
+        assert getattr(B, k) is want, (
+            f'{k} is {getattr(B, k)}, decision says {want}. These knobs change '
+            f'n=2 scores, so every cached sweep column and shipped dive is '
+            f'simmed under the recorded values.')
 
 
 def _build(name, fast, charged, league, shields, ivs=(15, 15, 15)):
@@ -78,17 +92,20 @@ PALKIA_O = ('Palkia (Origin)', 'DRAGON_BREATH',
             ['SPACIAL_REND', 'DRACO_METEOR'])
 
 
-def test_block_e_actually_changes_something_when_enabled(knob):
+def test_block_e_actually_changes_something_when_toggled(knob):
     """The knob must be live, not decorative.
 
     A knob that changes nothing would pass every other test in this file while
-    being wired to the wrong place.
+    being wired to the wrong place. Written as a TOGGLE against whatever the
+    current default is, so it keeps working if the decision is revisited.
     """
-    before = _sweep(XERNEAS, PALKIA_O)
     knob('_AL_SHIELDS_DOWN_ANTI_DEBUFF', True)
-    after = _sweep(XERNEAS, PALKIA_O)
+    on = _sweep(XERNEAS, PALKIA_O)
+    knob('_AL_SHIELDS_DOWN_ANTI_DEBUFF', False)
+    off = _sweep(XERNEAS, PALKIA_O)
+    before, after = off, on
     assert before != after, (
-        'enabling _AL_SHIELDS_DOWN_ANTI_DEBUFF changed nothing on a matchup '
+        'toggling _AL_SHIELDS_DOWN_ANTI_DEBUFF changed nothing on a matchup '
         'chosen because it has the trigger shape -- the block is probably not '
         'reachable from where it was inserted')
     # The gate is `defender.shields == 0` on the LIVE count, not the starting
@@ -106,10 +123,11 @@ def test_disabling_a_knob_restores_the_default_result(knob, name):
     Guards against a knob that mutates cached state (the frozen dp_init cache
     holds ordering and dpe) rather than only branching.
     """
+    default = getattr(B, name)
     base = _sweep(XERNEAS, PALKIA_O)
-    knob(name, True)
+    knob(name, not default)
     _sweep(XERNEAS, PALKIA_O)
-    knob(name, False)
+    knob(name, default)
     assert _sweep(XERNEAS, PALKIA_O) == base
 
 
