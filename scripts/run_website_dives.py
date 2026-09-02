@@ -527,35 +527,23 @@ DIVES = [
      'html_base': 'index.html', 'opponents_file': 'opponent_pools/ul_top60.txt',
      'top_movesets': 1, 'no_thresholds': True},
 
-    # ---- Equinox Cup pilot (GL 1500, Phase 2 of the top-N/cup plan) ----
-    # A cup dive is mechanically Great League; `cup: 'equinox'` adds the
-    # labeling + cup-rankings overlay (build_command also passes
-    # --no-active-variants automatically for cup dives). Opponents come from
-    # opponent_pools/equinox_great.txt (the curated 20-species meta on cup
-    # movesets). Each focal is pinned to its OWN cup-recommended build via
-    # --fast/--charged so the page shows the cup meta build, not the open-GL
-    # default. no_thresholds: cup thresholds are Phase 3 (see the
-    # threshold-export cup guard); we do not export them here.
-    {'species': 'Corviknight', 'league': 'great', 'slug': 'corviknight-equinox-cup',
-     'html_base': 'index.html', 'opponents_file': 'opponent_pools/equinox_great.txt',
-     'cup': 'equinox', 'top_movesets': 1, 'no_thresholds': True,
-     'extra_args': ['--fast', 'SAND_ATTACK', '--charged', 'AIR_CUTTER,PAYBACK']},
-    {'species': 'Mantine', 'league': 'great', 'slug': 'mantine-equinox-cup',
-     'html_base': 'index.html', 'opponents_file': 'opponent_pools/equinox_great.txt',
-     'cup': 'equinox', 'top_movesets': 1, 'no_thresholds': True,
-     'extra_args': ['--fast', 'WING_ATTACK', '--charged', 'TWISTER,WATER_PULSE']},
-    {'species': 'Mandibuzz', 'league': 'great', 'slug': 'mandibuzz-equinox-cup',
-     'html_base': 'index.html', 'opponents_file': 'opponent_pools/equinox_great.txt',
-     'cup': 'equinox', 'top_movesets': 1, 'no_thresholds': True,
-     'extra_args': ['--fast', 'SNARL', '--charged', 'FOUL_PLAY,SHADOW_BALL']},
-    {'species': 'Toucannon', 'league': 'great', 'slug': 'toucannon-equinox-cup',
-     'html_base': 'index.html', 'opponents_file': 'opponent_pools/equinox_great.txt',
-     'cup': 'equinox', 'top_movesets': 1, 'no_thresholds': True,
-     'extra_args': ['--fast', 'PECK', '--charged', 'BEAK_BLAST,DRILL_PECK']},
-    {'species': 'Clodsire', 'league': 'great', 'slug': 'clodsire-equinox-cup',
-     'html_base': 'index.html', 'opponents_file': 'opponent_pools/equinox_great.txt',
-     'cup': 'equinox', 'top_movesets': 1, 'no_thresholds': True,
-     'extra_args': ['--fast', 'POISON_STING', '--charged', 'EARTHQUAKE,STONE_EDGE']},
+    # ---- Equinox Cup pilot: RETIRED 2026-09-02 ----
+    # The 5 Equinox dives (Corviknight, Mantine, Mandibuzz, Toucannon,
+    # Clodsire) were removed from the roster and taken off the site under the
+    # season lifecycle policy (TODO.md "Site lifecycle policy"): a season's
+    # surfaces come down at the next season boundary. Equinox leaves PvPoke's
+    # active formats with the Twilight Trails rotation.
+    #
+    # They were left in this list when the pages were deleted, which meant the
+    # next chain run would have silently rebuilt them -- a take-down is not
+    # done until the roster entry goes too.
+    #
+    # To bring cup dives back (the season ships 8 new cups): restore these
+    # entries from git history (they carry the per-focal --fast/--charged cup
+    # builds), point opponents_file at the new cup's pool, and set
+    # cup: '<key>'. opponent_pools/equinox_great.txt is kept as the worked
+    # example of a curated cup pool.
+
     # === Coverage expansion 2026-07-06: GL uncovered thru rank #50 +
     #     UL uncovered thru rank #31 (Talonflame #24 dropped: 2493 CP
     #     @ L50, under the 2500 cap). Movesets track get_default_moveset

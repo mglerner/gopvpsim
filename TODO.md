@@ -260,6 +260,42 @@ Still open, Michael's: what counts as "in the meta" for the cups half,
 given the season ships eight of them (Willpower, Retro, Mega Color,
 Little, Fantasy, Halloween, GO LAIC, Mega Catch).
 
+## PARKED: PvPoke upstream drift 2026-08-31..09-01 (megas) -- SEPARATE TASK
+
+Michael pulled ../pvpoke on 2026-09-02: master 7b96d91fb -> 56bc6a8b1.
+The PVPOKE-ENGINE tripwire is FIRING as designed
+(`tests/test_rebalance_tripwire.py::test_pvpoke_engine_matches_last_vetted_commit`,
+drifted: Pokemon.js, DamageCalculator.js, ActionLogic.js; last vetted
+78c64048a). Do NOT re-pin the digest fixture without doing the
+`docs/rebalance_checklist.md` section B re-vet -- the pin IS the record
+that we read the diff.
+
+Because the test is in the fast tier, `verify_tests` fails, so the ship
+gates and every publish path are blocked until this is addressed. That
+is correct behaviour, not a bug.
+
+Headlines (these resolve BOTH open caveats in the
+`project_mega_league_sims` memory -- what was "unverified" now has an
+upstream implementation to read):
+
+- `574aeb0da` Updated Action Logic for **third charged attacks**, +
+  **Mega Bonus damage multiplier**. Our engine has an `n_cms > 2`
+  guard, and a Mega bonus damage multiplier is a mechanic we do not
+  model at all.
+- `bd8c5d889` **Mega Level select** for Pokemon.
+- `feba66f47` **Super Mega tag, default Mega Level to 4**, fixed battle
+  logic. The memory noted that nothing in our data model or PvPoke's
+  gamemaster carried a Mega Level; PvPoke now has one, with a default.
+- `e86688bd1` Rankings updates + consistency score for Mega Evolutions.
+
+Gamemaster moved too: live cache stamp is now `219c5741f21a`
+(= 56bc6a8b1). The pre-rebalance baseline pin (`46bd08a77` ->
+`c431557dcc76`, DEVELOPER_NOTES) is UNAFFECTED and still recovers
+correctly -- that is what it was for.
+
+NB `origin/new-mechanics` and `origin/twilight-trails` are still NOT
+merged into master as of 56bc6a8b1.
+
 ## Site lifecycle policy (Michael, 2026-09-02)
 
 Standing shape, seasons repeat:

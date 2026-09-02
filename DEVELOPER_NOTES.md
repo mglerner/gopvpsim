@@ -217,8 +217,13 @@ post-rebalance data within a day of the merge.
 
     pvpoke commit      7b96d91fb   (origin/master, clean tree, verified 2026-08-31)
     gamemaster source  46bd08a77:src/data/gamemaster.json
-    gamemaster stamp   c431557dcc76   (sweep_cache v7 narrow hash, VERIFIED equal
-                                       to the live cache's gamemaster_hash())
+    gamemaster stamp   c431557dcc76   (sweep_cache v7 narrow hash; verified equal
+                                       to the live cache's gamemaster_hash() ON
+                                       2026-08-31. The LIVE cache moves with
+                                       PvPoke master -- it was already
+                                       219c5741f21a by 09-02 -- so re-derive
+                                       from the commit, never assume the cache
+                                       still holds this vintage.)
     cached columns     153,376 at gamemaster 1398b001cf86 / engine 515a0a95171b
                        (i.e. the cache was ALREADY gamemaster-stale before the
                        rebalance -- a migration was pending independent of it)
