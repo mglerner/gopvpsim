@@ -174,16 +174,24 @@ def _estimate_best_cm(owner: "BattlePokemon", opponent: "BattlePokemon") -> "tup
     return (dp['order'][slot], dp['cms'][slot])
 
 
-def _cheapest_cm(owner: "BattlePokemon") -> "dict | None":
-    """Approximate PvPoke's activeChargedMoves[0] (priority slot).
+def _priority_cm(owner: "BattlePokemon",
+                 opponent: "BattlePokemon") -> "dict | None":
+    """PvPoke's ``activeChargedMoves[0]`` -- the actual post-shuffle slot 0.
 
-    PvPoke's priority shuffle (Pokemon.js:711-787) reorders by buff/cost;
-    the slot-0 move after shuffle is typically the cheapest-energy
-    non-special move. We use cheapest-by-energy as a defensible proxy.
+    This used to be ``_cheapest_cm``, a documented APPROXIMATION ("the slot-0
+    move after shuffle is typically the cheapest-energy non-special move; we
+    use cheapest-by-energy as a defensible proxy"). It is not typically that:
+    the shuffle exists precisely to move something else into slot 0, and
+    measured against real PvPoke the proxy names the wrong move in 70/600
+    two-charged-move cases and 42/111 three-move ones.
+
+    The real value is already computed and frozen per battle by
+    _ensure_dp_init_cache (PvPoke's resetMoves timing), so reading it costs
+    nothing beyond the opponent argument this now needs.
     """
     if not owner.charged_moves:
         return None
-    return min(owner.charged_moves, key=lambda m: m['energy'])
+    return owner._ensure_dp_init_cache(opponent)['cms'][0]
 
 
 # --- Cramorant policy-lab knobs (docs/cramorant_policy_plan.md) -----------
@@ -539,7 +547,9 @@ def pvpoke_simulate_shield(attacker: "BattlePokemon", defender: "BattlePokemon",
                     f" {move.get('moveId')} [defBestCM={d_best_cm.get('moveId')} selfDefDebuff,"
                     f" attShields={attacker.shields}]): → wouldShield={sd_value}")
         else:
-            a_first = _cheapest_cm(attacker)
+            # Battle.js:1169 reads the shield-decider's activeChargedMoves[0]
+            # (the real post-shuffle slot 0), not its cheapest move.
+            a_first = _priority_cm(attacker, defender)
             if a_first is not None:
                 d_fast_energy = defender.fast_move.get('energyGain', 5)
                 d_fast_turns  = defender.fast_move.get('_turns', 1)
@@ -2800,11 +2810,23 @@ class BattlePokemon:
         # then reordered by the priority-shuffle (Pokemon.js lines 711-787)
         # using the init-stage damage.
         cms = sorted(self.charged_moves, key=lambda m: m['energy'])
+        # fastestChargedMove is snapshotted BEFORE the shuffle
+        # (Pokemon.js:750), so it is NOT the post-shuffle slot 0 -- measured
+        # against real PvPoke it differs on 42/111 three-move orderings. Take
+        # it here, off the energy-sorted list, while that is still true.
+        # Tie-break: PvPoke's sort is stable and the list is built in user
+        # slot order, so the first minimum in USER order wins -- which is
+        # what Python's min() returns (same rule as the Mimikyu path below).
+        _fastest_cm = cms[0] if cms else None
         if len(cms) > 1:
             _priority_shuffle(cms, dmg_init, idx_map,
                               self.active_form_sid)
 
         order = [idx_map[id(m)] for m in cms]
+        # Post-shuffle position of the pre-shuffle fastest move, so the
+        # per-position energy/dpe lists below can be indexed by it.
+        fastest_pos = next((_p for _p, _m in enumerate(cms)
+                            if _m is _fastest_cm), 0)
         n = len(cms)
         cm_energy_l   = [m['energy'] for m in cms]
         cm_self_debuf = [1 if m.get('selfDebuffing', False) else 0
@@ -2845,12 +2867,16 @@ class BattlePokemon:
 
             # The farm-down threshold + self-debuff swap (ActionLogic.js
             # lines 370-393) -- pure functions of the frozen dpe/best_idx.
+            # ActionLogic.js:395 compares bestChargedMove against
+            # poke.fastestChargedMove -- the PRE-shuffle cheapest -- not
+            # against activeChargedMoves[0]. Those coincide only when the
+            # shuffle left the cheapest move in slot 0.
             min_cycle_thr = 2.0
             if (n > 1
                     and cm_self_debuf[best_idx]
-                    and cm_energy_l[best_idx] > cm_energy_l[0]
-                    and cm_dpe[0] > 0
-                    and cm_dpe[best_idx] / cm_dpe[0] < 2.0):
+                    and cm_energy_l[best_idx] > cm_energy_l[fastest_pos]
+                    and cm_dpe[fastest_pos] > 0
+                    and cm_dpe[best_idx] / cm_dpe[fastest_pos] < 2.0):
                 min_cycle_thr = 1.1
 
             # Swap selfDebuffing best to a non-debuffing alt whose DPE is
