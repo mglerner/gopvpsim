@@ -73,7 +73,8 @@ def _move_hash(move_dict):
 
 
 def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_stats,
-                      shield_scenarios=None, iv_floor=None, focal_max_level=None):
+                      shield_scenarios=None, iv_floor=None, focal_max_level=None,
+                      mechanics='legacy'):
     """
     Build a stable cache key string identifying a slayer-iteration scenario.
 
@@ -90,6 +91,12 @@ def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_st
       two runs at different caps produce different scores and must not share a
       file (bug #4, 2026-06-27). Mirrors the sweep cache's ``focal_max_level``
       field. ``None`` means the run used the league default;
+    - ``mechanics`` — the turn-resolution model. Added 2026-09-02, keyed the
+      same way as the sweep cache's: the base value 'legacy' contributes
+      NOTHING, so every existing cached file stays valid, and only a 'new'
+      run gets a distinct key. Before this the model was absent and
+      deep_dive.py force-disabled the slayer disk cache under
+      ``--mechanics new``;
     NB: as of v5 the engine-source hash and the gamemaster hash are NO LONGER
     part of this key — they live in the per-file ``.json`` sidecar STAMP
     (see ``SlayerCache.save``/``_load``), exactly like the sweep cache's
@@ -115,6 +122,10 @@ def compute_cache_key(species, league, shadow, fast_move, charged_moves, base_st
     if iv_floor is not None:
         h.update(f'floor={tuple(iv_floor)}'.encode())
     h.update(f'focal_max_level={focal_max_level}'.encode())
+    # Contributes NOTHING for the base model, so every pre-2026-09-02 cached
+    # file keeps its key and stays warm; only a 'new' run keys distinctly.
+    if mechanics not in (None, 'legacy'):
+        h.update(f'mechanics={mechanics}'.encode())
     return f'{species}_{league}_{h.hexdigest()[:12]}'
 
 

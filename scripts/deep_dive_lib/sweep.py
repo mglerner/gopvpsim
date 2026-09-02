@@ -709,13 +709,16 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
     n_ivs_total = len(iv_meta)
     sweep_cache = None
     cached_cols = {}  # oi -> {'score': ndarray, 'energy': ndarray}
-    # The sweep cache key (sweep_cache.focal_key_fields) does NOT include the
-    # turn-mechanics model, so a 'new'-mechanics run would collide with any
-    # legacy-cached columns. The 'new' model is experimental; disable the
-    # persistent cache for it rather than widen the cache-key schema (which
-    # CLAUDE.md flags as coordination-sensitive).
-    if mechanics != 'legacy':
-        use_sweep_cache = False
+    # The turn-mechanics model IS part of the sweep cache key as of
+    # 2026-09-02 (sweep_cache.focal_key_fields, keyed the same way as
+    # `policy`: the base value adds no field, so legacy columns were not
+    # invalidated by introducing it). A 'new'-mechanics run therefore keys
+    # distinctly and can be cached like any other.
+    #
+    # This used to force use_sweep_cache=False under 'new'. That was safe but
+    # meant a new-mechanics dive could never be warm -- every re-dive cold,
+    # forever, with no migration path. Now that the in-game turn system has
+    # moved, that would have made a whole season's bakes uncacheable.
     # Energy is now always captured + stored in the column (v5), so
     # capture_energy no longer bypasses the cache — a --compare-energy re-dive
     # serves warm. capture_energy only gates whether energy is exposed on the
@@ -730,7 +733,8 @@ def iv_sweep(species, fast_id, charged_ids, league, shadow,
         sweep_cache = swc.SweepCache(swc.focal_key_fields(
             species, league, shadow, fast_id, charged_ids,
             iv_floor, shield_scenarios, bait_mode,
-            energy_lead=focal_energy, focal_max_level=_eff_focal_cap))
+            energy_lead=focal_energy, focal_max_level=_eff_focal_cap,
+            mechanics=mechanics))
         for oi, opp in enumerate(opp_cache):
             col = sweep_cache.get_column(
                 swc.column_key_fields(
