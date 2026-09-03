@@ -1,20 +1,24 @@
-"""
-EXPERIMENTAL: spec-only tests for the mechanics='new' turn model
-(the 2026-06-23 in-game PvP turn system; pokemongo.com/news/pvp-updates2026).
+"""Tests for the mechanics='new' turn model -- the system the live game runs.
 
-There is NO PvPoke reference for this mode -- PvPoke still implements the
-legacy turn system. These tests pin the 'new' branch to the published spec
-alone (changes 1, 2, 5). They are NOT cross-checked against any external
-oracle. The legacy path is covered by tests/test_battle.py + the oracle
-harness; here we only assert that 'new' DIVERGES from legacy in exactly the
-spec-mandated ways.
+CORRECTED 2026-09-03. These used to pin our reading of the published spec
+alone, with no reference to check against, and one of them pinned a MISREADING:
+we took "charged attacks begin at the start of the next turn" literally and
+deferred the charged move by a turn.
 
-Spec changes modelled (1v1 core; swap changes 3,4 are out of scope -- the
-core never switches, see battle.py module comment):
+The live game does not work that way. Its order of operations is
+
+    swaps > charged attacks (including their buffs/debuffs) > fast attacks
+
+-- a priority ordering WITHIN a turn. Ground truth, with side-by-side footage
+of both systems, is recorded in
+docs/validations/2026-09-03_new_turn_system_ground_truth.md. PvPoke made and
+then reverted the identical mistake (041d8c722 -> 442a4afe8).
+
+Modelled here (1v1 core; the swap rules are out of scope -- the core never
+switches, see the battle.py module comment):
   1. damage+energy resolve at END of turn
   2. one-turn fast attacks on the same turn TIE (corollary of 1)
-  5. charged attacks begin at the START of the next turn; charged
-     damage+effects resolve before any fast finishing during the sequence
+  5. charged attacks resolve BEFORE fast damage, same turn, buffs included
 """
 import pytest
 from gopvpsim.battle import (
@@ -109,14 +113,14 @@ def test_new_simultaneous_one_turn_fast_ties():
 # Change 5: a charged move resolves the turn AFTER it is chosen
 # ---------------------------------------------------------------------------
 
-def test_new_charged_resolves_one_turn_later():
-    """Change 5: a charged move chosen on turn N deals its damage at the START
-    of turn N+1, so in NEW mode the defender's HP drops one turn later than in
-    LEGACY. We give the attacker pre-loaded energy and a bulky, non-shielding
-    defender so the only HP swing is the charged hit; we stop the sim one turn
-    after the first charge is affordable and compare the HP drop timing."""
-    # Run both to completion and compare the turn at which the FIRST charged
-    # hit lands by inspecting the timeline.
+def test_new_charged_resolves_the_same_turn_as_legacy_not_a_turn_later():
+    """Charged priority is an ORDERING within a turn, not a deferral.
+
+    Fail-first record: this test previously asserted
+    ``new_turn == legacy_turn + 1`` and passed against the deferral model.
+    That model was our misreading of the spec; the live game resolves the
+    charged move on the turn it is thrown, ahead of fast damage.
+    """
     def first_charged_turn(mechanics):
         atk = _bp(atk=150.0, initial_energy=40,
                   fast=_fast(power=1, energy_gain=1, cooldown_ms=2000),
@@ -129,28 +133,81 @@ def test_new_charged_resolves_one_turn_later():
                        log=True, mechanics=mechanics)
         for line in res.timeline:
             if 'Fake Charged' in line and 'dmg' in line:
-                # line format: "T  N: Testmon uses Fake Charged -> X dmg"
                 return int(line.split(':')[0].lstrip('T').strip())
         return None
 
     legacy_turn = first_charged_turn('legacy')
     new_turn = first_charged_turn('new')
     assert legacy_turn is not None and new_turn is not None
-    assert new_turn == legacy_turn + 1   # charged lands exactly one turn later
+    assert new_turn == legacy_turn, (
+        f'charged landed on turn {new_turn} under new vs {legacy_turn} under '
+        f'legacy; the live game resolves it the same turn, only ahead of fast '
+        f'damage rather than after it')
+
+
+def test_new_charged_debuff_applies_before_incoming_fast_damage():
+    """THE discriminator between the two models, and what the footage shows.
+
+    A self-DEFENCE-debuffing charged move thrown on the same turn an opposing
+    fast lands: the live game applies the debuff first, so the fast hits the
+    lowered defence. Under legacy the fast is computed against the un-debuffed
+    defence.
+
+    Tuned so the ordering decides an OUTCOME rather than a total. With this
+    defender the same fast move deals 63 un-debuffed and 94 after -2 defence,
+    so an attacker on exactly 94 HP is killed by the debuffed hit and survives
+    the un-debuffed one with 31 left. A deferral model cannot produce this --
+    it applies the debuff a turn after that fast has already landed.
+    """
+    LETHAL_IF_DEBUFFED = 94          # fast damage at -2 def (63 un-debuffed)
+
+    def run(mechanics):
+        atk = _bp(atk=150.0, def_=100.0, hp=LETHAL_IF_DEBUFFED,
+                  initial_energy=40, shields=0,
+                  fast=_fast(power=1, energy_gain=1, cooldown_ms=2000),
+                  charged=[_charged(power=10, energy=40, buffs=[0, -2])])
+        dfn = _bp(atk=200.0, def_=100.0, hp=5000, shields=0,
+                  fast=_fast(power=40, energy_gain=1, cooldown_ms=500))
+        res = simulate(atk, dfn,
+                       charged_policy_0=use_first_available,
+                       charged_policy_1=no_bait,
+                       shield_policy_1=never_shield, shield_policy_0=never_shield,
+                       log=True, mechanics=mechanics)
+        return res, atk
+
+    # sanity: the two damage figures the tuning rests on
+    from gopvpsim.battle import _stat_stage_mult
+    from gopvpsim.moves import damage as _dmg
+    assert _dmg(40, 200.0, 100.0, 'normal', ['normal'], ['normal']) == 63
+    assert _dmg(40, 200.0, 100.0 * _stat_stage_mult(-2), 'normal',
+                ['normal'], ['normal']) == LETHAL_IF_DEBUFFED
+
+    new_res, new_atk = run('new')
+    leg_res, leg_atk = run('legacy')
+
+    # the debuff landed in both, so this is about ORDER, not whether it fired
+    assert new_atk.def_stage < 0 and leg_atk.def_stage < 0
+
+    # new: debuff first -> the same fast now deals 94 into 94 HP -> dead.
+    # legacy: fast first at 63 -> survives that turn. The battle ends sooner
+    # under the live game's ordering.
+    assert len(new_res.timeline) < len(leg_res.timeline), (
+        f'new timeline {len(new_res.timeline)} vs legacy '
+        f'{len(leg_res.timeline)}: applying the charged move\'s debuff BEFORE '
+        f'the same-turn fast should make that fast lethal (94 >= 94 HP) where '
+        f'legacy computes it un-debuffed (63) and the attacker survives')
 
 
 # ---------------------------------------------------------------------------
-# Change 5 + change 1: a fast that would KO the charged-thrower does NOT
-# cancel the charged move (charged resolves at the top of the next turn,
-# before that turn's fast landings).
+# A fast that would KO the charged-thrower does NOT cancel the charged move:
+# the charged resolves FIRST, while its user is still alive.
 # ---------------------------------------------------------------------------
 
 def test_new_charged_survives_incoming_fast():
-    """Change 1 (charged still resolves even if its user is about to faint
-    from a fast) + change 5 (charged resolves at the top of the next turn,
-    before fasts). Attacker is at lethal-fast HP but has a queued charged;
-    in NEW mode the charged lands before the killing fast, so the defender
-    still takes charged damage."""
+    """Caleb's claim 1, and what the footage shows: throw on the turn a fast
+    would KO you and the charged still lands, because it resolves ahead of the
+    fast. If it does not KO, you faint immediately after -- which is asserted
+    here too."""
     # Attacker: enough energy to charge, fragile enough that one defender fast
     # KOs it. Defender: bulky, no shields, hits hard with its one-turn fast.
     atk = _bp(atk=150.0, def_=100.0, initial_energy=40,
@@ -171,14 +228,13 @@ def test_new_charged_survives_incoming_fast():
 
 
 # ---------------------------------------------------------------------------
-# Change 5: charged EFFECTS (stat buffs) resolve before fasts in the sequence
+# Charged EFFECTS (stat buffs) resolve with the charged move, ahead of fasts
 # ---------------------------------------------------------------------------
 
 def test_new_charged_buff_applies():
-    """Change 5: charged effects resolve with the charged move (at the top of
-    the next turn). A self-+atk buff move must leave the attacker's atk_stage
-    raised after it resolves in NEW mode, same as legacy (only timing differs).
-    """
+    """A self-+atk buff move leaves atk_stage raised in NEW mode, as in legacy.
+    Ordering, not presence, is what differs between the models -- the sibling
+    test above is the one that pins the ordering."""
     atk = _bp(atk=120.0, initial_energy=50,
               fast=_fast(power=1, energy_gain=1, cooldown_ms=2000),
               charged=[_charged(power=20, energy=50, buffs=[2, 0])])

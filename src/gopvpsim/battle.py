@@ -2573,7 +2573,6 @@ class BattlePokemon:
     # Deferred charged move for mechanics='new' (2026-06-23 turn system):
     # a charged move chosen this turn resolves at the START of the next
     # turn. Holds the move dict (or None). NEVER set in legacy mode.
-    _pending_charged: "dict | None" = field(init=False, repr=False)
     # Stat stages: each in [-4, +4]
     atk_stage: int = field(init=False, repr=False)
     def_stage: int = field(init=False, repr=False)
@@ -2655,7 +2654,6 @@ class BattlePokemon:
         self.cooldown          = 0
         self._fm_since_charge  = 0
         self._queued_fast      = None
-        self._pending_charged  = None
         self.atk_stage         = self.initial_atk_stage
         self.def_stage         = self.initial_def_stage
         self._buff_apply_meters = {}
@@ -2799,7 +2797,6 @@ class BattlePokemon:
         self.cooldown = 0
         self._fm_since_charge = 0
         self._queued_fast = None
-        self._pending_charged = None
         self.atk_stage = self.initial_atk_stage
         self.def_stage = self.initial_def_stage
         self._buff_apply_meters = {}
@@ -3316,11 +3313,17 @@ def _apply_move_buffs(
 #   2. (corollary of 1) one-turn fast attacks on the same turn TIE -- both
 #      resolve. Implemented via the simultaneous-apply in change 1 (the
 #      legacy CMP sort that let the higher-attack side land first is skipped).
-#   5. CHARGED attacks begin at the START of the NEXT turn; charged damage
-#      AND effects resolve BEFORE any fast attack finishing during the
-#      charged sequence. Implemented: in 'new' mode a charged decision is
-#      stamped on the actor (_pending_charged) and resolved at the TOP of the
-#      following turn, before that turn's fast landings.
+#   5. CHARGED attacks resolve BEFORE fast-attack damage, in the SAME turn,
+#      buffs/debuffs included. Implemented: in 'new' mode charged actions are
+#      resolved at step 2.5, ahead of the step-3 fast landings.
+#
+#      CORRECTED 2026-09-03. This previously deferred the charged move to the
+#      TOP OF THE NEXT TURN, reading the spec's "charged begins at the start
+#      of the next turn" literally. The live game does not work that way: its
+#      order of operations is swaps > charged (incl. buffs/debuffs) > fast, a
+#      priority ordering WITHIN a turn. See
+#      docs/validations/2026-09-03_new_turn_system_ground_truth.md. PvPoke
+#      made and then reverted the same mistake (041d8c722 -> 442a4afe8).
 #
 #   3. SWAPS resolve before damage, and 4. swap costs (quick=1 turn,
 #      forced=0, charged-end=0) are NOT MODELED. Our 1v1 core never switches
@@ -3659,28 +3662,6 @@ def simulate(
         for p in pokemon:
             p.cooldown = max(0, p.cooldown - 1)
 
-        # --- 1.5 (mechanics=='new' ONLY) Resolve deferred charged moves ---
-        # Spec change 5: a charged move chosen on turn N begins at the START
-        # of turn N+1. We resolve it here, AT THE TOP of the turn -- before
-        # this turn's fast landings (step 3) and before the actors decide
-        # again (step 2) -- so charged damage AND effects (stat changes) land
-        # before any fast attack that finishes during the charged sequence,
-        # and the actors decide their next move against post-charged state.
-        # _pending_charged is never set in legacy mode, so this block is dead
-        # there. (Energy is consumed inside _resolve_charged at resolution
-        # time, i.e. on turn N+1; see design note (d)2 -- resolving energy
-        # with damage lets the legacy and new paths share one resolver.)
-        if mechanics == 'new':
-            _deferred = [(i, pk._pending_charged)
-                         for i, pk in enumerate(pokemon)
-                         if pk._pending_charged is not None]
-            if _deferred:
-                for i, _ in _deferred:
-                    pokemon[i]._pending_charged = None
-                _resolve_charged(_deferred, allow_dead_attacker=True)
-                if p0.hp <= 0 or p1.hp <= 0:
-                    break
-
         # --- 2. Decide and queue actions ---
         # Mirrors PvPoke's cooldownsToSet mechanism: both pokemon see each
         # other's pre-queuing state at decision time. Implemented in three
@@ -3744,15 +3725,10 @@ def simulate(
         for i, action_type, data in _pending:
             p = pokemon[i]
             if action_type == 'charged':
-                if mechanics == 'new':
-                    # Spec change 5: defer to the START of the next turn.
-                    # Stamp the move on the actor; it is drained and resolved
-                    # in step 1.5 next turn. charged_actions stays empty in
-                    # 'new' mode, so the same-turn step 4 + floating-fast
-                    # block below are no-ops (they gate on charged_actions).
-                    p._pending_charged = p.charged_moves[data]
-                else:
-                    charged_actions.append((i, p.charged_moves[data]))
+                # Both models queue it for THIS turn. They differ only in
+                # where it resolves relative to fast damage: legacy resolves
+                # charged at step 4 (after fast), 'new' at step 2.5 (before).
+                charged_actions.append((i, p.charged_moves[data]))
             elif action_type == 'fast_1':
                 fast_landings.append((i, data))
                 p.cooldown = 1   # blocks re-acting until next turn
@@ -3760,7 +3736,33 @@ def simulate(
                 p._queued_fast = (turn, data)
                 p.cooldown = data['_turns']
 
-        # --- 3. Resolve fast move landings (fire BEFORE charged moves) ---
+        # --- 2.5 (mechanics=='new' ONLY) Resolve charged moves FIRST ---
+        # The live game's order of operations is
+        #     swaps > charged attacks (including their buffs/debuffs) > fast
+        # -- a priority ordering WITHIN a turn, not a deferral to the next one
+        # (Caleb Peng's side-by-side breakdown of the two systems; see
+        # docs/validations/2026-09-03_new_turn_system_ground_truth.md).
+        #
+        # This single reordering delivers two observable behaviours that the
+        # old deferral model needed special cases for, and gets them for free:
+        #
+        #   * A charged move thrown on the turn its user would be KO'd by a
+        #     fast attack still lands, because it resolves while the attacker
+        #     is alive. If it KOs, the fast never lands (dead defender); if it
+        #     does not, the attacker faints to the fast immediately after --
+        #     exactly what the footage shows. No allow_dead_attacker, and no
+        #     "withhold the faint break" guard.
+        #   * A charged move's buffs/debuffs are applied BEFORE the incoming
+        #     fast attack is computed, so a self-defense-debuffing move makes
+        #     you take MORE from the fast landing the same turn. Under legacy
+        #     the fast damage was computed first.
+        if mechanics == 'new':
+            _resolve_charged(charged_actions)
+            if p0.hp <= 0 or p1.hp <= 0:
+                break
+
+        # --- 3. Resolve fast move landings ---
+        # legacy: fast BEFORE charged. new: charged already went, at 2.5.
         if mechanics == 'new':
             # Spec changes 1+2: damage+energy resolve at the END of the turn,
             # so simultaneously-landing one-turn fast moves TIE -- neither can
@@ -3827,7 +3829,10 @@ def simulate(
 
         # --- 4. Resolve charged moves (higher priority first) ---
         # Skip if defender was already killed by the fast move this turn.
-        _resolve_charged(charged_actions)
+        # 'new' mode already resolved them at step 2.5, before the fast
+        # landings, per the live game's charged-over-fast priority.
+        if mechanics != 'new':
+            _resolve_charged(charged_actions)
 
         # After any charged move this turn, fire "floating" fast moves then reset.
         # PvPoke Battle.js: a fast move queued in the same turn as a charged move
@@ -3872,19 +3877,12 @@ def simulate(
                 p._fm_since_charge = 0
 
         # --- 5. Check for faint ---
+        # No 'new'-mode special case here any more. The old deferral model
+        # needed one (withhold the break so next turn's step 1.5 could fire an
+        # outstanding _pending_charged); resolving charged at step 2.5, before
+        # the fast that would KO its user, makes the situation unreachable.
         if p0.hp <= 0 or p1.hp <= 0:
-            # mechanics=='new' (spec change 1): a charged move already committed
-            # this turn STILL resolves even if its user is fainting from a fast
-            # this turn. Under our deferral model the commit resolves at the top
-            # of the NEXT turn (step 1.5), so we must not break out while a
-            # _pending_charged is outstanding -- let the loop run one more turn so
-            # step 1.5 fires it, then the faint check breaks. (Legacy resolves
-            # charged same-turn, so this never applies there.)
-            if mechanics == 'new' and (p0._pending_charged is not None
-                                       or p1._pending_charged is not None):
-                pass
-            else:
-                break
+            break
 
     # Determine winner
     if p0.hp > 0 and p1.hp <= 0:
