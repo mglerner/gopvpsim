@@ -899,6 +899,19 @@ spec and disagrees with PvPoke's implementation on **104 of 243** oracle
 cells. Full measurement + per-commit attribution:
 `docs/validations/2026-09-02_new_mechanics_oracle_ab.md`.
 
+**2026-09-03 UPDATE -- the model question is settled, the merge wait is not.**
+A Caleb Peng breakdown of the live system (side-by-side footage of both
+systems; `docs/validations/2026-09-03_new_turn_system_ground_truth.md`) gives
+the first in-game description either implementation has been checked against.
+It states the order of operations as **swaps > charged (incl. buffs/debuffs) >
+fast**, i.e. a priority ORDERING WITHIN A TURN -- not the one-turn deferral
+our `mechanics='new'` implements. PvPoke's `442a4afe8` revert, the commit its
+author marked "for now" and the one accounting for 45 of our 104 mismatches,
+moved it TOWARD the game. Expected outcome of the re-port therefore changes
+from "adopt a coin-flip" to "adopt the model the game demonstrably uses".
+Still waiting on the MERGE (stable reference + the rebalance energies), not on
+the question.
+
 **DECISION (Michael): wait.** Do not chase `origin/twilight-trails`. Its
 author reverted the charged-attack timing rule we implement and marked it
 "for now"; if it does not match the live game he will notice and fix it
