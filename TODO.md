@@ -899,7 +899,18 @@ spec and disagrees with PvPoke's implementation on **104 of 243** oracle
 cells. Full measurement + per-commit attribution:
 `docs/validations/2026-09-02_new_mechanics_oracle_ab.md`.
 
-**2026-09-03 UPDATE -- the model question is settled, the merge wait is not.**
+**2026-09-03 RESOLVED -- our `new` model now matches the live game.**
+Corrected `mechanics='new'` to resolve charged moves the SAME turn, ahead of
+the fast landings, instead of deferring them a turn. Our `new` vs PvPoke's
+new-mechanics branch went **104 -> 1** mismatches on the 243-cell grid; the
+legacy control stayed at 0, so port fidelity is intact. One residual:
+`aegislash_blade_vs_azumarill [1v0]`, same winner, form-change interaction --
+worth a look before any bake leaning on Blade-form numbers.
+
+Still waiting on the MERGE, but only for a stable reference and the real
+rebalance energies -- no longer for the answer. Original note follows.
+
+**2026-09-03 -- the model question is settled, the merge wait is not.**
 A Caleb Peng breakdown of the live system (side-by-side footage of both
 systems; `docs/validations/2026-09-03_new_turn_system_ground_truth.md`) gives
 the first in-game description either implementation has been checked against.

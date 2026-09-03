@@ -68,18 +68,46 @@ to port against, and the move rebalance is still guessed), but it changes the
 expected outcome of the re-port from "adopt a coin-flip" to "adopt the model
 the game demonstrably uses".
 
-## Not yet established
+## FIXED, same day: our model now matches
 
-Claim 2 is the cleanest discriminator between the two models -- our deferral
-would apply the debuff a turn later than PvPoke's priority ordering -- and a
-first attempt to exhibit it in our engine did NOT isolate it: Zekrom
-(Wild Charge, self-def-debuff `[0,-2]`) vs Dialga in ML scored 364/635 under
-BOTH `legacy` and `new`, differing only in turn count (19 vs 20). That means
-the matchup never reached the situation, not that the models agree. A real
-discriminator needs the self-debuffing charged move and an opposing fast move
-landing on the SAME turn, with the defender's HP near the boundary where the
-extra debuffed damage changes the outcome. Worth building as a fixture before
-the re-port, so the re-port has a test that fails for the right reason.
+`mechanics='new'` was corrected to resolve charged moves at step 2.5 -- the
+same turn, ahead of the fast landings -- instead of deferring them to the top
+of the next turn. The change is a REORDERING, and it deleted machinery rather
+than adding any: `_pending_charged`, the `allow_dead_attacker` deferred
+resolve, and the "withhold the faint break" guard all existed only to make the
+deferral behave, and the ordering gives both observable behaviours for free.
+
+Result against PvPoke's new-mechanics branch, same harness and roots as the
+attribution run:
+
+| our `new` vs PvPoke new-mechanics | mismatches |
+| --------------------------------- | ---------- |
+| before                            | **104**    |
+| after                             | **1**      |
+
+Legacy control unchanged at 0/243, so port fidelity is intact.
+
+That is the validation the A/B writeup asked for: Caleb's description, PvPoke's
+reverted-to model and our corrected model all agree. The commit its author
+marked "for now" was right.
+
+### The discriminator, built
+
+The earlier failed attempt (Zekrom Wild Charge vs Dialga, 364/635 under BOTH
+models) failed because the matchup never reached the situation. The working
+version tunes it so the ordering decides an OUTCOME rather than a total: the
+defender's fast deals **63** un-debuffed and **94** after -2 defence, so an
+attacker on exactly 94 HP dies to the debuffed hit and survives the un-debuffed
+one with 31 left. Pinned as
+`test_new_charged_debuff_applies_before_incoming_fast_damage`, and verified
+fail-first -- reverting the ordering fails it and the charged-survives test.
+
+### Known residual (1 cell)
+
+`aegislash_blade_vs_azumarill_form_change [1v0]`: same winner, score 584/415
+ours vs 712/287 PvPoke, chargedLog differs. A form-change interaction with the
+new ordering, not chased. It is 1 of 243 and does not flip a winner; worth a
+look before any bake that leans on Blade-form numbers.
 
 Claims 3 and 4 concern SWAPS and are unreachable in our 1v1 core (`simulate()`
 takes exactly two BattlePokemon and has no incoming-Pokemon path). They matter
