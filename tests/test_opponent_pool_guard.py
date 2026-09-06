@@ -128,3 +128,67 @@ def test_the_guard_runs_before_any_dive_starts():
     assert call < reserve, (
         'check_opponent_pools runs after dive setup has begun; it must be the '
         'first thing after argparse')
+
+
+def test_curated_inclusions_are_shared_with_the_generator():
+    """The inclusion table must live with the RECIPES, not with the checker.
+
+    If the checker owned its own copy, a regeneration would drop the
+    hand-extension and the checker would immediately fail it -- "remember to
+    re-add X" every rebuild, which is exactly the manual step that let the
+    pools go stale. One table, applied by build_opponent_pool and enforced
+    here.
+    """
+    import build_opponent_pool as bop
+    assert hasattr(bop, 'CURATED_INCLUSIONS')
+    assert vp._required('gl_top50_plus_cs') is not None
+    # every entry needs a real reason, same bar as the exclusions
+    for pool, entries in bop.CURATED_INCLUSIONS.items():
+        for species, reason in entries.items():
+            assert isinstance(reason, str) and len(reason) > 25, (pool, species)
+
+
+def test_a_missing_curated_inclusion_fails_the_guard():
+    """A required species absent from a pool is the failing direction.
+
+    Same treatment as a live meta entrant the pool lacks: it is an opponent
+    every dive would be blind to.
+    """
+    import build_opponent_pool as bop
+    rows = {r['pool']: r for r in vp.run()}
+    for pool, entries in bop.CURATED_INCLUSIONS.items():
+        r = rows.get(pool) or rows.get(pool.removesuffix('.txt'))
+        if r is None or r['status'] == 'SKIP':
+            continue
+        committed = set(vp._read_pool(
+            __import__('os').path.join(vp.POOL_DIR,
+                                       pool if pool.endswith('.txt')
+                                       else pool + '.txt')))
+        for species in entries:
+            if species not in committed:
+                assert r['status'] == 'DRIFT', (
+                    f'{pool} is missing required {species} but the guard '
+                    f'reports {r["status"]}')
+                assert species in (r.get('added') or []), (
+                    f'{pool}: {species} missing but not named in the report')
+
+
+def test_recipes_actually_apply_their_inclusions():
+    """Regeneration must produce a pool the checker then accepts.
+
+    Behavioural, not a source scan: runs the real recipe and asserts the
+    required species comes out. A recipe that forgot the apply_inclusions call
+    would leave the checker permanently red after every rebuild.
+    """
+    import build_opponent_pool as bop
+    for pool in ('gl_top50_plus_cs', 'gl_top30_plus_cs_top100'):
+        required = bop.CURATED_INCLUSIONS.get(pool) or {}
+        if not required:
+            continue
+        result = bop.RECIPES[pool]()
+        names = result[0] if isinstance(result, tuple) else result
+        produced = {n.split('|', 1)[0].strip() for n in names}
+        for species in required:
+            assert species in produced, (
+                f'recipe {pool} does not emit required {species}; it is '
+                f'probably missing an apply_inclusions() call')
