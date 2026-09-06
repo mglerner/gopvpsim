@@ -83,6 +83,18 @@ CURATED_EXCLUSIONS = {
 }
 
 
+def _required(pool_key):
+    """Curated inclusions for a pool -- the table lives with the RECIPES.
+
+    Shared with build_opponent_pool so a regeneration applies exactly what
+    this checker enforces. Without that pairing "remember to add X" is a note
+    someone has to honour by hand on every rebuild, which is how the pools
+    went stale to begin with.
+    """
+    from build_opponent_pool import CURATED_INCLUSIONS
+    return CURATED_INCLUSIONS.get(pool_key, {})
+
+
 def _read_pool(path):
     """Species names from a pool file, in file order.
 
@@ -116,9 +128,13 @@ def check_recipe_pool(name, recipe):
     live = {n.split('|', 1)[0].strip() for n in live_names}
 
     excluded = CURATED_EXCLUSIONS.get(name, {})
-    # THE failure direction: a live species the pool does not contain. Those
-    # are meta entrants every dive would be blind to.
-    missing = sorted(live - committed - set(excluded))
+    required = _required(name)
+    # THE failure direction: a species the pool does not contain but should --
+    # either a live meta entrant, or a curated inclusion we decided to sim
+    # against regardless of the rank cut. Both are opponents every dive would
+    # otherwise be blind to.
+    missing = sorted((live - committed - set(excluded))
+                     | (set(required) - committed))
     # The other direction is informational: pool entries the recipe no longer
     # produces. Some are deliberate hand-extensions (dive focals that never
     # cleared the auto recipe -- see the pool headers), so this must NOT fail;
@@ -147,7 +163,9 @@ def check_rankings_pool(fname, league, n):
     committed = set(_read_pool(path))
     live = set(_live_top_n(league, n))
     excluded = CURATED_EXCLUSIONS.get(fname, {})
-    missing = sorted(live - committed - set(excluded))
+    required = _required(fname)
+    missing = sorted((live - committed - set(excluded))
+                     | (set(required) - committed))
     return {
         'pool': fname, 'status': 'DRIFT' if missing else 'OK',
         'committed': len(committed), 'live': len(live),

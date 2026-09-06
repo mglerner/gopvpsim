@@ -57,6 +57,59 @@ def _cs_names():
     return names
 
 
+# ---------------------------------------------------------------------------
+# Curated INCLUSIONS -- species that must be in a pool regardless of the cut
+# ---------------------------------------------------------------------------
+# The mirror of scripts/verify_opponent_pools.py's CURATED_EXCLUSIONS. An
+# entry here is a deliberate hand-extension: a species we want dives to sim
+# against even though it does not clear the recipe's rank cut.
+#
+# Recorded HERE, next to the recipes, so a regeneration applies it
+# automatically -- and verify_opponent_pools.py imports this same table and
+# FAILS when a required species is missing from a committed pool. Without
+# that pairing, "remember to add X" is a note someone has to honour by hand
+# every time the pools are rebuilt, which is how the pools went stale in the
+# first place.
+#
+# Add one only with a stated reason. "It seems good" is a ranking argument --
+# the recipe already handles those.
+CURATED_INCLUSIONS = {
+    'gl_top50_plus_cs': {
+        'Melmetal': ('Michael, 2026-09-06. Buffed this season -- the Twilight '
+                     'Trails rebalance takes DOUBLE_IRON_BASH from 55 to 70 '
+                     'power, and that is its default charged move in every '
+                     'league. Ranks GL #79 on PRE-rebalance data, so it does '
+                     'not clear the top-50 cut yet and would be invisible to '
+                     'every GL dive. Also uniquely worth preparing for: Meltan '
+                     'is farmable without limit via the Mystery Box, so it is '
+                     'the one species an opponent can scout for a specific IV '
+                     'spread rather than taking what they catch.'),
+    },
+    'gl_top30_plus_cs_top100': {
+        'Melmetal': 'same as gl_top50_plus_cs -- this is the fast-dive GL pool',
+    },
+    # Hand-built files with no recipe: verify enforces, a human adds on rebuild.
+    'ul_top60.txt': {
+        'Melmetal': ('as GL. Ranks UL #72 pre-rebalance, so it does not clear '
+                     'the top-60 cut either.'),
+    },
+    'master_top60.txt': {
+        'Melmetal': ('as GL. Already clears the ML cut at #38 -- pinned so a '
+                     'regeneration cannot silently drop it.'),
+    },
+}
+
+
+def apply_inclusions(pool_key, names):
+    """Append any curated inclusions missing from ``names`` (order preserved)."""
+    out = list(names)
+    have = set(out)
+    for species in CURATED_INCLUSIONS.get(pool_key, {}):
+        if species not in have:
+            out.append(species)
+    return out
+
+
 def recipe_gl_top50_plus_cs():
     """Top 50 GL rankings union PvPoke championshipseries group.
 
@@ -73,6 +126,7 @@ def recipe_gl_top50_plus_cs():
         if n not in seen:
             seen.add(n)
             union.append(n)
+    union = apply_inclusions('gl_top50_plus_cs', union)
     return union, (f'Top 50 GL overall rankings (PvPoke) union the '
                    f'championshipseries group. {len(union)} unique species.')
 
@@ -98,6 +152,7 @@ def recipe_gl_top30_plus_cs_top100():
         if n not in seen:
             seen.add(n)
             union.append(n)
+    union = apply_inclusions('gl_top30_plus_cs_top100', union)
     return union, (f'Top 30 GL overall rankings (PvPoke) union '
                    f'championshipseries members ranked <= 100. '
                    f'{len(union)} unique species.')
