@@ -76,31 +76,31 @@ def _cs_names():
 CURATED_INCLUSIONS = {
     'gl_top50_plus_cs': {
         'Deoxys (Defense)': (
-            'Michael, 2026-09-06. Ranks GL #540 -- not near the cut, ~490 '
-            'ranks below it -- and that low rank is itself the argument for '
-            'including it. PvPoke ranks on 1v1 sims, and the reason to fear '
-            'Deoxys (Defense) is a TEAM play the 1v1 sim cannot express: it '
-            'fires Psycho Boost (35 energy, self -2 attack, guaranteed) and '
-            'then swaps out, shedding the debuff on the switch. The ranking '
-            'prices in a cost real players do not pay.\n'
+            'Michael, 2026-09-06. Post-rebalance it switches its fast move to '
+            'LOW_KICK and jumps GL #540 -> #60 (measured on '
+            'origin/twilight-trails vs origin/master). Still outside the '
+            'top-50 cut, hence the hand-extension. Kit becomes '
+            'LOW_KICK / PSYCHO_BOOST, THUNDERBOLT.\n'
             '\n'
-            'CAVEAT, and it cuts against us: our core never switches '
-            '(simulate() takes exactly two BattlePokemon and has no '
-            'incoming-Pokemon path), so we sim it EATING the -2 attack for '
-            'the rest of the fight. Our numbers therefore UNDERSTATE it as an '
-            'opponent -- the debuff cost is paid in full here and only '
-            'partly in reality. Treat a Deoxys (Defense) matchup score as a '
+            'CAVEAT, and it cuts against us: it fires Psycho Boost (35 '
+            'energy, guaranteed self -2 attack) and then SWAPS OUT to shed '
+            'the debuff. Our core never switches (simulate() takes exactly '
+            'two BattlePokemon, no incoming-Pokemon path), so we sim it '
+            'eating the -2 for the rest of the fight. Our numbers UNDERSTATE '
+            'it as an opponent -- read a Deoxys (Defense) matchup score as a '
             'floor, not an estimate. Same limitation as the swap rules in '
             'docs/validations/2026-09-03_new_turn_system_ground_truth.md.'),
-        'Melmetal': ('Michael, 2026-09-06. Buffed this season -- the Twilight '
-                     'Trails rebalance takes DOUBLE_IRON_BASH from 55 to 70 '
-                     'power, and that is its default charged move in every '
-                     'league. Ranks GL #79 on PRE-rebalance data, so it does '
-                     'not clear the top-50 cut yet and would be invisible to '
-                     'every GL dive. Also uniquely worth preparing for: Meltan '
-                     'is farmable without limit via the Mystery Box, so it is '
-                     'the one species an opponent can scout for a specific IV '
-                     'spread rather than taking what they catch.'),
+        'Melmetal': (
+            'Michael, 2026-09-06. The Twilight Trails rebalance takes '
+            'DOUBLE_IRON_BASH from 55 to 70 power; its moveset is otherwise '
+            'UNCHANGED, so the buff is the whole story. Jumps GL #79 -> #7 '
+            '(measured on origin/twilight-trails vs origin/master), so it '
+            'will clear the top-50 cut on merit post-rebalance and this entry '
+            'becomes belt-and-braces rather than load-bearing. Kept anyway: '
+            'Meltan is farmable without limit via the Mystery Box, so it is '
+            'the one species an opponent can scout for a SPECIFIC IV spread '
+            'rather than taking what they catch -- worth guaranteeing in the '
+            'pool independent of where any given ranking pass puts it.'),
     },
     'gl_top30_plus_cs_top100': {
         'Melmetal': 'same as gl_top50_plus_cs -- this is the fast-dive GL pool',
@@ -109,16 +109,24 @@ CURATED_INCLUSIONS = {
     },
     # Hand-built files with no recipe: verify enforces, a human adds on rebuild.
     'ul_top60.txt': {
-        'Melmetal': ('as GL. Ranks UL #72 pre-rebalance, so it does not clear '
-                     'the top-60 cut either.'),
-        'Deoxys (Defense)': ('as GL, including the no-swap caveat. Ranks UL '
-                             '#345, so nowhere near the top-60 cut.'),
+        'Melmetal': ('as GL. UL #72 -> #6 post-rebalance, so likewise clears '
+                     'on merit; kept for the same scoutability reason.'),
+        'Deoxys (Defense)': ('as GL, including the no-swap caveat. UL #345 -> '
+                             '#84 post-rebalance -- still outside the top-60 '
+                             'cut, so this one stays load-bearing.'),
     },
     'master_top60.txt': {
         'Melmetal': ('as GL. Already clears the ML cut at #38 -- pinned so a '
                      'regeneration cannot silently drop it.'),
     },
 }
+
+# NB the ranks above are the reason these entries are NOT self-maintaining.
+# Every rank cited is from PRE-rebalance master unless marked post-; the
+# post-rebalance figures come from origin/twilight-trails, whose move data is
+# still partly PvPoke-guessed (17 of 27 changed moves carry inferred
+# energies). Re-check them when the rebalance is public -- an entry that has
+# become redundant is clutter, and one whose reasoning has gone stale is worse.
 
 
 def apply_inclusions(pool_key, names):
