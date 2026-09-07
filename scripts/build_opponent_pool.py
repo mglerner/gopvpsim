@@ -75,6 +75,23 @@ def _cs_names():
 # the recipe already handles those.
 CURATED_INCLUSIONS = {
     'gl_top50_plus_cs': {
+        'Deoxys (Defense)': (
+            'Michael, 2026-09-06. Ranks GL #540 -- not near the cut, ~490 '
+            'ranks below it -- and that low rank is itself the argument for '
+            'including it. PvPoke ranks on 1v1 sims, and the reason to fear '
+            'Deoxys (Defense) is a TEAM play the 1v1 sim cannot express: it '
+            'fires Psycho Boost (35 energy, self -2 attack, guaranteed) and '
+            'then swaps out, shedding the debuff on the switch. The ranking '
+            'prices in a cost real players do not pay.\n'
+            '\n'
+            'CAVEAT, and it cuts against us: our core never switches '
+            '(simulate() takes exactly two BattlePokemon and has no '
+            'incoming-Pokemon path), so we sim it EATING the -2 attack for '
+            'the rest of the fight. Our numbers therefore UNDERSTATE it as an '
+            'opponent -- the debuff cost is paid in full here and only '
+            'partly in reality. Treat a Deoxys (Defense) matchup score as a '
+            'floor, not an estimate. Same limitation as the swap rules in '
+            'docs/validations/2026-09-03_new_turn_system_ground_truth.md.'),
         'Melmetal': ('Michael, 2026-09-06. Buffed this season -- the Twilight '
                      'Trails rebalance takes DOUBLE_IRON_BASH from 55 to 70 '
                      'power, and that is its default charged move in every '
@@ -87,11 +104,15 @@ CURATED_INCLUSIONS = {
     },
     'gl_top30_plus_cs_top100': {
         'Melmetal': 'same as gl_top50_plus_cs -- this is the fast-dive GL pool',
+        'Deoxys (Defense)': ('same as gl_top50_plus_cs, including the '
+                             'no-swap caveat -- this is the fast-dive GL pool'),
     },
     # Hand-built files with no recipe: verify enforces, a human adds on rebuild.
     'ul_top60.txt': {
         'Melmetal': ('as GL. Ranks UL #72 pre-rebalance, so it does not clear '
                      'the top-60 cut either.'),
+        'Deoxys (Defense)': ('as GL, including the no-swap caveat. Ranks UL '
+                             '#345, so nowhere near the top-60 cut.'),
     },
     'master_top60.txt': {
         'Melmetal': ('as GL. Already clears the ML cut at #38 -- pinned so a '
