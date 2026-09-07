@@ -960,13 +960,30 @@ What is already in place so the wait is safe:
 - The PVPOKE-ENGINE tripwire fires on the merge and its message now names
   these follow-ups.
 
-WHEN THE MERGE LANDS:
+THE BAKE GATE (Michael, 2026-09-07): **no rebake until we switch to
+twilight-trails, and we do not switch until the rebalance is FULLY
+ANNOUNCED.** PvPoke's inferred energies are probably right -- 17 of 27 changed
+moves carry them -- but "probably right" is not the standard for numbers we
+publish, and the cost of waiting is a delay while the cost of being wrong is a
+whole bake plus whatever shipped off it.
 
-1. Re-port the turn loop against the merged reference (port, do not infer --
-   spec-first is exactly how we ended up 104 cells out).
-2. Drive `audit_oracle_harness.py --mechanics new` to zero.
-3. Flip the default to `new`; re-vet per `docs/rebalance_checklist.md`
-   section B.
-4. Delete `scripts/mechanics_notice.py` and its call sites.
-5. Only then bake. Note the bake also wants the move rebalance public --
-   17 of 27 changed moves carry PvPoke-guessed energies today.
+Steps 1-3 of the original list are DONE (2026-09-03): the turn loop was
+re-ported against the live game's ordering, `--mechanics new` went 104 -> 1
+mismatches against PvPoke's branch, and the product CLIs default to `new`.
+What remains:
+
+1. Wait for the rebalance to be publicly announced, then switch the data
+   source to the real post-rebalance gamemaster.
+2. Close the residual oracle cell: `aegislash_blade_vs_azumarill [1v0]`, same
+   winner, chargedLog differs -- a form-change interaction with the new
+   ordering. Do this before a bake that leans on Blade-form numbers.
+3. Re-vet per `docs/rebalance_checklist.md` section B and re-pin the tripwire.
+4. REGENERATE THE OPPONENT POOLS -- `verify_opponent_pools.py` currently
+   reports 3 of 8 stale, and `gl_top30_plus_cs_top100` is ~20 species behind.
+   The post-rebalance meta is materially different (Melmetal GL #79 -> #7),
+   and Deoxys (Defense) changes its FAST MOVE (Counter -> Low Kick), so a pool
+   baked against today's data sims the wrong kit outright. Also needs
+   Michael's Cramorant curation call.
+5. Delete `scripts/mechanics_notice.py` and its call sites once `new` is the
+   only model anyone should use.
+6. Only then bake.
