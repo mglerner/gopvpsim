@@ -75,16 +75,31 @@ def _cs_names():
 # the recipe already handles those.
 # AUGMENTATION SOURCES (Michael, 2026-09-08)
 # ------------------------------------------
-# The GL top-N recipes cut on PvPoke's rankings alone. That is one signal,
-# thresholded: a species can matter to real teams while sitting below the cut,
-# and the cut cannot tell you which. Community tier lists are a second,
-# independent signal worth folding in, for two reasons the ranker cannot cover:
+# The GL top-N recipes cut on PvPoke's rankings alone -- a threshold on a
+# SIMULATED 1v1 score. The augmentation source is a world-class human expert's
+# tier list, and the reason (Michael, 2026-09-08) is that such a player knows
+# things a sim score structurally cannot express:
 #
-#   1. They are FORWARD-looking. A ranking can only score the gamemaster it
-#      has; a season-preview tier list projects the season, which is exactly
-#      the window we are in while the rebalance is still partly guessed.
-#   2. They price in ROLE -- safe-swap duty, farmability, how a species is
-#      actually used on a team -- where the ranker scores isolated 1v1s.
+#   1. Which mons actually PERFORM, as against "sim heroes" -- species that
+#      rank well because the simulation grants them favourable play, most often
+#      by being heavily BAIT-DEPENDENT. A sim's bait policy is a modelled
+#      opponent; a real opponent does not reliably fall for the bait, so the
+#      score overstates the species by exactly the amount the bait was assumed
+#      to work.
+#   2. Which mons play well in real 3v3 battles -- swap pressure, safe-swap
+#      duty, how a species carries energy or a shield advantage into the next
+#      matchup.
+#
+# Both cut against OUR numbers as much as PvPoke's; this is not a claim that
+# their ranker is uniquely blind. We score isolated 1v1s under a bait policy of
+# our own, and `simulate()` takes exactly two BattlePokemon with no
+# incoming-Pokemon path, so every multi-mon consideration in (2) is invisible
+# to us by construction. See the Deoxys (Defense) caveat below for a case where
+# we can name the resulting error and its direction.
+#
+# Secondary, and true only in this window: a tier list is forward-looking,
+# while a ranking can only score the gamemaster it has -- and ours is still
+# partly a guess at the rebalance.
 #
 # DO NOT justify this with the Deoxys (Defense) numbers. An earlier draft of
 # this block claimed PvPoke had it GL #540 while players rated it a threat,
