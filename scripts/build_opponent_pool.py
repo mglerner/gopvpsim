@@ -73,6 +73,35 @@ def _cs_names():
 #
 # Add one only with a stated reason. "It seems good" is a ranking argument --
 # the recipe already handles those.
+# AUGMENTATION SOURCES (Michael, 2026-09-08)
+# ------------------------------------------
+# The GL top-N recipes cut on PvPoke's rankings alone. Community tier lists
+# are a second signal worth folding in, because they price in team play the
+# 1v1 ranker cannot see -- the Deoxys (Defense) case is the worked example:
+# PvPoke had it GL #540 pre-rebalance while players rated it a real threat,
+# and the rebalanced ranking then moved it to #60.
+#
+#   * ItsAxn, expected tier list for the new season (screenshot supplied
+#     2026-09-08). Tiers, strongest first: Meta Defining, Top Meta, Meta,
+#     Strong Spice, Fringe Spice, Garbage. Anything in the top THREE tiers is
+#     a candidate for the GL pool regardless of rank.
+#
+# NOT TRANSCRIBED YET, on purpose. The source we hold is an IMAGE of ~250
+# sprites, and reading species off it by eye would land some wrong. That is a
+# silent failure: a misread species in a pool sims the wrong opponent, and no
+# test catches it -- the pool guard only checks a name against rankings, and a
+# wrong-but-real species passes.
+#
+# HOW TO TRANSCRIBE IT (Michael, 2026-09-08): the tier list comes from an
+# ItsAxn video; pull the TRANSCRIPT and take the names from there, using the
+# sprites only to cross-check. Names in text, image as verification -- never
+# the reverse. Michael has the link when it is time to build lists.
+#
+# Confidently readable from the image so far, pending that pass: Mimikyu,
+# Cramorant and Sableye (Meta Defining), Deoxys (Defense) (Top Meta), Quagsire
+# and Altaria (Meta) -- and Deoxys (Defense) is already an entry below, added
+# on independent grounds, which is a small check on the source.
+
 CURATED_INCLUSIONS = {
     'gl_top50_plus_cs': {
         'Deoxys (Defense)': (

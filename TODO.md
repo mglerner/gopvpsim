@@ -978,7 +978,14 @@ What remains:
    winner, chargedLog differs -- a form-change interaction with the new
    ordering. Do this before a bake that leans on Blade-form numbers.
 3. Re-vet per `docs/rebalance_checklist.md` section B and re-pin the tripwire.
-4. REGENERATE THE OPPONENT POOLS -- `verify_opponent_pools.py` currently
+4. REGENERATE THE OPPONENT POOLS, augmenting the rank cut with community
+   tier lists (ItsAxn's new-season list is the first such source -- see
+   `AUGMENTATION SOURCES` in `scripts/build_opponent_pool.py`; top three
+   tiers are pool candidates regardless of rank). NB it is not transcribed:
+   we hold an image of ~250 sprites, and a misread species sims the wrong
+   opponent silently. Transcribe from the video transcript and cross-check
+   against the sprites -- Michael has the link. Separately,
+   `verify_opponent_pools.py` currently
    reports 3 of 8 stale, and `gl_top30_plus_cs_top100` is ~20 species behind.
    The post-rebalance meta is materially different (Melmetal GL #79 -> #7),
    and Deoxys (Defense) changes its FAST MOVE (Counter -> Low Kick), so a pool
