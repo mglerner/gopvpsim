@@ -75,11 +75,25 @@ def _cs_names():
 # the recipe already handles those.
 # AUGMENTATION SOURCES (Michael, 2026-09-08)
 # ------------------------------------------
-# The GL top-N recipes cut on PvPoke's rankings alone. Community tier lists
-# are a second signal worth folding in, because they price in team play the
-# 1v1 ranker cannot see -- the Deoxys (Defense) case is the worked example:
-# PvPoke had it GL #540 pre-rebalance while players rated it a real threat,
-# and the rebalanced ranking then moved it to #60.
+# The GL top-N recipes cut on PvPoke's rankings alone. That is one signal,
+# thresholded: a species can matter to real teams while sitting below the cut,
+# and the cut cannot tell you which. Community tier lists are a second,
+# independent signal worth folding in, for two reasons the ranker cannot cover:
+#
+#   1. They are FORWARD-looking. A ranking can only score the gamemaster it
+#      has; a season-preview tier list projects the season, which is exactly
+#      the window we are in while the rebalance is still partly guessed.
+#   2. They price in ROLE -- safe-swap duty, farmability, how a species is
+#      actually used on a team -- where the ranker scores isolated 1v1s.
+#
+# DO NOT justify this with the Deoxys (Defense) numbers. An earlier draft of
+# this block claimed PvPoke had it GL #540 while players rated it a threat,
+# making it look like the ranker missed something the community saw. That is
+# wrong and Michael corrected it (2026-09-08): #540 scores the OLD moveset and
+# nobody rated it there either, #60 scores the NEW one and the community
+# agrees. Ranker and players concur at both points; the moveset changed between
+# them, not the opinion. It is an example of PvPoke tracking a rebalance
+# correctly -- the opposite of a blind spot.
 #
 #   * ItsAxn, expected tier list for the new season (screenshot supplied
 #     2026-09-08). Tiers, strongest first: Meta Defining, Top Meta, Meta,
