@@ -248,11 +248,34 @@ def apply_exclusions(pool_key, names):
 # where PvPoke's ranker puts it -- see AUGMENTATION SOURCES above for why an
 # expert's read catches things a 1v1 score cannot ("sim heroes", 3v3 play).
 #
-# TRANSCRIBED FROM THE TRANSCRIPT, not from the tier-list image, per the
-# procedure in AUGMENTATION SOURCES. Boundaries used:
-#   top meta ends  15:30  ("And rounding out our top meta...")
-#   meta ends     ~21:59  (first spice language: "might be an interesting
-#                          spice pick")
+# TRANSCRIBED FROM THE TRANSCRIPT, then CROSS-CHECKED AGAINST THE IMAGE --
+# which is the whole point of the procedure in AUGMENTATION SOURCES, and it
+# caught a real error. First pass read "And rounding out our top meta" (15:28)
+# as closing a *top meta* tier with a separate *meta* tier running to ~21:59.
+# Wrong: it closes the ENTIRE meta block. Florges at 15:31 opens Strong Spice.
+#
+# The image settles it by COUNTS, which are far more reliable to read off
+# sprites than names are. Taking first-mention order and dropping three
+# passing references (Floette, Electrike, Wigglytuff) plus two duplicate
+# artifacts (Sableye (Mega) -- "like a Mega Sableye on this list, but if..."
+# is a wish, not a placement -- and plain Corsola), the order splits
+# 5 / 6 / 19, matching the image's three top rows exactly:
+#
+#   Meta Defining  5   Mimikyu, Cramorant, Ninetales (Alolan), Melmetal, Sableye
+#   Top Meta       6   Tinkaton, Thievul, Lickilicky, Corsola (Galarian),
+#                      Electrode (Hisuian), Deoxys (Defense)
+#   Meta          19   Corviknight (07:31) ... Furret (15:08)
+#
+# The first pass wrongly added five STRONG SPICE species on the bad boundary:
+# Bombirdier, Dunsparce, Volbeat, Wartortle (all removed) and Rillaboom (kept,
+# but on Michael's explicit request rather than on this list's authority).
+#
+# Michael reads Aegislash as Strong Spice; this mapping puts it 28th of the 30,
+# i.e. in the last handful of the Meta row. The two readings differ by a couple
+# of sprites at the boundary and his direct read of the image wins -- but it
+# changes nothing here, because Aegislash is in CURATED_EXCLUSIONS regardless.
+# Mega Malamar is in his Meta row and is NOT added: it has no entry in the GL
+# rankings at all (megas rank in their own cup), so it cannot go in a GL pool.
 #
 # JUDGMENT CALLS, so they can be revisited:
 #  * EXCLUDED as passing references rather than tier placements -- each is
@@ -272,19 +295,21 @@ def apply_exclusions(pool_key, names):
 #    it is weak. Restore it to this list when that defect is fixed.
 
 ITSAXN_META_PLUS = {
-    'Lickilicky':          'top meta, 05:19, x12 mentions; GL #155',
-    'Toxapex':             'top meta, 08:36; GL #126',
-    'Charjabug':           'top meta, 11:53; GL #60',
-    'Forretress':          'top meta, 12:49; GL #55',
-    'Spidops':             'top meta, 13:20; GL #57',
-    'Morpeko (Hangry)':    'top meta, 14:04 (he says "Full Belly"; PvPoke '
-                           'ranks the Hangry form, and it form-changes in '
-                           'battle either way); GL #88',
-    'Rillaboom':           'meta, 16:14; GL #70. Also named by Michael.',
-    'Wartortle':           'meta, 17:16; GL #110',
-    'Bombirdier':          'meta, 18:37; GL #228',
-    'Dunsparce':           'meta, 18:53; GL #91',
-    'Volbeat':             'meta, 19:17; GL #193',
+    'Ninetales (Alolan)':  'META DEFINING (his #3), 01:47, x16; GL #63. The '
+                           'miss that mattered: a top-5 pick sitting outside '
+                           'the top-50 cut, so we had never simmed against it.',
+    'Lickilicky':          'top meta, 05:19, x12; GL #155',
+    'Toxapex':             'meta, 08:36; GL #126',
+    'Charjabug':           'meta, 11:53; GL #60',
+    'Forretress':          'meta, 12:49; GL #55',
+    'Spidops':             'meta, 13:20; GL #57',
+    'Morpeko (Hangry)':    'meta, 14:04 (he says "Full Belly"; PvPoke ranks '
+                           'the Hangry form, and it form-changes in battle '
+                           'either way); GL #88',
+    'Rillaboom':           'MICHAEL, not ItsAxn: he puts it in STRONG SPICE '
+                           '(16:14, after the 15:08 meta boundary). Michael '
+                           'asked for it explicitly on 2026-09-09. Kept on '
+                           'his authority, not the tier list\'s; GL #70.',
 }
 
 
