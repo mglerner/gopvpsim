@@ -318,12 +318,42 @@ ITSAXN_META_PLUS = {
 }
 
 
+# ItsAxn STRONG SPICE -- the tier below "meta". Michael, 2026-09-09.
+# ---------------------------------------------------------------------------
+# Added when the championshipseries union was dropped (see the recipes): this
+# season is too young for a believable championship meta, so an expert's read
+# of the CURRENT meta is the better second signal.
+#
+# PARTIAL: this is the FIRST ROW of Strong Spice only, read off the image by
+# Michael. The tier continues; later rows are not transcribed. Entries already
+# inside the top-50 cut are listed anyway so the roster stays readable as a
+# tier -- apply_itsaxn only appends what is missing.
+
+ITSAXN_STRONG_SPICE = {
+    'Araquanid':        'strong spice row 1; GL #22 (clears the cut anyway)',
+    'Marowak':          'strong spice row 1; GL #29 (clears). The KANTO form -- '
+                        'Alolan is #211 and is a different pick.',
+    'Dondozo':          'strong spice row 1; GL #39 (clears). Michael also '
+                        'asked for it by name on 2026-09-09.',
+    'Jumpluff':         'strong spice row 1; GL #49 (clears)',
+    'Blastoise':        'strong spice row 1; GL #50 (clears)',
+    'Carbink':          'strong spice row 1; GL #52',
+    'Turtonator':       'strong spice row 1; GL #59',
+    'Cradily':          'strong spice row 1; GL #61',
+    'Wartortle':        'strong spice row 1; GL #110',
+    'Bombirdier':       'strong spice row 1; GL #228',
+    'Cradily (Shadow)': 'strong spice row 1; GL #251 (he lists Cradily '
+                        '"including shadow")',
+}
+
+
 def apply_itsaxn(names):
-    """Append ItsAxn meta-or-better picks missing from ``names``."""
+    """Append ItsAxn meta-or-better and strong-spice picks missing from ``names``."""
     out = list(names); have = set(out)
-    for species in ITSAXN_META_PLUS:
-        if species not in have:
-            out.append(species)
+    for table in (ITSAXN_META_PLUS, ITSAXN_STRONG_SPICE):
+        for species in table:
+            if species not in have:
+                out.append(species); have.add(species)
     return out
 
 
@@ -358,26 +388,32 @@ def apply_inclusions(pool_key, names):
 
 
 def recipe_gl_top50_plus_cs():
-    """Top 50 GL rankings union PvPoke championshipseries group.
+    """Top 50 GL rankings, augmented from ItsAxn's tier list.
 
-    PvPoke's championshipseries adds bulky mons that don't clear the
-    rankings' top 50 cut (Talonflame, Togekiss, Furret, Diggersby,
-    Politoed, Togekiss, etc.) plus a few meta-niche picks. The union is
-    the opponent pool we use for "real" GL deep dives where you want
-    comprehensive coverage.
+    NAME IS NOW HISTORICAL: the "_plus_cs" championshipseries union was
+    DROPPED 2026-09-09 (Michael) -- this early in the season there is not
+    enough tournament data for a believable championship meta, so an
+    expert's read of the current meta is the better second signal. The
+    filename is kept because run_website_dives.py and the committed pool
+    files reference it by path.
+
+    Dropping CS lost 7 species nothing else replaces: Medicham #54,
+    Diggersby #62, Dewgong #67, Forretress (Shadow) #76, Talonflame #84,
+    Dunsparce #91, Togekiss #123. Some may return as the remaining Strong
+    Spice rows are read; Medicham is the one to watch, being a dive focal
+    with its own threshold file.
     """
     top50 = [resolvable_name(r) for r in load_rankings('great')[:50]]
-    cs = _cs_names()
     seen, union = set(), []
-    for n in top50 + cs:
+    for n in top50:
         if n not in seen:
             seen.add(n)
             union.append(n)
     union = apply_exclusions('gl_top50_plus_cs',
                              apply_itsaxn(
                                  apply_inclusions('gl_top50_plus_cs', union)))
-    return union, (f'Top 50 GL overall rankings (PvPoke) union the '
-                   f'championshipseries group. {len(union)} unique species.')
+    return union, (f'Top 50 GL overall rankings (PvPoke) plus ItsAxn tier-list '
+                   f'picks. {len(union)} unique species.')
 
 
 def recipe_gl_top30_plus_cs_top100():
@@ -393,20 +429,17 @@ def recipe_gl_top30_plus_cs_top100():
     prep targets, not near-duplicates.
     """
     rankings = load_rankings('great')
-    rank = {resolvable_name(r): i + 1 for i, r in enumerate(rankings)}
     top30 = [resolvable_name(r) for r in rankings[:30]]
-    cs_filt = [n for n in _cs_names() if rank.get(n, 10**9) <= 100]
     seen, union = set(), []
-    for n in top30 + cs_filt:
+    for n in top30:
         if n not in seen:
             seen.add(n)
             union.append(n)
     union = apply_exclusions('gl_top30_plus_cs_top100',
                              apply_itsaxn(
                                  apply_inclusions('gl_top30_plus_cs_top100', union)))
-    return union, (f'Top 30 GL overall rankings (PvPoke) union '
-                   f'championshipseries members ranked <= 100. '
-                   f'{len(union)} unique species.')
+    return union, (f'Top 30 GL overall rankings (PvPoke) plus ItsAxn tier-list '
+                   f'picks. {len(union)} unique species.')
 
 
 # --- Championship-series tournament pools ---

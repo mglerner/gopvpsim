@@ -1,4 +1,4 @@
-# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 70 unique species.
+# Top 50 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 67 unique species.
 # Generated 2026-09-09 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
@@ -52,23 +52,20 @@ Kingdra (Shadow)
 Sableye
 Jumpluff
 Blastoise
-Carbink
-Charjabug
-Cradily
-Dewgong
-Diggersby
-Dunsparce
-Forretress (Shadow)
-Hippowdon (Shadow)
-Medicham
-Morpeko (Full Belly)
-Stunfisk
-Talonflame
-Togekiss
 Rillaboom
 Aegislash (Shield)
 Aegislash (Blade)
 Ninetales (Alolan)
+Hippowdon (Shadow)
 Forretress
 Spidops
+Charjabug
+Morpeko (Full Belly)
+Stunfisk
 Toxapex
+Carbink
+Turtonator
+Cradily
+Wartortle
+Bombirdier
+Cradily (Shadow)
