@@ -1,4 +1,4 @@
-# Top 50 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 67 unique species.
+# Top 60 GL overall rankings (PvPoke) plus ItsAxn tier-list picks. 71 unique species.
 # Generated 2026-09-09 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
@@ -52,19 +52,23 @@ Kingdra (Shadow)
 Sableye
 Jumpluff
 Blastoise
+Hydreigon (Shadow)
+Carbink
+Hippowdon (Shadow)
+Medicham
+Forretress
+Moltres (Galarian)
+Spidops
+Dragonair (Shadow)
+Turtonator
+Charjabug
 Rillaboom
 Aegislash (Shield)
 Aegislash (Blade)
 Ninetales (Alolan)
-Hippowdon (Shadow)
-Forretress
-Spidops
-Charjabug
 Morpeko (Full Belly)
 Stunfisk
 Toxapex
-Carbink
-Turtonator
 Cradily
 Wartortle
 Bombirdier

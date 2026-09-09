@@ -357,6 +357,15 @@ def apply_itsaxn(names):
     return out
 
 
+# GL rank cut for the main pool. Raised 50 -> 60 on 2026-09-09 (Michael):
+# dropping the championshipseries union left the 51-70 band moth-eaten -- #52
+# and #53 were in via ItsAxn while #51 Hydreigon (Shadow) and #54 Medicham were
+# out, which is arbitrary rather than curated. 60 pulls in Hydreigon (Shadow)
+# #51, Medicham #54, Moltres (Galarian) #56 and Dragonair (Shadow) #58, all of
+# which CS used to supply. Pool 67 -> 71.
+GL_CUT = 60
+
+
 def resolvable_name(row):
     """The pool name for a rankings row that the DIVE can actually resolve.
 
@@ -388,7 +397,7 @@ def apply_inclusions(pool_key, names):
 
 
 def recipe_gl_top50_plus_cs():
-    """Top 50 GL rankings, augmented from ItsAxn's tier list.
+    """Top GL_CUT (60) GL rankings, augmented from ItsAxn's tier list.
 
     NAME IS NOW HISTORICAL: the "_plus_cs" championshipseries union was
     DROPPED 2026-09-09 (Michael) -- this early in the season there is not
@@ -403,7 +412,7 @@ def recipe_gl_top50_plus_cs():
     Spice rows are read; Medicham is the one to watch, being a dive focal
     with its own threshold file.
     """
-    top50 = [resolvable_name(r) for r in load_rankings('great')[:50]]
+    top50 = [resolvable_name(r) for r in load_rankings('great')[:GL_CUT]]
     seen, union = set(), []
     for n in top50:
         if n not in seen:
@@ -412,8 +421,8 @@ def recipe_gl_top50_plus_cs():
     union = apply_exclusions('gl_top50_plus_cs',
                              apply_itsaxn(
                                  apply_inclusions('gl_top50_plus_cs', union)))
-    return union, (f'Top 50 GL overall rankings (PvPoke) plus ItsAxn tier-list '
-                   f'picks. {len(union)} unique species.')
+    return union, (f'Top {GL_CUT} GL overall rankings (PvPoke) plus ItsAxn '
+                   f'tier-list picks. {len(union)} unique species.')
 
 
 def recipe_gl_top30_plus_cs_top100():
