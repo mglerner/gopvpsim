@@ -1,4 +1,4 @@
-# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 69 unique species.
+# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 71 unique species.
 # Generated 2026-09-09 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
@@ -65,6 +65,8 @@ Morpeko (Full Belly)
 Stunfisk
 Talonflame
 Togekiss
+Aegislash (Shield)
+Aegislash (Blade)
 Ninetales (Alolan)
 Lickilicky
 Toxapex
