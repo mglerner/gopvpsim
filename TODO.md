@@ -997,11 +997,37 @@ Three consequences that change the shape of the work:
 
 PLAN (not started; ordered so the cheap measurement gates the expensive work):
 
-1. **Re-measure first.** Point `audit_oracle_harness.py` at `../pvpoke`
-   directly (no shadow root) and run `--mechanics new`. This is cheap and it
-   decides everything below. Expect ~1 mismatch; treat any larger number as
-   the move data having moved a matchup, not as a turn-loop regression, until
-   shown otherwise.
+1. **DONE 2026-09-09. Re-measured against `../pvpoke` master directly (no
+   shadow root), `--mechanics new`. Raw:
+   `docs/validations/2026-09-09_oracle_new_vs_master_raw.txt`.**
+
+       cells checked                        243
+       exact                                223
+       documented divergences (legacy xfail) 14
+       NEW / undocumented mismatches          6
+       divergences that VANISHED              3
+
+   **The turn loop is not broadly regressed** -- 237 of 243 agree, which is
+   the answer this step existed to get.
+
+   **All 6 mismatches are one cluster: Aegislash x Azumarill, form change.**
+   `aegislash_vs_azumarill (1,1) (2,1)`, `aegislash_blade_vs_azumarill (1,0)
+   (2,0)`, `azumarill_vs_aegislash_shield (1,1) (1,2)`. Not scattered, not a
+   timing drift across the grid -- one interaction.
+
+   It grew 1 -> 6 since 2026-09-03. The JS is byte-identical to what we
+   measured against then, so the growth is attributable to the MOVE DATA:
+   `SHADOW_BALL` is on the 29-move changed list and is Aegislash's charged
+   move. Hypothesis, not yet confirmed -- the rebalance widened the reach of a
+   form-change bug that was already there, rather than creating a new one.
+
+   Caveat on the 14: those xfails were derived under LEGACY and the harness
+   says so in its own banner. Treat only the mismatch count as meaningful
+   until they are re-derived (step 3 territory).
+
+   3 vanished (2 aegislash_blade, 1 corviknight_vs_moltres_galarian) are
+   un-xfail candidates once the cluster is understood -- do not un-xfail them
+   piecemeal first, they may be the same root cause moving.
 2. **Flip the harness default** `legacy` -> `new`, and decide the fate of the
    legacy path: freeze it as port-fidelity history (it is the only proof the
    port was ever faithful) or delete it. Recommend freeze + a test that says
@@ -1010,8 +1036,14 @@ PLAN (not started; ordered so the cheap measurement gates the expensive work):
    incidental mentions, and re-baseline only the former against post-rebalance
    pvpoke.com. This is the largest and least glamorous item; it is where the
    silent staleness lives.
-4. Close the residual oracle cell `aegislash_blade_vs_azumarill [1v0]` (same
-   winner, chargedLog differs, form-change x new ordering).
+4. **RESIZED by step 1: this is 6 cells, not 1, and it is now the only thing
+   standing between us and a green harness.** Form change x the new ordering,
+   all Aegislash/Azumarill. Two of the six flip `log_ok=False` (the chargedLog
+   itself differs, not just the score), which is the useful end to pull:
+   `aegislash_blade_vs_azumarill (1,0)` diverges 570/429 vs 712/287, the
+   widest gap on the grid. Start there, and check `SHADOW_BALL`'s rebalanced
+   numbers against the form-change energy path before assuming the ordering is
+   at fault.
 5. Re-vet per `docs/rebalance_checklist.md` section B; re-pin the tripwire
    digest. **Do not re-pin before 1-4** -- re-pinning silences the signal.
 6. Delete `scripts/mechanics_notice.py` and its call sites (its own stated
