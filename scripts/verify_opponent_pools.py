@@ -82,6 +82,14 @@ CURATED_EXCLUSIONS = {
     },
 }
 
+# Aegislash is excluded by the GENERATOR (build_opponent_pool.CURATED_EXCLUSIONS)
+# so that a regeneration keeps it out. Fold those entries in here too, from the
+# same table, so the checker reads one source rather than a hand-kept copy.
+import build_opponent_pool as _bop  # noqa: E402  (sys.path set above)
+
+for _pool, _entries in _bop.CURATED_EXCLUSIONS.items():
+    CURATED_EXCLUSIONS.setdefault(_pool, {}).update(_entries)
+
 
 def _required(pool_key):
     """Curated inclusions for a pool -- the table lives with the RECIPES.

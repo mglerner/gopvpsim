@@ -187,6 +187,56 @@ CURATED_INCLUSIONS = {
 # become redundant is clutter, and one whose reasoning has gone stale is worse.
 
 
+_AEGISLASH_REASON = (
+    'Michael, 2026-09-09: TEMPORARY, pending a fix. Our engine over-farms '
+    'Aegislash in SHIELD form. Traced on aegislash_blade vs azumarill [1v0] '
+    'against pvpoke master: both engines toggle Blade->Shield->Blade, but '
+    'PvPoke commits its second Shadow Ball on T30 ("it KOs or it wants to '
+    'farm down afterwards") while ours banks to the full 100 energy and '
+    'throws on T44 -- 25 turns farming at 1 damage per Psycho Cut vs their '
+    '10. Scores 570/429 ours vs 712/287 theirs. That is 6 of the 6 '
+    'undocumented oracle mismatches. Sims against a wrong Aegislash would '
+    'contaminate every other focal, so it comes out until the DP commit '
+    'behaviour in the low-attack form is fixed. REMOVE THIS once the oracle '
+    'grid is green -- Aegislash clears the cut on merit and belongs here.'
+)
+
+
+# ---------------------------------------------------------------------------
+# Curated EXCLUSIONS -- species the recipe produces that we deliberately drop
+# ---------------------------------------------------------------------------
+# Lives here for the same reason CURATED_INCLUSIONS does: so a REGENERATION
+# applies it. verify_opponent_pools.py keeps the matching entries so the
+# absence reads as a decision rather than as drift. Before 2026-09-09 only the
+# checker had a table, which meant a rebuild silently re-added anything
+# excluded -- the exact "remember to redo it by hand" step the inclusion table
+# was built to kill.
+#
+# An entry needs a reason someone actually decided. "Not looked at yet" is
+# drift, not an exclusion.
+
+CURATED_EXCLUSIONS = {
+    'gl_top50_plus_cs': {
+        'Aegislash (Blade)': _AEGISLASH_REASON,
+        'Aegislash (Shield)': _AEGISLASH_REASON,
+    },
+    'gl_top30_plus_cs_top100': {
+        'Aegislash (Blade)': _AEGISLASH_REASON,
+        'Aegislash (Shield)': _AEGISLASH_REASON,
+    },
+    # NOT ul_top60.txt: Aegislash has been out of the UL pool since
+    # 2026-06-25 for an unrelated reason (not UL-viable as an opponent -- see
+    # that file's header). Adding it here would overwrite a correct, older
+    # record with this one's reason.
+}
+
+
+def apply_exclusions(pool_key, names):
+    """Drop any curated exclusions from ``names`` (order preserved)."""
+    drop = set(CURATED_EXCLUSIONS.get(pool_key, {}))
+    return [n for n in names if n not in drop]
+
+
 def apply_inclusions(pool_key, names):
     """Append any curated inclusions missing from ``names`` (order preserved)."""
     out = list(names)
@@ -213,7 +263,8 @@ def recipe_gl_top50_plus_cs():
         if n not in seen:
             seen.add(n)
             union.append(n)
-    union = apply_inclusions('gl_top50_plus_cs', union)
+    union = apply_exclusions('gl_top50_plus_cs',
+                             apply_inclusions('gl_top50_plus_cs', union))
     return union, (f'Top 50 GL overall rankings (PvPoke) union the '
                    f'championshipseries group. {len(union)} unique species.')
 
@@ -239,7 +290,8 @@ def recipe_gl_top30_plus_cs_top100():
         if n not in seen:
             seen.add(n)
             union.append(n)
-    union = apply_inclusions('gl_top30_plus_cs_top100', union)
+    union = apply_exclusions('gl_top30_plus_cs_top100',
+                             apply_inclusions('gl_top30_plus_cs_top100', union))
     return union, (f'Top 30 GL overall rankings (PvPoke) union '
                    f'championshipseries members ranked <= 100. '
                    f'{len(union)} unique species.')

@@ -1036,10 +1036,25 @@ PLAN (not started; ordered so the cheap measurement gates the expensive work):
    legacy path: freeze it as port-fidelity history (it is the only proof the
    port was ever faithful) or delete it. Recommend freeze + a test that says
    why it may never be re-derived from upstream.
-3. **Triage the 41 move-touching test files** into numeric ground truth vs
-   incidental mentions, and re-baseline only the former against post-rebalance
-   pvpoke.com. This is the largest and least glamorous item; it is where the
-   silent staleness lives.
+3. **Triage and re-baseline the move-touching tests. MEASURED 2026-09-09:
+   102 failures across 19 files in the fast tier** (2112 pass, 13 xfail).
+   Verified attributable to the pvpoke pull alone -- stashing the Aegislash
+   exclusion gives the identical 102 and the identical file set. Concentration:
+
+       test_battle.py                 40
+       test_port_fidelity_68ad233.py  19
+       test_form_change_oracle.py     16
+       test_nb1_selection_freeze.py    6
+       test_fire_now_cmp_shadow.py     3
+       test_bug3_farm_stack.py         3
+       (13 more files at 1-2 each)
+
+   These are pinned hardcoded scores, so they FAIL loudly rather than rotting
+   silently -- better than feared. The 3 in test_bug3_farm_stack and the 16 in
+   test_form_change_oracle are worth reading FIRST: they are the same
+   form-change/farm axis as the Aegislash defect in step 4, so one root cause
+   may clear a chunk of the 102. Do not re-baseline anything to our own output
+   before step 4 lands, or we pin the bug.
 4. **RESIZED by step 1: this is 6 cells, not 1, and it is now the only thing
    standing between us and a green harness.** Form change x the new ordering,
    all Aegislash/Azumarill. Two of the six flip `log_ok=False` (the chargedLog
