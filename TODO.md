@@ -1016,10 +1016,14 @@ PLAN (not started; ordered so the cheap measurement gates the expensive work):
    timing drift across the grid -- one interaction.
 
    It grew 1 -> 6 since 2026-09-03. The JS is byte-identical to what we
-   measured against then, so the growth is attributable to the MOVE DATA:
-   `SHADOW_BALL` is on the 29-move changed list and is Aegislash's charged
-   move. Hypothesis, not yet confirmed -- the rebalance widened the reach of a
-   form-change bug that was already there, rather than creating a new one.
+   measured against then, so the growth is attributable to the MOVE DATA.
+
+   **The SHADOW_BALL hypothesis is DEAD (checked 2026-09-09).** Shadow Ball
+   went power 100 -> 90 at unchanged energy 50, so its DPE fell 2.00 -> 1.80
+   but stays above Gyro Ball's 1.60 -- the move-SELECTION ordering the
+   documented divergence turns on did not flip, and both Aegislash gamemaster
+   entries are byte-unchanged. The nerf moves damage and KO timing, not which
+   move gets picked, so it cannot be the whole story.
 
    Caveat on the 14: those xfails were derived under LEGACY and the harness
    says so in its own banner. Treat only the mismatch count as meaningful
@@ -1041,9 +1045,24 @@ PLAN (not started; ordered so the cheap measurement gates the expensive work):
    all Aegislash/Azumarill. Two of the six flip `log_ok=False` (the chargedLog
    itself differs, not just the score), which is the useful end to pull:
    `aegislash_blade_vs_azumarill (1,0)` diverges 570/429 vs 712/287, the
-   widest gap on the grid. Start there, and check `SHADOW_BALL`'s rebalanced
-   numbers against the form-change energy path before assuming the ordering is
-   at fault.
+   widest gap on the grid.
+
+   **Traced 2026-09-09, timeboxed -- symptom found, root cause NOT found.**
+   Our Aegislash farms in SHIELD form for 43 turns at 1 damage per Psycho Cut,
+   banks the full 100 energy, then form-changes to Blade on T44 and throws
+   Shadow Ball for 91. PvPoke scores the same cell 712/287 -- markedly BETTER
+   for Aegislash -- so its Aegislash is very likely committing earlier rather
+   than banking to 100. Not confirmed: PvPoke's chargedLog was not put
+   side-by-side. Next probe is that comparison, not more of ours.
+
+   **The "just do not add Aegislash to the meta" escape hatch does NOT work as
+   stated.** Both forms come out of the AUTO recipe (Blade via the
+   championshipseries group -- see the header comment in
+   `opponent_pools/gl_top50_plus_cs.txt`), so excluding it takes a deliberate
+   CURATED_EXCLUSION with a reason, not the absence of a hand-add. And it is a
+   dive FOCAL: `thresholds/aegislash_blade.toml` and
+   `thresholds/aegislash_shield.toml` are shipped pages, so dropping it as an
+   opponent still leaves two pages that would bake on the diverging path.
 5. Re-vet per `docs/rebalance_checklist.md` section B; re-pin the tripwire
    digest. **Do not re-pin before 1-4** -- re-pinning silences the signal.
 6. Delete `scripts/mechanics_notice.py` and its call sites (its own stated
