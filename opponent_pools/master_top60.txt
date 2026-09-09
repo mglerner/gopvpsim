@@ -12,66 +12,64 @@
 #   from gopvpsim.data import load_rankings
 #   [e['speciesName'] for e in load_rankings('master')[:60]]
 #
-Zacian (Crowned Sword)
+
 Palkia (Origin)
+Zacian (Crowned Sword)
+Zygarde (Complete Forme)
 Metagross
 Kyurem (White)
-Lunala
 Xerneas
-Reshiram
-Dialga (Origin)
-Zamazenta (Crowned Shield)
-Kyurem (Black)
 Kyogre
-Zekrom
-Marshadow
+Dialga (Origin)
+Reshiram
+Ursaluna
 Eternatus
-Palkia (Shadow)
-Lugia
-Metagross (Shadow)
-Lugia (Shadow)
-Necrozma (Dawn Wings)
-Garchomp (Shadow)
-Yveltal
-Garchomp
-Ho-Oh
-Zygarde (Complete Forme)
-Meloetta (Aria)
-Palkia
-Latios
-Latios (Shadow)
-Kyogre (Shadow)
-Necrozma (Dusk Mane)
-Gyarados (Shadow)
-Groudon
-Gholdengo
-Mewtwo (Shadow)
-Florges
-Solgaleo
-Melmetal
-Latias (Shadow)
-Keldeo (Resolute)
-Dialga (Shadow)
-Dialga
-Hydreigon (Shadow)
-Jirachi
-Mewtwo
-Togekiss
-Kyurem
-Annihilape (Shadow)
-Primarina
-Tapu Lele
-Latias
-Dragonite (Shadow)
-Goodra
-Keldeo (Ordinary)
-Sylveon
-Tyranitar (Shadow)
-Landorus (Therian)
-Gyarados
-Groudon (Shadow)
-Annihilape
-Ho-Oh (Shadow)
-
-# --- 2026-06-25 union additions (current PvPoke top-60) ---
 Reshiram (Shadow)
+Kyurem (Black)
+Lugia
+Lunala
+Zamazenta (Crowned Shield)
+Ursaluna (Shadow)
+Necrozma (Dawn Wings)
+Marshadow
+Zekrom
+Necrozma (Dusk Mane)
+Lugia (Shadow)
+Palkia (Shadow)
+Ho-Oh
+Garchomp (Shadow)
+Groudon
+Metagross (Shadow)
+Melmetal
+Keldeo (Resolute)
+Garchomp
+Gyarados (Shadow)
+Kyogre (Shadow)
+Palkia
+Rillaboom
+Keldeo (Ordinary)
+Latios (Shadow)
+Yveltal
+Giratina (Altered) (Shadow)
+Florges
+Landorus (Therian)
+Solgaleo
+Dialga (Shadow)
+Meloetta (Aria)
+Dialga
+Primarina
+Kyurem
+Gholdengo
+Dragonite (Shadow)
+Latios
+Giratina (Altered)
+Mewtwo (Shadow)
+Groudon (Shadow)
+Hydreigon (Shadow)
+Ho-Oh (Shadow)
+Goodra
+Latias (Shadow)
+Gyarados
+Togekiss
+Tapu Lele
+Enamorus (Therian)

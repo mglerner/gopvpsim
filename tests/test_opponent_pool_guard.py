@@ -67,10 +67,11 @@ def test_missing_from_pool_is_the_failing_direction():
         assert r['status'] == expect, (
             f"{r['pool']}: status {r['status']} but added={r.get('added')}; "
             f"only the 'missing from pool' direction may fail")
-    # positive control: at least one pool carries extras, so the rule above
-    # is actually exercised rather than vacuously true
-    assert any(r.get('removed') for r in recipe_rows), (
-        'no pool has recipe-absent extras; this test is not discriminating')
+    # The loop above goes vacuous whenever every committed pool exactly matches
+    # its recipe -- which is the NORMAL state right after a regeneration (as of
+    # 2026-09-09 it is the state of all 8). It used to assert that some pool
+    # carried extras, which made a freshly-regenerated repo fail a test about
+    # classification logic. Pin the rule directly instead.
 
 
 def test_curated_exclusions_carry_a_reason_and_do_not_fail():
@@ -192,3 +193,30 @@ def test_recipes_actually_apply_their_inclusions():
             assert species in produced, (
                 f'recipe {pool} does not emit required {species}; it is '
                 f'probably missing an apply_inclusions() call')
+
+
+def test_extras_alone_never_fail_a_pool(tmp_path, monkeypatch):
+    """A pool carrying recipe-absent extras is OK; only a MISSING species drifts.
+
+    The behavioural positive control for the rule above, built rather than
+    borrowed from repo state so it keeps working when every pool matches its
+    recipe. Writes a pool that is the recipe output PLUS a species no recipe
+    can produce, and asserts the status stays OK.
+    """
+    import build_opponent_pool as bop
+    key = 'gl_top50_plus_cs'
+    produced = bop.RECIPES[key]()
+    names = produced[0] if isinstance(produced, tuple) else produced
+    names = [n.split('|', 1)[0].strip() for n in names]
+    pool = tmp_path / f'{key}.txt'
+    pool.write_text('# synthetic\n' + '\n'.join(names) + '\nBulbasaur\n')
+    monkeypatch.setattr(vp, 'POOL_DIR', str(tmp_path))
+    row = {r['pool']: r for r in vp.run()}.get(key)
+    assert row is not None, 'synthetic pool was not checked'
+    assert 'Bulbasaur' in (row.get('removed') or []), (
+        'the extra was not reported at all; the guard has stopped surfacing '
+        'the informational direction')
+    assert not row.get('added'), 'synthetic pool should lack nothing'
+    assert row['status'] == 'OK', (
+        f"extras alone flipped the status to {row['status']}; a pool with a "
+        f"deliberate hand-extension would now fail the bake")
