@@ -121,7 +121,11 @@ def _read_pool(path):
 
 def _live_top_n(league, n):
     from gopvpsim.data import load_rankings
-    return [r['speciesName'] for r in load_rankings(league)[:n]]
+    # resolvable_name, not speciesName: PvPoke displays some form-change
+    # species under a name that maps to an UNRANKED gamemaster id, and a
+    # pool written with the display name is silently undivable. Must match
+    # what the recipes emit or every rebuild reads as drift.
+    return [_bop.resolvable_name(r) for r in load_rankings(league)[:n]]
 
 
 def check_recipe_pool(name, recipe):

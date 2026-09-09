@@ -19,7 +19,7 @@ Empoleon (Shadow)
 Florges
 Thievul
 Corviknight (Shadow)
-Mimikyu (Busted)
+Mimikyu
 Feraligatr
 Jellicent
 Altaria (Shadow)
@@ -48,6 +48,7 @@ Jumpluff
 Kingdra
 Malamar
 Medicham
+Morpeko (Full Belly)
 Sableye
 Sableye (Shadow)
 Snorlax (Shadow)
@@ -57,5 +58,4 @@ Lickilicky
 Toxapex
 Forretress
 Spidops
-Morpeko (Hangry)
 Rillaboom

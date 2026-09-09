@@ -1,4 +1,4 @@
-# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 71 unique species.
+# Top 50 GL overall rankings (PvPoke) union the championshipseries group. 69 unique species.
 # Generated 2026-09-09 by scripts/build_opponent_pool.py
 # Format: one PvPoke speciesName per line; blank lines and # comments ignored.
 
@@ -19,7 +19,7 @@ Empoleon (Shadow)
 Florges
 Thievul
 Corviknight (Shadow)
-Mimikyu (Busted)
+Mimikyu
 Feraligatr
 Jellicent
 Altaria (Shadow)
@@ -61,7 +61,6 @@ Dunsparce
 Forretress (Shadow)
 Hippowdon (Shadow)
 Medicham
-Mimikyu
 Morpeko (Full Belly)
 Stunfisk
 Talonflame
@@ -71,5 +70,4 @@ Lickilicky
 Toxapex
 Forretress
 Spidops
-Morpeko (Hangry)
 Rillaboom

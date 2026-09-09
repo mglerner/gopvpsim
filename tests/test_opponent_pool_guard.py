@@ -220,3 +220,69 @@ def test_extras_alone_never_fail_a_pool(tmp_path, monkeypatch):
     assert row['status'] == 'OK', (
         f"extras alone flipped the status to {row['status']}; a pool with a "
         f"deliberate hand-extension would now fail the bake")
+
+
+def test_every_pool_entry_resolves_to_a_ranked_species():
+    """A pool name the DIVE cannot look up is an opponent silently dropped.
+
+    Regression, 2026-09-09. PvPoke ranks some form-change species under the
+    BASE speciesId while displaying the CHANGED form's name: `Mimikyu (Busted)`
+    is the display name for sid `mimikyu`, `Morpeko (Hangry)` for
+    `morpeko_full_belly`. A pool regeneration wrote those DISPLAY names, and
+    `get_default_moveset` maps a name back through the gamemaster -- yielding
+    `mimikyu_busted`, which is not a ranked id. Both were dropped from every GL
+    dive with only a log warning, Mimikyu being ItsAxn's #1 meta-defining pick.
+
+    The pool guard could not see this: it compares NAMES against the same
+    rankings the recipe read, so a display name matched itself and looked
+    perfectly healthy. Only asking "does the consumer resolve it?" catches it.
+
+    Tournament pools are exempt: they record a past event's roster, and a
+    species that has since left the rankings is a historical fact.
+    """
+    from gopvpsim.data import get_default_moveset
+    unresolvable = []
+    for path in sorted((REPO / 'opponent_pools').glob('*.txt')):
+        if path.name.startswith(vp.TOURNAMENT_PREFIXES):
+            continue
+        league = ('ultra' if path.name.startswith('ul_')
+                  else 'master' if 'master' in path.name else 'great')
+        for raw in path.read_text().splitlines():
+            entry = raw.split('#')[0].strip()
+            if not entry:
+                continue
+            name = entry.split('|')[0].strip()
+            shadow = '(Shadow)' in name
+            base = name.replace('(Shadow)', '').strip()
+            try:
+                get_default_moveset(base, league, shadow=shadow)
+            except Exception:
+                unresolvable.append(f'{path.name}: {name}')
+    assert not unresolvable, (
+        'pool entries the dive cannot resolve (each is an opponent every dive '
+        f'silently drops): {unresolvable}')
+
+
+def test_the_resolvable_name_helper_actually_rewrites_display_names():
+    """Positive control: the helper must CHANGE the two known display names.
+
+    Without this, the test above would keep passing if resolvable_name were
+    reduced to `return row['speciesName']` -- as long as nobody regenerated a
+    pool. Pins the transform itself, not just today's committed files.
+    """
+    import build_opponent_pool as bop
+    from gopvpsim.data import load_rankings
+    rows = {r['speciesName']: r for r in load_rankings('great')}
+    checked = 0
+    for display, expected in (('Mimikyu (Busted)', 'Mimikyu'),
+                              ('Morpeko (Hangry)', 'Morpeko (Full Belly)')):
+        row = rows.get(display)
+        if row is None:
+            continue          # PvPoke renamed or unranked it; not this test's job
+        checked += 1
+        assert bop.resolvable_name(row) == expected, (
+            f'{display!r} must map to {expected!r} (the name derived from its '
+            f'rankings speciesId), got {bop.resolvable_name(row)!r}')
+    assert checked, (
+        'neither known display-name case is present in the GL rankings any '
+        'more; find a current one or this control is dead')
