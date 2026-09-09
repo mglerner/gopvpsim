@@ -960,6 +960,28 @@ What is already in place so the wait is safe:
 - The PVPOKE-ENGINE tripwire fires on the merge and its message now names
   these follow-ups.
 
+IDEA, parked 2026-09-09 (Michael: re-think after more dives land): a
+"does IV choice still matter once you're bulky?" number for the dive page.
+Metric is the RATIO, not the absolute spread -- what fraction of the full
+4096-spread score range still shows up among the bulkiest 10%:
+
+    Melmetal UL   full 25.8   top-10% 12.0   kept 47%
+    DD GL         full 31.2   top-10% 13.9   kept 45%
+    Melmetal GL   full 39.4   top-10% 12.7   kept 32%
+    DD UL         full 72.3   top-10% 12.8   kept 18%
+
+The absolute top-decile range is nearly constant (12.0-13.9 across all four)
+and so carries NO information; only the denominator separates them. DD UL has
+the widest total spread of the four yet the flattest top end -- almost all its
+value is in being bulky at all. Melmetal UL keeps its gradient all the way up,
+which is the "worth digging in before spending resources" case.
+
+Caveat that needs resolving with more data: points-gained tells a different
+story than shape. Best-vs-median inside the top decile is 4.9 for Melmetal UL
+vs 7.5 for DD UL, i.e. DD UL rewards optimization MORE in raw points while
+having the flatter shape. Which of the two a reader actually needs is the open
+question. Computable from the replay blob alone -- no re-simming.
+
 THE WAIT IS OVER (measured 2026-09-09). PvPoke shipped the moveset, the
 mechanics and the rankings **to master**. Measurements:
 
