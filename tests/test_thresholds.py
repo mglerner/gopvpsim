@@ -563,9 +563,38 @@ class TestRepoFiles:
         # checkout (2026-08-09 test-suite review, silent-hole class).
         assert p.exists(), f"tracked fixture missing: {p}"
         reg = th.load_toml(p)
-        sp = reg.get_spread("Tinkaton", "Great", "GH Great")
-        assert isinstance(sp, th.StatCutoffSpread)
-        assert sp.defense == 143.03
+        # The file still loads and still carries its ANCHORS -- those are
+        # declarations the bake recomputes, so a rebalance does not touch them.
+        assert reg.get_anchor("Tinkaton", "Great", "azumarill_blkp_any")
+
+    def test_tinkaton_stat_cutoff_spread_was_retired_not_lost(self):
+        """"GH Great" (defense 143.03) was archived 2026-09-09, not deleted.
+
+        Stat-cutoff spreads are DERIVED thresholds: true only against a
+        specific opponent kit, so the Twilight Trails move rebalance
+        invalidated them. 58 were retired; the 15 IV-LIST spreads stayed live
+        because a named IV combo is an observed fact no move change can
+        invalidate. See thresholds/archive/README.md.
+
+        Pins both halves. Asserting only the absence would pass just as well
+        if someone deleted the archive outright, which is the failure this
+        exists to catch.
+        """
+        repo_root = Path(__file__).resolve().parent.parent
+        reg = th.load_toml(repo_root / "thresholds" / "tinkaton.toml")
+        assert reg.get_spread("Tinkaton", "Great", "GH Great") is None, (
+            "a retired stat-cutoff spread is live again; if this was "
+            "deliberate it needs re-deriving against the new gamemaster")
+        arch = repo_root / "thresholds" / "archive" / "tinkaton.toml"
+        assert arch.exists(), "the archive was deleted, not just the live entry"
+        text = arch.read_text()
+        assert '[Tinkaton.Great.spreads."GH Great"]' in text
+        assert "143.03" in text, "archived spread lost its original value"
+        assert "HomeSliceHenry" in text, "archived spread lost its attribution"
+        # the archive must carry the environment needed to reproduce it
+        assert "79d04af74" in text and "LEGACY" in text, (
+            "archive is missing the engine pointer, so the number cannot be "
+            "reconstructed")
 
 
 class TestLeagueKeyCaseNormalization:

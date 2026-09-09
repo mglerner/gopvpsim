@@ -31,52 +31,6 @@ sources = "RyanSwag GamePress 'Azumarill PvP IV Deep-Dive' (2022-05-13; Wayback 
 # Spreads — stat-cutoff tiers from the SwagTips-era writeup
 # ─────────────────────────────────────────────────────────────────────
 
-[Azumarill.Great.spreads."Medi Wall"]
-attack = 0
-defense = 137.64
-stamina = 0
-description = "Premium bulk tier: 137.64 def reaches the Medicham bulkpoint (1-1 consistency, 1-2 potential with Play Rough) plus all lower def checks."
-source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13); SwagTips 'Medi Wall' tier"
-
-[Azumarill.Great.spreads.Min]
-attack = 0
-defense = 135.78
-stamina = 192
-description = "RyanSwag's baseline bulk rule: 135.78 def + 192 hp (the def value is the min for the rank-1 Walrein EQ check). Below either stat, ballpark a 1:2 def:hp tradeoff to stay functionally equivalent — e.g. 134.78 def + 194 hp."
-source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13); SwagTips 'Min' tier"
-
-[Azumarill.Great.spreads.General]
-attack = 0
-defense = 132.8
-stamina = 187
-description = "General-purpose bulk floor from the SwagTips tier list: 132.80 def + 187 hp. Looser than the article's 1:2-ratio baseline; everyday keep/transfer cutoff."
-source = "SwagTips-era SENTIMENTAL_DEFAULT_THRESHOLDS (gobattlekit thresholds.py)"
-
-[Azumarill.Great.spreads."Slight Atk"]
-attack = 92.0
-defense = 132.8
-stamina = 187
-description = "Slight-atk-weight tier: 92.00 atk on top of the general 132.80 def + 187 hp bulk floor. The article favors >= 92.15 atk to potentiate Talonflame and Cofagrigus breakpoints plus Charge Move Priority in the mirror; the SwagTips tier rounds the atk cutoff to 92.00 atk."
-source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13); SwagTips 'Slight Atk' tier"
-
-[Azumarill.Great.spreads.kieng_champion]
-attack = 0
-defense = 133.7
-stamina = 196
-description = "KiengIV's 2022 Indianapolis Championship Azumarill: 133.70 def + 196 hp (rank 23, slight atk weight). Below the 135.78 def baseline but inside the 1:2 def:hp ratio; meets the Cofagrigus BP with high potential for Lickitung/Skarmory BPs. Encoded as a real-tournament reference cutoff."
-source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13), KiengIV validation section"
-
-[Azumarill.Great.spreads.atk_stretch]
-attack = 93.09
-defense = 0
-stamina = 0
-description = "Stretch atk tier the article names but advises against: 92.76 atk reaches Skarmory 1-1 with Ice Beam; 93.09 atk reaches Trevenant 2-1 potential. Per RyanSwag, 'may be too unreasonable to pursue' given the bulk drop (and Trevenant prefers def weight)."
-source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — CMP (atk-side)
-# ─────────────────────────────────────────────────────────────────────
-
 [Azumarill.Great.anchors.cmp_vs_slight_atk]
 kind = "cmp"
 spread = "Slight Atk"
@@ -229,3 +183,17 @@ kind = "bulkpoint"
 opponent = "Nidoqueen (Shadow)"
 description = "Discover all Shadow Nidoqueen bulkpoints. RyanSwag: ~138.04 def gives the potential to reach a 2nd Ice Beam while getting farmed in the 0-1; an atk-weighted Shadow Queen may assume you won't reach it."
 source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"
+
+# --- spreads KEPT through the 2026-09-09 retirement ---
+# These are IV-LIST spreads: a named IV combo is an observed fact about
+# what an opponent actually runs, and no move rebalance can invalidate
+# one. The 58 retired spreads were STAT-CUTOFF spreads -- derived
+# thresholds, true only against a specific opponent kit. See
+# thresholds/archive/README.md.
+
+[Azumarill.Great.spreads."Slight Atk"]
+attack = 92.0
+defense = 132.8
+stamina = 187
+description = "Slight-atk-weight tier: 92.00 atk on top of the general 132.80 def + 187 hp bulk floor. The article favors >= 92.15 atk to potentiate Talonflame and Cofagrigus breakpoints plus Charge Move Priority in the mirror; the SwagTips tier rounds the atk cutoff to 92.00 atk."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13); SwagTips 'Slight Atk' tier"

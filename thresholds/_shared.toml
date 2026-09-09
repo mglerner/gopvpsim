@@ -25,6 +25,13 @@
 [shared]
 sources = "RyanSwag 'How to do your own PVP IV analysis' methodology video (video-confirmed 2026-04-16 — see docs/ryanswag_methodology_gap_analysis.md §2 Canonical consolidated list)"
 
+# --- spreads KEPT through the 2026-09-09 retirement ---
+# These are IV-LIST spreads: a named IV combo is an observed fact about
+# what an opponent actually runs, and no move rebalance can invalidate
+# one. The 58 retired spreads were STAT-CUTOFF spreads -- derived
+# thresholds, true only against a specific opponent kit. See
+# thresholds/archive/README.md.
+
 [shared.Great.spreads.medicham_atk_weighted]
 description = "RyanSwag's preferred 'Best of Both Worlds' Medicham at 7/15/14, 106.92 atk. Higher-attack variant than rank-1 NBB (5/15/15, 105.88 atk); a meta-relevant focal for Oinkologne / other GL species to prepare against. Note: PvPoke's cp1500 default for Medicham is already 7/15/14, so under --opp-ivs=pvpoke this variant sims identically to the default column; distinctive only under --opp-ivs=rank1."
 source = "RyanSwag 'How to do your own PVP IV analysis' methodology video"

@@ -23,47 +23,6 @@ sources = "RyanSwag Malamar PvP IV Deep-Dive (GamePress series #25, 2022-09-02, 
 # Spreads — stat-cutoff tiers from the RyanSwag deep dive
 # ─────────────────────────────────────────────────────────────────────
 
-[Malamar.Great.spreads."Swag Floor"]
-attack = 119.94
-defense = 111.2
-stamina = 0
-description = "RyanSwag minimum Atk-weight tier: 119.94 atk + 111.20 def flips the Medicham 1-1 (Psycho Cut breakpoint), Trevenant 1-1, Galarian Stunfisk 0-0, and Registeel 0-0 (even when debuffed), and takes CMP against Talonflame."
-source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
-
-[Malamar.Great.spreads."Swag Recommended"]
-attack = 120.23
-defense = 111.2
-stamina = 136
-description = "RyanSwag recommended build (Research/Raid IV floor): 120.23 atk + 111.20 def + 136 hp; 136 hp overcomes Faint Attack Bronzong in the 0-1. Preferred when available: 120.23 atk + 111.20 def + 137 hp. 120.23 atk covers 89.35% of Victini CMP scenarios."
-source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
-
-[Malamar.Great.spreads."Swag CMP Secure"]
-attack = 121.0
-defense = 111.2
-stamina = 136
-description = "RyanSwag top CMP tier: 121.00 atk covers 99.54% of Victini CMP; the intermediate 120.46 atk tier covers 96.76%. Same 111.20 def + 136 hp bulk floor as the recommended build."
-source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — CMP ties (atk-side)
-#
-# RyanSwag's headline CMP target is Victini (one-time Research mon,
-# opponent atk spontaneously ranges 117.55 to 121.55 — those are
-# *Victini* stats, not focal thresholds, so they live in this comment
-# rather than a parsable description). Encoding the coverage tiers
-# (120.23 / 120.46 / 121.00 focal atk) as CMP anchors would need
-# Victini IV-list spreads; like tinkaton.toml, deferred until CMP
-# anchors support single-opponent shorthand. The coverage tiers are
-# preserved in the spreads above. Talonflame CMP at the 119.94 atk
-# floor is likewise recorded in the "Swag Floor" spread.
-# ─────────────────────────────────────────────────────────────────────
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — damage breakpoints (atk-side)
-# ─────────────────────────────────────────────────────────────────────
-
-# Level 2: reproduce RyanSwag's Psycho Cut Medicham breakpoint — the
-# calibration point of his whole Atk-weight recommendation.
 [Malamar.Great.anchors.medicham_brkp_above_swag]
 kind = "damage_breakpoint"
 opponent = "Medicham"

@@ -41,40 +41,6 @@ notes = "Shadow trade-off: x1.2 atk pushes the base form's super-effective Poiso
 # Spreads — stat-cutoff tiers from the expert record
 # ─────────────────────────────────────────────────────────────────────
 
-# The tier shipped in GoBattleKit's DEFAULT_THRESHOLDS today, verbatim
-# ('Azu bul': attack 0 / defense 138 / stamina 0).
-["Drapion (Shadow)".Great.spreads."Azu bul"]
-attack = 0
-defense = 138.0
-stamina = 0
-description = "HomeSliceHenry's Azu-bulk tier: 138.00 def floor to hold the Azumarill matchup. Shipped verbatim in GoBattleKit DEFAULT_THRESHOLDS as 'Azu bul'; the exact (move, tier) bulkpoint it preserves is rediscovered by the azumarill anchors below."
-source = "HomeSliceHenry's Discord"
-
-# An HSH Discord member's attack-weighted community build — the variant their
-# Tinkaton prep is calibrated against. Stat-cutoff form only: the local
-# record gives the effective attack, not an IV list, so this cannot yet
-# feed the _shared.toml atk-weighted opponent-injection convention
-# (which needs `ivs`). Whether 119.80 is pre- or post-shadow-multiplier
-# in the original calibration should be confirmed before using this for
-# membership checks — see the CHANGELOG "--opp-ivs custom:119.80" thread.
-["Drapion (Shadow)".Great.spreads.atk_weighted]
-attack = 119.8
-defense = 0
-stamina = 0
-description = "An HSH Discord member's attack-weighted Shadow Drapion build: 119.80 atk effective attack. The opponent variant that Tinkaton's anti-Drapion bulkpoint is calibrated against; encoded here as the community's punchy-Drapion reference tier."
-source = "An HSH Discord member (HomeSliceHenry's Discord); pogo-simulator CHANGELOG + docs/validations/2026-04-06_tinkaton_gh_vs_reference.md"
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — bulkpoints (def-side). The shadow def penalty makes these
-# the binding constraint; Level 3 discover-all unless an expert number
-# pins a Level 2 probe.
-# ─────────────────────────────────────────────────────────────────────
-
-# Level 2: probe upward from HomeSliceHenry's shipped def floor. The
-# exact (move, tier) the floor preserves was never recorded — this
-# reports the next def step above it, and the Level 3 anchor below
-# enumerates the candidates at and below the floor for promotion to a
-# Level 1 anchor with full provenance.
 ["Drapion (Shadow)".Great.anchors.azumarill_blkp_above_hsh]
 kind = "bulkpoint"
 opponent = "Azumarill"

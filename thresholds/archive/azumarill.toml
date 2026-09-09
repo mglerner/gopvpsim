@@ -1,0 +1,78 @@
+# ARCHIVED SPREADS -- retired 2026-09-09, NOT loaded by anything.
+#
+# These are the human-sourced spreads for azumarill, lifted verbatim out of
+# thresholds/azumarill.toml when the Twilight Trails move rebalance invalidated
+# them. Values, descriptions and sources are unmodified.
+#
+# WHY THEY WERE RETIRED. A spread cutoff is the stat at which a specific
+# matchup flips, so it is only true against a specific opponent kit. The
+# rebalance changed a move in the DEFAULT moveset of 32 of the 86 opponents
+# named across the threshold files, so most cutoffs no longer land on a real
+# breakpoint. Leaving them live would have kept a named community member's
+# `source` attribution attached to numbers the rebalance had made wrong.
+#
+# WHAT IS ACTUALLY VALUABLE HERE. Not the numbers -- the `description`
+# fields. "Premium bulk: Azu bulkpoint + Medicham survival + all lower def
+# checks" is a SPECIFICATION that re-derives mechanically once a bake
+# recomputes those anchors, and it encodes the human judgment about which
+# thresholds matter, which is the part that cannot be regenerated. Read this
+# file as a work queue, not as data.
+#
+# THE ENGINE THESE WERE TRUE UNDER -- to reconstruct it:
+#
+#   pvpoke commit   79d04af74   (last vetted pre-rebalance; the pin in
+#                                tests/fixtures/pvpoke_engine_digests.json
+#                                at the time of retirement)
+#   turn system     LEGACY      (charged moves did NOT take priority over
+#                                fast damage; the live game stopped running
+#                                this on 2026-09-02)
+#   gamemaster      cd ~/coding/pvpoke &&
+#                   git show 79d04af74:src/data/gamemaster.json
+#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#                                rebalance landed; engine-hash files are
+#                                battle.py, _dp_jit.py, moves.py,
+#                                formchange.py, pokemon.py)
+#
+# Note the turn system: these came from community in-game testing under the
+# LEGACY clock. Re-deriving them needs BOTH the old gamemaster and
+# --mechanics legacy, and a number reproduced under only one of the two is
+# not a reproduction.
+
+[Azumarill.Great.spreads."Medi Wall"]
+attack = 0
+defense = 137.64
+stamina = 0
+description = "Premium bulk tier: 137.64 def reaches the Medicham bulkpoint (1-1 consistency, 1-2 potential with Play Rough) plus all lower def checks."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13); SwagTips 'Medi Wall' tier"
+
+[Azumarill.Great.spreads.Min]
+attack = 0
+defense = 135.78
+stamina = 192
+description = "RyanSwag's baseline bulk rule: 135.78 def + 192 hp (the def value is the min for the rank-1 Walrein EQ check). Below either stat, ballpark a 1:2 def:hp tradeoff to stay functionally equivalent — e.g. 134.78 def + 194 hp."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13); SwagTips 'Min' tier"
+
+[Azumarill.Great.spreads.General]
+attack = 0
+defense = 132.8
+stamina = 187
+description = "General-purpose bulk floor from the SwagTips tier list: 132.80 def + 187 hp. Looser than the article's 1:2-ratio baseline; everyday keep/transfer cutoff."
+source = "SwagTips-era SENTIMENTAL_DEFAULT_THRESHOLDS (gobattlekit thresholds.py)"
+
+[Azumarill.Great.spreads.kieng_champion]
+attack = 0
+defense = 133.7
+stamina = 196
+description = "KiengIV's 2022 Indianapolis Championship Azumarill: 133.70 def + 196 hp (rank 23, slight atk weight). Below the 135.78 def baseline but inside the 1:2 def:hp ratio; meets the Cofagrigus BP with high potential for Lickitung/Skarmory BPs. Encoded as a real-tournament reference cutoff."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13), KiengIV validation section"
+
+[Azumarill.Great.spreads.atk_stretch]
+attack = 93.09
+defense = 0
+stamina = 0
+description = "Stretch atk tier the article names but advises against: 92.76 atk reaches Skarmory 1-1 with Ice Beam; 93.09 atk reaches Trevenant 2-1 potential. Per RyanSwag, 'may be too unreasonable to pursue' given the bulk drop (and Trevenant prefers def weight)."
+source = "RyanSwag GamePress Azumarill PvP IV Deep-Dive (2022-05-13)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — CMP (atk-side)
+# ─────────────────────────────────────────────────────────────────────

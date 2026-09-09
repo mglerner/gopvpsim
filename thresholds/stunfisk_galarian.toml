@@ -48,41 +48,6 @@ G-Fisk rank 33) against opponent_pools/gl_top50_plus_cs.txt (2026-06-10).
 # article), encoded like tinkaton.toml's GH Great / GH Good tiers.
 # ─────────────────────────────────────────────────────────────────────
 
-["Stunfisk (Galarian)".Great.spreads."High Bulk"]
-attack = 0
-defense = 124.75
-stamina = 174
-description = "RyanSwag 'High Bulk' tier: 124.75 def + 174 hp. Ranks 1 (0/12/15), 2 (0/13/14), 3 (0/15/11) stand above the rest aside from CMP; 125.90 def is the safer minimum for the mirror, and 174 hp gets iffy the further you drop below 127.00 def + 174 hp (below that you may need 175 hp)."
-source = "RyanSwag GamePress deep dive (2022-09-25)"
-
-["Stunfisk (Galarian)".Great.spreads."Pure Mirror Slayer"]
-attack = 101.79
-defense = 127.38
-stamina = 0
-description = "RyanSwag 'Pure Mirror Slayer': 101.79 atk with at least 127.38 def (the article's table line prints 127.34 def; body text asks for 127.38 def, ideally 127.88 def for better mirror coverage). Preferred over the Bulk Mirror Slayer."
-source = "RyanSwag GamePress deep dive (2022-09-25)"
-
-["Stunfisk (Galarian)".Great.spreads."Bulk Mirror Slayer"]
-attack = 101.79
-defense = 124.75
-stamina = 172
-description = "RyanSwag 'Bulk Mirror Slayer': 101.79 atk with 124.75 def + 172 hp — just enough atk and def for mirror slaying, plus more HP. The article calls this exact combo a 'goldilocks zone' (only 4 IV spreads manage it) but generally too inconsistent to pan out."
-source = "RyanSwag GamePress deep dive (2022-09-25)"
-
-["Stunfisk (Galarian)".Great.spreads."Minimum Bulk"]
-attack = 0
-defense = 124.75
-stamina = 172
-description = "RyanSwag 'Minimum bulk': 124.75 def + 172 hp — High Bulk with HP dropped to the floor (HP is the dump stat when thrifting). May still maintain the Azumarill and Altaria matchups; 125.90 def remains the safer mirror minimum."
-source = "RyanSwag GamePress deep dive (2022-09-25)"
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — bulkpoints (def-side, Level-3 discover-all) vs the current
-# meta pool. Mirror first, then the close matchups where def/hp tiers
-# plausibly swing the result.
-# ─────────────────────────────────────────────────────────────────────
-
-# The mirror — carries the article's whole def ladder.
 ["Stunfisk (Galarian)".Great.anchors.mirror_blkp_any]
 kind = "bulkpoint"
 opponent = "Stunfisk (Galarian)"

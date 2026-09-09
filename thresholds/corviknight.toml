@@ -29,38 +29,6 @@ sources = "HomeSliceHenry's Discord #iv-tech (via GoBattleKit DEFAULT_THRESHOLDS
 # Spreads — stat-cutoff tiers from the HomeSliceHenry writeup
 # ─────────────────────────────────────────────────────────────────────
 
-[Corviknight.Great.spreads."HSH Basic"]
-attack = 0
-defense = 127.59
-stamina = 0
-description = "Baseline tier: 127.59 def floor; the entry-level def check from the HomeSliceHenry writeup."
-source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
-
-[Corviknight.Great.spreads."HSH Atk"]
-attack = 111.47
-defense = 127.59
-stamina = 0
-description = "Attack-weighted tier: 111.47 atk on top of the 127.59 def floor; trades rank-1 bulk for breakpoint/CMP pressure."
-source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
-
-[Corviknight.Great.spreads."HSH Bulk"]
-attack = 100
-defense = 132.10
-stamina = 149
-description = "Premium bulk tier: 100.00 atk minimum with 132.10 def + 149 hp."
-source = "HomeSliceHenry's Discord (via GoBattleKit DEFAULT_THRESHOLDS)"
-
-# ─────────────────────────────────────────────────────────────────────
-# Anchors — bulkpoints (def-side), expert Level-2 floors
-#
-# The HomeSliceHenry def floors arrived without their (opponent, move,
-# tier) calibrations. Following the annihilape.toml lurgan-floor
-# precedent, each is encoded as a Level-2 anchor against the mirror,
-# with the Level-3 discover-all anchors below used to identify which
-# opponent/move tier each floor actually preserves — promote to
-# Level 1 once identified.
-# ─────────────────────────────────────────────────────────────────────
-
 [Corviknight.Great.anchors.mirror_blkp_above_hsh_basic]
 kind = "bulkpoint"
 opponent = "Corviknight"

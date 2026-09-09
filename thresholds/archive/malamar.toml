@@ -1,0 +1,81 @@
+# ARCHIVED SPREADS -- retired 2026-09-09, NOT loaded by anything.
+#
+# These are the human-sourced spreads for malamar, lifted verbatim out of
+# thresholds/malamar.toml when the Twilight Trails move rebalance invalidated
+# them. Values, descriptions and sources are unmodified.
+#
+# WHY THEY WERE RETIRED. A spread cutoff is the stat at which a specific
+# matchup flips, so it is only true against a specific opponent kit. The
+# rebalance changed a move in the DEFAULT moveset of 32 of the 86 opponents
+# named across the threshold files, so most cutoffs no longer land on a real
+# breakpoint. Leaving them live would have kept a named community member's
+# `source` attribution attached to numbers the rebalance had made wrong.
+#
+# WHAT IS ACTUALLY VALUABLE HERE. Not the numbers -- the `description`
+# fields. "Premium bulk: Azu bulkpoint + Medicham survival + all lower def
+# checks" is a SPECIFICATION that re-derives mechanically once a bake
+# recomputes those anchors, and it encodes the human judgment about which
+# thresholds matter, which is the part that cannot be regenerated. Read this
+# file as a work queue, not as data.
+#
+# THE ENGINE THESE WERE TRUE UNDER -- to reconstruct it:
+#
+#   pvpoke commit   79d04af74   (last vetted pre-rebalance; the pin in
+#                                tests/fixtures/pvpoke_engine_digests.json
+#                                at the time of retirement)
+#   turn system     LEGACY      (charged moves did NOT take priority over
+#                                fast damage; the live game stopped running
+#                                this on 2026-09-02)
+#   gamemaster      cd ~/coding/pvpoke &&
+#                   git show 79d04af74:src/data/gamemaster.json
+#   our engine      git log --oneline -1 fba4d4c   (repo HEAD when the
+#                                rebalance landed; engine-hash files are
+#                                battle.py, _dp_jit.py, moves.py,
+#                                formchange.py, pokemon.py)
+#
+# Note the turn system: these came from community in-game testing under the
+# LEGACY clock. Re-deriving them needs BOTH the old gamemaster and
+# --mechanics legacy, and a number reproduced under only one of the two is
+# not a reproduction.
+
+[Malamar.Great.spreads."Swag Floor"]
+attack = 119.94
+defense = 111.2
+stamina = 0
+description = "RyanSwag minimum Atk-weight tier: 119.94 atk + 111.20 def flips the Medicham 1-1 (Psycho Cut breakpoint), Trevenant 1-1, Galarian Stunfisk 0-0, and Registeel 0-0 (even when debuffed), and takes CMP against Talonflame."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+[Malamar.Great.spreads."Swag Recommended"]
+attack = 120.23
+defense = 111.2
+stamina = 136
+description = "RyanSwag recommended build (Research/Raid IV floor): 120.23 atk + 111.20 def + 136 hp; 136 hp overcomes Faint Attack Bronzong in the 0-1. Preferred when available: 120.23 atk + 111.20 def + 137 hp. 120.23 atk covers 89.35% of Victini CMP scenarios."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+[Malamar.Great.spreads."Swag CMP Secure"]
+attack = 121.0
+defense = 111.2
+stamina = 136
+description = "RyanSwag top CMP tier: 121.00 atk covers 99.54% of Victini CMP; the intermediate 120.46 atk tier covers 96.76%. Same 111.20 def + 136 hp bulk floor as the recommended build."
+source = "RyanSwag Malamar PvP IV Deep-Dive (GamePress, 2022-09-02)"
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — CMP ties (atk-side)
+#
+# RyanSwag's headline CMP target is Victini (one-time Research mon,
+# opponent atk spontaneously ranges 117.55 to 121.55 — those are
+# *Victini* stats, not focal thresholds, so they live in this comment
+# rather than a parsable description). Encoding the coverage tiers
+# (120.23 / 120.46 / 121.00 focal atk) as CMP anchors would need
+# Victini IV-list spreads; like tinkaton.toml, deferred until CMP
+# anchors support single-opponent shorthand. The coverage tiers are
+# preserved in the spreads above. Talonflame CMP at the 119.94 atk
+# floor is likewise recorded in the "Swag Floor" spread.
+# ─────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────
+# Anchors — damage breakpoints (atk-side)
+# ─────────────────────────────────────────────────────────────────────
+
+# Level 2: reproduce RyanSwag's Psycho Cut Medicham breakpoint — the
+# calibration point of his whole Atk-weight recommendation.
