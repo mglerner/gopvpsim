@@ -19,8 +19,13 @@
 #     stays — retained per the keep-shadow-pairs policy (players prep
 #     against each form deliberately), and it's a dive focal.
 #
-# Aegislash: both (Shield) and (Blade) now come out of the auto recipe
-# (Blade via the championshipseries group), so no hand entry is needed.
+# Aegislash: both forms come out of the auto recipe (Blade via the
+# championshipseries group), but are EXCLUDED as of 2026-09-09 -- our
+# engine over-farms Aegislash in Shield form and accounts for all 6
+# undocumented oracle mismatches. See CURATED_EXCLUSIONS in
+# scripts/build_opponent_pool.py; the exclusion is applied by the recipe,
+# so a regeneration keeps it out. TEMPORARY: it clears the cut on merit
+# and comes back once the oracle grid is green.
 # Blade's default-moveset rejection is handled in src/gopvpsim/data.py
 # via _DEFAULT_MOVESET_FALLBACK (pins PSYCHO_CUT/SHADOW_BALL/GYRO_BALL
 # for aegislash_blade).
@@ -67,7 +72,6 @@ Kingdra (Shadow)
 Feraligatr (Shadow)
 Dragonair (Shadow)
 Medicham
-Aegislash (Blade)
 Sableye (Shadow)
 Shelgon
 Sliggoo
@@ -90,7 +94,6 @@ Grumpig
 Lumineon
 Milotic
 Greedent
-Aegislash (Shield)
 Charjabug
 Cradily
 Dewgong
