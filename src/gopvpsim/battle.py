@@ -3355,7 +3355,7 @@ def simulate(
     debug: bool = False,
     trace_shields: bool = False,
     trace_dp: bool = False,
-    mechanics: str = 'legacy',
+    mechanics: str = 'new',
 ) -> BattleResult:
     """
     Run a 1v1 battle between p0 and p1 and return the result.

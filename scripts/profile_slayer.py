@@ -118,9 +118,9 @@ def main():
                     help='Number of profiler rows to print')
     ap.add_argument('--sort', default='cumulative',
                     choices=['cumulative', 'tottime', 'ncalls'])
-    ap.add_argument('--mechanics', default='legacy',
+    ap.add_argument('--mechanics', default='new',
                     choices=['legacy', 'new'],
-                    help='Turn-mechanics model to measure (default legacy, '
+                    help='Turn-mechanics model to measure (default new, '
                          'matching the dive default)')
     args = ap.parse_args()
 
