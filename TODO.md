@@ -960,37 +960,67 @@ What is already in place so the wait is safe:
 - The PVPOKE-ENGINE tripwire fires on the merge and its message now names
   these follow-ups.
 
-THE BAKE GATE (Michael, 2026-09-07): **no rebake until we switch to
-twilight-trails, and we do not switch until the rebalance is FULLY
-ANNOUNCED.** PvPoke's inferred energies are probably right -- 17 of 27 changed
-moves carry them -- but "probably right" is not the standard for numbers we
-publish, and the cost of waiting is a delay while the cost of being wrong is a
-whole bake plus whatever shipped off it.
+THE WAIT IS OVER (measured 2026-09-09). PvPoke shipped the moveset, the
+mechanics and the rankings **to master**. Measurements:
 
-Steps 1-3 of the original list are DONE (2026-09-03): the turn loop was
-re-ported against the live game's ordering, `--mechanics new` went 104 -> 1
-mismatches against PvPoke's branch, and the product CLIs default to `new`.
-What remains:
+- All five new-mechanics commits (`041d8c722`, `442a4afe8`, `a2685efe6`,
+  `a1b3ebd95`, `71ab81008`) are ancestors of `origin/master`.
+- `origin/master:src/js` is **byte-identical** to `origin/twilight-trails:src/js`.
+  The branches now differ only in 39 mega *rankings* files. **twilight-trails is
+  obsolete as a source** -- point everything at master and retire the shadow-root
+  recipe.
+- Tripwire fired on `Battle.js` and ONLY `Battle.js` (vetted pin `79d04af74`).
+  `ActionLogic.js` is unchanged, so the blocks (e)/(f) we adopted on 2026-09-02
+  are still current -- the decision layer does not need revisiting.
+- Gamemaster delta since the pin: **29 moves changed, 1 added, 0 removed;
+  105 pokemon changed, 1 added, 1 removed.** Old blob saved during the
+  measurement; re-extract with `git show 79d04af74:src/data/gamemaster.json`.
 
-1. Wait for the rebalance to be publicly announced, then switch the data
-   source to the real post-rebalance gamemaster.
-2. Close the residual oracle cell: `aegislash_blade_vs_azumarill [1v0]`, same
-   winner, chargedLog differs -- a form-change interaction with the new
-   ordering. Do this before a bake that leans on Blade-form numbers.
-3. Re-vet per `docs/rebalance_checklist.md` section B and re-pin the tripwire.
-4. REGENERATE THE OPPONENT POOLS, augmenting the rank cut with community
-   tier lists (ItsAxn's new-season list is the first such source -- see
-   `AUGMENTATION SOURCES` in `scripts/build_opponent_pool.py`; top three
-   tiers are pool candidates regardless of rank). NB it is not transcribed:
-   we hold an image of ~250 sprites, and a misread species sims the wrong
-   opponent silently. Transcribe from the video transcript and cross-check
-   against the sprites -- Michael has the link. Separately,
-   `verify_opponent_pools.py` currently
-   reports 3 of 8 stale, and `gl_top30_plus_cs_top100` is ~20 species behind.
-   The post-rebalance meta is materially different (Melmetal GL #79 -> #7),
-   and Deoxys (Defense) changes its FAST MOVE (Counter -> Low Kick), so a pool
-   baked against today's data sims the wrong kit outright. Also needs
-   Michael's Cramorant curation call.
-5. Delete `scripts/mechanics_notice.py` and its call sites once `new` is the
-   only model anyone should use.
-6. Only then bake.
+Three consequences that change the shape of the work:
+
+1. **The 2026-09-03 re-port was against this exact JS**, so `--mechanics new`
+   should still measure ~1/243 -- but the DATA moved underneath it, so the
+   number has to be re-measured before it can be believed.
+2. **The gamemaster cache migration is MOOT. Do not spend effort on it.**
+   `mechanics` is in both disk cache keys and we have never baked under `new`,
+   so every column misses regardless of the gamemaster stamp. This is the
+   CLAUDE.md rule "skip the migration when batching with a change that forces
+   cold anyway". The ~153k legacy columns stay on disk, keyed distinctly, and
+   are simply not reused.
+3. **The legacy oracle is now unreachable.** PvPoke master no longer runs the
+   legacy turn system, so `--mechanics legacy` compares our legacy engine
+   against their new one and is meaningless. The ~92 legacy-pinned assertions
+   still PASS -- they hold hardcoded scores and never call node -- which makes
+   them a silent-staleness hazard: they now certify a dead ruleset against
+   pre-rebalance move data. 41 test files mention a rebalanced move and 13 of
+   the 27 oracle matchups use one.
+
+PLAN (not started; ordered so the cheap measurement gates the expensive work):
+
+1. **Re-measure first.** Point `audit_oracle_harness.py` at `../pvpoke`
+   directly (no shadow root) and run `--mechanics new`. This is cheap and it
+   decides everything below. Expect ~1 mismatch; treat any larger number as
+   the move data having moved a matchup, not as a turn-loop regression, until
+   shown otherwise.
+2. **Flip the harness default** `legacy` -> `new`, and decide the fate of the
+   legacy path: freeze it as port-fidelity history (it is the only proof the
+   port was ever faithful) or delete it. Recommend freeze + a test that says
+   why it may never be re-derived from upstream.
+3. **Triage the 41 move-touching test files** into numeric ground truth vs
+   incidental mentions, and re-baseline only the former against post-rebalance
+   pvpoke.com. This is the largest and least glamorous item; it is where the
+   silent staleness lives.
+4. Close the residual oracle cell `aegislash_blade_vs_azumarill [1v0]` (same
+   winner, chargedLog differs, form-change x new ordering).
+5. Re-vet per `docs/rebalance_checklist.md` section B; re-pin the tripwire
+   digest. **Do not re-pin before 1-4** -- re-pinning silences the signal.
+6. Delete `scripts/mechanics_notice.py` and its call sites (its own stated
+   deletion condition is now met except for the green harness run).
+7. **Regenerate the opponent pools**, augmenting the rank cut with ItsAxn's
+   tier list -- see `AUGMENTATION SOURCES` in `scripts/build_opponent_pool.py`.
+   Transcribe from the video TRANSCRIPT, cross-check against the sprites;
+   Michael has the link. `verify_opponent_pools.py` reports 3 of 8 stale and
+   `gl_top30_plus_cs_top100` is ~20 species behind. Deoxys (Defense) changes
+   its FAST move (Counter -> Low Kick), so a pool baked against old data sims
+   the wrong kit outright. Needs Michael's Cramorant curation call.
+8. **Only then bake**, cold, under `--mechanics new`.
